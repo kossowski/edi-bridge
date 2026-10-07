@@ -28,7 +28,15 @@ const check = (probe: Probe, timeoutMs: number): Promise<CheckStatus> =>
 
 /** A tiny HTTP server exposing the worker's health, for local checks and container health checks. */
 export function createHealthServer({ probes, probeTimeoutMs = 2000 }: HealthServerOptions): Server {
-  return createServer((_request, response) => {
+  return createServer((request, response) => {
+    const { pathname } = new URL(request.url ?? '/', 'http://localhost')
+
+    if (request.method !== 'GET' || pathname !== '/health') {
+      response.writeHead(404, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ error: 'not found' }))
+      return
+    }
+
     void check(probes.redis, probeTimeoutMs).then((redis) => {
       const healthy = redis === 'up'
 

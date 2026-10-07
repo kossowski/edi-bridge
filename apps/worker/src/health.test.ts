@@ -18,13 +18,19 @@ afterEach(() => {
   server = undefined
 })
 
-async function getHealth(options: HealthServerOptions): Promise<Response> {
+async function request(
+  options: HealthServerOptions,
+  path = '/health',
+  init?: RequestInit,
+): Promise<Response> {
   server = createHealthServer(options).listen(0, '127.0.0.1')
   await once(server, 'listening')
   const { port } = server.address() as AddressInfo
 
-  return fetch(`http://127.0.0.1:${String(port)}/health`)
+  return fetch(`http://127.0.0.1:${String(port)}${path}`, init)
 }
+
+const getHealth = (options: HealthServerOptions) => request(options)
 
 describe('worker health check', () => {
   it('reports healthy when Redis is reachable', async () => {
@@ -47,5 +53,17 @@ describe('worker health check', () => {
 
     expect(response.status).toBe(503)
     expect(await response.json()).toEqual({ status: 'unhealthy', checks: { redis: 'down' } })
+  })
+
+  it('answers 404 on any other path', async () => {
+    const response = await request({ probes: { redis: up } }, '/other')
+
+    expect(response.status).toBe(404)
+  })
+
+  it('answers 404 on any other method', async () => {
+    const response = await request({ probes: { redis: up } }, '/health', { method: 'POST' })
+
+    expect(response.status).toBe(404)
   })
 })
