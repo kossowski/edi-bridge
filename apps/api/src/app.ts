@@ -34,7 +34,8 @@ export function buildApp({
 }: AppDependencies): FastifyInstance {
   const app = Fastify({ logger })
 
-  app.get('/health', async (_request, reply) => {
+  // Container health checks poll this route often, so its requests are not logged.
+  app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
       check(probes.postgres, probeTimeoutMs),
       check(probes.redis, probeTimeoutMs),
