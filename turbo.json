@@ -8,7 +8,7 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
     },
     "lint": {
       "dependsOn": ["transit"]
@@ -16,9 +16,17 @@
     "check-types": {
       "dependsOn": ["transit"]
     },
-    "dev": {
+    "test": {
+      "dependsOn": ["transit"]
+    },
+    "test:watch": {
       "cache": false,
       "persistent": true
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": ["DATABASE_URL", "REDIS_URL", "API_PORT", "WORKER_HEALTH_PORT"]
     }
   }
 }
