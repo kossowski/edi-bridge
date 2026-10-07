@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] web, api and worker each have a Dockerfile producing a production image
-- [ ] A full-stack Compose profile starts infrastructure plus all three app images, and the health checks pass
-- [ ] The infrastructure-only Compose usage from ticket 02 keeps working unchanged
-- [ ] A GitHub Actions workflow runs lint, check-types, test and build on pull requests
-- [ ] Turborepo limits CI work to affected packages
-- [ ] The README explains local setup: start infrastructure in Docker, run apps natively
+- [x] web, api and worker each have a Dockerfile producing a production image
+- [x] A full-stack Compose profile starts infrastructure plus all three app images, and the health checks pass
+- [x] The infrastructure-only Compose usage from ticket 02 keeps working unchanged
+- [x] A GitHub Actions workflow runs lint, check-types, test and build on pull requests
+- [x] Turborepo limits CI work to affected packages
+- [x] The README explains local setup: start infrastructure in Docker, run apps natively
