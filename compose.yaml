@@ -1,0 +1,52 @@
+# Local infrastructure only. The apps run natively via `pnpm dev`.
+# Host ports can be overridden (see .env.example) when they clash with services already running.
+name: edi-bridge
+
+services:
+  postgres:
+    image: postgres:18.6-alpine3.24
+    environment:
+      POSTGRES_USER: edi_bridge
+      POSTGRES_PASSWORD: edi_bridge
+      POSTGRES_DB: edi_bridge
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U edi_bridge -d edi_bridge']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8.10.2-alpine3.23
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # atmoz/sftp publishes no versioned tags, so the image is pinned by digest.
+  # Testcontainers-based integration tests use the same image.
+  sftp:
+    image: atmoz/sftp:alpine@sha256:7e439fabeae536fa254340724c042e11999924d906417dbb5c73602ad518813f
+    command: edi_bridge:edi_bridge:::upload
+    ports:
+      - '${SFTP_PORT:-2222}:22'
+    volumes:
+      - sftp-data:/home/edi_bridge/upload
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z 127.0.0.1 22']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  redis-data:
+  sftp-data:
