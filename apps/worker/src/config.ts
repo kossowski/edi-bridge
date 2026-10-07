@@ -11,7 +11,6 @@ if (!env.success) {
   throw new Error(`Invalid environment configuration:\n${z.prettifyError(env.error)}`)
 }
 
-/** Runtime configuration from the environment, with defaults matching the local Compose services. */
 export const config = {
   redisUrl: env.data.REDIS_URL,
   healthPort: env.data.WORKER_HEALTH_PORT,

@@ -2,13 +2,11 @@ import Fastify from 'fastify'
 
 import type { FastifyInstance } from 'fastify'
 
-/** Resolves when the dependency is reachable, rejects otherwise. */
 export type Probe = () => Promise<unknown>
 
 export interface AppDependencies {
   logger?: boolean
   probes: { postgres: Probe; redis: Probe }
-  /** How long a probe may take before its dependency counts as down. */
   probeTimeoutMs?: number
 }
 
@@ -34,7 +32,6 @@ export function buildApp({
 }: AppDependencies): FastifyInstance {
   const app = Fastify({ logger })
 
-  // Container health checks poll this route often, so its requests are not logged.
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
       check(probes.postgres, probeTimeoutMs),

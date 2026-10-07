@@ -2,12 +2,10 @@ import { createServer } from 'node:http'
 
 import type { Server } from 'node:http'
 
-/** Resolves when the dependency is reachable, rejects otherwise. */
 export type Probe = () => Promise<unknown>
 
 export interface HealthServerOptions {
   probes: { redis: Probe }
-  /** How long a probe may take before its dependency counts as down. */
   probeTimeoutMs?: number
 }
 
@@ -26,7 +24,6 @@ const check = (probe: Probe, timeoutMs: number): Promise<CheckStatus> =>
     () => 'down',
   )
 
-/** A tiny HTTP server exposing the worker's health, for local checks and container health checks. */
 export function createHealthServer({ probes, probeTimeoutMs = 2000 }: HealthServerOptions): Server {
   return createServer((request, response) => {
     const { pathname } = new URL(request.url ?? '/', 'http://localhost')
