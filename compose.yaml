@@ -44,6 +44,48 @@ services:
       timeout: 3s
       retries: 10
 
+  api:
+    profiles: [full-stack]
+    image: edi-bridge/api
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://edi_bridge:edi_bridge@postgres:5432/edi_bridge
+      REDIS_URL: redis://redis:6379
+      API_PORT: 3001
+    ports:
+      - '${API_PORT:-3001}:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    profiles: [full-stack]
+    image: edi-bridge/worker
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379
+      WORKER_HEALTH_PORT: 3002
+    ports:
+      - '${WORKER_HEALTH_PORT:-3002}:3002'
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    profiles: [full-stack]
+    image: edi-bridge/web
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+
 volumes:
   postgres-data:
   redis-data:
