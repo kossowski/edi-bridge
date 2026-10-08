@@ -48,13 +48,14 @@ For each acceptance criterion with visible behaviour, write a short script in yo
 import { chromium, gotoSettled, openPage, startDevServer } from '<repo>/.agents/skills/browser-check/scripts/lib.mjs'
 
 const server = await startDevServer('<worktree>')
-const browser = await chromium.launch()
+let browser
 try {
+	browser = await chromium.launch()
 	const { page } = await openPage(browser, { baseUrl: server.baseUrl, width: 390, theme: 'dark', locale: 'de' })
 	await gotoSettled(page, server.baseUrl + '/runs', 'dark')
 	// interact and assert
 } finally {
-	await browser.close()
+	await browser?.close()
 	await server.stop()
 }
 ```

@@ -45,8 +45,9 @@ const slug = (route) => (route === '/' ? 'root' : route.replace(/^\//, '').repla
 const findings = []
 const shots = []
 
-const browser = await chromium.launch()
+let browser
 try {
+  browser = await chromium.launch()
   for (const route of routes) {
     // German at every width catches longer labels that overflow; English is the default reading.
     const matrix = widths.flatMap((width) =>
@@ -90,7 +91,7 @@ try {
     }
   }
 } finally {
-  await browser.close()
+  await browser?.close()
   await server?.stop()
 }
 
