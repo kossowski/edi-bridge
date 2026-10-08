@@ -22,11 +22,11 @@ The local [`compose.yaml`](../../compose.yaml) defines the development setup. Pr
 
 Dokploy's GitHub settings contain these application-specific patterns:
 
-| Application | Patterns                        |
-| ----------- | ------------------------------- |
-| web         | `apps/web/**`, `packages/ui/**` |
-| api         | `apps/api/**`                   |
-| worker      | `apps/worker/**`                |
+| Application | Patterns                                                                      |
+| ----------- | ----------------------------------------------------------------------------- |
+| web         | `apps/web/**`, `packages/ui/**`, `packages/contracts/**`, `packages/mocks/**` |
+| api         | `apps/api/**`                                                                 |
+| worker      | `apps/worker/**`                                                              |
 
 All three applications also watch these shared build inputs:
 
