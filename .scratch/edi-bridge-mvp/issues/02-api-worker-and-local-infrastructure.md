@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] One Compose command starts Postgres, Redis and an SFTP server (the same SFTP image later used by integration tests)
 - [x] The api health route reports healthy only when Postgres and Redis are reachable, and unhealthy otherwise

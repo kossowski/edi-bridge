@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 (Dockerfiles, full-stack Compose profile and CI)
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] The maintainer connects the repository in Dokploy (GitHub app) for web, api and worker plus Postgres and Redis
 - [x] A push to main deploys all three apps
