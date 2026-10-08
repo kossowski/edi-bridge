@@ -1,0 +1,46 @@
+{
+  "Shell": {
+    "appName": "EDI Bridge",
+    "skipToContent": "Skip to main content",
+    "mainNavigation": "Main navigation",
+    "toggleSidebar": "Toggle sidebar",
+    "workspaceGroup": "Workspace",
+    "platformGroup": "Platform",
+    "theme": {
+      "label": "Colour theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": {
+      "label": "Language",
+      "en": "English",
+      "de": "Deutsch"
+    }
+  },
+  "Navigation": {
+    "overview": "Overview",
+    "runs": "Runs",
+    "orderLifecycle": "Order Lifecycle",
+    "tradingPartners": "Trading Partners",
+    "mappings": "Mappings",
+    "lookupTables": "Lookup Tables",
+    "settings": "Settings",
+    "operator": "Operator"
+  },
+  "Placeholder": {
+    "title": "Not built yet",
+    "overview": "Traffic, failed Runs and Overdue Interchanges at a glance.",
+    "runs": "Every Run with its outcome, steps, errors and output.",
+    "orderLifecycle": "All Messages that share one Business Reference, in order.",
+    "tradingPartners": "The Trading Partners of this Workspace, their Channels and Flows.",
+    "mappings": "Mappings, their versions and the mapping canvas.",
+    "lookupTables": "Lookup Tables for the Workspace and for single Trading Partners.",
+    "settings": "Settings for this Workspace.",
+    "operator": "Workspaces and their users, managed by the Operator."
+  },
+  "NotFound": {
+    "title": "Page not found",
+    "description": "This page does not exist. Use the navigation to go to another screen."
+  }
+}
