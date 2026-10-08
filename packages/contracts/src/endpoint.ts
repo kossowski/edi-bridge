@@ -1,15 +1,14 @@
 import type { z } from 'zod'
 
-export interface Endpoint<Response, Query = undefined> {
-  method: 'GET'
-  path: string
-  query?: z.ZodType<Query, unknown>
-  response: z.ZodType<Response>
-}
-
 type QueryValue = string | number | boolean | ReadonlyArray<string | number | boolean> | undefined
 
 export type QueryParams = Readonly<Record<string, QueryValue>>
+
+export type Endpoint<Response, Query extends QueryParams | undefined = undefined> = {
+  method: 'GET'
+  path: string
+  response: z.ZodType<Response>
+} & (Query extends QueryParams ? { query: z.ZodType<Query, unknown> } : { query?: undefined })
 
 export function toSearchParams(query: QueryParams): URLSearchParams {
   const params = new URLSearchParams()

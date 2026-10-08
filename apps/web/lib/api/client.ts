@@ -23,8 +23,8 @@ export class ApiError extends Error {
 
 let mockingStarted: Promise<unknown> | undefined
 
-async function request<Response, Query extends QueryParams>(
-  endpoint: Endpoint<Response, Query> | Endpoint<Response>,
+async function request<Response, Query extends QueryParams | undefined = undefined>(
+  endpoint: Endpoint<Response, Query>,
   query?: Query,
 ): Promise<Response> {
   if (isMockingEnabled && typeof window !== 'undefined') {
@@ -32,7 +32,7 @@ async function request<Response, Query extends QueryParams>(
     await mockingStarted
   }
 
-  const search = query ? `?${toSearchParams(query)}` : ''
+  const search = endpoint.query ? `?${toSearchParams(endpoint.query.parse(query))}` : ''
   const response = await fetch(`${apiUrl}${endpoint.path}${search}`, { method: endpoint.method })
 
   if (!response.ok) {
