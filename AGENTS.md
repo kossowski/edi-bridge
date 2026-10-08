@@ -28,6 +28,32 @@ Public deployment guidance lives in `docs/deployment/`. Before working on this i
 
 Keep actual hostnames, service names, tunnel identifiers, and installation-specific notes in `.local/deployment/`. Keep credentials in Dokploy or the secret manager. If private notes are missing, use the public guidance and request the missing installation details before changing the deployment.
 
+## Code Review Rules
+
+### Realistic triggers
+
+- Flag a defect only when you can name the input, state, or sequence of steps that triggers it in the way this repository runs the code.
+- Don't flag guards against states that no caller produces, such as more than 100 comments on a pull request or a server that accepts a connection and never answers.
+
+### Development tooling
+
+- Code under `.agents/`, `.claude/`, and `scripts/` is tooling that a person or an agent runs by hand. Flag only defects on the path that its `SKILL.md` or header comment documents.
+- Don't flag hardening for that tooling against interrupts, unused flag combinations, or missing system dependencies.
+
+### Follow-up commits
+
+- When a commit fixes an earlier review finding, check that the fix is correct. Don't flag further edge cases in the same code unless they break the documented path.
+
+### Strict areas
+
+- In the `edifact` package and the mapping engine, flag edge cases too: malformed Interchanges, boundary values, and wrong error positions. Trading Partners send broken data, and the spec makes these packages test seams.
+
+### Decisions already made
+
+- Don't flag what the spec in `.scratch/` or an ADR in `docs/adr/` decided. For example, UI prototype screens get tests only after the UX is accepted, in ticket 19.
+- Don't flag missing code comments or JSDoc. This repository keeps comments only for non-obvious reasons.
+- Flag breaches of the process rules in `docs/agents/`, such as a ticket set to `done` without its resolution line.
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know
