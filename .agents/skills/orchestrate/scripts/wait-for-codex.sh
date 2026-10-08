@@ -21,7 +21,7 @@ read -r request_id since < <(gh api "repos/$repo/issues/$pr/comments" \
   -f body="@codex review${focus:+ $focus}" --jq '"\(.id) \(.created_at)"')
 echo "Requested Codex review on #$pr at $since (comment $request_id)."
 
-deadline=$((SECONDS + 15 * 60))
+deadline=$((SECONDS + 10 * 60))
 while ((SECONDS < deadline)); do
   sleep 30
 

@@ -1,6 +1,7 @@
 ---
 name: orchestrate
 description: 'Implement the result of /to-spec and /to-tickets in code.'
+mode: true
 disable-model-invocation: true
 ---
 
@@ -16,6 +17,21 @@ Communication to and from subagents should be sparse. Communicate primarily thro
 
 **Implementer subagents** should be run in the background where possible for maximum concurrency.
 
+## Non-negotiables
+- Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill (`/technical-writing`).
+
+## Principles
+### Guard the Context Window
+The context window is finite and non-renewable within a session. Every token should be worth its cost.
+
+Why: Context overflow degrades reasoning quality, creates compression artifacts, and halts progress.
+
+Pattern:
+
+Isolate large payloads. Route verbose outputs, screenshots, and large documents to subagents. The main context gets summaries, not raw data.
+Keep frequently used content inline. Templates and references used on every invocation belong in the skill file, not in separate files that cost a read each time.
+Size phases and cap scope. Limit files per phase, set turn budgets, account for mechanism costs.
+
 ## Steps
 
 1. Read the spec and tickets to understand the task graph.
@@ -24,7 +40,7 @@ Communication to and from subagents should be sparse. Communicate primarily thro
 
 3. Create the integration branch. If the issue tracker closes work through PRs, or the user asks for one, open a draft PR after the first merge in step 5 (a branch with no commits ahead of main can't open one), marked as closing the spec and tickets.
 
-4. Use **implementer subagents** to implement each ticket, each in its own worktree on its own branch. Answering questions from subagents by yourself, excpt it is a product decision. Each implementer subagent:
+4. Use **implementer subagents** to implement each ticket, each in its own worktree on its own branch. Answering questions from subagents by yourself, except it is a product decision. Each implementer subagent:
    - confirms its worktree is based on the integration branch before starting, and resets onto it if not
    - calls the Skill tool with `tdd` to build the ticket
    - merges the integration branch tip into its own branch before reporting done
@@ -46,11 +62,11 @@ NOTES: <anything the reviewer should know: tradeoffs, skipped edge cases>
 
 8. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch and open a PR.
 
-9. Wait for CI and Codex. Run `scripts/wait-for-ci.sh` and `scripts/wait-for-codex.sh`. Use **implementer subagents** to fix any issues.
+9. Wait for CI and Codex. Run `bash scripts/wait-for-ci.sh` and `bash scripts/wait-for-codex.sh` in the background, relative to this skill directory. Use **implementer subagents** to fix any issues.
 
 10. Clean up all **implementer subagent** worktrees.
 
-11. Check all checkboxes of the ticket, that are finished. Do not add or change the content of the ticket.
+11. Resolve each ticket as described in docs/agents/issue-tracker.md
 
 12. Report to user:
 

@@ -12,7 +12,7 @@ set -euo pipefail
 pr=${1:?Usage: scripts/wait-for-ci.sh <PR>}
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 
-deadline=$((SECONDS + 20 * 60))
+deadline=$((SECONDS + 10 * 60))
 while ((SECONDS < deadline)); do
   sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
   runs=$(gh api "repos/$repo/actions/runs?head_sha=$sha&event=pull_request&per_page=100" \

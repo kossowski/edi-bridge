@@ -1,8 +1,12 @@
-# Fastify at the HTTP edge, Effect in the domain core
+# Fastify for HTTP, Effect for domain processing
 
-Effect ships its own HTTP stack, so using both Fastify and Effect overlaps on purpose. We use Fastify for the HTTP edge only (routing, Zod request validation, the better-auth handler) and Effect for everything behind it: the mapping engine, Run processing in BullMQ workers, Channel I/O, retries and scheduling. EDI processing is where Effect pays off (typed failures such as parse, mapping and delivery errors; retry schedules; timeouts; resource-safe SFTP connections), while a conventional Fastify API stays familiar to contributors and keeps the HTTP layer thin.
+We use Fastify for HTTP routing, Zod request validation, and the `better-auth` handler. We use Effect for the Mapping engine, Run processing in BullMQ workers, Channel input and output, retries, and scheduling.
 
-## Considered Options
+Effect provides typed failures for parsing, Mapping, and delivery. It also provides retry schedules, timeouts, and SFTP connections with safe resource cleanup. Fastify keeps the HTTP layer small and familiar to contributors. Although Effect has its own HTTP stack, we accept the overlap to keep these responsibilities separate.
 
-- **Effect everywhere (`effect/http-api`)**: rejected. In Effect 4.0 (stable since 2026-10-01) the `http`/`http-api` modules are still marked `@stability unstable`, i.e. they may break in minor releases. We don't want the public API surface to churn with Effect minors, and it raises the barrier for contributors on the part of the system with the least need for Effect.
-- **Fastify everywhere, Effect only sporadically**: rejected; error and retry handling in the pipeline would fall back to exceptions and ad-hoc try/catch.
+## Considered options
+
+We rejected these alternatives:
+
+- Using Effect throughout the application with `effect/http-api`. At the time of this decision, Effect 4.0 had been stable since 2026-10-01. Its `http` and `http-api` modules still had the `@stability unstable` annotation. Those modules could change incompatibly in minor releases. We rejected that risk for the public API. Contributors would also need Effect knowledge for HTTP work, where Effect offers the least benefit.
+- Using Fastify throughout the application with occasional Effect use. Run processing would rely on exceptions and ad hoc `try` and `catch` blocks for failures and retries.

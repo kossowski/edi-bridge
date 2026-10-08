@@ -1,8 +1,16 @@
-# Vercel AI SDK for AI-drafted Mappings, not Effect AI
+# Vercel AI SDK for AI-drafted Mappings
 
-AI-drafted Mappings use the Vercel AI SDK: structured output validated against the Zod Mapping schema, a tool loop in which the model runs its draft against a sample Document and corrects validation errors, and streamed partial output so links appear on the canvas as they are produced. Despite the Effect core, we don't use Effect's `ai` module: in Effect 4.0 it is marked `@stability unstable` and it works with Effect Schema, which would force a second schema system next to Zod (see ADR-0004).
+We use the Vercel AI SDK for AI-drafted Mappings. The SDK supports the behavior we need:
 
-## Considered Options
+- Structured output validated against the Zod Mapping schema.
+- A tool loop that lets the model run its draft against a sample Document and correct validation errors.
+- Streamed partial output that lets links appear on the canvas as the model produces them.
 
-- **TanStack AI**: rejected; younger and less proven for multi-step tool loops.
-- **Effect `ai` module**: rejected for the reasons above; worth revisiting once it is stable.
+Although domain processing uses Effect, we do not use its `ai` module. In Effect 4.0, the module has the `@stability unstable` annotation. It also uses Effect Schema, which would introduce a second schema system alongside Zod. [ADR-0004](0004-zod-as-single-schema-system.md) explains why we use one schema system.
+
+## Considered options
+
+We rejected these alternatives:
+
+- TanStack AI. At the time of this decision, it was newer and less proven for tool loops with multiple steps.
+- Effect's `ai` module. Its stability and schema requirements conflict with this decision. We can reconsider the module once it is stable.

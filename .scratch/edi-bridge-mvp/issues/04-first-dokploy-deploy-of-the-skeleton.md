@@ -6,8 +6,8 @@
 
 **Status:** ready-for-human
 
-- [ ] The maintainer connects the repository in Dokploy (GitHub app) for web, api and worker plus Postgres and Redis
-- [ ] A push to main deploys all three apps
-- [ ] The deployed web page loads and the deployed api health route reports healthy
-- [ ] Builds on the VPS complete without exhausting memory; if they don't, this is noted for switching to images built in CI
-- [ ] Required environment variables are documented
+- [x] The maintainer connects the repository in Dokploy (GitHub app) for web, api and worker plus Postgres and Redis
+- [x] A push to main deploys all three apps
+- [x] The deployed web page loads and the deployed api health route reports healthy
+- [x] Builds on the VPS complete without exhausting memory; if they don't, this is noted for switching to images built in CI
+- [x] Required environment variables are documented
