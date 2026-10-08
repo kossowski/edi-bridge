@@ -4,10 +4,14 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The web app starts with the monorepo's dev command and shows an empty page that renders a component imported from the ui package
 - [x] The ui package is configured with Base UI, Nova, Hugeicons, Geist and the neutral base colour
 - [x] Tailwind picks up class names used inside the ui package
 - [x] Both packages use the shared ESLint and TypeScript configs and are wired into the Turborepo tasks dev, build, lint and check-types
 - [x] Lint, typecheck and build pass from the repository root
+
+## Comments
+
+Resolved in b491cbc (main), committed without a pull request.

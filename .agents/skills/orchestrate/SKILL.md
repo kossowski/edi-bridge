@@ -58,7 +58,7 @@ NOTES: <anything the reviewer should know: tradeoffs, skipped edge cases>
 
 6. If this changes the **frontier** of available tickets, kick off more **implementer subagents** to work on the new tickets. This allows for maximum concurrency.
 
-7. Once all tickets are complete, call the Skill tool with `code-review` on the integration branch. Fix all issues raised by the code review in a single **implementer subagent**.
+7. Once all tickets are complete, call the Skill tool with `code-review` on the integration branch. If the diff touches `apps/web` or `packages/ui`, run a **browser-check subagent** in parallel: it calls the Skill tool with `browser-check` against a worktree of the integration branch and keeps the screenshots in its own context. Fix all issues raised by both in a single **implementer subagent**.
 
 8. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch and open a PR.
 
@@ -77,6 +77,7 @@ Status: ready for review | needs attention (<why>)
 - **Built**: <one or two lines>
 - **Checks**: <internal checks> green · CI <green/red>
 - **Review**: <rounds> rounds · <n> fixed · <n> dismissed
+- **Browser**: <routes checked> · <n> fixed · <n> dismissed, or "no UI change"
 - **Codex**: <rounds> rounds · <n> fixed · <n> dismissed (replied on thread)
 - **Decisions I made for you**: <questions answered without asking, with the answer>
 - **Open**: <anything left, or "nothing">

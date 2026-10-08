@@ -4,10 +4,14 @@
 
 **Blocked by:** 03 (Dockerfiles, full-stack Compose profile and CI)
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] The maintainer connects the repository in Dokploy (GitHub app) for web, api and worker plus Postgres and Redis
 - [x] A push to main deploys all three apps
 - [x] The deployed web page loads and the deployed api health route reports healthy
 - [x] Builds on the VPS complete without exhausting memory; if they don't, this is noted for switching to images built in CI
 - [x] Required environment variables are documented
+
+## Comments
+
+Resolved by the first Dokploy deploy, documented in e000bd4 (main).

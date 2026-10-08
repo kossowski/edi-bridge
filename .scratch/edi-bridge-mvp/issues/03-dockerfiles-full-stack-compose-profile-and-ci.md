@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Web app and ui package skeleton), 02 (API, worker and local infrastructure)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] web, api and worker each have a Dockerfile producing a production image
 - [x] A full-stack Compose profile starts infrastructure plus all three app images, and the health checks pass
@@ -12,3 +12,7 @@
 - [x] A GitHub Actions workflow runs lint, check-types, test and build on pull requests
 - [x] Turborepo limits CI work to affected packages
 - [x] The README explains local setup: start infrastructure in Docker, run apps natively
+
+## Comments
+
+Resolved in #2 (feat/dockerfiles-compose-and-ci).

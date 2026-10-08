@@ -1,7 +1,12 @@
 ---
 name: unslop-writing
-description: Cut AI tells from any writing. Must always apply.
+description: Cut AI tells from any writing. Does not apply to chat replies, progress updates, or conversational explanations.
 ---
+
+## Scope
+
+Apply this skill only to text written or reviewed in project files.
+Do not apply these rules to chat replies or progress updates.
 
 # Unslop
 

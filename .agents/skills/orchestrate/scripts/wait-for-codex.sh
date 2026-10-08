@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Asks Codex to review a pull request and waits for its answer.
+# Waits for the Codex review of a pull request's latest commit.
 #
 # Usage: scripts/wait-for-codex.sh <PR> [focus]
 #   scripts/wait-for-codex.sh 12
 #   scripts/wait-for-codex.sh 12 for Tenant isolation issues
 #
-# Posts "@codex review [focus]", then waits up to 15 minutes for a review or
-# comment from the Codex bot, or its 👍 reaction on the request (no findings).
-# Exits 0 when Codex answered, 1 on timeout.
+# Codex reviews pushes on its own, so this only waits. When no review of the
+# head commit has started after 3 minutes, it posts "@codex review [focus]"
+# once. It follows the pull request's head like wait-for-ci.sh. The answer is
+# a review on the head commit (findings), a "Reviewed commit" comment, or the
+# summary comment marked Completed for the head commit (no findings).
+# Exits 0 when Codex answered, 1 after 15 minutes.
 set -euo pipefail
 
 pr=${1:?Usage: scripts/wait-for-codex.sh <PR> [focus]}
@@ -16,31 +19,58 @@ focus=${*:-}
 
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 bot='chatgpt-codex-connector[bot]'
+summary_marker='<!-- codex-pull-request-review-summary -->'
+grace=$((3 * 60))
 
-read -r request_id since < <(gh api "repos/$repo/issues/$pr/comments" \
-  -f body="@codex review${focus:+ $focus}" --jq '"\(.id) \(.created_at)"')
-echo "Requested Codex review on #$pr at $since (comment $request_id)."
-
-deadline=$((SECONDS + 10 * 60))
+head=''
+deadline=$((SECONDS + 15 * 60))
 while ((SECONDS < deadline)); do
-  sleep 30
+  sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
+  if [[ $sha != "$head" ]]; then
+    head=$sha
+    short=${head:0:7}
+    head_seen_at=$SECONDS
+    requested=false
+    completed_once=false
+    echo "Waiting for the Codex review of $short on #$pr."
+  fi
 
-  reviews=$(gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
-    --jq "[.[] | select(.user.login == \"$bot\" and .submitted_at > \"$since\")] | length")
-  comments=$(gh api "repos/$repo/issues/$pr/comments?since=$since&per_page=100" \
-    --jq "[.[] | select(.user.login == \"$bot\")] | length")
-  thumbs_up=$(gh api "repos/$repo/issues/comments/$request_id/reactions" \
-    --jq "[.[] | select(.content == \"+1\" and .user.login == \"$bot\")] | length")
+  bot_comments=$(gh api --paginate "repos/$repo/issues/$pr/comments?per_page=100" \
+    --jq ".[] | select(.user.login == \"$bot\")" | jq -s .)
+  summary_row=$(jq -r --arg m "$summary_marker" \
+    '[.[] | select(.body | contains($m))] | last | .body // "" | split("\n")[] | select(test("Code Review"))' \
+    <<<"$bot_comments" | grep -F "\`$short" || true)
+  answer=$(jq -r --arg m "$summary_marker" --arg s "\`$short" \
+    '[.[] | select((.body | contains($m) | not) and (.body | contains("Reviewed commit")) and (.body | contains($s)))] | last | .body // "" | split("\n") | .[0] // ""' \
+    <<<"$bot_comments")
+  reviews=$(gh api --paginate "repos/$repo/pulls/$pr/reviews?per_page=100" \
+    --jq ".[] | select(.user.login == \"$bot\" and .commit_id == \"$head\") | .id" | grep -c . || true)
 
-  if ((reviews > 0 || comments > 0)); then
-    echo "Codex answered with $reviews review(s) and $comments comment(s)."
+  if ((reviews > 0)); then
+    echo "Codex reviewed $short with $reviews review(s)."
     echo "Inline comments: gh api repos/$repo/pulls/$pr/comments"
     exit 0
   fi
-  if ((thumbs_up > 0)); then
-    echo "Codex reacted 👍: no findings."
+  if [[ -n $answer ]]; then
+    echo "$answer"
     exit 0
   fi
+  # The summary can flip to Completed a few seconds before the review is posted.
+  if [[ $summary_row == *Completed* ]]; then
+    if [[ $completed_once == true ]]; then
+      echo "Codex review of $short completed: no findings."
+      exit 0
+    fi
+    completed_once=true
+  fi
+
+  if [[ -z $summary_row && $requested == false ]] && ((SECONDS - head_seen_at >= grace)); then
+    gh api "repos/$repo/issues/$pr/comments" -f body="@codex review${focus:+ $focus}" --silent
+    requested=true
+    echo "No review of $short started within $((grace / 60)) minutes. Requested one."
+  fi
+
+  sleep 30
 done
 
 echo "No answer from Codex after 15 minutes." >&2

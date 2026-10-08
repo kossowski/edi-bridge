@@ -6,7 +6,7 @@
 # The GitHub token cannot read check runs, so this uses the Actions API. It
 # follows the pull request's head: when a new commit is pushed while waiting,
 # it waits for that commit's runs instead. Prints each job's result. Exits 0
-# when every run succeeded, 1 when one failed, 2 after 20 minutes.
+# when every run succeeded, 1 when one failed, 2 after 10 minutes.
 set -euo pipefail
 
 pr=${1:?Usage: scripts/wait-for-ci.sh <PR>}
@@ -36,5 +36,5 @@ while ((SECONDS < deadline)); do
   sleep 30
 done
 
-echo "CI on #$pr did not finish within 20 minutes." >&2
+echo "CI on #$pr did not finish within 10 minutes." >&2
 exit 2
