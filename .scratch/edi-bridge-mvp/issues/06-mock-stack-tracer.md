@@ -4,12 +4,16 @@
 
 **Blocked by:** 03 (Dockerfiles, full-stack Compose profile and CI), 05 (App shell)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A contracts package holds the Zod schema of the tracer endpoint; a mocks package holds its handler and a dummy-data factory built from that schema
-- [ ] With mock mode on, web shows the mocked value; with mock mode off, web calls the real API URL (no UI code difference between the two)
-- [ ] Data fetching goes through one typed function per endpoint and TanStack Query; no server component fetches API data
-- [ ] Storybook lives in web, uses the same MSW handlers, includes the ui package's stories, and its stories run as tests with automatic accessibility checks in the Vitest task
-- [ ] Playwright runs one test against web in mock mode and is part of CI
-- [ ] Storybook is built and published to GitHub Pages on pushes to main
-- [ ] A changed contract that the handler no longer satisfies fails the typecheck
+- [x] A contracts package holds the Zod schema of the tracer endpoint; a mocks package holds its handler and a dummy-data factory built from that schema
+- [x] With mock mode on, web shows the mocked value; with mock mode off, web calls the real API URL (no UI code difference between the two)
+- [x] Data fetching goes through one typed function per endpoint and TanStack Query; no server component fetches API data
+- [x] Storybook lives in web, uses the same MSW handlers, includes the ui package's stories, and its stories run as tests with automatic accessibility checks in the Vitest task
+- [x] Playwright runs one test against web in mock mode and is part of CI
+- [x] Storybook is built and published to GitHub Pages on pushes to main
+- [x] A changed contract that the handler no longer satisfies fails the typecheck
+
+## Comments
+
+Resolved in #6 (feat/06-mock-stack-tracer).
