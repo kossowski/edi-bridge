@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 
-import type { FailureStage, MessageType, RunListQuery, RunStatus } from '@edi-bridge/contracts'
+import type {
+  FailureStage,
+  FlowSummary,
+  MessageType,
+  RunListQuery,
+  RunStatus,
+} from '@edi-bridge/contracts'
 
 export const timeRanges = [
   'any',
@@ -26,18 +32,27 @@ export type RunFilters = {
   messageType: MessageType[]
   flowId: string[]
   timeRange: TimeRange
-  // Presets are resolved when chosen, so the query key stays stable between renders.
-  receivedFrom: string | undefined
   customFrom: string
   customTo: string
+  // Resolved when the time range is chosen, so the query key stays stable between renders.
+  receivedFrom: string | undefined
+  receivedTo: string | undefined
   manualSubmission: ManualSubmissionOption
 }
 
-type RunFiltersState = RunFilters & {
+type TimeRangeSelection = Pick<RunFilters, 'timeRange' | 'customFrom' | 'customTo'>
+
+type FacetKey = Exclude<keyof RunFilters, keyof TimeRangeSelection | 'receivedFrom' | 'receivedTo'>
+
+export type RunListState = RunFilters & {
   page: number
   pageSize: number
-  setFilter: <Key extends keyof RunFilters>(key: Key, value: RunFilters[Key]) => void
-  setTimeRange: (timeRange: TimeRange, now?: Date) => void
+}
+
+type RunFiltersState = RunListState & {
+  setFilter: <Key extends FacetKey>(key: Key, value: RunFilters[Key]) => void
+  setTradingPartners: (tradingPartnerIds: string[], flows: ReadonlyArray<FlowSummary>) => void
+  setTimeRange: (selection: Partial<TimeRangeSelection>, now?: Date) => void
   setPage: (page: number) => void
   setPageSize: (pageSize: number) => void
   clearFilters: () => void
@@ -50,9 +65,10 @@ export const emptyRunFilters: RunFilters = {
   messageType: [],
   flowId: [],
   timeRange: 'any',
-  receivedFrom: undefined,
   customFrom: '',
   customTo: '',
+  receivedFrom: undefined,
+  receivedTo: undefined,
   manualSubmission: 'any',
 }
 
@@ -65,19 +81,57 @@ const presetDurations: Record<Exclude<TimeRange, 'any' | 'custom'>, number> = {
   last30Days: 30 * 24 * hour,
 }
 
+function startOfDay(date: string) {
+  return date ? new Date(`${date}T00:00:00`).toISOString() : undefined
+}
+
+function endOfDay(date: string) {
+  return date ? new Date(`${date}T23:59:59.999`).toISOString() : undefined
+}
+
+function resolveTimeRange(
+  { timeRange, customFrom, customTo }: TimeRangeSelection,
+  now: Date,
+): Pick<RunFilters, 'receivedFrom' | 'receivedTo'> {
+  switch (timeRange) {
+    case 'any':
+      return { receivedFrom: undefined, receivedTo: undefined }
+    case 'custom':
+      return { receivedFrom: startOfDay(customFrom), receivedTo: endOfDay(customTo) }
+    default:
+      return {
+        receivedFrom: new Date(now.getTime() - presetDurations[timeRange]).toISOString(),
+        receivedTo: undefined,
+      }
+  }
+}
+
 export const useRunFilters = create<RunFiltersState>()((set) => ({
   ...emptyRunFilters,
   page: 1,
   pageSize: 50,
   setFilter: (key, value) => set({ [key]: value, page: 1 }),
-  setTimeRange: (timeRange, now = new Date()) =>
-    set({
-      timeRange,
-      receivedFrom:
-        timeRange === 'any' || timeRange === 'custom'
-          ? undefined
-          : new Date(now.getTime() - presetDurations[timeRange]).toISOString(),
+  setTradingPartners: (tradingPartnerIds, flows) =>
+    set(({ flowId }) => ({
+      tradingPartnerId: tradingPartnerIds,
+      flowId: flowId.filter((id) =>
+        flows.some(
+          (flow) =>
+            flow.id === id &&
+            (tradingPartnerIds.length === 0 || tradingPartnerIds.includes(flow.tradingPartnerId)),
+        ),
+      ),
       page: 1,
+    })),
+  setTimeRange: (selection, now = new Date()) =>
+    set((state) => {
+      const next = {
+        timeRange: selection.timeRange ?? state.timeRange,
+        customFrom: selection.customFrom ?? state.customFrom,
+        customTo: selection.customTo ?? state.customTo,
+      }
+
+      return { ...next, ...resolveTimeRange(next, now), page: 1 }
     }),
   setPage: (page) => set({ page }),
   setPageSize: (pageSize) => set({ pageSize, page: 1 }),
@@ -96,30 +150,18 @@ export function hasActiveFilters(filters: RunFilters) {
   )
 }
 
-function startOfDay(date: string) {
-  return date ? new Date(`${date}T00:00:00`).toISOString() : undefined
-}
-
-function endOfDay(date: string) {
-  return date ? new Date(`${date}T23:59:59.999`).toISOString() : undefined
-}
-
-export function toRunListQuery(
-  filters: RunFilters & { page: number; pageSize: number },
-): RunListQuery {
-  const custom = filters.timeRange === 'custom'
-
+export function toRunListQuery(state: RunListState): RunListQuery {
   return {
-    status: filters.status,
-    failureStage: filters.failureStage,
-    tradingPartnerId: filters.tradingPartnerId,
-    messageType: filters.messageType,
-    flowId: filters.flowId,
-    receivedFrom: custom ? startOfDay(filters.customFrom) : filters.receivedFrom,
-    receivedTo: custom ? endOfDay(filters.customTo) : undefined,
+    status: state.status,
+    failureStage: state.failureStage,
+    tradingPartnerId: state.tradingPartnerId,
+    messageType: state.messageType,
+    flowId: state.flowId,
+    receivedFrom: state.receivedFrom,
+    receivedTo: state.receivedTo,
     manualSubmission:
-      filters.manualSubmission === 'any' ? undefined : filters.manualSubmission === 'manual',
-    page: filters.page,
-    pageSize: filters.pageSize,
+      state.manualSubmission === 'any' ? undefined : state.manualSubmission === 'manual',
+    page: state.page,
+    pageSize: state.pageSize,
   }
 }

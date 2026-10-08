@@ -67,19 +67,7 @@ export function RunFilters() {
         label={t('columns.tradingPartner')}
         options={tradingPartners.map(({ id: value, name }) => ({ value, label: name }))}
         selected={filters.tradingPartnerId}
-        onSelectedChange={(value) => {
-          filters.setFilter('tradingPartnerId', value)
-          filters.setFilter(
-            'flowId',
-            filters.flowId.filter((flowId) =>
-              flows.some(
-                (flow) =>
-                  flow.id === flowId &&
-                  (value.length === 0 || value.includes(flow.tradingPartnerId)),
-              ),
-            ),
-          )
-        }}
+        onSelectedChange={(value) => filters.setTradingPartners(value, flows)}
       />
       <FacetedFilter
         clearLabel={t('filters.clear')}
@@ -98,7 +86,7 @@ export function RunFilters() {
       <Select
         items={timeRanges.map((value) => ({ value, label: t(`timeRange.${value}`) }))}
         value={filters.timeRange}
-        onValueChange={(value) => filters.setTimeRange(value ?? 'any')}>
+        onValueChange={(value) => filters.setTimeRange({ timeRange: value ?? 'any' })}>
         <SelectTrigger size="sm" aria-label={t('filters.timeRange')}>
           <SelectValue />
         </SelectTrigger>
@@ -121,7 +109,7 @@ export function RunFilters() {
             type="date"
             value={filters.customFrom}
             className="h-7 w-auto"
-            onChange={(event) => filters.setFilter('customFrom', event.target.value)}
+            onChange={(event) => filters.setTimeRange({ customFrom: event.target.value })}
           />
           <label htmlFor={`${id}-to`} className="flex items-center gap-1.5 text-sm">
             {t('filters.to')}
@@ -132,7 +120,7 @@ export function RunFilters() {
             type="date"
             value={filters.customTo}
             className="h-7 w-auto"
-            onChange={(event) => filters.setFilter('customTo', event.target.value)}
+            onChange={(event) => filters.setTimeRange({ customTo: event.target.value })}
           />
         </div>
       )}

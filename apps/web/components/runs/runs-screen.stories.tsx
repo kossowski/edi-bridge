@@ -62,7 +62,7 @@ export const Empty = meta.story({
 export const NoMatches = meta.story({
   beforeEach({ msw }) {
     msw.use(runsHandler(apiUrl, createRuns({ count: 20 })))
-    useRunFilters.setState({
+    useRunFilters.getState().setTimeRange({
       timeRange: 'custom',
       customFrom: '2000-01-01',
       customTo: '2000-01-02',
