@@ -7,7 +7,7 @@ import { RunsScreen } from '@/components/runs/runs-screen'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { runsEndpoint } from '@edi-bridge/contracts'
-import { createRuns, runsHandler } from '@edi-bridge/mocks'
+import { createRuns, runsHandler, seedRuns } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -16,6 +16,8 @@ const meta = preview.meta({
   component: RunsScreen,
   parameters: { layout: 'fullscreen' },
   beforeEach() {
+    // Building the 12,000 seeded Runs takes longer than findByText waits on a slow CI runner.
+    seedRuns()
     useRunFilters.setState({ ...emptyRunFilters, page: 1, pageSize: 50 })
   },
 })
