@@ -12,3 +12,7 @@
 - [x] Both apps run natively via the monorepo's dev command alongside web
 - [x] A test task runs Vitest across packages; the api health route is covered by a test via Fastify request injection
 - [x] Both apps use the shared ESLint and TypeScript configs
+
+## Comments
+
+Resolved in #1 (feat/api-worker-and-local-infrastructure).

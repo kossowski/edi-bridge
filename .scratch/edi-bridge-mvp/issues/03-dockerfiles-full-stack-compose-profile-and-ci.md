@@ -12,3 +12,7 @@
 - [x] A GitHub Actions workflow runs lint, check-types, test and build on pull requests
 - [x] Turborepo limits CI work to affected packages
 - [x] The README explains local setup: start infrastructure in Docker, run apps natively
+
+## Comments
+
+Resolved in #2 (feat/dockerfiles-compose-and-ci).

@@ -11,3 +11,7 @@
 - [x] Tailwind picks up class names used inside the ui package
 - [x] Both packages use the shared ESLint and TypeScript configs and are wired into the Turborepo tasks dev, build, lint and check-types
 - [x] Lint, typecheck and build pass from the repository root
+
+## Comments
+
+Resolved in b491cbc (main), committed without a pull request.
