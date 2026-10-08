@@ -47,7 +47,7 @@ In mock mode, web runs without the API. MSW intercepts requests to the real API 
 pnpm dev:mock
 ```
 
-Without mock mode, web calls the API at `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`). Both variables are read at build time, so restart `next dev` or rebuild after you change them.
+Without mock mode, web calls the API at `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`). The web Docker image sets it to `/api` instead, the same-origin API path of the deployment. Both variables are read at build time, so restart `next dev` or rebuild after you change them.
 
 ## Storybook
 
