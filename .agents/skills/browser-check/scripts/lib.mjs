@@ -32,18 +32,22 @@ export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
   child.stderr.on('data', (chunk) => (log += chunk))
 
   const baseUrl = `http://localhost:${port}`
-  const exited = new Promise((resolve) => child.once('exit', resolve))
-  const killGroup = (signal) => {
-    // next dev forks workers, so signal the whole process group.
+  // next dev forks workers that outlive pnpm, so signal and wait for the whole process group.
+  const signalGroup = (signal) => {
     try {
       process.kill(-child.pid, signal)
-    } catch {}
+      return true
+    } catch {
+      return false
+    }
   }
   const stop = async () => {
-    killGroup('SIGTERM')
-    const timer = setTimeout(() => killGroup('SIGKILL'), 5000)
-    await exited
-    clearTimeout(timer)
+    signalGroup('SIGTERM')
+    const killAt = Date.now() + 5000
+    while (signalGroup(0)) {
+      if (Date.now() > killAt) signalGroup('SIGKILL')
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
   }
 
   const deadline = Date.now() + timeoutMs
@@ -52,7 +56,7 @@ export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
       throw new Error(`next dev exited with code ${child.exitCode}:\n${log}`)
     }
     try {
-      await fetch(baseUrl)
+      await fetch(baseUrl, { signal: AbortSignal.timeout(Math.max(deadline - Date.now(), 1)) })
       return { baseUrl, stop, log: () => log }
     } catch {
       await new Promise((resolve) => setTimeout(resolve, 1000))

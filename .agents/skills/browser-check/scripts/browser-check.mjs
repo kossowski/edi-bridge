@@ -36,9 +36,9 @@ const out = resolve(values.out)
 const screenshots = join(out, 'screenshots')
 mkdirSync(screenshots, { recursive: true })
 
-const repo =
+const repo = () =>
   values.repo ?? execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
-const server = values['base-url'] ? null : await startDevServer(repo)
+const server = values['base-url'] ? null : await startDevServer(repo())
 const baseUrl = values['base-url'] ?? server.baseUrl
 
 const slug = (route) => (route === '/' ? 'root' : route.replace(/^\//, '').replaceAll('/', '_'))
