@@ -10,7 +10,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTimeZone, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useState } from 'react'
 
@@ -235,9 +235,11 @@ function RunsPagination({ total }: { total: number }) {
 export function RunsTable() {
   const t = useTranslations('Runs')
   const filters = useRunFilters()
+  const now = useNow({ updateInterval: 60_000 })
+  const timeZone = useTimeZone() ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(
-    runsQuery(toRunListQuery(filters)),
+    runsQuery(toRunListQuery(filters, { now, timeZone })),
   )
 
   if (isError && !data) {

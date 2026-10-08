@@ -34,15 +34,12 @@ export type RunFilters = {
   timeRange: TimeRange
   customFrom: string
   customTo: string
-  // Resolved when the time range is chosen, so the query key stays stable between renders.
-  receivedFrom: string | undefined
-  receivedTo: string | undefined
   manualSubmission: ManualSubmissionOption
 }
 
 type TimeRangeSelection = Pick<RunFilters, 'timeRange' | 'customFrom' | 'customTo'>
 
-type FacetKey = Exclude<keyof RunFilters, keyof TimeRangeSelection | 'receivedFrom' | 'receivedTo'>
+type FacetKey = Exclude<keyof RunFilters, keyof TimeRangeSelection>
 
 export type RunListState = RunFilters & {
   page: number
@@ -52,7 +49,7 @@ export type RunListState = RunFilters & {
 type RunFiltersState = RunListState & {
   setFilter: <Key extends FacetKey>(key: Key, value: RunFilters[Key]) => void
   setTradingPartners: (tradingPartnerIds: string[], flows: ReadonlyArray<FlowSummary>) => void
-  setTimeRange: (selection: Partial<TimeRangeSelection>, now?: Date) => void
+  setTimeRange: (selection: Partial<TimeRangeSelection>) => void
   setPage: (page: number) => void
   setPageSize: (pageSize: number) => void
   clearFilters: () => void
@@ -67,12 +64,12 @@ export const emptyRunFilters: RunFilters = {
   timeRange: 'any',
   customFrom: '',
   customTo: '',
-  receivedFrom: undefined,
-  receivedTo: undefined,
   manualSubmission: 'any',
 }
 
-const hour = 60 * 60 * 1000
+const minute = 60 * 1000
+
+const hour = 60 * minute
 
 const presetDurations: Record<Exclude<TimeRange, 'any' | 'custom'>, number> = {
   lastHour: hour,
@@ -81,26 +78,69 @@ const presetDurations: Record<Exclude<TimeRange, 'any' | 'custom'>, number> = {
   last30Days: 30 * 24 * hour,
 }
 
-function startOfDay(date: string) {
-  return date ? new Date(`${date}T00:00:00`).toISOString() : undefined
+function zoneOffset(instant: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant)
+
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((candidate) => candidate.type === type)?.value)
+
+  const wallClock = Date.UTC(
+    part('year'),
+    part('month') - 1,
+    part('day'),
+    part('hour'),
+    part('minute'),
+    part('second'),
+  )
+
+  return wallClock - Math.floor(instant / 1000) * 1000
 }
 
-function endOfDay(date: string) {
-  return date ? new Date(`${date}T23:59:59.999`).toISOString() : undefined
+// Interpreted in the zone the table displays timestamps in, so a filtered day matches the rows.
+function zonedInstant(date: string, time: string, timeZone: string) {
+  if (!date) {
+    return undefined
+  }
+
+  const wallClock = Date.parse(`${date}T${time}Z`)
+  // The second pass corrects the offset when the first guess lands across a DST change.
+  const guess = wallClock - zoneOffset(wallClock, timeZone)
+
+  return new Date(wallClock - zoneOffset(guess, timeZone)).toISOString()
+}
+
+export type TimeRangeContext = {
+  now: Date
+  timeZone: string
 }
 
 function resolveTimeRange(
   { timeRange, customFrom, customTo }: TimeRangeSelection,
-  now: Date,
-): Pick<RunFilters, 'receivedFrom' | 'receivedTo'> {
+  { now, timeZone }: TimeRangeContext,
+): Pick<RunListQuery, 'receivedFrom' | 'receivedTo'> {
   switch (timeRange) {
     case 'any':
       return { receivedFrom: undefined, receivedTo: undefined }
     case 'custom':
-      return { receivedFrom: startOfDay(customFrom), receivedTo: endOfDay(customTo) }
+      return {
+        receivedFrom: zonedInstant(customFrom, '00:00:00.000', timeZone),
+        receivedTo: zonedInstant(customTo, '23:59:59.999', timeZone),
+      }
     default:
       return {
-        receivedFrom: new Date(now.getTime() - presetDurations[timeRange]).toISOString(),
+        // Rounded to the minute so the query key stays stable between renders.
+        receivedFrom: new Date(
+          Math.floor(now.getTime() / minute) * minute - presetDurations[timeRange],
+        ).toISOString(),
         receivedTo: undefined,
       }
   }
@@ -123,16 +163,13 @@ export const useRunFilters = create<RunFiltersState>()((set) => ({
       ),
       page: 1,
     })),
-  setTimeRange: (selection, now = new Date()) =>
-    set((state) => {
-      const next = {
-        timeRange: selection.timeRange ?? state.timeRange,
-        customFrom: selection.customFrom ?? state.customFrom,
-        customTo: selection.customTo ?? state.customTo,
-      }
-
-      return { ...next, ...resolveTimeRange(next, now), page: 1 }
-    }),
+  setTimeRange: (selection) =>
+    set((state) => ({
+      timeRange: selection.timeRange ?? state.timeRange,
+      customFrom: selection.customFrom ?? state.customFrom,
+      customTo: selection.customTo ?? state.customTo,
+      page: 1,
+    })),
   setPage: (page) => set({ page }),
   setPageSize: (pageSize) => set({ pageSize, page: 1 }),
   clearFilters: () => set({ ...emptyRunFilters, page: 1 }),
@@ -150,15 +187,14 @@ export function hasActiveFilters(filters: RunFilters) {
   )
 }
 
-export function toRunListQuery(state: RunListState): RunListQuery {
+export function toRunListQuery(state: RunListState, context: TimeRangeContext): RunListQuery {
   return {
     status: state.status,
     failureStage: state.failureStage,
     tradingPartnerId: state.tradingPartnerId,
     messageType: state.messageType,
     flowId: state.flowId,
-    receivedFrom: state.receivedFrom,
-    receivedTo: state.receivedTo,
+    ...resolveTimeRange(state, context),
     manualSubmission:
       state.manualSubmission === 'any' ? undefined : state.manualSubmission === 'manual',
     page: state.page,
