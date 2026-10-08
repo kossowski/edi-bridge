@@ -60,9 +60,9 @@ NOTES: <anything the reviewer should know: tradeoffs, skipped edge cases>
 
 7. Once all tickets are complete, call the Skill tool with `code-review` on the integration branch. If the diff touches `apps/web` or `packages/ui`, run a **browser-check subagent** in parallel: it calls the Skill tool with `browser-check` against a worktree of the integration branch and keeps the screenshots in its own context. Fix all issues raised by both in a single **implementer subagent**.
 
-8. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch and open a PR.
+8. If a draft PR exists, mark it ready for review and post one `@codex review` comment. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch and open a PR.
 
-9. Wait for CI and Codex. Run `bash scripts/wait-for-ci.sh` and `bash scripts/wait-for-codex.sh` in the background, relative to this skill directory. Use **implementer subagents** to fix any issues.
+9. Wait for CI and Codex. Run `bash scripts/wait-for-ci.sh` and `bash scripts/wait-for-codex.sh` in the background, relative to this skill directory. Use **implementer subagents** to fix any issues. Codex reviews once, after the comment from step 8: after fixes, wait for CI again, but not for Codex, and don't post `@codex review` again.
 
 10. Clean up all **implementer subagent** worktrees.
 

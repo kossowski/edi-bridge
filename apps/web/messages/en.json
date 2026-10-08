@@ -47,5 +47,81 @@
   "NotFound": {
     "title": "Page not found",
     "description": "This page does not exist. Use the navigation to go to another screen."
+  },
+  "Runs": {
+    "caption": "Runs, newest first",
+    "loading": "Loading Runs",
+    "count": "{count, plural, one {# Run} other {# Runs}}",
+    "openRun": "– open Run from {tradingPartner}, {messageType}",
+    "noFailureStage": "No Failure Stage",
+    "columns": {
+      "receivedAt": "Received",
+      "status": "Status",
+      "failureStage": "Failure Stage",
+      "tradingPartner": "Trading Partner",
+      "messageType": "Message Type",
+      "flow": "Flow",
+      "source": "Source"
+    },
+    "status": {
+      "received": "Received",
+      "processing": "Processing",
+      "delivered": "Delivered",
+      "failed": "Failed",
+      "duplicate": "Duplicate"
+    },
+    "failureStage": {
+      "parse": "Parse",
+      "validation": "Validation",
+      "mapping": "Mapping",
+      "delivery": "Delivery"
+    },
+    "timeRange": {
+      "any": "Any time",
+      "lastHour": "Last hour",
+      "last24Hours": "Last 24 hours",
+      "last7Days": "Last 7 days",
+      "last30Days": "Last 30 days",
+      "custom": "Custom range"
+    },
+    "manualSubmission": {
+      "any": "Any source",
+      "manual": "Manual Submission",
+      "channel": "Channel"
+    },
+    "filters": {
+      "label": "Filter Runs",
+      "clear": "Clear filter",
+      "clearAll": "Clear all filters",
+      "timeRange": "Time range",
+      "from": "From",
+      "to": "To",
+      "manualSubmission": "Source"
+    },
+    "pagination": {
+      "label": "Pages",
+      "pageSize": "Rows per page",
+      "page": "Page {page} of {pageCount}",
+      "first": "First page",
+      "previous": "Previous page",
+      "next": "Next page",
+      "last": "Last page"
+    },
+    "empty": {
+      "title": "No Runs yet",
+      "description": "Runs appear here as soon as a Document arrives on a Channel or through a Manual Submission.",
+      "filteredTitle": "No matching Runs",
+      "filteredDescription": "No Run matches these filters. Change or clear the filters."
+    },
+    "error": {
+      "title": "Runs unavailable",
+      "description": "The Runs could not be loaded. Try again.",
+      "retry": "Try again"
+    }
+  },
+  "RunDetail": {
+    "title": "Run",
+    "back": "Back to Runs",
+    "placeholder": "The step timeline, the raw Interchange and the parsed tree of this Run appear here."
   }
 }

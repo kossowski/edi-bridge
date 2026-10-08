@@ -47,5 +47,81 @@
   "NotFound": {
     "title": "Seite nicht gefunden",
     "description": "Diese Seite gibt es nicht. Wechseln Sie über die Navigation zu einer anderen Ansicht."
+  },
+  "Runs": {
+    "caption": "Runs, neueste zuerst",
+    "loading": "Runs werden geladen",
+    "count": "{count, plural, one {# Run} other {# Runs}}",
+    "openRun": "– Run von {tradingPartner} öffnen, {messageType}",
+    "noFailureStage": "Keine Failure Stage",
+    "columns": {
+      "receivedAt": "Empfangen",
+      "status": "Status",
+      "failureStage": "Failure Stage",
+      "tradingPartner": "Trading Partner",
+      "messageType": "Message Type",
+      "flow": "Flow",
+      "source": "Quelle"
+    },
+    "status": {
+      "received": "Empfangen",
+      "processing": "In Verarbeitung",
+      "delivered": "Zugestellt",
+      "failed": "Fehlgeschlagen",
+      "duplicate": "Duplicate"
+    },
+    "failureStage": {
+      "parse": "Parsen",
+      "validation": "Validierung",
+      "mapping": "Mapping",
+      "delivery": "Zustellung"
+    },
+    "timeRange": {
+      "any": "Beliebiger Zeitraum",
+      "lastHour": "Letzte Stunde",
+      "last24Hours": "Letzte 24 Stunden",
+      "last7Days": "Letzte 7 Tage",
+      "last30Days": "Letzte 30 Tage",
+      "custom": "Eigener Zeitraum"
+    },
+    "manualSubmission": {
+      "any": "Beliebige Quelle",
+      "manual": "Manual Submission",
+      "channel": "Channel"
+    },
+    "filters": {
+      "label": "Runs filtern",
+      "clear": "Filter zurücksetzen",
+      "clearAll": "Alle Filter zurücksetzen",
+      "timeRange": "Zeitraum",
+      "from": "Von",
+      "to": "Bis",
+      "manualSubmission": "Quelle"
+    },
+    "pagination": {
+      "label": "Seiten",
+      "pageSize": "Zeilen pro Seite",
+      "page": "Seite {page} von {pageCount}",
+      "first": "Erste Seite",
+      "previous": "Vorherige Seite",
+      "next": "Nächste Seite",
+      "last": "Letzte Seite"
+    },
+    "empty": {
+      "title": "Noch keine Runs",
+      "description": "Runs erscheinen hier, sobald ein Document auf einem Channel oder per Manual Submission eintrifft.",
+      "filteredTitle": "Keine passenden Runs",
+      "filteredDescription": "Kein Run passt zu diesen Filtern. Ändern Sie die Filter oder setzen Sie sie zurück."
+    },
+    "error": {
+      "title": "Runs nicht verfügbar",
+      "description": "Die Runs konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    }
+  },
+  "RunDetail": {
+    "title": "Run",
+    "back": "Zurück zu den Runs",
+    "placeholder": "Hier erscheinen die Schritt-Zeitleiste, das rohe Interchange und der geparste Baum dieses Runs."
   }
 }

@@ -1,4 +1,13 @@
-import { currentWorkspaceEndpoint, type Endpoint } from '@edi-bridge/contracts'
+import {
+  currentWorkspaceEndpoint,
+  type Endpoint,
+  flowsEndpoint,
+  type QueryParams,
+  type RunListQuery,
+  runsEndpoint,
+  toSearchParams,
+  tradingPartnersEndpoint,
+} from '@edi-bridge/contracts'
 
 import { apiUrl, isMockingEnabled } from './config'
 
@@ -14,13 +23,17 @@ export class ApiError extends Error {
 
 let mockingStarted: Promise<unknown> | undefined
 
-async function request<Response>(endpoint: Endpoint<Response>): Promise<Response> {
+async function request<Response, Query extends QueryParams | undefined = undefined>(
+  endpoint: Endpoint<Response, Query>,
+  query?: Query,
+): Promise<Response> {
   if (isMockingEnabled && typeof window !== 'undefined') {
     mockingStarted ??= import('./mock-worker').then(({ startMockWorker }) => startMockWorker())
     await mockingStarted
   }
 
-  const response = await fetch(`${apiUrl}${endpoint.path}`, { method: endpoint.method })
+  const search = query ? `?${toSearchParams(query)}` : ''
+  const response = await fetch(`${apiUrl}${endpoint.path}${search}`, { method: endpoint.method })
 
   if (!response.ok) {
     throw new ApiError(response.status, endpoint.path)
@@ -31,4 +44,16 @@ async function request<Response>(endpoint: Endpoint<Response>): Promise<Response
 
 export function getCurrentWorkspace() {
   return request(currentWorkspaceEndpoint)
+}
+
+export function listRuns(query: RunListQuery) {
+  return request(runsEndpoint, query)
+}
+
+export function listTradingPartners() {
+  return request(tradingPartnersEndpoint)
+}
+
+export function listFlows() {
+  return request(flowsEndpoint)
 }

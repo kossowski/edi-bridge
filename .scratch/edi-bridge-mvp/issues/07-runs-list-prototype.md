@@ -4,13 +4,17 @@
 
 **Blocked by:** 06 (Mock stack tracer)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] All listed filters work against the mocked data
-- [ ] The table stays responsive with 10,000+ mocked Runs
-- [ ] Status and Failure Stage are visually distinct and readable without relying on colour alone
-- [ ] The table is fully keyboard-operable
-- [ ] Selecting a Run navigates to its detail page (placeholder until ticket 08)
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] All listed filters work against the mocked data
+- [x] The table stays responsive with 10,000+ mocked Runs
+- [x] Status and Failure Stage are visually distinct and readable without relying on colour alone
+- [x] The table is fully keyboard-operable
+- [x] Selecting a Run navigates to its detail page (placeholder until ticket 08)
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #7 (feat/07-runs-list-prototype).

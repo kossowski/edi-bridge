@@ -44,6 +44,10 @@ Keep actual hostnames, service names, tunnel identifiers, and installation-speci
 
 - When a commit fixes an earlier review finding, check that the fix is correct. Don't flag further edge cases in the same code unless they break the documented path.
 
+### Severity
+
+- In Codex reviews, report only P0 and P1 findings. Leave out P2 and P3 findings.
+
 ### Strict areas
 
 - In the `edifact` package and the mapping engine, flag edge cases too: malformed Interchanges, boundary values, and wrong error positions. Trading Partners send broken data, and the spec makes these packages test seams.
