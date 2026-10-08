@@ -22,11 +22,11 @@ The local [`compose.yaml`](../../compose.yaml) defines the development setup. Pr
 
 Dokploy's GitHub settings contain these application-specific patterns:
 
-| Application | Patterns                        |
-| ----------- | ------------------------------- |
-| web         | `apps/web/**`, `packages/ui/**` |
-| api         | `apps/api/**`                   |
-| worker      | `apps/worker/**`                |
+| Application | Patterns                                                                      |
+| ----------- | ----------------------------------------------------------------------------- |
+| web         | `apps/web/**`, `packages/ui/**`, `packages/contracts/**`, `packages/mocks/**` |
+| api         | `apps/api/**`                                                                 |
+| worker      | `apps/worker/**`                                                              |
 
 All three applications also watch these shared build inputs:
 
@@ -72,7 +72,13 @@ Each application's Dokploy **Environment** settings contain values with the form
 | worker      | `NODE_ENV`           | `production`                                                                   |
 | worker      | `WORKER_HEALTH_PORT` | `3002`                                                                         |
 
-The web application does not call the API and requires no API URL variable. The `/api` prefix routes browser requests to the API on the same origin. These runtime variables require neither Docker build arguments nor a repository `.env` file.
+These runtime variables require neither Docker build arguments nor a repository `.env` file.
+
+## API URL of the web application
+
+The browser calls the API through the same-origin `/api` prefix. Next.js inlines `NEXT_PUBLIC_API_URL` into the client bundle at build time, so the variable has no effect at runtime. The web Dockerfile sets the build argument `NEXT_PUBLIC_API_URL` to `/api` by default. For example, the browser requests `/api/workspaces/current`, and Traefik forwards it to `/workspaces/current` on the API.
+
+The Dokploy web application requires no build argument. Override `NEXT_PUBLIC_API_URL` only if the API is served from a different path or origin. Outside Docker, the variable defaults to `http://localhost:3001`.
 
 ## Health checks
 

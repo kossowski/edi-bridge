@@ -39,13 +39,40 @@ The host ports of the infrastructure services can be changed in `.env` (`POSTGRE
 
 Stop the infrastructure with `docker compose down`; add `-v` to also delete its data.
 
+## Mock mode
+
+In mock mode, web runs without the API. MSW intercepts requests to the real API URLs in the browser and answers them with the handlers from `packages/mocks`:
+
+```sh
+pnpm dev:mock
+```
+
+Without mock mode, web calls the API at `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`). The web Docker image sets it to `/api` instead, the same-origin API path of the deployment. Both variables are read at build time, so restart `next dev` or rebuild after you change them.
+
+## Storybook
+
+Storybook lives in `apps/web` and also shows the stories of `packages/ui`. It uses the same MSW handlers as mock mode:
+
+```sh
+pnpm storybook
+```
+
+Storybook opens at http://localhost:6006. Each push to `main` publishes it to GitHub Pages.
+
 ## Checks
 
 ```sh
 pnpm lint
 pnpm check-types
 pnpm test
+pnpm test:e2e
 pnpm build
+```
+
+`pnpm test` also runs every story as a test in Chromium, with accessibility checks. `pnpm test:e2e` runs Playwright against web in mock mode. Both need the Playwright browser once:
+
+```sh
+pnpm --filter @edi-bridge/web exec playwright install chromium
 ```
 
 Tests never depend on the local Compose services.
@@ -68,7 +95,7 @@ docker build -f apps/api/Dockerfile .
 
 ## CI
 
-GitHub Actions runs lint, check-types, test and build on every pull request. Turborepo's `--affected` flag limits the run to the packages changed on the branch and the packages that depend on them.
+GitHub Actions runs lint, check-types, test, the Playwright tests, build and the Storybook build on every pull request. Turborepo's `--affected` flag limits the run to the packages changed on the branch and the packages that depend on them.
 
 ## Deployment
 

@@ -28,6 +28,7 @@
     "@edi-bridge/eslint-config": "workspace:*",
     "@edi-bridge/oxlint-config": "workspace:*",
     "@edi-bridge/typescript-config": "workspace:*",
+    "@storybook/react": "^10.6.1",
     "@tailwindcss/postcss": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -35,6 +36,7 @@
     "oxlint": "1.87.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "storybook": "^10.6.1",
     "tailwindcss": "^4",
     "typescript": "~6.0.3"
   },

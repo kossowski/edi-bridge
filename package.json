@@ -4,12 +4,15 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:mock": "turbo run dev:mock",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
+    "test:e2e": "turbo run test:e2e",
+    "storybook": "turbo run storybook",
     "format": "prettier --write .",
     "prepare": "husky"
   },

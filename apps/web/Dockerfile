@@ -41,6 +41,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=prepare /app/out/json/ .
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY --from=prepare /app/out/full/ .
+# Next inlines NEXT_PUBLIC_* at build time; Traefik strips /api before forwarding to the API.
+ARG NEXT_PUBLIC_API_URL=/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm turbo run build --filter=@edi-bridge/web
 
 FROM ${NODE_IMAGE} AS runner
@@ -51,6 +54,7 @@ ENV PORT=3000
 WORKDIR /app
 COPY --from=builder --chown=node:node /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=node:node /app/apps/web/public ./apps/web/public
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
