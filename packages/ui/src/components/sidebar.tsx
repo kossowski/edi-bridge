@@ -173,8 +173,9 @@ function Sidebar({
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent
           dir={dir}
+          showCloseButton={false}
           side={side}
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0"
           style={
             // SAFETY: CSSProperties has no index signature for custom properties; these keys are plain CSS variables.
             {
@@ -245,6 +246,7 @@ function SidebarTrigger({
   return (
     <Button
       size="icon-sm"
+      title={label}
       variant="ghost"
       className={cn(className)}
       data-sidebar="trigger"
@@ -260,14 +262,18 @@ function SidebarTrigger({
   )
 }
 
-function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
+function SidebarRail({
+  className,
+  label = 'Toggle Sidebar',
+  ...props
+}: React.ComponentProps<'button'> & { label?: string }) {
   const { toggleSidebar } = useSidebar()
 
   return (
     <button
       tabIndex={-1}
-      title="Toggle Sidebar"
-      aria-label="Toggle Sidebar"
+      title={label}
+      aria-label={label}
       className={cn(
         'hover:after:bg-sidebar-border absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2',
         'in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize',
@@ -673,5 +679,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  SIDEBAR_COOKIE_NAME,
   useSidebar,
 }
