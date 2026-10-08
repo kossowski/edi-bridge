@@ -7,7 +7,7 @@
     "workspaceGroup": "Workspace",
     "platformGroup": "Platform",
     "theme": {
-      "label": "Colour theme",
+      "label": "Color theme",
       "light": "Light",
       "dark": "Dark",
       "system": "System"

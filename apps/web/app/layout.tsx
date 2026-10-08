@@ -11,7 +11,11 @@ import { AppSidebar } from '@/components/app-sidebar'
 import { ThemeProvider } from '@/components/theme-provider'
 
 import '@edi-bridge/ui/globals.css'
-import { SidebarInset, SidebarProvider } from '@edi-bridge/ui/components/sidebar'
+import {
+  SIDEBAR_COOKIE_NAME,
+  SidebarInset,
+  SidebarProvider,
+} from '@edi-bridge/ui/components/sidebar'
 import { TooltipProvider } from '@edi-bridge/ui/components/tooltip'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -29,7 +33,7 @@ export default async function RootLayout({
   const locale = await getLocale()
   const t = await getTranslations('Shell')
   const cookieStore = await cookies()
-  const sidebarOpen = cookieStore.get('sidebar_state')?.value !== 'false'
+  const sidebarOpen = cookieStore.get(SIDEBAR_COOKIE_NAME)?.value !== 'false'
 
   return (
     <html

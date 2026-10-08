@@ -17,12 +17,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from '@edi-bridge/ui/components/sidebar'
 
 export function AppSidebar() {
   const tShell = useTranslations('Shell')
   const tNavigation = useTranslations('Navigation')
   const pathname = usePathname()
+  const { setOpenMobile } = useSidebar()
 
   return (
     <Sidebar collapsible="icon" label={tShell('mainNavigation')}>
@@ -50,7 +52,8 @@ export function AppSidebar() {
                           isActive={isActive}
                           render={<Link href={item.href} />}
                           tooltip={label}
-                          aria-current={isActive ? 'page' : undefined}>
+                          aria-current={isActive ? 'page' : undefined}
+                          onClick={() => setOpenMobile(false)}>
                           <HugeiconsIcon icon={item.icon} strokeWidth={2} />
                           <span>{label}</span>
                         </SidebarMenuButton>
@@ -63,7 +66,7 @@ export function AppSidebar() {
           ))}
         </nav>
       </SidebarContent>
-      <SidebarRail title={tShell('toggleSidebar')} aria-label={tShell('toggleSidebar')} />
+      <SidebarRail label={tShell('toggleSidebar')} />
     </Sidebar>
   )
 }
