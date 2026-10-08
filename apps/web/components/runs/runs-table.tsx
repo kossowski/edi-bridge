@@ -12,6 +12,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
+import { useState } from 'react'
 
 import type { KeyboardEvent } from 'react'
 
@@ -63,23 +64,53 @@ const columns = [
   'source',
 ] as const
 
-function moveFocusBetweenRows(event: KeyboardEvent<HTMLTableSectionElement>) {
-  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
-    return
+function RunRows({ runs }: { runs: RunSummary[] }) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const tabStop = Math.min(activeIndex, runs.length - 1)
+
+  function moveFocus(event: KeyboardEvent<HTMLTableSectionElement>) {
+    const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>('a[data-run-link]')]
+    const index = links.findIndex((link) => link === event.target)
+    const last = links.length - 1
+
+    const next = {
+      ArrowDown: Math.min(index + 1, last),
+      ArrowUp: Math.max(index - 1, 0),
+      Home: 0,
+      End: last,
+    }[event.key]
+
+    if (index === -1 || next === undefined) {
+      return
+    }
+
+    event.preventDefault()
+    links[next]?.focus()
   }
 
-  const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>('a[data-run-link]')]
-  const index = links.findIndex((link) => link === event.target)
-
-  if (index === -1) {
-    return
-  }
-
-  event.preventDefault()
-  links[event.key === 'ArrowDown' ? index + 1 : index - 1]?.focus()
+  return (
+    <TableBody onKeyDown={moveFocus}>
+      {runs.map((run, index) => (
+        <RunRow
+          key={run.id}
+          run={run}
+          tabIndex={index === tabStop ? 0 : -1}
+          onFocus={() => setActiveIndex(index)}
+        />
+      ))}
+    </TableBody>
+  )
 }
 
-function RunRow({ run }: { run: RunSummary }) {
+function RunRow({
+  run,
+  tabIndex,
+  onFocus,
+}: {
+  run: RunSummary
+  tabIndex: number
+  onFocus: () => void
+}) {
   const t = useTranslations('Runs')
   const format = useFormatter()
 
@@ -88,8 +119,10 @@ function RunRow({ run }: { run: RunSummary }) {
       <TableCell>
         <Link
           href={`/runs/${run.id}`}
+          tabIndex={tabIndex}
           className="focus-visible:after:ring-ring font-medium tabular-nums underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset"
-          data-run-link>
+          data-run-link
+          onFocus={onFocus}>
           <time dateTime={run.receivedAt}>
             {format.dateTime(new Date(run.receivedAt), {
               dateStyle: 'medium',
@@ -270,13 +303,13 @@ export function RunsTable() {
               ))}
             </TableRow>
           </TableHeader>
-          <TableBody onKeyDown={moveFocusBetweenRows}>
-            {isPending ? (
+          {isPending ? (
+            <TableBody>
               <LoadingRows count={10} />
-            ) : (
-              data.runs.map((run) => <RunRow key={run.id} run={run} />)
-            )}
-          </TableBody>
+            </TableBody>
+          ) : (
+            <RunRows runs={data.runs} />
+          )}
         </Table>
       </div>
       {data && <RunsPagination total={data.total} />}

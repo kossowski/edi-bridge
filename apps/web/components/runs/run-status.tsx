@@ -31,7 +31,7 @@ const runStatusStyles: Record<RunStatus, string> = {
   received: 'border-border text-foreground',
   processing: 'bg-sky-500/10 text-sky-800 dark:text-sky-300',
   delivered: 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
-  failed: 'bg-destructive/10 text-destructive dark:bg-destructive/20',
+  failed: 'bg-red-500/10 text-red-800 dark:text-red-300',
   duplicate: 'bg-amber-500/10 text-amber-800 dark:text-amber-300',
 }
 

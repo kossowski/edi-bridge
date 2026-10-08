@@ -27,7 +27,7 @@ export default async function Page({ params }: PageProps<'/runs/[id]'>) {
     <div className="flex flex-1 flex-col gap-6 p-6">
       <Link
         href="/runs"
-        className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm underline-offset-4 hover:underline">
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex w-fit items-center gap-1 rounded-sm text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3">
         <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} aria-hidden className="size-4" />
         {t('RunDetail.back')}
       </Link>
