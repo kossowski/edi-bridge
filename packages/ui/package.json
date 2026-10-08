@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "lint": "eslint",
+    "lint": "oxlint && eslint",
+    "lint:fix": "oxlint --fix && eslint --fix",
     "check-types": "tsc --noEmit"
   },
   "exports": {
@@ -25,11 +26,13 @@
   },
   "devDependencies": {
     "@edi-bridge/eslint-config": "workspace:*",
+    "@edi-bridge/oxlint-config": "workspace:*",
     "@edi-bridge/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^10.12.0",
+    "oxlint": "1.87.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "tailwindcss": "^4",

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { buildApp } from './app.js'
 
 const up = () => Promise.resolve()
+
 const down = () => Promise.reject(new Error('connection refused'))
 
 describe('GET /health', () => {

@@ -5,6 +5,7 @@ import { buildApp } from './app.js'
 import { config } from './config.js'
 
 const sql = postgres(config.databaseUrl, { connect_timeout: 2, max: 5 })
+
 // Without the offline queue, commands fail fast while Redis is unreachable instead of waiting
 // for a reconnect, so the health route reports the outage right away.
 const redis = new Redis(config.redisUrl, { enableOfflineQueue: false, maxRetriesPerRequest: 1 })
@@ -12,8 +13,12 @@ const redis = new Redis(config.redisUrl, { enableOfflineQueue: false, maxRetries
 const app = buildApp({
   logger: true,
   probes: {
-    postgres: () => sql`select 1`,
-    redis: () => redis.ping(),
+    postgres: async () => {
+      await sql`select 1`
+    },
+    redis: async () => {
+      await redis.ping()
+    },
   },
 })
 

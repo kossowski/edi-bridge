@@ -9,6 +9,7 @@ import { createHealthServer } from './health.js'
 import type { HealthServerOptions } from './health.js'
 
 const up = () => Promise.resolve()
+
 const down = () => Promise.reject(new Error('connection refused'))
 
 let server: Server | undefined
@@ -25,6 +26,7 @@ async function request(
 ): Promise<Response> {
   server = createHealthServer(options).listen(0, '127.0.0.1')
   await once(server, 'listening')
+  // SAFETY: a server listening on a TCP port reports an AddressInfo, never null or a pipe path.
   const { port } = server.address() as AddressInfo
 
   return fetch(`http://127.0.0.1:${String(port)}${path}`, init)

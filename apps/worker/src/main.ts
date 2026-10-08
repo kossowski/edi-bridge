@@ -11,12 +11,19 @@ const redis = new Redis(config.redisUrl, { enableOfflineQueue: false, maxRetries
 redis.on('ready', () => {
   console.info('worker connected to redis')
 })
+
 redis.on('error', (error: NodeJS.ErrnoException) => {
   // Connection failures arrive as an AggregateError with an empty message, so prefer the code.
   console.warn(`redis connection error: ${error.code ?? error.message}`)
 })
 
-const healthServer = createHealthServer({ probes: { redis: () => redis.ping() } })
+const healthServer = createHealthServer({
+  probes: {
+    redis: async () => {
+      await redis.ping()
+    },
+  },
+})
 
 function shutdown(): void {
   healthServer.close()
@@ -28,5 +35,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 
 healthServer.listen(config.healthPort, '0.0.0.0')
+
 await once(healthServer, 'listening')
+
 console.info(`worker health check listening on port ${String(config.healthPort)}`)

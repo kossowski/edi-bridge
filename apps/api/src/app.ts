@@ -2,7 +2,7 @@ import Fastify from 'fastify'
 
 import type { FastifyInstance } from 'fastify'
 
-export type Probe = () => Promise<unknown>
+export type Probe = () => Promise<void>
 
 export interface AppDependencies {
   logger?: boolean
@@ -37,6 +37,7 @@ export function buildApp({
       check(probes.postgres, probeTimeoutMs),
       check(probes.redis, probeTimeoutMs),
     ])
+
     const healthy = postgres === 'up' && redis === 'up'
 
     return reply

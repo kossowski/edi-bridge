@@ -2,7 +2,7 @@ import { createServer } from 'node:http'
 
 import type { Server } from 'node:http'
 
-export type Probe = () => Promise<unknown>
+export type Probe = () => Promise<void>
 
 export interface HealthServerOptions {
   probes: { redis: Probe }
@@ -31,6 +31,7 @@ export function createHealthServer({ probes, probeTimeoutMs = 2000 }: HealthServ
     if (request.method !== 'GET' || pathname !== '/health') {
       response.writeHead(404, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ error: 'not found' }))
+
       return
     }
 
