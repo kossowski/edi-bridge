@@ -6,9 +6,9 @@ import { parseArgs } from 'node:util'
 import { AxeBuilder } from '@axe-core/playwright'
 
 import {
-  chromium,
   gotoSettled,
   hasHorizontalOverflow,
+  launchBrowser,
   locales,
   openPage,
   startDevServer,
@@ -47,7 +47,7 @@ const shots = []
 
 let browser
 try {
-  browser = await chromium.launch()
+  browser = await launchBrowser()
   for (const route of routes) {
     // German at every width catches longer labels that overflow; English is the default reading.
     const matrix = widths.flatMap((width) =>

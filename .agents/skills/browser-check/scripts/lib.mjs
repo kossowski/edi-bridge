@@ -3,8 +3,6 @@ import { createServer } from 'node:net'
 
 import { chromium } from 'playwright'
 
-export { chromium }
-
 export const widths = [390, 768, 1024, 1440]
 export const themes = ['light', 'dark']
 export const locales = ['en', 'de']
@@ -41,7 +39,16 @@ export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
       return false
     }
   }
+  // Node skips finally blocks on a signal, and the detached group doesn't receive the terminal's signal.
+  const onSignal = async (signal) => {
+    await stop()
+    process.exit(signal === 'SIGINT' ? 130 : 143)
+  }
+  process.once('SIGINT', onSignal)
+  process.once('SIGTERM', onSignal)
   const stop = async () => {
+    process.off('SIGINT', onSignal)
+    process.off('SIGTERM', onSignal)
     signalGroup('SIGTERM')
     const killAt = Date.now() + 5000
     while (signalGroup(0)) {
@@ -53,6 +60,7 @@ export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
+      await stop()
       throw new Error(`next dev exited with code ${child.exitCode}:\n${log}`)
     }
     try {
@@ -64,6 +72,11 @@ export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
   }
   await stop()
   throw new Error(`next dev did not answer on ${baseUrl} within ${timeoutMs} ms:\n${log}`)
+}
+
+// Playwright's own SIGINT handler exits before startDevServer's handler has stopped the server.
+export function launchBrowser() {
+  return chromium.launch({ handleSIGHUP: false, handleSIGINT: false, handleSIGTERM: false })
 }
 
 export async function openPage(browser, { baseUrl, width = 1440, height = 900, theme = 'light', locale = 'en' }) {

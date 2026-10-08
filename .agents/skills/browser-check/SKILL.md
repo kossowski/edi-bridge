@@ -45,12 +45,12 @@ It writes `summary.md`, `summary.json` and one screenshot per combination, named
 For each acceptance criterion with visible behaviour, write a short script in your scratch directory. Import the helpers by absolute path, so that Playwright resolves from this skill:
 
 ```js
-import { chromium, gotoSettled, openPage, startDevServer } from '<repo>/.agents/skills/browser-check/scripts/lib.mjs'
+import { gotoSettled, launchBrowser, openPage, startDevServer } from '<repo>/.agents/skills/browser-check/scripts/lib.mjs'
 
 const server = await startDevServer('<worktree>')
 let browser
 try {
-	browser = await chromium.launch()
+	browser = await launchBrowser()
 	const { page } = await openPage(browser, { baseUrl: server.baseUrl, width: 390, theme: 'dark', locale: 'de' })
 	await gotoSettled(page, server.baseUrl + '/runs', 'dark')
 	// interact and assert
