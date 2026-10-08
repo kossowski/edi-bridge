@@ -43,5 +43,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Story tests (Vitest browser mode) and Playwright both run in Chromium.
+      - name: Install Playwright Chromium
+        run: pnpm --filter @edi-bridge/web exec playwright install --with-deps chromium
+
       - name: Lint, check-types, test and build affected packages
-        run: pnpm turbo run lint check-types test build --affected
+        run: pnpm turbo run lint check-types test test:e2e build build-storybook --affected
