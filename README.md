@@ -66,3 +66,7 @@ docker build -f apps/api/Dockerfile .
 ## CI
 
 GitHub Actions runs lint, check-types, test and build on every pull request. Turborepo's `--affected` flag limits the run to the packages changed on the branch and the packages that depend on them.
+
+## Deployment
+
+The skeleton runs on Dokploy at <https://edi-bridge.kossowski.io/>, with the API health route at <https://edi-bridge.kossowski.io/api/health>. See [the deployment runbook](docs/deployment.md) for service configuration, required environment variables, Cloudflare routing and verification.
