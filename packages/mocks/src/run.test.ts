@@ -217,6 +217,31 @@ describe('GET /runs', () => {
     expect(response.status).toBe(400)
   })
 
+  it('rejects APERAK, which is outside the MVP Message Types', async () => {
+    server.use(runsHandler(apiUrl, []))
+
+    const response = await fetch(`${apiUrl}${runsEndpoint.path}?messageType=APERAK`)
+
+    expect(response.status).toBe(400)
+  })
+
+  it('never seeds an outbound Run that failed at parsing', async () => {
+    server.use(runsHandler(apiUrl))
+
+    const outboundFailures = await listRuns({
+      status: ['failed'],
+      messageType: ['DESADV', 'INVOIC'],
+    })
+
+    const outboundParseFailures = await listRuns({
+      failureStage: ['parse'],
+      messageType: ['DESADV', 'INVOIC'],
+    })
+
+    expect(outboundFailures.body?.total).toBeGreaterThan(0)
+    expect(outboundParseFailures.body?.total).toBe(0)
+  })
+
   it('serves more than 10,000 seeded Runs by default', async () => {
     server.use(runsHandler(apiUrl))
 

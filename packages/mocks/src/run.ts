@@ -6,16 +6,14 @@ import {
   fromSearchParams,
   type MessageType,
   type RunListQuery,
-  runListQuerySchema,
   runsEndpoint,
   type RunStatus,
   type RunSummary,
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
-import { seedFlows, seedTradingPartners } from './directory'
-
-const outboundMessageTypes: ReadonlyArray<MessageType> = ['DESADV', 'INVOIC']
+import { outboundMessageTypes, seedFlows } from './flow'
+import { seedTradingPartners } from './trading-partner'
 
 function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
   // Outbound Documents come from the ERP as JSON or CSV, so they never fail at EDIFACT parsing.
@@ -104,7 +102,7 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary>) {
   let sorted: RunSummary[] | undefined
 
   return http.get(`${apiUrl}${runsEndpoint.path}`, ({ request }) => {
-    const query = runListQuerySchema.safeParse(fromSearchParams(new URL(request.url).searchParams))
+    const query = runsEndpoint.query.safeParse(fromSearchParams(new URL(request.url).searchParams))
 
     if (!query.success) {
       return HttpResponse.json({ message: query.error.message }, { status: 400 })
