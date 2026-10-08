@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-let mockingStarted: Promise<void> | undefined
+let mockingStarted: Promise<unknown> | undefined
 
 async function request<Response>(endpoint: Endpoint<Response>): Promise<Response> {
   if (isMockingEnabled && typeof window !== 'undefined') {
