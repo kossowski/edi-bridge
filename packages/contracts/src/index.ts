@@ -1,4 +1,4 @@
-export { type Endpoint, fromSearchParams, toSearchParams } from './endpoint'
+export { type Endpoint, fromSearchParams, type QueryParams, toSearchParams } from './endpoint'
 
 export { type FlowSummary, flowSummarySchema, flowsEndpoint } from './flow'
 

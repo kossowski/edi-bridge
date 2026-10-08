@@ -9,7 +9,9 @@ export interface Endpoint<Response, Query = undefined> {
 
 type QueryValue = string | number | boolean | ReadonlyArray<string | number | boolean> | undefined
 
-export function toSearchParams(query: Readonly<Record<string, QueryValue>>): URLSearchParams {
+export type QueryParams = Readonly<Record<string, QueryValue>>
+
+export function toSearchParams(query: QueryParams): URLSearchParams {
   const params = new URLSearchParams()
 
   for (const [key, value] of Object.entries(query)) {

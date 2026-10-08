@@ -53,7 +53,7 @@ export default async function RootLayout({
               <TooltipProvider>
                 <SidebarProvider defaultOpen={sidebarOpen}>
                   <AppSidebar />
-                  <SidebarInset>
+                  <SidebarInset className="min-w-0">
                     <AppHeader />
                     <div
                       id="main-content"
