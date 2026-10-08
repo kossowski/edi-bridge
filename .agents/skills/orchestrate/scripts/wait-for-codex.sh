@@ -35,16 +35,16 @@ while ((SECONDS < deadline)); do
     echo "Waiting for the Codex review of $short on #$pr."
   fi
 
-  bot_comments=$(gh api "repos/$repo/issues/$pr/comments?per_page=100" \
-    --jq "[.[] | select(.user.login == \"$bot\")]")
+  bot_comments=$(gh api --paginate "repos/$repo/issues/$pr/comments?per_page=100" \
+    --jq ".[] | select(.user.login == \"$bot\")" | jq -s .)
   summary_row=$(jq -r --arg m "$summary_marker" \
     '[.[] | select(.body | contains($m))] | last | .body // "" | split("\n")[] | select(test("Code Review"))' \
     <<<"$bot_comments" | grep -F "\`$short" || true)
   answer=$(jq -r --arg m "$summary_marker" --arg s "\`$short" \
     '[.[] | select((.body | contains($m) | not) and (.body | contains("Reviewed commit")) and (.body | contains($s)))] | last | .body // "" | split("\n") | .[0] // ""' \
     <<<"$bot_comments")
-  reviews=$(gh api "repos/$repo/pulls/$pr/reviews?per_page=100" \
-    --jq "[.[] | select(.user.login == \"$bot\" and .commit_id == \"$head\")] | length")
+  reviews=$(gh api --paginate "repos/$repo/pulls/$pr/reviews?per_page=100" \
+    --jq ".[] | select(.user.login == \"$bot\" and .commit_id == \"$head\") | .id" | grep -c . || true)
 
   if ((reviews > 0)); then
     echo "Codex reviewed $short with $reviews review(s)."
