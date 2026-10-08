@@ -3,3 +3,4 @@ pnpm-lock.yaml
 .claude/
 packages/oxlint-config/anti-slop/
 .local/
+apps/web/public/mockServiceWorker.js

@@ -6,6 +6,11 @@
     "toggleSidebar": "Seitenleiste ein- oder ausblenden",
     "workspaceGroup": "Workspace",
     "platformGroup": "Plattform",
+    "workspace": {
+      "label": "Workspace",
+      "loading": "Workspace wird geladen",
+      "unavailable": "Workspace nicht verfügbar"
+    },
     "theme": {
       "label": "Farbschema",
       "light": "Hell",

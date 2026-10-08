@@ -6,6 +6,11 @@
     "toggleSidebar": "Toggle sidebar",
     "workspaceGroup": "Workspace",
     "platformGroup": "Platform",
+    "workspace": {
+      "label": "Workspace",
+      "loading": "Loading Workspace",
+      "unavailable": "Workspace unavailable"
+    },
     "theme": {
       "label": "Color theme",
       "light": "Light",

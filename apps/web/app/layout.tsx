@@ -8,6 +8,7 @@ import type { Metadata } from 'next'
 
 import { AppHeader } from '@/components/app-header'
 import { AppSidebar } from '@/components/app-sidebar'
+import { QueryProvider } from '@/components/query-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 
 import '@edi-bridge/ui/globals.css'
@@ -48,20 +49,22 @@ export default async function RootLayout({
         </a>
         <NextIntlClientProvider>
           <ThemeProvider>
-            <TooltipProvider>
-              <SidebarProvider defaultOpen={sidebarOpen}>
-                <AppSidebar />
-                <SidebarInset>
-                  <AppHeader />
-                  <div
-                    id="main-content"
-                    tabIndex={-1}
-                    className="flex flex-1 flex-col outline-none">
-                    {children}
-                  </div>
-                </SidebarInset>
-              </SidebarProvider>
-            </TooltipProvider>
+            <QueryProvider>
+              <TooltipProvider>
+                <SidebarProvider defaultOpen={sidebarOpen}>
+                  <AppSidebar />
+                  <SidebarInset>
+                    <AppHeader />
+                    <div
+                      id="main-content"
+                      tabIndex={-1}
+                      className="flex flex-1 flex-col outline-none">
+                      {children}
+                    </div>
+                  </SidebarInset>
+                </SidebarProvider>
+              </TooltipProvider>
+            </QueryProvider>
           </ThemeProvider>
         </NextIntlClientProvider>
       </body>
