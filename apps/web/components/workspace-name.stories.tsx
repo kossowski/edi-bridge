@@ -3,6 +3,7 @@ import { expect } from 'storybook/test'
 
 import { WorkspaceName } from '@/components/workspace-name'
 import { apiUrl } from '@/lib/api/config'
+import { currentWorkspaceEndpoint } from '@edi-bridge/contracts'
 import { createWorkspace, currentWorkspaceHandler } from '@edi-bridge/mocks'
 
 import preview from '../.storybook/preview'
@@ -24,7 +25,7 @@ export const Loaded = meta.story({
 export const Loading = meta.story({
   beforeEach({ msw }) {
     msw.use(
-      http.get(`${apiUrl}/workspaces/current`, async () => {
+      http.get(`${apiUrl}${currentWorkspaceEndpoint.path}`, async () => {
         await delay('infinite')
       }),
     )
@@ -37,7 +38,7 @@ export const Loading = meta.story({
 export const Unavailable = meta.story({
   beforeEach({ msw }) {
     msw.use(
-      http.get(`${apiUrl}/workspaces/current`, () =>
+      http.get(`${apiUrl}${currentWorkspaceEndpoint.path}`, () =>
         HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
       ),
     )
