@@ -25,10 +25,8 @@ export const Outline: Story = {
   args: { variant: 'outline' },
 }
 
-// The shadcn destructive colours reach a contrast of 4:1, below the WCAG AA 4.5:1; fix in the theme tokens.
 export const Destructive: Story = {
   args: { variant: 'destructive' },
-  parameters: { a11y: { test: 'todo' } },
 }
 
 export const Disabled: Story = {
