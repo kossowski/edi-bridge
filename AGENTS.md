@@ -22,6 +22,12 @@ Conventional Commits, enforced by commitlint in the `commit-msg` hook. Fix the m
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Deployment docs
+
+Public deployment guidance lives in `docs/deployment/`. Before working on this installation, read `.local/deployment/deployment.md` and `.local/deployment/deployment-operations.md` if they exist. The `.local/` directory is ignored by Git and excluded from Docker builds.
+
+Keep actual hostnames, service names, tunnel identifiers, and installation-specific notes in `.local/deployment/`. Keep credentials in Dokploy or the secret manager. If private notes are missing, use the public guidance and request the missing installation details before changing the deployment.
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know

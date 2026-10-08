@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: edi_bridge
       POSTGRES_DB: edi_bridge
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
@@ -20,7 +20,7 @@ services:
   redis:
     image: redis:8.10.2-alpine3.23
     ports:
-      - '${REDIS_PORT:-6379}:6379'
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
     volumes:
       - redis-data:/data
     healthcheck:
@@ -35,7 +35,7 @@ services:
     platform: linux/amd64
     command: edi_bridge:edi_bridge:::upload
     ports:
-      - '${SFTP_PORT:-2222}:22'
+      - '127.0.0.1:${SFTP_PORT:-2222}:22'
     volumes:
       - sftp-data:/home/edi_bridge
     healthcheck:
@@ -55,7 +55,7 @@ services:
       REDIS_URL: redis://redis:6379
       API_PORT: 3001
     ports:
-      - '${API_PORT:-3001}:3001'
+      - '127.0.0.1:${API_PORT:-3001}:3001'
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,7 +72,7 @@ services:
       REDIS_URL: redis://redis:6379
       WORKER_HEALTH_PORT: 3002
     ports:
-      - '${WORKER_HEALTH_PORT:-3002}:3002'
+      - '127.0.0.1:${WORKER_HEALTH_PORT:-3002}:3002'
     depends_on:
       redis:
         condition: service_healthy
@@ -84,7 +84,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     ports:
-      - '${WEB_PORT:-3000}:3000'
+      - '127.0.0.1:${WEB_PORT:-3000}:3000'
 
 volumes:
   postgres-data:

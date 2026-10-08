@@ -1,5 +1,7 @@
 # edi-bridge
 
+⚠️ EDI Bridge is under active development. The current implementation is a deployment skeleton and is not ready for production use. APIs and data formats may change.
+
 A Turborepo monorepo with three apps and shared packages:
 
 | Path                         | What it is                  |
@@ -9,6 +11,7 @@ A Turborepo monorepo with three apps and shared packages:
 | `apps/worker`                | Background worker           |
 | `packages/ui`                | Shared shadcn/ui components |
 | `packages/eslint-config`     | Shared ESLint configs       |
+| `packages/oxlint-config`     | Shared Oxlint configs       |
 | `packages/typescript-config` | Shared TypeScript configs   |
 
 ## Local setup
@@ -32,7 +35,7 @@ pnpm dev
 | api    | http://localhost:3001/health |
 | worker | http://localhost:3002/health |
 
-The host ports of the infrastructure services can be changed in `.env` (`POSTGRES_PORT`, `REDIS_PORT`, `SFTP_PORT`).
+The host ports of the infrastructure services can be changed in `.env` (`POSTGRES_PORT`, `REDIS_PORT`, `SFTP_PORT`). Compose binds all published ports to `127.0.0.1`. The bundled credentials are for local development only.
 
 Stop the infrastructure with `docker compose down`; add `-v` to also delete its data.
 
@@ -69,4 +72,10 @@ GitHub Actions runs lint, check-types, test and build on every pull request. Tur
 
 ## Deployment
 
-The skeleton runs on Dokploy at <https://edi-bridge.kossowski.io/>, with the API health route at <https://edi-bridge.kossowski.io/api/health>. See [the deployment runbook](docs/deployment.md) for service configuration, required environment variables, Cloudflare routing and verification.
+See [Dokploy deployment configuration](docs/deployment/deployment.md) and [Deploy and maintain EDI Bridge](docs/deployment/deployment-operations.md) for service configuration, routing, and verification.
+
+Installation-specific notes belong in the Git-ignored `.local/deployment/` directory. They are available only on machines where you provision them. See [Private deployment notes](docs/deployment/private-notes.md) for storage and backup options.
+
+## License
+
+EDI Bridge uses the [MIT license](LICENSE). Copied code and skills retain the licenses listed in [Third-party notices](THIRD_PARTY_NOTICES.md).

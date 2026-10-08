@@ -1,6 +1,6 @@
 # Deploy and maintain EDI Bridge
 
-Use this guide to deploy EDI Bridge and check the applications on the Dokploy VPS. The applications run in the **production** environment of the **EDI Bridge** project. See [Dokploy deployment configuration](deployment.md) for service addresses, routing, and environment variables.
+Use this guide to deploy EDI Bridge and check the applications on Dokploy. Before changing an existing installation, read its notes in `.local/deployment/`. See [Dokploy deployment configuration](deployment.md) for the deployment layout and [Private deployment notes](private-notes.md) for access and storage options.
 
 ## Set environment variables
 
@@ -16,9 +16,9 @@ Keep production passwords in Dokploy. Do not commit passwords. Do not put these 
 
 Deploy changes through the GitHub integration:
 
-1. Push the change to `main`.
+1. Merge the reviewed change into `main` after the required CI checks pass.
 2. For each application whose **Watch Paths** match the change, open its deployment history in Dokploy.
-3. Confirm that the deployment uses the pushed commit.
+3. Confirm that the deployment uses the merged commit.
 4. Confirm that the build completed successfully.
 5. Follow [Verify the deployment](#verify-the-deployment).
 
@@ -26,12 +26,18 @@ If an application gains a dependency on another workspace package, add that pack
 
 ## Verify the deployment
 
-A successful build does not prove that the application can reach its dependencies. Check the public endpoints and the worker:
+A successful build does not prove that the application can reach its dependencies. Set `EDI_BRIDGE_URL` to the installation origin from the private notes:
+
+```sh
+	export EDI_BRIDGE_URL=https://edi-bridge.example.com
+```
+
+Check the public endpoints and the worker:
 
 1. Check the web endpoint:
 
    ```sh
-   curl -fsS https://edi-bridge.kossowski.io/ > /dev/null
+   curl -fsS "${EDI_BRIDGE_URL}/" > /dev/null
    ```
 
    Confirm that `curl` exits successfully.
@@ -39,7 +45,7 @@ A successful build does not prove that the application can reach its dependencie
 2. Check the API health endpoint:
 
    ```sh
-   curl -fsS https://edi-bridge.kossowski.io/api/health
+   curl -fsS "${EDI_BRIDGE_URL}/api/health"
    ```
 
    Confirm that the response matches the [healthy API response](deployment.md#health-checks).
@@ -71,4 +77,4 @@ If a build fails with an out-of-memory error or exit code 137, record the affect
 
 ## Add an application to the tunnel
 
-Reuse `dokploy-tunnel` for applications on this VPS. If an application requires separate credentials, network access, or a separate lifecycle, use a separate tunnel. See [Routing](deployment.md#routing) for the existing tunnel and Traefik configuration.
+Read the private installation notes to identify the existing tunnel. Reuse that tunnel for applications on the same VPS. If an application requires separate credentials, network access, or a separate lifecycle, use a separate tunnel. See [Routing](deployment.md#routing) for the existing tunnel and Traefik configuration.

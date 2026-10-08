@@ -2,6 +2,8 @@
 
 Source: [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop), commit `c44ef22ca116d0ba62a3ff663a0bd13a3f3fa40b`, path `skills/install-anti-slop/assets/anti-slop/`.
 
+The upstream MIT license is retained in [`LICENSE`](LICENSE). Keep it with redistributed copies.
+
 The copy in this directory is byte-identical to that path at that commit. It was installed on 2026-10-08 with the `install-anti-slop` skill.
 
 ## Installed paths
