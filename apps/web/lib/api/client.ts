@@ -32,7 +32,7 @@ async function request<Response, Query extends QueryParams | undefined = undefin
     await mockingStarted
   }
 
-  const search = endpoint.query ? `?${toSearchParams(endpoint.query.parse(query))}` : ''
+  const search = query ? `?${toSearchParams(query)}` : ''
   const response = await fetch(`${apiUrl}${endpoint.path}${search}`, { method: endpoint.method })
 
   if (!response.ok) {

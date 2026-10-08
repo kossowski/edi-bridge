@@ -7,6 +7,14 @@ export default defineConfig({
   test: {
     projects: [
       {
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['**/*.test.ts'],
+          exclude: ['**/node_modules/**', '.next/**'],
+        },
+      },
+      {
         extends: true,
         plugins: [
           storybookTest({ configDir: fileURLToPath(new URL('.storybook', import.meta.url)) }),
