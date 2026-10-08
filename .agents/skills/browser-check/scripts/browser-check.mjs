@@ -103,4 +103,4 @@ const lines = [
 writeFileSync(join(out, 'summary.json'), JSON.stringify({ baseUrl, routes, findings, shots }, null, 2))
 writeFileSync(join(out, 'summary.md'), lines.join('\n') + '\n')
 console.log(lines.join('\n'))
-process.exit(findings.length === 0 ? 0 : 1)
+process.exitCode = findings.length === 0 ? 0 : 1
