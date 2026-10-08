@@ -4,10 +4,14 @@
 
 **Blocked by:** 01 (Web app and ui package skeleton)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every screen named in the spec is reachable from the navigation and shows a placeholder
-- [ ] Users can switch between dark and light mode, and the choice persists
-- [ ] Users can switch between English (default) and German; all shell texts are translated
-- [ ] The shell is usable at tablet width and keyboard-navigable
-- [ ] Uses the project's glossary terms for navigation labels
+- [x] Every screen named in the spec is reachable from the navigation and shows a placeholder
+- [x] Users can switch between dark and light mode, and the choice persists
+- [x] Users can switch between English (default) and German; all shell texts are translated
+- [x] The shell is usable at tablet width and keyboard-navigable
+- [x] Uses the project's glossary terms for navigation labels
+
+## Comments
+
+Resolved in #4 (feat/05-app-shell).
