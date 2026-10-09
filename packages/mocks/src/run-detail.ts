@@ -19,7 +19,7 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
-import { directionOf } from './flow'
+import { directionOf } from './direction'
 import {
   type GeneratedInterchange,
   type GeneratedMessage,

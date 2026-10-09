@@ -11,7 +11,7 @@ import {
   withCheckDigit,
 } from '@edi-bridge/contracts'
 
-import { directionOf } from './flow'
+import { directionOf } from './direction'
 import { seededFaker } from './seeded-faker'
 import { seedGln } from './trading-partner'
 import { seedWorkspace } from './workspace'

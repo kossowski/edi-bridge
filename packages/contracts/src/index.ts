@@ -47,7 +47,23 @@ export {
 
 export { controlReferenceSchema, segmentTagSchema } from './edifact'
 
-export { type FlowSummary, flowSummarySchema, flowsEndpoint } from './flow'
+export {
+  createFlowEndpoint,
+  type Flow,
+  flowEndpoint,
+  type FlowInput,
+  flowInputSchema,
+  flowSchema,
+  type FlowSummary,
+  flowSummarySchema,
+  flowsEndpoint,
+  type FlowUpdate,
+  flowUpdateSchema,
+  type MoveFlowMappingVersionBody,
+  moveFlowMappingVersionBodySchema,
+  moveFlowMappingVersionEndpoint,
+  updateFlowEndpoint,
+} from './flow'
 
 export { type GlnIssue, glnIssue, glnSchema, withCheckDigit } from './gln'
 
@@ -65,6 +81,9 @@ export {
   type MappingVersionSummary,
   mappingVersionSummarySchema,
   mappingVersionsEndpoint,
+  publishedMappingVersionsEndpoint,
+  type PublishedMappingVersionsQuery,
+  publishedMappingVersionsQuerySchema,
 } from './mapping-version'
 
 export { type MessageType, messageTypeSchema, messageTypes } from './message-type'

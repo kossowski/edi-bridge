@@ -2,8 +2,11 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  type ChannelInput,
   channelsEndpoint,
   createChannelEndpoint,
+  createFlowEndpoint,
+  type FlowInput,
   mappingVersionsEndpoint,
   type ReprocessRunBody,
   reprocessRunEndpoint,
@@ -17,7 +20,7 @@ import {
   toSearchParams,
 } from '@edi-bridge/contracts'
 
-import { createHandlers } from './index'
+import { createHandlers, seedFlows } from './index'
 
 const apiUrl = 'http://api.test'
 
@@ -128,5 +131,38 @@ describe('createHandlers', () => {
     server.resetHandlers(...createHandlers(apiUrl, { channels: [] }))
 
     expect(await listChannels()).toEqual([])
+  })
+
+  it('lets a Flow use a Channel created within the same createHandlers call', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const post = (path: string, body: ChannelInput | FlowInput) =>
+      fetch(`${apiUrl}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+    const { channel } = createChannelEndpoint.response.parse(
+      await (
+        await post(createChannelEndpoint.path, {
+          type: 'webhook',
+          direction: 'inbound',
+          name: 'Shop webhook',
+          tradingPartnerId: null,
+          rateLimitPerMinute: 60,
+        })
+      ).json(),
+    )
+
+    const flow = seedFlows.find(({ messageType }) => messageType === 'DESADV')!
+
+    const response = await post(createFlowEndpoint.path, {
+      ...flow,
+      name: 'Shop DESADV',
+      inboundChannelId: channel.id,
+    })
+
+    expect(response.status).toBe(201)
   })
 })

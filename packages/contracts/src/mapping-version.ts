@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { messageTypeSchema } from './message-type'
+
 import type { Endpoint } from './endpoint'
 
 export const mappingVersionSummarySchema = z.object({
@@ -20,5 +22,22 @@ export const mappingVersionsEndpoint: Endpoint<
 > = {
   method: 'GET',
   path: '/mappings/:mappingId/versions',
+  response: z.array(mappingVersionSummarySchema),
+}
+
+export const publishedMappingVersionsQuerySchema = z.object({
+  messageType: messageTypeSchema.optional(),
+})
+
+export type PublishedMappingVersionsQuery = z.infer<typeof publishedMappingVersionsQuerySchema>
+
+// Every published Mapping Version a Flow can pin; a Draft is never listed.
+export const publishedMappingVersionsEndpoint: Endpoint<
+  MappingVersionSummary[],
+  PublishedMappingVersionsQuery
+> = {
+  method: 'GET',
+  path: '/mapping-versions',
+  query: publishedMappingVersionsQuerySchema,
   response: z.array(mappingVersionSummarySchema),
 }

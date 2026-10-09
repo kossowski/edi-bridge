@@ -12,7 +12,8 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
-import { directionOf, seedFlows } from './flow'
+import { directionOf } from './direction'
+import { seedFlows } from './flow'
 import { type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
