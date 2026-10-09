@@ -10,8 +10,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useFormatter, useNow, useTimeZone, useTranslations } from 'next-intl'
-import Link from 'next/link'
+import { useNow, useTimeZone, useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import type { KeyboardEvent } from 'react'
@@ -22,6 +21,7 @@ import {
   toRunListQuery,
   useRunFilters,
 } from '@/components/runs/run-filters-store'
+import { RunLink } from '@/components/runs/run-link'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { runsQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -112,31 +112,20 @@ function RunRow({
   onFocus: () => void
 }) {
   const t = useTranslations('Runs')
-  const format = useFormatter()
 
   return (
     <TableRow className="relative">
       <TableCell>
-        <Link
-          href={`/runs/${run.id}`}
+        <RunLink
+          description={t('openRun', {
+            tradingPartner: run.tradingPartner.name,
+            messageType: run.messageType,
+          })}
+          run={run}
           tabIndex={tabIndex}
-          className="focus-visible:after:ring-ring font-medium tabular-nums underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset"
           data-run-link
-          onFocus={onFocus}>
-          <time dateTime={run.receivedAt}>
-            {format.dateTime(new Date(run.receivedAt), {
-              dateStyle: 'medium',
-              timeStyle: 'medium',
-            })}
-          </time>
-          <span className="sr-only">
-            {' '}
-            {t('openRun', {
-              tradingPartner: run.tradingPartner.name,
-              messageType: run.messageType,
-            })}
-          </span>
-        </Link>
+          onFocus={onFocus}
+        />
       </TableCell>
       <TableCell>
         <RunStatusBadge status={run.status} />

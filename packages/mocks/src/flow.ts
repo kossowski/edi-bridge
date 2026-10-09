@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  type Direction,
   type FlowSummary,
   flowSummarySchema,
   flowsEndpoint,
@@ -10,26 +11,28 @@ import {
 import { seedId } from './seed-id'
 import { seedTradingPartners } from './trading-partner'
 
-type FlowDirection = 'inbound' | 'outbound'
-
-const flowTemplates: ReadonlyArray<{ messageType: MessageType; direction: FlowDirection }> = [
+const flowTemplates: ReadonlyArray<{ messageType: MessageType; direction: Direction }> = [
   { messageType: 'ORDERS', direction: 'inbound' },
   { messageType: 'DESADV', direction: 'outbound' },
   { messageType: 'INVOIC', direction: 'outbound' },
   { messageType: 'CONTRL', direction: 'inbound' },
 ]
 
-export const outboundMessageTypes: ReadonlyArray<MessageType> = flowTemplates.flatMap(
-  ({ messageType, direction }) => (direction === 'outbound' ? [messageType] : []),
+const directions = new Map(
+  flowTemplates.map(({ messageType, direction }) => [messageType, direction]),
 )
 
+export function directionOf({ messageType }: { messageType: MessageType }): Direction {
+  return directions.get(messageType)!
+}
+
 export const seedFlows: ReadonlyArray<FlowSummary> = seedTradingPartners.flatMap(
-  (partner, partnerIndex) =>
+  (tradingPartner, tradingPartnerIndex) =>
     flowTemplates.map(({ messageType, direction }, flowIndex) =>
       flowSummarySchema.parse({
-        id: seedId(2, partnerIndex * flowTemplates.length + flowIndex + 1),
-        name: `${partner.name.split(' ')[0]} ${messageType} ${direction}`,
-        tradingPartnerId: partner.id,
+        id: seedId(2, tradingPartnerIndex * flowTemplates.length + flowIndex + 1),
+        name: `${tradingPartner.name.split(' ')[0]} ${messageType} ${direction}`,
+        tradingPartnerId: tradingPartner.id,
         messageType,
       }),
     ),

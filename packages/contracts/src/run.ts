@@ -1,6 +1,8 @@
 import { z } from 'zod'
 
+import { controlReferenceSchema, segmentTagSchema } from './edifact'
 import { flowSummarySchema } from './flow'
+import { mappingVersionSummarySchema } from './mapping-version'
 import { messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
 
@@ -76,4 +78,133 @@ export const runsEndpoint: Endpoint<RunList, RunListQuery> = {
   path: '/runs',
   query: runListQuerySchema,
   response: runListSchema,
+}
+
+export const directions = ['inbound', 'outbound'] as const
+
+export const directionSchema = z.enum(directions)
+
+export type Direction = z.infer<typeof directionSchema>
+
+export const runStepStages = ['receipt', ...failureStages] as const
+
+export const runStepStageSchema = z.enum(runStepStages)
+
+export type RunStepStage = z.infer<typeof runStepStageSchema>
+
+export const runStepStatuses = ['succeeded', 'failed', 'running', 'pending', 'skipped'] as const
+
+export const runStepStatusSchema = z.enum(runStepStatuses)
+
+export type RunStepStatus = z.infer<typeof runStepStatusSchema>
+
+export const runStepSchema = z.object({
+  stage: runStepStageSchema,
+  status: runStepStatusSchema,
+  startedAt: z.iso.datetime().nullable(),
+  finishedAt: z.iso.datetime().nullable(),
+})
+
+export type RunStep = z.infer<typeof runStepSchema>
+
+export const errorPositionSchema = z.object({
+  segment: z.number().int().min(1),
+  tag: segmentTagSchema,
+  element: z.number().int().min(1).nullable(),
+  component: z.number().int().min(1).nullable(),
+})
+
+export type ErrorPosition = z.infer<typeof errorPositionSchema>
+
+export const runErrorSchema = z.object({
+  code: z.string().min(1),
+  message: z.string().min(1),
+  position: errorPositionSchema.nullable(),
+})
+
+export type RunError = z.infer<typeof runErrorSchema>
+
+export const parsedSegmentSchema = z.object({
+  tag: segmentTagSchema,
+  name: z.string().min(1).nullable(),
+  elements: z.array(z.array(z.string())),
+})
+
+export type ParsedSegment = z.infer<typeof parsedSegmentSchema>
+
+export const parsedMessageSchema = z.object({
+  reference: z.string().min(1),
+  messageType: messageTypeSchema,
+  segments: z.array(parsedSegmentSchema).min(1),
+})
+
+export type ParsedMessage = z.infer<typeof parsedMessageSchema>
+
+export const runInterchangeSchema = z.object({
+  id: z.uuid(),
+  controlReference: controlReferenceSchema,
+  raw: z.string().min(1),
+})
+
+export type RunInterchange = z.infer<typeof runInterchangeSchema>
+
+export const runReferenceSchema = z.object({ id: z.uuid() })
+
+export type RunReference = z.infer<typeof runReferenceSchema>
+
+const runDetailFields = {
+  direction: directionSchema,
+  steps: z.array(runStepSchema).min(1),
+  interchange: runInterchangeSchema.nullable(),
+  message: parsedMessageSchema.nullable(),
+  mappingVersion: mappingVersionSummarySchema.nullable(),
+  replaces: runReferenceSchema.nullable(),
+  replacedBy: runReferenceSchema.nullable(),
+}
+
+export const runDetailSchema = z.discriminatedUnion('status', [
+  runSummaryBaseSchema.extend({
+    ...runDetailFields,
+    status: z.literal('failed'),
+    failureStage: failureStageSchema,
+    error: runErrorSchema,
+  }),
+  runSummaryBaseSchema.extend({
+    ...runDetailFields,
+    status: runStatusSchema.exclude(['failed']),
+    failureStage: z.null(),
+    error: z.null(),
+  }),
+])
+
+export type RunDetail = z.infer<typeof runDetailSchema>
+
+export const runEndpoint: Endpoint<RunDetail, undefined, undefined, '/runs/:id'> = {
+  method: 'GET',
+  path: '/runs/:id',
+  response: runDetailSchema,
+}
+
+export const retryRunEndpoint: Endpoint<RunDetail, undefined, undefined, '/runs/:id/retry'> = {
+  method: 'POST',
+  path: '/runs/:id/retry',
+  response: runDetailSchema,
+}
+
+export const reprocessRunBodySchema = z.object({
+  mappingVersionId: z.uuid(),
+})
+
+export type ReprocessRunBody = z.infer<typeof reprocessRunBodySchema>
+
+export const reprocessRunEndpoint: Endpoint<
+  RunDetail,
+  undefined,
+  ReprocessRunBody,
+  '/runs/:id/reprocess'
+> = {
+  method: 'POST',
+  path: '/runs/:id/reprocess',
+  body: reprocessRunBodySchema,
+  response: runDetailSchema,
 }

@@ -12,14 +12,19 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
-import { outboundMessageTypes, seedFlows } from './flow'
+import { directionOf, seedFlows } from './flow'
+import { type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
 function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
   // Outbound Documents come from the ERP as JSON or CSV, so they never fail at EDIFACT parsing.
-  const stages: FailureStage[] = outboundMessageTypes.includes(messageType)
-    ? ['mapping', 'validation', 'delivery']
-    : ['parse', 'validation', 'mapping', 'delivery']
+  // A CONTRL is linked to its Interchange, not mapped, so no Mapping Version could fix it.
+  const stages: FailureStage[] =
+    directionOf({ messageType }) === 'outbound'
+      ? ['mapping', 'validation', 'delivery']
+      : messageType === 'CONTRL'
+        ? ['parse', 'validation', 'delivery']
+        : ['parse', 'validation', 'mapping', 'delivery']
 
   return faker.helpers.arrayElement(stages)
 }
@@ -69,9 +74,28 @@ export function createRuns({
   const faker = new Faker({ locale: [en], seed })
   const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 
-  return Array.from({ length: count }, () =>
-    runSummarySchema.parse(generateRun(faker, faker.date.between({ from, to: now }))),
-  )
+  const runs: RunSummary[] = []
+
+  while (runs.length < count) {
+    const run = generateRun(faker, faker.date.between({ from, to: now }))
+
+    // Retailers often bundle several ORDERS into one Interchange, which is split into one Run each.
+    const bundled =
+      run.messageType === 'ORDERS' && faker.datatype.boolean({ probability: 0.2 })
+        ? faker.number.int({ min: 1, max: 3 })
+        : 0
+
+    const siblings = Array.from({ length: bundled }, () => ({
+      ...generateRun(faker, new Date(run.receivedAt)),
+      tradingPartner: run.tradingPartner,
+      messageType: run.messageType,
+      flow: run.flow,
+    }))
+
+    runs.push(...[run, ...siblings].map((item) => runSummarySchema.parse(item)))
+  }
+
+  return runs.slice(0, count)
 }
 
 let seedRunsCache: RunSummary[] | undefined
@@ -98,8 +122,8 @@ function matches(run: RunSummary, query: RunListQuery) {
   )
 }
 
-export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary>) {
-  let sorted: RunSummary[] | undefined
+export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | RunStore) {
+  let store: RunStore | undefined
 
   return http.get(`${apiUrl}${runsEndpoint.path}`, ({ request }) => {
     const query = runsEndpoint.query.safeParse(fromSearchParams(new URL(request.url).searchParams))
@@ -108,11 +132,9 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary>) {
       return HttpResponse.json({ message: query.error.message }, { status: 400 })
     }
 
-    sorted ??= [...(runs ?? seedRuns())].sort(
-      (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
-    )
+    store ??= toRunStore(runs ?? seedRuns())
     const { page, pageSize } = query.data
-    const filtered = sorted.filter((run) => matches(run, query.data))
+    const filtered = store.newestFirst().filter((run) => matches(run, query.data))
 
     return HttpResponse.json({
       runs: filtered.slice((page - 1) * pageSize, page * pageSize),
