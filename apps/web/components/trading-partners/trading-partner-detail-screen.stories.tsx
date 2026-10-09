@@ -6,7 +6,7 @@ import { TradingPartnerDetailScreen } from '@/components/trading-partners/tradin
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { tradingPartnerEndpoint } from '@edi-bridge/contracts'
-import { createHandlers, createWorkspace, seedTradingPartners } from '@edi-bridge/mocks'
+import { createHandlers, createWorkspace, seedFlows, seedTradingPartners } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -37,7 +37,9 @@ export const InProduction = meta.story({
     await expect(await canvas.findByRole('heading', { name: 'Hansemarkt GmbH' })).toBeVisible()
     await expect(await canvas.findByText('Hansemarkt SFTP inbox')).toBeVisible()
     const flows = within(canvas.getByRole('region', { name: 'Flows' }))
-    await expect(await flows.findByText('Hansemarkt ORDERS inbound')).toBeVisible()
+    await expect(
+      await flows.findByRole('link', { name: 'Hansemarkt ORDERS inbound' }),
+    ).toHaveAttribute('href', `/flows/${seedFlows[0]!.id}`)
     await expect(await canvas.findByRole('link', { name: /View all .* Runs/ })).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Switch to production' })).toBeNull()
   },

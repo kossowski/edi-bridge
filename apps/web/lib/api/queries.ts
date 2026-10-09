@@ -1,16 +1,24 @@
 import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 
-import type { Channel, RunListQuery, TradingPartner } from '@edi-bridge/contracts'
+import type {
+  Channel,
+  Flow,
+  MessageType,
+  RunListQuery,
+  TradingPartner,
+} from '@edi-bridge/contracts'
 
 import {
   getChannel,
   getCurrentWorkspace,
+  getFlow,
   getInterchange,
   getRun,
   getTradingPartner,
   listChannels,
   listFlows,
   listMappingVersions,
+  listPublishedMappingVersions,
   listRuns,
   listTradingPartners,
 } from './client'
@@ -106,7 +114,32 @@ export function storeSavedChannel(queryClient: QueryClient, saved: Channel) {
   void queryClient.invalidateQueries({ queryKey: channelKeys.list() })
 }
 
+export function publishedMappingVersionsQuery(messageType: MessageType) {
+  return queryOptions({
+    queryKey: ['mapping-versions', 'published', messageType],
+    queryFn: () => listPublishedMappingVersions({ messageType }),
+  })
+}
+
+export const flowKeys = {
+  all: () => ['flows'] as const,
+  list: () => [...flowKeys.all(), 'list'] as const,
+  detail: (id: string) => [...flowKeys.all(), 'detail', id] as const,
+}
+
 export const flowsQuery = queryOptions({
-  queryKey: ['flows', 'list'],
+  queryKey: flowKeys.list(),
   queryFn: listFlows,
 })
+
+export function flowQuery(id: string) {
+  return queryOptions({
+    queryKey: flowKeys.detail(id),
+    queryFn: () => getFlow(id),
+  })
+}
+
+export function storeSavedFlow(queryClient: QueryClient, saved: Flow) {
+  queryClient.setQueryData(flowQuery(saved.id).queryKey, saved)
+  void queryClient.invalidateQueries({ queryKey: flowKeys.list() })
+}

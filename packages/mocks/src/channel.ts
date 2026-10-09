@@ -22,6 +22,7 @@ import {
   webhookTokenSchema,
 } from '@edi-bridge/contracts'
 
+import { badRequest, conflict, notFound } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { hasTraffic, seedTradingPartners } from './trading-partner'
@@ -297,14 +298,6 @@ export function toChannelStore(
   return 'get' in channels ? channels : createChannelStore(channels)
 }
 
-function conflict(message: string) {
-  return HttpResponse.json({ message }, { status: 409 })
-}
-
-function badRequest(message: string) {
-  return HttpResponse.json({ message }, { status: 400 })
-}
-
 function applyUpdate(
   existing: ChannelRecord,
   update: ChannelUpdate,
@@ -352,8 +345,6 @@ export function channelHandlers(
   { channels = seedChannels }: { channels?: ReadonlyArray<ChannelRecord> | ChannelStore } = {},
 ) {
   const store = toChannelStore(channels)
-
-  const notFound = () => HttpResponse.json({ message: 'Not found' }, { status: 404 })
 
   return [
     http.get(`${apiUrl}${channelsEndpoint.path}`, () =>

@@ -5,12 +5,20 @@ import {
   type ChannelUpdate,
   type CompanyIdentityInput,
   createChannelEndpoint,
+  createFlowEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   type Endpoint,
+  flowEndpoint,
+  type FlowInput,
   flowsEndpoint,
+  type FlowUpdate,
   interchangeEndpoint,
   mappingVersionsEndpoint,
+  type MoveFlowMappingVersionBody,
+  moveFlowMappingVersionEndpoint,
+  publishedMappingVersionsEndpoint,
+  type PublishedMappingVersionsQuery,
   type QueryParams,
   regenerateWebhookTokenEndpoint,
   type ReprocessRunBody,
@@ -27,6 +35,7 @@ import {
   tradingPartnersEndpoint,
   updateChannelEndpoint,
   updateCompanyIdentityEndpoint,
+  updateFlowEndpoint,
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
@@ -114,6 +123,10 @@ export function listMappingVersions(mappingId: string) {
   })
 }
 
+export function listPublishedMappingVersions(query: PublishedMappingVersionsQuery) {
+  return request(publishedMappingVersionsEndpoint, { query })
+}
+
 export function listTradingPartners() {
   return request(tradingPartnersEndpoint)
 }
@@ -163,4 +176,23 @@ export function regenerateWebhookToken(id: string) {
 
 export function listFlows() {
   return request(flowsEndpoint)
+}
+
+export function getFlow(id: string) {
+  return request(flowEndpoint, { path: toPath(flowEndpoint.path, { id }) })
+}
+
+export function createFlow(body: FlowInput) {
+  return request(createFlowEndpoint, { body })
+}
+
+export function updateFlow(id: string, body: FlowUpdate) {
+  return request(updateFlowEndpoint, { path: toPath(updateFlowEndpoint.path, { id }), body })
+}
+
+export function moveFlowMappingVersion(id: string, body: MoveFlowMappingVersionBody) {
+  return request(moveFlowMappingVersionEndpoint, {
+    path: toPath(moveFlowMappingVersionEndpoint.path, { id }),
+    body,
+  })
 }

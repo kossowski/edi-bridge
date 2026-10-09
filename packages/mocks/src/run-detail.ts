@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  directionOf,
   type Interchange,
   interchangeEndpoint,
   interchangeSchema,
@@ -19,7 +20,6 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
-import { directionOf } from './flow'
 import {
   type GeneratedInterchange,
   type GeneratedMessage,

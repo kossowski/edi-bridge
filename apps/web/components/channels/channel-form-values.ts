@@ -12,6 +12,8 @@ import {
   webhookRateLimitPerMinute,
 } from '@edi-bridge/contracts'
 
+import { fieldErrors, type FormIssue, tooLongOr } from '../../lib/forms/field-errors'
+
 type KindKey<Kind> = Kind extends ChannelKind ? `${Kind['type']}-${Kind['direction']}` : never
 
 export type ChannelKindKey = KindKey<ChannelKind>
@@ -84,20 +86,14 @@ export function isFieldOfKind<Kind extends FieldKind>(
   return fieldKinds[field] === kind
 }
 
-function isField(key: PropertyKey | undefined): key is ChannelField {
-  return Object.keys(fieldKinds).some((field) => field === key)
-}
+const fields = Object.keys(fieldKinds).filter((key): key is ChannelField => key in fieldKinds)
 
-function fieldError(field: ChannelField, issue: { code: string }, value: string): FieldError {
+function fieldError(field: ChannelField, issue: FormIssue, value: string): FieldError {
   if (isFieldOfKind(field, 'number')) {
     return 'range'
   }
 
-  if (issue.code === 'too_big') {
-    return 'tooLong'
-  }
-
-  return value.trim() === '' ? 'required' : 'format'
+  return tooLongOr(issue, value.trim() === '' ? 'required' : 'format')
 }
 
 // A blank number field must fail as out of range, not silently become 0.
@@ -149,21 +145,8 @@ function toBody(values: ChannelFormValues, secrets: { keep: boolean }) {
   }
 }
 
-function collectErrors(
-  issues: ReadonlyArray<{ code: string; path: PropertyKey[] }>,
-  values: ChannelFormValues,
-) {
-  const errors: Partial<Record<ChannelField, FieldError>> = {}
-
-  for (const issue of issues) {
-    const field = issue.path[0]
-
-    if (isField(field)) {
-      errors[field] ??= fieldError(field, issue, values[field])
-    }
-  }
-
-  return errors
+function collectErrors(issues: ReadonlyArray<FormIssue>, values: ChannelFormValues) {
+  return fieldErrors(issues, fields, (field, issue) => fieldError(field, issue, values[field]))
 }
 
 export function validateNewChannel(values: ChannelFormValues): ChannelFormResult<ChannelInput> {

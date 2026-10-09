@@ -1,7 +1,8 @@
 import type { TradingPartner, Workspace } from '@edi-bridge/contracts'
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
-import { flowsHandler } from './flow'
+import { createFlowStore, flowHandlers, seedMappings } from './flow'
+import { createMappingCatalogue, publishedMappingVersionsHandler } from './mapping-version'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
@@ -20,7 +21,24 @@ export {
   toChannel,
 } from './channel'
 
-export { flowsHandler, seedFlows } from './flow'
+export {
+  createFlows,
+  createFlowStore,
+  flowHandlers,
+  type FlowRecord,
+  type FlowStore,
+  seedFlows,
+  seedMappings,
+  toFlow,
+  toFlowStore,
+} from './flow'
+
+export {
+  createMappingCatalogue,
+  type MappingCatalogue,
+  type MappingRecord,
+  publishedMappingVersionsHandler,
+} from './mapping-version'
 
 export { createRun, createRuns, runsHandler, seedRuns } from './run'
 
@@ -64,12 +82,14 @@ export function createHandlers(
   const runs = createRunStore(seedRuns())
   const workspaceStore = createWorkspaceStore(workspace)
   const channelStore = createChannelStore(channels)
+  const mappings = createMappingCatalogue(seedMappings)
 
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
     ...tradingPartnerHandlers(apiUrl, { tradingPartners, workspace: workspaceStore }),
     ...channelHandlers(apiUrl, { channels: channelStore }),
-    flowsHandler(apiUrl),
+    ...flowHandlers(apiUrl, { flows: createFlowStore(), channels: channelStore, mappings }),
+    publishedMappingVersionsHandler(apiUrl, mappings),
     runsHandler(apiUrl, runs),
     ...runDetailHandlers(apiUrl, { runs, reprocessed: seedReprocessed() }),
   ]

@@ -125,7 +125,9 @@ function TradingPartnerFlows({ tradingPartnerId }: { tradingPartnerId: string })
           <ul className="divide-y rounded-lg border">
             {items.map((flow) => (
               <li key={flow.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3">
-                <span className="font-medium">{flow.name}</span>
+                <Link href={`/flows/${flow.id}`} className={linkClass}>
+                  {flow.name}
+                </Link>
                 <code className="text-muted-foreground font-mono text-xs">{flow.messageType}</code>
               </li>
             ))}
