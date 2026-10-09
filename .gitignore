@@ -12,6 +12,7 @@ node_modules
 
 # Private local notes
 /.local/
+.scratch/edi-bridge-mvp/retrospectives
 
 # Testing
 coverage
