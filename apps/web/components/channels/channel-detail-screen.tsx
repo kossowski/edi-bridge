@@ -13,6 +13,7 @@ import {
 } from '@/components/channels/channel-parts'
 import { WebhookAccess } from '@/components/channels/webhook-token'
 import { BackLink, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { ManualSubmissionDialog } from '@/components/manual-submission/manual-submission-dialog'
 import { ApiError } from '@/lib/api/client'
 import { channelQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -102,12 +103,17 @@ function ChannelView({ channel }: { channel: Channel }) {
           <h1 className="text-2xl font-semibold tracking-tight">{channel.name}</h1>
           <Badge variant="outline">{kindLabel(channel)}</Badge>
         </div>
-        <Link
-          href={`/channels/${channel.id}/edit`}
-          className={buttonVariants({ variant: 'outline' })}>
-          <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-          {t('edit')}
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {channel.direction === 'inbound' && (
+            <ManualSubmissionDialog defaultChannelId={channel.id} />
+          )}
+          <Link
+            href={`/channels/${channel.id}/edit`}
+            className={buttonVariants({ variant: 'outline' })}>
+            <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
+            {t('edit')}
+          </Link>
+        </div>
       </div>
       <dl
         aria-label={t('facts.label')}

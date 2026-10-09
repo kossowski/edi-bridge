@@ -1,13 +1,13 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect } from 'storybook/test'
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { emptyRunFilters, useRunFilters } from '@/components/runs/run-filters-store'
 import { RunsScreen } from '@/components/runs/runs-screen'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { runsEndpoint } from '@edi-bridge/contracts'
-import { createRuns, runsHandler, seedRuns } from '@edi-bridge/mocks'
+import { createHandlers, createRuns, runsHandler, seedRuns } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -29,6 +29,36 @@ export const Default = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('40 Runs')).toBeVisible()
     await expect(canvas.getAllByRole('row')).toHaveLength(41)
+  },
+})
+
+export const ManualSubmission = meta.story({
+  parameters: { a11y: { context: 'body' } },
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl))
+    useRunFilters.setState({ manualSubmission: 'manual' })
+  },
+  async play({ canvas }) {
+    const count = async () =>
+      Number((await canvas.findByText(/^[\d,]+ Runs$/)).textContent.replaceAll(/\D/g, ''))
+
+    const before = await count()
+    await userEvent.click(canvas.getByRole('button', { name: 'Submit a Document' }))
+    const dialog = within(await screen.findByRole('dialog', { name: 'Manual Submission' }))
+    const trigger = dialog.getByRole('combobox', { name: 'Inbound Channel' })
+    await waitFor(() => expect(trigger).toBeEnabled())
+    await userEvent.click(trigger)
+    await userEvent.click(await screen.findByRole('option', { name: 'Hansemarkt SFTP inbox' }))
+    await userEvent.upload(
+      dialog.getByLabelText('Document'),
+      new File(['Please ship by Friday.'], 'notes.txt', { type: 'text/plain' }),
+    )
+    await userEvent.click(dialog.getByRole('button', { name: 'Submit Document' }))
+    await expect(await dialog.findByRole('heading', { name: '1 Run created' })).toBeVisible()
+    await userEvent.click(dialog.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await expect(canvas.getByRole('button', { name: 'Submit a Document' })).toHaveFocus()
+    await waitFor(async () => expect(await count()).toBe(before + 1))
   },
 })
 

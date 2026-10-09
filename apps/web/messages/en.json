@@ -774,6 +774,52 @@
     "saving": "Saving…",
     "cancel": "Cancel"
   },
+  "ManualSubmission": {
+    "open": "Submit a Document",
+    "title": "Manual Submission",
+    "description": "Hand over a Document as if it had arrived on an inbound Channel. EDI Bridge processes it like Channel traffic and marks its Runs as manual.",
+    "close": "Close",
+    "cancel": "Cancel",
+    "submit": "Submit Document",
+    "submitting": "Submitting Document…",
+    "channel": {
+      "label": "Inbound Channel",
+      "description": "The Document is processed as if it had arrived on this Channel.",
+      "placeholder": "Choose an inbound Channel",
+      "loading": "Loading Channels…",
+      "error": "The Channels could not be loaded.",
+      "retry": "Try again",
+      "empty": {
+        "title": "No inbound Channel yet",
+        "description": "A Manual Submission needs an inbound Channel. Create one first.",
+        "action": "New Channel"
+      }
+    },
+    "document": {
+      "label": "Document",
+      "description": "An EDIFACT Interchange from a Trading Partner, or a JSON or CSV file from your own systems.",
+      "drop": "Drop the file here or choose it."
+    },
+    "errors": {
+      "channelRequired": "Choose an inbound Channel.",
+      "document": {
+        "required": "Choose a file.",
+        "empty": "The file is empty.",
+        "tooLarge": "The file is too large. A Document can have at most 5 million characters."
+      },
+      "unroutable": "No Flow routes Documents from this Channel. Create a Flow for it first.",
+      "failed": "The Document could not be submitted. Try again."
+    },
+    "result": {
+      "title": "{count, plural, one {# Run created} other {# Runs created}}",
+      "description": "{fileName} was submitted on {channel}.",
+      "run": "{messageType} from {tradingPartner} · {flow}",
+      "open": "Open Run",
+      "openContext": "{messageType} from {tradingPartner}",
+      "another": "Submit another Document",
+      "done": "Done"
+    }
+  },
   "Settings": {
     "loading": "Loading settings",
     "notFound": {
