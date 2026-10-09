@@ -1,10 +1,9 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useMemo } from 'react'
 
 import { channelKindKey } from '@/components/channels/channel-form-values'
+import { useLookup } from '@/hooks/use-lookup'
 import { tradingPartnersQuery } from '@/lib/api/queries'
 
 import type { Channel, ChannelKind, MaskedSecret } from '@edi-bridge/contracts'
@@ -17,25 +16,14 @@ export function useChannelKindLabel() {
 
 export function useChannelTradingPartners() {
   const t = useTranslations('Channels')
-  const tradingPartners = useQuery(tradingPartnersQuery)
-
-  const byId = useMemo(
-    () =>
-      new Map(tradingPartners.data?.map((tradingPartner) => [tradingPartner.id, tradingPartner])),
-    [tradingPartners.data],
-  )
-
-  function find(tradingPartnerId: string | null) {
-    return tradingPartnerId === null ? undefined : byId.get(tradingPartnerId)
-  }
+  const tradingPartners = useLookup(tradingPartnersQuery)
 
   return {
-    isPending: tradingPartners.isPending,
-    find,
+    ...tradingPartners,
     name: (tradingPartnerId: string | null) =>
       tradingPartnerId === null
         ? t('ownSystems')
-        : (find(tradingPartnerId)?.name ?? t('unknownTradingPartner')),
+        : (tradingPartners.find(tradingPartnerId)?.name ?? t('unknownTradingPartner')),
   }
 }
 

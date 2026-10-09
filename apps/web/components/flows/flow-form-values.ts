@@ -9,6 +9,8 @@ import {
   type MessageType,
 } from '@edi-bridge/contracts'
 
+import { fieldErrors, type FormIssue, tooLongOr } from '../../lib/forms/field-errors'
+
 export type FlowFormValues = {
   name: string
   tradingPartnerId: string
@@ -33,10 +35,6 @@ const fields = [
   'destinationChannelId',
   'mappingVersionId',
 ] as const satisfies ReadonlyArray<FlowField>
-
-function isField(key: PropertyKey | undefined): key is FlowField {
-  return fields.some((field) => field === key)
-}
 
 export function toFormValues(flow?: Flow): FlowFormValues {
   return {
@@ -93,18 +91,8 @@ export function chooseMessageType(values: FlowFormValues, messageType: MessageTy
     : { ...values, messageType, mappingVersionId: '' }
 }
 
-function collectErrors(issues: ReadonlyArray<{ code: string; path: PropertyKey[] }>) {
-  const errors: Partial<Record<FlowField, FlowFieldError>> = {}
-
-  for (const issue of issues) {
-    const field = issue.path[0]
-
-    if (isField(field)) {
-      errors[field] ??= issue.code === 'too_big' ? 'tooLong' : 'required'
-    }
-  }
-
-  return errors
+function collectErrors(issues: ReadonlyArray<FormIssue>) {
+  return fieldErrors(issues, fields, (_, issue): FlowFieldError => tooLongOr(issue, 'required'))
 }
 
 export function validateNewFlow(values: FlowFormValues): FlowFormResult<FlowInput> {

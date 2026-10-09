@@ -1,28 +1,20 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
-import { useMemo } from 'react'
 
 import { useChannelTradingPartners } from '@/components/channels/channel-parts'
+import { useLookup } from '@/hooks/use-lookup'
 import { channelsQuery } from '@/lib/api/queries'
 
 import type { MappingVersionSummary } from '@edi-bridge/contracts'
 
 export function useFlowChannels() {
   const t = useTranslations('Flow')
-  const channels = useQuery(channelsQuery)
-
-  const byId = useMemo(
-    () => new Map(channels.data?.map((channel) => [channel.id, channel])),
-    [channels.data],
-  )
+  const channels = useLookup(channelsQuery)
 
   return {
-    data: channels.data,
-    isPending: channels.isPending,
-    find: (id: string) => byId.get(id),
-    name: (id: string) => byId.get(id)?.name ?? t('unknownChannel'),
+    ...channels,
+    name: (id: string) => channels.find(id)?.name ?? t('unknownChannel'),
   }
 }
 
