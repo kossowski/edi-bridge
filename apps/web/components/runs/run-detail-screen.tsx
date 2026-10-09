@@ -141,7 +141,7 @@ function RunDetailView({ run }: { run: RunDetail }) {
       <RunFacts run={run} />
       {run.error && <RunErrorNotice error={run.error} />}
       <RunRemedyPanel run={run} />
-      <div className="grid gap-6 lg:grid-cols-[minmax(16rem,1fr)_2fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Section id="run-steps" title={t('steps.title')}>
           <RunTimeline steps={run.steps} />
         </Section>
@@ -176,7 +176,7 @@ function RunDetailLoading() {
       </p>
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-28 w-full" />
-      <div className="grid gap-6 lg:grid-cols-[minmax(16rem,1fr)_2fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Skeleton className="h-56 w-full" />
         <Skeleton className="h-56 w-full" />
       </div>
