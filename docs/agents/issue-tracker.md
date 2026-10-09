@@ -20,10 +20,10 @@ Read the file at the referenced path. The user will normally pass the path or th
 
 ## When a skill says "close" or "resolve" a ticket
 
-Work is delivered through a PR against `main`. Merging a PR doesn't close anything here; the ticket file is updated by hand:
+Work is delivered through a stack of PRs, the bottom one against `main`. Merging a PR doesn't close anything here; the ticket file is updated by hand, in a commit on the top PR of the stack:
 
 1. Check every acceptance-criteria checkbox that the work fulfils. Don't change the wording.
 2. Set the `Status:` line to `done`.
-3. Append a line under `## Comments`: `Resolved in #<PR number> (<integration branch>).`
+3. Append a line under `## Comments`: `Resolved in #<PR number>, #<PR number>, ...`, listing every PR of the stack.
 
 Commits reference the ticket with the `refs: edi-bridge-issue#<NN>` footer.
