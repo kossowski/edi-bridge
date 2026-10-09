@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useId, useRef, useState } from 'react'
 
-import { describedBy, FormField, GlnField, useGlnErrorMessage } from '@/components/form-field'
+import { GlnField, SelectField, TextField, useGlnErrorMessage } from '@/components/form-field'
 import {
   type FieldError,
   toFormValues,
@@ -24,14 +24,6 @@ import {
   tradingPartnerInputSchema,
 } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
-import { Input } from '@edi-bridge/ui/components/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@edi-bridge/ui/components/select'
 
 function useFieldErrorMessage() {
   const t = useTranslations('TradingPartnerForm.errors')
@@ -138,25 +130,16 @@ export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: Tradin
           {t('testModeNotice')}
         </p>
       )}
-      <FormField
+      <TextField
         id={ids.name}
+        autoComplete="organization"
         description={t('fields.name.description')}
         error={nameError}
-        label={
-          <label htmlFor={ids.name} className="text-sm font-medium">
-            {t('fields.name.label')}
-          </label>
-        }>
-        <Input
-          id={ids.name}
-          autoComplete="organization"
-          name="name"
-          value={values.name}
-          aria-describedby={describedBy(ids.name, nameError)}
-          aria-invalid={nameError !== null}
-          onChange={(event) => update('name', event.target.value)}
-        />
-      </FormField>
+        label={t('fields.name.label')}
+        name="name"
+        value={values.name}
+        onChange={(value) => update('name', value)}
+      />
       <GlnField
         id={ids.gln}
         description={t('fields.gln.description')}
@@ -165,64 +148,29 @@ export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: Tradin
         value={values.gln}
         onChange={(value) => update('gln', value)}
       />
-      <FormField
+      <SelectField
         id={ids.characterSet}
         description={t('fields.characterSet.description')}
-        error={null}
-        label={
-          <span id={`${ids.characterSet}-label`} className="text-sm font-medium">
-            {t('fields.characterSet.label')}
-          </span>
-        }>
-        <Select
-          items={characterSetItems}
-          value={values.characterSet}
-          onValueChange={(value) => {
-            const characterSet = characterSets.find((item) => item === value)
-
-            if (characterSet) {
-              update('characterSet', characterSet)
-            }
-          }}>
-          <SelectTrigger
-            aria-describedby={`${ids.characterSet}-description`}
-            aria-labelledby={`${ids.characterSet}-label`}
-            className="w-full sm:w-80">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {characterSetItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FormField>
-      <FormField
+        items={characterSetItems}
+        label={t('fields.characterSet.label')}
+        value={values.characterSet}
+        onChange={(value) => update('characterSet', value)}
+      />
+      <TextField
         id={ids.acknowledgementTimeLimitHours}
         description={t('fields.acknowledgementTimeLimitHours.description')}
         error={hoursError}
-        label={
-          <label htmlFor={ids.acknowledgementTimeLimitHours} className="text-sm font-medium">
-            {t('fields.acknowledgementTimeLimitHours.label')}
-          </label>
-        }>
-        <Input
-          id={ids.acknowledgementTimeLimitHours}
-          inputMode="numeric"
-          max={acknowledgementTimeLimitHours.max}
-          min={acknowledgementTimeLimitHours.min}
-          name="acknowledgementTimeLimitHours"
-          step={1}
-          type="number"
-          value={values.acknowledgementTimeLimitHours}
-          aria-describedby={describedBy(ids.acknowledgementTimeLimitHours, hoursError)}
-          aria-invalid={hoursError !== null}
-          className="sm:w-32"
-          onChange={(event) => update('acknowledgementTimeLimitHours', event.target.value)}
-        />
-      </FormField>
+        inputMode="numeric"
+        label={t('fields.acknowledgementTimeLimitHours.label')}
+        max={acknowledgementTimeLimitHours.max}
+        min={acknowledgementTimeLimitHours.min}
+        name="acknowledgementTimeLimitHours"
+        step={1}
+        type="number"
+        value={values.acknowledgementTimeLimitHours}
+        className="sm:w-32"
+        onChange={(value) => update('acknowledgementTimeLimitHours', value)}
+      />
       {save.isError && !conflict && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.saveFailed')}

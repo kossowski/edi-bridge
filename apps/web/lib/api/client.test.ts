@@ -2,6 +2,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  channelHandlers,
   createRun,
   createTradingPartner as buildTradingPartner,
   createWorkspace,
@@ -12,10 +13,13 @@ import {
 } from '@edi-bridge/mocks'
 
 import {
+  createChannel,
   createTradingPartner,
+  getChannel,
   getRun,
   listMappingVersions,
   listRuns,
+  regenerateWebhookToken,
   reprocessRun,
   retryRun,
   switchToProduction,
@@ -175,6 +179,30 @@ describe('Trading Partner actions', () => {
 
     await expect(updateCompanyIdentity({ gln: '0212345000007' })).resolves.toMatchObject({
       gln: '0212345000007',
+    })
+  })
+})
+
+describe('Channel actions', () => {
+  it('returns the webhook token only on create and regenerate', async () => {
+    server.use(...channelHandlers(apiUrl, { channels: [] }))
+
+    const created = await createChannel({
+      type: 'webhook',
+      direction: 'inbound',
+      name: 'Shop webhook',
+      tradingPartnerId: null,
+      rateLimitPerMinute: 60,
+    })
+
+    const token = created.webhookToken!
+    const read = await getChannel(created.channel.id)
+    const regenerated = await regenerateWebhookToken(created.channel.id)
+
+    expect(read).toMatchObject({ token: { lastFour: token.slice(-4) } })
+    expect(regenerated.webhookToken).not.toBe(token)
+    expect(regenerated.channel).toMatchObject({
+      token: { lastFour: regenerated.webhookToken.slice(-4) },
     })
   })
 })

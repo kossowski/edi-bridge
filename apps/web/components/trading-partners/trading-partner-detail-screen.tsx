@@ -8,6 +8,7 @@ import Link from 'next/link'
 
 import type { ReactNode } from 'react'
 
+import { useChannelKindLabel } from '@/components/channels/channel-parts'
 import { BackLink, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
 import { useRunFilters } from '@/components/runs/run-filters-store'
 import { RunLink } from '@/components/runs/run-link'
@@ -82,6 +83,7 @@ function TradingPartnerFacts({ tradingPartner }: { tradingPartner: TradingPartne
 
 function TradingPartnerChannels({ tradingPartnerId }: { tradingPartnerId: string }) {
   const t = useTranslations('TradingPartner.channels')
+  const kindLabel = useChannelKindLabel()
 
   const channels = useQuery({
     ...channelsQuery,
@@ -95,13 +97,10 @@ function TradingPartnerChannels({ tradingPartnerId }: { tradingPartnerId: string
           <ul className="divide-y rounded-lg border">
             {items.map((channel) => (
               <li key={channel.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3">
-                <span className="font-medium">{channel.name}</span>
-                <span className="text-muted-foreground text-sm">
-                  {t('kind', {
-                    type: t(`type.${channel.type}`),
-                    direction: t(`direction.${channel.direction}`),
-                  })}
-                </span>
+                <Link href={`/channels/${channel.id}`} className={linkClass}>
+                  {channel.name}
+                </Link>
+                <span className="text-muted-foreground text-sm">{kindLabel(channel)}</span>
               </li>
             ))}
           </ul>
