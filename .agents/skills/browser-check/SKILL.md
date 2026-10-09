@@ -23,6 +23,8 @@ The branch under review needs its dependencies installed (`pnpm install` in its 
 
 List the pages the diff changes. If the diff touches the shell (`apps/web/app/layout.tsx`, `apps/web/components/app-*`) or `packages/ui`, take every route from `apps/web/lib/navigation.ts`.
 
+For a dynamic route such as `/runs/[id]`, pass concrete URLs. Take the ids from the links on the list page, and pick one per state the ticket changes.
+
 ## 2. Run the fixed checks
 
 ```sh
@@ -30,7 +32,9 @@ node .agents/skills/browser-check/scripts/browser-check.mjs \
 	--repo <worktree of the branch> --out <dir outside the repo> --routes /,/runs
 ```
 
-The script starts `next dev` on a free port and stops it afterwards. For each route it opens every combination of 390, 768, 1024 and 1440px, light and dark, and English and German. It reports:
+The script starts `next dev` on a free port with `NEXT_PUBLIC_API_MOCKING=enabled`, so the pages get their data from the mocks package. It stops the server afterwards. Next refuses a second dev server for the same checkout. If one already runs, the script names its URL. Pass that URL with `--base-url` only if the server runs in mock mode (`pnpm --filter @edi-bridge/web dev:mock`). Otherwise run the check against a worktree.
+
+Each page counts as loaded when no element has `aria-busy="true"`. Screens mark their loading state that way. A page that is still busy after 20 seconds becomes an `error` finding, and the script doesn't check its skeleton. For each route it opens every combination of 390, 768, 1024 and 1440px, light and dark, and English and German. It reports:
 
 - an HTTP status other than 2xx
 - a wrong `<html lang>`
@@ -38,7 +42,7 @@ The script starts `next dev` on a free port and stops it afterwards. For each ro
 - browser console errors and uncaught exceptions
 - axe-core violations against WCAG 2.2 AA, at 1440px
 
-It writes `summary.md`, `summary.json` and one screenshot per combination, named `<route>_<width>_<theme>_<locale>.png`. It exits with 0 when there are no findings, 1 when there are findings, and 2 on a usage error. Pass `--base-url` to check a server that is already running.
+It writes `summary.md`, `summary.json` and one screenshot per combination, named `<route>_<width>_<theme>_<locale>.png`. It exits with 0 when there are no findings, 1 when there are findings, and 2 on a usage error or when the dev server doesn't start. Pass `--base-url` to check a server that is already running.
 
 ## 3. Check the ticket's behaviour
 
@@ -60,7 +64,7 @@ try {
 }
 ```
 
-`lib.mjs` also exports `hasHorizontalOverflow(page)` and the `widths`, `themes` and `locales` lists.
+`gotoSettled` waits for the theme and for the page to load, the same way the fixed checks do. `startDevServer` starts the server in mock mode. `lib.mjs` also exports `hasHorizontalOverflow(page)` and the `widths`, `themes` and `locales` lists.
 
 - Find elements by role and accessible name, in the locale you opened. The German page has German names.
 - Reload the page before you test the Tab order. After a click, Tab continues from the clicked element.
@@ -77,4 +81,5 @@ Stay under 400 words. List each finding with where it occurs (route, width, them
 ## Limits
 
 - The check runs against `next dev`, not a production build.
-- Pages that need API data show what the dev server returns. That stays true until the mocks package and MSW exist.
+- Pages get mock data, not data from `apps/api`.
+- The script can't tell that a screen has loaded if the screen doesn't set `aria-busy` while it loads. It then checks the loading state.
