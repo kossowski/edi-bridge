@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, userEvent, waitFor } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import { apiUrl } from '@/lib/api/config'
@@ -28,6 +28,35 @@ const withoutLinks = seeded('Rheinkauf: ERP JSON to INVOIC')
 const largeStructure = createDocumentStructure({ fieldCount: 400 })
 
 const [, , largeDraft] = createMappingDrafts({ count: 3, documentStructures: [largeStructure] })
+
+// The tooltip renders in a portal outside the story's root.
+function page(canvasElement: HTMLElement) {
+  return within(canvasElement.ownerDocument.body)
+}
+
+async function findRow(canvasElement: HTMLElement, id: string) {
+  return waitFor(() => {
+    const row = canvasElement.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`)
+
+    if (!row) {
+      throw new Error(`No row ${id}`)
+    }
+
+    return row
+  })
+}
+
+async function findTooltip(canvasElement: HTMLElement) {
+  const tooltip = await page(canvasElement).findByRole('tooltip')
+
+  await waitFor(() => expect(tooltip).toBeVisible())
+
+  return within(tooltip)
+}
+
+function detailsPanel(canvasElement: HTMLElement, name = 'Meaning') {
+  return within(page(canvasElement).getByRole('region', { name }))
+}
 
 const meta = preview.meta({
   title: 'Mappings/MappingCanvasScreen',
@@ -197,7 +226,14 @@ export const LargeVolume = meta.story({
     )
 
     // Every part is rendered, also those out of view, so that each one can get keyboard focus.
-    await expect(canvasElement.querySelectorAll('.react-flow__node').length).toBeGreaterThan(400)
+    const nodes = canvasElement.querySelectorAll('.react-flow__node')
+
+    await expect(nodes.length).toBeGreaterThan(400)
+
+    const rows = [...canvasElement.querySelectorAll<HTMLElement>('[data-row-id]')]
+
+    await expect(rows.length).toBe(nodes.length - 2)
+    await expect(rows.every((row) => row.tabIndex === 0)).toBe(true)
   },
 })
 
@@ -218,7 +254,9 @@ export const KeyboardPansToParts = meta.story({
 
     await expect(hidden).toBeGreaterThan(0)
 
-    toggles[hidden - 1]!.focus()
+    const focusable = [...canvasElement.querySelectorAll<HTMLElement>('.react-flow__node button')]
+
+    focusable[focusable.indexOf(toggles[hidden]!) - 1]!.focus()
 
     const before = viewport.style.transform
 
@@ -256,7 +294,7 @@ export const EmptyPart = meta.story({
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByText('header')).toBeVisible()
     await expect(canvas.getByText('Empty')).toBeVisible()
-    await expect(canvas.queryByRole('button', { name: /header/ })).toBeNull()
+    await expect(canvas.queryByRole('button', { name: /(Expand|Collapse) header/ })).toBeNull()
     await expect(canvas.getByText('UNH')).toBeVisible()
     await expect(canvasElement.querySelector('.react-flow__edge')).toBeNull()
   },
@@ -363,5 +401,171 @@ export const Dark = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('despatchNumber')).toBeVisible()
+  },
+})
+
+export const HoverMeaning = meta.story({
+  args: { id: inbound.id },
+  async play({ canvasElement }) {
+    await userEvent.hover(await findRow(canvasElement, 'source:DTM+137'))
+
+    const tooltip = await findTooltip(canvasElement)
+
+    await expect(tooltip.getByText('DTM+137')).toBeVisible()
+    await expect(tooltip.getByText('Document/message date/time')).toBeVisible()
+    await expect(tooltip.getByText('Mandatory')).toBeVisible()
+    await expect(tooltip.getByText('Once')).toBeVisible()
+  },
+})
+
+export const HoverMeaningOnTarget = meta.story({
+  args: { id: outbound.id },
+  async play({ canvasElement }) {
+    const row = await findRow(canvasElement, 'target:DTM+137')
+
+    await userEvent.hover(row)
+
+    const tooltip = await findTooltip(canvasElement)
+
+    await expect(tooltip.getByText('Document/message date/time')).toBeVisible()
+    await expect(row).toHaveAccessibleDescription(/Document\/message date\/time/)
+  },
+})
+
+export const KeyboardFocusMeaning = meta.story({
+  args: { id: inbound.id },
+  async play({ canvas, canvasElement }) {
+    const row = await findRow(canvasElement, 'source:DTM+137')
+    const panel = detailsPanel(canvasElement)
+
+    canvas.getByRole('button', { name: 'Collapse DTM+137' }).focus()
+    await userEvent.tab()
+    await expect(row).toHaveFocus()
+    await expect(
+      (await findTooltip(canvasElement)).getByText('Document/message date/time'),
+    ).toBeVisible()
+
+    await userEvent.keyboard('{Enter}')
+    await expect(row).toHaveAttribute('aria-pressed', 'true')
+    await expect(panel.getByText('Document/message date/time')).toBeVisible()
+
+    await userEvent.tab({ shift: true })
+    await userEvent.tab()
+    await findTooltip(canvasElement)
+
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('tooltip')).toBeNull())
+    await expect(row).toHaveFocus()
+    await expect(row).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.keyboard('{Escape}')
+    await expect(row).toHaveAttribute('aria-pressed', 'false')
+    await expect(panel.getByText('Select a part', { exact: false })).toBeVisible()
+
+    await userEvent.keyboard(' ')
+    await expect(row).toHaveAttribute('aria-pressed', 'true')
+  },
+})
+
+export const SelectedRow = meta.story({
+  args: { id: inbound.id },
+  async play({ canvasElement }) {
+    const row = await findRow(canvasElement, 'source:DTM+137')
+    const panel = detailsPanel(canvasElement)
+
+    await expect(panel.getByText('Select a part', { exact: false })).toBeVisible()
+
+    await userEvent.click(row)
+    await expect(row).toHaveAttribute('aria-pressed', 'true')
+    await expect(panel.getByText('Document/message date/time')).toBeVisible()
+    await expect(panel.getByText('Source')).toBeVisible()
+
+    await userEvent.click(panel.getByRole('button', { name: 'Clear selection' }))
+    await expect(row).toHaveAttribute('aria-pressed', 'false')
+    await expect(row).toHaveFocus()
+
+    await userEvent.click(row)
+    await userEvent.click(row)
+    await expect(row).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(await findRow(canvasElement, 'target:orderNumber'))
+    await expect(panel.getByText('Target')).toBeVisible()
+    await expect(panel.getByText('Required')).toBeVisible()
+  },
+})
+
+export const QualifiedGroup = meta.story({
+  args: { id: inbound.id },
+  async play({ canvasElement }) {
+    await userEvent.hover(await findRow(canvasElement, 'source:SG2+BY'))
+
+    const tooltip = await findTooltip(canvasElement)
+
+    await expect(tooltip.getByText('Name and address')).toBeVisible()
+    await expect(tooltip.getByText('Buyer')).toBeVisible()
+
+    await userEvent.click(await findRow(canvasElement, 'source:SG2+BY/NAD+BY'))
+
+    const panel = detailsPanel(canvasElement)
+
+    await expect(panel.getByText('NAD+BY')).toBeVisible()
+    await expect(panel.getByText('Buyer')).toBeVisible()
+  },
+})
+
+export const CodedElement = meta.story({
+  args: { id: inbound.id },
+  async play({ canvasElement }) {
+    await userEvent.click(await findRow(canvasElement, 'source:DTM+137/C507/2379'))
+
+    const panel = detailsPanel(canvasElement)
+
+    await expect(panel.getByText('Date/time/period format qualifier')).toBeVisible()
+    await expect(
+      panel.getByText('(alphanumeric, up to 3 characters)', { exact: false }),
+    ).toBeVisible()
+    await expect(panel.getByText('CCYYMMDD')).toBeVisible()
+    await expect(panel.getByText('CCYYMMDDHHMM')).toBeVisible()
+  },
+})
+
+export const MeaningGerman = meta.story({
+  args: { id: inbound.id },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  async play({ canvasElement }) {
+    const row = await findRow(canvasElement, 'source:DTM+137')
+
+    await userEvent.click(row)
+
+    const panel = detailsPanel(canvasElement, 'Bedeutung')
+
+    await expect(panel.getByText('Dokumenten-/Nachrichtendatum/-zeit')).toBeVisible()
+    await expect(panel.getByText('Muss')).toBeVisible()
+
+    await userEvent.hover(row)
+    await expect((await findTooltip(canvasElement)).getByText('Einmal')).toBeVisible()
+  },
+})
+
+export const MeaningDark = meta.story({
+  args: { id: outbound.id },
+  beforeEach() {
+    document.documentElement.classList.add('dark')
+
+    return () => document.documentElement.classList.remove('dark')
+  },
+  async play({ canvasElement }) {
+    const row = await findRow(canvasElement, 'target:DTM+137')
+
+    await userEvent.click(row)
+    await expect(detailsPanel(canvasElement).getByText('Document/message date/time')).toBeVisible()
+    await userEvent.hover(row)
+    await findTooltip(canvasElement)
   },
 })

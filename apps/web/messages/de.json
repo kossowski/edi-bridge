@@ -864,6 +864,37 @@
     "desktopOnly": {
       "title": "Die Mapping-Zeichenfläche braucht einen größeren Bildschirm",
       "description": "Öffnen Sie dieses Mapping auf einem Bildschirm mit mindestens 1024 Pixeln Breite, um Quelle, Ziel und ihre Verknüpfungen zu sehen."
+    },
+    "meaning": {
+      "kind": {
+        "segmentGroup": "Segmentgruppe",
+        "segment": "Segment",
+        "composite": "Datenelementgruppe",
+        "element": "Datenelement",
+        "field": "Feld",
+        "object": "Objekt",
+        "array": "Liste"
+      },
+      "qualifier": "Qualifier",
+      "status": "Status",
+      "mandatory": "Muss",
+      "conditional": "Kann",
+      "required": "Pflicht",
+      "optional": "Optional",
+      "repetition": "Wiederholung",
+      "once": "Einmal",
+      "upTo": "Bis zu {count}-mal",
+      "unbounded": "Beliebig oft",
+      "format": "Format",
+      "formatText": "{characters, select, a {alphabetisch} n {numerisch} other {alphanumerisch}}, {variable, select, variable {bis zu} other {genau}} {length} Zeichen",
+      "dataType": "Datentyp",
+      "codes": "Codes",
+      "moreCodes": "{count, plural, one {Und # weiterer Code. Wählen Sie den Teil aus, um alle Codes zu sehen.} other {Und # weitere Codes. Wählen Sie den Teil aus, um alle Codes zu sehen.}}"
+    },
+    "details": {
+      "title": "Bedeutung",
+      "empty": "Wählen Sie einen Teil aus, um seine Bedeutung hier zu behalten. Für einen schnellen Blick zeigen Sie auf einen Teil oder setzen Sie den Fokus darauf.",
+      "clear": "Auswahl aufheben"
     }
   },
   "ManualSubmission": {

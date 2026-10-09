@@ -1,8 +1,10 @@
 import type { Locale } from '@/i18n/locales'
 import type {
   DocumentStructureNode,
+  EdifactCode,
   EdifactComposite,
   EdifactElement,
+  EdifactSegmentGroup,
   EdifactStructureNode,
   MappingLink,
   MessageTypeStructure,
@@ -13,6 +15,8 @@ export type TreeItemKind =
 
 export type Repeat = 'unbounded' | number | null
 
+export type CodeMeaning = { code: string; meaning: string }
+
 export type TreeItem = {
   path: string
   kind: TreeItemKind
@@ -21,6 +25,8 @@ export type TreeItem = {
   detail: string | null
   required: boolean
   repeat: Repeat
+  qualifier: CodeMeaning | null
+  codes: ReadonlyArray<CodeMeaning>
   // `null` marks a leaf, so an empty container, e.g. an object without fields, is not taken for one.
   children: TreeItem[] | null
 }
@@ -28,7 +34,14 @@ export type TreeItem = {
 export type Side = 'source' | 'target'
 
 function documentItem(node: DocumentStructureNode): TreeItem {
-  const base = { path: node.path, label: node.name, required: node.required, name: null }
+  const base = {
+    path: node.path,
+    label: node.name,
+    required: node.required,
+    name: null,
+    qualifier: null,
+    codes: [],
+  }
 
   switch (node.kind) {
     case 'field':
@@ -55,23 +68,58 @@ function repeatOf(maxRepeat: number): Repeat {
   return maxRepeat > 1 ? maxRepeat : null
 }
 
+function codeMeaning({ code, meaning }: EdifactCode, locale: Locale): CodeMeaning {
+  return { code, meaning: meaning[locale] }
+}
+
+// A group carries its qualifier only in its path, e.g. SG2+BY; the meaning is on the segment
+// that it is qualified by, e.g. NAD+BY.
+function groupQualifier(group: EdifactSegmentGroup, label: string) {
+  const [, code] = label.split('+')
+
+  if (code === undefined) {
+    return null
+  }
+
+  for (const child of group.children) {
+    if (child.kind === 'segment' && child.qualifier?.code === code) {
+      return child.qualifier
+    }
+  }
+
+  return null
+}
+
 function edifactItem(
   node: EdifactStructureNode | EdifactComposite | EdifactElement,
   locale: Locale,
 ): TreeItem {
-  const base = { path: node.path, name: node.name[locale], required: node.required }
+  const base = {
+    path: node.path,
+    name: node.name[locale],
+    required: node.required,
+    qualifier: null,
+    codes: [],
+  }
+
   const children = 'children' in node ? edifactItems(node.children, locale) : null
 
   switch (node.kind) {
-    case 'segmentGroup':
+    case 'segmentGroup': {
+      const label = node.path.split('/').at(-1)!
+      const qualifier = groupQualifier(node, label)
+
       return {
         ...base,
         kind: 'segmentGroup',
-        label: node.path.split('/').at(-1)!,
+        label,
         detail: null,
         repeat: repeatOf(node.maxRepeat),
+        qualifier: qualifier && codeMeaning(qualifier, locale),
         children,
       }
+    }
+
     case 'segment':
       return {
         ...base,
@@ -79,6 +127,7 @@ function edifactItem(
         label: node.qualifier ? `${node.tag}+${node.qualifier.code}` : node.tag,
         detail: null,
         repeat: repeatOf(node.maxRepeat),
+        qualifier: node.qualifier && codeMeaning(node.qualifier, locale),
         children,
       }
     case 'composite':
@@ -97,6 +146,7 @@ function edifactItem(
         label: node.code,
         detail: node.format,
         repeat: null,
+        codes: node.codes.map((code) => codeMeaning(code, locale)),
         children,
       }
   }
@@ -114,6 +164,22 @@ export function edifactTree(
   locale: Locale,
 ): TreeItem[] {
   return edifactItems(structure.children, locale)
+}
+
+export function findItem(items: ReadonlyArray<TreeItem>, path: string): TreeItem | undefined {
+  for (const item of items) {
+    if (item.path === path) {
+      return item
+    }
+
+    const found = findItem(item.children ?? [], path)
+
+    if (found) {
+      return found
+    }
+  }
+
+  return undefined
 }
 
 export type TreeRow = Omit<TreeItem, 'children'> & {

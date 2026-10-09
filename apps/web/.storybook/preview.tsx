@@ -7,6 +7,7 @@ import { type ReactNode, useState } from 'react'
 
 import { startMockWorker } from '@/lib/api/mock-worker'
 import messages from '@/messages/en.json'
+import { TooltipProvider } from '@edi-bridge/ui/components/tooltip'
 
 import '@edi-bridge/ui/globals.css'
 
@@ -30,7 +31,9 @@ export default definePreview({
     (Story) => (
       <NextIntlClientProvider locale="en" messages={messages} timeZone="Europe/Berlin">
         <StoryQueryProvider>
-          <Story />
+          <TooltipProvider>
+            <Story />
+          </TooltipProvider>
         </StoryQueryProvider>
       </NextIntlClientProvider>
     ),

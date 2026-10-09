@@ -2,23 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import { messageTypeStructures, seedDocumentStructureOf } from '@edi-bridge/mocks'
 
-import { canvasLinks, documentTree, edifactTree, layoutTree, type TreeItem } from './mapping-tree'
-
-function find(items: ReadonlyArray<TreeItem>, path: string): TreeItem | undefined {
-  for (const item of items) {
-    if (item.path === path) {
-      return item
-    }
-
-    const found = find(item.children ?? [], path)
-
-    if (found) {
-      return found
-    }
-  }
-
-  return undefined
-}
+import {
+  canvasLinks,
+  documentTree,
+  edifactTree,
+  findItem as find,
+  layoutTree,
+} from './mapping-tree'
 
 describe('documentTree', () => {
   const tree = documentTree(seedDocumentStructureOf.ORDERS)
@@ -55,6 +45,38 @@ describe('edifactTree', () => {
 
   it('labels elements with their code and format', () => {
     expect(find(tree, 'DTM+137/C507/2380')).toMatchObject({ label: '2380', kind: 'element' })
+  })
+
+  describe('meanings', () => {
+    const english = edifactTree(messageTypeStructures.ORDERS, 'en')
+
+    it('gives a qualified segment its qualifier meaning', () => {
+      expect(find(english, 'DTM+137')).toMatchObject({
+        name: 'Date/time/period',
+        required: true,
+        qualifier: { code: '137', meaning: 'Document/message date/time' },
+      })
+    })
+
+    it('gives a qualified group the qualifier of its segment', () => {
+      expect(find(english, 'SG2+BY')?.qualifier).toEqual({ code: 'BY', meaning: 'Buyer' })
+      expect(find(english, 'SG2+BY/NAD+BY')?.qualifier).toEqual({ code: 'BY', meaning: 'Buyer' })
+    })
+
+    it('leaves an unqualified group without a qualifier', () => {
+      expect(find(english, 'SG25')?.qualifier).toBeNull()
+    })
+
+    it('lists the codes of a coded element in the locale', () => {
+      expect(find(english, 'DTM+137/C507/2379')).toMatchObject({
+        detail: 'an..3',
+        codes: [
+          { code: '102', meaning: 'CCYYMMDD' },
+          { code: '203', meaning: 'CCYYMMDDHHMM' },
+        ],
+      })
+      expect(find(tree, 'DTM+137/C507/2379')?.codes[0]?.meaning).toBe('JJJJMMTT')
+    })
   })
 })
 
