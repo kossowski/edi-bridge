@@ -30,45 +30,43 @@ export const documentFieldSchema = z.object({
 
 export type DocumentField = z.infer<typeof documentFieldSchema>
 
-export type DocumentObject = {
-  kind: 'object'
-  path: string
-  name: string
-  required: boolean
-  children: DocumentStructureNode[]
-}
-
-export type DocumentArray = {
-  kind: 'array'
-  path: string
-  name: string
-  required: boolean
-  items: DocumentField | DocumentObject
-}
-
-export type DocumentStructureNode = DocumentField | DocumentObject | DocumentArray
-
-export const documentObjectSchema: z.ZodType<DocumentObject> = z.object({
-  ...node,
+// The recursive schemas list the node fields one by one: spreading them in breaks TypeScript's
+// inference of the getter.
+export const documentObjectSchema = z.object({
+  path: node.path,
+  name: node.name,
+  required: node.required,
   kind: z.literal('object'),
-  get children() {
-    return z.array(documentStructureNodeSchema)
+  get children(): z.ZodArray<
+    z.ZodUnion<
+      [typeof documentFieldSchema, typeof documentObjectSchema, typeof documentArraySchema]
+    >
+  > {
+    return z.array(z.union([documentFieldSchema, documentObjectSchema, documentArraySchema]))
   },
 })
 
-export const documentArraySchema: z.ZodType<DocumentArray> = z.object({
-  ...node,
+export type DocumentObject = z.infer<typeof documentObjectSchema>
+
+export const documentArraySchema = z.object({
+  path: node.path,
+  name: node.name,
+  required: node.required,
   kind: z.literal('array'),
-  get items() {
+  get items(): z.ZodUnion<[typeof documentFieldSchema, typeof documentObjectSchema]> {
     return z.union([documentFieldSchema, documentObjectSchema])
   },
 })
 
-export const documentStructureNodeSchema: z.ZodType<DocumentStructureNode> = z.union([
+export type DocumentArray = z.infer<typeof documentArraySchema>
+
+export const documentStructureNodeSchema = z.union([
   documentFieldSchema,
   documentObjectSchema,
   documentArraySchema,
 ])
+
+export type DocumentStructureNode = z.infer<typeof documentStructureNodeSchema>
 
 export const documentStructureSchema = z.object({
   id: z.uuid(),

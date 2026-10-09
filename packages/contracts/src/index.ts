@@ -138,6 +138,7 @@ export {
   mappingLinkSchema,
   mappingLinksSchema,
   type MappingSide,
+  mappingSideSchema,
   mappingsEndpoint,
   type MappingSummary,
   mappingSummarySchema,
@@ -166,6 +167,9 @@ export {
   messageTypeStructureEndpoint,
   type MessageTypeStructure,
   messageTypeStructureSchema,
+  type Release,
+  releaseSchema,
+  releases,
 } from './message-type'
 
 export {

@@ -18,7 +18,7 @@ export const edifactCodeSchema = z.object({
 
 export type EdifactCode = z.infer<typeof edifactCodeSchema>
 
-// Every node carries its path, e.g. `SG2/NAD+BY/C082/3039`, which Mapping links point at.
+// Every node carries its path, e.g. `SG2+BY/NAD+BY/C082/3039`, which Mapping links point at.
 const structureNode = {
   path: z.string().min(1),
   name: localizedTextSchema,
@@ -59,29 +59,23 @@ export const edifactSegmentSchema = z.object({
 
 export type EdifactSegment = z.infer<typeof edifactSegmentSchema>
 
-export type EdifactSegmentGroup = {
-  kind: 'segmentGroup'
-  path: string
-  code: string
-  name: LocalizedText
-  required: boolean
-  maxRepeat: number
-  children: EdifactStructureNode[]
-}
-
-export const edifactSegmentGroupSchema: z.ZodType<EdifactSegmentGroup> = z.object({
-  ...structureNode,
+// Lists the node fields one by one: spreading them in breaks TypeScript's inference of the getter.
+export const edifactSegmentGroupSchema = z.object({
+  path: structureNode.path,
+  name: structureNode.name,
+  required: structureNode.required,
   kind: z.literal('segmentGroup'),
   code: z.string().regex(/^SG\d{1,2}$/),
   maxRepeat: maxRepeatSchema,
-  get children() {
-    return z.array(edifactStructureNodeSchema)
+  get children(): z.ZodArray<
+    z.ZodUnion<[typeof edifactSegmentSchema, typeof edifactSegmentGroupSchema]>
+  > {
+    return z.array(z.union([edifactSegmentSchema, edifactSegmentGroupSchema]))
   },
 })
 
-export type EdifactStructureNode = EdifactSegment | EdifactSegmentGroup
+export type EdifactSegmentGroup = z.infer<typeof edifactSegmentGroupSchema>
 
-export const edifactStructureNodeSchema: z.ZodType<EdifactStructureNode> = z.union([
-  edifactSegmentSchema,
-  edifactSegmentGroupSchema,
-])
+export const edifactStructureNodeSchema = z.union([edifactSegmentSchema, edifactSegmentGroupSchema])
+
+export type EdifactStructureNode = z.infer<typeof edifactStructureNodeSchema>

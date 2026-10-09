@@ -22,9 +22,15 @@ export function directionOf({ messageType }: { messageType: MessageType }): Dire
   return messageTypeDirections[messageType]
 }
 
+export const releases = ['D.96A', 'D.3'] as const
+
+export const releaseSchema = z.enum(releases)
+
+export type Release = z.infer<typeof releaseSchema>
+
 export const messageTypeStructureSchema = z.object({
   messageType: messageTypeSchema,
-  release: z.enum(['D.96A', 'D.3']),
+  release: releaseSchema,
   name: localizedTextSchema,
   children: z.array(edifactStructureNodeSchema).min(1),
 })

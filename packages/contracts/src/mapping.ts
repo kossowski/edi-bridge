@@ -33,10 +33,15 @@ export const messageTypeSideSchema = z.object({
 
 export type MessageTypeSide = z.infer<typeof messageTypeSideSchema>
 
-export type MappingSide = DocumentStructureSide | MessageTypeSide
+export const mappingSideSchema = z.discriminatedUnion('kind', [
+  documentStructureSideSchema,
+  messageTypeSideSchema,
+])
+
+export type MappingSide = z.infer<typeof mappingSideSchema>
 
 // A link copies the value at a source path into a target path, e.g. `buyer.gln` into
-// `SG2/NAD+BY/C082/3039`. Combining several sources into one target needs a transform.
+// `SG2+BY/NAD+BY/C082/3039`. Combining several sources into one target needs a transform.
 export const mappingLinkSchema = z.object({
   sourcePath: z.string().min(1),
   targetPath: z.string().min(1),
