@@ -21,12 +21,19 @@ const defaultSeparators: Separators = {
   terminator: "'",
 }
 
-function separatorsOf(raw: string): Separators {
-  if (!raw.startsWith('UNA') || raw.length < 9) {
+function adviceOf(raw: string) {
+  return raw.startsWith('UNA') && raw.length >= 9 ? raw.slice(0, 9) : null
+}
+
+function separatorsOf(advice: string | null): Separators {
+  if (advice === null) {
     return defaultSeparators
   }
 
-  return { component: raw[3]!, element: raw[4]!, release: raw[6]!, terminator: raw[8]! }
+  // ISO 9735 reserves a space in the release position for "no release character".
+  const release = advice[6] === ' ' ? '' : advice[6]!
+
+  return { component: advice[3]!, element: advice[4]!, release, terminator: advice[8]! }
 }
 
 function splitSegments(raw: string, separators: Separators) {
@@ -67,8 +74,18 @@ function splitRanges(text: string, start: number, end: number, separator: string
   return ranges
 }
 
-function locate(text: string, position: ErrorPosition, separators: Separators): LocatedPosition {
+function locate(
+  text: string,
+  position: ErrorPosition,
+  separators: Separators,
+): LocatedPosition | null {
   const body = text.endsWith(separators.terminator) ? text.length - 1 : text.length
+  const [tag] = splitRanges(text, 0, body, separators.element, separators.release)
+
+  if (text.slice(...tag!) !== position.tag) {
+    return null
+  }
+
   const segment = { highlight: [0, body] as const, precision: 'segment' as const }
 
   if (position.element === null) {
@@ -100,9 +117,10 @@ function locate(text: string, position: ErrorPosition, separators: Separators): 
     : { highlight: element, precision: 'element' }
 }
 
-export function interchangeLines(raw: string, position: ErrorPosition | null): InterchangeLines {
-  const separators = separatorsOf(raw)
-  const advice = raw.startsWith('UNA') ? raw.slice(0, 9) : null
+export function interchangeLines(source: string, position: ErrorPosition | null): InterchangeLines {
+  const raw = source.replace(/^[\uFEFF\s]+/, '')
+  const advice = adviceOf(raw)
+  const separators = separatorsOf(advice)
   const segments = splitSegments(advice === null ? raw : raw.slice(9), separators)
   let precision: HighlightPrecision | null = null
 
@@ -114,6 +132,11 @@ export function interchangeLines(raw: string, position: ErrorPosition | null): I
     }
 
     const located = locate(text, position, separators)
+
+    if (located === null) {
+      return { number, text, highlight: null }
+    }
+
     precision = located.precision
 
     return { number, text, highlight: located.highlight }

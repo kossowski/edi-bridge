@@ -99,4 +99,36 @@ describe('interchangeLines', () => {
       [2, "UNZ+0+1'"],
     ])
   })
+
+  it.each([
+    ['a byte order mark', '\uFEFF'],
+    ['leading line breaks and spaces', '\r\n  '],
+  ])('recognises UNA after %s', (_, prefix) => {
+    const result = interchangeLines(`${prefix}${raw}`, {
+      segment: 3,
+      tag: 'DTM',
+      element: 1,
+      component: 2,
+    })
+
+    expect(result.lines[0]).toMatchObject({ number: null, text: "UNA:+.? '" })
+    expect(highlighted(result)).toBe('20261341')
+  })
+
+  it('treats a space in the release position as no release character', () => {
+    const { lines } = interchangeLines("UNA:+.  'UNB+UNOC:3+A 'UNZ+0+1'", null)
+
+    expect(lines.map(({ number, text }) => [number, text])).toEqual([
+      [null, "UNA:+.  '"],
+      [1, "UNB+UNOC:3+A '"],
+      [2, "UNZ+0+1'"],
+    ])
+  })
+
+  it('highlights nothing when the segment at the position has another tag', () => {
+    const result = interchangeLines(raw, { segment: 3, tag: 'NAD', element: 1, component: null })
+
+    expect(result.precision).toBeNull()
+    expect(result.lines.every(({ highlight }) => highlight === null)).toBe(true)
+  })
 })
