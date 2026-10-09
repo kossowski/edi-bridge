@@ -101,12 +101,14 @@ export const OutboundMessageType = meta.story({
       (await screen.findAllByRole('option')).map((option) => option.textContent),
     ).toEqual([expect.stringMatching(/^ERP webhook/)])
     await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 
     await userEvent.click(canvas.getByRole('combobox', { name: 'Destination Channel' }))
     await expect(
       (await screen.findAllByRole('option')).map((option) => option.textContent),
     ).toEqual([expect.stringMatching(/^Hansemarkt SFTP outbox/)])
     await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
   },
 })
 
