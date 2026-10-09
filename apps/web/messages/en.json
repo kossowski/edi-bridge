@@ -28,6 +28,7 @@
     "runs": "Runs",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
+    "channels": "Channels",
     "mappings": "Mappings",
     "lookupTables": "Lookup Tables",
     "settings": "Settings",
@@ -39,6 +40,7 @@
     "runs": "Every Run with its outcome, steps, errors and output.",
     "orderLifecycle": "All Messages that share one Business Reference, in order.",
     "tradingPartners": "The Trading Partners of this Workspace, their Channels and Flows.",
+    "channels": "The inbound and outbound Channels and their connection settings.",
     "mappings": "Mappings, their versions and the mapping canvas.",
     "lookupTables": "Lookup Tables for the Workspace and for single Trading Partners.",
     "settings": "Settings for this Workspace.",
@@ -428,6 +430,222 @@
     "saving": "Saving…",
     "cancel": "Cancel"
   },
+  "Channels": {
+    "new": "New Channel",
+    "caption": "Channels, by name",
+    "loading": "Loading Channels",
+    "count": "{count, plural, one {# Channel} other {# Channels}}",
+    "filteredCount": "{count} of {total} Channels",
+    "search": "Search by name, Trading Partner or address",
+    "noMatch": "No Channel matches the search.",
+    "ownSystems": "Own systems",
+    "unknownTradingPartner": "Unknown Trading Partner",
+    "columns": {
+      "name": "Name",
+      "kind": "Kind",
+      "tradingPartner": "Trading Partner",
+      "address": "Address"
+    },
+    "empty": {
+      "title": "No Channels yet",
+      "description": "Create a Channel to receive Documents or deliver them."
+    },
+    "error": {
+      "title": "Channels unavailable",
+      "description": "The Channels could not be loaded. Try again.",
+      "retry": "Try again"
+    }
+  },
+  "Channel": {
+    "title": "Channel",
+    "back": "Back to Channels",
+    "loading": "Loading Channel",
+    "edit": "Edit",
+    "notFound": {
+      "title": "Channel not found",
+      "description": "There is no Channel with this ID in this Workspace."
+    },
+    "error": {
+      "title": "Channel unavailable",
+      "description": "The Channel could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "facts": {
+      "label": "Channel details",
+      "kind": "Kind",
+      "tradingPartner": "Trading Partner",
+      "host": "Host",
+      "port": "Port",
+      "username": "Username",
+      "remotePath": {
+        "inbound": "Polled folder",
+        "outbound": "Upload folder"
+      },
+      "authentication": "Authentication",
+      "pollingInterval": "Polling interval",
+      "rateLimit": "Rate limit",
+      "url": "URL",
+      "authorization": "Authorization header"
+    },
+    "authentication": {
+      "password": "Password",
+      "privateKey": "Private key"
+    },
+    "every": "{minutes, plural, one {Every minute} other {Every # minutes}}",
+    "perMinute": "{count, plural, one {# request per minute} other {# requests per minute}}",
+    "secret": {
+      "set": "Set",
+      "notSet": "None",
+      "endsIn": "Ends in {lastFour}"
+    },
+    "webhook": {
+      "title": "Webhook",
+      "description": "Senders POST Documents to this URL and present the token in the <header></header> header.",
+      "url": "Webhook URL",
+      "header": "Header format",
+      "token": "Token",
+      "hideToken": "I have stored the token",
+      "regenerate": {
+        "button": "Regenerate token",
+        "confirmation": "The current token stops working immediately. Every sender must switch to the new token.",
+        "confirm": "Regenerate token now",
+        "cancel": "Cancel",
+        "pending": "Regenerating…",
+        "failed": "The token could not be regenerated. Try again."
+      }
+    },
+    "tokenReveal": {
+      "title": "Copy the webhook token now",
+      "description": "You won't see this token again. Store it where the sender can use it. If it gets lost, regenerate it.",
+      "token": "Token",
+      "header": "Header for the sender"
+    }
+  },
+  "ChannelForm": {
+    "createTitle": "New Channel",
+    "editTitle": "Edit {name}",
+    "editPageTitle": "Edit Channel",
+    "backTo": "Back to {name}",
+    "webhookNotice": "EDI Bridge generates the webhook URL and token when you create the Channel.",
+    "sections": {
+      "sftp": "SFTP connection",
+      "webhook": "Webhook",
+      "http": "HTTP delivery"
+    },
+    "fields": {
+      "kind": {
+        "label": "Kind",
+        "description": "The kind cannot change after the Channel is created.",
+        "fixed": "The kind cannot change. Create a new Channel for another kind."
+      },
+      "name": {
+        "label": "Name",
+        "description": "Shown in Flows and Runs."
+      },
+      "tradingPartner": {
+        "label": "Trading Partner",
+        "description": "The Trading Partner on the other end. Choose Own systems for your ERP.",
+        "none": "Own systems"
+      },
+      "host": {
+        "label": "Host",
+        "description": "The host name of the SFTP server, without protocol or port."
+      },
+      "port": {
+        "label": "Port",
+        "description": "Usually 22."
+      },
+      "username": {
+        "label": "Username",
+        "description": "The user EDI Bridge logs in as."
+      },
+      "remotePath": {
+        "label": "Folder",
+        "inbound": "The folder EDI Bridge polls for new Documents.",
+        "outbound": "The folder EDI Bridge uploads Documents to."
+      },
+      "authentication": {
+        "label": "Authentication",
+        "description": "How EDI Bridge logs in to the SFTP server."
+      },
+      "credential": {
+        "description": "Stored encrypted and never shown again.",
+        "keep": "Stored encrypted and never shown again. Leave blank to keep the current one."
+      },
+      "pollingIntervalMinutes": {
+        "label": "Polling interval (minutes)",
+        "description": "How often EDI Bridge checks the folder for new Documents."
+      },
+      "rateLimitPerMinute": {
+        "label": "Rate limit (requests per minute)",
+        "description": "Further requests within the same minute are rejected."
+      },
+      "url": {
+        "label": "URL",
+        "description": "EDI Bridge POSTs each Document to this address."
+      },
+      "sendAuthorization": {
+        "label": "Send an Authorization header"
+      },
+      "authorization": {
+        "label": "Authorization header value",
+        "description": "For example Bearer followed by an API key. Stored encrypted and never shown again.",
+        "keep": "Stored encrypted and never shown again. Leave blank to keep the current value."
+      }
+    },
+    "errors": {
+      "required": {
+        "name": "Enter a name.",
+        "host": "Enter a host.",
+        "port": "Enter a port.",
+        "username": "Enter a username.",
+        "remotePath": "Enter a folder.",
+        "credential": "Enter the password or private key.",
+        "pollingIntervalMinutes": "Enter a polling interval.",
+        "rateLimitPerMinute": "Enter a rate limit.",
+        "url": "Enter a URL.",
+        "authorization": "Enter the header value, or stop sending the header."
+      },
+      "tooLong": "This value is too long.",
+      "range": "Enter a whole number from {min} to {max}.",
+      "format": {
+        "host": "Enter a host name without protocol, path or port.",
+        "remotePath": "Enter an absolute path that starts with /.",
+        "url": "Enter a full URL that starts with https:// or http://."
+      },
+      "invalid": "Check this value.",
+      "kindChanged": "The kind of a Channel cannot change.",
+      "saveFailed": "The Channel could not be saved. Try again."
+    },
+    "created": {
+      "title": "{name} created",
+      "status": "The Channel {name} is created.",
+      "url": "Webhook URL",
+      "continue": "Go to the Channel"
+    },
+    "create": "Create Channel",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "cancel": "Cancel"
+  },
+  "ChannelKind": {
+    "sftp-inbound": {
+      "label": "Inbound SFTP",
+      "description": "Polls a folder on an SFTP server for new Documents."
+    },
+    "sftp-outbound": {
+      "label": "Outbound SFTP",
+      "description": "Uploads Documents to a folder on an SFTP server."
+    },
+    "webhook-inbound": {
+      "label": "Inbound webhook",
+      "description": "Receives Documents that a sender POSTs to EDI Bridge."
+    },
+    "http-outbound": {
+      "label": "Outbound HTTP",
+      "description": "POSTs Documents to an HTTP endpoint, such as your ERP."
+    }
+  },
   "Settings": {
     "loading": "Loading settings",
     "notFound": {
@@ -460,5 +678,10 @@
       "format": "A GLN has exactly 13 digits.",
       "checkDigit": "The check digit does not match. Check the GLN for typos."
     }
+  },
+  "Copy": {
+    "button": "Copy {label}",
+    "copied": "Copied",
+    "failed": "Copying failed. Select the text and copy it yourself."
   }
 }

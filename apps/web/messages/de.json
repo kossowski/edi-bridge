@@ -28,6 +28,7 @@
     "runs": "Runs",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
+    "channels": "Channels",
     "mappings": "Mappings",
     "lookupTables": "Lookup Tables",
     "settings": "Einstellungen",
@@ -39,6 +40,7 @@
     "runs": "Jeder Run mit Ergebnis, Schritten, Fehlern und Ausgabe.",
     "orderLifecycle": "Alle Messages mit derselben Business Reference in zeitlicher Reihenfolge.",
     "tradingPartners": "Die Trading Partners dieses Workspace mit ihren Channels und Flows.",
+    "channels": "Die eingehenden und ausgehenden Channels und ihre Verbindungseinstellungen.",
     "mappings": "Mappings, ihre Versionen und der Mapping-Canvas.",
     "lookupTables": "Lookup Tables für den Workspace und für einzelne Trading Partners.",
     "settings": "Einstellungen für diesen Workspace.",
@@ -428,6 +430,222 @@
     "saving": "Wird gespeichert…",
     "cancel": "Abbrechen"
   },
+  "Channels": {
+    "new": "Neuer Channel",
+    "caption": "Channels, nach Name",
+    "loading": "Channels werden geladen",
+    "count": "{count, plural, one {# Channel} other {# Channels}}",
+    "filteredCount": "{count} von {total} Channels",
+    "search": "Nach Name, Trading Partner oder Adresse suchen",
+    "noMatch": "Kein Channel passt zur Suche.",
+    "ownSystems": "Eigene Systeme",
+    "unknownTradingPartner": "Unbekannter Trading Partner",
+    "columns": {
+      "name": "Name",
+      "kind": "Art",
+      "tradingPartner": "Trading Partner",
+      "address": "Adresse"
+    },
+    "empty": {
+      "title": "Noch keine Channels",
+      "description": "Legen Sie einen Channel an, um Documents zu empfangen oder zuzustellen."
+    },
+    "error": {
+      "title": "Channels nicht verfügbar",
+      "description": "Die Channels konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    }
+  },
+  "Channel": {
+    "title": "Channel",
+    "back": "Zurück zu den Channels",
+    "loading": "Channel wird geladen",
+    "edit": "Bearbeiten",
+    "notFound": {
+      "title": "Channel nicht gefunden",
+      "description": "In diesem Workspace gibt es keinen Channel mit dieser ID."
+    },
+    "error": {
+      "title": "Channel nicht verfügbar",
+      "description": "Der Channel konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "facts": {
+      "label": "Channel-Details",
+      "kind": "Art",
+      "tradingPartner": "Trading Partner",
+      "host": "Host",
+      "port": "Port",
+      "username": "Benutzername",
+      "remotePath": {
+        "inbound": "Abgefragter Ordner",
+        "outbound": "Upload-Ordner"
+      },
+      "authentication": "Anmeldung",
+      "pollingInterval": "Abfrageintervall",
+      "rateLimit": "Rate Limit",
+      "url": "URL",
+      "authorization": "Authorization-Header"
+    },
+    "authentication": {
+      "password": "Passwort",
+      "privateKey": "Privater Schlüssel"
+    },
+    "every": "{minutes, plural, one {Jede Minute} other {Alle # Minuten}}",
+    "perMinute": "{count, plural, one {# Anfrage pro Minute} other {# Anfragen pro Minute}}",
+    "secret": {
+      "set": "Gesetzt",
+      "notSet": "Keiner",
+      "endsIn": "Endet auf {lastFour}"
+    },
+    "webhook": {
+      "title": "Webhook",
+      "description": "Absender schicken Documents per POST an diese URL und übergeben den Token im <header></header>-Header.",
+      "url": "Webhook-URL",
+      "header": "Header-Format",
+      "token": "Token",
+      "hideToken": "Ich habe den Token gespeichert",
+      "regenerate": {
+        "button": "Token neu erzeugen",
+        "confirmation": "Der aktuelle Token wird sofort ungültig. Alle Absender müssen auf den neuen Token umstellen.",
+        "confirm": "Token jetzt neu erzeugen",
+        "cancel": "Abbrechen",
+        "pending": "Wird neu erzeugt…",
+        "failed": "Der Token konnte nicht neu erzeugt werden. Versuchen Sie es erneut."
+      }
+    },
+    "tokenReveal": {
+      "title": "Kopieren Sie den Webhook-Token jetzt",
+      "description": "Sie sehen diesen Token nicht noch einmal. Speichern Sie ihn dort, wo der Absender ihn verwenden kann. Geht er verloren, erzeugen Sie ihn neu.",
+      "token": "Token",
+      "header": "Header für den Absender"
+    }
+  },
+  "ChannelForm": {
+    "createTitle": "Neuer Channel",
+    "editTitle": "{name} bearbeiten",
+    "editPageTitle": "Channel bearbeiten",
+    "backTo": "Zurück zu {name}",
+    "webhookNotice": "EDI Bridge erzeugt Webhook-URL und Token, wenn Sie den Channel anlegen.",
+    "sections": {
+      "sftp": "SFTP-Verbindung",
+      "webhook": "Webhook",
+      "http": "HTTP-Zustellung"
+    },
+    "fields": {
+      "kind": {
+        "label": "Art",
+        "description": "Die Art lässt sich nach dem Anlegen nicht mehr ändern.",
+        "fixed": "Die Art lässt sich nicht ändern. Legen Sie für eine andere Art einen neuen Channel an."
+      },
+      "name": {
+        "label": "Name",
+        "description": "Wird in Flows und Runs angezeigt."
+      },
+      "tradingPartner": {
+        "label": "Trading Partner",
+        "description": "Der Trading Partner auf der Gegenseite. Wählen Sie Eigene Systeme für Ihr ERP.",
+        "none": "Eigene Systeme"
+      },
+      "host": {
+        "label": "Host",
+        "description": "Der Hostname des SFTP-Servers, ohne Protokoll und Port."
+      },
+      "port": {
+        "label": "Port",
+        "description": "Meist 22."
+      },
+      "username": {
+        "label": "Benutzername",
+        "description": "Der Benutzer, mit dem sich EDI Bridge anmeldet."
+      },
+      "remotePath": {
+        "label": "Ordner",
+        "inbound": "Der Ordner, den EDI Bridge nach neuen Documents abfragt.",
+        "outbound": "Der Ordner, in den EDI Bridge Documents hochlädt."
+      },
+      "authentication": {
+        "label": "Anmeldung",
+        "description": "Wie sich EDI Bridge am SFTP-Server anmeldet."
+      },
+      "credential": {
+        "description": "Wird verschlüsselt gespeichert und nie wieder angezeigt.",
+        "keep": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Leer lassen, um den aktuellen Wert zu behalten."
+      },
+      "pollingIntervalMinutes": {
+        "label": "Abfrageintervall (Minuten)",
+        "description": "Wie oft EDI Bridge den Ordner nach neuen Documents abfragt."
+      },
+      "rateLimitPerMinute": {
+        "label": "Rate Limit (Anfragen pro Minute)",
+        "description": "Weitere Anfragen in derselben Minute werden abgewiesen."
+      },
+      "url": {
+        "label": "URL",
+        "description": "EDI Bridge schickt jedes Document per POST an diese Adresse."
+      },
+      "sendAuthorization": {
+        "label": "Authorization-Header mitsenden"
+      },
+      "authorization": {
+        "label": "Wert des Authorization-Headers",
+        "description": "Zum Beispiel Bearer, gefolgt von einem API-Schlüssel. Wird verschlüsselt gespeichert und nie wieder angezeigt.",
+        "keep": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Leer lassen, um den aktuellen Wert zu behalten."
+      }
+    },
+    "errors": {
+      "required": {
+        "name": "Geben Sie einen Namen ein.",
+        "host": "Geben Sie einen Host ein.",
+        "port": "Geben Sie einen Port ein.",
+        "username": "Geben Sie einen Benutzernamen ein.",
+        "remotePath": "Geben Sie einen Ordner ein.",
+        "credential": "Geben Sie das Passwort oder den privaten Schlüssel ein.",
+        "pollingIntervalMinutes": "Geben Sie ein Abfrageintervall ein.",
+        "rateLimitPerMinute": "Geben Sie ein Rate Limit ein.",
+        "url": "Geben Sie eine URL ein.",
+        "authorization": "Geben Sie den Header-Wert ein oder senden Sie den Header nicht mit."
+      },
+      "tooLong": "Dieser Wert ist zu lang.",
+      "range": "Geben Sie eine ganze Zahl von {min} bis {max} ein.",
+      "format": {
+        "host": "Geben Sie einen Hostnamen ohne Protokoll, Pfad und Port ein.",
+        "remotePath": "Geben Sie einen absoluten Pfad ein, der mit / beginnt.",
+        "url": "Geben Sie eine vollständige URL ein, die mit https:// oder http:// beginnt."
+      },
+      "invalid": "Prüfen Sie diesen Wert.",
+      "kindChanged": "Die Art eines Channels lässt sich nicht ändern.",
+      "saveFailed": "Der Channel konnte nicht gespeichert werden. Versuchen Sie es erneut."
+    },
+    "created": {
+      "title": "{name} angelegt",
+      "status": "Der Channel {name} ist angelegt.",
+      "url": "Webhook-URL",
+      "continue": "Zum Channel"
+    },
+    "create": "Channel anlegen",
+    "save": "Änderungen speichern",
+    "saving": "Wird gespeichert…",
+    "cancel": "Abbrechen"
+  },
+  "ChannelKind": {
+    "sftp-inbound": {
+      "label": "Eingehend per SFTP",
+      "description": "Fragt einen Ordner auf einem SFTP-Server nach neuen Documents ab."
+    },
+    "sftp-outbound": {
+      "label": "Ausgehend per SFTP",
+      "description": "Lädt Documents in einen Ordner auf einem SFTP-Server hoch."
+    },
+    "webhook-inbound": {
+      "label": "Eingehender Webhook",
+      "description": "Empfängt Documents, die ein Absender per POST an EDI Bridge schickt."
+    },
+    "http-outbound": {
+      "label": "Ausgehend per HTTP",
+      "description": "Schickt Documents per POST an einen HTTP-Endpunkt, etwa Ihr ERP."
+    }
+  },
   "Settings": {
     "loading": "Einstellungen werden geladen",
     "notFound": {
@@ -460,5 +678,10 @@
       "format": "Eine GLN hat genau 13 Ziffern.",
       "checkDigit": "Die Prüfziffer stimmt nicht. Prüfen Sie die GLN auf Tippfehler."
     }
+  },
+  "Copy": {
+    "button": "{label} kopieren",
+    "copied": "Kopiert",
+    "failed": "Kopieren fehlgeschlagen. Markieren Sie den Text und kopieren Sie ihn selbst."
   }
 }

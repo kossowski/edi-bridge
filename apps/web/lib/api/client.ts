@@ -1,6 +1,10 @@
 import {
+  channelEndpoint,
+  type ChannelInput,
   channelsEndpoint,
+  type ChannelUpdate,
   type CompanyIdentityInput,
+  createChannelEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   type Endpoint,
@@ -8,6 +12,7 @@ import {
   interchangeEndpoint,
   mappingVersionsEndpoint,
   type QueryParams,
+  regenerateWebhookTokenEndpoint,
   type ReprocessRunBody,
   reprocessRunEndpoint,
   retryRunEndpoint,
@@ -20,6 +25,7 @@ import {
   tradingPartnerEndpoint,
   type TradingPartnerInput,
   tradingPartnersEndpoint,
+  updateChannelEndpoint,
   updateCompanyIdentityEndpoint,
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
@@ -135,6 +141,24 @@ export function switchToProduction(id: string) {
 
 export function listChannels() {
   return request(channelsEndpoint)
+}
+
+export function getChannel(id: string) {
+  return request(channelEndpoint, { path: toPath(channelEndpoint.path, { id }) })
+}
+
+export function createChannel(body: ChannelInput) {
+  return request(createChannelEndpoint, { body })
+}
+
+export function updateChannel(id: string, body: ChannelUpdate) {
+  return request(updateChannelEndpoint, { path: toPath(updateChannelEndpoint.path, { id }), body })
+}
+
+export function regenerateWebhookToken(id: string) {
+  return request(regenerateWebhookTokenEndpoint, {
+    path: toPath(regenerateWebhookTokenEndpoint.path, { id }),
+  })
 }
 
 export function listFlows() {
