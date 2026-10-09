@@ -4,12 +4,16 @@
 
 **Blocked by:** 09 (Trading Partners prototype)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Forms for all four Channel types; secrets are never displayed in full after saving
-- [ ] Webhook Channels show their URL and allow regenerating the token
-- [ ] Flow form with pinned Mapping Version and an explicit 'move to newer version' action
-- [ ] Manual Submission dialog: pick an inbound Channel, upload a Document, see the resulting (mocked) Run
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Forms for all four Channel types; secrets are never displayed in full after saving
+- [x] Webhook Channels show their URL and allow regenerating the token
+- [x] Flow form with pinned Mapping Version and an explicit 'move to newer version' action
+- [x] Manual Submission dialog: pick an inbound Channel, upload a Document, see the resulting (mocked) Run
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #11, #12, #13, #14

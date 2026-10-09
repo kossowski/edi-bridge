@@ -136,6 +136,7 @@ export function SelectField<Value extends string>({
   placeholder,
   error = null,
   disabled = false,
+  loading = false,
 }: {
   id: string
   label: string
@@ -146,6 +147,7 @@ export function SelectField<Value extends string>({
   placeholder?: string
   error?: string | null
   disabled?: boolean
+  loading?: boolean
 }) {
   return (
     <FormField
@@ -162,6 +164,12 @@ export function SelectField<Value extends string>({
         items={items}
         // Until its items load, Base UI would show the raw value, e.g. an ID.
         value={items.some((item) => item.value === value) ? value : null}
+        // Unlike disabled, loading keeps the trigger focusable, so a dialog can focus it on open.
+        onOpenChange={(open, details) => {
+          if (open && loading) {
+            details.cancel()
+          }
+        }}
         onValueChange={(next) => {
           const item = items.find((candidate) => candidate.value === next)
 
@@ -171,10 +179,12 @@ export function SelectField<Value extends string>({
         }}>
         <SelectTrigger
           id={id}
+          aria-busy={loading || undefined}
           aria-describedby={describedBy(id, error)}
+          aria-disabled={loading || undefined}
           aria-invalid={error !== null}
           aria-labelledby={`${id}-label`}
-          className="w-full sm:w-80">
+          className="w-full aria-disabled:cursor-progress aria-disabled:opacity-50 sm:w-80">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

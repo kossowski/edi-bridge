@@ -14,6 +14,7 @@ import {
   flowsEndpoint,
   type FlowUpdate,
   interchangeEndpoint,
+  type ManualSubmissionInput,
   mappingVersionsEndpoint,
   type MoveFlowMappingVersionBody,
   moveFlowMappingVersionEndpoint,
@@ -27,6 +28,7 @@ import {
   runEndpoint,
   type RunListQuery,
   runsEndpoint,
+  submitDocumentEndpoint,
   switchToProductionEndpoint,
   toPath,
   toSearchParams,
@@ -195,4 +197,8 @@ export function moveFlowMappingVersion(id: string, body: MoveFlowMappingVersionB
     path: toPath(moveFlowMappingVersionEndpoint.path, { id }),
     body,
   })
+}
+
+export function submitDocument(body: ManualSubmissionInput) {
+  return request(submitDocumentEndpoint, { body })
 }

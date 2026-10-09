@@ -13,6 +13,8 @@ export function useLookup<Item extends { id: string }, Key extends QueryKey>(
   return {
     data: query.data,
     isPending: query.isPending,
+    isError: query.isError,
+    refetch: query.refetch,
     find: (id: string | null) => (id === null ? undefined : byId.get(id)),
   }
 }

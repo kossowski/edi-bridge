@@ -774,6 +774,56 @@
     "saving": "Wird gespeichert…",
     "cancel": "Abbrechen"
   },
+  "ManualSubmission": {
+    "open": "Ein Document einreichen",
+    "title": "Manual Submission",
+    "description": "Übergeben Sie ein Document, als wäre es auf einem eingehenden Channel eingetroffen. EDI Bridge verarbeitet es wie Channel-Verkehr und markiert seine Runs als manuell.",
+    "close": "Schließen",
+    "cancel": "Abbrechen",
+    "submit": "Document einreichen",
+    "submitting": "Document wird eingereicht…",
+    "channel": {
+      "label": "Eingehender Channel",
+      "description": "Das Document wird verarbeitet, als wäre es auf diesem Channel eingetroffen.",
+      "placeholder": "Eingehenden Channel wählen",
+      "loading": "Channels werden geladen…",
+      "error": "Die Channels konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "empty": {
+        "title": "Noch kein eingehender Channel",
+        "description": "Eine Manual Submission braucht einen eingehenden Channel. Legen Sie zuerst einen an.",
+        "action": "Neuer Channel"
+      }
+    },
+    "document": {
+      "label": "Document",
+      "description": "Ein EDIFACT-Interchange von einem Trading Partner oder ein JSON- oder CSV-Document aus Ihren eigenen Systemen.",
+      "drop": "Datei hier ablegen oder auswählen."
+    },
+    "errors": {
+      "channelRequired": "Wählen Sie einen eingehenden Channel.",
+      "document": {
+        "required": "Wählen Sie eine Datei.",
+        "empty": "Das Document ist leer.",
+        "tooLarge": "Das Document ist zu groß. Ein Document darf höchstens 5 Millionen Zeichen haben."
+      },
+      "unroutable": "Kein Flow auf diesem Channel leitet die Messages dieses Documents weiter. Legen Sie zuerst einen Flow für ihren Message Type an.",
+      "failed": "Das Document konnte nicht eingereicht werden. Versuchen Sie es erneut."
+    },
+    "result": {
+      "title": "{count, plural, one {# Run angelegt} other {# Runs angelegt}}",
+      "description": "{fileName} wurde auf {channel} eingereicht.",
+      "run": "{messageType} von {tradingPartner} · {flow}",
+      "open": "Run öffnen",
+      "openContext": "{messageType} von {tradingPartner}",
+      "another": "Weiteres Document einreichen",
+      "done": "Fertig",
+      "notRouted": {
+        "title": "{count, plural, one {# Message nicht weitergeleitet} other {# Messages nicht weitergeleitet}}",
+        "description": "Kein Flow auf {channel} leitet diese Message Types weiter, deshalb hat EDI Bridge für sie keinen Run angelegt. Legen Sie einen Flow für den Message Type an, um solche Messages zu verarbeiten."
+      }
+    }
+  },
   "Settings": {
     "loading": "Einstellungen werden geladen",
     "notFound": {

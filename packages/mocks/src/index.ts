@@ -2,6 +2,7 @@ import type { TradingPartner, Workspace } from '@edi-bridge/contracts'
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
 import { createFlowStore, flowHandlers, seedMappings } from './flow'
+import { manualSubmissionHandler } from './manual-submission'
 import { createMappingCatalogue, publishedMappingVersionsHandler } from './mapping-version'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
@@ -32,6 +33,8 @@ export {
   toFlow,
   toFlowStore,
 } from './flow'
+
+export { manualSubmissionHandler } from './manual-submission'
 
 export {
   createMappingCatalogue,
@@ -83,14 +86,16 @@ export function createHandlers(
   const workspaceStore = createWorkspaceStore(workspace)
   const channelStore = createChannelStore(channels)
   const mappings = createMappingCatalogue(seedMappings)
+  const flows = createFlowStore()
 
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
     ...tradingPartnerHandlers(apiUrl, { tradingPartners, workspace: workspaceStore }),
     ...channelHandlers(apiUrl, { channels: channelStore }),
-    ...flowHandlers(apiUrl, { flows: createFlowStore(), channels: channelStore, mappings }),
+    ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings }),
     publishedMappingVersionsHandler(apiUrl, mappings),
     runsHandler(apiUrl, runs),
     ...runDetailHandlers(apiUrl, { runs, reprocessed: seedReprocessed() }),
+    manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
   ]
 }

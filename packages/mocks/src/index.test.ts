@@ -16,11 +16,12 @@ import {
   runEndpoint,
   runListSchema,
   runsEndpoint,
+  submitDocumentEndpoint,
   toPath,
   toSearchParams,
 } from '@edi-bridge/contracts'
 
-import { createHandlers, seedFlows } from './index'
+import { createHandlers, seedChannels, seedFlows } from './index'
 
 const apiUrl = 'http://api.test'
 
@@ -164,5 +165,32 @@ describe('createHandlers', () => {
     })
 
     expect(response.status).toBe(201)
+  })
+
+  it('lists and shows the Runs of a Manual Submission', async () => {
+    server.use(...createHandlers(apiUrl))
+    const inbox = seedChannels.find(({ name }) => name === 'Hansemarkt SFTP inbox')!
+    await listRuns({})
+    await getRun((await listRuns({ pageSize: 1 })).runs[0]!.id)
+
+    const response = await fetch(`${apiUrl}${submitDocumentEndpoint.path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        channelId: inbox.id,
+        document: { fileName: 'notes.txt', content: 'Please ship by Friday.' },
+      }),
+    })
+
+    const { runs } = submitDocumentEndpoint.response.parse(await response.json())
+    const { runs: listed } = await listRuns({ manualSubmission: true, pageSize: 1 })
+
+    expect(listed[0]?.id).toBe(runs[0]!.id)
+    expect(await getRun(runs[0]!.id)).toMatchObject({
+      manualSubmission: true,
+      status: 'failed',
+      failureStage: 'parse',
+      direction: 'inbound',
+    })
   })
 })

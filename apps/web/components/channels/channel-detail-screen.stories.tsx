@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, userEvent, waitFor } from 'storybook/test'
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { ChannelDetailScreen } from '@/components/channels/channel-detail-screen'
 import { apiUrl } from '@/lib/api/config'
@@ -45,11 +45,25 @@ export const InboundSftp = meta.story({
   },
 })
 
+export const ManualSubmissionFromChannel = meta.story({
+  args: { id: sftpInbox.id },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Submit a Document' }))
+    const dialog = within(await screen.findByRole('dialog', { name: 'Manual Submission' }))
+    await waitFor(() =>
+      expect(dialog.getByRole('combobox', { name: 'Inbound Channel' })).toHaveTextContent(
+        'Hansemarkt SFTP inbox',
+      ),
+    )
+  },
+})
+
 export const OutboundSftp = meta.story({
   args: { id: sftpOutbox.id },
   async play({ canvas }) {
     await expect(await canvas.findByText('Upload folder')).toBeVisible()
     await expect(canvas.queryByText('Polling interval')).toBeNull()
+    await expect(canvas.queryByRole('button', { name: 'Submit a Document' })).toBeNull()
   },
 })
 
