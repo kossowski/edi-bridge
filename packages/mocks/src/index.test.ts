@@ -2,6 +2,8 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  channelsEndpoint,
+  createChannelEndpoint,
   mappingVersionsEndpoint,
   type ReprocessRunBody,
   reprocessRunEndpoint,
@@ -99,5 +101,32 @@ describe('createHandlers', () => {
     const { runs: fresh } = await listRuns({ status: ['failed'], failureStage: ['delivery'] })
 
     expect(fresh[0]?.id).toBe(runs[0]!.id)
+  })
+
+  it('keeps a created Channel within one createHandlers call', async () => {
+    server.use(...createHandlers(apiUrl, { channels: [] }))
+
+    await fetch(`${apiUrl}${createChannelEndpoint.path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'webhook',
+        direction: 'inbound',
+        name: 'Shop webhook',
+        tradingPartnerId: null,
+        rateLimitPerMinute: 60,
+      }),
+    })
+
+    const listChannels = async () =>
+      channelsEndpoint.response.parse(
+        await (await fetch(`${apiUrl}${channelsEndpoint.path}`)).json(),
+      )
+
+    expect(await listChannels()).toHaveLength(1)
+
+    server.resetHandlers(...createHandlers(apiUrl, { channels: [] }))
+
+    expect(await listChannels()).toEqual([])
   })
 })
