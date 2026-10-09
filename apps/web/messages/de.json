@@ -775,7 +775,7 @@
     "cancel": "Abbrechen"
   },
   "ManualSubmission": {
-    "open": "Document einreichen",
+    "open": "Ein Document einreichen",
     "title": "Manual Submission",
     "description": "Übergeben Sie ein Document, als wäre es auf einem eingehenden Channel eingetroffen. EDI Bridge verarbeitet es wie Channel-Verkehr und markiert seine Runs als manuell.",
     "close": "Schließen",
@@ -797,17 +797,17 @@
     },
     "document": {
       "label": "Document",
-      "description": "Ein EDIFACT-Interchange von einem Trading Partner oder eine JSON- oder CSV-Datei aus Ihren eigenen Systemen.",
+      "description": "Ein EDIFACT-Interchange von einem Trading Partner oder ein JSON- oder CSV-Document aus Ihren eigenen Systemen.",
       "drop": "Datei hier ablegen oder auswählen."
     },
     "errors": {
       "channelRequired": "Wählen Sie einen eingehenden Channel.",
       "document": {
         "required": "Wählen Sie eine Datei.",
-        "empty": "Die Datei ist leer.",
-        "tooLarge": "Die Datei ist zu groß. Ein Document darf höchstens 5 Millionen Zeichen haben."
+        "empty": "Das Document ist leer.",
+        "tooLarge": "Das Document ist zu groß. Ein Document darf höchstens 5 Millionen Zeichen haben."
       },
-      "unroutable": "Kein Flow leitet Documents von diesem Channel weiter. Legen Sie zuerst einen Flow dafür an.",
+      "unroutable": "Kein Flow auf diesem Channel leitet die Messages dieses Documents weiter. Legen Sie zuerst einen Flow für ihren Message Type an.",
       "failed": "Das Document konnte nicht eingereicht werden. Versuchen Sie es erneut."
     },
     "result": {
@@ -817,7 +817,11 @@
       "open": "Run öffnen",
       "openContext": "{messageType} von {tradingPartner}",
       "another": "Weiteres Document einreichen",
-      "done": "Fertig"
+      "done": "Fertig",
+      "notRouted": {
+        "title": "{count, plural, one {# Message nicht weitergeleitet} other {# Messages nicht weitergeleitet}}",
+        "description": "Kein Flow auf {channel} leitet diese Message Types weiter, deshalb hat EDI Bridge für sie keinen Run angelegt. Legen Sie einen Flow für den Message Type an, um solche Messages zu verarbeiten."
+      }
     }
   },
   "Settings": {

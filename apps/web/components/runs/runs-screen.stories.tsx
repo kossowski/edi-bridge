@@ -46,7 +46,7 @@ export const ManualSubmission = meta.story({
     await userEvent.click(canvas.getByRole('button', { name: 'Submit a Document' }))
     const dialog = within(await screen.findByRole('dialog', { name: 'Manual Submission' }))
     const trigger = dialog.getByRole('combobox', { name: 'Inbound Channel' })
-    await waitFor(() => expect(trigger).toBeEnabled())
+    await waitFor(() => expect(trigger).not.toHaveAttribute('aria-disabled'))
     await userEvent.click(trigger)
     await userEvent.click(await screen.findByRole('option', { name: 'Hansemarkt SFTP inbox' }))
     await userEvent.upload(

@@ -2,7 +2,7 @@
 
 import { DocumentAttachmentIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { type DragEvent, useEffect, useId, useRef, useState } from 'react'
@@ -10,6 +10,7 @@ import { type DragEvent, useEffect, useId, useRef, useState } from 'react'
 import { linkClass } from '@/components/detail-parts'
 import { describedBy, FormField, SelectField } from '@/components/form-field'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
+import { useLookup } from '@/hooks/use-lookup'
 import { ApiError, submitDocument } from '@/lib/api/client'
 import { channelsQuery, runKeys } from '@/lib/api/queries'
 import { maxDocumentLength } from '@edi-bridge/contracts'
@@ -31,7 +32,7 @@ import type { ManualSubmission, ManualSubmissionInput } from '@edi-bridge/contra
 
 type DocumentError = 'required' | 'empty' | 'tooLarge'
 
-type Result = {
+type SubmissionOutcome = {
   submission: ManualSubmission
   fileName: string
   channelId: string
@@ -52,7 +53,7 @@ function ChannelChoice({
   onChange: (channelId: string) => void
 }) {
   const t = useTranslations('ManualSubmission.channel')
-  const channels = useQuery(channelsQuery)
+  const channels = useLookup(channelsQuery)
 
   const inbound = (channels.data ?? [])
     .filter((channel) => channel.direction === 'inbound')
@@ -87,10 +88,10 @@ function ChannelChoice({
     <SelectField
       id={id}
       description={t('description')}
-      disabled={channels.isPending}
       error={error}
       items={inbound}
       label={t('label')}
+      loading={channels.isPending}
       placeholder={channels.isPending ? t('loading') : t('placeholder')}
       value={value}
       onChange={onChange}
@@ -194,11 +195,12 @@ function SubmissionForm({
 }: {
   defaultChannelId: string | null
   focusOnMount: boolean
-  onSubmitted: (result: Result) => void
+  onSubmitted: (outcome: SubmissionOutcome) => void
 }) {
   const t = useTranslations('ManualSubmission')
   const id = useId()
   const queryClient = useQueryClient()
+  const channels = useLookup(channelsQuery)
   const form = useRef<HTMLFormElement>(null)
   const [channelId, setChannelId] = useState(defaultChannelId)
   const [file, setFile] = useState<File | null>(null)
@@ -209,13 +211,12 @@ function SubmissionForm({
     mutationFn: (input: ManualSubmissionInput) => submitDocument(input),
     onSuccess: (submitted, input) => {
       void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
-      const channels = queryClient.getQueryData(channelsQuery.queryKey)
 
       onSubmitted({
         submission: submitted,
         fileName: input.document.fileName,
         channelId: input.channelId,
-        channelName: channels?.find((channel) => channel.id === input.channelId)?.name ?? '',
+        channelName: channels.find(input.channelId)?.name ?? '',
       })
     },
   })
@@ -285,10 +286,16 @@ function SubmissionForm({
   )
 }
 
-function SubmissionResult({ result, onAnother }: { result: Result; onAnother: () => void }) {
+function SubmissionResult({
+  outcome,
+  onAnother,
+}: {
+  outcome: SubmissionOutcome
+  onAnother: () => void
+}) {
   const t = useTranslations('ManualSubmission.result')
   const heading = useRef<HTMLHeadingElement>(null)
-  const { runs } = result.submission
+  const { runs, notRouted } = outcome.submission
 
   useEffect(() => {
     heading.current?.focus()
@@ -305,7 +312,7 @@ function SubmissionResult({ result, onAnother }: { result: Result; onAnother: ()
           {t('title', { count: runs.length })}
         </h3>
         <p className="text-muted-foreground break-words">
-          {t('description', { fileName: result.fileName, channel: result.channelName })}
+          {t('description', { fileName: outcome.fileName, channel: outcome.channelName })}
         </p>
       </div>
       <ul className="flex max-h-72 flex-col divide-y overflow-y-auto rounded-lg border">
@@ -337,6 +344,22 @@ function SubmissionResult({ result, onAnother }: { result: Result; onAnother: ()
           </li>
         ))}
       </ul>
+      {notRouted.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
+          <p className="font-medium">{t('notRouted.title', { count: notRouted.length })}</p>
+          <p className="text-muted-foreground">
+            {t('notRouted.description', { channel: outcome.channelName })}
+          </p>
+          <ul className="flex flex-wrap gap-2">
+            {notRouted.map(({ messageType }, index) => (
+              // The same Message Type can occur several times in one Interchange.
+              <li key={index} className="bg-muted rounded-md px-2 py-0.5 font-mono text-xs">
+                {messageType}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <DialogFooter>
         <Button variant="outline" onClick={onAnother}>
           {t('another')}
@@ -355,7 +378,7 @@ export function ManualSubmissionDialog({
   defaultOpen?: boolean
 }) {
   const t = useTranslations('ManualSubmission')
-  const [result, setResult] = useState<Result | null>(null)
+  const [outcome, setOutcome] = useState<SubmissionOutcome | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [channelId, setChannelId] = useState(defaultChannelId)
 
@@ -364,7 +387,7 @@ export function ManualSubmissionDialog({
       defaultOpen={defaultOpen}
       onOpenChangeComplete={(open) => {
         if (!open) {
-          setResult(null)
+          setOutcome(null)
           setChannelId(defaultChannelId)
           setAttempt(0)
         }
@@ -378,12 +401,12 @@ export function ManualSubmissionDialog({
           <DialogTitle>{t('title')}</DialogTitle>
           <DialogDescription>{t('description')}</DialogDescription>
         </DialogHeader>
-        {result ? (
+        {outcome ? (
           <SubmissionResult
-            result={result}
+            outcome={outcome}
             onAnother={() => {
-              setChannelId(result.channelId)
-              setResult(null)
+              setChannelId(outcome.channelId)
+              setOutcome(null)
               setAttempt((count) => count + 1)
             }}
           />
@@ -392,7 +415,7 @@ export function ManualSubmissionDialog({
             key={attempt}
             defaultChannelId={channelId}
             focusOnMount={attempt > 0}
-            onSubmitted={setResult}
+            onSubmitted={setOutcome}
           />
         )}
       </DialogContent>

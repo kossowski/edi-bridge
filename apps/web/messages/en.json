@@ -797,17 +797,17 @@
     },
     "document": {
       "label": "Document",
-      "description": "An EDIFACT Interchange from a Trading Partner, or a JSON or CSV file from your own systems.",
+      "description": "An EDIFACT Interchange from a Trading Partner, or a JSON or CSV Document from your own systems.",
       "drop": "Drop the file here or choose it."
     },
     "errors": {
       "channelRequired": "Choose an inbound Channel.",
       "document": {
         "required": "Choose a file.",
-        "empty": "The file is empty.",
-        "tooLarge": "The file is too large. A Document can have at most 5 million characters."
+        "empty": "The Document is empty.",
+        "tooLarge": "The Document is too large. A Document can have at most 5 million characters."
       },
-      "unroutable": "No Flow routes Documents from this Channel. Create a Flow for it first.",
+      "unroutable": "No Flow on this Channel routes the Messages of this Document. Create a Flow for their Message Type first.",
       "failed": "The Document could not be submitted. Try again."
     },
     "result": {
@@ -817,7 +817,11 @@
       "open": "Open Run",
       "openContext": "{messageType} from {tradingPartner}",
       "another": "Submit another Document",
-      "done": "Done"
+      "done": "Done",
+      "notRouted": {
+        "title": "{count, plural, one {# Message not routed} other {# Messages not routed}}",
+        "description": "No Flow on {channel} routes these Message Types, so EDI Bridge created no Run for them. Create a Flow for the Message Type to process such Messages."
+      }
     }
   },
   "Settings": {

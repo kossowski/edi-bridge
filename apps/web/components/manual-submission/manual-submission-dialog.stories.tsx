@@ -19,6 +19,16 @@ const twoOrders = [
   "UNZ+2+4711'",
 ].join('\n')
 
+const mixedInterchange = [
+  "UNB+UNOC:3+4012345000016:14+4098765000013:14+261009:1015+4712'",
+  "UNH+1+ORDERS:D:96A:UN:EAN008'BGM+220+PO-3+9'UNT+3+1'",
+  "UNH+2+DESADV:D:96A:UN:EAN007'BGM+351+DN-1+9'UNT+3+2'",
+  "UNH+3+PRICAT:D:96A:UN:EAN008'BGM+9+PL-1+9'UNT+3+3'",
+  "UNZ+3+4712'",
+].join('\n')
+
+const mixed = new File([mixedInterchange], 'mixed.edi', { type: 'text/plain' })
+
 const orders = new File([twoOrders], 'orders.edi', { type: 'text/plain' })
 
 const notes = new File(['Please ship by Friday.'], 'notes.txt', { type: 'text/plain' })
@@ -37,12 +47,16 @@ async function choose(trigger: HTMLElement, option: string) {
   await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 }
 
+async function loaded(trigger: HTMLElement) {
+  await waitFor(() => expect(trigger).not.toHaveAttribute('aria-disabled'))
+}
+
 async function submit(file: File, channel?: string) {
   const content = within(await dialog())
 
   if (channel) {
     const trigger = content.getByRole('combobox', { name: 'Inbound Channel' })
-    await waitFor(() => expect(trigger).toBeEnabled())
+    await loaded(trigger)
     await choose(trigger, channel)
   }
 
@@ -89,6 +103,26 @@ export const SubmitInterchange = meta.story({
     await expect(links).toHaveLength(2)
     await expect(links[0]).toHaveAttribute('href', expect.stringMatching(/^\/runs\/[0-9a-f-]{36}$/))
     await expect(content.getAllByText('Delivered')).toHaveLength(2)
+    await expect(content.queryByText(/not routed/)).toBeNull()
+  },
+})
+
+export const MixedInterchange = meta.story({
+  args: { defaultChannelId: inbox.id },
+  async play() {
+    await submit(mixed)
+    const content = within(await dialog())
+
+    await expect(await content.findByRole('heading', { name: '1 Run created' })).toBeVisible()
+    await expect(
+      content.getByRole('link', { name: /^Open Run ORDERS from Hansemarkt GmbH/ }),
+    ).toBeVisible()
+    await expect(content.getByText('2 Messages not routed')).toBeVisible()
+    await expect(
+      content.getByText(/^No Flow on Hansemarkt SFTP inbox routes these Message Types/),
+    ).toBeVisible()
+    await expect(content.getByText('DESADV')).toBeVisible()
+    await expect(content.getByText('PRICAT')).toBeVisible()
   },
 })
 
@@ -143,14 +177,14 @@ export const MissingInput = meta.story({
   },
 })
 
-export const EmptyFile = meta.story({
+export const EmptyDocument = meta.story({
   args: { defaultChannelId: inbox.id },
   async play() {
     await submit(new File([], 'empty.edi'))
 
     const content = within(await dialog())
 
-    await expect(await content.findByText('The file is empty.')).toBeVisible()
+    await expect(await content.findByText('The Document is empty.')).toBeVisible()
     await expect(content.getByLabelText('Document')).toHaveFocus()
   },
 })
@@ -197,7 +231,7 @@ export const NoFlowForChannel = meta.story({
     msw.use(
       http.post(`${apiUrl}${submitDocumentEndpoint.path}`, () =>
         HttpResponse.json(
-          { message: 'No Flow routes Documents from this Channel' },
+          { message: 'No Flow on this Channel routes a Message of this Document' },
           { status: 422 },
         ),
       ),
@@ -207,7 +241,7 @@ export const NoFlowForChannel = meta.story({
     await submit(orders)
 
     await expect(await within(await dialog()).findByRole('alert')).toHaveTextContent(
-      'No Flow routes Documents from this Channel.',
+      'No Flow on this Channel routes the Messages of this Document.',
     )
   },
 })
@@ -223,8 +257,21 @@ export const ChannelsLoading = meta.story({
   async play() {
     const trigger = within(await dialog()).getByRole('combobox', { name: 'Inbound Channel' })
 
-    await expect(trigger).toBeDisabled()
+    await expect(trigger).toHaveAttribute('aria-disabled', 'true')
     await expect(trigger).toHaveTextContent('Loading Channels…')
+    await waitFor(() => expect(trigger).toHaveFocus())
+    await userEvent.keyboard('{Enter}')
+    await expect(screen.queryByRole('listbox')).toBeNull()
+  },
+})
+
+export const FocusOnOpen = meta.story({
+  async play() {
+    const trigger = within(await dialog()).getByRole('combobox', { name: 'Inbound Channel' })
+
+    await waitFor(() => expect(trigger).toHaveFocus())
+    await loaded(trigger)
+    await expect(trigger).toHaveFocus()
   },
 })
 
@@ -272,7 +319,7 @@ export const LargeChannelList = meta.story({
   async play() {
     const trigger = within(await dialog()).getByRole('combobox', { name: 'Inbound Channel' })
 
-    await waitFor(() => expect(trigger).toBeEnabled())
+    await loaded(trigger)
     await userEvent.click(trigger)
     await expect((await screen.findAllByRole('option')).length).toBeGreaterThan(100)
     await userEvent.keyboard('{Escape}')
@@ -289,12 +336,16 @@ export const German = meta.story({
       </NextIntlClientProvider>
     ),
   ],
-  async play() {
+  async play({ canvas }) {
     const content = within(await dialog())
 
-    await userEvent.upload(content.getByLabelText('Document'), orders)
+    await userEvent.upload(content.getByLabelText('Document'), mixed)
     await userEvent.click(content.getByRole('button', { name: 'Document einreichen' }))
-    await expect(await content.findByRole('heading', { name: '2 Runs angelegt' })).toBeVisible()
+    await expect(await content.findByRole('heading', { name: '1 Run angelegt' })).toBeVisible()
+    await expect(content.getByText('2 Messages nicht weitergeleitet')).toBeVisible()
+    await userEvent.click(content.getByRole('button', { name: 'Fertig' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await expect(canvas.getByRole('button', { name: 'Ein Document einreichen' })).toBeVisible()
   },
 })
 
