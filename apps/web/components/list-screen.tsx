@@ -54,20 +54,18 @@ function NewLink({ href, label }: { href: string; label: string }) {
 
 export function ListScreen({
   title,
-  newHref,
-  newLabel,
+  newLink,
   children,
 }: {
   title: string
-  newHref?: string
-  newLabel?: string
+  newLink?: { href: string; label: string }
   children: ReactNode
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {newHref && newLabel && <NewLink href={newHref} label={newLabel} />}
+        {newLink && <NewLink href={newLink.href} label={newLink.label} />}
       </div>
       {children}
     </div>

@@ -104,8 +104,7 @@ export function TradingPartnersScreen() {
 
   return (
     <ListScreen
-      newHref="/trading-partners/new"
-      newLabel={t('TradingPartners.new')}
+      newLink={{ href: '/trading-partners/new', label: t('TradingPartners.new') }}
       title={t('Navigation.tradingPartners')}>
       <TradingPartnersTable />
     </ListScreen>

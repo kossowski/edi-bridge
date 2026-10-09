@@ -119,8 +119,69 @@ export const LargeVolume = meta.story({
       expect(canvasElement.querySelectorAll('.react-flow__node').length).toBeGreaterThan(0),
     )
 
-    // Only the parts in view are rendered, not all of the Document Structure and the Message Type.
-    await expect(canvasElement.querySelectorAll('.react-flow__node').length).toBeLessThan(200)
+    // Every part is rendered, also those out of view, so that each one can get keyboard focus.
+    await expect(canvasElement.querySelectorAll('.react-flow__node').length).toBeGreaterThan(400)
+  },
+})
+
+export const KeyboardPansToParts = meta.story({
+  args: { id: inbound.id },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('button', { name: 'Collapse UNH' })
+
+    const flow = canvasElement.querySelector('.react-flow')!
+    const viewport = canvasElement.querySelector<HTMLElement>('.react-flow__viewport')!
+
+    await waitFor(() => expect(viewport.style.transform).not.toContain('translate(0px, 0px)'))
+    const toggles = canvas.getAllByRole('button', { name: /^Collapse / })
+
+    const hidden = toggles.findIndex(
+      (toggle) => toggle.getBoundingClientRect().top > flow.getBoundingClientRect().bottom,
+    )
+
+    await expect(hidden).toBeGreaterThan(0)
+
+    toggles[hidden - 1]!.focus()
+
+    const before = viewport.style.transform
+
+    await userEvent.tab()
+
+    const focused = toggles[hidden]!
+
+    await expect(focused).toHaveFocus()
+    await waitFor(() => expect(viewport.style.transform).not.toBe(before))
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    const box = focused.getBoundingClientRect()
+    const pane = flow.getBoundingClientRect()
+
+    await expect(flow.scrollTop).toBe(0)
+    await expect(box.top).toBeGreaterThanOrEqual(pane.top)
+    await expect(box.bottom).toBeLessThanOrEqual(pane.bottom)
+  },
+})
+
+export const EmptyPart = meta.story({
+  args: { id: outbound.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${documentStructureEndpoint.path}`, () =>
+        HttpResponse.json({
+          ...createDocumentStructure({ fieldCount: 1 }),
+          children: [
+            { kind: 'object', path: 'header', name: 'header', required: true, children: [] },
+          ],
+        }),
+      ),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText('header')).toBeVisible()
+    await expect(canvas.getByText('Empty')).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: /header/ })).toBeNull()
+    await expect(canvas.getByText('UNH')).toBeVisible()
+    await expect(canvasElement.querySelector('.react-flow__edge')).toBeNull()
   },
 })
 

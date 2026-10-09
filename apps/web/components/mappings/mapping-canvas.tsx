@@ -20,6 +20,7 @@ import {
   columnWidth,
   headingHeight,
   layoutTree,
+  nodeId,
   type Side,
   type TreeItem,
   type TreeRow,
@@ -33,6 +34,8 @@ import {
 
 import type { MappingLink } from '@edi-bridge/contracts'
 
+type CanvasNode = TreeFlowNode | HeadingFlowNode
+
 const nodeTypes = { tree: TreeNode, heading: HeadingNode }
 
 const targetX = columnWidth + columnGap
@@ -40,6 +43,9 @@ const targetX = columnWidth + columnGap
 const canvasWidth = targetX + columnWidth
 
 const viewportPadding = 24
+
+// Below this the part labels shrink under a readable size; the user pans to the rest instead.
+const minInitialZoom = 0.85
 
 // React Flow announces every node as one to select, move or delete; these nodes are none of that.
 const plainNode = { 'aria-roledescription': undefined, 'aria-describedby': undefined }
@@ -100,7 +106,12 @@ export function MappingCanvas({
       target: layouts.target.visible,
     })
 
-    const linked = new Set(shown.flatMap((link) => [link.source, link.target]))
+    const linked = new Set(
+      shown.flatMap((link) => [
+        nodeId('source', link.sourcePath),
+        nodeId('target', link.targetPath),
+      ]),
+    )
 
     const heading = (side: Side, x: number, title: string): HeadingFlowNode => ({
       id: `${side}:heading`,
@@ -129,24 +140,21 @@ export function MappingCanvas({
       domAttributes: plainNode,
     }))
 
-    const flowEdges = shown.map(({ id, source: from, target: to, links: merged }): Edge => {
+    const flowEdges = shown.map(({ id, sourcePath, targetPath, links: merged }): Edge => {
       const [first] = merged
 
       return {
         id,
-        source: from,
-        target: to,
+        source: nodeId('source', sourcePath),
+        target: nodeId('target', targetPath),
+        data: { sourcePath, targetPath, links: merged },
         selectable: false,
         focusable: false,
         zIndex: 100,
         ariaLabel:
           merged.length === 1 && first
             ? t('link', { source: first.sourcePath, target: first.targetPath })
-            : t('links', {
-                count: merged.length,
-                source: from.slice('source:'.length),
-                target: to.slice('target:'.length),
-              }),
+            : t('links', { count: merged.length, source: sourcePath, target: targetPath }),
       }
     })
 
@@ -158,11 +166,11 @@ export function MappingCanvas({
       ],
       edges: flowEdges,
     }
-  }, [collapsed, links, onToggle, source, t, target])
+  }, [collapsed, links, onToggle, source.items, source.title, t, target.items, target.title])
 
-  const onInit = useCallback((instance: ReactFlowInstance<TreeFlowNode | HeadingFlowNode>) => {
+  const onInit = useCallback((instance: ReactFlowInstance<CanvasNode>) => {
     const width = container.current?.clientWidth ?? canvasWidth
-    const zoom = Math.min(1, Math.max(0.4, (width - 2 * viewportPadding) / canvasWidth))
+    const zoom = Math.min(1, Math.max(minInitialZoom, (width - 2 * viewportPadding) / canvasWidth))
 
     void instance.setViewport({
       x: Math.max(viewportPadding, (width - canvasWidth * zoom) / 2),
@@ -176,7 +184,7 @@ export function MappingCanvas({
       ref={container}
       className="mapping-canvas relative min-h-[32rem] flex-1 overflow-hidden rounded-lg border">
       <div className="absolute inset-0">
-        <ReactFlow<TreeFlowNode | HeadingFlowNode>
+        <ReactFlow<CanvasNode>
           ariaLabelConfig={{
             'controls.ariaLabel': t('controls.panel'),
             'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
@@ -193,7 +201,6 @@ export function MappingCanvas({
           nodesDraggable={false}
           nodesFocusable={false}
           nodeTypes={nodeTypes}
-          onlyRenderVisibleElements
           panOnScroll
           zoomOnDoubleClick={false}
           aria-label={label}

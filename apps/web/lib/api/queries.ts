@@ -11,11 +11,9 @@ import type {
 import {
   getChannel,
   getCurrentWorkspace,
-  getDocumentStructure,
   getFlow,
   getInterchange,
   getMappingDraft,
-  getMessageTypeStructure,
   getRun,
   getTradingPartner,
   listChannels,
@@ -68,8 +66,9 @@ export function interchangeQuery(id: string) {
 export const mappingKeys = {
   all: () => ['mappings'] as const,
   list: () => [...mappingKeys.all(), 'list'] as const,
-  draft: (id: string) => [...mappingKeys.all(), id, 'draft'] as const,
-  versions: (id: string) => [...mappingKeys.all(), id, 'versions'] as const,
+  detail: (id: string) => [...mappingKeys.all(), 'detail', id] as const,
+  draft: (id: string) => [...mappingKeys.detail(id), 'draft'] as const,
+  versions: (id: string) => [...mappingKeys.detail(id), 'versions'] as const,
 }
 
 export const mappingsQuery = queryOptions({
@@ -84,18 +83,15 @@ export function mappingDraftQuery(id: string) {
   })
 }
 
-export function documentStructureQuery(id: string) {
-  return queryOptions({
-    queryKey: ['document-structures', id],
-    queryFn: () => getDocumentStructure(id),
-  })
+export const documentStructureKeys = {
+  all: () => ['document-structures'] as const,
+  detail: (id: string) => [...documentStructureKeys.all(), 'detail', id] as const,
 }
 
-export function messageTypeStructureQuery(messageType: MessageType) {
-  return queryOptions({
-    queryKey: ['message-types', messageType, 'structure'],
-    queryFn: () => getMessageTypeStructure(messageType),
-  })
+export const messageTypeKeys = {
+  all: () => ['message-types'] as const,
+  structure: (messageType: MessageType) =>
+    [...messageTypeKeys.all(), 'detail', messageType, 'structure'] as const,
 }
 
 export function mappingVersionsQuery(mappingId: string) {

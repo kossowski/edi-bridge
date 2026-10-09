@@ -2,14 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { messageTypeStructures, seedDocumentStructureOf } from '@edi-bridge/mocks'
 
-import {
-  canvasLinks,
-  documentTree,
-  edifactTree,
-  layoutTree,
-  nodeId,
-  type TreeItem,
-} from './mapping-tree'
+import { canvasLinks, documentTree, edifactTree, layoutTree, type TreeItem } from './mapping-tree'
 
 function find(items: ReadonlyArray<TreeItem>, path: string): TreeItem | undefined {
   for (const item of items) {
@@ -17,7 +10,7 @@ function find(items: ReadonlyArray<TreeItem>, path: string): TreeItem | undefine
       return item
     }
 
-    const found = find(item.children, path)
+    const found = find(item.children ?? [], path)
 
     if (found) {
       return found
@@ -34,7 +27,7 @@ describe('documentTree', () => {
     const lines = find(tree, 'lines[]')
 
     expect(lines).toMatchObject({ kind: 'array', label: 'lines', repeat: 'unbounded' })
-    expect(lines?.children.map(({ path }) => path)).toContain('lines[].gtin')
+    expect(lines?.children?.map(({ path }) => path)).toContain('lines[].gtin')
   })
 
   it('nests objects', () => {
@@ -91,6 +84,19 @@ describe('layoutTree', () => {
     expect(rows.find(({ path }) => path === 'buyer')?.expanded).toBe(false)
     expect(visible.get('buyer.contact.name')).toBe('buyer')
   })
+
+  it('keeps an empty container a container that cannot be linked or expanded', () => {
+    const { rows } = layoutTree(
+      documentTree({
+        children: [
+          { kind: 'object', path: 'header', name: 'header', required: false, children: [] },
+        ],
+      }),
+      { side: 'source', x: 0, y: 0, collapsed: new Set() },
+    )
+
+    expect(rows).toMatchObject([{ path: 'header', linkable: false, expanded: null, childCount: 0 }])
+  })
 })
 
 describe('canvasLinks', () => {
@@ -115,10 +121,7 @@ describe('canvasLinks', () => {
     )
 
     expect(links).toHaveLength(1)
-    expect(links[0]).toMatchObject({
-      source: nodeId('source', 'buyer'),
-      target: nodeId('target', 'SG2+BY'),
-    })
+    expect(links[0]).toMatchObject({ sourcePath: 'buyer', targetPath: 'SG2+BY' })
     expect(links[0]?.links).toHaveLength(2)
   })
 })

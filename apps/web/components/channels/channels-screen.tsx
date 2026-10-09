@@ -81,8 +81,7 @@ export function ChannelsScreen() {
 
   return (
     <ListScreen
-      newHref="/channels/new"
-      newLabel={t('Channels.new')}
+      newLink={{ href: '/channels/new', label: t('Channels.new') }}
       title={t('Navigation.channels')}>
       <ChannelsTable />
     </ListScreen>

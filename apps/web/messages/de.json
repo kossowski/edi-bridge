@@ -848,6 +848,7 @@
       "repeatsUnboundedLabel": "Beliebig oft wiederholt",
       "repeatsUpToLabel": "Bis zu {count}-mal wiederholt",
       "hiddenParts": "{count, plural, one {# Teil ausgeblendet} other {# Teile ausgeblendet}}",
+      "emptyPart": "Leer",
       "error": {
         "title": "Strukturen nicht verfügbar",
         "description": "Die Quell- oder Zielstruktur konnte nicht geladen werden. Versuchen Sie es erneut.",

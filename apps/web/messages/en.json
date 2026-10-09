@@ -848,6 +848,7 @@
       "repeatsUnboundedLabel": "Repeats any number of times",
       "repeatsUpToLabel": "Repeats up to {count} times",
       "hiddenParts": "{count, plural, one {# part hidden} other {# parts hidden}}",
+      "emptyPart": "Empty",
       "error": {
         "title": "Structures unavailable",
         "description": "The source or target structure could not be loaded. Try again.",

@@ -11,7 +11,6 @@ import type {
 export type TreeItemKind =
   'field' | 'object' | 'array' | 'segmentGroup' | 'segment' | 'composite' | 'element'
 
-// `unbounded` for Document arrays, a number for EDIFACT parts that repeat up to maxRepeat times.
 export type Repeat = 'unbounded' | number | null
 
 export type TreeItem = {
@@ -22,7 +21,8 @@ export type TreeItem = {
   detail: string | null
   required: boolean
   repeat: Repeat
-  children: TreeItem[]
+  // `null` marks a leaf, so an empty container, e.g. an object without fields, is not taken for one.
+  children: TreeItem[] | null
 }
 
 export type Side = 'source' | 'target'
@@ -32,9 +32,9 @@ function documentItem(node: DocumentStructureNode): TreeItem {
 
   switch (node.kind) {
     case 'field':
-      return { ...base, kind: 'field', detail: node.type, repeat: null, children: [] }
+      return { ...base, kind: 'field', detail: node.type, repeat: null, children: null }
     case 'object':
-      return { ...base, kind: 'object', detail: null, repeat: null, children: documentItems(node) }
+      return { ...base, kind: 'object', detail: null, repeat: null, children: documentTree(node) }
     // An array's items share its path, so the array and its item are one row on the canvas.
     case 'array':
       return {
@@ -42,17 +42,13 @@ function documentItem(node: DocumentStructureNode): TreeItem {
         kind: 'array',
         detail: node.items.kind === 'field' ? node.items.type : null,
         repeat: 'unbounded',
-        children: node.items.kind === 'object' ? documentItems(node.items) : [],
+        children: node.items.kind === 'object' ? documentTree(node.items) : null,
       }
   }
 }
 
-function documentItems(parent: { children: DocumentStructureNode[] }): TreeItem[] {
+export function documentTree(parent: { children: DocumentStructureNode[] }): TreeItem[] {
   return parent.children.map(documentItem)
-}
-
-export function documentTree(structure: { children: DocumentStructureNode[] }): TreeItem[] {
-  return documentItems(structure)
 }
 
 function repeatOf(maxRepeat: number): Repeat {
@@ -64,6 +60,7 @@ function edifactItem(
   locale: Locale,
 ): TreeItem {
   const base = { path: node.path, name: node.name[locale], required: node.required }
+  const children = 'children' in node ? edifactItems(node.children, locale) : null
 
   switch (node.kind) {
     case 'segmentGroup':
@@ -73,7 +70,7 @@ function edifactItem(
         label: node.path.split('/').at(-1)!,
         detail: null,
         repeat: repeatOf(node.maxRepeat),
-        children: node.children.map((child) => edifactItem(child, locale)),
+        children,
       }
     case 'segment':
       return {
@@ -82,7 +79,7 @@ function edifactItem(
         label: node.qualifier ? `${node.tag}+${node.qualifier.code}` : node.tag,
         detail: null,
         repeat: repeatOf(node.maxRepeat),
-        children: node.children.map((child) => edifactItem(child, locale)),
+        children,
       }
     case 'composite':
       return {
@@ -91,7 +88,7 @@ function edifactItem(
         label: node.code,
         detail: null,
         repeat: null,
-        children: node.children.map((child) => edifactItem(child, locale)),
+        children,
       }
     case 'element':
       return {
@@ -100,16 +97,23 @@ function edifactItem(
         label: node.code,
         detail: node.format,
         repeat: null,
-        children: [],
+        children,
       }
   }
+}
+
+function edifactItems(
+  nodes: ReadonlyArray<EdifactStructureNode | EdifactComposite | EdifactElement>,
+  locale: Locale,
+): TreeItem[] {
+  return nodes.map((node) => edifactItem(node, locale))
 }
 
 export function edifactTree(
   structure: Pick<MessageTypeStructure, 'children'>,
   locale: Locale,
 ): TreeItem[] {
-  return structure.children.map((node) => edifactItem(node, locale))
+  return edifactItems(structure.children, locale)
 }
 
 export type TreeRow = Omit<TreeItem, 'children'> & {
@@ -121,7 +125,6 @@ export type TreeRow = Omit<TreeItem, 'children'> & {
   width: number
   height: number
   linkable: boolean
-  // Only containers have it: whether their children are shown.
   expanded: boolean | null
   childCount: number
 }
@@ -151,18 +154,17 @@ export function layoutTree(
   { side, x, y, collapsed }: { side: Side; x: number; y: number; collapsed: ReadonlySet<string> },
 ) {
   const rows: TreeRow[] = []
-  // Maps every path to the path of the row that shows it: itself, or its collapsed ancestor.
   const visible = new Map<string, string>()
 
   const hide = (item: TreeItem, shownAs: string) => {
     visible.set(item.path, shownAs)
-    item.children.forEach((child) => hide(child, shownAs))
+    item.children?.forEach((child) => hide(child, shownAs))
   }
 
   const place = (item: TreeItem, depth: number, top: number): number => {
     const { children, ...rest } = item
-    const container = children.length > 0
-    const expanded = container ? !collapsed.has(item.path) : null
+    const container = children !== null
+    const expanded = container && children.length > 0 ? !collapsed.has(item.path) : null
 
     const row: TreeRow = {
       ...rest,
@@ -175,14 +177,14 @@ export function layoutTree(
       height: rowHeight,
       linkable: !container,
       expanded,
-      childCount: children.length,
+      childCount: children?.length ?? 0,
     }
 
     rows.push(row)
     visible.set(item.path, item.path)
 
-    if (!expanded) {
-      children.forEach((child) => hide(child, item.path))
+    if (!expanded || children === null) {
+      children?.forEach((child) => hide(child, item.path))
 
       return top + rowHeight + rowGap
     }
@@ -205,8 +207,8 @@ export function layoutTree(
 
 export type CanvasLink = {
   id: string
-  source: string
-  target: string
+  sourcePath: string
+  targetPath: string
   // Links that end inside a collapsed part are drawn to that part and merged.
   links: MappingLink[]
 }
@@ -225,15 +227,13 @@ export function canvasLinks(
       continue
     }
 
-    const source = nodeId('source', sourcePath)
-    const target = nodeId('target', targetPath)
-    const id = `${source}->${target}`
+    const id = `${nodeId('source', sourcePath)}->${nodeId('target', targetPath)}`
     const existing = byId.get(id)
 
     if (existing) {
       existing.links.push(link)
     } else {
-      byId.set(id, { id, source, target, links: [link] })
+      byId.set(id, { id, sourcePath, targetPath, links: [link] })
     }
   }
 

@@ -2,9 +2,16 @@
 
 import { ArrowRight01Icon, RepeatIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Handle, type Node, type NodeProps, Position } from '@xyflow/react'
+import {
+  Handle,
+  type Node,
+  type NodeProps,
+  Position,
+  useReactFlow,
+  useStoreApi,
+} from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { memo } from 'react'
+import { type FocusEvent, memo, useCallback } from 'react'
 
 import { type Repeat, rowHeight, type TreeRow } from '@/components/mappings/mapping-tree'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -19,6 +26,55 @@ export type TreeFlowNode = Node<TreeNodeData, 'tree'>
 export type HeadingNodeData = { side: string; title: string }
 
 export type HeadingFlowNode = Node<HeadingNodeData, 'heading'>
+
+const focusMargin = 24
+
+function shift(start: number, size: number, extent: number) {
+  if (start < focusMargin) {
+    return focusMargin - start
+  }
+
+  return Math.min(0, extent - focusMargin - start - size)
+}
+
+// The canvas cannot be panned by keyboard, so a part that gets focus outside the view is panned in.
+function usePanIntoView() {
+  const store = useStoreApi()
+  const { setViewport } = useReactFlow()
+
+  return useCallback(
+    (event: FocusEvent<HTMLElement>) => {
+      const { transform, domNode } = store.getState()
+
+      if (!domNode) {
+        return
+      }
+
+      // The browser has already scrolled the clipped pane to the part, and React Flow undoes that
+      // scroll later; undo it first so the part is measured where it ends up.
+      for (
+        let element: HTMLElement | null = event.target;
+        element && domNode.contains(element);
+        element = element.parentElement
+      ) {
+        if (element.scrollTop !== 0 || element.scrollLeft !== 0) {
+          element.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+        }
+      }
+
+      const [x, y, zoom] = transform
+      const pane = domNode.getBoundingClientRect()
+      const focused = event.target.getBoundingClientRect()
+      const dx = shift(focused.left - pane.left, focused.width, pane.width)
+      const dy = shift(focused.top - pane.top, focused.height, pane.height)
+
+      if (dx !== 0 || dy !== 0) {
+        void setViewport({ x: x + dx, y: y + dy, zoom })
+      }
+    },
+    [setViewport, store],
+  )
+}
 
 function RepeatBadge({ repeat }: { repeat: Exclude<Repeat, null> }) {
   const t = useTranslations('Mapping.canvas')
@@ -59,8 +115,9 @@ function ToggleButton({ data }: { data: TreeNodeData }) {
 
 function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
   const t = useTranslations('Mapping.canvas')
-  const container = data.expanded !== null
+  const container = !data.linkable
   const showHandle = data.linkable || (data.expanded === false && data.linked)
+  const onFocus = usePanIntoView()
 
   return (
     <div
@@ -68,16 +125,21 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         'text-foreground relative h-full w-full rounded-md border text-xs',
         container ? 'bg-card/70' : 'bg-card',
         data.kind === 'segmentGroup' && 'border-foreground/40 border-2',
-        data.repeat !== null && 'border-dashed shadow-[3px_3px_0_-1px_var(--border)]',
+        data.repeat !== null &&
+          'border-muted-foreground border-dashed shadow-[3px_3px_0_-1px_var(--border)]',
       )}
-      data-kind={data.kind}>
+      data-kind={data.kind}
+      onFocus={onFocus}>
       <div className="flex items-center gap-1.5 px-2" style={{ height: rowHeight - 2 }}>
-        {container && <ToggleButton data={data} />}
+        {data.expanded !== null && <ToggleButton data={data} />}
         <code className={cn('shrink-0 font-mono', container && 'font-semibold')}>{data.label}</code>
         {data.name && <span className="text-muted-foreground min-w-0 truncate">{data.name}</span>}
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
           {data.detail && <code className="text-muted-foreground font-mono">{data.detail}</code>}
           {data.repeat !== null && <RepeatBadge repeat={data.repeat} />}
+          {container && data.childCount === 0 && (
+            <span className="text-muted-foreground">{t('emptyPart')}</span>
+          )}
           {data.expanded === false && (
             <span className="text-muted-foreground">
               {t('hiddenParts', { count: data.childCount })}

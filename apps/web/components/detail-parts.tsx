@@ -70,7 +70,14 @@ export function LoadFailure({
 }: {
   notFound: boolean
   namespace:
-    'RunDetail' | 'Interchange' | 'TradingPartner' | 'Channel' | 'Flow' | 'Mapping' | 'Settings'
+    | 'RunDetail'
+    | 'Interchange'
+    | 'TradingPartner'
+    | 'Channel'
+    | 'Flow'
+    | 'Mapping'
+    | 'Mapping.canvas'
+    | 'Settings'
   onRetry: () => void
 }) {
   const t = useTranslations(namespace)

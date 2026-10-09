@@ -1,26 +1,19 @@
 'use client'
 
-import { AlertCircleIcon, ComputerIcon } from '@hugeicons/core-free-icons'
+import { ComputerIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
+import { type QueryKey, useQuery, type UseQueryOptions } from '@tanstack/react-query'
 import { useLocale, useTranslations } from 'next-intl'
-import { useMemo } from 'react'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { documentTree, edifactTree, type TreeItem } from '@/components/mappings/mapping-tree'
 import { useDesktop } from '@/hooks/use-desktop'
-import { ApiError } from '@/lib/api/client'
-import {
-  documentStructureQuery,
-  mappingDraftQuery,
-  messageTypeStructureQuery,
-} from '@/lib/api/queries'
+import { ApiError, getDocumentStructure, getMessageTypeStructure } from '@/lib/api/client'
+import { documentStructureKeys, mappingDraftQuery, messageTypeKeys } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
-import { Button } from '@edi-bridge/ui/components/button'
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -28,64 +21,65 @@ import {
 } from '@edi-bridge/ui/components/empty'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
+import type { Locale } from '@/i18n/locales'
 import type { MappingDraft, MappingSide } from '@edi-bridge/contracts'
 
+// The sides load different structures, but past `select` the canvas only sees the tree; leaving
+// the structure type out of the options lets one `useQuery` call serve both kinds of side.
+function treeQuery<Data>(
+  queryKey: QueryKey,
+  queryFn: () => Promise<Data>,
+  tree: (data: Data) => TreeItem[],
+): UseQueryOptions<unknown, Error, TreeItem[]> {
+  return {
+    queryKey,
+    queryFn,
+    // SAFETY: `select` only receives what `queryFn` above returned, which is Data.
+    select: (data) => tree(data as Data),
+  }
+}
+
+function sideOf(
+  side: MappingSide,
+  t: ReturnType<typeof useTranslations<'Mapping'>>,
+  locale: Locale,
+) {
+  switch (side.kind) {
+    case 'documentStructure':
+      return {
+        title: t('side.documentStructure', { name: side.name }),
+        query: treeQuery(
+          documentStructureKeys.detail(side.documentStructureId),
+          () => getDocumentStructure(side.documentStructureId),
+          documentTree,
+        ),
+      }
+    case 'messageType':
+      return {
+        title: t('side.messageType', { messageType: side.messageType }),
+        query: treeQuery(
+          messageTypeKeys.structure(side.messageType),
+          () => getMessageTypeStructure(side.messageType),
+          (structure) => edifactTree(structure, locale),
+        ),
+      }
+  }
+}
+
 function useSideTitle() {
-  const t = useTranslations('Mapping.side')
-
-  return (side: MappingSide) =>
-    side.kind === 'documentStructure'
-      ? t('documentStructure', { name: side.name })
-      : t('messageType', { messageType: side.messageType })
-}
-
-function useSideTree(side: MappingSide) {
+  const t = useTranslations('Mapping')
   const locale = useLocale()
-  const documentStructureId = side.kind === 'documentStructure' ? side.documentStructureId : null
-  const messageType = side.kind === 'messageType' ? side.messageType : null
 
-  const documentStructure = useQuery({
-    ...documentStructureQuery(documentStructureId ?? ''),
-    enabled: documentStructureId !== null,
-  })
-
-  const messageTypeStructure = useQuery({
-    ...messageTypeStructureQuery(messageType ?? 'ORDERS'),
-    enabled: messageType !== null,
-  })
-
-  const query = documentStructureId !== null ? documentStructure : messageTypeStructure
-
-  const items = useMemo((): TreeItem[] | undefined => {
-    if (documentStructureId !== null) {
-      return documentStructure.data && documentTree(documentStructure.data)
-    }
-
-    return messageTypeStructure.data && edifactTree(messageTypeStructure.data, locale)
-  }, [documentStructure.data, documentStructureId, locale, messageTypeStructure.data])
-
-  return { items, isError: query.isError, refetch: query.refetch }
+  return (side: MappingSide) => sideOf(side, t, locale).title
 }
 
-function CanvasFailure({ onRetry }: { onRetry: () => void }) {
-  const t = useTranslations('Mapping.canvas.error')
+function useSide(side: MappingSide) {
+  const t = useTranslations('Mapping')
+  const locale = useLocale()
+  const { title, query } = sideOf(side, t, locale)
+  const { data: items, isError, refetch } = useQuery(query)
 
-  return (
-    <Empty className="flex-1 border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <HugeiconsIcon icon={AlertCircleIcon} strokeWidth={2} />
-        </EmptyMedia>
-        <EmptyTitle>{t('title')}</EmptyTitle>
-        <EmptyDescription>{t('description')}</EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button variant="outline" onClick={onRetry}>
-          {t('retry')}
-        </Button>
-      </EmptyContent>
-    </Empty>
-  )
+  return { title, items, isError, refetch }
 }
 
 function CanvasLoading() {
@@ -110,13 +104,14 @@ function CanvasLoading() {
 
 function Canvas({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping.canvas')
-  const sideTitle = useSideTitle()
-  const source = useSideTree(draft.source)
-  const target = useSideTree(draft.target)
+  const source = useSide(draft.source)
+  const target = useSide(draft.target)
 
   if (source.isError || target.isError) {
     return (
-      <CanvasFailure
+      <LoadFailure
+        namespace="Mapping.canvas"
+        notFound={false}
         onRetry={() => {
           void (source.isError && source.refetch())
           void (target.isError && target.refetch())
@@ -129,15 +124,12 @@ function Canvas({ draft }: { draft: MappingDraft }) {
     return <CanvasLoading />
   }
 
-  const sourceTitle = sideTitle(draft.source)
-  const targetTitle = sideTitle(draft.target)
-
   return (
     <MappingCanvas
-      label={t('label', { source: sourceTitle, target: targetTitle })}
+      label={t('label', { source: source.title, target: target.title })}
       links={draft.links}
-      source={{ title: sourceTitle, items: source.items }}
-      target={{ title: targetTitle, items: target.items }}
+      source={{ title: source.title, items: source.items }}
+      target={{ title: target.title, items: target.items }}
     />
   )
 }

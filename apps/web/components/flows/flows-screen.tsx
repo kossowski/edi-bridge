@@ -95,7 +95,9 @@ export function FlowsScreen() {
   const t = useTranslations()
 
   return (
-    <ListScreen newHref="/flows/new" newLabel={t('Flows.new')} title={t('Navigation.flows')}>
+    <ListScreen
+      newLink={{ href: '/flows/new', label: t('Flows.new') }}
+      title={t('Navigation.flows')}>
       <FlowsTable />
     </ListScreen>
   )
