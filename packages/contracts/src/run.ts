@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { controlReferenceSchema, segmentTagSchema } from './edifact'
 import { flowSummarySchema } from './flow'
 import { mappingVersionSummarySchema } from './mapping-version'
 import { messageTypeSchema } from './message-type'
@@ -108,7 +109,7 @@ export type RunStep = z.infer<typeof runStepSchema>
 
 export const errorPositionSchema = z.object({
   segment: z.number().int().min(1),
-  tag: z.string().regex(/^[A-Z0-9]{3}$/),
+  tag: segmentTagSchema,
   element: z.number().int().min(1).nullable(),
   component: z.number().int().min(1).nullable(),
 })
@@ -124,7 +125,7 @@ export const runErrorSchema = z.object({
 export type RunError = z.infer<typeof runErrorSchema>
 
 export const parsedSegmentSchema = z.object({
-  tag: z.string().regex(/^[A-Z0-9]{3}$/),
+  tag: segmentTagSchema,
   name: z.string().min(1).nullable(),
   elements: z.array(z.array(z.string())),
 })
@@ -141,11 +142,15 @@ export type ParsedMessage = z.infer<typeof parsedMessageSchema>
 
 export const runInterchangeSchema = z.object({
   id: z.uuid(),
-  controlReference: z.string().min(1).max(14),
+  controlReference: controlReferenceSchema,
   raw: z.string().min(1),
 })
 
 export type RunInterchange = z.infer<typeof runInterchangeSchema>
+
+export const runReferenceSchema = z.object({ id: z.uuid() })
+
+export type RunReference = z.infer<typeof runReferenceSchema>
 
 const runDetailFields = {
   direction: directionSchema,
@@ -153,8 +158,8 @@ const runDetailFields = {
   interchange: runInterchangeSchema.nullable(),
   message: parsedMessageSchema.nullable(),
   mappingVersion: mappingVersionSummarySchema.nullable(),
-  replaces: z.object({ id: z.uuid() }).nullable(),
-  replacedBy: z.object({ id: z.uuid() }).nullable(),
+  replaces: runReferenceSchema.nullable(),
+  replacedBy: runReferenceSchema.nullable(),
 }
 
 export const runDetailSchema = z.discriminatedUnion('status', [

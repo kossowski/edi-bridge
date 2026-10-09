@@ -7,6 +7,8 @@ export {
   toSearchParams,
 } from './endpoint'
 
+export { controlReferenceSchema, segmentTagSchema } from './edifact'
+
 export { type FlowSummary, flowSummarySchema, flowsEndpoint } from './flow'
 
 export {
@@ -49,6 +51,8 @@ export {
   runErrorSchema,
   type RunInterchange,
   runInterchangeSchema,
+  type RunReference,
+  runReferenceSchema,
   type RunList,
   type RunListQuery,
   runListQuerySchema,

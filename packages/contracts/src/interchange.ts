@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { controlReferenceSchema } from './edifact'
 import { directionSchema, runSummarySchema } from './run'
 
 import type { Endpoint } from './endpoint'
@@ -13,7 +14,7 @@ export type InterchangeParty = z.infer<typeof interchangePartySchema>
 
 export const interchangeSchema = z.object({
   id: z.uuid(),
-  controlReference: z.string().min(1).max(14),
+  controlReference: controlReferenceSchema,
   direction: directionSchema,
   sender: interchangePartySchema,
   receiver: interchangePartySchema,
