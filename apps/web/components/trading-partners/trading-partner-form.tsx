@@ -4,8 +4,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react'
+import { type FormEvent, useId, useRef, useState } from 'react'
 
+import { describedBy, FormField, GlnField, useGlnErrorMessage } from '@/components/form-field'
 import {
   type FieldError,
   toFormValues,
@@ -14,12 +15,13 @@ import {
   validateTradingPartnerForm,
 } from '@/components/trading-partners/trading-partner-form-values'
 import { ApiError, createTradingPartner, updateTradingPartner } from '@/lib/api/client'
-import { tradingPartnerKeys, tradingPartnerQuery } from '@/lib/api/queries'
+import { storeSavedTradingPartner } from '@/lib/api/queries'
 import {
   acknowledgementTimeLimitHours,
   characterSets,
   type TradingPartner,
   type TradingPartnerInput,
+  tradingPartnerInputSchema,
 } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Input } from '@edi-bridge/ui/components/input'
@@ -31,54 +33,24 @@ import {
   SelectValue,
 } from '@edi-bridge/ui/components/select'
 
-function FormField({
-  id,
-  label,
-  description,
-  error,
-  children,
-}: {
-  id: string
-  label: ReactNode
-  description: string
-  error: string | null
-  children: ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {label}
-      {children}
-      <p id={`${id}-description`} className="text-muted-foreground text-sm">
-        {description}
-      </p>
-      {error && (
-        <p id={`${id}-error`} className="text-sm text-red-800 dark:text-red-300">
-          {error}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function describedBy(id: string, error: string | null) {
-  return error ? `${id}-description ${id}-error` : `${id}-description`
-}
-
-export function useFieldErrorMessage() {
+function useFieldErrorMessage() {
   const t = useTranslations('TradingPartnerForm.errors')
+  const glnErrorMessage = useGlnErrorMessage()
 
   return (field: TradingPartnerField, error: FieldError) => {
     switch (error) {
-      case 'required':
-        return t(`required.${field === 'gln' ? 'gln' : 'name'}`)
       case 'tooLong':
-        return t('tooLong')
+        return t('tooLong', { max: tradingPartnerInputSchema.shape.name.maxLength ?? 0 })
       case 'range':
         return t('range', acknowledgementTimeLimitHours)
-      case 'format':
-        return t('gln.format')
-      case 'checkDigit':
-        return t('gln.checkDigit')
+      case 'required':
+        if (field === 'name' || field === 'characterSet') {
+          return t(`required.${field}`)
+        }
+
+        return glnErrorMessage(error)
+      default:
+        return glnErrorMessage(error)
     }
   }
 }
@@ -98,8 +70,7 @@ export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: Tradin
     mutationFn: (input: TradingPartnerInput) =>
       tradingPartner ? updateTradingPartner(tradingPartner.id, input) : createTradingPartner(input),
     onSuccess: (saved) => {
-      queryClient.setQueryData(tradingPartnerQuery(saved.id).queryKey, saved)
-      void queryClient.invalidateQueries({ queryKey: tradingPartnerKeys.list() })
+      storeSavedTradingPartner(queryClient, saved)
       router.push(`/trading-partners/${saved.id}`)
     },
     onError: (error, input) => {
@@ -186,28 +157,14 @@ export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: Tradin
           onChange={(event) => update('name', event.target.value)}
         />
       </FormField>
-      <FormField
+      <GlnField
         id={ids.gln}
         description={t('fields.gln.description')}
         error={glnError}
-        label={
-          <label htmlFor={ids.gln} className="text-sm font-medium">
-            {t('fields.gln.label')}
-          </label>
-        }>
-        <Input
-          id={ids.gln}
-          autoComplete="off"
-          inputMode="numeric"
-          name="gln"
-          spellCheck={false}
-          value={values.gln}
-          aria-describedby={describedBy(ids.gln, glnError)}
-          aria-invalid={glnError !== null}
-          className="font-mono sm:w-60"
-          onChange={(event) => update('gln', event.target.value)}
-        />
-      </FormField>
+        label={t('fields.gln.label')}
+        value={values.gln}
+        onChange={(value) => update('gln', value)}
+      />
       <FormField
         id={ids.characterSet}
         description={t('fields.characterSet.description')}

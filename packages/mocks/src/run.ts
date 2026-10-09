@@ -29,9 +29,20 @@ function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage 
   return faker.helpers.arrayElement(stages)
 }
 
-function generateRun(faker: Faker, receivedAt: Date) {
-  const flow = faker.helpers.arrayElement(seedFlows)
+// A Trading Partner in Test Mode has exchanged only a few test Interchanges, and no CONTRL arrives
+// before onboarding records one.
+const weightedFlows = seedFlows.flatMap((flow) => {
   const tradingPartner = seedTradingPartners.find(({ id }) => id === flow.tradingPartnerId)!
+
+  if (flow.messageType === 'CONTRL' && tradingPartner.onboarding.contrlReceivedAt === null) {
+    return []
+  }
+
+  return [{ value: { flow, tradingPartner }, weight: tradingPartner.testMode ? 0.003 : 1 }]
+})
+
+function generateRun(faker: Faker, receivedAt: Date) {
+  const { flow, tradingPartner } = faker.helpers.weightedArrayElement(weightedFlows)
 
   const status = faker.helpers.weightedArrayElement<RunStatus>([
     { value: 'delivered', weight: 78 },

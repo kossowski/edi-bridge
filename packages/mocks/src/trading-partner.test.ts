@@ -26,6 +26,7 @@ import { interchangeIdOf } from './run-detail'
 import {
   createTradingPartner,
   createTradingPartners,
+  hasTraffic,
   seedTradingPartners,
   tradingPartnerHandlers,
 } from './trading-partner'
@@ -100,14 +101,14 @@ describe('seedTradingPartners', () => {
 
     expect(
       seedTradingPartners.some(
-        ({ testMode, onboarding }) =>
-          testMode && onboarding.testInterchangeSentAt !== null && !onboarding.contrlReceivedAt,
+        (tradingPartner) =>
+          tradingPartner.testMode &&
+          hasTraffic(tradingPartner) &&
+          !tradingPartner.onboarding.contrlReceivedAt,
       ),
     ).toBe(true)
 
-    expect(
-      seedTradingPartners.some(({ onboarding }) => onboarding.testInterchangeSentAt === null),
-    ).toBe(true)
+    expect(seedTradingPartners.some((tradingPartner) => !hasTraffic(tradingPartner))).toBe(true)
   })
 
   it('carries the same GLN as the Interchanges exchanged with the Trading Partner', async () => {
@@ -280,9 +281,7 @@ describe('createHandlers', () => {
     const response = await send('GET', channelsEndpoint.path)
     const channels = channelsEndpoint.response.parse(await response.json())
 
-    for (const { id } of seedTradingPartners.filter(
-      ({ onboarding }) => onboarding.testInterchangeSentAt !== null,
-    )) {
+    for (const { id } of seedTradingPartners.filter(hasTraffic)) {
       expect(channels.filter(({ tradingPartnerId }) => tradingPartnerId === id)).not.toHaveLength(0)
     }
   })

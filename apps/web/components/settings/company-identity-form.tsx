@@ -5,19 +5,18 @@ import { useTranslations } from 'next-intl'
 import { type FormEvent, useId, useState } from 'react'
 
 import { LoadFailure } from '@/components/detail-parts'
-import { useFieldErrorMessage } from '@/components/trading-partners/trading-partner-form'
-import { glnError, normalizeGln } from '@/components/trading-partners/trading-partner-form-values'
+import { GlnField, useGlnErrorMessage } from '@/components/form-field'
 import { updateCompanyIdentity } from '@/lib/api/client'
 import { currentWorkspaceQuery } from '@/lib/api/queries'
+import { glnError, normalizeGln } from '@/lib/forms/gln'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Input } from '@edi-bridge/ui/components/input'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { Workspace } from '@edi-bridge/contracts'
 
 function IdentityForm({ workspace }: { workspace: Workspace }) {
   const t = useTranslations('Settings.companyIdentity')
-  const errorMessage = useFieldErrorMessage()
+  const errorMessage = useGlnErrorMessage()
   const queryClient = useQueryClient()
   const id = useId()
   const [gln, setGln] = useState(workspace.gln ?? '')
@@ -31,7 +30,7 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
   })
 
   const issue = glnError(gln)
-  const error = submitted && issue ? errorMessage('gln', issue) : null
+  const error = submitted && issue ? errorMessage(issue) : null
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -54,31 +53,17 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
         <dt className="text-muted-foreground text-xs">{t('companyName')}</dt>
         <dd className="text-sm">{workspace.name}</dd>
       </dl>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={id} className="text-sm font-medium">
-          {t('gln.label')}
-        </label>
-        <Input
-          id={id}
-          autoComplete="off"
-          inputMode="numeric"
-          name="gln"
-          spellCheck={false}
-          value={gln}
-          aria-describedby={error ? `${id}-description ${id}-error` : `${id}-description`}
-          aria-invalid={error !== null}
-          className="font-mono sm:w-60"
-          onChange={(event) => setGln(event.target.value)}
-        />
-        <p id={`${id}-description`} className="text-muted-foreground text-sm">
-          {t('gln.description')}
-        </p>
-        {error && (
-          <p id={`${id}-error`} className="text-sm text-red-800 dark:text-red-300">
-            {error}
-          </p>
-        )}
-      </div>
+      <GlnField
+        id={id}
+        description={t('gln.description')}
+        error={error}
+        label={t('gln.label')}
+        value={gln}
+        onChange={(value) => {
+          setGln(value)
+          save.reset()
+        }}
+      />
       <div className="flex flex-wrap items-center gap-3">
         <Button disabled={save.isPending} type="submit">
           {save.isPending ? t('saving') : t('save')}

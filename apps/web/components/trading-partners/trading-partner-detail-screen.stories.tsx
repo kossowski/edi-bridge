@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { TradingPartnerDetailScreen } from '@/components/trading-partners/trading-partner-detail-screen'
 import { apiUrl } from '@/lib/api/config'
@@ -50,6 +50,34 @@ export const ReadyForProduction = meta.story({
   },
 })
 
+export const SwitchToProduction = meta.story({
+  args: { id: readyForProduction.id },
+  async play({ canvas }) {
+    const button = await canvas.findByRole('button', { name: 'Switch to production' })
+    await userEvent.click(button)
+    await expect(canvas.getByText(/From now on, Interchanges with/)).toHaveFocus()
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Cancel' }))
+    await expect(canvas.getByRole('button', { name: 'Switch to production' })).toHaveFocus()
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Switch to production' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Switch to production now' }))
+    await waitFor(() => expect(canvas.getByText(/^Production on/)).toHaveFocus())
+  },
+})
+
+export const ReadyButWorkspaceWithoutGln = meta.story({
+  args: { id: readyForProduction.id },
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { workspace: createWorkspace({ gln: null }) }))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText("You can switch to production once your company's GLN is recorded."),
+    ).toBeVisible()
+  },
+})
+
 export const AwaitingContrl = meta.story({
   args: { id: awaitingContrl.id },
   async play({ canvas }) {
@@ -62,6 +90,9 @@ export const AwaitingContrl = meta.story({
 export const WithoutTraffic = meta.story({
   args: { id: withoutTraffic.id },
   async play({ canvas }) {
+    await expect(
+      await canvas.findByText('You can switch to production once the test Interchange is sent.'),
+    ).toBeVisible()
     await expect(await canvas.findByText('No Runs for this Trading Partner yet.')).toBeVisible()
     await expect(canvas.getByText('No Flows for this Trading Partner yet.')).toBeVisible()
   },

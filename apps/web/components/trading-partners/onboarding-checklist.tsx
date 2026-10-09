@@ -5,14 +5,15 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
 import { switchToProduction } from '@/lib/api/client'
-import { tradingPartnerKeys, tradingPartnerQuery } from '@/lib/api/queries'
+import { storeSavedTradingPartner } from '@/lib/api/queries'
 import {
   type OnboardingChecklistItem,
   onboardingChecklist,
+  type OnboardingStep,
   type TradingPartner,
 } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -38,23 +39,42 @@ function StepIcon({ state }: { state: OnboardingChecklistItem['state'] }) {
   )
 }
 
-function ProductionSwitch({ tradingPartner }: { tradingPartner: TradingPartner }) {
+function ProductionSwitch({
+  tradingPartner,
+  onSwitched,
+}: {
+  tradingPartner: TradingPartner
+  onSwitched: () => void
+}) {
   const t = useTranslations('TradingPartner.onboarding.switch')
   const queryClient = useQueryClient()
   const [confirming, setConfirming] = useState(false)
+  const toggled = useRef(false)
+  const switchButton = useRef<HTMLButtonElement>(null)
+  const confirmation = useRef<HTMLParagraphElement>(null)
+
+  useEffect(() => {
+    if (toggled.current) {
+      ;(confirming ? confirmation : switchButton).current?.focus()
+    }
+  }, [confirming])
+
+  function toggle(next: boolean) {
+    toggled.current = true
+    setConfirming(next)
+  }
 
   const production = useMutation({
     mutationFn: () => switchToProduction(tradingPartner.id),
     onSuccess: (updated) => {
-      queryClient.setQueryData(tradingPartnerQuery(updated.id).queryKey, updated)
-      void queryClient.invalidateQueries({ queryKey: tradingPartnerKeys.list() })
-      setConfirming(false)
+      onSwitched()
+      storeSavedTradingPartner(queryClient, updated)
     },
   })
 
   if (!confirming) {
     return (
-      <Button className="w-fit" onClick={() => setConfirming(true)}>
+      <Button ref={switchButton} className="w-fit" onClick={() => toggle(true)}>
         <HugeiconsIcon icon={Rocket01Icon} strokeWidth={2} aria-hidden />
         {t('button')}
       </Button>
@@ -66,17 +86,14 @@ function ProductionSwitch({ tradingPartner }: { tradingPartner: TradingPartner }
       role="group"
       aria-labelledby="production-confirm"
       className="flex flex-col gap-3 rounded-lg border border-amber-600/40 bg-amber-500/10 p-3">
-      <p id="production-confirm" className="text-sm">
+      <p id="production-confirm" ref={confirmation} tabIndex={-1} className="text-sm">
         {t('confirmation', { tradingPartner: tradingPartner.name })}
       </p>
       <div className="flex flex-wrap gap-2">
         <Button disabled={production.isPending} onClick={() => production.mutate()}>
           {production.isPending ? t('pending') : t('confirm')}
         </Button>
-        <Button
-          disabled={production.isPending}
-          variant="outline"
-          onClick={() => setConfirming(false)}>
+        <Button disabled={production.isPending} variant="outline" onClick={() => toggle(false)}>
           {t('cancel')}
         </Button>
       </div>
@@ -91,10 +108,14 @@ function ProductionSwitch({ tradingPartner }: { tradingPartner: TradingPartner }
 
 function StepDetail({
   item,
+  blockedBy,
   tradingPartner,
+  onSwitched,
 }: {
   item: OnboardingChecklistItem
+  blockedBy: OnboardingStep | undefined
   tradingPartner: TradingPartner
+  onSwitched: () => void
 }) {
   const t = useTranslations('TradingPartner.onboarding')
 
@@ -107,11 +128,16 @@ function StepDetail({
   }
 
   if (item.step === 'production' && item.state === 'current') {
-    return <ProductionSwitch tradingPartner={tradingPartner} />
+    return <ProductionSwitch tradingPartner={tradingPartner} onSwitched={onSwitched} />
   }
 
-  if (item.step === 'production' && item.state === 'pending') {
-    return <p className="text-muted-foreground text-sm">{t('productionLocked')}</p>
+  if (
+    item.step === 'production' &&
+    item.state === 'pending' &&
+    blockedBy !== undefined &&
+    blockedBy !== 'production'
+  ) {
+    return <p className="text-muted-foreground text-sm">{t(`productionLocked.${blockedBy}`)}</p>
   }
 
   return null
@@ -127,6 +153,15 @@ export function OnboardingChecklist({
   const t = useTranslations('TradingPartner.onboarding')
   const format = useFormatter()
   const checklist = onboardingChecklist(tradingPartner, workspaceGln)
+  const blockedBy = checklist.find(({ state }) => state === 'current')?.step
+  const [switched, setSwitched] = useState(false)
+  const productionTitle = useRef<HTMLParagraphElement>(null)
+
+  useEffect(() => {
+    if (switched && !tradingPartner.testMode) {
+      productionTitle.current?.focus()
+    }
+  }, [switched, tradingPartner.testMode])
 
   return (
     <ol className="flex flex-col gap-4 rounded-lg border p-4">
@@ -137,7 +172,10 @@ export function OnboardingChecklist({
           className="flex gap-3">
           <StepIcon state={item.state} />
           <div className="flex min-w-0 flex-col gap-1.5">
-            <p className="flex flex-wrap items-baseline gap-x-2 font-medium">
+            <p
+              ref={item.step === 'production' ? productionTitle : undefined}
+              tabIndex={item.step === 'production' ? -1 : undefined}
+              className="flex flex-wrap items-baseline gap-x-2 font-medium">
               {t(`steps.${item.step}.title`)}
               <span
                 className={cn(
@@ -157,7 +195,12 @@ export function OnboardingChecklist({
                 </time>
               </p>
             )}
-            <StepDetail item={item} tradingPartner={tradingPartner} />
+            <StepDetail
+              blockedBy={blockedBy}
+              item={item}
+              tradingPartner={tradingPartner}
+              onSwitched={() => setSwitched(true)}
+            />
           </div>
         </li>
       ))}

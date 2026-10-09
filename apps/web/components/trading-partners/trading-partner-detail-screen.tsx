@@ -80,7 +80,7 @@ function TradingPartnerFacts({ tradingPartner }: { tradingPartner: TradingPartne
   )
 }
 
-function PartnerChannels({ tradingPartnerId }: { tradingPartnerId: string }) {
+function TradingPartnerChannels({ tradingPartnerId }: { tradingPartnerId: string }) {
   const t = useTranslations('TradingPartner.channels')
 
   const channels = useQuery({
@@ -89,7 +89,7 @@ function PartnerChannels({ tradingPartnerId }: { tradingPartnerId: string }) {
   })
 
   return (
-    <Section id="partner-channels" title={t('title')}>
+    <Section id="trading-partner-channels" title={t('title')}>
       <SectionBody empty={t('none')} failed={t('failed')} query={channels}>
         {(items) => (
           <ul className="divide-y rounded-lg border">
@@ -111,7 +111,7 @@ function PartnerChannels({ tradingPartnerId }: { tradingPartnerId: string }) {
   )
 }
 
-function PartnerFlows({ tradingPartnerId }: { tradingPartnerId: string }) {
+function TradingPartnerFlows({ tradingPartnerId }: { tradingPartnerId: string }) {
   const t = useTranslations('TradingPartner.flows')
 
   const flows = useQuery({
@@ -120,7 +120,7 @@ function PartnerFlows({ tradingPartnerId }: { tradingPartnerId: string }) {
   })
 
   return (
-    <Section id="partner-flows" title={t('title')}>
+    <Section id="trading-partner-flows" title={t('title')}>
       <SectionBody empty={t('none')} failed={t('failed')} query={flows}>
         {(items) => (
           <ul className="divide-y rounded-lg border">
@@ -152,7 +152,7 @@ function RecentRuns({ tradingPartner }: { tradingPartner: TradingPartner }) {
   }
 
   return (
-    <Section id="partner-runs" title={t('title')}>
+    <Section id="trading-partner-runs" title={t('title')}>
       <SectionBody
         empty={t('none')}
         failed={t('failed')}
@@ -206,7 +206,7 @@ function TradingPartnerView({ tradingPartner }: { tradingPartner: TradingPartner
         </Link>
       </div>
       <TradingPartnerFacts tradingPartner={tradingPartner} />
-      <Section id="partner-onboarding" title={t('onboarding.title')}>
+      <Section id="trading-partner-onboarding" title={t('onboarding.title')}>
         {workspace.isPending ? (
           <Skeleton className="h-64 w-full" />
         ) : (
@@ -217,8 +217,8 @@ function TradingPartnerView({ tradingPartner }: { tradingPartner: TradingPartner
         )}
       </Section>
       <div className="grid gap-6 lg:grid-cols-2">
-        <PartnerChannels tradingPartnerId={tradingPartner.id} />
-        <PartnerFlows tradingPartnerId={tradingPartner.id} />
+        <TradingPartnerChannels tradingPartnerId={tradingPartner.id} />
+        <TradingPartnerFlows tradingPartnerId={tradingPartner.id} />
       </div>
       <RecentRuns tradingPartner={tradingPartner} />
     </>

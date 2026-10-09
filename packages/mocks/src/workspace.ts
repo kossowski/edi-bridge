@@ -9,11 +9,13 @@ import {
   workspaceSchema,
 } from '@edi-bridge/contracts'
 
+import { randomGln } from './gln'
+
 export function createWorkspace(overrides: Partial<Workspace> = {}): Workspace {
   const workspace: Workspace = {
     id: faker.string.uuid(),
     name: faker.company.name(),
-    gln: withCheckDigit(`02${faker.string.numeric({ length: 10, allowLeadingZeros: true })}`),
+    gln: randomGln(faker),
     ...overrides,
   }
 

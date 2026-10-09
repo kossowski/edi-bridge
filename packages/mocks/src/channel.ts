@@ -3,15 +3,15 @@ import { http, HttpResponse } from 'msw'
 import { type ChannelSummary, channelSummarySchema, channelsEndpoint } from '@edi-bridge/contracts'
 
 import { seedId } from './seed-id'
-import { seedTradingPartners } from './trading-partner'
+import { hasTraffic, seedTradingPartners } from './trading-partner'
 
 const erpChannels: ReadonlyArray<Omit<ChannelSummary, 'id'>> = [
   { name: 'ERP webhook', type: 'webhook', direction: 'inbound', tradingPartnerId: null },
   { name: 'ERP HTTP delivery', type: 'http', direction: 'outbound', tradingPartnerId: null },
 ]
 
-const partnerChannels = seedTradingPartners
-  .filter(({ onboarding }) => onboarding.testInterchangeSentAt !== null)
+const tradingPartnerChannels = seedTradingPartners
+  .filter(hasTraffic)
   .flatMap((tradingPartner): Array<Omit<ChannelSummary, 'id'>> => {
     const shortName = tradingPartner.name.split(' ')[0]
 
@@ -31,9 +31,10 @@ const partnerChannels = seedTradingPartners
     ]
   })
 
-export const seedChannels: ReadonlyArray<ChannelSummary> = [...erpChannels, ...partnerChannels].map(
-  (channel, index) => channelSummarySchema.parse({ ...channel, id: seedId(3, index + 1) }),
-)
+export const seedChannels: ReadonlyArray<ChannelSummary> = [
+  ...erpChannels,
+  ...tradingPartnerChannels,
+].map((channel, index) => channelSummarySchema.parse({ ...channel, id: seedId(3, index + 1) }))
 
 export function channelsHandler(
   apiUrl: string,

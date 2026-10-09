@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   createRun,
-  createTradingPartner,
+  createTradingPartner as buildTradingPartner,
   createWorkspace,
   runDetailHandlers,
   runsHandler,
@@ -12,7 +12,7 @@ import {
 } from '@edi-bridge/mocks'
 
 import {
-  createTradingPartner as create,
+  createTradingPartner,
   getRun,
   listMappingVersions,
   listRuns,
@@ -132,7 +132,7 @@ describe('listRuns', () => {
 })
 
 describe('Trading Partner actions', () => {
-  const existing = createTradingPartner({
+  const existing = buildTradingPartner({
     id: '00000000-0000-4000-8000-0000000000d4',
     gln: '0200000000011',
     testMode: true,
@@ -152,14 +152,16 @@ describe('Trading Partner actions', () => {
   it('creates a Trading Partner in Test Mode', async () => {
     server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
 
-    await expect(create(input)).resolves.toMatchObject({ ...input, testMode: true })
+    await expect(createTradingPartner(input)).resolves.toMatchObject({ ...input, testMode: true })
   })
 
   it('rejects with 409 when another Trading Partner uses the GLN', async () => {
     server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [existing] }))
 
     await expect(updateTradingPartner(existing.id, input)).resolves.toMatchObject(input)
-    await expect(create({ ...input, name: 'Other' })).rejects.toMatchObject({ status: 409 })
+    await expect(createTradingPartner({ ...input, name: 'Other' })).rejects.toMatchObject({
+      status: 409,
+    })
   })
 
   it('switches a Trading Partner to production', async () => {

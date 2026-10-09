@@ -6,7 +6,7 @@ import { TradingPartnersScreen } from '@/components/trading-partners/trading-par
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { tradingPartnersEndpoint } from '@edi-bridge/contracts'
-import { createTradingPartners, tradingPartnersHandler } from '@edi-bridge/mocks'
+import { createTradingPartners, tradingPartnerHandlers } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -26,7 +26,7 @@ export const Default = meta.story({
 
 export const Empty = meta.story({
   beforeEach({ msw }) {
-    msw.use(tradingPartnersHandler(apiUrl, []))
+    msw.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('No Trading Partners yet')).toBeVisible()
@@ -61,7 +61,9 @@ export const Unavailable = meta.story({
 
 export const LargeVolume = meta.story({
   beforeEach({ msw }) {
-    msw.use(tradingPartnersHandler(apiUrl, createTradingPartners({ count: 400 })))
+    msw.use(
+      ...tradingPartnerHandlers(apiUrl, { tradingPartners: createTradingPartners({ count: 400 }) }),
+    )
   },
   // Contrast is checked on the same rows in the small stories. Over a large DOM it makes axe
   // outrun the test timeout on CI, so only the structural rules run here.

@@ -14,18 +14,20 @@ import {
   tradingPartnerSchema,
   tradingPartnersEndpoint,
   updateTradingPartnerEndpoint,
-  withCheckDigit,
   type Workspace,
 } from '@edi-bridge/contracts'
 
+import { randomGln } from './gln'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { seedWorkspace, toWorkspaceStore, type WorkspaceStore } from './workspace'
 
 export function seedGln(tradingPartnerId: string) {
-  const faker = seededFaker(`gln:${tradingPartnerId}`)
+  return randomGln(seededFaker(`gln:${tradingPartnerId}`))
+}
 
-  return withCheckDigit(`02${faker.string.numeric({ length: 10, allowLeadingZeros: true })}`)
+export function hasTraffic({ onboarding }: Pick<TradingPartner, 'onboarding'>) {
+  return onboarding.testInterchangeSentAt !== null
 }
 
 const notStarted: TradingPartnerOnboarding = { testInterchangeSentAt: null, contrlReceivedAt: null }
@@ -98,10 +100,10 @@ export const seedTradingPartners: ReadonlyArray<TradingPartner> = seeds.map((see
 
 function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
   const stage = faker.helpers.weightedArrayElement([
-    { value: 'production', weight: 80 },
-    { value: 'contrl', weight: 8 },
+    { value: 'inProduction', weight: 80 },
+    { value: 'readyForProduction', weight: 8 },
     { value: 'awaitingContrl', weight: 6 },
-    { value: 'new', weight: 6 },
+    { value: 'awaitingTestInterchange', weight: 6 },
   ] as const)
 
   const sentAt = faker.date.past({ years: 2, refDate: now })
@@ -110,7 +112,7 @@ function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
   return {
     id: faker.string.uuid(),
     name: faker.company.name(),
-    gln: withCheckDigit(`02${faker.string.numeric({ length: 10, allowLeadingZeros: true })}`),
+    gln: randomGln(faker),
     characterSet: faker.helpers.weightedArrayElement<CharacterSet>([
       { value: 'UNOC', weight: 70 },
       ...characterSets
@@ -118,11 +120,13 @@ function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
         .map((value) => ({ value, weight: 6 })),
     ]),
     acknowledgementTimeLimitHours: faker.helpers.arrayElement([4, 12, 24, 24, 24, 48, 72]),
-    testMode: stage !== 'production',
+    testMode: stage !== 'inProduction',
     onboarding: {
-      testInterchangeSentAt: stage === 'new' ? null : sentAt.toISOString(),
+      testInterchangeSentAt: stage === 'awaitingTestInterchange' ? null : sentAt.toISOString(),
       contrlReceivedAt:
-        stage === 'new' || stage === 'awaitingContrl' ? null : receivedAt.toISOString(),
+        stage === 'awaitingTestInterchange' || stage === 'awaitingContrl'
+          ? null
+          : receivedAt.toISOString(),
     },
   }
 }
@@ -157,15 +161,6 @@ export function createTradingPartners({
   }
 
   return tradingPartners
-}
-
-export function tradingPartnersHandler(
-  apiUrl: string,
-  tradingPartners: ReadonlyArray<TradingPartner> = seedTradingPartners,
-) {
-  return http.get(`${apiUrl}${tradingPartnersEndpoint.path}`, () =>
-    HttpResponse.json(tradingPartners),
-  )
 }
 
 export function tradingPartnerHandlers(

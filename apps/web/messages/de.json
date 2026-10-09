@@ -338,7 +338,11 @@
         }
       },
       "setIdentity": "GLN Ihres Unternehmens in den Einstellungen erfassen",
-      "productionLocked": "Sie können auf Produktion umstellen, sobald das CONTRL empfangen ist.",
+      "productionLocked": {
+        "identity": "Sie können auf Produktion umstellen, sobald die GLN Ihres Unternehmens erfasst ist.",
+        "testInterchange": "Sie können auf Produktion umstellen, sobald das Test-Interchange gesendet ist.",
+        "contrl": "Sie können auf Produktion umstellen, sobald das CONTRL empfangen ist."
+      },
       "switch": {
         "button": "Auf Produktion umstellen",
         "confirmation": "Ab sofort sind Interchanges mit {tradingPartner} Produktionsverkehr und nicht mehr als Test markiert.",
@@ -410,13 +414,11 @@
     "errors": {
       "required": {
         "name": "Geben Sie einen Namen ein.",
-        "gln": "Geben Sie eine GLN ein."
+        "characterSet": "Wählen Sie einen Zeichensatz."
       },
-      "tooLong": "Verwenden Sie höchstens 70 Zeichen.",
+      "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
       "range": "Geben Sie eine ganze Zahl von {min} bis {max} Stunden ein.",
       "gln": {
-        "format": "Eine GLN hat genau 13 Ziffern.",
-        "checkDigit": "Die Prüfziffer stimmt nicht. Prüfen Sie die GLN auf Tippfehler.",
         "taken": "Ein anderer Trading Partner verwendet diese GLN bereits."
       },
       "saveFailed": "Der Trading Partner konnte nicht gespeichert werden. Versuchen Sie es erneut."
@@ -450,6 +452,13 @@
       "saving": "Wird gespeichert…",
       "saved": "Unternehmensidentität gespeichert.",
       "failed": "Die Unternehmensidentität konnte nicht gespeichert werden. Versuchen Sie es erneut."
+    }
+  },
+  "GlnField": {
+    "errors": {
+      "required": "Geben Sie eine GLN ein.",
+      "format": "Eine GLN hat genau 13 Ziffern.",
+      "checkDigit": "Die Prüfziffer stimmt nicht. Prüfen Sie die GLN auf Tippfehler."
     }
   }
 }

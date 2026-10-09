@@ -1,11 +1,12 @@
 import {
   acknowledgementTimeLimitHours,
   type CharacterSet,
-  glnIssue,
-  type GlnIssue,
   type TradingPartner,
   type TradingPartnerInput,
+  tradingPartnerInputSchema,
 } from '@edi-bridge/contracts'
+
+import { type GlnError, glnError, normalizeGln } from '../../lib/forms/gln'
 
 export type TradingPartnerFormValues = {
   name: string
@@ -16,58 +17,62 @@ export type TradingPartnerFormValues = {
 
 export type TradingPartnerField = keyof TradingPartnerFormValues
 
-export type FieldError = 'required' | 'tooLong' | 'range' | GlnIssue
+export type FieldError = 'required' | 'tooLong' | 'range' | GlnError
 
 export type TradingPartnerFormResult =
   { input: TradingPartnerInput } | { errors: Partial<Record<TradingPartnerField, FieldError>> }
 
-const maxNameLength = 70
-
-export function normalizeGln(value: string) {
-  return value.replaceAll(/\s/g, '')
+function isField(key: PropertyKey | undefined): key is TradingPartnerField {
+  return (
+    key === 'name' ||
+    key === 'gln' ||
+    key === 'characterSet' ||
+    key === 'acknowledgementTimeLimitHours'
+  )
 }
 
-export function glnError(value: string): FieldError | null {
-  const gln = normalizeGln(value)
-
-  return gln === '' ? 'required' : glnIssue(gln)
-}
-
-function hoursError(value: string) {
-  const hours = Number(value)
-
-  return /^\d+$/.test(value.trim()) &&
-    hours >= acknowledgementTimeLimitHours.min &&
-    hours <= acknowledgementTimeLimitHours.max
-    ? null
-    : 'range'
+function fieldError(
+  field: TradingPartnerField,
+  issue: { code: string },
+  values: TradingPartnerFormValues,
+): FieldError {
+  switch (field) {
+    case 'name':
+      return issue.code === 'too_big' ? 'tooLong' : 'required'
+    case 'gln':
+      return glnError(values.gln) ?? 'format'
+    case 'characterSet':
+      return 'required'
+    case 'acknowledgementTimeLimitHours':
+      return 'range'
+  }
 }
 
 export function validateTradingPartnerForm(
   values: TradingPartnerFormValues,
 ): TradingPartnerFormResult {
-  const name = values.name.trim()
+  const parsed = tradingPartnerInputSchema.safeParse({
+    name: values.name,
+    gln: normalizeGln(values.gln),
+    characterSet: values.characterSet,
+    acknowledgementTimeLimitHours: Number(values.acknowledgementTimeLimitHours),
+  })
 
-  const found: ReadonlyArray<[TradingPartnerField, FieldError | null]> = [
-    ['name', name === '' ? 'required' : name.length > maxNameLength ? 'tooLong' : null],
-    ['gln', glnError(values.gln)],
-    ['acknowledgementTimeLimitHours', hoursError(values.acknowledgementTimeLimitHours)],
-  ]
-
-  const errors = Object.fromEntries(found.filter(([, error]) => error !== null))
-
-  if (Object.keys(errors).length > 0) {
-    return { errors }
+  if (parsed.success) {
+    return { input: parsed.data }
   }
 
-  return {
-    input: {
-      name,
-      gln: normalizeGln(values.gln),
-      characterSet: values.characterSet,
-      acknowledgementTimeLimitHours: Number(values.acknowledgementTimeLimitHours),
-    },
+  const errors: Partial<Record<TradingPartnerField, FieldError>> = {}
+
+  for (const issue of parsed.error.issues) {
+    const field = issue.path[0]
+
+    if (isField(field)) {
+      errors[field] ??= fieldError(field, issue, values)
+    }
   }
+
+  return { errors }
 }
 
 export function toFormValues(tradingPartner?: TradingPartner): TradingPartnerFormValues {

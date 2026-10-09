@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createTradingPartner } from '@edi-bridge/mocks'
 
-import { glnError, toFormValues, validateTradingPartnerForm } from './trading-partner-form-values'
+import { toFormValues, validateTradingPartnerForm } from './trading-partner-form-values'
 
 const valid = {
   name: 'Kieler Kontor GmbH',
@@ -10,21 +10,6 @@ const valid = {
   characterSet: 'UNOC',
   acknowledgementTimeLimitHours: '12',
 } as const
-
-describe('glnError', () => {
-  it.each([
-    ['', 'required'],
-    ['   ', 'required'],
-    ['023456789012', 'format'],
-    ['0234567890128', 'checkDigit'],
-  ])('reports %j as %s', (value, expected) => {
-    expect(glnError(value)).toBe(expected)
-  })
-
-  it('accepts a GLN typed in groups with spaces', () => {
-    expect(glnError('023 4567 890129')).toBeNull()
-  })
-})
 
 describe('validateTradingPartnerForm', () => {
   it('turns valid values into the API input', () => {

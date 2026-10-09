@@ -26,7 +26,6 @@ export {
   createTradingPartners,
   seedTradingPartners,
   tradingPartnerHandlers,
-  tradingPartnersHandler,
 } from './trading-partner'
 
 export {

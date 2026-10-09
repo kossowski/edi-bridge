@@ -1,6 +1,6 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 
-import type { RunListQuery } from '@edi-bridge/contracts'
+import type { RunListQuery, TradingPartner } from '@edi-bridge/contracts'
 
 import {
   getCurrentWorkspace,
@@ -75,6 +75,11 @@ export function tradingPartnerQuery(id: string) {
     queryKey: tradingPartnerKeys.detail(id),
     queryFn: () => getTradingPartner(id),
   })
+}
+
+export function storeSavedTradingPartner(queryClient: QueryClient, saved: TradingPartner) {
+  queryClient.setQueryData(tradingPartnerQuery(saved.id).queryKey, saved)
+  void queryClient.invalidateQueries({ queryKey: tradingPartnerKeys.list() })
 }
 
 export const channelsQuery = queryOptions({

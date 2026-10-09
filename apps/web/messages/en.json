@@ -338,7 +338,11 @@
         }
       },
       "setIdentity": "Record your company's GLN in Settings",
-      "productionLocked": "You can switch to production once the CONTRL is received.",
+      "productionLocked": {
+        "identity": "You can switch to production once your company's GLN is recorded.",
+        "testInterchange": "You can switch to production once the test Interchange is sent.",
+        "contrl": "You can switch to production once the CONTRL is received."
+      },
       "switch": {
         "button": "Switch to production",
         "confirmation": "From now on, Interchanges with {tradingPartner} are production traffic and are no longer flagged as a test.",
@@ -410,13 +414,11 @@
     "errors": {
       "required": {
         "name": "Enter a name.",
-        "gln": "Enter a GLN."
+        "characterSet": "Choose a character set."
       },
-      "tooLong": "Use at most 70 characters.",
+      "tooLong": "Use at most {max} characters.",
       "range": "Enter a whole number of hours from {min} to {max}.",
       "gln": {
-        "format": "A GLN has exactly 13 digits.",
-        "checkDigit": "The check digit does not match. Check the GLN for typos.",
         "taken": "Another Trading Partner already uses this GLN."
       },
       "saveFailed": "The Trading Partner could not be saved. Try again."
@@ -450,6 +452,13 @@
       "saving": "Saving…",
       "saved": "Company identity saved.",
       "failed": "The company identity could not be saved. Try again."
+    }
+  },
+  "GlnField": {
+    "errors": {
+      "required": "Enter a GLN.",
+      "format": "A GLN has exactly 13 digits.",
+      "checkDigit": "The check digit does not match. Check the GLN for typos."
     }
   }
 }

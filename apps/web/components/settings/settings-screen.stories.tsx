@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect } from 'storybook/test'
+import { expect, userEvent } from 'storybook/test'
 
 import { SettingsScreen } from '@/components/settings/settings-screen'
 import { apiUrl } from '@/lib/api/config'
@@ -22,6 +22,17 @@ const meta = preview.meta({
 export const Default = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByLabelText('GLN')).toHaveValue(seedWorkspace.gln)
+  },
+})
+
+export const SavedThenEdited = meta.story({
+  async play({ canvas }) {
+    const gln = await canvas.findByLabelText('GLN')
+    await userEvent.click(canvas.getByRole('button', { name: 'Save company identity' }))
+    await expect(await canvas.findByText('Company identity saved.')).toBeVisible()
+
+    await userEvent.type(gln, '1')
+    await expect(canvas.queryByText('Company identity saved.')).toBeNull()
   },
 })
 
