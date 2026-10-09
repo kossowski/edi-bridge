@@ -4,9 +4,13 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `gotoSettled` waits until no element has `aria-busy="true"`, and a page that stays busy becomes a finding instead of a check of the skeleton
-- [ ] The script starts `next dev` with `NEXT_PUBLIC_API_MOCKING=enabled`
-- [ ] When a dev server already runs for the checkout, the script names its URL and points to `--base-url` or a worktree
-- [ ] `SKILL.md` describes mock mode, the loading marker and concrete URLs for dynamic routes
+- [x] `gotoSettled` waits until no element has `aria-busy="true"`, and a page that stays busy becomes a finding instead of a check of the skeleton
+- [x] The script starts `next dev` with `NEXT_PUBLIC_API_MOCKING=enabled`
+- [x] When a dev server already runs for the checkout, the script names its URL and points to `--base-url` or a worktree
+- [x] `SKILL.md` describes mock mode, the loading marker and concrete URLs for dynamic routes
+
+## Comments
+
+Resolved in #9 (fix/49-browser-check-settled-pages).
