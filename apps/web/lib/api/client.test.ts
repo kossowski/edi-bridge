@@ -1,9 +1,27 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { createRun, runDetailHandlers, runsHandler } from '@edi-bridge/mocks'
+import {
+  createRun,
+  createTradingPartner as buildTradingPartner,
+  createWorkspace,
+  runDetailHandlers,
+  runsHandler,
+  tradingPartnerHandlers,
+  workspaceHandlers,
+} from '@edi-bridge/mocks'
 
-import { getRun, listMappingVersions, listRuns, reprocessRun, retryRun } from './client'
+import {
+  createTradingPartner,
+  getRun,
+  listMappingVersions,
+  listRuns,
+  reprocessRun,
+  retryRun,
+  switchToProduction,
+  updateCompanyIdentity,
+  updateTradingPartner,
+} from './client'
 import { apiUrl } from './config'
 
 const server = setupServer()
@@ -111,4 +129,52 @@ describe('listRuns', () => {
       expect(result.runs.map((run) => run.id)).toEqual(expected)
     },
   )
+})
+
+describe('Trading Partner actions', () => {
+  const existing = buildTradingPartner({
+    id: '00000000-0000-4000-8000-0000000000d4',
+    gln: '0200000000011',
+    testMode: true,
+    onboarding: {
+      testInterchangeSentAt: '2026-10-01T08:00:00.000Z',
+      contrlReceivedAt: '2026-10-01T08:05:00.000Z',
+    },
+  })
+
+  const input = {
+    name: 'Kieler Kontor GmbH',
+    gln: '0234567890129',
+    characterSet: 'UNOC',
+    acknowledgementTimeLimitHours: 12,
+  } as const
+
+  it('creates a Trading Partner in Test Mode', async () => {
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
+
+    await expect(createTradingPartner(input)).resolves.toMatchObject({ ...input, testMode: true })
+  })
+
+  it('rejects with 409 when another Trading Partner uses the GLN', async () => {
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [existing] }))
+
+    await expect(updateTradingPartner(existing.id, input)).resolves.toMatchObject(input)
+    await expect(createTradingPartner({ ...input, name: 'Other' })).rejects.toMatchObject({
+      status: 409,
+    })
+  })
+
+  it('switches a Trading Partner to production', async () => {
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [existing] }))
+
+    await expect(switchToProduction(existing.id)).resolves.toMatchObject({ testMode: false })
+  })
+
+  it('records the company GLN of the Workspace', async () => {
+    server.use(...workspaceHandlers(apiUrl, createWorkspace({ gln: null })))
+
+    await expect(updateCompanyIdentity({ gln: '0212345000007' })).resolves.toMatchObject({
+      gln: '0212345000007',
+    })
+  })
 })

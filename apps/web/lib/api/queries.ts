@@ -1,11 +1,13 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
 
-import type { RunListQuery } from '@edi-bridge/contracts'
+import type { RunListQuery, TradingPartner } from '@edi-bridge/contracts'
 
 import {
   getCurrentWorkspace,
   getInterchange,
   getRun,
+  getTradingPartner,
+  listChannels,
   listFlows,
   listMappingVersions,
   listRuns,
@@ -57,9 +59,32 @@ export function mappingVersionsQuery(mappingId: string) {
   })
 }
 
+export const tradingPartnerKeys = {
+  all: () => ['trading-partners'] as const,
+  list: () => [...tradingPartnerKeys.all(), 'list'] as const,
+  detail: (id: string) => [...tradingPartnerKeys.all(), 'detail', id] as const,
+}
+
 export const tradingPartnersQuery = queryOptions({
-  queryKey: ['trading-partners', 'list'],
+  queryKey: tradingPartnerKeys.list(),
   queryFn: listTradingPartners,
+})
+
+export function tradingPartnerQuery(id: string) {
+  return queryOptions({
+    queryKey: tradingPartnerKeys.detail(id),
+    queryFn: () => getTradingPartner(id),
+  })
+}
+
+export function storeSavedTradingPartner(queryClient: QueryClient, saved: TradingPartner) {
+  queryClient.setQueryData(tradingPartnerQuery(saved.id).queryKey, saved)
+  void queryClient.invalidateQueries({ queryKey: tradingPartnerKeys.list() })
+}
+
+export const channelsQuery = queryOptions({
+  queryKey: ['channels', 'list'],
+  queryFn: listChannels,
 })
 
 export const flowsQuery = queryOptions({

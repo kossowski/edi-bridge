@@ -9,7 +9,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedId } from './seed-id'
-import { seedTradingPartners } from './trading-partner'
+import { hasTraffic, seedTradingPartners } from './trading-partner'
 
 const flowTemplates: ReadonlyArray<{ messageType: MessageType; direction: Direction }> = [
   { messageType: 'ORDERS', direction: 'inbound' },
@@ -26,8 +26,9 @@ export function directionOf({ messageType }: { messageType: MessageType }): Dire
   return directions.get(messageType)!
 }
 
-export const seedFlows: ReadonlyArray<FlowSummary> = seedTradingPartners.flatMap(
-  (tradingPartner, tradingPartnerIndex) =>
+export const seedFlows: ReadonlyArray<FlowSummary> = seedTradingPartners
+  .filter(hasTraffic)
+  .flatMap((tradingPartner, tradingPartnerIndex) =>
     flowTemplates.map(({ messageType, direction }, flowIndex) =>
       flowSummarySchema.parse({
         id: seedId(2, tradingPartnerIndex * flowTemplates.length + flowIndex + 1),
@@ -36,7 +37,7 @@ export const seedFlows: ReadonlyArray<FlowSummary> = seedTradingPartners.flatMap
         messageType,
       }),
     ),
-)
+  )
 
 export function flowsHandler(apiUrl: string, flows: ReadonlyArray<FlowSummary> = seedFlows) {
   return http.get(`${apiUrl}${flowsEndpoint.path}`, () => HttpResponse.json(flows))

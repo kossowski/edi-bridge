@@ -257,5 +257,208 @@
       },
       "openRun": "– Run zu Message {messageReference} öffnen, {messageType}"
     }
+  },
+  "TradingPartners": {
+    "new": "Neuer Trading Partner",
+    "caption": "Trading Partners, nach Name",
+    "loading": "Trading Partners werden geladen",
+    "count": "{count, plural, one {# Trading Partner} other {# Trading Partners}}",
+    "filteredCount": "{count} von {total} Trading Partners",
+    "search": "Nach Name oder GLN suchen",
+    "noMatch": "Kein Trading Partner passt zur Suche.",
+    "nextStep": "Nächster Schritt: {step}",
+    "complete": "Abgeschlossen",
+    "hours": "{hours, plural, one {# Stunde} other {# Stunden}}",
+    "columns": {
+      "name": "Name",
+      "gln": "GLN",
+      "mode": "Modus",
+      "onboarding": "Onboarding",
+      "characterSet": "Zeichensatz",
+      "acknowledgementTimeLimit": "Frist für Acknowledgements"
+    },
+    "mode": {
+      "test": "Test Mode",
+      "production": "Produktion"
+    },
+    "empty": {
+      "title": "Noch keine Trading Partners",
+      "description": "Legen Sie einen Trading Partner an, um sein Onboarding zu beginnen."
+    },
+    "error": {
+      "title": "Trading Partners nicht verfügbar",
+      "description": "Die Trading Partners konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    }
+  },
+  "TradingPartner": {
+    "title": "Trading Partner",
+    "back": "Zurück zu den Trading Partners",
+    "loading": "Trading Partner wird geladen",
+    "edit": "Bearbeiten",
+    "notFound": {
+      "title": "Trading Partner nicht gefunden",
+      "description": "In diesem Workspace gibt es keinen Trading Partner mit dieser ID."
+    },
+    "error": {
+      "title": "Trading Partner nicht verfügbar",
+      "description": "Der Trading Partner konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "facts": {
+      "label": "Details zum Trading Partner",
+      "gln": "GLN",
+      "characterSet": "Zeichensatz",
+      "acknowledgementTimeLimit": "Frist für Acknowledgements",
+      "mode": "Modus"
+    },
+    "onboarding": {
+      "title": "Onboarding",
+      "state": {
+        "done": "Erledigt",
+        "current": "Nächster Schritt",
+        "pending": "Offen"
+      },
+      "steps": {
+        "identity": {
+          "title": "Identität erfasst",
+          "description": "Die GLN Ihres Unternehmens und die GLN des Trading Partners sind erfasst, damit Interchanges den richtigen Absender und Empfänger tragen."
+        },
+        "testInterchange": {
+          "title": "Test-Interchange gesendet",
+          "description": "Ein erstes, als Test markiertes Interchange ging an den Trading Partner."
+        },
+        "contrl": {
+          "title": "CONTRL empfangen",
+          "description": "Der Trading Partner hat das Test-Interchange mit einem CONTRL bestätigt."
+        },
+        "production": {
+          "title": "Produktion aktiv",
+          "description": "Interchanges mit dem Trading Partner sind nicht mehr als Test markiert."
+        }
+      },
+      "setIdentity": "GLN Ihres Unternehmens in den Einstellungen erfassen",
+      "productionLocked": {
+        "identity": "Sie können auf Produktion umstellen, sobald die GLN Ihres Unternehmens erfasst ist.",
+        "testInterchange": "Sie können auf Produktion umstellen, sobald das Test-Interchange gesendet ist.",
+        "contrl": "Sie können auf Produktion umstellen, sobald das CONTRL empfangen ist."
+      },
+      "switch": {
+        "button": "Auf Produktion umstellen",
+        "confirmation": "Ab sofort sind Interchanges mit {tradingPartner} Produktionsverkehr und nicht mehr als Test markiert.",
+        "confirm": "Jetzt auf Produktion umstellen",
+        "cancel": "Abbrechen",
+        "pending": "Wird umgestellt…",
+        "failed": "Die Umstellung auf Produktion ist fehlgeschlagen. Versuchen Sie es erneut."
+      }
+    },
+    "channels": {
+      "title": "Channels",
+      "none": "Zu diesem Trading Partner gehören noch keine Channels.",
+      "failed": "Die Channels konnten nicht geladen werden.",
+      "kind": "{type}, {direction}",
+      "type": {
+        "sftp": "SFTP",
+        "webhook": "Webhook",
+        "http": "HTTP"
+      },
+      "direction": {
+        "inbound": "eingehend",
+        "outbound": "ausgehend"
+      }
+    },
+    "flows": {
+      "title": "Flows",
+      "none": "Für diesen Trading Partner gibt es noch keine Flows.",
+      "failed": "Die Flows konnten nicht geladen werden."
+    },
+    "runs": {
+      "title": "Letzte Runs",
+      "none": "Für diesen Trading Partner gibt es noch keine Runs.",
+      "failed": "Die letzten Runs konnten nicht geladen werden.",
+      "viewAll": "Alle {count, plural, one {# Run} other {# Runs}} dieses Trading Partners anzeigen"
+    }
+  },
+  "TradingPartnerForm": {
+    "createTitle": "Neuer Trading Partner",
+    "editTitle": "{name} bearbeiten",
+    "editPageTitle": "Trading Partner bearbeiten",
+    "backTo": "Zurück zu {name}",
+    "testModeNotice": "Ein neuer Trading Partner startet im Test Mode. Jedes Interchange mit ihm ist als Test markiert, bis Sie ihn auf Produktion umstellen.",
+    "fields": {
+      "name": {
+        "label": "Name",
+        "description": "Der Firmenname des Trading Partners."
+      },
+      "gln": {
+        "label": "GLN",
+        "description": "Die 13-stellige Global Location Number des Trading Partners, einschließlich Prüfziffer."
+      },
+      "characterSet": {
+        "label": "Zeichensatz",
+        "description": "Die Syntaxebene im UNB-Rahmen der Interchanges an diesen Trading Partner."
+      },
+      "acknowledgementTimeLimitHours": {
+        "label": "Frist für Acknowledgements (Stunden)",
+        "description": "Ein gesendetes Interchange wird überfällig, wenn innerhalb dieser Zeit kein CONTRL eintrifft."
+      }
+    },
+    "characterSets": {
+      "UNOA": "UNOA – nur Großbuchstaben",
+      "UNOB": "UNOB – Groß- und Kleinbuchstaben",
+      "UNOC": "UNOC – Latin-1 (ISO 8859-1)",
+      "UNOD": "UNOD – Latin-2 (ISO 8859-2)",
+      "UNOE": "UNOE – Kyrillisch (ISO 8859-5)",
+      "UNOF": "UNOF – Griechisch (ISO 8859-7)"
+    },
+    "errors": {
+      "required": {
+        "name": "Geben Sie einen Namen ein.",
+        "characterSet": "Wählen Sie einen Zeichensatz."
+      },
+      "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
+      "range": "Geben Sie eine ganze Zahl von {min} bis {max} Stunden ein.",
+      "gln": {
+        "taken": "Ein anderer Trading Partner verwendet diese GLN bereits."
+      },
+      "saveFailed": "Der Trading Partner konnte nicht gespeichert werden. Versuchen Sie es erneut."
+    },
+    "create": "Trading Partner anlegen",
+    "save": "Änderungen speichern",
+    "saving": "Wird gespeichert…",
+    "cancel": "Abbrechen"
+  },
+  "Settings": {
+    "loading": "Einstellungen werden geladen",
+    "notFound": {
+      "title": "Workspace nicht gefunden",
+      "description": "Diesen Workspace gibt es nicht."
+    },
+    "error": {
+      "title": "Einstellungen nicht verfügbar",
+      "description": "Die Einstellungen konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "companyIdentity": {
+      "title": "Unternehmensidentität",
+      "description": "Jedes Interchange, das Ihr Unternehmen sendet, trägt diese Identität als Absender.",
+      "missing": "Ihr Unternehmen hat noch keine GLN. Ohne sie können Trading Partners das Onboarding nicht abschließen.",
+      "companyName": "Unternehmen",
+      "gln": {
+        "label": "GLN",
+        "description": "Die 13-stellige Global Location Number Ihres Unternehmens, einschließlich Prüfziffer."
+      },
+      "save": "Unternehmensidentität speichern",
+      "saving": "Wird gespeichert…",
+      "saved": "Unternehmensidentität gespeichert.",
+      "failed": "Die Unternehmensidentität konnte nicht gespeichert werden. Versuchen Sie es erneut."
+    }
+  },
+  "GlnField": {
+    "errors": {
+      "required": "Geben Sie eine GLN ein.",
+      "format": "Eine GLN hat genau 13 Ziffern.",
+      "checkDigit": "Die Prüfziffer stimmt nicht. Prüfen Sie die GLN auf Tippfehler."
+    }
   }
 }

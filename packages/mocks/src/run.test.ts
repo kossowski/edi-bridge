@@ -8,7 +8,8 @@ import {
   toSearchParams,
 } from '@edi-bridge/contracts'
 
-import { createRun, runsHandler } from './run'
+import { createRun, runsHandler, seedRuns } from './run'
+import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
 
@@ -263,5 +264,35 @@ describe('GET /runs', () => {
 
     expect(body?.total).toBeGreaterThan(10_000)
     expect(body?.runs).toHaveLength(100)
+  })
+})
+
+describe('seedRuns', () => {
+  const runsOf = (tradingPartnerId: string) =>
+    seedRuns().filter(({ tradingPartner }) => tradingPartner.id === tradingPartnerId)
+
+  it('gives a Trading Partner in Test Mode only a handful of test Runs', () => {
+    const inTestMode = seedTradingPartners.filter(
+      ({ testMode, onboarding }) => testMode && onboarding.testInterchangeSentAt !== null,
+    )
+
+    expect(inTestMode.length).toBeGreaterThan(0)
+
+    for (const { id } of inTestMode) {
+      expect(runsOf(id).length).toBeGreaterThan(0)
+      expect(runsOf(id).length).toBeLessThanOrEqual(20)
+    }
+  })
+
+  it('has no CONTRL Run from a Trading Partner whose CONTRL is not received yet', () => {
+    const awaitingContrl = seedTradingPartners.filter(
+      ({ onboarding }) => onboarding.contrlReceivedAt === null,
+    )
+
+    expect(awaitingContrl.length).toBeGreaterThan(0)
+
+    for (const { id } of awaitingContrl) {
+      expect(runsOf(id).filter(({ messageType }) => messageType === 'CONTRL')).toEqual([])
+    }
   })
 })

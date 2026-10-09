@@ -4,12 +4,16 @@
 
 **Blocked by:** 06 (Mock stack tracer)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] List and detail screens with create and edit forms
-- [ ] GLN input is validated (13 digits, check digit)
-- [ ] The onboarding checklist shows each step's state and the explicit switch to production
-- [ ] The detail page shows the partner's Channels, Flows and recent Runs from mocked data
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] List and detail screens with create and edit forms
+- [x] GLN input is validated (13 digits, check digit)
+- [x] The onboarding checklist shows each step's state and the explicit switch to production
+- [x] The detail page shows the partner's Channels, Flows and recent Runs from mocked data
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #10 (feat/09-trading-partners-prototype).

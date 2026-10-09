@@ -16,7 +16,7 @@ export type Endpoint<
   Body = undefined,
   Path extends string = string,
 > = {
-  method: 'GET' | 'POST'
+  method: 'GET' | 'POST' | 'PUT'
   path: Path
   response: z.ZodType<Response>
 } & (Query extends QueryParams ? { query: z.ZodType<Query, unknown> } : { query?: undefined }) &

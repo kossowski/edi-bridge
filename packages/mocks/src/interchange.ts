@@ -8,11 +8,12 @@ import {
   type ParsedSegment,
   type RunError,
   type RunSummary,
+  withCheckDigit,
 } from '@edi-bridge/contracts'
 
-import { withCheckDigit } from './check-digit'
 import { directionOf } from './flow'
 import { seededFaker } from './seeded-faker'
+import { seedGln } from './trading-partner'
 import { seedWorkspace } from './workspace'
 
 type Segment = { tag: string; elements: string[][] }
@@ -61,17 +62,15 @@ const messageVersions: Readonly<Record<MessageType, string>> = {
 }
 
 export const ownCompany: InterchangeParty = {
-  gln: withCheckDigit('021234500000'),
+  gln: seedWorkspace.gln!,
   name: seedWorkspace.name,
 }
 
 export function tradingPartnerParty(
   tradingPartner: RunSummary['tradingPartner'],
 ): InterchangeParty {
-  const faker = seededFaker(`gln:${tradingPartner.id}`)
-
   return {
-    gln: withCheckDigit(`02${faker.string.numeric({ length: 10, allowLeadingZeros: true })}`),
+    gln: seedGln(tradingPartner.id),
     name: tradingPartner.name,
   }
 }

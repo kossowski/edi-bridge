@@ -1,7 +1,8 @@
-import { PagePlaceholder, placeholderMetadata } from '@/components/page-placeholder'
+import { placeholderMetadata } from '@/components/page-placeholder'
+import { TradingPartnersScreen } from '@/components/trading-partners/trading-partners-screen'
 
 export const generateMetadata = placeholderMetadata('tradingPartners')
 
 export default function Page() {
-  return <PagePlaceholder page="tradingPartners" />
+  return <TradingPartnersScreen />
 }
