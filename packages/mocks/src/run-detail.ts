@@ -131,9 +131,34 @@ type GeneratedGroup = {
   interchange: (GeneratedInterchange & { controlReference: string }) | null
 }
 
+type Reprocessed = { replaced: string; replacing: string }
+
 export type RunDetailOptions = {
   runs?: ReadonlyArray<RunSummary>
-  reprocessed?: ReadonlyArray<{ replaced: string; replacing: string }>
+  reprocessed?: ReadonlyArray<Reprocessed>
+}
+
+export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): Reprocessed[] {
+  const bundleSizes = Map.groupBy(runs, bundleKeyOf)
+
+  return (['inbound', 'outbound'] as const).flatMap((direction) => {
+    const replaced = runs.find(
+      (run) =>
+        directionOf(run) === direction && run.status === 'failed' && run.failureStage === 'mapping',
+    )
+
+    const replacing =
+      replaced &&
+      runs.find(
+        (run) =>
+          run.flow.id === replaced.flow.id &&
+          run.status === 'delivered' &&
+          run.receivedAt > replaced.receivedAt &&
+          bundleSizes.get(bundleKeyOf(run))?.length === 1,
+      )
+
+    return replacing ? [{ replaced: replaced.id, replacing: replacing.id }] : []
+  })
 }
 
 // The first Run of an Interchange names it: Run ids come from a fixed seed, while the seeded

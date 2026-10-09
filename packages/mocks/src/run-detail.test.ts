@@ -15,7 +15,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { createRun, createRuns } from './run'
-import { runDetailHandlers } from './run-detail'
+import { runDetailHandlers, seedReprocessed } from './run-detail'
 
 const apiUrl = 'http://api.test'
 
@@ -368,6 +368,39 @@ describe('POST /runs/:id/reprocess', () => {
     })
 
     expect(status).toBe(409)
+  })
+})
+
+describe('seedReprocessed', () => {
+  it('pairs an inbound and an outbound Run that failed at mapping with a later Run that replaced it', async () => {
+    const runs = createRuns({ count: 2000 })
+    const reprocessed = seedReprocessed(runs)
+    server.use(...runDetailHandlers(apiUrl, { runs, reprocessed }))
+
+    const pairs = await Promise.all(
+      reprocessed.map(async ({ replaced, replacing }) => ({
+        replaced: (await getRun(replaced)).body!,
+        replacing: (await getRun(replacing)).body!,
+      })),
+    )
+
+    expect(new Set(pairs.map(({ replaced }) => replaced.direction))).toEqual(
+      new Set(['inbound', 'outbound']),
+    )
+
+    for (const { replaced, replacing } of pairs) {
+      expect(replaced).toMatchObject({
+        status: 'failed',
+        failureStage: 'mapping',
+        replacedBy: { id: replacing.id },
+      })
+      expect(replacing).toMatchObject({
+        status: 'delivered',
+        flow: replaced.flow,
+        replaces: { id: replaced.id },
+      })
+      expect(Date.parse(replacing.receivedAt)).toBeGreaterThan(Date.parse(replaced.receivedAt))
+    }
   })
 })
 
