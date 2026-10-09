@@ -6,6 +6,8 @@ import {
   getCurrentWorkspace,
   getInterchange,
   getRun,
+  getTradingPartner,
+  listChannels,
   listFlows,
   listMappingVersions,
   listRuns,
@@ -57,9 +59,27 @@ export function mappingVersionsQuery(mappingId: string) {
   })
 }
 
+export const tradingPartnerKeys = {
+  all: () => ['trading-partners'] as const,
+  list: () => [...tradingPartnerKeys.all(), 'list'] as const,
+  detail: (id: string) => [...tradingPartnerKeys.all(), 'detail', id] as const,
+}
+
 export const tradingPartnersQuery = queryOptions({
-  queryKey: ['trading-partners', 'list'],
+  queryKey: tradingPartnerKeys.list(),
   queryFn: listTradingPartners,
+})
+
+export function tradingPartnerQuery(id: string) {
+  return queryOptions({
+    queryKey: tradingPartnerKeys.detail(id),
+    queryFn: () => getTradingPartner(id),
+  })
+}
+
+export const channelsQuery = queryOptions({
+  queryKey: ['channels', 'list'],
+  queryFn: listChannels,
 })
 
 export const flowsQuery = queryOptions({

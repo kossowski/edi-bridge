@@ -1,9 +1,14 @@
+import type { TradingPartner, Workspace } from '@edi-bridge/contracts'
+
+import { channelsHandler } from './channel'
 import { flowsHandler } from './flow'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
-import { tradingPartnersHandler } from './trading-partner'
-import { currentWorkspaceHandler } from './workspace'
+import { seedTradingPartners, tradingPartnerHandlers } from './trading-partner'
+import { createWorkspaceStore, seedWorkspace, workspaceHandlers } from './workspace'
+
+export { channelsHandler, seedChannels } from './channel'
 
 export { flowsHandler, seedFlows } from './flow'
 
@@ -16,18 +21,39 @@ export {
   seedReprocessed,
 } from './run-detail'
 
-export { seedTradingPartners, tradingPartnersHandler } from './trading-partner'
+export {
+  createTradingPartner,
+  createTradingPartners,
+  seedTradingPartners,
+  tradingPartnerHandlers,
+  tradingPartnersHandler,
+} from './trading-partner'
 
-export { createWorkspace, currentWorkspaceHandler, seedWorkspace } from './workspace'
+export {
+  createWorkspace,
+  createWorkspaceStore,
+  currentWorkspaceHandler,
+  seedWorkspace,
+  workspaceHandlers,
+  type WorkspaceStore,
+} from './workspace'
 
 export { createRunStore, type RunStore } from './run-store'
 
-export function createHandlers(apiUrl: string) {
+export function createHandlers(
+  apiUrl: string,
+  {
+    workspace = seedWorkspace,
+    tradingPartners = seedTradingPartners,
+  }: { workspace?: Workspace; tradingPartners?: ReadonlyArray<TradingPartner> } = {},
+) {
   const runs = createRunStore(seedRuns())
+  const workspaceStore = createWorkspaceStore(workspace)
 
   return [
-    currentWorkspaceHandler(apiUrl),
-    tradingPartnersHandler(apiUrl),
+    ...workspaceHandlers(apiUrl, workspaceStore),
+    ...tradingPartnerHandlers(apiUrl, { tradingPartners, workspace: workspaceStore }),
+    channelsHandler(apiUrl),
     flowsHandler(apiUrl),
     runsHandler(apiUrl, runs),
     ...runDetailHandlers(apiUrl, { runs, reprocessed: seedReprocessed() }),

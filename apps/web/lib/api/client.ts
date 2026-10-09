@@ -1,4 +1,7 @@
 import {
+  channelsEndpoint,
+  type CompanyIdentityInput,
+  createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   type Endpoint,
   flowsEndpoint,
@@ -11,9 +14,14 @@ import {
   runEndpoint,
   type RunListQuery,
   runsEndpoint,
+  switchToProductionEndpoint,
   toPath,
   toSearchParams,
+  tradingPartnerEndpoint,
+  type TradingPartnerInput,
   tradingPartnersEndpoint,
+  updateCompanyIdentityEndpoint,
+  updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
 import { apiUrl, isMockingEnabled } from './config'
@@ -70,6 +78,10 @@ export function getCurrentWorkspace() {
   return request(currentWorkspaceEndpoint)
 }
 
+export function updateCompanyIdentity(body: CompanyIdentityInput) {
+  return request(updateCompanyIdentityEndpoint, { body })
+}
+
 export function listRuns(query: RunListQuery) {
   return request(runsEndpoint, { query })
 }
@@ -98,6 +110,31 @@ export function listMappingVersions(mappingId: string) {
 
 export function listTradingPartners() {
   return request(tradingPartnersEndpoint)
+}
+
+export function getTradingPartner(id: string) {
+  return request(tradingPartnerEndpoint, { path: toPath(tradingPartnerEndpoint.path, { id }) })
+}
+
+export function createTradingPartner(body: TradingPartnerInput) {
+  return request(createTradingPartnerEndpoint, { body })
+}
+
+export function updateTradingPartner(id: string, body: TradingPartnerInput) {
+  return request(updateTradingPartnerEndpoint, {
+    path: toPath(updateTradingPartnerEndpoint.path, { id }),
+    body,
+  })
+}
+
+export function switchToProduction(id: string) {
+  return request(switchToProductionEndpoint, {
+    path: toPath(switchToProductionEndpoint.path, { id }),
+  })
+}
+
+export function listChannels() {
+  return request(channelsEndpoint)
 }
 
 export function listFlows() {

@@ -21,9 +21,13 @@ export const linkClass =
   'focus-visible:ring-ring/50 rounded-sm font-medium underline underline-offset-4 outline-none focus-visible:ring-3'
 
 export function BackToRuns({ label }: { label: string }) {
+  return <BackLink href="/runs" label={label} />
+}
+
+export function BackLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
-      href="/runs"
+      href={href}
       className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex w-fit items-center gap-1 rounded-sm text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3">
       <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} aria-hidden className="size-4" />
       {label}
@@ -65,7 +69,7 @@ export function LoadFailure({
   onRetry,
 }: {
   notFound: boolean
-  namespace: 'RunDetail' | 'Interchange'
+  namespace: 'RunDetail' | 'Interchange' | 'TradingPartner' | 'Settings'
   onRetry: () => void
 }) {
   const t = useTranslations(namespace)

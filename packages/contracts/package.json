@@ -6,7 +6,9 @@
   "scripts": {
     "lint": "oxlint && eslint",
     "lint:fix": "oxlint --fix && eslint --fix",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "exports": {
     ".": "./src/index.ts"
@@ -20,6 +22,7 @@
     "@edi-bridge/typescript-config": "workspace:*",
     "eslint": "^10.12.0",
     "oxlint": "1.87.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
   }
 }

@@ -257,5 +257,199 @@
       },
       "openRun": "– open Run of Message {messageReference}, {messageType}"
     }
+  },
+  "TradingPartners": {
+    "new": "New Trading Partner",
+    "caption": "Trading Partners, by name",
+    "loading": "Loading Trading Partners",
+    "count": "{count, plural, one {# Trading Partner} other {# Trading Partners}}",
+    "filteredCount": "{count} of {total} Trading Partners",
+    "search": "Search by name or GLN",
+    "noMatch": "No Trading Partner matches the search.",
+    "nextStep": "Next: {step}",
+    "complete": "Complete",
+    "hours": "{hours, plural, one {# hour} other {# hours}}",
+    "columns": {
+      "name": "Name",
+      "gln": "GLN",
+      "mode": "Mode",
+      "onboarding": "Onboarding",
+      "characterSet": "Character set",
+      "acknowledgementTimeLimit": "Acknowledgement time limit"
+    },
+    "mode": {
+      "test": "Test Mode",
+      "production": "Production"
+    },
+    "empty": {
+      "title": "No Trading Partners yet",
+      "description": "Create a Trading Partner to start onboarding it."
+    },
+    "error": {
+      "title": "Trading Partners unavailable",
+      "description": "The Trading Partners could not be loaded. Try again.",
+      "retry": "Try again"
+    }
+  },
+  "TradingPartner": {
+    "title": "Trading Partner",
+    "back": "Back to Trading Partners",
+    "loading": "Loading Trading Partner",
+    "edit": "Edit",
+    "notFound": {
+      "title": "Trading Partner not found",
+      "description": "No Trading Partner with this ID exists in this Workspace."
+    },
+    "error": {
+      "title": "Trading Partner unavailable",
+      "description": "The Trading Partner could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "facts": {
+      "label": "Trading Partner details",
+      "gln": "GLN",
+      "characterSet": "Character set",
+      "acknowledgementTimeLimit": "Acknowledgement time limit",
+      "mode": "Mode"
+    },
+    "onboarding": {
+      "title": "Onboarding",
+      "state": {
+        "done": "Done",
+        "current": "Next step",
+        "pending": "Open"
+      },
+      "steps": {
+        "identity": {
+          "title": "Identity set",
+          "description": "Your company's GLN and the Trading Partner's GLN are recorded, so Interchanges carry the correct sender and receiver."
+        },
+        "testInterchange": {
+          "title": "Test Interchange sent",
+          "description": "A first Interchange flagged as a test went to the Trading Partner."
+        },
+        "contrl": {
+          "title": "CONTRL received",
+          "description": "The Trading Partner confirmed the test Interchange with a CONTRL."
+        },
+        "production": {
+          "title": "Production on",
+          "description": "Interchanges with the Trading Partner are no longer flagged as a test."
+        }
+      },
+      "setIdentity": "Record your company's GLN in Settings",
+      "productionLocked": "You can switch to production once the CONTRL is received.",
+      "switch": {
+        "button": "Switch to production",
+        "confirmation": "From now on, Interchanges with {tradingPartner} are production traffic and are no longer flagged as a test.",
+        "confirm": "Switch to production now",
+        "cancel": "Cancel",
+        "pending": "Switching…",
+        "failed": "The switch to production failed. Try again."
+      }
+    },
+    "channels": {
+      "title": "Channels",
+      "none": "No Channels belong to this Trading Partner yet.",
+      "failed": "The Channels could not be loaded.",
+      "kind": "{type}, {direction}",
+      "type": {
+        "sftp": "SFTP",
+        "webhook": "Webhook",
+        "http": "HTTP"
+      },
+      "direction": {
+        "inbound": "inbound",
+        "outbound": "outbound"
+      }
+    },
+    "flows": {
+      "title": "Flows",
+      "none": "No Flows for this Trading Partner yet.",
+      "failed": "The Flows could not be loaded."
+    },
+    "runs": {
+      "title": "Recent Runs",
+      "none": "No Runs for this Trading Partner yet.",
+      "failed": "The recent Runs could not be loaded.",
+      "viewAll": "View all {count, plural, one {# Run} other {# Runs}} of this Trading Partner"
+    }
+  },
+  "TradingPartnerForm": {
+    "createTitle": "New Trading Partner",
+    "editTitle": "Edit {name}",
+    "editPageTitle": "Edit Trading Partner",
+    "backTo": "Back to {name}",
+    "testModeNotice": "A new Trading Partner starts in Test Mode. Every Interchange with it is flagged as a test until you switch it to production.",
+    "fields": {
+      "name": {
+        "label": "Name",
+        "description": "The company name of the Trading Partner."
+      },
+      "gln": {
+        "label": "GLN",
+        "description": "The Trading Partner's 13-digit Global Location Number, including the check digit."
+      },
+      "characterSet": {
+        "label": "Character set",
+        "description": "The syntax level in the UNB envelope of Interchanges to this Trading Partner."
+      },
+      "acknowledgementTimeLimitHours": {
+        "label": "Acknowledgement time limit (hours)",
+        "description": "A sent Interchange becomes Overdue when no CONTRL arrives within this time."
+      }
+    },
+    "characterSets": {
+      "UNOA": "UNOA – upper-case letters only",
+      "UNOB": "UNOB – upper- and lower-case letters",
+      "UNOC": "UNOC – Latin-1 (ISO 8859-1)",
+      "UNOD": "UNOD – Latin-2 (ISO 8859-2)",
+      "UNOE": "UNOE – Cyrillic (ISO 8859-5)",
+      "UNOF": "UNOF – Greek (ISO 8859-7)"
+    },
+    "errors": {
+      "required": {
+        "name": "Enter a name.",
+        "gln": "Enter a GLN."
+      },
+      "tooLong": "Use at most 70 characters.",
+      "range": "Enter a whole number of hours from {min} to {max}.",
+      "gln": {
+        "format": "A GLN has exactly 13 digits.",
+        "checkDigit": "The check digit does not match. Check the GLN for typos.",
+        "taken": "Another Trading Partner already uses this GLN."
+      },
+      "saveFailed": "The Trading Partner could not be saved. Try again."
+    },
+    "create": "Create Trading Partner",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "cancel": "Cancel"
+  },
+  "Settings": {
+    "loading": "Loading settings",
+    "notFound": {
+      "title": "Workspace not found",
+      "description": "This Workspace does not exist."
+    },
+    "error": {
+      "title": "Settings unavailable",
+      "description": "The settings could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "companyIdentity": {
+      "title": "Company identity",
+      "description": "Every Interchange your company sends carries this identity as the sender.",
+      "missing": "Your company has no GLN yet. Trading Partners cannot finish onboarding without it.",
+      "companyName": "Company",
+      "gln": {
+        "label": "GLN",
+        "description": "Your company's 13-digit Global Location Number, including the check digit."
+      },
+      "save": "Save company identity",
+      "saving": "Saving…",
+      "saved": "Company identity saved.",
+      "failed": "The company identity could not be saved. Try again."
+    }
   }
 }
