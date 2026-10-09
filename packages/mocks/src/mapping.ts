@@ -8,6 +8,7 @@ import {
   mappingDraftEndpoint,
   mappingDraftSchema,
   type MappingLink,
+  type MappingSide,
   mappingsEndpoint,
   type MappingSummary,
   mappingSummarySchema,
@@ -17,16 +18,12 @@ import {
 } from '@edi-bridge/contracts'
 
 import {
-  documentStructureHandler,
   documentStructureLeaves,
+  seedDocumentStructureOf,
   seedDocumentStructures,
 } from './document-structure'
 import { seedMappings } from './flow'
-import {
-  edifactLeaves,
-  messageTypeStructureHandler,
-  messageTypeStructures,
-} from './message-type-structure'
+import { edifactLeaves, messageTypeStructures } from './message-type-structure'
 import { badRequest, notFound, unprocessable } from './responses'
 import { seedId } from './seed-id'
 
@@ -42,8 +39,7 @@ export type MappingDraftRecord = {
 
 type DocumentStructures = ReadonlyArray<DocumentStructure>
 
-// Pairs of [ERP Document field, EDIFACT element]. Inbound Mappings read the element and write the
-// field, outbound ones the other way round.
+// Pairs of [ERP Document field, EDIFACT element], turned into links by `link`.
 const linkTemplates: Readonly<Record<MessageType, ReadonlyArray<readonly [string, string]>>> = {
   ORDERS: [
     ['orderNumber', 'BGM/1004'],
@@ -137,17 +133,20 @@ const linkTemplates: Readonly<Record<MessageType, ReadonlyArray<readonly [string
   ],
 }
 
-const seedStructureOf: Readonly<Record<MessageType, DocumentStructure>> = {
-  ORDERS: seedDocumentStructures[0]!,
-  DESADV: seedDocumentStructures[1]!,
-  INVOIC: seedDocumentStructures[2]!,
-  CONTRL: seedDocumentStructures[3]!,
+// Inbound Mappings read the Message Type and write the Document, outbound ones the other way.
+function oriented<Side>(
+  messageType: MessageType,
+  { document, edifact }: { document: Side; edifact: Side },
+): { source: Side; target: Side } {
+  return directionOf({ messageType }) === 'inbound'
+    ? { source: edifact, target: document }
+    : { source: document, target: edifact }
 }
 
-function oriented(messageType: MessageType, [field, element]: readonly [string, string]) {
-  return directionOf({ messageType }) === 'inbound'
-    ? { sourcePath: element, targetPath: field }
-    : { sourcePath: field, targetPath: element }
+function link(messageType: MessageType, [field, element]: readonly [string, string]): MappingLink {
+  const { source, target } = oriented(messageType, { document: field, edifact: element })
+
+  return { sourcePath: source, targetPath: target }
 }
 
 function templateLinks(messageType: MessageType, share: number): MappingLink[] {
@@ -155,7 +154,7 @@ function templateLinks(messageType: MessageType, share: number): MappingLink[] {
 
   return template
     .slice(0, Math.round(template.length * share))
-    .map((pair) => oriented(messageType, pair))
+    .map((pair) => link(messageType, pair))
 }
 
 const firstDraftChange = Date.parse('2026-04-06T08:15:00.000Z')
@@ -179,7 +178,7 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
       id: mapping.mappingId,
       name: newest.mappingName,
       messageType: mapping.messageType,
-      documentStructureId: seedStructureOf[mapping.messageType].id,
+      documentStructureId: seedDocumentStructureOf[mapping.messageType].id,
       latestVersion: newest.version,
       links: templateLinks(mapping.messageType, linkShares[sameTypeBefore % linkShares.length]!),
       updatedAt: seedUpdatedAt(index),
@@ -189,7 +188,7 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
     id: seedId(7, 1),
     name: 'Spreewald: ERP JSON to INVOIC',
     messageType: 'INVOIC',
-    documentStructureId: seedStructureOf.INVOIC.id,
+    documentStructureId: seedDocumentStructureOf.INVOIC.id,
     latestVersion: null,
     links: templateLinks('INVOIC', 0.3),
     updatedAt: seedUpdatedAt(seedMappings.length),
@@ -208,9 +207,7 @@ function sideLeaves(
     edifactLeaves(messageTypeStructures[record.messageType]).map(({ path }) => path),
   )
 
-  return directionOf(record) === 'inbound'
-    ? { source: edifact, target: document }
-    : { source: document, target: edifact }
+  return oriented(record.messageType, { document, edifact })
 }
 
 function randomLinks(
@@ -223,7 +220,7 @@ function randomLinks(
   const count = Math.floor(Math.min(fields.length, elements.length) * 0.8)
 
   return Array.from({ length: count }, (_, index) =>
-    oriented(record.messageType, [fields[index]!.path, elements[index]!.path]),
+    link(record.messageType, [fields[index]!.path, elements[index]!.path]),
   )
 }
 
@@ -245,14 +242,13 @@ export function createMappingDrafts({
 
     const documentStructure = documentStructures
       ? faker.helpers.arrayElement(documentStructures)
-      : seedStructureOf[messageType]
+      : seedDocumentStructureOf[messageType]
+
+    const { source, target } = oriented(messageType, { document: 'ERP JSON', edifact: messageType })
 
     const record = {
       id: faker.string.uuid(),
-      name:
-        directionOf({ messageType }) === 'inbound'
-          ? `${company}: ${messageType} to ERP JSON`
-          : `${company}: ERP JSON to ${messageType}`,
+      name: `${company}: ${source} to ${target}`,
       messageType,
       documentStructureId: documentStructure.id,
       latestVersion: faker.datatype.boolean({ probability: 0.8 })
@@ -305,26 +301,21 @@ export function toMappingDraft(
   record: MappingDraftRecord,
   documentStructures: DocumentStructures,
 ): MappingDraft {
-  const documentSide = {
-    kind: 'documentStructure',
-    documentStructureId: record.documentStructureId,
-    name: structureOf(record, documentStructures).name,
-  } as const
-
-  const messageTypeSide = { kind: 'messageType', messageType: record.messageType } as const
-
-  const common = {
+  return mappingDraftSchema.parse({
     mappingId: record.id,
     name: record.name,
+    direction: directionOf(record),
     links: record.links,
     updatedAt: record.updatedAt,
-  }
-
-  return mappingDraftSchema.parse(
-    directionOf(record) === 'inbound'
-      ? { ...common, direction: 'inbound', source: messageTypeSide, target: documentSide }
-      : { ...common, direction: 'outbound', source: documentSide, target: messageTypeSide },
-  )
+    ...oriented<MappingSide>(record.messageType, {
+      document: {
+        kind: 'documentStructure',
+        documentStructureId: record.documentStructureId,
+        name: structureOf(record, documentStructures).name,
+      },
+      edifact: { kind: 'messageType', messageType: record.messageType },
+    }),
+  })
 }
 
 export type MappingDraftStore = {
@@ -420,7 +411,5 @@ export function mappingHandlers(
         return HttpResponse.json(toMappingDraft(record, documentStructures))
       },
     ),
-    documentStructureHandler(apiUrl, documentStructures),
-    messageTypeStructureHandler(apiUrl),
   ]
 }

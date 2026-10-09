@@ -12,7 +12,11 @@ import {
   toPath,
 } from '@edi-bridge/contracts'
 
-import { createDocumentStructure, documentStructureLeaves } from './document-structure'
+import {
+  createDocumentStructure,
+  documentStructureHandler,
+  documentStructureLeaves,
+} from './document-structure'
 import { seedMappings } from './flow'
 import {
   createMappingDrafts,
@@ -21,7 +25,7 @@ import {
   type MappingDraftRecord,
   seedMappingDrafts,
 } from './mapping'
-import { edifactLeaves } from './message-type-structure'
+import { edifactLeaves, messageTypeStructureHandler } from './message-type-structure'
 
 const apiUrl = 'http://api.test'
 
@@ -179,7 +183,11 @@ describe('GET /mappings/:id/draft', () => {
   it.each(seedMappingDrafts.map((mapping) => [mapping.name, mapping] as const))(
     'links only existing fields and elements in %s',
     async (_, mapping: MappingDraftRecord) => {
-      server.use(...mappingHandlers(apiUrl))
+      server.use(
+        ...mappingHandlers(apiUrl),
+        documentStructureHandler(apiUrl),
+        messageTypeStructureHandler(apiUrl),
+      )
       const draft = await getDraft(mapping.id)
       const leaves = await leavesOf(draft)
 
@@ -206,7 +214,11 @@ describe('GET /mappings/:id/draft', () => {
       documentStructures: [documentStructure],
     })
 
-    server.use(...mappingHandlers(apiUrl, { mappings, documentStructures: [documentStructure] }))
+    server.use(
+      ...mappingHandlers(apiUrl, { mappings, documentStructures: [documentStructure] }),
+      documentStructureHandler(apiUrl, [documentStructure]),
+      messageTypeStructureHandler(apiUrl),
+    )
 
     for (const mapping of mappings) {
       const draft = await getDraft(mapping.id)

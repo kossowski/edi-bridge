@@ -9,7 +9,7 @@ import {
   messageTypeStructureSchema,
 } from '@edi-bridge/contracts'
 
-import { compositeDefinition, elementDefinition, segmentDefinition } from './dictionary'
+import { compositeDefinition, elementDefinition, segmentDefinition } from './directory'
 
 type Occurrence = { required?: boolean; maxRepeat?: number }
 

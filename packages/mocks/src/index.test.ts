@@ -25,7 +25,13 @@ import {
   toSearchParams,
 } from '@edi-bridge/contracts'
 
-import { createHandlers, seedChannels, seedFlows } from './index'
+import {
+  createDocumentStructure,
+  createHandlers,
+  createMappingDrafts,
+  seedChannels,
+  seedFlows,
+} from './index'
 
 const apiUrl = 'http://api.test'
 
@@ -220,5 +226,27 @@ describe('createHandlers', () => {
 
     expect(draft.mappingId).toBe(inbound.id)
     expect(trees.map(({ status }) => status)).toEqual([200, 200])
+  })
+
+  it('serves custom Mapping Drafts with their Document Structures', async () => {
+    const documentStructure = createDocumentStructure({ fieldCount: 400 })
+    const mappingDrafts = createMappingDrafts({ count: 2, documentStructures: [documentStructure] })
+
+    server.use(
+      ...createHandlers(apiUrl, { mappingDrafts, documentStructures: [documentStructure] }),
+    )
+
+    const mappings = mappingsEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${mappingsEndpoint.path}`)).json(),
+    )
+
+    const structure = await fetch(
+      `${apiUrl}${toPath(documentStructureEndpoint.path, documentStructure)}`,
+    )
+
+    expect(mappings.map(({ id }) => id).sort()).toEqual(mappingDrafts.map(({ id }) => id).sort())
+    expect(documentStructureEndpoint.response.parse(await structure.json())).toEqual(
+      documentStructure,
+    )
   })
 })

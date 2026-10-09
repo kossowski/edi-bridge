@@ -9,6 +9,8 @@ import {
   documentStructureEndpoint,
   type DocumentStructureNode,
   documentStructureSchema,
+  type MessageType,
+  messageTypes,
 } from '@edi-bridge/contracts'
 
 import { notFound } from './responses'
@@ -93,8 +95,8 @@ const party = (name: string, required = true, extra: ReadonlyArray<Spec> = []): 
 
 const vatId: FieldSpec = ['vatId', 'string', false]
 
-export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = [
-  structure(1, 'ERP purchase order', [
+export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStructure>> = {
+  ORDERS: structure(1, 'ERP purchase order', [
     ['orderNumber', 'string'],
     ['orderDate', 'date'],
     ['requestedDeliveryDate', 'date', false],
@@ -132,7 +134,7 @@ export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = [
     },
     ['lineCount', 'integer', false],
   ]),
-  structure(2, 'ERP dispatch advice', [
+  DESADV: structure(2, 'ERP dispatch advice', [
     ['despatchNumber', 'string'],
     ['despatchDate', 'date'],
     ['documentDate', 'date'],
@@ -161,7 +163,7 @@ export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = [
       ],
     },
   ]),
-  structure(3, 'ERP invoice', [
+  INVOIC: structure(3, 'ERP invoice', [
     ['invoiceNumber', 'string'],
     ['invoiceDate', 'date'],
     ['isCreditNote', 'boolean'],
@@ -204,7 +206,7 @@ export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = [
       ],
     },
   ]),
-  structure(4, 'ERP acknowledgement status', [
+  CONTRL: structure(4, 'ERP acknowledgement status', [
     ['interchangeReference', 'string'],
     ['senderGln', 'string'],
     ['recipientGln', 'string'],
@@ -229,7 +231,11 @@ export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = [
       ],
     },
   ]),
-]
+}
+
+export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = messageTypes.map(
+  (messageType) => seedDocumentStructureOf[messageType],
+)
 
 export function documentStructureLeaves(
   documentStructure: Pick<DocumentStructure, 'children'>,
