@@ -6,12 +6,16 @@ import {
   channelEndpoint,
   type ChannelInput,
   channelInputSchema,
+  type ChannelKind,
+  channelKinds,
   channelSchema,
   channelsEndpoint,
   type ChannelUpdate,
   createChannelEndpoint,
+  type Direction,
   type MaskedSecret,
   regenerateWebhookTokenEndpoint,
+  sftpAuthentications,
   toPath,
   updateChannelEndpoint,
   webhookPath,
@@ -29,14 +33,10 @@ export type ChannelRecord = { id: string } & (
   Exclude<ChannelInput, { type: 'webhook' }> | (WebhookInput & { token: string })
 )
 
-type ChannelKind = Pick<ChannelInput, 'type' | 'direction'>
-
-const channelKinds: ReadonlyArray<ChannelKind> = [
-  { type: 'sftp', direction: 'inbound' },
-  { type: 'sftp', direction: 'outbound' },
-  { type: 'webhook', direction: 'inbound' },
-  { type: 'http', direction: 'outbound' },
-]
+type SftpConnection = Omit<
+  Extract<ChannelRecord, { type: 'sftp'; direction: 'outbound' }>,
+  'id' | 'type' | 'direction' | 'name' | 'remotePath'
+>
 
 const hidden: MaskedSecret = { lastFour: null }
 
@@ -50,6 +50,14 @@ export function randomWebhookToken(faker: Faker = defaultFaker) {
   )
 }
 
+// The web build points NEXT_PUBLIC_API_URL at the reverse proxy (/api), but the webhook URL is
+// handed to senders outside the browser, so it must be absolute.
+function webhookUrl(apiUrl: string, id: string) {
+  const origin = typeof location === 'undefined' ? 'http://localhost' : location.origin
+
+  return new URL(`${apiUrl}${toPath(webhookPath, { id })}`, origin).href
+}
+
 export function toChannel(record: ChannelRecord, apiUrl: string): Channel {
   switch (record.type) {
     case 'sftp':
@@ -59,7 +67,7 @@ export function toChannel(record: ChannelRecord, apiUrl: string): Channel {
 
       return channelSchema.parse({
         ...rest,
-        url: `${apiUrl}${toPath(webhookPath, record)}`,
+        url: webhookUrl(apiUrl, record.id),
         token: lastFour(token),
       })
     }
@@ -79,14 +87,57 @@ function parseRecord(record: ChannelRecord): ChannelRecord {
     webhookTokenSchema.parse(record.token)
   }
 
-  toChannel(record, 'https://api.edi-bridge.example')
+  assertServable(record)
 
   return record
 }
 
+// Catches a record that would leak a secret or break the response contract when it is created,
+// not on the first GET. The API URL does not matter for that.
+function assertServable(record: ChannelRecord) {
+  toChannel(record, '')
+}
+
+function sftpConnection(
+  faker: Faker,
+  tradingPartnerId: string | null,
+  host: string,
+  overrides: Partial<SftpConnection> = {},
+): SftpConnection {
+  return {
+    tradingPartnerId,
+    host,
+    port: 22,
+    username: 'nordwind',
+    authentication: faker.helpers.arrayElement(sftpAuthentications),
+    credential: faker.internet.password({ length: 24 }),
+    ...overrides,
+  }
+}
+
+function sftpChannel(
+  id: string,
+  direction: Direction,
+  label: string,
+  connection: SftpConnection,
+  pollingIntervalMinutes: number,
+): ChannelRecord {
+  const base = { id, type: 'sftp', ...connection } as const
+
+  return direction === 'inbound'
+    ? {
+        ...base,
+        direction,
+        name: `${label} SFTP inbox`,
+        remotePath: '/outbox',
+        pollingIntervalMinutes,
+      }
+    : { ...base, direction, name: `${label} SFTP outbox`, remotePath: '/inbox' }
+}
+
 function generateChannel(
   faker: Faker,
-  { type, direction }: ChannelKind,
+  kind: ChannelKind,
   tradingPartnerIds: ReadonlyArray<string>,
   id: string,
 ): ChannelRecord {
@@ -98,63 +149,41 @@ function generateChannel(
   const company = faker.company.name()
   const domain = `${faker.internet.domainWord()}.example`
 
-  const sftp = {
-    tradingPartnerId,
-    host: `sftp.${domain}`,
-    port: faker.helpers.weightedArrayElement([
-      { value: 22, weight: 8 },
-      { value: 2222, weight: 2 },
-    ]),
-    username: faker.internet.username().toLowerCase(),
-    authentication: faker.helpers.arrayElement(['password', 'privateKey'] as const),
-    credential: faker.internet.password({ length: 24 }),
-  }
-
-  if (type === 'sftp' && direction === 'inbound') {
-    return {
-      id,
-      type,
-      direction,
-      name: `${company} SFTP inbox`,
-      ...sftp,
-      remotePath: '/outbox',
-      pollingIntervalMinutes: faker.helpers.arrayElement([1, 1, 1, 5, 15, 60]),
-    }
-  }
-
-  if (type === 'sftp') {
-    return {
-      id,
-      type,
-      direction: 'outbound',
-      name: `${company} SFTP outbox`,
-      ...sftp,
-      remotePath: '/inbox',
-    }
-  }
-
-  if (type === 'webhook') {
-    return {
-      id,
-      type,
-      direction: 'inbound',
-      name: `${company} webhook`,
-      tradingPartnerId,
-      rateLimitPerMinute: faker.helpers.arrayElement([30, 60, 60, 120, 600]),
-      token: randomWebhookToken(faker),
-    }
-  }
-
-  return {
-    id,
-    type: 'http',
-    direction: 'outbound',
-    name: `${company} HTTP delivery`,
-    tradingPartnerId,
-    url: `https://erp.${domain}/api/edi/documents`,
-    authorization: faker.datatype.boolean({ probability: 0.8 })
-      ? `Bearer ${faker.string.alphanumeric(40)}`
-      : null,
+  switch (kind.type) {
+    case 'sftp':
+      return sftpChannel(
+        id,
+        kind.direction,
+        company,
+        sftpConnection(faker, tradingPartnerId, `sftp.${domain}`, {
+          port: faker.helpers.weightedArrayElement([
+            { value: 22, weight: 8 },
+            { value: 2222, weight: 2 },
+          ]),
+          username: faker.internet.username().toLowerCase(),
+        }),
+        faker.helpers.arrayElement([1, 1, 1, 5, 15, 60]),
+      )
+    case 'webhook':
+      return {
+        id,
+        ...kind,
+        name: `${company} webhook`,
+        tradingPartnerId,
+        rateLimitPerMinute: faker.helpers.arrayElement([30, 60, 60, 120, 600]),
+        token: randomWebhookToken(faker),
+      }
+    case 'http':
+      return {
+        id,
+        ...kind,
+        name: `${company} HTTP delivery`,
+        tradingPartnerId,
+        url: `https://erp.${domain}/api/edi/documents`,
+        authorization: faker.datatype.boolean({ probability: 0.8 })
+          ? `Bearer ${faker.string.alphanumeric(40)}`
+          : null,
+      }
   }
 }
 
@@ -184,36 +213,23 @@ const erpSeeds: ReadonlyArray<ChannelRecord> = [
 const tradingPartnerSeeds = seedTrafficPartners.flatMap(
   (tradingPartner, index): ChannelRecord[] => {
     const shortName = tradingPartner.name.split(' ')[0] ?? tradingPartner.name
-    const faker = seededFaker(`sftp:${tradingPartner.id}`)
 
-    const sftp = {
-      tradingPartnerId: tradingPartner.id,
-      host: `sftp.${shortName.toLowerCase()}.example`,
-      port: 22,
-      username: 'nordwind',
-      authentication: index % 2 === 0 ? 'password' : 'privateKey',
-      credential: faker.internet.password({ length: 24 }),
-    } as const
+    const connection = sftpConnection(
+      seededFaker(`sftp:${tradingPartner.id}`),
+      tradingPartner.id,
+      `sftp.${shortName.toLowerCase()}.example`,
+      { authentication: index % 2 === 0 ? 'password' : 'privateKey' },
+    )
 
-    return [
-      {
-        id: seedId(3, erpSeeds.length + index * 2 + 1),
-        type: 'sftp',
-        direction: 'inbound',
-        name: `${shortName} SFTP inbox`,
-        ...sftp,
-        remotePath: '/outbox',
-        pollingIntervalMinutes: index === 1 ? 5 : 1,
-      },
-      {
-        id: seedId(3, erpSeeds.length + index * 2 + 2),
-        type: 'sftp',
-        direction: 'outbound',
-        name: `${shortName} SFTP outbox`,
-        ...sftp,
-        remotePath: '/inbox',
-      },
-    ]
+    return (['inbound', 'outbound'] as const).map((direction, offset) =>
+      sftpChannel(
+        seedId(3, erpSeeds.length + index * 2 + offset + 1),
+        direction,
+        shortName,
+        connection,
+        index === 1 ? 5 : 1,
+      ),
+    )
   },
 )
 
@@ -222,7 +238,7 @@ export const seedChannels: ReadonlyArray<ChannelRecord> = [...erpSeeds, ...tradi
 )
 
 export function createChannel(
-  kind: ChannelKind = { type: 'sftp', direction: 'inbound' },
+  kind: ChannelKind = channelKinds[0],
   { tradingPartnerIds = [] }: { tradingPartnerIds?: ReadonlyArray<string> } = {},
 ): ChannelRecord {
   return parseRecord(
@@ -233,7 +249,7 @@ export function createChannel(
 export function createChannels({
   count,
   seed = 13,
-  tradingPartnerIds = [],
+  tradingPartnerIds = seedTradingPartners.map(({ id }) => id),
 }: {
   count: number
   seed?: number
@@ -281,35 +297,54 @@ export function toChannelStore(
   return 'get' in channels ? channels : createChannelStore(channels)
 }
 
-type UpdateResult = ChannelRecord | 'kindChanged' | 'credentialRequired'
+function conflict(message: string) {
+  return HttpResponse.json({ message }, { status: 409 })
+}
 
-function applyUpdate(existing: ChannelRecord, update: ChannelUpdate): UpdateResult {
+function badRequest(message: string) {
+  return HttpResponse.json({ message }, { status: 400 })
+}
+
+function applyUpdate(
+  existing: ChannelRecord,
+  update: ChannelUpdate,
+): { record: ChannelRecord } | { response: Response } {
+  const kindChanged = () => ({
+    response: conflict('The type and direction of a Channel cannot change'),
+  })
+
   if (update.type !== existing.type || update.direction !== existing.direction) {
-    return 'kindChanged'
+    return kindChanged()
   }
 
   if (update.type === 'sftp' && existing.type === 'sftp') {
     if (update.credential === undefined && update.authentication !== existing.authentication) {
-      return 'credentialRequired'
+      return {
+        response: badRequest('A new credential is required when the authentication method changes'),
+      }
     }
 
-    return { ...update, id: existing.id, credential: update.credential ?? existing.credential }
+    return {
+      record: { ...update, id: existing.id, credential: update.credential ?? existing.credential },
+    }
   }
 
   if (update.type === 'webhook' && existing.type === 'webhook') {
-    return { ...update, id: existing.id, token: existing.token }
+    return { record: { ...update, id: existing.id, token: existing.token } }
   }
 
   if (update.type === 'http' && existing.type === 'http') {
     return {
-      ...update,
-      id: existing.id,
-      authorization:
-        update.authorization === undefined ? existing.authorization : update.authorization,
+      record: {
+        ...update,
+        id: existing.id,
+        authorization:
+          update.authorization === undefined ? existing.authorization : update.authorization,
+      },
     }
   }
 
-  return 'kindChanged'
+  return kindChanged()
 }
 
 export function channelHandlers(
@@ -319,8 +354,6 @@ export function channelHandlers(
   const store = toChannelStore(channels)
 
   const notFound = () => HttpResponse.json({ message: 'Not found' }, { status: 404 })
-
-  const badRequest = (message: string) => HttpResponse.json({ message }, { status: 400 })
 
   return [
     http.get(`${apiUrl}${channelsEndpoint.path}`, () =>
@@ -376,20 +409,13 @@ export function channelHandlers(
 
         const updated = applyUpdate(existing, body.data)
 
-        if (updated === 'kindChanged') {
-          return HttpResponse.json(
-            { message: 'The type and direction of a Channel cannot change' },
-            { status: 409 },
-          )
+        if ('response' in updated) {
+          return updated.response
         }
 
-        if (updated === 'credentialRequired') {
-          return badRequest('A new credential is required when the authentication method changes')
-        }
+        store.set(updated.record)
 
-        store.set(updated)
-
-        return HttpResponse.json(toChannel(updated, apiUrl))
+        return HttpResponse.json(toChannel(updated.record, apiUrl))
       },
     ),
     http.post<{ id: string }>(`${apiUrl}${regenerateWebhookTokenEndpoint.path}`, ({ params }) => {
@@ -400,7 +426,7 @@ export function channelHandlers(
       }
 
       if (existing.type !== 'webhook') {
-        return HttpResponse.json({ message: 'Only webhook Channels have a token' }, { status: 409 })
+        return conflict('Only webhook Channels have a token')
       }
 
       const updated = { ...existing, token: randomWebhookToken() }

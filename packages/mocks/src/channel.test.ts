@@ -1,11 +1,11 @@
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
   channelEndpoint,
   type ChannelInput,
-  channelsEndpoint,
   type ChannelUpdate,
+  channelsEndpoint,
   createChannelEndpoint,
   regenerateWebhookTokenEndpoint,
   toPath,
@@ -19,6 +19,7 @@ import {
   createChannels,
   createChannelStore,
   seedChannels,
+  toChannel,
 } from './channel'
 import { seedTradingPartners } from './trading-partner'
 
@@ -32,7 +33,7 @@ afterEach(() => server.resetHandlers())
 
 afterAll(() => server.close())
 
-async function send(method: string, path: string, body?: ChannelInput | ChannelUpdate) {
+async function send(method: string, path: string, body?: Partial<ChannelInput> | ChannelUpdate) {
   return fetch(`${apiUrl}${path}`, {
     method,
     headers: { 'content-type': 'application/json' },
@@ -61,7 +62,7 @@ type InboundSftpInput = Extract<ChannelInput, { type: 'sftp'; direction: 'inboun
 
 type HttpInput = Extract<ChannelInput, { type: 'http' }>
 
-const sftpInput: InboundSftpInput = {
+const sftpInputWithoutPollingInterval: Omit<InboundSftpInput, 'pollingIntervalMinutes'> = {
   type: 'sftp',
   direction: 'inbound',
   name: 'Mainfranken SFTP inbox',
@@ -72,7 +73,11 @@ const sftpInput: InboundSftpInput = {
   remotePath: '/outbox',
   authentication: 'password',
   credential: 'first-password',
-  pollingIntervalMinutes: 1,
+}
+
+const sftpInput: InboundSftpInput = {
+  ...sftpInputWithoutPollingInterval,
+  pollingIntervalMinutes: 15,
 }
 
 const webhookInput: ChannelInput = {
@@ -100,6 +105,42 @@ describe('seed Channels', () => {
   })
 })
 
+describe('toChannel', () => {
+  const webhook = createChannel({ type: 'webhook', direction: 'inbound' })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('resolves a relative API URL against the page origin', () => {
+    vi.stubGlobal('location', new URL('https://edi.nordwind.example/runs'))
+
+    expect(toChannel(webhook, '/api')).toMatchObject({
+      url: `https://edi.nordwind.example/api/webhooks/${webhook.id}`,
+    })
+  })
+
+  it('resolves a relative API URL outside the browser', () => {
+    expect(toChannel(webhook, '/api')).toMatchObject({
+      url: `http://localhost/api/webhooks/${webhook.id}`,
+    })
+  })
+})
+
+describe('createChannels', () => {
+  it('spreads the Channels over the seed Trading Partners and some without one', () => {
+    const tradingPartnerIds = createChannels({ count: 200 }).map(
+      ({ tradingPartnerId }) => tradingPartnerId,
+    )
+
+    expect(new Set(tradingPartnerIds)).toEqual(
+      new Set([null, ...seedTradingPartners.map(({ id }) => id)]),
+    )
+  })
+
+  it('generates the same Channels for the same seed', () => {
+    expect(createChannels({ count: 5 })).toEqual(createChannels({ count: 5 }))
+  })
+})
+
 describe('channelHandlers', () => {
   it('lists the seed Channels sorted by name without any plaintext secret', async () => {
     server.use(...channelHandlers(apiUrl))
@@ -124,10 +165,7 @@ describe('channelHandlers', () => {
   })
 
   it('serves a large volume of generated Channels', async () => {
-    const channels = createChannels({
-      count: 500,
-      tradingPartnerIds: seedTradingPartners.map(({ id }) => id),
-    })
+    const channels = createChannels({ count: 500 })
 
     server.use(...channelHandlers(apiUrl, { channels }))
 
@@ -135,10 +173,6 @@ describe('channelHandlers', () => {
 
     expect(listed).toHaveLength(500)
     expect(new Set(listed.map(({ type }) => type))).toEqual(new Set(['sftp', 'webhook', 'http']))
-  })
-
-  it('generates the same Channels for the same seed', () => {
-    expect(createChannels({ count: 5 })).toEqual(createChannels({ count: 5 }))
   })
 
   it('serves one Channel and 404 for an unknown one', async () => {
@@ -182,6 +216,15 @@ describe('channelHandlers', () => {
     expect(channel).toMatchObject({ type: 'sftp', credential: { lastFour: null } })
     expect(text).not.toContain('first-password')
     expect(await listChannels()).toEqual([channel])
+  })
+
+  it('polls a new SFTP Channel every minute when no interval is given', async () => {
+    server.use(...channelHandlers(apiUrl, { channels: [] }))
+    const response = await send('POST', createChannelEndpoint.path, sftpInputWithoutPollingInterval)
+
+    expect(createChannelEndpoint.response.parse(await response.json()).channel).toMatchObject({
+      pollingIntervalMinutes: 1,
+    })
   })
 
   it('rejects an invalid Channel', async () => {

@@ -1,6 +1,6 @@
 import type { TradingPartner, Workspace } from '@edi-bridge/contracts'
 
-import { channelHandlers, type ChannelRecord, seedChannels } from './channel'
+import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
 import { flowsHandler } from './flow'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
@@ -63,11 +63,12 @@ export function createHandlers(
 ) {
   const runs = createRunStore(seedRuns())
   const workspaceStore = createWorkspaceStore(workspace)
+  const channelStore = createChannelStore(channels)
 
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
     ...tradingPartnerHandlers(apiUrl, { tradingPartners, workspace: workspaceStore }),
-    ...channelHandlers(apiUrl, { channels }),
+    ...channelHandlers(apiUrl, { channels: channelStore }),
     flowsHandler(apiUrl),
     runsHandler(apiUrl, runs),
     ...runDetailHandlers(apiUrl, { runs, reprocessed: seedReprocessed() }),
