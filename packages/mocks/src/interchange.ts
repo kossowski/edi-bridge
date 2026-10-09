@@ -272,22 +272,6 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
     }
 
     case 'mapping': {
-      if (run.messageType === 'CONTRL') {
-        const uci = indexOf(segments, 'UCI')
-        const reference = segments[uci]!.elements[0]![0]!
-
-        return {
-          segments,
-          fault: {
-            segment: uci,
-            element: 1,
-            component: null,
-            code: 'unknownInterchange',
-            message: `No sent Interchange has the control reference ${reference}.`,
-          },
-        }
-      }
-
       const qty = indexOf(segments, 'QTY')
 
       return {

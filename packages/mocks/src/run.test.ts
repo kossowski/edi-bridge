@@ -242,6 +242,20 @@ describe('GET /runs', () => {
     expect(outboundParseFailures.body?.total).toBe(0)
   })
 
+  it('never seeds a CONTRL that failed at mapping, because no Mapping Version can fix an unmatched control reference', async () => {
+    server.use(runsHandler(apiUrl))
+
+    const contrlFailures = await listRuns({ status: ['failed'], messageType: ['CONTRL'] })
+
+    const contrlMappingFailures = await listRuns({
+      failureStage: ['mapping'],
+      messageType: ['CONTRL'],
+    })
+
+    expect(contrlFailures.body?.total).toBeGreaterThan(0)
+    expect(contrlMappingFailures.body?.total).toBe(0)
+  })
+
   it('serves more than 10,000 seeded Runs by default', async () => {
     server.use(runsHandler(apiUrl))
 

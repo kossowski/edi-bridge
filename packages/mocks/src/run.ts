@@ -17,9 +17,12 @@ import { seedTradingPartners } from './trading-partner'
 
 function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
   // Outbound Documents come from the ERP as JSON or CSV, so they never fail at EDIFACT parsing.
+  // A CONTRL is linked to its Interchange, not mapped, so no Mapping Version could fix it.
   const stages: FailureStage[] = outboundMessageTypes.includes(messageType)
     ? ['mapping', 'validation', 'delivery']
-    : ['parse', 'validation', 'mapping', 'delivery']
+    : messageType === 'CONTRL'
+      ? ['parse', 'validation', 'delivery']
+      : ['parse', 'validation', 'mapping', 'delivery']
 
   return faker.helpers.arrayElement(stages)
 }
