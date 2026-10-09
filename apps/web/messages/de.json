@@ -29,6 +29,7 @@
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
     "channels": "Channels",
+    "flows": "Flows",
     "mappings": "Mappings",
     "lookupTables": "Lookup Tables",
     "settings": "Einstellungen",
@@ -41,6 +42,7 @@
     "orderLifecycle": "Alle Messages mit derselben Business Reference in zeitlicher Reihenfolge.",
     "tradingPartners": "Die Trading Partners dieses Workspace mit ihren Channels und Flows.",
     "channels": "Die eingehenden und ausgehenden Channels und ihre Verbindungseinstellungen.",
+    "flows": "Die Flows, die Documents von einem Channel über eine Mapping Version an einen Ziel-Channel leiten.",
     "mappings": "Mappings, ihre Versionen und der Mapping-Canvas.",
     "lookupTables": "Lookup Tables für den Workspace und für einzelne Trading Partners.",
     "settings": "Einstellungen für diesen Workspace.",
@@ -635,6 +637,141 @@
       "label": "Ausgehend per HTTP",
       "description": "Schickt Documents per POST an eine URL, etwa Ihr ERP."
     }
+  },
+  "Flows": {
+    "new": "Neuer Flow",
+    "caption": "Flows, nach Name",
+    "loading": "Flows werden geladen",
+    "count": "{count, plural, one {# Flow} other {# Flows}}",
+    "filteredCount": "{count} von {total} Flows",
+    "search": "Nach Name, Trading Partner, Channel oder Mapping suchen",
+    "noMatch": "Kein Flow passt zur Suche.",
+    "routeTo": "nach",
+    "version": "Version {version}",
+    "newerAvailable": "Neuere Version verfügbar",
+    "columns": {
+      "name": "Name",
+      "tradingPartner": "Trading Partner",
+      "messageType": "Message Type",
+      "route": "Weg",
+      "mappingVersion": "Mapping Version"
+    },
+    "empty": {
+      "title": "Noch keine Flows",
+      "description": "Legen Sie einen Flow an, um Documents eines Message Types von einem Trading Partner an einen Ziel-Channel zu leiten."
+    },
+    "error": {
+      "title": "Flows nicht verfügbar",
+      "description": "Die Flows konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    }
+  },
+  "Flow": {
+    "title": "Flow",
+    "back": "Zurück zu den Flows",
+    "loading": "Flow wird geladen",
+    "edit": "Bearbeiten",
+    "unknownChannel": "Unbekannter Channel",
+    "notFound": {
+      "title": "Flow nicht gefunden",
+      "description": "In diesem Workspace gibt es keinen Flow mit dieser ID."
+    },
+    "error": {
+      "title": "Flow nicht verfügbar",
+      "description": "Der Flow konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "facts": {
+      "label": "Details zum Flow",
+      "messageType": "Message Type",
+      "tradingPartner": "Trading Partner",
+      "inboundChannel": "Eingehender Channel",
+      "destinationChannel": "Ziel-Channel"
+    },
+    "mappingVersion": "{mappingName}, Version {version}",
+    "versionOption": "Version {version}, veröffentlicht am {publishedAt}",
+    "pinned": {
+      "title": "Mapping Version",
+      "description": "Jeder Run dieses Flows verwendet die festgelegte Version. Der Flow wechselt nie von selbst auf eine neuere Version.",
+      "published": "Veröffentlicht am {publishedAt}",
+      "newest": "Dies ist die neueste veröffentlichte Version.",
+      "newer": "{count, plural, one {Eine neuere Version ist verfügbar: Version {latest}.} other {# neuere Versionen sind verfügbar, bis Version {latest}.}}"
+    },
+    "move": {
+      "button": "Auf neuere Version umstellen",
+      "legend": "Neue Version",
+      "confirmation": "Runs, die nach der Umstellung starten, verwenden die gewählte Version. Bereits verarbeitete Runs behalten ihre Version.",
+      "confirm": "Auf Version {version} umstellen",
+      "cancel": "Abbrechen",
+      "pending": "Wird umgestellt…",
+      "failed": "Der Flow konnte nicht umgestellt werden. Versuchen Sie es erneut.",
+      "done": "Der Flow verwendet jetzt Version {version}."
+    }
+  },
+  "FlowForm": {
+    "createTitle": "Neuer Flow",
+    "editTitle": "{name} bearbeiten",
+    "editPageTitle": "Flow bearbeiten",
+    "backTo": "Zurück zu {name}",
+    "sections": {
+      "route": "Weg",
+      "mappingVersion": "Mapping Version"
+    },
+    "fields": {
+      "name": {
+        "label": "Name",
+        "description": "Erscheint in Runs und beim Trading Partner."
+      },
+      "tradingPartner": {
+        "label": "Trading Partner",
+        "description": "Der Trading Partner, dessen Documents dieser Flow verarbeitet.",
+        "placeholder": "Trading Partner wählen",
+        "fixed": "Der Trading Partner lässt sich nicht ändern. Legen Sie für einen anderen einen neuen Flow an."
+      },
+      "messageType": {
+        "label": "Message Type",
+        "description": "Die Art von Document, die dieser Flow verarbeitet.",
+        "fixed": "Der Message Type lässt sich nicht ändern. Legen Sie für einen anderen einen neuen Flow an."
+      },
+      "inboundChannel": {
+        "label": "Eingehender Channel",
+        "description": "Wo die Documents ankommen: ein Channel dieses Trading Partners oder Ihrer eigenen Systeme.",
+        "placeholder": "Eingehenden Channel wählen",
+        "none": "Kein eingehender Channel passt zu diesem Trading Partner. Legen Sie zuerst einen an."
+      },
+      "destinationChannel": {
+        "label": "Ziel-Channel",
+        "description": "Wohin EDI Bridge das gemappte Document zustellt.",
+        "placeholder": "Ziel-Channel wählen",
+        "none": "Kein ausgehender Channel passt zu diesem Trading Partner. Legen Sie zuerst einen an."
+      },
+      "mappingVersion": {
+        "label": "Mapping Version",
+        "description": "Festlegen lässt sich nur eine veröffentlichte Mapping Version, nie ein Draft. Der Flow behält diese Version, bis Sie ihn auf eine neuere umstellen.",
+        "placeholder": "Mapping Version wählen",
+        "loading": "Mapping Versions werden geladen…",
+        "none": "Für {messageType} ist noch keine Mapping Version veröffentlicht.",
+        "failed": "Die Mapping Versions konnten nicht geladen werden.",
+        "fixed": "Um eine neuere Version zu verwenden, stellen Sie den Flow auf seiner Seite um."
+      }
+    },
+    "errors": {
+      "required": {
+        "name": "Geben Sie einen Namen ein.",
+        "tradingPartnerId": "Wählen Sie einen Trading Partner.",
+        "messageType": "Wählen Sie einen Message Type.",
+        "inboundChannelId": "Wählen Sie einen eingehenden Channel.",
+        "destinationChannelId": "Wählen Sie einen Ziel-Channel.",
+        "mappingVersionId": "Wählen Sie eine Mapping Version."
+      },
+      "tooLong": "Dieser Wert ist zu lang.",
+      "invalidReference": "Ein gewählter Channel oder die Mapping Version passt nicht mehr zu diesem Flow. Prüfen Sie die Auswahl und speichern Sie erneut.",
+      "saveFailed": "Der Flow konnte nicht gespeichert werden. Versuchen Sie es erneut."
+    },
+    "create": "Flow anlegen",
+    "save": "Änderungen speichern",
+    "saving": "Wird gespeichert…",
+    "cancel": "Abbrechen"
   },
   "Settings": {
     "loading": "Einstellungen werden geladen",

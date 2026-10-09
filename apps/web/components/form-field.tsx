@@ -133,27 +133,35 @@ export function SelectField<Value extends string>({
   value,
   items,
   onChange,
+  placeholder,
+  error = null,
+  disabled = false,
 }: {
   id: string
   label: string
   description: string
-  value: Value
+  value: Value | null
   items: ReadonlyArray<{ value: Value; label: string }>
   onChange: (value: Value) => void
+  placeholder?: string
+  error?: string | null
+  disabled?: boolean
 }) {
   return (
     <FormField
       id={id}
       description={description}
-      error={null}
+      error={error}
       label={
         <span id={`${id}-label`} className="text-sm font-medium">
           {label}
         </span>
       }>
       <Select
+        disabled={disabled}
         items={items}
-        value={value}
+        // Until its items load, Base UI would show the raw value, e.g. an ID.
+        value={items.some((item) => item.value === value) ? value : null}
         onValueChange={(next) => {
           const item = items.find((candidate) => candidate.value === next)
 
@@ -162,10 +170,12 @@ export function SelectField<Value extends string>({
           }
         }}>
         <SelectTrigger
-          aria-describedby={`${id}-description`}
+          id={id}
+          aria-describedby={describedBy(id, error)}
+          aria-invalid={error !== null}
           aria-labelledby={`${id}-label`}
           className="w-full sm:w-80">
-          <SelectValue />
+          <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {items.map((item) => (

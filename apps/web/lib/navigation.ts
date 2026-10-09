@@ -9,6 +9,7 @@ import {
   Table01Icon,
   UserMultiple02Icon,
   UserShield01Icon,
+  WorkflowSquare03Icon,
 } from '@hugeicons/core-free-icons'
 
 import type { IconSvgElement } from '@hugeicons/react'
@@ -29,6 +30,7 @@ export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = 
   orderLifecycle: { href: '/order-lifecycle', icon: Route01Icon },
   tradingPartners: { href: '/trading-partners', icon: UserMultiple02Icon },
   channels: { href: '/channels', icon: PlugSocketIcon },
+  flows: { href: '/flows', icon: WorkflowSquare03Icon },
   mappings: { href: '/mappings', icon: FlowConnectionIcon },
   lookupTables: { href: '/lookup-tables', icon: Table01Icon },
   settings: { href: '/settings', icon: Settings02Icon },
@@ -44,6 +46,7 @@ export const navigationGroups = [
       'orderLifecycle',
       'tradingPartners',
       'channels',
+      'flows',
       'mappings',
       'lookupTables',
       'settings',
