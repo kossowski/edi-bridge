@@ -136,12 +136,16 @@ export type RunDetailOptions = {
   reprocessed?: ReadonlyArray<{ replaced: string; replacing: string }>
 }
 
-export function interchangeIdOf(run: RunSummary) {
-  return stableUuid(
-    directionOf(run) === 'inbound'
-      ? `interchange:${run.tradingPartner.id}|${run.flow.id}|${run.receivedAt}`
-      : `interchange:${run.id}`,
-  )
+// The first Run of an Interchange names it: Run ids come from a fixed seed, while the seeded
+// receipt times move with the page load.
+export function interchangeIdOf(firstRun: RunSummary) {
+  return stableUuid(`interchange:${firstRun.id}`)
+}
+
+function bundleKeyOf(run: RunSummary) {
+  return directionOf(run) === 'inbound'
+    ? `${run.tradingPartner.id}|${run.flow.id}|${run.receivedAt}`
+    : run.id
 }
 
 function problem(status: number, message: string) {
@@ -151,6 +155,7 @@ function problem(status: number, message: string) {
 export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}) {
   const runs = new Map<string, RunSummary>()
   const groups = new Map<string, Group>()
+  const bundles = new Map<string, Group>()
   const groupOf = new Map<string, Group>()
   const generated = new Map<string, GeneratedGroup>()
   const sourceOf = new Map<string, string>()
@@ -159,10 +164,12 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   const retried = new Map<string, RunDetail>()
   let indexed = false
 
-  function join(id: string, member: Member) {
-    const group = groups.get(id) ?? { id, members: [] }
+  function join(run: RunSummary, member: Member) {
+    const key = bundleKeyOf(run)
+    const group = bundles.get(key) ?? { id: interchangeIdOf(run), members: [] }
     group.members.push(member)
-    groups.set(id, group)
+    bundles.set(key, group)
+    groups.set(group.id, group)
     groupOf.set(member.runId, group)
   }
 
@@ -170,10 +177,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     runs.set(run.id, run)
 
     if (replaced === undefined) {
-      join(interchangeIdOf(run), { runId: run.id, content: run })
+      join(run, { runId: run.id, content: run })
     } else if (directionOf(run) === 'outbound') {
       // The replacing Run maps the same ERP Document again, so it produces its own Interchange.
-      join(interchangeIdOf(run), {
+      join(run, {
         runId: run.id,
         content: { ...replaced, status: 'delivered', failureStage: null },
       })
