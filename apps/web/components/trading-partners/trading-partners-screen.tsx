@@ -84,7 +84,7 @@ function TradingPartnersTable() {
         tradingPartner.name.toLocaleLowerCase().includes(term) ||
         tradingPartner.gln.includes(term.replaceAll(/\s/g, ''))
       }
-      newHref="/trading-partners/new"
+      newLink={{ href: '/trading-partners/new', label: t('new') }}
       pending={workspace.isPending}
       query={tradingPartners}
       row={(tradingPartner) => (

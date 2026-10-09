@@ -29,7 +29,6 @@ import {
 } from '@edi-bridge/ui/components/table'
 
 type ListMessageKey =
-  | 'new'
   | 'search'
   | 'loading'
   | 'count'
@@ -60,15 +59,15 @@ export function ListScreen({
   children,
 }: {
   title: string
-  newHref: string
-  newLabel: string
+  newHref?: string
+  newLabel?: string
   children: ReactNode
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <NewLink href={newHref} label={newLabel} />
+        {newHref && newLabel && <NewLink href={newHref} label={newLabel} />}
       </div>
       {children}
     </div>
@@ -92,7 +91,7 @@ export function ListTable<Item>({
   pending,
   t,
   emptyIcon,
-  newHref,
+  newLink,
   columns,
   matches,
   row,
@@ -106,7 +105,7 @@ export function ListTable<Item>({
   pending: boolean
   t: ListTranslator
   emptyIcon: IconSvgElement
-  newHref: string
+  newLink?: { href: string; label: string }
   columns: ReadonlyArray<{ key: string; label: string }>
   matches: (item: Item, term: string) => boolean
   row: (item: Item) => ReactNode
@@ -143,9 +142,11 @@ export function ListTable<Item>({
           <EmptyTitle>{t('empty.title')}</EmptyTitle>
           <EmptyDescription>{t('empty.description')}</EmptyDescription>
         </EmptyHeader>
-        <EmptyContent>
-          <NewLink href={newHref} label={t('new')} />
-        </EmptyContent>
+        {newLink && (
+          <EmptyContent>
+            <NewLink href={newLink.href} label={newLink.label} />
+          </EmptyContent>
+        )}
       </Empty>
     )
   }

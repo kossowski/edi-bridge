@@ -61,7 +61,7 @@ function ChannelsTable() {
           channelAddress(channel),
         ].some((text) => text.toLocaleLowerCase().includes(term))
       }
-      newHref="/channels/new"
+      newLink={{ href: '/channels/new', label: t('new') }}
       pending={tradingPartners.isPending}
       query={channels}
       row={(channel) => (

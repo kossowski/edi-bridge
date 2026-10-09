@@ -774,6 +774,97 @@
     "saving": "Saving…",
     "cancel": "Cancel"
   },
+  "Mappings": {
+    "caption": "Mappings, by name",
+    "loading": "Loading Mappings",
+    "count": "{count, plural, one {# Mapping} other {# Mappings}}",
+    "filteredCount": "{count} of {total} Mappings",
+    "search": "Search by name, Message Type or Document Structure",
+    "noMatch": "No Mapping matches the search.",
+    "version": "Version {version}",
+    "neverPublished": "Never published",
+    "direction": {
+      "inbound": "Inbound",
+      "outbound": "Outbound"
+    },
+    "columns": {
+      "name": "Name",
+      "direction": "Direction",
+      "messageType": "Message Type",
+      "documentStructure": "Document Structure",
+      "latestVersion": "Latest Mapping Version"
+    },
+    "empty": {
+      "title": "No Mappings yet",
+      "description": "Mappings describe how a Document is turned into EDIFACT and back. Once a Mapping exists, it is listed here."
+    },
+    "error": {
+      "title": "Mappings unavailable",
+      "description": "The Mappings could not be loaded. Try again.",
+      "retry": "Try again"
+    }
+  },
+  "Mapping": {
+    "title": "Mapping",
+    "back": "Back to Mappings",
+    "loading": "Loading Mapping",
+    "notFound": {
+      "title": "Mapping not found",
+      "description": "There is no Mapping with this ID in this Workspace."
+    },
+    "error": {
+      "title": "Mapping unavailable",
+      "description": "The Mapping could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "draft": "Draft",
+    "facts": {
+      "label": "Mapping details",
+      "direction": "Direction",
+      "source": "Source",
+      "target": "Target",
+      "links": "Links"
+    },
+    "direction": {
+      "inbound": "Inbound: Message Type to Document Structure",
+      "outbound": "Outbound: Document Structure to Message Type"
+    },
+    "linkCount": "{count, plural, =0 {No links yet} one {# link} other {# links}}",
+    "side": {
+      "documentStructure": "Document Structure {name}",
+      "messageType": "Message Type {messageType}"
+    },
+    "canvas": {
+      "label": "Mapping canvas: {source} to {target}",
+      "source": "Source",
+      "target": "Target",
+      "loading": "Loading the structures",
+      "link": "Link from {source} to {target}",
+      "links": "{count} links from {source} to {target}",
+      "expand": "Expand {label}",
+      "collapse": "Collapse {label}",
+      "repeatsUnbounded": "Repeats",
+      "repeatsUpTo": "Up to {count}×",
+      "repeatsUnboundedLabel": "Repeats any number of times",
+      "repeatsUpToLabel": "Repeats up to {count} times",
+      "hiddenParts": "{count, plural, one {# part hidden} other {# parts hidden}}",
+      "error": {
+        "title": "Structures unavailable",
+        "description": "The source or target structure could not be loaded. Try again.",
+        "retry": "Try again"
+      },
+      "controls": {
+        "panel": "Canvas controls",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "fitView": "Fit to screen"
+      }
+    },
+    "desktopOnly": {
+      "title": "The Mapping canvas needs a larger screen",
+      "description": "Open this Mapping on a screen at least 1024 pixels wide to see its source and target and their links."
+    }
+  },
   "ManualSubmission": {
     "open": "Submit a Document",
     "title": "Manual Submission",

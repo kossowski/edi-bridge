@@ -82,7 +82,7 @@ function FlowsTable() {
           flow.mappingVersion.mappingName,
         ].some((text) => text.toLocaleLowerCase().includes(term))
       }
-      newHref="/flows/new"
+      newLink={{ href: '/flows/new', label: t('new') }}
       pending={references.isPending}
       query={flows}
       row={(flow) => <FlowRow key={flow.id} flow={flow} references={references} />}
