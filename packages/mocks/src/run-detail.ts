@@ -285,6 +285,13 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     return result
   }
 
+  // An inbound replacing Run reprocesses the Message of the Run it replaced.
+  function messageOwnerOf(runId: string) {
+    return groupOf.get(runId)!.members.some((member) => member.runId === runId)
+      ? runId
+      : sourceOf.get(runId)!
+  }
+
   function detail(id: string): RunDetail | undefined {
     ensureIndexed()
     const run = runs.get(id)
@@ -302,7 +309,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
     const group = groupOf.get(id)!
     const { messages, interchange } = generate(group)
-    const messageOwner = messages.has(id) ? id : sourceOf.get(id)!
+    const messageOwner = messageOwnerOf(id)
     const message = messages.get(messageOwner)!
     const direction = directionOf(run)
 
@@ -378,9 +385,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   function interchange(id: string): Interchange | undefined {
     ensureIndexed()
     const group = groups.get(id)
-    const generatedInterchange = group && generate(group).interchange
+    const generatedGroup = group && generate(group)
+    const generatedInterchange = generatedGroup?.interchange
 
-    if (!group || !generatedInterchange) {
+    if (!generatedGroup || !generatedInterchange) {
       return undefined
     }
 
@@ -396,7 +404,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       direction: directionOf(first),
       ...partiesOf(first),
       raw: generatedInterchange.raw,
-      runs: produced.map((runId) => runSummarySchema.parse(detail(runId))),
+      runs: produced.map((runId) => ({
+        ...runSummarySchema.parse(detail(runId)),
+        messageReference: generatedGroup.messages.get(messageOwnerOf(runId))!.reference,
+      })),
     })
   }
 

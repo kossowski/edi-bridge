@@ -28,6 +28,7 @@ type Fault = {
 }
 
 export type GeneratedMessage = {
+  reference: string
   segments: Segment[]
   parsed: ParsedMessage | null
   fault: Fault | null
@@ -363,6 +364,7 @@ export function generateMessage(run: RunSummary, reference: string): GeneratedMe
         }
 
   return {
+    reference,
     segments: faulty.segments,
     parsed,
     fault: faulty.fault,

@@ -457,7 +457,11 @@ describe('GET /interchanges/:id', () => {
       sender: { name: 'Hansemarkt GmbH' },
       receiver: { name: 'Nordwind Handel GmbH' },
     })
-    expect(interchange.runs.map(({ id }) => id)).toEqual([first.id, second.id, replacing.id])
+    expect(interchange.runs.map(({ id, messageReference }) => [id, messageReference])).toEqual([
+      [first.id, '1'],
+      [second.id, '2'],
+      [replacing.id, '2'],
+    ])
   })
 
   it('seeds inbound Interchanges that hold several Messages', async () => {
