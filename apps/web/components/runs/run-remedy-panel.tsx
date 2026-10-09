@@ -11,7 +11,7 @@ import { useId, useState } from 'react'
 import { linkClass } from '@/components/detail-parts'
 import { runRemedy } from '@/components/runs/run-remedy'
 import { reprocessRun, retryRun } from '@/lib/api/client'
-import { mappingVersionsQuery, runQuery } from '@/lib/api/queries'
+import { interchangeKeys, mappingVersionsQuery, runKeys, runQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Select,
@@ -39,8 +39,8 @@ function RetryAction({ run }: { run: RunDetail }) {
     mutationFn: () => retryRun(run.id),
     onSuccess: (updated) => {
       queryClient.setQueryData(runQuery(run.id).queryKey, updated)
-      void queryClient.invalidateQueries({ queryKey: ['runs', 'list'] })
-      void queryClient.invalidateQueries({ queryKey: ['interchanges'] })
+      void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
+      void queryClient.invalidateQueries({ queryKey: interchangeKeys.all() })
     },
   })
 
@@ -85,13 +85,18 @@ function ReprocessAction({ run }: { run: RunDetail }) {
   const [chosen, setChosen] = useState<string | null>(null)
   const selected = chosen ?? versions.data?.[0]?.id ?? null
 
+  const items = (versions.data ?? []).map((version) => ({
+    value: version.id,
+    label: versionLabel(version),
+  }))
+
   const reprocess = useMutation({
     mutationFn: (mappingVersionId: string) => reprocessRun(run.id, { mappingVersionId }),
     onSuccess: (replacing) => {
       queryClient.setQueryData(runQuery(replacing.id).queryKey, replacing)
-      void queryClient.invalidateQueries({ queryKey: runQuery(run.id).queryKey })
-      void queryClient.invalidateQueries({ queryKey: ['runs', 'list'] })
-      void queryClient.invalidateQueries({ queryKey: ['interchanges'] })
+      void queryClient.invalidateQueries({ queryKey: runKeys.detail(run.id) })
+      void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
+      void queryClient.invalidateQueries({ queryKey: interchangeKeys.all() })
       router.push(`/runs/${replacing.id}`)
     },
   })
@@ -102,26 +107,29 @@ function ReprocessAction({ run }: { run: RunDetail }) {
       {versions.isError ? (
         <ActionError message={t('versionsUnavailable')} />
       ) : (
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-wrap items-end gap-2">
+          <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
             <span id={labelId} className="text-sm font-medium">
               {t('version')}
             </span>
             <Select
               disabled={versions.isPending}
-              items={(versions.data ?? []).map((version) => ({
-                value: version.id,
-                label: versionLabel(version),
-              }))}
+              items={items}
               value={selected}
               onValueChange={(value) => setChosen(value)}>
-              <SelectTrigger aria-labelledby={labelId} className="min-w-72">
-                <SelectValue />
+              <SelectTrigger aria-labelledby={labelId} className="w-full sm:w-80">
+                <SelectValue className="min-w-0">
+                  {(value: string | null) => (
+                    <span className="truncate">
+                      {items.find((item) => item.value === value)?.label}
+                    </span>
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {versions.data?.map((version) => (
-                  <SelectItem key={version.id} value={version.id}>
-                    {versionLabel(version)}
+                {items.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
                   </SelectItem>
                 ))}
               </SelectContent>

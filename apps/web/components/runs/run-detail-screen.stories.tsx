@@ -134,7 +134,7 @@ export const ParseFailure = meta.story({
   args: { id: parseFailure.id },
   async play({ canvas }) {
     await expect(
-      await canvas.findByRole('heading', { name: 'Awaiting resend from partner' }),
+      await canvas.findByRole('heading', { name: 'Awaiting resend from the Trading Partner' }),
     ).toBeVisible()
     await expect(canvas.getByText(/could not be parsed/)).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Retry' })).toBeNull()

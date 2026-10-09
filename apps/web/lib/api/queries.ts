@@ -17,9 +17,20 @@ export const currentWorkspaceQuery = queryOptions({
   queryFn: getCurrentWorkspace,
 })
 
+export const runKeys = {
+  lists: () => ['runs', 'list'] as const,
+  list: (query: RunListQuery) => [...runKeys.lists(), query] as const,
+  detail: (id: string) => ['runs', 'detail', id] as const,
+}
+
+export const interchangeKeys = {
+  all: () => ['interchanges'] as const,
+  detail: (id: string) => [...interchangeKeys.all(), 'detail', id] as const,
+}
+
 export function runsQuery(query: RunListQuery) {
   return queryOptions({
-    queryKey: ['runs', 'list', query],
+    queryKey: runKeys.list(query),
     queryFn: () => listRuns(query),
     placeholderData: keepPreviousData,
   })
@@ -27,14 +38,14 @@ export function runsQuery(query: RunListQuery) {
 
 export function runQuery(id: string) {
   return queryOptions({
-    queryKey: ['runs', 'detail', id],
+    queryKey: runKeys.detail(id),
     queryFn: () => getRun(id),
   })
 }
 
 export function interchangeQuery(id: string) {
   return queryOptions({
-    queryKey: ['interchanges', 'detail', id],
+    queryKey: interchangeKeys.detail(id),
     queryFn: () => getInterchange(id),
   })
 }

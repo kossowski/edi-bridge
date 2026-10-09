@@ -198,7 +198,7 @@
         "versionsUnavailable": "Die Mapping Versions konnten nicht geladen werden."
       },
       "awaitingResend": {
-        "title": "Wartet auf erneutes Senden durch den Partner",
+        "title": "Wartet auf erneutes Senden durch den Trading Partner",
         "description": "Das Interchange von {tradingPartner} ist bei {failureStage} fehlgeschlagen. EDI Bridge hat es mit einem CONTRL abgelehnt. Nur ein korrigiertes erneutes Senden durch den Trading Partner behebt den Fehler."
       },
       "replaced": {
@@ -251,7 +251,11 @@
     "runs": {
       "title": "Runs",
       "count": "{count, plural, one {Dieses Interchange hat # Run erzeugt.} other {Dieses Interchange hat # Runs erzeugt.}}",
-      "caption": "Von diesem Interchange erzeugte Runs"
+      "caption": "Von diesem Interchange erzeugte Runs",
+      "columns": {
+        "message": "Message"
+      },
+      "openRun": "– Run zu Message {messageReference} öffnen, {messageType}"
     }
   }
 }

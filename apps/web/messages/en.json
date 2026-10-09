@@ -198,7 +198,7 @@
         "versionsUnavailable": "The Mapping Versions could not be loaded."
       },
       "awaitingResend": {
-        "title": "Awaiting resend from partner",
+        "title": "Awaiting resend from the Trading Partner",
         "description": "The Interchange from {tradingPartner} failed at {failureStage}. EDI Bridge rejected it with a CONTRL. Only a corrected resend from the Trading Partner fixes it."
       },
       "replaced": {
@@ -251,7 +251,11 @@
     "runs": {
       "title": "Runs",
       "count": "{count, plural, one {This Interchange produced # Run.} other {This Interchange produced # Runs.}}",
-      "caption": "Runs produced by this Interchange"
+      "caption": "Runs produced by this Interchange",
+      "columns": {
+        "message": "Message"
+      },
+      "openRun": "– open Run of Message {messageReference}, {messageType}"
     }
   }
 }

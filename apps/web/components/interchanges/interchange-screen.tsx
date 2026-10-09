@@ -1,11 +1,11 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useFormatter, useTranslations } from 'next-intl'
-import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 
 import { BackToRuns, Fact, LoadFailure, Section } from '@/components/detail-parts'
 import { RawInterchange } from '@/components/runs/raw-interchange'
+import { RunLink } from '@/components/runs/run-link'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { ApiError } from '@/lib/api/client'
 import { interchangeQuery } from '@/lib/api/queries'
@@ -31,7 +31,6 @@ function Party({ party }: { party: InterchangeParty }) {
 function InterchangeRuns({ interchange }: { interchange: Interchange }) {
   const t = useTranslations('Interchange.runs')
   const tRuns = useTranslations('Runs')
-  const format = useFormatter()
 
   return (
     <div className="flex flex-col gap-3">
@@ -44,6 +43,7 @@ function InterchangeRuns({ interchange }: { interchange: Interchange }) {
           <TableHeader>
             <TableRow>
               <TableHead scope="col">{tRuns('columns.receivedAt')}</TableHead>
+              <TableHead scope="col">{t('columns.message')}</TableHead>
               <TableHead scope="col">{tRuns('columns.status')}</TableHead>
               <TableHead scope="col">{tRuns('columns.failureStage')}</TableHead>
               <TableHead scope="col">{tRuns('columns.messageType')}</TableHead>
@@ -54,24 +54,15 @@ function InterchangeRuns({ interchange }: { interchange: Interchange }) {
             {interchange.runs.map((run) => (
               <TableRow key={run.id} className="relative">
                 <TableCell>
-                  <Link
-                    href={`/runs/${run.id}`}
-                    className="focus-visible:after:ring-ring font-medium tabular-nums underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset">
-                    <time dateTime={run.receivedAt}>
-                      {format.dateTime(new Date(run.receivedAt), {
-                        dateStyle: 'medium',
-                        timeStyle: 'medium',
-                      })}
-                    </time>
-                    <span className="sr-only">
-                      {' '}
-                      {tRuns('openRun', {
-                        tradingPartner: run.tradingPartner.name,
-                        messageType: run.messageType,
-                      })}
-                    </span>
-                  </Link>
+                  <RunLink
+                    description={t('openRun', {
+                      messageReference: run.messageReference,
+                      messageType: run.messageType,
+                    })}
+                    run={run}
+                  />
                 </TableCell>
+                <TableCell className="tabular-nums">{run.messageReference}</TableCell>
                 <TableCell>
                   <RunStatusBadge status={run.status} />
                 </TableCell>

@@ -94,7 +94,7 @@ function RunFacts({ run }: { run: RunDetail }) {
   )
 }
 
-function RunError({ error }: { error: NonNullable<RunDetail['error']> }) {
+function RunErrorNotice({ error }: { error: NonNullable<RunDetail['error']> }) {
   const t = useTranslations('RunDetail.failure')
 
   return (
@@ -139,7 +139,7 @@ function RunDetailView({ run }: { run: RunDetail }) {
         <p className="text-muted-foreground font-mono text-sm break-all">{run.id}</p>
       </div>
       <RunFacts run={run} />
-      {run.error && <RunError error={run.error} />}
+      {run.error && <RunErrorNotice error={run.error} />}
       <RunRemedyPanel run={run} />
       <div className="grid gap-6 lg:grid-cols-[minmax(16rem,1fr)_2fr]">
         <Section id="run-steps" title={t('steps.title')}>
