@@ -30,6 +30,7 @@ export {
   seedFlows,
   seedMappings,
   toFlow,
+  toFlowStore,
 } from './flow'
 
 export {

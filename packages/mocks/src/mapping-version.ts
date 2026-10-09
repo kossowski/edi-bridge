@@ -10,6 +10,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { directionOf } from './direction'
+import { badRequest } from './responses'
 import { seededFaker } from './seeded-faker'
 
 const firstPublication = Date.parse('2026-03-02T09:00:00.000Z')
@@ -103,6 +104,6 @@ export function publishedMappingVersionsHandler(
 
     return query.success
       ? HttpResponse.json(catalogue.published(query.data.messageType))
-      : HttpResponse.json({ message: query.error.message }, { status: 400 })
+      : badRequest(query.error.message)
   })
 }

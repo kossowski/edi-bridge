@@ -25,6 +25,7 @@ import {
   type MappingRecord,
   toMappingCatalogue,
 } from './mapping-version'
+import { badRequest, conflict, notFound, unprocessable } from './responses'
 import { seedId } from './seed-id'
 import { hasTraffic, seedTradingPartners } from './trading-partner'
 
@@ -156,8 +157,8 @@ export function createFlowStore(flows: ReadonlyArray<FlowRecord> = seedFlows): F
   }
 }
 
-function problem(status: number, message: string) {
-  return HttpResponse.json({ message }, { status })
+export function toFlowStore(flows: ReadonlyArray<FlowRecord> | FlowStore = seedFlows) {
+  return 'get' in flows ? flows : createFlowStore(flows)
 }
 
 type RouteCheck = Pick<FlowRecord, 'tradingPartnerId' | 'inboundChannelId' | 'destinationChannelId'>
@@ -175,15 +176,15 @@ function routeProblem(
     const channel = channels.get(id)
 
     if (!channel) {
-      return problem(422, `The ${role} does not exist`)
+      return unprocessable(`The ${role} does not exist`)
     }
 
     if (channel.direction !== direction) {
-      return problem(422, `The ${role} must be an ${direction} Channel`)
+      return unprocessable(`The ${role} must be an ${direction} Channel`)
     }
 
     if (channel.tradingPartnerId !== null && channel.tradingPartnerId !== tradingPartnerId) {
-      return problem(422, `The ${role} belongs to another Trading Partner`)
+      return unprocessable(`The ${role} belongs to another Trading Partner`)
     }
   }
 
@@ -202,11 +203,9 @@ export function flowHandlers(
     mappings?: ReadonlyArray<MappingRecord> | MappingCatalogue
   } = {},
 ) {
-  const store = 'get' in flows ? flows : createFlowStore(flows)
+  const store = toFlowStore(flows)
   const channelStore = toChannelStore(channels)
   const catalogue = toMappingCatalogue(mappings)
-
-  const notFound = () => problem(404, 'Not found')
 
   const respond = (record: FlowRecord, status = 200) =>
     HttpResponse.json(toFlow(record, catalogue), { status })
@@ -229,17 +228,17 @@ export function flowHandlers(
       const body = createFlowEndpoint.body.safeParse(await request.json())
 
       if (!body.success) {
-        return problem(400, body.error.message)
+        return badRequest(body.error.message)
       }
 
       const pinned = catalogue.find(body.data.mappingVersionId)
 
       if (!pinned) {
-        return problem(422, 'The Mapping Version is not published')
+        return unprocessable('The Mapping Version is not published')
       }
 
       if (pinned.mapping.messageType !== body.data.messageType) {
-        return problem(422, 'The Mapping Version is for another Message Type')
+        return unprocessable('The Mapping Version is for another Message Type')
       }
 
       const record: FlowRecord = { ...body.data, id: crypto.randomUUID() }
@@ -264,7 +263,7 @@ export function flowHandlers(
       const body = updateFlowEndpoint.body.safeParse(await request.json())
 
       if (!body.success) {
-        return problem(400, body.error.message)
+        return badRequest(body.error.message)
       }
 
       const update: FlowUpdate = body.data
@@ -292,18 +291,18 @@ export function flowHandlers(
         const body = moveFlowMappingVersionEndpoint.body.safeParse(await request.json())
 
         if (!body.success) {
-          return problem(400, body.error.message)
+          return badRequest(body.error.message)
         }
 
         const current = catalogue.find(existing.mappingVersionId)!
         const target = catalogue.find(body.data.mappingVersionId)
 
         if (!target || target.mapping.mappingId !== current.mapping.mappingId) {
-          return problem(422, 'The Mapping Version does not belong to the Mapping of this Flow')
+          return unprocessable('The Mapping Version does not belong to the Mapping of this Flow')
         }
 
         if (target.version.version <= current.version.version) {
-          return problem(409, 'A Flow only moves to a newer Mapping Version')
+          return conflict('A Flow only moves to a newer Mapping Version')
         }
 
         const record: FlowRecord = { ...existing, mappingVersionId: target.version.id }
