@@ -29,6 +29,7 @@ import {
 } from './interchange'
 import { mappingVersionsForFlow } from './mapping-version'
 import { seedRuns } from './run'
+import { type RunStore, toRunStore } from './run-store'
 import { stableUuid } from './seed-id'
 import { seededFaker } from './seeded-faker'
 
@@ -135,7 +136,7 @@ type GeneratedGroup = {
 type Reprocessed = { replaced: string; replacing: string }
 
 export type RunDetailOptions = {
-  runs?: ReadonlyArray<RunSummary>
+  runs?: ReadonlyArray<RunSummary> | RunStore
   reprocessed?: ReadonlyArray<Reprocessed>
 }
 
@@ -179,7 +180,7 @@ function problem(status: number, message: string) {
 }
 
 export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}) {
-  const runs = new Map<string, RunSummary>()
+  let runs: RunStore
   const groups = new Map<string, Group>()
   const bundles = new Map<string, Group>()
   const groupOf = new Map<string, Group>()
@@ -200,7 +201,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   }
 
   function add(run: RunSummary, replaced?: RunSummary) {
-    runs.set(run.id, run)
+    runs.set(run)
 
     if (replaced === undefined) {
       join(run, { runId: run.id, run })
@@ -221,7 +222,8 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     }
 
     indexed = true
-    const all = options.runs ?? seedRuns()
+    runs = toRunStore(options.runs ?? seedRuns())
+    const all = runs.all()
 
     for (const { replaced, replacing } of options.reprocessed ?? []) {
       sourceOf.set(replacing, replaced)
@@ -359,6 +361,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     })
 
     retried.set(run.id, result)
+    runs.set(runSummarySchema.parse(result))
 
     return result
   }
@@ -413,7 +416,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
   function versionsOf(mappingId: string) {
     ensureIndexed()
-    const flows = new Map([...runs.values()].map((run) => [run.flow.id, run]))
+    const flows = new Map(runs.all().map((run) => [run.flow.id, run]))
 
     return [...flows.values()]
       .map(mappingVersionsForFlow)

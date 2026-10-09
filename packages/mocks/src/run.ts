@@ -13,6 +13,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { directionOf, seedFlows } from './flow'
+import { type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
 function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
@@ -121,8 +122,8 @@ function matches(run: RunSummary, query: RunListQuery) {
   )
 }
 
-export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary>) {
-  let sorted: RunSummary[] | undefined
+export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | RunStore) {
+  let store: RunStore | undefined
 
   return http.get(`${apiUrl}${runsEndpoint.path}`, ({ request }) => {
     const query = runsEndpoint.query.safeParse(fromSearchParams(new URL(request.url).searchParams))
@@ -131,11 +132,9 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary>) {
       return HttpResponse.json({ message: query.error.message }, { status: 400 })
     }
 
-    sorted ??= [...(runs ?? seedRuns())].sort(
-      (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
-    )
+    store ??= toRunStore(runs ?? seedRuns())
     const { page, pageSize } = query.data
-    const filtered = sorted.filter((run) => matches(run, query.data))
+    const filtered = store.newestFirst().filter((run) => matches(run, query.data))
 
     return HttpResponse.json({
       runs: filtered.slice((page - 1) * pageSize, page * pageSize),
