@@ -74,16 +74,28 @@ describe('manualSubmissionSchema', () => {
   it('accepts one Run per Message, each marked as manual', () => {
     const runs = [run, { ...run, id: '6b0f1f0e-2a54-4d7c-9a51-0c6f1d2e3a41' }]
 
-    expect(manualSubmissionSchema.parse({ runs })).toEqual({ runs })
+    expect(manualSubmissionSchema.parse({ runs, notRouted: [] })).toEqual({ runs, notRouted: [] })
+  })
+
+  it('lists the Messages that no Flow routes by their raw Message Type', () => {
+    const notRouted = [{ messageType: 'PRICAT' }]
+
+    expect(manualSubmissionSchema.parse({ runs: [run], notRouted }).notRouted).toEqual(notRouted)
   })
 
   it('rejects a Run that is not marked as manual', () => {
     expect(
-      manualSubmissionSchema.safeParse({ runs: [{ ...run, manualSubmission: false }] }).success,
+      manualSubmissionSchema.safeParse({
+        runs: [{ ...run, manualSubmission: false }],
+        notRouted: [],
+      }).success,
     ).toBe(false)
   })
 
   it('rejects a Manual Submission without a Run', () => {
-    expect(manualSubmissionSchema.safeParse({ runs: [] }).success).toBe(false)
+    expect(
+      manualSubmissionSchema.safeParse({ runs: [], notRouted: [{ messageType: 'PRICAT' }] })
+        .success,
+    ).toBe(false)
   })
 })

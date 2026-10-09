@@ -21,7 +21,9 @@ export const manualSubmissionInputSchema = z.object({
 
 export type ManualSubmissionInput = z.infer<typeof manualSubmissionInputSchema>
 
-// One Run per Message: an Interchange with several Messages produces several Runs.
+// One Run per Message: an Interchange with several Messages produces several Runs. A Message
+// without a Flow for its Message Type on the Channel gets no Run and is listed as not routed, by the
+// raw UNH type, so one unknown Message doesn't block the others.
 export const manualSubmissionSchema = z.object({
   runs: z
     .array(runSummarySchema)
@@ -29,6 +31,7 @@ export const manualSubmissionSchema = z.object({
     .refine((runs) => runs.every((run) => run.manualSubmission), {
       message: 'Every Run of a Manual Submission is marked as manual',
     }),
+  notRouted: z.array(z.object({ messageType: z.string().min(1) })),
 })
 
 export type ManualSubmission = z.infer<typeof manualSubmissionSchema>

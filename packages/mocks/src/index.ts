@@ -34,7 +34,7 @@ export {
   toFlowStore,
 } from './flow'
 
-export { manualSubmissionHandler, messageTypesOf } from './manual-submission'
+export { manualSubmissionHandler } from './manual-submission'
 
 export {
   createMappingCatalogue,

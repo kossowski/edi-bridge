@@ -35,6 +35,14 @@ const twoOrders = [
   "UNZ+2+4711'",
 ].join('\n')
 
+const mixed = [
+  "UNB+UNOC:3+4012345000016:14+4098765000013:14+261009:1015+4712'",
+  "UNH+1+ORDERS:D:96A:UN:EAN008'BGM+220+PO-3+9'UNT+3+1'",
+  "UNH+2+DESADV:D:96A:UN:EAN007'BGM+351+DN-1+9'UNT+3+2'",
+  "UNH+3+PRICAT:D:96A:UN:EAN008'BGM+9+PL-1+9'UNT+3+3'",
+  "UNZ+3+4712'",
+].join('\n')
+
 function use(runs = createRunStore([])) {
   server.use(manualSubmissionHandler(apiUrl, { runs, flows: createFlowStore() }))
 
@@ -54,12 +62,16 @@ async function submitted(body: ManualSubmissionInput) {
 
   expect(response.status).toBe(201)
 
-  return submitDocumentEndpoint.response.parse(await response.json()).runs
+  return submitDocumentEndpoint.response.parse(await response.json())
 }
 
 describe('messageTypesOf', () => {
   it('reads the Message Type of every UNH segment', () => {
     expect(messageTypesOf(twoOrders)).toEqual(['ORDERS', 'ORDERS'])
+  })
+
+  it('keeps a Message Type that EDI Bridge does not know', () => {
+    expect(messageTypesOf(mixed)).toEqual(['ORDERS', 'DESADV', 'PRICAT'])
   })
 
   it('returns null for a Document that is not EDIFACT', () => {
@@ -71,12 +83,13 @@ describe('manualSubmissionHandler', () => {
   it('creates one manual Run per Message and adds it to the run store', async () => {
     const runs = use()
 
-    const created = await submitted({
+    const { runs: created, notRouted } = await submitted({
       channelId: inbox.id,
       document: { fileName: 'orders.edi', content: twoOrders },
     })
 
     expect(created).toHaveLength(2)
+    expect(notRouted).toEqual([])
 
     for (const run of created) {
       expect(run).toMatchObject({
@@ -92,7 +105,9 @@ describe('manualSubmissionHandler', () => {
   it('routes each Message to the Flow for its Message Type', async () => {
     use()
 
-    const [run] = await submitted({
+    const {
+      runs: [run],
+    } = await submitted({
       channelId: inbox.id,
       document: {
         fileName: 'contrl.edi',
@@ -108,10 +123,39 @@ describe('manualSubmissionHandler', () => {
     expect(run?.flow).toEqual({ id: flow.id, name: flow.name })
   })
 
+  it('reports the Messages without a Flow on the Channel as not routed', async () => {
+    const runs = use()
+
+    const { runs: created, notRouted } = await submitted({
+      channelId: inbox.id,
+      document: { fileName: 'mixed.edi', content: mixed },
+    })
+
+    expect(created).toEqual([expect.objectContaining({ messageType: 'ORDERS' })])
+    expect(notRouted).toEqual([{ messageType: 'DESADV' }, { messageType: 'PRICAT' }])
+    expect(runs.all()).toHaveLength(1)
+  })
+
+  it('rejects an Interchange when no Message has a Flow on the Channel', async () => {
+    const runs = use()
+
+    const response = await submit({
+      channelId: inbox.id,
+      document: {
+        fileName: 'pricat.edi',
+        content:
+          "UNB+UNOC:3+4012345000016:14+4098765000013:14+261009:1015+1'UNH+1+PRICAT:D:96A:UN'",
+      },
+    })
+
+    expect(response.status).toBe(422)
+    expect(runs.all()).toHaveLength(0)
+  })
+
   it('fails a Document that is not EDIFACT at parsing on a Trading Partner Channel', async () => {
     use()
 
-    const created = await submitted({
+    const { runs: created } = await submitted({
       channelId: inbox.id,
       document: { fileName: 'notes.txt', content: 'Please ship by Friday.' },
     })
@@ -124,7 +168,7 @@ describe('manualSubmissionHandler', () => {
   it('accepts a JSON Document from the own systems on the ERP webhook', async () => {
     use()
 
-    const created = await submitted({
+    const { runs: created } = await submitted({
       channelId: erpWebhook.id,
       document: { fileName: 'desadv.json', content: '{"deliveryNote": "DN-1"}' },
     })

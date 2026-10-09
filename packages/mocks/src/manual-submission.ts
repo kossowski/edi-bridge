@@ -2,8 +2,6 @@ import { http, HttpResponse } from 'msw'
 
 import {
   directionOf,
-  type MessageType,
-  messageTypeSchema,
   type RunSummary,
   runSummarySchema,
   submitDocumentEndpoint,
@@ -18,37 +16,45 @@ import { seedTradingPartners } from './trading-partner'
 
 const interchangeStart = /^\s*UN[AB]/
 
-const messageHeader = /UNH\+[^+']*\+([A-Z]{6})/g
+const messageHeader = /UNH\+[^+']*\+([^:+']+)/g
 
 // The prototype reads only the Message Types from the UNH segments; real parsing comes later.
-export function messageTypesOf(content: string): MessageType[] | null {
+export function messageTypesOf(content: string): string[] | null {
   if (!interchangeStart.test(content)) {
     return null
   }
 
-  return [...content.matchAll(messageHeader)].flatMap(([, type]) => {
-    const parsed = messageTypeSchema.safeParse(type)
-
-    return parsed.success ? [parsed.data] : []
-  })
+  return [...content.matchAll(messageHeader)].flatMap(([, type]) => (type ? [type] : []))
 }
 
 type Outcome = { flow: FlowRecord; failed: boolean }
 
+type Routing = { outcomes: Outcome[]; notRouted: Array<{ messageType: string }> }
+
 // An inbound Flow expects EDIFACT from the Trading Partner, so a Document without a Message fails
 // at parsing; an outbound Flow takes JSON or CSV from the own systems.
-function outcomesOf(content: string, routed: readonly [FlowRecord, ...FlowRecord[]]): Outcome[] {
-  const [fallback] = routed
+function routingOf(content: string, routed: readonly [FlowRecord, ...FlowRecord[]]): Routing {
+  const [first] = routed
   const declared = messageTypesOf(content) ?? []
 
   if (declared.length === 0) {
-    return [{ flow: fallback, failed: directionOf(fallback) === 'inbound' }]
+    return { outcomes: [{ flow: first, failed: directionOf(first) === 'inbound' }], notRouted: [] }
   }
 
-  return declared.map((messageType) => ({
-    flow: routed.find((flow) => flow.messageType === messageType) ?? fallback,
-    failed: false,
-  }))
+  return declared.reduce<Routing>(
+    (routing, messageType) => {
+      const flow = routed.find((candidate) => candidate.messageType === messageType)
+
+      if (flow) {
+        routing.outcomes.push({ flow, failed: false })
+      } else {
+        routing.notRouted.push({ messageType })
+      }
+
+      return routing
+    },
+    { outcomes: [], notRouted: [] },
+  )
 }
 
 export function manualSubmissionHandler(
@@ -96,7 +102,16 @@ export function manualSubmissionHandler(
       return unprocessable('No Flow routes Documents from this Channel')
     }
 
-    const outcomes = outcomesOf(body.data.document.content, [first, ...rest]).map((outcome) => ({
+    const { outcomes: routedOutcomes, notRouted } = routingOf(body.data.document.content, [
+      first,
+      ...rest,
+    ])
+
+    if (routedOutcomes.length === 0) {
+      return unprocessable('No Flow on this Channel routes a Message of this Document')
+    }
+
+    const outcomes = routedOutcomes.map((outcome) => ({
       ...outcome,
       tradingPartner: tradingPartners.find(({ id }) => id === outcome.flow.tradingPartnerId),
     }))
@@ -124,7 +139,7 @@ export function manualSubmissionHandler(
       runs.set(run)
     }
 
-    return HttpResponse.json(submitDocumentEndpoint.response.parse({ runs: created }), {
+    return HttpResponse.json(submitDocumentEndpoint.response.parse({ runs: created, notRouted }), {
       status: 201,
     })
   })
