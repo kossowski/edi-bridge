@@ -31,7 +31,6 @@ export const publishedMappingVersionsQuerySchema = z.object({
 
 export type PublishedMappingVersionsQuery = z.infer<typeof publishedMappingVersionsQuerySchema>
 
-// Every published Mapping Version a Flow can pin; a Draft is never listed.
 export const publishedMappingVersionsEndpoint: Endpoint<
   MappingVersionSummary[],
   PublishedMappingVersionsQuery

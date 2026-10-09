@@ -3,8 +3,11 @@ import { http, HttpResponse } from 'msw'
 
 import {
   createFlowEndpoint,
-  type Direction,
+  directionOf,
+  fitsFlow,
   type Flow,
+  type FlowChannelField,
+  flowChannelFields,
   flowEndpoint,
   type FlowInput,
   flowSchema,
@@ -18,7 +21,6 @@ import {
 } from '@edi-bridge/contracts'
 
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
-import { directionOf, messageTypeDirections } from './direction'
 import {
   type MappingCatalogue,
   mappingOfFlow,
@@ -34,10 +36,10 @@ export type FlowRecord = FlowSummary & Omit<FlowInput, keyof FlowSummary>
 const seedSummaries: ReadonlyArray<FlowSummary> = seedTradingPartners
   .filter(hasTraffic)
   .flatMap((tradingPartner, tradingPartnerIndex) =>
-    messageTypeDirections.map(({ messageType, direction }, flowIndex) =>
+    messageTypes.map((messageType, flowIndex) =>
       flowSummarySchema.parse({
-        id: seedId(2, tradingPartnerIndex * messageTypeDirections.length + flowIndex + 1),
-        name: `${tradingPartner.name.split(' ')[0]} ${messageType} ${direction}`,
+        id: seedId(2, tradingPartnerIndex * messageTypes.length + flowIndex + 1),
+        name: `${tradingPartner.name.split(' ')[0]} ${messageType} ${directionOf({ messageType })}`,
         tradingPartnerId: tradingPartner.id,
         messageType,
       }),
@@ -46,29 +48,21 @@ const seedSummaries: ReadonlyArray<FlowSummary> = seedTradingPartners
 
 export const seedMappings: ReadonlyArray<MappingRecord> = seedSummaries.map(mappingOfFlow)
 
-const ownChannel = (direction: Direction) =>
-  seedChannels.find(
-    (channel) => channel.tradingPartnerId === null && channel.direction === direction,
-  )!
-
-function partnerChannel(tradingPartnerId: string, direction: Direction) {
-  return seedChannels.find(
-    (channel) => channel.tradingPartnerId === tradingPartnerId && channel.direction === direction,
-  )!
+function channelsFitting(
+  channels: ReadonlyArray<ChannelRecord>,
+  field: FlowChannelField,
+  flow: Pick<FlowSummary, 'messageType' | 'tradingPartnerId'>,
+) {
+  return channels.filter((channel) => fitsFlow(channel, field, flow))
 }
 
 // Inbound Messages come from the partner's SFTP inbox and go to the ERP; outbound ones come from
 // the ERP's webhook and go to the partner's SFTP outbox.
-function seedRoute({ tradingPartnerId, messageType }: FlowSummary) {
-  return directionOf({ messageType }) === 'inbound'
-    ? {
-        inboundChannelId: partnerChannel(tradingPartnerId, 'inbound').id,
-        destinationChannelId: ownChannel('outbound').id,
-      }
-    : {
-        inboundChannelId: ownChannel('inbound').id,
-        destinationChannelId: partnerChannel(tradingPartnerId, 'outbound').id,
-      }
+function seedFlowChannels(summary: FlowSummary) {
+  return {
+    inboundChannelId: channelsFitting(seedChannels, 'inboundChannelId', summary)[0]!.id,
+    destinationChannelId: channelsFitting(seedChannels, 'destinationChannelId', summary)[0]!.id,
+  }
 }
 
 // Some Flows stay one or two versions behind, so the seed shows Flows with newer versions.
@@ -77,7 +71,7 @@ export const seedFlows: ReadonlyArray<FlowRecord> = seedSummaries.map((summary, 
 
   return {
     ...summary,
-    ...seedRoute(summary),
+    ...seedFlowChannels(summary),
     mappingVersionId: versions[Math.min([0, 1, 0, 2][index % 4]!, versions.length - 1)]!.id,
   }
 })
@@ -96,27 +90,34 @@ export function createFlows({
   const faker = new Faker({ locale: [en], seed })
 
   return Array.from({ length: count }, (_, index) => {
-    const tradingPartner = faker.helpers.arrayElement(seedTradingPartners)
     const messageType = faker.helpers.arrayElement(messageTypes)
 
-    const fits = (direction: Direction) =>
-      channels.filter(
-        (channel) =>
-          channel.direction === direction &&
-          (channel.tradingPartnerId === null || channel.tradingPartnerId === tradingPartner.id),
-      )
+    const tradingPartner = faker.helpers.arrayElement(
+      seedTradingPartners.filter((candidate) =>
+        flowChannelFields.every(
+          (field) =>
+            channelsFitting(channels, field, { messageType, tradingPartnerId: candidate.id })
+              .length > 0,
+        ),
+      ),
+    )
+
+    const flow = { messageType, tradingPartnerId: tradingPartner.id }
 
     const mapping = faker.helpers.arrayElement(
       mappings.filter((candidate) => candidate.messageType === messageType),
     )
 
     return {
+      ...flow,
       id: faker.string.uuid(),
       name: `${tradingPartner.name.split(' ')[0]} ${messageType} ${index + 1}`,
-      tradingPartnerId: tradingPartner.id,
-      messageType,
-      inboundChannelId: faker.helpers.arrayElement(fits('inbound')).id,
-      destinationChannelId: faker.helpers.arrayElement(fits('outbound')).id,
+      inboundChannelId: faker.helpers.arrayElement(
+        channelsFitting(channels, 'inboundChannelId', flow),
+      ).id,
+      destinationChannelId: faker.helpers.arrayElement(
+        channelsFitting(channels, 'destinationChannelId', flow),
+      ).id,
       mappingVersionId: faker.helpers.arrayElement(mapping.versions).id,
     }
   })
@@ -161,30 +162,26 @@ export function toFlowStore(flows: ReadonlyArray<FlowRecord> | FlowStore = seedF
   return 'get' in flows ? flows : createFlowStore(flows)
 }
 
-type RouteCheck = Pick<FlowRecord, 'tradingPartnerId' | 'inboundChannelId' | 'destinationChannelId'>
+const roles = {
+  inboundChannelId: 'inbound Channel',
+  destinationChannelId: 'destination Channel',
+} as const satisfies Record<FlowChannelField, string>
 
-function routeProblem(
-  { tradingPartnerId, inboundChannelId, destinationChannelId }: RouteCheck,
+function channelProblem(
+  flow: Pick<FlowRecord, 'messageType' | 'tradingPartnerId' | FlowChannelField>,
   channels: ChannelStore,
 ) {
-  const ends = [
-    { id: inboundChannelId, direction: 'inbound', role: 'inbound Channel' },
-    { id: destinationChannelId, direction: 'outbound', role: 'destination Channel' },
-  ] as const
-
-  for (const { id, direction, role } of ends) {
-    const channel = channels.get(id)
+  for (const field of flowChannelFields) {
+    const channel = channels.get(flow[field])
 
     if (!channel) {
-      return unprocessable(`The ${role} does not exist`)
+      return unprocessable(`The ${roles[field]} does not exist`)
     }
 
-    if (channel.direction !== direction) {
-      return unprocessable(`The ${role} must be an ${direction} Channel`)
-    }
-
-    if (channel.tradingPartnerId !== null && channel.tradingPartnerId !== tradingPartnerId) {
-      return unprocessable(`The ${role} belongs to another Trading Partner`)
+    if (!fitsFlow(channel, field, flow)) {
+      return unprocessable(
+        `The ${roles[field]} does not fit the Message Type and Trading Partner of the Flow`,
+      )
     }
   }
 
@@ -243,10 +240,10 @@ export function flowHandlers(
 
       const record: FlowRecord = { ...body.data, id: crypto.randomUUID() }
 
-      const invalidRoute = routeProblem(record, channelStore)
+      const invalidChannel = channelProblem(record, channelStore)
 
-      if (invalidRoute) {
-        return invalidRoute
+      if (invalidChannel) {
+        return invalidChannel
       }
 
       store.set(record)
@@ -269,10 +266,10 @@ export function flowHandlers(
       const update: FlowUpdate = body.data
       const record: FlowRecord = { ...existing, ...update }
 
-      const invalidRoute = routeProblem(record, channelStore)
+      const invalidChannel = channelProblem(record, channelStore)
 
-      if (invalidRoute) {
-        return invalidRoute
+      if (invalidChannel) {
+        return invalidChannel
       }
 
       store.set(record)

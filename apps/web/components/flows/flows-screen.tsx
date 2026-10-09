@@ -14,7 +14,7 @@ import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 
 import type { Flow } from '@edi-bridge/contracts'
 
-const columns = ['name', 'tradingPartner', 'messageType', 'route', 'mappingVersion'] as const
+const columns = ['name', 'tradingPartner', 'messageType', 'channels', 'mappingVersion'] as const
 
 type References = ReturnType<typeof useFlowReferences>
 
@@ -44,7 +44,7 @@ function FlowRow({ flow, references }: { flow: Flow; references: References }) {
             aria-hidden
             className="text-muted-foreground size-4"
           />
-          <span className="sr-only">{t('routeTo')}</span>
+          <span className="sr-only">{t('toDestination')}</span>
           <span>{channels.name(flow.destinationChannelId)}</span>
         </span>
       </TableCell>

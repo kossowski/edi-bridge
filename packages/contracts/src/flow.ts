@@ -1,9 +1,11 @@
 import { z } from 'zod'
 
 import { mappingVersionSummarySchema } from './mapping-version'
-import { messageTypeSchema } from './message-type'
+import { directionOf, messageTypeSchema } from './message-type'
 
+import type { ChannelSummary } from './channel'
 import type { Endpoint } from './endpoint'
+import type { Direction } from './run'
 
 export const flowSummarySchema = z.object({
   id: z.uuid(),
@@ -14,7 +16,7 @@ export const flowSummarySchema = z.object({
 
 export type FlowSummary = z.infer<typeof flowSummarySchema>
 
-const flowRoute = {
+const editableFields = {
   name: z.string().trim().min(1).max(70),
   inboundChannelId: z.uuid(),
   destinationChannelId: z.uuid(),
@@ -23,7 +25,7 @@ const flowRoute = {
 // Message Type, Trading Partner and Mapping are fixed once the Flow exists, and the pinned
 // Mapping Version only changes through the explicit move to a newer version.
 export const flowInputSchema = z.object({
-  ...flowRoute,
+  ...editableFields,
   tradingPartnerId: z.uuid(),
   messageType: messageTypeSchema,
   mappingVersionId: z.uuid(),
@@ -31,18 +33,41 @@ export const flowInputSchema = z.object({
 
 export type FlowInput = z.infer<typeof flowInputSchema>
 
-export const flowUpdateSchema = z.object(flowRoute)
+export const flowUpdateSchema = z.object(editableFields)
 
 export type FlowUpdate = z.infer<typeof flowUpdateSchema>
 
 export const flowSchema = flowSummarySchema.extend({
-  ...flowRoute,
+  ...editableFields,
   mappingVersion: mappingVersionSummarySchema,
-  // Published versions of the same Mapping that are newer than the pinned one, newest first.
   newerMappingVersions: z.array(mappingVersionSummarySchema),
 })
 
 export type Flow = z.infer<typeof flowSchema>
+
+export const flowChannelFields = ['inboundChannelId', 'destinationChannelId'] as const
+
+export type FlowChannelField = (typeof flowChannelFields)[number]
+
+const channelDirections = {
+  inboundChannelId: 'inbound',
+  destinationChannelId: 'outbound',
+} as const satisfies Record<FlowChannelField, Direction>
+
+// An inbound Message arrives from the Trading Partner and goes to the company's own systems; an
+// outbound one arrives from the own systems and goes to the Trading Partner.
+export function fitsFlow(
+  channel: Pick<ChannelSummary, 'direction' | 'tradingPartnerId'>,
+  field: FlowChannelField,
+  flow: Pick<FlowSummary, 'messageType' | 'tradingPartnerId'>,
+) {
+  const fromTradingPartner = (directionOf(flow) === 'inbound') === (field === 'inboundChannelId')
+
+  return (
+    channel.direction === channelDirections[field] &&
+    channel.tradingPartnerId === (fromTradingPartner ? flow.tradingPartnerId : null)
+  )
+}
 
 export const moveFlowMappingVersionBodySchema = z.object({ mappingVersionId: z.uuid() })
 

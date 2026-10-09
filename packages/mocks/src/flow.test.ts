@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   createFlowEndpoint,
+  fitsFlow,
   flowEndpoint,
   type FlowInput,
   flowsEndpoint,
@@ -14,7 +15,7 @@ import {
   updateFlowEndpoint,
 } from '@edi-bridge/contracts'
 
-import { seedChannels } from './channel'
+import { type ChannelRecord, seedChannels } from './channel'
 import {
   createFlows,
   createFlowStore,
@@ -36,9 +37,12 @@ afterEach(() => server.resetHandlers())
 
 afterAll(() => server.close())
 
-function use(flows: ReadonlyArray<FlowRecord> = seedFlows) {
+function use(
+  flows: ReadonlyArray<FlowRecord> = seedFlows,
+  channels: ReadonlyArray<ChannelRecord> = seedChannels,
+) {
   server.use(
-    ...flowHandlers(apiUrl, { flows: createFlowStore(flows) }),
+    ...flowHandlers(apiUrl, { flows: createFlowStore(flows), channels }),
     publishedMappingVersionsHandler(apiUrl, seedMappings),
   )
 }
@@ -86,10 +90,17 @@ describe('seed Flows', () => {
     expect(seedFlows.map(({ name }) => name)).toContain('Hansemarkt DESADV outbound')
   })
 
-  it('route inbound Messages from the partner inbox to the ERP', () => {
+  it('take inbound Messages from the partner inbox to the ERP', () => {
     expect(hansemarktOrders).toMatchObject({
       inboundChannelId: channelNamed('Hansemarkt SFTP inbox').id,
       destinationChannelId: channelNamed('ERP HTTP delivery').id,
+    })
+  })
+
+  it('take outbound Messages from the ERP webhook to the partner outbox', () => {
+    expect(seeded('Hansemarkt DESADV outbound')).toMatchObject({
+      inboundChannelId: channelNamed('ERP webhook').id,
+      destinationChannelId: channelNamed('Hansemarkt SFTP outbox').id,
     })
   })
 
@@ -111,6 +122,17 @@ describe('createFlows', () => {
     const response = await send('GET', flowsEndpoint.path)
 
     expect(flowsEndpoint.response.parse(await response.json())).toHaveLength(50)
+  })
+
+  it("picks Channels that follow each Flow's Message Type direction", () => {
+    const byId = new Map(seedChannels.map((channel) => [channel.id, channel]))
+
+    for (const flow of createFlows({ count: 50 })) {
+      expect(fitsFlow(byId.get(flow.inboundChannelId)!, 'inboundChannelId', flow)).toBe(true)
+      expect(fitsFlow(byId.get(flow.destinationChannelId)!, 'destinationChannelId', flow)).toBe(
+        true,
+      )
+    }
   })
 })
 
@@ -159,6 +181,22 @@ describe('POST /flows', () => {
       "another Trading Partner's Channel",
       { inboundChannelId: channelNamed('Alpenfrisch SFTP inbox').id },
     ],
+    [
+      'an own-systems inbound Channel for an inbound Message Type',
+      { inboundChannelId: channelNamed('ERP webhook').id },
+    ],
+    [
+      "the partner's outbound Channel as the destination of an inbound Message Type",
+      { destinationChannelId: channelNamed('Hansemarkt SFTP outbox').id },
+    ],
+    [
+      "the partner's inbound Channel for an outbound Message Type",
+      {
+        messageType: 'DESADV' as const,
+        mappingVersionId: seedMappings.find(({ messageType }) => messageType === 'DESADV')!
+          .versions[0]!.id,
+      },
+    ],
     ['an unpublished Mapping Version', { mappingVersionId: crypto.randomUUID() }],
     [
       'a Mapping Version for another Message Type',
@@ -183,14 +221,20 @@ describe('POST /flows', () => {
 })
 
 describe('PUT /flows/:id', () => {
+  const secondInbox: ChannelRecord = {
+    ...channelNamed('Hansemarkt SFTP inbox'),
+    id: crypto.randomUUID(),
+    name: 'Hansemarkt SFTP inbox 2',
+  }
+
   const update: FlowUpdate = {
     name: 'Hansemarkt orders',
-    inboundChannelId: channelNamed('ERP webhook').id,
+    inboundChannelId: secondInbox.id,
     destinationChannelId: channelNamed('ERP HTTP delivery').id,
   }
 
-  it('changes the route and keeps the pinned Mapping Version', async () => {
-    use()
+  it('changes the Channels and keeps the pinned Mapping Version', async () => {
+    use(seedFlows, [...seedChannels, secondInbox])
     const before = await getFlow(hansemarktOrders.id)
     const path = toPath(updateFlowEndpoint.path, { id: hansemarktOrders.id })
     const response = await send('PUT', path, { ...update, mappingVersionId: ordersVersion.id })
@@ -201,7 +245,7 @@ describe('PUT /flows/:id', () => {
   })
 
   it('rejects a destination that is an inbound Channel', async () => {
-    use()
+    use(seedFlows, [...seedChannels, secondInbox])
     const path = toPath(updateFlowEndpoint.path, { id: hansemarktOrders.id })
 
     const response = await send('PUT', path, {

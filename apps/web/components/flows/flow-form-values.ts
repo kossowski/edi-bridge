@@ -1,7 +1,9 @@
 import {
   type ChannelSummary,
-  type Direction,
+  fitsFlow,
   type Flow,
+  type FlowChannelField,
+  flowChannelFields,
   type FlowInput,
   flowInputSchema,
   type FlowUpdate,
@@ -47,22 +49,31 @@ export function toFormValues(flow?: Flow): FlowFormValues {
   }
 }
 
-// A Channel of the company's own systems serves every Trading Partner; any other Channel only
-// its own one.
-export function fitsTradingPartner(channel: ChannelSummary, tradingPartnerId: string) {
-  return channel.tradingPartnerId === null || channel.tradingPartnerId === tradingPartnerId
-}
-
 export function channelChoices<Channel extends ChannelSummary>(
   channels: ReadonlyArray<Channel>,
-  direction: Direction,
-  tradingPartnerId: string,
+  field: FlowChannelField,
+  values: Pick<FlowFormValues, 'messageType' | 'tradingPartnerId'>,
 ): Channel[] {
   return channels
-    .filter(
-      (channel) => channel.direction === direction && fitsTradingPartner(channel, tradingPartnerId),
-    )
+    .filter((channel) => fitsFlow(channel, field, values))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+}
+
+function keepFittingChannels(
+  values: FlowFormValues,
+  channels: ReadonlyArray<ChannelSummary>,
+): FlowFormValues {
+  const kept = { ...values }
+
+  for (const field of flowChannelFields) {
+    const channel = channels.find((candidate) => candidate.id === values[field])
+
+    if (!channel || !fitsFlow(channel, field, values)) {
+      kept[field] = ''
+    }
+  }
+
+  return kept
 }
 
 export function chooseTradingPartner(
@@ -70,25 +81,18 @@ export function chooseTradingPartner(
   tradingPartnerId: string,
   channels: ReadonlyArray<ChannelSummary>,
 ): FlowFormValues {
-  const keepIfFits = (id: string) => {
-    const channel = channels.find((candidate) => candidate.id === id)
-
-    return channel && fitsTradingPartner(channel, tradingPartnerId) ? id : ''
-  }
-
-  return {
-    ...values,
-    tradingPartnerId,
-    inboundChannelId: keepIfFits(values.inboundChannelId),
-    destinationChannelId: keepIfFits(values.destinationChannelId),
-  }
+  return keepFittingChannels({ ...values, tradingPartnerId }, channels)
 }
 
 // A Mapping Version reads or writes one Message Type, so a new Message Type needs a new choice.
-export function chooseMessageType(values: FlowFormValues, messageType: MessageType) {
+export function chooseMessageType(
+  values: FlowFormValues,
+  messageType: MessageType,
+  channels: ReadonlyArray<ChannelSummary>,
+): FlowFormValues {
   return messageType === values.messageType
     ? values
-    : { ...values, messageType, mappingVersionId: '' }
+    : keepFittingChannels({ ...values, messageType, mappingVersionId: '' }, channels)
 }
 
 function collectErrors(issues: ReadonlyArray<FormIssue>) {

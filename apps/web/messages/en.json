@@ -646,14 +646,14 @@
     "filteredCount": "{count} of {total} Flows",
     "search": "Search by name, Trading Partner, Channel or Mapping",
     "noMatch": "No Flow matches the search.",
-    "routeTo": "to",
+    "toDestination": "to",
     "version": "Version {version}",
     "newerAvailable": "Newer version available",
     "columns": {
       "name": "Name",
       "tradingPartner": "Trading Partner",
       "messageType": "Message Type",
-      "route": "Route",
+      "channels": "Channels",
       "mappingVersion": "Mapping Version"
     },
     "empty": {
@@ -714,7 +714,7 @@
     "editPageTitle": "Edit Flow",
     "backTo": "Back to {name}",
     "sections": {
-      "route": "Route",
+      "channels": "Channels",
       "mappingVersion": "Mapping Version"
     },
     "fields": {
@@ -735,15 +735,15 @@
       },
       "inboundChannel": {
         "label": "Inbound Channel",
-        "description": "Where the Documents arrive: a Channel of this Trading Partner or of your own systems.",
+        "description": "Where the Documents arrive: for an inbound Message Type a Channel of this Trading Partner, for an outbound one a Channel of your own systems.",
         "placeholder": "Choose an inbound Channel",
-        "none": "No inbound Channel fits this Trading Partner. Create one first."
+        "none": "No inbound Channel fits this Trading Partner and Message Type. Create one first."
       },
       "destinationChannel": {
         "label": "Destination Channel",
-        "description": "Where EDI Bridge delivers the mapped Document.",
+        "description": "Where EDI Bridge delivers the mapped Document: for an inbound Message Type a Channel of your own systems, for an outbound one a Channel of this Trading Partner.",
         "placeholder": "Choose a destination Channel",
-        "none": "No outbound Channel fits this Trading Partner. Create one first."
+        "none": "No outbound Channel fits this Trading Partner and Message Type. Create one first."
       },
       "mappingVersion": {
         "label": "Mapping Version",

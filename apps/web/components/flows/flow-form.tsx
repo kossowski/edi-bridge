@@ -28,13 +28,18 @@ import {
   tradingPartnersQuery,
 } from '@/lib/api/queries'
 import {
-  type Direction,
   type Flow,
+  type FlowChannelField,
   type FlowInput,
   type FlowUpdate,
   messageTypes,
 } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
+
+const channelKeys = {
+  inboundChannelId: 'inboundChannel',
+  destinationChannelId: 'destinationChannel',
+} as const satisfies Record<FlowChannelField, string>
 
 type Submission = { create: FlowInput } | { id: string; update: FlowUpdate }
 
@@ -70,8 +75,8 @@ function useChannelItems(values: FlowFormValues) {
   return {
     all: channels.data ?? [],
     isPending: channels.isPending,
-    items: (direction: Direction) =>
-      channelChoices(channels.data ?? [], direction, values.tradingPartnerId).map((channel) => ({
+    items: (field: FlowChannelField) =>
+      channelChoices(channels.data ?? [], field, values).map((channel) => ({
         value: channel.id,
         label: `${channel.name} · ${kindLabel(channel)}`,
       })),
@@ -175,10 +180,9 @@ export function FlowForm({ flow }: { flow?: Flow }) {
     save.mutate(result.submission)
   }
 
-  function channelField(field: 'inboundChannelId' | 'destinationChannelId') {
-    const direction = field === 'inboundChannelId' ? 'inbound' : 'outbound'
-    const key = field === 'inboundChannelId' ? 'inboundChannel' : 'destinationChannel'
-    const items = channels.items(direction)
+  function channelField(field: FlowChannelField) {
+    const key = channelKeys[field]
+    const items = channels.items(field)
     const empty = !channels.isPending && items.length === 0
 
     return (
@@ -246,11 +250,13 @@ export function FlowForm({ flow }: { flow?: Flow }) {
             items={messageTypes.map((messageType) => ({ value: messageType, label: messageType }))}
             label={t('fields.messageType.label')}
             value={values.messageType}
-            onChange={(next) => setValues((current) => chooseMessageType(current, next))}
+            onChange={(next) =>
+              setValues((current) => chooseMessageType(current, next, channels.all))
+            }
           />
         </>
       )}
-      <Fieldset legend={t('sections.route')}>
+      <Fieldset legend={t('sections.channels')}>
         {channelField('inboundChannelId')}
         {channelField('destinationChannelId')}
       </Fieldset>

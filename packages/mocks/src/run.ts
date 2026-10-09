@@ -2,6 +2,7 @@ import { en, Faker, faker as defaultFaker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
 import {
+  directionOf,
   type FailureStage,
   fromSearchParams,
   type MessageType,
@@ -12,7 +13,6 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
-import { directionOf } from './direction'
 import { seedFlows } from './flow'
 import { type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'

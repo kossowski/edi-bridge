@@ -646,14 +646,14 @@
     "filteredCount": "{count} von {total} Flows",
     "search": "Nach Name, Trading Partner, Channel oder Mapping suchen",
     "noMatch": "Kein Flow passt zur Suche.",
-    "routeTo": "nach",
+    "toDestination": "nach",
     "version": "Version {version}",
     "newerAvailable": "Neuere Version verfügbar",
     "columns": {
       "name": "Name",
       "tradingPartner": "Trading Partner",
       "messageType": "Message Type",
-      "route": "Weg",
+      "channels": "Channels",
       "mappingVersion": "Mapping Version"
     },
     "empty": {
@@ -714,7 +714,7 @@
     "editPageTitle": "Flow bearbeiten",
     "backTo": "Zurück zu {name}",
     "sections": {
-      "route": "Weg",
+      "channels": "Channels",
       "mappingVersion": "Mapping Version"
     },
     "fields": {
@@ -735,15 +735,15 @@
       },
       "inboundChannel": {
         "label": "Eingehender Channel",
-        "description": "Wo die Documents ankommen: ein Channel dieses Trading Partners oder Ihrer eigenen Systeme.",
+        "description": "Wo die Documents ankommen: bei einem eingehenden Message Type ein Channel dieses Trading Partners, bei einem ausgehenden ein Channel Ihrer eigenen Systeme.",
         "placeholder": "Eingehenden Channel wählen",
-        "none": "Kein eingehender Channel passt zu diesem Trading Partner. Legen Sie zuerst einen an."
+        "none": "Kein eingehender Channel passt zu diesem Trading Partner und Message Type. Legen Sie zuerst einen an."
       },
       "destinationChannel": {
         "label": "Ziel-Channel",
-        "description": "Wohin EDI Bridge das gemappte Document zustellt.",
+        "description": "Wohin EDI Bridge das gemappte Document zustellt: bei einem eingehenden Message Type ein Channel Ihrer eigenen Systeme, bei einem ausgehenden ein Channel dieses Trading Partners.",
         "placeholder": "Ziel-Channel wählen",
-        "none": "Kein ausgehender Channel passt zu diesem Trading Partner. Legen Sie zuerst einen an."
+        "none": "Kein ausgehender Channel passt zu diesem Trading Partner und Message Type. Legen Sie zuerst einen an."
       },
       "mappingVersion": {
         "label": "Mapping Version",

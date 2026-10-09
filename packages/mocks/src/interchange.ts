@@ -1,6 +1,7 @@
 import type { Faker } from '@faker-js/faker'
 
 import {
+  directionOf,
   type ErrorPosition,
   type InterchangeParty,
   type MessageType,
@@ -11,7 +12,6 @@ import {
   withCheckDigit,
 } from '@edi-bridge/contracts'
 
-import { directionOf } from './direction'
 import { seededFaker } from './seeded-faker'
 import { seedGln } from './trading-partner'
 import { seedWorkspace } from './workspace'

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  directionOf,
   fromSearchParams,
   type MappingVersionSummary,
   mappingVersionSummarySchema,
@@ -9,7 +10,6 @@ import {
   type RunSummary,
 } from '@edi-bridge/contracts'
 
-import { directionOf } from './direction'
 import { badRequest } from './responses'
 import { seededFaker } from './seeded-faker'
 

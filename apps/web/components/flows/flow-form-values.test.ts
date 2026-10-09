@@ -67,17 +67,28 @@ describe('toFormValues', () => {
 })
 
 describe('channelChoices', () => {
-  it("offers own systems' Channels and the Trading Partner's own, by name", () => {
-    expect(channelChoices(channels, 'inbound', hansemarktId).map(({ name }) => name)).toEqual([
-      'ERP webhook',
+  const names = (choices: ReadonlyArray<{ name: string }>) => choices.map(({ name }) => name)
+
+  it("takes an inbound Message Type from the Trading Partner's Channel to own systems", () => {
+    expect(names(channelChoices(channels, 'inboundChannelId', filled))).toEqual([
       'Hansemarkt SFTP inbox',
+    ])
+    expect(names(channelChoices(channels, 'destinationChannelId', filled))).toEqual([
+      'ERP HTTP delivery',
     ])
   })
 
-  it('offers only own systems while no Trading Partner is chosen', () => {
-    expect(channelChoices(channels, 'outbound', '').map(({ name }) => name)).toEqual([
-      'ERP HTTP delivery',
+  it("takes an outbound Message Type from own systems to the Trading Partner's Channel", () => {
+    const desadv = { ...filled, messageType: 'DESADV' } as const
+
+    expect(names(channelChoices(channels, 'inboundChannelId', desadv))).toEqual(['ERP webhook'])
+    expect(names(channelChoices(channels, 'destinationChannelId', desadv))).toEqual([
+      'Hansemarkt SFTP outbox',
     ])
+  })
+
+  it('offers no Trading Partner Channel while no Trading Partner is chosen', () => {
+    expect(channelChoices(channels, 'inboundChannelId', toFormValues())).toEqual([])
   })
 })
 
@@ -93,11 +104,25 @@ describe('chooseTradingPartner', () => {
 
 describe('chooseMessageType', () => {
   it('clears the Mapping Version when the Message Type changes', () => {
-    expect(chooseMessageType(filled, 'INVOIC')).toMatchObject({
-      messageType: 'INVOIC',
+    expect(chooseMessageType(filled, 'CONTRL', channels)).toMatchObject({
+      messageType: 'CONTRL',
       mappingVersionId: '',
     })
-    expect(chooseMessageType(filled, 'ORDERS')).toBe(filled)
+    expect(chooseMessageType(filled, 'ORDERS', channels)).toBe(filled)
+  })
+
+  it('clears the chosen Channels when the direction changes', () => {
+    expect(chooseMessageType(filled, 'INVOIC', channels)).toMatchObject({
+      inboundChannelId: '',
+      destinationChannelId: '',
+    })
+  })
+
+  it('keeps the chosen Channels when the direction stays the same', () => {
+    expect(chooseMessageType(filled, 'CONTRL', channels)).toMatchObject({
+      inboundChannelId: filled.inboundChannelId,
+      destinationChannelId: filled.destinationChannelId,
+    })
   })
 })
 
@@ -122,7 +147,7 @@ describe('validateNewFlow', () => {
 })
 
 describe('validateFlowUpdate', () => {
-  it('sends only the name and the route', () => {
+  it('sends only the name and the Channels', () => {
     expect(validateFlowUpdate(filled)).toEqual({
       input: {
         name: filled.name,

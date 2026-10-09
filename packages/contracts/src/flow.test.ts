@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  fitsFlow,
   type Flow,
   type FlowInput,
   flowInputSchema,
@@ -102,5 +103,30 @@ describe('publishedMappingVersionsQuerySchema', () => {
       messageType: 'INVOIC',
     })
     expect(publishedMappingVersionsQuerySchema.parse({})).toEqual({})
+  })
+})
+
+describe('fitsFlow', () => {
+  const tradingPartnerId = '00000001-0000-4000-8000-000000000001'
+  const otherPartnerId = '00000001-0000-4000-8000-000000000002'
+
+  const channel = (direction: 'inbound' | 'outbound', owner: string | null) => ({
+    direction,
+    tradingPartnerId: owner,
+  })
+
+  it.each([
+    ['ORDERS', 'inboundChannelId', channel('inbound', tradingPartnerId), true],
+    ['ORDERS', 'inboundChannelId', channel('inbound', null), false],
+    ['ORDERS', 'destinationChannelId', channel('outbound', null), true],
+    ['ORDERS', 'destinationChannelId', channel('outbound', tradingPartnerId), false],
+    ['DESADV', 'inboundChannelId', channel('inbound', null), true],
+    ['DESADV', 'inboundChannelId', channel('inbound', tradingPartnerId), false],
+    ['DESADV', 'destinationChannelId', channel('outbound', tradingPartnerId), true],
+    ['DESADV', 'destinationChannelId', channel('outbound', null), false],
+    ['ORDERS', 'inboundChannelId', channel('outbound', tradingPartnerId), false],
+    ['ORDERS', 'inboundChannelId', channel('inbound', otherPartnerId), false],
+  ] as const)('%s %s on %o: %s', (messageType, field, candidate, fits) => {
+    expect(fitsFlow(candidate, field, { messageType, tradingPartnerId })).toBe(fits)
   })
 })

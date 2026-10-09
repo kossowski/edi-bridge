@@ -80,6 +80,35 @@ export const CreateFlow = meta.story({
   },
 })
 
+export const OutboundMessageType = meta.story({
+  async play({ canvas }) {
+    await waitFor(() =>
+      expect(canvas.getByRole('combobox', { name: 'Trading Partner' })).toBeEnabled(),
+    )
+    await choose(canvas.getByRole('combobox', { name: 'Trading Partner' }), 'Hansemarkt GmbH')
+    await choose(
+      canvas.getByRole('combobox', { name: 'Inbound Channel' }),
+      /^Hansemarkt SFTP inbox/,
+    )
+    await choose(canvas.getByRole('combobox', { name: 'Message Type' }), 'DESADV')
+    await expect(canvas.getByRole('combobox', { name: 'Inbound Channel' })).toHaveTextContent(
+      'Choose an inbound Channel',
+    )
+
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Inbound Channel' }))
+    await expect(
+      (await screen.findAllByRole('option')).map((option) => option.textContent),
+    ).toEqual([expect.stringMatching(/^ERP webhook/)])
+    await userEvent.keyboard('{Escape}')
+
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Destination Channel' }))
+    await expect(
+      (await screen.findAllByRole('option')).map((option) => option.textContent),
+    ).toEqual([expect.stringMatching(/^Hansemarkt SFTP outbox/)])
+    await userEvent.keyboard('{Escape}')
+  },
+})
+
 export const ValidationErrors = meta.story({
   async play({ canvas }) {
     await userEvent.click(canvas.getByRole('button', { name: 'Create Flow' }))

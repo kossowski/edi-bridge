@@ -49,7 +49,10 @@ export { controlReferenceSchema, segmentTagSchema } from './edifact'
 
 export {
   createFlowEndpoint,
+  fitsFlow,
   type Flow,
+  type FlowChannelField,
+  flowChannelFields,
   flowEndpoint,
   type FlowInput,
   flowInputSchema,
@@ -86,7 +89,13 @@ export {
   publishedMappingVersionsQuerySchema,
 } from './mapping-version'
 
-export { type MessageType, messageTypeSchema, messageTypes } from './message-type'
+export {
+  directionOf,
+  messageTypeDirections,
+  type MessageType,
+  messageTypeSchema,
+  messageTypes,
+} from './message-type'
 
 export {
   type Direction,
