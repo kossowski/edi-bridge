@@ -16,6 +16,8 @@ export {
   interchangeEndpoint,
   type InterchangeParty,
   interchangePartySchema,
+  type InterchangeRun,
+  interchangeRunSchema,
   interchangeSchema,
 } from './interchange'
 

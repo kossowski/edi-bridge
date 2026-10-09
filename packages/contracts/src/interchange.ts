@@ -12,6 +12,12 @@ export const interchangePartySchema = z.object({
 
 export type InterchangeParty = z.infer<typeof interchangePartySchema>
 
+export const interchangeRunSchema = runSummarySchema.and(
+  z.object({ messageReference: z.string().min(1).max(14) }),
+)
+
+export type InterchangeRun = z.infer<typeof interchangeRunSchema>
+
 export const interchangeSchema = z.object({
   id: z.uuid(),
   controlReference: controlReferenceSchema,
@@ -19,7 +25,7 @@ export const interchangeSchema = z.object({
   sender: interchangePartySchema,
   receiver: interchangePartySchema,
   raw: z.string().min(1),
-  runs: z.array(runSummarySchema),
+  runs: z.array(interchangeRunSchema),
 })
 
 export type Interchange = z.infer<typeof interchangeSchema>
