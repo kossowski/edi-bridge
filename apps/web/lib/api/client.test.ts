@@ -1,9 +1,9 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { createRun, runsHandler } from '@edi-bridge/mocks'
+import { createRun, runDetailHandlers, runsHandler } from '@edi-bridge/mocks'
 
-import { listRuns } from './client'
+import { getRun, listMappingVersions, listRuns, reprocessRun, retryRun } from './client'
 import { apiUrl } from './config'
 
 const server = setupServer()
@@ -46,6 +46,50 @@ const runs = [
     tradingPartner: partnerC,
   }),
 ]
+
+describe('Run detail actions', () => {
+  const deliveryFailure = createRun({
+    id: '00000000-0000-4000-8000-000000000011',
+    messageType: 'ORDERS',
+    status: 'failed',
+    failureStage: 'delivery',
+  })
+
+  const mappingFailure = createRun({
+    id: '00000000-0000-4000-8000-000000000012',
+    messageType: 'ORDERS',
+    status: 'failed',
+    failureStage: 'mapping',
+  })
+
+  it('retries a delivery failure and gets the delivered Run back', async () => {
+    server.use(...runDetailHandlers(apiUrl, { runs: [deliveryFailure] }))
+
+    const run = await retryRun(deliveryFailure.id)
+
+    expect(run).toMatchObject({ id: deliveryFailure.id, status: 'delivered' })
+  })
+
+  it('reprocesses a mapping failure with the chosen Mapping Version', async () => {
+    server.use(...runDetailHandlers(apiUrl, { runs: [mappingFailure] }))
+    const { mappingVersion } = await getRun(mappingFailure.id)
+    const versions = await listMappingVersions(mappingVersion!.mappingId)
+
+    const run = await reprocessRun(mappingFailure.id, { mappingVersionId: versions.at(-1)!.id })
+
+    expect(run.replaces).toEqual({ id: mappingFailure.id })
+    expect(run.mappingVersion).toEqual(versions.at(-1))
+  })
+
+  it('rejects with the response status when an action is not allowed', async () => {
+    server.use(...runDetailHandlers(apiUrl, { runs: [mappingFailure] }))
+
+    await expect(retryRun(mappingFailure.id)).rejects.toMatchObject({
+      status: 409,
+      path: `/runs/${mappingFailure.id}/retry`,
+    })
+  })
+})
 
 describe('listRuns', () => {
   it.each([
