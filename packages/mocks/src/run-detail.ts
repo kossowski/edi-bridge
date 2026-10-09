@@ -136,6 +136,14 @@ export type RunDetailOptions = {
   reprocessed?: ReadonlyArray<{ replaced: string; replacing: string }>
 }
 
+export function interchangeIdOf(run: RunSummary) {
+  return stableUuid(
+    directionOf(run) === 'inbound'
+      ? `interchange:${run.tradingPartner.id}|${run.flow.id}|${run.receivedAt}`
+      : `interchange:${run.id}`,
+  )
+}
+
 function problem(status: number, message: string) {
   return HttpResponse.json({ message }, { status })
 }
@@ -151,8 +159,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   const retried = new Map<string, RunDetail>()
   let indexed = false
 
-  function join(key: string, member: Member) {
-    const id = stableUuid(`interchange:${key}`)
+  function join(id: string, member: Member) {
     const group = groups.get(id) ?? { id, members: [] }
     group.members.push(member)
     groups.set(id, group)
@@ -163,15 +170,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     runs.set(run.id, run)
 
     if (replaced === undefined) {
-      join(
-        directionOf(run) === 'inbound'
-          ? `${run.tradingPartner.id}|${run.flow.id}|${run.receivedAt}`
-          : run.id,
-        { runId: run.id, content: run },
-      )
+      join(interchangeIdOf(run), { runId: run.id, content: run })
     } else if (directionOf(run) === 'outbound') {
       // The replacing Run maps the same ERP Document again, so it produces its own Interchange.
-      join(run.id, {
+      join(interchangeIdOf(run), {
         runId: run.id,
         content: { ...replaced, status: 'delivered', failureStage: null },
       })

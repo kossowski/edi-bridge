@@ -2,7 +2,15 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 
 import type { RunListQuery } from '@edi-bridge/contracts'
 
-import { getCurrentWorkspace, listFlows, listRuns, listTradingPartners } from './client'
+import {
+  getCurrentWorkspace,
+  getInterchange,
+  getRun,
+  listFlows,
+  listMappingVersions,
+  listRuns,
+  listTradingPartners,
+} from './client'
 
 export const currentWorkspaceQuery = queryOptions({
   queryKey: ['workspaces', 'current'],
@@ -14,6 +22,27 @@ export function runsQuery(query: RunListQuery) {
     queryKey: ['runs', 'list', query],
     queryFn: () => listRuns(query),
     placeholderData: keepPreviousData,
+  })
+}
+
+export function runQuery(id: string) {
+  return queryOptions({
+    queryKey: ['runs', 'detail', id],
+    queryFn: () => getRun(id),
+  })
+}
+
+export function interchangeQuery(id: string) {
+  return queryOptions({
+    queryKey: ['interchanges', 'detail', id],
+    queryFn: () => getInterchange(id),
+  })
+}
+
+export function mappingVersionsQuery(mappingId: string) {
+  return queryOptions({
+    queryKey: ['mappings', mappingId, 'versions'],
+    queryFn: () => listMappingVersions(mappingId),
   })
 }
 

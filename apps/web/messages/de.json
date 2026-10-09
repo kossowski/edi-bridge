@@ -122,6 +122,136 @@
   "RunDetail": {
     "title": "Run",
     "back": "Zurück zu den Runs",
-    "placeholder": "Hier erscheinen die Schritt-Zeitleiste, das rohe Interchange und der geparste Baum dieses Runs."
+    "loading": "Run wird geladen",
+    "notFound": {
+      "title": "Run nicht gefunden",
+      "description": "In diesem Workspace gibt es keinen Run mit dieser ID."
+    },
+    "error": {
+      "title": "Run nicht verfügbar",
+      "description": "Der Run konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "facts": {
+      "label": "Details zum Run",
+      "receivedAt": "Empfangen",
+      "tradingPartner": "Trading Partner",
+      "messageType": "Message Type",
+      "direction": "Richtung",
+      "flow": "Flow",
+      "source": "Quelle",
+      "mappingVersion": "Mapping Version",
+      "interchange": "Interchange",
+      "replaces": "Ersetzt",
+      "replacedBy": "Ersetzt durch"
+    },
+    "direction": {
+      "inbound": "Eingehend",
+      "outbound": "Ausgehend"
+    },
+    "mappingVersion": "{mappingName}, Version {version}",
+    "notMapped": "Noch nicht gemappt",
+    "noInterchange": "Noch keines erzeugt",
+    "interchangeLink": "Kontrollreferenz {controlReference}",
+    "runLink": "Run {id}",
+    "failure": {
+      "title": "Fehler",
+      "code": "Code {code}",
+      "segment": "Segment {segment} ({tag})",
+      "element": "Datenelement {element}",
+      "component": "Komponente {component}"
+    },
+    "steps": {
+      "title": "Schritte",
+      "stage": {
+        "receipt": "Empfang",
+        "parse": "Parsen",
+        "validation": "Validierung",
+        "mapping": "Mapping",
+        "delivery": "Zustellung"
+      },
+      "status": {
+        "succeeded": "Erfolgreich",
+        "failed": "Fehlgeschlagen",
+        "running": "Läuft",
+        "pending": "Ausstehend",
+        "skipped": "Übersprungen"
+      },
+      "failedHere": "Failure Stage"
+    },
+    "remedy": {
+      "title": "Abhilfe",
+      "retry": {
+        "description": "Die Zustellung ist fehlgeschlagen. Retry wiederholt den Zustellschritt unverändert.",
+        "button": "Retry",
+        "pending": "Retry läuft",
+        "failed": "Der Retry wurde nicht gestartet. Versuchen Sie es erneut."
+      },
+      "reprocess": {
+        "description": "Das Mapping ist fehlgeschlagen. Reprocess startet einen neuen Run aus dem originalen, unveränderten Document mit der gewählten Mapping Version.",
+        "version": "Mapping Version",
+        "option": "Version {version}, veröffentlicht am {publishedAt}",
+        "used": "{option} (von diesem Run verwendet)",
+        "button": "Reprocess",
+        "pending": "Reprocess läuft",
+        "failed": "Der Reprocess wurde nicht gestartet. Versuchen Sie es erneut.",
+        "versionsUnavailable": "Die Mapping Versions konnten nicht geladen werden."
+      },
+      "awaitingResend": {
+        "title": "Wartet auf erneutes Senden durch den Partner",
+        "description": "Das Interchange von {tradingPartner} ist bei {failureStage} fehlgeschlagen. EDI Bridge hat es mit einem CONTRL abgelehnt. Nur ein korrigiertes erneutes Senden durch den Trading Partner behebt den Fehler."
+      },
+      "replaced": {
+        "description": "Ein Reprocess hat diesen Run ersetzt.",
+        "link": "Ersetzenden Run öffnen"
+      },
+      "none": {
+        "description": "Für einen Run, der in dieser Failure Stage fehlgeschlagen ist, gibt es weder Retry noch Reprocess."
+      }
+    },
+    "raw": {
+      "title": "Rohes Interchange",
+      "label": "Rohes Interchange, ein Segment pro Zeile",
+      "errorPosition": "Fehlerposition",
+      "emptyValue": "leer",
+      "positionMissing": "Die Fehlerposition liegt nicht in diesem Interchange.",
+      "none": "Dieser Run hat noch kein Interchange erzeugt."
+    },
+    "tree": {
+      "title": "Geparste Message",
+      "heading": "Message {reference}, {messageType}",
+      "element": "Datenelement {number}",
+      "component": "Komponente {number}",
+      "empty": "leer",
+      "unparsed": "Die Message konnte nicht geparst werden. Das rohe Interchange zeigt die Fehlerposition.",
+      "none": "Dieser Run hat noch keine geparste Message."
+    }
+  },
+  "Interchange": {
+    "title": "Interchange",
+    "heading": "Interchange {controlReference}",
+    "back": "Zurück zu den Runs",
+    "loading": "Interchange wird geladen",
+    "notFound": {
+      "title": "Interchange nicht gefunden",
+      "description": "In diesem Workspace gibt es kein Interchange mit dieser ID."
+    },
+    "error": {
+      "title": "Interchange nicht verfügbar",
+      "description": "Das Interchange konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "facts": {
+      "label": "Details zum Interchange",
+      "direction": "Richtung",
+      "sender": "Absender",
+      "receiver": "Empfänger",
+      "party": "{name}, GLN {gln}"
+    },
+    "runs": {
+      "title": "Runs",
+      "count": "{count, plural, one {Dieses Interchange hat # Run erzeugt.} other {Dieses Interchange hat # Runs erzeugt.}}",
+      "caption": "Von diesem Interchange erzeugte Runs"
+    }
   }
 }

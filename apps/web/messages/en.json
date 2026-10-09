@@ -122,6 +122,136 @@
   "RunDetail": {
     "title": "Run",
     "back": "Back to Runs",
-    "placeholder": "The step timeline, the raw Interchange and the parsed tree of this Run appear here."
+    "loading": "Loading Run",
+    "notFound": {
+      "title": "Run not found",
+      "description": "No Run with this ID exists in this Workspace."
+    },
+    "error": {
+      "title": "Run unavailable",
+      "description": "The Run could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "facts": {
+      "label": "Run details",
+      "receivedAt": "Received",
+      "tradingPartner": "Trading Partner",
+      "messageType": "Message Type",
+      "direction": "Direction",
+      "flow": "Flow",
+      "source": "Source",
+      "mappingVersion": "Mapping Version",
+      "interchange": "Interchange",
+      "replaces": "Replaces",
+      "replacedBy": "Replaced by"
+    },
+    "direction": {
+      "inbound": "Inbound",
+      "outbound": "Outbound"
+    },
+    "mappingVersion": "{mappingName}, version {version}",
+    "notMapped": "Not mapped yet",
+    "noInterchange": "None produced yet",
+    "interchangeLink": "Control reference {controlReference}",
+    "runLink": "Run {id}",
+    "failure": {
+      "title": "Error",
+      "code": "Code {code}",
+      "segment": "Segment {segment} ({tag})",
+      "element": "element {element}",
+      "component": "component {component}"
+    },
+    "steps": {
+      "title": "Steps",
+      "stage": {
+        "receipt": "Receipt",
+        "parse": "Parse",
+        "validation": "Validation",
+        "mapping": "Mapping",
+        "delivery": "Delivery"
+      },
+      "status": {
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "running": "Running",
+        "pending": "Pending",
+        "skipped": "Skipped"
+      },
+      "failedHere": "Failure Stage"
+    },
+    "remedy": {
+      "title": "Remedy",
+      "retry": {
+        "description": "The delivery failed. Retry repeats the delivery step unchanged.",
+        "button": "Retry",
+        "pending": "Retrying",
+        "failed": "The Retry did not start. Try again."
+      },
+      "reprocess": {
+        "description": "The mapping failed. Reprocess starts a new Run from the original, unmodified Document with the Mapping Version you choose.",
+        "version": "Mapping Version",
+        "option": "Version {version}, published {publishedAt}",
+        "used": "{option} (used by this Run)",
+        "button": "Reprocess",
+        "pending": "Reprocessing",
+        "failed": "The Reprocess did not start. Try again.",
+        "versionsUnavailable": "The Mapping Versions could not be loaded."
+      },
+      "awaitingResend": {
+        "title": "Awaiting resend from partner",
+        "description": "The Interchange from {tradingPartner} failed at {failureStage}. EDI Bridge rejected it with a CONTRL. Only a corrected resend from the Trading Partner fixes it."
+      },
+      "replaced": {
+        "description": "A Reprocess replaced this Run.",
+        "link": "Open the replacing Run"
+      },
+      "none": {
+        "description": "No Retry or Reprocess is available for a Run that failed at this Failure Stage."
+      }
+    },
+    "raw": {
+      "title": "Raw Interchange",
+      "label": "Raw Interchange, one segment per line",
+      "errorPosition": "Error position",
+      "emptyValue": "empty",
+      "positionMissing": "The error position is not inside this Interchange.",
+      "none": "This Run has not produced an Interchange yet."
+    },
+    "tree": {
+      "title": "Parsed Message",
+      "heading": "Message {reference}, {messageType}",
+      "element": "Element {number}",
+      "component": "Component {number}",
+      "empty": "empty",
+      "unparsed": "The Message could not be parsed. The raw Interchange shows the error position.",
+      "none": "This Run has no parsed Message yet."
+    }
+  },
+  "Interchange": {
+    "title": "Interchange",
+    "heading": "Interchange {controlReference}",
+    "back": "Back to Runs",
+    "loading": "Loading Interchange",
+    "notFound": {
+      "title": "Interchange not found",
+      "description": "No Interchange with this ID exists in this Workspace."
+    },
+    "error": {
+      "title": "Interchange unavailable",
+      "description": "The Interchange could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "facts": {
+      "label": "Interchange details",
+      "direction": "Direction",
+      "sender": "Sender",
+      "receiver": "Receiver",
+      "party": "{name}, GLN {gln}"
+    },
+    "runs": {
+      "title": "Runs",
+      "count": "{count, plural, one {This Interchange produced # Run.} other {This Interchange produced # Runs.}}",
+      "caption": "Runs produced by this Interchange"
+    }
   }
 }

@@ -8,7 +8,7 @@ export { flowsHandler, seedFlows } from './flow'
 
 export { createRun, createRuns, runsHandler, seedRuns } from './run'
 
-export { runDetailHandlers, type RunDetailOptions } from './run-detail'
+export { interchangeIdOf, runDetailHandlers, type RunDetailOptions } from './run-detail'
 
 export { seedTradingPartners, tradingPartnersHandler } from './trading-partner'
 
