@@ -8,12 +8,37 @@ export {
 } from './endpoint'
 
 export {
+  type Channel,
+  channelEndpoint,
+  type ChannelInput,
+  channelInputSchema,
+  channelSchema,
   type ChannelSummary,
   channelSummarySchema,
   channelsEndpoint,
   type ChannelType,
   channelTypeSchema,
   channelTypes,
+  type ChannelUpdate,
+  channelUpdateSchema,
+  type CreatedChannel,
+  createChannelEndpoint,
+  createdChannelSchema,
+  type MaskedSecret,
+  maskedSecretSchema,
+  pollingIntervalMinutes,
+  regeneratedWebhookTokenSchema,
+  type RegeneratedWebhookToken,
+  regenerateWebhookTokenEndpoint,
+  secretInputSchema,
+  type SftpAuthentication,
+  sftpAuthenticationSchema,
+  sftpAuthentications,
+  sftpPort,
+  updateChannelEndpoint,
+  webhookPath,
+  webhookRateLimitPerMinute,
+  webhookTokenSchema,
 } from './channel'
 
 export { controlReferenceSchema, segmentTagSchema } from './edifact'

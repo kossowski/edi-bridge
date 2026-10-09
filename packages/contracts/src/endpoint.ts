@@ -20,7 +20,7 @@ export type Endpoint<
   path: Path
   response: z.ZodType<Response>
 } & (Query extends QueryParams ? { query: z.ZodType<Query, unknown> } : { query?: undefined }) &
-  (Body extends undefined ? { body?: undefined } : { body: z.ZodType<Body> })
+  ([Body] extends [undefined] ? { body?: undefined } : { body: z.ZodType<Body> })
 
 export function toPath<Path extends string>(path: Path, params: PathParams<Path>): string {
   const values: Readonly<Record<string, string>> = params
