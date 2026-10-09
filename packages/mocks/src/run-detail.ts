@@ -190,6 +190,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   const chosenVersions = new Map<string, MappingVersionSummary>()
   const retried = new Map<string, RunDetail>()
   let indexed = false
+  let indexedCount = 0
 
   function join(run: RunSummary, member: Member) {
     const key = bundleKeyOf(run)
@@ -216,8 +217,25 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     }
   }
 
+  // Manual Submissions add Runs to the shared store after the first lookup.
+  function indexAdded() {
+    const all = runs.all()
+
+    for (let index = indexedCount; index < all.length; index++) {
+      const run = all[index]!
+
+      if (!groupOf.has(run.id)) {
+        join(run, { runId: run.id, run })
+      }
+    }
+
+    indexedCount = all.length
+  }
+
   function ensureIndexed() {
     if (indexed) {
+      indexAdded()
+
       return
     }
 
@@ -243,6 +261,8 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
         add(run, replaced)
       }
     }
+
+    indexedCount = runs.all().length
   }
 
   function generate(group: Group): GeneratedGroup {

@@ -81,6 +81,17 @@ export {
 } from './interchange'
 
 export {
+  documentSchema,
+  type ManualSubmission,
+  type ManualSubmissionInput,
+  manualSubmissionInputSchema,
+  manualSubmissionSchema,
+  maxDocumentLength,
+  submitDocumentEndpoint,
+  type SubmittedDocument,
+} from './manual-submission'
+
+export {
   type MappingVersionSummary,
   mappingVersionSummarySchema,
   mappingVersionsEndpoint,
