@@ -38,7 +38,15 @@ mkdirSync(screenshots, { recursive: true })
 
 const repo = () =>
   values.repo ?? execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
-const server = values['base-url'] ? null : await startDevServer(repo())
+let server = null
+if (!values['base-url']) {
+  try {
+    server = await startDevServer(repo())
+  } catch (error) {
+    console.error(error.message)
+    process.exit(2)
+  }
+}
 const baseUrl = values['base-url'] ?? server.baseUrl
 
 const slug = (route) => (route === '/' ? 'root' : route.replace(/^\//, '').replaceAll('/', '_'))

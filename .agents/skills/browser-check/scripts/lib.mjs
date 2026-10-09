@@ -23,7 +23,13 @@ export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
   const child = spawn(
     'pnpm',
     ['--filter', '@edi-bridge/web', 'exec', 'next', 'dev', '--port', String(port)],
-    { cwd: repo, detached: true, stdio: ['ignore', 'pipe', 'pipe'] },
+    {
+      cwd: repo,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // apps/api doesn't serve the screens' endpoints yet, so the pages get their data from MSW.
+      env: { ...process.env, NEXT_PUBLIC_API_MOCKING: 'enabled' },
+    },
   )
   let log = ''
   child.stdout.on('data', (chunk) => (log += chunk))
@@ -61,6 +67,15 @@ export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
       await stop()
+      // Next refuses a second dev server for the same app directory.
+      const running = log.match(/Another next dev server is already running[\s\S]*?Local:\s+(\S+)/)
+      if (running) {
+        throw new Error(
+          `A next dev server already runs for ${repo} at ${running[1]}. ` +
+            `Pass --base-url ${running[1]} if it runs with NEXT_PUBLIC_API_MOCKING=enabled, ` +
+            `or run the check against a worktree.`,
+        )
+      }
       throw new Error(`next dev exited with code ${child.exitCode}:\n${log}`)
     }
     try {
@@ -95,9 +110,17 @@ export async function openPage(browser, { baseUrl, width = 1440, height = 900, t
   return { context, page, consoleErrors }
 }
 
-export async function gotoSettled(page, url, theme) {
+export async function gotoSettled(page, url, theme, { timeoutMs = 20_000 } = {}) {
   const response = await page.goto(url, { waitUntil: 'load' })
   await page.waitForFunction((value) => document.documentElement.classList.contains(value), theme)
+  // Mock data arrives after the load event. Screens mark their loading state with aria-busy.
+  try {
+    await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), null, {
+      timeout: timeoutMs,
+    })
+  } catch {
+    throw new Error(`page still loading after ${timeoutMs} ms: an element keeps aria-busy="true"`)
+  }
   return response
 }
 
