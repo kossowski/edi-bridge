@@ -12,6 +12,8 @@ export {
   channelEndpoint,
   type ChannelInput,
   channelInputSchema,
+  type ChannelKind,
+  channelKinds,
   channelSchema,
   type ChannelSummary,
   channelSummarySchema,
@@ -36,8 +38,10 @@ export {
   sftpAuthentications,
   sftpPort,
   updateChannelEndpoint,
+  webhookAuthorization,
   webhookPath,
   webhookRateLimitPerMinute,
+  webhookTokenHeader,
   webhookTokenSchema,
 } from './channel'
 

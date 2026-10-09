@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { directionSchema } from './run'
+import { type Direction, directionSchema } from './run'
 
 import type { Endpoint } from './endpoint'
 
@@ -25,6 +25,13 @@ export const sftpPort = { min: 1, max: 65_535, default: 22 } as const
 export const webhookTokenSchema = z.string().regex(/^whk_[A-Za-z0-9]{32}$/)
 
 export const webhookPath = '/webhooks/:id'
+
+// How a sender presents the webhook token: `Authorization: Bearer whk_…`.
+export const webhookTokenHeader = 'Authorization'
+
+export function webhookAuthorization(token: string) {
+  return `Bearer ${token}`
+}
 
 // Write-only: accepted in requests, never returned. Responses carry a maskedSecretSchema instead.
 export const secretInputSchema = z.string().min(1).max(16_384)
@@ -53,13 +60,11 @@ const sftpConnection = {
   authentication: sftpAuthenticationSchema,
 }
 
-const sftpPolling = {
-  pollingIntervalMinutes: z
-    .number()
-    .int()
-    .min(pollingIntervalMinutes.min)
-    .max(pollingIntervalMinutes.max),
-}
+const pollingIntervalSchema = z
+  .number()
+  .int()
+  .min(pollingIntervalMinutes.min)
+  .max(pollingIntervalMinutes.max)
 
 const webhookRateLimit = {
   rateLimitPerMinute: z
@@ -73,104 +78,119 @@ const httpDestination = {
   url: z.url({ protocol: /^https?$/ }),
 }
 
-const inboundSftp = { type: z.literal('sftp'), direction: z.literal('inbound') }
+const inboundSftp = { type: 'sftp', direction: 'inbound' } as const
 
-const outboundSftp = { type: z.literal('sftp'), direction: z.literal('outbound') }
+const outboundSftp = { type: 'sftp', direction: 'outbound' } as const
 
-const inboundWebhook = { type: z.literal('webhook'), direction: z.literal('inbound') }
+const inboundWebhook = { type: 'webhook', direction: 'inbound' } as const
 
-const outboundHttp = { type: z.literal('http'), direction: z.literal('outbound') }
+const outboundHttp = { type: 'http', direction: 'outbound' } as const
 
-export const channelInputSchema = z.discriminatedUnion('type', [
-  z.discriminatedUnion('direction', [
-    z.object({
-      ...inboundSftp,
+export const channelKinds = [
+  inboundSftp,
+  outboundSftp,
+  inboundWebhook,
+  outboundHttp,
+] as const satisfies ReadonlyArray<{ type: ChannelType; direction: Direction }>
+
+export type ChannelKind = (typeof channelKinds)[number]
+
+function literals<Type extends ChannelType, Way extends Direction>({
+  type,
+  direction,
+}: {
+  type: Type
+  direction: Way
+}) {
+  return { type: z.literal(type), direction: z.literal(direction) }
+}
+
+// Requests, updates and responses differ only in these parts, so all three share one shape.
+function channelUnion<
+  Config extends z.core.$ZodObjectConfig,
+  Common extends Record<string, z.ZodType>,
+  Credential extends z.ZodType,
+  PollingInterval extends z.ZodType,
+  Webhook extends Record<string, z.ZodType>,
+  Authorization extends z.ZodType,
+>(
+  object: <Fields extends Record<string, z.ZodType>>(
+    fields: Fields,
+  ) => z.ZodObject<z.core.util.Writeable<Fields>, Config>,
+  parts: {
+    common: Common
+    credential: Credential
+    pollingInterval: PollingInterval
+    webhook: Webhook
+    authorization: Authorization
+  },
+) {
+  const { common, credential, pollingInterval, webhook, authorization } = parts
+
+  return z.discriminatedUnion('type', [
+    z.discriminatedUnion('direction', [
+      object({
+        ...common,
+        ...literals(inboundSftp),
+        ...channelIdentity,
+        ...sftpConnection,
+        pollingIntervalMinutes: pollingInterval,
+        credential,
+      }),
+      object({
+        ...common,
+        ...literals(outboundSftp),
+        ...channelIdentity,
+        ...sftpConnection,
+        credential,
+      }),
+    ]),
+    object({
+      ...common,
+      ...literals(inboundWebhook),
       ...channelIdentity,
-      ...sftpConnection,
-      ...sftpPolling,
-      credential: secretInputSchema,
+      ...webhookRateLimit,
+      ...webhook,
     }),
-    z.object({
-      ...outboundSftp,
+    object({
+      ...common,
+      ...literals(outboundHttp),
       ...channelIdentity,
-      ...sftpConnection,
-      credential: secretInputSchema,
+      ...httpDestination,
+      authorization,
     }),
-  ]),
-  z.object({ ...inboundWebhook, ...channelIdentity, ...webhookRateLimit }),
-  z.object({
-    ...outboundHttp,
-    ...channelIdentity,
-    ...httpDestination,
-    authorization: secretInputSchema.nullable(),
-  }),
-])
+  ])
+}
+
+export const channelInputSchema = channelUnion(z.object, {
+  common: {},
+  credential: secretInputSchema,
+  pollingInterval: pollingIntervalSchema.default(pollingIntervalMinutes.default),
+  webhook: {},
+  authorization: secretInputSchema.nullable(),
+})
 
 export type ChannelInput = z.infer<typeof channelInputSchema>
 
 // Omitting a secret keeps the stored one; for HTTP, null removes the Authorization header.
-export const channelUpdateSchema = z.discriminatedUnion('type', [
-  z.discriminatedUnion('direction', [
-    z.object({
-      ...inboundSftp,
-      ...channelIdentity,
-      ...sftpConnection,
-      ...sftpPolling,
-      credential: secretInputSchema.optional(),
-    }),
-    z.object({
-      ...outboundSftp,
-      ...channelIdentity,
-      ...sftpConnection,
-      credential: secretInputSchema.optional(),
-    }),
-  ]),
-  z.object({ ...inboundWebhook, ...channelIdentity, ...webhookRateLimit }),
-  z.object({
-    ...outboundHttp,
-    ...channelIdentity,
-    ...httpDestination,
-    authorization: secretInputSchema.nullable().optional(),
-  }),
-])
+export const channelUpdateSchema = channelUnion(z.object, {
+  common: {},
+  credential: secretInputSchema.optional(),
+  pollingInterval: pollingIntervalSchema,
+  webhook: {},
+  authorization: secretInputSchema.nullable().optional(),
+})
 
 export type ChannelUpdate = z.infer<typeof channelUpdateSchema>
 
 // Strict objects, so a response that leaks a plaintext secret fails to parse.
-export const channelSchema = z.discriminatedUnion('type', [
-  z.discriminatedUnion('direction', [
-    z.strictObject({
-      id: z.uuid(),
-      ...inboundSftp,
-      ...channelIdentity,
-      ...sftpConnection,
-      ...sftpPolling,
-      credential: maskedSecretSchema,
-    }),
-    z.strictObject({
-      id: z.uuid(),
-      ...outboundSftp,
-      ...channelIdentity,
-      ...sftpConnection,
-      credential: maskedSecretSchema,
-    }),
-  ]),
-  z.strictObject({
-    id: z.uuid(),
-    ...inboundWebhook,
-    ...channelIdentity,
-    ...webhookRateLimit,
-    url: z.url(),
-    token: maskedSecretSchema,
-  }),
-  z.strictObject({
-    id: z.uuid(),
-    ...outboundHttp,
-    ...channelIdentity,
-    ...httpDestination,
-    authorization: maskedSecretSchema.nullable(),
-  }),
-])
+export const channelSchema = channelUnion(z.strictObject, {
+  common: { id: z.uuid() },
+  credential: maskedSecretSchema,
+  pollingInterval: pollingIntervalSchema,
+  webhook: { url: z.url(), token: maskedSecretSchema },
+  authorization: maskedSecretSchema.nullable(),
+})
 
 export type Channel = z.infer<typeof channelSchema>
 
@@ -200,7 +220,7 @@ export const regeneratedWebhookTokenSchema = z.strictObject({
 
 export type RegeneratedWebhookToken = z.infer<typeof regeneratedWebhookTokenSchema>
 
-export const channelsEndpoint: Endpoint<Channel[], undefined, undefined, '/channels'> = {
+export const channelsEndpoint: Endpoint<Channel[]> = {
   method: 'GET',
   path: '/channels',
   response: z.array(channelSchema),

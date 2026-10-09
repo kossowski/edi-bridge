@@ -4,10 +4,13 @@ import {
   type Channel,
   type ChannelInput,
   channelInputSchema,
+  channelKinds,
   channelSchema,
   channelSummarySchema,
   channelUpdateSchema,
   createdChannelSchema,
+  webhookAuthorization,
+  webhookTokenHeader,
   webhookTokenSchema,
 } from './channel'
 
@@ -98,6 +101,20 @@ describe('channelInputSchema', () => {
     expect(channelInputSchema.safeParse(input).success).toBe(false)
   })
 
+  it('lists the four Channel kinds the schema accepts', () => {
+    const inputs = [inboundSftp, outboundSftp, webhook, http]
+
+    expect(inputs.map(({ type, direction }) => ({ type, direction }))).toEqual(channelKinds)
+  })
+
+  it('polls every minute when the polling interval is omitted', () => {
+    const withoutPollingInterval = { ...inboundSftp, pollingIntervalMinutes: undefined }
+
+    expect(channelInputSchema.parse(withoutPollingInterval)).toMatchObject({
+      pollingIntervalMinutes: 1,
+    })
+  })
+
   it('requires the SFTP credential when creating a Channel', () => {
     const withoutCredential = { ...inboundSftp, credential: undefined }
 
@@ -179,6 +196,16 @@ describe('channelSchema', () => {
       type: 'sftp',
       direction: 'inbound',
       tradingPartnerId,
+    })
+  })
+})
+
+describe('webhookAuthorization', () => {
+  it('presents the webhook token as a bearer token in the Authorization header', () => {
+    const webhookToken = `whk_${'Ab1'.repeat(10)}a1`
+
+    expect({ [webhookTokenHeader]: webhookAuthorization(webhookToken) }).toEqual({
+      Authorization: `Bearer ${webhookToken}`,
     })
   })
 })
