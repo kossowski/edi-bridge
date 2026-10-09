@@ -12,17 +12,18 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
-import { outboundMessageTypes, seedFlows } from './flow'
+import { directionOf, seedFlows } from './flow'
 import { seedTradingPartners } from './trading-partner'
 
 function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
   // Outbound Documents come from the ERP as JSON or CSV, so they never fail at EDIFACT parsing.
   // A CONTRL is linked to its Interchange, not mapped, so no Mapping Version could fix it.
-  const stages: FailureStage[] = outboundMessageTypes.includes(messageType)
-    ? ['mapping', 'validation', 'delivery']
-    : messageType === 'CONTRL'
-      ? ['parse', 'validation', 'delivery']
-      : ['parse', 'validation', 'mapping', 'delivery']
+  const stages: FailureStage[] =
+    directionOf({ messageType }) === 'outbound'
+      ? ['mapping', 'validation', 'delivery']
+      : messageType === 'CONTRL'
+        ? ['parse', 'validation', 'delivery']
+        : ['parse', 'validation', 'mapping', 'delivery']
 
   return faker.helpers.arrayElement(stages)
 }

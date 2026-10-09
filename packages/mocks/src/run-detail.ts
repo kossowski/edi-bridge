@@ -19,8 +19,8 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
+import { directionOf } from './flow'
 import {
-  directionOf,
   type GeneratedInterchange,
   type GeneratedMessage,
   generateMessage,
@@ -29,7 +29,8 @@ import {
 } from './interchange'
 import { mappingVersionsForFlow } from './mapping-version'
 import { seedRuns } from './run'
-import { seededFaker, stableUuid } from './seed-id'
+import { stableUuid } from './seed-id'
+import { seededFaker } from './seeded-faker'
 
 const stepDurations: Readonly<Record<RunStepStage, readonly [number, number]>> = {
   receipt: [20, 200],
@@ -122,7 +123,7 @@ function pinnedVersion(run: RunSummary) {
   )
 }
 
-type Member = { runId: string; content: RunSummary }
+type Member = { runId: string; run: RunSummary }
 
 type Group = { id: string; members: Member[] }
 
@@ -202,12 +203,12 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     runs.set(run.id, run)
 
     if (replaced === undefined) {
-      join(run, { runId: run.id, content: run })
+      join(run, { runId: run.id, run })
     } else if (directionOf(run) === 'outbound') {
       // The replacing Run maps the same ERP Document again, so it produces its own Interchange.
       join(run, {
         runId: run.id,
-        content: { ...replaced, status: 'delivered', failureStage: null },
+        run: { ...replaced, status: 'delivered', failureStage: null },
       })
     } else {
       groupOf.set(run.id, groupOf.get(replaced.id)!)
@@ -249,12 +250,12 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       return cached
     }
 
-    const first = group.members[0]!.content
+    const first = group.members[0]!.run
 
     const messages = new Map(
-      group.members.map(({ runId, content }, position) => [
+      group.members.map(({ runId, run }, position) => [
         runId,
-        generateMessage(content, String(position + 1)),
+        generateMessage(run, String(position + 1)),
       ]),
     )
 
@@ -383,7 +384,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       return undefined
     }
 
-    const first = group.members[0]!.content
+    const first = group.members[0]!.run
 
     const produced = [...groupOf].flatMap(([runId, runGroup]) =>
       runGroup === group ? [runId] : [],

@@ -485,11 +485,9 @@ describe('GET /interchanges/:id', () => {
   })
 
   it('keeps the id of an inbound Interchange when the seed is generated on another page load', async () => {
-    const [earlier, later] = ['2026-10-01T08:00:00.000Z', '2026-10-02T17:30:00.000Z'].map((now) =>
-      createRuns({ count: 50, now: new Date(now) }),
-    )
-
-    const inbound = earlier!.find(({ messageType }) => messageType === 'ORDERS')!
+    const earlier = createRuns({ count: 50, now: new Date('2026-10-01T08:00:00.000Z') })
+    const later = createRuns({ count: 50, now: new Date('2026-10-02T17:30:00.000Z') })
+    const inbound = earlier.find(({ messageType }) => messageType === 'ORDERS')!
     server.use(...runDetailHandlers(apiUrl, { runs: earlier }))
     const { body } = await getRun(inbound.id)
     server.resetHandlers(...runDetailHandlers(apiUrl, { runs: later }))

@@ -1,7 +1,6 @@
 import type { Faker } from '@faker-js/faker'
 
 import {
-  type Direction,
   type ErrorPosition,
   type InterchangeParty,
   type MessageType,
@@ -11,8 +10,9 @@ import {
   type RunSummary,
 } from '@edi-bridge/contracts'
 
-import { isOutbound } from './flow'
-import { seededFaker, withCheckDigit } from './seed-id'
+import { withCheckDigit } from './check-digit'
+import { directionOf } from './flow'
+import { seededFaker } from './seeded-faker'
 import { seedWorkspace } from './workspace'
 
 type Segment = { tag: string; elements: string[][] }
@@ -64,17 +64,15 @@ export const ownCompany: InterchangeParty = {
   name: seedWorkspace.name,
 }
 
-export function partnerParty(partner: RunSummary['tradingPartner']): InterchangeParty {
-  const faker = seededFaker(`gln:${partner.id}`)
+export function tradingPartnerParty(
+  tradingPartner: RunSummary['tradingPartner'],
+): InterchangeParty {
+  const faker = seededFaker(`gln:${tradingPartner.id}`)
 
   return {
     gln: withCheckDigit(`02${faker.string.numeric({ length: 10, allowLeadingZeros: true })}`),
-    name: partner.name,
+    name: tradingPartner.name,
   }
-}
-
-export function directionOf(run: Pick<RunSummary, 'messageType'>): Direction {
-  return isOutbound(run.messageType) ? 'outbound' : 'inbound'
 }
 
 function seg(tag: string, ...elements: Array<string | string[]>): Segment {
@@ -99,8 +97,9 @@ function businessSegments(faker: Faker, run: RunSummary, parties: Parties): Segm
     price: faker.number.float({ min: 0.5, max: 80, fractionDigits: 2 }),
   }))
 
-  const buyer = isOutbound(run.messageType) ? parties.receiver : parties.sender
-  const supplier = isOutbound(run.messageType) ? parties.sender : parties.receiver
+  const outbound = directionOf(run) === 'outbound'
+  const buyer = outbound ? parties.receiver : parties.sender
+  const supplier = outbound ? parties.sender : parties.receiver
 
   switch (run.messageType) {
     case 'ORDERS': {
@@ -188,7 +187,7 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
     return { segments, fault: null }
   }
 
-  const outbound = isOutbound(run.messageType)
+  const outbound = directionOf(run) === 'outbound'
 
   switch (run.failureStage) {
     case 'parse': {
@@ -311,7 +310,7 @@ function errorFor(run: RunSummary, faker: Faker, fault: Fault | null): RunError 
     }
   }
 
-  return isOutbound(run.messageType)
+  return directionOf(run) === 'outbound'
     ? {
         code: 'destinationUnreachable',
         message: `The SFTP server of ${run.tradingPartner.name} refused the connection (ECONNREFUSED).`,
@@ -327,11 +326,11 @@ function errorFor(run: RunSummary, faker: Faker, fault: Fault | null): RunError 
 type Parties = { sender: InterchangeParty; receiver: InterchangeParty }
 
 export function partiesOf(run: RunSummary): Parties {
-  const partner = partnerParty(run.tradingPartner)
+  const tradingPartner = tradingPartnerParty(run.tradingPartner)
 
-  return isOutbound(run.messageType)
-    ? { sender: ownCompany, receiver: partner }
-    : { sender: partner, receiver: ownCompany }
+  return directionOf(run) === 'outbound'
+    ? { sender: ownCompany, receiver: tradingPartner }
+    : { sender: tradingPartner, receiver: ownCompany }
 }
 
 export function generateMessage(run: RunSummary, reference: string): GeneratedMessage {
