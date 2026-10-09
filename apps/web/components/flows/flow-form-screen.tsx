@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { BackLink } from '@/components/detail-parts'
 import { EditScreen } from '@/components/edit-screen'
 import { FlowForm } from '@/components/flows/flow-form'
+import { useFlowReferences } from '@/components/flows/flow-parts'
 import { flowQuery } from '@/lib/api/queries'
 
 export function NewFlowScreen() {
@@ -22,9 +23,15 @@ export function NewFlowScreen() {
 
 export function EditFlowScreen({ id }: { id: string }) {
   const query = useQuery(flowQuery(id))
+  const references = useFlowReferences()
 
   return (
-    <EditScreen detailHref={`/flows/${id}`} listHref="/flows" namespace="Flow" query={query}>
+    <EditScreen
+      busy={references.isPending}
+      detailHref={`/flows/${id}`}
+      listHref="/flows"
+      namespace="Flow"
+      query={query}>
       {(flow) => <FlowForm flow={flow} />}
     </EditScreen>
   )

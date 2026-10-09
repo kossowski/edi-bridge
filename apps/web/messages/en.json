@@ -745,6 +745,7 @@
         "placeholder": "Choose a destination Channel",
         "none": "No outbound Channel fits this Trading Partner and Message Type. Create one first."
       },
+      "channelsLoading": "Loading Channels…",
       "mappingVersion": {
         "label": "Mapping Version",
         "description": "Only a published Mapping Version can be pinned, never a Draft. The Flow keeps this version until you move it to a newer one.",

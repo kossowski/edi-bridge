@@ -745,6 +745,7 @@
         "placeholder": "Ziel-Channel wählen",
         "none": "Kein ausgehender Channel passt zu diesem Trading Partner und Message Type. Legen Sie zuerst einen an."
       },
+      "channelsLoading": "Channels werden geladen…",
       "mappingVersion": {
         "label": "Mapping Version",
         "description": "Festlegen lässt sich nur eine veröffentlichte Mapping Version, nie ein Draft. Der Flow behält diese Version, bis Sie ihn auf eine neuere umstellen.",

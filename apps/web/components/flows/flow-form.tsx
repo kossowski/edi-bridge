@@ -193,7 +193,9 @@ export function FlowForm({ flow }: { flow?: Flow }) {
         error={messageFor(field)}
         items={items}
         label={t(`fields.${key}.label`)}
-        placeholder={t(`fields.${key}.placeholder`)}
+        placeholder={
+          channels.isPending ? t('fields.channelsLoading') : t(`fields.${key}.placeholder`)
+        }
         value={values[field] === '' ? null : values[field]}
         onChange={(next) => setValues((current) => ({ ...current, [field]: next }))}
       />

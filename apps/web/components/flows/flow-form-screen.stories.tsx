@@ -7,6 +7,7 @@ import { EditFlowScreen, NewFlowScreen } from '@/components/flows/flow-form-scre
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import {
+  channelsEndpoint,
   flowEndpoint,
   publishedMappingVersionsEndpoint,
   updateFlowEndpoint,
@@ -202,6 +203,27 @@ export const EditLoading = meta.story({
   },
   async play({ canvas }) {
     await expect(canvas.getByText('Loading Flow')).toBeInTheDocument()
+  },
+})
+
+export const EditChannelsLoading = meta.story({
+  render: () => <EditFlowScreen id={ordersFlow.id} />,
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${channelsEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByLabelText('Name')).toHaveValue('Hansemarkt ORDERS inbound')
+    await expect(canvas.getByRole('combobox', { name: 'Inbound Channel' })).toHaveTextContent(
+      'Loading Channels…',
+    )
+    await expect(canvas.getByRole('combobox', { name: 'Destination Channel' })).toHaveTextContent(
+      'Loading Channels…',
+    )
+    await expect(canvasElement.querySelector('[aria-busy="true"]')).not.toBeNull()
   },
 })
 
