@@ -6,8 +6,12 @@ import {
   channelsEndpoint,
   createChannelEndpoint,
   createFlowEndpoint,
+  documentStructureEndpoint,
   type FlowInput,
+  mappingDraftEndpoint,
+  mappingsEndpoint,
   mappingVersionsEndpoint,
+  messageTypeStructureEndpoint,
   type ReprocessRunBody,
   reprocessRunEndpoint,
   retryRunEndpoint,
@@ -192,5 +196,29 @@ describe('createHandlers', () => {
       failureStage: 'parse',
       direction: 'inbound',
     })
+  })
+
+  it('serves the Mapping canvas with both of its trees', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const mappings = mappingsEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${mappingsEndpoint.path}`)).json(),
+    )
+
+    const inbound = mappings.find(({ direction }) => direction === 'inbound')!
+
+    const draft = mappingDraftEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${toPath(mappingDraftEndpoint.path, inbound)}`)).json(),
+    )
+
+    const trees = await Promise.all([
+      fetch(`${apiUrl}${toPath(messageTypeStructureEndpoint.path, inbound)}`),
+      fetch(
+        `${apiUrl}${toPath(documentStructureEndpoint.path, { id: inbound.documentStructureId })}`,
+      ),
+    ])
+
+    expect(draft.mappingId).toBe(inbound.id)
+    expect(trees.map(({ status }) => status)).toEqual([200, 200])
   })
 })
