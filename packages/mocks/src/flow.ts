@@ -23,6 +23,10 @@ export const outboundMessageTypes: ReadonlyArray<MessageType> = flowTemplates.fl
   ({ messageType, direction }) => (direction === 'outbound' ? [messageType] : []),
 )
 
+export function isOutbound(messageType: MessageType) {
+  return outboundMessageTypes.includes(messageType)
+}
+
 export const seedFlows: ReadonlyArray<FlowSummary> = seedTradingPartners.flatMap(
   (partner, partnerIndex) =>
     flowTemplates.map(({ messageType, direction }, flowIndex) =>

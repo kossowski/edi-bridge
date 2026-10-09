@@ -69,9 +69,28 @@ export function createRuns({
   const faker = new Faker({ locale: [en], seed })
   const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 
-  return Array.from({ length: count }, () =>
-    runSummarySchema.parse(generateRun(faker, faker.date.between({ from, to: now }))),
-  )
+  const runs: RunSummary[] = []
+
+  while (runs.length < count) {
+    const run = generateRun(faker, faker.date.between({ from, to: now }))
+
+    // Retailers often bundle several ORDERS into one Interchange, which is split into one Run each.
+    const bundled =
+      run.messageType === 'ORDERS' && faker.datatype.boolean({ probability: 0.2 })
+        ? faker.number.int({ min: 1, max: 3 })
+        : 0
+
+    const siblings = Array.from({ length: bundled }, () => ({
+      ...generateRun(faker, new Date(run.receivedAt)),
+      tradingPartner: run.tradingPartner,
+      messageType: run.messageType,
+      flow: run.flow,
+    }))
+
+    runs.push(...[run, ...siblings].map((item) => runSummarySchema.parse(item)))
+  }
+
+  return runs.slice(0, count)
 }
 
 let seedRunsCache: RunSummary[] | undefined
