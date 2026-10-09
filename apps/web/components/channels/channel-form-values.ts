@@ -55,33 +55,41 @@ export type FieldError = 'required' | 'tooLong' | 'range' | 'format'
 export type ChannelFormResult<Input> =
   { input: Input } | { errors: Partial<Record<ChannelField, FieldError>> }
 
-const fields: ReadonlyArray<ChannelField> = [
-  'name',
-  'tradingPartnerId',
-  'host',
-  'port',
-  'username',
-  'remotePath',
-  'authentication',
-  'credential',
-  'pollingIntervalMinutes',
-  'rateLimitPerMinute',
-  'url',
-  'authorization',
-]
+// Choice fields cannot be left empty from the form, so their errors get the generic message.
+const fieldKinds = {
+  name: 'text',
+  tradingPartnerId: 'choice',
+  host: 'format',
+  port: 'number',
+  username: 'text',
+  remotePath: 'format',
+  authentication: 'choice',
+  credential: 'text',
+  pollingIntervalMinutes: 'number',
+  rateLimitPerMinute: 'number',
+  url: 'format',
+  authorization: 'text',
+} as const satisfies Record<ChannelField, 'text' | 'format' | 'number' | 'choice'>
 
-const numberFields: ReadonlyArray<ChannelField> = [
-  'port',
-  'pollingIntervalMinutes',
-  'rateLimitPerMinute',
-]
+type FieldKind = (typeof fieldKinds)[ChannelField]
+
+export type FieldOfKind<Kind extends FieldKind> = {
+  [Field in ChannelField]: (typeof fieldKinds)[Field] extends Kind ? Field : never
+}[ChannelField]
+
+export function isFieldOfKind<Kind extends FieldKind>(
+  field: ChannelField,
+  kind: Kind,
+): field is FieldOfKind<Kind> {
+  return fieldKinds[field] === kind
+}
 
 function isField(key: PropertyKey | undefined): key is ChannelField {
-  return fields.some((field) => field === key)
+  return Object.keys(fieldKinds).some((field) => field === key)
 }
 
 function fieldError(field: ChannelField, issue: { code: string }, value: string): FieldError {
-  if (numberFields.includes(field)) {
+  if (isFieldOfKind(field, 'number')) {
     return 'range'
   }
 

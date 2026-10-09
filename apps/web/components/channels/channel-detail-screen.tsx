@@ -6,11 +6,15 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
-import { MaskedSecretText, useChannelKindLabel } from '@/components/channels/channel-parts'
+import {
+  MaskedSecretText,
+  useChannelKindLabel,
+  useChannelTradingPartners,
+} from '@/components/channels/channel-parts'
 import { WebhookAccess } from '@/components/channels/webhook-token'
 import { BackLink, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
 import { ApiError } from '@/lib/api/client'
-import { channelQuery, tradingPartnersQuery } from '@/lib/api/queries'
+import { channelQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
@@ -18,25 +22,19 @@ import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import type { Channel } from '@edi-bridge/contracts'
 
 function TradingPartnerFact({ tradingPartnerId }: { tradingPartnerId: string | null }) {
-  const t = useTranslations('Channels')
-  const tradingPartners = useQuery(tradingPartnersQuery)
+  const tradingPartners = useChannelTradingPartners()
+  const tradingPartner = tradingPartners.find(tradingPartnerId)
 
-  if (tradingPartnerId === null) {
-    return t('ownSystems')
-  }
-
-  if (tradingPartners.isPending) {
+  if (tradingPartnerId !== null && tradingPartners.isPending) {
     return <Skeleton className="h-4 w-32" />
   }
-
-  const tradingPartner = tradingPartners.data?.find(({ id }) => id === tradingPartnerId)
 
   return tradingPartner ? (
     <Link href={`/trading-partners/${tradingPartner.id}`} className={linkClass}>
       {tradingPartner.name}
     </Link>
   ) : (
-    t('unknownTradingPartner')
+    tradingPartners.name(tradingPartnerId)
   )
 }
 

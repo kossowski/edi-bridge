@@ -73,6 +73,8 @@ export const RegenerateWebhookToken = meta.story({
       expect(canvas.getByRole('heading', { name: 'Copy the webhook token now' })).toHaveFocus(),
     )
     await expect(canvas.getByText(/^whk_[A-Za-z0-9]{32}$/)).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: 'I have stored the token' }))
+    await expect(canvas.getByRole('button', { name: 'Regenerate token' })).toHaveFocus()
   },
 })
 

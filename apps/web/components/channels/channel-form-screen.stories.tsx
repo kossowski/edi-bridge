@@ -1,11 +1,11 @@
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
 import { EditChannelScreen, NewChannelScreen } from '@/components/channels/channel-form-screen'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { updateChannelEndpoint } from '@edi-bridge/contracts'
+import { channelEndpoint, updateChannelEndpoint } from '@edi-bridge/contracts'
 import { createHandlers, seedChannels } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -140,6 +140,34 @@ export const EditNotFound = meta.story({
   render: () => <EditChannelScreen id="10000000-0000-4000-8000-0000000000ff" />,
   async play({ canvas }) {
     await expect(await canvas.findByText('Channel not found')).toBeVisible()
+  },
+})
+
+export const EditLoading = meta.story({
+  render: () => <EditChannelScreen id={sftpInbox.id} />,
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${channelEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await expect(canvas.getByText('Loading Channel')).toBeInTheDocument()
+  },
+})
+
+export const EditUnavailable = meta.story({
+  render: () => <EditChannelScreen id={sftpInbox.id} />,
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${channelEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Channel unavailable')).toBeVisible()
   },
 })
 

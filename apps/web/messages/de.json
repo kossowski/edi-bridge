@@ -357,17 +357,7 @@
     "channels": {
       "title": "Channels",
       "none": "Zu diesem Trading Partner gehören noch keine Channels.",
-      "failed": "Die Channels konnten nicht geladen werden.",
-      "kind": "{type}, {direction}",
-      "type": {
-        "sftp": "SFTP",
-        "webhook": "Webhook",
-        "http": "HTTP"
-      },
-      "direction": {
-        "inbound": "eingehend",
-        "outbound": "ausgehend"
-      }
+      "failed": "Die Channels konnten nicht geladen werden."
     },
     "flows": {
       "title": "Flows",
@@ -643,7 +633,7 @@
     },
     "http-outbound": {
       "label": "Ausgehend per HTTP",
-      "description": "Schickt Documents per POST an einen HTTP-Endpunkt, etwa Ihr ERP."
+      "description": "Schickt Documents per POST an eine URL, etwa Ihr ERP."
     }
   },
   "Settings": {

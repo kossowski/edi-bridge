@@ -1,8 +1,11 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
+import { useMemo } from 'react'
 
 import { channelKindKey } from '@/components/channels/channel-form-values'
+import { tradingPartnersQuery } from '@/lib/api/queries'
 
 import type { Channel, ChannelKind, MaskedSecret } from '@edi-bridge/contracts'
 
@@ -10,6 +13,30 @@ export function useChannelKindLabel() {
   const t = useTranslations('ChannelKind')
 
   return (channel: ChannelKind) => t(`${channelKindKey(channel)}.label`)
+}
+
+export function useChannelTradingPartners() {
+  const t = useTranslations('Channels')
+  const tradingPartners = useQuery(tradingPartnersQuery)
+
+  const byId = useMemo(
+    () =>
+      new Map(tradingPartners.data?.map((tradingPartner) => [tradingPartner.id, tradingPartner])),
+    [tradingPartners.data],
+  )
+
+  function find(tradingPartnerId: string | null) {
+    return tradingPartnerId === null ? undefined : byId.get(tradingPartnerId)
+  }
+
+  return {
+    isPending: tradingPartners.isPending,
+    find,
+    name: (tradingPartnerId: string | null) =>
+      tradingPartnerId === null
+        ? t('ownSystems')
+        : (find(tradingPartnerId)?.name ?? t('unknownTradingPartner')),
+  }
 }
 
 export function channelAddress(channel: Channel) {
@@ -29,7 +56,6 @@ export function MaskedSecretText({ secret }: { secret: MaskedSecret | null }) {
     return <span className="text-muted-foreground">{t('notSet')}</span>
   }
 
-  // The dots are decoration; screen readers get the words.
   return secret.lastFour === null ? (
     <span className="inline-flex items-center gap-2">
       <span aria-hidden className="font-mono">

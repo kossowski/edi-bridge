@@ -4,9 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type FormEvent, type ReactNode, useId, useRef, useState } from 'react'
-
-import type { ComponentProps } from 'react'
+import { type FormEvent, useId, useRef, useState } from 'react'
 
 import {
   type ChannelField,
@@ -14,13 +12,15 @@ import {
   channelKindKeys,
   channelKindOf,
   type FieldError,
+  type FieldOfKind,
   isChannelKindKey,
+  isFieldOfKind,
   toFormValues,
   validateChannelUpdate,
   validateNewChannel,
 } from '@/components/channels/channel-form-values'
 import { useChannelKindLabel } from '@/components/channels/channel-parts'
-import { describedBy, FormField } from '@/components/form-field'
+import { Fieldset, SelectField, TextareaField, TextField } from '@/components/form-field'
 import { ApiError, createChannel, updateChannel } from '@/lib/api/client'
 import { storeSavedChannel, tradingPartnersQuery } from '@/lib/api/queries'
 import {
@@ -35,22 +35,13 @@ import {
 } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Checkbox } from '@edi-bridge/ui/components/checkbox'
-import { Input } from '@edi-bridge/ui/components/input'
 import { RadioGroup, RadioGroupItem } from '@edi-bridge/ui/components/radio-group'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@edi-bridge/ui/components/select'
-import { Textarea } from '@edi-bridge/ui/components/textarea'
 
 const ranges = {
   port: sftpPort,
   pollingIntervalMinutes,
   rateLimitPerMinute: webhookRateLimitPerMinute,
-} as const
+} as const satisfies Record<FieldOfKind<'number'>, { min: number; max: number }>
 
 // Base UI's Select treats an empty string as "no value", so "own systems" needs a real one.
 const ownSystems = 'own-systems'
@@ -63,67 +54,16 @@ function useFieldErrorMessage() {
       case 'tooLong':
         return t('tooLong')
       case 'range':
-        return field === 'port' ||
-          field === 'pollingIntervalMinutes' ||
-          field === 'rateLimitPerMinute'
-          ? t('range', ranges[field])
-          : t('invalid')
+        return isFieldOfKind(field, 'number') ? t('range', ranges[field]) : t('invalid')
       case 'format':
-        return field === 'host' || field === 'remotePath' || field === 'url'
-          ? t(`format.${field}`)
-          : t('invalid')
+        return isFieldOfKind(field, 'format') ? t(`format.${field}`) : t('invalid')
       case 'required':
-        return field === 'tradingPartnerId' || field === 'authentication'
-          ? t('invalid')
-          : t(`required.${field}`)
+        return isFieldOfKind(field, 'choice') ? t('invalid') : t(`required.${field}`)
     }
   }
 }
 
 type TextFieldName = Exclude<ChannelField, 'tradingPartnerId' | 'authentication'>
-
-type FieldProps = {
-  field: ChannelField
-  label: string
-  description: string
-  error: string | null
-  id: string
-  value: string
-  onChange: (value: string) => void
-} & Omit<ComponentProps<'input'>, 'id' | 'value' | 'onChange'>
-
-function TextField({
-  field,
-  label,
-  description,
-  error,
-  id,
-  value,
-  onChange,
-  ...inputProps
-}: FieldProps) {
-  return (
-    <FormField
-      id={id}
-      description={description}
-      error={error}
-      label={
-        <label htmlFor={id} className="text-sm font-medium">
-          {label}
-        </label>
-      }>
-      <Input
-        id={id}
-        name={field}
-        value={value}
-        aria-describedby={describedBy(id, error)}
-        aria-invalid={error !== null}
-        onChange={(event) => onChange(event.target.value)}
-        {...inputProps}
-      />
-    </FormField>
-  )
-}
 
 function KindChoice({
   value,
@@ -183,59 +123,6 @@ function FixedKind({ channel }: { channel: Channel }) {
   )
 }
 
-function SelectField<Value extends string>({
-  id,
-  label,
-  description,
-  value,
-  items,
-  onChange,
-}: {
-  id: string
-  label: string
-  description: string
-  value: Value
-  items: ReadonlyArray<{ value: Value; label: string }>
-  onChange: (value: Value) => void
-}) {
-  return (
-    <FormField
-      id={id}
-      description={description}
-      error={null}
-      label={
-        <span id={`${id}-label`} className="text-sm font-medium">
-          {label}
-        </span>
-      }>
-      <Select
-        items={items}
-        value={value}
-        onValueChange={(next) => {
-          const item = items.find((candidate) => candidate.value === next)
-
-          if (item) {
-            onChange(item.value)
-          }
-        }}>
-        <SelectTrigger
-          aria-describedby={`${id}-description`}
-          aria-labelledby={`${id}-label`}
-          className="w-full sm:w-80">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </FormField>
-  )
-}
-
 type Submission = { create: ChannelInput } | { id: string; update: ChannelUpdate }
 
 function toSubmission(
@@ -251,15 +138,6 @@ function toSubmission(
   const result = validateNewChannel(values)
 
   return 'input' in result ? { submission: { create: result.input } } : result
-}
-
-function Fieldset({ legend, children }: { legend: string; children: ReactNode }) {
-  return (
-    <fieldset className="flex min-w-0 flex-col gap-6 border-t pt-4">
-      <legend className="pr-2 font-semibold">{legend}</legend>
-      {children}
-    </fieldset>
-  )
 }
 
 export function ChannelForm({
@@ -329,7 +207,7 @@ export function ChannelForm({
 
   function field(name: TextFieldName) {
     return {
-      field: name,
+      name,
       id: `${baseId}-${name}`,
       error: messageFor(name),
       value: values[name],
@@ -343,6 +221,11 @@ export function ChannelForm({
   ]
 
   const credential = field('credential')
+
+  const credentialDescription = channel
+    ? t('fields.credential.keep')
+    : t('fields.credential.description')
+
   const authorization = field('authorization')
   const kindChanged = save.error instanceof ApiError && save.error.status === 409
 
@@ -426,42 +309,26 @@ export function ChannelForm({
             value={values.authentication}
             onChange={(next) => update('authentication', next)}
           />
-          <FormField
-            id={credential.id}
-            description={channel ? t('fields.credential.keep') : t('fields.credential.description')}
-            error={credential.error}
-            label={
-              <label htmlFor={credential.id} className="text-sm font-medium">
-                {tAuthentication(values.authentication)}
-              </label>
-            }>
-            {values.authentication === 'privateKey' ? (
-              <Textarea
-                id={credential.id}
-                autoComplete="off"
-                name="credential"
-                rows={6}
-                spellCheck={false}
-                value={credential.value}
-                aria-describedby={describedBy(credential.id, credential.error)}
-                aria-invalid={credential.error !== null}
-                className="font-mono text-xs"
-                onChange={(event) => credential.onChange(event.target.value)}
-              />
-            ) : (
-              <Input
-                id={credential.id}
-                autoComplete="new-password"
-                name="credential"
-                type="password"
-                value={credential.value}
-                aria-describedby={describedBy(credential.id, credential.error)}
-                aria-invalid={credential.error !== null}
-                className="sm:w-80"
-                onChange={(event) => credential.onChange(event.target.value)}
-              />
-            )}
-          </FormField>
+          {values.authentication === 'privateKey' ? (
+            <TextareaField
+              {...credential}
+              autoComplete="off"
+              description={credentialDescription}
+              label={tAuthentication('privateKey')}
+              rows={6}
+              spellCheck={false}
+              className="min-h-32 font-mono text-xs"
+            />
+          ) : (
+            <TextField
+              {...credential}
+              autoComplete="new-password"
+              description={credentialDescription}
+              label={tAuthentication('password')}
+              type="password"
+              className="sm:w-80"
+            />
+          )}
         </Fieldset>
       )}
       {kind.type === 'webhook' && (

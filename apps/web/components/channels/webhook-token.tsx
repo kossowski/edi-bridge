@@ -4,7 +4,8 @@ import { Alert02Icon, RefreshIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 import { MaskedSecretText } from '@/components/channels/channel-parts'
 import { CopyableValue } from '@/components/copy-button'
@@ -72,23 +73,24 @@ export function WebhookTokenReveal({ token, children }: { token: string; childre
 
 function RegenerateToken({
   channel,
+  button,
   onRegenerated,
 }: {
   channel: WebhookChannel
+  button: RefObject<HTMLButtonElement | null>
   onRegenerated: (token: string) => void
 }) {
   const t = useTranslations('Channel.webhook.regenerate')
   const queryClient = useQueryClient()
   const [confirming, setConfirming] = useState(false)
   const toggled = useRef(false)
-  const button = useRef<HTMLButtonElement>(null)
   const confirmation = useRef<HTMLParagraphElement>(null)
 
   useEffect(() => {
     if (toggled.current) {
       ;(confirming ? confirmation : button).current?.focus()
     }
-  }, [confirming])
+  }, [button, confirming])
 
   function toggle(next: boolean) {
     toggled.current = true
@@ -142,6 +144,13 @@ function RegenerateToken({
 export function WebhookAccess({ channel }: { channel: WebhookChannel }) {
   const t = useTranslations('Channel.webhook')
   const [revealed, setRevealed] = useState<string | null>(null)
+  const regenerateButton = useRef<HTMLButtonElement>(null)
+
+  // Hiding the token removes the focused button, so focus moves on instead of dropping to <body>.
+  function hideToken() {
+    flushSync(() => setRevealed(null))
+    regenerateButton.current?.focus()
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-4 rounded-lg border p-4">
@@ -165,12 +174,12 @@ export function WebhookAccess({ channel }: { channel: WebhookChannel }) {
       </dl>
       {revealed && (
         <WebhookTokenReveal token={revealed}>
-          <Button variant="outline" className="w-fit" onClick={() => setRevealed(null)}>
+          <Button variant="outline" className="w-fit" onClick={hideToken}>
             {t('hideToken')}
           </Button>
         </WebhookTokenReveal>
       )}
-      <RegenerateToken channel={channel} onRegenerated={setRevealed} />
+      <RegenerateToken button={regenerateButton} channel={channel} onRegenerated={setRevealed} />
     </div>
   )
 }
