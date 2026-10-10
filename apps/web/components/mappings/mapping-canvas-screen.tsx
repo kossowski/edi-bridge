@@ -131,6 +131,7 @@ function Canvas({ draft }: { draft: MappingDraft }) {
 
   return (
     <MappingCanvas
+      beside={(band) => <MappingPreviewPanel draft={draft} {...band} />}
       graph={draft}
       label={t('label', { source: source.title, target: target.title })}
       source={{ title: source.title, items: source.items }}
@@ -183,13 +184,8 @@ function MappingView({ draft }: { draft: MappingDraft }) {
       </dl>
       <DesktopOnlyNotice />
       {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
-      <div className="hidden flex-1 flex-col gap-4 lg:flex">
-        {desktop && (
-          <>
-            <Canvas draft={draft} />
-            <MappingPreviewPanel draft={draft} />
-          </>
-        )}
+      <div className="hidden min-h-0 flex-1 flex-col lg:flex">
+        {desktop && <Canvas draft={draft} />}
       </div>
     </MappingCanvasProvider>
   )
@@ -214,10 +210,10 @@ export function MappingCanvasScreen({ id }: { id: string }) {
   const t = useTranslations('Mapping')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
 
-  // On desktop the screen takes the viewport below the app header, so the canvas and the preview
-  // share it without page scrolling; it still grows when their minimum heights do not fit.
+  // On desktop the screen takes the viewport below the app header (h-14), so the canvas and the
+  // band under it share the height without page scrolling.
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 lg:h-[calc(100svh-3.5rem)] lg:min-h-fit">
+    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 lg:h-[calc(100svh-3.5rem)] lg:flex-none lg:gap-3 lg:py-4">
       <BackLink href="/mappings" label={t('back')} />
       {isPending ? (
         <MappingLoading />

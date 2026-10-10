@@ -27,12 +27,13 @@ import {
   SelectValue,
 } from '@edi-bridge/ui/components/select'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
-import { cn } from '@edi-bridge/ui/lib/utils'
 
 // Long enough that typing into a transform's form does not send a preview per keystroke.
 const previewDelay = 600
 
 const formats = { json: 'JSON', edifact: 'EDIFACT' } as const
+
+const views = ['target', 'source'] as const
 
 function Failure({ message, onRetry }: { message: string; onRetry: () => void }) {
   const t = useTranslations('Mapping.preview.error')
@@ -63,31 +64,20 @@ function Loading({ label }: { label: string }) {
 }
 
 function DocumentView({
-  title,
   label,
   document,
   busy = false,
   children,
 }: {
-  title: string
   label: string
   document: DocumentContent | undefined
   busy?: boolean
   children?: React.ReactNode
 }) {
-  const t = useTranslations('Mapping.preview')
   const text = document ? documentText(document) : ''
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col gap-1.5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h3 className="text-sm font-medium">{title}</h3>
-        {document && (
-          <span className="text-muted-foreground text-xs">
-            {t('size', { format: formats[document.format], count: lineCount(text) })}
-          </span>
-        )}
-      </div>
+    <div className="flex min-h-24 min-w-0 flex-1 flex-col">
       {children ??
         (document && (
           <pre
@@ -151,6 +141,7 @@ function SamplePreview({
   const preview = useQuery(mappingPreviewQuery(draft.mappingId, sample.id, settled.value))
   const updating = settled.pending || preview.isFetching
   const [firstKey] = useState(() => `${sample.id}|${key}`)
+  const [shown, setShown] = useState<(typeof views)[number]>('target')
   const changed = `${sample.id}|${settled.key}` !== firstKey
 
   // A polite message once each update has settled, never while the Mapping is still changing.
@@ -158,11 +149,12 @@ function SamplePreview({
     !updating && changed && preview.isSuccess ? t('updated', { name: sample.name }) : ''
 
   const items = samples.map(({ id, name }) => ({ value: id, label: name }))
+  const shownDocument = shown === 'source' ? sample.document : preview.data?.document
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
           <span id={labelId} className="text-sm font-medium">
             {t('sample')}
           </span>
@@ -170,7 +162,7 @@ function SamplePreview({
             items={items}
             value={sample.id}
             onValueChange={(value) => value && onChoose(value)}>
-            <SelectTrigger aria-labelledby={labelId} className="w-80 max-w-full">
+            <SelectTrigger aria-labelledby={labelId} className="w-64 max-w-full">
               <SelectValue className="min-w-0">
                 {(value: string | null) => (
                   <span className="truncate">
@@ -188,7 +180,7 @@ function SamplePreview({
             </SelectContent>
           </Select>
         </div>
-        <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+        <p className="text-muted-foreground flex min-h-8 items-center gap-1.5 text-sm">
           {updating && (
             <HugeiconsIcon
               icon={Loading03Icon}
@@ -200,24 +192,43 @@ function SamplePreview({
           {preview.isSuccess && (updating ? t('updating') : t('upToDate'))}
         </p>
       </div>
-      <div className="grid min-h-40 flex-1 grid-cols-2 grid-rows-[minmax(0,1fr)] gap-4">
-        <DocumentView
-          document={sample.document}
-          label={t('sourceLabel', { name: sample.name })}
-          title={t('source')}
-        />
+      {/* One Document at a time: the band's column is too narrow for both side by side. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div role="group" aria-label={t('shown')} className="flex flex-wrap gap-1">
+          {views.map((view) => (
+            <Button
+              key={view}
+              size="sm"
+              variant={shown === view ? 'secondary' : 'ghost'}
+              aria-pressed={shown === view}
+              onClick={() => setShown(view)}>
+              {t(view)}
+            </Button>
+          ))}
+        </div>
+        {shownDocument && (
+          <span className="text-muted-foreground text-xs">
+            {t('size', {
+              format: formats[shownDocument.format],
+              count: lineCount(documentText(shownDocument)),
+            })}
+          </span>
+        )}
+      </div>
+      {shown === 'source' ? (
+        <DocumentView document={sample.document} label={t('sourceLabel', { name: sample.name })} />
+      ) : (
         <DocumentView
           busy={updating}
           document={preview.data?.document}
-          label={t('targetLabel', { name: sample.name })}
-          title={t('target')}>
+          label={t('targetLabel', { name: sample.name })}>
           {preview.isError ? (
             <Failure message={t('error.preview')} onRetry={() => void preview.refetch()} />
           ) : preview.isPending ? (
             <Loading label={t('building')} />
           ) : undefined}
         </DocumentView>
-      </div>
+      )}
       {preview.data && <Notes draft={draft} notes={preview.data.notes} />}
       <p role="status" className="sr-only">
         {announcement}
@@ -262,12 +273,21 @@ function PreviewContent({
   return <SamplePreview draft={draft} sample={sample} samples={samples.data} onChoose={onChoose} />
 }
 
-// Collapsible, so the canvas can have the room back while the preview is not needed. Open, it keeps
-// a bounded height and scrolls inside, so the canvas above stays in view while the admin edits.
-export function MappingPreviewPanel({ draft }: { draft: MappingDraft }) {
+// Shown beside the Details panel in the band under the canvas, whose toggle it carries: hidden,
+// the band gives its height to the canvas.
+export function MappingPreviewPanel({
+  draft,
+  open,
+  onToggle,
+  controls,
+}: {
+  draft: MappingDraft
+  open: boolean
+  onToggle: () => void
+  controls?: string
+}) {
   const t = useTranslations('Mapping.preview')
-  const [open, setOpen] = useState(true)
-  // Held here, not in the content, which unmounts while the panel is collapsed.
+  // Held here, not in the content, which unmounts while the band is collapsed.
   const [chosen, setChosen] = useState<string | null>(null)
   const headingId = useId()
   const contentId = useId()
@@ -275,20 +295,17 @@ export function MappingPreviewPanel({ draft }: { draft: MappingDraft }) {
   return (
     <section
       aria-labelledby={headingId}
-      className={cn(
-        'bg-card flex shrink-0 flex-col rounded-lg border',
-        open && 'h-[clamp(14rem,32svh,24rem)]',
-      )}>
-      <div className="flex min-h-11 items-center justify-between gap-3 px-4 py-2">
+      className="bg-card flex min-h-0 min-w-0 flex-col rounded-lg border">
+      <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 px-4 py-1.5">
         <h2 id={headingId} className="text-sm font-semibold">
           {t('title')}
         </h2>
         <Button
           size="sm"
           variant="ghost"
-          aria-controls={contentId}
+          aria-controls={controls ? `${controls} ${contentId}` : contentId}
           aria-expanded={open}
-          onClick={() => setOpen((current) => !current)}>
+          onClick={onToggle}>
           <HugeiconsIcon
             icon={open ? ArrowDown01Icon : ArrowUp01Icon}
             strokeWidth={2}

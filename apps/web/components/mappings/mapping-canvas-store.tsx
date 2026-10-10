@@ -23,6 +23,8 @@ export type CanvasState = {
   edgeAnchor: XYPosition | null
   announcement: string
   problem: string | null
+  bandOpen: boolean
+  toggleBand: () => void
   toggleCollapsed: (row: RowRef) => void
   toggleSelected: (row: RowRef) => void
   select: (row: RowRef) => void
@@ -66,6 +68,8 @@ export function createCanvasStore() {
     edgeAnchor: null,
     announcement: '',
     problem: null,
+    bandOpen: true,
+    toggleBand: () => set(({ bandOpen }) => ({ bandOpen: !bandOpen })),
     toggleCollapsed: ({ side, path }) =>
       set(({ collapsed }) => {
         const next = new Set(collapsed[side])
@@ -77,19 +81,22 @@ export function createCanvasStore() {
         return { collapsed: { ...collapsed, [side]: next } }
       }),
     toggleSelected: (row) =>
-      set(({ selected }) => ({
+      set(({ selected, bandOpen }) => ({
         selected: isSameRow(selected, row) ? null : toRowRef(row),
         selectedTransform: null,
+        bandOpen: bandOpen || !isSameRow(selected, row),
       })),
-    select: (row) => set({ selected: toRowRef(row), selectedTransform: null }),
+    select: (row) => set({ selected: toRowRef(row), selectedTransform: null, bandOpen: true }),
     toggleTransform: (id) =>
-      set(({ selectedTransform }) => ({
+      set(({ selectedTransform, bandOpen }) => ({
         selectedTransform: selectedTransform === id ? null : id,
         selected: null,
+        bandOpen: bandOpen || selectedTransform !== id,
       })),
-    selectTransform: (id) => set({ selectedTransform: id, selected: null }),
+    selectTransform: (id) => set({ selectedTransform: id, selected: null, bandOpen: true }),
     clearSelection: () => set({ selected: null, selectedTransform: null }),
-    startLink: (linkFrom) => set({ linkFrom, problem: null }),
+    // A selection or a pending link shows its details, and focus may move there, so the band opens.
+    startLink: (linkFrom) => set({ linkFrom, problem: null, bandOpen: true }),
     cancelLink: () => set({ linkFrom: null }),
     setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
     hoverEdge: (id, at) => {

@@ -578,13 +578,13 @@ export const OverlappingSaveRollback = meta.story({
 
 export const German = meta.story({
   args: { id: invoic.id },
-  // Wide enough for the details panel to sit beside the canvas, where its fields have to fit.
+  // The band's Details column is narrowest on a laptop, where its fields have to fit.
   parameters: {
     viewport: {
-      options: { wide: { name: 'Wide desktop', styles: { width: '1600px', height: '900px' } } },
+      options: { laptop: { name: 'Laptop', styles: { width: '1024px', height: '900px' } } },
     },
   },
-  globals: { viewport: { value: 'wide', isRotated: false } },
+  globals: { viewport: { value: 'laptop', isRotated: false } },
   decorators: [
     (Story) => (
       <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">

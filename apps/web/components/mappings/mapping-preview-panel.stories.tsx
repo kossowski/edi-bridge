@@ -1,5 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
+import { type ComponentProps, useState } from 'react'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingPreviewPanel } from '@/components/mappings/mapping-preview-panel'
@@ -61,13 +62,27 @@ function targetDocument(canvasElement: HTMLElement, sample: string) {
   return within(canvasElement).findByRole('region', { name: `Target Document for ${sample}` })
 }
 
+// The band under the canvas holds the open state; here the panel holds it alone.
+function Panel({ draft }: Pick<ComponentProps<typeof MappingPreviewPanel>, 'draft'>) {
+  const [open, setOpen] = useState(true)
+
+  return <MappingPreviewPanel draft={draft} open={open} onToggle={() => setOpen((now) => !now)} />
+}
+
+async function showSample(canvasElement: HTMLElement) {
+  await userEvent.click(
+    await within(canvasElement).findByRole('button', { name: 'Sample Document' }),
+  )
+}
+
 const meta = preview.meta({
   title: 'Mappings/MappingPreviewPanel',
   component: MappingPreviewPanel,
-  args: { draft: desadv.draft },
+  args: { draft: desadv.draft, open: true, onToggle: () => {} },
+  render: ({ draft }) => <Panel draft={draft} />,
   decorators: [
     (Story) => (
-      <div className="w-[64rem] p-6">
+      <div className="flex h-96 w-[40rem] flex-col p-6">
         <Story />
       </div>
     ),
@@ -82,6 +97,7 @@ export const SampleChosen = meta.story({
     const target = await targetDocument(canvasElement, firstSample!.name)
 
     await waitFor(() => expect(target).toHaveTextContent(/BGM\+351\+DN-2026-\d{5}'/))
+    await showSample(canvasElement)
     await expect(
       canvas.getByRole('region', { name: `Sample Document ${firstSample!.name}` }),
     ).toHaveTextContent('"despatchNumber"')
@@ -91,6 +107,7 @@ export const SampleChosen = meta.story({
     await userEvent.click(canvas.getByRole('combobox', { name: 'Sample Document' }))
     await userEvent.click(await screen.findByRole('option', { name: secondSample!.name }))
 
+    await userEvent.click(canvas.getByRole('button', { name: 'Target Document' }))
     await expect(await targetDocument(canvasElement, secondSample!.name)).toBeVisible()
     await waitFor(() =>
       expect(canvas.getByRole('status')).toHaveTextContent(
@@ -98,9 +115,9 @@ export const SampleChosen = meta.story({
       ),
     )
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Hide preview' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Hide details and preview' }))
     await expect(canvas.queryByRole('combobox', { name: 'Sample Document' })).toBeNull()
-    await userEvent.click(canvas.getByRole('button', { name: 'Show preview' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Show details and preview' }))
     await expect(
       await canvas.findByRole('combobox', { name: 'Sample Document' }),
     ).toHaveTextContent(secondSample!.name)
@@ -109,10 +126,7 @@ export const SampleChosen = meta.story({
 
 export const InboundSample = meta.story({
   args: { draft: ordersWithValidExpression },
-  async play({ canvas }) {
-    await expect(
-      await canvas.findByRole('region', { name: /^Sample Document po-2026-\d{5}\.edi$/ }),
-    ).toHaveTextContent(/UNH\+\d+\+ORDERS:D:96A:UN'/)
+  async play({ canvas, canvasElement }) {
     await expect(
       await canvas.findByRole('region', { name: /^Target Document for / }),
     ).toHaveTextContent('"orderNumber"')
@@ -121,6 +135,10 @@ export const InboundSample = meta.story({
         'JSONata expression 1 is not previewed on EDIFACT Sample Documents yet.',
       ),
     ).toBeVisible()
+    await showSample(canvasElement)
+    await expect(
+      await canvas.findByRole('region', { name: /^Sample Document po-2026-\d{5}\.edi$/ }),
+    ).toHaveTextContent(/UNH\+\d+\+ORDERS:D:96A:UN'/)
   },
 })
 
@@ -153,8 +171,9 @@ export const BuildingPreview = meta.story({
       }),
     )
   },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await expect(await canvas.findByText('Building the preview')).toBeInTheDocument()
+    await showSample(canvasElement)
     await expect(
       canvas.getByRole('region', { name: `Sample Document ${firstSample!.name}` }),
     ).toBeVisible()
@@ -214,7 +233,9 @@ export const German = meta.story({
     ).toBeVisible()
     await expect(await canvas.findByText('2 Ziele bleiben leer')).toBeVisible()
     await expect(canvas.getByText('Lookup Table 1 ist ungültig konfiguriert.')).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Vorschau ausblenden' })).toBeVisible()
+    await expect(
+      canvas.getByRole('button', { name: 'Details und Vorschau ausblenden' }),
+    ).toBeVisible()
   },
 })
 
