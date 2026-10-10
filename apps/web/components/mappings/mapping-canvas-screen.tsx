@@ -2,8 +2,8 @@
 
 import { ComputerIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { type QueryKey, useQuery, type UseQueryOptions } from '@tanstack/react-query'
-import { useLocale, useTranslations } from 'next-intl'
+import { useQuery } from '@tanstack/react-query'
+import { useTranslations } from 'next-intl'
 import { useId } from 'react'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
@@ -11,12 +11,12 @@ import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
 import { MappingPreviewPanel } from '@/components/mappings/mapping-preview-panel'
-import { documentTree, edifactTree, type TreeItem } from '@/components/mappings/mapping-tree'
+import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
 import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
-import { ApiError, getDocumentStructure, getMessageTypeStructure } from '@/lib/api/client'
-import { documentStructureKeys, mappingDraftQuery, messageTypeKeys } from '@/lib/api/queries'
+import { ApiError } from '@/lib/api/client'
+import { mappingDraftQuery } from '@/lib/api/queries'
 import {
   Empty,
   EmptyDescription,
@@ -26,66 +26,7 @@ import {
 } from '@edi-bridge/ui/components/empty'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { Locale } from '@/i18n/locales'
-import type { MappingDraft, MappingSide } from '@edi-bridge/contracts'
-
-// The sides load different structures, but past `select` the canvas only sees the tree; leaving
-// the structure type out of the options lets one `useQuery` call serve both kinds of side.
-function treeQuery<Data>(
-  queryKey: QueryKey,
-  queryFn: () => Promise<Data>,
-  tree: (data: Data) => TreeItem[],
-): UseQueryOptions<unknown, Error, TreeItem[]> {
-  return {
-    queryKey,
-    queryFn,
-    // SAFETY: `select` only receives what `queryFn` above returned, which is Data.
-    select: (data) => tree(data as Data),
-  }
-}
-
-function sideOf(
-  side: MappingSide,
-  t: ReturnType<typeof useTranslations<'Mapping'>>,
-  locale: Locale,
-) {
-  switch (side.kind) {
-    case 'documentStructure':
-      return {
-        title: t('side.documentStructure', { name: side.name }),
-        query: treeQuery(
-          documentStructureKeys.detail(side.documentStructureId),
-          () => getDocumentStructure(side.documentStructureId),
-          documentTree,
-        ),
-      }
-    case 'messageType':
-      return {
-        title: t('side.messageType', { messageType: side.messageType }),
-        query: treeQuery(
-          messageTypeKeys.structure(side.messageType),
-          () => getMessageTypeStructure(side.messageType),
-          (structure) => edifactTree(structure, locale),
-        ),
-      }
-  }
-}
-
-function useSideTitle() {
-  const t = useTranslations('Mapping')
-  const locale = useLocale()
-
-  return (side: MappingSide) => sideOf(side, t, locale).title
-}
-
-function useSide(side: MappingSide) {
-  const t = useTranslations('Mapping')
-  const locale = useLocale()
-  const { title, query } = sideOf(side, t, locale)
-  const { data: items, isError, refetch } = useQuery(query)
-
-  return { title, items, isError, refetch }
-}
+import type { MappingDraft } from '@edi-bridge/contracts'
 
 function CanvasLoading() {
   const t = useTranslations('Mapping.canvas')

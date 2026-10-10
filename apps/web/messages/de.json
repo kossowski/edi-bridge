@@ -1270,6 +1270,118 @@
       "title": "Mapping Versions nicht verfügbar",
       "description": "Die Mapping Versions konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
+    },
+    "compare": "Versionen vergleichen",
+    "compareWith": "Mit Version {version} vergleichen"
+  },
+  "MappingComparison": {
+    "title": "Mapping Versions vergleichen",
+    "back": "Zurück zu den Mapping Versions",
+    "loading": "Vergleich wird geladen",
+    "openDraft": "Draft öffnen",
+    "from": "Von",
+    "to": "Nach",
+    "swap": "Versionen tauschen",
+    "sample": "Beispiel-Document",
+    "chooseVersion": "Version wählen",
+    "chooseSample": "Beispiel-Document wählen",
+    "version": "Version {version}",
+    "latestVersion": "Version {version} (neueste)",
+    "retry": "Erneut versuchen",
+    "shown": "{shown} von {total} angezeigt",
+    "showMore": "{count} weitere anzeigen",
+    "columns": {
+      "change": "Änderung"
+    },
+    "change": {
+      "added": "Hinzugefügt",
+      "removed": "Entfernt",
+      "changed": "Geändert"
+    },
+    "tooFew": {
+      "title": "Noch nichts zu vergleichen",
+      "description": "Ein Vergleich braucht mindestens zwei Mapping Versions. Veröffentlichen Sie den Draft im Canvas, um eine weitere zu erstellen."
+    },
+    "unknownVersion": {
+      "title": "Mapping Version nicht gefunden",
+      "description": "Eine gewählte Version gehört nicht zu diesem Mapping. Wählen Sie oben zwei seiner Versionen."
+    },
+    "sameVersion": {
+      "title": "Zweimal dieselbe Version",
+      "description": "Wählen Sie zwei verschiedene Versionen, um zu sehen, was sich zwischen ihnen geändert hat."
+    },
+    "versions": {
+      "error": {
+        "title": "Mapping Versions nicht verfügbar",
+        "description": "Die Mapping Versions konnten nicht geladen werden. Versuchen Sie es erneut."
+      }
+    },
+    "differences": {
+      "title": "Unterschiede im Mapping",
+      "description": "Was sich an Verknüpfungen, Transforms und Transform Links von Version {from} zu Version {to} geändert hat.",
+      "loading": "Unterschiede im Mapping werden geladen",
+      "summary": "{count, plural, one {# Unterschied} other {# Unterschiede}}: {added} hinzugefügt, {removed} entfernt, {changed} geändert",
+      "absent": "Nicht in dieser Version",
+      "empty": {
+        "title": "Keine Unterschiede im Mapping",
+        "description": "Version {from} und Version {to} haben dieselben Verknüpfungen, Transforms und Transform Links."
+      },
+      "error": {
+        "title": "Unterschiede im Mapping nicht verfügbar",
+        "description": "Die Unterschiede im Mapping konnten nicht geladen werden. Versuchen Sie es erneut."
+      },
+      "kinds": {
+        "link": {
+          "title": "{count, plural, one {# Verknüpfung} other {# Verknüpfungen}}",
+          "part": "Ziel",
+          "caption": "Verknüpfungen nach ihrem Ziel, mit der Quelle, die jede Version damit verknüpft"
+        },
+        "transform": {
+          "title": "{count, plural, one {# Transform} other {# Transforms}}",
+          "part": "Transform",
+          "caption": "Transforms mit ihrer Konfiguration in jeder Version"
+        },
+        "transformLink": {
+          "title": "{count, plural, one {# Transform Link} other {# Transform Links}}",
+          "part": "Führt zu",
+          "caption": "Transform Links nach ihrem Ziel, mit ihrer Herkunft in jeder Version"
+        }
+      }
+    },
+    "outputs": {
+      "title": "Unterschiede in der Ausgabe",
+      "description": "Die Ziel-Documents, die beide Versionen für dasselbe Beispiel-Document erzeugen, und die Werte, die sich unterscheiden.",
+      "loadingSamples": "Beispiel-Documents werden geladen",
+      "loading": "Ausgaben für {name} werden erstellt",
+      "summary": "{count, plural, one {# Wert unterscheidet sich} other {# Werte unterscheiden sich}} für {name}",
+      "caption": "Unterschiedliche Werte nach Ziel und Wiederholung",
+      "columns": {
+        "path": "Ziel",
+        "repetition": "Wiederholung"
+      },
+      "single": "Nicht wiederholt",
+      "repetition": "{label} Nr. {number}",
+      "repetitionPlain": "Nr. {number}",
+      "notSet": "Nicht gesetzt",
+      "emptyValue": "Leer",
+      "documents": "Ziel-Documents",
+      "document": "Ziel-Document von Version {version}",
+      "empty": {
+        "title": "Gleiche Ausgabe",
+        "description": "Version {from} und Version {to} erzeugen für {name} dasselbe Ziel-Document."
+      },
+      "noSamples": {
+        "title": "Noch keine Beispiel-Documents",
+        "description": "Unterschiede in der Ausgabe brauchen ein Beispiel-Document dieses Mappings, und es hat noch keine."
+      },
+      "unknownSample": {
+        "title": "Beispiel-Document nicht gefunden",
+        "description": "Das gewählte Beispiel-Document gehört nicht zu diesem Mapping. Wählen Sie oben ein anderes."
+      },
+      "error": {
+        "title": "Ausgaben nicht verfügbar",
+        "description": "Die Ausgaben für dieses Beispiel-Document konnten nicht erstellt werden. Versuchen Sie es erneut."
+      }
     }
   },
   "ManualSubmission": {

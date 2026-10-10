@@ -58,12 +58,14 @@ export function ListScreen({
   subtitle,
   back,
   newLink,
+  action,
   children,
 }: {
   title: string
   subtitle?: string | undefined
   back?: { href: string; label: string }
   newLink?: { href: string; label: string }
+  action?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -75,6 +77,7 @@ export function ListScreen({
           {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
         </div>
         {newLink && <NewLink href={newLink.href} label={newLink.label} />}
+        {action}
       </div>
       {children}
     </div>

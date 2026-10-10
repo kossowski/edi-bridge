@@ -3,6 +3,7 @@ import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/reac
 import type {
   Channel,
   Flow,
+  MappingComparisonQuery,
   MappingDraft,
   MappingGraph,
   MappingVersionSummary,
@@ -12,11 +13,13 @@ import type {
 } from '@edi-bridge/contracts'
 
 import {
+  compareMappingVersions,
   getChannel,
   getCurrentWorkspace,
   getFlow,
   getInterchange,
   getMappingDraft,
+  getMappingVersion,
   getRun,
   getTradingPartner,
   listChannels,
@@ -76,6 +79,9 @@ export const mappingKeys = {
   draft: (id: string) => [...mappingKeys.detail(id), 'draft'] as const,
   graph: (id: string) => [...mappingKeys.draft(id), 'graph'] as const,
   versions: (id: string) => [...mappingKeys.detail(id), 'versions'] as const,
+  version: (id: string, versionId: string) => [...mappingKeys.versions(id), versionId] as const,
+  comparison: (id: string, query: MappingComparisonQuery) =>
+    [...mappingKeys.detail(id), 'comparison', query] as const,
   samples: (id: string) => [...mappingKeys.detail(id), 'samples'] as const,
   preview: (id: string, sampleId: string, graph: MappingGraph) =>
     [...mappingKeys.detail(id), 'preview', sampleId, graph] as const,
@@ -127,6 +133,23 @@ export function mappingVersionsQuery(mappingId: string) {
   return queryOptions({
     queryKey: mappingKeys.versions(mappingId),
     queryFn: () => listMappingVersions(mappingId),
+  })
+}
+
+// A Mapping Version never changes, so neither does its graph nor a comparison of two of them.
+export function mappingVersionQuery(mappingId: string, versionId: string) {
+  return queryOptions({
+    queryKey: mappingKeys.version(mappingId, versionId),
+    queryFn: () => getMappingVersion(mappingId, versionId),
+    staleTime: Infinity,
+  })
+}
+
+export function mappingComparisonQuery(mappingId: string, query: MappingComparisonQuery) {
+  return queryOptions({
+    queryKey: mappingKeys.comparison(mappingId, query),
+    queryFn: () => compareMappingVersions(mappingId, query),
+    staleTime: Infinity,
   })
 }
 

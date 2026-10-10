@@ -51,6 +51,14 @@ export const Default = meta.story({
       'href',
       `/mappings/${published.id}`,
     )
+    await expect(canvas.getByRole('link', { name: 'Compare versions' })).toHaveAttribute(
+      'href',
+      `/mappings/${published.id}/versions/compare`,
+    )
+    await expect(newest.getByRole('link', { name: 'Compare with Version 2' })).toBeVisible()
+    await expect(
+      within(canvas.getByText('Version 1').closest('tr')!).queryByRole('link'),
+    ).not.toBeInTheDocument()
   },
 })
 
@@ -59,6 +67,7 @@ export const Empty = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('No Mapping Versions yet')).toBeVisible()
     await expect(canvas.getByText('Never published')).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: 'Compare versions' })).not.toBeInTheDocument()
   },
 })
 

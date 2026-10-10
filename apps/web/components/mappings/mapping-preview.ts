@@ -18,3 +18,9 @@ export function documentText(document: DocumentContent) {
 export function lineCount(text: string) {
   return text === '' ? 0 : text.split('\n').length
 }
+
+const formatNames = { json: 'JSON', edifact: 'EDIFACT' } as const
+
+export function documentSize(document: DocumentContent) {
+  return { format: formatNames[document.format], count: lineCount(documentText(document)) }
+}
