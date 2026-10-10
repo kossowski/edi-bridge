@@ -1,6 +1,9 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "futureFlags": {
+    "githubActionsRemoteBaseRefFallback": true
+  },
   "tasks": {
     "transit": {
       "dependsOn": ["^transit"]
@@ -21,6 +24,10 @@
       "dependsOn": ["transit"]
     },
     "test": {
+      "dependsOn": ["transit"],
+      "passThroughEnv": ["CI"]
+    },
+    "test:canvas": {
       "dependsOn": ["transit"],
       "passThroughEnv": ["CI"]
     },

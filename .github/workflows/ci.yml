@@ -2,19 +2,54 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Lint, check-types, test and build
+  tasks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint and check-types
+            job: lint
+            tasks: lint check-types
+          - name: Test
+            job: test
+            tasks: test
+            chromium: 'true'
+          - name: Canvas stories 1/3
+            job: canvas-1
+            tasks: test:canvas
+            args: -- --shard=1/3
+            chromium: 'true'
+          - name: Canvas stories 2/3
+            job: canvas-2
+            tasks: test:canvas
+            args: -- --shard=2/3
+            chromium: 'true'
+          - name: Canvas stories 3/3
+            job: canvas-3
+            tasks: test:canvas
+            args: -- --shard=3/3
+            chromium: 'true'
+          - name: Build
+            job: build
+            tasks: build build-storybook
+          - name: E2E test
+            job: e2e
+            tasks: test:e2e
+            chromium: 'true'
     steps:
       - name: Check out code
         uses: actions/checkout@v7
@@ -23,29 +58,21 @@ jobs:
           fetch-depth: 0
           filter: blob:none
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up
+        uses: ./.github/actions/setup
         with:
-          node-version-file: package.json
-          cache: pnpm
+          job: ${{ matrix.job }}
+          chromium: ${{ matrix.chromium || 'false' }}
 
-      - name: Restore Turborepo cache
-        uses: actions/cache@v6
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
+      - name: Run affected tasks
+        run: pnpm turbo run ${{ matrix.tasks }} ${{ github.event_name == 'pull_request' && '--affected' || '' }} ${{ matrix.args }}
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # Story tests (Vitest browser mode) and Playwright both run in Chromium.
-      - name: Install Playwright Chromium
-        run: pnpm --filter @edi-bridge/web exec playwright install --with-deps chromium
-
-      - name: Lint, check-types, test and build affected packages
-        run: pnpm turbo run lint check-types test test:e2e build build-storybook --affected
+  checks:
+    name: CI passed
+    if: always()
+    needs: tasks
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every task job to pass
+        run: test "${{ needs.tasks.result }}" = success
