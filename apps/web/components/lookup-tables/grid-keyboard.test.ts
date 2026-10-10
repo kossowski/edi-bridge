@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { gridCommand, type KeyPress, moveCell } from './grid-keyboard'
+import { gridCommand, isSaveShortcut, type KeyPress, moveCell } from './grid-keyboard'
 
 function press(key: string, modifiers: Partial<Omit<KeyPress, 'key'>> = {}): KeyPress {
   return { key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...modifiers }
 }
 
-const size = { rows: 3, columns: 4, firstTabColumn: 1, pageRows: 10 }
+const size = { rows: 3, columns: 4, editColumns: { first: 1, last: 2 }, pageRows: 10 }
 
 describe('gridCommand', () => {
   it('moves with arrow, Home, End and page keys while navigating', () => {
@@ -37,12 +37,17 @@ describe('gridCommand', () => {
     expect(gridCommand(press('Escape'), false)).toBeNull()
   })
 
-  it('moves to the next or previous cell with Tab in both modes', () => {
+  it('moves to the next or previous cell with Tab only while editing', () => {
     expect(gridCommand(press('Tab'), true)).toEqual({ kind: 'move', move: 'next' })
-    expect(gridCommand(press('Tab', { shiftKey: true }), false)).toEqual({
+    expect(gridCommand(press('Tab', { shiftKey: true }), true)).toEqual({
       kind: 'move',
       move: 'previous',
     })
+  })
+
+  it('leaves Tab to the browser while navigating so the grid is one tab stop', () => {
+    expect(gridCommand(press('Tab'), false)).toBeNull()
+    expect(gridCommand(press('Tab', { shiftKey: true }), false)).toBeNull()
   })
 
   it('adds a row with Ctrl or Cmd and Enter, also while editing', () => {
@@ -62,6 +67,12 @@ describe('gridCommand', () => {
     expect(gridCommand(press('S', { metaKey: true, shiftKey: true }), false)).toEqual({
       kind: 'save',
     })
+  })
+
+  it('recognises the save shortcut on its own', () => {
+    expect(isSaveShortcut(press('s', { ctrlKey: true }))).toBe(true)
+    expect(isSaveShortcut(press('S', { metaKey: true }))).toBe(true)
+    expect(isSaveShortcut(press('s'))).toBe(false)
   })
 })
 
@@ -89,15 +100,12 @@ describe('moveCell', () => {
 
   it('tabs through the editable columns and wraps to the next row', () => {
     expect(moveCell({ row: 0, column: 1 }, 'next', size)).toEqual({ row: 0, column: 2 })
-    expect(moveCell({ row: 0, column: 3 }, 'next', size)).toEqual({ row: 1, column: 1 })
-    expect(moveCell({ row: 1, column: 1 }, 'previous', size)).toEqual({ row: 0, column: 3 })
-    expect(moveCell({ row: 1, column: 0 }, 'next', size)).toEqual({ row: 1, column: 1 })
-    expect(moveCell({ row: 1, column: 0 }, 'previous', size)).toEqual({ row: 0, column: 3 })
+    expect(moveCell({ row: 0, column: 2 }, 'next', size)).toEqual({ row: 1, column: 1 })
+    expect(moveCell({ row: 1, column: 1 }, 'previous', size)).toEqual({ row: 0, column: 2 })
   })
 
-  it('leaves the grid when tabbing past its first or last cell', () => {
+  it('returns no cell when tabbing past the first or last editable cell', () => {
     expect(moveCell({ row: 0, column: 1 }, 'previous', size)).toBeNull()
-    expect(moveCell({ row: 0, column: 0 }, 'previous', size)).toBeNull()
-    expect(moveCell({ row: 2, column: 3 }, 'next', size)).toBeNull()
+    expect(moveCell({ row: 2, column: 2 }, 'next', size)).toBeNull()
   })
 })

@@ -1713,6 +1713,7 @@
         "actions": "Actions"
       },
       "cellLabel": "{column}, row {row}",
+      "activeError": "{column}, row {row}: {error}",
       "filter": "Filter by source or target code",
       "count": "{count, plural, one {# entry} other {# entries}}",
       "filteredCount": "{count, number} of {total, number} entries",
@@ -1728,6 +1729,7 @@
       "discard": "Discard changes",
       "unsaved": "Unsaved changes",
       "upToDate": "All changes saved",
+      "savingReadOnly": "Saving… The entries are read-only until the save finishes.",
       "errors": {
         "required": "Enter a code.",
         "tooLong": "Use at most {max} characters.",
@@ -1750,7 +1752,7 @@
           },
           "tab": {
             "keys": "Tab, Shift+Tab",
-            "action": "Move to the next or previous cell"
+            "action": "Leave the entries; while editing, keep the change and move to the next or previous cell"
           },
           "edit": {
             "keys": "Enter, F2 or start typing",

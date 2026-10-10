@@ -2,7 +2,6 @@
 
 import { Add01Icon, Table01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import {
   useDeferredValue,
@@ -16,27 +15,19 @@ import {
 } from 'react'
 
 import { LeaveGuard } from '@/components/leave-guard'
-import { gridCommand } from '@/components/lookup-tables/grid-keyboard'
-import {
-  type EntryField,
-  type EntryRow,
-  matchesFilter,
-  type RowErrors,
-  sameEntries,
-  toRows,
-  validateEntries,
-} from '@/components/lookup-tables/lookup-table-entries'
+import { isSaveShortcut } from '@/components/lookup-tables/grid-keyboard'
+import { type EntryField, matchesFilter } from '@/components/lookup-tables/lookup-table-entries'
 import {
   type ActiveCell,
   type Editing,
+  type EntryGridHandle,
   type GridHandlers,
+  columnOf,
   LookupTableEntryGrid,
-  revealCell,
-  type ShownRow,
+  positionOf,
+  type VisibleRow,
 } from '@/components/lookup-tables/lookup-table-entry-grid'
-import { toScopeInput } from '@/components/lookup-tables/lookup-table-scope'
-import { updateLookupTable } from '@/lib/api/client'
-import { lookupTableQuery, storeSavedLookupTable } from '@/lib/api/queries'
+import { useEntryEditing } from '@/components/lookup-tables/use-entry-editing'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -47,21 +38,12 @@ import {
 } from '@edi-bridge/ui/components/empty'
 import { Input } from '@edi-bridge/ui/components/input'
 
-import type { LookupTable, LookupTableEntry } from '@edi-bridge/contracts'
+import type { LookupTable } from '@edi-bridge/contracts'
 
 const shortcuts = ['move', 'tab', 'edit', 'commit', 'cancel', 'add', 'delete', 'save'] as const
 
-const fieldColumns: Record<EntryField, number> = { sourceCode: 1, targetCode: 2 }
-
-function without(keys: ReadonlySet<number>, key: number) {
-  const next = new Set(keys)
-  next.delete(key)
-
-  return next
-}
-
-function withoutRequired(errors: RowErrors): RowErrors {
-  return Object.fromEntries(Object.entries(errors).filter(([, error]) => error.kind !== 'required'))
+function dialogOpen() {
+  return document.querySelector('[role="dialog"], [role="alertdialog"]') !== null
 }
 
 function Shortcuts() {
@@ -88,80 +70,29 @@ function Shortcuts() {
   )
 }
 
-function useSaveEntries(table: LookupTable, onSaved: (saved: LookupTable) => void) {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (entries: LookupTableEntry[]) => {
-      const current = queryClient.getQueryData(lookupTableQuery(table.id).queryKey) ?? table
-
-      return updateLookupTable(table.id, {
-        name: current.name,
-        scope: toScopeInput(current.scope),
-        entries,
-      })
-    },
-    onSuccess: (saved) => {
-      storeSavedLookupTable(queryClient, saved)
-      onSaved(saved)
-    },
-  })
-}
-
 export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   const t = useTranslations('LookupTable.entries')
   const ids = { title: useId(), hint: useId(), filter: useId() }
-  const [baseline, setBaseline] = useState<ReadonlyArray<LookupTableEntry>>(table.entries)
-  const [rows, setRows] = useState<EntryRow[]>(() => toRows(table.entries))
-  const nextKey = useRef(table.entries.length)
-  const [fresh, setFresh] = useState<ReadonlySet<number>>(() => new Set())
   const [active, setActive] = useState<ActiveCell | null>(null)
   const [editing, setEditing] = useState<Editing | null>(null)
   const [filter, setFilter] = useState('')
-  const [attempted, setAttempted] = useState(false)
   const [announcement, setAnnouncement] = useState('')
   const focusRequest = useRef(false)
-  const grid = useRef<HTMLDivElement>(null)
+  const grid = useRef<EntryGridHandle>(null)
   const addButton = useRef<HTMLButtonElement>(null)
   const focusAddButton = useRef(false)
   const term = useDeferredValue(filter.trim().toLocaleLowerCase())
 
-  const save = useSaveEntries(table, (saved) => {
-    setBaseline(saved.entries)
-    setRows((current) =>
-      current.length === saved.entries.length
-        ? current.map((row, index) => ({ ...row, ...saved.entries[index] }))
-        : current,
-    )
-    setAttempted(false)
-    setAnnouncement(t('announcements.saved'))
+  const entries = useEntryEditing(table, {
+    onSaved: () => setAnnouncement(t('announcements.saved')),
   })
 
-  const validation = useMemo(() => validateEntries(rows), [rows])
-  const dirty = useMemo(() => !sameEntries(rows, baseline), [rows, baseline])
+  const { rows, saving } = entries
 
-  const shown = useMemo<ShownRow[]>(
+  const visibleRows = useMemo<VisibleRow[]>(
     () => rows.flatMap((row, index) => (matchesFilter(row, term) ? [{ row, index }] : [])),
     [rows, term],
   )
-
-  const errors = useMemo(() => {
-    const visible = new Map<number, RowErrors>()
-
-    if ('errors' in validation) {
-      for (const [index, rowErrors] of validation.errors) {
-        const shownErrors = fresh.has(rows[index]?.key ?? -1)
-          ? withoutRequired(rowErrors)
-          : rowErrors
-
-        if (shownErrors.sourceCode || shownErrors.targetCode) {
-          visible.set(index, shownErrors)
-        }
-      }
-    }
-
-    return visible
-  }, [validation, fresh, rows])
 
   useLayoutEffect(() => {
     if (focusAddButton.current) {
@@ -169,36 +100,30 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
       addButton.current?.focus()
     }
 
-    const position = active ? shown.findIndex(({ row }) => row.key === active.key) : -1
-
-    if (focusRequest.current && active && position >= 0) {
+    if (focusRequest.current && active && positionOf(visibleRows, active.key) >= 0) {
       focusRequest.current = false
-      revealCell(grid.current, position, active, editing === null)
+      grid.current?.reveal(active, editing === null)
     }
   })
-
-  function updateRow(key: number, field: EntryField, value: string) {
-    setRows((current) => current.map((row) => (row.key === key ? { ...row, [field]: value } : row)))
-  }
 
   function startEditing(key: number, field: EntryField, text: string | null) {
     const row = rows.find((candidate) => candidate.key === key)
 
-    if (!row) {
+    if (!row || saving) {
       return
     }
 
-    setActive({ key, column: fieldColumns[field] })
+    setActive({ key, column: columnOf(field) })
     setEditing({ key, field, original: row[field] })
 
     if (text !== null) {
-      updateRow(key, field, text)
+      entries.updateRow(key, field, text)
     }
   }
 
   function activate(cell: ActiveCell, focus: boolean) {
     if (active && active.key !== cell.key) {
-      setFresh((current) => without(current, active.key))
+      entries.markTouched(active.key)
     }
 
     setActive(cell)
@@ -214,39 +139,40 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
 
   function cancel() {
     if (editing) {
-      updateRow(editing.key, editing.field, editing.original)
+      entries.updateRow(editing.key, editing.field, editing.original)
       setEditing(null)
       focusRequest.current = true
     }
   }
 
   function add(afterKey?: number) {
-    const key = nextKey.current++
-    const afterIndex = rows.findIndex((row) => row.key === afterKey)
-    const index = afterKey === undefined || afterIndex < 0 ? rows.length : afterIndex + 1
-    const row = { key, sourceCode: '', targetCode: '' }
+    if (saving) {
+      return
+    }
 
-    setRows((current) => [...current.slice(0, index), row, ...current.slice(index)])
-    setFresh((current) => new Set(without(current, active?.key ?? -1)).add(key))
+    const { key, index } = entries.insertRow(afterKey, active?.key)
+
     setFilter('')
-    setActive({ key, column: 1 })
+    setActive({ key, column: columnOf('sourceCode') })
     setEditing({ key, field: 'sourceCode', original: '' })
     focusRequest.current = true
     setAnnouncement(t('announcements.added', { row: index + 1 }))
   }
 
   function remove(key: number) {
-    const index = rows.findIndex((row) => row.key === key)
-    const position = shown.findIndex(({ row }) => row.key === key)
-    const neighbour = shown[position + 1] ?? shown[position - 1]
+    if (saving) {
+      return
+    }
 
-    setRows((current) => current.filter((row) => row.key !== key))
-    setFresh((current) => without(current, key))
+    const position = positionOf(visibleRows, key)
+    const neighbour = visibleRows[position + 1] ?? visibleRows[position - 1]
+    const index = entries.removeRow(key)
+
     setEditing(null)
     setAnnouncement(t('announcements.deleted', { row: index + 1 }))
 
     if (neighbour) {
-      setActive({ key: neighbour.row.key, column: active?.column ?? 1 })
+      setActive({ key: neighbour.row.key, column: active?.column ?? columnOf('sourceCode') })
       focusRequest.current = true
     } else {
       setActive(null)
@@ -255,43 +181,31 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   }
 
   function discard() {
-    setRows(toRows(baseline, nextKey.current))
-    nextKey.current += baseline.length
-    setFresh(new Set())
+    entries.discard()
     setActive(null)
     setEditing(null)
-    setAttempted(false)
-    save.reset()
     setAnnouncement(t('announcements.discarded'))
   }
 
   function submit() {
     setEditing(null)
-    setFresh(new Set())
-    setAttempted(true)
 
-    if ('errors' in validation) {
-      const index = Math.min(...validation.errors.keys())
-      const rowErrors = validation.errors.get(index)!
-      const key = rows[index]!.key
+    const invalid = entries.submit()
 
-      if (!shown.some(({ row }) => row.key === key)) {
-        setFilter('')
-      }
-
-      setActive({ key, column: rowErrors.sourceCode ? 1 : 2 })
-      focusRequest.current = true
-
+    if (!invalid) {
       return
     }
 
-    if (dirty && !save.isPending) {
-      save.mutate(validation.entries)
+    if (positionOf(visibleRows, invalid.key) < 0) {
+      setFilter('')
     }
+
+    setActive({ key: invalid.key, column: columnOf(invalid.field) })
+    focusRequest.current = true
   }
 
   const saveShortcut = useEffectEvent((event: globalThis.KeyboardEvent) => {
-    if (gridCommand(event, true)?.kind === 'save') {
+    if (isSaveShortcut(event) && !dialogOpen()) {
       event.preventDefault()
       submit()
     }
@@ -306,14 +220,14 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   const handlers: GridHandlers = {
     onActivate: activate,
     onStartEditing: startEditing,
-    onChange: updateRow,
+    onChange: entries.updateRow,
     onCommit: commit,
     onCancel: cancel,
     onAdd: add,
     onDelete: remove,
   }
 
-  const errorCount = 'errors' in validation ? validation.errors.size : 0
+  const { dirty, errorCount } = entries
   const filtered = term !== ''
 
   return (
@@ -331,25 +245,22 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground text-sm">
-            {dirty ? t('unsaved') : t('upToDate')}
+            {saving ? t('savingReadOnly') : dirty ? t('unsaved') : t('upToDate')}
           </span>
-          <Button disabled={!dirty || save.isPending} variant="outline" onClick={discard}>
+          <Button disabled={!dirty || saving} variant="outline" onClick={discard}>
             {t('discard')}
           </Button>
-          <Button
-            disabled={!dirty || save.isPending}
-            aria-keyshortcuts="Control+S Meta+S"
-            onClick={submit}>
-            {save.isPending ? t('saving') : t('save')}
+          <Button disabled={!dirty || saving} aria-keyshortcuts="Control+S Meta+S" onClick={submit}>
+            {saving ? t('saving') : t('save')}
           </Button>
         </div>
       </div>
-      {attempted && errorCount > 0 && (
+      {errorCount > 0 && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.summary', { count: errorCount })}
         </p>
       )}
-      {save.isError && (
+      {entries.saveFailed && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.saveFailed')}
         </p>
@@ -370,10 +281,14 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
         <div className="flex items-center gap-3">
           <p aria-live="polite" className="text-muted-foreground text-sm">
             {filtered
-              ? t('filteredCount', { count: shown.length, total: rows.length })
+              ? t('filteredCount', { count: visibleRows.length, total: rows.length })
               : t('count', { count: rows.length })}
           </p>
-          <Button ref={addButton} variant="outline" onClick={() => add(active?.key)}>
+          <Button
+            disabled={saving}
+            ref={addButton}
+            variant="outline"
+            onClick={() => add(active?.key)}>
             <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden />
             {t('add')}
           </Button>
@@ -389,7 +304,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
             <EmptyDescription>{t('empty.description')}</EmptyDescription>
           </EmptyHeader>
         </Empty>
-      ) : shown.length === 0 ? (
+      ) : visibleRows.length === 0 ? (
         <p className="text-muted-foreground rounded-lg border px-2 py-6 text-center text-sm">
           {t('noMatch')}
         </p>
@@ -402,11 +317,12 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
             active={active}
             describedBy={ids.hint}
             editing={editing}
-            errors={errors}
+            errors={entries.errors}
             handlers={handlers}
             labelledBy={ids.title}
+            readOnly={saving}
             ref={grid}
-            shown={shown}
+            visibleRows={visibleRows}
           />
         </>
       )}

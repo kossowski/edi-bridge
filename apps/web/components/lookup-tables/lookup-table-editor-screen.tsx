@@ -10,6 +10,12 @@ import { ApiError } from '@/lib/api/client'
 import { lookupTableQuery } from '@/lib/api/queries'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
+function focusIfNothingFocused(heading: HTMLHeadingElement | null) {
+  if (heading && (document.activeElement === null || document.activeElement === document.body)) {
+    heading.focus()
+  }
+}
+
 export function LookupTableEditorScreen({ id }: { id: string }) {
   const t = useTranslations('LookupTable')
   const tLookupTables = useTranslations('LookupTables')
@@ -29,7 +35,12 @@ export function LookupTableEditorScreen({ id }: { id: string }) {
       ) : data ? (
         <>
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold tracking-tight">{data.name}</h1>
+            <h1
+              ref={focusIfNothingFocused}
+              tabIndex={-1}
+              className="text-2xl font-semibold tracking-tight outline-none">
+              {data.name}
+            </h1>
             <dl className="text-muted-foreground flex flex-wrap gap-x-2 text-sm">
               <dt>{tLookupTables('columns.scope')}:</dt>
               <dd>

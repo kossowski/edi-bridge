@@ -10,14 +10,21 @@ import {
   type Ref,
   type RefObject,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
 } from 'react'
 
-import { type CellPosition, gridCommand, moveCell } from '@/components/lookup-tables/grid-keyboard'
+import {
+  type CellPosition,
+  gridCommand,
+  type GridSize,
+  moveCell,
+} from '@/components/lookup-tables/grid-keyboard'
 import {
   type EntryError,
   type EntryField,
+  entryFields,
   type EntryRow,
   type RowErrors,
 } from '@/components/lookup-tables/lookup-table-entries'
@@ -33,20 +40,32 @@ const overscan = 6
 
 const fallbackViewport = 560
 
-const columnFields: ReadonlyArray<EntryField | null> = [null, 'sourceCode', 'targetCode', null]
+export const gridColumns = ['row', 'sourceCode', 'targetCode', 'actions'] as const
 
-const columnKeys = ['row', 'sourceCode', 'targetCode', 'actions'] as const
+export function columnOf(key: (typeof gridColumns)[number]) {
+  return gridColumns.indexOf(key)
+}
 
-const gridColumns = 'grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem]'
+function fieldAt(column: number): EntryField | null {
+  return entryFields.find((field) => columnOf(field) === column) ?? null
+}
+
+const gridTemplate = 'grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem]'
 
 const cellClass =
-  'focus-visible:ring-ring flex min-w-0 flex-col justify-center gap-0.5 px-2 outline-none focus-visible:ring-2 focus-visible:ring-inset'
+  'focus-visible:ring-foreground flex min-w-0 scroll-mt-10 flex-col justify-center gap-0.5 px-2 outline-none focus-visible:ring-2 focus-visible:ring-inset'
 
-export type ShownRow = { row: EntryRow; index: number }
+export type VisibleRow = { row: EntryRow; index: number }
+
+export function positionOf(visibleRows: ReadonlyArray<VisibleRow>, key: number) {
+  return visibleRows.findIndex(({ row }) => row.key === key)
+}
 
 export type ActiveCell = { key: number; column: number }
 
 export type Editing = { key: number; field: EntryField; original: string }
+
+export type EntryGridHandle = { reveal: (cell: ActiveCell, focus: boolean) => void }
 
 export type GridHandlers = {
   onActivate: (cell: ActiveCell, focus: boolean) => void
@@ -110,31 +129,6 @@ function renderedIndexes(count: number, top: number, height: number, active: num
   return active >= 0 && (active < first || active > last) ? [...indexes, active] : indexes
 }
 
-export function revealCell(
-  grid: HTMLElement | null,
-  position: number,
-  cell: ActiveCell,
-  focus: boolean,
-) {
-  const scroller = grid?.querySelector<HTMLElement>('[data-scroller]')
-
-  if (scroller) {
-    const top = position * rowHeight
-
-    if (top < scroller.scrollTop) {
-      scroller.scrollTop = top
-    } else if (headerHeight + top + rowHeight > scroller.scrollTop + scroller.clientHeight) {
-      scroller.scrollTop = headerHeight + top + rowHeight - scroller.clientHeight
-    }
-  }
-
-  if (focus) {
-    grid
-      ?.querySelector<HTMLElement>(`[data-key="${cell.key}"][data-column="${cell.column}"]`)
-      ?.focus({ preventScroll: true })
-  }
-}
-
 function cellAt(target: EventTarget): ActiveCell | null {
   const cell = target instanceof Element ? target.closest<HTMLElement>('[data-column]') : null
 
@@ -181,8 +175,7 @@ function EditInput({
 
 function CodeCell({
   row,
-  number,
-  column,
+  rowNumber,
   field,
   tabIndex,
   editing,
@@ -191,8 +184,7 @@ function CodeCell({
   handlers,
 }: {
   row: EntryRow
-  number: number
-  column: number
+  rowNumber: number
   field: EntryField
   tabIndex: number
   editing: boolean
@@ -201,7 +193,7 @@ function CodeCell({
   handlers: GridHandlers
 }) {
   const t = useTranslations('LookupTable.entries')
-  const label = t('cellLabel', { column: t(`columns.${field}`), row: number })
+  const label = t('cellLabel', { column: t(`columns.${field}`), row: rowNumber })
 
   return (
     <div
@@ -209,7 +201,7 @@ function CodeCell({
       tabIndex={tabIndex}
       aria-invalid={error ? true : undefined}
       className={cn(cellClass, 'cursor-text')}
-      data-column={column}
+      data-column={columnOf(field)}
       data-key={row.key}>
       {editing ? (
         <EditInput
@@ -233,26 +225,28 @@ function CodeCell({
 }
 
 function GridRow({
-  shown,
+  visibleRow,
   position,
   activeColumn,
   editingField,
   errors,
   idPrefix,
+  readOnly,
   handlers,
 }: {
-  shown: ShownRow
+  visibleRow: VisibleRow
   position: number
   activeColumn: number | null
   editingField: EntryField | null
   errors: RowErrors | undefined
   idPrefix: string
+  readOnly: boolean
   handlers: GridHandlers
 }) {
   const t = useTranslations('LookupTable.entries')
   const errorMessage = useErrorMessage()
-  const { row, index } = shown
-  const number = index + 1
+  const { row, index } = visibleRow
+  const rowNumber = index + 1
   const tabIndexOf = (column: number) => (activeColumn === column ? 0 : -1)
 
   return (
@@ -260,44 +254,45 @@ function GridRow({
       role="row"
       aria-rowindex={position + 2}
       className={cn(
-        gridColumns,
+        gridTemplate,
         'absolute inset-x-0 border-b',
         errors && 'bg-red-50/60 dark:bg-red-950/30',
       )}
       style={{ top: position * rowHeight, height: rowHeight }}>
       <div
         role="rowheader"
-        tabIndex={tabIndexOf(0)}
+        tabIndex={tabIndexOf(columnOf('row'))}
         className={cn(cellClass, 'text-muted-foreground text-sm tabular-nums')}
-        data-column={0}
+        data-column={columnOf('row')}
         data-key={row.key}>
-        {number}
+        {rowNumber}
       </div>
-      {(['sourceCode', 'targetCode'] as const).map((field, offset) => {
+      {entryFields.map((field) => {
         const error = errors?.[field]
 
         return (
           <CodeCell
             key={field}
-            column={offset + 1}
             editing={editingField === field}
             error={error ? errorMessage(error) : null}
             errorId={`${idPrefix}-${row.key}-${field}-error`}
             field={field}
             handlers={handlers}
-            number={number}
             row={row}
-            tabIndex={tabIndexOf(offset + 1)}
+            rowNumber={rowNumber}
+            tabIndex={tabIndexOf(columnOf(field))}
           />
         )
       })}
       <div role="gridcell" className="flex items-center justify-center">
         <Button
           size="icon-sm"
-          tabIndex={tabIndexOf(3)}
+          tabIndex={tabIndexOf(columnOf('actions'))}
           variant="ghost"
-          aria-label={t('deleteRow', { row: number })}
-          data-column={3}
+          aria-disabled={readOnly || undefined}
+          aria-label={t('deleteRow', { row: rowNumber })}
+          className="scroll-mt-10"
+          data-column={columnOf('actions')}
           data-key={row.key}
           onClick={() => handlers.onDelete(row.key)}>
           <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
@@ -308,41 +303,73 @@ function GridRow({
 }
 
 export function LookupTableEntryGrid({
-  shown,
+  visibleRows,
   active,
   editing,
   errors,
+  readOnly,
   ref,
   labelledBy,
   describedBy,
   handlers,
 }: {
-  shown: ReadonlyArray<ShownRow>
+  visibleRows: ReadonlyArray<VisibleRow>
   active: ActiveCell | null
   editing: Editing | null
   errors: ReadonlyMap<number, RowErrors>
-  ref: Ref<HTMLDivElement>
+  readOnly: boolean
+  ref: Ref<EntryGridHandle>
   labelledBy: string
   describedBy: string
   handlers: GridHandlers
 }) {
   const t = useTranslations('LookupTable.entries')
+  const errorMessage = useErrorMessage()
+  const root = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const { viewport, onScroll } = useViewport(scroller)
-  const foundIndex = active ? shown.findIndex(({ row }) => row.key === active.key) : -1
-  const activePosition = foundIndex >= 0 ? foundIndex : 0
-  const activeColumn = foundIndex >= 0 && active ? active.column : 1
-  const activeKey = shown[activePosition]?.row.key
+  const activePosition = active ? positionOf(visibleRows, active.key) : -1
 
-  const size = {
-    rows: shown.length,
-    columns: columnKeys.length,
-    firstTabColumn: 1,
+  const current: CellPosition =
+    active && activePosition >= 0
+      ? { row: activePosition, column: active.column }
+      : { row: 0, column: columnOf('sourceCode') }
+
+  const currentRow = visibleRows[current.row]
+  const currentField = fieldAt(current.column)
+
+  const currentError =
+    activePosition >= 0 && currentRow && currentField
+      ? errors.get(currentRow.index)?.[currentField]
+      : undefined
+
+  const size: GridSize = {
+    rows: visibleRows.length,
+    columns: gridColumns.length,
+    editColumns: { first: columnOf('sourceCode'), last: columnOf('targetCode') },
     pageRows: Math.max(1, Math.floor(viewport.height / rowHeight) - 1),
   }
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      reveal(cell, focus) {
+        const element = root.current?.querySelector<HTMLElement>(
+          `[data-key="${cell.key}"][data-column="${cell.column}"]`,
+        )
+
+        if (focus) {
+          element?.focus({ preventScroll: true })
+        }
+
+        element?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      },
+    }),
+    [],
+  )
+
   function goTo(position: CellPosition) {
-    const target = shown[position.row]
+    const target = visibleRows[position.row]
 
     if (target) {
       handlers.onActivate({ key: target.row.key, column: position.column }, true)
@@ -351,16 +378,15 @@ export function LookupTableEntryGrid({
 
   function keyDown(event: KeyboardEvent<HTMLDivElement>) {
     const command = gridCommand(event, editing !== null)
+    const activeKey = currentRow?.row.key
 
     if (!command || activeKey === undefined) {
       return
     }
 
-    const field = columnFields[activeColumn] ?? null
-
     switch (command.kind) {
       case 'move': {
-        const next = moveCell({ row: activePosition, column: activeColumn }, command.move, size)
+        const next = moveCell(current, command.move, size)
 
         if (editing) {
           handlers.onCommit(false)
@@ -376,9 +402,13 @@ export function LookupTableEntryGrid({
 
       case 'edit':
       case 'type':
-        if (field) {
+        if (currentField && !readOnly) {
           event.preventDefault()
-          handlers.onStartEditing(activeKey, field, command.kind === 'type' ? command.text : null)
+          handlers.onStartEditing(
+            activeKey,
+            currentField,
+            command.kind === 'type' ? command.text : null,
+          )
         }
 
         return
@@ -409,9 +439,9 @@ export function LookupTableEntryGrid({
 
   function click(event: MouseEvent<HTMLDivElement>) {
     const cell = cellAt(event.target)
-    const field = cell ? columnFields[cell.column] : null
+    const field = cell ? fieldAt(cell.column) : null
 
-    if (cell && field && !(editing?.key === cell.key && editing.field === field)) {
+    if (cell && field && !readOnly && !(editing?.key === cell.key && editing.field === field)) {
       handlers.onStartEditing(cell.key, field, null)
     }
   }
@@ -424,70 +454,84 @@ export function LookupTableEntryGrid({
     }
   }
 
-  const indexes = renderedIndexes(
-    shown.length,
-    viewport.top,
-    viewport.height,
-    foundIndex >= 0 ? foundIndex : 0,
-  )
+  const indexes = renderedIndexes(visibleRows.length, viewport.top, viewport.height, current.row)
 
   return (
-    <div
-      ref={ref}
-      role="grid"
-      tabIndex={-1}
-      aria-colcount={columnKeys.length}
-      aria-describedby={describedBy}
-      aria-labelledby={labelledBy}
-      aria-rowcount={shown.length + 1}
-      className="bg-card overflow-hidden rounded-lg border outline-none"
-      onClick={click}
-      onFocus={focus}
-      onKeyDown={keyDown}>
+    <div className="flex min-w-0 flex-col gap-2">
       <div
-        ref={scroller}
-        className="max-h-[min(35rem,calc(100dvh-18rem))] overflow-y-auto"
-        data-scroller
-        onScroll={(event) => onScroll(event.currentTarget.scrollTop)}>
-        <div role="rowgroup" className="bg-muted sticky top-0 z-10 border-b">
+        ref={root}
+        role="grid"
+        tabIndex={-1}
+        aria-busy={readOnly || undefined}
+        aria-colcount={gridColumns.length}
+        aria-describedby={describedBy}
+        aria-labelledby={labelledBy}
+        aria-readonly={readOnly || undefined}
+        aria-rowcount={visibleRows.length + 1}
+        className={cn(
+          'bg-card overflow-hidden rounded-lg border outline-none',
+          readOnly && 'bg-muted/40',
+        )}
+        onClick={click}
+        onFocus={focus}
+        onKeyDown={keyDown}>
+        <div
+          ref={scroller}
+          className="max-h-[min(35rem,calc(100dvh-18rem))] overflow-y-auto"
+          onScroll={(event) => onScroll(event.currentTarget.scrollTop)}>
+          <div role="rowgroup" className="bg-muted sticky top-0 z-10 border-b">
+            <div
+              role="row"
+              aria-rowindex={1}
+              className={cn(gridTemplate, 'items-center')}
+              style={{ height: headerHeight }}>
+              {gridColumns.map((key) => (
+                <div
+                  key={key}
+                  role="columnheader"
+                  className={cn(
+                    'text-foreground px-2 text-sm font-medium',
+                    key === 'actions' && 'sr-only',
+                  )}>
+                  {t(`columns.${key}`)}
+                </div>
+              ))}
+            </div>
+          </div>
           <div
-            role="row"
-            aria-rowindex={1}
-            className={cn(gridColumns, 'items-center')}
-            style={{ height: headerHeight }}>
-            {columnKeys.map((key) => (
-              <div
-                key={key}
-                role="columnheader"
-                className={cn(
-                  'text-foreground px-2 text-sm font-medium',
-                  key === 'actions' && 'sr-only',
-                )}>
-                {t(`columns.${key}`)}
-              </div>
-            ))}
+            role="rowgroup"
+            className="relative"
+            style={{ height: visibleRows.length * rowHeight }}>
+            {indexes.map((position) => {
+              const item = visibleRows[position]!
+              const isActive = position === current.row
+
+              return (
+                <GridRow
+                  key={item.row.key}
+                  activeColumn={isActive ? current.column : null}
+                  editingField={editing?.key === item.row.key ? editing.field : null}
+                  errors={errors.get(item.index)}
+                  handlers={handlers}
+                  idPrefix={labelledBy}
+                  position={position}
+                  readOnly={readOnly}
+                  visibleRow={item}
+                />
+              )
+            })}
           </div>
         </div>
-        <div role="rowgroup" className="relative" style={{ height: shown.length * rowHeight }}>
-          {indexes.map((position) => {
-            const item = shown[position]!
-            const isActive = item.row.key === activeKey
-
-            return (
-              <GridRow
-                key={item.row.key}
-                activeColumn={isActive ? activeColumn : null}
-                editingField={editing?.key === item.row.key ? editing.field : null}
-                errors={errors.get(item.index)}
-                handlers={handlers}
-                idPrefix={labelledBy}
-                position={position}
-                shown={item}
-              />
-            )
-          })}
-        </div>
       </div>
+      {currentError && currentRow && currentField && (
+        <p className="text-sm text-red-800 dark:text-red-300">
+          {t('activeError', {
+            column: t(`columns.${currentField}`),
+            row: currentRow.index + 1,
+            error: errorMessage(currentError),
+          })}
+        </p>
+      )}
     </div>
   )
 }

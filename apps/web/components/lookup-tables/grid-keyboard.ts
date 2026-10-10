@@ -1,6 +1,11 @@
 export type CellPosition = { row: number; column: number }
 
-export type GridSize = { rows: number; columns: number; firstTabColumn: number; pageRows: number }
+export type GridSize = {
+  rows: number
+  columns: number
+  editColumns: { first: number; last: number }
+  pageRows: number
+}
 
 export type GridMove =
   | 'up'
@@ -53,6 +58,10 @@ function arrowMove(key: string): GridMove | null {
   }
 }
 
+export function isSaveShortcut(press: KeyPress) {
+  return (press.ctrlKey || press.metaKey) && press.key.toLowerCase() === 's'
+}
+
 export function gridCommand(press: KeyPress, editing: boolean): GridCommand | null {
   const command = press.ctrlKey || press.metaKey
 
@@ -60,15 +69,15 @@ export function gridCommand(press: KeyPress, editing: boolean): GridCommand | nu
     return { kind: 'add' }
   }
 
-  if (command && press.key.toLowerCase() === 's') {
+  if (isSaveShortcut(press)) {
     return { kind: 'save' }
   }
 
-  if (press.key === 'Tab') {
-    return { kind: 'move', move: press.shiftKey ? 'previous' : 'next' }
-  }
-
   if (editing) {
+    if (press.key === 'Tab') {
+      return { kind: 'move', move: press.shiftKey ? 'previous' : 'next' }
+    }
+
     if (press.key === 'Enter') {
       return { kind: 'commit' }
     }
@@ -109,25 +118,15 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function tabStep({ row, column }: CellPosition, size: GridSize, step: 1 | -1) {
-  const tabColumns = size.columns - size.firstTabColumn
-  const flat = row * tabColumns + (column - size.firstTabColumn) + step
+  const { first, last } = size.editColumns
+  const width = last - first + 1
+  const flat = row * width + (clamp(column, first, last) - first) + step
 
-  if (column < size.firstTabColumn) {
-    return step === 1
-      ? { row, column: size.firstTabColumn }
-      : row > 0
-        ? { row: row - 1, column: size.columns - 1 }
-        : null
-  }
-
-  if (flat < 0 || flat >= size.rows * tabColumns) {
+  if (flat < 0 || flat >= size.rows * width) {
     return null
   }
 
-  return {
-    row: Math.floor(flat / tabColumns),
-    column: (flat % tabColumns) + size.firstTabColumn,
-  }
+  return { row: Math.floor(flat / width), column: (flat % width) + first }
 }
 
 export function moveCell(

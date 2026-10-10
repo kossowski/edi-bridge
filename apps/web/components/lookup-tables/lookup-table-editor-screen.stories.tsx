@@ -1,12 +1,12 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect } from 'storybook/test'
+import { expect, userEvent } from 'storybook/test'
 
 import { LookupTableEditorScreen } from '@/components/lookup-tables/lookup-table-editor-screen'
 import { LookupTableEntryEditor } from '@/components/lookup-tables/lookup-table-entry-editor'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { lookupTableEndpoint } from '@edi-bridge/contracts'
+import { lookupTableEndpoint, updateLookupTableEndpoint } from '@edi-bridge/contracts'
 import {
   createLookupTables,
   lookupTableHandlers,
@@ -94,6 +94,46 @@ export const LargeVolume = meta.story({
       '5001',
     )
     await expect(canvas.getAllByRole('row').length).toBeLessThan(60)
+  },
+})
+
+export const OneTabStop = meta.story({
+  async play({ canvas }) {
+    const grid = await canvas.findByRole('grid', { name: 'Entries' })
+
+    await userEvent.click(canvas.getByLabelText('Filter by source or target code'))
+    await userEvent.tab()
+    await expect(canvas.getByRole('button', { name: 'Add entry' })).toHaveFocus()
+    await userEvent.tab()
+    await expect(grid.contains(document.activeElement)).toBe(true)
+    await userEvent.tab()
+    await expect(canvas.getByText('Keyboard shortcuts')).toHaveFocus()
+  },
+})
+
+export const Saving = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.put(`${apiUrl}${updateLookupTableEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('gridcell', { name: 'KGM' }))
+    await userEvent.keyboard('X{Enter}')
+    await userEvent.click(canvas.getByRole('button', { name: 'Save changes' }))
+
+    await expect(
+      await canvas.findByText('Saving… The entries are read-only until the save finishes.'),
+    ).toBeVisible()
+    await expect(canvas.getByRole('grid', { name: 'Entries' })).toHaveAttribute(
+      'aria-readonly',
+      'true',
+    )
+
+    await userEvent.click(canvas.getByRole('gridcell', { name: 'KGMX' }))
+    await expect(canvas.queryByRole('textbox', { name: /row/ })).toBeNull()
   },
 })
 

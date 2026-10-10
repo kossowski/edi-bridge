@@ -1713,6 +1713,7 @@
         "actions": "Aktionen"
       },
       "cellLabel": "{column}, Zeile {row}",
+      "activeError": "{column}, Zeile {row}: {error}",
       "filter": "Nach Ausgangs- oder Zielcode filtern",
       "count": "{count, plural, one {# Eintrag} other {# Einträge}}",
       "filteredCount": "{count, number} von {total, number} Einträgen",
@@ -1728,6 +1729,7 @@
       "discard": "Änderungen verwerfen",
       "unsaved": "Ungespeicherte Änderungen",
       "upToDate": "Alle Änderungen gespeichert",
+      "savingReadOnly": "Wird gespeichert… Die Einträge sind schreibgeschützt, bis das Speichern abgeschlossen ist.",
       "errors": {
         "required": "Geben Sie einen Code ein.",
         "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
@@ -1750,7 +1752,7 @@
           },
           "tab": {
             "keys": "Tab, Umschalt+Tab",
-            "action": "Zur nächsten oder vorherigen Zelle"
+            "action": "Einträge verlassen; beim Bearbeiten Änderung übernehmen und zur nächsten oder vorherigen Zelle wechseln"
           },
           "edit": {
             "keys": "Enter, F2 oder lostippen",
