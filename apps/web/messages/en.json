@@ -1653,7 +1653,10 @@
         },
         "scope": {
           "label": "Scope",
-          "description": "A Workspace Lookup Table applies to all Trading Partners.",
+          "description": {
+            "workspace": "A Workspace Lookup Table applies to all Trading Partners.",
+            "tradingPartner": "A Trading Partner Lookup Table applies only to the chosen Trading Partner."
+          },
           "workspace": "Workspace",
           "tradingPartner": "A single Trading Partner"
         },

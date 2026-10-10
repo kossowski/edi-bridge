@@ -2,22 +2,24 @@
 
 import {
   Add01Icon,
-  Building03Icon,
   Delete02Icon,
   MoreHorizontalIcon,
   PencilEdit02Icon,
   Table01Icon,
-  UserMultiple02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
-import Link from 'next/link'
-import { type RefObject, useMemo, useRef, useState } from 'react'
+import { type Ref, type RefObject, useMemo, useRef, useState } from 'react'
 
 import { ListScreen, ListTable } from '@/components/list-screen'
 import { DeleteLookupTableDialog } from '@/components/lookup-tables/delete-lookup-table-dialog'
 import { LookupTableFormDialog } from '@/components/lookup-tables/lookup-table-form-dialog'
+import {
+  scopeIcons,
+  scopeKey,
+  workspaceScopeKey,
+} from '@/components/lookup-tables/lookup-table-scope'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
@@ -33,19 +35,13 @@ import type { LookupTable, LookupTableScope, LookupTableSummary } from '@edi-bri
 
 const columns = ['name', 'scope', 'entries', 'updatedAt', 'actions'] as const
 
-const workspaceScope = 'workspace'
-
-function scopeValue(scope: LookupTableScope) {
-  return scope.kind === 'workspace' ? workspaceScope : scope.tradingPartner.id
-}
-
 function ScopeLabel({ scope }: { scope: LookupTableScope }) {
   const t = useTranslations('LookupTables.scope')
 
   return (
     <span className="flex items-center gap-1.5">
       <HugeiconsIcon
-        icon={scope.kind === 'workspace' ? Building03Icon : UserMultiple02Icon}
+        icon={scopeIcons[scope.kind]}
         strokeWidth={2}
         aria-hidden
         className="text-muted-foreground size-4 shrink-0"
@@ -105,14 +101,8 @@ function LookupTableRow({
   const format = useFormatter()
 
   return (
-    <TableRow className="relative">
-      <TableCell>
-        <Link
-          href={`/lookup-tables/${table.id}`}
-          className="focus-visible:after:ring-ring font-medium underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset">
-          {table.name}
-        </Link>
-      </TableCell>
+    <TableRow>
+      <TableCell className="font-medium">{table.name}</TableCell>
       <TableCell>
         <ScopeLabel scope={table.scope} />
       </TableCell>
@@ -120,7 +110,7 @@ function LookupTableRow({
       <TableCell className="tabular-nums">
         {format.dateTime(new Date(table.updatedAt), { dateStyle: 'medium', timeStyle: 'short' })}
       </TableCell>
-      <TableCell className="relative z-10 w-px text-right">
+      <TableCell className="w-px text-right">
         <LookupTableActions table={table} onDelete={onDelete} onEdit={onEdit} />
       </TableCell>
     </TableRow>
@@ -141,10 +131,10 @@ function useScopeFilter(tables: ReadonlyArray<LookupTableSummary> | undefined) {
     }
 
     return [
-      { value: workspaceScope, label: t('scope.workspace'), icon: Building03Icon },
+      { value: workspaceScopeKey, label: t('scope.workspace'), icon: scopeIcons.workspace },
       ...[...tradingPartners]
         .sort(([, a], [, b]) => a.localeCompare(b))
-        .map(([value, label]) => ({ value, label, icon: UserMultiple02Icon })),
+        .map(([value, label]) => ({ value, label, icon: scopeIcons.tradingPartner })),
     ]
   }, [tables, t])
 
@@ -154,7 +144,7 @@ function useScopeFilter(tables: ReadonlyArray<LookupTableSummary> | undefined) {
     filter:
       active.length === 0
         ? undefined
-        : (table: LookupTableSummary) => active.includes(scopeValue(table.scope)),
+        : (table: LookupTableSummary) => active.includes(scopeKey(table.scope)),
     element: (
       <FacetedFilter
         clearLabel={t('filters.clear')}
@@ -167,6 +157,23 @@ function useScopeFilter(tables: ReadonlyArray<LookupTableSummary> | undefined) {
   }
 }
 
+function NewLookupTableButton({
+  ref,
+  onClick,
+}: {
+  ref?: Ref<HTMLButtonElement>
+  onClick: () => void
+}) {
+  const t = useTranslations('LookupTables')
+
+  return (
+    <Button ref={ref} onClick={onClick}>
+      <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden />
+      {t('new')}
+    </Button>
+  )
+}
+
 type Dialogs = {
   form: { open: boolean; table: LookupTableSummary | null }
   delete: { open: boolean; table: LookupTableSummary | null }
@@ -175,7 +182,7 @@ type Dialogs = {
 function useLookupTableDialogs(newButton: RefObject<HTMLButtonElement | null>) {
   const returnFocus = useRef<HTMLElement | null>(null)
 
-  const [dialogs, setDialogs] = useState<Dialogs>({
+  const [state, setState] = useState<Dialogs>({
     form: { open: false, table: null },
     delete: { open: false, table: null },
   })
@@ -186,15 +193,15 @@ function useLookupTableDialogs(newButton: RefObject<HTMLButtonElement | null>) {
     trigger: HTMLElement | null,
   ) {
     returnFocus.current = trigger ?? newButton.current
-    setDialogs((current) => ({ ...current, [kind]: { open: true, table } }))
+    setState((current) => ({ ...current, [kind]: { open: true, table } }))
   }
 
   function close(kind: keyof Dialogs) {
-    setDialogs((current) => ({ ...current, [kind]: { ...current[kind], open: false } }))
+    setState((current) => ({ ...current, [kind]: { ...current[kind], open: false } }))
   }
 
   return {
-    dialogs,
+    state,
     returnFocus,
     create: () => open('form', null, null),
     edit: ((table, trigger) => open('form', table, trigger)) satisfies RowAction,
@@ -218,7 +225,7 @@ export function LookupTablesScreen() {
 
   function saved(table: LookupTable) {
     setAnnouncement(
-      dialogs.dialogs.form.table
+      dialogs.state.form.table
         ? t('announcements.saved', { name: table.name })
         : t('announcements.created', { name: table.name }),
     )
@@ -230,16 +237,9 @@ export function LookupTablesScreen() {
     dialogs.afterDelete()
   }
 
-  const newIcon = <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden />
-
   return (
     <ListScreen
-      action={
-        <Button ref={newButton} onClick={dialogs.create}>
-          {newIcon}
-          {t('new')}
-        </Button>
-      }
+      action={<NewLookupTableButton ref={newButton} onClick={dialogs.create} />}
       title={tNavigation('lookupTables')}>
       <p role="status" className="sr-only">
         {announcement}
@@ -250,12 +250,7 @@ export function LookupTablesScreen() {
           label: t(`columns.${key}`),
           hidden: key === 'actions',
         }))}
-        emptyAction={
-          <Button onClick={dialogs.create}>
-            {newIcon}
-            {t('new')}
-          </Button>
-        }
+        emptyAction={<NewLookupTableButton onClick={dialogs.create} />}
         emptyIcon={Table01Icon}
         filter={scopeFilter.filter}
         matches={(table, term) =>
@@ -278,15 +273,15 @@ export function LookupTablesScreen() {
       />
       <LookupTableFormDialog
         finalFocus={dialogs.returnFocus}
-        open={dialogs.dialogs.form.open}
-        table={dialogs.dialogs.form.table}
+        open={dialogs.state.form.open}
+        table={dialogs.state.form.table}
         onOpenChange={(open) => !open && dialogs.close('form')}
         onSaved={saved}
       />
       <DeleteLookupTableDialog
         finalFocus={dialogs.returnFocus}
-        open={dialogs.dialogs.delete.open}
-        table={dialogs.dialogs.delete.table}
+        open={dialogs.state.delete.open}
+        table={dialogs.state.delete.table}
         onDeleted={deleted}
         onOpenChange={(open) => !open && dialogs.close('delete')}
       />

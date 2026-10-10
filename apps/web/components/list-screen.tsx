@@ -201,7 +201,7 @@ export function ListTable<Item>({
               : t('filteredCount', { count: shown.length, total: query.data?.length ?? 0 })}
         </p>
       </div>
-      <div className="rounded-lg border">
+      <div className="@container rounded-lg border">
         <Table aria-busy={busy}>
           <TableCaption className="sr-only">{t('caption')}</TableCaption>
           <TableHeader>
@@ -218,10 +218,10 @@ export function ListTable<Item>({
               <LoadingRows columns={columns.length} count={6} />
             ) : shown.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="text-muted-foreground py-6 text-center">
-                  {t('noMatch')}
+                <TableCell colSpan={columns.length} className="p-0">
+                  <p className="text-muted-foreground sticky left-0 w-[100cqw] px-2 py-6 text-center whitespace-normal">
+                    {t('noMatch')}
+                  </p>
                 </TableCell>
               </TableRow>
             ) : (

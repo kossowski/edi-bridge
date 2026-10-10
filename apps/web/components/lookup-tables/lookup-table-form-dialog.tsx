@@ -14,6 +14,7 @@ import {
   toFormValues,
   validateLookupTableForm,
 } from '@/components/lookup-tables/lookup-table-form-values'
+import { scopeKey } from '@/components/lookup-tables/lookup-table-scope'
 import { useLookup } from '@/hooks/use-lookup'
 import { ApiError, createLookupTable, updateLookupTable } from '@/lib/api/client'
 import { lookupTableQuery, storeSavedLookupTable, tradingPartnersQuery } from '@/lib/api/queries'
@@ -34,10 +35,6 @@ import type { LookupTable, LookupTableSummary } from '@edi-bridge/contracts'
 const errorClass = 'text-sm text-red-800 dark:text-red-300'
 
 const scopeKinds = ['workspace', 'tradingPartner'] as const satisfies ReadonlyArray<ScopeKind>
-
-function scopeKey({ scope }: LookupTableSettings) {
-  return scope.kind === 'workspace' ? 'workspace' : scope.tradingPartnerId
-}
 
 function useFieldErrorMessage() {
   const t = useTranslations('LookupTables.form.errors')
@@ -124,7 +121,10 @@ function LookupTableForm({
         return createLookupTable({ ...settings, entries: [] })
       }
 
-      const { entries } = await queryClient.fetchQuery(lookupTableQuery(table.id))
+      const { entries } = await queryClient.fetchQuery({
+        ...lookupTableQuery(table.id),
+        staleTime: 0,
+      })
 
       return updateLookupTable(table.id, { ...settings, entries })
     },
@@ -134,7 +134,7 @@ function LookupTableForm({
     },
     onError: (error, settings) => {
       if (error instanceof ApiError && error.status === 409) {
-        setTaken({ name: settings.name.toLocaleLowerCase(), scope: scopeKey(settings) })
+        setTaken({ name: settings.name.toLocaleLowerCase(), scope: scopeKey(settings.scope) })
       }
     },
   })
@@ -152,7 +152,7 @@ function LookupTableForm({
     'input' in result &&
     taken !== null &&
     result.input.name.toLocaleLowerCase() === taken.name &&
-    scopeKey(result.input) === taken.scope
+    scopeKey(result.input.scope) === taken.scope
       ? t('errors.taken')
       : null
 
@@ -202,7 +202,7 @@ function LookupTableForm({
       />
       <RadioField
         id={ids.scope}
-        description={t('fields.scope.description')}
+        description={t(`fields.scope.description.${values.scopeKind}`)}
         items={scopeKinds.map((kind) => ({ value: kind, label: t(`fields.scope.${kind}`) }))}
         label={t('fields.scope.label')}
         value={values.scopeKind}

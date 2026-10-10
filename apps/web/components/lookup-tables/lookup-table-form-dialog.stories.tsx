@@ -49,6 +49,9 @@ export const Create = meta.story({
     await dialog()
     await expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('')
     await expect(screen.getByRole('radio', { name: 'Workspace' })).toBeChecked()
+    await expect(
+      screen.getByText('A Workspace Lookup Table applies to all Trading Partners.'),
+    ).toBeVisible()
   },
 })
 
@@ -58,8 +61,12 @@ export const EditTradingPartnerScope = meta.story({
     await dialog()
     await expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Hansemarkt units')
     await expect(
-      await screen.findByRole('combobox', { name: 'Trading Partner' }),
-    ).toHaveTextContent('Hansemarkt GmbH')
+      screen.getByText(
+        'A Trading Partner Lookup Table applies only to the chosen Trading Partner.',
+      ),
+    ).toBeVisible()
+    const tradingPartner = await screen.findByRole('combobox', { name: 'Trading Partner' })
+    await waitFor(() => expect(tradingPartner).toHaveTextContent('Hansemarkt GmbH'))
   },
 })
 
@@ -98,8 +105,7 @@ export const Dark = meta.story({
   },
   async play() {
     await dialog()
-    await expect(
-      await screen.findByRole('combobox', { name: 'Trading Partner' }),
-    ).toHaveTextContent('Hansemarkt GmbH')
+    const tradingPartner = await screen.findByRole('combobox', { name: 'Trading Partner' })
+    await waitFor(() => expect(tradingPartner).toHaveTextContent('Hansemarkt GmbH'))
   },
 })

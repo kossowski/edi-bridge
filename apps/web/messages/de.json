@@ -1653,7 +1653,10 @@
         },
         "scope": {
           "label": "Geltungsbereich",
-          "description": "Eine Lookup Table des Workspace gilt für alle Trading Partners.",
+          "description": {
+            "workspace": "Eine Lookup Table des Workspace gilt für alle Trading Partners.",
+            "tradingPartner": "Eine Lookup Table eines Trading Partners gilt nur für den gewählten Trading Partner."
+          },
           "workspace": "Workspace",
           "tradingPartner": "Ein einzelner Trading Partner"
         },

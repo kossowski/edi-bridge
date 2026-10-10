@@ -4,7 +4,7 @@ import {
   type LookupTableSummary,
 } from '@edi-bridge/contracts'
 
-import { type FormIssue, tooLongOr } from '../../lib/forms/field-errors'
+import { fieldErrors, type FormIssue, tooLongOr } from '../../lib/forms/field-errors'
 
 export type ScopeKind = LookupTableScopeInput['kind']
 
@@ -26,12 +26,10 @@ export type LookupTableFormResult =
 
 const settingsSchema = lookupTableInputSchema.pick({ name: true, scope: true })
 
-function fieldOf(issue: FormIssue): LookupTableField | undefined {
-  if (issue.path[0] === 'name') {
-    return 'name'
-  }
+const fields = ['name', 'tradingPartnerId'] as const satisfies ReadonlyArray<LookupTableField>
 
-  return issue.path[0] === 'scope' ? 'tradingPartnerId' : undefined
+function toField(issue: FormIssue): FormIssue {
+  return issue.path[0] === 'scope' ? { ...issue, path: ['tradingPartnerId'] } : issue
 }
 
 export function validateLookupTableForm(values: LookupTableFormValues): LookupTableFormResult {
@@ -47,17 +45,14 @@ export function validateLookupTableForm(values: LookupTableFormValues): LookupTa
     return { input: parsed.data }
   }
 
-  const errors: Partial<Record<LookupTableField, LookupTableFieldError>> = {}
-
-  for (const issue of parsed.error.issues) {
-    const field = fieldOf(issue)
-
-    if (field) {
-      errors[field] ??= field === 'name' ? tooLongOr(issue, 'required') : 'required'
-    }
+  return {
+    errors: fieldErrors(
+      parsed.error.issues.map(toField),
+      fields,
+      (field, issue): LookupTableFieldError =>
+        field === 'name' ? tooLongOr(issue, 'required') : 'required',
+    ),
   }
-
-  return { errors }
 }
 
 export function toFormValues(table?: LookupTableSummary): LookupTableFormValues {

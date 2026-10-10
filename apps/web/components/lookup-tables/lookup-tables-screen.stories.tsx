@@ -21,7 +21,7 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   async play({ canvas }) {
-    await expect(await canvas.findByRole('link', { name: 'Units of measure' })).toBeVisible()
+    await expect(await canvas.findByRole('cell', { name: 'Units of measure' })).toBeVisible()
     await expect(canvas.getByRole('cell', { name: 'Hansemarkt GmbH' })).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Actions for Country codes' })).toBeVisible()
   },
@@ -83,7 +83,7 @@ export const German = meta.story({
     ),
   ],
   async play({ canvas }) {
-    await expect(await canvas.findByRole('link', { name: 'Units of measure' })).toBeVisible()
+    await expect(await canvas.findByRole('cell', { name: 'Units of measure' })).toBeVisible()
     await expect(canvas.getByRole('columnheader', { name: 'Geltungsbereich' })).toBeVisible()
   },
 })
@@ -95,6 +95,6 @@ export const Dark = meta.story({
     return () => document.documentElement.classList.remove('dark')
   },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('link', { name: 'Units of measure' })).toBeVisible()
+    await expect(await canvas.findByRole('cell', { name: 'Units of measure' })).toBeVisible()
   },
 })
