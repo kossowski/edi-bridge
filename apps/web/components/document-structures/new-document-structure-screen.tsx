@@ -8,19 +8,16 @@ import { useId, useState } from 'react'
 import { BackLink, Loading } from '@/components/detail-parts'
 import { CsvSettingsFacts } from '@/components/document-structures/csv-settings-facts'
 import {
-  ProblemAlert,
-  problemTextClass,
-} from '@/components/document-structures/document-structure-problem'
-import { FileField } from '@/components/document-structures/file-field'
-import {
   encodeBase64,
   fileProblem,
   type FileProblem,
-  leafCount,
   nameFromFileName,
   originKindOf,
   toOrigin,
-} from '@/components/document-structures/structure-tree'
+} from '@/components/document-structures/document-file'
+import { RefusalAlert } from '@/components/document-structures/document-structure-problem'
+import { FileField } from '@/components/document-structures/file-field'
+import { leafCount } from '@/components/document-structures/structure-tree'
 import { StructureTreeGrid } from '@/components/document-structures/structure-tree-grid'
 import { RadioField, TextField } from '@/components/form-field'
 import {
@@ -36,6 +33,7 @@ import {
   type DocumentStructureOriginKind,
   documentStructureOriginKinds,
   type EncodedFile,
+  maxDocumentStructureNameLength,
 } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 
@@ -53,7 +51,6 @@ function Preview({
   onRetry: () => void
 }) {
   const t = useTranslations('DocumentStructureForm.preview')
-  const problem = documentStructureProblemOf(infer.error)
 
   if (file === null) {
     return (
@@ -67,20 +64,13 @@ function Preview({
     return <Loading label={t('loading')} rows={8} />
   }
 
-  if (problem) {
-    return <ProblemAlert problem={problem} />
-  }
-
   if (infer.isError) {
     return (
-      <div className="flex flex-col items-start gap-2">
-        <p role="alert" className={problemTextClass}>
-          {t('failed')}
-        </p>
+      <RefusalAlert error={infer.error} failed={t('failed')}>
         <Button size="sm" variant="outline" onClick={onRetry}>
           {t('retry')}
         </Button>
-      </div>
+      </RefusalAlert>
     )
   }
 
@@ -115,6 +105,7 @@ export function NewDocumentStructureScreen() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [kind, setKind] = useState<DocumentStructureOriginKind>('jsonDocument')
+  const [kindChosen, setKindChosen] = useState(false)
   const [file, setFile] = useState<EncodedFile | null>(null)
   const [fileError, setFileError] = useState<FileError | null>(null)
   const [name, setName] = useState('')
@@ -129,7 +120,6 @@ export function NewDocumentStructureScreen() {
     },
   })
 
-  const createProblem = documentStructureProblemOf(create.error)
   const previewProblem = documentStructureProblemOf(infer.error) !== null
 
   function preview(nextKind: DocumentStructureOriginKind, nextFile: EncodedFile) {
@@ -154,7 +144,7 @@ export function NewDocumentStructureScreen() {
       content: encodeBase64(new Uint8Array(await chosen.arrayBuffer())),
     }
 
-    const nextKind = originKindOf(chosen.name) ?? kind
+    const nextKind = kindChosen ? kind : (originKindOf(chosen.name) ?? kind)
 
     setKind(nextKind)
     setFile(encoded)
@@ -209,6 +199,7 @@ export function NewDocumentStructureScreen() {
             value={kind}
             onChange={(next) => {
               setKind(next)
+              setKindChosen(true)
 
               if (file) {
                 preview(next, file)
@@ -229,22 +220,14 @@ export function NewDocumentStructureScreen() {
             description={t('name.description')}
             error={nameError ? t('errors.nameRequired') : null}
             label={t('name.label')}
-            maxLength={70}
+            maxLength={maxDocumentStructureNameLength}
             value={name}
             onChange={(next) => {
               setName(next)
               setNameError(false)
             }}
           />
-          {createProblem ? (
-            <ProblemAlert problem={createProblem} />
-          ) : (
-            create.isError && (
-              <p role="alert" className={problemTextClass}>
-                {t('failed')}
-              </p>
-            )
-          )}
+          <RefusalAlert error={create.error} failed={t('failed')} takeFocus />
           <Button disabled={create.isPending} type="submit" className="self-start">
             {create.isPending ? t('creating') : t('create')}
           </Button>

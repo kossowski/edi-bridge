@@ -4,19 +4,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useId, useState } from 'react'
 
-import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
+import { BackLink, Fact, LoadFailure, Loading } from '@/components/detail-parts'
 import { CsvSettingsFacts } from '@/components/document-structures/csv-settings-facts'
-import {
-  ProblemAlert,
-  problemTextClass,
-} from '@/components/document-structures/document-structure-problem'
-import { UsedByMappings } from '@/components/document-structures/document-structures-screen'
+import { RefusalAlert } from '@/components/document-structures/document-structure-problem'
+import { UsedByMappings } from '@/components/document-structures/mapping-list'
 import {
   type Adjustments,
   leafCount,
   withAdjustment,
 } from '@/components/document-structures/structure-tree'
 import {
+  type Reveal,
+  revealOf,
   type RowMark,
   StructureTreeGrid,
 } from '@/components/document-structures/structure-tree-grid'
@@ -27,15 +26,15 @@ import {
   documentStructuresQuery,
   storeSavedDocumentStructure,
 } from '@/lib/api/queries'
+import {
+  type DocumentStructure,
+  type DocumentStructureProblem,
+  maxDocumentStructureNameLength,
+  type UpdateDocumentStructureBody,
+} from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
-
-import type {
-  DocumentStructure,
-  DocumentStructureProblem,
-  UpdateDocumentStructureBody,
-} from '@edi-bridge/contracts'
 
 const markedCodes = new Set<DocumentStructureProblem['code']>([
   'usedByMappingVersion',
@@ -66,7 +65,7 @@ function Editor({ structure }: { structure: DocumentStructure }) {
   const mappings = summaries.data?.find((summary) => summary.id === structure.id)?.mappings
   const [name, setName] = useState(structure.name)
   const [adjustments, setAdjustments] = useState<Adjustments>(new Map())
-  const [reveal, setReveal] = useState<{ path: string; key: number } | null>(null)
+  const [reveal, setReveal] = useState<Reveal | null>(null)
   const [saved, setSaved] = useState(false)
   const nameMissing = name.trim() === ''
   const nameChanged = name.trim() !== structure.name
@@ -101,7 +100,11 @@ function Editor({ structure }: { structure: DocumentStructure }) {
           {tList('fieldCount', { count: leafCount(structure.children) })}
         </Fact>
         <Fact label={t('facts.mappings')}>
-          {mappings ? <UsedByMappings mappings={mappings} /> : <Skeleton className="h-4 w-32" />}
+          {mappings ? (
+            <UsedByMappings mappings={mappings} />
+          ) : (
+            <Loading label={t('facts.mappingsLoading')} rowClassName="h-4 w-32" rows={1} />
+          )}
         </Fact>
       </dl>
       {mappings && mappings.length > 0 && (
@@ -128,7 +131,7 @@ function Editor({ structure }: { structure: DocumentStructure }) {
           description={t('name.description')}
           error={nameMissing ? t('errors.nameRequired') : null}
           label={t('name.label')}
-          maxLength={70}
+          maxLength={maxDocumentStructureNameLength}
           value={name}
           className="sm:w-96"
           onChange={(next) => {
@@ -160,34 +163,31 @@ function Editor({ structure }: { structure: DocumentStructure }) {
             tree={structure}
           />
         </section>
-        {problem ? (
-          <ProblemAlert
+        <div className="bg-background/95 sticky bottom-0 -mx-6 flex flex-col gap-3 border-t px-6 py-3 backdrop-blur">
+          <RefusalAlert
+            error={save.error}
+            failed={t('failed')}
             mappings={mappings ?? []}
-            problem={problem}
-            onShowPath={(path) => setReveal({ path, key: Date.now() })}
+            takeFocus
+            className="max-h-[40vh] w-full overflow-y-auto"
+            onShowPath={(path) => setReveal(revealOf(path))}
           />
-        ) : (
-          save.isError && (
-            <p role="alert" className={problemTextClass}>
-              {t('failed')}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p aria-live="polite" className="text-muted-foreground text-sm">
+              {saved && changeCount === 0 ? t('saved') : t('unsaved', { count: changeCount })}
             </p>
-          )
-        )}
-        <div className="bg-background/95 sticky bottom-0 -mx-6 flex flex-wrap items-center justify-between gap-3 border-t px-6 py-3 backdrop-blur">
-          <p aria-live="polite" className="text-muted-foreground text-sm">
-            {saved && changeCount === 0 ? t('saved') : t('unsaved', { count: changeCount })}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              disabled={changeCount === 0 || save.isPending}
-              type="button"
-              variant="outline"
-              onClick={discard}>
-              {t('discard')}
-            </Button>
-            <Button disabled={changeCount === 0 || save.isPending} type="submit">
-              {save.isPending ? t('saving') : t('save')}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                disabled={changeCount === 0 || save.isPending}
+                type="button"
+                variant="outline"
+                onClick={discard}>
+                {t('discard')}
+              </Button>
+              <Button disabled={changeCount === 0 || save.isPending} type="submit">
+                {save.isPending ? t('saving') : t('save')}
+              </Button>
+            </div>
           </div>
         </div>
       </form>

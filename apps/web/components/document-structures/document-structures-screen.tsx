@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 import { linkClass } from '@/components/detail-parts'
+import { UsedByMappings } from '@/components/document-structures/mapping-list'
 import { ListScreen, ListTable } from '@/components/list-screen'
 import { documentStructuresQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -14,26 +15,6 @@ import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 import type { DocumentStructureSummary } from '@edi-bridge/contracts'
 
 const columns = ['name', 'format', 'fields', 'mappings'] as const
-
-export function UsedByMappings({ mappings }: { mappings: DocumentStructureSummary['mappings'] }) {
-  const t = useTranslations('DocumentStructures')
-
-  if (mappings.length === 0) {
-    return <span className="text-muted-foreground">{t('notUsed')}</span>
-  }
-
-  return (
-    <ul className="flex flex-col gap-1">
-      {mappings.map((mapping) => (
-        <li key={mapping.id}>
-          <Link href={`/mappings/${mapping.id}`} className={linkClass}>
-            {mapping.name}
-          </Link>
-        </li>
-      ))}
-    </ul>
-  )
-}
 
 function DocumentStructureRow({ summary }: { summary: DocumentStructureSummary }) {
   const t = useTranslations('DocumentStructures')

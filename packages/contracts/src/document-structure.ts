@@ -199,7 +199,9 @@ function checkTree(tree: DocumentTree, context: z.RefinementCtx) {
   }
 }
 
-const structureName = z.string().trim().min(1).max(70)
+export const maxDocumentStructureNameLength = 70
+
+const structureName = z.string().trim().min(1).max(maxDocumentStructureNameLength)
 
 const treeFields = { children: z.array(documentStructureNodeSchema).min(1) }
 

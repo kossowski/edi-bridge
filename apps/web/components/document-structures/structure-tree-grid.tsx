@@ -3,7 +3,15 @@
 import { ArrowRight01Icon, SquareLock02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
-import { type KeyboardEvent, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  Fragment,
+  type KeyboardEvent,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import {
   adjustable,
@@ -12,13 +20,20 @@ import {
   ancestorPaths,
   containerPaths,
   initialExpanded,
+  nameParts,
   type SettingsChange,
+  settingsOf,
   type StructureRow,
   type StructureTree,
   visibleRows,
 } from '@/components/document-structures/structure-tree'
-import { documentFieldTypes, type DocumentStructureNode, nodeContent } from '@edi-bridge/contracts'
+import {
+  type DocumentFieldType,
+  documentFieldTypes,
+  type DocumentStructureNode,
+} from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
+import { NativeCheckbox } from '@edi-bridge/ui/components/native-checkbox'
 import { NativeSelect, NativeSelectOption } from '@edi-bridge/ui/components/native-select'
 import {
   Table,
@@ -37,7 +52,15 @@ export type Editing = {
   onAdjust: (node: DocumentStructureNode, change: SettingsChange) => void
 }
 
-const indent = 1.25
+export type Reveal = { path: string; key: number }
+
+export function revealOf(path: string): Reveal {
+  return { path, key: Date.now() }
+}
+
+type FocusRequest = { path: string; block: ScrollLogicalPosition }
+
+const indent = 0.75
 
 function moveKey(event: KeyboardEvent, rows: StructureRow[], index: number) {
   const row = rows[index]!
@@ -59,6 +82,9 @@ function moveKey(event: KeyboardEvent, rows: StructureRow[], index: number) {
       return row.expanded && (row.childCount ?? 0) > 0
         ? { focus: rows[index + 1]?.node.path }
         : null
+    case 'Enter':
+    case ' ':
+      return row.expanded === null ? null : { toggle: row.node.path }
     case 'ArrowLeft':
       if (row.expanded) {
         return { toggle: row.node.path }
@@ -71,27 +97,25 @@ function moveKey(event: KeyboardEvent, rows: StructureRow[], index: number) {
 }
 
 function TypeCell({
-  row,
+  node,
+  type,
+  editable,
   editing,
-  tree,
   active,
 }: {
-  row: StructureRow
+  node: DocumentStructureNode
+  type: DocumentFieldType | null
+  editable: boolean
   editing: Editing | null
-  tree: StructureTree
   active: boolean
 }) {
   const t = useTranslations('DocumentStructureTree')
-  const { node } = row
-  const content = nodeContent(node)
-  const own = content.kind === 'field' ? content.type : null
-  const type = editing ? adjustedSettings(node, editing.adjustments).type : own
 
   if (type === null) {
     return <span className="text-muted-foreground">{t('object')}</span>
   }
 
-  if (!editing || !adjustable(tree, node).type) {
+  if (!editing || !editable) {
     return t(`types.${type}`)
   }
 
@@ -101,6 +125,7 @@ function TypeCell({
       tabIndex={active ? 0 : -1}
       value={type}
       aria-label={t('typeLabel', { path: node.path })}
+      className="w-[7.5rem] [&_select]:pr-7 [&_select]:text-xs"
       onChange={(event) => {
         const next = documentFieldTypes.find((candidate) => candidate === event.target.value)
 
@@ -143,14 +168,26 @@ function FlagCell({
   }
 
   return (
-    <input
+    <NativeCheckbox
       checked={checked}
       tabIndex={active ? 0 : -1}
-      type="checkbox"
       aria-label={label}
-      className="accent-primary focus-visible:ring-ring/50 size-4 rounded-sm outline-none focus-visible:ring-3"
       onChange={(event) => onChange(event.target.checked)}
     />
+  )
+}
+
+function NodeName({ name, container }: { name: string; container: boolean }) {
+  return (
+    <code
+      className={cn('font-mono text-xs [overflow-wrap:anywhere]', container && 'font-semibold')}>
+      {nameParts(name).map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && <wbr />}
+          {part}
+        </Fragment>
+      ))}
+    </code>
   )
 }
 
@@ -176,11 +213,10 @@ function TreeRowView({
   const t = useTranslations('DocumentStructureTree')
   const { node } = row
   const can = adjustable(tree, node)
-  const settings = editing ? adjustedSettings(node, editing.adjustments) : null
+  const settings = editing ? adjustedSettings(node, editing.adjustments) : settingsOf(node)
   const changed = editing?.adjustments.has(node.path) ?? false
-  const required = settings?.required ?? node.required
-  const repeating = settings?.repeating ?? node.kind === 'array'
   const rootList = !can.required && !can.repeating
+  const hidden = row.expanded === false && (row.childCount ?? 0) > 0
 
   return (
     <TableRow
@@ -190,7 +226,7 @@ function TreeRowView({
       aria-posinset={row.position}
       aria-setsize={row.setSize}
       className={cn(
-        'focus-visible:ring-ring/50 outline-none focus-visible:ring-3 focus-visible:ring-inset',
+        'focus-visible:ring-primary outline-none focus-visible:ring-2 focus-visible:ring-inset',
         changed && 'bg-muted/60',
         mark && 'bg-red-50 dark:bg-red-950/30',
       )}
@@ -208,73 +244,83 @@ function TreeRowView({
           onKeyDown(event)
         }
       }}>
-      <TableCell role="gridcell" className="py-1.5 whitespace-normal">
+      <TableCell role="gridcell" className="py-1 whitespace-normal">
         <div
-          className="flex min-w-0 items-center gap-1.5"
+          className="flex items-start gap-1"
           style={{ paddingLeft: `${(row.level - 1) * indent}rem` }}>
           {row.expanded === null ? (
-            <span aria-hidden className="size-5 shrink-0" />
+            <span aria-hidden className="size-6 shrink-0" />
           ) : (
-            <span
-              aria-hidden
-              className="hover:bg-muted inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm"
+            <button
+              tabIndex={active ? 0 : -1}
+              type="button"
+              aria-label={t(row.expanded ? 'collapse' : 'expand', { path: node.path })}
+              className="hover:bg-muted focus-visible:ring-primary inline-flex size-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-2"
               onClick={() => onToggle(node.path)}>
               <HugeiconsIcon
                 icon={ArrowRight01Icon}
                 strokeWidth={2}
+                aria-hidden
                 className={cn('size-4 transition-transform', row.expanded && 'rotate-90')}
               />
-            </span>
+            </button>
           )}
-          <code
-            title={node.path}
-            className={cn(
-              'font-mono text-xs break-all',
-              row.childCount !== null && 'font-semibold',
-            )}>
-            {node.name}
-          </code>
-          {row.childCount === 0 && <span className="text-muted-foreground">{t('empty')}</span>}
-          {row.expanded === false && (row.childCount ?? 0) > 0 && (
-            <span className="text-muted-foreground text-xs">
-              {t('hidden', { count: row.childCount ?? 0 })}
-            </span>
-          )}
-          {changed && (
-            <span className="border-border rounded-sm border px-1 text-[11px] font-medium">
-              {t('changed')}
-            </span>
-          )}
-          {mark && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-red-800 dark:text-red-300">
-              <HugeiconsIcon
-                icon={SquareLock02Icon}
-                strokeWidth={2}
-                aria-hidden
-                className="size-3.5"
-              />
-              {t(`marks.${mark}`)}
-            </span>
-          )}
+          <div title={node.path} className="flex min-w-24 flex-1 flex-col gap-0.5 py-1">
+            <NodeName container={row.childCount !== null} name={node.name} />
+            {(row.childCount === 0 || hidden || changed) && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                {row.childCount === 0 && (
+                  <span className="text-muted-foreground">{t('empty')}</span>
+                )}
+                {hidden && (
+                  <span className="text-muted-foreground">
+                    {t('hidden', { count: row.childCount ?? 0 })}
+                  </span>
+                )}
+                {changed && (
+                  <span className="border-border rounded-sm border px-1 text-[11px] font-medium">
+                    {t('changed')}
+                  </span>
+                )}
+              </div>
+            )}
+            {mark && (
+              <span className="flex items-start gap-1 text-xs font-medium text-red-800 dark:text-red-300">
+                <HugeiconsIcon
+                  icon={SquareLock02Icon}
+                  strokeWidth={2}
+                  aria-hidden
+                  className="mt-px size-3.5 shrink-0"
+                />
+                {t(`marks.${mark}`)}
+              </span>
+            )}
+          </div>
         </div>
       </TableCell>
-      <TableCell role="gridcell" className="py-1.5">
-        <TypeCell active={active} editing={editing} row={row} tree={tree} />
+      <TableCell role="gridcell" className="py-1">
+        <TypeCell
+          active={active}
+          editable={can.type}
+          editing={editing}
+          node={node}
+          type={settings.type}
+        />
       </TableCell>
-      <TableCell role="gridcell" className="py-1.5">
+      <TableCell role="gridcell" className="py-1">
         <FlagCell
           active={active}
-          checked={required}
+          checked={settings.required}
           editable={editing !== null && can.required}
           label={t('requiredLabel', { path: node.path })}
           onChange={(next) => editing?.onAdjust(node, { required: next })}
         />
       </TableCell>
-      <TableCell role="gridcell" className="py-1.5">
+      <TableCell role="gridcell" className="py-1">
         <FlagCell
           active={active}
           always={rootList}
-          checked={repeating}
+          checked={settings.repeating}
           editable={editing !== null && can.repeating}
           label={t('repeatsLabel', { path: node.path })}
           onChange={(next) => editing?.onAdjust(node, { repeating: next })}
@@ -295,14 +341,14 @@ export function StructureTreeGrid({
   name: string
   editing?: Editing | null
   marks?: ReadonlyMap<string, RowMark>
-  reveal?: { path: string; key: number } | null
+  reveal?: Reveal | null
 }) {
   const t = useTranslations('DocumentStructureTree')
   const hintId = useId()
   const container = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState(() => initialExpanded(tree.children))
   const [activePath, setActivePath] = useState<string | null>(null)
-  const [focusRequest, setFocusRequest] = useState<{ path: string } | null>(null)
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null)
   const [revealed, setRevealed] = useState(reveal)
   const rows = useMemo(() => visibleRows(tree.children, expanded), [tree.children, expanded])
   const active = rows.some(({ node }) => node.path === activePath) ? activePath : rows[0]?.node.path
@@ -314,7 +360,7 @@ export function StructureTreeGrid({
     if (reveal && ancestors) {
       setExpanded(new Set([...expanded, ...ancestors]))
       setActivePath(reveal.path)
-      setFocusRequest({ path: reveal.path })
+      setFocusRequest({ path: reveal.path, block: 'center' })
     }
   }
 
@@ -331,7 +377,7 @@ export function StructureTreeGrid({
 
   const focusRow = (path: string) => {
     setActivePath(path)
-    setFocusRequest({ path })
+    setFocusRequest({ path, block: 'nearest' })
   }
 
   useLayoutEffect(() => {
@@ -343,8 +389,8 @@ export function StructureTreeGrid({
       `tr[data-path="${CSS.escape(focusRequest.path)}"]`,
     )
 
-    element?.focus()
-    element?.scrollIntoView({ block: 'nearest' })
+    element?.focus({ preventScroll: true })
+    element?.scrollIntoView({ block: focusRequest.block })
   }, [focusRequest])
 
   return (
@@ -370,13 +416,13 @@ export function StructureTreeGrid({
           <TableHeader>
             <TableRow>
               <TableHead scope="col">{t('columns.name')}</TableHead>
-              <TableHead scope="col" className="w-40">
+              <TableHead scope="col" className="w-0">
                 {t('columns.type')}
               </TableHead>
-              <TableHead scope="col" className="w-24">
+              <TableHead scope="col" className="w-0">
                 {t('columns.required')}
               </TableHead>
-              <TableHead scope="col" className="w-28">
+              <TableHead scope="col" className="w-0">
                 {t('columns.repeats')}
               </TableHead>
             </TableRow>

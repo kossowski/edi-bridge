@@ -1,3 +1,4 @@
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
@@ -21,6 +22,7 @@ import {
 } from '@edi-bridge/mocks'
 
 import {
+  ApiError,
   createChannel,
   createTradingPartner,
   documentStructureProblemOf,
@@ -325,5 +327,29 @@ describe('Document Structure problems', () => {
     await expect(
       problemOf(updateDocumentStructure(csv!.id, { name: 'x', adjustments: [] })),
     ).resolves.toBeNull()
+  })
+
+  it('reads a problem only from a refusal', async () => {
+    const body = {
+      code: 'notAdjustable',
+      message: 'x',
+      path: null,
+      line: null,
+      mappingVersions: null,
+    }
+
+    server.use(
+      http.put(`${apiUrl}/document-structures/${csv!.id}`, () =>
+        HttpResponse.json(body, { status: 500 }),
+      ),
+    )
+
+    const error = await updateDocumentStructure(csv!.id, { name: 'x', adjustments: [] }).then(
+      () => null,
+      (failure: Error) => failure,
+    )
+
+    expect(error instanceof ApiError && JSON.parse(error.body)).toEqual(body)
+    expect(documentStructureProblemOf(error)).toBeNull()
   })
 })

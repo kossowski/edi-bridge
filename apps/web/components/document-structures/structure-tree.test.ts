@@ -1,19 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { defaultCsvSettings, type DocumentStructureNode } from '@edi-bridge/contracts'
 import { createDocumentStructure, seedDocumentStructureOf } from '@edi-bridge/mocks'
+
+import type { DocumentStructureNode } from '@edi-bridge/contracts'
 
 import {
   adjustable,
   adjustedSettings,
   ancestorPaths,
-  encodeBase64,
-  fileProblem,
   initialExpanded,
   leafCount,
-  nameFromFileName,
-  originKindOf,
-  toOrigin,
+  nameParts,
   visibleRows,
   withAdjustment,
 } from './structure-tree'
@@ -156,39 +153,10 @@ describe('leafCount', () => {
   })
 })
 
-describe('file helpers', () => {
-  it('encodes bytes as base64', () => {
-    expect(encodeBase64(new TextEncoder().encode('Kühlware'))).toBe(
-      Buffer.from('Kühlware').toString('base64'),
-    )
-  })
-
-  it('refuses empty and too large files', () => {
-    expect(fileProblem(0)).toBe('empty')
-    expect(fileProblem(5_000_001)).toBe('tooLarge')
-    expect(fileProblem(12)).toBeNull()
-  })
-
-  it('guesses the origin from the file name', () => {
-    expect(originKindOf('article.schema.json')).toBe('jsonSchema')
-    expect(originKindOf('Order.JSON')).toBe('jsonDocument')
-    expect(originKindOf('lieferscheine.csv')).toBe('csvDocument')
-    expect(originKindOf('notes.pdf')).toBeNull()
-  })
-
-  it('reads a CSV Document with the default CSV settings', () => {
-    const file = { fileName: 'a.csv', content: 'YQ==' }
-
-    expect(toOrigin('csvDocument', file)).toEqual({
-      kind: 'csvDocument',
-      document: file,
-      csv: defaultCsvSettings,
-    })
-    expect(toOrigin('jsonSchema', file)).toEqual({ kind: 'jsonSchema', jsonSchema: file })
-  })
-
-  it('suggests a name from the file name', () => {
-    expect(nameFromFileName('article.schema.json')).toBe('article')
-    expect(nameFromFileName('erp_dispatch-export.csv')).toBe('erp dispatch export')
+describe('nameParts', () => {
+  it('splits a name where it can wrap', () => {
+    expect(nameParts('supplierArticleNumber')).toEqual(['supplier', 'Article', 'Number'])
+    expect(nameParts('order_line-id')).toEqual(['order_', 'line-', 'id'])
+    expect(nameParts('GTIN')).toEqual(['GTIN'])
   })
 })

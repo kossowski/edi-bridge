@@ -1433,7 +1433,8 @@
       "label": "Details der Document Structure",
       "format": "Format",
       "fields": "Felder",
-      "mappings": "Verwendet von Mappings"
+      "mappings": "Verwendet von Mappings",
+      "mappingsLoading": "Mappings werden geladen"
     },
     "usedNote": "Veröffentlichte Mapping Versions ändern sich nie, deshalb lehnt EDI Bridge Änderungen an Feldern ab, die sie verwenden. Felder, die nur ein Draft verknüpft, lassen sich ändern, solange sie ihren Platz behalten.",
     "name": {
@@ -1504,7 +1505,7 @@
       "name": "Feld",
       "type": "Typ",
       "required": "Pflicht",
-      "repeats": "Wiederholt sich"
+      "repeats": "Wiederholt"
     },
     "types": {
       "string": "Text",
@@ -1527,7 +1528,9 @@
       "usedByMappingVersion": "Von veröffentlichten Mapping Versions verwendet",
       "linkedByMapping": "Von einem Mapping-Draft verknüpft",
       "other": "Abgelehnt"
-    }
+    },
+    "expand": "{path} öffnen",
+    "collapse": "{path} schließen"
   },
   "CsvSettings": {
     "title": "CSV-Einstellungen",
@@ -1549,7 +1552,7 @@
   "DocumentStructureProblem": {
     "line": "Zeile {line}",
     "path": "Bei <code>{path}</code>",
-    "details": "Details",
+    "details": "Details (auf Englisch)",
     "showInTree": "{path} im Baum zeigen",
     "versionsTitle": "Veröffentlichte Mapping Versions, die es verwenden:",
     "version": "{mappingName}, Version {version}",

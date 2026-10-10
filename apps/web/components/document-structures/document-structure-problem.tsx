@@ -4,22 +4,41 @@ import { AlertCircleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
+import { type ReactNode, useEffect, useRef } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
+import { MappingList } from '@/components/document-structures/mapping-list'
+import { documentStructureProblemOf } from '@/lib/api/client'
 import { Button } from '@edi-bridge/ui/components/button'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
-import type { DocumentStructureProblem, DocumentStructureSummary } from '@edi-bridge/contracts'
+import type {
+  DocumentStructureProblem,
+  DocumentStructureProblemCode,
+  DocumentStructureSummary,
+} from '@edi-bridge/contracts'
 
-export const problemTextClass = 'text-sm text-red-800 dark:text-red-300'
+type Mappings = DocumentStructureSummary['mappings']
 
-export function ProblemAlert({
+const detailedCodes = new Set<DocumentStructureProblemCode>([
+  'unreadableContent',
+  'invalidJson',
+  'invalidCsv',
+  'invalidJsonSchema',
+  'unsupportedJson',
+  'unsupportedJsonSchema',
+  'inconsistentCsvRows',
+  'linkedByMapping',
+])
+
+function ProblemAlert({
   problem,
-  mappings = [],
+  mappings,
   onShowPath,
 }: {
   problem: DocumentStructureProblem
-  mappings?: DocumentStructureSummary['mappings']
-  onShowPath?: (path: string) => void
+  mappings: Mappings
+  onShowPath: ((path: string) => void) | undefined
 }) {
   const t = useTranslations('DocumentStructureProblem')
   const { path, line, mappingVersions } = problem
@@ -27,7 +46,7 @@ export function ProblemAlert({
   return (
     <div
       role="alert"
-      className="flex gap-3 rounded-lg border border-red-300 bg-red-50 p-4 text-sm dark:border-red-900 dark:bg-red-950/40">
+      className="flex w-full gap-3 rounded-lg border border-red-300 bg-red-50 p-4 text-sm dark:border-red-900 dark:bg-red-950/40">
       <HugeiconsIcon
         icon={AlertCircleIcon}
         strokeWidth={2}
@@ -66,20 +85,14 @@ export function ProblemAlert({
         {problem.code === 'linkedByMapping' && mappings.length > 0 && (
           <div className="flex flex-col gap-1">
             <p>{t('mappingsTitle')}</p>
-            <ul className="flex flex-col gap-1">
-              {mappings.map((mapping) => (
-                <li key={mapping.id}>
-                  <Link href={`/mappings/${mapping.id}`} className={linkClass}>
-                    {mapping.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <MappingList mappings={mappings} />
           </div>
         )}
-        <p>
-          {t('details')}: <span lang="en">{problem.message}</span>
-        </p>
+        {detailedCodes.has(problem.code) && (
+          <p>
+            {t('details')}: <span lang="en">{problem.message}</span>
+          </p>
+        )}
         {onShowPath && path !== null && (
           <Button
             size="sm"
@@ -90,6 +103,56 @@ export function ProblemAlert({
           </Button>
         )}
       </div>
+    </div>
+  )
+}
+
+export function RefusalAlert({
+  error,
+  failed,
+  mappings = [],
+  onShowPath,
+  takeFocus = false,
+  className,
+  children,
+}: {
+  error: Error | null
+  failed: string
+  mappings?: Mappings
+  onShowPath?: (path: string) => void
+  takeFocus?: boolean
+  className?: string
+  children?: ReactNode
+}) {
+  const container = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (takeFocus && error) {
+      container.current?.focus()
+    }
+  }, [takeFocus, error])
+
+  if (!error) {
+    return null
+  }
+
+  const problem = documentStructureProblemOf(error)
+
+  return (
+    <div
+      ref={container}
+      tabIndex={-1}
+      className={cn('flex flex-col items-start gap-2 outline-none', className)}>
+      {problem ? (
+        <ProblemAlert mappings={mappings} problem={problem} onShowPath={onShowPath} />
+      ) : (
+        <>
+          <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+            {failed}
+          </p>
+          {children}
+        </>
+      )}
     </div>
   )
 }

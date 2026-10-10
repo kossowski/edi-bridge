@@ -71,7 +71,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly path: string,
-    readonly problem: DocumentStructureProblem | null = null,
+    readonly body = '',
   ) {
     super(`API request to ${path} failed with status ${status}`)
     this.name = 'ApiError'
@@ -84,17 +84,6 @@ type RequestOptions<Query, Body> = {
   path?: string
   query?: Query
   body?: Body
-  problem?: typeof documentStructureProblemSchema
-}
-
-async function problemOf(response: Response, schema: RequestOptions<unknown, unknown>['problem']) {
-  if (!schema || response.status !== 422) {
-    return null
-  }
-
-  const parsed = schema.safeParse(await response.json().catch(() => null))
-
-  return parsed.success ? parsed.data : null
 }
 
 async function request<
@@ -103,7 +92,7 @@ async function request<
   Body = undefined,
 >(
   endpoint: Endpoint<Response, Query, Body>,
-  { path = endpoint.path, query, body, problem }: RequestOptions<Query, Body> = {},
+  { path = endpoint.path, query, body }: RequestOptions<Query, Body> = {},
 ): Promise<Response> {
   if (isMockingEnabled && typeof window !== 'undefined') {
     mockingStarted ??= import('./mock-worker').then(({ startMockWorker }) => startMockWorker())
@@ -121,7 +110,7 @@ async function request<
   })
 
   if (!response.ok) {
-    throw new ApiError(response.status, path, await problemOf(response, problem))
+    throw new ApiError(response.status, path, await response.text().catch(() => ''))
   }
 
   return endpoint.response.parse(await response.json())
@@ -217,29 +206,32 @@ export function listDocumentStructures() {
 }
 
 export function inferDocumentStructure(origin: DocumentStructureOrigin) {
-  return request(inferDocumentStructureEndpoint, {
-    body: origin,
-    problem: documentStructureProblemSchema,
-  })
+  return request(inferDocumentStructureEndpoint, { body: origin })
 }
 
 export function createDocumentStructure(body: CreateDocumentStructureBody) {
-  return request(createDocumentStructureEndpoint, {
-    body,
-    problem: documentStructureProblemSchema,
-  })
+  return request(createDocumentStructureEndpoint, { body })
 }
 
 export function updateDocumentStructure(id: string, body: UpdateDocumentStructureBody) {
   return request(updateDocumentStructureEndpoint, {
     path: toPath(updateDocumentStructureEndpoint.path, { id }),
     body,
-    problem: documentStructureProblemSchema,
   })
 }
 
-export function documentStructureProblemOf(error: Error | null) {
-  return error instanceof ApiError ? error.problem : null
+export function documentStructureProblemOf(error: Error | null): DocumentStructureProblem | null {
+  if (!(error instanceof ApiError) || error.status !== 422) {
+    return null
+  }
+
+  try {
+    const parsed = documentStructureProblemSchema.safeParse(JSON.parse(error.body))
+
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
 }
 
 export function getMessageTypeStructure(messageType: MessageType) {

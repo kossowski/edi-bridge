@@ -1,5 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
+import { type ReactNode } from 'react'
 import { expect, userEvent, within } from 'storybook/test'
 
 import { DocumentStructureScreen } from '@/components/document-structures/document-structure-screen'
@@ -8,6 +9,7 @@ import messagesDe from '@/messages/de.json'
 import {
   documentStructureEndpoint,
   type DocumentStructureProblem,
+  documentStructuresEndpoint,
   toPath,
   updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
@@ -41,13 +43,67 @@ function refuseUpdate(problem: DocumentStructureProblem) {
   return http.put(updatePath(order.id), () => HttpResponse.json(problem, { status: 422 }))
 }
 
-async function changeAndSave(canvasElement: HTMLElement) {
+const refusedByPublishedVersions = refuseUpdate({
+  code: 'usedByMappingVersion',
+  message:
+    'Published Mapping Versions use buyer.contact.phone, and a published Mapping Version never changes: Hansemarkt: ORDERS to ERP JSON v2, Hansemarkt: ORDERS to ERP JSON v3',
+  path: 'buyer.contact.phone',
+  line: null,
+  mappingVersions: [2, 3].map((version) => ({
+    id: `00000000-0000-4000-8000-00000000000${version}`,
+    mappingId: orderMapping.id,
+    mappingName: orderMapping.name,
+    version,
+    publishedAt: `2026-09-0${version}T08:00:00.000Z`,
+  })),
+})
+
+const german = (Story: () => ReactNode) => (
+  <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+    <Story />
+  </NextIntlClientProvider>
+)
+
+// At 768px the app's sidebar takes 16rem of the width.
+const besideSidebar = (Story: () => ReactNode) => (
+  <div className="ml-64">
+    <Story />
+  </div>
+)
+
+const tablet = {
+  parameters: {
+    viewport: {
+      options: { tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } } },
+    },
+  },
+  globals: { viewport: { value: 'tablet', isRotated: false } },
+}
+
+async function expectReadableColumns(canvasElement: HTMLElement) {
+  const [field, ...headers] = canvasElement.querySelectorAll('[role=treegrid] th')
+  const scroller = canvasElement.querySelector('[data-slot=table-container]')!
+
+  await expect(scroller.scrollWidth).toBeLessThanOrEqual(scroller.clientWidth)
+
+  await expect(field!.getBoundingClientRect().width).toBeGreaterThanOrEqual(160)
+
+  for (const header of [field!, ...headers]) {
+    await expect(header.scrollWidth).toBeLessThanOrEqual(header.clientWidth)
+  }
+
+  for (const select of canvasElement.querySelectorAll('[role=treegrid] select')) {
+    await expect(select.getBoundingClientRect().width).toBeGreaterThanOrEqual(112)
+  }
+}
+
+const english = { required: 'buyer.contact.phone is required', save: 'Save' }
+
+async function changeAndSave(canvasElement: HTMLElement, labels = english) {
   const canvas = within(canvasElement)
 
-  await userEvent.click(
-    await canvas.findByRole('checkbox', { name: 'buyer.contact.phone is required' }),
-  )
-  await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
+  await userEvent.click(await canvas.findByRole('checkbox', { name: labels.required }))
+  await userEvent.click(canvas.getByRole('button', { name: labels.save }))
 }
 
 const meta = preview.meta({
@@ -93,30 +149,63 @@ export const UnsavedChanges = meta.story({
 
 export const RefusedByPublishedVersions = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      refuseUpdate({
-        code: 'usedByMappingVersion',
-        message:
-          'Published Mapping Versions use buyer.contact.phone, and a published Mapping Version never changes: Hansemarkt: ORDERS to ERP JSON v2, Hansemarkt: ORDERS to ERP JSON v3',
-        path: 'buyer.contact.phone',
-        line: null,
-        mappingVersions: [2, 3].map((version) => ({
-          id: `00000000-0000-4000-8000-00000000000${version}`,
-          mappingId: orderMapping.id,
-          mappingName: orderMapping.name,
-          version,
-          publishedAt: `2026-09-0${version}T08:00:00.000Z`,
-        })),
-      }),
-    )
+    msw.use(refusedByPublishedVersions)
   },
   async play({ canvas, canvasElement }) {
     await changeAndSave(canvasElement)
-    await expect(await canvas.findByRole('alert')).toBeVisible()
+    const alert = await canvas.findByRole('alert')
+    await expect(alert).toBeVisible()
+    await expect(alert.parentElement).toHaveFocus()
     await expect(
       canvas.getByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON, version 3' }),
     ).toBeVisible()
+    await expect(within(alert).queryByText(/^Details/)).toBeNull()
     await expect(canvas.getByText('Used by published Mapping Versions')).toBeVisible()
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Show buyer.contact.phone in the tree' }),
+    )
+    await expect(canvasElement.querySelector('tr[data-path="buyer.contact.phone"]')).toHaveFocus()
+  },
+})
+
+export const TabletRefused = meta.story({
+  ...tablet,
+  decorators: [besideSidebar, german],
+  beforeEach({ msw }) {
+    msw.use(refusedByPublishedVersions)
+  },
+  async play({ canvas, canvasElement }) {
+    await changeAndSave(canvasElement, {
+      required: 'buyer.contact.phone ist Pflicht',
+      save: 'Speichern',
+    })
+    await expect(await canvas.findByRole('alert')).toBeVisible()
+    await expect(canvas.getByText('Von veröffentlichten Mapping Versions verwendet')).toBeVisible()
+    await expectReadableColumns(canvasElement)
+  },
+})
+
+export const Tablet = meta.story({
+  ...tablet,
+  decorators: [besideSidebar],
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expectReadableColumns(canvasElement)
+  },
+})
+
+export const KeyboardToggle = meta.story({
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('treegrid')
+    const buyer = canvasElement.querySelector<HTMLElement>('tr[data-path="buyer"]')!
+    buyer.focus()
+    await expect(buyer).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.keyboard('{Enter}')
+    await expect(buyer).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.keyboard(' ')
+    await expect(buyer).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(canvas.getByRole('button', { name: 'Collapse buyer' }))
+    await expect(buyer).toHaveAttribute('aria-expanded', 'false')
   },
 })
 
@@ -148,6 +237,20 @@ export const LargeVolume = meta.story({
   parameters: { a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } } },
   async play({ canvas }) {
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
+  },
+})
+
+export const MappingsLoading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${documentStructuresEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expect(canvas.getByText('Loading Mappings').closest('[aria-busy]')).not.toBeNull()
   },
 })
 
@@ -185,13 +288,7 @@ export const Unavailable = meta.story({
 })
 
 export const German = meta.story({
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
-    ),
-  ],
+  decorators: [german],
   async play({ canvas }) {
     await expect(
       await canvas.findByRole('treegrid', { name: 'Felder von ERP purchase order' }),
@@ -200,12 +297,14 @@ export const German = meta.story({
 })
 
 export const Dark = meta.story({
-  beforeEach() {
+  beforeEach({ msw }) {
+    msw.use(refusedByPublishedVersions)
     document.documentElement.classList.add('dark')
 
     return () => document.documentElement.classList.remove('dark')
   },
-  async play({ canvas }) {
-    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+  async play({ canvas, canvasElement }) {
+    await changeAndSave(canvasElement)
+    await expect(await canvas.findByRole('alert')).toBeVisible()
   },
 })

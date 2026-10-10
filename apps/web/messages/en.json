@@ -1433,7 +1433,8 @@
       "label": "Document Structure details",
       "format": "Format",
       "fields": "Fields",
-      "mappings": "Used by Mappings"
+      "mappings": "Used by Mappings",
+      "mappingsLoading": "Loading Mappings"
     },
     "usedNote": "Published Mapping Versions never change, so EDI Bridge refuses changes to fields they use. Fields only a Draft links can change as long as they keep their place.",
     "name": {
@@ -1527,7 +1528,9 @@
       "usedByMappingVersion": "Used by published Mapping Versions",
       "linkedByMapping": "Linked by a Mapping Draft",
       "other": "Refused"
-    }
+    },
+    "expand": "Expand {path}",
+    "collapse": "Collapse {path}"
   },
   "CsvSettings": {
     "title": "CSV settings",
