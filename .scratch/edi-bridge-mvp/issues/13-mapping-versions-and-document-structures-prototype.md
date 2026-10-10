@@ -4,12 +4,16 @@
 
 **Blocked by:** 11 (Mapping canvas prototype: trees and links)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Draft vs. published state is always visible; publishing creates a new version
-- [ ] Version list and a comparison view (mapping differences and output differences for the same Document)
-- [ ] Create a Document Structure from an uploaded sample or a JSON Schema, then adjust optional/repeating fields
-- [ ] CSV settings: delimiter, header row, encoding
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Draft vs. published state is always visible; publishing creates a new version
+- [x] Version list and a comparison view (mapping differences and output differences for the same Document)
+- [x] Create a Document Structure from an uploaded sample or a JSON Schema, then adjust optional/repeating fields
+- [x] CSV settings: delimiter, header row, encoding
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #35, #38, #43, #46, #48, #49
