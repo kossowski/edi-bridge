@@ -4,19 +4,23 @@ import { delay, http, HttpResponse } from 'msw'
 import {
   directionOf,
   failureStages,
+  type FinishedRunCounts,
   fromSearchParams,
   type HealthStatus,
   healthStatuses,
   healthStatusOf,
   messageTypes,
   type OverdueAcknowledgement,
+  overdueAcknowledgementMessageTypes,
   overdueAcknowledgementSchema,
   type Overview,
   overviewEndpoint,
   type OverviewQuery,
   overviewSchema,
   overviewWindowSizes,
+  type RunStatus,
   type RunSummary,
+  runSummarySchema,
   type TradingPartner,
   type TradingPartnerHealth,
 } from '@edi-bridge/contracts'
@@ -38,21 +42,21 @@ const minute = 60 * 1000
 
 const hour = 60 * minute
 
+const overdueLookback = 72 * hour
+
 function generateOverdueAcknowledgement(
   faker: Faker,
   tradingPartner: Pick<TradingPartner, 'id' | 'name' | 'acknowledgementTimeLimitHours'>,
   now: Date,
 ): OverdueAcknowledgement {
-  const overdueSince = faker.date.between({ from: now.getTime() - 72 * hour, to: now })
+  const overdueSince = faker.date.between({ from: now.getTime() - overdueLookback, to: now })
   const { acknowledgementTimeLimitHours } = tradingPartner
+  const id = faker.string.uuid()
 
   return {
-    interchange: {
-      id: faker.string.uuid(),
-      controlReference: String(faker.number.int({ min: 1, max: 99_999_999 })),
-    },
+    interchange: { id, controlReference: controlReferenceOf(id) },
     tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
-    messageType: faker.helpers.arrayElement(['DESADV', 'INVOIC'] as const),
+    messageType: faker.helpers.arrayElement(overdueAcknowledgementMessageTypes),
     sentAt: new Date(overdueSince.getTime() - acknowledgementTimeLimitHours * hour).toISOString(),
     acknowledgementTimeLimitHours,
     overdueSince: overdueSince.toISOString(),
@@ -74,7 +78,10 @@ export function createOverdueAcknowledgement(
 
 const worstFirst = (status: HealthStatus) => -healthStatuses.indexOf(status)
 
-function healthOf(
+const isFinished = (status: RunStatus): status is keyof FinishedRunCounts =>
+  status === 'delivered' || status === 'failed'
+
+function tradingPartnerHealthOf(
   tradingPartners: ReadonlyArray<TradingPartner>,
   runs: readonly RunSummary[],
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>,
@@ -95,10 +102,7 @@ function healthOf(
       count.lastRunAt = run.receivedAt
     }
 
-    if (
-      Date.parse(run.receivedAt) >= from &&
-      (run.status === 'delivered' || run.status === 'failed')
-    ) {
+    if (Date.parse(run.receivedAt) >= from && isFinished(run.status)) {
       count[run.status] += 1
     }
   }
@@ -147,7 +151,7 @@ export function toOverview(
     const receivedAt = Date.parse(run.receivedAt)
     const bucket = throughput[Math.floor((receivedAt - from) / bucketMs)]
 
-    if (bucket && (run.status === 'delivered' || run.status === 'failed')) {
+    if (bucket && isFinished(run.status)) {
       bucket[run.status] += 1
     }
   }
@@ -157,7 +161,7 @@ export function toOverview(
     from: new Date(from).toISOString(),
     to: new Date(to).toISOString(),
     throughput,
-    tradingPartners: healthOf(tradingPartners, all, overdueAcknowledgements, from),
+    tradingPartners: tradingPartnerHealthOf(tradingPartners, all, overdueAcknowledgements, from),
     overdueAcknowledgements: [...overdueAcknowledgements].sort(
       (a, b) => Date.parse(a.overdueSince) - Date.parse(b.overdueSince),
     ),
@@ -170,7 +174,7 @@ export const emptyOverviewData: OverviewData = {
   overdueAcknowledgements: [],
 }
 
-const profiles = [
+const healthProfiles = [
   { value: { errorShare: 0.01, overdue: false }, weight: 60 },
   { value: { errorShare: 0.1, overdue: true }, weight: 25 },
   { value: { errorShare: 0.4, overdue: true }, weight: 15 },
@@ -181,14 +185,12 @@ export function createOverviewData({
   overdueCount,
   runCount,
   now = new Date(),
-  days = 7,
   seed = 16,
 }: {
   tradingPartnerCount: number
   overdueCount: number
   runCount: number
   now?: Date
-  days?: number
   seed?: number
 }): OverviewData {
   const faker = new Faker({ locale: [en], seed })
@@ -196,12 +198,12 @@ export function createOverviewData({
 
   const profiled = tradingPartners.map((tradingPartner) => ({
     tradingPartner,
-    ...faker.helpers.weightedArrayElement(profiles),
+    ...faker.helpers.weightedArrayElement(healthProfiles),
   }))
 
-  const from = new Date(now.getTime() - days * 24 * hour)
+  const from = new Date(now.getTime() - overviewWindowSizes['7d'].durationMinutes * minute)
 
-  const runs = Array.from({ length: runCount }, (): RunSummary => {
+  const runs = Array.from({ length: runCount }, () => {
     const { tradingPartner, errorShare } = faker.helpers.arrayElement(profiled)
     const messageType = faker.helpers.arrayElement(messageTypes)
 
@@ -214,16 +216,29 @@ export function createOverviewData({
       manualSubmission: false,
     }
 
-    return faker.datatype.boolean({ probability: errorShare })
-      ? { ...base, status: 'failed', failureStage: faker.helpers.arrayElement(failureStages) }
-      : { ...base, status: 'delivered', failureStage: null }
+    return runSummarySchema.parse(
+      faker.datatype.boolean({ probability: errorShare })
+        ? { ...base, status: 'failed', failureStage: faker.helpers.arrayElement(failureStages) }
+        : { ...base, status: 'delivered', failureStage: null },
+    )
   })
 
-  const late = profiled.filter(({ overdue }) => overdue)
+  const inProduction = profiled.filter(({ tradingPartner }) => !tradingPartner.testMode)
+  const overdueProfiled = inProduction.filter(({ overdue }) => overdue)
+  const overdueCandidates = overdueProfiled.length > 0 ? overdueProfiled : inProduction
 
-  const overdueAcknowledgements = Array.from({ length: overdueCount }, () =>
-    generateOverdueAcknowledgement(faker, faker.helpers.arrayElement(late).tradingPartner, now),
-  )
+  const overdueAcknowledgements =
+    overdueCandidates.length === 0
+      ? []
+      : Array.from({ length: overdueCount }, () =>
+          overdueAcknowledgementSchema.parse(
+            generateOverdueAcknowledgement(
+              faker,
+              faker.helpers.arrayElement(overdueCandidates).tradingPartner,
+              now,
+            ),
+          ),
+        )
 
   return { runs, tradingPartners, overdueAcknowledgements }
 }
@@ -244,7 +259,7 @@ export function seedOverdueAcknowledgements(
       !tradingPartner ||
       tradingPartner.testMode ||
       run.status !== 'delivered' ||
-      Date.parse(run.receivedAt) < now.getTime() - 72 * hour ||
+      Date.parse(run.receivedAt) < now.getTime() - overdueLookback ||
       directionOf(run) !== 'outbound' ||
       !seededFaker(`overdue:${run.id}`).datatype.boolean({ probability: 0.02 })
     ) {
@@ -283,7 +298,7 @@ export function seedOverviewData(runs: ReadonlyArray<RunSummary> | RunStore = se
 
 export type OverviewState = 'empty' | 'large' | 'loading' | 'error'
 
-function dataOf(source: OverviewData | OverviewState | undefined) {
+function overviewDataOf(source: OverviewData | 'empty' | 'large' | undefined): OverviewData {
   switch (source) {
     case undefined:
       return seedOverviewData()
@@ -297,18 +312,22 @@ function dataOf(source: OverviewData | OverviewState | undefined) {
 }
 
 export function overviewHandler(apiUrl: string, source?: OverviewData | OverviewState) {
-  let data: OverviewData | 'loading' | 'error' | undefined
+  const path = `${apiUrl}${overviewEndpoint.path}`
 
-  return http.get(`${apiUrl}${overviewEndpoint.path}`, async ({ request }) => {
-    data ??= dataOf(source)
-
-    if (data === 'loading') {
+  if (source === 'loading') {
+    return http.get(path, async () => {
       await delay('infinite')
-    }
+    })
+  }
 
-    if (data === 'error' || data === 'loading') {
-      return serverError()
-    }
+  if (source === 'error') {
+    return http.get(path, () => serverError())
+  }
+
+  let data: OverviewData | undefined
+
+  return http.get(path, ({ request }) => {
+    data ??= overviewDataOf(source)
 
     const query = overviewEndpoint.query.safeParse(
       fromSearchParams(new URL(request.url).searchParams),

@@ -2,16 +2,21 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  interchangeEndpoint,
   overviewEndpoint,
   type OverviewQuery,
   overviewSchema,
-  interchangeEndpoint,
   toPath,
   toSearchParams,
   type TradingPartner,
 } from '@edi-bridge/contracts'
 
-import { createOverdueAcknowledgement, overviewHandler } from './overview'
+import {
+  createOverdueAcknowledgement,
+  createOverviewData,
+  emptyOverviewData,
+  overviewHandler,
+} from './overview'
 import { createRun } from './run'
 import { runDetailHandlers } from './run-detail'
 import { createTradingPartner, seedTradingPartners } from './trading-partner'
@@ -19,8 +24,6 @@ import { createTradingPartner, seedTradingPartners } from './trading-partner'
 const apiUrl = 'http://api.test'
 
 const now = new Date('2026-10-10T12:20:00.000Z')
-
-const empty = { runs: [], tradingPartners: [], overdueAcknowledgements: [] }
 
 const server = setupServer()
 
@@ -100,7 +103,7 @@ describe('GET /overview', () => {
     ['1h', 12, '2026-10-10T11:25:00.000Z', '2026-10-10T12:25:00.000Z'],
     ['7d', 28, '2026-10-03T18:00:00.000Z', '2026-10-10T18:00:00.000Z'],
   ] as const)('splits the %s window into %i buckets', async (window, count, from, to) => {
-    server.use(overviewHandler(apiUrl, empty))
+    server.use(overviewHandler(apiUrl, emptyOverviewData))
 
     const overview = await getOverview({ window })
 
@@ -110,7 +113,7 @@ describe('GET /overview', () => {
   })
 
   it('rejects an unknown window', async () => {
-    server.use(overviewHandler(apiUrl, empty))
+    server.use(overviewHandler(apiUrl, emptyOverviewData))
 
     const response = await fetch(`${apiUrl}${overviewEndpoint.path}?window=30d`)
 
@@ -197,7 +200,7 @@ describe('GET /overview', () => {
 
     server.use(
       overviewHandler(apiUrl, {
-        ...empty,
+        ...emptyOverviewData,
         overdueAcknowledgements: overdueSince.map((since) =>
           createOverdueAcknowledgement({ overdueSince: since }),
         ),
@@ -305,5 +308,33 @@ describe('GET /overview seeded', () => {
       )
       expect(Date.parse(overdue.overdueSince)).toBeLessThanOrEqual(Date.now())
     }
+  })
+})
+
+describe('createOverviewData', () => {
+  it('falls back to any Trading Partner in production when none drew an overdue profile', () => {
+    const { tradingPartners, overdueAcknowledgements } = createOverviewData({
+      tradingPartnerCount: 1,
+      overdueCount: 3,
+      runCount: 0,
+      seed: 1,
+    })
+
+    expect(tradingPartners[0]?.testMode).toBe(false)
+    expect(overdueAcknowledgements.map(({ tradingPartner }) => tradingPartner.id)).toEqual(
+      Array(3).fill(tradingPartners[0]?.id),
+    )
+  })
+
+  it('leaves Test Mode Trading Partners without Overdue Acknowledgements', () => {
+    const { tradingPartners, overdueAcknowledgements } = createOverviewData({
+      tradingPartnerCount: 1,
+      overdueCount: 3,
+      runCount: 0,
+      seed: 4,
+    })
+
+    expect(tradingPartners[0]?.testMode).toBe(true)
+    expect(overdueAcknowledgements).toEqual([])
   })
 })
