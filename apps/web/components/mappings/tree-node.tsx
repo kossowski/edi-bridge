@@ -16,6 +16,7 @@ import { type FocusEvent, memo, type ReactNode, useCallback } from 'react'
 
 import {
   isSameRow,
+  isStartRow,
   useCanvasStore,
   useLinkHints,
   useMeaningTooltip,
@@ -65,8 +66,17 @@ function shift(start: number, size: number, extent: number) {
   return Math.min(0, extent - focusMargin - start - size)
 }
 
+// Shows as much of `outer` as fits, but never at the cost of `inner`.
+function shiftAround(outer: [number, number], inner: [number, number], extent: number) {
+  const whole = shift(outer[0], outer[1], extent)
+
+  return shift(inner[0] + whole, inner[1], extent) === 0 ? whole : shift(inner[0], inner[1], extent)
+}
+
 // The canvas cannot be panned by keyboard, so a part that gets focus outside the view is panned in.
-function usePanIntoView() {
+// With `whole`, the element listening is shown along with the focused one, e.g. a whole Transform
+// with its problems rather than only its focused button.
+export function usePanIntoView({ whole = false }: { whole?: boolean } = {}) {
   const store = useStoreApi()
   const { setViewport } = useReactFlow()
 
@@ -93,14 +103,25 @@ function usePanIntoView() {
       const [x, y, zoom] = transform
       const pane = domNode.getBoundingClientRect()
       const focused = event.target.getBoundingClientRect()
-      const dx = shift(focused.left - pane.left, focused.width, pane.width)
-      const dy = shift(focused.top - pane.top, focused.height, pane.height)
+      const shown = (whole ? event.currentTarget : event.target).getBoundingClientRect()
+
+      const dx = shiftAround(
+        [shown.left - pane.left, shown.width],
+        [focused.left - pane.left, focused.width],
+        pane.width,
+      )
+
+      const dy = shiftAround(
+        [shown.top - pane.top, shown.height],
+        [focused.top - pane.top, focused.height],
+        pane.height,
+      )
 
       if (dx !== 0 || dy !== 0) {
         void setViewport({ x: x + dx, y: y + dy, zoom })
       }
     },
-    [setViewport, store],
+    [setViewport, store, whole],
   )
 }
 
@@ -186,7 +207,7 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
   const onFocus = usePanIntoView()
   const selected = useCanvasStore((state) => isSameRow(state.selected, data))
   const hints = useLinkHints()
-  const linkStart = useCanvasStore((state) => isSameRow(state.linkFrom, data))
+  const linkStart = useCanvasStore((state) => isStartRow(state.linkFrom, data))
 
   // Only a free target leaf can take the pending link; a linked one would refuse it.
   const linkTarget = useCanvasStore(

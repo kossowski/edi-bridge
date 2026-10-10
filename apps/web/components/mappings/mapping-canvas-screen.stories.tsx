@@ -3,8 +3,23 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
+import {
+  detailsPanel,
+  dragLink,
+  dragOver,
+  drop,
+  findRow,
+  findSaveStatus,
+  handleOf,
+  liveStatus,
+  page,
+  pressOn,
+  seeded,
+  source,
+  startDrag,
+  target,
+} from '@/components/mappings/mapping-canvas-story-helpers'
 import { nodeId } from '@/components/mappings/mapping-tree'
-import { findRowButton } from '@/components/mappings/tree-node'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import {
@@ -12,20 +27,11 @@ import {
   mappingDraftEndpoint,
   saveMappingDraftEndpoint,
 } from '@edi-bridge/contracts'
-import {
-  createDocumentStructure,
-  createHandlers,
-  createMappingDrafts,
-  seedMappingDrafts,
-} from '@edi-bridge/mocks'
+import { createDocumentStructure, createHandlers, createMappingDrafts } from '@edi-bridge/mocks'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
 
 import preview from '../../.storybook/preview'
-
-function seeded(name: string) {
-  return seedMappingDrafts.find((draft) => draft.name === name && draft.latestVersion !== null)!
-}
 
 const inbound = seeded('Hansemarkt: ORDERS to ERP JSON')
 
@@ -37,75 +43,12 @@ const largeStructure = createDocumentStructure({ fieldCount: 400 })
 
 const [, , largeDraft] = createMappingDrafts({ count: 3, documentStructures: [largeStructure] })
 
-// The tooltip renders in a portal outside the story's root.
-function page(canvasElement: HTMLElement) {
-  return within(canvasElement.ownerDocument.body)
-}
-
-async function findRow(canvasElement: HTMLElement, ref: RowRef) {
-  return waitFor(() => {
-    const row = findRowButton(canvasElement, ref)
-
-    if (!row) {
-      throw new Error(`No row ${ref.side}:${ref.path}`)
-    }
-
-    return row
-  })
-}
-
 async function findTooltip(canvasElement: HTMLElement) {
   const tooltip = await page(canvasElement).findByRole('tooltip')
 
   await waitFor(() => expect(tooltip).toBeVisible())
 
   return within(tooltip)
-}
-
-function handleOf(canvasElement: HTMLElement, ref: RowRef) {
-  return canvasElement.querySelector<HTMLElement>(
-    `.react-flow__node[data-id="${CSS.escape(nodeId(ref.side, ref.path))}"] .react-flow__handle`,
-  )!
-}
-
-function centre(element: Element) {
-  const { left, top, width, height } = element.getBoundingClientRect()
-
-  return { clientX: left + width / 2, clientY: top + height / 2 }
-}
-
-// React Flow follows mouse events on the document while a link is drawn; user-event moves no
-// real pointer, so the drag is dispatched as those events at the handles' positions.
-async function startDrag(canvasElement: HTMLElement, from: RowRef) {
-  const start = centre(handleOf(canvasElement, from))
-
-  await fireEvent.mouseDown(handleOf(canvasElement, from), { ...start, button: 0, buttons: 1 })
-  await fireEvent.mouseMove(canvasElement.ownerDocument, {
-    clientX: start.clientX + 20,
-    clientY: start.clientY,
-    buttons: 1,
-  })
-}
-
-async function dragOver(canvasElement: HTMLElement, to: RowRef) {
-  await fireEvent.mouseMove(canvasElement.ownerDocument, {
-    ...centre(handleOf(canvasElement, to)),
-    buttons: 1,
-  })
-  await waitFor(() => expect(handleOf(canvasElement, to)).toHaveClass('connectingto'))
-}
-
-async function drop(canvasElement: HTMLElement, on: RowRef) {
-  await fireEvent.mouseUp(canvasElement.ownerDocument, {
-    ...centre(handleOf(canvasElement, on)),
-    button: 0,
-  })
-}
-
-async function dragLink(canvasElement: HTMLElement, from: RowRef, to: RowRef) {
-  await startDrag(canvasElement, from)
-  await dragOver(canvasElement, to)
-  await drop(canvasElement, to)
 }
 
 function edgeOf(canvasElement: HTMLElement, from: RowRef, to: RowRef) {
@@ -128,23 +71,6 @@ function screenPoint(path: SVGGeometryElement, length: number) {
     path.getPointAtLength(length).x,
     path.getPointAtLength(length).y,
   ).matrixTransform(path.getScreenCTM()!)
-}
-
-function liveStatus(canvasElement: HTMLElement) {
-  return canvasElement.querySelector('p[role="status"].sr-only')!
-}
-
-async function pressOn(element: HTMLElement, keys: string) {
-  element.focus()
-  await userEvent.keyboard(keys)
-}
-
-const source = (path: string): RowRef => ({ side: 'source', path })
-
-const target = (path: string): RowRef => ({ side: 'target', path })
-
-function detailsPanel(canvasElement: HTMLElement, name = 'Details') {
-  return within(page(canvasElement).getByRole('region', { name }))
 }
 
 const meta = preview.meta({
@@ -170,7 +96,7 @@ export const Outbound = meta.story({
       await canvas.findByRole('heading', { name: 'Hansemarkt: ERP JSON to DESADV' }),
     ).toBeVisible()
     await expect(canvas.getByText('Outbound: Document Structure to Message Type')).toBeVisible()
-    await expect(canvas.getByText('18 links')).toBeVisible()
+    await expect(canvas.getByText('30 links')).toBeVisible()
     await expect(await canvas.findByText('despatchNumber')).toBeVisible()
     await expect(canvas.getByText('UNH')).toBeVisible()
     await expect(
@@ -312,22 +238,29 @@ export const LargeVolume = meta.story({
     await expect(await canvas.findByText(largeStructure.name, { exact: false })).toBeVisible()
 
     await waitFor(() =>
-      expect(canvasElement.querySelectorAll('.react-flow__node').length).toBeGreaterThan(0),
+      expect(canvasElement.querySelectorAll('.react-flow__node-tree').length).toBeGreaterThan(0),
     )
 
     // Every part is rendered, also those out of view, so that each one can get keyboard focus.
-    const nodes = canvasElement.querySelectorAll('.react-flow__node')
+    const nodes = canvasElement.querySelectorAll('.react-flow__node-tree')
 
     await expect(nodes.length).toBeGreaterThan(400)
+    await expect(canvasElement.querySelectorAll('.react-flow__node-transform')).toHaveLength(30)
 
     const rows = [
-      ...canvasElement.querySelectorAll<HTMLElement>('.react-flow__node button[aria-pressed]'),
+      ...canvasElement.querySelectorAll<HTMLElement>('.react-flow__node-tree button[aria-pressed]'),
     ]
 
-    await expect(rows.length).toBe(nodes.length - 2)
+    await expect(rows.length).toBe(nodes.length)
     await expect(rows.every((row) => row.tabIndex === 0)).toBe(true)
 
-    // A pending link marks every free target leaf, which must stay checkable at this volume.
+    // A pending link marks every free target leaf and transform input, which must stay checkable
+    // at this volume. Every target is taken here, so a new transform brings free inputs.
+    await userEvent.click(canvas.getByRole('button', { name: 'Add Concatenate' }))
+    await waitFor(() =>
+      expect(canvasElement.ownerDocument.activeElement).toHaveTextContent(/^Concatenate \d+$/),
+    )
+
     const from = canvasElement.querySelector<HTMLElement>(
       '.react-flow__node[data-id^="source:"]:has(.link-handle) button[aria-pressed]',
     )!
@@ -398,7 +331,8 @@ export const EmptyPart = meta.story({
     await expect(canvas.getByText('Empty')).toBeVisible()
     await expect(canvas.queryByRole('button', { name: /(Expand|Collapse) header/ })).toBeNull()
     await expect(canvas.getByText('UNH')).toBeVisible()
-    await expect(canvasElement.querySelector('.react-flow__edge')).toBeNull()
+    // Only the transforms' own links into the target are left, as no source field exists.
+    await expect(canvasElement.querySelector('.react-flow__edge[data-id^="source:"]')).toBeNull()
   },
 })
 
@@ -703,7 +637,7 @@ export const DrawLinkByMouse = meta.story({
     await expect(
       await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeInTheDocument()
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
     await expect(canvas.getByText('1 link')).toBeVisible()
     await waitFor(() =>
       expect(liveStatus(canvasElement)).toHaveTextContent(
@@ -739,7 +673,7 @@ export const DrawLinkByKeyboard = meta.story({
     ).toBeInTheDocument()
     await waitFor(() => expect(to).toHaveFocus())
     await expect(panel.getByText('invoiceNumber to BGM/1004')).toBeVisible()
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
     // The shortcut: L on a source starts a link, L on a target finishes it.
     await pressOn(await findRow(canvasElement, source('invoiceDate')), 'l')
@@ -779,8 +713,8 @@ export const RemoveLinkByMouse = meta.story({
         canvas.queryByRole('img', { name: 'Link from despatchNumber to BGM/1004' }),
       ).toBeNull(),
     )
-    await expect(await canvas.findByText('17 links')).toBeVisible()
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await canvas.findByText('29 links')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
     // An edge into collapsed parts carries several links; its button lists them by name first.
     await userEvent.click(canvas.getByRole('button', { name: 'Collapse packages' }))
@@ -792,8 +726,9 @@ export const RemoveLinkByMouse = meta.story({
 
     const panel = detailsPanel(canvasElement)
 
+    // The panel also lists the loop that takes the whole part.
     await expect(panel.getAllByRole('button', { name: /^Remove link from packages/ })).toHaveLength(
-      9,
+      10,
     )
     // Focus moves a frame after the panel lists the links.
     await waitFor(() =>
@@ -803,7 +738,7 @@ export const RemoveLinkByMouse = meta.story({
         }),
       ).toHaveFocus(),
     )
-    await expect(canvas.getByText('17 links')).toBeVisible()
+    await expect(canvas.getByText('29 links')).toBeVisible()
   },
 })
 
@@ -827,7 +762,7 @@ export const RemoveLinkByKeyboard = meta.story({
     )
     await waitFor(() => expect(row).toHaveFocus())
     await expect(panel.getByText('This part has no links yet.')).toBeVisible()
-    await expect(await canvas.findByText('17 links')).toBeVisible()
+    await expect(await canvas.findByText('29 links')).toBeVisible()
 
     // Delete removes the only link of the focused part.
     await pressOn(await findRow(canvasElement, source('documentDate')), '{Delete}')
@@ -836,16 +771,16 @@ export const RemoveLinkByKeyboard = meta.story({
         canvas.queryByRole('img', { name: 'Link from documentDate to DTM+137/C507/2380' }),
       ).toBeNull(),
     )
-    await expect(await canvas.findByText('16 links')).toBeVisible()
+    await expect(await canvas.findByText('28 links')).toBeVisible()
 
     // A part holding several links keeps them and says how to remove them.
     await pressOn(await findRow(canvasElement, source('packages[]')), '{Delete}')
     await waitFor(() =>
       expect(liveStatus(canvasElement)).toHaveTextContent(
-        'packages has 9 links. Select it to remove them one by one.',
+        'packages has 10 links. Select it to remove them one by one.',
       ),
     )
-    await expect(canvas.getByText('16 links')).toBeVisible()
+    await expect(canvas.getByText('28 links')).toBeVisible()
   },
 })
 
@@ -878,9 +813,16 @@ export const RemoveButtonOfLongEdge = meta.story({
     // Hovered where the edge is in view, near the end that is on screen.
     const lengths = Array.from({ length: 41 }, (_, step) => (length * step) / 40)
 
+    // Not where a transform or another link covers it.
     const shown = lengths
       .map((at) => screenPoint(edge, at))
-      .find((point) => inside(new DOMRect(point.x - 20, point.y - 20, 40, 40), pane))!
+      .find(
+        (point) =>
+          inside(new DOMRect(point.x - 20, point.y - 20, 40, 40), pane) &&
+          canvasElement.ownerDocument
+            .elementFromPoint(point.x, point.y)
+            ?.closest('.react-flow__edge') === edge.closest('.react-flow__edge'),
+      )!
 
     await fireEvent.mouseOver(edge, { clientX: shown.x, clientY: shown.y })
 
@@ -949,7 +891,7 @@ export const DragOntoLinkedTarget = meta.story({
     await expect(
       canvas.queryByRole('img', { name: 'Link from despatchDate to BGM/1004' }),
     ).toBeNull()
-    await expect(canvas.getByText('18 links')).toBeVisible()
+    await expect(canvas.getByText('30 links')).toBeVisible()
   },
 })
 
@@ -976,7 +918,7 @@ export const TargetAlreadyLinked = meta.story({
     await expect(
       canvas.queryByRole('img', { name: 'Link from despatchDate to DTM+137/C507/2380' }),
     ).toBeNull()
-    await expect(canvas.getByText('18 links')).toBeVisible()
+    await expect(canvas.getByText('30 links')).toBeVisible()
     await expect(
       detailsPanel(canvasElement).getByText('Linking from despatchDate.', { exact: false }),
     ).toBeVisible()
@@ -1012,7 +954,7 @@ export const SaveErrorRollback = meta.story({
     await expect(
       canvas.queryByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeNull()
-    await expect(await canvas.findByText('Not saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Not saved')).toBeVisible()
     await expect(canvas.getByText('No links yet')).toBeVisible()
   },
 })

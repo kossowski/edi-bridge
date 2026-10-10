@@ -2,15 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { messageTypeStructures, seedDocumentStructureOf } from '@edi-bridge/mocks'
 
-import {
-  addLink,
-  canLink,
-  leafPaths,
-  linksOfItem,
-  removeLink,
-  revertChange,
-  rowListingLinks,
-} from './mapping-links'
+import { leafPaths, linksOfItem, rowListingLinks } from './mapping-links'
 import { documentTree, edifactTree, findItem } from './mapping-tree'
 
 const source = documentTree(seedDocumentStructureOf.ORDERS)
@@ -34,97 +26,50 @@ describe('leafPaths', () => {
   })
 })
 
-describe('canLink', () => {
-  it('links a source leaf to a target leaf only', () => {
-    expect(
-      canLink(
-        leaves,
-        { side: 'source', path: 'orderDate' },
-        { side: 'target', path: 'DTM+137/C507/2380' },
-      ),
-    ).toBe(true)
-    expect(
-      canLink(leaves, { side: 'source', path: 'buyer' }, { side: 'target', path: 'BGM/1004' }),
-    ).toBe(false)
-    expect(
-      canLink(leaves, { side: 'source', path: 'orderDate' }, { side: 'target', path: 'DTM+137' }),
-    ).toBe(false)
-    expect(
-      canLink(
-        leaves,
-        { side: 'target', path: 'BGM/1004' },
-        { side: 'source', path: 'orderNumber' },
-      ),
-    ).toBe(false)
-  })
-})
-
-describe('addLink', () => {
-  it('appends a link into a free target', () => {
-    const added = addLink(
-      links,
-      leaves,
-      { side: 'source', path: 'orderDate' },
-      { side: 'target', path: 'DTM+137/C507/2380' },
-    )
-
-    expect(added).toEqual({
-      ok: true,
-      change: {
-        kind: 'add',
-        link: { sourcePath: 'orderDate', targetPath: 'DTM+137/C507/2380' },
-        links: [...links, { sourcePath: 'orderDate', targetPath: 'DTM+137/C507/2380' }],
-      },
-    })
-  })
-
-  it('refuses a second link into a linked target and names the first one', () => {
-    expect(
-      addLink(
-        links,
-        leaves,
-        { side: 'source', path: 'orderDate' },
-        { side: 'target', path: 'BGM/1004' },
-      ),
-    ).toEqual({ ok: false, reason: 'alreadyLinked', existing: links[0] })
-  })
-
-  it('lets one source feed several targets', () => {
-    expect(
-      addLink(
-        links,
-        leaves,
-        { side: 'source', path: 'orderNumber' },
-        { side: 'target', path: 'SG1+CT/RFF+CT/C506/1154' },
-      ).ok,
-    ).toBe(true)
-  })
-
-  it('refuses parts that hold others', () => {
-    expect(
-      addLink(links, leaves, { side: 'source', path: 'buyer' }, { side: 'target', path: 'BGM' }),
-    ).toEqual({ ok: false, reason: 'notLinkable' })
-  })
-})
-
-describe('removeLink', () => {
-  it('removes only the given link', () => {
-    expect(removeLink(links, links[1]!)).toEqual({
-      kind: 'remove',
-      link: links[1],
-      links: [links[0], links[2]],
-    })
-  })
-})
-
 describe('linksOfItem', () => {
+  const graph = { links, transforms: [], transformLinks: [] }
+  const plain = (index: number) => ({ kind: 'link', link: links[index] })
+
   it('gives a leaf its own links', () => {
-    expect(linksOfItem(links, 'source', findItem(source, 'orderNumber')!)).toEqual([links[0]])
+    expect(linksOfItem(graph, 'source', findItem(source, 'orderNumber')!)).toEqual([plain(0)])
   })
 
   it('gives a part the links of every leaf inside it', () => {
-    expect(linksOfItem(links, 'source', findItem(source, 'lines[]')!)).toEqual([links[1], links[2]])
-    expect(linksOfItem(links, 'target', findItem(target, 'SG25')!)).toEqual([links[1], links[2]])
+    expect(linksOfItem(graph, 'source', findItem(source, 'lines[]')!)).toEqual([plain(1), plain(2)])
+    expect(linksOfItem(graph, 'target', findItem(target, 'SG25')!)).toEqual([plain(1), plain(2)])
+  })
+
+  it('counts links to and from transforms, and loops that take a whole part', () => {
+    const transformId = '00000000-0000-4000-8000-000000000001'
+
+    const intoTransform = {
+      from: { kind: 'source', path: 'orderDate' },
+      to: { kind: 'transform', transformId, input: 'value' },
+    } as const
+
+    const fromTransform = {
+      from: { kind: 'transform', transformId, output: 'value' },
+      to: { kind: 'target', path: 'DTM+137/C507/2380' },
+    } as const
+
+    const loopItems = {
+      from: { kind: 'transform', transformId, output: 'items' },
+      to: { kind: 'target', path: 'SG25' },
+    } as const
+
+    const withTransforms = { ...graph, transformLinks: [intoTransform, fromTransform, loopItems] }
+
+    expect(linksOfItem(withTransforms, 'source', findItem(source, 'orderDate')!)).toEqual([
+      { kind: 'transformLink', link: intoTransform },
+    ])
+    expect(linksOfItem(withTransforms, 'target', findItem(target, 'DTM+137')!)).toEqual([
+      { kind: 'transformLink', link: fromTransform },
+    ])
+    expect(linksOfItem(withTransforms, 'target', findItem(target, 'SG25')!)).toEqual([
+      plain(1),
+      plain(2),
+      { kind: 'transformLink', link: loopItems },
+    ])
   })
 })
 
@@ -147,34 +92,5 @@ describe('rowListingLinks', () => {
         links: [links[0]!],
       }),
     ).toEqual({ side: 'target', path: 'BGM' })
-  })
-})
-
-describe('revertChange', () => {
-  const later = { sourcePath: 'orderDate', targetPath: 'DTM+137/C507/2380' }
-
-  it('takes back a failed add and keeps the changes made after it', () => {
-    const added = { sourcePath: 'buyer.gln', targetPath: 'SG2+BY/NAD+BY/C082/3039' }
-
-    expect(revertChange([...links, added, later], { kind: 'add', link: added })).toEqual([
-      ...links,
-      later,
-    ])
-  })
-
-  it('brings back a link whose removal failed and keeps the changes made after it', () => {
-    const [removed, ...rest] = links
-
-    expect(revertChange([...rest, later], { kind: 'remove', link: removed! })).toEqual([
-      ...rest,
-      later,
-      removed,
-    ])
-  })
-
-  it('does not bring back a link twice', () => {
-    const [removed] = links
-
-    expect(revertChange(links, { kind: 'remove', link: removed! })).toHaveLength(links.length)
   })
 })

@@ -5,15 +5,18 @@ import { createStore, type StoreApi, useStore } from 'zustand'
 
 import type { XYPosition } from '@xyflow/react'
 
+import { sameStart } from '@/components/mappings/mapping-graph'
 import { createTooltipHandle } from '@edi-bridge/ui/components/tooltip'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
 import type { Side, TreeRow } from '@/components/mappings/mapping-tree'
+import type { LinkStart } from '@edi-bridge/contracts'
 
 export type CanvasState = {
   collapsed: Readonly<Record<Side, ReadonlySet<string>>>
   selected: RowRef | null
-  linkFrom: RowRef | null
+  selectedTransform: string | null
+  linkFrom: LinkStart | null
   tooltipRowId: string | null
   hoveredEdge: string | null
   // Where the pointer met the hovered edge, in flow coordinates; its middle may be out of view.
@@ -23,8 +26,10 @@ export type CanvasState = {
   toggleCollapsed: (row: RowRef) => void
   toggleSelected: (row: RowRef) => void
   select: (row: RowRef) => void
+  toggleTransform: (id: string) => void
+  selectTransform: (id: string) => void
   clearSelection: () => void
-  startLink: (row: RowRef) => void
+  startLink: (start: LinkStart) => void
   cancelLink: () => void
   setTooltipRowId: (id: string | null) => void
   hoverEdge: (id: string, at?: XYPosition) => void
@@ -35,6 +40,10 @@ export type CanvasState = {
 
 export function isSameRow(a: RowRef | null, b: RowRef) {
   return a !== null && a.side === b.side && a.path === b.path
+}
+
+export function isStartRow(start: LinkStart | null, row: RowRef) {
+  return row.side === 'source' && sameStart(start, { kind: 'source', path: row.path })
 }
 
 function toRowRef({ side, path }: RowRef): RowRef {
@@ -50,6 +59,7 @@ export function createCanvasStore() {
   return createStore<CanvasState>()((set, get) => ({
     collapsed: { source: new Set(), target: new Set() },
     selected: null,
+    selectedTransform: null,
     linkFrom: null,
     tooltipRowId: null,
     hoveredEdge: null,
@@ -69,10 +79,17 @@ export function createCanvasStore() {
     toggleSelected: (row) =>
       set(({ selected }) => ({
         selected: isSameRow(selected, row) ? null : toRowRef(row),
+        selectedTransform: null,
       })),
-    select: (row) => set({ selected: toRowRef(row) }),
-    clearSelection: () => set({ selected: null }),
-    startLink: (row) => set({ linkFrom: toRowRef(row), problem: null }),
+    select: (row) => set({ selected: toRowRef(row), selectedTransform: null }),
+    toggleTransform: (id) =>
+      set(({ selectedTransform }) => ({
+        selectedTransform: selectedTransform === id ? null : id,
+        selected: null,
+      })),
+    selectTransform: (id) => set({ selectedTransform: id, selected: null }),
+    clearSelection: () => set({ selected: null, selectedTransform: null }),
+    startLink: (linkFrom) => set({ linkFrom, problem: null }),
     cancelLink: () => set({ linkFrom: null }),
     setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
     hoverEdge: (id, at) => {

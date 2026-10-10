@@ -6,11 +6,11 @@ import { type QueryKey, useQuery, type UseQueryOptions } from '@tanstack/react-q
 import { useLocale, useTranslations } from 'next-intl'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
-import { LinkSaveStatus } from '@/components/mappings/link-save-status'
+import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
 import { documentTree, edifactTree, type TreeItem } from '@/components/mappings/mapping-tree'
-import { useSaveLinks } from '@/components/mappings/use-save-links'
+import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
 import { ApiError, getDocumentStructure, getMessageTypeStructure } from '@/lib/api/client'
 import { documentStructureKeys, mappingDraftQuery, messageTypeKeys } from '@/lib/api/queries'
@@ -109,7 +109,7 @@ function Canvas({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping.canvas')
   const source = useSide(draft.source)
   const target = useSide(draft.target)
-  const save = useSaveLinks(draft.mappingId)
+  const save = useSaveGraph(draft.mappingId)
 
   if (source.isError || target.isError) {
     return (
@@ -130,8 +130,8 @@ function Canvas({ draft }: { draft: MappingDraft }) {
 
   return (
     <MappingCanvas
+      graph={draft}
       label={t('label', { source: source.title, target: target.title })}
-      links={draft.links}
       source={{ title: source.title, items: source.items }}
       target={{ title: target.title, items: target.items }}
       onChange={save}
@@ -165,7 +165,7 @@ function MappingView({ draft }: { draft: MappingDraft }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <Badge variant="outline">{t('draft')}</Badge>
-        <LinkSaveStatus mappingId={draft.mappingId} />
+        <GraphSaveStatus mappingId={draft.mappingId} />
       </div>
       <dl
         aria-label={t('facts.label')}
@@ -173,7 +173,12 @@ function MappingView({ draft }: { draft: MappingDraft }) {
         <Fact label={t('facts.direction')}>{t(`direction.${draft.direction}`)}</Fact>
         <Fact label={t('facts.source')}>{sideTitle(draft.source)}</Fact>
         <Fact label={t('facts.target')}>{sideTitle(draft.target)}</Fact>
-        <Fact label={t('facts.links')}>{t('linkCount', { count: draft.links.length })}</Fact>
+        <Fact label={t('facts.links')}>
+          {t('linkCount', { count: draft.links.length + draft.transformLinks.length })}
+        </Fact>
+        <Fact label={t('facts.transforms')}>
+          {t('transforms.count', { count: draft.transforms.length })}
+        </Fact>
       </dl>
       <DesktopOnlyNotice />
       {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}

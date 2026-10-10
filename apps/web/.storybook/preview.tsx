@@ -39,7 +39,12 @@ export default definePreview({
     ),
   ],
   parameters: {
-    a11y: { test: 'error' },
+    a11y: {
+      test: 'error',
+      // Every passing element otherwise ends up in each story's report, about 2 MB on the mapping
+      // canvas, which the test run then copies out of the browser. Passes keep one example each.
+      options: { resultTypes: ['violations', 'incomplete'] },
+    },
     nextjs: { appDirectory: true },
   },
 })
