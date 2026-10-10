@@ -1,5 +1,6 @@
 export {
   type Endpoint,
+  type EventStreamEndpoint,
   fromSearchParams,
   type PathParams,
   type QueryParams,
@@ -221,7 +222,6 @@ export {
 } from './mapping-preview'
 
 export {
-  type EventStreamEndpoint,
   type LiveEvent,
   liveEventSchema,
   liveEventsEndpoint,
