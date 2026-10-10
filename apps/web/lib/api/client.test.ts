@@ -35,9 +35,11 @@ import {
   getLookupTable,
   inferDocumentStructure,
   getRun,
+  importLookupTable,
   listLookupTables,
   listMappingVersions,
   listRuns,
+  previewLookupTableImport,
   publishMappingDraft,
   regenerateWebhookToken,
   reprocessRun,
@@ -395,5 +397,41 @@ describe('Lookup Table actions', () => {
 
     await expect(deleteLookupTable(units.id)).resolves.toBeUndefined()
     await expect(getLookupTable(units.id)).rejects.toMatchObject({ status: 404 })
+  })
+})
+
+describe('Lookup Table CSV import', () => {
+  const units = seedLookupTableNamed('Units of measure')
+  const csv = 'source;target\nST;PCE\nKG;KGS\nMTR;MTR\n;LTR'
+
+  it('previews the import without applying it', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const { rows } = await previewLookupTableImport(units.id, { csv })
+
+    expect(rows.map(({ status }) => status)).toEqual(['unchanged', 'changed', 'added', 'invalid'])
+    await expect(getLookupTable(units.id)).resolves.toMatchObject({ entries: units.entries })
+  })
+
+  it('merges the imported entries and keeps entries missing from the CSV', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const imported = await importLookupTable(units.id, { csv })
+
+    expect(imported.entries).toEqual([
+      { sourceCode: 'ST', targetCode: 'PCE' },
+      { sourceCode: 'STK', targetCode: 'PCE' },
+      { sourceCode: 'KG', targetCode: 'KGS' },
+      { sourceCode: 'L', targetCode: 'LTR' },
+      { sourceCode: 'MTR', targetCode: 'MTR' },
+    ])
+  })
+
+  it('rejects a preview for an unknown Lookup Table', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    await expect(
+      previewLookupTableImport('00000000-0000-4000-8000-0000000000ff', { csv }),
+    ).rejects.toMatchObject({ status: 404 })
   })
 })

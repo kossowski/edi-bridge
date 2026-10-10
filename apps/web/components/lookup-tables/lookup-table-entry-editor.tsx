@@ -1,6 +1,6 @@
 'use client'
 
-import { Add01Icon, Table01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, FileImportIcon, Table01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import {
@@ -16,6 +16,7 @@ import {
 
 import { LeaveGuard } from '@/components/leave-guard'
 import { isSaveShortcut } from '@/components/lookup-tables/grid-keyboard'
+import { ImportCsvDialog } from '@/components/lookup-tables/import-csv-dialog'
 import { type EntryField, matchesFilter } from '@/components/lookup-tables/lookup-table-entries'
 import {
   type ActiveCell,
@@ -38,6 +39,7 @@ import {
 } from '@edi-bridge/ui/components/empty'
 import { Input } from '@edi-bridge/ui/components/input'
 
+import type { ImportCounts } from '@/components/lookup-tables/lookup-table-import'
 import type { LookupTable } from '@edi-bridge/contracts'
 
 const shortcuts = ['move', 'tab', 'edit', 'commit', 'cancel', 'add', 'delete', 'save'] as const
@@ -72,11 +74,14 @@ function Shortcuts() {
 
 export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   const t = useTranslations('LookupTable.entries')
+  const tImport = useTranslations('LookupTable.import')
   const ids = { title: useId(), hint: useId(), filter: useId() }
   const [active, setActive] = useState<ActiveCell | null>(null)
   const [editing, setEditing] = useState<Editing | null>(null)
   const [filter, setFilter] = useState('')
   const [announcement, setAnnouncement] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
+  const importButton = useRef<HTMLButtonElement>(null)
   const focusRequest = useRef(false)
   const grid = useRef<EntryGridHandle>(null)
   const addButton = useRef<HTMLButtonElement>(null)
@@ -187,6 +192,14 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
     setAnnouncement(t('announcements.discarded'))
   }
 
+  function applyImported(saved: LookupTable, counts: ImportCounts) {
+    entries.load(saved.entries)
+    setActive(null)
+    setEditing(null)
+    setImportOpen(false)
+    setAnnouncement(tImport('applied', { added: counts.added, changed: counts.changed }))
+  }
+
   function submit() {
     setEditing(null)
 
@@ -247,6 +260,17 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
           <span className="text-muted-foreground text-sm">
             {saving ? t('savingReadOnly') : dirty ? t('unsaved') : t('upToDate')}
           </span>
+          <Button
+            disabled={saving}
+            ref={importButton}
+            variant="outline"
+            onClick={() => {
+              setEditing(null)
+              setImportOpen(true)
+            }}>
+            <HugeiconsIcon icon={FileImportIcon} strokeWidth={2} aria-hidden />
+            {tImport('open')}
+          </Button>
           <Button disabled={!dirty || saving} variant="outline" onClick={discard}>
             {t('discard')}
           </Button>
@@ -327,6 +351,15 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
         </>
       )}
       <Shortcuts />
+      <ImportCsvDialog
+        dirty={dirty}
+        finalFocus={importButton}
+        open={importOpen}
+        table={table}
+        onDiscard={discard}
+        onImported={applyImported}
+        onOpenChange={setImportOpen}
+      />
     </section>
   )
 }
