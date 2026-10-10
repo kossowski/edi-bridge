@@ -94,6 +94,12 @@ export function liveStatus(canvasElement: HTMLElement) {
   return canvasElement.querySelector('p[role="status"].sr-only')!
 }
 
+// Each save is a request to the mock API, which a busy CI runner can answer later than the default
+// second of findBy* allows.
+export function findSaveStatus(canvasElement: HTMLElement, status: 'Saved' | 'Not saved') {
+  return within(canvasElement).findByText(status, {}, { timeout: 5000 })
+}
+
 export async function pressOn(element: HTMLElement, keys: string) {
   element.focus()
   await userEvent.keyboard(keys)

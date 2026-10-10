@@ -74,9 +74,11 @@ export function useSaveGraph(mappingId: string) {
       )
       store.getState().setProblem(failed)
     },
-    onSettled: async () => {
+    // Not awaited: the mutation reads as pending until onSettled resolves, so awaiting the
+    // refetch would keep showing "Saving…" after the server has already confirmed the save.
+    onSettled: () => {
       if (isLast()) {
-        await queryClient.invalidateQueries({ queryKey })
+        void queryClient.invalidateQueries({ queryKey })
       }
     },
   })

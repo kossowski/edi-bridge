@@ -7,6 +7,7 @@ import {
   detailsPanel,
   dragLink,
   findRow,
+  findSaveStatus,
   liveStatus,
   pressOn,
   seeded,
@@ -184,7 +185,7 @@ export const PlaceTransform = meta.story({
     await expect(panel.getByRole('heading', { name: 'Date format 1' })).toBeVisible()
     await expect(panel.getByRole('textbox', { name: 'From pattern' })).toHaveValue('yyyy-MM-dd')
     await expect(panel.getByRole('textbox', { name: 'To pattern' })).toHaveValue('yyyyMMdd')
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
     await expect(canvas.getByText('1 Transform')).toBeVisible()
     await waitFor(() => expect(liveStatus(canvasElement)).toHaveTextContent('Date format 1 added.'))
 
@@ -244,7 +245,7 @@ export const ConnectByKeyboard = meta.story({
         'data-invalid',
       ),
     )
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
     // An input takes one link.
     await pressOn(await findRow(canvasElement, source('invoiceNumber')), 'l')
@@ -296,7 +297,7 @@ export const ConnectByMouse = meta.story({
     await waitFor(() =>
       expect(node(canvasElement, 'Concatenate 1').queryByText(/not linked/)).toBeNull(),
     )
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
     await expect(canvas.getByText('3 links')).toBeVisible()
   },
 })
@@ -417,7 +418,7 @@ export const LowerConcatenateParts = meta.story({
     ).toBeNull()
     await expect(concatenate.queryByRole('button', { name: /Part 2 input/ })).toBeNull()
     await expect(concatenate.getByText('Number of parts must be between 2 and 10.')).toBeVisible()
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
   },
 })
 
@@ -464,7 +465,7 @@ export const RemoveTransforms = meta.story({
     await waitFor(() =>
       expect(node(canvasElement, 'Concatenate 1').getByText('2 problems')).toBeVisible(),
     )
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
     // The panel lists a selected transform's links and removes them, or the transform.
     await userEvent.click(canvas.getByRole('button', { name: 'Concatenate 1' }))
@@ -514,7 +515,7 @@ export const SaveErrorRollback = meta.story({
       }),
     )
   },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Add Constant' }))
 
     await expect(await canvas.findByRole('group', { name: 'Transform Constant 1' })).toBeVisible()
@@ -526,7 +527,7 @@ export const SaveErrorRollback = meta.story({
       ),
     )
     await expect(canvas.queryByRole('group', { name: 'Transform Constant 1' })).toBeNull()
-    await expect(await canvas.findByText('Not saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Not saved')).toBeVisible()
     await expect(canvas.getByText('No Transforms yet')).toBeVisible()
   },
 })
@@ -551,7 +552,7 @@ export const OverlappingSaveRollback = meta.story({
       }),
     )
   },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Add Constant' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Add Split' }))
     await expect(await canvas.findByRole('group', { name: 'Transform Split 1' })).toBeVisible()
@@ -561,7 +562,7 @@ export const OverlappingSaveRollback = meta.story({
         'Constant 1 could not be saved and was taken back. Try again.',
       ),
     )
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
     const response = await fetch(
       `${apiUrl}${toPath(mappingDraftEndpoint.path, { id: withoutLinks.id })}`,

@@ -9,6 +9,7 @@ import {
   dragOver,
   drop,
   findRow,
+  findSaveStatus,
   handleOf,
   liveStatus,
   page,
@@ -636,7 +637,7 @@ export const DrawLinkByMouse = meta.story({
     await expect(
       await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeInTheDocument()
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
     await expect(canvas.getByText('1 link')).toBeVisible()
     await waitFor(() =>
       expect(liveStatus(canvasElement)).toHaveTextContent(
@@ -672,7 +673,7 @@ export const DrawLinkByKeyboard = meta.story({
     ).toBeInTheDocument()
     await waitFor(() => expect(to).toHaveFocus())
     await expect(panel.getByText('invoiceNumber to BGM/1004')).toBeVisible()
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
     // The shortcut: L on a source starts a link, L on a target finishes it.
     await pressOn(await findRow(canvasElement, source('invoiceDate')), 'l')
@@ -713,7 +714,7 @@ export const RemoveLinkByMouse = meta.story({
       ).toBeNull(),
     )
     await expect(await canvas.findByText('29 links')).toBeVisible()
-    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
     // An edge into collapsed parts carries several links; its button lists them by name first.
     await userEvent.click(canvas.getByRole('button', { name: 'Collapse packages' }))
@@ -953,7 +954,7 @@ export const SaveErrorRollback = meta.story({
     await expect(
       canvas.queryByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeNull()
-    await expect(await canvas.findByText('Not saved')).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Not saved')).toBeVisible()
     await expect(canvas.getByText('No links yet')).toBeVisible()
   },
 })
