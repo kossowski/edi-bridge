@@ -16,6 +16,7 @@ import type {
   MappingGraph,
   MappingVersionSummary,
   MessageType,
+  OverviewWindow,
   RunListQuery,
   TradingPartner,
 } from '@edi-bridge/contracts'
@@ -30,6 +31,7 @@ import {
   getLookupTable,
   getMappingDraft,
   getMappingVersion,
+  getOverview,
   getRun,
   getTradingPartner,
   inferDocumentStructure,
@@ -50,6 +52,19 @@ export const currentWorkspaceQuery = queryOptions({
   queryKey: ['workspaces', 'current'],
   queryFn: getCurrentWorkspace,
 })
+
+export const overviewKeys = {
+  all: () => ['overview'] as const,
+  window: (window: OverviewWindow) => [...overviewKeys.all(), window] as const,
+}
+
+export function overviewQuery(window: OverviewWindow) {
+  return queryOptions({
+    queryKey: overviewKeys.window(window),
+    queryFn: () => getOverview({ window }),
+    placeholderData: keepPreviousData,
+  })
+}
 
 export const runKeys = {
   lists: () => ['runs', 'list'] as const,

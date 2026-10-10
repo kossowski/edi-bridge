@@ -54,6 +54,68 @@
     "title": "Seite nicht gefunden",
     "description": "Diese Seite gibt es nicht. Wechseln Sie über die Navigation zu einer anderen Ansicht."
   },
+  "Overview": {
+    "loading": "Übersicht wird geladen",
+    "window": {
+      "label": "Zeitraum",
+      "1h": "1 Stunde",
+      "24h": "24 Stunden",
+      "7d": "7 Tage"
+    },
+    "period": {
+      "1h": "der letzten Stunde",
+      "24h": "den letzten 24 Stunden",
+      "7d": "den letzten 7 Tagen"
+    },
+    "bucket": {
+      "1h": "5 Minuten",
+      "24h": "Stunde",
+      "7d": "6 Stunden"
+    },
+    "series": {
+      "delivered": "Zugestellt",
+      "failed": "Fehlgeschlagen",
+      "errorRate": "Fehlerquote"
+    },
+    "kpis": {
+      "label": "Summen aus {period}",
+      "finished": "Abgeschlossene Runs",
+      "delivered": "Zugestellt",
+      "failed": "Fehlgeschlagen",
+      "errorRate": "Fehlerquote",
+      "noErrorRate": "Keine"
+    },
+    "throughput": {
+      "title": "Durchsatz",
+      "description": "Zugestellte und fehlgeschlagene Runs pro {bucket}",
+      "summary": "In {period} wurden {delivered, plural, one {# Run} other {# Runs}} zugestellt und {failed, plural, one {# Run} other {# Runs}} sind fehlgeschlagen. Die meisten Runs wurden um {peakTime} abgeschlossen: {peak, number}."
+    },
+    "errorRate": {
+      "title": "Fehlerquote",
+      "description": "Anteil der abgeschlossenen Runs, die fehlgeschlagen sind, pro {bucket}",
+      "summary": "Die Fehlerquote in {period} beträgt {rate}. Am höchsten war sie um {peakTime}: {peakRate}. Zeiträume ohne abgeschlossene Runs haben keine Fehlerquote."
+    },
+    "table": {
+      "toggle": "Werte als Tabelle anzeigen",
+      "caption": "Zugestellte und fehlgeschlagene Runs und die Fehlerquote pro {bucket}",
+      "columns": {
+        "period": "Zeitraum",
+        "delivered": "Zugestellt",
+        "failed": "Fehlgeschlagen",
+        "errorRate": "Fehlerquote"
+      },
+      "noErrorRate": "–"
+    },
+    "empty": {
+      "title": "Keine abgeschlossenen Runs",
+      "description": "In {period} wurde kein Run zugestellt und keiner ist fehlgeschlagen. Die Diagramme erscheinen, sobald Runs abgeschlossen werden."
+    },
+    "error": {
+      "title": "Übersicht nicht verfügbar",
+      "description": "Die Übersicht konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    }
+  },
   "Runs": {
     "caption": "Runs, neueste zuerst",
     "loading": "Runs werden geladen",

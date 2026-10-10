@@ -43,6 +43,8 @@ import {
   messageTypeStructureEndpoint,
   type MoveFlowMappingVersionBody,
   moveFlowMappingVersionEndpoint,
+  overviewEndpoint,
+  type OverviewQuery,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   type PreviewMappingBody,
@@ -130,6 +132,10 @@ export function getCurrentWorkspace() {
 
 export function updateCompanyIdentity(body: CompanyIdentityInput) {
   return request(updateCompanyIdentityEndpoint, { body })
+}
+
+export function getOverview(query: OverviewQuery) {
+  return request(overviewEndpoint, { query })
 }
 
 export function listRuns(query: RunListQuery) {
