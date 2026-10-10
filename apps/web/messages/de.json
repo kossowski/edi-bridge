@@ -1452,6 +1452,17 @@
     "failed": "Die Document Structure konnte nicht gespeichert werden. Versuchen Sie es erneut.",
     "errors": {
       "nameRequired": "Geben Sie einen Namen ein."
+    },
+    "csv": {
+      "description": "EDI Bridge liest CSV-Documents dieser Document Structure mit diesen Einstellungen. Um sie zu ändern, wählen Sie ein CSV-Document: EDI Bridge liest es mit den neuen Einstellungen erneut und zeigt die abgeleiteten Felder, bevor Sie speichern.",
+      "document": {
+        "label": "CSV-Document",
+        "description": "Ein aktueller Export aus Ihren eigenen Systemen. Beim Speichern ersetzen die daraus gelesenen Felder die bisherigen. Höchstens 5 MB."
+      },
+      "documentNeeded": "Wählen Sie ein CSV-Document, um es mit den neuen Einstellungen erneut zu lesen.",
+      "rereadFieldsDescription": "Die Felder, die EDI Bridge mit den Einstellungen oben aus {fileName} liest. Beim Speichern ersetzen sie die bisherigen Felder. Markieren Sie Spalten als Pflicht oder optional und passen Sie ihren Typ an.",
+      "reading": "CSV-Document wird gelesen…",
+      "unread": "Die Felder erscheinen, sobald EDI Bridge das CSV-Document lesen kann. Passen Sie die CSV-Einstellungen an oder wählen Sie ein anderes CSV-Document."
     }
   },
   "DocumentStructureForm": {
@@ -1493,8 +1504,10 @@
       "fileRequired": "Wählen Sie eine Datei.",
       "empty": "Die Datei ist leer.",
       "tooLarge": "Die Datei ist zu groß. Sie darf höchstens 5 MB haben.",
-      "unreadable": "Beheben Sie das Problem in der Datei oder wählen Sie eine andere."
-    }
+      "unreadable": "Beheben Sie das Problem in der Datei oder wählen Sie eine andere.",
+      "unreadableCsv": "Passen Sie die CSV-Einstellungen an, beheben Sie das Problem in der Datei oder wählen Sie eine andere."
+    },
+    "csvDescription": "EDI Bridge liest das CSV-Document mit diesen Einstellungen. Die Vorschau folgt jeder Änderung."
   },
   "DocumentStructureTree": {
     "label": "Felder von {name}",
@@ -1534,9 +1547,8 @@
   },
   "CsvSettings": {
     "title": "CSV-Einstellungen",
-    "description": "EDI Bridge liest CSV-Documents dieser Document Structure mit diesen Einstellungen.",
     "delimiter": "Trennzeichen",
-    "headerRow": "Kopfzeile",
+    "headerRow": "Die erste Zeile benennt die Spalten",
     "encoding": "Zeichenkodierung",
     "delimiters": {
       "comma": "Komma (,)",
@@ -1544,9 +1556,14 @@
       "tab": "Tabulator",
       "pipe": "Senkrechter Strich (|)"
     },
-    "headerRows": {
-      "yes": "Die erste Zeile benennt die Spalten",
-      "no": "Keine Kopfzeile"
+    "delimiterDescription": "Das Zeichen zwischen zwei Zellen einer Zeile.",
+    "encodingDescription": "Ältere ERP-Exporte verwenden oft Windows-1252. Sehen Umlaute falsch aus, wählen Sie eine andere Kodierung.",
+    "headerRowDescription": "Ohne Kopfzeile benennt EDI Bridge die Spalten column1, column2 und so weiter und liest die erste Zeile als Daten.",
+    "firstRows": {
+      "title": "Erste Zeilen",
+      "description": "So liest EDI Bridge sie mit {encoding} und dem Trennzeichen oben.",
+      "label": "Erste Zeilen von {fileName}",
+      "none": "Das CSV-Document hat keine Zeilen unter der Kopfzeile."
     }
   },
   "DocumentStructureProblem": {
@@ -1571,7 +1588,8 @@
       "csvDocumentRequired": "Für andere CSV-Einstellungen braucht es ein CSV-Document, das EDI Bridge mit den neuen Einstellungen erneut liest.",
       "linkedByMapping": "Ein Mapping-Draft verknüpft ein Feld, das diese Änderung entfernen würde. Entfernen Sie zuerst die Verknüpfung auf dem Mapping-Canvas oder machen Sie die Änderung rückgängig.",
       "usedByMappingVersion": "Veröffentlichte Mapping Versions verwenden diesen Teil, und eine veröffentlichte Mapping Version ändert sich nie. Machen Sie die Änderung rückgängig oder erstellen Sie eine neue Document Structure für die neue Form."
-    }
+    },
+    "csvSettingsUsedByMappingVersion": "Veröffentlichte Mapping Versions lesen CSV-Documents mit diesen Einstellungen, und eine veröffentlichte Mapping Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie eine neue Document Structure mit den neuen."
   },
   "ManualSubmission": {
     "open": "Ein Document einreichen",

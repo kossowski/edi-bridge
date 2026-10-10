@@ -42,6 +42,13 @@ describe('document files', () => {
     expect(toOrigin('jsonSchema', file)).toEqual({ kind: 'jsonSchema', jsonSchema: file })
   })
 
+  it('reads a CSV Document with the chosen CSV settings', () => {
+    const file = { fileName: 'a.csv', content: 'YQ==' }
+    const csv = { delimiter: '\t', headerRow: false, encoding: 'windows-1252' } as const
+
+    expect(toOrigin('csvDocument', file, csv)).toEqual({ kind: 'csvDocument', document: file, csv })
+  })
+
   it('suggests a name from the file name', () => {
     expect(nameFromFileName('article.schema.json')).toBe('article')
     expect(nameFromFileName('erp_dispatch-export.csv')).toBe('erp dispatch export')

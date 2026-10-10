@@ -22,6 +22,8 @@ function toFile({ fileName, content }: EncodedFile) {
   )
 }
 
+const windows1252 = documentStructureOrigins.windows1252CsvDocument
+
 const unclosedQuote = new File(['Nummer;Bemerkung\r\nLS-1;"Kühlware\r\nLS-2;ok'], 'broken.csv')
 
 const german = (Story: () => ReactNode) => (
@@ -80,8 +82,76 @@ export const CsvDocument = meta.story({
   async play({ canvas, canvasElement }) {
     await choose(canvasElement, toFile(documentStructureOrigins.csvDocument.document))
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
-    await expect(canvas.getByRole('heading', { name: 'CSV settings' })).toBeVisible()
+    await expect(canvas.getByRole('group', { name: 'CSV settings' })).toBeVisible()
     await expect(canvas.getByRole('radio', { name: 'A CSV Document' })).toBeChecked()
+    const firstRows = canvas.getByRole('region', { name: 'First rows of lieferscheine.csv' })
+    await expect(within(firstRows).getByRole('columnheader', { name: 'Straße' })).toBeVisible()
+  },
+})
+
+export const Windows1252Umlauts = meta.story({
+  async play({ canvas, canvasElement }) {
+    await choose(canvasElement, toFile(windows1252.document))
+    await expect(
+      await canvas.findByText(/^The file cannot be read with its character encoding/),
+    ).toBeVisible()
+    await expect(canvas.getAllByText(/L\uFFFDbeck/).length).toBeGreaterThan(0)
+    await userEvent.selectOptions(
+      canvas.getByRole('combobox', { name: 'Character encoding' }),
+      'windows-1252',
+    )
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    const firstRows = canvas.getByRole('region', { name: 'First rows of lieferscheine-ansi.csv' })
+    await expect(within(firstRows).getAllByText('Lübeck').length).toBeGreaterThan(0)
+    await expect(within(firstRows).getByText('Kühlware; „bitte zügig“')).toBeVisible()
+  },
+})
+
+export const CsvWithoutHeaderRow = meta.story({
+  async play({ canvas, canvasElement }) {
+    await choose(canvasElement, toFile(documentStructureOrigins.csvDocument.document))
+    await canvas.findByRole('treegrid')
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'The first row names the columns' }))
+    await expect(await canvas.findByRole('columnheader', { name: 'column1' })).toBeVisible()
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expect(canvasElement.querySelector('tr[data-path="rows[].column8"]')).not.toBeNull()
+  },
+})
+
+export const CsvWrongDelimiter = meta.story({
+  async play({ canvas, canvasElement }) {
+    await choose(canvasElement, toFile(documentStructureOrigins.csvDocument.document))
+    await canvas.findByRole('treegrid')
+    await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Delimiter' }), '|')
+    await expect(await canvas.findByText('1 field')).toBeVisible()
+    const firstRows = canvas.getByRole('region', { name: 'First rows of lieferscheine.csv' })
+    await expect(within(firstRows).getAllByRole('columnheader')).toHaveLength(1)
+  },
+})
+
+export const TabletCsvSettings = meta.story({
+  ...tablet,
+  decorators: [besideSidebar, german],
+  async play({ canvas, canvasElement }) {
+    await choose(canvasElement, toFile(windows1252.document), 'Datei')
+    await userEvent.selectOptions(
+      await canvas.findByRole('combobox', { name: 'Zeichenkodierung' }),
+      'windows-1252',
+    )
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expect(canvas.getByRole('group', { name: 'CSV-Einstellungen' })).toBeVisible()
+  },
+})
+
+export const DarkCsvSettings = meta.story({
+  beforeEach() {
+    document.documentElement.classList.add('dark')
+
+    return () => document.documentElement.classList.remove('dark')
+  },
+  async play({ canvas, canvasElement }) {
+    await choose(canvasElement, toFile(windows1252.document))
+    await expect(await canvas.findByRole('alert')).toBeVisible()
   },
 })
 
@@ -173,6 +243,21 @@ export const LargeCsvDocument = meta.story({
   async play({ canvas, canvasElement }) {
     await choose(canvasElement, toFile(createCsvDocument({ rowCount: 20_000 })))
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
+  },
+})
+
+export const LargeWindows1252CsvDocument = meta.story({
+  async play({ canvas, canvasElement }) {
+    await choose(
+      canvasElement,
+      toFile(createCsvDocument({ rowCount: 20_000, encoding: 'windows-1252' })),
+    )
+    await userEvent.selectOptions(
+      await canvas.findByRole('combobox', { name: 'Character encoding' }),
+      'windows-1252',
+    )
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expect(canvas.getAllByRole('row').length).toBeGreaterThan(5)
   },
 })
 

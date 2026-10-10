@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
 
 import { BackLink, Loading } from '@/components/detail-parts'
-import { CsvSettingsFacts } from '@/components/document-structures/csv-settings-facts'
+import { CsvSettingsFields, FirstRows } from '@/components/document-structures/csv-settings'
 import {
   encodeBase64,
   fileProblem,
@@ -28,6 +28,7 @@ import {
 import { storeSavedDocumentStructure } from '@/lib/api/queries'
 import {
   type CreateDocumentStructureBody,
+  type CsvSettings,
   defaultCsvSettings,
   type DocumentStructureOrigin,
   type DocumentStructureOriginKind,
@@ -40,6 +41,27 @@ import { Button } from '@edi-bridge/ui/components/button'
 type FileError = FileProblem | 'fileRequired'
 
 function Preview({
+  file,
+  csv,
+  infer,
+  name,
+  onRetry,
+}: {
+  file: EncodedFile | null
+  csv: CsvSettings | null
+  infer: ReturnType<typeof useInference>
+  name: string
+  onRetry: () => void
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-6">
+      {file && csv && <FirstRows csv={csv} file={file} />}
+      <InferredTree file={file} infer={infer} name={name} onRetry={onRetry} />
+    </div>
+  )
+}
+
+function InferredTree({
   file,
   infer,
   name,
@@ -106,6 +128,7 @@ export function NewDocumentStructureScreen() {
   const queryClient = useQueryClient()
   const [kind, setKind] = useState<DocumentStructureOriginKind>('jsonDocument')
   const [kindChosen, setKindChosen] = useState(false)
+  const [csv, setCsv] = useState<CsvSettings>(defaultCsvSettings)
   const [file, setFile] = useState<EncodedFile | null>(null)
   const [fileError, setFileError] = useState<FileError | null>(null)
   const [name, setName] = useState('')
@@ -122,9 +145,13 @@ export function NewDocumentStructureScreen() {
 
   const previewProblem = documentStructureProblemOf(infer.error) !== null
 
-  function preview(nextKind: DocumentStructureOriginKind, nextFile: EncodedFile) {
+  function preview(
+    nextKind: DocumentStructureOriginKind,
+    nextFile: EncodedFile,
+    nextCsv: CsvSettings = csv,
+  ) {
     create.reset()
-    infer.mutate(toOrigin(nextKind, nextFile))
+    infer.mutate(toOrigin(nextKind, nextFile, nextCsv))
   }
 
   async function choose(chosen: File) {
@@ -172,7 +199,7 @@ export function NewDocumentStructureScreen() {
       return
     }
 
-    create.mutate({ name: name.trim(), origin: toOrigin(kind, file) })
+    create.mutate({ name: name.trim(), origin: toOrigin(kind, file, csv) })
   }
 
   return (
@@ -209,12 +236,29 @@ export function NewDocumentStructureScreen() {
           <FileField
             id={`${id}-file`}
             error={
-              fileError ? t(`errors.${fileError}`) : previewProblem ? t('errors.unreadable') : null
+              fileError
+                ? t(`errors.${fileError}`)
+                : previewProblem
+                  ? t(kind === 'csvDocument' ? 'errors.unreadableCsv' : 'errors.unreadable')
+                  : null
             }
             fileName={file?.fileName ?? null}
             onChange={(chosen) => void choose(chosen)}
           />
-          {kind === 'csvDocument' && <CsvSettingsFacts id={`${id}-csv`} csv={defaultCsvSettings} />}
+          {kind === 'csvDocument' && (
+            <CsvSettingsFields
+              id={`${id}-csv`}
+              csv={csv}
+              description={t('csvDescription')}
+              onChange={(next) => {
+                setCsv(next)
+
+                if (file) {
+                  preview(kind, file, next)
+                }
+              }}
+            />
+          )}
           <TextField
             id={`${id}-name`}
             description={t('name.description')}
@@ -240,6 +284,7 @@ export function NewDocumentStructureScreen() {
             <p className="text-muted-foreground text-sm">{t('preview.description')}</p>
           </div>
           <Preview
+            csv={kind === 'csvDocument' ? csv : null}
             file={file}
             infer={infer}
             name={name}

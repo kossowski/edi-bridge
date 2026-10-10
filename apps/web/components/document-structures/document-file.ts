@@ -1,4 +1,5 @@
 import {
+  type CsvSettings,
   defaultCsvSettings,
   type DocumentStructureOrigin,
   type DocumentStructureOriginKind,
@@ -44,12 +45,13 @@ export function originKindOf(fileName: string): DocumentStructureOriginKind | nu
 export function toOrigin(
   kind: DocumentStructureOriginKind,
   file: EncodedFile,
+  csv: CsvSettings = defaultCsvSettings,
 ): DocumentStructureOrigin {
   switch (kind) {
     case 'jsonDocument':
       return { kind, document: file }
     case 'csvDocument':
-      return { kind, document: file, csv: defaultCsvSettings }
+      return { kind, document: file, csv }
     case 'jsonSchema':
       return { kind, jsonSchema: file }
   }

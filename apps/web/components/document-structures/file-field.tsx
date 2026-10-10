@@ -9,16 +9,24 @@ import { describedBy, FormField } from '@/components/form-field'
 import { Input } from '@edi-bridge/ui/components/input'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
+const anyOrigin = '.json,.csv,.txt,application/json,application/schema+json,text/csv,text/plain'
+
 export function FileField({
   id,
   fileName,
   error,
   onChange,
+  label,
+  description,
+  accept = anyOrigin,
 }: {
   id: string
   fileName: string | null
   error: string | null
   onChange: (file: File) => void
+  label?: string
+  description?: string
+  accept?: string
 }) {
   const t = useTranslations('DocumentStructureForm.file')
   const input = useRef<HTMLInputElement>(null)
@@ -38,11 +46,11 @@ export function FileField({
   return (
     <FormField
       id={id}
-      description={t('description')}
+      description={description ?? t('description')}
       error={error}
       label={
         <label htmlFor={id} className="text-sm font-medium">
-          {t('label')}
+          {label ?? t('label')}
         </label>
       }>
       <div
@@ -67,7 +75,7 @@ export function FileField({
         </p>
         <Input
           id={id}
-          accept=".json,.csv,.txt,application/json,application/schema+json,text/csv,text/plain"
+          accept={accept}
           name="file"
           ref={input}
           type="file"
