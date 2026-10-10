@@ -22,7 +22,9 @@ export function GraphSaveStatus({ mappingId }: { mappingId: string }) {
       </p>
       {/* Its line stays reserved: a problem that comes or goes during a drag would otherwise move
           the canvas under the pointer, and React Flow measures the pane only when the drag starts. */}
-      <p role="alert" className="min-h-5 basis-full text-sm text-red-800 dark:text-red-300">
+      <p
+        role="alert"
+        className="order-last min-h-5 basis-full text-sm text-red-800 dark:text-red-300">
         {problem}
       </p>
     </>

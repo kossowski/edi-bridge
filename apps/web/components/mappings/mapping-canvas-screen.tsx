@@ -6,6 +6,7 @@ import { type QueryKey, useQuery, type UseQueryOptions } from '@tanstack/react-q
 import { useLocale, useTranslations } from 'next-intl'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
+import { DraftStateLabel, PublishDraft } from '@/components/mappings/draft-status'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
@@ -15,7 +16,6 @@ import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
 import { ApiError, getDocumentStructure, getMessageTypeStructure } from '@/lib/api/client'
 import { documentStructureKeys, mappingDraftQuery, messageTypeKeys } from '@/lib/api/queries'
-import { Badge } from '@edi-bridge/ui/components/badge'
 import {
   Empty,
   EmptyDescription,
@@ -166,8 +166,11 @@ function MappingView({ draft }: { draft: MappingDraft }) {
     <MappingCanvasProvider>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
-        <Badge variant="outline">{t('draft')}</Badge>
+        <DraftStateLabel draft={draft} />
         <GraphSaveStatus mappingId={draft.mappingId} />
+        <div className="ms-auto">
+          <PublishDraft draft={draft} />
+        </div>
       </div>
       <dl
         aria-label={t('facts.label')}

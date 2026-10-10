@@ -27,6 +27,7 @@ import {
   type MoveFlowMappingVersionBody,
   moveFlowMappingVersionEndpoint,
   publishedMappingVersionsEndpoint,
+  publishMappingDraftEndpoint,
   type PreviewMappingBody,
   type PublishedMappingVersionsQuery,
   type QueryParams,
@@ -133,6 +134,12 @@ export function getInterchange(id: string) {
 export function listMappingVersions(mappingId: string) {
   return request(mappingVersionsEndpoint, {
     path: toPath(mappingVersionsEndpoint.path, { mappingId }),
+  })
+}
+
+export function publishMappingDraft(mappingId: string) {
+  return request(publishMappingDraftEndpoint, {
+    path: toPath(publishMappingDraftEndpoint.path, { mappingId }),
   })
 }
 

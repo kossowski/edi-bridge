@@ -8,6 +8,7 @@ import {
   createWorkspace,
   lookupTablesHandler,
   mappingHandlers,
+  mappingVersionHandlers,
   seedMappingDrafts,
   runDetailHandlers,
   runsHandler,
@@ -24,6 +25,7 @@ import {
   listLookupTables,
   listMappingVersions,
   listRuns,
+  publishMappingDraft,
   regenerateWebhookToken,
   reprocessRun,
   retryRun,
@@ -236,6 +238,29 @@ describe('saveMappingDraft', () => {
         transformLinks,
       }),
     ).rejects.toMatchObject({ status: 422 })
+  })
+})
+
+describe('publishMappingDraft', () => {
+  const unchanged = seedMappingDrafts.find(
+    ({ unpublishedChanges, links }) => !unpublishedChanges && links.length === 0,
+  )!
+
+  it('publishes the Draft as the next Mapping Version', async () => {
+    const changed = { ...unchanged, unpublishedChanges: true }
+
+    server.use(...mappingVersionHandlers(apiUrl, { mappings: [changed] }))
+
+    await expect(publishMappingDraft(changed.id)).resolves.toMatchObject({
+      mappingId: changed.id,
+      version: changed.latestVersion! + 1,
+    })
+  })
+
+  it('rejects with 409 when the Draft has no changes since its latest version', async () => {
+    server.use(...mappingVersionHandlers(apiUrl, { mappings: [unchanged] }))
+
+    await expect(publishMappingDraft(unchanged.id)).rejects.toMatchObject({ status: 409 })
   })
 })
 

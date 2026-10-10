@@ -818,6 +818,27 @@
       "retry": "Try again"
     },
     "draft": "Draft",
+    "state": {
+      "neverPublished": "Never published",
+      "unpublishedChanges": "Unpublished changes since Version {version}",
+      "published": "No changes since Version {version}"
+    },
+    "versionsLink": "Mapping Versions",
+    "publish": {
+      "button": "Publish",
+      "title": "Publish the Draft as Version {version}?",
+      "description": "A Mapping Version cannot be changed once it is published. Flows keep the Mapping Version they are pinned to until you move them to a newer one.",
+      "confirm": "Publish Version {version}",
+      "pending": "Publishing…",
+      "cancel": "Cancel",
+      "close": "Close",
+      "done": "Published as Version {version}.",
+      "problem": {
+        "noChanges": "The Draft has no changes since its latest Mapping Version, so there is nothing to publish.",
+        "incomplete": "The Draft cannot be published yet: every link and Transform must be complete. Fix the problems on the canvas and publish again.",
+        "failed": "The Draft could not be published. Try again."
+      }
+    },
     "facts": {
       "label": "Mapping details",
       "direction": "Direction",
@@ -1223,6 +1244,32 @@
         "expressionNotPreviewed": "{transform} is not previewed on EDIFACT Sample Documents yet.",
         "brokenLink": "A link here reaches a field or element its side does not have, so the preview skips it."
       }
+    }
+  },
+  "MappingVersions": {
+    "title": "Mapping Versions",
+    "back": "Back to the Draft",
+    "openDraft": "Open the Draft",
+    "caption": "Mapping Versions, newest first",
+    "loading": "Loading Mapping Versions",
+    "count": "{count, plural, one {# Mapping Version} other {# Mapping Versions}}",
+    "filteredCount": "{count} of {total} Mapping Versions",
+    "search": "Search by version number",
+    "noMatch": "No Mapping Version matches the search.",
+    "version": "Version {version}",
+    "latest": "Latest",
+    "columns": {
+      "version": "Version",
+      "publishedAt": "Published"
+    },
+    "empty": {
+      "title": "No Mapping Versions yet",
+      "description": "The Draft of this Mapping was never published. Publish it on the canvas to create Version 1, which Flows can then be pinned to."
+    },
+    "error": {
+      "title": "Mapping Versions unavailable",
+      "description": "The Mapping Versions could not be loaded. Try again.",
+      "retry": "Try again"
     }
   },
   "ManualSubmission": {
