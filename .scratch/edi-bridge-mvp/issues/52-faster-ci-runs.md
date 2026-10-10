@@ -8,9 +8,9 @@ Today every PR runs all 22 tasks. `turbo run --affected` reads the base branch f
 
 **Status:** ready-for-agent
 
-- [ ] `--affected` resolves the PR's base branch, for PRs into `main` and for stacked PRs, without the `TURBO_SCM_BASE` warning
-- [ ] CI runs on pushes to `main`, so new branches restore a Turbo cache saved on `main`
-- [ ] The Playwright Chromium download is cached by Playwright version
-- [ ] Lint and types, tests, builds and e2e run as parallel jobs, so story tests don't share CPU with the builds; the required check keeps its name
+- [x] `--affected` resolves the PR's base branch, for PRs into `main` and for stacked PRs, without the `TURBO_SCM_BASE` warning
+- [x] CI runs on pushes to `main`, so new branches restore a Turbo cache saved on `main`
+- [x] The Playwright Chromium download is cached by Playwright version
+- [x] Lint and types, tests, builds and e2e run as parallel jobs, so story tests don't share CPU with the builds; the required check keeps its name
 
 ## Comments

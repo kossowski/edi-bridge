@@ -16,11 +16,17 @@ Find out where the time goes before changing anything. Candidates: the axe run p
 
 **Blocked by:** none
 
-**Status:** needs-triage
+**Status:** ready-for-human
 
 - [ ] A profile of one slow canvas story on CI shows how its time splits between render, interactions and axe
 - [ ] No canvas story takes more than 5 s on CI
-- [ ] The `storybook-canvas` project no longer needs its 30 s test timeout, or the ticket records why it still does
-- [ ] Canvas stories still cover the same behaviour and accessibility checks
+- [x] The `storybook-canvas` project no longer needs its 30 s test timeout, or the ticket records why it still does
+- [x] Canvas stories still cover the same behaviour and accessibility checks
 
 ## Comments
+
+2026-10-10, in #30:
+
+- The cause was CPU, not the stories. Locally the 64 canvas stories take 0.6–2.4 s each; axe takes about 34 % of that (measured by switching `a11y.test` off). Moving the builds to their own CI job did not help: the three story files still took 91–98 s each, because they ran side by side on one 4-CPU runner.
+- The canvas stories now run as the `test:canvas` task, which CI shards across three runners so each heavy story file gets its own runner. On run 38075498322 the files took 28–34 s, and every story took 1.0–3.1 s except Updates After Change (5.4 s). That story is the only one in its file, so it pays the file's warm-up, and it waits for the save and the preview's 600 ms debounce on purpose.
+- Not done: a profile on CI that splits render, interactions and axe. The 5 s bound holds for every story except Updates After Change. Needs a decision whether that is acceptable.

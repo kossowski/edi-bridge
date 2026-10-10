@@ -39,12 +39,11 @@ const testConfig: TestUserConfig = {
     },
     storybookProject('storybook', { exclude: ['**/mapping-canvas-*.stories.tsx'] }),
     // Each canvas story renders some 250 React Flow nodes and runs axe over about 3,000 elements.
-    // That fixed cost is 1-2 s locally but 5-10 s on a shared CI runner, too close to the 15 s
-    // default, so only these stories get more time.
+    // Side by side on one CI runner, these files took 10-15 s per story, so the `test:canvas`
+    // task runs them on their own and CI shards them across runners.
     storybookProject('storybook-canvas', {
       // The Storybook plugin adds every story file to `include`, so the rest is excluded here.
       exclude: ['**/!(mapping-canvas-*).stories.tsx', '../../packages/**'],
-      testTimeout: 30_000,
     }),
   ],
 }
