@@ -306,19 +306,48 @@ describe('POST /mappings/:id/preview', () => {
     expect(status).toBe(404)
   })
 
-  it('rejects links to paths the sides do not have, as a Draft save does', async () => {
+  it('skips links to paths the sides do not have and notes their targets', async () => {
     server.use(...mappingPreviewHandlers(apiUrl))
     const [sample] = await samplesOf(hansemarktDesadv.id)
+    const id = '0000000b-0000-4000-8000-000000000002'
 
-    const { status } = await requestPreview(hansemarktDesadv.id, {
+    const { despatchNumber } = z
+      .object({ despatchNumber: z.string() })
+      .parse(sample!.document.content)
+
+    const response = await requestPreview(hansemarktDesadv.id, {
       sampleId: sample!.id,
       graph: {
-        links: [{ sourcePath: 'noSuchField', targetPath: 'BGM/1004' }],
-        transforms: [],
-        transformLinks: [],
+        links: [
+          { sourcePath: 'despatchNumber', targetPath: 'BGM/1004' },
+          { sourcePath: 'noSuchField', targetPath: 'DTM+137/C507/2380' },
+          { sourcePath: 'despatchNumber', targetPath: 'NO/SUCH' },
+        ],
+        transforms: [
+          { id, kind: 'substring', position: { x: 0, y: 0 }, config: { start: 0, length: 3 } },
+        ],
+        transformLinks: [
+          {
+            from: { kind: 'source', path: 'noSuchField' },
+            to: { kind: 'transform', transformId: id, input: 'value' },
+          },
+          {
+            from: { kind: 'transform', transformId: id, output: 'value' },
+            to: { kind: 'target', path: 'SG10/SG17/LIN/C212/7140' },
+          },
+        ],
       },
     })
 
-    expect(status).toBe(422)
+    expect(response.status).toBe(200)
+
+    const preview = mappingPreviewEndpoint.response.parse(await response.json())
+
+    expect(edifactLines(preview)).toContain(`BGM+351+${despatchNumber}'`)
+    expect(preview.notes).toEqual([
+      { targetPath: 'DTM+137/C507/2380', transformId: null, code: 'brokenLink' },
+      { targetPath: 'NO/SUCH', transformId: null, code: 'brokenLink' },
+      { targetPath: 'SG10/SG17/LIN/C212/7140', transformId: id, code: 'brokenLink' },
+    ])
   })
 })

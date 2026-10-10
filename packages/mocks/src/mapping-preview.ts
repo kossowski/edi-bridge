@@ -1,23 +1,24 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
-  directionOf,
   type DocumentContent,
   type DocumentStructure,
   type MappingPreview,
   mappingPreviewEndpoint,
   mappingSamplesEndpoint,
   type PreviewNote,
+  previewNoteKey,
 } from '@edi-bridge/contracts'
 
 import { seedDocumentStructures } from './document-structure'
 import { documentValues, renderEdifact, renderJson } from './document-values'
 import {
-  linkProblem,
   type MappingDraftRecord,
   type MappingDraftStore,
+  oriented,
   sideLeaves,
   toMappingDraftStore,
+  unknownPaths,
 } from './mapping'
 import { type MappingSampleRecord, seedMappingSamples, toMappingSample } from './mapping-sample'
 import { messageTypeStructures } from './message-type-structure'
@@ -28,7 +29,7 @@ function distinct(notes: ReadonlyArray<PreviewNote>) {
   const seen = new Set<string>()
 
   return notes.filter((note) => {
-    const key = `${note.targetPath}|${note.transformId}|${note.code}`
+    const key = previewNoteKey(note)
 
     return !seen.has(key) && seen.add(key)
   })
@@ -81,14 +82,6 @@ export function mappingPreviewHandlers(
           return notFound()
         }
 
-        const invalidLink = linkProblem(graph, sideLeaves(mapping, documentStructures))
-
-        if (invalidLink) {
-          return invalidLink
-        }
-
-        const outbound = directionOf(mapping) === 'outbound'
-
         const expressions = await evaluateExpressions(
           graph,
           sample.document.format === 'json' ? sample.document.content : undefined,
@@ -98,6 +91,7 @@ export function mappingPreviewHandlers(
           graph,
           documentValues(sample.entries),
           expressions,
+          unknownPaths(graph, sideLeaves(mapping, documentStructures)),
         )
 
         const values = documentValues(entries)
@@ -106,15 +100,16 @@ export function mappingPreviewHandlers(
           ({ id }) => id === mapping.documentStructureId,
         )
 
-        const document: DocumentContent = outbound
-          ? {
-              format: 'edifact',
-              content: renderEdifact(messageTypeStructures[mapping.messageType], values),
-            }
-          : {
-              format: 'json',
-              content: documentStructure ? renderJson(documentStructure, values) : {},
-            }
+        const document = oriented<() => DocumentContent>(mapping.messageType, {
+          document: () => ({
+            format: 'json',
+            content: documentStructure ? renderJson(documentStructure, values) : {},
+          }),
+          edifact: () => ({
+            format: 'edifact',
+            content: renderEdifact(messageTypeStructures[mapping.messageType], values),
+          }),
+        }).target()
 
         await delay()
 

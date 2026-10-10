@@ -148,7 +148,7 @@ export const linkTemplates: Readonly<
 }
 
 // Inbound Mappings read the Message Type and write the Document, outbound ones the other way.
-function oriented<Side>(
+export function oriented<Side>(
   messageType: MessageType,
   { document, edifact }: { document: Side; edifact: Side },
 ): { source: Side; target: Side } {
@@ -388,6 +388,8 @@ function seedUpdatedAt(index: number) {
   return new Date(firstDraftChange + index * 5 * 86_400_000 + index * 3_600_000).toISOString()
 }
 
+export const unpublishedDraftId = seedId(7, 1)
+
 // Each Message Type has one complete Draft, one half-done and one without links.
 const linkShares = [1, 0.5, 0]
 
@@ -414,12 +416,12 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
     }
   }),
   {
-    id: seedId(7, 1),
+    id: unpublishedDraftId,
     name: 'Spreewald: ERP JSON to INVOIC',
     messageType: 'INVOIC',
     documentStructureId: seedDocumentStructureOf.INVOIC.id,
     latestVersion: null,
-    ...templateDraftGraph(seedId(7, 1), 'INVOIC', 0.3),
+    ...templateDraftGraph(unpublishedDraftId, 'INVOIC', 0.3),
     updatedAt: seedUpdatedAt(seedMappings.length),
   },
 ]
@@ -639,7 +641,7 @@ function containerOf(leaves: ReadonlySet<string>, path: string) {
 
 type LinkedPath = { path: string; wholePart: boolean }
 
-export function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
+export function unknownPaths(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
   const loops = new Set(graph.transforms.flatMap(({ id, kind }) => (kind === 'loop' ? [id] : [])))
 
   // A loop takes a whole repeated part and fills one; every other link ends at a field or element.
@@ -675,17 +677,26 @@ export function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideL
 
   const missing = (side: ReadonlySet<string>) => (linked: LinkedPath) =>
     !side.has(linked.path) && !(linked.wholePart && containerOf(side, linked.path))
+      ? [linked.path]
+      : []
 
-  const unknownSource = sourcePaths.find(missing(leaves.source))
+  return {
+    source: new Set(sourcePaths.flatMap(missing(leaves.source))),
+    target: new Set(targetPaths.flatMap(missing(leaves.target))),
+  }
+}
 
-  if (unknownSource) {
-    return unprocessable(`The source has no field or element at ${unknownSource.path}`)
+export function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
+  const unknown = unknownPaths(graph, leaves)
+  const [unknownSource] = unknown.source
+  const [unknownTarget] = unknown.target
+
+  if (unknownSource !== undefined) {
+    return unprocessable(`The source has no field or element at ${unknownSource}`)
   }
 
-  const unknownTarget = targetPaths.find(missing(leaves.target))
-
-  if (unknownTarget) {
-    return unprocessable(`The target has no field or element at ${unknownTarget.path}`)
+  if (unknownTarget !== undefined) {
+    return unprocessable(`The target has no field or element at ${unknownTarget}`)
   }
 
   return null

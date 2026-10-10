@@ -14,8 +14,8 @@ import {
   transformPorts,
 } from '@edi-bridge/contracts'
 
-import { type DocumentValues, type Entry } from './document-values'
-import { seedLookupTables } from './lookup-table'
+import { compatible, type DocumentValues, type Entry } from './document-values'
+import { seedId } from './seed-id'
 
 // A rough stand-in for the mapping engine of tickets 27 and 28: enough to show what a change does
 // to the target Document, not a faithful execution of the Mapping.
@@ -37,7 +37,7 @@ const failed = (transformId: string | null, code: PreviewNoteCode): Outcome => (
 // A few rows per seed Lookup Table; ticket 14 brings the real entries.
 const lookupRows = new Map([
   [
-    'Units of measure',
+    seedId(8, 1),
     new Map([
       ['ST', 'PCE'],
       ['STK', 'PCE'],
@@ -46,7 +46,7 @@ const lookupRows = new Map([
     ]),
   ],
   [
-    'Country codes',
+    seedId(8, 2),
     new Map([
       ['Deutschland', 'DE'],
       ['Österreich', 'AT'],
@@ -54,7 +54,7 @@ const lookupRows = new Map([
     ]),
   ],
   [
-    'VAT categories',
+    seedId(8, 3),
     new Map([
       ['19', 'S'],
       ['7', 'AA'],
@@ -62,7 +62,7 @@ const lookupRows = new Map([
     ]),
   ],
   [
-    'Hansemarkt units',
+    seedId(8, 4),
     new Map([
       ['ST', 'PCE'],
       ['KAR', 'CT'],
@@ -71,9 +71,7 @@ const lookupRows = new Map([
 ])
 
 function lookUp(lookupTableId: string | null, value: string) {
-  const table = seedLookupTables.find(({ id }) => id === lookupTableId)
-
-  return table ? lookupRows.get(table.name)?.get(value) : undefined
+  return lookupTableId === null ? undefined : lookupRows.get(lookupTableId)?.get(value)
 }
 
 const dateTokens = ['yyyy', 'yy', 'MM', 'dd', 'HH', 'mm', 'ss'] as const
@@ -186,11 +184,6 @@ function applyTransform(
   }
 }
 
-function compatible(a: ReadonlyArray<number>, b: ReadonlyArray<number>) {
-  return a.slice(0, Math.min(a.length, b.length)).every((index, position) => index === b[position])
-}
-
-// The repetitions of a part, e.g. each line beneath `lines[]`, numbered from `counterStart`.
 function counters(values: DocumentValues, part: string, counterStart: number): Value[] {
   const entries = values.beneath(part)
 
@@ -264,10 +257,16 @@ export async function evaluateExpressions(
   return results
 }
 
+// Paths a side does not have, e.g. after its structure changed; their links are skipped.
+export type UnknownPaths = { source: ReadonlySet<string>; target: ReadonlySet<string> }
+
+const noUnknownPaths: UnknownPaths = { source: new Set(), target: new Set() }
+
 export function previewEntries(
   graph: MappingGraph,
   values: DocumentValues,
   expressions: ExpressionResults,
+  unknown: UnknownPaths = noUnknownPaths,
 ) {
   const issues = transformIssues(graph)
   const byId = new Map(graph.transforms.map((transform) => [transform.id, transform]))
@@ -280,7 +279,9 @@ export function previewEntries(
 
   const outputOf = (start: LinkStart): Outcome => {
     if (start.kind === 'source') {
-      return ok(values.entries(start.path))
+      return unknown.source.has(start.path)
+        ? failed(null, 'brokenLink')
+        : ok(values.entries(start.path))
     }
 
     const transform = byId.get(start.transformId)
@@ -297,6 +298,10 @@ export function previewEntries(
       case 'loop': {
         const items = feeding.get(`${transform.id}/items`)
 
+        if (items?.kind === 'source' && unknown.source.has(items.path)) {
+          return failed(transform.id, 'brokenLink')
+        }
+
         return start.output === 'counter' && items?.kind === 'source'
           ? ok(counters(values, items.path, transform.config.counterStart))
           : ok([])
@@ -307,7 +312,13 @@ export function previewEntries(
 
     for (const input of transformPorts(transform).inputs) {
       const from = feeding.get(`${transform.id}/${input}`)
-      const outcome = from ? outputOf(from) : ok([])
+
+      const outcome =
+        from?.kind === 'source' && unknown.source.has(from.path)
+          ? failed(transform.id, 'brokenLink')
+          : from
+            ? outputOf(from)
+            : ok([])
 
       if (!outcome.ok) {
         return outcome
@@ -366,7 +377,9 @@ export function previewEntries(
   const notes: PreviewNote[] = []
 
   for (const [targetPath, start] of targets) {
-    const outcome = outputOf(start)
+    const outcome = unknown.target.has(targetPath)
+      ? failed(start.kind === 'transform' ? start.transformId : null, 'brokenLink')
+      : outputOf(start)
 
     if (outcome.ok) {
       entries.push(...outcome.values.map(({ at, value }) => ({ path: targetPath, at, value })))

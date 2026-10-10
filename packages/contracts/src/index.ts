@@ -166,6 +166,7 @@ export {
   type PreviewNote,
   type PreviewNoteCode,
   previewNoteCodes,
+  previewNoteKey,
   previewNoteSchema,
 } from './mapping-preview'
 

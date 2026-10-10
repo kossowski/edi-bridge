@@ -110,6 +110,10 @@ _Avoid_: Revision, release
 The single editable working copy of a Mapping, which becomes a new Mapping Version when published.
 _Avoid_: Work in progress, unsaved mapping
 
+**Sample Document**:
+A representative source Document stored with a Mapping, on which the Draft's preview shows the target Document it would produce.
+_Avoid_: Example, test file, fixture
+
 **Manual Submission**:
 A Document handed to EDI Bridge by a person, as if it had arrived on a chosen inbound Channel; it is processed exactly like channel traffic and marked as manual.
 _Avoid_: Upload, import, manual run

@@ -6,13 +6,11 @@ import type {
   MessageTypeStructure,
 } from '@edi-bridge/contracts'
 
-// One value of a Document at a structure path. `at` numbers the repetitions it sits in, outermost
-// first, e.g. [2, 0] for the first line of the third package.
 export type Entry = { path: string; at: ReadonlyArray<number>; value: string }
 
 // Repetitions match when the shorter index list starts the longer one, so a header value also
 // reaches every line, and a value from a repeating group also fills a single field.
-function compatible(a: ReadonlyArray<number>, b: ReadonlyArray<number>) {
+export function compatible(a: ReadonlyArray<number>, b: ReadonlyArray<number>) {
   const length = Math.min(a.length, b.length)
 
   for (let index = 0; index < length; index++) {
@@ -30,7 +28,6 @@ export type DocumentValues = {
   get: (path: string, at: ReadonlyArray<number>) => string | undefined
   entries: (path: string) => ReadonlyArray<Entry>
   beneath: (part: string) => ReadonlyArray<Entry>
-  // The repetitions at depth `at.length` of the part at `path`, found from the values beneath it.
   repetitions: (path: string, at: ReadonlyArray<number>) => number[]
 }
 

@@ -30,11 +30,11 @@ export const previewNoteCodes = [
   'noLookupMatch',
   'expressionFailed',
   'expressionNotPreviewed',
+  'brokenLink',
 ] as const
 
 export type PreviewNoteCode = (typeof previewNoteCodes)[number]
 
-// Says why a linked target stayed empty in the preview, and which transform it was waiting on.
 export const previewNoteSchema = z.object({
   targetPath: z.string().min(1),
   transformId: z.uuid().nullable(),
@@ -42,6 +42,10 @@ export const previewNoteSchema = z.object({
 })
 
 export type PreviewNote = z.infer<typeof previewNoteSchema>
+
+export function previewNoteKey({ targetPath, transformId, code }: PreviewNote) {
+  return `${targetPath}|${transformId}|${code}`
+}
 
 // The graph comes from the client rather than the saved Draft, so the preview already shows a
 // change whose save is still on its way.

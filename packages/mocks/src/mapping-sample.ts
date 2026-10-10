@@ -1,7 +1,6 @@
 import type { Faker } from '@faker-js/faker'
 
 import {
-  directionOf,
   type DocumentField,
   type DocumentStructure,
   type DocumentStructureNode,
@@ -19,9 +18,15 @@ import {
   renderJson,
 } from './document-values'
 import { randomGln } from './gln'
-import { linkTemplates, type MappingDraftRecord, seedMappingDrafts } from './mapping'
+import {
+  linkTemplates,
+  type MappingDraftRecord,
+  oriented,
+  seedMappingDrafts,
+  unpublishedDraftId,
+} from './mapping'
 import { messageTypeStructures } from './message-type-structure'
-import { seedId, stableUuid } from './seed-id'
+import { stableUuid } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { seedTradingPartners } from './trading-partner'
 import { seedWorkspace } from './workspace'
@@ -292,8 +297,8 @@ function withTotals(entries: ReadonlyArray<Entry>) {
 const edifactDate = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.replaceAll('-', '') : value
 
-// Places the values of an ERP Document where the partner's EDIFACT carries them, by the same
-// field and element pairs the seed Mappings link.
+// Places the values of an ERP Document where the Trading Partner's EDIFACT carries them, by the
+// same field and element pairs the seed Mappings link.
 function edifactEntries(messageType: MessageType, entries: ReadonlyArray<Entry>): Entry[] {
   const elementOf = new Map(linkTemplates[messageType])
 
@@ -369,32 +374,34 @@ export function createMappingSample({
   const values = documentValues(entries)
   const id = stableUuid(`${mapping.id}:sample:${index}:${lineCount}`)
 
-  if (directionOf(mapping) === 'outbound') {
+  const jsonSample = (): MappingSampleRecord => ({
+    id,
+    mappingId: mapping.id,
+    name: sampleName(values, 'json', index),
+    document: { format: 'json', content: renderJson(documentStructure, values) },
+    entries,
+  })
+
+  const edifactSample = (): MappingSampleRecord => {
+    const edifact = edifactEntries(mapping.messageType, entries)
+    const reference = faker.string.numeric(6)
+
+    const message = renderEdifact(
+      messageTypeStructures[mapping.messageType],
+      documentValues(edifact),
+      reference,
+    )
+
     return {
       id,
       mappingId: mapping.id,
-      name: sampleName(values, 'json', index),
-      document: { format: 'json', content: renderJson(documentStructure, values) },
-      entries,
+      name: sampleName(values, 'edi', index),
+      document: { format: 'edifact', content: envelope(message, context, reference) },
+      entries: edifact,
     }
   }
 
-  const edifact = edifactEntries(mapping.messageType, entries)
-  const reference = faker.string.numeric(6)
-
-  const message = renderEdifact(
-    messageTypeStructures[mapping.messageType],
-    documentValues(edifact),
-    reference,
-  )
-
-  return {
-    id,
-    mappingId: mapping.id,
-    name: sampleName(values, 'edi', index),
-    document: { format: 'edifact', content: envelope(message, context, reference) },
-    entries: edifact,
-  }
+  return oriented(mapping.messageType, { document: jsonSample, edifact: edifactSample }).source()
 }
 
 const sampleVariants: Readonly<
@@ -415,7 +422,7 @@ function structureFor(mapping: MappingDraftRecord) {
 
 // The Draft that has never been published has no samples yet, so the seed shows that state too.
 export const seedMappingSamples: ReadonlyArray<MappingSampleRecord> = seedMappingDrafts
-  .filter(({ id }) => id !== seedId(7, 1))
+  .filter(({ id }) => id !== unpublishedDraftId)
   .flatMap((mapping) => {
     const documentStructure = structureFor(mapping)
 
