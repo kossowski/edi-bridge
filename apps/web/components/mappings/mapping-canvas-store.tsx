@@ -5,6 +5,7 @@ import { createStore, type StoreApi, useStore } from 'zustand'
 
 import type { XYPosition } from '@xyflow/react'
 
+import { sameStart } from '@/components/mappings/mapping-graph'
 import { createTooltipHandle } from '@edi-bridge/ui/components/tooltip'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
@@ -42,13 +43,7 @@ export function isSameRow(a: RowRef | null, b: RowRef) {
 }
 
 export function isStartRow(start: LinkStart | null, row: RowRef) {
-  return start?.kind === 'source' && row.side === 'source' && start.path === row.path
-}
-
-function toStart(start: LinkStart): LinkStart {
-  return start.kind === 'source'
-    ? { kind: 'source', path: start.path }
-    : { kind: 'transform', transformId: start.transformId, output: start.output }
+  return row.side === 'source' && sameStart(start, { kind: 'source', path: row.path })
 }
 
 function toRowRef({ side, path }: RowRef): RowRef {
@@ -94,7 +89,7 @@ export function createCanvasStore() {
       })),
     selectTransform: (id) => set({ selectedTransform: id, selected: null }),
     clearSelection: () => set({ selected: null, selectedTransform: null }),
-    startLink: (start) => set({ linkFrom: toStart(start), problem: null }),
+    startLink: (linkFrom) => set({ linkFrom, problem: null }),
     cancelLink: () => set({ linkFrom: null }),
     setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
     hoverEdge: (id, at) => {

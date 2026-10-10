@@ -1,5 +1,4 @@
 import {
-  concatenateInputs,
   type LinkEnd,
   type LinkStart,
   type MappingGraph,
@@ -11,6 +10,8 @@ import {
 } from '@edi-bridge/contracts'
 
 import type { Leaves } from '@/components/mappings/mapping-links'
+
+import { defaultConfig, type PlaceableKind } from './transform-kinds'
 
 export type Graph = Pick<MappingGraph, 'links' | 'transforms' | 'transformLinks'>
 
@@ -32,22 +33,12 @@ export type GraphChange =
 
 export type Connected =
   | { ok: true; change: GraphChange }
-  | { ok: false; reason: 'notLinkable' | 'circle' }
+  | { ok: false; reason: 'notLinkable' | 'needsPart'; end: 'from' | 'to' }
+  | { ok: false; reason: 'circle' }
   | { ok: false; reason: 'alreadyLinked' | 'inputTaken'; existing: LinkStart }
 
-export const placeableKinds = [
-  'constant',
-  'concatenate',
-  'split',
-  'substring',
-  'dateFormat',
-  'numberFormat',
-] as const satisfies ReadonlyArray<TransformKind>
-
-export type PlaceableKind = (typeof placeableKinds)[number]
-
-export function isPlaceable(kind: TransformKind): kind is PlaceableKind {
-  return placeableKinds.some((placeable) => placeable === kind)
+export function transformById(graph: Pick<Graph, 'transforms'>, transformId: string) {
+  return graph.transforms.find(({ id }) => id === transformId)
 }
 
 export function startOfLink(link: MappingLink): LinkStart {
@@ -108,10 +99,20 @@ export function linkIntoInput(graph: Graph, transformId: string, input: string) 
   )
 }
 
-function portsOf(graph: Graph, transformId: string) {
-  const transform = graph.transforms.find(({ id }) => id === transformId)
+function portExists(graph: Graph, end: LinkStart | LinkEnd) {
+  if (end.kind !== 'transform') {
+    return true
+  }
 
-  return transform ? transformPorts(transform) : null
+  const transform = transformById(graph, end.transformId)
+
+  if (!transform) {
+    return false
+  }
+
+  const { inputs, outputs } = transformPorts(transform)
+
+  return 'input' in end ? inputs.includes(end.input) : outputs.includes(end.output)
 }
 
 // A loop's items ports take whole repeating parts, not single fields; they are linked with the
@@ -122,23 +123,24 @@ export function takesPart(graph: Graph, end: LinkStart | LinkEnd) {
   return (
     port === 'items' &&
     end.kind === 'transform' &&
-    graph.transforms.some(({ id, kind }) => id === end.transformId && kind === 'loop')
+    transformById(graph, end.transformId)?.kind === 'loop'
   )
 }
 
 function startExists(graph: Graph, leaves: Leaves, from: LinkStart) {
-  return from.kind === 'source'
-    ? leaves.source.has(from.path)
-    : (portsOf(graph, from.transformId)?.outputs.includes(from.output) ?? false)
+  return from.kind === 'source' ? leaves.source.has(from.path) : portExists(graph, from)
 }
 
 function endExists(graph: Graph, leaves: Leaves, to: LinkEnd) {
-  return to.kind === 'target'
-    ? leaves.target.has(to.path)
-    : (portsOf(graph, to.transformId)?.inputs.includes(to.input) ?? false)
+  return to.kind === 'target' ? leaves.target.has(to.path) : portExists(graph, to)
 }
 
-// Whether `from` already feeds `to`, directly or through other transforms.
+function endTaken(graph: Graph, to: LinkEnd) {
+  return to.kind === 'target'
+    ? linkIntoTarget(graph, to.path)
+    : (linkIntoInput(graph, to.transformId, to.input)?.from ?? null)
+}
+
 function feeds(graph: Graph, from: string, to: string): boolean {
   const seen = new Set<string>()
   const queue = [from]
@@ -169,38 +171,41 @@ function feeds(graph: Graph, from: string, to: string): boolean {
 }
 
 export function connect(graph: Graph, leaves: Leaves, from: LinkStart, to: LinkEnd): Connected {
-  if (
-    !startExists(graph, leaves, from) ||
-    !endExists(graph, leaves, to) ||
-    takesPart(graph, from) ||
-    takesPart(graph, to)
-  ) {
-    return { ok: false, reason: 'notLinkable' }
+  if (takesPart(graph, to) || takesPart(graph, from)) {
+    return { ok: false, reason: 'needsPart', end: takesPart(graph, to) ? 'to' : 'from' }
   }
 
-  if (to.kind === 'target') {
-    const existing = linkIntoTarget(graph, to.path)
+  if (!endExists(graph, leaves, to)) {
+    return { ok: false, reason: 'notLinkable', end: 'to' }
+  }
 
-    if (existing) {
-      return { ok: false, reason: 'alreadyLinked', existing }
-    }
+  if (!startExists(graph, leaves, from)) {
+    return { ok: false, reason: 'notLinkable', end: 'from' }
+  }
 
-    if (from.kind === 'source') {
-      return {
-        ok: true,
-        change: { kind: 'addLink', link: { sourcePath: from.path, targetPath: to.path } },
-      }
-    }
-  } else {
-    const existing = linkIntoInput(graph, to.transformId, to.input)
+  const existing = endTaken(graph, to)
 
-    if (existing) {
-      return { ok: false, reason: 'inputTaken', existing: existing.from }
+  if (existing) {
+    return {
+      ok: false,
+      reason: to.kind === 'target' ? 'alreadyLinked' : 'inputTaken',
+      existing,
     }
+  }
 
-    if (from.kind === 'transform' && feeds(graph, to.transformId, from.transformId)) {
-      return { ok: false, reason: 'circle' }
+  if (to.kind === 'target' && from.kind === 'source') {
+    return {
+      ok: true,
+      change: { kind: 'addLink', link: { sourcePath: from.path, targetPath: to.path } },
     }
+  }
+
+  if (
+    to.kind === 'transform' &&
+    from.kind === 'transform' &&
+    feeds(graph, to.transformId, from.transformId)
+  ) {
+    return { ok: false, reason: 'circle' }
   }
 
   return { ok: true, change: { kind: 'addTransformLink', link: { from, to } } }
@@ -255,18 +260,8 @@ export function applyChange(graph: Graph, change: GraphChange): Graph {
 
 // Changes made after a failed one may have taken a target or an input, or removed a transform;
 // what the failed change took away comes back only where it still fits.
-function restorable(graph: Graph, link: TransformLink) {
-  const fromOk =
-    link.from.kind === 'source' ||
-    (portsOf(graph, link.from.transformId)?.outputs.includes(link.from.output) ?? false)
-
-  const toOk =
-    link.to.kind === 'target'
-      ? linkIntoTarget(graph, link.to.path) === null
-      : (portsOf(graph, link.to.transformId)?.inputs.includes(link.to.input) ?? false) &&
-        linkIntoInput(graph, link.to.transformId, link.to.input) === null
-
-  return fromOk && toOk
+function restorable(graph: Graph, { from, to }: TransformLink) {
+  return portExists(graph, from) && portExists(graph, to) && endTaken(graph, to) === null
 }
 
 function restoreTransformLinks(graph: Graph, links: ReadonlyArray<TransformLink>): Graph {
@@ -281,7 +276,7 @@ function restoreTransformLinks(graph: Graph, links: ReadonlyArray<TransformLink>
   return { ...graph, transformLinks }
 }
 
-// Saves overlap, so a failed one takes back only its own change and keeps the ones after it.
+// Later changes are already in the cache when a save fails, so it takes back only its own change.
 export function revertChange(graph: Graph, change: GraphChange): Graph {
   switch (change.kind) {
     case 'addLink':
@@ -302,7 +297,7 @@ export function revertChange(graph: Graph, change: GraphChange): Graph {
         transformLinks: [],
       })
     case 'removeTransform':
-      return graph.transforms.some(({ id }) => id === change.transform.id)
+      return transformById(graph, change.transform.id)
         ? graph
         : restoreTransformLinks(
             { ...graph, transforms: [...graph.transforms, change.transform] },
@@ -310,7 +305,7 @@ export function revertChange(graph: Graph, change: GraphChange): Graph {
           )
     case 'configureTransform':
     case 'moveTransform': {
-      const current = graph.transforms.find(({ id }) => id === change.before.id)
+      const current = transformById(graph, change.before.id)
 
       if (!current) {
         return graph
@@ -333,7 +328,7 @@ export function revertChange(graph: Graph, change: GraphChange): Graph {
 }
 
 export function removeTransform(graph: Graph, transformId: string): GraphChange | null {
-  const transform = graph.transforms.find(({ id }) => id === transformId)
+  const transform = transformById(graph, transformId)
 
   return transform
     ? {
@@ -344,7 +339,6 @@ export function removeTransform(graph: Graph, transformId: string): GraphChange 
     : null
 }
 
-// Lowering a concatenate's input count drops the links into the inputs that go away.
 export function configureTransform(
   graph: Graph,
   before: MappingTransform,
@@ -352,8 +346,9 @@ export function configureTransform(
 ): GraphChange {
   // SAFETY: the config comes from the form of the same kind, parsed with that kind's schema.
   const after = { ...before, config } as MappingTransform
-  const inputs = new Set(transformPorts(after).inputs)
-  const outputs = new Set(transformPorts(after).outputs)
+  const ports = transformPorts(after)
+  const inputs = new Set(ports.inputs)
+  const outputs = new Set(ports.outputs)
 
   const dropped = graph.transformLinks.filter(
     ({ from, to }) =>
@@ -400,7 +395,6 @@ const slotMargin = 16
 
 const slotStep = 20
 
-// The first spot at or below `from` where a new transform overlaps none of the others.
 export function freeSlot(
   taken: ReadonlyArray<Rect>,
   from: number,
@@ -427,24 +421,13 @@ export function freeSlot(
   return { x: 0, y: limit }
 }
 
-export const newTransformConfigs = {
-  constant: { value: '' },
-  concatenate: { inputCount: concatenateInputs.min, separator: '' },
-  split: { separator: '', index: 0 },
-  substring: { start: 0, length: null },
-  dateFormat: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' },
-  numberFormat: { decimalPlaces: 2, decimalSeparator: '.' },
-} as const satisfies {
-  [Kind in PlaceableKind]: Extract<MappingTransform, { kind: Kind }>['config']
-}
-
 export function newTransform(
   kind: PlaceableKind,
   id: string,
   position: Position,
 ): MappingTransform {
-  // SAFETY: each kind gets the default config of its own kind from `newTransformConfigs`.
-  return { id, kind, position, config: newTransformConfigs[kind] } as MappingTransform
+  // SAFETY: each kind gets the default config of its own kind.
+  return { id, kind, position, config: defaultConfig(kind) } as MappingTransform
 }
 
 export type TransformName = { kind: TransformKind; number: number }

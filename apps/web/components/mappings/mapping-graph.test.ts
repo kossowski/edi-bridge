@@ -158,9 +158,7 @@ describe('connect', () => {
     ).toEqual({ ok: false, reason: 'circle' })
   })
 
-  it('refuses parts, ports a transform does not have and the items of a loop', () => {
-    const refused = { ok: false, reason: 'notLinkable' }
-
+  it('refuses parts and ports a transform does not have, and names the refused end', () => {
     expect(
       connect(
         graph,
@@ -168,7 +166,7 @@ describe('connect', () => {
         { kind: 'source', path: 'buyer' },
         { kind: 'target', path: 'FTX+AAI/C108/4440' },
       ),
-    ).toEqual(refused)
+    ).toEqual({ ok: false, reason: 'notLinkable', end: 'from' })
     expect(
       connect(
         graph,
@@ -176,7 +174,10 @@ describe('connect', () => {
         { kind: 'source', path: 'note' },
         { kind: 'transform', transformId: ids.join, input: 'part4' },
       ),
-    ).toEqual(refused)
+    ).toEqual({ ok: false, reason: 'notLinkable', end: 'to' })
+  })
+
+  it('says which end of a link takes the whole repeating part of a loop', () => {
     expect(
       connect(
         graph,
@@ -184,7 +185,15 @@ describe('connect', () => {
         { kind: 'source', path: 'note' },
         { kind: 'transform', transformId: ids.loop, input: 'items' },
       ),
-    ).toEqual(refused)
+    ).toEqual({ ok: false, reason: 'needsPart', end: 'to' })
+    expect(
+      connect(
+        graph,
+        leaves,
+        { kind: 'transform', transformId: ids.loop, output: 'items' },
+        { kind: 'target', path: 'FTX+AAI/C108/4440' },
+      ),
+    ).toEqual({ ok: false, reason: 'needsPart', end: 'from' })
   })
 })
 

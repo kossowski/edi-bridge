@@ -12,12 +12,8 @@ import { useTranslations } from 'next-intl'
 import { useId, useState } from 'react'
 
 import { TextField } from '@/components/form-field'
-import {
-  linkIntoInput,
-  type Graph,
-  isPlaceable,
-  type PlaceableKind,
-} from '@/components/mappings/mapping-graph'
+import { linkIntoInput, type Graph } from '@/components/mappings/mapping-graph'
+import { formFields, isPlaceable, type PlaceableKind } from '@/components/mappings/transform-kinds'
 import {
   decimalSeparators,
   draftTransformConfigSchemas,
@@ -35,32 +31,6 @@ import type {
   TransformLink,
 } from '@edi-bridge/contracts'
 
-type FieldKind = 'text' | 'integer' | 'optionalInteger' | 'decimalSeparator'
-
-const settingsFields = {
-  constant: [['value', 'text']],
-  concatenate: [
-    ['inputCount', 'integer'],
-    ['separator', 'text'],
-  ],
-  split: [
-    ['separator', 'text'],
-    ['index', 'integer'],
-  ],
-  substring: [
-    ['start', 'integer'],
-    ['length', 'optionalInteger'],
-  ],
-  dateFormat: [
-    ['from', 'text'],
-    ['to', 'text'],
-  ],
-  numberFormat: [
-    ['decimalPlaces', 'optionalInteger'],
-    ['decimalSeparator', 'decimalSeparator'],
-  ],
-} as const satisfies Record<PlaceableKind, ReadonlyArray<readonly [string, FieldKind]>>
-
 type Values = Readonly<Record<string, string>>
 
 type Candidate = Record<string, string | number | null>
@@ -70,7 +40,7 @@ function valuesOf(transform: MappingTransform & { kind: PlaceableKind }): Values
   const config = transform.config as Readonly<Record<string, string | number | null>>
 
   return Object.fromEntries(
-    settingsFields[transform.kind].map(([field]) => [field, String(config[field] ?? '')]),
+    formFields(transform.kind).map(({ name }) => [name, String(config[name] ?? '')]),
   )
 }
 
@@ -80,7 +50,7 @@ function read(kind: PlaceableKind, values: Values) {
   const candidate: Candidate = {}
   const local: TransformConfigIssue[] = []
 
-  for (const [field, type] of settingsFields[kind]) {
+  for (const { name: field, input: type } of formFields(kind)) {
     const value = values[field] ?? ''
 
     if (type === 'text' || type === 'decimalSeparator') {
@@ -112,7 +82,7 @@ function read(kind: PlaceableKind, values: Values) {
 }
 
 function sameValues(kind: PlaceableKind, a: Values, b: Values) {
-  return settingsFields[kind].every(([field]) => a[field] === b[field])
+  return formFields(kind).every(({ name }) => a[name] === b[name])
 }
 
 function TransformSettings({
@@ -156,17 +126,17 @@ function TransformSettings({
     }
 
     return issue.code === 'invalid' &&
-      settingsFields[transform.kind].some(([name, type]) => name === field && type !== 'text')
+      formFields(transform.kind).some(({ name, input }) => name === field && input !== 'text')
       ? t('issues.notWholeNumber', { field: text.field(transform.kind, field) })
       : text.issue(transform.kind, issue)
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {settingsFields[transform.kind].map(([field, type]) => {
+      {formFields(transform.kind).map(({ name: field, input: type }) => {
         const fieldId = `${id}${field}`
         const label = text.field(transform.kind, field)
-        // SAFETY: `settingsFields` lists exactly the keys under `fieldDescriptions.<kind>`.
+        // SAFETY: the form fields are exactly the keys under `fieldDescriptions.<kind>`.
         const description = t(`fieldDescriptions.${transform.kind}.${field}` as never)
 
         if (type === 'decimalSeparator') {
@@ -219,6 +189,14 @@ function TransformSettings({
               if (event.key === 'Enter') {
                 event.preventDefault()
                 commit(values)
+              }
+            }}
+            // The canvas clears the selection on Escape; caught before it, the first Escape only
+            // takes back what was typed, so the form and the focus stay.
+            onKeyDownCapture={(event) => {
+              if (event.key === 'Escape' && values[field] !== saved[field]) {
+                event.preventDefault()
+                setValues({ ...values, [field]: saved[field] ?? '' })
               }
             }}
           />
@@ -287,8 +265,8 @@ export function TransformDetails({
   const ports = transformPorts(transform)
 
   // The form shows its own fields' problems beside them.
-  const formFields: ReadonlyArray<string> = isPlaceable(transform.kind)
-    ? settingsFields[transform.kind].map(([field]) => field)
+  const shownInForm: ReadonlyArray<string> = isPlaceable(transform.kind)
+    ? formFields(transform.kind).map(({ name }) => name)
     : []
 
   const outgoing = graph.transformLinks.filter(
@@ -330,7 +308,7 @@ export function TransformDetails({
       </div>
       <IssueList
         issues={issues
-          .filter((issue) => !('field' in issue && formFields.includes(issue.field)))
+          .filter((issue) => !('field' in issue && shownInForm.includes(issue.field)))
           .map((issue) => text.issue(transform.kind, issue))}
       />
       <section className="flex flex-col gap-3">

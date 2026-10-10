@@ -48,12 +48,11 @@ import {
   maxTransformX,
   moveTransform,
   newTransform,
-  type PlaceableKind,
   type Position,
   type Rect,
   removeTransform,
   sameStart,
-  takesPart,
+  transformById,
   transformInset,
   transformWidth,
 } from '@/components/mappings/mapping-graph'
@@ -78,6 +77,7 @@ import {
   rowOfNodeId,
   type Side,
   type TreeItem,
+  type TreeRow,
 } from '@/components/mappings/mapping-tree'
 import {
   LinkHints,
@@ -90,6 +90,7 @@ import {
   TransformDetails,
   type TransformDetailsActions,
 } from '@/components/mappings/transform-details'
+import { type PlaceableKind } from '@/components/mappings/transform-kinds'
 import {
   findTransformButton,
   inputHandle,
@@ -230,7 +231,7 @@ function DetailsPanel({
   const selected = useCanvasStore((state) => state.selected)
   const selectedTransform = useCanvasStore((state) => state.selectedTransform)
   const item = selected && itemOf(selected)
-  const transform = graph.transforms.find(({ id }) => id === selectedTransform)
+  const transform = selectedTransform ? transformById(graph, selectedTransform) : undefined
 
   const content = () => {
     if (transform) {
@@ -518,7 +519,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
       domAttributes: plainNode,
     })
 
-    const treeNodes = [...layouts.source.rows, ...layouts.target.rows].map((row): TreeFlowNode => ({
+    const treeNode = (row: TreeRow): TreeFlowNode => ({
       id: row.id,
       type: 'tree',
       position: { x: row.x, y: row.y },
@@ -531,7 +532,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
       selectable: false,
       focusable: false,
       domAttributes: plainNode,
-    }))
+    })
 
     const transformNodes = graph.transforms.map((transform): TransformFlowNode => {
       const position = draggedTo(transform.id) ?? transform.position
@@ -547,7 +548,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
           linked: into !== null,
           status: into
             ? tTransforms('node.linkedFrom', { source: text.start(into.from) })
-            : tTransforms('node.notConnected'),
+            : tTransforms('node.notLinked'),
         }
       })
 
@@ -615,8 +616,10 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
       nodes: [
         heading('source', 0, source.title),
         heading('target', targetX, target.title),
-        ...treeNodes,
+        // In the order they stand, so Tab reaches the transforms before the whole target tree.
+        ...layouts.source.rows.map(treeNode),
         ...transformNodes,
+        ...layouts.target.rows.map(treeNode),
       ],
       edges: [...plainEdges, ...transformEdges],
     }
@@ -697,48 +700,17 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
         return true
       }
 
-      switch (connected.reason) {
-        case 'alreadyLinked':
-          setProblem(
-            tLinks('alreadyLinked', {
-              target: text.end(to),
-              source: text.start(connected.existing),
-            }),
-          )
-          break
-        case 'inputTaken':
-          setProblem(
-            tTransforms('inputTaken', {
-              input: text.end(to),
-              source: text.start(connected.existing),
-            }),
-          )
-          break
-        case 'circle':
-          setProblem(
-            tTransforms('circle', {
-              source: from.kind === 'transform' ? text.name(from.transformId) : text.start(from),
-              target: to.kind === 'transform' ? text.name(to.transformId) : text.end(to),
-            }),
-          )
-          break
-        case 'notLinkable':
-          if (takesPart(graph, to) || takesPart(graph, from)) {
-            announce(
-              tTransforms('needsPart', {
-                port: takesPart(graph, to) ? text.end(to) : text.start(from),
-              }),
-            )
-          } else if (to.kind === 'target') {
-            announce(tLinks('notLinkable', { label: labelOf({ side: 'target', path: to.path }) }))
-          } else if (from.kind === 'source') {
-            announce(tLinks('notLinkable', { label: labelOf({ side: 'source', path: from.path }) }))
-          }
+      const failed = text.failedLink(connected, from, to, labelOf)
+
+      if (failed?.problem) {
+        setProblem(failed.text)
+      } else if (failed) {
+        announce(failed.text)
       }
 
       return false
     },
-    [graph, labelOf, leaves, save, store, tLinks, tTransforms, text],
+    [graph, labelOf, leaves, save, store, text],
   )
 
   const removeRowLink = useCallback(
@@ -1086,7 +1058,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
   const onNodeDragStop = useCallback<OnNodeDrag<CanvasNode>>(
     (_, node) => {
       const transformId = transformOfNodeId(node.id)
-      const transform = graph.transforms.find(({ id }) => id === transformId)
+      const transform = transformId ? transformById(graph, transformId) : undefined
 
       if (!transform) {
         return
@@ -1107,7 +1079,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
         setDragged(null)
       }
     },
-    [graph.transforms, save],
+    [graph, save],
   )
 
   const tooltip = useMeaningTooltip()
@@ -1195,18 +1167,29 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
 
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
-        // The first Escape closes an open tooltip (WCAG 1.4.13), the next a pending link, and
-        // only the one after that clears the selection.
-        if (tooltip.handle.isOpen) {
+        // The first Escape closes an open tooltip (WCAG 1.4.13) or takes back what was typed in a
+        // settings field, the next a pending link, and only the one after that clears the
+        // selection.
+        if (tooltip.handle.isOpen || event.defaultPrevented) {
           return
         }
 
         const state = store.getState()
+        // The panel's content goes with the selection or the pending link, and its focus with it.
+        const inPanel = event.target instanceof Node && panel.current?.contains(event.target)
 
         if (state.linkFrom) {
-          cancel()
+          if (inPanel) {
+            panelActions.cancel()
+          } else {
+            cancel()
+          }
         } else if (state.selected || state.selectedTransform) {
-          clearSelection()
+          if (inPanel) {
+            panelActions.clear()
+          } else {
+            clearSelection()
+          }
         }
 
         return
@@ -1249,6 +1232,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     leaves,
     link,
     outputAction,
+    panelActions,
     removeRowLink,
     removeTransformById,
     start,

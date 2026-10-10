@@ -215,7 +215,7 @@ function OutputPort({
 function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
   const t = useTranslations('Mapping.transforms.node')
   const actions = useTransformActions()
-  const onFocus = usePanIntoView()
+  const onFocus = usePanIntoView({ whole: true })
   const issuesId = useId()
   const selected = useCanvasStore((state) => state.selectedTransform === data.transformId)
   const invalid = data.issues.length > 0

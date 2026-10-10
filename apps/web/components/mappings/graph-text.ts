@@ -3,8 +3,14 @@
 import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
 
-import { type GraphChange, transformNames } from '@/components/mappings/mapping-graph'
+import {
+  type Connected,
+  type GraphChange,
+  transformNames,
+} from '@/components/mappings/mapping-graph'
+import { isField, isRanged } from '@/components/mappings/transform-kinds'
 
+import type { RowRef } from '@/components/mappings/mapping-links'
 import type {
   LinkEnd,
   LinkStart,
@@ -17,34 +23,18 @@ const inputPorts = ['value', 'then', 'else', 'items'] as const
 
 const outputPorts = ['value', 'items', 'counter'] as const
 
-const rangedFields: Partial<Record<TransformKind, ReadonlyArray<string>>> = {
-  concatenate: ['inputCount'],
-  split: ['index'],
-  substring: ['start', 'length'],
-  numberFormat: ['decimalPlaces'],
-  loop: ['counterStart'],
-}
-
 function known<Name extends string>(names: ReadonlyArray<Name>, name: string): name is Name {
   return names.some((candidate) => candidate === name)
 }
 
-const fieldNames = {
-  constant: ['value'],
-  concatenate: ['inputCount', 'separator'],
-  split: ['separator', 'index'],
-  substring: ['start', 'length'],
-  dateFormat: ['from', 'to'],
-  numberFormat: ['decimalPlaces', 'decimalSeparator'],
-  lookupTable: ['lookupTableId', 'fallback'],
-  conditional: ['operator', 'compareTo'],
-  loop: ['counterStart'],
-  jsonata: ['expression'],
-} as const satisfies Record<TransformKind, ReadonlyArray<string>>
-
 export type GraphText = ReturnType<typeof useGraphText>
 
-// Every name the canvas shows or announces for transforms, their ports and the ends of links.
+export type FailedLink = Exclude<Connected, { ok: true }>
+
+// A refusal the user caused by pointing at a taken or circular end stays as a problem; one that
+// only explains what cannot be linked is announced.
+export type FailedLinkText = { text: string; problem: boolean }
+
 export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
   const t = useTranslations('Mapping.transforms')
   const tLinks = useTranslations('Mapping.links')
@@ -82,19 +72,13 @@ export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
         ? to.path
         : t('port', { transform: name(to.transformId), port: input(to.input) })
 
-    const field = (transformKind: TransformKind, value: string) => {
-      const fields: ReadonlyArray<string> = fieldNames[transformKind]
+    // SAFETY: `transformKindFields` lists exactly the keys under `fields.<kind>` in the messages.
+    const field = (transformKind: TransformKind, value: string) =>
+      isField(transformKind, value) ? t(`fields.${transformKind}.${value}` as never) : value
 
-      // SAFETY: `fields` lists exactly the keys under `fields.<kind>` in the messages.
-      return fields.includes(value) ? t(`fields.${transformKind}.${value}` as never) : value
-    }
-
-    const range = (transformKind: TransformKind, value: string) => {
-      const ranged = rangedFields[transformKind] ?? []
-
-      // SAFETY: `rangedFields` lists exactly the keys under `ranges.<kind>` in the messages.
-      return ranged.includes(value) ? t(`ranges.${transformKind}.${value}` as never) : null
-    }
+    // SAFETY: its `ranged` fields are exactly the keys under `ranges.<kind>` in the messages.
+    const range = (transformKind: TransformKind, value: string) =>
+      isRanged(transformKind, value) ? t(`ranges.${transformKind}.${value}` as never) : null
 
     const issue = (transformKind: TransformKind, found: TransformIssue) => {
       if (found.code === 'unconnected') {
@@ -177,6 +161,51 @@ export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
       }
     }
 
+    const failedLink = (
+      failed: FailedLink,
+      from: LinkStart,
+      to: LinkEnd,
+      label: (row: RowRef) => string,
+    ): FailedLinkText | null => {
+      switch (failed.reason) {
+        case 'alreadyLinked':
+          return {
+            text: tLinks('alreadyLinked', { target: end(to), source: start(failed.existing) }),
+            problem: true,
+          }
+        case 'inputTaken':
+          return {
+            text: t('inputTaken', { input: end(to), source: start(failed.existing) }),
+            problem: true,
+          }
+        case 'circle':
+          return {
+            text: t('circle', {
+              source: from.kind === 'transform' ? name(from.transformId) : start(from),
+              target: to.kind === 'transform' ? name(to.transformId) : end(to),
+            }),
+            problem: true,
+          }
+        case 'needsPart':
+          return {
+            text: t('needsPart', { port: failed.end === 'to' ? end(to) : start(from) }),
+            problem: false,
+          }
+        case 'notLinkable': {
+          const row: RowRef | null =
+            failed.end === 'to'
+              ? to.kind === 'target'
+                ? { side: 'target', path: to.path }
+                : null
+              : from.kind === 'source'
+                ? { side: 'source', path: from.path }
+                : null
+
+          return row && { text: tLinks('notLinkable', { label: label(row) }), problem: false }
+        }
+      }
+    }
+
     const summary = (transform: MappingTransform) => {
       switch (transform.kind) {
         case 'constant':
@@ -222,6 +251,6 @@ export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
       }
     }
 
-    return { kind, name, input, output, start, end, field, issue, change, summary }
+    return { kind, name, input, output, start, end, field, issue, change, failedLink, summary }
   }, [t, tLinks, transforms])
 }

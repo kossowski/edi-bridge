@@ -16,7 +16,7 @@ import {
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { saveMappingDraftEndpoint } from '@edi-bridge/contracts'
+import { mappingDraftEndpoint, saveMappingDraftEndpoint, toPath } from '@edi-bridge/contracts'
 import { createHandlers } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -81,7 +81,7 @@ export const TransformNodes = meta.story({
 
     const dateFormat = await findNode(canvasElement, 'Date format 1')
 
-    await expect(dateFormat.getByText('yyyy-MM-dd to yyyyMMdd')).toBeVisible()
+    await expect(dateFormat.getByText('yyyy-MM-dd → yyyyMMdd')).toBeVisible()
     await expect(
       dateFormat.getByRole('button', { name: 'Value input of Date format 1' }),
     ).toHaveAccessibleDescription('Linked from invoiceDate.')
@@ -142,6 +142,27 @@ export const InvalidNodes = meta.story({
   },
 })
 
+export const PanToWholeNode = meta.story({
+  args: { id: invoic.id },
+  async play({ canvasElement }) {
+    const name = 'Loop over line items 1'
+    const loop = await findNode(canvasElement, name)
+
+    loop.getByRole('button', { name }).focus()
+
+    // The whole node comes into view, not only its focused button.
+    await waitFor(() => {
+      const pane = canvasElement.querySelector('.react-flow')!.getBoundingClientRect()
+      const shown = transformNodeOf(canvasElement, name).getBoundingClientRect()
+
+      return expect({
+        top: shown.top >= pane.top,
+        bottom: shown.bottom <= pane.bottom,
+      }).toEqual({ top: true, bottom: true })
+    })
+  },
+})
+
 export const PlaceTransform = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
@@ -153,10 +174,10 @@ export const PlaceTransform = meta.story({
 
     const dateFormat = node(canvasElement, 'Date format 1')
 
-    await expect(dateFormat.getByText('The Value input is not connected.')).toBeVisible()
+    await expect(dateFormat.getByText('The Value input is not linked.')).toBeVisible()
     await expect(
       dateFormat.getByRole('button', { name: 'Value input of Date format 1' }),
-    ).toHaveAccessibleDescription('Not connected.')
+    ).toHaveAccessibleDescription('Not linked yet.')
 
     const panel = detailsPanel(canvasElement)
 
@@ -193,7 +214,7 @@ export const ConnectByKeyboard = meta.story({
     await pressOn(await findRow(canvasElement, source('invoiceDate')), 'l')
     await waitFor(() => expect(input.closest('[data-link-target]')).not.toBeNull())
     await expect(input).toHaveAccessibleDescription(
-      'Not connected. Can take the link from invoiceDate',
+      'Not linked yet. Can take the link from invoiceDate',
     )
     await pressOn(input, '{Enter}')
     await expect(
@@ -273,7 +294,7 @@ export const ConnectByMouse = meta.story({
       await canvas.findByRole('img', { name: 'Link from Concatenate 1 (Result) to BGM/1004' }),
     ).toBeInTheDocument()
     await waitFor(() =>
-      expect(node(canvasElement, 'Concatenate 1').queryByText(/not connected/)).toBeNull(),
+      expect(node(canvasElement, 'Concatenate 1').queryByText(/not linked/)).toBeNull(),
     )
     await expect(await canvas.findByText('Saved')).toBeVisible()
     await expect(canvas.getByText('3 links')).toBeVisible()
@@ -324,6 +345,45 @@ export const ConfigureTransform = meta.story({
     await expect(
       node(canvasElement, 'Number format 1').queryByText('Decimal places must be between 0 and 6.'),
     ).toBeNull()
+  },
+})
+
+export const EscapeInSettings = meta.story({
+  args: { id: invoic.id },
+  async play({ canvasElement }) {
+    const header = (await findNode(canvasElement, 'Split 1')).getByRole('button', {
+      name: 'Split 1',
+    })
+
+    await userEvent.click(header)
+
+    const panel = detailsPanel(canvasElement)
+    const separator = panel.getByRole('textbox', { name: 'Separator' })
+
+    // The first Escape takes back what was typed and keeps the form and the focus.
+    await userEvent.type(separator, '-')
+    await userEvent.keyboard('{Escape}')
+    await expect(separator).toHaveValue('')
+    await expect(separator).toHaveFocus()
+    await expect(header).toHaveAttribute('aria-pressed', 'true')
+
+    // The next clears the selection and takes the focus back to the Transform.
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(header).toHaveFocus())
+    await expect(header).toHaveAttribute('aria-pressed', 'false')
+
+    // From a link's remove button, the focus goes back to the selected part.
+    const filled = target('DTM+137/C507/2380')
+
+    await pressOn(await findRow(canvasElement, filled), '{Enter}')
+    panel
+      .getByRole('button', {
+        name: 'Remove link from Date format 1 (Result) to DTM+137/C507/2380',
+      })
+      .focus()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(async () => expect(await findRow(canvasElement, filled)).toHaveFocus())
+    await expect(panel.getByText(/Select a part/)).toBeVisible()
   },
 })
 
@@ -416,7 +476,7 @@ export const RemoveTransforms = meta.story({
         name: 'Remove link from Concatenate 1 (Result) to SG2+DP/NAD+DP/3164',
       }),
     )
-    await waitFor(() => expect(panel.getAllByText('Not connected')).toHaveLength(3))
+    await waitFor(() => expect(panel.getAllByText('Not linked yet')).toHaveLength(3))
     await userEvent.click(panel.getByRole('button', { name: 'Remove Concatenate 1' }))
     await expect(await canvas.findByText('4 Transforms')).toBeVisible()
     await expect(panel.getByText(/Select a part to keep its meaning/)).toBeVisible()
@@ -468,6 +528,50 @@ export const SaveErrorRollback = meta.story({
     await expect(canvas.queryByRole('group', { name: 'Transform Constant 1' })).toBeNull()
     await expect(await canvas.findByText('Not saved')).toBeVisible()
     await expect(canvas.getByText('No Transforms yet')).toBeVisible()
+  },
+})
+
+// The save of Split 1 waits for the failing save of Constant 1, so it neither sends Constant 1 nor
+// brings it back.
+export const OverlappingSaveRollback = meta.story({
+  args: { id: withoutLinks.id },
+  beforeEach({ msw }) {
+    let failed = false
+
+    msw.use(
+      http.put(`${apiUrl}${saveMappingDraftEndpoint.path}`, async () => {
+        if (failed) {
+          return undefined
+        }
+
+        failed = true
+        await delay(400)
+
+        return HttpResponse.json({ message: 'Unprocessable' }, { status: 422 })
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Add Constant' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Add Split' }))
+    await expect(await canvas.findByRole('group', { name: 'Transform Split 1' })).toBeVisible()
+
+    await waitFor(() =>
+      expect(canvas.getByRole('alert')).toHaveTextContent(
+        'Constant 1 could not be saved and was taken back. Try again.',
+      ),
+    )
+    await expect(await canvas.findByText('Saved')).toBeVisible()
+
+    const response = await fetch(
+      `${apiUrl}${toPath(mappingDraftEndpoint.path, { id: withoutLinks.id })}`,
+    )
+
+    const saved = mappingDraftEndpoint.response.parse(await response.json())
+
+    await expect(saved.transforms.map(({ kind }) => kind)).toEqual(['split'])
+    await expect(canvas.queryByRole('group', { name: 'Transform Constant 1' })).toBeNull()
+    await expect(canvas.getByText('1 Transform')).toBeVisible()
   },
 })
 

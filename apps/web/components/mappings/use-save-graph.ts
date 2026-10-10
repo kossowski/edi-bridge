@@ -26,8 +26,9 @@ const saveStates = {
   error: 'failed',
 } as const satisfies Record<MutationStatus, GraphSaveState | null>
 
-// Links and transforms go through this one mutation, each save sending the whole graph as the
-// cache holds it, so overlapping saves of either never drop each other's changes.
+// Each save sends the whole graph as the cache holds it, so the saves of one Mapping run one after
+// another: a save reads the cache only once the one before it has settled, and so never sends a
+// change that a failed save before it has taken back. Each change still shows at once.
 export function useSaveGraph(mappingId: string) {
   const queryClient = useQueryClient()
   const store = useCanvasStoreApi()
@@ -40,6 +41,7 @@ export function useSaveGraph(mappingId: string) {
 
   const save = useMutation<MappingDraft, Error, GraphSave>({
     mutationKey,
+    scope: { id: mutationKey.join('/') },
     mutationFn: () => {
       const draft = queryClient.getQueryData<MappingDraft>(queryKey)
 

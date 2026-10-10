@@ -5,7 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import { useId } from 'react'
 
-import { type PlaceableKind, placeableKinds } from '@/components/mappings/mapping-graph'
+import { type PlaceableKind, placeableKinds } from '@/components/mappings/transform-kinds'
 import { Button } from '@edi-bridge/ui/components/button'
 
 export function TransformPalette({ onPlace }: { onPlace: (kind: PlaceableKind) => void }) {
