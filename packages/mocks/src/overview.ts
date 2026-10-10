@@ -25,11 +25,11 @@ import {
   type TradingPartnerHealth,
 } from '@edi-bridge/contracts'
 
+import { hash } from './hash'
 import { badRequest, serverError } from './responses'
 import { seedRuns } from './run'
 import { controlReferenceOf, interchangeIdOf } from './run-detail'
 import { type RunStore, toRunStore } from './run-store'
-import { seededFaker } from './seeded-faker'
 import { createTradingPartners, seedTradingPartners } from './trading-partner'
 
 export type OverviewData = {
@@ -243,17 +243,8 @@ export function createOverviewData({
   return { runs, tradingPartners, overdueAcknowledgements }
 }
 
-const unacknowledged = new Map<string, boolean>()
-
 function isUnacknowledged(run: RunSummary) {
-  let value = unacknowledged.get(run.id)
-
-  if (value === undefined) {
-    value = seededFaker(`overdue:${run.id}`).datatype.boolean({ probability: 0.02 })
-    unacknowledged.set(run.id, value)
-  }
-
-  return value
+  return hash(`overdue:${run.id}`) / 2 ** 32 < 0.02
 }
 
 // An outbound Run delivers its own Interchange, so a few recent delivered ones stand for sent
