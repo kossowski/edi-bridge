@@ -3,7 +3,7 @@ description: Installs pnpm, Node.js and the dependencies, restores the job's Tur
 
 inputs:
   job:
-    description: Names the job's Turborepo cache, because parallel jobs can't share one cache key.
+    description: Names the job's Turborepo cache.
     required: true
   chromium:
     description: Installs Playwright Chromium when 'true'.
@@ -52,7 +52,6 @@ runs:
       shell: bash
       run: pnpm --filter @edi-bridge/web exec playwright install --with-deps chromium
 
-    # The cache holds the browser, not the system libraries it needs.
     - name: Install Playwright system dependencies
       if: inputs.chromium == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
       shell: bash

@@ -2,7 +2,6 @@ name: CI
 
 on:
   pull_request:
-  # Fills the Turbo cache on main, which every new branch can restore.
   push:
     branches: [main]
 
@@ -13,7 +12,6 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-# Each job gets its own runner, so the story tests don't compete with the builds for CPU.
 jobs:
   tasks:
     name: ${{ matrix.name }}
@@ -29,9 +27,7 @@ jobs:
           - name: Test
             job: test
             tasks: test
-            # Story tests run in Vitest browser mode.
             chromium: 'true'
-          # The canvas stories take most of the test time, so each heavy story file gets a runner.
           - name: Canvas stories 1/3
             job: canvas-1
             tasks: test:canvas
@@ -68,11 +64,9 @@ jobs:
           job: ${{ matrix.job }}
           chromium: ${{ matrix.chromium || 'false' }}
 
-      # Main runs every task, so its cache covers every package.
       - name: Run affected tasks
         run: pnpm turbo run ${{ matrix.tasks }} ${{ github.event_name == 'pull_request' && '--affected' || '' }} ${{ matrix.args }}
 
-  # The main ruleset requires this check name.
   checks:
     name: Lint, check-types, test and build
     if: always()
