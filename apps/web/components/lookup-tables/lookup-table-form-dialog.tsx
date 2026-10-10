@@ -32,8 +32,6 @@ import {
 
 import type { LookupTable, LookupTableSummary } from '@edi-bridge/contracts'
 
-const errorClass = 'text-sm text-red-800 dark:text-red-300'
-
 const scopeKinds = ['workspace', 'tradingPartner'] as const satisfies ReadonlyArray<ScopeKind>
 
 function useFieldErrorMessage() {
@@ -62,7 +60,7 @@ function TradingPartnerChoice({
   if (tradingPartners.isError) {
     return (
       <div className="flex flex-col items-start gap-2">
-        <p role="alert" className={errorClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('error')}
         </p>
         <Button size="sm" variant="outline" onClick={() => void tradingPartners.refetch()}>
@@ -217,7 +215,7 @@ function LookupTableForm({
         />
       )}
       {save.isError && !conflict && (
-        <p role="alert" className={errorClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.saveFailed')}
         </p>
       )}
