@@ -78,7 +78,7 @@ function useSideTitle() {
   return (side: MappingSide) => sideOf(side, t, locale).title
 }
 
-function useSide(side: MappingSide) {
+export function useSide(side: MappingSide) {
   const t = useTranslations('Mapping')
   const locale = useLocale()
   const { title, query } = sideOf(side, t, locale)

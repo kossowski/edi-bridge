@@ -1260,7 +1260,8 @@
     "latest": "Latest",
     "columns": {
       "version": "Version",
-      "publishedAt": "Published"
+      "publishedAt": "Published",
+      "compare": "Comparison"
     },
     "empty": {
       "title": "No Mapping Versions yet",
@@ -1270,6 +1271,117 @@
       "title": "Mapping Versions unavailable",
       "description": "The Mapping Versions could not be loaded. Try again.",
       "retry": "Try again"
+    },
+    "compare": "Compare versions",
+    "compareWith": "Compare with Version {version}"
+  },
+  "MappingComparison": {
+    "title": "Compare Mapping Versions",
+    "back": "Back to the Mapping Versions",
+    "loading": "Loading the comparison",
+    "openDraft": "Open the Draft",
+    "from": "From",
+    "to": "To",
+    "swap": "Swap versions",
+    "sample": "Sample Document",
+    "chooseVersion": "Choose a version",
+    "chooseSample": "Choose a Sample Document",
+    "version": "Version {version}",
+    "latestVersion": "Version {version} (latest)",
+    "retry": "Try again",
+    "shown": "Showing {shown} of {total}",
+    "showMore": "Show {count} more",
+    "columns": {
+      "change": "Change"
+    },
+    "change": {
+      "added": "Added",
+      "removed": "Removed",
+      "changed": "Changed"
+    },
+    "tooFew": {
+      "title": "Nothing to compare yet",
+      "description": "A comparison needs at least two Mapping Versions. Publish the Draft on the canvas to create another one."
+    },
+    "unknownVersion": {
+      "title": "Mapping Version not found",
+      "description": "A chosen version is not one of this Mapping. Choose two of its versions above."
+    },
+    "sameVersion": {
+      "title": "The same version twice",
+      "description": "Choose two different versions to see what changed between them."
+    },
+    "versions": {
+      "error": {
+        "title": "Mapping Versions unavailable",
+        "description": "The Mapping Versions could not be loaded. Try again."
+      }
+    },
+    "differences": {
+      "title": "Mapping differences",
+      "description": "What changed in the links, Transforms and Transform Links from Version {from} to Version {to}.",
+      "loading": "Loading the mapping differences",
+      "summary": "{count, plural, one {# difference} other {# differences}}: {added} added, {removed} removed, {changed} changed",
+      "absent": "Not in this version",
+      "empty": {
+        "title": "No mapping differences",
+        "description": "Version {from} and Version {to} have the same links, Transforms and Transform Links."
+      },
+      "error": {
+        "title": "Mapping differences unavailable",
+        "description": "The mapping differences could not be loaded. Try again."
+      },
+      "kinds": {
+        "link": {
+          "title": "{count, plural, one {# link} other {# links}}",
+          "part": "Target",
+          "caption": "Links by their target, with the source each version links to it"
+        },
+        "transform": {
+          "title": "{count, plural, one {# Transform} other {# Transforms}}",
+          "part": "Transform",
+          "caption": "Transforms with their configuration in each version"
+        },
+        "transformLink": {
+          "title": "{count, plural, one {# Transform Link} other {# Transform Links}}",
+          "part": "Leads to",
+          "caption": "Transform Links by where they lead, with where they come from in each version"
+        }
+      }
+    },
+    "outputs": {
+      "title": "Output differences",
+      "description": "The target Documents both versions produce for the same Sample Document, and the values that differ.",
+      "loadingSamples": "Loading the Sample Documents",
+      "loading": "Building the outputs for {name}",
+      "summary": "{count, plural, one {# value differs} other {# values differ}} for {name}",
+      "caption": "Values that differ, by target and repetition",
+      "columns": {
+        "path": "Target",
+        "repetition": "Repetition"
+      },
+      "single": "Not repeated",
+      "repetition": "{label} no. {number}",
+      "repetitionPlain": "No. {number}",
+      "notSet": "Not set",
+      "documents": "Target Documents",
+      "document": "Target Document of Version {version}",
+      "empty": {
+        "title": "Same output",
+        "description": "Version {from} and Version {to} produce the same target Document for {name}."
+      },
+      "noSamples": {
+        "title": "No Sample Documents yet",
+        "description": "Output differences need a Sample Document of this Mapping, and it has none yet."
+      },
+      "unknownSample": {
+        "title": "Sample Document not found",
+        "description": "The chosen Sample Document is not one of this Mapping. Choose another one above."
+      },
+      "error": {
+        "title": "Outputs unavailable",
+        "description": "The outputs for this Sample Document could not be built. Try again."
+      }
     }
   },
   "ManualSubmission": {

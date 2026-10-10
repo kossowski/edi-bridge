@@ -21,6 +21,9 @@ import {
   mappingPreviewEndpoint,
   mappingSamplesEndpoint,
   mappingsEndpoint,
+  mappingComparisonEndpoint,
+  type MappingComparisonQuery,
+  mappingVersionEndpoint,
   mappingVersionsEndpoint,
   type MessageType,
   messageTypeStructureEndpoint,
@@ -134,6 +137,19 @@ export function getInterchange(id: string) {
 export function listMappingVersions(mappingId: string) {
   return request(mappingVersionsEndpoint, {
     path: toPath(mappingVersionsEndpoint.path, { mappingId }),
+  })
+}
+
+export function getMappingVersion(mappingId: string, versionId: string) {
+  return request(mappingVersionEndpoint, {
+    path: toPath(mappingVersionEndpoint.path, { mappingId, versionId }),
+  })
+}
+
+export function compareMappingVersions(mappingId: string, query: MappingComparisonQuery) {
+  return request(mappingComparisonEndpoint, {
+    path: toPath(mappingComparisonEndpoint.path, { mappingId }),
+    query,
   })
 }
 

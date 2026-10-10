@@ -1,6 +1,7 @@
 'use client'
 
-import { WorkHistoryIcon } from '@hugeicons/core-free-icons'
+import { GitCompareIcon, WorkHistoryIcon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
@@ -8,17 +9,27 @@ import Link from 'next/link'
 import { linkClass, LoadFailure } from '@/components/detail-parts'
 import { ListScreen, ListTable } from '@/components/list-screen'
 import { DraftStateLabel } from '@/components/mappings/publish-draft'
+import { comparisonHref } from '@/components/mappings/version-comparison'
 import { ApiError } from '@/lib/api/client'
 import { mappingDraftQuery, mappingVersionsQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
+import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 
 import type { MappingDraft, MappingVersionSummary } from '@edi-bridge/contracts'
 
-const columns = ['version', 'publishedAt'] as const
+const columns = ['version', 'publishedAt', 'compare'] as const
 
-function VersionRow({ version, latest }: { version: MappingVersionSummary; latest: boolean }) {
+function VersionRow({
+  version,
+  previous,
+  latest,
+}: {
+  version: MappingVersionSummary
+  previous: MappingVersionSummary | undefined
+  latest: boolean
+}) {
   const t = useTranslations('MappingVersions')
   const format = useFormatter()
 
@@ -37,6 +48,15 @@ function VersionRow({ version, latest }: { version: MappingVersionSummary; lates
             timeStyle: 'short',
           })}
         </time>
+      </TableCell>
+      <TableCell>
+        {previous && (
+          <Link
+            href={comparisonHref(version.mappingId, { from: previous.id, to: version.id })}
+            className={`${linkClass} text-sm`}>
+            {t('compareWith', { version: previous.version })}
+          </Link>
+        )}
       </TableCell>
     </TableRow>
   )
@@ -70,7 +90,12 @@ function VersionList({ draft }: { draft: MappingDraft }) {
         pending={false}
         query={versions}
         row={(version) => (
-          <VersionRow key={version.id} latest={version.id === latest} version={version} />
+          <VersionRow
+            key={version.id}
+            latest={version.id === latest}
+            previous={versions.data?.find((other) => other.version < version.version)}
+            version={version}
+          />
         )}
         t={t}
       />
@@ -95,9 +120,18 @@ function VersionsLoading() {
 export function MappingVersionsScreen({ id }: { id: string }) {
   const t = useTranslations('MappingVersions')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
+  const versions = useQuery({ ...mappingVersionsQuery(id), enabled: data !== undefined })
 
   return (
     <ListScreen
+      action={
+        (versions.data?.length ?? 0) > 1 && (
+          <Link href={comparisonHref(id)} className={buttonVariants({ variant: 'outline' })}>
+            <HugeiconsIcon icon={GitCompareIcon} strokeWidth={2} aria-hidden />
+            {t('compare')}
+          </Link>
+        )
+      }
       back={{ href: `/mappings/${id}`, label: t('back') }}
       subtitle={data?.name}
       title={t('title')}>
