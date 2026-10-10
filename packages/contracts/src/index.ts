@@ -45,7 +45,44 @@ export {
   webhookTokenSchema,
 } from './channel'
 
-export { controlReferenceSchema, segmentTagSchema } from './edifact'
+export {
+  documentArraySchema,
+  type DocumentArray,
+  type DocumentField,
+  documentFieldSchema,
+  type DocumentFieldType,
+  documentFieldTypeSchema,
+  documentFieldTypes,
+  type DocumentFormat,
+  documentFormatSchema,
+  documentFormats,
+  type DocumentObject,
+  documentObjectSchema,
+  type DocumentStructure,
+  documentStructureEndpoint,
+  type DocumentStructureNode,
+  documentStructureNodeSchema,
+  documentStructureSchema,
+} from './document-structure'
+
+export {
+  controlReferenceSchema,
+  type EdifactCode,
+  edifactCodeSchema,
+  type EdifactComposite,
+  edifactCompositeSchema,
+  type EdifactElement,
+  edifactElementSchema,
+  type EdifactSegment,
+  type EdifactSegmentGroup,
+  edifactSegmentGroupSchema,
+  edifactSegmentSchema,
+  type EdifactStructureNode,
+  edifactStructureNodeSchema,
+  type LocalizedText,
+  localizedTextSchema,
+  segmentTagSchema,
+} from './edifact'
 
 export {
   createFlowEndpoint,
@@ -92,6 +129,27 @@ export {
 } from './manual-submission'
 
 export {
+  type DocumentStructureSide,
+  documentStructureSideSchema,
+  type MappingDraft,
+  mappingDraftEndpoint,
+  mappingDraftSchema,
+  type MappingLink,
+  mappingLinkSchema,
+  mappingLinksSchema,
+  type MappingSide,
+  mappingSideSchema,
+  mappingsEndpoint,
+  type MappingSummary,
+  mappingSummarySchema,
+  type MessageTypeSide,
+  messageTypeSideSchema,
+  type SaveMappingLinksBody,
+  saveMappingLinksBodySchema,
+  saveMappingLinksEndpoint,
+} from './mapping'
+
+export {
   type MappingVersionSummary,
   mappingVersionSummarySchema,
   mappingVersionsEndpoint,
@@ -106,6 +164,12 @@ export {
   type MessageType,
   messageTypeSchema,
   messageTypes,
+  messageTypeStructureEndpoint,
+  type MessageTypeStructure,
+  messageTypeStructureSchema,
+  type Release,
+  releaseSchema,
+  releases,
 } from './message-type'
 
 export {

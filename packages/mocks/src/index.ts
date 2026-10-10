@@ -1,9 +1,17 @@
-import type { TradingPartner, Workspace } from '@edi-bridge/contracts'
+import type { DocumentStructure, TradingPartner, Workspace } from '@edi-bridge/contracts'
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
+import { documentStructureHandler, seedDocumentStructures } from './document-structure'
 import { createFlowStore, flowHandlers, seedMappings } from './flow'
 import { manualSubmissionHandler } from './manual-submission'
+import {
+  type MappingDraftRecord,
+  mappingHandlers,
+  type MappingDraftStore,
+  seedMappingDrafts,
+} from './mapping'
 import { createMappingCatalogue, publishedMappingVersionsHandler } from './mapping-version'
+import { messageTypeStructureHandler } from './message-type-structure'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
@@ -34,7 +42,33 @@ export {
   toFlowStore,
 } from './flow'
 
+export {
+  createDocumentStructure,
+  documentStructureHandler,
+  documentStructureLeaves,
+  seedDocumentStructureOf,
+  seedDocumentStructures,
+} from './document-structure'
+
 export { manualSubmissionHandler } from './manual-submission'
+
+export {
+  createMappingDrafts,
+  createMappingDraftStore,
+  mappingHandlers,
+  type MappingDraftRecord,
+  type MappingDraftStore,
+  seedMappingDrafts,
+  toMappingDraft,
+  toMappingDraftStore,
+  toMappingSummary,
+} from './mapping'
+
+export {
+  edifactLeaves,
+  messageTypeStructureHandler,
+  messageTypeStructures,
+} from './message-type-structure'
 
 export {
   createMappingCatalogue,
@@ -76,10 +110,14 @@ export function createHandlers(
     workspace = seedWorkspace,
     tradingPartners = seedTradingPartners,
     channels = seedChannels,
+    mappingDrafts = seedMappingDrafts,
+    documentStructures = seedDocumentStructures,
   }: {
     workspace?: Workspace
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
+    mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
+    documentStructures?: ReadonlyArray<DocumentStructure>
   } = {},
 ) {
   const runs = createRunStore(seedRuns())
@@ -97,5 +135,8 @@ export function createHandlers(
     runsHandler(apiUrl, runs),
     ...runDetailHandlers(apiUrl, { runs, reprocessed: seedReprocessed() }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
+    ...mappingHandlers(apiUrl, { mappings: mappingDrafts, documentStructures }),
+    documentStructureHandler(apiUrl, documentStructures),
+    messageTypeStructureHandler(apiUrl),
   ]
 }
