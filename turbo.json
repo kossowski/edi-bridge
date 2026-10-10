@@ -27,6 +27,10 @@
       "dependsOn": ["transit"],
       "passThroughEnv": ["CI"]
     },
+    "test:canvas": {
+      "dependsOn": ["transit"],
+      "passThroughEnv": ["CI"]
+    },
     "test:watch": {
       "cache": false,
       "persistent": true
