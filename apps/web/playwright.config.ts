@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 const port = 3100
 
-export default defineConfig({
+const config = defineConfig({
   testDir: './e2e',
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
@@ -20,3 +20,9 @@ export default defineConfig({
     timeout: 120_000,
   },
 })
+
+if (!process.env.CI) {
+  config.workers = 1
+}
+
+export default config

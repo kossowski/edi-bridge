@@ -12,6 +12,7 @@
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
     "test:e2e": "turbo run test:e2e",
+    "check": "turbo run lint check-types test test:e2e build build-storybook --concurrency=2",
     "storybook": "turbo run storybook",
     "format": "prettier --write .",
     "prepare": "husky"

@@ -75,7 +75,7 @@ WORKTREE   <absolute worktree path>, branch <branch>. Work and commit only here.
 CONTEXT    Ticket <path>, stack file <path>, spec <path>. Parts below are already on this branch.
 SCOPE      The scope of part <k> in the stack file. Later parts build what it leaves out.
 BUILD      Call the Skill tool with `tdd`, unless the ticket sets another testing rule.
-VERIFY     pnpm turbo run lint check-types test test:e2e build build-storybook, all green in the worktree.
+VERIFY     pnpm check, all green in the worktree.
 COMMITS    Conventional Commits per AGENTS.md, footer `refs: edi-bridge-issue#<NN>`.
 REPORT     STATUS: done | blocked
            COMMITS: <git log --oneline <parent>..HEAD>

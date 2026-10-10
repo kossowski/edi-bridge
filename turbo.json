@@ -21,7 +21,8 @@
       "dependsOn": ["transit"]
     },
     "test": {
-      "dependsOn": ["transit"]
+      "dependsOn": ["transit"],
+      "passThroughEnv": ["CI"]
     },
     "test:watch": {
       "cache": false,
