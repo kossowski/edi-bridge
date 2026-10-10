@@ -3,7 +3,7 @@
 import { Loading03Icon, Wifi01Icon, WifiDisconnected01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -24,21 +24,38 @@ const liveStatusStyles: Record<LiveStatus, string> = {
   offline: 'bg-red-500/10 text-red-800 dark:text-red-300',
 }
 
+const announceInterruptionAfterMs = 3000
+
 function useAnnouncement(status: LiveStatus) {
   const t = useTranslations('Overview.live.announcement')
   const [previous, setPrevious] = useState(status)
-  const [connectedOnce, setConnectedOnce] = useState(status === 'connected')
+  const [interrupted, setInterrupted] = useState(false)
   const [announcement, setAnnouncement] = useState('')
 
   if (status !== previous) {
     setPrevious(status)
 
-    if (status === 'connected' && !connectedOnce) {
-      setConnectedOnce(true)
-    } else if (status === 'offline' || (connectedOnce && status !== 'connecting')) {
-      setAnnouncement(t(status))
+    if (status === 'offline') {
+      setInterrupted(true)
+      setAnnouncement(t('offline'))
+    } else if (status === 'connected' && interrupted) {
+      setInterrupted(false)
+      setAnnouncement(t('connected'))
     }
   }
+
+  useEffect(() => {
+    if (status !== 'reconnecting') {
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setInterrupted(true)
+      setAnnouncement(t('reconnecting'))
+    }, announceInterruptionAfterMs)
+
+    return () => clearTimeout(timer)
+  }, [status, t])
 
   return announcement
 }

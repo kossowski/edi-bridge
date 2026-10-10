@@ -1,3 +1,4 @@
+import { type SetupWorker } from 'msw/browser'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect, within } from 'storybook/test'
 
@@ -7,7 +8,7 @@ import messagesDe from '@/messages/de.json'
 import {
   createRunStore,
   liveEventsHandler,
-  type LiveEventsMode,
+  type LiveEventsOptions,
   overviewHandler,
   seedOverviewData,
   seedRuns,
@@ -135,44 +136,33 @@ export const Dark = meta.story({
   },
 })
 
-function liveStream(mode: LiveEventsMode) {
-  const runs = createRunStore(seedRuns())
-  const streams = new AbortController()
+function liveStream(options: Omit<LiveEventsOptions, 'runs' | 'signal'>) {
+  return ({ msw }: { msw: Pick<SetupWorker, 'use'> }) => {
+    const runs = createRunStore(seedRuns())
+    const streams = new AbortController()
 
-  return {
-    handlers: [
+    msw.use(
       overviewHandler(apiUrl, seedOverviewData(runs)),
-      liveEventsHandler(apiUrl, { runs, mode, intervalMs: 1500, signal: streams.signal }),
-    ],
-    stop: () => streams.abort(),
+      liveEventsHandler(apiUrl, { intervalMs: 1500, ...options, runs, signal: streams.signal }),
+    )
+
+    return () => streams.abort()
   }
 }
 
 export const Live = meta.story({
   args: { defaultWindow: '1h' },
-  beforeEach({ msw }) {
-    const stream = liveStream('live')
-    msw.use(...stream.handlers)
-
-    return stream.stop
-  },
+  beforeEach: liveStream({ mode: 'live' }),
 })
 
 export const LiveReconnecting = meta.story({
   args: { defaultWindow: '1h' },
-  beforeEach({ msw }) {
-    const stream = liveStream('dropping')
-    msw.use(...stream.handlers)
-
-    return stream.stop
+  beforeEach: liveStream({ mode: 'stalling', dropAfter: 0, intervalMs: 300 }),
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Reconnecting')).toBeVisible()
   },
 })
 
 export const LiveOffline = meta.story({
-  beforeEach({ msw }) {
-    const stream = liveStream('unavailable')
-    msw.use(...stream.handlers)
-
-    return stream.stop
-  },
+  beforeEach: liveStream({ mode: 'unavailable' }),
 })
