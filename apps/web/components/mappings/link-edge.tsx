@@ -18,16 +18,21 @@ import { useCanvasStore } from '@/components/mappings/mapping-canvas-store'
 import { panelGutter } from '@/components/mappings/mapping-tree'
 
 import type { CanvasLink } from '@/components/mappings/mapping-tree'
-import type { MappingLink } from '@edi-bridge/contracts'
+import type { MappingLink, TransformLink } from '@edi-bridge/contracts'
 
-export type LinkEdgeData = Omit<CanvasLink, 'id'>
+export type PlainEdgeData = Omit<CanvasLink, 'id'>
+
+export type LinkEdgeData =
+  | ({ kind: 'link' } & PlainEdgeData)
+  | { kind: 'transformLink'; link: TransformLink; source: string; target: string }
 
 export type LinkFlowEdge = Edge<LinkEdgeData, 'link'>
 
 export type LinkActions = {
   remove: (link: MappingLink) => void
+  removeTransformLink: (link: TransformLink) => void
   // A merged edge stands for several links; they are listed by name before any is removed.
-  show: (edge: LinkEdgeData) => void
+  show: (edge: PlainEdgeData) => void
 }
 
 export const LinkActionsContext = createContext<LinkActions | null>(null)
@@ -47,29 +52,48 @@ function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
   const actions = useLinkActions()
   const hoverEdge = useCanvasStore((state) => state.hoverEdge)
   const leaveEdge = useCanvasStore((state) => state.leaveEdge)
-  const [only] = data.links
-  const single = data.links.length === 1 && only
+  const plain = data.kind === 'link' ? data : null
+  const [only] = plain?.links ?? []
+  const single = plain === null || (plain.links.length === 1 && only !== undefined)
 
-  const names = { source: data.sourcePath, target: data.targetPath }
+  const onClick = () => {
+    if (data.kind === 'transformLink') {
+      actions.removeTransformLink(data.link)
+    } else if (single && only) {
+      actions.remove(only)
+    } else {
+      actions.show(data)
+    }
+  }
+
+  const label = () => {
+    if (data.kind === 'transformLink') {
+      return t('removeLabel', { source: data.source, target: data.target })
+    }
+
+    return single && only
+      ? t('removeLabel', { source: only.sourcePath, target: only.targetPath })
+      : t('showLinksLabel', {
+          count: data.links.length,
+          source: data.sourcePath,
+          target: data.targetPath,
+        })
+  }
 
   return (
     <button
       type="button"
-      aria-label={
-        single
-          ? t('removeLabel', { source: only.sourcePath, target: only.targetPath })
-          : t('showLinksLabel', { count: data.links.length, ...names })
-      }
+      aria-label={label()}
       className="nodrag nopan bg-card text-foreground hover:bg-muted focus-visible:ring-ring/50 inline-flex h-7.5 min-w-7.5 items-center justify-center gap-1 rounded-full border px-1.5 text-xs font-medium shadow-sm outline-none focus-visible:ring-3"
       onBlur={() => leaveEdge(id)}
-      onClick={() => (single ? actions.remove(only) : actions.show(data))}
+      onClick={onClick}
       onFocus={() => hoverEdge(id)}
       onMouseEnter={() => hoverEdge(id)}
       onMouseLeave={() => leaveEdge(id)}>
       {single ? (
         <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden className="size-4" />
       ) : (
-        <span aria-hidden>{t('showLinks', { count: data.links.length })}</span>
+        <span aria-hidden>{t('showLinks', { count: plain?.links.length ?? 1 })}</span>
       )}
     </button>
   )

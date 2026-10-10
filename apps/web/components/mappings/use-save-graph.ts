@@ -6,77 +6,71 @@ import {
   useMutationState,
   useQueryClient,
 } from '@tanstack/react-query'
-import { useTranslations } from 'next-intl'
 
 import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
-import { revertChange } from '@/components/mappings/mapping-links'
+import { applyChange, type GraphChange, revertChange } from '@/components/mappings/mapping-graph'
 import { saveMappingDraft } from '@/lib/api/client'
 import { mappingDraftQuery, mappingKeys } from '@/lib/api/queries'
 
-import type { LinkChange } from '@/components/mappings/mapping-links'
 import type { MappingDraft } from '@edi-bridge/contracts'
 
-const messages = {
-  add: { saved: 'added', failed: 'addFailed' },
-  remove: { saved: 'removed', failed: 'removeFailed' },
-} as const satisfies Record<LinkChange['kind'], { saved: string; failed: string }>
+// The canvas words the messages, since it still knows the names of what a change removes.
+export type GraphSave = { change: GraphChange; saved: string; failed: string }
 
-export type LinkSaveState = 'saving' | 'saved' | 'failed'
+export type GraphSaveState = 'saving' | 'saved' | 'failed'
 
 const saveStates = {
   idle: null,
   pending: 'saving',
   success: 'saved',
   error: 'failed',
-} as const satisfies Record<MutationStatus, LinkSaveState | null>
+} as const satisfies Record<MutationStatus, GraphSaveState | null>
 
-export function useSaveLinks(mappingId: string) {
-  const t = useTranslations('Mapping.links')
+// Links and transforms go through this one mutation, each save sending the whole graph as the
+// cache holds it, so overlapping saves of either never drop each other's changes.
+export function useSaveGraph(mappingId: string) {
   const queryClient = useQueryClient()
   const store = useCanvasStoreApi()
   const { queryKey } = mappingDraftQuery(mappingId)
-  const mutationKey = mappingKeys.links(mappingId)
+  const mutationKey = mappingKeys.graph(mappingId)
 
   // Only the last of several quick changes may write the server's answer into the cache;
   // an earlier answer would drop the changes made after it.
   const isLast = () => queryClient.isMutating({ mutationKey }) === 1
 
-  const save = useMutation({
+  const save = useMutation<MappingDraft, Error, GraphSave>({
     mutationKey,
-    mutationFn: ({ links }: LinkChange) => {
+    mutationFn: () => {
       const draft = queryClient.getQueryData<MappingDraft>(queryKey)
 
       if (!draft) {
         throw new Error(`The Draft of Mapping ${mappingId} is not loaded`)
       }
 
-      const { transforms, transformLinks } = draft
+      const { links, transforms, transformLinks } = draft
 
       return saveMappingDraft(mappingId, { links, transforms, transformLinks })
     },
-    onMutate: async ({ links }) => {
+    onMutate: async ({ change }) => {
       await queryClient.cancelQueries({ queryKey })
-      queryClient.setQueryData<MappingDraft>(queryKey, (draft) => draft && { ...draft, links })
+      queryClient.setQueryData<MappingDraft>(
+        queryKey,
+        (draft) => draft && { ...draft, ...applyChange(draft, change) },
+      )
     },
-    onSuccess: (saved, { kind, link }) => {
+    onSuccess: (saved, { saved: message }) => {
       if (isLast()) {
         queryClient.setQueryData(queryKey, saved)
       }
 
-      store
-        .getState()
-        .announce(t(messages[kind].saved, { source: link.sourcePath, target: link.targetPath }))
+      store.getState().announce(message)
     },
-    onError: (_error, change) => {
-      const { kind, link } = change
-
+    onError: (_error, { change, failed }) => {
       queryClient.setQueryData<MappingDraft>(
         queryKey,
-        (draft) => draft && { ...draft, links: revertChange(draft.links, change) },
+        (draft) => draft && { ...draft, ...revertChange(draft, change) },
       )
-      store
-        .getState()
-        .setProblem(t(messages[kind].failed, { source: link.sourcePath, target: link.targetPath }))
+      store.getState().setProblem(failed)
     },
     onSettled: async () => {
       if (isLast()) {
@@ -88,9 +82,9 @@ export function useSaveLinks(mappingId: string) {
   return save.mutate
 }
 
-export function useLinkSaveState(mappingId: string): LinkSaveState | null {
+export function useGraphSaveState(mappingId: string): GraphSaveState | null {
   const statuses = useMutationState({
-    filters: { mutationKey: mappingKeys.links(mappingId) },
+    filters: { mutationKey: mappingKeys.graph(mappingId) },
     select: (mutation) => mutation.state.status,
   })
 

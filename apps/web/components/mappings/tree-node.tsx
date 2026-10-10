@@ -16,6 +16,7 @@ import { type FocusEvent, memo, type ReactNode, useCallback } from 'react'
 
 import {
   isSameRow,
+  isStartRow,
   useCanvasStore,
   useLinkHints,
   useMeaningTooltip,
@@ -66,7 +67,7 @@ function shift(start: number, size: number, extent: number) {
 }
 
 // The canvas cannot be panned by keyboard, so a part that gets focus outside the view is panned in.
-function usePanIntoView() {
+export function usePanIntoView() {
   const store = useStoreApi()
   const { setViewport } = useReactFlow()
 
@@ -186,7 +187,7 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
   const onFocus = usePanIntoView()
   const selected = useCanvasStore((state) => isSameRow(state.selected, data))
   const hints = useLinkHints()
-  const linkStart = useCanvasStore((state) => isSameRow(state.linkFrom, data))
+  const linkStart = useCanvasStore((state) => isStartRow(state.linkFrom, data))
 
   // Only a free target leaf can take the pending link; a linked one would refuse it.
   const linkTarget = useCanvasStore(

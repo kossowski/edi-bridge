@@ -11,6 +11,8 @@ import type {
   MessageTypeStructure,
 } from '@edi-bridge/contracts'
 
+import { transformGap } from './mapping-graph'
+
 export type TreeItemKind =
   'field' | 'object' | 'array' | 'segmentGroup' | 'segment' | 'composite' | 'element'
 
@@ -196,7 +198,7 @@ const containerBottom = 6
 
 export const columnWidth = 380
 
-export const columnGap = 260
+export const columnGap = transformGap
 
 export const headingHeight = 60
 

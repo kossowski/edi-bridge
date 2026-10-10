@@ -823,7 +823,8 @@
       "direction": "Direction",
       "source": "Source",
       "target": "Target",
-      "links": "Links"
+      "links": "Links",
+      "transforms": "Transforms"
     },
     "direction": {
       "inbound": "Inbound: Message Type to Document Structure",
@@ -872,7 +873,7 @@
       "linkFromHere": "Link from here",
       "linkToHere": "Link to here",
       "cancel": "Cancel link",
-      "shortcut": "Shortcut: press L on a source field or element to start a link, and L on a target to finish it. Delete removes the only link of a part.",
+      "shortcut": "Shortcut: press L on a source field or element, or on a Transform output, to start a link, and L on a target or a Transform input to finish it. Delete removes the only link of a part or port, or a selected Transform.",
       "pending": "Linking from {source}. Select a target and choose Link to here, or press L on it. Press Escape to cancel.",
       "started": "Linking from {source}. Move to a target and press L, or select it and choose Link to here.",
       "cancelled": "Link from {source} cancelled.",
@@ -882,7 +883,7 @@
       "removed": "Link from {source} to {target} removed.",
       "alreadyLinked": "{target} is already linked from {source}. Remove that link first.",
       "notLinkable": "{label} holds other parts. Links connect single fields and elements.",
-      "startOnSource": "Start a link on a source field or element first.",
+      "startOnSource": "Start a link on a source field or element, or on a Transform output, first.",
       "severalLinks": "{count, plural, one {{label} has # link. Select it to remove it.} other {{label} has # links. Select it to remove them one by one.}}",
       "addFailed": "The link from {source} to {target} could not be saved and was taken back. Try again.",
       "removeFailed": "Removing the link from {source} to {target} could not be saved, so the link is back. Try again.",
@@ -924,6 +925,205 @@
       "title": "Details",
       "empty": "Select a part to keep its meaning and links here. To take a quick look, point at a part or move the focus to it.",
       "clear": "Clear selection"
+    },
+    "transforms": {
+      "kinds": {
+        "constant": "Constant",
+        "concatenate": "Concatenate",
+        "split": "Split",
+        "substring": "Substring",
+        "dateFormat": "Date format",
+        "numberFormat": "Number format",
+        "lookupTable": "Lookup Table",
+        "conditional": "Conditional",
+        "loop": "Loop over line items",
+        "jsonata": "JSONata expression"
+      },
+      "descriptions": {
+        "constant": "Writes a fixed value.",
+        "concatenate": "Joins several values into one, with a separator between them.",
+        "split": "Splits a value at a separator and keeps one of the pieces.",
+        "substring": "Keeps part of a value, counted in characters.",
+        "dateFormat": "Rewrites a date from one pattern into another.",
+        "numberFormat": "Rounds a number and sets its decimal separator.",
+        "lookupTable": "Translates a value with a Lookup Table.",
+        "conditional": "Chooses between two values by a condition.",
+        "loop": "Repeats the links beneath a repeating part once per item.",
+        "jsonata": "Computes a value from the whole source Document."
+      },
+      "name": "{kind} {number}",
+      "port": "{transform} ({port})",
+      "inputs": {
+        "value": "Value",
+        "part": "Part {number}",
+        "then": "Then",
+        "else": "Else",
+        "items": "Items"
+      },
+      "outputs": {
+        "value": "Result",
+        "items": "Items",
+        "counter": "Counter"
+      },
+      "count": "{count, plural, =0 {No Transforms yet} one {# Transform} other {# Transforms}}",
+      "palette": {
+        "heading": "Add a Transform",
+        "add": "Add {kind}",
+        "later": "Lookup Table, conditional, loop and JSONata Transforms follow in a later version."
+      },
+      "node": {
+        "label": "Transform {name}",
+        "remove": "Remove {name}",
+        "inputLabel": "{port} input of {transform}",
+        "outputLabel": "{port} output of {transform}",
+        "linkedFrom": "Linked from {source}.",
+        "linkedTo": "{count, plural, =0 {Not linked yet.} one {Linked to {target}.} other {Linked to # places.}}",
+        "notConnected": "Not connected.",
+        "problems": "{count, plural, one {# problem} other {# problems}}",
+        "noInputs": "No inputs"
+      },
+      "summary": {
+        "constant": "“{value}”",
+        "constantEmpty": "No value yet",
+        "concatenate": "{count, plural, one {# part} other {# parts}}, separator “{separator}”",
+        "split": "Piece {index} after “{separator}”",
+        "substring": "{length, select, all {From character {start} to the end} other {{length} characters from character {start}}}",
+        "dateFormat": "{from} to {to}",
+        "numberFormat": "{places, select, keep {Decimal places kept} other {{places} decimal places}}, separator “{separator}”",
+        "lookupTable": "{chosen, select, yes {Lookup Table chosen} other {No Lookup Table chosen}}",
+        "conditional": "If the value {operator}",
+        "loop": "Counter starts at {start}",
+        "jsonata": "{expression}"
+      },
+      "operators": {
+        "equals": "equals “{compareTo}”",
+        "notEquals": "does not equal “{compareTo}”",
+        "contains": "contains “{compareTo}”",
+        "isEmpty": "is empty",
+        "isNotEmpty": "is not empty"
+      },
+      "fields": {
+        "constant": {
+          "value": "Value"
+        },
+        "concatenate": {
+          "inputCount": "Number of parts",
+          "separator": "Separator"
+        },
+        "split": {
+          "separator": "Separator",
+          "index": "Piece"
+        },
+        "substring": {
+          "start": "Start",
+          "length": "Length"
+        },
+        "dateFormat": {
+          "from": "From pattern",
+          "to": "To pattern"
+        },
+        "numberFormat": {
+          "decimalPlaces": "Decimal places",
+          "decimalSeparator": "Decimal separator"
+        },
+        "lookupTable": {
+          "lookupTableId": "Lookup Table",
+          "fallback": "When no entry matches"
+        },
+        "conditional": {
+          "operator": "Condition",
+          "compareTo": "Compare with"
+        },
+        "loop": {
+          "counterStart": "Counter start"
+        },
+        "jsonata": {
+          "expression": "Expression"
+        }
+      },
+      "fieldDescriptions": {
+        "constant": {
+          "value": "The text written into the target, e.g. 351 for a despatch advice."
+        },
+        "concatenate": {
+          "inputCount": "How many values are joined, from 2 to 10. Fewer parts remove the links into the parts that go away.",
+          "separator": "Written between the parts; leave empty to join them directly."
+        },
+        "split": {
+          "separator": "The text the value is split at, e.g. a hyphen.",
+          "index": "Which piece is kept, counted from 0."
+        },
+        "substring": {
+          "start": "The first character kept, counted from 0.",
+          "length": "How many characters are kept; leave empty to keep the rest."
+        },
+        "dateFormat": {
+          "from": "The pattern of the incoming date, from yyyy, yy, MM, dd, HH, mm and ss, e.g. yyyy-MM-dd.",
+          "to": "The pattern written out, e.g. yyyyMMdd for EDIFACT format 102."
+        },
+        "numberFormat": {
+          "decimalPlaces": "From 0 to 6; leave empty to keep the decimal places as they come.",
+          "decimalSeparator": "The character between the whole number and its decimals."
+        }
+      },
+      "separators": {
+        "point": "Point (.)",
+        "comma": "Comma (,)"
+      },
+      "ranges": {
+        "concatenate": {
+          "inputCount": "between 2 and 10"
+        },
+        "split": {
+          "index": "0 or more"
+        },
+        "substring": {
+          "start": "0 or more",
+          "length": "1 or more"
+        },
+        "numberFormat": {
+          "decimalPlaces": "between 0 and 6"
+        },
+        "loop": {
+          "counterStart": "0 or more"
+        }
+      },
+      "issues": {
+        "heading": "Problems",
+        "required": "{field} is required.",
+        "outOfRange": "{field} must be {range}.",
+        "outOfRangePlain": "{field} is out of range.",
+        "invalidPattern": "{field} is not a valid date pattern. Use yyyy or yy, MM and dd, and optionally HH, mm and ss.",
+        "invalidExpression": "{field} is not a valid JSONata expression.",
+        "invalid": "{field} has an invalid value.",
+        "invalidConfig": "The settings are invalid.",
+        "notWholeNumber": "{field} must be a whole number.",
+        "unconnected": "The {input} input is not connected."
+      },
+      "details": {
+        "settings": "Settings",
+        "settingsLater": "The settings of this Transform can be changed in a later version. Its links can be changed here.",
+        "inputs": "Inputs",
+        "outputs": "Outputs",
+        "noLink": "Not connected",
+        "position": "Position",
+        "moveLeft": "Move {name} left",
+        "moveRight": "Move {name} right",
+        "moveUp": "Move {name} up",
+        "moveDown": "Move {name} down",
+        "removeLabel": "Remove {name}"
+      },
+      "added": "{name} added.",
+      "addFailed": "{name} could not be saved and was taken back. Try again.",
+      "removed": "{name} removed.",
+      "removeFailed": "Removing {name} could not be saved, so it is back. Try again.",
+      "configured": "{dropped, plural, =0 {Settings of {name} saved.} one {Settings of {name} saved. The link into the removed part was removed.} other {Settings of {name} saved. The # links into the removed parts were removed.}}",
+      "configureFailed": "The settings of {name} could not be saved and were taken back. Try again.",
+      "moved": "{name} moved.",
+      "moveFailed": "Moving {name} could not be saved, so it is back in place. Try again.",
+      "inputTaken": "{input} is already linked from {source}. Remove that link first.",
+      "circle": "{target} already feeds {source}, so this link would make a circle.",
+      "needsPart": "{port} takes a whole repeating part, which the loop's settings will link in a later version."
     }
   },
   "ManualSubmission": {

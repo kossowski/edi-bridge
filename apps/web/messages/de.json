@@ -823,7 +823,8 @@
       "direction": "Richtung",
       "source": "Quelle",
       "target": "Ziel",
-      "links": "Verknüpfungen"
+      "links": "Verknüpfungen",
+      "transforms": "Transforms"
     },
     "direction": {
       "inbound": "Eingehend: Message Type zu Document Structure",
@@ -872,7 +873,7 @@
       "linkFromHere": "Von hier verknüpfen",
       "linkToHere": "Hierhin verknüpfen",
       "cancel": "Verknüpfen abbrechen",
-      "shortcut": "Tastenkürzel: L auf einem Feld oder Element der Quelle beginnt eine Verknüpfung, L auf einem Ziel schließt sie ab. Entf entfernt die einzige Verknüpfung eines Teils.",
+      "shortcut": "Tastenkürzel: L auf einem Feld oder Element der Quelle oder auf dem Ausgang eines Transforms beginnt eine Verknüpfung, L auf einem Ziel oder dem Eingang eines Transforms schließt sie ab. Entf entfernt die einzige Verknüpfung eines Teils oder Anschlusses oder einen ausgewählten Transform.",
       "pending": "Verknüpfung von {source} begonnen. Wählen Sie ein Ziel aus und dann „Hierhin verknüpfen“, oder drücken Sie darauf L. Escape bricht ab.",
       "started": "Verknüpfung von {source} begonnen. Gehen Sie zu einem Ziel und drücken Sie L, oder wählen Sie es aus und dann „Hierhin verknüpfen“.",
       "cancelled": "Verknüpfung von {source} abgebrochen.",
@@ -882,7 +883,7 @@
       "removed": "Verknüpfung von {source} zu {target} entfernt.",
       "alreadyLinked": "{target} ist bereits mit {source} verknüpft. Entfernen Sie zuerst diese Verknüpfung.",
       "notLinkable": "{label} enthält weitere Teile. Verknüpfungen verbinden einzelne Felder und Elemente.",
-      "startOnSource": "Beginnen Sie eine Verknüpfung zuerst auf einem Feld oder Element der Quelle.",
+      "startOnSource": "Beginnen Sie eine Verknüpfung zuerst auf einem Feld oder Element der Quelle oder auf dem Ausgang eines Transforms.",
       "severalLinks": "{count, plural, one {{label} hat # Verknüpfung. Wählen Sie den Teil aus, um sie zu entfernen.} other {{label} hat # Verknüpfungen. Wählen Sie den Teil aus, um sie einzeln zu entfernen.}}",
       "addFailed": "Die Verknüpfung von {source} zu {target} konnte nicht gespeichert werden und wurde zurückgenommen. Versuchen Sie es erneut.",
       "removeFailed": "Das Entfernen der Verknüpfung von {source} zu {target} konnte nicht gespeichert werden, die Verknüpfung ist wieder da. Versuchen Sie es erneut.",
@@ -924,6 +925,205 @@
       "title": "Details",
       "empty": "Wählen Sie einen Teil aus, um seine Bedeutung und Verknüpfungen hier zu behalten. Für einen schnellen Blick zeigen Sie auf einen Teil oder setzen Sie den Fokus darauf.",
       "clear": "Auswahl aufheben"
+    },
+    "transforms": {
+      "kinds": {
+        "constant": "Konstante",
+        "concatenate": "Verketten",
+        "split": "Teilen",
+        "substring": "Teilzeichenfolge",
+        "dateFormat": "Datumsformat",
+        "numberFormat": "Zahlenformat",
+        "lookupTable": "Lookup Table",
+        "conditional": "Bedingung",
+        "loop": "Schleife über Positionen",
+        "jsonata": "JSONata-Ausdruck"
+      },
+      "descriptions": {
+        "constant": "Schreibt einen festen Wert.",
+        "concatenate": "Fügt mehrere Werte zu einem zusammen, mit einem Trennzeichen dazwischen.",
+        "split": "Teilt einen Wert an einem Trennzeichen und behält eines der Stücke.",
+        "substring": "Behält einen Teil eines Werts, in Zeichen gezählt.",
+        "dateFormat": "Schreibt ein Datum von einem Muster in ein anderes um.",
+        "numberFormat": "Rundet eine Zahl und legt ihr Dezimaltrennzeichen fest.",
+        "lookupTable": "Übersetzt einen Wert mit einer Lookup Table.",
+        "conditional": "Wählt anhand einer Bedingung zwischen zwei Werten.",
+        "loop": "Wiederholt die Verknüpfungen unter einem wiederholten Teil einmal je Eintrag.",
+        "jsonata": "Berechnet einen Wert aus dem ganzen Quell-Document."
+      },
+      "name": "{kind} {number}",
+      "port": "{transform} ({port})",
+      "inputs": {
+        "value": "Wert",
+        "part": "Teil {number}",
+        "then": "Dann",
+        "else": "Sonst",
+        "items": "Einträge"
+      },
+      "outputs": {
+        "value": "Ergebnis",
+        "items": "Einträge",
+        "counter": "Zähler"
+      },
+      "count": "{count, plural, =0 {Noch keine Transforms} one {# Transform} other {# Transforms}}",
+      "palette": {
+        "heading": "Transform hinzufügen",
+        "add": "{kind} hinzufügen",
+        "later": "Lookup-Table-, Bedingungs-, Schleifen- und JSONata-Transforms folgen in einer späteren Version."
+      },
+      "node": {
+        "label": "Transform {name}",
+        "remove": "{name} entfernen",
+        "inputLabel": "Eingang {port} von {transform}",
+        "outputLabel": "Ausgang {port} von {transform}",
+        "linkedFrom": "Verknüpft von {source}.",
+        "linkedTo": "{count, plural, =0 {Noch nicht verknüpft.} one {Verknüpft mit {target}.} other {Mit # Stellen verknüpft.}}",
+        "notConnected": "Nicht verbunden.",
+        "problems": "{count, plural, one {# Problem} other {# Probleme}}",
+        "noInputs": "Keine Eingänge"
+      },
+      "summary": {
+        "constant": "„{value}“",
+        "constantEmpty": "Noch kein Wert",
+        "concatenate": "{count, plural, one {# Teil} other {# Teile}}, Trennzeichen „{separator}“",
+        "split": "Stück {index} nach „{separator}“",
+        "substring": "{length, select, all {Ab Zeichen {start} bis zum Ende} other {{length} Zeichen ab Zeichen {start}}}",
+        "dateFormat": "{from} zu {to}",
+        "numberFormat": "{places, select, keep {Nachkommastellen unverändert} other {{places} Nachkommastellen}}, Trennzeichen „{separator}“",
+        "lookupTable": "{chosen, select, yes {Lookup Table gewählt} other {Keine Lookup Table gewählt}}",
+        "conditional": "Wenn der Wert {operator}",
+        "loop": "Zähler beginnt bei {start}",
+        "jsonata": "{expression}"
+      },
+      "operators": {
+        "equals": "gleich „{compareTo}“ ist",
+        "notEquals": "nicht gleich „{compareTo}“ ist",
+        "contains": "„{compareTo}“ enthält",
+        "isEmpty": "leer ist",
+        "isNotEmpty": "nicht leer ist"
+      },
+      "fields": {
+        "constant": {
+          "value": "Wert"
+        },
+        "concatenate": {
+          "inputCount": "Anzahl der Teile",
+          "separator": "Trennzeichen"
+        },
+        "split": {
+          "separator": "Trennzeichen",
+          "index": "Stück"
+        },
+        "substring": {
+          "start": "Anfang",
+          "length": "Länge"
+        },
+        "dateFormat": {
+          "from": "Muster der Eingabe",
+          "to": "Muster der Ausgabe"
+        },
+        "numberFormat": {
+          "decimalPlaces": "Nachkommastellen",
+          "decimalSeparator": "Dezimaltrennzeichen"
+        },
+        "lookupTable": {
+          "lookupTableId": "Lookup Table",
+          "fallback": "Wenn kein Eintrag passt"
+        },
+        "conditional": {
+          "operator": "Bedingung",
+          "compareTo": "Vergleichswert"
+        },
+        "loop": {
+          "counterStart": "Zählerbeginn"
+        },
+        "jsonata": {
+          "expression": "Ausdruck"
+        }
+      },
+      "fieldDescriptions": {
+        "constant": {
+          "value": "Der Text, der ins Ziel geschrieben wird, z. B. 351 für ein Lieferavis."
+        },
+        "concatenate": {
+          "inputCount": "Wie viele Werte zusammengefügt werden, von 2 bis 10. Weniger Teile entfernen die Verknüpfungen in die wegfallenden Teile.",
+          "separator": "Steht zwischen den Teilen; leer lassen, um sie direkt aneinanderzufügen."
+        },
+        "split": {
+          "separator": "Der Text, an dem der Wert geteilt wird, z. B. ein Bindestrich.",
+          "index": "Welches Stück behalten wird, ab 0 gezählt."
+        },
+        "substring": {
+          "start": "Das erste behaltene Zeichen, ab 0 gezählt.",
+          "length": "Wie viele Zeichen behalten werden; leer lassen, um den Rest zu behalten."
+        },
+        "dateFormat": {
+          "from": "Das Muster des eingehenden Datums aus yyyy, yy, MM, dd, HH, mm und ss, z. B. yyyy-MM-dd.",
+          "to": "Das ausgegebene Muster, z. B. yyyyMMdd für das EDIFACT-Format 102."
+        },
+        "numberFormat": {
+          "decimalPlaces": "Von 0 bis 6; leer lassen, um die Nachkommastellen unverändert zu lassen.",
+          "decimalSeparator": "Das Zeichen zwischen der ganzen Zahl und ihren Nachkommastellen."
+        }
+      },
+      "separators": {
+        "point": "Punkt (.)",
+        "comma": "Komma (,)"
+      },
+      "ranges": {
+        "concatenate": {
+          "inputCount": "zwischen 2 und 10"
+        },
+        "split": {
+          "index": "0 oder mehr"
+        },
+        "substring": {
+          "start": "0 oder mehr",
+          "length": "1 oder mehr"
+        },
+        "numberFormat": {
+          "decimalPlaces": "zwischen 0 und 6"
+        },
+        "loop": {
+          "counterStart": "0 oder mehr"
+        }
+      },
+      "issues": {
+        "heading": "Probleme",
+        "required": "{field}: Angabe erforderlich.",
+        "outOfRange": "{field}: Der Wert muss {range} sein.",
+        "outOfRangePlain": "{field}: Der Wert liegt außerhalb des erlaubten Bereichs.",
+        "invalidPattern": "{field}: kein gültiges Datumsmuster. Verwenden Sie yyyy oder yy, MM und dd, optional HH, mm und ss.",
+        "invalidExpression": "{field}: kein gültiger JSONata-Ausdruck.",
+        "invalid": "{field}: ungültiger Wert.",
+        "invalidConfig": "Die Einstellungen sind ungültig.",
+        "notWholeNumber": "{field}: Geben Sie eine ganze Zahl ein.",
+        "unconnected": "Der Eingang {input} ist nicht verbunden."
+      },
+      "details": {
+        "settings": "Einstellungen",
+        "settingsLater": "Die Einstellungen dieses Transforms lassen sich in einer späteren Version ändern. Seine Verknüpfungen lassen sich hier ändern.",
+        "inputs": "Eingänge",
+        "outputs": "Ausgänge",
+        "noLink": "Nicht verbunden",
+        "position": "Position",
+        "moveLeft": "{name} nach links verschieben",
+        "moveRight": "{name} nach rechts verschieben",
+        "moveUp": "{name} nach oben verschieben",
+        "moveDown": "{name} nach unten verschieben",
+        "removeLabel": "{name} entfernen"
+      },
+      "added": "{name} hinzugefügt.",
+      "addFailed": "{name} konnte nicht gespeichert werden und wurde zurückgenommen. Versuchen Sie es erneut.",
+      "removed": "{name} entfernt.",
+      "removeFailed": "Das Entfernen von {name} konnte nicht gespeichert werden, der Transform ist wieder da. Versuchen Sie es erneut.",
+      "configured": "{dropped, plural, =0 {Einstellungen von {name} gespeichert.} one {Einstellungen von {name} gespeichert. Die Verknüpfung in den entfernten Teil wurde entfernt.} other {Einstellungen von {name} gespeichert. Die # Verknüpfungen in die entfernten Teile wurden entfernt.}}",
+      "configureFailed": "Die Einstellungen von {name} konnten nicht gespeichert werden und wurden zurückgenommen. Versuchen Sie es erneut.",
+      "moved": "{name} verschoben.",
+      "moveFailed": "Das Verschieben von {name} konnte nicht gespeichert werden, der Transform steht wieder an seinem Platz. Versuchen Sie es erneut.",
+      "inputTaken": "{input} ist bereits mit {source} verknüpft. Entfernen Sie zuerst diese Verknüpfung.",
+      "circle": "{target} speist bereits {source}, diese Verknüpfung würde einen Kreis bilden.",
+      "needsPart": "{port} nimmt einen ganzen wiederholten Teil auf, den die Einstellungen der Schleife in einer späteren Version verknüpfen."
     }
   },
   "ManualSubmission": {

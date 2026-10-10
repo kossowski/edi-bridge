@@ -68,7 +68,7 @@ export const mappingKeys = {
   list: () => [...mappingKeys.all(), 'list'] as const,
   detail: (id: string) => [...mappingKeys.all(), 'detail', id] as const,
   draft: (id: string) => [...mappingKeys.detail(id), 'draft'] as const,
-  links: (id: string) => [...mappingKeys.draft(id), 'links'] as const,
+  graph: (id: string) => [...mappingKeys.draft(id), 'graph'] as const,
   versions: (id: string) => [...mappingKeys.detail(id), 'versions'] as const,
 }
 

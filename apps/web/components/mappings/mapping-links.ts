@@ -1,18 +1,8 @@
+import type { Graph } from '@/components/mappings/mapping-graph'
 import type { CanvasLink, Side, TreeItem } from '@/components/mappings/mapping-tree'
-import type { MappingLink } from '@edi-bridge/contracts'
+import type { MappingLink, TransformLink } from '@edi-bridge/contracts'
 
 export type RowRef = { side: Side; path: string }
-
-export type LinkChange = {
-  kind: 'add' | 'remove'
-  link: MappingLink
-  links: MappingLink[]
-}
-
-export type AddedLink =
-  | { ok: true; change: LinkChange }
-  | { ok: false; reason: 'notLinkable' }
-  | { ok: false; reason: 'alreadyLinked'; existing: MappingLink }
 
 export function leafPaths(items: ReadonlyArray<TreeItem>, into = new Set<string>()) {
   for (const item of items) {
@@ -32,56 +22,30 @@ export function isLinkableRow(leaves: Leaves, row: RowRef) {
   return leaves[row.side].has(row.path)
 }
 
-export function canLink(leaves: Leaves, from: RowRef, to: RowRef) {
-  return (
-    from.side === 'source' &&
-    to.side === 'target' &&
-    isLinkableRow(leaves, from) &&
-    isLinkableRow(leaves, to)
-  )
+export type RowLink =
+  { kind: 'link'; link: MappingLink } | { kind: 'transformLink'; link: TransformLink }
+
+// A loop links whole parts, so a part's own path counts as well as its leaves.
+function pathsOf(item: TreeItem) {
+  return leafPaths(item.children ?? [], new Set([item.path]))
 }
 
-export function sameLink(a: MappingLink, b: MappingLink) {
-  return a.sourcePath === b.sourcePath && a.targetPath === b.targetPath
-}
-
-export function linkInto(links: ReadonlyArray<MappingLink>, targetPath: string) {
-  return links.find((link) => link.targetPath === targetPath)
-}
-
-// A target takes one value; combining several sources needs a transform, so a second link into
-// a linked target is refused rather than replacing the first one.
-export function addLink(
-  links: ReadonlyArray<MappingLink>,
-  leaves: Leaves,
-  from: RowRef,
-  to: RowRef,
-): AddedLink {
-  if (!canLink(leaves, from, to)) {
-    return { ok: false, reason: 'notLinkable' }
-  }
-
-  const existing = linkInto(links, to.path)
-
-  if (existing) {
-    return { ok: false, reason: 'alreadyLinked', existing }
-  }
-
-  const link = { sourcePath: from.path, targetPath: to.path }
-
-  return { ok: true, change: { kind: 'add', link, links: [...links, link] } }
-}
-
-export function removeLink(links: ReadonlyArray<MappingLink>, link: MappingLink): LinkChange {
-  return { kind: 'remove', link, links: links.filter((other) => !sameLink(other, link)) }
-}
-
-// A collapsed part carries the links of every leaf inside it.
-export function linksOfItem(links: ReadonlyArray<MappingLink>, side: Side, item: TreeItem) {
-  const paths = item.children === null ? new Set([item.path]) : leafPaths(item.children)
+// A collapsed part carries the links of every leaf inside it, also those to and from transforms.
+export function linksOfItem(graph: Graph, side: Side, item: TreeItem): RowLink[] {
+  const paths = pathsOf(item)
   const key = side === 'source' ? 'sourcePath' : 'targetPath'
 
-  return links.filter((link) => paths.has(link[key]))
+  const plain = graph.links.flatMap((link): RowLink[] =>
+    paths.has(link[key]) ? [{ kind: 'link', link }] : [],
+  )
+
+  const throughTransforms = graph.transformLinks.flatMap((link): RowLink[] => {
+    const end = side === 'source' ? link.from : link.to
+
+    return end.kind !== 'transform' && paths.has(end.path) ? [{ kind: 'transformLink', link }] : []
+  })
+
+  return [...plain, ...throughTransforms]
 }
 
 // A merged edge lists its links at the part that was collapsed into it: the source part when
@@ -90,14 +54,4 @@ export function rowListingLinks({ sourcePath, targetPath, links }: Omit<CanvasLi
   return links.some((link) => link.sourcePath !== sourcePath)
     ? { side: 'source', path: sourcePath }
     : { side: 'target', path: targetPath }
-}
-
-// Saves overlap, so a failed one takes back only its own change and keeps the ones after it.
-export function revertChange(
-  links: ReadonlyArray<MappingLink>,
-  { kind, link }: Pick<LinkChange, 'kind' | 'link'>,
-): MappingLink[] {
-  const rest = links.filter((other) => !sameLink(other, link))
-
-  return kind === 'add' ? rest : [...rest, link]
 }

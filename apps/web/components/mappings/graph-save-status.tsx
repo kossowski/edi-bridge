@@ -3,14 +3,14 @@
 import { useTranslations } from 'next-intl'
 
 import { useCanvasStore } from '@/components/mappings/mapping-canvas-store'
-import { useLinkSaveState } from '@/components/mappings/use-save-links'
+import { useGraphSaveState } from '@/components/mappings/use-save-graph'
 
 const labels = { saving: 'saving', saved: 'saved', failed: 'saveFailed' } as const
 
 // Rendered beside the page title, outside the canvas, so it reads the store and not its props.
-export function LinkSaveStatus({ mappingId }: { mappingId: string }) {
+export function GraphSaveStatus({ mappingId }: { mappingId: string }) {
   const t = useTranslations('Mapping.links')
-  const saveState = useLinkSaveState(mappingId)
+  const saveState = useGraphSaveState(mappingId)
   const problem = useCanvasStore((state) => state.problem)
   const announcement = useCanvasStore((state) => state.announcement)
 
