@@ -39,7 +39,12 @@ export function useSaveGraph(mappingId: string) {
   // an earlier answer would drop the changes made after it.
   const isLast = () => queryClient.isMutating({ mutationKey }) === 1
 
-  const save = useMutation<MappingDraft, Error, GraphSave>({
+  const save = useMutation<
+    MappingDraft,
+    Error,
+    GraphSave,
+    { unpublishedChanges: boolean | undefined }
+  >({
     mutationKey,
     scope: { id: mutationKey.join('/') },
     mutationFn: () => {
@@ -55,10 +60,15 @@ export function useSaveGraph(mappingId: string) {
     },
     onMutate: async ({ change }) => {
       await queryClient.cancelQueries({ queryKey })
+
+      const before = queryClient.getQueryData<MappingDraft>(queryKey)
+
       queryClient.setQueryData<MappingDraft>(
         queryKey,
-        (draft) => draft && { ...draft, ...applyChange(draft, change) },
+        (draft) => draft && { ...draft, ...applyChange(draft, change), unpublishedChanges: true },
       )
+
+      return { unpublishedChanges: before?.unpublishedChanges }
     },
     onSuccess: (saved, { saved: message }) => {
       if (isLast()) {
@@ -67,10 +77,18 @@ export function useSaveGraph(mappingId: string) {
 
       store.getState().announce(message)
     },
-    onError: (_error, { change, failed }) => {
+    onError: (_error, { change, failed }, context) => {
+      // A save still running keeps its own change on the Draft, so only the last one restores the flag.
+      const unpublishedChanges = isLast() ? context?.unpublishedChanges : undefined
+
       queryClient.setQueryData<MappingDraft>(
         queryKey,
-        (draft) => draft && { ...draft, ...revertChange(draft, change) },
+        (draft) =>
+          draft && {
+            ...draft,
+            ...revertChange(draft, change),
+            unpublishedChanges: unpublishedChanges ?? draft.unpublishedChanges,
+          },
       )
       store.getState().setProblem(failed)
     },

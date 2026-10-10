@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
+import { useId } from 'react'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
-import { DraftStateLabel, PublishDraft } from '@/components/mappings/draft-status'
+import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { apiUrl } from '@/lib/api/config'
 import { mappingDraftQuery } from '@/lib/api/queries'
 import messagesDe from '@/messages/de.json'
-import { publishMappingDraftEndpoint, transformIssues } from '@edi-bridge/contracts'
-import { createHandlers, seedMappingDrafts } from '@edi-bridge/mocks'
+import { publishMappingDraftEndpoint } from '@edi-bridge/contracts'
+import { createHandlers, incompleteDraftId, seedMappingDrafts } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -25,23 +26,18 @@ const publishable = {
   unpublishedChanges: true,
 }
 
-const incomplete = seedMappingDrafts.find(
-  (draft) =>
-    draft.unpublishedChanges &&
-    Object.values(transformIssues(draft)).some((issues) => issues.length > 0),
-)!
-
 const publishPath = `${apiUrl}${publishMappingDraftEndpoint.path}`
 
 function DraftHeader({ id }: { id: string }) {
   const { data: draft } = useQuery(mappingDraftQuery(id))
+  const stateId = useId()
 
   return draft ? (
     <div className="flex flex-wrap items-center gap-3 p-6">
       <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
-      <DraftStateLabel draft={draft} />
+      <DraftStateLabel id={stateId} draft={draft} />
       <div className="ms-auto">
-        <PublishDraft draft={draft} />
+        <PublishDraft draft={draft} stateId={stateId} />
       </div>
     </div>
   ) : null
@@ -59,10 +55,12 @@ async function confirmPublish(canvasElement: HTMLElement) {
   const confirm = await dialog(canvasElement).findByRole('button', { name: /^Publish Version/ })
 
   await userEvent.click(confirm)
+
+  return confirm
 }
 
 const meta = preview.meta({
-  title: 'Mappings/DraftStatus',
+  title: 'Mappings/PublishDraft',
   component: DraftHeader,
   parameters: { layout: 'fullscreen' },
   args: { id: changed.id },
@@ -82,11 +80,25 @@ export const UnpublishedChanges = meta.story({
   },
 })
 
+export const KeyboardFocus = meta.story({
+  async play({ canvas }) {
+    const link = await canvas.findByRole('link', { name: 'Mapping Versions' })
+
+    await userEvent.tab()
+    await expect(link).toHaveFocus()
+    await expect(getComputedStyle(link).boxShadow).not.toBe('none')
+  },
+})
+
 export const NoChanges = meta.story({
   args: { id: unchanged.id },
   async play({ canvas }) {
     await expect(await canvas.findByText('No changes since Version 3')).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Publish' })).toBeDisabled()
+
+    const publish = canvas.getByRole('button', { name: 'Publish' })
+
+    await expect(publish).toBeDisabled()
+    await expect(publish).toHaveAccessibleDescription('No changes since Version 3')
   },
 })
 
@@ -119,10 +131,12 @@ export const Publishing = meta.story({
     )
   },
   async play({ canvasElement }) {
-    await confirmPublish(canvasElement)
+    const confirm = await confirmPublish(canvasElement)
+
     await expect(
       await dialog(canvasElement).findByRole('button', { name: 'Publishing…' }),
-    ).toBeDisabled()
+    ).toHaveAttribute('aria-disabled', 'true')
+    await expect(confirm).toHaveFocus()
   },
 })
 
@@ -132,8 +146,12 @@ export const Published = meta.story({
     msw.use(...createHandlers(apiUrl, { mappingDrafts: [publishable] }))
   },
   async play({ canvas, canvasElement }) {
+    const title = await canvas.findByRole('heading', { level: 1 })
+    const top = title.getBoundingClientRect().top
+
     await confirmPublish(canvasElement)
     await expect(await canvas.findByText('Published as Version 5.')).toBeVisible()
+    await expect(title.getBoundingClientRect().top).toBe(top)
     await expect(canvas.getByText('No changes since Version 5')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Publish' })).toBeDisabled()
   },
@@ -159,12 +177,14 @@ export const NothingToPublish = meta.story({
 })
 
 export const Incomplete = meta.story({
-  args: { id: incomplete.id },
+  args: { id: incompleteDraftId },
   async play({ canvasElement }) {
-    await confirmPublish(canvasElement)
+    const confirm = await confirmPublish(canvasElement)
+
     await expect(
       await dialog(canvasElement).findByText(/every link and Transform must be complete/),
     ).toBeVisible()
+    await expect(confirm).toHaveFocus()
   },
 })
 
@@ -177,10 +197,13 @@ export const Failed = meta.story({
     )
   },
   async play({ canvasElement }) {
-    await confirmPublish(canvasElement)
+    const confirm = await confirmPublish(canvasElement)
+
     await expect(
       await dialog(canvasElement).findByText('The Draft could not be published. Try again.'),
     ).toBeVisible()
+    await expect(confirm).toHaveFocus()
+    await expect(confirm).toBeEnabled()
   },
 })
 

@@ -7,7 +7,12 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRef, useState } from 'react'
 
-import { draftState, nextVersion, publishProblem } from '@/components/mappings/draft-state'
+import {
+  draftState,
+  nextVersion,
+  publishProblem,
+  type VersionFacts,
+} from '@/components/mappings/draft-state'
 import { useGraphSaveState } from '@/components/mappings/use-save-graph'
 import { ApiError, publishMappingDraft } from '@/lib/api/client'
 import { mappingDraftQuery, storePublishedMappingVersion } from '@/lib/api/queries'
@@ -26,22 +31,20 @@ import {
 
 import type { MappingDraft } from '@edi-bridge/contracts'
 
-type VersionFacts = Pick<MappingDraft, 'latestVersion' | 'unpublishedChanges'>
-
 const dotTones = {
   neverPublished: 'bg-amber-500',
   unpublishedChanges: 'bg-amber-500',
   published: 'bg-emerald-500',
 } as const
 
-export function DraftStateLabel({ draft }: { draft: VersionFacts }) {
+export function DraftStateLabel({ draft, id }: { draft: VersionFacts; id?: string }) {
   const t = useTranslations('Mapping')
   const state = draftState(draft)
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2 text-sm">
       <Badge variant="outline">{t('draft')}</Badge>
-      <span className="inline-flex items-center gap-1.5">
+      <span id={id} className="inline-flex items-center gap-1.5">
         <span aria-hidden className={`size-2 rounded-full ${dotTones[state.kind]}`} />
         {state.kind === 'neverPublished'
           ? t('state.neverPublished')
@@ -64,13 +67,13 @@ export function MappingVersionsLink({ mappingId }: { mappingId: string }) {
   )
 }
 
-export function PublishDraft({ draft }: { draft: MappingDraft }) {
+export function PublishDraft({ draft, stateId }: { draft: MappingDraft; stateId?: string }) {
   const t = useTranslations('Mapping.publish')
   const queryClient = useQueryClient()
   const saving = useGraphSaveState(draft.mappingId) === 'saving'
   const [open, setOpen] = useState(false)
-  const [published, setPublished] = useState<number | null>(null)
-  const done = useRef<HTMLParagraphElement>(null)
+  const [publishedVersion, setPublishedVersion] = useState<number | null>(null)
+  const doneRef = useRef<HTMLParagraphElement>(null)
   const version = nextVersion(draft)
 
   const problemOf = (error: Error) =>
@@ -80,7 +83,7 @@ export function PublishDraft({ draft }: { draft: MappingDraft }) {
     mutationFn: () => publishMappingDraft(draft.mappingId),
     onSuccess: (summary) => {
       storePublishedMappingVersion(queryClient, summary)
-      setPublished(summary.version)
+      setPublishedVersion(summary.version)
       setOpen(false)
     },
     onError: (error) => {
@@ -93,16 +96,18 @@ export function PublishDraft({ draft }: { draft: MappingDraft }) {
   })
 
   const justPublished =
-    published !== null && published === draft.latestVersion && !draft.unpublishedChanges
+    publishedVersion !== null &&
+    publishedVersion === draft.latestVersion &&
+    !draft.unpublishedChanges
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="relative flex flex-wrap items-center gap-2">
       <p
-        ref={done}
+        ref={doneRef}
         role="status"
         tabIndex={-1}
-        className="text-sm text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
-        {justPublished && t('done', { version: published })}
+        className="absolute end-0 top-full mt-1 text-sm whitespace-nowrap text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
+        {justPublished && t('done', { version: publishedVersion })}
       </p>
       <MappingVersionsLink mappingId={draft.mappingId} />
       <Dialog
@@ -118,13 +123,16 @@ export function PublishDraft({ draft }: { draft: MappingDraft }) {
 
           setOpen(next)
         }}>
-        <DialogTrigger disabled={!draft.unpublishedChanges || saving} render={<Button />}>
+        <DialogTrigger
+          disabled={!draft.unpublishedChanges || saving}
+          render={<Button />}
+          aria-describedby={stateId}>
           <HugeiconsIcon icon={CloudUploadIcon} strokeWidth={2} aria-hidden />
           {t('button')}
         </DialogTrigger>
         <DialogContent
           closeLabel={t('close')}
-          finalFocus={publish.isSuccess ? done : true}
+          finalFocus={publish.isSuccess ? doneRef : true}
           showCloseButton={!publish.isPending}>
           <DialogHeader>
             <DialogTitle>{t('title', { version })}</DialogTitle>
@@ -139,7 +147,10 @@ export function PublishDraft({ draft }: { draft: MappingDraft }) {
             <DialogClose disabled={publish.isPending} render={<Button variant="outline" />}>
               {t('cancel')}
             </DialogClose>
-            <Button disabled={publish.isPending} onClick={() => publish.mutate()}>
+            <Button
+              disabled={publish.isPending}
+              focusableWhenDisabled
+              onClick={() => publish.mutate()}>
               {publish.isPending ? t('pending') : t('confirm', { version })}
             </Button>
           </DialogFooter>

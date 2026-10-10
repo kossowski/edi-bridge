@@ -5,7 +5,7 @@ export type DraftState =
   | { kind: 'unpublishedChanges'; version: number }
   | { kind: 'published'; version: number }
 
-type VersionFacts = Pick<MappingDraft, 'latestVersion' | 'unpublishedChanges'>
+export type VersionFacts = Pick<MappingDraft, 'latestVersion' | 'unpublishedChanges'>
 
 export function draftState({ latestVersion, unpublishedChanges }: VersionFacts): DraftState {
   if (latestVersion === null) {

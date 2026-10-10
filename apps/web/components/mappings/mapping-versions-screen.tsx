@@ -5,9 +5,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
-import { BackLink, linkClass, LoadFailure } from '@/components/detail-parts'
-import { ListTable } from '@/components/list-screen'
-import { DraftStateLabel } from '@/components/mappings/draft-status'
+import { linkClass, LoadFailure } from '@/components/detail-parts'
+import { ListScreen, ListTable } from '@/components/list-screen'
+import { DraftStateLabel } from '@/components/mappings/publish-draft'
 import { ApiError } from '@/lib/api/client'
 import { mappingDraftQuery, mappingVersionsQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -62,12 +62,6 @@ function VersionList({ draft }: { draft: MappingDraft }) {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-          <p className="text-muted-foreground text-sm">{draft.name}</p>
-        </div>
-      </div>
       <DraftSummary draft={draft} />
       <ListTable
         columns={columns.map((key) => ({ key, label: t(`columns.${key}`) }))}
@@ -92,7 +86,6 @@ function VersionsLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-64" />
       <Skeleton className="h-14 w-full" />
       <Skeleton className="h-64 w-full" />
     </div>
@@ -104,8 +97,10 @@ export function MappingVersionsScreen({ id }: { id: string }) {
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
-      <BackLink href={`/mappings/${id}`} label={t('back')} />
+    <ListScreen
+      back={{ href: `/mappings/${id}`, label: t('back') }}
+      subtitle={data?.name}
+      title={t('title')}>
       {isPending ? (
         <VersionsLoading />
       ) : data ? (
@@ -117,6 +112,6 @@ export function MappingVersionsScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </ListScreen>
   )
 }

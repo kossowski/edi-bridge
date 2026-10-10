@@ -835,7 +835,7 @@
       "done": "Published as Version {version}.",
       "problem": {
         "noChanges": "The Draft has no changes since its latest Mapping Version, so there is nothing to publish.",
-        "incomplete": "The Draft cannot be published yet: every link and Transform must be complete. Fix the problems on the canvas and publish again.",
+        "incomplete": "The Draft cannot be published yet: every link and Transform must be complete. Complete them, then publish again.",
         "failed": "The Draft could not be published. Try again."
       }
     },

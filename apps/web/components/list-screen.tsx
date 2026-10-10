@@ -7,6 +7,7 @@ import { type ReactNode, useId, useState } from 'react'
 
 import type { IconSvgElement } from '@hugeicons/react'
 
+import { BackLink } from '@/components/detail-parts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -54,17 +55,25 @@ function NewLink({ href, label }: { href: string; label: string }) {
 
 export function ListScreen({
   title,
+  subtitle,
+  back,
   newLink,
   children,
 }: {
   title: string
+  subtitle?: string | undefined
+  back?: { href: string; label: string }
   newLink?: { href: string; label: string }
   children: ReactNode
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
+      {back && <BackLink href={back.href} label={back.label} />}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
+        </div>
         {newLink && <NewLink href={newLink.href} label={newLink.label} />}
       </div>
       {children}

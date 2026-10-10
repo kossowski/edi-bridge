@@ -835,7 +835,7 @@
       "done": "Als Version {version} veröffentlicht.",
       "problem": {
         "noChanges": "Der Draft hat seit der neuesten Mapping Version keine Änderungen, es gibt also nichts zu veröffentlichen.",
-        "incomplete": "Der Draft lässt sich noch nicht veröffentlichen: Jede Verknüpfung und jeder Transform muss vollständig sein. Beheben Sie die Probleme im Canvas und veröffentlichen Sie erneut.",
+        "incomplete": "Der Draft lässt sich noch nicht veröffentlichen: Jede Verknüpfung und jeder Transform muss vollständig sein. Vervollständigen Sie sie und veröffentlichen Sie dann erneut.",
         "failed": "Der Draft konnte nicht veröffentlicht werden. Versuchen Sie es erneut."
       }
     },
