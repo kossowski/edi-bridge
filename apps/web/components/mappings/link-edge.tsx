@@ -78,6 +78,9 @@ function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
 // Screen pixels kept between the button and the pane's border.
 const paneInset = 8
 
+// Screen pixels between the hovered point and the nearer side of the button.
+const pointerGap = 20
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), Math.max(min, max))
 }
@@ -113,7 +116,8 @@ function EdgeButtonAnchor({
   data: LinkEdgeData
   midpoint: XYPosition
 }) {
-  const at = useCanvasStore((state) => state.edgeAnchor) ?? midpoint
+  const pointer = useCanvasStore((state) => state.edgeAnchor)
+  const at = pointer ?? midpoint
   const [x, y, zoom] = useStore((state) => state.transform)
   const paneWidth = useStore((state) => state.width)
   const paneHeight = useStore((state) => state.height)
@@ -125,11 +129,13 @@ function EdgeButtonAnchor({
     (paneWidth - paneInset - x) / zoom - size.width / 2,
   )
 
-  const top = clamp(
-    at.y,
-    (paneInset - y) / zoom + size.height / 2,
-    (paneHeight - paneInset - y) / zoom - size.height / 2,
-  )
+  const minTop = (paneInset - y) / zoom + size.height / 2
+  const maxTop = (paneHeight - paneInset - y) / zoom - size.height / 2
+  const shift = pointerGap / zoom + size.height / 2
+  const above = at.y - shift
+
+  // Beside the pointer, not under it: a click on the edge there must not remove the link.
+  const top = clamp(pointer ? (above >= minTop ? above : at.y + shift) : at.y, minTop, maxTop)
 
   return (
     <EdgeLabelRenderer>

@@ -888,7 +888,24 @@ export const RemoveButtonOfLongEdge = meta.story({
       name: 'Show the 8 links from SG2+BY to buyer',
     })
 
-    await expect(inside(button.getBoundingClientRect(), pane)).toBe(true)
+    const box = button.getBoundingClientRect()
+
+    await expect(inside(box, pane)).toBe(true)
+
+    // The button sits beside the hovered point, so a click there still lands on the edge.
+    await expect(inside(new DOMRect(shown.x, shown.y), box)).toBe(false)
+
+    const hit = canvasElement.ownerDocument.elementFromPoint(shown.x, shown.y)!
+
+    await expect(button.contains(hit)).toBe(false)
+    await expect(hit.closest('.react-flow__edge')).not.toBeNull()
+    await userEvent.click(hit)
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    await expect(edgeOf(canvasElement, source('SG2+BY'), target('buyer'))).not.toBeNull()
+    await expect(canvas.queryByText('Saving…')).toBeNull()
+    await expect(
+      canvas.getByRole('button', { name: 'Show the 8 links from SG2+BY to buyer' }),
+    ).toBeVisible()
   },
 })
 
