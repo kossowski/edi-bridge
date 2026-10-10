@@ -14,7 +14,7 @@ const config = defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `pnpm exec next dev --port ${port}`,
-    env: { NEXT_PUBLIC_API_MOCKING: 'enabled' },
+    env: { NEXT_PUBLIC_API_MOCKING: 'enabled', NEXT_PUBLIC_API_MOCK_LIVE_EVENTS: 'quiet' },
     url: `http://localhost:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

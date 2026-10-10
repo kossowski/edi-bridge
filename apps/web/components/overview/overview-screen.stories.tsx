@@ -4,7 +4,14 @@ import { expect, within } from 'storybook/test'
 import { OverviewScreen } from '@/components/overview/overview-screen'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { overviewHandler, seedRuns } from '@edi-bridge/mocks'
+import {
+  createRunStore,
+  liveEventsHandler,
+  type LiveEventsMode,
+  overviewHandler,
+  seedOverviewData,
+  seedRuns,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -125,5 +132,47 @@ export const Dark = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('heading', { name: 'Throughput' })).toBeVisible()
     await expect(canvas.getByRole('heading', { name: 'Trading Partner health' })).toBeVisible()
+  },
+})
+
+function liveStream(mode: LiveEventsMode) {
+  const runs = createRunStore(seedRuns())
+  const streams = new AbortController()
+
+  return {
+    handlers: [
+      overviewHandler(apiUrl, seedOverviewData(runs)),
+      liveEventsHandler(apiUrl, { runs, mode, intervalMs: 1500, signal: streams.signal }),
+    ],
+    stop: () => streams.abort(),
+  }
+}
+
+export const Live = meta.story({
+  args: { defaultWindow: '1h' },
+  beforeEach({ msw }) {
+    const stream = liveStream('live')
+    msw.use(...stream.handlers)
+
+    return stream.stop
+  },
+})
+
+export const LiveReconnecting = meta.story({
+  args: { defaultWindow: '1h' },
+  beforeEach({ msw }) {
+    const stream = liveStream('dropping')
+    msw.use(...stream.handlers)
+
+    return stream.stop
+  },
+})
+
+export const LiveOffline = meta.story({
+  beforeEach({ msw }) {
+    const stream = liveStream('unavailable')
+    msw.use(...stream.handlers)
+
+    return stream.stop
   },
 })

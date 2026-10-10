@@ -25,6 +25,7 @@ import {
   type FlowUpdate,
   importLookupTableEndpoint,
   interchangeEndpoint,
+  liveEventsEndpoint,
   lookupTableEndpoint,
   type LookupTableImportBody,
   lookupTableImportPreviewEndpoint,
@@ -75,7 +76,7 @@ import {
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
-import { apiUrl, isMockingEnabled } from './config'
+import { apiUrl, isMockingEnabled, mockLiveEvents } from './config'
 
 export class ApiError extends Error {
   constructor(
@@ -89,6 +90,15 @@ export class ApiError extends Error {
 }
 
 let mockingStarted: Promise<unknown> | undefined
+
+async function mockingReady() {
+  if (isMockingEnabled && typeof window !== 'undefined') {
+    mockingStarted ??= import('./mock-worker').then(({ startMockWorker }) =>
+      startMockWorker({}, mockLiveEvents),
+    )
+    await mockingStarted
+  }
+}
 
 type RequestOptions<Query, Body> = {
   path?: string
@@ -104,10 +114,7 @@ async function request<
   endpoint: Endpoint<Response, Query, Body>,
   { path = endpoint.path, query, body }: RequestOptions<Query, Body> = {},
 ): Promise<Response> {
-  if (isMockingEnabled && typeof window !== 'undefined') {
-    mockingStarted ??= import('./mock-worker').then(({ startMockWorker }) => startMockWorker())
-    await mockingStarted
-  }
+  await mockingReady()
 
   const search = query ? `?${toSearchParams(query)}` : ''
 
@@ -124,6 +131,12 @@ async function request<
   }
 
   return endpoint.response.parse(response.status === 204 ? undefined : await response.json())
+}
+
+export async function openLiveEvents() {
+  await mockingReady()
+
+  return new EventSource(`${apiUrl}${liveEventsEndpoint.path}`)
 }
 
 export function getCurrentWorkspace() {
