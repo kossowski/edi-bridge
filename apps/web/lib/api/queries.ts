@@ -13,10 +13,12 @@ import {
   getCurrentWorkspace,
   getFlow,
   getInterchange,
+  getMappingDraft,
   getRun,
   getTradingPartner,
   listChannels,
   listFlows,
+  listMappings,
   listMappingVersions,
   listPublishedMappingVersions,
   listRuns,
@@ -61,9 +63,40 @@ export function interchangeQuery(id: string) {
   })
 }
 
+export const mappingKeys = {
+  all: () => ['mappings'] as const,
+  list: () => [...mappingKeys.all(), 'list'] as const,
+  detail: (id: string) => [...mappingKeys.all(), 'detail', id] as const,
+  draft: (id: string) => [...mappingKeys.detail(id), 'draft'] as const,
+  versions: (id: string) => [...mappingKeys.detail(id), 'versions'] as const,
+}
+
+export const mappingsQuery = queryOptions({
+  queryKey: mappingKeys.list(),
+  queryFn: listMappings,
+})
+
+export function mappingDraftQuery(id: string) {
+  return queryOptions({
+    queryKey: mappingKeys.draft(id),
+    queryFn: () => getMappingDraft(id),
+  })
+}
+
+export const documentStructureKeys = {
+  all: () => ['document-structures'] as const,
+  detail: (id: string) => [...documentStructureKeys.all(), 'detail', id] as const,
+}
+
+export const messageTypeKeys = {
+  all: () => ['message-types'] as const,
+  structure: (messageType: MessageType) =>
+    [...messageTypeKeys.all(), 'detail', messageType, 'structure'] as const,
+}
+
 export function mappingVersionsQuery(mappingId: string) {
   return queryOptions({
-    queryKey: ['mappings', mappingId, 'versions'],
+    queryKey: mappingKeys.versions(mappingId),
     queryFn: () => listMappingVersions(mappingId),
   })
 }

@@ -8,6 +8,7 @@ import {
   createFlowEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
+  documentStructureEndpoint,
   type Endpoint,
   flowEndpoint,
   type FlowInput,
@@ -15,7 +16,11 @@ import {
   type FlowUpdate,
   interchangeEndpoint,
   type ManualSubmissionInput,
+  mappingDraftEndpoint,
+  mappingsEndpoint,
   mappingVersionsEndpoint,
+  type MessageType,
+  messageTypeStructureEndpoint,
   type MoveFlowMappingVersionBody,
   moveFlowMappingVersionEndpoint,
   publishedMappingVersionsEndpoint,
@@ -122,6 +127,26 @@ export function getInterchange(id: string) {
 export function listMappingVersions(mappingId: string) {
   return request(mappingVersionsEndpoint, {
     path: toPath(mappingVersionsEndpoint.path, { mappingId }),
+  })
+}
+
+export function listMappings() {
+  return request(mappingsEndpoint)
+}
+
+export function getMappingDraft(id: string) {
+  return request(mappingDraftEndpoint, { path: toPath(mappingDraftEndpoint.path, { id }) })
+}
+
+export function getDocumentStructure(id: string) {
+  return request(documentStructureEndpoint, {
+    path: toPath(documentStructureEndpoint.path, { id }),
+  })
+}
+
+export function getMessageTypeStructure(messageType: MessageType) {
+  return request(messageTypeStructureEndpoint, {
+    path: toPath(messageTypeStructureEndpoint.path, { messageType }),
   })
 }
 

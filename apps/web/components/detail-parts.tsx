@@ -69,7 +69,15 @@ export function LoadFailure({
   onRetry,
 }: {
   notFound: boolean
-  namespace: 'RunDetail' | 'Interchange' | 'TradingPartner' | 'Channel' | 'Flow' | 'Settings'
+  namespace:
+    | 'RunDetail'
+    | 'Interchange'
+    | 'TradingPartner'
+    | 'Channel'
+    | 'Flow'
+    | 'Mapping'
+    | 'Mapping.canvas'
+    | 'Settings'
   onRetry: () => void
 }) {
   const t = useTranslations(namespace)

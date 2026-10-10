@@ -61,7 +61,7 @@ function ChannelsTable() {
           channelAddress(channel),
         ].some((text) => text.toLocaleLowerCase().includes(term))
       }
-      newHref="/channels/new"
+      newLink={{ href: '/channels/new', label: t('new') }}
       pending={tradingPartners.isPending}
       query={channels}
       row={(channel) => (
@@ -81,8 +81,7 @@ export function ChannelsScreen() {
 
   return (
     <ListScreen
-      newHref="/channels/new"
-      newLabel={t('Channels.new')}
+      newLink={{ href: '/channels/new', label: t('Channels.new') }}
       title={t('Navigation.channels')}>
       <ChannelsTable />
     </ListScreen>

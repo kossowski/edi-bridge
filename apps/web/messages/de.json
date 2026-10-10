@@ -774,6 +774,98 @@
     "saving": "Wird gespeichert…",
     "cancel": "Abbrechen"
   },
+  "Mappings": {
+    "caption": "Mappings, nach Name",
+    "loading": "Mappings werden geladen",
+    "count": "{count, plural, one {# Mapping} other {# Mappings}}",
+    "filteredCount": "{count} von {total} Mappings",
+    "search": "Nach Name, Message Type oder Document Structure suchen",
+    "noMatch": "Kein Mapping passt zur Suche.",
+    "version": "Version {version}",
+    "neverPublished": "Nie veröffentlicht",
+    "direction": {
+      "inbound": "Eingehend",
+      "outbound": "Ausgehend"
+    },
+    "columns": {
+      "name": "Name",
+      "direction": "Richtung",
+      "messageType": "Message Type",
+      "documentStructure": "Document Structure",
+      "latestVersion": "Neueste Mapping Version"
+    },
+    "empty": {
+      "title": "Noch keine Mappings",
+      "description": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sobald es ein Mapping gibt, steht es hier."
+    },
+    "error": {
+      "title": "Mappings nicht verfügbar",
+      "description": "Die Mappings konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    }
+  },
+  "Mapping": {
+    "title": "Mapping",
+    "back": "Zurück zu den Mappings",
+    "loading": "Mapping wird geladen",
+    "notFound": {
+      "title": "Mapping nicht gefunden",
+      "description": "In diesem Workspace gibt es kein Mapping mit dieser ID."
+    },
+    "error": {
+      "title": "Mapping nicht verfügbar",
+      "description": "Das Mapping konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "draft": "Draft",
+    "facts": {
+      "label": "Mapping-Details",
+      "direction": "Richtung",
+      "source": "Quelle",
+      "target": "Ziel",
+      "links": "Verknüpfungen"
+    },
+    "direction": {
+      "inbound": "Eingehend: Message Type zu Document Structure",
+      "outbound": "Ausgehend: Document Structure zu Message Type"
+    },
+    "linkCount": "{count, plural, =0 {Noch keine Verknüpfungen} one {# Verknüpfung} other {# Verknüpfungen}}",
+    "side": {
+      "documentStructure": "Document Structure {name}",
+      "messageType": "Message Type {messageType}"
+    },
+    "canvas": {
+      "label": "Mapping-Zeichenfläche: {source} zu {target}",
+      "source": "Quelle",
+      "target": "Ziel",
+      "loading": "Strukturen werden geladen",
+      "link": "Verknüpfung von {source} zu {target}",
+      "links": "{count} Verknüpfungen von {source} zu {target}",
+      "expand": "{label} aufklappen",
+      "collapse": "{label} zuklappen",
+      "repeatsUnbounded": "Wiederholt",
+      "repeatsUpTo": "Bis {count}×",
+      "repeatsUnboundedLabel": "Beliebig oft wiederholt",
+      "repeatsUpToLabel": "Bis zu {count}-mal wiederholt",
+      "hiddenParts": "{count, plural, one {# Teil ausgeblendet} other {# Teile ausgeblendet}}",
+      "emptyPart": "Leer",
+      "error": {
+        "title": "Strukturen nicht verfügbar",
+        "description": "Die Quell- oder Zielstruktur konnte nicht geladen werden. Versuchen Sie es erneut.",
+        "retry": "Erneut versuchen"
+      },
+      "controls": {
+        "panel": "Steuerung der Zeichenfläche",
+        "zoomIn": "Vergrößern",
+        "zoomOut": "Verkleinern",
+        "fitView": "An Bildschirm anpassen"
+      }
+    },
+    "desktopOnly": {
+      "title": "Die Mapping-Zeichenfläche braucht einen größeren Bildschirm",
+      "description": "Öffnen Sie dieses Mapping auf einem Bildschirm mit mindestens 1024 Pixeln Breite, um Quelle, Ziel und ihre Verknüpfungen zu sehen."
+    }
+  },
   "ManualSubmission": {
     "open": "Ein Document einreichen",
     "title": "Manual Submission",
