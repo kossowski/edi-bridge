@@ -83,7 +83,9 @@ async function chooseOption(canvasElement: HTMLElement, combobox: HTMLElement, n
   await userEvent.click(await page(canvasElement).findByRole('option', { name }))
 }
 
-export const PlaceEveryKind = meta.story({
+// Each placement is a save of the whole graph, and the saves run one after another, so the kinds
+// are placed two per story to stay within the test timeout on a slow CI runner.
+export const PlaceLookupTableAndConditional = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
     const palette = within(await canvas.findByRole('region', { name: 'Add a Transform' }))
@@ -103,8 +105,18 @@ export const PlaceEveryKind = meta.story({
     await place(canvasElement, 'Conditional', 'Conditional 1')
     await expect(panel.getByRole('radio', { name: 'Equals' })).toBeChecked()
     await expect(panel.getByRole('textbox', { name: 'Compare with' })).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
+    await expect(await canvas.findByText('2 Transforms')).toBeVisible()
+  },
+})
 
+export const PlaceLoopAndJsonata = meta.story({
+  args: { id: withoutLinks.id },
+  async play({ canvas, canvasElement }) {
     await place(canvasElement, 'Loop over line items', 'Loop over line items 1')
+
+    const panel = detailsPanel(canvasElement)
+
     await expect(panel.getByRole('textbox', { name: 'Counter start' })).toHaveValue('1')
 
     await place(canvasElement, 'JSONata expression', 'JSONata expression 1')
@@ -113,7 +125,7 @@ export const PlaceEveryKind = meta.story({
       (await findNode(canvasElement, 'JSONata expression 1')).getByText('No inputs'),
     ).toBeVisible()
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
-    await expect(await canvas.findByText('4 Transforms')).toBeVisible()
+    await expect(await canvas.findByText('2 Transforms')).toBeVisible()
   },
 })
 
