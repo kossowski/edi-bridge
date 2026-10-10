@@ -151,6 +151,25 @@ export {
 } from './mapping'
 
 export {
+  type DocumentContent,
+  documentContentSchema,
+  type JsonContent,
+  jsonContentSchema,
+  type MappingPreview,
+  mappingPreviewEndpoint,
+  mappingPreviewSchema,
+  type MappingSample,
+  mappingSampleSchema,
+  mappingSamplesEndpoint,
+  type PreviewMappingBody,
+  previewMappingBodySchema,
+  type PreviewNote,
+  type PreviewNoteCode,
+  previewNoteCodes,
+  previewNoteSchema,
+} from './mapping-preview'
+
+export {
   type LookupTableScope,
   lookupTableScopeSchema,
   type LookupTableSummary,

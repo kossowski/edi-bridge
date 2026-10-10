@@ -10,6 +10,8 @@ import {
   type FlowInput,
   lookupTablesEndpoint,
   mappingDraftEndpoint,
+  mappingPreviewEndpoint,
+  mappingSamplesEndpoint,
   mappingsEndpoint,
   mappingVersionsEndpoint,
   messageTypeStructureEndpoint,
@@ -30,6 +32,7 @@ import {
   createDocumentStructure,
   createHandlers,
   createMappingDrafts,
+  createMappingSample,
   seedChannels,
   seedFlows,
 } from './index'
@@ -262,5 +265,35 @@ describe('createHandlers', () => {
 
     server.resetHandlers(...createHandlers(apiUrl, { lookupTables: [] }))
     expect(await listLookupTables()).toEqual([])
+  })
+
+  it('serves the samples and previews of custom Mapping Drafts', async () => {
+    const documentStructure = createDocumentStructure({ fieldCount: 40 })
+    const [mapping] = createMappingDrafts({ count: 1, documentStructures: [documentStructure] })
+    const sample = createMappingSample({ mapping: mapping!, documentStructure })
+
+    server.use(
+      ...createHandlers(apiUrl, {
+        mappingDrafts: [mapping!],
+        documentStructures: [documentStructure],
+        mappingSamples: [sample],
+      }),
+    )
+
+    const samples = mappingSamplesEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${toPath(mappingSamplesEndpoint.path, mapping!)}`)).json(),
+    )
+
+    const preview = await fetch(`${apiUrl}${toPath(mappingPreviewEndpoint.path, mapping!)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sampleId: sample.id,
+        graph: { links: mapping!.links, transforms: [], transformLinks: [] },
+      }),
+    })
+
+    expect(samples.map(({ id }) => id)).toEqual([sample.id])
+    expect(mappingPreviewEndpoint.response.parse(await preview.json()).sampleId).toBe(sample.id)
   })
 })

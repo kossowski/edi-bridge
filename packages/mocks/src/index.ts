@@ -15,7 +15,10 @@ import {
   mappingHandlers,
   type MappingDraftStore,
   seedMappingDrafts,
+  toMappingDraftStore,
 } from './mapping'
+import { mappingPreviewHandlers } from './mapping-preview'
+import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'
 import { createMappingCatalogue, publishedMappingVersionsHandler } from './mapping-version'
 import { messageTypeStructureHandler } from './message-type-structure'
 import { runsHandler, seedRuns } from './run'
@@ -77,6 +80,15 @@ export {
   toMappingSummary,
 } from './mapping'
 
+export { mappingPreviewHandlers } from './mapping-preview'
+
+export {
+  createMappingSample,
+  type MappingSampleRecord,
+  seedMappingSamples,
+  toMappingSample,
+} from './mapping-sample'
+
 export {
   edifactLeaves,
   messageTypeStructureHandler,
@@ -126,6 +138,7 @@ export function createHandlers(
     mappingDrafts = seedMappingDrafts,
     documentStructures = seedDocumentStructures,
     lookupTables = seedLookupTables,
+    mappingSamples = seedMappingSamples,
   }: {
     workspace?: Workspace
     tradingPartners?: ReadonlyArray<TradingPartner>
@@ -133,6 +146,7 @@ export function createHandlers(
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure>
     lookupTables?: ReadonlyArray<LookupTableSummary>
+    mappingSamples?: ReadonlyArray<MappingSampleRecord>
   } = {},
 ) {
   const runs = createRunStore(seedRuns())
@@ -140,6 +154,7 @@ export function createHandlers(
   const channelStore = createChannelStore(channels)
   const mappings = createMappingCatalogue(seedMappings)
   const flows = createFlowStore()
+  const mappingDraftStore = toMappingDraftStore(mappingDrafts)
 
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
@@ -150,7 +165,12 @@ export function createHandlers(
     runsHandler(apiUrl, runs),
     ...runDetailHandlers(apiUrl, { runs, reprocessed: seedReprocessed() }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
-    ...mappingHandlers(apiUrl, { mappings: mappingDrafts, documentStructures }),
+    ...mappingHandlers(apiUrl, { mappings: mappingDraftStore, documentStructures }),
+    ...mappingPreviewHandlers(apiUrl, {
+      mappings: mappingDraftStore,
+      samples: mappingSamples,
+      documentStructures,
+    }),
     documentStructureHandler(apiUrl, documentStructures),
     messageTypeStructureHandler(apiUrl),
     lookupTablesHandler(apiUrl, lookupTables),

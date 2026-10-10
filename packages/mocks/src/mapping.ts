@@ -52,7 +52,9 @@ export type MappingDraftRecord = {
 type DocumentStructures = ReadonlyArray<DocumentStructure>
 
 // Pairs of [ERP Document field, EDIFACT element], turned into links by `link`.
-const linkTemplates: Readonly<Record<MessageType, ReadonlyArray<readonly [string, string]>>> = {
+export const linkTemplates: Readonly<
+  Record<MessageType, ReadonlyArray<readonly [string, string]>>
+> = {
   ORDERS: [
     ['orderNumber', 'BGM/1004'],
     ['orderDate', 'DTM+137/C507/2380'],
@@ -422,7 +424,7 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
   },
 ]
 
-function sideLeaves(
+export function sideLeaves(
   record: MappingDraftRecord,
   documentStructures: DocumentStructures,
 ): { source: Set<string>; target: Set<string> } {
@@ -637,7 +639,7 @@ function containerOf(leaves: ReadonlySet<string>, path: string) {
 
 type LinkedPath = { path: string; wholePart: boolean }
 
-function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
+export function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
   const loops = new Set(graph.transforms.flatMap(({ id, kind }) => (kind === 'loop' ? [id] : [])))
 
   // A loop takes a whole repeated part and fills one; every other link ends at a field or element.
