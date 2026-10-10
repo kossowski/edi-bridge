@@ -58,8 +58,12 @@ const samplesUrl = `${apiUrl}${mappingSamplesEndpoint.path}`
 
 const previewUrl = `${apiUrl}${mappingPreviewEndpoint.path}`
 
-function targetDocument(canvasElement: HTMLElement, sample: string) {
-  return within(canvasElement).findByRole('region', { name: `Target Document for ${sample}` })
+function targetDocument(canvasElement: HTMLElement, sample: string, timeout = 1000) {
+  return within(canvasElement).findByRole(
+    'region',
+    { name: `Target Document for ${sample}` },
+    { timeout },
+  )
 }
 
 // The band under the canvas holds the open state; here the panel holds it alone.
@@ -208,7 +212,8 @@ export const LargeVolume = meta.story({
     msw.use(...createHandlers(apiUrl, { mappingSamples: [largeSample] }))
   },
   async play({ canvasElement }) {
-    const target = await targetDocument(canvasElement, largeSample.name)
+    // The mock builds the 2,000-line preview before the region renders, which takes up to 6 s on CI.
+    const target = await targetDocument(canvasElement, largeSample.name, 10_000)
 
     await waitFor(
       () => expect(target.textContent?.match(/^LIN\+/gm)?.length ?? 0).toBeGreaterThanOrEqual(2000),
