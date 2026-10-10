@@ -221,6 +221,17 @@ export {
 } from './mapping-preview'
 
 export {
+  type EventStreamEndpoint,
+  type LiveEvent,
+  liveEventSchema,
+  liveEventsEndpoint,
+  type LiveEventType,
+  parseLiveEvent,
+  type RunChangedEvent,
+  runChangedEventSchema,
+} from './live-event'
+
+export {
   createLookupTableEndpoint,
   deleteLookupTableEndpoint,
   importLookupTableEndpoint,
