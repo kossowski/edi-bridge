@@ -309,6 +309,28 @@ describe('GET /overview seeded', () => {
       expect(Date.parse(overdue.overdueSince)).toBeLessThanOrEqual(Date.now())
     }
   })
+  it('lists the sent Interchanges that became Overdue since the last request', async () => {
+    vi.useRealTimers()
+    server.use(overviewHandler(apiUrl))
+
+    const before = await getOverview()
+    const later = Date.now() + 24 * 60 * 60 * 1000
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(later)
+
+    const after = await getOverview()
+
+    const listedBefore = new Set(
+      before.overdueAcknowledgements.map(({ interchange }) => interchange.id),
+    )
+
+    expect(
+      after.overdueAcknowledgements.some(({ interchange }) => !listedBefore.has(interchange.id)),
+    ).toBe(true)
+    expect(
+      after.overdueAcknowledgements.every(({ overdueSince }) => Date.parse(overdueSince) <= later),
+    ).toBe(true)
+  })
 })
 
 describe('createOverviewData', () => {

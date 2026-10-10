@@ -243,6 +243,19 @@ export function createOverviewData({
   return { runs, tradingPartners, overdueAcknowledgements }
 }
 
+const unacknowledged = new Map<string, boolean>()
+
+function isUnacknowledged(run: RunSummary) {
+  let value = unacknowledged.get(run.id)
+
+  if (value === undefined) {
+    value = seededFaker(`overdue:${run.id}`).datatype.boolean({ probability: 0.02 })
+    unacknowledged.set(run.id, value)
+  }
+
+  return value
+}
+
 // An outbound Run delivers its own Interchange, so a few recent delivered ones stand for sent
 // Interchanges whose Acknowledgement never arrived. Test Mode traffic is checked during onboarding.
 export function seedOverdueAcknowledgements(
@@ -261,7 +274,7 @@ export function seedOverdueAcknowledgements(
       run.status !== 'delivered' ||
       Date.parse(run.receivedAt) < now.getTime() - overdueLookback ||
       directionOf(run) !== 'outbound' ||
-      !seededFaker(`overdue:${run.id}`).datatype.boolean({ probability: 0.02 })
+      !isUnacknowledged(run)
     ) {
       return []
     }
@@ -288,11 +301,17 @@ export function seedOverdueAcknowledgements(
   })
 }
 
-export function seedOverviewData(runs: ReadonlyArray<RunSummary> | RunStore = seedRuns()) {
+export function seedOverviewData(
+  runs: ReadonlyArray<RunSummary> | RunStore = seedRuns(),
+): OverviewData {
+  const store = toRunStore(runs)
+
   return {
-    runs,
+    runs: store,
     tradingPartners: seedTradingPartners,
-    overdueAcknowledgements: seedOverdueAcknowledgements(toRunStore(runs).all()),
+    get overdueAcknowledgements() {
+      return seedOverdueAcknowledgements(store.all())
+    },
   }
 }
 
