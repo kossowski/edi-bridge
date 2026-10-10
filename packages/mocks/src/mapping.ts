@@ -20,6 +20,7 @@ import {
   saveMappingDraftEndpoint,
   type TransformConfig,
   type TransformKind,
+  transformIssues,
   type TransformLink,
   transformLinkTargets,
   transformPorts,
@@ -372,9 +373,37 @@ function templateGraph(mappingId: string, messageType: MessageType, share: numbe
   }
 }
 
+// Dropping a transform can leave the one it fed unconnected, so this repeats until none is left.
+function withoutInvalidTransforms(graph: TransformGraph): TransformGraph {
+  const invalid = new Set(
+    Object.entries(transformIssues(graph))
+      .filter(([, issues]) => issues.length > 0)
+      .map(([id]) => id),
+  )
+
+  if (invalid.size === 0) {
+    return graph
+  }
+
+  const touchesInvalid = ({ from, to }: TransformLink) =>
+    (from.kind === 'transform' && invalid.has(from.transformId)) ||
+    (to.kind === 'transform' && invalid.has(to.transformId))
+
+  return withoutInvalidTransforms({
+    transforms: graph.transforms.filter(({ id }) => !invalid.has(id)),
+    transformLinks: graph.transformLinks.filter((transformLink) => !touchesInvalid(transformLink)),
+  })
+}
+
 // A target takes one value, so a transform that fills it replaces the plain link into it.
-function templateDraftGraph(mappingId: string, messageType: MessageType, share: number) {
-  const graph = templateGraph(mappingId, messageType, share)
+function templateDraftGraph(
+  mappingId: string,
+  messageType: MessageType,
+  share: number,
+  { publishable = false } = {},
+) {
+  const template = templateGraph(mappingId, messageType, share)
+  const graph = publishable ? withoutInvalidTransforms(template) : template
   const filled = new Set(transformLinkTargets(graph.transformLinks))
 
   return {
@@ -398,16 +427,26 @@ const seedDraftStages = [
   { linkShare: 0, unpublishedChanges: false },
 ]
 
+function seedDraftStageOf(index: number) {
+  const { messageType } = seedMappings[index]!
+
+  const sameTypeBefore = seedMappings
+    .slice(0, index)
+    .filter((mapping) => mapping.messageType === messageType).length
+
+  return seedDraftStages[sameTypeBefore % seedDraftStages.length]!
+}
+
+// Only this half-done Draft keeps its invalid transform, so publishing it answers 422.
+export const incompleteDraftId = seedMappings.find(
+  ({ messageType }, index) =>
+    messageType === 'INVOIC' && seedDraftStageOf(index).unpublishedChanges,
+)!.mappingId
+
 export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
   ...seedMappings.map((mapping, index): MappingDraftRecord => {
     const newest = mapping.versions[0]!
-
-    const sameTypeBefore = seedMappings
-      .slice(0, index)
-      .filter(({ messageType }) => messageType === mapping.messageType).length
-
-    const { linkShare, unpublishedChanges } =
-      seedDraftStages[sameTypeBefore % seedDraftStages.length]!
+    const { linkShare, unpublishedChanges } = seedDraftStageOf(index)
 
     return {
       id: mapping.mappingId,
@@ -416,7 +455,9 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
       documentStructureId: seedDocumentStructureOf[mapping.messageType].id,
       latestVersion: newest.version,
       unpublishedChanges,
-      ...templateDraftGraph(mapping.mappingId, mapping.messageType, linkShare),
+      ...templateDraftGraph(mapping.mappingId, mapping.messageType, linkShare, {
+        publishable: unpublishedChanges && mapping.mappingId !== incompleteDraftId,
+      }),
       updatedAt: seedUpdatedAt(index),
     }
   }),

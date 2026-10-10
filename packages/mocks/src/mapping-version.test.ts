@@ -20,6 +20,7 @@ import { seedMappings } from './flow'
 import {
   createMappingDrafts,
   createMappingDraftStore,
+  incompleteDraftId,
   mappingHandlers,
   type MappingDraftRecord,
   seedMappingDrafts,
@@ -252,12 +253,21 @@ describe('POST /mappings/:mappingId/versions', () => {
   it('answers 422 for a Draft with an invalid transform', async () => {
     handlers()
 
-    const invalid = seedMappingDrafts.find(
-      ({ unpublishedChanges, transforms }) =>
-        unpublishedChanges && transforms.some(({ kind }) => kind === 'numberFormat'),
-    )!
+    expect((await publish(incompleteDraftId)).status).toBe(422)
+  })
 
-    expect((await publish(invalid.id)).status).toBe(422)
+  it('publishes every seed Draft with unpublished changes but the incomplete one', async () => {
+    handlers()
+
+    const changedDrafts = seedMappingDrafts.filter(({ unpublishedChanges }) => unpublishedChanges)
+
+    const statuses = await Promise.all(
+      changedDrafts.map(async ({ id }) => [id, (await publish(id)).status] as const),
+    )
+
+    expect(Object.fromEntries(statuses)).toEqual(
+      Object.fromEntries(changedDrafts.map(({ id }) => [id, id === incompleteDraftId ? 422 : 201])),
+    )
   })
 
   it('answers 404 for an unknown Mapping', async () => {
