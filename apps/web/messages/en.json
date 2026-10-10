@@ -861,6 +861,35 @@
         "fitView": "Fit to screen"
       }
     },
+    "links": {
+      "heading": "Links",
+      "none": "This part has no links yet.",
+      "item": "{source} to {target}",
+      "remove": "Remove link",
+      "removeLabel": "Remove link from {source} to {target}",
+      "showLinks": "{count} links",
+      "showLinksLabel": "Show the {count} links from {source} to {target}",
+      "linkFromHere": "Link from here",
+      "linkToHere": "Link to here",
+      "cancel": "Cancel link",
+      "shortcut": "Shortcut: press L on a source field or element to start a link, and L on a target to finish it. Delete removes the only link of a part.",
+      "pending": "Linking from {source}. Select a target and choose Link to here, or press L on it. Press Escape to cancel.",
+      "started": "Linking from {source}. Move to a target and press L, or select it and choose Link to here.",
+      "cancelled": "Link from {source} cancelled.",
+      "targetHint": "Can take the link from {source}",
+      "startHint": "The pending link starts here",
+      "added": "Link from {source} to {target} added.",
+      "removed": "Link from {source} to {target} removed.",
+      "alreadyLinked": "{target} is already linked from {source}. Remove that link first.",
+      "notLinkable": "{label} holds other parts. Links connect single fields and elements.",
+      "startOnSource": "Start a link on a source field or element first.",
+      "severalLinks": "{label} has {count} links. Select it to remove them one by one.",
+      "addFailed": "The link from {source} to {target} could not be saved and was taken back. Try again.",
+      "removeFailed": "Removing the link from {source} to {target} could not be saved, so the link is back. Try again.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveFailed": "Not saved"
+    },
     "desktopOnly": {
       "title": "The Mapping canvas needs a larger screen",
       "description": "Open this Mapping on a screen at least 1024 pixels wide to see its source and target and their links."
@@ -892,8 +921,8 @@
       "moreCodes": "{count, plural, one {And # more code. Select the part to see all codes.} other {And # more codes. Select the part to see all codes.}}"
     },
     "details": {
-      "title": "Meaning",
-      "empty": "Select a part to keep its meaning here. To take a quick look, point at a part or move the focus to it.",
+      "title": "Details",
+      "empty": "Select a part to keep its meaning and links here. To take a quick look, point at a part or move the focus to it.",
       "clear": "Clear selection"
     }
   },

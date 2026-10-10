@@ -861,6 +861,35 @@
         "fitView": "An Bildschirm anpassen"
       }
     },
+    "links": {
+      "heading": "Verknüpfungen",
+      "none": "Dieser Teil hat noch keine Verknüpfungen.",
+      "item": "{source} zu {target}",
+      "remove": "Verknüpfung entfernen",
+      "removeLabel": "Verknüpfung entfernen: {source} zu {target}",
+      "showLinks": "{count} Verknüpfungen",
+      "showLinksLabel": "Die {count} Verknüpfungen von {source} zu {target} anzeigen",
+      "linkFromHere": "Von hier verknüpfen",
+      "linkToHere": "Hierhin verknüpfen",
+      "cancel": "Verknüpfen abbrechen",
+      "shortcut": "Tastenkürzel: L auf einem Feld oder Element der Quelle beginnt eine Verknüpfung, L auf einem Ziel schließt sie ab. Entf entfernt die einzige Verknüpfung eines Teils.",
+      "pending": "Verknüpfung von {source} begonnen. Wählen Sie ein Ziel aus und dann „Hierhin verknüpfen“, oder drücken Sie darauf L. Escape bricht ab.",
+      "started": "Verknüpfung von {source} begonnen. Gehen Sie zu einem Ziel und drücken Sie L, oder wählen Sie es aus und dann „Hierhin verknüpfen“.",
+      "cancelled": "Verknüpfung von {source} abgebrochen.",
+      "targetHint": "Kann die Verknüpfung von {source} aufnehmen",
+      "startHint": "Hier beginnt die offene Verknüpfung",
+      "added": "Verknüpfung von {source} zu {target} hinzugefügt.",
+      "removed": "Verknüpfung von {source} zu {target} entfernt.",
+      "alreadyLinked": "{target} ist bereits mit {source} verknüpft. Entfernen Sie zuerst diese Verknüpfung.",
+      "notLinkable": "{label} enthält weitere Teile. Verknüpfungen verbinden einzelne Felder und Elemente.",
+      "startOnSource": "Beginnen Sie eine Verknüpfung zuerst auf einem Feld oder Element der Quelle.",
+      "severalLinks": "{label} hat {count} Verknüpfungen. Wählen Sie den Teil aus, um sie einzeln zu entfernen.",
+      "addFailed": "Die Verknüpfung von {source} zu {target} konnte nicht gespeichert werden und wurde zurückgenommen. Versuchen Sie es erneut.",
+      "removeFailed": "Das Entfernen der Verknüpfung von {source} zu {target} konnte nicht gespeichert werden, die Verknüpfung ist wieder da. Versuchen Sie es erneut.",
+      "saving": "Wird gespeichert …",
+      "saved": "Gespeichert",
+      "saveFailed": "Nicht gespeichert"
+    },
     "desktopOnly": {
       "title": "Die Mapping-Zeichenfläche braucht einen größeren Bildschirm",
       "description": "Öffnen Sie dieses Mapping auf einem Bildschirm mit mindestens 1024 Pixeln Breite, um Quelle, Ziel und ihre Verknüpfungen zu sehen."
@@ -892,8 +921,8 @@
       "moreCodes": "{count, plural, one {Und # weiterer Code. Wählen Sie den Teil aus, um alle Codes zu sehen.} other {Und # weitere Codes. Wählen Sie den Teil aus, um alle Codes zu sehen.}}"
     },
     "details": {
-      "title": "Bedeutung",
-      "empty": "Wählen Sie einen Teil aus, um seine Bedeutung hier zu behalten. Für einen schnellen Blick zeigen Sie auf einen Teil oder setzen Sie den Fokus darauf.",
+      "title": "Details",
+      "empty": "Wählen Sie einen Teil aus, um seine Bedeutung und Verknüpfungen hier zu behalten. Für einen schnellen Blick zeigen Sie auf einen Teil oder setzen Sie den Fokus darauf.",
       "clear": "Auswahl aufheben"
     }
   },

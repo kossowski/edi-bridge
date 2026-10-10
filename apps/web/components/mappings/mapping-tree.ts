@@ -203,6 +203,15 @@ export function nodeId(side: Side, path: string) {
   return `${side}:${path}`
 }
 
+export function rowOfNodeId(id: string): { side: Side; path: string } | null {
+  const colon = id.indexOf(':')
+  const side = id.slice(0, colon)
+
+  return colon > 0 && (side === 'source' || side === 'target')
+    ? { side, path: id.slice(colon + 1) }
+    : null
+}
+
 export function layoutTree(
   items: ReadonlyArray<TreeItem>,
   { side, x, y, collapsed }: { side: Side; x: number; y: number; collapsed: ReadonlySet<string> },

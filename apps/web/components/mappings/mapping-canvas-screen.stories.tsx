@@ -1,12 +1,17 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, userEvent, waitFor, within } from 'storybook/test'
+import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
+import { nodeId } from '@/components/mappings/mapping-tree'
 import { findRowButton } from '@/components/mappings/tree-node'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { documentStructureEndpoint, mappingDraftEndpoint } from '@edi-bridge/contracts'
+import {
+  documentStructureEndpoint,
+  mappingDraftEndpoint,
+  saveMappingLinksEndpoint,
+} from '@edi-bridge/contracts'
 import {
   createDocumentStructure,
   createHandlers,
@@ -57,7 +62,56 @@ async function findTooltip(canvasElement: HTMLElement) {
   return within(tooltip)
 }
 
-function detailsPanel(canvasElement: HTMLElement, name = 'Meaning') {
+function handleOf(canvasElement: HTMLElement, ref: RowRef) {
+  return canvasElement.querySelector<HTMLElement>(
+    `.react-flow__node[data-id="${CSS.escape(nodeId(ref.side, ref.path))}"] .react-flow__handle`,
+  )!
+}
+
+function centre(element: Element) {
+  const { left, top, width, height } = element.getBoundingClientRect()
+
+  return { clientX: left + width / 2, clientY: top + height / 2 }
+}
+
+// React Flow follows mouse events on the document while a link is drawn; user-event moves no
+// real pointer, so the drag is dispatched as those events at the handles' positions.
+async function dragLink(canvasElement: HTMLElement, from: RowRef, to: RowRef) {
+  const start = centre(handleOf(canvasElement, from))
+  const end = centre(handleOf(canvasElement, to))
+  const doc = canvasElement.ownerDocument
+
+  await fireEvent.mouseDown(handleOf(canvasElement, from), { ...start, button: 0, buttons: 1 })
+  await fireEvent.mouseMove(doc, {
+    clientX: start.clientX + 20,
+    clientY: start.clientY,
+    buttons: 1,
+  })
+  await fireEvent.mouseMove(doc, { ...end, buttons: 1 })
+  await waitFor(() => expect(handleOf(canvasElement, to)).toHaveClass('connectingto'))
+  await fireEvent.mouseUp(doc, { ...end, button: 0 })
+}
+
+function edgeOf(canvasElement: HTMLElement, from: RowRef, to: RowRef) {
+  return canvasElement.querySelector<SVGElement>(
+    `.react-flow__edge[data-id="${CSS.escape(`${nodeId(from.side, from.path)}->${nodeId(to.side, to.path)}`)}"] .react-flow__edge-interaction`,
+  )
+}
+
+function liveStatus(canvasElement: HTMLElement) {
+  return canvasElement.querySelector('p[role="status"].sr-only')!
+}
+
+async function pressOn(element: HTMLElement, keys: string) {
+  element.focus()
+  await userEvent.keyboard(keys)
+}
+
+const source = (path: string): RowRef => ({ side: 'source', path })
+
+const target = (path: string): RowRef => ({ side: 'target', path })
+
+function detailsPanel(canvasElement: HTMLElement, name = 'Details') {
   return within(page(canvasElement).getByRole('region', { name }))
 }
 
@@ -240,6 +294,16 @@ export const LargeVolume = meta.story({
 
     await expect(rows.length).toBe(nodes.length - 2)
     await expect(rows.every((row) => row.tabIndex === 0)).toBe(true)
+
+    // A pending link marks every free target leaf, which must stay checkable at this volume.
+    const from = canvasElement.querySelector<HTMLElement>(
+      '.react-flow__node[data-id^="source:"]:has(.link-handle) button[aria-pressed]',
+    )!
+
+    await pressOn(from, 'l')
+    await waitFor(() =>
+      expect(canvasElement.querySelectorAll('[data-link-target]').length).toBeGreaterThan(0),
+    )
   },
 })
 
@@ -403,7 +467,7 @@ export const German = meta.story({
 
     await userEvent.click(row)
 
-    const panel = detailsPanel(canvasElement, 'Bedeutung')
+    const panel = detailsPanel(canvasElement, 'Details')
 
     await expect(panel.getByText('Quelle')).toBeVisible()
     await expect(panel.getByText('Dokumenten-/Nachrichtendatum/-zeit')).toBeVisible()
@@ -411,13 +475,28 @@ export const German = meta.story({
     await expect(panel.getByText('Einmal')).toBeVisible()
 
     for (const value of page(canvasElement)
-      .getByRole('region', { name: 'Bedeutung' })
+      .getByRole('region', { name: 'Details' })
       .querySelectorAll('dd')) {
       await expect(value.scrollWidth).toBeLessThanOrEqual(value.clientWidth)
     }
 
     await userEvent.hover(row)
     await expect((await findTooltip(canvasElement)).getByText('Einmal')).toBeVisible()
+
+    await pressOn(await findRow(canvasElement, source('DTM+137/C507/2380')), 'l')
+    await expect(
+      panel.getByText('Verknüpfung von DTM+137/C507/2380 begonnen.', { exact: false }),
+    ).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Verknüpfen abbrechen' })).toBeVisible()
+    await pressOn(await findRow(canvasElement, target('orderDate')), 'l')
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'orderDate ist bereits mit DTM+137/C507/2380 verknüpft. Entfernen Sie zuerst diese Verknüpfung.',
+    )
+
+    await userEvent.hover(edgeOf(canvasElement, source('BGM/1004'), target('orderNumber'))!)
+    await expect(
+      await canvas.findByRole('button', { name: 'Verknüpfung entfernen: BGM/1004 zu orderNumber' }),
+    ).toBeVisible()
   },
 })
 
@@ -437,6 +516,13 @@ export const Dark = meta.story({
     await expect(detailsPanel(canvasElement).getByText('Document/message date/time')).toBeVisible()
     await userEvent.hover(row)
     await findTooltip(canvasElement)
+
+    // The marks of a pending link and an edge's remove button, checked in dark too.
+    await pressOn(await findRow(canvasElement, source('despatchDate')), 'l')
+    await userEvent.hover(edgeOf(canvasElement, source('despatchNumber'), target('BGM/1004'))!)
+    await expect(
+      await canvas.findByRole('button', { name: 'Remove link from despatchNumber to BGM/1004' }),
+    ).toBeVisible()
   },
 })
 
@@ -564,5 +650,224 @@ export const CodedElement = meta.story({
     ).toBeVisible()
     await expect(panel.getByText('CCYYMMDD')).toBeVisible()
     await expect(panel.getByText('CCYYMMDDHHMM')).toBeVisible()
+  },
+})
+
+const linkStories = {
+  a11y: { config: { rules: [{ id: 'target-size', enabled: true }] } },
+}
+
+export const DrawLinkByMouse = meta.story({
+  args: { id: withoutLinks.id },
+  parameters: linkStories,
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Collapse UNH' }))
+    await findRow(canvasElement, target('BGM/1004'))
+
+    await dragLink(canvasElement, source('invoiceNumber'), target('BGM/1004'))
+
+    await expect(
+      await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
+    ).toBeInTheDocument()
+    await expect(await canvas.findByText('Saved')).toBeVisible()
+    await expect(canvas.getByText('1 link')).toBeVisible()
+    await waitFor(() =>
+      expect(liveStatus(canvasElement)).toHaveTextContent(
+        'Link from invoiceNumber to BGM/1004 added.',
+      ),
+    )
+  },
+})
+
+export const DrawLinkByKeyboard = meta.story({
+  args: { id: withoutLinks.id },
+  parameters: linkStories,
+  async play({ canvas, canvasElement }) {
+    const from = await findRow(canvasElement, source('invoiceNumber'))
+    const to = await findRow(canvasElement, target('BGM/1004'))
+    const panel = detailsPanel(canvasElement)
+
+    await pressOn(from, '{Enter}')
+    await expect(panel.getByText('Shortcut: press L', { exact: false })).toBeVisible()
+    await pressOn(panel.getByRole('button', { name: 'Link from here' }), '{Enter}')
+
+    await expect(panel.getByText('Linking from invoiceNumber.', { exact: false })).toBeVisible()
+    await waitFor(() => expect(from).toHaveFocus())
+    await expect(liveStatus(canvasElement)).toHaveTextContent('Linking from invoiceNumber.')
+    await expect(to).toHaveAccessibleDescription('Can take the link from invoiceNumber')
+    await expect(to.closest('[data-link-target]')).not.toBeNull()
+
+    await pressOn(to, '{Enter}')
+    await pressOn(panel.getByRole('button', { name: 'Link to here' }), '{Enter}')
+
+    await expect(
+      await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
+    ).toBeInTheDocument()
+    await waitFor(() => expect(to).toHaveFocus())
+    await expect(panel.getByText('invoiceNumber to BGM/1004')).toBeVisible()
+    await expect(await canvas.findByText('Saved')).toBeVisible()
+
+    // The shortcut: L on a source starts a link, L on a target finishes it.
+    await pressOn(await findRow(canvasElement, source('invoiceDate')), 'l')
+    await pressOn(await findRow(canvasElement, target('DTM+137/C507/2380')), 'l')
+    await expect(
+      await canvas.findByRole('img', { name: 'Link from invoiceDate to DTM+137/C507/2380' }),
+    ).toBeInTheDocument()
+    await expect(await canvas.findByText('2 links')).toBeVisible()
+
+    // Escape cancels a pending link first and clears the selection only after that.
+    const pending = await findRow(canvasElement, source('deliveryDate'))
+
+    await pressOn(pending, 'l')
+    await expect(pending).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.keyboard('{Escape}')
+    await expect(panel.queryByText('Linking from', { exact: false })).toBeNull()
+    await expect(liveStatus(canvasElement)).toHaveTextContent('Link from deliveryDate cancelled.')
+    await expect(pending).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.keyboard('{Escape}')
+    await expect(pending).toHaveAttribute('aria-pressed', 'false')
+  },
+})
+
+export const RemoveLinkByMouse = meta.story({
+  args: { id: outbound.id },
+  parameters: linkStories,
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('img', { name: 'Link from despatchNumber to BGM/1004' })
+
+    await userEvent.hover(edgeOf(canvasElement, source('despatchNumber'), target('BGM/1004'))!)
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Remove link from despatchNumber to BGM/1004' }),
+    )
+
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole('img', { name: 'Link from despatchNumber to BGM/1004' }),
+      ).toBeNull(),
+    )
+    await expect(await canvas.findByText('17 links')).toBeVisible()
+    await expect(await canvas.findByText('Saved')).toBeVisible()
+
+    // An edge into collapsed parts carries several links; its button lists them by name first.
+    await userEvent.click(canvas.getByRole('button', { name: 'Collapse packages' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Collapse SG10' }))
+    await userEvent.hover(edgeOf(canvasElement, source('packages[]'), target('SG10'))!)
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Show the 9 links from packages[] to SG10' }),
+    )
+
+    const panel = detailsPanel(canvasElement)
+
+    await expect(panel.getAllByRole('button', { name: /^Remove link from packages/ })).toHaveLength(
+      9,
+    )
+    await expect(
+      panel.getByRole('button', {
+        name: 'Remove link from packages[].packageNumber to SG10/CPS/7164',
+      }),
+    ).toHaveFocus()
+    await expect(canvas.getByText('17 links')).toBeVisible()
+  },
+})
+
+export const RemoveLinkByKeyboard = meta.story({
+  args: { id: outbound.id },
+  parameters: linkStories,
+  async play({ canvas, canvasElement }) {
+    const row = await findRow(canvasElement, source('despatchNumber'))
+    const panel = detailsPanel(canvasElement)
+
+    await pressOn(row, '{Enter}')
+    await pressOn(
+      panel.getByRole('button', { name: 'Remove link from despatchNumber to BGM/1004' }),
+      '{Enter}',
+    )
+
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole('img', { name: 'Link from despatchNumber to BGM/1004' }),
+      ).toBeNull(),
+    )
+    await waitFor(() => expect(row).toHaveFocus())
+    await expect(panel.getByText('This part has no links yet.')).toBeVisible()
+    await expect(await canvas.findByText('17 links')).toBeVisible()
+
+    // Delete removes the only link of the focused part.
+    await pressOn(await findRow(canvasElement, source('documentDate')), '{Delete}')
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole('img', { name: 'Link from documentDate to DTM+137/C507/2380' }),
+      ).toBeNull(),
+    )
+    await expect(await canvas.findByText('16 links')).toBeVisible()
+
+    // A part holding several links keeps them and says how to remove them.
+    await pressOn(await findRow(canvasElement, source('packages[]')), '{Delete}')
+    await waitFor(() =>
+      expect(liveStatus(canvasElement)).toHaveTextContent(
+        'packages has 9 links. Select it to remove them one by one.',
+      ),
+    )
+    await expect(canvas.getByText('16 links')).toBeVisible()
+  },
+})
+
+export const TargetAlreadyLinked = meta.story({
+  args: { id: outbound.id },
+  parameters: linkStories,
+  async play({ canvas, canvasElement }) {
+    await pressOn(await findRow(canvasElement, source('despatchDate')), 'l')
+
+    const linked = await findRow(canvasElement, target('DTM+137/C507/2380'))
+
+    await expect(linked.closest('[data-link-target]')).toBeNull()
+    await expect(
+      (await findRow(canvasElement, target('DTM+137/C507/2005'))).closest('[data-link-target]'),
+    ).not.toBeNull()
+
+    await pressOn(linked, 'l')
+
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'DTM+137/C507/2380 is already linked from documentDate. Remove that link first.',
+    )
+    await expect(
+      canvas.queryByRole('img', { name: 'Link from despatchDate to DTM+137/C507/2380' }),
+    ).toBeNull()
+    await expect(canvas.getByText('18 links')).toBeVisible()
+    await expect(
+      detailsPanel(canvasElement).getByText('Linking from despatchDate.', { exact: false }),
+    ).toBeVisible()
+  },
+})
+
+export const SaveErrorRollback = meta.story({
+  args: { id: withoutLinks.id },
+  parameters: linkStories,
+  beforeEach({ msw }) {
+    msw.use(
+      http.put(`${apiUrl}${saveMappingLinksEndpoint.path}`, async () => {
+        await delay(400)
+
+        return HttpResponse.json({ message: 'Unprocessable' }, { status: 422 })
+      }),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await pressOn(await findRow(canvasElement, source('invoiceNumber')), 'l')
+    await pressOn(await findRow(canvasElement, target('BGM/1004')), 'l')
+
+    await expect(
+      await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
+    ).toBeInTheDocument()
+    await expect(canvas.getByText('Saving…')).toBeVisible()
+
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'The link from invoiceNumber to BGM/1004 could not be saved and was taken back. Try again.',
+    )
+    await expect(
+      canvas.queryByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
+    ).toBeNull()
+    await expect(await canvas.findByText('Not saved')).toBeVisible()
+    await expect(canvas.getByText('No links yet')).toBeVisible()
   },
 })

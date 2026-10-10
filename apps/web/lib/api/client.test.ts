@@ -6,6 +6,8 @@ import {
   createRun,
   createTradingPartner as buildTradingPartner,
   createWorkspace,
+  mappingHandlers,
+  seedMappingDrafts,
   runDetailHandlers,
   runsHandler,
   tradingPartnerHandlers,
@@ -22,6 +24,7 @@ import {
   regenerateWebhookToken,
   reprocessRun,
   retryRun,
+  saveMappingLinks,
   switchToProduction,
   updateCompanyIdentity,
   updateTradingPartner,
@@ -204,5 +207,25 @@ describe('Channel actions', () => {
     expect(regenerated.channel).toMatchObject({
       token: { lastFour: regenerated.webhookToken.slice(-4) },
     })
+  })
+})
+
+describe('saveMappingLinks', () => {
+  const draft = seedMappingDrafts.find(({ messageType }) => messageType === 'INVOIC')!
+
+  it('saves the links and returns the Draft', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: [draft] }))
+
+    const links = draft.links.slice(1)
+
+    await expect(saveMappingLinks(draft.id, { links })).resolves.toMatchObject({ links })
+  })
+
+  it('rejects with 422 when a link ends at a part that holds others', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: [draft] }))
+
+    await expect(
+      saveMappingLinks(draft.id, { links: [{ sourcePath: 'invoiceNumber', targetPath: 'BGM' }] }),
+    ).rejects.toMatchObject({ status: 422 })
   })
 })
