@@ -4,11 +4,13 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Outside CI, Vitest and Playwright run one test file at a time with one worker; CI keeps its defaults
-- [ ] The `test` task passes `CI` through, so Vitest can tell CI from a local run under turbo's strict environment mode
-- [ ] `pnpm check` runs the full check locally with limited turbo concurrency
-- [ ] The orchestrate skill tells implementers to verify with `pnpm check`
+- [x] Outside CI, Vitest and Playwright run one test file at a time with one worker; CI keeps its defaults
+- [x] The `test` task passes `CI` through, so Vitest can tell CI from a local run under turbo's strict environment mode
+- [x] `pnpm check` runs the full check locally with limited turbo concurrency
+- [x] The orchestrate skill tells implementers to verify with `pnpm check`
 
 ## Comments
+
+Resolved in #22.
