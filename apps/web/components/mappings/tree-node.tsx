@@ -20,6 +20,7 @@ import {
   useCanvasStore,
   useLinkHints,
   useMeaningTooltip,
+  usePendingPartLink,
 } from '@/components/mappings/mapping-canvas-store'
 import {
   nodeId,
@@ -35,7 +36,7 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 import type { RowRef } from '@/components/mappings/mapping-links'
 
 // `filled` says a link ends at this very target, not only somewhere inside it.
-export type TreeNodeData = TreeRow & { linked: boolean; filled: boolean }
+export type TreeNodeData = TreeRow & { linked: boolean; filled: boolean; wholePart: boolean }
 
 export type TreeFlowNode = Node<TreeNodeData, 'tree'>
 
@@ -204,14 +205,13 @@ function RowButton({
 function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
   const t = useTranslations('Mapping.canvas')
   const container = !data.linkable
-  // A repeating part is linked whole through a loop.
-  const part = container && data.repeat !== null
-  const linkable = data.linkable || part
+  const linkable = data.linkable || data.wholePart
   const showHandle = linkable || (data.expanded === false && data.linked)
   const onFocus = usePanIntoView()
   const selected = useCanvasStore((state) => isSameRow(state.selected, data))
   const hints = useLinkHints()
   const linkStart = useCanvasStore((state) => isStartRow(state.linkFrom, data))
+  const pendingPart = usePendingPartLink()
 
   // Only a free target can take the pending link: a leaf, or a repeating part for a loop's items.
   const linkTarget = useCanvasStore(
@@ -219,7 +219,7 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
       state.linkFrom !== null &&
       data.side === 'target' &&
       !data.filled &&
-      (state.linkFromPart ? data.repeat !== null : data.linkable),
+      (pendingPart ? data.repeat !== null : data.linkable),
   )
 
   // While a link is dragged, a filled target refuses it; the drop there still says why.

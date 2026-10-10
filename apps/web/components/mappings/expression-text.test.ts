@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { insertText, jsonataPath, textPosition } from './expression-text'
+import { expressionSyntaxError } from '@edi-bridge/contracts'
+
+import messagesDe from '../../messages/de.json'
+import messagesEn from '../../messages/en.json'
+import {
+  insertText,
+  jsonataPath,
+  knownSyntaxError,
+  syntaxErrorCodes,
+  textPosition,
+} from './expression-text'
 
 describe('jsonataPath', () => {
   it.each([
@@ -37,5 +47,23 @@ describe('insertText', () => {
       caret: 21,
     })
     expect(insertText('a + b', 4, 5, 'c')).toEqual({ value: 'a + c', caret: 5 })
+  })
+})
+
+describe('knownSyntaxError', () => {
+  it('knows the codes of common syntax errors and no others', () => {
+    expect(knownSyntaxError(expressionSyntaxError('$sum(')?.code ?? null)).toBe('S0203')
+    expect(knownSyntaxError('S0402')).toBeNull()
+    expect(knownSyntaxError(null)).toBeNull()
+  })
+
+  it.each([
+    ['en', messagesEn],
+    ['de', messagesDe],
+  ])('has a message for each known code in %s', (_, messages) => {
+    const texts: Readonly<Record<string, string>> =
+      messages.Mapping.transforms.expression.syntaxErrors
+
+    expect(Object.keys(texts)).toEqual([...syntaxErrorCodes])
   })
 })

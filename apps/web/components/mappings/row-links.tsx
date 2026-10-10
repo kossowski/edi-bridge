@@ -9,8 +9,8 @@ import {
   useLinkHints,
 } from '@/components/mappings/mapping-canvas-store'
 import {
-  isLinkablePart,
   isLinkableRow,
+  type LinkableRows,
   linksOfItem,
   type RowLink,
   type RowRef,
@@ -18,7 +18,7 @@ import {
 import { Button } from '@edi-bridge/ui/components/button'
 
 import type { GraphText } from '@/components/mappings/graph-text'
-import type { Graph, LinkableRows } from '@/components/mappings/mapping-graph'
+import type { Graph } from '@/components/mappings/mapping-graph'
 import type { TreeItem } from '@/components/mappings/mapping-tree'
 import type { LinkStart } from '@edi-bridge/contracts'
 
@@ -73,7 +73,7 @@ export function RowLinks({
   const heading = useId()
   const linkFrom = useCanvasStore((state) => state.linkFrom)
   const own = linksOfItem(graph, row.side, item)
-  const linkable = isLinkableRow(rows.leaves, row) || isLinkablePart(rows.parts, row)
+  const linkable = isLinkableRow(rows, row)
 
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-2">

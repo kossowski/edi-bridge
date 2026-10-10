@@ -1,4 +1,11 @@
-import { concatenateInputs, type TransformConfig, type TransformKind } from '@edi-bridge/contracts'
+import {
+  concatenateInputs,
+  operatorsWithOperand,
+  type TransformConfig,
+  type TransformKind,
+} from '@edi-bridge/contracts'
+
+import type { CanvasIssue } from '@/components/mappings/mapping-graph'
 
 export type FieldInput =
   | 'text'
@@ -10,7 +17,17 @@ export type FieldInput =
   | 'operator'
   | 'expression'
 
-type FormField = { readonly input: FieldInput; readonly ranged?: true }
+export type FormValues = Readonly<Record<string, string>>
+
+type CanvasOnlyCode = Extract<CanvasIssue, { code: 'unknownLookupTable' }>['code']
+
+type FormField = {
+  readonly input: FieldInput
+  readonly ranged?: true
+  readonly visibleWhen?: (values: FormValues) => boolean
+  // Problems only the canvas can know, shown beside the field until its value changes.
+  readonly canvasIssues?: ReadonlyArray<CanvasOnlyCode>
+}
 
 type KindFields<Kind extends TransformKind> = {
   readonly fields: { readonly [Name in keyof TransformConfig<Kind>]: FormField }
@@ -52,11 +69,22 @@ export const transformKindFields = {
     defaults: { decimalPlaces: 2, decimalSeparator: '.' },
   },
   lookupTable: {
-    fields: { lookupTableId: { input: 'lookupTable' }, fallback: { input: 'fallback' } },
+    fields: {
+      // A deleted Lookup Table is only known on the canvas; it stays a problem until another is
+      // chosen.
+      lookupTableId: { input: 'lookupTable', canvasIssues: ['unknownLookupTable'] },
+      fallback: { input: 'fallback' },
+    },
     defaults: { lookupTableId: null, fallback: 'keepValue' },
   },
   conditional: {
-    fields: { operator: { input: 'operator' }, compareTo: { input: 'text' } },
+    fields: {
+      operator: { input: 'operator' },
+      compareTo: {
+        input: 'text',
+        visibleWhen: ({ operator }) => operatorsWithOperand.some((found) => found === operator),
+      },
+    },
     defaults: { operator: 'equals', compareTo: '' },
   },
   loop: {
@@ -75,12 +103,12 @@ export function defaultConfig<Kind extends TransformKind>(kind: Kind): Catalogue
   return transformKindFields[kind].defaults
 }
 
-export type FormFieldSpec = { name: string; input: FieldInput }
+export type FormFieldSpec = FormField & { name: string }
 
 export function formFields(kind: TransformKind): ReadonlyArray<FormFieldSpec> {
   const fields: Readonly<Record<string, FormField>> = transformKindFields[kind].fields
 
-  return Object.entries(fields).map(([name, { input }]) => ({ name, input }))
+  return Object.entries(fields).map(([name, field]) => ({ ...field, name }))
 }
 
 function fieldOf(kind: TransformKind, name: string): FormField | undefined {

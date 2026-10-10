@@ -367,7 +367,10 @@ describe('canvasIssues', () => {
     config: { lookupTableId: tableId, fallback: 'keepValue' },
   }
 
+  const trees = { source: sourceTree, target: targetTree }
+
   const linked = {
+    links: [],
     transforms: [lookup],
     transformLinks: [
       {
@@ -378,13 +381,88 @@ describe('canvasIssues', () => {
   }
 
   it('reports a chosen Lookup Table that is no longer in the list', () => {
-    expect(canvasIssues(linked, [])).toEqual({
+    expect(canvasIssues(linked, [], trees)).toEqual({
       [lookup.id]: [{ field: 'lookupTableId', code: 'unknownLookupTable' }],
     })
   })
 
   it('reports nothing about the Lookup Table while the list is unknown or holds it', () => {
-    expect(canvasIssues(linked, undefined)).toEqual({ [lookup.id]: [] })
-    expect(canvasIssues(linked, [{ id: tableId }])).toEqual({ [lookup.id]: [] })
+    expect(canvasIssues(linked, undefined, trees)).toEqual({ [lookup.id]: [] })
+    expect(canvasIssues(linked, [{ id: tableId }], trees)).toEqual({ [lookup.id]: [] })
+  })
+
+  describe('around a loop', () => {
+    const looped: Graph = {
+      links: [{ sourcePath: 'lines[].gtin', targetPath: 'SG25/LIN/C212/7140' }],
+      transforms: [loop, dateFormat],
+      transformLinks: [
+        {
+          from: { kind: 'source', path: 'lines[]' },
+          to: { kind: 'transform', transformId: ids.loop, input: 'items' },
+        },
+        {
+          from: { kind: 'transform', transformId: ids.loop, output: 'items' },
+          to: { kind: 'target', path: 'SG25' },
+        },
+      ],
+    }
+
+    const loopIssues = (graph: Graph) => canvasIssues(graph, undefined, trees)[ids.loop]
+
+    it('accepts links between fields beneath the looped parts and outside them', () => {
+      expect(
+        loopIssues({
+          ...looped,
+          links: [...looped.links, { sourcePath: 'orderNumber', targetPath: 'BGM/1004' }],
+        }),
+      ).toEqual([])
+    })
+
+    it('reports a field beneath the looped target part filled from outside the source part', () => {
+      expect(
+        loopIssues({
+          ...looped,
+          links: [
+            ...looped.links,
+            { sourcePath: 'orderNumber', targetPath: 'SG25/QTY+21/C186/6060' },
+          ],
+        }),
+      ).toEqual([{ code: 'outsideLoop', source: 'orderNumber', target: 'SG25/QTY+21/C186/6060' }])
+    })
+
+    it('reports a field beneath the looped source part linked outside the target part', () => {
+      expect(
+        loopIssues({
+          ...looped,
+          links: [...looped.links, { sourcePath: 'lines[].quantity', targetPath: 'BGM/1004' }],
+        }),
+      ).toEqual([{ code: 'outsideLoop', source: 'lines[].quantity', target: 'BGM/1004' }])
+    })
+
+    it('follows links through transforms back to their source fields', () => {
+      expect(
+        loopIssues({
+          ...looped,
+          transformLinks: [
+            ...looped.transformLinks,
+            intoDate,
+            {
+              from: { kind: 'transform', transformId: ids.date, output: 'value' },
+              to: { kind: 'target', path: 'SG25/QTY+21/C186/6060' },
+            },
+          ],
+        }),
+      ).toEqual([{ code: 'outsideLoop', source: 'orderDate', target: 'SG25/QTY+21/C186/6060' }])
+    })
+
+    it('says nothing while the loop is not linked on both sides', () => {
+      expect(
+        loopIssues({
+          ...looped,
+          transformLinks: looped.transformLinks.slice(0, 1),
+          links: [{ sourcePath: 'orderNumber', targetPath: 'SG25/QTY+21/C186/6060' }],
+        }),
+      ).toEqual([])
+    })
   })
 })

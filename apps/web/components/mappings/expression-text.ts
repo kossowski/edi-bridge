@@ -30,3 +30,27 @@ export function insertText(value: string, start: number, end: number, text: stri
 
   return { value: `${value.slice(0, from)}${text}${value.slice(to)}`, caret: from + text.length }
 }
+
+// The parser's codes for the syntax errors users run into most; others keep the parser's English.
+export const syntaxErrorCodes = [
+  'S0101',
+  'S0105',
+  'S0106',
+  'S0201',
+  'S0202',
+  'S0203',
+  'S0204',
+  'S0205',
+  'S0207',
+  'S0211',
+  'S0212',
+  'S0213',
+  'S0301',
+  'S0302',
+] as const
+
+export type SyntaxErrorCode = (typeof syntaxErrorCodes)[number]
+
+export function knownSyntaxError(code: string | null): SyntaxErrorCode | null {
+  return syntaxErrorCodes.find((known) => known === code) ?? null
+}

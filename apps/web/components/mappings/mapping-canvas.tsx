@@ -35,6 +35,7 @@ import {
   type LinkFlowEdge,
 } from '@/components/mappings/link-edge'
 import {
+  LinkableRowsContext,
   useCanvasStore,
   useCanvasStoreApi,
   useMeaningTooltip,
@@ -47,8 +48,6 @@ import {
   freeSlot,
   type Graph,
   type GraphChange,
-  isPartStart,
-  type LinkableRows,
   linkIntoInput,
   linkIntoTarget,
   maxTransformX,
@@ -64,9 +63,11 @@ import {
   transformWidth,
 } from '@/components/mappings/mapping-graph'
 import {
-  isLinkablePart,
+  expressionPathItems,
   isLinkableRow,
+  isWholePart,
   leafPaths,
+  type LinkableRows,
   linksOfItem,
   repeatingPaths,
   type RowLink,
@@ -311,18 +312,6 @@ function DetailsPanel({
   )
 }
 
-function sourceFieldsOf(items: ReadonlyArray<TreeItem>, into: SourceField[] = []) {
-  for (const item of items) {
-    if (item.children === null) {
-      into.push({ path: item.path, label: item.name ?? item.label })
-    } else {
-      sourceFieldsOf(item.children, into)
-    }
-  }
-
-  return into
-}
-
 // Focus moves once the change has rendered, when the button it goes to exists.
 function afterRender(focus: () => void) {
   requestAnimationFrame(focus)
@@ -457,15 +446,30 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     [source.items, target.items],
   )
 
-  const sourceFields = useMemo(() => sourceFieldsOf(source.items), [source.items])
+  const sourceFields = useMemo(
+    () =>
+      expressionPathItems(source.items).map((item): SourceField => ({
+        path: item.path,
+        label: item.name ?? item.label,
+      })),
+    [source.items],
+  )
 
   const issues = useMemo(
     () =>
       canvasIssues(
-        { transforms: graph.transforms, transformLinks: graph.transformLinks },
+        { links: graph.links, transforms: graph.transforms, transformLinks: graph.transformLinks },
         lookupTables.data,
+        { source: source.items, target: target.items },
       ),
-    [graph.transforms, graph.transformLinks, lookupTables.data],
+    [
+      graph.links,
+      graph.transforms,
+      graph.transformLinks,
+      lookupTables.data,
+      source.items,
+      target.items,
+    ],
   )
 
   const flow = useRef<ReactFlowInstance<CanvasNode, LinkFlowEdge>>(null)
@@ -566,6 +570,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
         ...row,
         linked: linked.has(row.id),
         filled: row.side === 'target' && linkIntoTarget(graph, row.path) !== null,
+        wholePart: isWholePart(rows, row),
       },
       draggable: false,
       selectable: false,
@@ -678,6 +683,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     graph,
     heights,
     issues,
+    rows,
     source.items,
     source.title,
     t,
@@ -778,12 +784,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     (from: LinkStart) => {
       const { startLink, select, announce } = store.getState()
 
-      startLink(
-        from,
-        from.kind === 'source'
-          ? rows.parts.source.has(from.path) && !rows.leaves.source.has(from.path)
-          : isPartStart(from),
-      )
+      startLink(from)
 
       if (from.kind === 'source') {
         select({ side: 'source', path: from.path })
@@ -791,7 +792,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
 
       announce(tLinks('started', { source: text.start(from) }))
     },
-    [rows, store, tLinks, text],
+    [store, tLinks, text],
   )
 
   const cancel = useCallback(() => {
@@ -1149,7 +1150,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     const onLinkKey = (row: RowRef) => {
       const { linkFrom, announce } = store.getState()
 
-      if (!isLinkableRow(rows.leaves, row) && !isLinkablePart(rows.parts, row)) {
+      if (!isLinkableRow(rows, row)) {
         announce(tLinks('notLinkable', { label: labelOf(row) }))
       } else if (row.side === 'source') {
         start({ kind: 'source', path: row.path })
@@ -1307,44 +1308,46 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
           <div className="absolute inset-0">
             <LinkActionsContext value={edgeActions}>
               <TransformActionsContext value={transformActions}>
-                <ReactFlow<CanvasNode, LinkFlowEdge>
-                  ariaLabelConfig={{
-                    'controls.ariaLabel': t('controls.panel'),
-                    'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
-                    'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
-                    'controls.fitView.ariaLabel': t('controls.fitView'),
-                  }}
-                  attributionPosition="bottom-left"
-                  deleteKeyCode={null}
-                  edges={edges}
-                  edgesFocusable={false}
-                  edgeTypes={edgeTypes}
-                  elementsSelectable={false}
-                  isValidConnection={isValidConnection}
-                  maxZoom={1.5}
-                  minZoom={0.2}
-                  nodes={nodes}
-                  nodesConnectable
-                  nodesDraggable={false}
-                  nodesFocusable={false}
-                  nodeTypes={nodeTypes}
-                  panOnScroll
-                  zoomOnDoubleClick={false}
-                  aria-label={label}
-                  onConnect={onConnect}
-                  onConnectEnd={onConnectEnd}
-                  onConnectStart={onConnectStart}
-                  // A click shows the remove button too, for pointers that cannot hover.
-                  onEdgeClick={(event, edge) => hoverEdge(edge.id, pointOf(event))}
-                  onEdgeMouseEnter={(event, edge) => hoverEdge(edge.id, pointOf(event))}
-                  onEdgeMouseLeave={(_, edge) => leaveEdge(edge.id)}
-                  onInit={onInit}
-                  onNodeDrag={onNodeDrag}
-                  onNodeDragStop={onNodeDragStop}
-                  onPaneClick={clearSelection}>
-                  <Background gap={16} variant={BackgroundVariant.Dots} />
-                  <Controls position="top-left" showInteractive={false} />
-                </ReactFlow>
+                <LinkableRowsContext value={rows}>
+                  <ReactFlow<CanvasNode, LinkFlowEdge>
+                    ariaLabelConfig={{
+                      'controls.ariaLabel': t('controls.panel'),
+                      'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
+                      'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
+                      'controls.fitView.ariaLabel': t('controls.fitView'),
+                    }}
+                    attributionPosition="bottom-left"
+                    deleteKeyCode={null}
+                    edges={edges}
+                    edgesFocusable={false}
+                    edgeTypes={edgeTypes}
+                    elementsSelectable={false}
+                    isValidConnection={isValidConnection}
+                    maxZoom={1.5}
+                    minZoom={0.2}
+                    nodes={nodes}
+                    nodesConnectable
+                    nodesDraggable={false}
+                    nodesFocusable={false}
+                    nodeTypes={nodeTypes}
+                    panOnScroll
+                    zoomOnDoubleClick={false}
+                    aria-label={label}
+                    onConnect={onConnect}
+                    onConnectEnd={onConnectEnd}
+                    onConnectStart={onConnectStart}
+                    // A click shows the remove button too, for pointers that cannot hover.
+                    onEdgeClick={(event, edge) => hoverEdge(edge.id, pointOf(event))}
+                    onEdgeMouseEnter={(event, edge) => hoverEdge(edge.id, pointOf(event))}
+                    onEdgeMouseLeave={(_, edge) => leaveEdge(edge.id)}
+                    onInit={onInit}
+                    onNodeDrag={onNodeDrag}
+                    onNodeDragStop={onNodeDragStop}
+                    onPaneClick={clearSelection}>
+                    <Background gap={16} variant={BackgroundVariant.Dots} />
+                    <Controls position="top-left" showInteractive={false} />
+                  </ReactFlow>
+                </LinkableRowsContext>
               </TransformActionsContext>
             </LinkActionsContext>
           </div>

@@ -4,39 +4,58 @@ import type { MappingLink, TransformLink } from '@edi-bridge/contracts'
 
 export type RowRef = { side: Side; path: string }
 
-export function leafPaths(items: ReadonlyArray<TreeItem>, into = new Set<string>()) {
+function collect(
+  items: ReadonlyArray<TreeItem>,
+  keep: (item: TreeItem) => boolean,
+  into: TreeItem[] = [],
+) {
   for (const item of items) {
-    if (item.children === null) {
-      into.add(item.path)
-    } else {
-      leafPaths(item.children, into)
+    if (keep(item)) {
+      into.push(item)
     }
+
+    collect(item.children ?? [], keep, into)
   }
 
   return into
 }
 
-export function repeatingPaths(items: ReadonlyArray<TreeItem>, into = new Set<string>()) {
-  for (const item of items) {
-    if (item.repeat !== null) {
-      into.add(item.path)
-    }
+const isLeaf = (item: TreeItem) => item.children === null
 
-    repeatingPaths(item.children ?? [], into)
-  }
+const repeats = (item: TreeItem) => item.repeat !== null
 
-  return into
+export function leafPaths(items: ReadonlyArray<TreeItem>) {
+  return new Set(collect(items, isLeaf).map(({ path }) => path))
 }
 
-export type Leaves = Readonly<Record<Side, ReadonlySet<string>>>
-
-export function isLinkableRow(leaves: Leaves, row: RowRef) {
-  return leaves[row.side].has(row.path)
+export function repeatingPaths(items: ReadonlyArray<TreeItem>) {
+  return new Set(collect(items, repeats).map(({ path }) => path))
 }
 
-// A repeating part takes part in a link through a loop, so it is no dead end for the keyboard.
-export function isLinkablePart(parts: Leaves, row: RowRef) {
-  return parts[row.side].has(row.path)
+export function pathsBeneath(items: ReadonlyArray<TreeItem>, part: string) {
+  const [found] = collect(items, ({ path }) => path === part)
+
+  return leafPaths(found?.children ?? [])
+}
+
+// A JSONata expression reads fields and also whole repeating parts, e.g. `$sum(lines.netPrice)`;
+// in tree order, each part comes before its fields.
+export function expressionPathItems(items: ReadonlyArray<TreeItem>) {
+  return collect(items, (item) => isLeaf(item) || repeats(item))
+}
+
+export type PathsBySide = Readonly<Record<Side, ReadonlySet<string>>>
+
+// Fields and elements take single values; repeating parts are linked whole, but only through a
+// loop's items ports, which take nothing else.
+export type LinkableRows = { leaves: PathsBySide; parts: PathsBySide }
+
+export function isLinkableRow(rows: LinkableRows, { side, path }: RowRef) {
+  return rows.leaves[side].has(path) || rows.parts[side].has(path)
+}
+
+export function isWholePart(rows: LinkableRows, { side, path }: RowRef) {
+  return rows.parts[side].has(path) && !rows.leaves[side].has(path)
 }
 
 export type RowLink =
@@ -44,7 +63,7 @@ export type RowLink =
 
 // A loop links whole parts, so a part's own path counts as well as its leaves.
 function pathsOf(item: TreeItem) {
-  return leafPaths(item.children ?? [], new Set([item.path]))
+  return new Set([item.path, ...leafPaths(item.children ?? [])])
 }
 
 // A collapsed part carries the links of every leaf inside it, also those to and from transforms.

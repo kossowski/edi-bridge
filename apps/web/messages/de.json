@@ -1116,7 +1116,23 @@
         "sourcePath": "Pfad aus der Quelle",
         "sourcePathPlaceholder": "Feld der Quelle wählen",
         "sourcePathDescription": "Fügt den Pfad des gewählten Felds in JSONata-Schreibweise an der Cursorposition ein.",
-        "insert": "Pfad einfügen"
+        "insert": "Pfad einfügen",
+        "syntaxErrors": {
+          "S0101": "Einem Text in Anführungszeichen fehlt das schließende Anführungszeichen.",
+          "S0105": "Einem Namen in Backticks fehlt der schließende Backtick (`).",
+          "S0106": "Einem Kommentar fehlt das schließende */.",
+          "S0201": "Unerwartetes „{token}“.",
+          "S0202": "„{value}“ erwartet, aber „{token}“ gefunden.",
+          "S0203": "„{value}“ fehlt vor dem Ende des Ausdrucks.",
+          "S0204": "Unbekannter Operator „{token}“.",
+          "S0205": "Unerwartetes „{token}“.",
+          "S0207": "Der Ausdruck endet zu früh.",
+          "S0211": "Das Zeichen „{token}“ kann nicht vor einem Wert stehen.",
+          "S0212": "Links von := muss ein Variablenname stehen, der mit $ beginnt.",
+          "S0213": "Der Wert {value} kann kein Schritt in einem Pfad sein.",
+          "S0301": "Ein regulärer Ausdruck darf nicht leer sein.",
+          "S0302": "Einem regulären Ausdruck fehlt das schließende /."
+        }
       },
       "ranges": {
         "concatenate": {
@@ -1147,7 +1163,8 @@
         "invalidConfig": "Die Einstellungen sind ungültig.",
         "notWholeNumber": "{field}: Geben Sie eine ganze Zahl ein.",
         "unconnected": "Der Eingang {input} ist nicht verknüpft.",
-        "unknownLookupTable": "Die gewählte Lookup Table gibt es nicht mehr. Wählen Sie eine andere."
+        "unknownLookupTable": "Die gewählte Lookup Table gibt es nicht mehr. Wählen Sie eine andere.",
+        "outsideLoop": "Die Verknüpfung von {source} nach {target} verlässt die Schleife: Nur Verknüpfungen zwischen Feldern unterhalb der Schleifenteile laufen einmal pro Position."
       },
       "details": {
         "settings": "Einstellungen",

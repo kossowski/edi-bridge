@@ -306,7 +306,7 @@ export const ExpressionEditor = meta.story({
 
     await expect(editor).toHaveAttribute('aria-invalid', 'true')
     await expect(editor).toHaveAccessibleDescription(
-      /Syntax error at line 1, column 16: Expected "\)" before end of expression/,
+      /Syntax error at line 1, column 16: Expected "\)" before the end of the expression/,
     )
 
     // The error can be reached from its message.
@@ -340,11 +340,14 @@ export const InsertSourcePath = meta.story({
     await userEvent.clear(editor)
     await userEvent.type(editor, '$count()')
     editor.setSelectionRange(7, 7)
-    await chooseOption(
-      canvasElement,
-      panel.getByRole('combobox', { name: 'Source path' }),
-      /^shipTo\.city/,
-    )
+    const sourcePath = panel.getByRole('combobox', { name: 'Source path' })
+
+    // Repeating parts are listed too, so they can be used as a whole, as in $sum(lines.netPrice).
+    await userEvent.click(sourcePath)
+    const [packages] = await page(canvasElement).findAllByRole('option', { name: /^packages\[\]/ })
+
+    await expect(packages).toHaveAccessibleName(/^packages\[\]($|[^.])/)
+    await userEvent.click(await page(canvasElement).findByRole('option', { name: /^shipTo\.city/ }))
     await userEvent.click(panel.getByRole('button', { name: 'Insert path' }))
 
     await waitFor(() => expect(editor).toHaveValue('$count(shipTo.city)'))
@@ -449,6 +452,48 @@ export const LoopByMouse = meta.story({
   },
 })
 
+// A header field linked into a field of the line items runs once for the whole Document, not
+// once per item.
+export const LinkOutsideLoop = meta.story({
+  args: { id: invoic.id },
+  async play({ canvasElement }) {
+    const loop = await findNode(canvasElement, 'Loop over line items 1')
+
+    const problem =
+      'The link from invoiceNumber to SG25/QTY+47/C186/6411 leaves the loop: links run once per item only between fields beneath the looped parts.'
+
+    await expect(loop.queryByText(problem)).toBeNull()
+
+    await pressOn(await findRow(canvasElement, source('invoiceNumber')), 'l')
+    await pressOn(await findRow(canvasElement, target('SG25/QTY+47/C186/6411')), 'l')
+
+    await expect(await loop.findByText(problem)).toBeVisible()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
+
+    const panel = await select(canvasElement, 'Loop over line items 1')
+
+    await expect(panel.getByText(problem)).toBeVisible()
+  },
+})
+
+// Same-kind Transforms are told apart by their number, so a long name wraps rather than losing it.
+export const LongNames = meta.story({
+  args: { id: withoutLinks.id },
+  async play({ canvasElement }) {
+    await place(canvasElement, 'Loop over line items', 'Loop over line items 1')
+    await place(canvasElement, 'Loop over line items', 'Loop over line items 2')
+    await place(canvasElement, 'JSONata expression', 'JSONata expression 1')
+
+    for (const name of ['Loop over line items 2', 'JSONata expression 1']) {
+      const header = (await findNode(canvasElement, name)).getByRole('button', { name })
+      const text = header.lastElementChild!
+
+      await expect(text).toHaveTextContent(name)
+      await expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth)
+    }
+  },
+})
+
 export const German = meta.story({
   args: { id: orders.id },
   parameters: {
@@ -479,8 +524,17 @@ export const German = meta.story({
       'aria-invalid',
       'true',
     )
-    await expect(panel.getByText(/^Syntaxfehler in Zeile 1, Spalte 16/)).toBeVisible()
+    await expect(
+      panel.getByText('Syntaxfehler in Zeile 1, Spalte 16: „)“ fehlt vor dem Ende des Ausdrucks.'),
+    ).toBeVisible()
     await expect(panel.getByRole('button', { name: 'Pfad einfügen' })).toBeDisabled()
+
+    const header = canvas.getByRole('button', { name: 'Schleife über Positionen 1' })
+
+    await expect(header.lastElementChild).toHaveTextContent('Schleife über Positionen 1')
+    await expect(header.lastElementChild!.scrollWidth).toBeLessThanOrEqual(
+      header.lastElementChild!.clientWidth,
+    )
 
     await userEvent.click(canvas.getByRole('button', { name: 'Lookup Table 1' }))
     await expect(await panel.findByText('Gehört zu: Workspace')).toBeVisible()

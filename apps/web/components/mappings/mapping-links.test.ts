@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest'
 
 import { messageTypeStructures, seedDocumentStructureOf } from '@edi-bridge/mocks'
 
-import { leafPaths, linksOfItem, rowListingLinks } from './mapping-links'
+import {
+  expressionPathItems,
+  isLinkableRow,
+  isWholePart,
+  leafPaths,
+  linksOfItem,
+  pathsBeneath,
+  repeatingPaths,
+  rowListingLinks,
+} from './mapping-links'
 import { documentTree, edifactTree, findItem } from './mapping-tree'
 
 const source = documentTree(seedDocumentStructureOf.ORDERS)
@@ -23,6 +32,42 @@ describe('leafPaths', () => {
     expect(leaves.source).not.toContain('lines[]')
     expect(leaves.target).toContain('DTM+137/C507/2380')
     expect(leaves.target).not.toContain('DTM+137/C507')
+  })
+})
+
+describe('linkable rows', () => {
+  const rows = {
+    leaves: leaves,
+    parts: { source: repeatingPaths(source), target: repeatingPaths(target) },
+  }
+
+  it('links fields and whole repeating parts, but no other parts', () => {
+    expect(isLinkableRow(rows, { side: 'source', path: 'lines[].gtin' })).toBe(true)
+    expect(isLinkableRow(rows, { side: 'target', path: 'SG25' })).toBe(true)
+    expect(isLinkableRow(rows, { side: 'target', path: 'DTM+137/C507' })).toBe(false)
+  })
+
+  it('tells a whole repeating part from a field', () => {
+    expect(isWholePart(rows, { side: 'source', path: 'lines[]' })).toBe(true)
+    expect(isWholePart(rows, { side: 'source', path: 'lines[].gtin' })).toBe(false)
+  })
+})
+
+describe('pathsBeneath', () => {
+  it('gives the fields inside a part', () => {
+    expect(pathsBeneath(source, 'lines[]')).toContain('lines[].gtin')
+    expect(pathsBeneath(source, 'lines[]')).not.toContain('orderNumber')
+    expect(pathsBeneath(source, 'unknown').size).toBe(0)
+  })
+})
+
+describe('expressionPathItems', () => {
+  it('lists fields and repeating parts in tree order, each part before its fields', () => {
+    const paths = expressionPathItems(source).map(({ path }) => path)
+
+    expect(paths).toContain('orderNumber')
+    expect(paths.indexOf('lines[]')).toBeGreaterThanOrEqual(0)
+    expect(paths.indexOf('lines[]')).toBeLessThan(paths.indexOf('lines[].gtin'))
   })
 })
 

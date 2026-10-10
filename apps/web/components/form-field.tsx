@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import type { ComponentProps, ReactNode } from 'react'
 
 import { Input } from '@edi-bridge/ui/components/input'
+import { RadioGroup, RadioGroupItem } from '@edi-bridge/ui/components/radio-group'
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import {
   SelectValue,
 } from '@edi-bridge/ui/components/select'
 import { Textarea } from '@edi-bridge/ui/components/textarea'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { GlnError } from '@/lib/forms/gln'
 
@@ -126,6 +128,16 @@ export function TextareaField({
   )
 }
 
+type Choice<Value extends string> = { value: Value; label: string; detail?: string }
+
+function OwnLabel({ id, label }: { id: string; label: string }) {
+  return (
+    <span id={`${id}-label`} className="text-sm font-medium">
+      {label}
+    </span>
+  )
+}
+
 export function SelectField<Value extends string>({
   id,
   label,
@@ -137,28 +149,30 @@ export function SelectField<Value extends string>({
   error = null,
   disabled = false,
   loading = false,
+  mono = false,
+  describedBy: alsoDescribedBy,
+  className = 'sm:w-80',
 }: {
   id: string
   label: string
   description: string
   value: Value | null
-  items: ReadonlyArray<{ value: Value; label: string }>
+  items: ReadonlyArray<Choice<Value>>
   onChange: (value: Value) => void
   placeholder?: string
   error?: string | null
   disabled?: boolean
   loading?: boolean
+  mono?: boolean
+  describedBy?: string
+  className?: string
 }) {
   return (
     <FormField
       id={id}
       description={description}
       error={error}
-      label={
-        <span id={`${id}-label`} className="text-sm font-medium">
-          {label}
-        </span>
-      }>
+      label={<OwnLabel id={id} label={label} />}>
       <Select
         disabled={disabled}
         items={items}
@@ -180,21 +194,78 @@ export function SelectField<Value extends string>({
         <SelectTrigger
           id={id}
           aria-busy={loading || undefined}
-          aria-describedby={describedBy(id, error)}
+          aria-describedby={[describedBy(id, error), alsoDescribedBy].filter(Boolean).join(' ')}
           aria-disabled={loading || undefined}
           aria-invalid={error !== null}
           aria-labelledby={`${id}-label`}
-          className="w-full aria-disabled:cursor-progress aria-disabled:opacity-50 sm:w-80">
+          className={cn(
+            'w-full aria-disabled:cursor-progress aria-disabled:opacity-50',
+            mono && 'font-mono',
+            className,
+          )}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
+            <SelectItem key={item.value} label={item.label} value={item.value}>
+              {item.detail === undefined ? (
+                <span className={cn(mono && 'font-mono')}>{item.label}</span>
+              ) : (
+                <span className="flex min-w-0 flex-col">
+                  <span className={cn('truncate', mono && 'font-mono')}>{item.label}</span>
+                  <span className="text-muted-foreground truncate text-xs">{item.detail}</span>
+                </span>
+              )}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
+    </FormField>
+  )
+}
+
+export function RadioField<Value extends string>({
+  id,
+  label,
+  description,
+  value,
+  items,
+  onChange,
+  error = null,
+}: {
+  id: string
+  label: string
+  description: string
+  value: Value | null
+  items: ReadonlyArray<Choice<Value>>
+  onChange: (value: Value) => void
+  error?: string | null
+}) {
+  return (
+    <FormField
+      id={id}
+      description={description}
+      error={error}
+      label={<OwnLabel id={id} label={label} />}>
+      <RadioGroup
+        value={value}
+        aria-describedby={describedBy(id, error)}
+        aria-labelledby={`${id}-label`}
+        className="flex flex-col gap-2"
+        onValueChange={(next) => {
+          const item = items.find((candidate) => candidate.value === next)
+
+          if (item) {
+            onChange(item.value)
+          }
+        }}>
+        {items.map((item) => (
+          <label key={item.value} className="flex min-h-6 items-center gap-2 text-sm">
+            <RadioGroupItem value={item.value} />
+            {item.label}
+          </label>
+        ))}
+      </RadioGroup>
     </FormField>
   )
 }

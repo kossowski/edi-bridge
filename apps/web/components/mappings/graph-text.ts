@@ -93,6 +93,10 @@ export function useGraphText(
         return t('issues.unknownLookupTable')
       }
 
+      if (found.code === 'outsideLoop') {
+        return t('issues.outsideLoop', { source: found.source, target: found.target })
+      }
+
       if (found.field === '') {
         return t('issues.invalidConfig')
       }
@@ -253,11 +257,12 @@ export function useGraphText(
           })
         case 'lookupTable': {
           const { lookupTableId } = transform.config
-          const chosen = lookupTables?.find(({ id }) => id === lookupTableId)
 
           if (lookupTableId === null) {
             return t('summary.lookupTableNone')
           }
+
+          const chosen = lookupTables?.find(({ id }) => id === lookupTableId)
 
           if (chosen) {
             return chosen.name

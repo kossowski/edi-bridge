@@ -1116,7 +1116,23 @@
         "sourcePath": "Source path",
         "sourcePathPlaceholder": "Choose a source field",
         "sourcePathDescription": "Inserts the path of the chosen field at the cursor, written for JSONata.",
-        "insert": "Insert path"
+        "insert": "Insert path",
+        "syntaxErrors": {
+          "S0101": "A text in quotes is missing its closing quote.",
+          "S0105": "A name in backticks is missing its closing backtick (`).",
+          "S0106": "A comment is missing its closing */.",
+          "S0201": "Unexpected \"{token}\".",
+          "S0202": "Expected \"{value}\", but found \"{token}\".",
+          "S0203": "Expected \"{value}\" before the end of the expression.",
+          "S0204": "Unknown operator \"{token}\".",
+          "S0205": "Unexpected \"{token}\".",
+          "S0207": "The expression ends too early.",
+          "S0211": "The symbol \"{token}\" cannot stand before a value.",
+          "S0212": "The left side of := must be a variable name that starts with $.",
+          "S0213": "The value {value} cannot be a step in a path.",
+          "S0301": "A regular expression must not be empty.",
+          "S0302": "A regular expression is missing its closing /."
+        }
       },
       "ranges": {
         "concatenate": {
@@ -1147,7 +1163,8 @@
         "invalidConfig": "The settings are invalid.",
         "notWholeNumber": "{field} must be a whole number.",
         "unconnected": "The {input} input is not linked.",
-        "unknownLookupTable": "The chosen Lookup Table no longer exists. Choose another one."
+        "unknownLookupTable": "The chosen Lookup Table no longer exists. Choose another one.",
+        "outsideLoop": "The link from {source} to {target} leaves the loop: links run once per item only between fields beneath the looped parts."
       },
       "details": {
         "settings": "Settings",

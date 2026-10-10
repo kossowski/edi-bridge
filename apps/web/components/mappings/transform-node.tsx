@@ -6,7 +6,11 @@ import { Handle, type Node, type NodeProps, Position, useConnection } from '@xyf
 import { useTranslations } from 'next-intl'
 import { createContext, memo, useCallback, useContext, useId } from 'react'
 
-import { useCanvasStore, useLinkHints } from '@/components/mappings/mapping-canvas-store'
+import {
+  useCanvasStore,
+  useLinkHints,
+  usePendingPartLink,
+} from '@/components/mappings/mapping-canvas-store'
 import { sameStart, transformWidth } from '@/components/mappings/mapping-graph'
 import { usePanIntoView } from '@/components/mappings/tree-node'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -19,7 +23,6 @@ export type PortView = {
   // Who the input is linked from, or where the output goes; read out with the port.
   status: string
   linked: boolean
-  // A loop's items take a whole repeating part rather than a single value.
   takesPart: boolean
 }
 
@@ -122,12 +125,13 @@ function InputPort({
   const hints = useLinkHints()
   const status = useId()
   const end: LinkEnd = { kind: 'transform', transformId, input: view.port }
+  const pendingPart = usePendingPartLink()
 
   const target = useCanvasStore(
     (state) =>
       state.linkFrom !== null &&
       !view.linked &&
-      state.linkFromPart === view.takesPart &&
+      pendingPart === view.takesPart &&
       !(state.linkFrom.kind === 'transform' && state.linkFrom.transformId === transformId),
   )
 
@@ -254,12 +258,13 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
       data-invalid={invalid || undefined}
       data-selected={selected || undefined}
       onFocus={onFocus}>
-      <div className="flex items-center gap-1 px-1.5">
+      <div className="flex items-start gap-1 px-1.5">
         <button
+          title={data.name}
           type="button"
           aria-describedby={invalid ? issuesId : undefined}
           aria-pressed={selected}
-          className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 flex h-7.5 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm px-1 text-left font-semibold outline-none focus-visible:ring-3"
+          className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 flex min-h-7.5 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 text-left leading-tight font-semibold outline-none focus-visible:ring-3"
           data-transform-id={data.transformId}
           onClick={() => actions.toggle(data.transformId)}>
           {invalid && (
@@ -270,7 +275,8 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
               className="size-4 shrink-0 text-amber-700 dark:text-amber-300"
             />
           )}
-          <span className="truncate">{data.name}</span>
+          {/* Wraps rather than truncates, so the number that tells same-kind nodes apart stays. */}
+          <span className="min-w-0 [overflow-wrap:anywhere]">{data.name}</span>
         </button>
         <button
           type="button"
