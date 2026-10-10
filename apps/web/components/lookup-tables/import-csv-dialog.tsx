@@ -2,7 +2,15 @@
 
 import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
-import { type RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import { describedBy, FormField } from '@/components/form-field'
 import {
@@ -16,7 +24,6 @@ import {
   previewPageSize,
   rowsWithStatus,
 } from '@/components/lookup-tables/lookup-table-import'
-import { errorTextClass } from '@/components/lookup-tables/lookup-table-styles'
 import { importLookupTable, previewLookupTableImport } from '@/lib/api/client'
 import { lookupTableKeys, storeSavedLookupTable } from '@/lib/api/queries'
 import {
@@ -46,20 +53,18 @@ type SourceError = CsvError | 'readFailed'
 
 type Preview = { csv: string; rows: LookupTableImportRow[] }
 
-const emptyStateClass = 'text-muted-foreground rounded-lg border px-2 py-6 text-center'
-
-const statusStyles: Record<LookupTableImportStatus, string> = {
-  added: 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
-  changed: 'bg-amber-500/10 text-amber-800 dark:text-amber-300',
-  unchanged: 'border-border text-foreground',
-  invalid: 'bg-red-500/10 text-red-800 dark:text-red-300',
-}
-
 function StatusBadge({ status }: { status: LookupTableImportStatus }) {
   const t = useTranslations('LookupTable.import.statuses')
 
   return (
-    <Badge variant="outline" className={statusStyles[status]}>
+    <Badge
+      variant="outline"
+      className={cn(
+        status === 'added' && 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+        status === 'changed' && 'bg-amber-500/10 text-amber-800 dark:text-amber-300',
+        status === 'unchanged' && 'border-border text-foreground',
+        status === 'invalid' && 'bg-red-500/10 text-red-800 dark:text-red-300',
+      )}>
       {t(status)}
     </Badge>
   )
@@ -184,7 +189,7 @@ function CsvSource({
         />
       </FormField>
       {previewFailed && (
-        <p role="alert" className={errorTextClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.previewFailed')}
         </p>
       )}
@@ -262,6 +267,20 @@ function Codes({ row }: { row: LookupTableImportRow }) {
   )
 }
 
+function HeaderCell({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <th
+      scope="col"
+      className={cn('bg-popover sticky top-0 border-b px-2 py-2 text-left font-medium', className)}>
+      {children}
+    </th>
+  )
+}
+
+function EmptyState({ children }: { children: ReactNode }) {
+  return <p className="text-muted-foreground rounded-lg border px-2 py-6 text-center">{children}</p>
+}
+
 function PreviewTable({
   rows,
   focusIndex,
@@ -272,7 +291,6 @@ function PreviewTable({
   const t = useTranslations('LookupTable.import')
   const captionId = useId()
   const focusRow = useRef<HTMLTableRowElement>(null)
-  const headerClass = 'bg-popover sticky top-0 px-2 py-2 text-left font-medium'
 
   useLayoutEffect(() => {
     if (focusIndex !== null) {
@@ -293,21 +311,11 @@ function PreviewTable({
         </caption>
         <thead>
           <tr>
-            <th scope="col" className={cn(headerClass, 'w-12 border-b sm:w-16')}>
-              {t('columns.line')}
-            </th>
-            <th scope="col" className={cn(headerClass, 'border-b sm:w-28')}>
-              {t('columns.status')}
-            </th>
-            <th scope="col" className={cn(headerClass, 'border-b')}>
-              {t('columns.sourceCode')}
-            </th>
-            <th scope="col" className={cn(headerClass, 'border-b')}>
-              {t('columns.targetCode')}
-            </th>
-            <th scope="col" className={cn(headerClass, 'hidden border-b sm:table-cell')}>
-              {t('columns.details')}
-            </th>
+            <HeaderCell className="w-12 sm:w-16">{t('columns.line')}</HeaderCell>
+            <HeaderCell className="sm:w-28">{t('columns.status')}</HeaderCell>
+            <HeaderCell>{t('columns.sourceCode')}</HeaderCell>
+            <HeaderCell>{t('columns.targetCode')}</HeaderCell>
+            <HeaderCell className="hidden sm:table-cell">{t('columns.details')}</HeaderCell>
           </tr>
         </thead>
         <tbody className="[&_td]:border-b [&>tr:last-child_td]:border-b-0">
@@ -380,7 +388,7 @@ function ImportPreview({
         <p className="text-muted-foreground">{t('result.description')}</p>
       </div>
       {rows.length === 0 ? (
-        <p className={emptyStateClass}>{t('result.noLines')}</p>
+        <EmptyState>{t('result.noLines')}</EmptyState>
       ) : (
         <>
           <div role="group" aria-label={t('result.filter')} className="flex flex-wrap gap-2">
@@ -402,7 +410,7 @@ function ImportPreview({
             ))}
           </div>
           {filtered.length === 0 ? (
-            <p className={emptyStateClass}>{t('result.noMatch')}</p>
+            <EmptyState>{t('result.noMatch')}</EmptyState>
           ) : (
             <PreviewTable focusIndex={focusIndex} rows={shown} />
           )}
@@ -433,7 +441,7 @@ function ImportPreview({
         <p className="text-muted-foreground">{t('result.nothingToApply')}</p>
       )}
       {applyFailed && (
-        <p role="alert" className={errorTextClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.applyFailed')}
         </p>
       )}

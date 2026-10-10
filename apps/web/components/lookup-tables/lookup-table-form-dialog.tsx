@@ -15,7 +15,6 @@ import {
   validateLookupTableForm,
 } from '@/components/lookup-tables/lookup-table-form-values'
 import { scopeKey } from '@/components/lookup-tables/lookup-table-scope'
-import { errorTextClass } from '@/components/lookup-tables/lookup-table-styles'
 import { useLookup } from '@/hooks/use-lookup'
 import { ApiError, createLookupTable, updateLookupTable } from '@/lib/api/client'
 import { lookupTableQuery, storeSavedLookupTable, tradingPartnersQuery } from '@/lib/api/queries'
@@ -61,7 +60,7 @@ function TradingPartnerChoice({
   if (tradingPartners.isError) {
     return (
       <div className="flex flex-col items-start gap-2">
-        <p role="alert" className={errorTextClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('error')}
         </p>
         <Button size="sm" variant="outline" onClick={() => void tradingPartners.refetch()}>
@@ -216,7 +215,7 @@ function LookupTableForm({
         />
       )}
       {save.isError && !conflict && (
-        <p role="alert" className={errorTextClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.saveFailed')}
         </p>
       )}

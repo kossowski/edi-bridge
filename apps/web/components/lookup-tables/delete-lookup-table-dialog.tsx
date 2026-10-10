@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl'
 
 import type { RefObject } from 'react'
 
-import { errorTextClass } from '@/components/lookup-tables/lookup-table-styles'
 import { ApiError, deleteLookupTable } from '@/lib/api/client'
 import { forgetDeletedLookupTable } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -50,7 +49,7 @@ function DeleteConfirmation({
   return (
     <>
       {remove.isError && (
-        <p role="alert" className={errorTextClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('failed')}
         </p>
       )}

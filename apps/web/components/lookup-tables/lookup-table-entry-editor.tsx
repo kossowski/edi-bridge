@@ -28,7 +28,6 @@ import {
   positionOf,
   type VisibleRow,
 } from '@/components/lookup-tables/lookup-table-entry-grid'
-import { errorTextClass } from '@/components/lookup-tables/lookup-table-styles'
 import { useEntryEditing } from '@/components/lookup-tables/use-entry-editing'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
@@ -281,12 +280,12 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
         </div>
       </div>
       {errorCount > 0 && (
-        <p role="alert" className={errorTextClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.summary', { count: errorCount })}
         </p>
       )}
       {entries.saveFailed && (
-        <p role="alert" className={errorTextClass}>
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.saveFailed')}
         </p>
       )}
