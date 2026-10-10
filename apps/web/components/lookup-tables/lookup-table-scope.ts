@@ -18,3 +18,9 @@ export function scopeKey(scope: LookupTableScope | LookupTableScopeInput) {
 
   return 'tradingPartner' in scope ? scope.tradingPartner.id : scope.tradingPartnerId
 }
+
+export function toScopeInput(scope: LookupTableScope): LookupTableScopeInput {
+  return scope.kind === 'workspace'
+    ? { kind: 'workspace' }
+    : { kind: 'tradingPartner', tradingPartnerId: scope.tradingPartner.id }
+}

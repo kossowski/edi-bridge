@@ -10,6 +10,8 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { type Ref, type RefObject, useMemo, useRef, useState } from 'react'
 
 import { ListScreen, ListTable } from '@/components/list-screen'
@@ -20,6 +22,7 @@ import {
   scopeKey,
   workspaceScopeKey,
 } from '@/components/lookup-tables/lookup-table-scope'
+import { ScopeLabel } from '@/components/lookup-tables/lookup-table-scope-label'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
@@ -31,25 +34,9 @@ import {
 import { FacetedFilter } from '@edi-bridge/ui/components/faceted-filter'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 
-import type { LookupTable, LookupTableScope, LookupTableSummary } from '@edi-bridge/contracts'
+import type { LookupTable, LookupTableSummary } from '@edi-bridge/contracts'
 
 const columns = ['name', 'scope', 'entries', 'updatedAt', 'actions'] as const
-
-function ScopeLabel({ scope }: { scope: LookupTableScope }) {
-  const t = useTranslations('LookupTables.scope')
-
-  return (
-    <span className="flex items-center gap-1.5">
-      <HugeiconsIcon
-        icon={scopeIcons[scope.kind]}
-        strokeWidth={2}
-        aria-hidden
-        className="text-muted-foreground size-4 shrink-0"
-      />
-      {scope.kind === 'workspace' ? t('workspace') : scope.tradingPartner.name}
-    </span>
-  )
-}
 
 type RowAction = (table: LookupTableSummary, trigger: HTMLElement | null) => void
 
@@ -101,8 +88,14 @@ function LookupTableRow({
   const format = useFormatter()
 
   return (
-    <TableRow>
-      <TableCell className="font-medium">{table.name}</TableCell>
+    <TableRow className="relative">
+      <TableCell>
+        <Link
+          href={`/lookup-tables/${table.id}`}
+          className="focus-visible:after:ring-ring font-medium underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset">
+          {table.name}
+        </Link>
+      </TableCell>
       <TableCell>
         <ScopeLabel scope={table.scope} />
       </TableCell>
@@ -110,7 +103,7 @@ function LookupTableRow({
       <TableCell className="tabular-nums">
         {format.dateTime(new Date(table.updatedAt), { dateStyle: 'medium', timeStyle: 'short' })}
       </TableCell>
-      <TableCell className="w-px text-right">
+      <TableCell className="relative w-px text-right">
         <LookupTableActions table={table} onDelete={onDelete} onEdit={onEdit} />
       </TableCell>
     </TableRow>
@@ -218,17 +211,20 @@ export function LookupTablesScreen() {
   const t = useTranslations('LookupTables')
   const tNavigation = useTranslations('Navigation')
   const lookupTables = useQuery(lookupTablesQuery)
+  const router = useRouter()
   const newButton = useRef<HTMLButtonElement>(null)
   const [announcement, setAnnouncement] = useState('')
   const dialogs = useLookupTableDialogs(newButton)
   const scopeFilter = useScopeFilter(lookupTables.data)
 
   function saved(table: LookupTable) {
-    setAnnouncement(
-      dialogs.state.form.table
-        ? t('announcements.saved', { name: table.name })
-        : t('announcements.created', { name: table.name }),
-    )
+    if (!dialogs.state.form.table) {
+      router.push(`/lookup-tables/${table.id}`)
+
+      return
+    }
+
+    setAnnouncement(t('announcements.saved', { name: table.name }))
     dialogs.close('form')
   }
 
