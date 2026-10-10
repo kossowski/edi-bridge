@@ -171,6 +171,10 @@ export function interchangeIdOf(firstRun: RunSummary) {
   return stableUuid(`interchange:${firstRun.id}`)
 }
 
+export function controlReferenceOf(interchangeId: string) {
+  return String(seededFaker(interchangeId).number.int({ min: 1, max: 99_999_999 }))
+}
+
 function bundleKeyOf(run: RunSummary) {
   return directionOf(run) === 'inbound'
     ? `${run.tradingPartner.id}|${run.flow.id}|${run.receivedAt}`
@@ -283,7 +287,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       ]),
     )
 
-    const controlReference = String(seededFaker(group.id).number.int({ min: 1, max: 99_999_999 }))
+    const controlReference = controlReferenceOf(group.id)
 
     const result: GeneratedGroup = {
       messages,

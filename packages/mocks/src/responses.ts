@@ -11,3 +11,5 @@ export const notFound = () => problem(404, 'Not found')
 export const conflict = (message: string) => problem(409, message)
 
 export const unprocessable = (message: string) => problem(422, message)
+
+export const serverError = () => problem(500, 'Internal Server Error')
