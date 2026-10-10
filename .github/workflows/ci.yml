@@ -68,7 +68,7 @@ jobs:
         run: pnpm turbo run ${{ matrix.tasks }} ${{ github.event_name == 'pull_request' && '--affected' || '' }} ${{ matrix.args }}
 
   checks:
-    name: Lint, check-types, test and build
+    name: CI passed
     if: always()
     needs: tasks
     runs-on: ubuntu-latest
