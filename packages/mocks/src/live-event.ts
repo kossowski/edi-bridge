@@ -11,7 +11,7 @@ import {
 import { generateRun, pickFailureStage, seedRuns } from './run'
 import { type RunStore, toRunStore } from './run-store'
 
-export type LiveEventsMode = 'live' | 'quiet' | 'unavailable' | 'dropping'
+export type LiveEventsMode = 'live' | 'quiet' | 'unavailable' | 'dropping' | 'stalling'
 
 export type LiveEventsOptions = {
   runs?: ReadonlyArray<RunSummary> | RunStore
@@ -26,8 +26,8 @@ const encoder = new TextEncoder()
 
 const opened = encoder.encode(': connected\n\n')
 
-function frameOf(id: number, event: LiveEvent) {
-  return encoder.encode(`id:${id}\ndata:${JSON.stringify(event)}\n\n`)
+function frameOf(event: LiveEvent) {
+  return encoder.encode(`data:${JSON.stringify(liveEventsEndpoint.event.parse(event))}\n\n`)
 }
 
 function receive(faker: Faker): RunSummary {
@@ -66,20 +66,36 @@ export function liveEventsHandler(
   const faker = new Faker({ locale: [en], seed })
   const inFlight: string[] = []
   let store: RunStore | undefined
-  let lastId = 0
+  let connections = 0
 
-  function nextChanges(): RunSummary[] {
+  function applyNextChanges(): RunSummary[] {
     store ??= toRunStore(runs ?? seedRuns())
 
     const finishing = inFlight.shift()
     const pending = finishing === undefined ? undefined : store.get(finishing)
     const received = receive(faker)
     inFlight.push(received.id)
+    const changes = [...(pending ? [finish(faker, pending)] : []), received]
 
-    return [...(pending ? [finish(faker, pending)] : []), received]
+    for (const run of changes) {
+      store.set(run)
+    }
+
+    return changes
   }
 
-  return http.get(path, ({ request }) => {
+  return http.get(path, async ({ request }) => {
+    connections += 1
+
+    if (mode === 'stalling' && connections > 1) {
+      await new Promise((resolve) => {
+        request.signal.addEventListener('abort', resolve, { once: true })
+        signal?.addEventListener('abort', resolve, { once: true })
+      })
+
+      return new HttpResponse(null, { status: 503 })
+    }
+
     let timer: ReturnType<typeof setInterval> | undefined
     let close = () => {}
 
@@ -111,7 +127,7 @@ export function liveEventsHandler(
         let sent = 0
 
         timer = setInterval(() => {
-          if (mode === 'dropping' && sent >= dropAfter) {
+          if ((mode === 'dropping' || mode === 'stalling') && sent >= dropAfter) {
             stop()
             controller.error(new Error('Live event stream dropped'))
 
@@ -119,10 +135,8 @@ export function liveEventsHandler(
           }
 
           try {
-            for (const run of nextChanges()) {
-              store!.set(run)
-              lastId += 1
-              controller.enqueue(frameOf(lastId, { type: 'run.changed', run }))
+            for (const run of applyNextChanges()) {
+              controller.enqueue(frameOf({ type: 'run.changed', run }))
               sent += 1
             }
           } catch {

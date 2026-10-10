@@ -159,15 +159,13 @@ describe('GET /events', () => {
     expect(counted).toBeGreaterThanOrEqual(finished.length)
   })
 
-  it('numbers events across connections, so a reconnecting client can tell where it left off', async () => {
+  it('sends events without ids, so a reconnecting client refetches instead of resuming', async () => {
     server.use(live({ runs: createRunStore([]) }))
 
-    const first = (await readFrames(await openStream(), 2)).frames
-    const second = (await readFrames(await openStream(), 2)).frames
-    const ids = [...first, ...second].map(({ id }) => Number(id))
+    const { frames } = await readFrames(await openStream(), 2)
 
-    expect(ids).toHaveLength(4)
-    expect(ids.every((id, index) => index === 0 || id > ids[index - 1]!)).toBe(true)
+    expect(frames).toHaveLength(2)
+    expect(frames.map(({ id }) => id)).toEqual([undefined, undefined])
   })
 
   it('ends every stream and stops changing Runs once stopped', async () => {
@@ -215,6 +213,17 @@ describe('GET /events states', () => {
     expect(ended).toBe(true)
     expect(frames.length).toBeGreaterThanOrEqual(3)
     expect(frames.length).toBeLessThan(10)
+  })
+
+  it('drops the first connection and leaves every reconnect unanswered, so a client keeps reconnecting', async () => {
+    server.use(live({ runs: createRunStore([]), mode: 'stalling', dropAfter: 1 }))
+
+    const { ended } = await readFrames(await openStream(), 10)
+
+    expect(ended).toBe(true)
+    await expect(
+      fetch(`${apiUrl}${liveEventsEndpoint.path}`, { signal: AbortSignal.timeout(50) }),
+    ).rejects.toThrow()
   })
 })
 
