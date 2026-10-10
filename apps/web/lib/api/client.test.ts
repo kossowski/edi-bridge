@@ -1,3 +1,4 @@
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
@@ -6,10 +7,13 @@ import {
   createRun,
   createTradingPartner as buildTradingPartner,
   createWorkspace,
+  documentStructureHandlers,
+  documentStructureOrigins,
   lookupTablesHandler,
   mappingHandlers,
   mappingVersionHandlers,
   seedMappingDrafts,
+  seedUnusedDocumentStructures,
   runDetailHandlers,
   runsHandler,
   seedLookupTables,
@@ -18,9 +22,12 @@ import {
 } from '@edi-bridge/mocks'
 
 import {
+  ApiError,
   createChannel,
   createTradingPartner,
+  documentStructureProblemOf,
   getChannel,
+  inferDocumentStructure,
   getRun,
   listLookupTables,
   listMappingVersions,
@@ -32,6 +39,7 @@ import {
   saveMappingDraft,
   switchToProduction,
   updateCompanyIdentity,
+  updateDocumentStructure,
   updateTradingPartner,
 } from './client'
 import { apiUrl } from './config'
@@ -275,5 +283,73 @@ describe('listLookupTables', () => {
     expect(tables.find(({ name }) => name === 'Country codes')?.scope).toEqual({
       kind: 'workspace',
     })
+  })
+})
+
+describe('Document Structure problems', () => {
+  const [csv] = seedUnusedDocumentStructures
+
+  async function problemOf(attempt: Promise<unknown>) {
+    const error = await attempt.then(
+      () => null,
+      (failure: Error) => failure,
+    )
+
+    return documentStructureProblemOf(error)
+  }
+
+  it('reads the problem of a refused adjustment', async () => {
+    server.use(...documentStructureHandlers(apiUrl, { documentStructures: [csv!] }))
+
+    const problem = await problemOf(
+      updateDocumentStructure(csv!.id, {
+        name: csv!.name,
+        adjustments: [{ path: 'rows[]', required: false }],
+      }),
+    )
+
+    expect(problem).toMatchObject({ code: 'notAdjustable', path: 'rows[]' })
+  })
+
+  it('reads the problem of a file that cannot be inferred', async () => {
+    server.use(...documentStructureHandlers(apiUrl))
+
+    const problem = await problemOf(
+      inferDocumentStructure(documentStructureOrigins.invalidJsonDocument),
+    )
+
+    expect(problem).toMatchObject({ code: 'invalidJson' })
+  })
+
+  it('has no problem for other failures', async () => {
+    server.use(...documentStructureHandlers(apiUrl, { documentStructures: [] }))
+
+    await expect(
+      problemOf(updateDocumentStructure(csv!.id, { name: 'x', adjustments: [] })),
+    ).resolves.toBeNull()
+  })
+
+  it('reads a problem only from a refusal', async () => {
+    const body = {
+      code: 'notAdjustable',
+      message: 'x',
+      path: null,
+      line: null,
+      mappingVersions: null,
+    }
+
+    server.use(
+      http.put(`${apiUrl}/document-structures/${csv!.id}`, () =>
+        HttpResponse.json(body, { status: 500 }),
+      ),
+    )
+
+    const error = await updateDocumentStructure(csv!.id, { name: 'x', adjustments: [] }).then(
+      () => null,
+      (failure: Error) => failure,
+    )
+
+    expect(error instanceof ApiError && JSON.parse(error.body)).toEqual(body)
+    expect(documentStructureProblemOf(error)).toBeNull()
   })
 })

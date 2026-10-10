@@ -9,9 +9,12 @@ import {
 } from '@edi-bridge/mocks'
 
 import {
+  documentStructureQuery,
+  documentStructuresQuery,
   mappingDraftQuery,
   mappingVersionsQuery,
   storePublishedMappingVersion,
+  storeSavedDocumentStructure,
   storeSavedTradingPartner,
   tradingPartnerQuery,
   tradingPartnersQuery,
@@ -58,5 +61,18 @@ describe('storePublishedMappingVersion', () => {
     expect(
       queryClient.getQueryState(mappingVersionsQuery(draft.mappingId).queryKey)?.isInvalidated,
     ).toBe(true)
+  })
+})
+
+describe('storeSavedDocumentStructure', () => {
+  it('caches the saved Document Structure and marks the list as stale', () => {
+    const queryClient = new QueryClient()
+    const [saved] = seedDocumentStructures
+    queryClient.setQueryData(documentStructuresQuery.queryKey, [])
+
+    storeSavedDocumentStructure(queryClient, saved!)
+
+    expect(queryClient.getQueryData(documentStructureQuery(saved!.id).queryKey)).toEqual(saved)
+    expect(queryClient.getQueryState(documentStructuresQuery.queryKey)?.isInvalidated).toBe(true)
   })
 })

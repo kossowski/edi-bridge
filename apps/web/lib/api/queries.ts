@@ -2,6 +2,7 @@ import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/reac
 
 import type {
   Channel,
+  DocumentStructure,
   Flow,
   MappingComparisonQuery,
   MappingDraft,
@@ -16,6 +17,7 @@ import {
   compareMappingVersions,
   getChannel,
   getCurrentWorkspace,
+  getDocumentStructure,
   getFlow,
   getInterchange,
   getMappingDraft,
@@ -23,6 +25,7 @@ import {
   getRun,
   getTradingPartner,
   listChannels,
+  listDocumentStructures,
   listLookupTables,
   listFlows,
   listMappingSamples,
@@ -120,7 +123,26 @@ export function mappingPreviewQuery(id: string, sampleId: string, graph: Mapping
 
 export const documentStructureKeys = {
   all: () => ['document-structures'] as const,
+  list: () => [...documentStructureKeys.all(), 'list'] as const,
   detail: (id: string) => [...documentStructureKeys.all(), 'detail', id] as const,
+}
+
+export const documentStructuresQuery = queryOptions({
+  queryKey: documentStructureKeys.list(),
+  queryFn: listDocumentStructures,
+})
+
+export function documentStructureQuery(id: string) {
+  return queryOptions({
+    queryKey: documentStructureKeys.detail(id),
+    queryFn: () => getDocumentStructure(id),
+  })
+}
+
+export function storeSavedDocumentStructure(queryClient: QueryClient, saved: DocumentStructure) {
+  queryClient.setQueryData(documentStructureQuery(saved.id).queryKey, saved)
+  void queryClient.invalidateQueries({ queryKey: documentStructureKeys.list() })
+  void queryClient.invalidateQueries({ queryKey: mappingKeys.list() })
 }
 
 export const messageTypeKeys = {

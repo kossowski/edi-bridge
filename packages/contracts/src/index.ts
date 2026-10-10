@@ -103,6 +103,7 @@ export {
   type JsonRoot,
   jsonRoots,
   jsonRootSchema,
+  maxDocumentStructureNameLength,
   maxEncodedFileBytes,
   nodeContent,
   type NodeAdjustment,

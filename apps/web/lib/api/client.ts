@@ -5,14 +5,21 @@ import {
   type ChannelUpdate,
   type CompanyIdentityInput,
   createChannelEndpoint,
+  type CreateDocumentStructureBody,
+  createDocumentStructureEndpoint,
   createFlowEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   documentStructureEndpoint,
+  type DocumentStructureOrigin,
+  type DocumentStructureProblem,
+  documentStructureProblemSchema,
+  documentStructuresEndpoint,
   type Endpoint,
   flowEndpoint,
   type FlowInput,
   flowsEndpoint,
+  inferDocumentStructureEndpoint,
   type FlowUpdate,
   interchangeEndpoint,
   lookupTablesEndpoint,
@@ -52,6 +59,8 @@ import {
   tradingPartnersEndpoint,
   updateChannelEndpoint,
   updateCompanyIdentityEndpoint,
+  type UpdateDocumentStructureBody,
+  updateDocumentStructureEndpoint,
   updateFlowEndpoint,
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
@@ -62,6 +71,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly path: string,
+    readonly body = '',
   ) {
     super(`API request to ${path} failed with status ${status}`)
     this.name = 'ApiError'
@@ -100,7 +110,7 @@ async function request<
   })
 
   if (!response.ok) {
-    throw new ApiError(response.status, path)
+    throw new ApiError(response.status, path, await response.text().catch(() => ''))
   }
 
   return endpoint.response.parse(await response.json())
@@ -189,6 +199,39 @@ export function getDocumentStructure(id: string) {
   return request(documentStructureEndpoint, {
     path: toPath(documentStructureEndpoint.path, { id }),
   })
+}
+
+export function listDocumentStructures() {
+  return request(documentStructuresEndpoint)
+}
+
+export function inferDocumentStructure(origin: DocumentStructureOrigin) {
+  return request(inferDocumentStructureEndpoint, { body: origin })
+}
+
+export function createDocumentStructure(body: CreateDocumentStructureBody) {
+  return request(createDocumentStructureEndpoint, { body })
+}
+
+export function updateDocumentStructure(id: string, body: UpdateDocumentStructureBody) {
+  return request(updateDocumentStructureEndpoint, {
+    path: toPath(updateDocumentStructureEndpoint.path, { id }),
+    body,
+  })
+}
+
+export function documentStructureProblemOf(error: Error | null): DocumentStructureProblem | null {
+  if (!(error instanceof ApiError) || error.status !== 422) {
+    return null
+  }
+
+  try {
+    const parsed = documentStructureProblemSchema.safeParse(JSON.parse(error.body))
+
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
 }
 
 export function getMessageTypeStructure(messageType: MessageType) {
