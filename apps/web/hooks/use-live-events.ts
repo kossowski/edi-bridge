@@ -59,6 +59,10 @@ export function useLiveEvents(): LiveStatus {
     }
 
     function fail() {
+      if (disposed) {
+        return
+      }
+
       failures += 1
       setStatus(failures >= offlineAfterFailures ? 'offline' : 'reconnecting')
       retryTimer = setTimeout(connect, backoffMs(failures))

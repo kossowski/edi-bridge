@@ -24,7 +24,11 @@ export default definePreview({
     addonA11y(),
     // Relative so the worker also registers under the GitHub Pages sub-path.
     addonMsw(() =>
-      startMockWorker({ quiet: true, serviceWorker: { url: './mockServiceWorker.js' } }),
+      startMockWorker({
+        liveEvents: 'quiet',
+        quiet: true,
+        serviceWorker: { url: './mockServiceWorker.js' },
+      }),
     ),
   ],
   decorators: [

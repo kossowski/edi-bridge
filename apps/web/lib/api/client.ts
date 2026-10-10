@@ -76,7 +76,7 @@ import {
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
-import { apiUrl, isMockingEnabled, mockLiveEvents } from './config'
+import { apiUrl, isMockingEnabled } from './config'
 
 export class ApiError extends Error {
   constructor(
@@ -93,9 +93,14 @@ let mockingStarted: Promise<unknown> | undefined
 
 async function mockingReady() {
   if (isMockingEnabled && typeof window !== 'undefined') {
-    mockingStarted ??= import('./mock-worker').then(({ startMockWorker }) =>
-      startMockWorker({}, mockLiveEvents),
-    )
+    if (!mockingStarted) {
+      const starting = import('./mock-worker').then(({ startMockWorker }) => startMockWorker())
+      mockingStarted = starting
+      void starting.catch(() => {
+        mockingStarted = undefined
+      })
+    }
+
     await mockingStarted
   }
 }
