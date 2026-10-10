@@ -818,6 +818,27 @@
       "retry": "Erneut versuchen"
     },
     "draft": "Draft",
+    "state": {
+      "neverPublished": "Nie veröffentlicht",
+      "unpublishedChanges": "Unveröffentlichte Änderungen seit Version {version}",
+      "published": "Keine Änderungen seit Version {version}"
+    },
+    "versionsLink": "Mapping Versions",
+    "publish": {
+      "button": "Veröffentlichen",
+      "title": "Draft als Version {version} veröffentlichen?",
+      "description": "Eine veröffentlichte Mapping Version lässt sich nicht mehr ändern. Flows behalten ihre festgelegte Mapping Version, bis Sie sie auf eine neuere umstellen.",
+      "confirm": "Version {version} veröffentlichen",
+      "pending": "Wird veröffentlicht…",
+      "cancel": "Abbrechen",
+      "close": "Schließen",
+      "done": "Als Version {version} veröffentlicht.",
+      "problem": {
+        "noChanges": "Der Draft hat seit der neuesten Mapping Version keine Änderungen, es gibt also nichts zu veröffentlichen.",
+        "incomplete": "Der Draft lässt sich noch nicht veröffentlichen: Jede Verknüpfung und jeder Transform muss vollständig sein. Vervollständigen Sie sie und veröffentlichen Sie dann erneut.",
+        "failed": "Der Draft konnte nicht veröffentlicht werden. Versuchen Sie es erneut."
+      }
+    },
     "facts": {
       "label": "Mapping-Details",
       "direction": "Richtung",
@@ -1223,6 +1244,32 @@
         "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispiel-Documents noch nicht in der Vorschau berechnet.",
         "brokenLink": "Eine Verknüpfung hier führt zu einem Feld oder Element, das ihre Seite nicht hat; die Vorschau überspringt sie."
       }
+    }
+  },
+  "MappingVersions": {
+    "title": "Mapping Versions",
+    "back": "Zurück zum Draft",
+    "openDraft": "Draft öffnen",
+    "caption": "Mapping Versions, neueste zuerst",
+    "loading": "Mapping Versions werden geladen",
+    "count": "{count, plural, one {# Mapping Version} other {# Mapping Versions}}",
+    "filteredCount": "{count} von {total} Mapping Versions",
+    "search": "Nach Versionsnummer suchen",
+    "noMatch": "Keine Mapping Version passt zur Suche.",
+    "version": "Version {version}",
+    "latest": "Neueste",
+    "columns": {
+      "version": "Version",
+      "publishedAt": "Veröffentlicht"
+    },
+    "empty": {
+      "title": "Noch keine Mapping Versions",
+      "description": "Der Draft dieses Mappings wurde nie veröffentlicht. Veröffentlichen Sie ihn im Canvas, um Version 1 zu erstellen, auf die Flows dann festgelegt werden können."
+    },
+    "error": {
+      "title": "Mapping Versions nicht verfügbar",
+      "description": "Die Mapping Versions konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
     }
   },
   "ManualSubmission": {

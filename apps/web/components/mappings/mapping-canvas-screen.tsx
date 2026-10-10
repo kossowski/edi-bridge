@@ -4,6 +4,7 @@ import { ComputerIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { type QueryKey, useQuery, type UseQueryOptions } from '@tanstack/react-query'
 import { useLocale, useTranslations } from 'next-intl'
+import { useId } from 'react'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
@@ -11,11 +12,11 @@ import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
 import { MappingPreviewPanel } from '@/components/mappings/mapping-preview-panel'
 import { documentTree, edifactTree, type TreeItem } from '@/components/mappings/mapping-tree'
+import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
 import { ApiError, getDocumentStructure, getMessageTypeStructure } from '@/lib/api/client'
 import { documentStructureKeys, mappingDraftQuery, messageTypeKeys } from '@/lib/api/queries'
-import { Badge } from '@edi-bridge/ui/components/badge'
 import {
   Empty,
   EmptyDescription,
@@ -161,13 +162,17 @@ function MappingView({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping')
   const sideTitle = useSideTitle()
   const desktop = useDesktop()
+  const stateId = useId()
 
   return (
     <MappingCanvasProvider>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
-        <Badge variant="outline">{t('draft')}</Badge>
+        <DraftStateLabel id={stateId} draft={draft} />
         <GraphSaveStatus mappingId={draft.mappingId} />
+        <div className="ms-auto">
+          <PublishDraft draft={draft} stateId={stateId} />
+        </div>
       </div>
       <dl
         aria-label={t('facts.label')}

@@ -3,7 +3,9 @@ import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/reac
 import type {
   Channel,
   Flow,
+  MappingDraft,
   MappingGraph,
+  MappingVersionSummary,
   MessageType,
   RunListQuery,
   TradingPartner,
@@ -128,6 +130,20 @@ export function mappingVersionsQuery(mappingId: string) {
   })
 }
 
+export function storePublishedMappingVersion(
+  queryClient: QueryClient,
+  published: MappingVersionSummary,
+) {
+  queryClient.setQueryData<MappingDraft>(
+    mappingDraftQuery(published.mappingId).queryKey,
+    (draft) => draft && { ...draft, latestVersion: published.version, unpublishedChanges: false },
+  )
+  void queryClient.invalidateQueries({ queryKey: mappingKeys.versions(published.mappingId) })
+  void queryClient.invalidateQueries({ queryKey: mappingKeys.list() })
+  void queryClient.invalidateQueries({ queryKey: publishedMappingVersionKeys.all() })
+  void queryClient.invalidateQueries({ queryKey: flowKeys.all() })
+}
+
 export const lookupTableKeys = {
   all: () => ['lookup-tables'] as const,
   list: () => [...lookupTableKeys.all(), 'list'] as const,
@@ -184,9 +200,14 @@ export function storeSavedChannel(queryClient: QueryClient, saved: Channel) {
   void queryClient.invalidateQueries({ queryKey: channelKeys.list() })
 }
 
+export const publishedMappingVersionKeys = {
+  all: () => ['mapping-versions', 'published'] as const,
+  list: (messageType: MessageType) => [...publishedMappingVersionKeys.all(), messageType] as const,
+}
+
 export function publishedMappingVersionsQuery(messageType: MessageType) {
   return queryOptions({
-    queryKey: ['mapping-versions', 'published', messageType],
+    queryKey: publishedMappingVersionKeys.list(messageType),
     queryFn: () => listPublishedMappingVersions({ messageType }),
   })
 }

@@ -945,6 +945,7 @@ export const SaveErrorRollback = meta.story({
       await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeInTheDocument()
     await expect(canvas.getByText('Saving…')).toBeVisible()
+    await expect(canvas.getByText(/^Unpublished changes since Version/)).toBeVisible()
 
     await waitFor(() =>
       expect(canvas.getByRole('alert')).toHaveTextContent(
@@ -956,5 +957,6 @@ export const SaveErrorRollback = meta.story({
     ).toBeNull()
     await expect(await findSaveStatus(canvasElement, 'Not saved')).toBeVisible()
     await expect(canvas.getByText('No links yet')).toBeVisible()
+    await expect(canvas.getByText(/^No changes since Version/)).toBeVisible()
   },
 })
