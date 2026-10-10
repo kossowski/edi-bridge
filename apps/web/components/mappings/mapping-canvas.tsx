@@ -1298,13 +1298,13 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
   ])
 
   return (
-    <div ref={root} className="flex min-h-[32rem] flex-1 flex-col gap-3">
+    <div ref={root} className="flex flex-1 flex-col gap-3">
       <TransformPalette onPlace={place} />
       {/* Beside the canvas the panel would cost the trees their room below 2xl, so it goes under. */}
-      <div ref={area} className="flex min-h-[32rem] flex-1 flex-col gap-4 2xl:flex-row">
+      <div ref={area} className="flex flex-1 flex-col gap-4 2xl:flex-row">
         <div
           ref={container}
-          className="mapping-canvas relative min-h-[32rem] flex-1 overflow-hidden rounded-lg border">
+          className="mapping-canvas relative min-h-96 flex-1 overflow-hidden rounded-lg border">
           <div className="absolute inset-0">
             <LinkActionsContext value={edgeActions}>
               <TransformActionsContext value={transformActions}>

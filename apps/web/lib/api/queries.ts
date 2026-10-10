@@ -98,13 +98,14 @@ export function mappingSamplesQuery(id: string) {
   })
 }
 
-// The same graph and sample always give the same preview, so a result never goes stale. The
-// previous result stays visible while the next one loads.
+// The same graph and sample always give the same preview, so a result never goes stale. While
+// the Mapping changes, the previous result stays visible as the next one loads; another Sample
+// Document's result would show the wrong Document, so a sample switch loads from empty.
 export function mappingPreviewQuery(id: string, sampleId: string, graph: MappingGraph) {
   return queryOptions({
     queryKey: mappingKeys.preview(id, sampleId, graph),
     queryFn: () => previewMapping(id, { sampleId, graph }),
-    placeholderData: keepPreviousData,
+    placeholderData: (previous) => (previous?.sampleId === sampleId ? previous : undefined),
     staleTime: Infinity,
   })
 }

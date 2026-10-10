@@ -1194,23 +1194,23 @@
       "title": "Vorschau",
       "show": "Vorschau einblenden",
       "hide": "Vorschau ausblenden",
-      "sample": "Beispiel",
+      "sample": "Beispiel-Document",
       "source": "Beispiel-Document",
       "target": "Ziel-Document",
       "sourceLabel": "Beispiel-Document {name}",
       "targetLabel": "Ziel-Document für {name}",
       "size": "{format}, {count, plural, one {# Zeile} other {# Zeilen}}",
-      "loading": "Beispiele werden geladen",
+      "loading": "Beispiel-Documents werden geladen",
       "building": "Vorschau wird erstellt",
       "updating": "Wird aktualisiert …",
       "upToDate": "Aktuell",
       "updated": "Vorschau für {name} aktualisiert",
       "empty": {
-        "title": "Noch keine Beispiele",
-        "description": "Die Vorschau zeigt das Ziel-Document für ein Beispiel-Document der Quelle. Dieses Mapping hat noch keine Beispiele."
+        "title": "Noch keine Beispiel-Documents",
+        "description": "Die Vorschau zeigt das Ziel-Document für ein Beispiel-Document der Quelle. Dieses Mapping hat noch keine Beispiel-Documents."
       },
       "error": {
-        "samples": "Die Beispiele konnten nicht geladen werden.",
+        "samples": "Die Beispiel-Documents konnten nicht geladen werden.",
         "preview": "Die Vorschau konnte nicht erstellt werden.",
         "retry": "Erneut versuchen"
       },
@@ -1218,8 +1218,9 @@
         "title": "{count, plural, one {# Ziel bleibt leer} other {# Ziele bleiben leer}}",
         "invalidTransform": "{transform} ist ungültig konfiguriert.",
         "noLookupMatch": "{transform} hat in seiner Lookup Table keinen Treffer gefunden.",
-        "expressionFailed": "{transform} ist bei diesem Beispiel fehlgeschlagen.",
-        "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispielen noch nicht in der Vorschau berechnet."
+        "expressionFailed": "{transform} ist bei diesem Beispiel-Document fehlgeschlagen.",
+        "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispiel-Documents noch nicht in der Vorschau berechnet.",
+        "brokenLink": "Eine Verknüpfung hier führt zu einem Feld oder Element, das ihre Seite nicht hat; die Vorschau überspringt sie."
       }
     }
   },

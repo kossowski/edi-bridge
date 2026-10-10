@@ -10,6 +10,13 @@ import { useGraphText } from '@/components/mappings/graph-text'
 import { documentText, lineCount, previewGraph } from '@/components/mappings/mapping-preview'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { mappingPreviewQuery, mappingSamplesQuery } from '@/lib/api/queries'
+import {
+  type DocumentContent,
+  type MappingDraft,
+  type MappingSample,
+  type PreviewNote,
+  previewNoteKey,
+} from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@edi-bridge/ui/components/empty'
 import {
@@ -20,13 +27,7 @@ import {
   SelectValue,
 } from '@edi-bridge/ui/components/select'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
-
-import type {
-  DocumentContent,
-  MappingDraft,
-  MappingSample,
-  PreviewNote,
-} from '@edi-bridge/contracts'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 // Long enough that typing into a transform's form does not send a preview per keystroke.
 const previewDelay = 600
@@ -78,7 +79,7 @@ function DocumentView({
   const text = document ? documentText(document) : ''
 
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className="flex min-h-0 min-w-0 flex-col gap-1.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <h3 className="text-sm font-medium">{title}</h3>
         {document && (
@@ -95,7 +96,7 @@ function DocumentView({
             tabIndex={0}
             aria-busy={busy}
             aria-label={label}
-            className="bg-muted/40 focus-visible:ring-ring/50 h-72 overflow-auto rounded-md border p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-3">
+            className="bg-muted/40 focus-visible:ring-ring/50 min-h-0 flex-1 overflow-auto rounded-md border p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-3">
             {text}
           </pre>
         ))}
@@ -119,9 +120,7 @@ function Notes({ draft, notes }: { draft: MappingDraft; notes: ReadonlyArray<Pre
       </h3>
       <ul aria-labelledby={headingId} className="flex flex-col gap-1 text-sm">
         {notes.map((note) => (
-          <li
-            key={`${note.targetPath}|${note.transformId}|${note.code}`}
-            className="flex flex-wrap gap-x-2">
+          <li key={previewNoteKey(note)} className="flex flex-wrap gap-x-2">
             <span className="font-mono text-xs leading-5">{note.targetPath}</span>
             <span className="text-muted-foreground">
               {t(note.code, { transform: note.transformId ? text.name(note.transformId) : '' })}
@@ -161,7 +160,7 @@ function SamplePreview({
   const items = samples.map(({ id, name }) => ({ value: id, label: name }))
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
           <span id={labelId} className="text-sm font-medium">
@@ -201,7 +200,7 @@ function SamplePreview({
           {preview.isSuccess && (updating ? t('updating') : t('upToDate'))}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid min-h-40 flex-1 grid-cols-2 grid-rows-[minmax(0,1fr)] gap-4">
         <DocumentView
           document={sample.document}
           label={t('sourceLabel', { name: sample.name })}
@@ -227,10 +226,17 @@ function SamplePreview({
   )
 }
 
-function PreviewContent({ draft }: { draft: MappingDraft }) {
+function PreviewContent({
+  draft,
+  chosen,
+  onChoose,
+}: {
+  draft: MappingDraft
+  chosen: string | null
+  onChoose: (id: string) => void
+}) {
   const t = useTranslations('Mapping.preview')
   const samples = useQuery(mappingSamplesQuery(draft.mappingId))
-  const [chosen, setChosen] = useState<string | null>(null)
 
   if (samples.isPending) {
     return <Loading label={t('loading')} />
@@ -253,18 +259,26 @@ function PreviewContent({ draft }: { draft: MappingDraft }) {
     )
   }
 
-  return <SamplePreview draft={draft} sample={sample} samples={samples.data} onChoose={setChosen} />
+  return <SamplePreview draft={draft} sample={sample} samples={samples.data} onChoose={onChoose} />
 }
 
-// Collapsible, so the canvas can have the room back while the preview is not needed.
+// Collapsible, so the canvas can have the room back while the preview is not needed. Open, it keeps
+// a bounded height and scrolls inside, so the canvas above stays in view while the admin edits.
 export function MappingPreviewPanel({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping.preview')
   const [open, setOpen] = useState(true)
+  // Held here, not in the content, which unmounts while the panel is collapsed.
+  const [chosen, setChosen] = useState<string | null>(null)
   const headingId = useId()
   const contentId = useId()
 
   return (
-    <section aria-labelledby={headingId} className="bg-card flex flex-col rounded-lg border">
+    <section
+      aria-labelledby={headingId}
+      className={cn(
+        'bg-card flex shrink-0 flex-col rounded-lg border',
+        open && 'h-[clamp(14rem,32svh,24rem)]',
+      )}>
       <div className="flex min-h-11 items-center justify-between gap-3 px-4 py-2">
         <h2 id={headingId} className="text-sm font-semibold">
           {t('title')}
@@ -283,8 +297,11 @@ export function MappingPreviewPanel({ draft }: { draft: MappingDraft }) {
           {open ? t('hide') : t('show')}
         </Button>
       </div>
-      <div id={contentId} hidden={!open} className="border-t px-4 py-3">
-        {open && <PreviewContent draft={draft} />}
+      <div
+        id={contentId}
+        hidden={!open}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t px-4 py-3">
+        {open && <PreviewContent chosen={chosen} draft={draft} onChoose={setChosen} />}
       </div>
     </section>
   )

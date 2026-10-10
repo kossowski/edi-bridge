@@ -28,6 +28,16 @@ const desadv = draftNamed('Hansemarkt: ERP JSON to DESADV')
 
 const orders = draftNamed('Hansemarkt: ORDERS to ERP JSON')
 
+// The seed's expression is invalid on purpose; a valid one shows that EDIFACT sources skip JSONata.
+const ordersWithValidExpression = {
+  ...orders.draft,
+  transforms: orders.draft.transforms.map((transform) =>
+    transform.kind === 'jsonata'
+      ? { ...transform, config: { expression: '$string(SG25.PIA)' } }
+      : transform,
+  ),
+}
+
 const unpublished = toMappingDraft(
   seedMappingDrafts.find(({ latestVersion }) => latestVersion === null)!,
   seedDocumentStructures,
@@ -78,7 +88,7 @@ export const SampleChosen = meta.story({
     await expect(canvas.getByText('2 targets left empty')).toBeVisible()
     await expect(canvas.getByText('Lookup Table 1 has an invalid configuration.')).toBeVisible()
 
-    await userEvent.click(canvas.getByRole('combobox', { name: 'Sample' }))
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Sample Document' }))
     await userEvent.click(await screen.findByRole('option', { name: secondSample!.name }))
 
     await expect(await targetDocument(canvasElement, secondSample!.name)).toBeVisible()
@@ -89,14 +99,16 @@ export const SampleChosen = meta.story({
     )
 
     await userEvent.click(canvas.getByRole('button', { name: 'Hide preview' }))
-    await expect(canvas.queryByRole('combobox', { name: 'Sample' })).toBeNull()
+    await expect(canvas.queryByRole('combobox', { name: 'Sample Document' })).toBeNull()
     await userEvent.click(canvas.getByRole('button', { name: 'Show preview' }))
-    await expect(await canvas.findByRole('combobox', { name: 'Sample' })).toBeVisible()
+    await expect(
+      await canvas.findByRole('combobox', { name: 'Sample Document' }),
+    ).toHaveTextContent(secondSample!.name)
   },
 })
 
 export const InboundSample = meta.story({
-  args: { draft: orders.draft },
+  args: { draft: ordersWithValidExpression },
   async play({ canvas }) {
     await expect(
       await canvas.findByRole('region', { name: /^Sample Document po-2026-\d{5}\.edi$/ }),
@@ -105,7 +117,9 @@ export const InboundSample = meta.story({
       await canvas.findByRole('region', { name: /^Target Document for / }),
     ).toHaveTextContent('"orderNumber"')
     await expect(
-      await canvas.findByText('JSONata expression 1 has an invalid configuration.'),
+      await canvas.findByText(
+        'JSONata expression 1 is not previewed on EDIFACT Sample Documents yet.',
+      ),
     ).toBeVisible()
   },
 })
@@ -113,8 +127,8 @@ export const InboundSample = meta.story({
 export const EmptySamples = meta.story({
   args: { draft: unpublished },
   async play({ canvas }) {
-    await expect(await canvas.findByText('No samples yet')).toBeVisible()
-    await expect(canvas.queryByRole('combobox', { name: 'Sample' })).toBeNull()
+    await expect(await canvas.findByText('No Sample Documents yet')).toBeVisible()
+    await expect(canvas.queryByRole('combobox', { name: 'Sample Document' })).toBeNull()
   },
 })
 
@@ -127,7 +141,7 @@ export const LoadingSamples = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Loading the samples')).toBeInTheDocument()
+    await expect(await canvas.findByText('Loading the Sample Documents')).toBeInTheDocument()
   },
 })
 
@@ -153,7 +167,7 @@ export const SamplesUnavailable = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The samples could not be loaded.',
+      'The Sample Documents could not be loaded.',
     )
     await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
   },

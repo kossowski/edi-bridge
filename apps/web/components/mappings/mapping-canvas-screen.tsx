@@ -183,7 +183,7 @@ function MappingView({ draft }: { draft: MappingDraft }) {
       </dl>
       <DesktopOnlyNotice />
       {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
-      <div className="hidden min-h-[32rem] flex-1 flex-col gap-4 lg:flex">
+      <div className="hidden flex-1 flex-col gap-4 lg:flex">
         {desktop && (
           <>
             <Canvas draft={draft} />
@@ -214,8 +214,10 @@ export function MappingCanvasScreen({ id }: { id: string }) {
   const t = useTranslations('Mapping')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
 
+  // On desktop the screen takes the viewport below the app header, so the canvas and the preview
+  // share it without page scrolling; it still grows when their minimum heights do not fit.
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
+    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 lg:h-[calc(100svh-3.5rem)] lg:min-h-fit">
       <BackLink href="/mappings" label={t('back')} />
       {isPending ? (
         <MappingLoading />
