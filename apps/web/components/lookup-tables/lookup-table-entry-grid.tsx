@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import {
   type FocusEvent,
   type KeyboardEvent,
+  type ComponentProps,
   type MouseEvent,
   type Ref,
   type RefObject,
@@ -49,11 +50,6 @@ export function columnOf(key: (typeof gridColumns)[number]) {
 function fieldAt(column: number): EntryField | null {
   return entryFields.find((field) => columnOf(field) === column) ?? null
 }
-
-const gridTemplate = 'grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem]'
-
-const cellClass =
-  'focus-visible:ring-foreground flex min-w-0 scroll-mt-10 flex-col justify-center gap-0.5 px-2 outline-none focus-visible:ring-2 focus-visible:ring-inset'
 
 export type VisibleRow = { row: EntryRow; index: number }
 
@@ -137,6 +133,28 @@ function cellAt(target: EventTarget): ActiveCell | null {
     : null
 }
 
+function GridRow({ className, ...props }: ComponentProps<'div'>) {
+  return (
+    <div
+      role="row"
+      className={cn('grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem]', className)}
+      {...props}
+    />
+  )
+}
+
+function GridCell({ className, ...props }: ComponentProps<'div'>) {
+  return (
+    <div
+      className={cn(
+        'focus-visible:ring-foreground flex min-w-0 scroll-mt-10 flex-col justify-center gap-0.5 px-2 outline-none focus-visible:ring-2 focus-visible:ring-inset',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
 function EditInput({
   value,
   label,
@@ -196,11 +214,11 @@ function CodeCell({
   const label = t('cellLabel', { column: t(`columns.${field}`), row: rowNumber })
 
   return (
-    <div
+    <GridCell
       role="gridcell"
       tabIndex={tabIndex}
       aria-invalid={error ? true : undefined}
-      className={cn(cellClass, 'cursor-text')}
+      className="cursor-text"
       data-column={columnOf(field)}
       data-key={row.key}>
       {editing ? (
@@ -220,11 +238,11 @@ function CodeCell({
           {error}
         </span>
       )}
-    </div>
+    </GridCell>
   )
 }
 
-function GridRow({
+function EntryGridRow({
   visibleRow,
   position,
   activeColumn,
@@ -250,23 +268,18 @@ function GridRow({
   const tabIndexOf = (column: number) => (activeColumn === column ? 0 : -1)
 
   return (
-    <div
-      role="row"
+    <GridRow
       aria-rowindex={position + 2}
-      className={cn(
-        gridTemplate,
-        'absolute inset-x-0 border-b',
-        errors && 'bg-red-50/60 dark:bg-red-950/30',
-      )}
+      className={cn('absolute inset-x-0 border-b', errors && 'bg-red-50/60 dark:bg-red-950/30')}
       style={{ top: position * rowHeight, height: rowHeight }}>
-      <div
+      <GridCell
         role="rowheader"
         tabIndex={tabIndexOf(columnOf('row'))}
-        className={cn(cellClass, 'text-muted-foreground text-sm tabular-nums')}
+        className="text-muted-foreground text-sm tabular-nums"
         data-column={columnOf('row')}
         data-key={row.key}>
         {rowNumber}
-      </div>
+      </GridCell>
       {entryFields.map((field) => {
         const error = errors?.[field]
 
@@ -298,7 +311,7 @@ function GridRow({
           <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
         </Button>
       </div>
-    </div>
+    </GridRow>
   )
 }
 
@@ -480,11 +493,7 @@ export function LookupTableEntryGrid({
           className="max-h-[min(35rem,calc(100dvh-18rem))] overflow-y-auto"
           onScroll={(event) => onScroll(event.currentTarget.scrollTop)}>
           <div role="rowgroup" className="bg-muted sticky top-0 z-10 border-b">
-            <div
-              role="row"
-              aria-rowindex={1}
-              className={cn(gridTemplate, 'items-center')}
-              style={{ height: headerHeight }}>
+            <GridRow aria-rowindex={1} className="items-center" style={{ height: headerHeight }}>
               {gridColumns.map((key) => (
                 <div
                   key={key}
@@ -496,7 +505,7 @@ export function LookupTableEntryGrid({
                   {t(`columns.${key}`)}
                 </div>
               ))}
-            </div>
+            </GridRow>
           </div>
           <div
             role="rowgroup"
@@ -507,7 +516,7 @@ export function LookupTableEntryGrid({
               const isActive = position === current.row
 
               return (
-                <GridRow
+                <EntryGridRow
                   key={item.row.key}
                   activeColumn={isActive ? current.column : null}
                   editingField={editing?.key === item.row.key ? editing.field : null}
