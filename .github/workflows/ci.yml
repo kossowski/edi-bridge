@@ -13,11 +13,31 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Each job gets its own runner, so the story tests don't compete with the builds for CPU.
 jobs:
-  checks:
-    name: Lint, check-types, test and build
+  tasks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint and check-types
+            job: lint
+            tasks: lint check-types
+          - name: Test
+            job: test
+            tasks: test
+            # Story tests run in Vitest browser mode.
+            chromium: 'true'
+          - name: Build
+            job: build
+            tasks: build build-storybook
+          - name: E2E test
+            job: e2e
+            tasks: test:e2e
+            chromium: 'true'
     steps:
       - name: Check out code
         uses: actions/checkout@v7
@@ -26,47 +46,23 @@ jobs:
           fetch-depth: 0
           filter: blob:none
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up
+        uses: ./.github/actions/setup
         with:
-          node-version-file: package.json
-          cache: pnpm
-
-      - name: Restore Turborepo cache
-        uses: actions/cache@v6
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Read Playwright version
-        id: playwright
-        run: echo "version=$(pnpm --filter @edi-bridge/web exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Playwright Chromium
-        id: playwright-cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
-
-      # Story tests (Vitest browser mode) and Playwright both run in Chromium.
-      - name: Install Playwright Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm --filter @edi-bridge/web exec playwright install --with-deps chromium
-
-      # The cache holds the browser, not the system libraries it needs.
-      - name: Install Playwright system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm --filter @edi-bridge/web exec playwright install-deps chromium
+          job: ${{ matrix.job }}
+          chromium: ${{ matrix.chromium || 'false' }}
 
       # Main runs every task, so its cache covers every package.
-      - name: Lint, check-types, test and build affected packages
-        run: pnpm turbo run lint check-types test test:e2e build build-storybook ${{ github.event_name == 'pull_request' && '--affected' || '' }}
+      - name: Run affected tasks
+        run: pnpm turbo run ${{ matrix.tasks }} ${{ github.event_name == 'pull_request' && '--affected' || '' }}
+
+  # The main ruleset requires this check name.
+  checks:
+    name: Lint, check-types, test and build
+    if: always()
+    needs: tasks
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every task job to pass
+        run: test "${{ needs.tasks.result }}" = success

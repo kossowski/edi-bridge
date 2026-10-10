@@ -1,0 +1,59 @@
+name: Set up
+description: Installs pnpm, Node.js and the dependencies, restores the job's Turborepo cache and, on request, Playwright Chromium.
+
+inputs:
+  job:
+    description: Names the job's Turborepo cache, because parallel jobs can't share one cache key.
+    required: true
+  chromium:
+    description: Installs Playwright Chromium when 'true'.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up pnpm
+      uses: pnpm/action-setup@v6
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: package.json
+        cache: pnpm
+
+    - name: Restore Turborepo cache
+      uses: actions/cache@v6
+      with:
+        path: .turbo
+        key: ${{ runner.os }}-turbo-${{ inputs.job }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-turbo-${{ inputs.job }}-
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Read Playwright version
+      if: inputs.chromium == 'true'
+      id: playwright
+      shell: bash
+      run: echo "version=$(pnpm --filter @edi-bridge/web exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Playwright Chromium
+      if: inputs.chromium == 'true'
+      id: playwright-cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+
+    - name: Install Playwright Chromium
+      if: inputs.chromium == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: pnpm --filter @edi-bridge/web exec playwright install --with-deps chromium
+
+    # The cache holds the browser, not the system libraries it needs.
+    - name: Install Playwright system dependencies
+      if: inputs.chromium == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: pnpm --filter @edi-bridge/web exec playwright install-deps chromium
