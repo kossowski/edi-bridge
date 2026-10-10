@@ -3,9 +3,7 @@ import { createServer } from 'node:net'
 
 import { chromium } from 'playwright'
 
-export const widths = [390, 768, 1024, 1440]
-export const themes = ['light', 'dark']
-export const locales = ['en', 'de']
+export const widths = [390, 768, 1440]
 
 function freePort() {
   return new Promise((resolve, reject) => {

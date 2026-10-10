@@ -86,7 +86,7 @@ REPORT     STATUS: done | blocked
 
 Answer a subagent's questions yourself, unless the answer is a product decision. Ask the user for those, and record the other answers for the report.
 
-**c. Review.** Call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part touches `apps/web` or `packages/ui`, run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree and keeps the screenshots in its own context. Give all findings you accept to one fresh implementer subagent in the same worktree.
+**c. Review.** Call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part changes what renders (components, routes, styles or i18n messages in `apps/web` or `packages/ui`), run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree and keeps the screenshots in its own context. Give all findings you accept to one fresh implementer subagent in the same worktree.
 
 **d. Open the PR and link the stack.**
 

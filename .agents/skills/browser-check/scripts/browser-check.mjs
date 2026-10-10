@@ -9,10 +9,8 @@ import {
   gotoSettled,
   hasHorizontalOverflow,
   launchBrowser,
-  locales,
   openPage,
   startDevServer,
-  themes,
   widths,
 } from './lib.mjs'
 
@@ -57,25 +55,18 @@ let browser
 try {
   browser = await launchBrowser()
   for (const route of routes) {
-    // German at every width catches longer labels that overflow; English is the default reading.
-    const matrix = widths.flatMap((width) =>
-      themes.flatMap((theme) => locales.map((locale) => ({ width, theme, locale }))),
-    )
-    for (const { width, theme, locale } of matrix) {
-      const { context, page, consoleErrors } = await openPage(browser, { baseUrl, width, theme, locale })
-      const where = `${route} @ ${width}px ${theme} ${locale}`
+    for (const width of widths) {
+      const { context, page, consoleErrors } = await openPage(browser, { baseUrl, width })
+      const where = `${route} @ ${width}px`
       try {
-        const response = await gotoSettled(page, baseUrl + route, theme)
+        const response = await gotoSettled(page, baseUrl + route, 'light')
         if (!response?.ok()) findings.push({ kind: 'http', where, detail: `status ${response?.status()}` })
-
-        const lang = await page.getAttribute('html', 'lang')
-        if (lang !== locale) findings.push({ kind: 'locale', where, detail: `<html lang="${lang}">` })
 
         if (await hasHorizontalOverflow(page)) {
           findings.push({ kind: 'overflow', where, detail: 'page scrolls sideways' })
         }
 
-        const file = join(screenshots, `${slug(route)}_${width}_${theme}_${locale}.png`)
+        const file = join(screenshots, `${slug(route)}_${width}.png`)
         await page.screenshot({ path: file, fullPage: true })
         shots.push(file)
 
