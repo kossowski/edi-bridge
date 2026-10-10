@@ -1595,6 +1595,98 @@
     },
     "csvSettingsUsedByMappingVersion": "Published Mapping Versions read CSV Documents with these settings, and a published Mapping Version never changes. Keep the saved CSV settings, or create a new Document Structure with the new ones."
   },
+  "LookupTables": {
+    "new": "New Lookup Table",
+    "caption": "Lookup Tables, by name",
+    "loading": "Loading Lookup Tables",
+    "count": "{count, plural, one {# Lookup Table} other {# Lookup Tables}}",
+    "filteredCount": "{count} of {total} Lookup Tables",
+    "search": "Search by name or Trading Partner",
+    "noMatch": "No Lookup Table matches the search and filter.",
+    "entryCount": "{count, plural, one {# entry} other {# entries}}",
+    "columns": {
+      "name": "Name",
+      "scope": "Scope",
+      "entries": "Entries",
+      "updatedAt": "Last changed",
+      "actions": "Actions"
+    },
+    "scope": {
+      "workspace": "Workspace"
+    },
+    "filters": {
+      "clear": "Clear filter"
+    },
+    "actions": {
+      "label": "Actions for {name}",
+      "edit": "Edit name and scope",
+      "delete": "Delete"
+    },
+    "announcements": {
+      "created": "Lookup Table {name} created.",
+      "saved": "Lookup Table {name} saved.",
+      "deleted": "Lookup Table {name} deleted."
+    },
+    "empty": {
+      "title": "No Lookup Tables yet",
+      "description": "Create a Lookup Table to translate codes in Mappings, e.g. unit ST to PCE."
+    },
+    "error": {
+      "title": "Lookup Tables unavailable",
+      "description": "The Lookup Tables could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "form": {
+      "createTitle": "New Lookup Table",
+      "createDescription": "Name the Lookup Table and choose where it applies. You add the entries afterwards.",
+      "editTitle": "Edit {name}",
+      "editDescription": "Rename the Lookup Table or change where it applies. The entries stay as they are.",
+      "close": "Close",
+      "cancel": "Cancel",
+      "create": "Create Lookup Table",
+      "save": "Save",
+      "saving": "Saving…",
+      "fields": {
+        "name": {
+          "label": "Name",
+          "description": "Unique within the scope, e.g. Units of measure."
+        },
+        "scope": {
+          "label": "Scope",
+          "description": "A Workspace Lookup Table applies to all Trading Partners.",
+          "workspace": "Workspace",
+          "tradingPartner": "A single Trading Partner"
+        },
+        "tradingPartner": {
+          "label": "Trading Partner",
+          "description": "The Trading Partner this Lookup Table belongs to.",
+          "placeholder": "Choose a Trading Partner",
+          "loading": "Loading Trading Partners…",
+          "empty": "There are no Trading Partners yet. Create one first, or use the Workspace scope.",
+          "error": "The Trading Partners could not be loaded.",
+          "retry": "Try again"
+        }
+      },
+      "errors": {
+        "required": {
+          "name": "Enter a name.",
+          "tradingPartnerId": "Choose a Trading Partner."
+        },
+        "tooLong": "Use at most {max} characters.",
+        "taken": "Another Lookup Table of this scope already uses this name.",
+        "saveFailed": "The Lookup Table could not be saved. Try again."
+      }
+    },
+    "delete": {
+      "title": "Delete {name}?",
+      "description": "{count, plural, =0 {The Lookup Table is deleted.} one {The Lookup Table and its # entry are deleted.} other {The Lookup Table and its # entries are deleted.}} This cannot be undone.",
+      "close": "Close",
+      "cancel": "Cancel",
+      "confirm": "Delete Lookup Table",
+      "pending": "Deleting…",
+      "failed": "The Lookup Table could not be deleted. Try again."
+    }
+  },
   "ManualSubmission": {
     "open": "Submit a Document",
     "title": "Manual Submission",

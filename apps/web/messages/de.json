@@ -1595,6 +1595,98 @@
     },
     "csvSettingsUsedByMappingVersion": "Veröffentlichte Mapping Versions lesen CSV-Documents mit diesen Einstellungen, und eine veröffentlichte Mapping Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie eine neue Document Structure mit den neuen."
   },
+  "LookupTables": {
+    "new": "Neue Lookup Table",
+    "caption": "Lookup Tables, nach Name",
+    "loading": "Lookup Tables werden geladen",
+    "count": "{count, plural, one {# Lookup Table} other {# Lookup Tables}}",
+    "filteredCount": "{count} von {total} Lookup Tables",
+    "search": "Nach Name oder Trading Partner suchen",
+    "noMatch": "Keine Lookup Table passt zu Suche und Filter.",
+    "entryCount": "{count, plural, one {# Eintrag} other {# Einträge}}",
+    "columns": {
+      "name": "Name",
+      "scope": "Geltungsbereich",
+      "entries": "Einträge",
+      "updatedAt": "Zuletzt geändert",
+      "actions": "Aktionen"
+    },
+    "scope": {
+      "workspace": "Workspace"
+    },
+    "filters": {
+      "clear": "Filter zurücksetzen"
+    },
+    "actions": {
+      "label": "Aktionen für {name}",
+      "edit": "Name und Geltungsbereich bearbeiten",
+      "delete": "Löschen"
+    },
+    "announcements": {
+      "created": "Lookup Table {name} angelegt.",
+      "saved": "Lookup Table {name} gespeichert.",
+      "deleted": "Lookup Table {name} gelöscht."
+    },
+    "empty": {
+      "title": "Noch keine Lookup Tables",
+      "description": "Legen Sie eine Lookup Table an, um Codes in Mappings zu übersetzen, z. B. die Einheit ST in PCE."
+    },
+    "error": {
+      "title": "Lookup Tables nicht verfügbar",
+      "description": "Die Lookup Tables konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "form": {
+      "createTitle": "Neue Lookup Table",
+      "createDescription": "Benennen Sie die Lookup Table und wählen Sie, wo sie gilt. Die Einträge fügen Sie danach hinzu.",
+      "editTitle": "{name} bearbeiten",
+      "editDescription": "Benennen Sie die Lookup Table um oder ändern Sie, wo sie gilt. Die Einträge bleiben unverändert.",
+      "close": "Schließen",
+      "cancel": "Abbrechen",
+      "create": "Lookup Table anlegen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert…",
+      "fields": {
+        "name": {
+          "label": "Name",
+          "description": "Eindeutig im Geltungsbereich, z. B. Maßeinheiten."
+        },
+        "scope": {
+          "label": "Geltungsbereich",
+          "description": "Eine Lookup Table des Workspace gilt für alle Trading Partners.",
+          "workspace": "Workspace",
+          "tradingPartner": "Ein einzelner Trading Partner"
+        },
+        "tradingPartner": {
+          "label": "Trading Partner",
+          "description": "Der Trading Partner, zu dem diese Lookup Table gehört.",
+          "placeholder": "Trading Partner wählen",
+          "loading": "Trading Partners werden geladen…",
+          "empty": "Es gibt noch keine Trading Partners. Legen Sie zuerst einen an oder wählen Sie den Workspace als Geltungsbereich.",
+          "error": "Die Trading Partners konnten nicht geladen werden.",
+          "retry": "Erneut versuchen"
+        }
+      },
+      "errors": {
+        "required": {
+          "name": "Geben Sie einen Namen ein.",
+          "tradingPartnerId": "Wählen Sie einen Trading Partner."
+        },
+        "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
+        "taken": "Eine andere Lookup Table dieses Geltungsbereichs verwendet diesen Namen bereits.",
+        "saveFailed": "Die Lookup Table konnte nicht gespeichert werden. Versuchen Sie es erneut."
+      }
+    },
+    "delete": {
+      "title": "{name} löschen?",
+      "description": "{count, plural, =0 {Die Lookup Table wird gelöscht.} one {Die Lookup Table und ihr # Eintrag werden gelöscht.} other {Die Lookup Table und ihre # Einträge werden gelöscht.}} Das lässt sich nicht rückgängig machen.",
+      "close": "Schließen",
+      "cancel": "Abbrechen",
+      "confirm": "Lookup Table löschen",
+      "pending": "Wird gelöscht…",
+      "failed": "Die Lookup Table konnte nicht gelöscht werden. Versuchen Sie es erneut."
+    }
+  },
   "ManualSubmission": {
     "open": "Ein Document einreichen",
     "title": "Manual Submission",
