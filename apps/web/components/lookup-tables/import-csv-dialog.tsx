@@ -16,10 +16,12 @@ import {
   previewPageSize,
   rowsWithStatus,
 } from '@/components/lookup-tables/lookup-table-import'
+import { errorTextClass } from '@/components/lookup-tables/lookup-table-styles'
 import { importLookupTable, previewLookupTableImport } from '@/lib/api/client'
 import { lookupTableKeys, storeSavedLookupTable } from '@/lib/api/queries'
 import {
   type LookupTable,
+  type LookupTableImportReason,
   type LookupTableImportRow,
   type LookupTableImportStatus,
   maxLookupCodeLength,
@@ -44,7 +46,7 @@ type SourceError = CsvError | 'readFailed'
 
 type Preview = { csv: string; rows: LookupTableImportRow[] }
 
-const errorClass = 'text-sm text-red-800 dark:text-red-300'
+const emptyStateClass = 'text-muted-foreground rounded-lg border px-2 py-6 text-center'
 
 const statusStyles: Record<LookupTableImportStatus, string> = {
   added: 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
@@ -52,8 +54,6 @@ const statusStyles: Record<LookupTableImportStatus, string> = {
   unchanged: 'border-border text-foreground',
   invalid: 'bg-red-500/10 text-red-800 dark:text-red-300',
 }
-
-const importKey = (id: string) => [...lookupTableKeys.detail(id), 'import'] as const
 
 function StatusBadge({ status }: { status: LookupTableImportStatus }) {
   const t = useTranslations('LookupTable.import.statuses')
@@ -184,7 +184,7 @@ function CsvSource({
         />
       </FormField>
       {previewFailed && (
-        <p role="alert" className={errorClass}>
+        <p role="alert" className={errorTextClass}>
           {t('errors.previewFailed')}
         </p>
       )}
@@ -198,21 +198,42 @@ function CsvSource({
   )
 }
 
+function Reasons({
+  reasons,
+  className,
+}: {
+  reasons: ReadonlyArray<LookupTableImportReason>
+  className?: string
+}) {
+  const t = useTranslations('LookupTable.import.reasons')
+
+  return (
+    <ul className={cn('flex flex-col gap-0.5', className)}>
+      {reasons.map((reason) => (
+        <li key={reason}>{t(reason, { max: maxLookupCodeLength })}</li>
+      ))}
+    </ul>
+  )
+}
+
 function Codes({ row }: { row: LookupTableImportRow }) {
-  const t = useTranslations('LookupTable.import.result')
+  const t = useTranslations('LookupTable.import')
 
   if (row.status === 'invalid') {
     return (
       <td colSpan={2} className="px-2 py-1.5">
-        <span className="sr-only">{t('invalidCells')}: </span>
+        <span className="sr-only">{t('result.invalidCells')}: </span>
         <span className="flex flex-wrap gap-1">
           {row.cells.map((cell, index) => (
-            // Cells have no identity of their own; their order is the line's column order.
             <span key={index} className="bg-muted rounded px-1 font-mono break-all">
               {cell === '' ? '""' : cell}
             </span>
           ))}
         </span>
+        <div className="mt-1 sm:hidden">
+          <span className="sr-only">{t('columns.details')}: </span>
+          <Reasons reasons={row.reasons} />
+        </div>
       </td>
     )
   }
@@ -227,7 +248,10 @@ function Codes({ row }: { row: LookupTableImportRow }) {
               <s className="text-muted-foreground">{row.previousTargetCode}</s> → {row.targetCode}
             </span>
             <span className="sr-only">
-              {t('changedTarget', { previous: row.previousTargetCode, next: row.targetCode })}
+              {t('result.changedTarget', {
+                previous: row.previousTargetCode,
+                next: row.targetCode,
+              })}
             </span>
           </>
         ) : (
@@ -238,10 +262,23 @@ function Codes({ row }: { row: LookupTableImportRow }) {
   )
 }
 
-function PreviewTable({ rows }: { rows: ReadonlyArray<LookupTableImportRow> }) {
+function PreviewTable({
+  rows,
+  focusIndex,
+}: {
+  rows: ReadonlyArray<LookupTableImportRow>
+  focusIndex: number | null
+}) {
   const t = useTranslations('LookupTable.import')
   const captionId = useId()
+  const focusRow = useRef<HTMLTableRowElement>(null)
   const headerClass = 'bg-popover sticky top-0 px-2 py-2 text-left font-medium'
+
+  useLayoutEffect(() => {
+    if (focusIndex !== null) {
+      focusRow.current?.focus()
+    }
+  }, [focusIndex])
 
   return (
     <div
@@ -256,10 +293,10 @@ function PreviewTable({ rows }: { rows: ReadonlyArray<LookupTableImportRow> }) {
         </caption>
         <thead>
           <tr>
-            <th scope="col" className={cn(headerClass, 'w-16 border-b')}>
+            <th scope="col" className={cn(headerClass, 'w-12 border-b sm:w-16')}>
               {t('columns.line')}
             </th>
-            <th scope="col" className={cn(headerClass, 'w-28 border-b')}>
+            <th scope="col" className={cn(headerClass, 'border-b sm:w-28')}>
               {t('columns.status')}
             </th>
             <th scope="col" className={cn(headerClass, 'border-b')}>
@@ -268,27 +305,25 @@ function PreviewTable({ rows }: { rows: ReadonlyArray<LookupTableImportRow> }) {
             <th scope="col" className={cn(headerClass, 'border-b')}>
               {t('columns.targetCode')}
             </th>
-            <th scope="col" className={cn(headerClass, 'border-b')}>
+            <th scope="col" className={cn(headerClass, 'hidden border-b sm:table-cell')}>
               {t('columns.details')}
             </th>
           </tr>
         </thead>
         <tbody className="[&_td]:border-b [&>tr:last-child_td]:border-b-0">
-          {rows.map((row) => (
-            <tr key={row.line} className="align-top">
+          {rows.map((row, index) => (
+            <tr
+              key={row.line}
+              ref={index === focusIndex ? focusRow : undefined}
+              tabIndex={index === focusIndex ? -1 : undefined}
+              className="focus-visible:outline-ring align-top outline-none focus-visible:outline-2 focus-visible:-outline-offset-2">
               <td className="px-2 py-1.5 tabular-nums">{row.line}</td>
               <td className="px-2 py-1.5">
                 <StatusBadge status={row.status} />
               </td>
               <Codes row={row} />
-              <td className="px-2 py-1.5">
-                {row.status === 'invalid' && (
-                  <ul className="flex flex-col gap-0.5">
-                    {row.reasons.map((reason) => (
-                      <li key={reason}>{t(`reasons.${reason}`, { max: maxLookupCodeLength })}</li>
-                    ))}
-                  </ul>
-                )}
+              <td className="hidden px-2 py-1.5 sm:table-cell">
+                {row.status === 'invalid' && <Reasons reasons={row.reasons} />}
               </td>
             </tr>
           ))}
@@ -317,6 +352,7 @@ function ImportPreview({
   const heading = useRef<HTMLHeadingElement>(null)
   const [filter, setFilter] = useState<ImportFilter>('all')
   const [limit, setLimit] = useState(previewPageSize)
+  const [focusIndex, setFocusIndex] = useState<number | null>(null)
   const counts = countByStatus(rows)
   const filtered = rowsWithStatus(rows, filter)
   const shown = filtered.slice(0, limit)
@@ -344,9 +380,7 @@ function ImportPreview({
         <p className="text-muted-foreground">{t('result.description')}</p>
       </div>
       {rows.length === 0 ? (
-        <p className="text-muted-foreground rounded-lg border px-2 py-6 text-center">
-          {t('result.noLines')}
-        </p>
+        <p className={emptyStateClass}>{t('result.noLines')}</p>
       ) : (
         <>
           <div role="group" aria-label={t('result.filter')} className="flex flex-wrap gap-2">
@@ -360,6 +394,7 @@ function ImportPreview({
                 onClick={() => {
                   setFilter(value)
                   setLimit(previewPageSize)
+                  setFocusIndex(null)
                 }}>
                 {label}
                 <span className="tabular-nums">{format.number(count)}</span>
@@ -367,11 +402,9 @@ function ImportPreview({
             ))}
           </div>
           {filtered.length === 0 ? (
-            <p className="text-muted-foreground rounded-lg border px-2 py-6 text-center">
-              {t('result.noMatch')}
-            </p>
+            <p className={emptyStateClass}>{t('result.noMatch')}</p>
           ) : (
-            <PreviewTable rows={shown} />
+            <PreviewTable focusIndex={focusIndex} rows={shown} />
           )}
           {filtered.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -382,7 +415,13 @@ function ImportPreview({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setLimit(limit + previewPageSize)}>
+                  onClick={() => {
+                    setLimit(limit + previewPageSize)
+
+                    if (remaining <= previewPageSize) {
+                      setFocusIndex(shown.length)
+                    }
+                  }}>
                   {t('result.showMore', { count: Math.min(remaining, previewPageSize) })}
                 </Button>
               )}
@@ -394,7 +433,7 @@ function ImportPreview({
         <p className="text-muted-foreground">{t('result.nothingToApply')}</p>
       )}
       {applyFailed && (
-        <p role="alert" className={errorClass}>
+        <p role="alert" className={errorTextClass}>
           {t('errors.applyFailed')}
         </p>
       )}
@@ -426,7 +465,7 @@ function ImportSteps({
   const [csv, setCsv] = useState('')
   const [sourceError, setSourceError] = useState<SourceError | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
-  const [returned, setReturned] = useState(false)
+  const [backFromPreview, setBackFromPreview] = useState(false)
 
   const previewing = useMutation({
     mutationFn: (text: string) => previewLookupTableImport(tableId, { csv: text }),
@@ -434,7 +473,7 @@ function ImportSteps({
   })
 
   const applying = useMutation({
-    mutationKey: importKey(tableId),
+    mutationKey: lookupTableKeys.import(tableId),
     mutationFn: ({ csv: text }: Preview) => importLookupTable(tableId, { csv: text }),
     onSuccess: (imported, { rows }) => {
       storeSavedLookupTable(queryClient, imported)
@@ -452,7 +491,7 @@ function ImportSteps({
         onBack={() => {
           applying.reset()
           setPreview(null)
-          setReturned(true)
+          setBackFromPreview(true)
         }}
       />
     )
@@ -462,7 +501,7 @@ function ImportSteps({
     <CsvSource
       csv={csv}
       error={sourceError}
-      focusOnMount={focusOnMount || returned}
+      focusOnMount={focusOnMount || backFromPreview}
       previewFailed={previewing.isError}
       previewing={previewing.isPending}
       onChange={(text) => {
@@ -500,9 +539,9 @@ export function ImportCsvDialog({
   onImported: (imported: LookupTable, counts: ImportCounts) => void
 }) {
   const t = useTranslations('LookupTable.import')
-  const [attempt, setAttempt] = useState(0)
+  const [resetKey, setResetKey] = useState(0)
   const [discarded, setDiscarded] = useState(false)
-  const applying = useIsMutating({ mutationKey: importKey(table.id) }) > 0
+  const applying = useIsMutating({ mutationKey: lookupTableKeys.import(table.id) }) > 0
 
   return (
     <Dialog
@@ -514,7 +553,7 @@ export function ImportCsvDialog({
       }}
       onOpenChangeComplete={(next) => {
         if (!next) {
-          setAttempt((count) => count + 1)
+          setResetKey((count) => count + 1)
           setDiscarded(false)
         }
       }}>
@@ -535,7 +574,7 @@ export function ImportCsvDialog({
           />
         ) : (
           <ImportSteps
-            key={attempt}
+            key={resetKey}
             focusOnMount={discarded}
             tableId={table.id}
             onImported={onImported}

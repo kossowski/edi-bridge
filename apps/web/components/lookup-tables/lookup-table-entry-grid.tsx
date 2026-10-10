@@ -29,6 +29,7 @@ import {
   type EntryRow,
   type RowErrors,
 } from '@/components/lookup-tables/lookup-table-entries'
+import { errorTextClass } from '@/components/lookup-tables/lookup-table-styles'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Input } from '@edi-bridge/ui/components/input'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -533,7 +534,7 @@ export function LookupTableEntryGrid({
         </div>
       </div>
       {currentError && currentRow && currentField && (
-        <p className="text-sm text-red-800 dark:text-red-300">
+        <p className={errorTextClass}>
           {t('activeError', {
             column: t(`columns.${currentField}`),
             row: currentRow.index + 1,

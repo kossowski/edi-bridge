@@ -1,15 +1,13 @@
 import {
   type LookupTableImportRow,
+  lookupTableImportRowSchema,
   type LookupTableImportStatus,
   maxLookupTableCsvLength,
 } from '@edi-bridge/contracts'
 
-export const importStatuses = [
-  'added',
-  'changed',
-  'unchanged',
-  'invalid',
-] as const satisfies ReadonlyArray<LookupTableImportStatus>
+export const importStatuses = lookupTableImportRowSchema.options.map(
+  (variant) => variant.shape.status.value,
+)
 
 export type ImportCounts = Record<LookupTableImportStatus, number>
 

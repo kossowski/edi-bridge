@@ -28,6 +28,7 @@ import {
   positionOf,
   type VisibleRow,
 } from '@/components/lookup-tables/lookup-table-entry-grid'
+import { errorTextClass } from '@/components/lookup-tables/lookup-table-styles'
 import { useEntryEditing } from '@/components/lookup-tables/use-entry-editing'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
@@ -192,7 +193,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
     setAnnouncement(t('announcements.discarded'))
   }
 
-  function imported(saved: LookupTable, counts: ImportCounts) {
+  function applyImported(saved: LookupTable, counts: ImportCounts) {
     entries.load(saved.entries)
     setActive(null)
     setEditing(null)
@@ -280,12 +281,12 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
         </div>
       </div>
       {errorCount > 0 && (
-        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+        <p role="alert" className={errorTextClass}>
           {t('errors.summary', { count: errorCount })}
         </p>
       )}
       {entries.saveFailed && (
-        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+        <p role="alert" className={errorTextClass}>
           {t('errors.saveFailed')}
         </p>
       )}
@@ -357,7 +358,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
         open={importOpen}
         table={table}
         onDiscard={discard}
-        onImported={imported}
+        onImported={applyImported}
         onOpenChange={setImportOpen}
       />
     </section>

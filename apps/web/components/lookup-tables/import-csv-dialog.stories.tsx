@@ -42,6 +42,10 @@ async function dialog() {
   return element
 }
 
+function visibleText(text: string) {
+  return screen.getAllByText(text).find((element) => element.checkVisibility())
+}
+
 async function requestPreview(
   csv: string,
   { textLabel = 'CSV text', previewLabel = 'Preview import' } = {},
@@ -107,11 +111,9 @@ export const Preview = meta.story({
     await expect(screen.getByRole('button', { name: 'Unchanged 1' })).toBeVisible()
     await expect(screen.getByRole('button', { name: 'Invalid 3' })).toBeVisible()
     await expect(screen.getByText('changed from KGM to KGS')).toBeInTheDocument()
-    await expect(screen.getByText('The source code is missing.')).toBeVisible()
-    await expect(screen.getByText('Needs exactly two columns.')).toBeVisible()
-    await expect(
-      screen.getByText('The source code already occurs in an earlier line.'),
-    ).toBeVisible()
+    await expect(visibleText('The source code is missing.')).toBeVisible()
+    await expect(visibleText('Needs exactly two columns.')).toBeVisible()
+    await expect(visibleText('The source code already occurs in an earlier line.')).toBeVisible()
   },
 })
 
@@ -124,6 +126,23 @@ export const LargePreview = meta.story({
     await expect(screen.getByRole('button', { name: 'Added 1,000' })).toBeVisible()
     await expect(screen.getByRole('button', { name: 'Changed 1,500' })).toBeVisible()
     await expect(screen.getByRole('button', { name: 'Show 200 more lines' })).toBeVisible()
+  },
+})
+
+export const ShowAllLines = meta.story({
+  args: { table: largeTable! },
+  async play() {
+    await requestPreview(largeCsv)
+    await userEvent.click(await screen.findByRole('button', { name: 'Added 1,000' }))
+
+    for (let page = 0; page < 4; page++) {
+      await userEvent.click(screen.getByRole('button', { name: 'Show 200 more lines' }))
+    }
+
+    await expect(await screen.findByText('Showing 1,000 of 1,000 lines')).toBeVisible()
+    await expect(screen.queryByRole('button', { name: /more lines/ })).not.toBeInTheDocument()
+    await waitFor(() => expect(document.activeElement).toHaveTextContent('NEW800'))
+    await expect(document.activeElement?.tagName).toBe('TR')
   },
 })
 
@@ -150,6 +169,55 @@ export const PreviewError = meta.story({
     await expect(
       await screen.findByText('The preview could not be loaded. Try again.'),
     ).toBeVisible()
+  },
+})
+
+export const Previewing = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${lookupTableImportPreviewEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play() {
+    await requestPreview(everyStatusCsv)
+
+    await expect(screen.getByRole('button', { name: 'Loading preview…' })).toBeDisabled()
+  },
+})
+
+export const ReadFailed = meta.story({
+  async play() {
+    await dialog()
+    const file = new File(['ST;PCE'], 'units.csv', { type: 'text/csv' })
+    Object.defineProperty(file, 'text', { value: () => Promise.reject(new Error('unreadable')) })
+    await userEvent.upload(screen.getByLabelText('CSV file'), file)
+
+    await expect(
+      await screen.findByText('The file could not be read. Choose another file.'),
+    ).toBeVisible()
+    await expect(screen.getByLabelText('CSV file')).toHaveFocus()
+    await expect(screen.getByLabelText('CSV file')).toHaveAttribute('aria-invalid', 'true')
+  },
+})
+
+export const ApplyFailed = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${importLookupTableEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play() {
+    await requestPreview(everyStatusCsv)
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply import' }))
+
+    await expect(
+      await screen.findByText('The import could not be applied. Try again.'),
+    ).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Apply import' })).toBeEnabled()
   },
 })
 
@@ -185,7 +253,7 @@ export const German = meta.story({
     })
 
     await expect(await screen.findByRole('button', { name: 'Neu 1' })).toBeVisible()
-    await expect(screen.getByText('Der Ausgangscode fehlt.')).toBeVisible()
+    await expect(visibleText('Der Ausgangscode fehlt.')).toBeVisible()
   },
 })
 

@@ -210,6 +210,7 @@ export const lookupTableKeys = {
   all: () => ['lookup-tables'] as const,
   list: () => [...lookupTableKeys.all(), 'list'] as const,
   detail: (id: string) => [...lookupTableKeys.all(), 'detail', id] as const,
+  import: (id: string) => [...lookupTableKeys.detail(id), 'import'] as const,
 }
 
 export const lookupTablesQuery = queryOptions({
