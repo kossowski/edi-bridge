@@ -18,12 +18,17 @@ export type ComparisonSelection =
   | { kind: 'sameVersion'; from: string; to: string }
   | { kind: 'ready'; from: MappingVersionSummary; to: MappingVersionSummary }
 
-// Without a choice, the latest version is compared with the one before it.
+export function newestFirst<Version extends Pick<MappingVersionSummary, 'version'>>(
+  versions: ReadonlyArray<Version>,
+): Version[] {
+  return [...versions].sort((a, b) => b.version - a.version)
+}
+
 export function resolveVersions(
   versions: ReadonlyArray<MappingVersionSummary>,
   { from, to }: ComparisonRequest,
 ): ComparisonSelection {
-  const [latest, previous] = [...versions].sort((a, b) => b.version - a.version)
+  const [latest, previous] = newestFirst(versions)
 
   if (!latest || !previous) {
     return { kind: 'tooFew' }
@@ -107,8 +112,7 @@ export function trailOf(items: ReadonlyArray<TreeItem>, path: string): TreeItem[
 
 export type Repetition = { label: string | null; number: number }
 
-// Each index belongs to a repeating part on the way to the value, outermost first. When the
-// counts disagree, the indices are still shown, only without the part they repeat.
+// A tree whose repeating parts do not match the indices cannot name them, but the numbers still help.
 export function repetitionsOf(
   trail: ReadonlyArray<TreeItem>,
   indices: ReadonlyArray<number>,

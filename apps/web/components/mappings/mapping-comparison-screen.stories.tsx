@@ -13,6 +13,7 @@ import {
   seedDocumentStructures,
   seedMappingDrafts,
   seedMappingSamples,
+  toMappingVersionSummary,
 } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -78,6 +79,53 @@ export const ChosenVersionsAndSample = meta.story({
     await expect(table.getByRole('columnheader', { name: 'Version 3' })).toBeVisible()
     await expect(
       await canvas.findByText(new RegExp(`for ${samples[1]!.name}`), {}, { timeout: 5000 }),
+    ).toBeVisible()
+  },
+})
+
+export const NotesAndEmptyValue = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(comparisonPath, ({ request }) => {
+        const sampleId = new URL(request.url).searchParams.get('sampleId')
+        const document = samples[0]!.document
+
+        return HttpResponse.json({
+          mappingId: published.id,
+          from: toMappingVersionSummary(previous!),
+          to: toMappingVersionSummary(latest!),
+          differences: [],
+          outputs: sampleId
+            ? {
+                sampleId,
+                from: { document, notes: [] },
+                to: {
+                  document,
+                  notes: [{ targetPath: 'orderNumber', transformId: null, code: 'brokenLink' }],
+                },
+                differences: [
+                  { path: 'orderNumber', repetitions: [], before: 'PO-4711', after: '' },
+                  { path: 'buyer.reference', repetitions: [], before: null, after: 'HM-01' },
+                ],
+              }
+            : null,
+        })
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const table = await canvas.findByRole(
+      'region',
+      { name: 'Values that differ, by target and repetition' },
+      { timeout: 5000 },
+    )
+
+    await expect(table).toHaveAttribute('tabindex', '0')
+    await expect(within(table).getByText('Empty')).toBeVisible()
+    await expect(within(table).getByText('Not set')).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: '1 target left empty' })).toBeVisible()
+    await expect(
+      canvas.getByText(/A link here reaches a field or element its side does not have/),
     ).toBeVisible()
   },
 })

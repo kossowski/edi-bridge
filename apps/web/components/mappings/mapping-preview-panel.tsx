@@ -6,14 +6,16 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useId, useMemo, useState } from 'react'
 
+import { Loading } from '@/components/detail-parts'
 import { useGraphText } from '@/components/mappings/graph-text'
-import { documentText, lineCount, previewGraph } from '@/components/mappings/mapping-preview'
+import { documentSize, documentText, previewGraph } from '@/components/mappings/mapping-preview'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { mappingPreviewQuery, mappingSamplesQuery } from '@/lib/api/queries'
 import {
   type DocumentContent,
   type MappingDraft,
   type MappingSample,
+  type MappingTransform,
   type PreviewNote,
   previewNoteKey,
 } from '@edi-bridge/contracts'
@@ -26,12 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@edi-bridge/ui/components/select'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 // Long enough that typing into a transform's form does not send a preview per keystroke.
 const previewDelay = 600
-
-const formats = { json: 'JSON', edifact: 'EDIFACT' } as const
 
 const views = ['target', 'source'] as const
 
@@ -50,16 +50,30 @@ function Failure({ message, onRetry }: { message: string; onRetry: () => void })
   )
 }
 
-function Loading({ label }: { label: string }) {
+export function DocumentText({
+  label,
+  document,
+  busy = false,
+  className,
+}: {
+  label: string
+  document: DocumentContent
+  busy?: boolean
+  className?: string
+}) {
   return (
-    <div aria-busy className="flex flex-col gap-2">
-      <p role="status" className="sr-only">
-        {label}
-      </p>
-      {Array.from({ length: 6 }, (_, row) => (
-        <Skeleton key={row} className="h-4 w-full" />
-      ))}
-    </div>
+    <pre
+      role="region"
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Document
+      tabIndex={0}
+      aria-busy={busy}
+      aria-label={label}
+      className={cn(
+        'bg-muted/40 focus-visible:ring-ring/50 overflow-auto rounded-md border p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-3',
+        className,
+      )}>
+      {documentText(document)}
+    </pre>
   )
 }
 
@@ -74,29 +88,27 @@ function DocumentView({
   busy?: boolean
   children?: React.ReactNode
 }) {
-  const text = document ? documentText(document) : ''
-
   return (
     <div className="flex min-h-24 min-w-0 flex-1 flex-col">
       {children ??
         (document && (
-          <pre
-            role="region"
-            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Document
-            tabIndex={0}
-            aria-busy={busy}
-            aria-label={label}
-            className="bg-muted/40 focus-visible:ring-ring/50 min-h-0 flex-1 overflow-auto rounded-md border p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-3">
-            {text}
-          </pre>
+          <DocumentText busy={busy} document={document} label={label} className="min-h-0 flex-1" />
         ))}
     </div>
   )
 }
 
-function Notes({ draft, notes }: { draft: MappingDraft; notes: ReadonlyArray<PreviewNote> }) {
+export function PreviewNotes({
+  transforms,
+  notes,
+  heading: Heading = 'h3',
+}: {
+  transforms: ReadonlyArray<MappingTransform>
+  notes: ReadonlyArray<PreviewNote>
+  heading?: 'h3' | 'h5'
+}) {
   const t = useTranslations('Mapping.preview.notes')
-  const text = useGraphText(draft.transforms)
+  const text = useGraphText(transforms)
   const headingId = useId()
 
   if (notes.length === 0) {
@@ -105,9 +117,9 @@ function Notes({ draft, notes }: { draft: MappingDraft; notes: ReadonlyArray<Pre
 
   return (
     <div className="flex flex-col gap-1.5">
-      <h3 id={headingId} className="text-sm font-medium">
+      <Heading id={headingId} className="text-sm font-medium">
         {t('title', { count: notes.length })}
-      </h3>
+      </Heading>
       <ul aria-labelledby={headingId} className="flex flex-col gap-1 text-sm">
         {notes.map((note) => (
           <li key={previewNoteKey(note)} className="flex flex-wrap gap-x-2">
@@ -208,10 +220,7 @@ function SamplePreview({
         </div>
         {shownDocument && (
           <span className="text-muted-foreground text-xs">
-            {t('size', {
-              format: formats[shownDocument.format],
-              count: lineCount(documentText(shownDocument)),
-            })}
+            {t('size', documentSize(shownDocument))}
           </span>
         )}
       </div>
@@ -225,11 +234,11 @@ function SamplePreview({
           {preview.isError ? (
             <Failure message={t('error.preview')} onRetry={() => void preview.refetch()} />
           ) : preview.isPending ? (
-            <Loading label={t('building')} />
+            <Loading label={t('building')} rowClassName="h-4" />
           ) : undefined}
         </DocumentView>
       )}
-      {preview.data && <Notes draft={draft} notes={preview.data.notes} />}
+      {preview.data && <PreviewNotes notes={preview.data.notes} transforms={draft.transforms} />}
       <p role="status" className="sr-only">
         {announcement}
       </p>
@@ -250,7 +259,7 @@ function PreviewContent({
   const samples = useQuery(mappingSamplesQuery(draft.mappingId))
 
   if (samples.isPending) {
-    return <Loading label={t('loading')} />
+    return <Loading label={t('loading')} rowClassName="h-4" />
   }
 
   if (samples.isError) {

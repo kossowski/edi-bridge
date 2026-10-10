@@ -7,22 +7,24 @@ import {
   FileNotFoundIcon,
   WorkHistoryIcon,
 } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
-import { usePrefetchQuery, useQuery } from '@tanstack/react-query'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { usePrefetchQuery, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { type ReactNode, useEffect, useId, useState } from 'react'
+import { Fragment, type ReactNode, useEffect, useId, useState } from 'react'
 
-import { LoadFailure } from '@/components/detail-parts'
+import { Failure as FailureNotice, Loading, LoadFailure, Notice } from '@/components/detail-parts'
 import { ListScreen } from '@/components/list-screen'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
-import { useSide } from '@/components/mappings/mapping-canvas-screen'
-import { documentText, lineCount } from '@/components/mappings/mapping-preview'
+import { documentSize } from '@/components/mappings/mapping-preview'
+import { DocumentText, PreviewNotes } from '@/components/mappings/mapping-preview-panel'
+import { useSide } from '@/components/mappings/mapping-side'
 import {
   byKind,
   changeCounts,
   type ComparisonRequest,
   comparisonSearch,
+  newestFirst,
   outputChange,
   repetitionsOf,
   resolveSample,
@@ -41,21 +43,12 @@ import {
 } from '@/lib/api/queries'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@edi-bridge/ui/components/empty'
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@edi-bridge/ui/components/select'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import {
   Table,
   TableBody,
@@ -70,20 +63,19 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 import type { TreeItem } from '@/components/mappings/mapping-tree'
 import type {
   DifferenceChange,
-  DocumentContent,
   LinkEnd,
   LinkStart,
+  LookupTableSummary,
   MappingDifference,
   MappingSample,
   MappingTransform,
   MappingVersion,
   MappingVersionSummary,
   OutputDifference,
+  VersionOutput,
 } from '@edi-bridge/contracts'
 
 const pageSize = 100
-
-const formats = { json: 'JSON', edifact: 'EDIFACT' } as const
 
 const changeStyles: Record<DifferenceChange, string> = {
   added: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
@@ -91,47 +83,16 @@ const changeStyles: Record<DifferenceChange, string> = {
   changed: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
 }
 
-type Trees = { source: TreeItem[] | undefined; target: TreeItem[] | undefined }
+type VersionSide = {
+  source: TreeItem[] | undefined
+  target: TreeItem[] | undefined
+  text: GraphText
+  transforms: ReadonlyArray<MappingTransform>
+}
+
+type Sides = { before: VersionSide; after: VersionSide }
 
 type Pair = { from: MappingVersionSummary; to: MappingVersionSummary }
-
-function Loading({ label, rows = 4 }: { label: string; rows?: number }) {
-  return (
-    <div aria-busy className="flex flex-col gap-2">
-      <p role="status" className="sr-only">
-        {label}
-      </p>
-      {Array.from({ length: rows }, (_, row) => (
-        <Skeleton key={row} className="h-8 w-full" />
-      ))}
-    </div>
-  )
-}
-
-function Notice({
-  icon,
-  title,
-  description,
-  children,
-}: {
-  icon: IconSvgElement
-  title: string
-  description: string
-  children?: ReactNode
-}) {
-  return (
-    <Empty className="border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <HugeiconsIcon icon={icon} strokeWidth={2} />
-        </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
-        <EmptyDescription>{description}</EmptyDescription>
-      </EmptyHeader>
-      {children && <EmptyContent>{children}</EmptyContent>}
-    </Empty>
-  )
-}
 
 function Failure({
   namespace,
@@ -144,25 +105,20 @@ function Failure({
 }) {
   const t = useTranslations('MappingComparison')
 
-  if (error instanceof ApiError && error.status === 404) {
-    return (
-      <Notice
-        description={t('unknownVersion.description')}
-        icon={FileNotFoundIcon}
-        title={t('unknownVersion.title')}
-      />
-    )
-  }
-
   return (
-    <Notice
-      description={t(`${namespace}.error.description`)}
-      icon={AlertCircleIcon}
-      title={t(`${namespace}.error.title`)}>
-      <Button variant="outline" onClick={onRetry}>
-        {t('retry')}
-      </Button>
-    </Notice>
+    <FailureNotice
+      error={{
+        title: t(`${namespace}.error.title`),
+        description: t(`${namespace}.error.description`),
+        retry: t('retry'),
+      }}
+      notFound={
+        error instanceof ApiError && error.status === 404
+          ? { title: t('unknownVersion.title'), description: t('unknownVersion.description') }
+          : null
+      }
+      onRetry={onRetry}
+    />
   )
 }
 
@@ -184,37 +140,50 @@ function Absent({ text }: { text: string }) {
   return <span className="text-muted-foreground italic">{text}</span>
 }
 
+function Separated({ text }: { text: string }) {
+  return text.split(/(?<=[.›/])/).map((piece, index) => (
+    <Fragment key={index}>
+      {index > 0 && <wbr />}
+      {piece}
+    </Fragment>
+  ))
+}
+
 function PathLabel({ items, path }: { items: TreeItem[] | undefined; path: string }) {
   const trail = items ? trailOf(items, path) : []
   const leaf = trail.at(-1)
 
   if (!leaf) {
-    return <code className="font-mono text-xs [overflow-wrap:anywhere]">{path}</code>
+    return (
+      <code className="font-mono text-xs wrap-break-word">
+        <Separated text={path} />
+      </code>
+    )
   }
 
   return (
     <span className="flex flex-col gap-0.5">
-      <code title={path} className="font-mono text-xs [overflow-wrap:anywhere]">
-        {trail.map(({ label }) => label).join(' › ')}
+      <code title={path} className="font-mono text-xs wrap-break-word">
+        <Separated text={trail.map(({ label }) => label).join(' › ')} />
       </code>
       {leaf.name && <span className="text-muted-foreground text-xs">{leaf.name}</span>}
     </span>
   )
 }
 
-function StartLabel({ from, trees, text }: { from: LinkStart; trees: Trees; text: GraphText }) {
+function StartLabel({ from, side }: { from: LinkStart; side: VersionSide }) {
   return from.kind === 'source' ? (
-    <PathLabel items={trees.source} path={from.path} />
+    <PathLabel items={side.source} path={from.path} />
   ) : (
-    <span>{text.start(from)}</span>
+    <span>{side.text.start(from)}</span>
   )
 }
 
-function EndLabel({ to, trees, text }: { to: LinkEnd; trees: Trees; text: GraphText }) {
+function EndLabel({ to, side }: { to: LinkEnd; side: VersionSide }) {
   return to.kind === 'target' ? (
-    <PathLabel items={trees.target} path={to.path} />
+    <PathLabel items={side.target} path={to.path} />
   ) : (
-    <span>{text.end(to)}</span>
+    <span>{side.text.end(to)}</span>
   )
 }
 
@@ -222,7 +191,7 @@ function TransformLabel({ transform, text }: { transform: MappingTransform; text
   return (
     <span className="flex flex-col gap-0.5">
       <span className="font-medium">{text.name(transform.id)}</span>
-      <span className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
+      <span className="text-muted-foreground text-xs wrap-break-word">
         {text.summary(transform)}
       </span>
     </span>
@@ -266,81 +235,53 @@ function ShowMore({
   )
 }
 
-function DifferenceRow({
-  difference,
-  trees,
-  before,
-  after,
-}: {
-  difference: MappingDifference
-  trees: Trees
-  before: GraphText
-  after: GraphText
-}) {
+type DifferenceKind = MappingDifference['kind']
+
+type PartOf<Kind extends DifferenceKind> = NonNullable<
+  Extract<MappingDifference, { kind: Kind }>['after']
+>
+
+type PartRenderer<Kind extends DifferenceKind> = {
+  part: (entry: PartOf<Kind>, side: VersionSide) => ReactNode
+  value: (entry: PartOf<Kind>, side: VersionSide) => ReactNode
+}
+
+type PartRenderers = { [Kind in DifferenceKind]: PartRenderer<Kind> }
+
+const partRenderers: PartRenderers = {
+  link: {
+    part: (link, side) => <PathLabel items={side.target} path={link.targetPath} />,
+    value: (link, side) => <PathLabel items={side.source} path={link.sourcePath} />,
+  },
+  transform: {
+    part: (transform, side) => <span className="font-medium">{side.text.name(transform.id)}</span>,
+    value: (transform, side) => <TransformLabel text={side.text} transform={transform} />,
+  },
+  transformLink: {
+    part: (transformLink, side) => <EndLabel side={side} to={transformLink.to} />,
+    value: (transformLink, side) => <StartLabel from={transformLink.from} side={side} />,
+  },
+}
+
+function differenceCells<Kind extends DifferenceKind>(
+  kind: Kind,
+  before: PartOf<Kind> | null,
+  after: PartOf<Kind> | null,
+  sides: Sides,
+) {
+  const { part, value } = partRenderers[kind]
+
+  return {
+    part: after ? part(after, sides.after) : before && part(before, sides.before),
+    before: before && value(before, sides.before),
+    after: after && value(after, sides.after),
+  }
+}
+
+function DifferenceRow({ difference, sides }: { difference: MappingDifference; sides: Sides }) {
   const t = useTranslations('MappingComparison.differences')
   const absent = <Absent text={t('absent')} />
-
-  const cells = (() => {
-    switch (difference.kind) {
-      case 'link': {
-        const target = (difference.after ?? difference.before)!.targetPath
-
-        return {
-          part: <PathLabel items={trees.target} path={target} />,
-          before: difference.before ? (
-            <PathLabel items={trees.source} path={difference.before.sourcePath} />
-          ) : (
-            absent
-          ),
-          after: difference.after ? (
-            <PathLabel items={trees.source} path={difference.after.sourcePath} />
-          ) : (
-            absent
-          ),
-        }
-      }
-
-      case 'transform':
-        return {
-          part: (
-            <span className="font-medium">
-              {difference.after
-                ? after.name(difference.after.id)
-                : before.name(difference.before!.id)}
-            </span>
-          ),
-          before: difference.before ? (
-            <TransformLabel text={before} transform={difference.before} />
-          ) : (
-            absent
-          ),
-          after: difference.after ? (
-            <TransformLabel text={after} transform={difference.after} />
-          ) : (
-            absent
-          ),
-        }
-
-      case 'transformLink':
-        return {
-          part: difference.after ? (
-            <EndLabel text={after} to={difference.after.to} trees={trees} />
-          ) : (
-            <EndLabel text={before} to={difference.before!.to} trees={trees} />
-          ),
-          before: difference.before ? (
-            <StartLabel from={difference.before.from} text={before} trees={trees} />
-          ) : (
-            absent
-          ),
-          after: difference.after ? (
-            <StartLabel from={difference.after.from} text={after} trees={trees} />
-          ) : (
-            absent
-          ),
-        }
-    }
-  })()
+  const cells = differenceCells(difference.kind, difference.before, difference.after, sides)
 
   return (
     <TableRow>
@@ -348,9 +289,22 @@ function DifferenceRow({
         <ChangeBadge change={difference.change} />
       </TableCell>
       <TableCell className="align-top whitespace-normal">{cells.part}</TableCell>
-      <TableCell className="align-top whitespace-normal">{cells.before}</TableCell>
-      <TableCell className="align-top whitespace-normal">{cells.after}</TableCell>
+      <TableCell className="align-top whitespace-normal">{cells.before ?? absent}</TableCell>
+      <TableCell className="align-top whitespace-normal">{cells.after ?? absent}</TableCell>
     </TableRow>
+  )
+}
+
+function TableRegion({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div
+      role="region"
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a wide table
+      tabIndex={0}
+      aria-label={label}
+      className="focus-visible:ring-ring/50 overflow-x-auto rounded-lg border outline-none focus-visible:ring-3 [&>[data-slot=table-container]]:overflow-visible">
+      {children}
+    </div>
   )
 }
 
@@ -358,16 +312,12 @@ function DifferenceGroup({
   kind,
   differences,
   pair,
-  trees,
-  before,
-  after,
+  sides,
 }: {
-  kind: MappingDifference['kind']
+  kind: DifferenceKind
   differences: MappingDifference[]
   pair: Pair
-  trees: Trees
-  before: GraphText
-  after: GraphText
+  sides: Sides
 }) {
   const t = useTranslations('MappingComparison')
   const headingId = useId()
@@ -378,8 +328,8 @@ function DifferenceGroup({
       <h3 id={headingId} className="text-sm font-semibold">
         {t(`differences.kinds.${kind}.title`, { count: differences.length })}
       </h3>
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
+      <TableRegion label={t(`differences.kinds.${kind}.caption`)}>
+        <Table className="min-w-xl">
           <TableCaption className="sr-only">{t(`differences.kinds.${kind}.caption`)}</TableCaption>
           <TableHeader>
             <TableRow>
@@ -393,17 +343,11 @@ function DifferenceGroup({
           </TableHeader>
           <TableBody>
             {differences.slice(0, limit).map((difference, index) => (
-              <DifferenceRow
-                key={index}
-                after={after}
-                before={before}
-                difference={difference}
-                trees={trees}
-              />
+              <DifferenceRow key={index} difference={difference} sides={sides} />
             ))}
           </TableBody>
         </Table>
-      </div>
+      </TableRegion>
       <ShowMore limit={limit} more={more} total={differences.length} onClick={showMore} />
     </section>
   )
@@ -436,15 +380,11 @@ function SectionShell({
 function MappingDifferences({
   mappingId,
   pair,
-  trees,
-  before,
-  after,
+  sides,
 }: {
   mappingId: string
   pair: Pair
-  trees: Trees
-  before: GraphText
-  after: GraphText
+  sides: Sides
 }) {
   const t = useTranslations('MappingComparison')
 
@@ -456,7 +396,7 @@ function MappingDifferences({
 
   const content = () => {
     if (comparison.isPending) {
-      return <Loading label={t('differences.loading')} />
+      return <Loading label={t('differences.loading')} rows={4} />
     }
 
     if (comparison.isError) {
@@ -491,12 +431,10 @@ function MappingDifferences({
             group.differences.length > 0 && (
               <DifferenceGroup
                 key={group.kind}
-                after={after}
-                before={before}
                 differences={group.differences}
                 kind={group.kind}
                 pair={pair}
-                trees={trees}
+                sides={sides}
               />
             ),
         )}
@@ -542,29 +480,37 @@ function Repetitions({
 function OutputValue({ value }: { value: string | null }) {
   const t = useTranslations('MappingComparison.outputs')
 
-  return value === null ? (
-    <Absent text={t('notSet')} />
-  ) : (
-    <code className="font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">{value}</code>
+  if (value === null) {
+    return <Absent text={t('notSet')} />
+  }
+
+  if (value === '') {
+    return <Absent text={t('emptyValue')} />
+  }
+
+  return (
+    <code className="block max-w-80 font-mono text-xs wrap-break-word whitespace-pre-wrap">
+      {value}
+    </code>
   )
 }
 
 function OutputDifferenceTable({
   differences,
   pair,
-  target,
+  sides,
 }: {
   differences: OutputDifference[]
   pair: Pair
-  target: TreeItem[] | undefined
+  sides: Sides
 }) {
   const t = useTranslations('MappingComparison')
   const { limit, more, showMore } = useLimit(differences.length)
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
+      <TableRegion label={t('outputs.caption')}>
+        <Table className="min-w-2xl">
           <TableCaption className="sr-only">{t('outputs.caption')}</TableCaption>
           <TableHeader>
             <TableRow>
@@ -578,56 +524,58 @@ function OutputDifferenceTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {differences.slice(0, limit).map((difference) => (
-              <TableRow key={`${difference.path}|${difference.repetitions.join('/')}`}>
-                <TableCell className="align-top">
-                  <ChangeBadge change={outputChange(difference.before, difference.after)} />
-                </TableCell>
-                <TableCell className="align-top whitespace-normal">
-                  <PathLabel items={target} path={difference.path} />
-                </TableCell>
-                <TableCell className="align-top text-xs whitespace-normal">
-                  <Repetitions difference={difference} items={target} />
-                </TableCell>
-                <TableCell className="align-top whitespace-normal">
-                  <OutputValue value={difference.before} />
-                </TableCell>
-                <TableCell className="align-top whitespace-normal">
-                  <OutputValue value={difference.after} />
-                </TableCell>
-              </TableRow>
-            ))}
+            {differences.slice(0, limit).map((difference) => {
+              const target = (difference.after === null ? sides.before : sides.after).target
+
+              return (
+                <TableRow key={`${difference.path}|${difference.repetitions.join('/')}`}>
+                  <TableCell className="align-top">
+                    <ChangeBadge change={outputChange(difference.before, difference.after)} />
+                  </TableCell>
+                  <TableCell className="align-top whitespace-normal">
+                    <PathLabel items={target} path={difference.path} />
+                  </TableCell>
+                  <TableCell className="align-top text-xs whitespace-normal">
+                    <Repetitions difference={difference} items={target} />
+                  </TableCell>
+                  <TableCell className="align-top whitespace-normal">
+                    <OutputValue value={difference.before} />
+                  </TableCell>
+                  <TableCell className="align-top whitespace-normal">
+                    <OutputValue value={difference.after} />
+                  </TableCell>
+                </TableRow>
+              )
+            })}
           </TableBody>
         </Table>
-      </div>
+      </TableRegion>
       <ShowMore limit={limit} more={more} total={differences.length} onClick={showMore} />
     </div>
   )
 }
 
-function OutputDocument({ label, document }: { label: string; document: DocumentContent }) {
+function OutputDocument({
+  label,
+  output,
+  side,
+}: {
+  label: string
+  output: VersionOutput
+  side: VersionSide
+}) {
   const tPreview = useTranslations('Mapping.preview')
-  const text = documentText(document)
-  const headingId = useId()
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h4 id={headingId} className="text-sm font-medium">
-          {label}
-        </h4>
+        <h4 className="text-sm font-medium">{label}</h4>
         <span className="text-muted-foreground text-xs">
-          {tPreview('size', { format: formats[document.format], count: lineCount(text) })}
+          {tPreview('size', documentSize(output.document))}
         </span>
       </div>
-      <pre
-        role="region"
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Document
-        tabIndex={0}
-        aria-labelledby={headingId}
-        className="bg-muted/40 focus-visible:ring-ring/50 max-h-96 min-h-24 overflow-auto rounded-md border p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-3">
-        {text}
-      </pre>
+      <DocumentText document={output.document} label={label} className="max-h-96 min-h-24" />
+      <PreviewNotes heading="h5" notes={output.notes} transforms={side.transforms} />
     </div>
   )
 }
@@ -636,12 +584,12 @@ function SampleOutputs({
   mappingId,
   pair,
   sample,
-  target,
+  sides,
 }: {
   mappingId: string
   pair: Pair
   sample: MappingSample
-  target: TreeItem[] | undefined
+  sides: Sides
 }) {
   const t = useTranslations('MappingComparison')
   const documentsId = useId()
@@ -684,7 +632,7 @@ function SampleOutputs({
           <p className="text-sm">
             {t('outputs.summary', { count: outputs.differences.length, name: sample.name })}
           </p>
-          <OutputDifferenceTable differences={outputs.differences} pair={pair} target={target} />
+          <OutputDifferenceTable differences={outputs.differences} pair={pair} sides={sides} />
         </>
       )}
       <section aria-labelledby={documentsId} className="flex flex-col gap-2">
@@ -693,12 +641,14 @@ function SampleOutputs({
         </h3>
         <div className="flex flex-col gap-4 lg:flex-row">
           <OutputDocument
-            document={outputs.from.document}
             label={t('outputs.document', { version: pair.from.version })}
+            output={outputs.from}
+            side={sides.before}
           />
           <OutputDocument
-            document={outputs.to.document}
             label={t('outputs.document', { version: pair.to.version })}
+            output={outputs.to}
+            side={sides.after}
           />
         </div>
       </section>
@@ -711,24 +661,24 @@ function OutputDifferences({
   pair,
   samples,
   selection,
-  target,
+  sides,
 }: {
   mappingId: string
   pair: Pair
-  samples: { isError: boolean; refetch: () => void }
+  samples: UseQueryResult<MappingSample[]>
   selection: SampleSelection | undefined
-  target: TreeItem[] | undefined
+  sides: Sides
 }) {
   const t = useTranslations('MappingComparison')
 
   const content = () => {
     if (samples.isError) {
-      return <Failure error={null} namespace="outputs" onRetry={samples.refetch} />
+      return <Failure error={null} namespace="outputs" onRetry={() => void samples.refetch()} />
     }
 
     switch (selection?.kind) {
       case undefined:
-        return <Loading label={t('outputs.loadingSamples')} />
+        return <Loading label={t('outputs.loadingSamples')} rows={4} />
       case 'none':
         return (
           <Notice
@@ -752,7 +702,7 @@ function OutputDifferences({
             mappingId={mappingId}
             pair={pair}
             sample={selection.sample}
-            target={target}
+            sides={sides}
           />
         )
     }
@@ -763,6 +713,17 @@ function OutputDifferences({
       {content()}
     </SectionShell>
   )
+}
+
+function useVersionSide(
+  version: MappingVersion,
+  lookupTables: ReadonlyArray<LookupTableSummary> | undefined,
+): VersionSide {
+  const source = useSide(version.source)
+  const target = useSide(version.target)
+  const text = useGraphText(version.transforms, lookupTables)
+
+  return { source: source.items, target: target.items, text, transforms: version.transforms }
 }
 
 function ComparedVersions({
@@ -777,31 +738,25 @@ function ComparedVersions({
   pair: Pair
   before: MappingVersion
   after: MappingVersion
-  samples: { isError: boolean; refetch: () => void }
+  samples: UseQueryResult<MappingSample[]>
   sample: SampleSelection | undefined
 }) {
-  const source = useSide(after.source)
-  const target = useSide(after.target)
   const lookupTables = useQuery(lookupTablesQuery)
-  const beforeText = useGraphText(before.transforms, lookupTables.data)
-  const afterText = useGraphText(after.transforms, lookupTables.data)
-  const trees = { source: source.items, target: target.items }
+
+  const sides = {
+    before: useVersionSide(before, lookupTables.data),
+    after: useVersionSide(after, lookupTables.data),
+  }
 
   return (
     <>
-      <MappingDifferences
-        after={afterText}
-        before={beforeText}
-        mappingId={mappingId}
-        pair={pair}
-        trees={trees}
-      />
+      <MappingDifferences mappingId={mappingId} pair={pair} sides={sides} />
       <OutputDifferences
         mappingId={mappingId}
         pair={pair}
         samples={samples}
         selection={sample}
-        target={trees.target}
+        sides={sides}
       />
     </>
   )
@@ -815,7 +770,7 @@ function VersionGraphs({
 }: {
   mappingId: string
   pair: Pair
-  samples: { isError: boolean; refetch: () => void }
+  samples: UseQueryResult<MappingSample[]>
   sample: SampleSelection | undefined
 }) {
   const t = useTranslations('MappingComparison')
@@ -962,9 +917,10 @@ function Comparison({ mappingId, initial }: { mappingId: string; initial: Compar
     )
   }
 
-  const latest = versions.data[0]?.id
+  const ordered = newestFirst(versions.data)
+  const latest = ordered[0]?.id
 
-  const versionItems = versions.data.map(({ id, version }) => ({
+  const versionItems = ordered.map(({ id, version }) => ({
     value: id,
     label: id === latest ? t('latestVersion', { version }) : t('version', { version }),
   }))
@@ -1015,7 +971,7 @@ function Comparison({ mappingId, initial }: { mappingId: string; initial: Compar
           mappingId={mappingId}
           pair={selection}
           sample={sample}
-          samples={{ isError: samples.isError, refetch: () => void samples.refetch() }}
+          samples={samples}
         />
       ) : (
         <InvalidSelection same={selection?.kind === 'sameVersion'} />
@@ -1036,7 +992,7 @@ export function MappingComparisonScreen({ id, ...initial }: { id: string } & Com
       {isPending ? (
         <Loading label={t('loading')} rows={6} />
       ) : data ? (
-        <Comparison initial={initial} mappingId={id} />
+        <Comparison key={comparisonSearch('', initial)} initial={initial} mappingId={id} />
       ) : (
         <LoadFailure
           namespace="Mapping"

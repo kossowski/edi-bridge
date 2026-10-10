@@ -1260,8 +1260,7 @@
     "latest": "Latest",
     "columns": {
       "version": "Version",
-      "publishedAt": "Published",
-      "compare": "Comparison"
+      "publishedAt": "Published"
     },
     "empty": {
       "title": "No Mapping Versions yet",
@@ -1364,6 +1363,7 @@
       "repetition": "{label} no. {number}",
       "repetitionPlain": "No. {number}",
       "notSet": "Not set",
+      "emptyValue": "Empty",
       "documents": "Target Documents",
       "document": "Target Document of Version {version}",
       "empty": {

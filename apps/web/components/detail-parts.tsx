@@ -1,7 +1,7 @@
 'use client'
 
 import { AlertCircleIcon, ArrowLeft01Icon, FileNotFoundIcon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
@@ -16,6 +16,8 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@edi-bridge/ui/components/empty'
+import { Skeleton } from '@edi-bridge/ui/components/skeleton'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 export const linkClass =
   'focus-visible:ring-ring/50 rounded-sm font-medium underline underline-offset-4 outline-none focus-visible:ring-3'
@@ -63,6 +65,76 @@ export function Section({
   )
 }
 
+export function Loading({
+  label,
+  rows = 6,
+  rowClassName = 'h-8',
+}: {
+  label: string
+  rows?: number
+  rowClassName?: string
+}) {
+  return (
+    <div aria-busy className="flex flex-col gap-2">
+      <p role="status" className="sr-only">
+        {label}
+      </p>
+      {Array.from({ length: rows }, (_, row) => (
+        <Skeleton key={row} className={cn('w-full', rowClassName)} />
+      ))}
+    </div>
+  )
+}
+
+export function Notice({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: IconSvgElement
+  title: string
+  description: string
+  children?: ReactNode
+}) {
+  return (
+    <Empty className="border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <HugeiconsIcon icon={icon} strokeWidth={2} />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      {children && <EmptyContent>{children}</EmptyContent>}
+    </Empty>
+  )
+}
+
+export function Failure({
+  notFound,
+  error,
+  onRetry,
+}: {
+  notFound: { title: string; description: string } | null
+  error: { title: string; description: string; retry: string }
+  onRetry: () => void
+}) {
+  if (notFound) {
+    return (
+      <Notice description={notFound.description} icon={FileNotFoundIcon} title={notFound.title} />
+    )
+  }
+
+  return (
+    <Notice description={error.description} icon={AlertCircleIcon} title={error.title}>
+      <Button variant="outline" onClick={onRetry}>
+        {error.retry}
+      </Button>
+    </Notice>
+  )
+}
+
 export function LoadFailure({
   notFound,
   namespace,
@@ -83,23 +155,16 @@ export function LoadFailure({
   const t = useTranslations(namespace)
 
   return (
-    <Empty className="border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <HugeiconsIcon icon={notFound ? FileNotFoundIcon : AlertCircleIcon} strokeWidth={2} />
-        </EmptyMedia>
-        <EmptyTitle>{notFound ? t('notFound.title') : t('error.title')}</EmptyTitle>
-        <EmptyDescription>
-          {notFound ? t('notFound.description') : t('error.description')}
-        </EmptyDescription>
-      </EmptyHeader>
-      {!notFound && (
-        <EmptyContent>
-          <Button variant="outline" onClick={onRetry}>
-            {t('error.retry')}
-          </Button>
-        </EmptyContent>
-      )}
-    </Empty>
+    <Failure
+      error={{
+        title: t('error.title'),
+        description: t('error.description'),
+        retry: t('error.retry'),
+      }}
+      notFound={
+        notFound ? { title: t('notFound.title'), description: t('notFound.description') } : null
+      }
+      onRetry={onRetry}
+    />
   )
 }

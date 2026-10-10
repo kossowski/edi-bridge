@@ -8,6 +8,7 @@ import {
   changeCounts,
   comparisonHref,
   comparisonSearch,
+  newestFirst,
   outputChange,
   repetitionsOf,
   resolveSample,
@@ -29,15 +30,25 @@ function version(number: number): MappingVersionSummary {
 
 const [v1, v2, v3] = [version(1), version(2), version(3)] as const
 
-const newestFirst = [v3, v2, v1]
+const listed = [v3, v2, v1]
+
+describe('newestFirst', () => {
+  it('orders versions by number, whatever order they come in, and leaves the input as it was', () => {
+    const unordered = [v2, v3, v1]
+
+    expect(newestFirst(unordered)).toEqual([v3, v2, v1])
+    expect(unordered).toEqual([v2, v3, v1])
+  })
+})
 
 describe('resolveVersions', () => {
   it('compares the latest version with the one before it by default', () => {
-    expect(resolveVersions(newestFirst, {})).toEqual({ kind: 'ready', from: v2, to: v3 })
+    expect(resolveVersions(listed, {})).toEqual({ kind: 'ready', from: v2, to: v3 })
+    expect(resolveVersions([v1, v3, v2], {})).toEqual({ kind: 'ready', from: v2, to: v3 })
   })
 
   it('takes the chosen versions in any order', () => {
-    expect(resolveVersions(newestFirst, { from: v3.id, to: v1.id })).toEqual({
+    expect(resolveVersions(listed, { from: v3.id, to: v1.id })).toEqual({
       kind: 'ready',
       from: v3,
       to: v1,
@@ -50,7 +61,7 @@ describe('resolveVersions', () => {
   })
 
   it('tells a version that is not one of the Mapping', () => {
-    expect(resolveVersions(newestFirst, { from: 'unknown' })).toEqual({
+    expect(resolveVersions(listed, { from: 'unknown' })).toEqual({
       kind: 'unknownVersion',
       from: null,
       to: v3.id,
@@ -58,7 +69,7 @@ describe('resolveVersions', () => {
   })
 
   it('tells a comparison of a version with itself', () => {
-    expect(resolveVersions(newestFirst, { from: v2.id, to: v2.id })).toEqual({
+    expect(resolveVersions(listed, { from: v2.id, to: v2.id })).toEqual({
       kind: 'sameVersion',
       from: v2.id,
       to: v2.id,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { documentText, lineCount, previewGraph } from './mapping-preview'
+import { documentSize, documentText, lineCount, previewGraph } from './mapping-preview'
 
 const transformId = '0000000b-0000-4000-8000-000000000001'
 
@@ -53,5 +53,18 @@ describe('lineCount', () => {
   it('counts the lines of a text, and none for an empty one', () => {
     expect(lineCount("UNH+1'\nBGM+351'\nUNT+3+1'")).toBe(3)
     expect(lineCount('')).toBe(0)
+  })
+})
+
+describe('documentSize', () => {
+  it('names the format and counts the lines of the shown text', () => {
+    expect(documentSize({ format: 'edifact', content: "UNA:+.? '\nUNB+UNOC:3'" })).toEqual({
+      format: 'EDIFACT',
+      count: 2,
+    })
+    expect(documentSize({ format: 'json', content: { a: 1 } })).toEqual({
+      format: 'JSON',
+      count: 3,
+    })
   })
 })

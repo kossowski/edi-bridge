@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { linkClass, LoadFailure } from '@/components/detail-parts'
 import { ListScreen, ListTable } from '@/components/list-screen'
 import { DraftStateLabel } from '@/components/mappings/publish-draft'
-import { comparisonHref } from '@/components/mappings/version-comparison'
+import { comparisonHref, newestFirst } from '@/components/mappings/version-comparison'
 import { ApiError } from '@/lib/api/client'
 import { mappingDraftQuery, mappingVersionsQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -19,7 +19,7 @@ import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 
 import type { MappingDraft, MappingVersionSummary } from '@edi-bridge/contracts'
 
-const columns = ['version', 'publishedAt', 'compare'] as const
+const columns = ['version', 'publishedAt'] as const
 
 function VersionRow({
   version,
@@ -35,11 +35,20 @@ function VersionRow({
 
   return (
     <TableRow>
-      <TableCell>
-        <span className="inline-flex items-center gap-2 font-medium">
-          {t('version', { version: version.version })}
-          {latest && <Badge variant="secondary">{t('latest')}</Badge>}
-        </span>
+      <TableCell className="whitespace-normal">
+        <div className="flex flex-col items-start gap-1">
+          <span className="inline-flex items-center gap-2 font-medium">
+            {t('version', { version: version.version })}
+            {latest && <Badge variant="secondary">{t('latest')}</Badge>}
+          </span>
+          {previous && (
+            <Link
+              href={comparisonHref(version.mappingId, { from: previous.id, to: version.id })}
+              className={`${linkClass} text-sm`}>
+              {t('compareWith', { version: previous.version })}
+            </Link>
+          )}
+        </div>
       </TableCell>
       <TableCell>
         <time dateTime={version.publishedAt}>
@@ -48,15 +57,6 @@ function VersionRow({
             timeStyle: 'short',
           })}
         </time>
-      </TableCell>
-      <TableCell>
-        {previous && (
-          <Link
-            href={comparisonHref(version.mappingId, { from: previous.id, to: version.id })}
-            className={`${linkClass} text-sm`}>
-            {t('compareWith', { version: previous.version })}
-          </Link>
-        )}
       </TableCell>
     </TableRow>
   )
@@ -78,7 +78,7 @@ function DraftSummary({ draft }: { draft: MappingDraft }) {
 function VersionList({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('MappingVersions')
   const versions = useQuery(mappingVersionsQuery(draft.mappingId))
-  const latest = versions.data?.[0]?.id
+  const ordered = versions.data && newestFirst(versions.data)
 
   return (
     <>
@@ -88,12 +88,12 @@ function VersionList({ draft }: { draft: MappingDraft }) {
         emptyIcon={WorkHistoryIcon}
         matches={(version, term) => String(version.version).includes(term)}
         pending={false}
-        query={versions}
+        query={{ ...versions, data: ordered }}
         row={(version) => (
           <VersionRow
             key={version.id}
-            latest={version.id === latest}
-            previous={versions.data?.find((other) => other.version < version.version)}
+            latest={version.id === ordered?.[0]?.id}
+            previous={ordered?.find((other) => other.version < version.version)}
             version={version}
           />
         )}
