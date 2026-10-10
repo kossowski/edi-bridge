@@ -2,7 +2,18 @@ import { describe, expect, it } from 'vitest'
 
 import { createCsvDocument, documentStructureOrigins } from '@edi-bridge/mocks'
 
-import { decodeFirstBytes, firstRowCount, firstRows, sameCsvSettings, splitRows } from './csv-text'
+import type { DocumentStructureNode } from '@edi-bridge/contracts'
+
+import {
+  csvColumnNames,
+  decodeFirstBytes,
+  firstRowCount,
+  firstRows,
+  sameCsvSettings,
+  splitRows,
+} from './csv-text'
+
+import type { StructureTree } from './structure-tree'
 
 const ansi = documentStructureOrigins.windows1252CsvDocument.document
 
@@ -35,40 +46,65 @@ describe('CSV text', () => {
     expect(splitRows('"open\nquote', ';', 5)).toEqual([['open\nquote']])
   })
 
-  it('names the columns from the header row', () => {
-    const text = 'Ort;GTIN;\nLübeck;0401;x\nKöln;0402;y'
+  it('skips the header row once the columns are known', () => {
+    const text = 'Ort;GTIN\nLübeck;0401\nKöln;0402'
 
-    expect(firstRows(text, semicolons)).toEqual({
-      columns: ['Ort', 'GTIN', 'column3'],
-      rows: [
-        ['Lübeck', '0401', 'x'],
-        ['Köln', '0402', 'y'],
-      ],
-    })
+    expect(firstRows(text, semicolons, ['Ort', 'GTIN'])).toEqual([
+      ['Lübeck', '0401'],
+      ['Köln', '0402'],
+    ])
+    expect(firstRows(text, { ...semicolons, headerRow: false }, ['column1', 'column2'])).toEqual([
+      ['Ort', 'GTIN'],
+      ['Lübeck', '0401'],
+      ['Köln', '0402'],
+    ])
   })
 
-  it('numbers the columns without a header row', () => {
-    expect(firstRows('Ort;GTIN\nLübeck;0401', { ...semicolons, headerRow: false })).toEqual({
-      columns: ['column1', 'column2'],
-      rows: [
-        ['Ort', 'GTIN'],
-        ['Lübeck', '0401'],
-      ],
-    })
-  })
-
-  it('shows one column when the delimiter does not match', () => {
-    const { columns, rows } = firstRows('a;b\n1;2', { ...semicolons, delimiter: ',' })
-
-    expect(columns).toEqual(['a;b'])
-    expect(rows).toEqual([['1;2']])
+  it('keeps the header row while the columns are unknown', () => {
+    expect(firstRows('Ort;GTIN\nLübeck;0401', semicolons, null)).toEqual([
+      ['Ort', 'GTIN'],
+      ['Lübeck', '0401'],
+    ])
   })
 
   it('keeps only the first rows', () => {
     const text = Array.from({ length: 50 }, (_, row) => `r${row}`).join('\n')
 
-    expect(firstRows(text, semicolons).rows).toHaveLength(firstRowCount)
-    expect(firstRows('', semicolons)).toEqual({ columns: [], rows: [] })
+    expect(firstRows(text, semicolons, ['r0'])).toHaveLength(firstRowCount)
+    expect(firstRows(text, semicolons, null)).toHaveLength(firstRowCount + 1)
+    expect(firstRows('', semicolons, null)).toEqual([])
+  })
+
+  it('takes the column names from the inferred tree', () => {
+    const column = (name: string): DocumentStructureNode => ({
+      kind: 'field',
+      path: `rows[].${name}`,
+      name,
+      type: 'string',
+      required: true,
+    })
+
+    const tree: StructureTree = {
+      format: 'csv',
+      children: [
+        {
+          kind: 'array',
+          path: 'rows[]',
+          name: 'rows',
+          required: true,
+          items: {
+            kind: 'object',
+            path: 'rows[]',
+            name: 'rows',
+            required: true,
+            children: [column('Ort'), column('column2')],
+          },
+        },
+      ],
+    }
+
+    expect(csvColumnNames(tree)).toEqual(['Ort', 'column2'])
+    expect(csvColumnNames({ format: 'json', children: [] })).toBeNull()
   })
 
   it('compares CSV settings', () => {

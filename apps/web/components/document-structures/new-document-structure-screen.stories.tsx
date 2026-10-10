@@ -1,55 +1,42 @@
 import { delay, http, HttpResponse } from 'msw'
-import { NextIntlClientProvider } from 'next-intl'
-import { type ReactNode } from 'react'
 import { expect, userEvent, within } from 'storybook/test'
 
+import {
+  besideSidebar,
+  darkMode,
+  german,
+  mobile,
+  tablet,
+  toFile,
+} from '@/components/document-structures/document-structure-story-helpers'
 import { NewDocumentStructureScreen } from '@/components/document-structures/new-document-structure-screen'
 import { apiUrl } from '@/lib/api/config'
-import messagesDe from '@/messages/de.json'
 import {
   createDocumentStructureEndpoint,
-  type EncodedFile,
   inferDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 import { createCsvDocument, createHandlers, documentStructureOrigins } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
-function toFile({ fileName, content }: EncodedFile) {
-  return new File(
-    [Uint8Array.from(atob(content), (character) => character.charCodeAt(0))],
-    fileName,
-  )
-}
-
 const windows1252 = documentStructureOrigins.windows1252CsvDocument
 
 const unclosedQuote = new File(['Nummer;Bemerkung\r\nLS-1;"Kühlware\r\nLS-2;ok'], 'broken.csv')
 
-const german = (Story: () => ReactNode) => (
-  <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-    <Story />
-  </NextIntlClientProvider>
-)
-
-// At 768px the app's sidebar takes 16rem of the width.
-const besideSidebar = (Story: () => ReactNode) => (
-  <div className="ml-64">
-    <Story />
-  </div>
-)
-
-const tablet = {
-  parameters: {
-    viewport: {
-      options: { tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } } },
-    },
-  },
-  globals: { viewport: { value: 'tablet', isRotated: false } },
-}
-
 async function choose(canvasElement: HTMLElement, file: File, label = 'File') {
   await userEvent.upload(within(canvasElement).getByLabelText(label), file)
+}
+
+async function expectPreviewBetween(canvasElement: HTMLElement, settings: string, create: string) {
+  const canvas = within(canvasElement)
+  const top = (element: HTMLElement) => element.getBoundingClientRect().top
+  const firstRows = canvas.getByRole('region', { name: /\.csv$/ })
+
+  await expect(top(firstRows)).toBeGreaterThan(top(canvas.getByRole('group', { name: settings })))
+  await expect(top(canvas.getByRole('treegrid'))).toBeGreaterThan(top(firstRows))
+  await expect(top(canvas.getByRole('button', { name: create }))).toBeGreaterThan(
+    top(canvas.getByRole('treegrid')),
+  )
 }
 
 const meta = preview.meta({
@@ -96,6 +83,7 @@ export const Windows1252Umlauts = meta.story({
       await canvas.findByText(/^The file cannot be read with its character encoding/),
     ).toBeVisible()
     await expect(canvas.getAllByText(/L\uFFFDbeck/).length).toBeGreaterThan(0)
+    await expect(canvas.getByLabelText('File')).not.toHaveAttribute('aria-invalid', 'true')
     await userEvent.selectOptions(
       canvas.getByRole('combobox', { name: 'Character encoding' }),
       'windows-1252',
@@ -139,16 +127,21 @@ export const TabletCsvSettings = meta.story({
       'windows-1252',
     )
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
-    await expect(canvas.getByRole('group', { name: 'CSV-Einstellungen' })).toBeVisible()
+    await expectPreviewBetween(canvasElement, 'CSV-Einstellungen', 'Document Structure erstellen')
+  },
+})
+
+export const MobileCsvSettings = meta.story({
+  ...mobile,
+  async play({ canvas, canvasElement }) {
+    await choose(canvasElement, toFile(documentStructureOrigins.csvDocument.document))
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expectPreviewBetween(canvasElement, 'CSV settings', 'Create Document Structure')
   },
 })
 
 export const DarkCsvSettings = meta.story({
-  beforeEach() {
-    document.documentElement.classList.add('dark')
-
-    return () => document.documentElement.classList.remove('dark')
-  },
+  beforeEach: darkMode,
   async play({ canvas, canvasElement }) {
     await choose(canvasElement, toFile(windows1252.document))
     await expect(await canvas.findByRole('alert')).toBeVisible()
@@ -270,11 +263,7 @@ export const German = meta.story({
 })
 
 export const Dark = meta.story({
-  beforeEach() {
-    document.documentElement.classList.add('dark')
-
-    return () => document.documentElement.classList.remove('dark')
-  },
+  beforeEach: darkMode,
   async play({ canvas, canvasElement }) {
     await choose(canvasElement, toFile(documentStructureOrigins.jsonDocument.document))
     await expect(await canvas.findByRole('treegrid')).toBeVisible()

@@ -1,16 +1,20 @@
 import { delay, http, HttpResponse } from 'msw'
-import { NextIntlClientProvider } from 'next-intl'
-import { type ReactNode } from 'react'
 import { expect, userEvent, within } from 'storybook/test'
 
 import { DocumentStructureScreen } from '@/components/document-structures/document-structure-screen'
+import {
+  besideSidebar,
+  darkMode,
+  german,
+  mobile,
+  tablet,
+  toFile,
+} from '@/components/document-structures/document-structure-story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import messagesDe from '@/messages/de.json'
 import {
   documentStructureEndpoint,
   type DocumentStructureProblem,
   documentStructuresEndpoint,
-  type EncodedFile,
   inferDocumentStructureEndpoint,
   toPath,
   updateDocumentStructureEndpoint,
@@ -46,13 +50,6 @@ function refuseUpdate(problem: DocumentStructureProblem, id = order.id) {
   return http.put(updatePath(id), () => HttpResponse.json(problem, { status: 422 }))
 }
 
-function toFile({ fileName, content }: EncodedFile) {
-  return new File(
-    [Uint8Array.from(atob(content), (character) => character.charCodeAt(0))],
-    fileName,
-  )
-}
-
 const ansiExport = toFile({
   ...documentStructureOrigins.windows1252CsvDocument.document,
   fileName: 'lieferscheine-oktober.csv',
@@ -79,28 +76,6 @@ const refusedByPublishedVersions = refuseUpdate({
     publishedAt: `2026-09-0${version}T08:00:00.000Z`,
   })),
 })
-
-const german = (Story: () => ReactNode) => (
-  <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-    <Story />
-  </NextIntlClientProvider>
-)
-
-// At 768px the app's sidebar takes 16rem of the width.
-const besideSidebar = (Story: () => ReactNode) => (
-  <div className="ml-64">
-    <Story />
-  </div>
-)
-
-const tablet = {
-  parameters: {
-    viewport: {
-      options: { tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } } },
-    },
-  },
-  globals: { viewport: { value: 'tablet', isRotated: false } },
-}
 
 async function expectReadableColumns(canvasElement: HTMLElement) {
   const [field, ...headers] = canvasElement.querySelectorAll('[role=treegrid] th')
@@ -202,6 +177,20 @@ export const CsvRereadUnreadable = meta.story({
     ).toBeVisible()
     await expect(canvas.getAllByText(/L\uFFFDbeck/).length).toBeGreaterThan(0)
     await expect(canvas.queryByRole('treegrid')).toBeNull()
+    await expect(canvas.getByLabelText('CSV Document')).not.toHaveAttribute('aria-invalid', 'true')
+    await expect(
+      canvas.getByText(
+        'Adjust the CSV settings, fix the problem in the file, or choose another one.',
+      ),
+    ).toBeVisible()
+
+    const save = canvas.getByRole('button', { name: 'Save' })
+
+    await expect(save).toBeDisabled()
+    await expect(save).toHaveAccessibleDescription(
+      'Saving needs a CSV Document EDI Bridge can read with these settings.',
+    )
+    await expect(canvas.getAllByRole('alert')).toHaveLength(1)
   },
 })
 
@@ -221,17 +210,38 @@ export const CsvRereading = meta.story({
   },
 })
 
+const csvDocumentNeeded = 'Choose a CSV Document to read it again with the new settings.'
+
 export const CsvDocumentRequired = meta.story({
+  args: { id: csv!.id },
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(
+      await canvas.findByRole('checkbox', { name: 'The first row names the columns' }),
+    )
+    await expect(canvas.getByText('1 unsaved change')).toBeVisible()
+
+    const save = canvas.getByRole('button', { name: 'Save' })
+
+    await expect(save).toBeDisabled()
+    await expect(save).toHaveAccessibleDescription(csvDocumentNeeded)
+    await chooseCsvDocument(canvasElement)
+    await canvas.findByRole('treegrid')
+    await expect(save).toBeEnabled()
+    await expect(canvas.queryByText(csvDocumentNeeded)).toBeNull()
+  },
+})
+
+export const MobileCsvDocumentRequired = meta.story({
+  ...mobile,
   args: { id: csv!.id },
   async play({ canvas }) {
     await userEvent.selectOptions(await canvas.findByRole('combobox', { name: 'Delimiter' }), ',')
-    await expect(
-      canvas.getByText('Choose a CSV Document to read it again with the new settings.'),
-    ).toBeVisible()
-    await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
-    const alert = await canvas.findByRole('alert')
-    await expect(alert).toHaveTextContent(/^Changing the CSV settings needs a CSV Document/)
-    await expect(alert.parentElement).toHaveFocus()
+
+    const hint = canvas.getByText(csvDocumentNeeded)
+    const { bottom } = hint.getBoundingClientRect()
+
+    await expect(hint).toBeVisible()
+    await expect(bottom).toBeLessThanOrEqual(window.innerHeight)
   },
 })
 
@@ -321,11 +331,7 @@ export const TabletCsvReread = meta.story({
 
 export const DarkCsvReread = meta.story({
   args: { id: csv!.id },
-  beforeEach() {
-    document.documentElement.classList.add('dark')
-
-    return () => document.documentElement.classList.remove('dark')
-  },
+  beforeEach: darkMode,
   async play({ canvas, canvasElement }) {
     await chooseCsvDocument(canvasElement)
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
@@ -494,9 +500,8 @@ export const German = meta.story({
 export const Dark = meta.story({
   beforeEach({ msw }) {
     msw.use(refusedByPublishedVersions)
-    document.documentElement.classList.add('dark')
 
-    return () => document.documentElement.classList.remove('dark')
+    return darkMode()
   },
   async play({ canvas, canvasElement }) {
     await changeAndSave(canvasElement)

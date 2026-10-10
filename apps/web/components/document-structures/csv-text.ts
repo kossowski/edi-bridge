@@ -1,19 +1,17 @@
 import type { CharacterEncoding, CsvSettings, EncodedFile } from '@edi-bridge/contracts'
 
-export const firstRowsByteCount = 48_000
+import { decodeBase64 } from './document-file'
+
+import type { StructureTree } from './structure-tree'
+
+const firstRowsByteCount = 48_000
 
 export const firstRowCount = 5
 
-export type FirstRows = {
-  columns: string[]
-  rows: string[][]
-}
-
 export function decodeFirstBytes(file: EncodedFile, encoding: CharacterEncoding) {
   const content = file.content.slice(0, Math.ceil(firstRowsByteCount / 3) * 4)
-  const bytes = Uint8Array.from(atob(content), (character) => character.charCodeAt(0))
 
-  return new TextDecoder(encoding).decode(bytes)
+  return new TextDecoder(encoding).decode(decodeBase64(content))
 }
 
 export function splitRows(text: string, delimiter: string, limit: number) {
@@ -68,17 +66,25 @@ export function splitRows(text: string, delimiter: string, limit: number) {
   return rows
 }
 
-export function firstRows(text: string, { delimiter, headerRow }: CsvSettings): FirstRows {
-  const split = splitRows(text, delimiter, firstRowCount + (headerRow ? 1 : 0))
-  const [header = [], ...rest] = split
-  const rows = headerRow ? rest : split
-  const columnCount = Math.max(0, ...split.map((cells) => cells.length))
+export function firstRows(
+  text: string,
+  { delimiter, headerRow }: CsvSettings,
+  columns: ReadonlyArray<string> | null,
+) {
+  const skipHeader = headerRow && columns !== null
+  const rows = splitRows(text, delimiter, firstRowCount + (headerRow ? 1 : 0))
 
-  const columns = Array.from({ length: columnCount }, (_, index) =>
-    headerRow && header[index]?.trim() ? header[index].trim() : `column${index + 1}`,
-  )
+  return skipHeader ? rows.slice(1) : rows
+}
 
-  return { columns, rows }
+export function csvColumnNames(tree: StructureTree): string[] | null {
+  const [rows] = tree.children
+
+  if (tree.format !== 'csv' || rows?.kind !== 'array' || rows.items.kind !== 'object') {
+    return null
+  }
+
+  return rows.items.children.map(({ name }) => name)
 }
 
 export function sameCsvSettings(a: CsvSettings, b: CsvSettings) {

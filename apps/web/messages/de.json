@@ -1459,7 +1459,10 @@
         "label": "CSV-Document",
         "description": "Ein aktueller Export aus Ihren eigenen Systemen. Beim Speichern ersetzen die daraus gelesenen Felder die bisherigen. Höchstens 5 MB."
       },
-      "documentNeeded": "Wählen Sie ein CSV-Document, um es mit den neuen Einstellungen erneut zu lesen.",
+      "blocked": {
+        "documentNeeded": "Wählen Sie ein CSV-Document, um es mit den neuen Einstellungen erneut zu lesen.",
+        "unread": "Zum Speichern muss EDI Bridge das CSV-Document mit diesen Einstellungen lesen können."
+      },
       "rereadFieldsDescription": "Die Felder, die EDI Bridge mit den Einstellungen oben aus {fileName} liest. Beim Speichern ersetzen sie die bisherigen Felder. Markieren Sie Spalten als Pflicht oder optional und passen Sie ihren Typ an.",
       "reading": "CSV-Document wird gelesen…",
       "unread": "Die Felder erscheinen, sobald EDI Bridge das CSV-Document lesen kann. Passen Sie die CSV-Einstellungen an oder wählen Sie ein anderes CSV-Document."
@@ -1563,7 +1566,8 @@
       "title": "Erste Zeilen",
       "description": "So liest EDI Bridge sie mit {encoding} und dem Trennzeichen oben.",
       "label": "Erste Zeilen von {fileName}",
-      "none": "Das CSV-Document hat keine Zeilen unter der Kopfzeile."
+      "none": "Das CSV-Document hat keine Zeilen unter der Kopfzeile.",
+      "column": "Spalte {number}"
     }
   },
   "DocumentStructureProblem": {

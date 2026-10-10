@@ -5,6 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import { type DragEvent, useRef, useState } from 'react'
 
+import { type FileMessage } from '@/components/document-structures/document-file'
 import { describedBy, FormField } from '@/components/form-field'
 import { Input } from '@edi-bridge/ui/components/input'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -14,7 +15,7 @@ const anyOrigin = '.json,.csv,.txt,application/json,application/schema+json,text
 export function FileField({
   id,
   fileName,
-  error,
+  message,
   onChange,
   label,
   description,
@@ -22,13 +23,16 @@ export function FileField({
 }: {
   id: string
   fileName: string | null
-  error: string | null
+  message: FileMessage | null
   onChange: (file: File) => void
   label?: string
   description?: string
   accept?: string
 }) {
-  const t = useTranslations('DocumentStructureForm.file')
+  const t = useTranslations('DocumentStructureForm')
+  const text = message && t(`errors.${message.key}`)
+  const error = message?.invalid ? text : null
+  const note = message && !message.invalid ? text : null
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -46,11 +50,11 @@ export function FileField({
   return (
     <FormField
       id={id}
-      description={description ?? t('description')}
+      description={description ?? t('file.description')}
       error={error}
       label={
         <label htmlFor={id} className="text-sm font-medium">
-          {label ?? t('label')}
+          {label ?? t('file.label')}
         </label>
       }>
       <div
@@ -71,7 +75,7 @@ export function FileField({
           className="text-muted-foreground size-6"
         />
         <p aria-hidden className="text-muted-foreground">
-          {t('drop')}
+          {t('file.drop')}
         </p>
         <Input
           id={id}
@@ -79,7 +83,7 @@ export function FileField({
           name="file"
           ref={input}
           type="file"
-          aria-describedby={describedBy(id, error)}
+          aria-describedby={note ? `${describedBy(id, error)} ${id}-note` : describedBy(id, error)}
           aria-invalid={error !== null}
           className="h-auto py-1.5"
           onChange={(event) => {
@@ -94,6 +98,11 @@ export function FileField({
           <p className="text-muted-foreground font-mono text-xs break-all">{fileName}</p>
         )}
       </div>
+      {note && (
+        <p id={`${id}-note`} className="text-sm font-medium">
+          {note}
+        </p>
+      )}
     </FormField>
   )
 }

@@ -1459,7 +1459,10 @@
         "label": "CSV Document",
         "description": "A current export from your own systems. Saving replaces the fields with the ones read from it. At most 5 MB."
       },
-      "documentNeeded": "Choose a CSV Document to read it again with the new settings.",
+      "blocked": {
+        "documentNeeded": "Choose a CSV Document to read it again with the new settings.",
+        "unread": "Saving needs a CSV Document EDI Bridge can read with these settings."
+      },
       "rereadFieldsDescription": "The fields EDI Bridge reads from {fileName} with the settings above. Saving replaces the current fields with these. Mark columns as required or optional and adjust their type.",
       "reading": "Reading the CSV Document…",
       "unread": "The fields appear once EDI Bridge can read the CSV Document. Adjust the CSV settings or choose another CSV Document."
@@ -1563,7 +1566,8 @@
       "title": "First rows",
       "description": "As EDI Bridge reads them with {encoding} and the delimiter above.",
       "label": "First rows of {fileName}",
-      "none": "The CSV Document has no rows below the header row."
+      "none": "The CSV Document has no rows below the header row.",
+      "column": "Column {number}"
     }
   },
   "DocumentStructureProblem": {

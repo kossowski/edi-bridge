@@ -8,9 +8,9 @@ import { useId, useState } from 'react'
 import { BackLink, Loading } from '@/components/detail-parts'
 import { CsvSettingsFields, FirstRows } from '@/components/document-structures/csv-settings'
 import {
-  encodeBase64,
-  fileProblem,
-  type FileProblem,
+  encodeFile,
+  type FileError,
+  fileMessageOf,
   nameFromFileName,
   originKindOf,
   toOrigin,
@@ -20,25 +20,22 @@ import { FileField } from '@/components/document-structures/file-field'
 import { leafCount } from '@/components/document-structures/structure-tree'
 import { StructureTreeGrid } from '@/components/document-structures/structure-tree-grid'
 import { RadioField, TextField } from '@/components/form-field'
+import { createDocumentStructure, documentStructureProblemOf } from '@/lib/api/client'
 import {
-  createDocumentStructure,
-  documentStructureProblemOf,
-  inferDocumentStructure,
-} from '@/lib/api/client'
-import { storeSavedDocumentStructure } from '@/lib/api/queries'
+  type DocumentStructureInference,
+  storeSavedDocumentStructure,
+  useDocumentStructureInference,
+} from '@/lib/api/queries'
 import {
   type CreateDocumentStructureBody,
   type CsvSettings,
   defaultCsvSettings,
-  type DocumentStructureOrigin,
   type DocumentStructureOriginKind,
   documentStructureOriginKinds,
   type EncodedFile,
   maxDocumentStructureNameLength,
 } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
-
-type FileError = FileProblem | 'fileRequired'
 
 function Preview({
   file,
@@ -49,13 +46,13 @@ function Preview({
 }: {
   file: EncodedFile | null
   csv: CsvSettings | null
-  infer: ReturnType<typeof useInference>
+  infer: DocumentStructureInference
   name: string
   onRetry: () => void
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      {file && csv && <FirstRows csv={csv} file={file} />}
+      {file && csv && <FirstRows csv={csv} file={file} tree={infer.data ?? null} />}
       <InferredTree file={file} infer={infer} name={name} onRetry={onRetry} />
     </div>
   )
@@ -68,7 +65,7 @@ function InferredTree({
   onRetry,
 }: {
   file: EncodedFile | null
-  infer: ReturnType<typeof useInference>
+  infer: DocumentStructureInference
   name: string
   onRetry: () => void
 }) {
@@ -115,12 +112,6 @@ function InferredTree({
   )
 }
 
-function useInference() {
-  return useMutation({
-    mutationFn: (origin: DocumentStructureOrigin) => inferDocumentStructure(origin),
-  })
-}
-
 export function NewDocumentStructureScreen() {
   const t = useTranslations('DocumentStructureForm')
   const id = useId()
@@ -133,7 +124,7 @@ export function NewDocumentStructureScreen() {
   const [fileError, setFileError] = useState<FileError | null>(null)
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState(false)
-  const infer = useInference()
+  const infer = useDocumentStructureInference()
 
   const create = useMutation({
     mutationFn: (body: CreateDocumentStructureBody) => createDocumentStructure(body),
@@ -155,20 +146,15 @@ export function NewDocumentStructureScreen() {
   }
 
   async function choose(chosen: File) {
-    const problem = fileProblem(chosen.size)
+    const { problem, encoded } = await encodeFile(chosen)
 
     setFileError(problem)
 
-    if (problem) {
+    if (encoded === null) {
       setFile(null)
       infer.reset()
 
       return
-    }
-
-    const encoded = {
-      fileName: chosen.name,
-      content: encodeBase64(new Uint8Array(await chosen.arrayBuffer())),
     }
 
     const nextKind = kindChosen ? kind : (originKindOf(chosen.name) ?? kind)
@@ -206,15 +192,15 @@ export function NewDocumentStructureScreen() {
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <BackLink href="/document-structures" label={t('back')} />
       <h1 className="text-2xl font-semibold tracking-tight">{t('createTitle')}</h1>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-        <form
-          noValidate
-          aria-busy={create.isPending || undefined}
-          className="flex flex-col gap-6"
-          onSubmit={(event) => {
-            event.preventDefault()
-            submit()
-          }}>
+      <form
+        noValidate
+        aria-busy={create.isPending || undefined}
+        className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:grid-rows-[auto_1fr]"
+        onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}>
+        <div className="flex min-w-0 flex-col gap-6">
           <RadioField
             id={`${id}-kind`}
             description={t('origin.description')}
@@ -235,14 +221,8 @@ export function NewDocumentStructureScreen() {
           />
           <FileField
             id={`${id}-file`}
-            error={
-              fileError
-                ? t(`errors.${fileError}`)
-                : previewProblem
-                  ? t(kind === 'csvDocument' ? 'errors.unreadableCsv' : 'errors.unreadable')
-                  : null
-            }
             fileName={file?.fileName ?? null}
+            message={fileMessageOf(fileError, previewProblem, kind === 'csvDocument')}
             onChange={(chosen) => void choose(chosen)}
           />
           {kind === 'csvDocument' && (
@@ -259,6 +239,25 @@ export function NewDocumentStructureScreen() {
               }}
             />
           )}
+        </div>
+        <section
+          aria-labelledby={`${id}-preview`}
+          className="flex min-w-0 flex-col gap-3 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="flex flex-col gap-1">
+            <h2 id={`${id}-preview`} className="font-semibold">
+              {t('preview.title')}
+            </h2>
+            <p className="text-muted-foreground text-sm">{t('preview.description')}</p>
+          </div>
+          <Preview
+            csv={kind === 'csvDocument' ? csv : null}
+            file={file}
+            infer={infer}
+            name={name}
+            onRetry={() => file && preview(kind, file)}
+          />
+        </section>
+        <div className="flex min-w-0 flex-col gap-6">
           <TextField
             id={`${id}-name`}
             description={t('name.description')}
@@ -275,23 +274,8 @@ export function NewDocumentStructureScreen() {
           <Button disabled={create.isPending} type="submit" className="self-start">
             {create.isPending ? t('creating') : t('create')}
           </Button>
-        </form>
-        <section aria-labelledby={`${id}-preview`} className="flex min-w-0 flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 id={`${id}-preview`} className="font-semibold">
-              {t('preview.title')}
-            </h2>
-            <p className="text-muted-foreground text-sm">{t('preview.description')}</p>
-          </div>
-          <Preview
-            csv={kind === 'csvDocument' ? csv : null}
-            file={file}
-            infer={infer}
-            name={name}
-            onRetry={() => file && preview(kind, file)}
-          />
-        </section>
-      </div>
+        </div>
+      </form>
     </div>
   )
 }

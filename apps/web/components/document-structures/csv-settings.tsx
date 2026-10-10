@@ -3,7 +3,12 @@
 import { useTranslations } from 'next-intl'
 import { type ReactNode, useMemo } from 'react'
 
-import { decodeFirstBytes, firstRows } from '@/components/document-structures/csv-text'
+import {
+  csvColumnNames,
+  decodeFirstBytes,
+  firstRows,
+} from '@/components/document-structures/csv-text'
+import { type StructureTree } from '@/components/document-structures/structure-tree'
 import {
   characterEncodings,
   type CsvDelimiter,
@@ -138,17 +143,33 @@ export function CsvSettingsFields({
   )
 }
 
-export function FirstRows({ file, csv }: { file: EncodedFile; csv: CsvSettings }) {
+export function FirstRows({
+  file,
+  csv,
+  tree,
+}: {
+  file: EncodedFile
+  csv: CsvSettings
+  tree: StructureTree | null
+}) {
   const t = useTranslations('CsvSettings.firstRows')
 
-  const { columns, rows } = useMemo(
-    () => firstRows(decodeFirstBytes(file, csv.encoding), csv),
-    [file, csv],
-  )
+  const { columns, rows } = useMemo(() => {
+    const names = tree && csvColumnNames(tree)
 
-  if (columns.length === 0) {
+    return { columns: names, rows: firstRows(decodeFirstBytes(file, csv.encoding), csv, names) }
+  }, [file, csv, tree])
+
+  const columnCount = Math.max(columns?.length ?? 0, ...rows.map((cells) => cells.length))
+
+  if (columnCount === 0) {
     return null
   }
+
+  const headers = Array.from(
+    { length: columnCount },
+    (_, index) => columns?.[index] ?? t('column', { number: index + 1 }),
+  )
 
   return (
     <figure className="flex min-w-0 flex-col gap-2">
@@ -167,9 +188,9 @@ export function FirstRows({ file, csv }: { file: EncodedFile; csv: CsvSettings }
         <table className="w-full text-sm">
           <TableHeader>
             <TableRow>
-              {columns.map((column, index) => (
+              {headers.map((header, index) => (
                 <TableHead key={index} scope="col" className="font-mono text-xs">
-                  {column}
+                  {header}
                 </TableHead>
               ))}
             </TableRow>
@@ -177,14 +198,14 @@ export function FirstRows({ file, csv }: { file: EncodedFile; csv: CsvSettings }
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="text-muted-foreground">
+                <TableCell colSpan={columnCount} className="text-muted-foreground">
                   {t('none')}
                 </TableCell>
               </TableRow>
             ) : (
               rows.map((cells, row) => (
                 <TableRow key={row}>
-                  {columns.map((_, column) => (
+                  {headers.map((_, column) => (
                     <TableCell key={column} title={cells[column]} className="max-w-56 truncate">
                       {cells[column] ?? ''}
                     </TableCell>
