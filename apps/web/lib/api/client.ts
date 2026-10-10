@@ -18,6 +18,8 @@ import {
   lookupTablesEndpoint,
   type ManualSubmissionInput,
   mappingDraftEndpoint,
+  mappingPreviewEndpoint,
+  mappingSamplesEndpoint,
   mappingsEndpoint,
   mappingVersionsEndpoint,
   type MessageType,
@@ -25,6 +27,7 @@ import {
   type MoveFlowMappingVersionBody,
   moveFlowMappingVersionEndpoint,
   publishedMappingVersionsEndpoint,
+  type PreviewMappingBody,
   type PublishedMappingVersionsQuery,
   type QueryParams,
   regenerateWebhookTokenEndpoint,
@@ -144,6 +147,17 @@ export function getMappingDraft(id: string) {
 export function saveMappingDraft(id: string, body: SaveMappingDraftBody) {
   return request(saveMappingDraftEndpoint, {
     path: toPath(saveMappingDraftEndpoint.path, { id }),
+    body,
+  })
+}
+
+export function listMappingSamples(id: string) {
+  return request(mappingSamplesEndpoint, { path: toPath(mappingSamplesEndpoint.path, { id }) })
+}
+
+export function previewMapping(id: string, body: PreviewMappingBody) {
+  return request(mappingPreviewEndpoint, {
+    path: toPath(mappingPreviewEndpoint.path, { id }),
     body,
   })
 }

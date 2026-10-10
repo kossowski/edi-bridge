@@ -1,0 +1,325 @@
+'use client'
+
+import { ArrowDown01Icon, ArrowUp01Icon, Loading03Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { useQuery } from '@tanstack/react-query'
+import { useTranslations } from 'next-intl'
+import { useId, useMemo, useState } from 'react'
+
+import { useGraphText } from '@/components/mappings/graph-text'
+import { documentText, lineCount, previewGraph } from '@/components/mappings/mapping-preview'
+import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { mappingPreviewQuery, mappingSamplesQuery } from '@/lib/api/queries'
+import {
+  type DocumentContent,
+  type MappingDraft,
+  type MappingSample,
+  type PreviewNote,
+  previewNoteKey,
+} from '@edi-bridge/contracts'
+import { Button } from '@edi-bridge/ui/components/button'
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@edi-bridge/ui/components/empty'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@edi-bridge/ui/components/select'
+import { Skeleton } from '@edi-bridge/ui/components/skeleton'
+
+// Long enough that typing into a transform's form does not send a preview per keystroke.
+const previewDelay = 600
+
+const formats = { json: 'JSON', edifact: 'EDIFACT' } as const
+
+const views = ['target', 'source'] as const
+
+function Failure({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const t = useTranslations('Mapping.preview.error')
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+        {message}
+      </p>
+      <Button size="sm" variant="outline" onClick={onRetry}>
+        {t('retry')}
+      </Button>
+    </div>
+  )
+}
+
+function Loading({ label }: { label: string }) {
+  return (
+    <div aria-busy className="flex flex-col gap-2">
+      <p role="status" className="sr-only">
+        {label}
+      </p>
+      {Array.from({ length: 6 }, (_, row) => (
+        <Skeleton key={row} className="h-4 w-full" />
+      ))}
+    </div>
+  )
+}
+
+function DocumentView({
+  label,
+  document,
+  busy = false,
+  children,
+}: {
+  label: string
+  document: DocumentContent | undefined
+  busy?: boolean
+  children?: React.ReactNode
+}) {
+  const text = document ? documentText(document) : ''
+
+  return (
+    <div className="flex min-h-24 min-w-0 flex-1 flex-col">
+      {children ??
+        (document && (
+          <pre
+            role="region"
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Document
+            tabIndex={0}
+            aria-busy={busy}
+            aria-label={label}
+            className="bg-muted/40 focus-visible:ring-ring/50 min-h-0 flex-1 overflow-auto rounded-md border p-3 font-mono text-xs leading-5 outline-none focus-visible:ring-3">
+            {text}
+          </pre>
+        ))}
+    </div>
+  )
+}
+
+function Notes({ draft, notes }: { draft: MappingDraft; notes: ReadonlyArray<PreviewNote> }) {
+  const t = useTranslations('Mapping.preview.notes')
+  const text = useGraphText(draft.transforms)
+  const headingId = useId()
+
+  if (notes.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <h3 id={headingId} className="text-sm font-medium">
+        {t('title', { count: notes.length })}
+      </h3>
+      <ul aria-labelledby={headingId} className="flex flex-col gap-1 text-sm">
+        {notes.map((note) => (
+          <li key={previewNoteKey(note)} className="flex flex-wrap gap-x-2">
+            <span className="font-mono text-xs leading-5">{note.targetPath}</span>
+            <span className="text-muted-foreground">
+              {t(note.code, { transform: note.transformId ? text.name(note.transformId) : '' })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function SamplePreview({
+  draft,
+  samples,
+  sample,
+  onChoose,
+}: {
+  draft: MappingDraft
+  samples: ReadonlyArray<MappingSample>
+  sample: MappingSample
+  onChoose: (id: string) => void
+}) {
+  const t = useTranslations('Mapping.preview')
+  const labelId = useId()
+  const graph = useMemo(() => previewGraph(draft), [draft])
+  const key = useMemo(() => JSON.stringify(graph), [graph])
+  const settled = useDebouncedValue(graph, key, previewDelay)
+  const preview = useQuery(mappingPreviewQuery(draft.mappingId, sample.id, settled.value))
+  const updating = settled.pending || preview.isFetching
+  const [firstKey] = useState(() => `${sample.id}|${key}`)
+  const [shown, setShown] = useState<(typeof views)[number]>('target')
+  const changed = `${sample.id}|${settled.key}` !== firstKey
+
+  // A polite message once each update has settled, never while the Mapping is still changing.
+  const announcement =
+    !updating && changed && preview.isSuccess ? t('updated', { name: sample.name }) : ''
+
+  const items = samples.map(({ id, name }) => ({ value: id, label: name }))
+  const shownDocument = shown === 'source' ? sample.document : preview.data?.document
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span id={labelId} className="text-sm font-medium">
+            {t('sample')}
+          </span>
+          <Select
+            items={items}
+            value={sample.id}
+            onValueChange={(value) => value && onChoose(value)}>
+            <SelectTrigger aria-labelledby={labelId} className="w-64 max-w-full">
+              <SelectValue className="min-w-0">
+                {(value: string | null) => (
+                  <span className="truncate">
+                    {items.find((item) => item.value === value)?.label}
+                  </span>
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="text-muted-foreground flex min-h-8 items-center gap-1.5 text-sm">
+          {updating && (
+            <HugeiconsIcon
+              icon={Loading03Icon}
+              strokeWidth={2}
+              aria-hidden
+              className="size-4 animate-spin motion-reduce:animate-none"
+            />
+          )}
+          {preview.isSuccess && (updating ? t('updating') : t('upToDate'))}
+        </p>
+      </div>
+      {/* One Document at a time: the band's column is too narrow for both side by side. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div role="group" aria-label={t('shown')} className="flex flex-wrap gap-1">
+          {views.map((view) => (
+            <Button
+              key={view}
+              size="sm"
+              variant={shown === view ? 'secondary' : 'ghost'}
+              aria-pressed={shown === view}
+              onClick={() => setShown(view)}>
+              {t(view)}
+            </Button>
+          ))}
+        </div>
+        {shownDocument && (
+          <span className="text-muted-foreground text-xs">
+            {t('size', {
+              format: formats[shownDocument.format],
+              count: lineCount(documentText(shownDocument)),
+            })}
+          </span>
+        )}
+      </div>
+      {shown === 'source' ? (
+        <DocumentView document={sample.document} label={t('sourceLabel', { name: sample.name })} />
+      ) : (
+        <DocumentView
+          busy={updating}
+          document={preview.data?.document}
+          label={t('targetLabel', { name: sample.name })}>
+          {preview.isError ? (
+            <Failure message={t('error.preview')} onRetry={() => void preview.refetch()} />
+          ) : preview.isPending ? (
+            <Loading label={t('building')} />
+          ) : undefined}
+        </DocumentView>
+      )}
+      {preview.data && <Notes draft={draft} notes={preview.data.notes} />}
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
+    </div>
+  )
+}
+
+function PreviewContent({
+  draft,
+  chosen,
+  onChoose,
+}: {
+  draft: MappingDraft
+  chosen: string | null
+  onChoose: (id: string) => void
+}) {
+  const t = useTranslations('Mapping.preview')
+  const samples = useQuery(mappingSamplesQuery(draft.mappingId))
+
+  if (samples.isPending) {
+    return <Loading label={t('loading')} />
+  }
+
+  if (samples.isError) {
+    return <Failure message={t('error.samples')} onRetry={() => void samples.refetch()} />
+  }
+
+  const sample = samples.data.find(({ id }) => id === chosen) ?? samples.data[0]
+
+  if (!sample) {
+    return (
+      <Empty className="p-6">
+        <EmptyHeader>
+          <EmptyTitle>{t('empty.title')}</EmptyTitle>
+          <EmptyDescription>{t('empty.description')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+
+  return <SamplePreview draft={draft} sample={sample} samples={samples.data} onChoose={onChoose} />
+}
+
+// Shown beside the Details panel in the band under the canvas, whose toggle it carries: hidden,
+// the band gives its height to the canvas.
+export function MappingPreviewPanel({
+  draft,
+  open,
+  onToggle,
+  controls,
+}: {
+  draft: MappingDraft
+  open: boolean
+  onToggle: () => void
+  controls?: string
+}) {
+  const t = useTranslations('Mapping.preview')
+  // Held here, not in the content, which unmounts while the band is collapsed.
+  const [chosen, setChosen] = useState<string | null>(null)
+  const headingId = useId()
+  const contentId = useId()
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="bg-card flex min-h-0 min-w-0 flex-col rounded-lg border">
+      <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 px-4 py-1.5">
+        <h2 id={headingId} className="text-sm font-semibold">
+          {t('title')}
+        </h2>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-controls={controls ? `${controls} ${contentId}` : contentId}
+          aria-expanded={open}
+          onClick={onToggle}>
+          <HugeiconsIcon
+            icon={open ? ArrowDown01Icon : ArrowUp01Icon}
+            strokeWidth={2}
+            aria-hidden
+          />
+          {open ? t('hide') : t('show')}
+        </Button>
+      </div>
+      <div
+        id={contentId}
+        hidden={!open}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t px-4 py-3">
+        {open && <PreviewContent chosen={chosen} draft={draft} onChoose={setChosen} />}
+      </div>
+    </section>
+  )
+}

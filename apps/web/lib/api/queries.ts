@@ -3,6 +3,7 @@ import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/reac
 import type {
   Channel,
   Flow,
+  MappingGraph,
   MessageType,
   RunListQuery,
   TradingPartner,
@@ -19,11 +20,13 @@ import {
   listChannels,
   listLookupTables,
   listFlows,
+  listMappingSamples,
   listMappings,
   listMappingVersions,
   listPublishedMappingVersions,
   listRuns,
   listTradingPartners,
+  previewMapping,
 } from './client'
 
 export const currentWorkspaceQuery = queryOptions({
@@ -71,6 +74,9 @@ export const mappingKeys = {
   draft: (id: string) => [...mappingKeys.detail(id), 'draft'] as const,
   graph: (id: string) => [...mappingKeys.draft(id), 'graph'] as const,
   versions: (id: string) => [...mappingKeys.detail(id), 'versions'] as const,
+  samples: (id: string) => [...mappingKeys.detail(id), 'samples'] as const,
+  preview: (id: string, sampleId: string, graph: MappingGraph) =>
+    [...mappingKeys.detail(id), 'preview', sampleId, graph] as const,
 }
 
 export const mappingsQuery = queryOptions({
@@ -82,6 +88,25 @@ export function mappingDraftQuery(id: string) {
   return queryOptions({
     queryKey: mappingKeys.draft(id),
     queryFn: () => getMappingDraft(id),
+  })
+}
+
+export function mappingSamplesQuery(id: string) {
+  return queryOptions({
+    queryKey: mappingKeys.samples(id),
+    queryFn: () => listMappingSamples(id),
+  })
+}
+
+// The same graph and sample always give the same preview, so a result never goes stale. While
+// the Mapping changes, the previous result stays visible as the next one loads; another Sample
+// Document's result would show the wrong Document, so a sample switch loads from empty.
+export function mappingPreviewQuery(id: string, sampleId: string, graph: MappingGraph) {
+  return queryOptions({
+    queryKey: mappingKeys.preview(id, sampleId, graph),
+    queryFn: () => previewMapping(id, { sampleId, graph }),
+    placeholderData: (previous) => (previous?.sampleId === sampleId ? previous : undefined),
+    staleTime: Infinity,
   })
 }
 

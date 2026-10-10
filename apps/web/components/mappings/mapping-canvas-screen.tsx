@@ -9,6 +9,7 @@ import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
+import { MappingPreviewPanel } from '@/components/mappings/mapping-preview-panel'
 import { documentTree, edifactTree, type TreeItem } from '@/components/mappings/mapping-tree'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
@@ -130,6 +131,7 @@ function Canvas({ draft }: { draft: MappingDraft }) {
 
   return (
     <MappingCanvas
+      beside={(band) => <MappingPreviewPanel draft={draft} {...band} />}
       graph={draft}
       label={t('label', { source: source.title, target: target.title })}
       source={{ title: source.title, items: source.items }}
@@ -182,7 +184,7 @@ function MappingView({ draft }: { draft: MappingDraft }) {
       </dl>
       <DesktopOnlyNotice />
       {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
-      <div className="hidden min-h-[32rem] flex-1 flex-col lg:flex">
+      <div className="hidden min-h-0 flex-1 flex-col lg:flex">
         {desktop && <Canvas draft={draft} />}
       </div>
     </MappingCanvasProvider>
@@ -208,8 +210,10 @@ export function MappingCanvasScreen({ id }: { id: string }) {
   const t = useTranslations('Mapping')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
 
+  // On desktop the screen takes the viewport below the app header (h-14), so the canvas and the
+  // band under it share the height without page scrolling.
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
+    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 lg:h-[calc(100svh-3.5rem)] lg:flex-none lg:gap-3 lg:py-4">
       <BackLink href="/mappings" label={t('back')} />
       {isPending ? (
         <MappingLoading />

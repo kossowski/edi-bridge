@@ -411,8 +411,8 @@ export const SmallScreen = meta.story({
 export const German = meta.story({
   args: { id: inbound.id },
   parameters: desktopViewports,
-  // Wide enough for the details panel to sit beside the canvas, where its values have to wrap.
-  globals: { viewport: { value: 'wide', isRotated: false } },
+  // The band's Details column is narrowest on a laptop, where its values have to wrap.
+  globals: { viewport: { value: 'laptop', isRotated: false } },
   decorators: [
     (Story) => (
       <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">

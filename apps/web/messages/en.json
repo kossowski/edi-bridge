@@ -1189,6 +1189,40 @@
       "inputTaken": "{input} is already linked from {source}. Remove that link first.",
       "circle": "{target} already feeds {source}, so this link would make a circle.",
       "needsPart": "{port} takes only a whole repeating part, such as lines[] or SG25, not a single field or element."
+    },
+    "preview": {
+      "title": "Preview",
+      "show": "Show details and preview",
+      "hide": "Hide details and preview",
+      "sample": "Sample Document",
+      "source": "Sample Document",
+      "target": "Target Document",
+      "shown": "Document shown",
+      "sourceLabel": "Sample Document {name}",
+      "targetLabel": "Target Document for {name}",
+      "size": "{format}, {count, plural, one {# line} other {# lines}}",
+      "loading": "Loading the Sample Documents",
+      "building": "Building the preview",
+      "updating": "Updating…",
+      "upToDate": "Up to date",
+      "updated": "Preview updated for {name}",
+      "empty": {
+        "title": "No Sample Documents yet",
+        "description": "The preview shows the target Document for a Sample Document of the source. This Mapping has no Sample Documents yet."
+      },
+      "error": {
+        "samples": "The Sample Documents could not be loaded.",
+        "preview": "The preview could not be built.",
+        "retry": "Try again"
+      },
+      "notes": {
+        "title": "{count, plural, one {# target left empty} other {# targets left empty}}",
+        "invalidTransform": "{transform} has an invalid configuration.",
+        "noLookupMatch": "{transform} found no match in its Lookup Table.",
+        "expressionFailed": "{transform} failed on this Sample Document.",
+        "expressionNotPreviewed": "{transform} is not previewed on EDIFACT Sample Documents yet.",
+        "brokenLink": "A link here reaches a field or element its side does not have, so the preview skips it."
+      }
     }
   },
   "ManualSubmission": {

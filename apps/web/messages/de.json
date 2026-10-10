@@ -1189,6 +1189,40 @@
       "inputTaken": "{input} ist bereits mit {source} verknüpft. Entfernen Sie zuerst diese Verknüpfung.",
       "circle": "{target} liefert bereits Werte an {source}; diese Verknüpfung würde einen Zirkelbezug erzeugen.",
       "needsPart": "{port} nimmt nur einen ganzen wiederholten Teil wie lines[] oder SG25 auf, kein einzelnes Feld oder Element."
+    },
+    "preview": {
+      "title": "Vorschau",
+      "show": "Details und Vorschau einblenden",
+      "hide": "Details und Vorschau ausblenden",
+      "sample": "Beispiel-Document",
+      "source": "Beispiel-Document",
+      "target": "Ziel-Document",
+      "shown": "Angezeigtes Document",
+      "sourceLabel": "Beispiel-Document {name}",
+      "targetLabel": "Ziel-Document für {name}",
+      "size": "{format}, {count, plural, one {# Zeile} other {# Zeilen}}",
+      "loading": "Beispiel-Documents werden geladen",
+      "building": "Vorschau wird erstellt",
+      "updating": "Wird aktualisiert …",
+      "upToDate": "Aktuell",
+      "updated": "Vorschau für {name} aktualisiert",
+      "empty": {
+        "title": "Noch keine Beispiel-Documents",
+        "description": "Die Vorschau zeigt das Ziel-Document für ein Beispiel-Document der Quelle. Dieses Mapping hat noch keine Beispiel-Documents."
+      },
+      "error": {
+        "samples": "Die Beispiel-Documents konnten nicht geladen werden.",
+        "preview": "Die Vorschau konnte nicht erstellt werden.",
+        "retry": "Erneut versuchen"
+      },
+      "notes": {
+        "title": "{count, plural, one {# Ziel bleibt leer} other {# Ziele bleiben leer}}",
+        "invalidTransform": "{transform} ist ungültig konfiguriert.",
+        "noLookupMatch": "{transform} hat in seiner Lookup Table keinen Treffer gefunden.",
+        "expressionFailed": "{transform} ist bei diesem Beispiel-Document fehlgeschlagen.",
+        "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispiel-Documents noch nicht in der Vorschau berechnet.",
+        "brokenLink": "Eine Verknüpfung hier führt zu einem Feld oder Element, das ihre Seite nicht hat; die Vorschau überspringt sie."
+      }
     }
   },
   "ManualSubmission": {

@@ -18,6 +18,7 @@ import {
 import { useTranslations } from 'next-intl'
 import {
   type MouseEvent,
+  type ReactNode,
   type Ref,
   useCallback,
   useEffect,
@@ -125,6 +126,7 @@ import { lookupTablesQuery } from '@/lib/api/queries'
 import { transformPorts } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Tooltip, TooltipContent } from '@edi-bridge/ui/components/tooltip'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { GraphSave } from '@/components/mappings/use-save-graph'
 import type {
@@ -173,12 +175,17 @@ const transformExtent: [[number, number], [number, number]] = [
 
 export type CanvasSide = { title: string; items: ReadonlyArray<TreeItem> }
 
+// The band under the canvas: the Details panel, and beside it whatever the screen adds, such as the
+// preview, which toggles the whole band and so needs to name the Details body it hides.
+export type CanvasBand = { open: boolean; onToggle: () => void; controls: string }
+
 type MappingCanvasProps = {
   label: string
   graph: Graph
   source: CanvasSide
   target: CanvasSide
   onChange: (save: GraphSave) => void
+  beside?: (band: CanvasBand) => ReactNode
 }
 
 // Mounted only while the tooltip shows a row, so that row's button can point at the tooltip.
@@ -226,6 +233,8 @@ function DetailsPanel({
   text,
   actions,
   transformActions,
+  bodyId,
+  open,
   ref,
 }: {
   itemOf: (row: RowRef) => TreeItem | undefined
@@ -236,6 +245,8 @@ function DetailsPanel({
   text: GraphText
   actions: PanelActions
   transformActions: TransformDetailsActions
+  bodyId: string
+  open: boolean
   ref: Ref<HTMLElement>
 }) {
   const t = useTranslations('Mapping')
@@ -266,10 +277,7 @@ function DetailsPanel({
             <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
               {t(`canvas.${selected.side}`)}
             </p>
-            <RowMeaning
-              item={item}
-              className="flex-row flex-wrap gap-x-8 gap-y-2 text-sm 2xl:flex-col"
-            />
+            <RowMeaning item={item} className="flex-row flex-wrap gap-x-8 gap-y-2 text-sm" />
           </div>
           <RowLinks
             actions={actions}
@@ -294,8 +302,8 @@ function DetailsPanel({
     <section
       ref={ref}
       aria-labelledby={heading}
-      className="bg-card flex max-h-96 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border px-4 py-3 2xl:max-h-none 2xl:w-80 2xl:p-4">
-      <div className="flex min-h-8 items-center justify-between gap-2">
+      className="bg-card flex min-h-0 min-w-0 flex-col rounded-lg border">
+      <div className="flex min-h-11 shrink-0 items-center justify-between gap-2 px-4 py-1.5">
         <h2 id={heading} className="text-sm font-semibold">
           {t('details.title')}
         </h2>
@@ -305,9 +313,18 @@ function DetailsPanel({
           </Button>
         )}
       </div>
-      <PendingLink text={text} onCancel={actions.cancel} />
-      {content()}
-      <p className="text-muted-foreground text-xs">{t('links.shortcut')}</p>
+      <div
+        id={bodyId}
+        hidden={!open}
+        role="group"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll long details
+        tabIndex={0}
+        aria-labelledby={heading}
+        className="focus-visible:ring-ring/50 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto border-t px-4 py-3 outline-none focus-visible:ring-3">
+        <PendingLink text={text} onCancel={actions.cancel} />
+        {content()}
+        <p className="text-muted-foreground text-xs">{t('links.shortcut')}</p>
+      </div>
     </section>
   )
 }
@@ -405,14 +422,24 @@ function samePosition(a: Position, b: Position) {
   return a.x === b.x && a.y === b.y
 }
 
-export function MappingCanvas({ label, graph, source, target, onChange }: MappingCanvasProps) {
+export function MappingCanvas({
+  label,
+  graph,
+  source,
+  target,
+  onChange,
+  beside,
+}: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
   const tLinks = useTranslations('Mapping.links')
   const tTransforms = useTranslations('Mapping.transforms')
   const root = useRef<HTMLDivElement>(null)
   const container = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLElement>(null)
+  const detailsBodyId = useId()
   const store = useCanvasStoreApi()
+  const bandOpen = useCanvasStore((state) => state.bandOpen)
+  const toggleBand = useCanvasStore((state) => state.toggleBand)
   const collapsed = useCanvasStore((state) => state.collapsed)
   const clearSelection = useCanvasStore((state) => state.clearSelection)
   const hoverEdge = useCanvasStore((state) => state.hoverEdge)
@@ -1298,13 +1325,12 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
   ])
 
   return (
-    <div ref={root} className="flex min-h-[32rem] flex-1 flex-col gap-3">
+    <div ref={root} className="flex min-h-0 flex-1 flex-col gap-3">
       <TransformPalette onPlace={place} />
-      {/* Beside the canvas the panel would cost the trees their room below 2xl, so it goes under. */}
-      <div ref={area} className="flex min-h-[32rem] flex-1 flex-col gap-4 2xl:flex-row">
+      <div ref={area} className="flex min-h-0 flex-1 flex-col gap-3">
         <div
           ref={container}
-          className="mapping-canvas relative min-h-[32rem] flex-1 overflow-hidden rounded-lg border">
+          className="mapping-canvas relative min-h-80 flex-1 overflow-hidden rounded-lg border">
           <div className="absolute inset-0">
             <LinkActionsContext value={edgeActions}>
               <TransformActionsContext value={transformActions}>
@@ -1354,17 +1380,29 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
         </div>
         <MeaningTooltip />
         <LinkHints text={text} />
-        <DetailsPanel
-          actions={panelActions}
-          graph={graph}
-          issues={issues}
-          itemOf={itemOf}
-          ref={panel}
-          rows={rows}
-          sourceFields={sourceFields}
-          text={text}
-          transformActions={detailsActions}
-        />
+        {/* Below the canvas, not beside it, so the trees keep the full width; the band gives up its
+            height before the canvas goes below its minimum. */}
+        <div
+          className={cn(
+            'grid gap-3',
+            beside && 'grid-cols-2',
+            bandOpen ? 'min-h-44 shrink basis-[22rem]' : 'shrink-0',
+          )}>
+          <DetailsPanel
+            actions={panelActions}
+            bodyId={detailsBodyId}
+            graph={graph}
+            issues={issues}
+            itemOf={itemOf}
+            open={bandOpen}
+            ref={panel}
+            rows={rows}
+            sourceFields={sourceFields}
+            text={text}
+            transformActions={detailsActions}
+          />
+          {beside?.({ open: bandOpen, onToggle: toggleBand, controls: detailsBodyId })}
+        </div>
       </div>
     </div>
   )

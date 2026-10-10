@@ -17,11 +17,12 @@ export function TransformPalette({ onPlace }: { onPlace: (kind: TransformKind) =
     <section
       aria-describedby={note}
       aria-labelledby={heading}
-      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
-      <h2 id={heading} className="text-sm font-semibold">
+      className="flex shrink-0 flex-wrap items-center gap-1.5">
+      <h2 id={heading} className="mr-1.5 text-sm font-semibold">
         {t('palette.heading')}
       </h2>
-      <ul className="flex flex-wrap gap-1.5">
+      {/* Its buttons flow on from the heading's line, which saves the canvas a row. */}
+      <ul className="contents">
         {transformKinds.map((kind) => (
           <li key={kind}>
             <Button
@@ -41,6 +42,8 @@ export function TransformPalette({ onPlace }: { onPlace: (kind: TransformKind) =
           </li>
         ))}
       </ul>
+      {/* Besides reading out, the line keeps rows panned partly above the canvas, which axe counts
+          though clipped, off the buttons. */}
       <p id={note} className="text-muted-foreground basis-full text-xs">
         {t('palette.note')}
       </p>
