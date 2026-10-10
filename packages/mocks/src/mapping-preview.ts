@@ -18,6 +18,12 @@ import {
 } from './document-structure'
 import { documentValues, type Entry, renderEdifact, renderJson } from './document-values'
 import {
+  type LookupTableRecord,
+  type LookupTableStore,
+  seedLookupTables,
+  toLookupTableStore,
+} from './lookup-table'
+import {
   type MappingDraftRecord,
   type MappingDraftStore,
   oriented,
@@ -27,7 +33,7 @@ import {
 } from './mapping'
 import { type MappingSampleRecord, seedMappingSamples, toMappingSample } from './mapping-sample'
 import { messageTypeStructures } from './message-type-structure'
-import { evaluateExpressions, previewEntries } from './preview-engine'
+import { evaluateExpressions, type LookUp, previewEntries } from './preview-engine'
 import { badRequest, notFound } from './responses'
 
 function distinct(notes: ReadonlyArray<PreviewNote>) {
@@ -40,28 +46,33 @@ function distinct(notes: ReadonlyArray<PreviewNote>) {
   })
 }
 
+export function lookUpIn(lookupTables: LookupTableStore): LookUp {
+  return (lookupTableId, value) =>
+    lookupTableId === null ? undefined : lookupTables.translate(lookupTableId, value)
+}
+
 export async function previewOutput({
   mapping,
   graph,
   sample,
   documentStructures,
+  lookUp,
 }: {
   mapping: MappingDraftRecord
   graph: MappingGraph
   sample: MappingSampleRecord
   documentStructures: ReadonlyArray<DocumentStructure>
+  lookUp: LookUp
 }): Promise<{ document: DocumentContent; notes: PreviewNote[]; entries: ReadonlyArray<Entry> }> {
   const expressions = await evaluateExpressions(
     graph,
     sample.document.format === 'json' ? sample.document.content : undefined,
   )
 
-  const { entries, notes } = previewEntries(
-    graph,
-    documentValues(sample.entries),
-    expressions,
-    unknownPaths(graph, sideLeaves(mapping, documentStructures)),
-  )
+  const { entries, notes } = previewEntries(graph, documentValues(sample.entries), expressions, {
+    unknown: unknownPaths(graph, sideLeaves(mapping, documentStructures)),
+    lookUp,
+  })
 
   const values = documentValues(entries)
 
@@ -87,14 +98,17 @@ export function mappingPreviewHandlers(
     mappings,
     samples = seedMappingSamples,
     documentStructures = seedDocumentStructures,
+    lookupTables = seedLookupTables,
   }: {
     mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     samples?: ReadonlyArray<MappingSampleRecord>
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
+    lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore
   } = {},
 ) {
   const store = toMappingDraftStore(mappings)
   const structures = toDocumentStructureStore(documentStructures)
+  const lookUp = lookUpIn(toLookupTableStore(lookupTables))
 
   return [
     http.get<{ id: string }>(`${apiUrl}${mappingSamplesEndpoint.path}`, ({ params }) =>
@@ -134,6 +148,7 @@ export function mappingPreviewHandlers(
           graph,
           sample,
           documentStructures: structures.all(),
+          lookUp,
         })
 
         await delay()

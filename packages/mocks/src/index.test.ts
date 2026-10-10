@@ -7,11 +7,16 @@ import {
   createChannelEndpoint,
   createFlowEndpoint,
   createDocumentStructureEndpoint,
+  createLookupTableEndpoint,
+  createTradingPartnerEndpoint,
   documentStructureEndpoint,
   documentStructuresEndpoint,
   flowEndpoint,
   type FlowInput,
+  type LookupTableInput,
+  lookupTableEndpoint,
   lookupTablesEndpoint,
+  type MappingGraph,
   mappingDraftEndpoint,
   mappingPreviewEndpoint,
   mappingSamplesEndpoint,
@@ -32,7 +37,11 @@ import {
   submitDocumentEndpoint,
   toPath,
   toSearchParams,
+  type TradingPartnerInput,
+  tradingPartnerSchema,
   updateDocumentStructureEndpoint,
+  updateLookupTableEndpoint,
+  updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
@@ -44,6 +53,9 @@ import {
   seedChannels,
   seedDocumentStructureOf,
   seedFlows,
+  seedLookupTableNamed,
+  seedMappingDrafts,
+  seedTradingPartners,
 } from './index'
 
 const apiUrl = 'http://api.test'
@@ -66,6 +78,14 @@ async function getRun(id: string) {
   const response = await fetch(`${apiUrl}${toPath(runEndpoint.path, { id })}`)
 
   return runDetailSchema.parse(await response.json())
+}
+
+async function send(method: string, path: string, body: TradingPartnerInput | LookupTableInput) {
+  return fetch(`${apiUrl}${path}`, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 
 async function post(path: string, body?: ReprocessRunBody) {
@@ -362,6 +382,120 @@ describe('createHandlers', () => {
 
     server.resetHandlers(...createHandlers(apiUrl, { lookupTables: [] }))
     expect(await listLookupTables()).toEqual([])
+  })
+
+  it('scopes a Lookup Table to a Trading Partner created in the same session', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const partnerResponse = await send('POST', createTradingPartnerEndpoint.path, {
+      name: 'Havelland Feinkost GmbH',
+      gln: '4012345000009',
+      characterSet: 'UNOC',
+      acknowledgementTimeLimitHours: 24,
+    })
+
+    const partner = tradingPartnerSchema.parse(await partnerResponse.json())
+
+    const response = await send('POST', createLookupTableEndpoint.path, {
+      name: 'Havelland units',
+      scope: { kind: 'tradingPartner', tradingPartnerId: partner.id },
+      entries: [],
+    })
+
+    expect(response.status).toBe(201)
+    expect(lookupTableEndpoint.response.parse(await response.json()).scope).toEqual({
+      kind: 'tradingPartner',
+      tradingPartner: { id: partner.id, name: 'Havelland Feinkost GmbH' },
+    })
+  })
+
+  it('shows the current name of a renamed Trading Partner in Lookup Table scopes', async () => {
+    server.use(...createHandlers(apiUrl))
+    const hansemarkt = seedTradingPartners.find(({ name }) => name === 'Hansemarkt GmbH')!
+    const units = seedLookupTableNamed('Hansemarkt units')
+
+    await send('PUT', toPath(updateTradingPartnerEndpoint.path, hansemarkt), {
+      name: 'Hansemarkt Nord GmbH',
+      gln: hansemarkt.gln,
+      characterSet: hansemarkt.characterSet,
+      acknowledgementTimeLimitHours: hansemarkt.acknowledgementTimeLimitHours,
+    })
+
+    const table = lookupTableEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${toPath(lookupTableEndpoint.path, units)}`)).json(),
+    )
+
+    const listed = lookupTablesEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${lookupTablesEndpoint.path}`)).json(),
+    )
+
+    const renamed = {
+      kind: 'tradingPartner',
+      tradingPartner: { id: hansemarkt.id, name: 'Hansemarkt Nord GmbH' },
+    }
+
+    expect(table.scope).toEqual(renamed)
+    expect(listed.find(({ id }) => id === units.id)?.scope).toEqual(renamed)
+  })
+
+  it('previews a Lookup Table node with the entries saved for the table', async () => {
+    server.use(...createHandlers(apiUrl))
+    const vat = seedLookupTableNamed('VAT categories')
+    const invoic = seedMappingDrafts.find(({ name }) => name === 'Hansemarkt: ERP JSON to INVOIC')!
+    const transformId = '0000000b-0000-4000-8000-000000000001'
+
+    const graph: MappingGraph = {
+      links: [],
+      transforms: [
+        {
+          id: transformId,
+          kind: 'lookupTable',
+          position: { x: 0, y: 0 },
+          config: { lookupTableId: vat.id, fallback: 'fail' },
+        },
+      ],
+      transformLinks: [
+        {
+          from: { kind: 'source', path: 'lines[].vatRate' },
+          to: { kind: 'transform', transformId, input: 'value' },
+        },
+        {
+          from: { kind: 'transform', transformId, output: 'value' },
+          to: { kind: 'target', path: 'SG25/SG33/TAX+7/C241/5153' },
+        },
+      ],
+    }
+
+    const [sample] = mappingSamplesEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${toPath(mappingSamplesEndpoint.path, invoic)}`)).json(),
+    )
+
+    await fetch(`${apiUrl}${toPath(updateLookupTableEndpoint.path, vat)}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: vat.name,
+        scope: { kind: 'workspace' },
+        entries: [
+          { sourceCode: '19', targetCode: 'E' },
+          { sourceCode: '7', targetCode: 'E' },
+        ],
+      }),
+    })
+
+    const response = await fetch(`${apiUrl}${toPath(mappingPreviewEndpoint.path, invoic)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sampleId: sample!.id, graph }),
+    })
+
+    const preview = mappingPreviewEndpoint.response.parse(await response.json())
+    const lines = preview.document.format === 'edifact' ? preview.document.content.split('\n') : []
+    const taxLines = lines.filter((line) => line.startsWith('TAX+7+'))
+
+    expect(taxLines).not.toHaveLength(0)
+    expect(taxLines.every((line) => line.startsWith('TAX+7+E+'))).toBe(true)
+    expect(preview.notes).toEqual([])
   })
 
   it('serves the samples and previews of custom Mapping Drafts', async () => {

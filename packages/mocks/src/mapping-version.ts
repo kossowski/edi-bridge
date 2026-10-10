@@ -41,6 +41,12 @@ import {
   toMappingCatalogue,
 } from './flow'
 import {
+  type LookupTableRecord,
+  type LookupTableStore,
+  seedLookupTables,
+  toLookupTableStore,
+} from './lookup-table'
+import {
   linkProblem,
   type MappingDraftRecord,
   type MappingDraftStore,
@@ -50,7 +56,7 @@ import {
   structureOf,
   toMappingDraftStore,
 } from './mapping'
-import { previewOutput } from './mapping-preview'
+import { lookUpIn, previewOutput } from './mapping-preview'
 import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'
 import { badRequest, conflict, notFound, unprocessable } from './responses'
 import { stableUuid } from './seed-id'
@@ -331,15 +337,18 @@ export function mappingVersionHandlers(
     versions,
     samples = seedMappingSamples,
     documentStructures = seedDocumentStructures,
+    lookupTables = seedLookupTables,
   }: {
     mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     versions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
     samples?: ReadonlyArray<MappingSampleRecord>
     documentStructures?: DocumentStructures | DocumentStructureStore
+    lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore
   } = {},
 ) {
   const store = toMappingDraftStore(mappings)
   const structures = toDocumentStructureStore(documentStructures)
+  const lookUp = lookUpIn(toLookupTableStore(lookupTables))
 
   const versionStore = toMappingVersionStore(versions ?? createMappingVersions(store.all()))
 
@@ -447,6 +456,7 @@ export function mappingVersionHandlers(
             graph: toGraph(version),
             sample: found,
             documentStructures: structures.all(),
+            lookUp,
           })
 
         const outputs = sample

@@ -19,7 +19,7 @@ import {
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { lookupTablesEndpoint } from '@edi-bridge/contracts'
-import { createHandlers, lookupTablesHandler, seedLookupTables } from '@edi-bridge/mocks'
+import { createHandlers, lookupTableListHandler, seedLookupTables } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -176,7 +176,7 @@ export const LookupTableDeleted = meta.story({
   args: { id: invoic.id },
   beforeEach({ msw }) {
     msw.use(
-      lookupTablesHandler(
+      lookupTableListHandler(
         apiUrl,
         seedLookupTables.filter(({ name }) => name !== 'VAT categories'),
       ),
@@ -230,7 +230,7 @@ export const LookupTablesLoading = meta.story({
 export const LookupTablesEmpty = meta.story({
   args: { id: desadv.id },
   beforeEach({ msw }) {
-    msw.use(lookupTablesHandler(apiUrl, []))
+    msw.use(lookupTableListHandler(apiUrl, []))
   },
   async play({ canvasElement }) {
     const panel = await select(canvasElement, 'Lookup Table 1')

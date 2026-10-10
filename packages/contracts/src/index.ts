@@ -221,11 +221,38 @@ export {
 } from './mapping-preview'
 
 export {
+  createLookupTableEndpoint,
+  deleteLookupTableEndpoint,
+  importLookupTableEndpoint,
+  maxLookupCodeLength,
+  type LookupTable,
+  lookupTableEndpoint,
+  lookupTableEntriesSchema,
+  type LookupTableEntry,
+  lookupTableEntrySchema,
+  type LookupTableImportBody,
+  lookupTableImportBodySchema,
+  type LookupTableImportPreview,
+  lookupTableImportPreviewEndpoint,
+  lookupTableImportPreviewSchema,
+  type LookupTableImportReason,
+  lookupTableImportReasons,
+  lookupTableImportReasonSchema,
+  type LookupTableImportRow,
+  lookupTableImportRowSchema,
+  type LookupTableImportStatus,
+  type LookupTableInput,
+  lookupTableInputSchema,
+  lookupTableSchema,
   type LookupTableScope,
+  type LookupTableScopeInput,
+  lookupTableScopeInputSchema,
   lookupTableScopeSchema,
   type LookupTableSummary,
   lookupTableSummarySchema,
   lookupTablesEndpoint,
+  maxLookupTableCsvLength,
+  updateLookupTableEndpoint,
 } from './lookup-table'
 
 export {
