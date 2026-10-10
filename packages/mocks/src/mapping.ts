@@ -43,6 +43,7 @@ export type MappingDraftRecord = {
   messageType: MessageType
   documentStructureId: string
   latestVersion: number | null
+  unpublishedChanges: boolean
   links: ReadonlyArray<MappingLink>
   transforms: ReadonlyArray<MappingTransform>
   transformLinks: ReadonlyArray<TransformLink>
@@ -390,7 +391,8 @@ function seedUpdatedAt(index: number) {
 
 export const unpublishedDraftId = seedId(7, 1)
 
-// Each Message Type has one complete Draft, one half-done and one without links.
+// Each Message Type has one complete Draft, one half-done and one without links. The half-done
+// ones carry changes since their latest version.
 const linkShares = [1, 0.5, 0]
 
 export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
@@ -401,17 +403,16 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
       .slice(0, index)
       .filter(({ messageType }) => messageType === mapping.messageType).length
 
+    const share = linkShares[sameTypeBefore % linkShares.length]!
+
     return {
       id: mapping.mappingId,
       name: newest.mappingName,
       messageType: mapping.messageType,
       documentStructureId: seedDocumentStructureOf[mapping.messageType].id,
       latestVersion: newest.version,
-      ...templateDraftGraph(
-        mapping.mappingId,
-        mapping.messageType,
-        linkShares[sameTypeBefore % linkShares.length]!,
-      ),
+      unpublishedChanges: share === 0.5,
+      ...templateDraftGraph(mapping.mappingId, mapping.messageType, share),
       updatedAt: seedUpdatedAt(index),
     }
   }),
@@ -421,6 +422,7 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
     messageType: 'INVOIC',
     documentStructureId: seedDocumentStructureOf.INVOIC.id,
     latestVersion: null,
+    unpublishedChanges: true,
     ...templateDraftGraph(unpublishedDraftId, 'INVOIC', 0.3),
     updatedAt: seedUpdatedAt(seedMappings.length),
   },
@@ -532,14 +534,19 @@ export function createMappingDrafts({
 
     const { source, target } = oriented(messageType, { document: 'ERP JSON', edifact: messageType })
 
+    const id = faker.string.uuid()
+
+    const latestVersion = faker.datatype.boolean({ probability: 0.8 })
+      ? faker.number.int({ min: 1, max: 9 })
+      : null
+
     const record = {
-      id: faker.string.uuid(),
+      id,
       name: `${company}: ${source} to ${target}`,
       messageType,
       documentStructureId: documentStructure.id,
-      latestVersion: faker.datatype.boolean({ probability: 0.8 })
-        ? faker.number.int({ min: 1, max: 9 })
-        : null,
+      latestVersion,
+      unpublishedChanges: latestVersion === null || index % 3 === 0,
       updatedAt: faker.date.between({ from: '2026-01-01', to: '2026-09-30' }).toISOString(),
     }
 
@@ -555,7 +562,7 @@ export function createMappingDrafts({
   })
 }
 
-function structureOf(
+export function structureOf(
   record: Pick<MappingDraftRecord, 'id' | 'documentStructureId'>,
   documentStructures: DocumentStructures,
 ) {
@@ -598,6 +605,8 @@ export function toMappingDraft(
     transforms: record.transforms,
     transformLinks: record.transformLinks,
     updatedAt: record.updatedAt,
+    latestVersion: record.latestVersion,
+    unpublishedChanges: record.unpublishedChanges,
     ...oriented<MappingSide>(record.messageType, {
       document: {
         kind: 'documentStructure',
@@ -749,7 +758,13 @@ export function mappingHandlers(
           return invalidLink
         }
 
-        const record = { ...existing, ...body.data, updatedAt: new Date().toISOString() }
+        const record = {
+          ...existing,
+          ...body.data,
+          unpublishedChanges: true,
+          updatedAt: new Date().toISOString(),
+        }
+
         store.set(record)
 
         return HttpResponse.json(toMappingDraft(record, documentStructures))

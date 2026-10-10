@@ -17,6 +17,13 @@ import {
   seedMappingDrafts,
   toMappingDraftStore,
 } from './mapping'
+import {
+  createMappingVersions,
+  createMappingVersionStore,
+  mappingVersionHandlers,
+  type MappingVersionRecord,
+  type MappingVersionStore,
+} from './mapping-history'
 import { mappingPreviewHandlers } from './mapping-preview'
 import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'
 import { createMappingCatalogue, publishedMappingVersionsHandler } from './mapping-version'
@@ -80,6 +87,19 @@ export {
   toMappingSummary,
 } from './mapping'
 
+export {
+  createMappingVersions,
+  createMappingVersionStore,
+  deriveMappingVersions,
+  mappingDifferences,
+  mappingVersionHandlers,
+  type MappingVersionRecord,
+  type MappingVersionStore,
+  seedMappingVersions,
+  toMappingVersion,
+  toMappingVersionSummary,
+} from './mapping-history'
+
 export { mappingPreviewHandlers } from './mapping-preview'
 
 export {
@@ -139,6 +159,7 @@ export function createHandlers(
     documentStructures = seedDocumentStructures,
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
+    mappingVersions,
   }: {
     workspace?: Workspace
     tradingPartners?: ReadonlyArray<TradingPartner>
@@ -147,6 +168,7 @@ export function createHandlers(
     documentStructures?: ReadonlyArray<DocumentStructure>
     lookupTables?: ReadonlyArray<LookupTableSummary>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
+    mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
   } = {},
 ) {
   const runs = createRunStore(seedRuns())
@@ -156,6 +178,11 @@ export function createHandlers(
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
 
+  const mappingVersionStore =
+    mappingVersions && 'of' in mappingVersions
+      ? mappingVersions
+      : createMappingVersionStore(mappingVersions ?? createMappingVersions(mappingDraftStore.all()))
+
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
     ...tradingPartnerHandlers(apiUrl, { tradingPartners, workspace: workspaceStore }),
@@ -163,6 +190,12 @@ export function createHandlers(
     ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings }),
     publishedMappingVersionsHandler(apiUrl, mappings),
     runsHandler(apiUrl, runs),
+    ...mappingVersionHandlers(apiUrl, {
+      mappings: mappingDraftStore,
+      versions: mappingVersionStore,
+      samples: mappingSamples,
+      documentStructures,
+    }),
     ...runDetailHandlers(apiUrl, { runs, reprocessed: seedReprocessed() }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
     ...mappingHandlers(apiUrl, { mappings: mappingDraftStore, documentStructures }),

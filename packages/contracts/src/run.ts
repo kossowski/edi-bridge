@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { controlReferenceSchema, segmentTagSchema } from './edifact'
 import { flowSummarySchema } from './flow'
 import { mappingVersionSummarySchema } from './mapping-version'
-import { messageTypeSchema } from './message-type'
+import { directionSchema, messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
 
 import type { Endpoint } from './endpoint'
@@ -79,12 +79,6 @@ export const runsEndpoint: Endpoint<RunList, RunListQuery> = {
   query: runListQuerySchema,
   response: runListSchema,
 }
-
-export const directions = ['inbound', 'outbound'] as const
-
-export const directionSchema = z.enum(directions)
-
-export type Direction = z.infer<typeof directionSchema>
 
 export const runStepStages = ['receipt', ...failureStages] as const
 

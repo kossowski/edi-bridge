@@ -1,6 +1,9 @@
 import { z } from 'zod'
 
+import { checkGraph, graphFields, inboundSides, mappingLinkSchema, outboundSides } from './mapping'
+import { documentContentSchema, previewNoteSchema } from './mapping-preview'
 import { messageTypeSchema } from './message-type'
+import { mappingTransformSchema, transformLinkSchema } from './transform'
 
 import type { Endpoint } from './endpoint'
 
@@ -39,4 +42,143 @@ export const publishedMappingVersionsEndpoint: Endpoint<
   path: '/mapping-versions',
   query: publishedMappingVersionsQuerySchema,
   response: z.array(mappingVersionSummarySchema),
+}
+
+const summaryFields = mappingVersionSummarySchema.shape
+
+// A Mapping Version is immutable: its graph and sides stay as they were when the Draft was published.
+export const mappingVersionSchema = z
+  .discriminatedUnion('direction', [
+    z.object({ ...summaryFields, ...graphFields, ...outboundSides }),
+    z.object({ ...summaryFields, ...graphFields, ...inboundSides }),
+  ])
+  .superRefine(checkGraph)
+
+export type MappingVersion = z.infer<typeof mappingVersionSchema>
+
+export const mappingVersionEndpoint: Endpoint<
+  MappingVersion,
+  undefined,
+  undefined,
+  '/mappings/:mappingId/versions/:versionId'
+> = {
+  method: 'GET',
+  path: '/mappings/:mappingId/versions/:versionId',
+  response: mappingVersionSchema,
+}
+
+export const publishMappingDraftEndpoint: Endpoint<
+  MappingVersionSummary,
+  undefined,
+  undefined,
+  '/mappings/:mappingId/versions'
+> = {
+  method: 'POST',
+  path: '/mappings/:mappingId/versions',
+  response: mappingVersionSummarySchema,
+}
+
+export const differenceChanges = ['added', 'removed', 'changed'] as const
+
+export type DifferenceChange = (typeof differenceChanges)[number]
+
+function differenceOf<Kind extends string, Part extends z.ZodType>(kind: Kind, part: Part) {
+  return z.object({
+    kind: z.literal(kind),
+    change: z.enum(differenceChanges),
+    before: part.nullable(),
+    after: part.nullable(),
+  })
+}
+
+const presentSides = {
+  added: { before: false, after: true },
+  removed: { before: true, after: false },
+  changed: { before: true, after: true },
+} as const satisfies Record<DifferenceChange, { before: boolean; after: boolean }>
+
+// Links are matched by their target, transforms by their id; a moved transform is no difference.
+export const mappingDifferenceSchema = z
+  .discriminatedUnion('kind', [
+    differenceOf('link', mappingLinkSchema),
+    differenceOf('transform', mappingTransformSchema),
+    differenceOf('transformLink', transformLinkSchema),
+  ])
+  .refine(
+    ({ change, before, after }) =>
+      (before !== null) === presentSides[change].before &&
+      (after !== null) === presentSides[change].after,
+    { message: 'Only a removed part lacks an after, only an added part lacks a before' },
+  )
+  .refine(({ kind, change }) => kind !== 'transformLink' || change !== 'changed', {
+    message: 'A transform link is added or removed, never changed',
+  })
+
+export type MappingDifference = z.infer<typeof mappingDifferenceSchema>
+
+export const outputDifferenceSchema = z
+  .object({
+    path: z.string().min(1),
+    repetitions: z.array(z.number().int().min(0)),
+    before: z.string().nullable(),
+    after: z.string().nullable(),
+  })
+  .refine(({ before, after }) => before !== after, {
+    message: 'An output difference changes the value',
+  })
+
+export type OutputDifference = z.infer<typeof outputDifferenceSchema>
+
+export const versionOutputSchema = z.object({
+  document: documentContentSchema,
+  notes: z.array(previewNoteSchema),
+})
+
+export type VersionOutput = z.infer<typeof versionOutputSchema>
+
+export const comparisonOutputsSchema = z.object({
+  sampleId: z.uuid(),
+  from: versionOutputSchema,
+  to: versionOutputSchema,
+  differences: z.array(outputDifferenceSchema),
+})
+
+export type ComparisonOutputs = z.infer<typeof comparisonOutputsSchema>
+
+export const mappingComparisonSchema = z
+  .object({
+    mappingId: z.uuid(),
+    from: mappingVersionSummarySchema,
+    to: mappingVersionSummarySchema,
+    differences: z.array(mappingDifferenceSchema),
+    outputs: comparisonOutputsSchema.nullable(),
+  })
+  .refine(({ mappingId, from, to }) => from.mappingId === mappingId && to.mappingId === mappingId, {
+    message: 'Both versions belong to the compared Mapping',
+  })
+  .refine(({ from, to }) => from.id !== to.id, { message: 'Two different versions are compared' })
+
+export type MappingComparison = z.infer<typeof mappingComparisonSchema>
+
+// Without a Mapping Sample the comparison shows only the mapping differences.
+export const mappingComparisonQuerySchema = z
+  .object({
+    from: z.uuid(),
+    to: z.uuid(),
+    sampleId: z.uuid().optional(),
+  })
+  .refine(({ from, to }) => from !== to, { message: 'Two different versions are compared' })
+
+export type MappingComparisonQuery = z.infer<typeof mappingComparisonQuerySchema>
+
+export const mappingComparisonEndpoint: Endpoint<
+  MappingComparison,
+  MappingComparisonQuery,
+  undefined,
+  '/mappings/:mappingId/comparison'
+> = {
+  method: 'GET',
+  path: '/mappings/:mappingId/comparison',
+  query: mappingComparisonQuerySchema,
+  response: mappingComparisonSchema,
 }

@@ -180,6 +180,8 @@ describe('transformConfigIssues', () => {
       transforms: [constant],
       transformLinks: [],
       updatedAt: '2026-09-14T08:30:00.000Z',
+      latestVersion: null,
+      unpublishedChanges: true,
     }
 
     expect(mappingDraftSchema.safeParse(draft).success).toBe(true)

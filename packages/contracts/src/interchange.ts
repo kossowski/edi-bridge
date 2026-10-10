@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 import { controlReferenceSchema } from './edifact'
-import { directionSchema, runSummarySchema } from './run'
+import { directionSchema } from './message-type'
+import { runSummarySchema } from './run'
 
 import type { Endpoint } from './endpoint'
 
