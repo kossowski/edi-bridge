@@ -4,12 +4,16 @@
 
 **Blocked by:** 06 (Mock stack tracer)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Charts for throughput and error rate over time
-- [ ] Health per Trading Partner and a list of Overdue Acknowledgements
-- [ ] Values update live from a mocked SSE stream without reloading
-- [ ] Charts are accessible (readable in both themes, not colour-only)
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Charts for throughput and error rate over time
+- [x] Health per Trading Partner and a list of Overdue Acknowledgements
+- [x] Values update live from a mocked SSE stream without reloading
+- [x] Charts are accessible (readable in both themes, not colour-only)
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #34, #40, #45, #47.
