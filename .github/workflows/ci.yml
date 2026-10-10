@@ -51,7 +51,6 @@ jobs:
   tasks:
     name: ${{ matrix.name }}
     needs: plan
-    if: needs.plan.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -60,6 +59,7 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - name: Check out code
+        if: ${{ !matrix.skip }}
         uses: actions/checkout@v7
         with:
           # --affected compares against the base branch, which needs the full history.
@@ -67,12 +67,14 @@ jobs:
           filter: blob:none
 
       - name: Set up
+        if: ${{ !matrix.skip }}
         uses: ./.github/actions/setup
         with:
           job: ${{ matrix.job }}
           chromium: ${{ matrix.chromium || 'false' }}
 
       - name: Run affected tasks
+        if: ${{ !matrix.skip }}
         run: pnpm turbo run ${{ matrix.tasks }} ${{ github.event_name == 'pull_request' && '--affected' || '' }} ${{ matrix.args }}
 
   checks:
