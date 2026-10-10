@@ -5,10 +5,10 @@ import { createStore, type StoreApi, useStore } from 'zustand'
 
 import type { XYPosition } from '@xyflow/react'
 
-import { sameStart } from '@/components/mappings/mapping-graph'
+import { sameStart, startsAtPart } from '@/components/mappings/mapping-graph'
 import { createTooltipHandle } from '@edi-bridge/ui/components/tooltip'
 
-import type { RowRef } from '@/components/mappings/mapping-links'
+import type { LinkableRows, RowRef } from '@/components/mappings/mapping-links'
 import type { Side, TreeRow } from '@/components/mappings/mapping-tree'
 import type { LinkStart } from '@edi-bridge/contracts'
 
@@ -157,6 +157,20 @@ export function useCanvasStoreApi() {
 
 export function useMeaningTooltip() {
   return useCanvasContext().tooltip
+}
+
+const noRows: LinkableRows = {
+  leaves: { source: new Set(), target: new Set() },
+  parts: { source: new Set(), target: new Set() },
+}
+
+export const LinkableRowsContext = createContext<LinkableRows>(noRows)
+
+// A pending link from a repeating part or a loop's items output goes to a part, not a field.
+export function usePendingPartLink() {
+  const rows = useContext(LinkableRowsContext)
+
+  return useCanvasStore((state) => startsAtPart(rows, state.linkFrom))
 }
 
 export function useLinkHints() {

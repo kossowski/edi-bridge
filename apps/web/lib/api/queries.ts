@@ -17,6 +17,7 @@ import {
   getRun,
   getTradingPartner,
   listChannels,
+  listLookupTables,
   listFlows,
   listMappings,
   listMappingVersions,
@@ -101,6 +102,16 @@ export function mappingVersionsQuery(mappingId: string) {
     queryFn: () => listMappingVersions(mappingId),
   })
 }
+
+export const lookupTableKeys = {
+  all: () => ['lookup-tables'] as const,
+  list: () => [...lookupTableKeys.all(), 'list'] as const,
+}
+
+export const lookupTablesQuery = queryOptions({
+  queryKey: lookupTableKeys.list(),
+  queryFn: listLookupTables,
+})
 
 export const tradingPartnerKeys = {
   all: () => ['trading-partners'] as const,

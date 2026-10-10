@@ -873,7 +873,7 @@
       "linkFromHere": "Link from here",
       "linkToHere": "Link to here",
       "cancel": "Cancel link",
-      "shortcut": "Shortcut: press L on a source field or element, or on a Transform output, to start a link, and L on a target or a Transform input to finish it. Delete removes the only link of a part, a Transform input or a Transform output, or a selected Transform.",
+      "shortcut": "Shortcut: press L on a source field or element, a repeating source part, or a Transform output, to start a link, and L on a target or a Transform input to finish it. Delete removes the only link of a part, a Transform input or a Transform output, or a selected Transform.",
       "pending": "Linking from {source}. Select a target and choose Link to here, or press L on it. Press Escape to cancel.",
       "started": "Linking from {source}. Move to a target and press L, or select it and choose Link to here.",
       "cancelled": "Link from {source} cancelled.",
@@ -882,7 +882,8 @@
       "added": "Link from {source} to {target} added.",
       "removed": "Link from {source} to {target} removed.",
       "alreadyLinked": "{target} is already linked from {source}. Remove that link first.",
-      "notLinkable": "{label} holds other parts. Only single fields and elements can be linked.",
+      "notLinkable": "{label} holds other parts. Only single fields and elements can be linked, and repeating parts through a loop over line items.",
+      "needsLoop": "{label} is a repeating part. Link it into or out of the Items of a loop over line items, or link the fields beneath it.",
       "startOnSource": "Start a link on a source field or element, or on a Transform output, first.",
       "severalLinks": "{count, plural, one {{label} has # link. Select it to remove it.} other {{label} has # links. Select it to remove them one by one.}}",
       "addFailed": "The link from {source} to {target} could not be saved and was taken back. Try again.",
@@ -948,7 +949,7 @@
         "numberFormat": "Rounds a number and sets its decimal separator.",
         "lookupTable": "Translates a value with a Lookup Table.",
         "conditional": "Chooses between two values by a condition.",
-        "loop": "Repeats the links beneath a repeating part once per item.",
+        "loop": "Repeats the links beneath a repeating part once per item. Link a repeating source part, such as lines[], into Items, and Items into a repeating target part, such as SG25; then link the fields beneath them.",
         "jsonata": "Computes a value from the whole source Document."
       },
       "name": "{kind} {number}",
@@ -969,7 +970,7 @@
       "palette": {
         "heading": "Add a Transform",
         "add": "Add {kind}",
-        "later": "Lookup Table, conditional, loop and JSONata Transforms follow in a later version."
+        "note": "Select a placed Transform to change its settings under Details. Its inputs and outputs are linked like fields and elements."
       },
       "node": {
         "label": "Transform {name}",
@@ -990,7 +991,9 @@
         "substring": "{length, select, all {From character {start} to the end} other {{length} characters from character {start}}}",
         "dateFormat": "{from} → {to}",
         "numberFormat": "{places, select, keep {Decimal places kept} other {{places} decimal places}}, separator “{separator}”",
-        "lookupTable": "{chosen, select, yes {Lookup Table chosen} other {No Lookup Table chosen}}",
+        "lookupTableNone": "No Lookup Table chosen",
+        "lookupTableChosen": "Lookup Table chosen",
+        "lookupTableMissing": "Lookup Table not found",
         "conditional": "If the value {operator}",
         "loop": "Counter starts at {start}",
         "jsonata": "{expression}"
@@ -1001,6 +1004,13 @@
         "contains": "contains “{compareTo}”",
         "isEmpty": "is empty",
         "isNotEmpty": "is not empty"
+      },
+      "operatorNames": {
+        "equals": "Equals",
+        "notEquals": "Does not equal",
+        "contains": "Contains",
+        "isEmpty": "Is empty",
+        "isNotEmpty": "Is not empty"
       },
       "fields": {
         "constant": {
@@ -1064,11 +1074,65 @@
         "numberFormat": {
           "decimalPlaces": "From 0 to 6; leave empty to keep the decimal places as they come.",
           "decimalSeparator": "The character between the whole number and its decimals."
+        },
+        "lookupTable": {
+          "lookupTableId": "The Lookup Table that translates the value. A Workspace table serves every Trading Partner, a Trading Partner's table only that partner.",
+          "fallback": "What happens when the Lookup Table has no entry for the value."
+        },
+        "conditional": {
+          "operator": "How the Value input is checked. When the condition holds, Then is written, otherwise Else.",
+          "compareTo": "The text the value is compared with, e.g. true."
+        },
+        "loop": {
+          "counterStart": "The number of the first item; the Counter output numbers the items from here, e.g. for LIN."
+        },
+        "jsonata": {
+          "expression": "A JSONata expression over the whole source Document, e.g. $sum(lines.lineAmount). Leaving the field, or Ctrl+Enter, saves it; Enter starts a new line."
         }
       },
       "separators": {
         "point": "Point (.)",
         "comma": "Comma (,)"
+      },
+      "fallbacks": {
+        "keepValue": "Keep the incoming value",
+        "empty": "Leave the target empty",
+        "fail": "Fail the Run"
+      },
+      "lookupTables": {
+        "placeholder": "Choose a Lookup Table",
+        "loading": "Loading the Lookup Tables…",
+        "error": "The Lookup Tables could not be loaded.",
+        "retry": "Try again",
+        "empty": "There are no Lookup Tables in this Workspace yet.",
+        "workspace": "Workspace",
+        "tradingPartner": "Trading Partner {name}",
+        "scope": "Belongs to: {scope}"
+      },
+      "expression": {
+        "syntaxError": "Syntax error at line {line}, column {column}: {message}",
+        "goToError": "Go to the error",
+        "valid": "The syntax is valid.",
+        "sourcePath": "Source path",
+        "sourcePathPlaceholder": "Choose a source field",
+        "sourcePathDescription": "Inserts the path of the chosen field at the cursor, written for JSONata.",
+        "insert": "Insert path",
+        "syntaxErrors": {
+          "S0101": "A text in quotes is missing its closing quote.",
+          "S0105": "A name in backticks is missing its closing backtick (`).",
+          "S0106": "A comment is missing its closing */.",
+          "S0201": "Unexpected \"{token}\".",
+          "S0202": "Expected \"{value}\", but found \"{token}\".",
+          "S0203": "Expected \"{value}\" before the end of the expression.",
+          "S0204": "Unknown operator \"{token}\".",
+          "S0205": "Unexpected \"{token}\".",
+          "S0207": "The expression ends too early.",
+          "S0211": "The symbol \"{token}\" cannot stand before a value.",
+          "S0212": "The left side of := must be a variable name that starts with $.",
+          "S0213": "The value {value} cannot be a step in a path.",
+          "S0301": "A regular expression must not be empty.",
+          "S0302": "A regular expression is missing its closing /."
+        }
       },
       "ranges": {
         "concatenate": {
@@ -1098,11 +1162,12 @@
         "invalid": "{field} has an invalid value.",
         "invalidConfig": "The settings are invalid.",
         "notWholeNumber": "{field} must be a whole number.",
-        "unconnected": "The {input} input is not linked."
+        "unconnected": "The {input} input is not linked.",
+        "unknownLookupTable": "The chosen Lookup Table no longer exists. Choose another one.",
+        "outsideLoop": "The link from {source} to {target} leaves the loop: links run once per item only between fields beneath the looped parts."
       },
       "details": {
         "settings": "Settings",
-        "settingsLater": "The settings of this Transform can be changed in a later version. Its links can be changed here.",
         "inputs": "Inputs",
         "outputs": "Outputs",
         "noLink": "Not linked yet",
@@ -1123,7 +1188,7 @@
       "moveFailed": "Moving {name} could not be saved, so it is back in place. Try again.",
       "inputTaken": "{input} is already linked from {source}. Remove that link first.",
       "circle": "{target} already feeds {source}, so this link would make a circle.",
-      "needsPart": "{port} takes a whole repeating part, which the loop's settings will link in a later version."
+      "needsPart": "{port} takes only a whole repeating part, such as lines[] or SG25, not a single field or element."
     }
   },
   "ManualSubmission": {

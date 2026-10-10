@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { mappingDraftSchema } from './mapping'
 import {
+  expressionSyntaxError,
   type MappingTransform,
   mappingTransformSchema,
   transformConfigIssues,
@@ -190,6 +191,30 @@ describe('transformConfigSchemas', () => {
   it('validates a configuration on its own, e.g. in a form', () => {
     expect(transformConfigSchemas.substring.safeParse({ start: 2, length: 4 }).success).toBe(true)
     expect(transformConfigSchemas.substring.safeParse({ start: 2, length: 0 }).success).toBe(false)
+  })
+})
+
+describe('expressionSyntaxError', () => {
+  it('finds nothing wrong with a valid expression', () => {
+    expect(expressionSyntaxError('$sum(lines.lineAmount)')).toBeNull()
+  })
+
+  it('says where the parser stopped and why', () => {
+    expect(expressionSyntaxError('foo.bar]')).toEqual({
+      position: 8,
+      message: 'Syntax error: "]"',
+      code: 'S0201',
+      token: ']',
+      value: null,
+    })
+    expect(expressionSyntaxError('$string(SG25.PIA')).toEqual({
+      position: 16,
+      message: 'Expected ")" before end of expression',
+      code: 'S0203',
+      token: '(end)',
+      value: ')',
+    })
+    expect(expressionSyntaxError('a.2')).toMatchObject({ code: 'S0213', token: null, value: '2' })
   })
 })
 

@@ -1,24 +1,38 @@
 import {
   concatenateInputs,
+  operatorsWithOperand,
   type TransformConfig,
   type TransformKind,
-  transformKinds,
 } from '@edi-bridge/contracts'
 
-export type FieldInput = 'text' | 'integer' | 'optionalInteger' | 'decimalSeparator'
+import type { CanvasIssue } from '@/components/mappings/mapping-graph'
 
-type Field = { readonly input?: FieldInput; readonly ranged?: true }
+export type FieldInput =
+  | 'text'
+  | 'integer'
+  | 'optionalInteger'
+  | 'decimalSeparator'
+  | 'lookupTable'
+  | 'fallback'
+  | 'operator'
+  | 'expression'
 
-type FormField = Field & { readonly input: FieldInput }
+export type FormValues = Readonly<Record<string, string>>
 
-// A kind with `defaults` can be placed and gets a settings form, so each of its fields needs an
-// input; a kind without them still names its fields in the problems shown on its node.
-type KindFields<Kind extends TransformKind> =
-  | {
-      readonly fields: { readonly [Name in keyof TransformConfig<Kind>]: FormField }
-      readonly defaults: TransformConfig<Kind>
-    }
-  | { readonly fields: { readonly [Name in keyof TransformConfig<Kind>]: Field } }
+type CanvasOnlyCode = Extract<CanvasIssue, { code: 'unknownLookupTable' }>['code']
+
+type FormField = {
+  readonly input: FieldInput
+  readonly ranged?: true
+  readonly visibleWhen?: (values: FormValues) => boolean
+  // Problems only the canvas can know, shown beside the field until its value changes.
+  readonly canvasIssues?: ReadonlyArray<CanvasOnlyCode>
+}
+
+type KindFields<Kind extends TransformKind> = {
+  readonly fields: { readonly [Name in keyof TransformConfig<Kind>]: FormField }
+  readonly defaults: TransformConfig<Kind>
+}
 
 // The messages follow these names: `fields.<kind>.<field>` labels a field,
 // `fieldDescriptions.<kind>.<field>` describes it in the form and `ranges.<kind>.<field>` says
@@ -54,38 +68,51 @@ export const transformKindFields = {
     },
     defaults: { decimalPlaces: 2, decimalSeparator: '.' },
   },
-  lookupTable: { fields: { lookupTableId: {}, fallback: {} } },
-  conditional: { fields: { operator: {}, compareTo: {} } },
-  loop: { fields: { counterStart: { ranged: true } } },
-  jsonata: { fields: { expression: {} } },
+  lookupTable: {
+    fields: {
+      // A deleted Lookup Table is only known on the canvas; it stays a problem until another is
+      // chosen.
+      lookupTableId: { input: 'lookupTable', canvasIssues: ['unknownLookupTable'] },
+      fallback: { input: 'fallback' },
+    },
+    defaults: { lookupTableId: null, fallback: 'keepValue' },
+  },
+  conditional: {
+    fields: {
+      operator: { input: 'operator' },
+      compareTo: {
+        input: 'text',
+        visibleWhen: ({ operator }) => operatorsWithOperand.some((found) => found === operator),
+      },
+    },
+    defaults: { operator: 'equals', compareTo: '' },
+  },
+  loop: {
+    fields: { counterStart: { input: 'integer', ranged: true } },
+    defaults: { counterStart: 1 },
+  },
+  jsonata: {
+    fields: { expression: { input: 'expression' } },
+    defaults: { expression: '' },
+  },
 } as const satisfies { [Kind in TransformKind]: KindFields<Kind> }
 
 type Catalogue = typeof transformKindFields
 
-export type PlaceableKind = {
-  [Kind in TransformKind]: Catalogue[Kind] extends { defaults: object } ? Kind : never
-}[TransformKind]
-
-export function isPlaceable(kind: TransformKind): kind is PlaceableKind {
-  return 'defaults' in transformKindFields[kind]
-}
-
-export const placeableKinds: ReadonlyArray<PlaceableKind> = transformKinds.filter(isPlaceable)
-
-export function defaultConfig<Kind extends PlaceableKind>(kind: Kind): Catalogue[Kind]['defaults'] {
+export function defaultConfig<Kind extends TransformKind>(kind: Kind): Catalogue[Kind]['defaults'] {
   return transformKindFields[kind].defaults
 }
 
-export type FormFieldSpec = { name: string; input: FieldInput }
+export type FormFieldSpec = FormField & { name: string }
 
-export function formFields(kind: PlaceableKind): ReadonlyArray<FormFieldSpec> {
+export function formFields(kind: TransformKind): ReadonlyArray<FormFieldSpec> {
   const fields: Readonly<Record<string, FormField>> = transformKindFields[kind].fields
 
-  return Object.entries(fields).map(([name, { input }]) => ({ name, input }))
+  return Object.entries(fields).map(([name, field]) => ({ ...field, name }))
 }
 
-function fieldOf(kind: TransformKind, name: string): Field | undefined {
-  const fields: Readonly<Record<string, Field>> = transformKindFields[kind].fields
+function fieldOf(kind: TransformKind, name: string): FormField | undefined {
+  const fields: Readonly<Record<string, FormField>> = transformKindFields[kind].fields
 
   return Object.hasOwn(fields, name) ? fields[name] : undefined
 }

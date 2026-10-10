@@ -873,7 +873,7 @@
       "linkFromHere": "Von hier verknüpfen",
       "linkToHere": "Hierhin verknüpfen",
       "cancel": "Verknüpfen abbrechen",
-      "shortcut": "Tastenkürzel: L auf einem Feld oder Element der Quelle oder auf dem Ausgang eines Transforms beginnt eine Verknüpfung, L auf einem Ziel oder dem Eingang eines Transforms schließt sie ab. Entf entfernt die einzige Verknüpfung eines Teils oder eines Ein- oder Ausgangs eines Transforms oder einen ausgewählten Transform.",
+      "shortcut": "Tastenkürzel: L auf einem Feld oder Element der Quelle, einem wiederholten Teil der Quelle oder auf dem Ausgang eines Transforms beginnt eine Verknüpfung, L auf einem Ziel oder dem Eingang eines Transforms schließt sie ab. Entf entfernt die einzige Verknüpfung eines Teils oder eines Ein- oder Ausgangs eines Transforms oder einen ausgewählten Transform.",
       "pending": "Verknüpfung von {source} begonnen. Wählen Sie ein Ziel aus und dann „Hierhin verknüpfen“, oder drücken Sie darauf L. Escape bricht ab.",
       "started": "Verknüpfung von {source} begonnen. Gehen Sie zu einem Ziel und drücken Sie L, oder wählen Sie es aus und dann „Hierhin verknüpfen“.",
       "cancelled": "Verknüpfung von {source} abgebrochen.",
@@ -882,7 +882,8 @@
       "added": "Verknüpfung von {source} zu {target} hinzugefügt.",
       "removed": "Verknüpfung von {source} zu {target} entfernt.",
       "alreadyLinked": "{target} ist bereits mit {source} verknüpft. Entfernen Sie zuerst diese Verknüpfung.",
-      "notLinkable": "{label} enthält weitere Teile. Verknüpfen lassen sich nur einzelne Felder und Elemente.",
+      "notLinkable": "{label} enthält weitere Teile. Verknüpfen lassen sich nur einzelne Felder und Elemente sowie wiederholte Teile über eine Schleife über Positionen.",
+      "needsLoop": "{label} ist ein wiederholter Teil. Verknüpfen Sie ihn mit den Einträgen einer Schleife über Positionen oder verknüpfen Sie die Felder darunter.",
       "startOnSource": "Beginnen Sie eine Verknüpfung zuerst auf einem Feld oder Element der Quelle oder auf dem Ausgang eines Transforms.",
       "severalLinks": "{count, plural, one {{label} hat # Verknüpfung. Wählen Sie den Teil aus, um sie zu entfernen.} other {{label} hat # Verknüpfungen. Wählen Sie den Teil aus, um sie einzeln zu entfernen.}}",
       "addFailed": "Die Verknüpfung von {source} zu {target} konnte nicht gespeichert werden und wurde zurückgenommen. Versuchen Sie es erneut.",
@@ -948,7 +949,7 @@
         "numberFormat": "Rundet eine Zahl und legt ihr Dezimaltrennzeichen fest.",
         "lookupTable": "Übersetzt einen Wert mit einer Lookup Table.",
         "conditional": "Wählt anhand einer Bedingung zwischen zwei Werten.",
-        "loop": "Wiederholt die Verknüpfungen unter einem wiederholten Teil einmal je Eintrag.",
+        "loop": "Wiederholt die Verknüpfungen unter einem wiederholten Teil einmal je Eintrag. Verknüpfen Sie einen wiederholten Teil der Quelle wie lines[] mit „Einträge“ und „Einträge“ mit einem wiederholten Teil des Ziels wie SG25; verknüpfen Sie dann die Felder darunter.",
         "jsonata": "Berechnet einen Wert aus dem ganzen Quell-Document."
       },
       "name": "{kind} {number}",
@@ -969,7 +970,7 @@
       "palette": {
         "heading": "Transform hinzufügen",
         "add": "{kind} hinzufügen",
-        "later": "Lookup-Table-, Bedingungs-, Schleifen- und JSONata-Transforms folgen in einer späteren Version."
+        "note": "Wählen Sie einen platzierten Transform aus, um seine Einstellungen unter Details zu ändern. Seine Ein- und Ausgänge verknüpfen Sie wie Felder und Elemente."
       },
       "node": {
         "label": "Transform {name}",
@@ -990,7 +991,9 @@
         "substring": "{length, select, all {Ab Zeichen {start} bis zum Ende} other {{length} Zeichen ab Zeichen {start}}}",
         "dateFormat": "{from} → {to}",
         "numberFormat": "{places, select, keep {Nachkommastellen unverändert} other {{places} Nachkommastellen}}, Trennzeichen „{separator}“",
-        "lookupTable": "{chosen, select, yes {Lookup Table gewählt} other {Keine Lookup Table gewählt}}",
+        "lookupTableNone": "Keine Lookup Table gewählt",
+        "lookupTableChosen": "Lookup Table gewählt",
+        "lookupTableMissing": "Lookup Table nicht gefunden",
         "conditional": "Wenn der Wert {operator}",
         "loop": "Zähler beginnt bei {start}",
         "jsonata": "{expression}"
@@ -1001,6 +1004,13 @@
         "contains": "„{compareTo}“ enthält",
         "isEmpty": "leer ist",
         "isNotEmpty": "nicht leer ist"
+      },
+      "operatorNames": {
+        "equals": "Ist gleich",
+        "notEquals": "Ist nicht gleich",
+        "contains": "Enthält",
+        "isEmpty": "Ist leer",
+        "isNotEmpty": "Ist nicht leer"
       },
       "fields": {
         "constant": {
@@ -1064,11 +1074,65 @@
         "numberFormat": {
           "decimalPlaces": "Von 0 bis 6; leer lassen, um die Nachkommastellen unverändert zu lassen.",
           "decimalSeparator": "Das Zeichen zwischen der ganzen Zahl und ihren Nachkommastellen."
+        },
+        "lookupTable": {
+          "lookupTableId": "Die Lookup Table, die den Wert übersetzt. Eine Tabelle des Workspace gilt für alle Trading Partner, die eines Trading Partners nur für diesen.",
+          "fallback": "Was geschieht, wenn die Lookup Table keinen Eintrag für den Wert hat."
+        },
+        "conditional": {
+          "operator": "Wie der Eingang „Wert“ geprüft wird. Trifft die Bedingung zu, wird „Dann“ geschrieben, sonst „Sonst“.",
+          "compareTo": "Der Text, mit dem der Wert verglichen wird, z. B. true."
+        },
+        "loop": {
+          "counterStart": "Die Nummer des ersten Eintrags; der Ausgang „Zähler“ nummeriert die Einträge ab hier, z. B. für LIN."
+        },
+        "jsonata": {
+          "expression": "Ein JSONata-Ausdruck über das ganze Quell-Document, z. B. $sum(lines.lineAmount). Verlassen des Felds oder Strg+Enter speichert ihn; Enter beginnt eine neue Zeile."
         }
       },
       "separators": {
         "point": "Punkt (.)",
         "comma": "Komma (,)"
+      },
+      "fallbacks": {
+        "keepValue": "Eingehenden Wert behalten",
+        "empty": "Ziel leer lassen",
+        "fail": "Run scheitern lassen"
+      },
+      "lookupTables": {
+        "placeholder": "Lookup Table wählen",
+        "loading": "Lookup Tables werden geladen …",
+        "error": "Die Lookup Tables konnten nicht geladen werden.",
+        "retry": "Erneut versuchen",
+        "empty": "In diesem Workspace gibt es noch keine Lookup Tables.",
+        "workspace": "Workspace",
+        "tradingPartner": "Trading Partner {name}",
+        "scope": "Gehört zu: {scope}"
+      },
+      "expression": {
+        "syntaxError": "Syntaxfehler in Zeile {line}, Spalte {column}: {message}",
+        "goToError": "Zum Fehler springen",
+        "valid": "Die Syntax ist gültig.",
+        "sourcePath": "Pfad aus der Quelle",
+        "sourcePathPlaceholder": "Feld der Quelle wählen",
+        "sourcePathDescription": "Fügt den Pfad des gewählten Felds in JSONata-Schreibweise an der Cursorposition ein.",
+        "insert": "Pfad einfügen",
+        "syntaxErrors": {
+          "S0101": "Einem Text in Anführungszeichen fehlt das schließende Anführungszeichen.",
+          "S0105": "Einem Namen in Backticks fehlt der schließende Backtick (`).",
+          "S0106": "Einem Kommentar fehlt das schließende */.",
+          "S0201": "Unerwartetes „{token}“.",
+          "S0202": "„{value}“ erwartet, aber „{token}“ gefunden.",
+          "S0203": "„{value}“ fehlt vor dem Ende des Ausdrucks.",
+          "S0204": "Unbekannter Operator „{token}“.",
+          "S0205": "Unerwartetes „{token}“.",
+          "S0207": "Der Ausdruck endet zu früh.",
+          "S0211": "Das Zeichen „{token}“ kann nicht vor einem Wert stehen.",
+          "S0212": "Links von := muss ein Variablenname stehen, der mit $ beginnt.",
+          "S0213": "Der Wert {value} kann kein Schritt in einem Pfad sein.",
+          "S0301": "Ein regulärer Ausdruck darf nicht leer sein.",
+          "S0302": "Einem regulären Ausdruck fehlt das schließende /."
+        }
       },
       "ranges": {
         "concatenate": {
@@ -1098,11 +1162,12 @@
         "invalid": "{field}: ungültiger Wert.",
         "invalidConfig": "Die Einstellungen sind ungültig.",
         "notWholeNumber": "{field}: Geben Sie eine ganze Zahl ein.",
-        "unconnected": "Der Eingang {input} ist nicht verknüpft."
+        "unconnected": "Der Eingang {input} ist nicht verknüpft.",
+        "unknownLookupTable": "Die gewählte Lookup Table gibt es nicht mehr. Wählen Sie eine andere.",
+        "outsideLoop": "Die Verknüpfung von {source} nach {target} verlässt die Schleife: Nur Verknüpfungen zwischen Feldern unterhalb der Schleifenteile laufen einmal pro Position."
       },
       "details": {
         "settings": "Einstellungen",
-        "settingsLater": "Die Einstellungen dieses Transforms lassen sich in einer späteren Version ändern. Seine Verknüpfungen lassen sich hier ändern.",
         "inputs": "Eingänge",
         "outputs": "Ausgänge",
         "noLink": "Nicht verknüpft",
@@ -1123,7 +1188,7 @@
       "moveFailed": "Das Verschieben von {name} konnte nicht gespeichert werden, der Transform steht wieder an seinem Platz. Versuchen Sie es erneut.",
       "inputTaken": "{input} ist bereits mit {source} verknüpft. Entfernen Sie zuerst diese Verknüpfung.",
       "circle": "{target} liefert bereits Werte an {source}; diese Verknüpfung würde einen Zirkelbezug erzeugen.",
-      "needsPart": "{port} erwartet einen ganzen wiederholten Teil. Diesen verknüpfen Sie in einer späteren Version über die Einstellungen der Schleife."
+      "needsPart": "{port} nimmt nur einen ganzen wiederholten Teil wie lines[] oder SG25 auf, kein einzelnes Feld oder Element."
     }
   },
   "ManualSubmission": {

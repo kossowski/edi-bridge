@@ -6,36 +6,75 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   ArrowUp01Icon,
+  CheckmarkCircle02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useId, useState } from 'react'
+import { type ComponentType, useEffect, useId, useRef, useState } from 'react'
 
-import { TextField } from '@/components/form-field'
-import { linkIntoInput, type Graph } from '@/components/mappings/mapping-graph'
-import { formFields, isPlaceable, type PlaceableKind } from '@/components/mappings/transform-kinds'
+import { RadioField, SelectField, TextareaField, TextField } from '@/components/form-field'
 import {
+  insertText,
+  jsonataPath,
+  knownSyntaxError,
+  textPosition,
+} from '@/components/mappings/expression-text'
+import { type CanvasIssue, linkIntoInput, type Graph } from '@/components/mappings/mapping-graph'
+import {
+  type FieldInput,
+  type FormFieldSpec,
+  formFields,
+  type FormValues,
+} from '@/components/mappings/transform-kinds'
+import { lookupTablesQuery } from '@/lib/api/queries'
+import {
+  conditionOperators,
   decimalSeparators,
   draftTransformConfigSchemas,
+  expressionSyntaxError,
+  lookupFallbacks,
   transformConfigIssues,
   transformPorts,
 } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
-import { RadioGroup, RadioGroupItem } from '@edi-bridge/ui/components/radio-group'
 
 import type { GraphText } from '@/components/mappings/graph-text'
 import type {
+  ExpressionSyntaxError,
+  LookupTableSummary,
   MappingTransform,
   TransformConfigIssue,
-  TransformIssue,
   TransformLink,
 } from '@edi-bridge/contracts'
 
-type Values = Readonly<Record<string, string>>
+export type SourceField = { path: string; label: string }
 
 type Candidate = Record<string, string | number | null>
 
-function valuesOf(transform: MappingTransform & { kind: PlaceableKind }): Values {
+type FormIssue = TransformConfigIssue | { field: string; code: 'notWholeNumber' }
+
+type ReadValue = { value: string | number | null; code?: 'required' | 'notWholeNumber' }
+
+type Choice = { value: string; label: string }
+
+type WidgetProps = {
+  id: string
+  label: string
+  description: string
+  value: string
+  saved: string
+  error: string | null
+  sourceFields: ReadonlyArray<SourceField>
+  // Sets the field without saving, as while typing.
+  onChange: (value: string) => void
+  // Sets the field and saves the form if it is valid.
+  onCommit: (value: string) => void
+}
+
+type InputKind = { read: (value: string) => ReadValue; Widget: ComponentType<WidgetProps> }
+
+function valuesOf(transform: MappingTransform): FormValues {
   // SAFETY: every config is a flat object of strings, numbers and nulls, keyed by its field names.
   const config = transform.config as Readonly<Record<string, string | number | null>>
 
@@ -46,26 +85,357 @@ function valuesOf(transform: MappingTransform & { kind: PlaceableKind }): Values
 
 const wholeNumber = /^-?\d+$/
 
-function read(kind: PlaceableKind, values: Values) {
+const asText = (value: string): ReadValue => ({ value })
+
+function asInteger(required: boolean) {
+  return (value: string): ReadValue => {
+    const trimmed = value.trim()
+
+    if (trimmed === '') {
+      return required ? { value: null, code: 'required' } : { value: null }
+    }
+
+    return wholeNumber.test(trimmed)
+      ? { value: Number(trimmed) }
+      : { value, code: 'notWholeNumber' }
+  }
+}
+
+function TextInput({
+  id,
+  label,
+  description,
+  value,
+  saved,
+  error,
+  onChange,
+  onCommit,
+  numeric,
+}: WidgetProps & { numeric: boolean }) {
+  return (
+    <TextField
+      id={id}
+      autoComplete="off"
+      description={description}
+      error={error}
+      inputMode={numeric ? 'numeric' : undefined}
+      label={label}
+      spellCheck={false}
+      value={value}
+      className={numeric ? 'font-mono sm:w-28' : 'font-mono sm:max-w-sm'}
+      onBlur={() => onCommit(value)}
+      onChange={onChange}
+      // Enter saves, as leaving the field does.
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          onCommit(value)
+        }
+      }}
+      // The canvas clears the selection on Escape; caught before it, the first Escape only takes
+      // back what was typed, so the form and the focus stay.
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Escape' && value !== saved) {
+          event.preventDefault()
+          onChange(saved)
+        }
+      }}
+    />
+  )
+}
+
+function PlainTextInput(props: WidgetProps) {
+  return <TextInput {...props} numeric={false} />
+}
+
+function NumberInput(props: WidgetProps) {
+  return <TextInput {...props} numeric />
+}
+
+function radioInput(useChoices: () => ReadonlyArray<Choice>): ComponentType<WidgetProps> {
+  return function ChoiceInput({ id, label, description, value, onCommit }: WidgetProps) {
+    return (
+      <RadioField
+        id={id}
+        description={description}
+        items={useChoices()}
+        label={label}
+        value={value}
+        onChange={onCommit}
+      />
+    )
+  }
+}
+
+function useSeparators() {
+  const t = useTranslations('Mapping.transforms.separators')
+
+  return decimalSeparators.map((value) => ({
+    value,
+    label: t(value === '.' ? 'point' : 'comma'),
+  }))
+}
+
+function useFallbacks() {
+  const t = useTranslations('Mapping.transforms.fallbacks')
+
+  return lookupFallbacks.map((value) => ({ value, label: t(value) }))
+}
+
+function useOperators() {
+  const t = useTranslations('Mapping.transforms.operatorNames')
+
+  return conditionOperators.map((value) => ({ value, label: t(value) }))
+}
+
+function useScopeText() {
+  const t = useTranslations('Mapping.transforms.lookupTables')
+
+  return ({ scope }: LookupTableSummary) =>
+    scope.kind === 'workspace'
+      ? t('workspace')
+      : t('tradingPartner', { name: scope.tradingPartner.name })
+}
+
+function LookupTableInput({ id, label, description, value, error, onCommit }: WidgetProps) {
+  const t = useTranslations('Mapping.transforms.lookupTables')
+  const scopeOf = useScopeText()
+  const tables = useQuery(lookupTablesQuery)
+  const chosen = tables.data?.find((table) => table.id === value)
+  const loading = tables.isPending
+  const statusId = `${id}-status`
+
+  const items = (tables.data ?? []).map((table) => ({
+    value: table.id,
+    label: table.name,
+    detail: scopeOf(table),
+  }))
+
+  const status = () => {
+    if (loading) {
+      return <p className="text-muted-foreground text-sm">{t('loading')}</p>
+    }
+
+    if (tables.isError) {
+      return (
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-sm text-red-800 dark:text-red-300">{t('error')}</p>
+          <Button size="sm" variant="outline" onClick={() => void tables.refetch()}>
+            {t('retry')}
+          </Button>
+        </div>
+      )
+    }
+
+    if (items.length === 0) {
+      return <p className="text-muted-foreground text-sm">{t('empty')}</p>
+    }
+
+    return chosen ? <p className="text-sm">{t('scope', { scope: scopeOf(chosen) })}</p> : null
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <SelectField
+        id={id}
+        describedBy={statusId}
+        description={description}
+        disabled={tables.isError || (tables.isSuccess && items.length === 0)}
+        error={error}
+        items={items}
+        label={label}
+        loading={loading}
+        placeholder={loading ? t('loading') : t('placeholder')}
+        value={value}
+        className=""
+        onChange={onCommit}
+      />
+      <div id={statusId} aria-live="polite">
+        {status()}
+      </div>
+    </div>
+  )
+}
+
+function useSyntaxErrorText() {
+  const t = useTranslations('Mapping.transforms.expression')
+
+  return (error: ExpressionSyntaxError) => {
+    const code = knownSyntaxError(error.code)
+
+    return code
+      ? t(`syntaxErrors.${code}`, { token: error.token ?? '', value: error.value ?? '' })
+      : error.message
+  }
+}
+
+function ExpressionInput({
+  id,
+  label,
+  description,
+  value,
+  saved,
+  error: required,
+  sourceFields,
+  onChange,
+  onCommit,
+}: WidgetProps) {
+  const t = useTranslations('Mapping.transforms.expression')
+  const syntaxText = useSyntaxErrorText()
+  const editor = useRef<HTMLTextAreaElement>(null)
+  const selection = useRef<[number, number] | null>(null)
+  const [path, setPath] = useState<string | null>(null)
+  const syntax = value.trim() === '' ? null : expressionSyntaxError(value)
+  const at = syntax && textPosition(value, syntax.position)
+
+  const pathItems = sourceFields.map((field) => ({
+    value: field.path,
+    label: field.path,
+    ...(field.label !== field.path && { detail: field.label }),
+  }))
+
+  // The parser says more than the contract's "not a valid expression".
+  const error = at
+    ? t('syntaxError', { line: at.line, column: at.column, message: syntaxText(syntax) })
+    : required
+
+  const remember = () => {
+    const element = editor.current
+
+    if (element) {
+      selection.current = [element.selectionStart, element.selectionEnd]
+    }
+  }
+
+  const focusAt = (offset: number) => {
+    editor.current?.focus()
+    editor.current?.setSelectionRange(offset, offset)
+  }
+
+  // An inserted path moves the caret once the editor holds the new text; a value written after the
+  // caret would move it to the end.
+  const pendingCaret = useRef<{ offset: number; value: string } | null>(null)
+
+  useEffect(() => {
+    const pending = pendingCaret.current
+
+    if (pending?.value === value) {
+      pendingCaret.current = null
+      focusAt(pending.offset)
+    }
+  }, [value])
+
+  const insert = () => {
+    if (path === null) {
+      return
+    }
+
+    const [start, end] = selection.current ?? [value.length, value.length]
+    const next = insertText(value, start, end, jsonataPath(path))
+
+    selection.current = [next.caret, next.caret]
+    onCommit(next.value)
+    pendingCaret.current = { offset: next.caret, value: next.value }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <TextareaField
+        id={id}
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        description={description}
+        error={error}
+        label={label}
+        ref={editor}
+        rows={5}
+        spellCheck={false}
+        value={value}
+        className="min-h-28 font-mono text-sm md:text-sm"
+        onBlur={() => {
+          remember()
+          onCommit(value)
+        }}
+        onChange={onChange}
+        // Enter starts a new line here, so Ctrl+Enter or Cmd+Enter saves.
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+            event.preventDefault()
+            onCommit(value)
+          }
+        }}
+        onKeyDownCapture={(event) => {
+          if (event.key === 'Escape' && value !== saved) {
+            event.preventDefault()
+            onChange(saved)
+          }
+        }}
+        onSelect={remember}
+      />
+      {error ? (
+        at && (
+          <Button size="sm" variant="outline" className="w-fit" onClick={() => focusAt(at.offset)}>
+            {t('goToError')}
+          </Button>
+        )
+      ) : (
+        <p className="flex items-center gap-1.5 text-sm">
+          <HugeiconsIcon
+            icon={CheckmarkCircle02Icon}
+            strokeWidth={2}
+            aria-hidden
+            className="size-4 shrink-0 text-green-700 dark:text-green-300"
+          />
+          {t('valid')}
+        </p>
+      )}
+      <div className="flex flex-col items-start gap-2 pt-1">
+        <SelectField
+          id={`${id}-path`}
+          description={t('sourcePathDescription')}
+          disabled={pathItems.length === 0}
+          items={pathItems}
+          label={t('sourcePath')}
+          mono
+          placeholder={t('sourcePathPlaceholder')}
+          value={path}
+          className=""
+          onChange={setPath}
+        />
+        <Button disabled={path === null} size="sm" variant="outline" onClick={insert}>
+          {t('insert')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+const inputKinds: Readonly<Record<FieldInput, InputKind>> = {
+  text: { read: asText, Widget: PlainTextInput },
+  integer: { read: asInteger(true), Widget: NumberInput },
+  optionalInteger: { read: asInteger(false), Widget: NumberInput },
+  decimalSeparator: { read: asText, Widget: radioInput(useSeparators) },
+  lookupTable: {
+    read: (value) => ({ value: value === '' ? null : value }),
+    Widget: LookupTableInput,
+  },
+  fallback: { read: asText, Widget: radioInput(useFallbacks) },
+  operator: { read: asText, Widget: radioInput(useOperators) },
+  expression: { read: asText, Widget: ExpressionInput },
+}
+
+function read(kind: MappingTransform['kind'], values: FormValues) {
   const candidate: Candidate = {}
-  const local: TransformConfigIssue[] = []
+  const local: FormIssue[] = []
 
-  for (const { name: field, input: type } of formFields(kind)) {
-    const value = values[field] ?? ''
+  for (const { name, input } of formFields(kind)) {
+    const { value, code } = inputKinds[input].read(values[name] ?? '')
 
-    if (type === 'text' || type === 'decimalSeparator') {
-      candidate[field] = value
-    } else if (value.trim() === '') {
-      candidate[field] = null
+    candidate[name] = value
 
-      if (type === 'integer') {
-        local.push({ field, code: 'required' })
-      }
-    } else if (wholeNumber.test(value.trim())) {
-      candidate[field] = Number(value.trim())
-    } else {
-      candidate[field] = value
-      local.push({ field, code: 'invalid' })
+    if (code) {
+      local.push({ field: name, code })
     }
   }
 
@@ -81,16 +451,20 @@ function read(kind: PlaceableKind, values: Values) {
   }
 }
 
-function sameValues(kind: PlaceableKind, a: Values, b: Values) {
+function sameValues(kind: MappingTransform['kind'], a: FormValues, b: FormValues) {
   return formFields(kind).every(({ name }) => a[name] === b[name])
 }
 
 function TransformSettings({
   transform,
+  issues,
+  sourceFields,
   text,
   onConfigure,
 }: {
-  transform: MappingTransform & { kind: PlaceableKind }
+  transform: MappingTransform
+  issues: ReadonlyArray<CanvasIssue>
+  sourceFields: ReadonlyArray<SourceField>
   text: GraphText
   onConfigure: (config: MappingTransform['config']) => void
 }) {
@@ -107,9 +481,9 @@ function TransformSettings({
     setValues(saved)
   }
 
-  const { issues } = read(transform.kind, values)
+  const { issues: formIssues } = read(transform.kind, values)
 
-  const commit = (next: Values) => {
+  const commit = (next: FormValues) => {
     const { config } = read(transform.kind, next)
 
     if (config && !sameValues(transform.kind, next, saved)) {
@@ -118,86 +492,58 @@ function TransformSettings({
     }
   }
 
-  const errorOf = (field: string) => {
-    const issue = issues.find((found) => found.field === field)
+  const errorOf = ({ name, canvasIssues = [] }: FormFieldSpec) => {
+    const fromCanvas =
+      values[name] === saved[name]
+        ? issues.find(
+            (issue) =>
+              'field' in issue &&
+              issue.field === name &&
+              canvasIssues.some((code) => code === issue.code),
+          )
+        : undefined
+
+    if (fromCanvas) {
+      return text.issue(transform.kind, fromCanvas)
+    }
+
+    const issue = formIssues.find((found) => found.field === name)
 
     if (!issue) {
       return null
     }
 
-    return issue.code === 'invalid' &&
-      formFields(transform.kind).some(({ name, input }) => name === field && input !== 'text')
-      ? t('issues.notWholeNumber', { field: text.field(transform.kind, field) })
+    return issue.code === 'notWholeNumber'
+      ? t('issues.notWholeNumber', { field: text.field(transform.kind, name) })
       : text.issue(transform.kind, issue)
   }
 
+  const shown = formFields(transform.kind).filter(
+    ({ visibleWhen }) => visibleWhen?.(values) ?? true,
+  )
+
   return (
     <div className="flex flex-col gap-4">
-      {formFields(transform.kind).map(({ name: field, input: type }) => {
-        const fieldId = `${id}${field}`
-        const label = text.field(transform.kind, field)
-        // SAFETY: the form fields are exactly the keys under `fieldDescriptions.<kind>`.
-        const description = t(`fieldDescriptions.${transform.kind}.${field}` as never)
-
-        if (type === 'decimalSeparator') {
-          return (
-            <div key={field} className="flex flex-col gap-1.5">
-              <span id={`${fieldId}-label`} className="text-sm font-medium">
-                {label}
-              </span>
-              <RadioGroup
-                value={values[field] ?? null}
-                aria-describedby={`${fieldId}-description`}
-                aria-labelledby={`${fieldId}-label`}
-                className="flex flex-col gap-2"
-                onValueChange={(value) => {
-                  const next = { ...values, [field]: String(value) }
-
-                  setValues(next)
-                  commit(next)
-                }}>
-                {decimalSeparators.map((separator) => (
-                  <label key={separator} className="flex min-h-6 items-center gap-2 text-sm">
-                    <RadioGroupItem value={separator} />
-                    {t(separator === '.' ? 'separators.point' : 'separators.comma')}
-                  </label>
-                ))}
-              </RadioGroup>
-              <p id={`${fieldId}-description`} className="text-muted-foreground text-sm">
-                {description}
-              </p>
-            </div>
-          )
-        }
+      {shown.map((field) => {
+        const { Widget } = inputKinds[field.input]
 
         return (
-          <TextField
-            key={field}
-            id={fieldId}
-            autoComplete="off"
-            description={description}
+          <Widget
+            key={field.name}
+            id={`${id}${field.name}`}
+            // SAFETY: the form fields are exactly the keys under `fieldDescriptions.<kind>`.
+            description={t(`fieldDescriptions.${transform.kind}.${field.name}` as never)}
             error={errorOf(field)}
-            inputMode={type === 'text' ? undefined : 'numeric'}
-            label={label}
-            spellCheck={false}
-            value={values[field] ?? ''}
-            className={type === 'text' ? 'font-mono sm:max-w-sm' : 'font-mono sm:w-28'}
-            onBlur={() => commit(values)}
-            onChange={(value) => setValues({ ...values, [field]: value })}
-            // Enter saves, as leaving the field does.
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                commit(values)
-              }
-            }}
-            // The canvas clears the selection on Escape; caught before it, the first Escape only
-            // takes back what was typed, so the form and the focus stay.
-            onKeyDownCapture={(event) => {
-              if (event.key === 'Escape' && values[field] !== saved[field]) {
-                event.preventDefault()
-                setValues({ ...values, [field]: saved[field] ?? '' })
-              }
+            label={text.field(transform.kind, field.name)}
+            saved={saved[field.name] ?? ''}
+            sourceFields={sourceFields}
+            value={values[field.name] ?? ''}
+            onChange={(next) => setValues({ ...values, [field.name]: next })}
+            onCommit={(next) => {
+              const nextValues = { ...values, [field.name]: next }
+
+              setValues(nextValues)
+              commit(nextValues)
             }}
           />
         )
@@ -250,12 +596,14 @@ export function TransformDetails({
   transform,
   graph,
   issues,
+  sourceFields,
   text,
   actions,
 }: {
   transform: MappingTransform
   graph: Graph
-  issues: ReadonlyArray<TransformIssue>
+  issues: ReadonlyArray<CanvasIssue>
+  sourceFields: ReadonlyArray<SourceField>
   text: GraphText
   actions: TransformDetailsActions
 }) {
@@ -265,9 +613,7 @@ export function TransformDetails({
   const ports = transformPorts(transform)
 
   // The form shows its own fields' problems beside them.
-  const shownInForm: ReadonlyArray<string> = isPlaceable(transform.kind)
-    ? formFields(transform.kind).map(({ name }) => name)
-    : []
+  const shownInForm = formFields(transform.kind).map(({ name }) => name)
 
   const outgoing = graph.transformLinks.filter(
     ({ from }) => from.kind === 'transform' && from.transformId === transform.id,
@@ -313,17 +659,14 @@ export function TransformDetails({
       />
       <section className="flex flex-col gap-3">
         <h3 className="text-xs font-medium tracking-wide uppercase">{t('details.settings')}</h3>
-        {isPlaceable(transform.kind) ? (
-          <TransformSettings
-            key={transform.id}
-            text={text}
-            // SAFETY: `isPlaceable` just narrowed the kind of this very transform.
-            transform={transform as MappingTransform & { kind: PlaceableKind }}
-            onConfigure={(config) => actions.configure(transform, config)}
-          />
-        ) : (
-          <p className="text-muted-foreground text-sm">{t('details.settingsLater')}</p>
-        )}
+        <TransformSettings
+          key={transform.id}
+          issues={issues}
+          sourceFields={sourceFields}
+          text={text}
+          transform={transform}
+          onConfigure={(config) => actions.configure(transform, config)}
+        />
       </section>
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-medium tracking-wide uppercase">{t('details.inputs')}</h3>

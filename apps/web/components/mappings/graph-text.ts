@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
 
 import {
+  type CanvasIssue,
   type Connected,
   type GraphChange,
   transformNames,
@@ -14,8 +15,8 @@ import type { RowRef } from '@/components/mappings/mapping-links'
 import type {
   LinkEnd,
   LinkStart,
+  LookupTableSummary,
   MappingTransform,
-  TransformIssue,
   TransformKind,
 } from '@edi-bridge/contracts'
 
@@ -35,7 +36,10 @@ export type FailedLink = Exclude<Connected, { ok: true }>
 // only explains what cannot be linked is announced.
 export type FailedLinkText = { text: string; problem: boolean }
 
-export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
+export function useGraphText(
+  transforms: ReadonlyArray<MappingTransform>,
+  lookupTables?: ReadonlyArray<LookupTableSummary>,
+) {
   const t = useTranslations('Mapping.transforms')
   const tLinks = useTranslations('Mapping.links')
 
@@ -80,9 +84,17 @@ export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
     const range = (transformKind: TransformKind, value: string) =>
       isRanged(transformKind, value) ? t(`ranges.${transformKind}.${value}` as never) : null
 
-    const issue = (transformKind: TransformKind, found: TransformIssue) => {
+    const issue = (transformKind: TransformKind, found: CanvasIssue) => {
       if (found.code === 'unconnected') {
         return t('issues.unconnected', { input: input(found.input) })
+      }
+
+      if (found.code === 'unknownLookupTable') {
+        return t('issues.unknownLookupTable')
+      }
+
+      if (found.code === 'outsideLoop') {
+        return t('issues.outsideLoop', { source: found.source, target: found.target })
       }
 
       if (found.field === '') {
@@ -191,6 +203,7 @@ export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
             text: t('needsPart', { port: failed.end === 'to' ? end(to) : start(from) }),
             problem: false,
           }
+        case 'needsLoop':
         case 'notLinkable': {
           const row: RowRef | null =
             failed.end === 'to'
@@ -201,7 +214,15 @@ export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
                 ? { side: 'source', path: from.path }
                 : null
 
-          return row && { text: tLinks('notLinkable', { label: label(row) }), problem: false }
+          return (
+            row && {
+              text:
+                failed.reason === 'needsLoop'
+                  ? tLinks('needsLoop', { label: label(row) })
+                  : tLinks('notLinkable', { label: label(row) }),
+              problem: false,
+            }
+          )
         }
       }
     }
@@ -234,10 +255,22 @@ export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
                 : String(transform.config.decimalPlaces),
             separator: transform.config.decimalSeparator,
           })
-        case 'lookupTable':
-          return t('summary.lookupTable', {
-            chosen: transform.config.lookupTableId === null ? 'no' : 'yes',
-          })
+        case 'lookupTable': {
+          const { lookupTableId } = transform.config
+
+          if (lookupTableId === null) {
+            return t('summary.lookupTableNone')
+          }
+
+          const chosen = lookupTables?.find(({ id }) => id === lookupTableId)
+
+          if (chosen) {
+            return chosen.name
+          }
+
+          return lookupTables ? t('summary.lookupTableMissing') : t('summary.lookupTableChosen')
+        }
+
         case 'conditional':
           return t('summary.conditional', {
             operator: t(`operators.${transform.config.operator}`, {
@@ -252,5 +285,5 @@ export function useGraphText(transforms: ReadonlyArray<MappingTransform>) {
     }
 
     return { kind, name, input, output, start, end, field, issue, change, failedLink, summary }
-  }, [t, tLinks, transforms])
+  }, [lookupTables, t, tLinks, transforms])
 }

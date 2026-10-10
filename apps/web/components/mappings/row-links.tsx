@@ -10,7 +10,7 @@ import {
 } from '@/components/mappings/mapping-canvas-store'
 import {
   isLinkableRow,
-  type Leaves,
+  type LinkableRows,
   linksOfItem,
   type RowLink,
   type RowRef,
@@ -58,14 +58,14 @@ export function RowLinks({
   row,
   item,
   graph,
-  leaves,
+  rows,
   text,
   actions,
 }: {
   row: RowRef
   item: TreeItem
   graph: Graph
-  leaves: Leaves
+  rows: LinkableRows
   text: GraphText
   actions: PanelActions
 }) {
@@ -73,19 +73,19 @@ export function RowLinks({
   const heading = useId()
   const linkFrom = useCanvasStore((state) => state.linkFrom)
   const own = linksOfItem(graph, row.side, item)
-  const leaf = isLinkableRow(leaves, row)
+  const linkable = isLinkableRow(rows, row)
 
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-2">
       <h3 id={heading} className="text-xs font-medium tracking-wide uppercase">
         {t('heading')}
       </h3>
-      {leaf && row.side === 'source' && !isStartRow(linkFrom, row) && (
+      {linkable && row.side === 'source' && !isStartRow(linkFrom, row) && (
         <Button size="sm" className="w-fit" onClick={() => actions.start(row)}>
           {t('linkFromHere')}
         </Button>
       )}
-      {leaf && row.side === 'target' && linkFrom && (
+      {linkable && row.side === 'target' && linkFrom && (
         <Button size="sm" className="w-fit" onClick={() => actions.link(linkFrom, row)}>
           {t('linkToHere')}
         </Button>

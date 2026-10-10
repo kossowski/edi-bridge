@@ -89,21 +89,62 @@ function datePattern(field: string, pattern: string): TransformConfigIssue | fal
   return !(known && complete) && { field, code: 'invalidPattern' }
 }
 
+const jsonataErrorSchema = z.object({
+  position: z.number(),
+  message: z.string(),
+  code: z.string().optional(),
+  token: z.union([z.string(), z.number()]).optional(),
+  value: z.union([z.string(), z.number()]).optional(),
+})
+
+// `code` is the parser's error code, e.g. S0203, so the message can be shown in the user's
+// language; `token` and `value` fill its gaps, and `message` is the parser's own English text.
+export type ExpressionSyntaxError = {
+  position: number
+  message: string
+  code: string | null
+  token: string | null
+  value: string | null
+}
+
+// `position` counts the characters up to and including the token the parser stopped at.
+export function expressionSyntaxError(expression: string): ExpressionSyntaxError | null {
+  try {
+    jsonata(expression)
+
+    return null
+  } catch (error) {
+    const parsed = jsonataErrorSchema.safeParse(error)
+
+    if (!parsed.success) {
+      return { position: expression.length, message: '', code: null, token: null, value: null }
+    }
+
+    const { position, message, code, token, value } = parsed.data
+
+    return {
+      position,
+      message,
+      code: code ?? null,
+      token: token === undefined ? null : String(token),
+      value: value === undefined ? null : String(value),
+    }
+  }
+}
+
 function expression(field: string, value: string): TransformConfigIssue | false {
   if (blank(value)) {
     return { field, code: 'required' }
   }
 
-  try {
-    jsonata(value)
-
-    return false
-  } catch {
-    return { field, code: 'invalidExpression' }
-  }
+  return expressionSyntaxError(value) !== null && { field, code: 'invalidExpression' }
 }
 
-const operatorsWithOperand: ReadonlyArray<ConditionOperator> = ['equals', 'notEquals', 'contains']
+export const operatorsWithOperand: ReadonlyArray<ConditionOperator> = [
+  'equals',
+  'notEquals',
+  'contains',
+]
 
 const singleValue = (): TransformPorts => ({ inputs: ['value'], outputs: ['value'] })
 
