@@ -21,4 +21,8 @@ while read -r entry; do
   fi
 done < <(jq -c '.[]' <<<"$jobs")
 
+if [ "$selected" = '[]' ]; then
+  selected='[{"name":"No affected tasks","skip":true}]'
+fi
+
 echo "matrix=$selected" >>"$GITHUB_OUTPUT"
