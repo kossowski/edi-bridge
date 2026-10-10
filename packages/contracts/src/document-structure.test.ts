@@ -13,6 +13,7 @@ const purchaseOrder: DocumentStructure = {
   id: '00000006-0000-4000-8000-000000000001',
   name: 'ERP purchase order',
   format: 'json',
+  root: 'object',
   children: [
     { kind: 'field', path: 'orderNumber', name: 'orderNumber', type: 'string', required: true },
     {
@@ -153,6 +154,55 @@ describe('documentStructureSchema refinements', () => {
     expect(documentStructureSchema.safeParse(latin9).success).toBe(false)
   })
 
+  const listOfOrders = {
+    ...purchaseOrder,
+    root: 'array',
+    children: [
+      {
+        ...rows,
+        path: 'items[]',
+        name: 'items',
+        items: {
+          ...rows.items,
+          path: 'items[]',
+          name: 'items',
+          children: [
+            {
+              kind: 'field',
+              path: 'items[].orderNumber',
+              name: 'orderNumber',
+              type: 'string',
+              required: true,
+            },
+          ],
+        },
+      },
+    ],
+  }
+
+  it('accepts a JSON structure of a list as one items[] list', () => {
+    expect(documentStructureSchema.safeParse(listOfOrders).success).toBe(true)
+  })
+
+  it('rejects a JSON structure of a list with more than its items[] list', () => {
+    const more = {
+      ...listOfOrders,
+      children: [...listOfOrders.children, purchaseOrder.children[0]],
+    }
+
+    expect(documentStructureSchema.safeParse(more).success).toBe(false)
+    expect(
+      documentStructureSchema.safeParse({ ...listOfOrders, children: purchaseOrder.children })
+        .success,
+    ).toBe(false)
+  })
+
+  it('keeps a JSON object with one items list apart from a JSON list', () => {
+    expect(documentStructureSchema.safeParse({ ...listOfOrders, root: 'object' }).success).toBe(
+      true,
+    )
+  })
+
   it('checks an inferred structure the same way, without id and name', () => {
     const inferred = { ...csvStructure, id: undefined, name: undefined }
 
@@ -209,6 +259,17 @@ describe('updateDocumentStructureBodySchema', () => {
     expect(updateDocumentStructureBodySchema.safeParse(body).success).toBe(true)
   })
 
+  it('takes new CSV settings with a CSV Document to read again', () => {
+    const body = {
+      name: 'ERP dispatch export',
+      csv: { delimiter: ',', headerRow: false, encoding: 'utf-8' },
+      document: { fileName: 'dispatch.csv', content: btoa('1,2\n') },
+      adjustments: [],
+    }
+
+    expect(updateDocumentStructureBodySchema.safeParse(body).success).toBe(true)
+  })
+
   it('rejects an adjustment that changes nothing', () => {
     const body = { name: 'ERP purchase order', adjustments: [{ path: 'buyer' }] }
 
@@ -235,13 +296,55 @@ describe('documentStructureProblemSchema', () => {
       message: 'Line 3 has more cells than the header row',
       path: null,
       line: 3,
+      mappingVersions: null,
     }
 
     expect(documentStructureProblemSchema.parse(problem)).toEqual(problem)
   })
 
   it('rejects a code it does not know', () => {
-    const problem = { code: 'tooLarge', message: 'Too large', path: null, line: null }
+    const problem = {
+      code: 'tooLarge',
+      message: 'Too large',
+      path: null,
+      line: null,
+      mappingVersions: null,
+    }
+
+    expect(documentStructureProblemSchema.safeParse(problem).success).toBe(false)
+  })
+
+  const version = {
+    id: '00000007-0000-4000-8000-000000000001',
+    mappingId: '00000005-0000-4000-8000-000000000001',
+    mappingName: 'Hansemarkt ORDERS',
+    version: 3,
+    publishedAt: '2026-10-01T08:00:00.000Z',
+  }
+
+  it('names the Mapping Versions that use a node', () => {
+    const problem = {
+      code: 'usedByMappingVersion',
+      message: 'Published Mapping Versions use buyer.gln: Hansemarkt ORDERS v3',
+      path: 'buyer.gln',
+      line: null,
+      mappingVersions: [version],
+    }
+
+    expect(documentStructureProblemSchema.parse(problem)).toEqual(problem)
+    expect(
+      documentStructureProblemSchema.safeParse({ ...problem, mappingVersions: null }).success,
+    ).toBe(false)
+  })
+
+  it('names Mapping Versions only for usedByMappingVersion', () => {
+    const problem = {
+      code: 'linkedByMapping',
+      message: 'A Mapping Draft links lines[].gtin',
+      path: 'lines[]',
+      line: null,
+      mappingVersions: [version],
+    }
 
     expect(documentStructureProblemSchema.safeParse(problem).success).toBe(false)
   })

@@ -2,6 +2,8 @@ import { en, Faker } from '@faker-js/faker'
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  arrayPath,
+  childPath,
   createDocumentStructureEndpoint,
   type DocumentField,
   type DocumentFieldType,
@@ -9,27 +11,35 @@ import {
   type DocumentStructure,
   documentStructureEndpoint,
   type DocumentStructureNode,
+  documentStructureNodes,
   type DocumentStructureProblem,
   documentStructureSchema,
   documentStructuresEndpoint,
   type DocumentStructureSummary,
   documentStructureSummarySchema,
+  type GraphParts,
   inferDocumentStructureEndpoint,
   type InferredDocumentStructure,
+  type MappingVersionSummary,
+  mappingVersionSummarySchema,
   type MessageType,
   messageTypes,
+  nodeContent,
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
   adjustDocumentStructure,
-  changesPaths,
   DocumentStructureProblemError,
   findNode,
   inferDocumentStructure,
+  sameCsvSettings,
+  visitedNode,
 } from './document-structure-inference'
 import { documentStructureOrigins } from './document-structure-origin'
+import { byNameAndNewest } from './flow'
+import { containerOf } from './paths'
 import { badRequest, notFound } from './responses'
 import { seedId } from './seed-id'
 
@@ -45,10 +55,6 @@ type Spec =
 
 function isField(spec: Spec): spec is FieldSpec {
   return Array.isArray(spec)
-}
-
-function childPath(parentPath: string, name: string) {
-  return parentPath === '' ? name : `${parentPath}.${name}`
 }
 
 function toNodes(specs: ReadonlyArray<Spec>, parentPath: string): DocumentStructureNode[] {
@@ -71,7 +77,7 @@ function toNodes(specs: ReadonlyArray<Spec>, parentPath: string): DocumentStruct
       }
     }
 
-    const path = `${childPath(parentPath, spec.array)}[]`
+    const path = arrayPath(childPath(parentPath, spec.array))
 
     return {
       kind: 'array',
@@ -94,6 +100,7 @@ function structure(index: number, name: string, specs: ReadonlyArray<Spec>): Doc
     id: seedId(6, index),
     name,
     format: 'json',
+    root: 'object',
     children: toNodes(specs, ''),
   })
 }
@@ -260,18 +267,11 @@ export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = messageT
 export function documentStructureLeaves(
   documentStructure: Pick<DocumentStructure, 'children'>,
 ): DocumentField[] {
-  const visit = (node: DocumentStructureNode): DocumentField[] => {
-    switch (node.kind) {
-      case 'field':
-        return [node]
-      case 'object':
-        return node.children.flatMap(visit)
-      case 'array':
-        return visit(node.items)
-    }
-  }
+  return [...documentStructureNodes(documentStructure.children)].flatMap(({ node }) => {
+    const content = nodeContent(node)
 
-  return documentStructure.children.flatMap(visit)
+    return content.kind === 'field' ? [content] : []
+  })
 }
 
 // Spreads the fields over plain fields, objects and arrays of objects with a nested array, so a
@@ -349,6 +349,7 @@ export function createDocumentStructure({
     id: faker.string.uuid(),
     name,
     format: 'json',
+    root: 'object',
     children: toNodes(
       specs.filter((spec) => isField(spec) || spec.fields.length > 0),
       '',
@@ -356,30 +357,21 @@ export function createDocumentStructure({
   })
 }
 
-export function documentStructureHandler(
-  apiUrl: string,
-  documentStructures: ReadonlyArray<DocumentStructure> = seedDocumentStructures,
-) {
-  return http.get<{ id: string }>(`${apiUrl}${documentStructureEndpoint.path}`, ({ params }) => {
-    const found = documentStructures.find(({ id }) => id === params.id)
-
-    return found ? HttpResponse.json(found) : notFound()
-  })
-}
-
-function named(id: string, name: string, inferred: InferredDocumentStructure): DocumentStructure {
+function toDocumentStructure(
+  id: string,
+  name: string,
+  inferred: InferredDocumentStructure,
+): DocumentStructure {
   return documentStructureSchema.parse({ id, name, ...inferred })
 }
 
-// Structures no Mapping uses yet, created the way an Admin would: from a CSV export and a JSON
-// Schema.
 export const seedUnusedDocumentStructures: ReadonlyArray<DocumentStructure> = [
-  named(
+  toDocumentStructure(
     seedId(6, 5),
     'ERP dispatch export (CSV)',
     inferDocumentStructure(documentStructureOrigins.windows1252CsvDocument),
   ),
-  named(
+  toDocumentStructure(
     seedId(6, 6),
     'ERP article master',
     inferDocumentStructure(documentStructureOrigins.jsonSchema),
@@ -394,7 +386,7 @@ export function createDocumentStructures({
   seed?: number
 }): DocumentStructure[] {
   const faker = new Faker({ locale: [en], seed })
-  const csvSource = documentStructureOrigins.csvDocument
+  const csvOrigin = documentStructureOrigins.csvDocument
 
   return Array.from({ length: count }, (_, index) => {
     const name =
@@ -404,7 +396,7 @@ export function createDocumentStructures({
       )
 
     return index % 4 === 3
-      ? named(faker.string.uuid(), name, inferDocumentStructure(csvSource))
+      ? toDocumentStructure(faker.string.uuid(), name, inferDocumentStructure(csvOrigin))
       : createDocumentStructure({
           fieldCount: faker.number.int({ min: 5, max: 120 }),
           seed: seed + index,
@@ -414,8 +406,7 @@ export function createDocumentStructures({
 }
 
 export type DocumentStructureStore = {
-  // Updated in place, so the Mapping handlers holding it see created and renamed structures.
-  entries: ReadonlyArray<DocumentStructure>
+  all: () => readonly DocumentStructure[]
   get: (id: string) => DocumentStructure | undefined
   set: (documentStructure: DocumentStructure) => void
 }
@@ -426,19 +417,13 @@ export function createDocumentStructureStore(
     ...seedUnusedDocumentStructures,
   ],
 ): DocumentStructureStore {
-  const entries = [...documentStructures]
+  const byId = new Map(documentStructures.map((structure) => [structure.id, structure]))
 
   return {
-    entries,
-    get: (id) => entries.find((entry) => entry.id === id),
+    all: () => [...byId.values()],
+    get: (id) => byId.get(id),
     set: (documentStructure) => {
-      const index = entries.findIndex(({ id }) => id === documentStructure.id)
-
-      if (index === -1) {
-        entries.push(documentStructure)
-      } else {
-        entries[index] = documentStructure
-      }
+      byId.set(documentStructure.id, documentStructure)
     },
   }
 }
@@ -451,14 +436,18 @@ export function toDocumentStructureStore(
     : createDocumentStructureStore(documentStructures)
 }
 
-type Usage = {
+type MappingUse = {
   mappings?: MappingDraftStore | undefined
   versions?: MappingVersionStore | undefined
 }
 
-export function toDocumentStructureSummary(
+function byName(a: { name: string }, b: { name: string }) {
+  return a.name.localeCompare(b.name, 'de')
+}
+
+function toDocumentStructureSummary(
   documentStructure: DocumentStructure,
-  { mappings }: Usage = {},
+  { mappings }: MappingUse = {},
 ): DocumentStructureSummary {
   return documentStructureSummarySchema.parse({
     id: documentStructure.id,
@@ -468,43 +457,140 @@ export function toDocumentStructureSummary(
     mappings: (mappings?.all() ?? [])
       .filter(({ documentStructureId }) => documentStructureId === documentStructure.id)
       .map(({ id, name }) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+      .sort(byName),
   })
 }
 
-function linkedPaths(documentStructureId: string, { mappings, versions }: Usage) {
-  return (mappings?.all() ?? [])
-    .filter((mapping) => mapping.documentStructureId === documentStructureId)
-    .flatMap((mapping) => [mapping, ...(versions?.of(mapping.id) ?? [])])
-    .flatMap(({ links, transformLinks }) => [
-      ...links.flatMap(({ sourcePath, targetPath }) => [sourcePath, targetPath]),
-      ...transformLinks.flatMap(({ from, to }) => [
-        ...(from.kind === 'source' ? [from.path] : []),
-        ...(to.kind === 'target' ? [to.path] : []),
-      ]),
+function linkedPaths({ links, transformLinks }: GraphParts) {
+  return [
+    ...links.flatMap(({ sourcePath, targetPath }) => [sourcePath, targetPath]),
+    ...transformLinks.flatMap(({ from, to }) => [
+      ...(from.kind === 'source' ? [from.path] : []),
+      ...(to.kind === 'target' ? [to.path] : []),
+    ]),
+  ]
+}
+
+function publishedUses(documentStructureId: string, { versions }: MappingUse) {
+  return (versions?.all() ?? []).filter(
+    (version) => version.documentStructureId === documentStructureId,
+  )
+}
+
+function summaries(versions: ReadonlyArray<MappingVersionSummary>) {
+  return versions.map((version) => mappingVersionSummarySchema.parse(version)).sort(byNameAndNewest)
+}
+
+function fingerprintAt(nodes: ReadonlyArray<DocumentStructureNode>, path: string) {
+  const visited = visitedNode(nodes, path)
+
+  return (
+    visited &&
+    JSON.stringify([
+      ...visited.ancestors.map(({ path: ancestorPath, kind, required }) => ({
+        path: ancestorPath,
+        kind,
+        required,
+      })),
+      visited.node,
     ])
+  )
 }
 
-function isWithin(path: string, nodePath: string) {
-  return path === nodePath || path.startsWith(`${nodePath}.`) || path.startsWith(`${nodePath}[]`)
+function related(a: string, b: string) {
+  return a === b || containerOf([a], b) || containerOf([b], a)
 }
 
-// Turning a node into a list or back renames the paths below it, which would cut the links of
-// every Mapping Version that uses them.
-function linkedChange(
-  documentStructure: DocumentStructure,
+function adjustmentAt(linkedPath: string, body: UpdateDocumentStructureBody) {
+  return body.adjustments.find(({ path }) => related(path, linkedPath))?.path ?? linkedPath
+}
+
+function usedByMappingVersion(
+  versions: ReadonlyArray<MappingVersionSummary>,
+  message: string,
+  path: string | null,
+): DocumentStructureProblem {
+  const named = versions.map(({ mappingName, version }) => `${mappingName} v${version}`)
+
+  return {
+    code: 'usedByMappingVersion',
+    message: `${message}: ${named.join(', ')}`,
+    path,
+    line: null,
+    mappingVersions: [...versions],
+  }
+}
+
+function settingsChange(
+  existing: DocumentStructure,
   body: UpdateDocumentStructureBody,
-  usage: Usage,
-) {
-  const linked = linkedPaths(documentStructure.id, usage)
+  use: MappingUse,
+): DocumentStructureProblem | null {
+  const published = publishedUses(existing.id, use)
 
-  return body.adjustments
-    .filter((adjustment) => changesPaths(documentStructure, adjustment))
-    .find(({ path }) => {
-      const nodePath = findNode(documentStructure.children, path)!.path
+  if (
+    existing.format !== 'csv' ||
+    body.csv === undefined ||
+    sameCsvSettings(existing.csv, body.csv) ||
+    published.length === 0
+  ) {
+    return null
+  }
 
-      return linked.some((linkedPath) => isWithin(linkedPath, nodePath))
-    })
+  return usedByMappingVersion(
+    summaries(published),
+    'Published Mapping Versions read this Document Structure with its CSV settings',
+    null,
+  )
+}
+
+// Published Mapping Versions never change, so nothing they link may change shape. A Draft only
+// needs its links to keep pointing at a node.
+function linkChange(
+  existing: DocumentStructure,
+  updated: DocumentStructure,
+  body: UpdateDocumentStructureBody,
+  use: MappingUse,
+): DocumentStructureProblem | null {
+  const known = (path: string) => findNode(existing.children, path) !== undefined
+
+  const changed = (path: string) =>
+    known(path) && fingerprintAt(existing.children, path) !== fingerprintAt(updated.children, path)
+
+  const published = publishedUses(existing.id, use).filter((version) =>
+    linkedPaths(version).some(changed),
+  )
+
+  const [firstPublished] = published
+
+  if (firstPublished) {
+    const path = adjustmentAt(linkedPaths(firstPublished).find(changed)!, body)
+
+    return usedByMappingVersion(
+      summaries(published),
+      `Published Mapping Versions use ${path}, and a published Mapping Version never changes`,
+      path,
+    )
+  }
+
+  const broken = (use.mappings?.all() ?? [])
+    .filter(({ documentStructureId }) => documentStructureId === existing.id)
+    .flatMap(linkedPaths)
+    .find((path) => known(path) && findNode(updated.children, path) === undefined)
+
+  if (broken === undefined) {
+    return null
+  }
+
+  const path = adjustmentAt(broken, body)
+
+  return {
+    code: 'linkedByMapping',
+    message: `A Mapping Draft links ${broken}, which the change at ${path} would remove`,
+    path,
+    line: null,
+    mappingVersions: null,
+  }
 }
 
 function problemResponse(problem: DocumentStructureProblem) {
@@ -531,19 +617,20 @@ export function documentStructureHandlers(
     versions,
   }: {
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
-  } & Usage = {},
+  } & MappingUse = {},
 ) {
   const store = toDocumentStructureStore(documentStructures)
-  const usage = { mappings, versions }
+  const use = { mappings, versions }
 
   return [
     http.get(`${apiUrl}${documentStructuresEndpoint.path}`, async () => {
       await delay()
 
       return HttpResponse.json(
-        store.entries
-          .map((entry) => toDocumentStructureSummary(entry, usage))
-          .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+        store
+          .all()
+          .map((entry) => toDocumentStructureSummary(entry, use))
+          .sort(byName),
       )
     }),
     http.post(`${apiUrl}${inferDocumentStructureEndpoint.path}`, async ({ request }) => {
@@ -574,7 +661,7 @@ export function documentStructureHandlers(
         return inferred.response
       }
 
-      const created = named(crypto.randomUUID(), body.data.name, inferred.result)
+      const created = toDocumentStructure(crypto.randomUUID(), body.data.name, inferred.result)
       store.set(created)
 
       return HttpResponse.json(created, { status: 201 })
@@ -601,24 +688,25 @@ export function documentStructureHandlers(
 
         await delay()
 
+        const refusedSettings = settingsChange(existing, body.data, use)
+
+        if (refusedSettings) {
+          return problemResponse(refusedSettings)
+        }
+
         const adjusted = attempt(() => adjustDocumentStructure(existing, body.data))
 
         if ('response' in adjusted) {
           return adjusted.response
         }
 
-        const linked = linkedChange(existing, body.data, usage)
+        const updated = documentStructureSchema.parse(adjusted.result)
+        const refusedLinks = linkChange(existing, updated, body.data, use)
 
-        if (linked) {
-          return problemResponse({
-            code: 'linkedByMapping',
-            message: `A Mapping links fields at or below ${linked.path}, so it cannot turn into a list or back`,
-            path: linked.path,
-            line: null,
-          })
+        if (refusedLinks) {
+          return problemResponse(refusedLinks)
         }
 
-        const updated = documentStructureSchema.parse(adjusted.result)
         store.set(updated)
 
         return HttpResponse.json(updated)

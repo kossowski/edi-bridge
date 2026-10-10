@@ -21,7 +21,11 @@ import {
   inferFromJsonSchema,
   parseCsv,
 } from './document-structure-inference'
-import { createCsvDocument, documentStructureOrigins, toUpload } from './document-structure-origin'
+import {
+  createCsvDocument,
+  documentStructureOrigins,
+  toEncodedFile,
+} from './document-structure-origin'
 
 function problemOf(run: () => void): DocumentStructureProblem {
   try {
@@ -68,8 +72,38 @@ describe('inferFromJson', () => {
     ).toMatchObject({ code: 'invalidJson' })
   })
 
+  it('infers a list at the top level as one items[] list', () => {
+    const list = inferFromJson('[{"orderNumber":"PO-1","total":2},{"orderNumber":"PO-2"}]')
+
+    expect(list).toMatchObject({ format: 'json', root: 'array' })
+    expect(list.children).toHaveLength(1)
+    expect(at(list, 'items[]')).toMatchObject({ kind: 'array', name: 'items', required: true })
+    expect(at(list, 'items[].orderNumber')).toMatchObject({ type: 'string', required: true })
+    expect(at(list, 'items[].total')).toMatchObject({ type: 'integer', required: false })
+  })
+
+  it('infers the ready-made list of orders', () => {
+    const list = inferDocumentStructure(documentStructureOrigins.jsonListDocument)
+
+    expect(at(list, 'items[].total')).toMatchObject({ type: 'number', required: true })
+    expect(at(list, 'items[].note')).toMatchObject({ required: false })
+  })
+
+  it('infers a top-level list of values', () => {
+    expect(at(inferFromJson('["a","b"]'), 'items[]')).toMatchObject({
+      kind: 'array',
+      items: { kind: 'field', path: 'items[]', type: 'string' },
+    })
+  })
+
+  it('infers an object as an object at the top level', () => {
+    expect(structure).toMatchObject({ format: 'json', root: 'object' })
+  })
+
   it.each([
-    ['a list at the top level', '[{"a":1}]', 'unsupportedJson'],
+    ['a value at the top level', '"PO-1"', 'unsupportedJson'],
+    ['lists inside a top-level list', '[[1,2]]', 'unsupportedJson'],
+    ['an empty list', '[]', 'emptyDocument'],
     ['lists inside lists', '{"grid":[[1,2]]}', 'unsupportedJson'],
     ['an object that is sometimes a value', '{"lines":[{"a":{"b":1}},{"a":2}]}', 'unsupportedJson'],
     ['a name with a dot', '{"order.number":"1"}', 'unsupportedJson'],
@@ -100,7 +134,7 @@ describe('decodeText', () => {
   })
 
   it('drops a UTF-8 byte order mark', () => {
-    expect(decodeText(toUpload('bom.csv', '﻿a;b').content, 'utf-8')).toBe('a;b')
+    expect(decodeText(toEncodedFile('bom.csv', '﻿a;b').content, 'utf-8')).toBe('a;b')
   })
 })
 
@@ -249,11 +283,7 @@ describe('inferFromJsonSchema', () => {
       'invalidJsonSchema',
     ],
     ['no properties', '{"type":"object"}', 'invalidJsonSchema'],
-    [
-      'a list at the top level',
-      '{"type":"array","items":{"type":"string"}}',
-      'unsupportedJsonSchema',
-    ],
+    ['a value at the top level', '{"type":"string"}', 'unsupportedJsonSchema'],
     [
       'an external reference',
       '{"properties":{"a":{"$ref":"other.json#/a"}}}',
@@ -266,6 +296,25 @@ describe('inferFromJsonSchema', () => {
     ],
   ])('rejects %s', (_, schema, code) => {
     expect(problemOf(() => inferFromJsonSchema(schema)).code).toBe(code)
+  })
+
+  it('infers a list at the top level as one items[] list', () => {
+    const list = inferFromJsonSchema(
+      JSON.stringify({
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['articleNumber'],
+          properties: { articleNumber: { type: 'string' }, price: { type: 'number' } },
+        },
+      }),
+    )
+
+    expect(list).toMatchObject({ format: 'json', root: 'array' })
+    expect(list.children).toHaveLength(1)
+    expect(at(list, 'items[]')).toMatchObject({ kind: 'array', required: true })
+    expect(at(list, 'items[].articleNumber')).toMatchObject({ required: true })
+    expect(at(list, 'items[].price')).toMatchObject({ type: 'number', required: false })
   })
 
   it('answers invalidJsonSchema for the broken example', () => {
@@ -355,15 +404,80 @@ describe('adjustDocumentStructure', () => {
     }
   })
 
-  it('changes CSV settings and column types of a CSV structure', () => {
+  it('changes column types of a CSV structure', () => {
     const adjusted = adjustDocumentStructure(csvStructure, {
       name: 'Dispatch',
-      csv: { delimiter: ',', headerRow: true, encoding: 'windows-1252' },
+      csv: defaultCsvSettings,
       adjustments: [{ path: 'rows[].Menge', type: 'integer', required: false }],
     })
 
-    expect(adjusted).toMatchObject({ csv: { delimiter: ',', encoding: 'windows-1252' } })
     expect(at(adjusted, 'rows[].Menge')).toMatchObject({ type: 'integer', required: false })
+  })
+
+  it('answers csvDocumentRequired for new CSV settings without a CSV Document', () => {
+    expect(
+      problemOf(() =>
+        adjustDocumentStructure(csvStructure, {
+          name: 'Dispatch',
+          csv: { ...defaultCsvSettings, headerRow: false },
+          adjustments: [],
+        }),
+      ).code,
+    ).toBe('csvDocumentRequired')
+  })
+
+  it('reads the CSV Document of the update again with the new CSV settings', () => {
+    const csv: CsvSettings = { delimiter: ',', headerRow: false, encoding: 'windows-1252' }
+
+    const adjusted = adjustDocumentStructure(csvStructure, {
+      name: 'Dispatch',
+      csv,
+      document: toEncodedFile('dispatch.csv', 'LS-1,Straße 1,24\r\nLS-2,,12\r\n', 'windows-1252'),
+      adjustments: [{ path: 'rows[].column3', type: 'number' }],
+    })
+
+    expect(adjusted).toMatchObject({ id: csvStructure.id, name: 'Dispatch', csv })
+    expect(at(adjusted, 'rows[].Menge')).toBeUndefined()
+    expect(at(adjusted, 'rows[].column2')).toMatchObject({ required: false })
+    expect(at(adjusted, 'rows[].column3')).toMatchObject({ type: 'number' })
+  })
+
+  it('answers the problems of the CSV Document of the update', () => {
+    expect(
+      problemOf(() =>
+        adjustDocumentStructure(csvStructure, {
+          name: 'Dispatch',
+          document: toEncodedFile('empty.csv', '\r\n'),
+          adjustments: [],
+        }),
+      ).code,
+    ).toBe('emptyDocument')
+  })
+
+  it('keeps the items[] list of a JSON list repeating', () => {
+    const list = documentStructureSchema.parse({
+      id: crypto.randomUUID(),
+      name: 'Orders',
+      ...inferFromJson('[{"orderNumber":"PO-1"}]'),
+    })
+
+    expect(
+      problemOf(() =>
+        adjustDocumentStructure(list, {
+          name: 'Orders',
+          adjustments: [{ path: 'items[]', repeating: false }],
+        }),
+      ),
+    ).toMatchObject({ code: 'notAdjustable', path: 'items[]' })
+    expect(
+      at(
+        adjustDocumentStructure(list, {
+          name: 'Orders',
+          adjustments: [{ path: 'items[].orderNumber', required: false }],
+        }),
+        'items[].orderNumber',
+      ),
+    ).toMatchObject({ required: false })
   })
 
   it('refuses CSV settings on a JSON structure', () => {

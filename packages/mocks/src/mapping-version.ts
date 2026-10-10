@@ -28,7 +28,11 @@ import {
   transformIssues,
 } from '@edi-bridge/contracts'
 
-import { seedDocumentStructures } from './document-structure'
+import {
+  type DocumentStructureStore,
+  seedDocumentStructures,
+  toDocumentStructureStore,
+} from './document-structure'
 import {
   byNameAndNewest,
   type MappingCatalogue,
@@ -158,6 +162,7 @@ export const seedMappingVersions: ReadonlyArray<MappingVersionRecord> =
 
 // The store is also the catalogue the Flows pin from, so a published version is offered there.
 export type MappingVersionStore = MappingCatalogue & {
+  all: () => readonly MappingVersionRecord[]
   of: (mappingId: string) => MappingVersionRecord[]
   get: (versionId: string) => MappingVersionRecord | undefined
   add: (version: MappingVersionRecord) => void
@@ -180,6 +185,7 @@ export function createMappingVersionStore(
   })
 
   return {
+    all: () => [...byId.values()],
     of,
     get: (versionId) => byId.get(versionId),
     add: (version) => {
@@ -329,10 +335,11 @@ export function mappingVersionHandlers(
     mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     versions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
     samples?: ReadonlyArray<MappingSampleRecord>
-    documentStructures?: DocumentStructures
+    documentStructures?: DocumentStructures | DocumentStructureStore
   } = {},
 ) {
   const store = toMappingDraftStore(mappings)
+  const structures = toDocumentStructureStore(documentStructures)
 
   const versionStore = toMappingVersionStore(versions ?? createMappingVersions(store.all()))
 
@@ -362,7 +369,7 @@ export function mappingVersionHandlers(
         await delay()
 
         return draft && version
-          ? HttpResponse.json(toMappingVersion(version, draft, documentStructures))
+          ? HttpResponse.json(toMappingVersion(version, draft, structures.all()))
           : notFound()
       },
     ),
@@ -381,7 +388,7 @@ export function mappingVersionHandlers(
           return conflict('The Draft has no changes since its latest version.')
         }
 
-        const invalidLink = linkProblem(toGraph(draft), sideLeaves(draft, documentStructures))
+        const invalidLink = linkProblem(toGraph(draft), sideLeaves(draft, structures.all()))
 
         if (invalidLink) {
           return invalidLink
@@ -439,7 +446,7 @@ export function mappingVersionHandlers(
             mapping: { ...draft, documentStructureId: version.documentStructureId },
             graph: toGraph(version),
             sample: found,
-            documentStructures,
+            documentStructures: structures.all(),
           })
 
         const outputs = sample

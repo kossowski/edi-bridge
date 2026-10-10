@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { mappingVersionSummarySchema } from './mapping-version'
+
 import type { Endpoint } from './endpoint'
 
 export const documentFormats = ['json', 'csv'] as const
@@ -94,19 +96,73 @@ export const defaultCsvSettings: CsvSettings = {
   encoding: 'utf-8',
 }
 
-// A CSV Document is a list of rows, so its tree is one repeating `rows` object of column fields.
+export function childPath(parentPath: string, segment: string) {
+  return parentPath === '' ? segment : `${parentPath}.${segment}`
+}
+
+export function arrayPath(path: string) {
+  return `${path}[]`
+}
+
+export function arrayBasePath(path: string) {
+  return path.endsWith('[]') ? path.slice(0, -2) : path
+}
+
+// A CSV Document is a list of rows, so its tree is one repeating `rows` object of column fields. A
+// JSON Document that is a list at the top level gets the same shape under `items`.
 export const csvRowsName = 'rows'
 
-export const csvRowsPath = `${csvRowsName}[]`
+export const csvRowsPath = arrayPath(csvRowsName)
 
-function treeProblems(tree: {
-  format: DocumentFormat
-  children: ReadonlyArray<DocumentStructureNode>
-}): string[] {
+export const jsonItemsName = 'items'
+
+export const jsonItemsPath = arrayPath(jsonItemsName)
+
+export const jsonRoots = ['object', 'array'] as const
+
+export const jsonRootSchema = z.enum(jsonRoots)
+
+export type JsonRoot = z.infer<typeof jsonRootSchema>
+
+export function nodeContent(node: DocumentStructureNode): DocumentField | DocumentObject {
+  return node.kind === 'array' ? node.items : node
+}
+
+export type VisitedNode = {
+  node: DocumentStructureNode
+  ancestors: ReadonlyArray<DocumentStructureNode>
+}
+
+export function* documentStructureNodes(
+  nodes: ReadonlyArray<DocumentStructureNode>,
+  ancestors: ReadonlyArray<DocumentStructureNode> = [],
+): Generator<VisitedNode> {
+  for (const node of nodes) {
+    yield { node, ancestors }
+
+    const content = nodeContent(node)
+
+    if (content.kind === 'object') {
+      yield* documentStructureNodes(content.children, [...ancestors, node])
+    }
+  }
+}
+
+type DocumentTree =
+  | { format: 'json'; root: JsonRoot; children: ReadonlyArray<DocumentStructureNode> }
+  | { format: 'csv'; children: ReadonlyArray<DocumentStructureNode> }
+
+function rootList(children: ReadonlyArray<DocumentStructureNode>, path: string) {
+  const [list, ...rest] = children
+
+  return list?.kind === 'array' && list.path === path && rest.length === 0 ? list : undefined
+}
+
+function treeProblems(tree: DocumentTree): string[] {
   const problems: string[] = []
   const paths = new Set<string>()
 
-  const visit = (node: DocumentStructureNode) => {
+  for (const { node } of documentStructureNodes(tree.children)) {
     if (paths.has(node.path)) {
       problems.push(`The path ${node.path} is used twice`)
     }
@@ -122,37 +178,22 @@ function treeProblems(tree: {
         problems.push(`The items of ${node.path} must be required`)
       }
     }
-
-    const inner = node.kind === 'array' ? node.items : node
-
-    if (inner.kind === 'object') {
-      inner.children.forEach(visit)
-    }
   }
 
-  tree.children.forEach(visit)
-
   if (tree.format === 'csv') {
-    const [rows, ...rest] = tree.children
+    const rows = rootList(tree.children, csvRowsPath)
 
-    const flat =
-      rows?.kind === 'array' &&
-      rows.path === csvRowsPath &&
-      rows.items.kind === 'object' &&
-      rows.items.children.every(({ kind }) => kind === 'field')
-
-    if (!flat || rest.length > 0) {
+    if (rows?.items.kind !== 'object' || rows.items.children.some(({ kind }) => kind !== 'field')) {
       problems.push(`A CSV Document Structure must be one ${csvRowsPath} object of column fields`)
     }
+  } else if (tree.root === 'array' && !rootList(tree.children, jsonItemsPath)) {
+    problems.push(`A JSON Document Structure of a list must be one ${jsonItemsPath} list`)
   }
 
   return problems
 }
 
-function checkTree(
-  tree: { format: DocumentFormat; children: ReadonlyArray<DocumentStructureNode> },
-  context: z.RefinementCtx,
-) {
+function checkTree(tree: DocumentTree, context: z.RefinementCtx) {
   for (const message of treeProblems(tree)) {
     context.addIssue({ code: 'custom', message, path: ['children'] })
   }
@@ -163,7 +204,7 @@ const structureName = z.string().trim().min(1).max(70)
 const treeFields = { children: z.array(documentStructureNodeSchema).min(1) }
 
 const formatFields = {
-  json: { format: z.literal('json') },
+  json: { format: z.literal('json'), root: jsonRootSchema },
   csv: { format: z.literal('csv'), csv: csvSettingsSchema },
 }
 
@@ -214,27 +255,27 @@ export const documentStructuresEndpoint: Endpoint<DocumentStructureSummary[]> = 
   response: z.array(documentStructureSummarySchema),
 }
 
-export const maxUploadBytes = 5_000_000
+export const maxEncodedFileBytes = 5_000_000
 
 // Base64 keeps the raw bytes, so a Windows-1252 Document is decoded only once its encoding is known.
-export const uploadSchema = z.object({
+export const encodedFileSchema = z.object({
   fileName: z.string().trim().min(1).max(255),
   content: z
     .base64()
     .min(1)
-    .max(Math.ceil(maxUploadBytes / 3) * 4),
+    .max(Math.ceil(maxEncodedFileBytes / 3) * 4),
 })
 
-export type Upload = z.infer<typeof uploadSchema>
+export type EncodedFile = z.infer<typeof encodedFileSchema>
 
 export const documentStructureOriginKinds = ['jsonDocument', 'csvDocument', 'jsonSchema'] as const
 
 export type DocumentStructureOriginKind = (typeof documentStructureOriginKinds)[number]
 
 export const documentStructureOriginSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('jsonDocument'), document: uploadSchema }),
-  z.object({ kind: z.literal('csvDocument'), document: uploadSchema, csv: csvSettingsSchema }),
-  z.object({ kind: z.literal('jsonSchema'), jsonSchema: uploadSchema }),
+  z.object({ kind: z.literal('jsonDocument'), document: encodedFileSchema }),
+  z.object({ kind: z.literal('csvDocument'), document: encodedFileSchema, csv: csvSettingsSchema }),
+  z.object({ kind: z.literal('jsonSchema'), jsonSchema: encodedFileSchema }),
 ])
 
 export type DocumentStructureOrigin = z.infer<typeof documentStructureOriginSchema>
@@ -269,7 +310,8 @@ export const createDocumentStructureEndpoint: Endpoint<
 }
 
 // Paths name nodes as the stored structure has them, so turning an object into an array and
-// adjusting its fields in the same update still addresses the fields by their old paths.
+// adjusting its fields in the same update still addresses the fields by their old paths. With a
+// CSV Document in the update, they name nodes as that Document infers them.
 export const nodeAdjustmentSchema = z
   .object({
     path: z.string().min(1),
@@ -288,6 +330,7 @@ export type NodeAdjustment = z.infer<typeof nodeAdjustmentSchema>
 export const updateDocumentStructureBodySchema = z.object({
   name: structureName,
   csv: csvSettingsSchema.optional(),
+  document: encodedFileSchema.optional(),
   adjustments: z
     .array(nodeAdjustmentSchema)
     .refine(
@@ -323,20 +366,29 @@ export const documentStructureProblemCodes = [
   'inconsistentCsvRows',
   'unknownPath',
   'notAdjustable',
+  'csvDocumentRequired',
   'linkedByMapping',
+  'usedByMappingVersion',
 ] as const
 
 export const documentStructureProblemCodeSchema = z.enum(documentStructureProblemCodes)
 
 export type DocumentStructureProblemCode = z.infer<typeof documentStructureProblemCodeSchema>
 
-// The body of a 422 from inference, creation and updates. `path` points into the Document, the
-// JSON Schema or the structure; `line` into a CSV Document.
-export const documentStructureProblemSchema = z.object({
-  code: documentStructureProblemCodeSchema,
-  message: z.string().min(1),
-  path: z.string().min(1).nullable(),
-  line: z.number().int().min(1).nullable(),
-})
+export const documentStructureProblemSchema = z
+  .object({
+    code: documentStructureProblemCodeSchema,
+    message: z.string().min(1),
+    path: z.string().min(1).nullable(),
+    line: z.number().int().min(1).nullable(),
+    mappingVersions: z.array(mappingVersionSummarySchema).min(1).nullable(),
+  })
+  .refine(
+    ({ code, mappingVersions }) => (code === 'usedByMappingVersion') === (mappingVersions !== null),
+    {
+      message: 'Only a usedByMappingVersion problem names Mapping Versions',
+      path: ['mappingVersions'],
+    },
+  )
 
 export type DocumentStructureProblem = z.infer<typeof documentStructureProblemSchema>

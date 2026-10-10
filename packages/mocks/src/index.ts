@@ -7,10 +7,11 @@ import type {
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
 import {
-  createDocumentStructureStore,
   documentStructureHandlers,
+  type DocumentStructureStore,
   seedDocumentStructures,
   seedUnusedDocumentStructures,
+  toDocumentStructureStore,
 } from './document-structure'
 import { createFlowStore, flowHandlers } from './flow'
 import { lookupTablesHandler, seedLookupTables } from './lookup-table'
@@ -71,7 +72,6 @@ export {
   createDocumentStructure,
   createDocumentStructures,
   createDocumentStructureStore,
-  documentStructureHandler,
   documentStructureHandlers,
   documentStructureLeaves,
   type DocumentStructureStore,
@@ -79,28 +79,9 @@ export {
   seedDocumentStructures,
   seedUnusedDocumentStructures,
   toDocumentStructureStore,
-  toDocumentStructureSummary,
 } from './document-structure'
 
-export {
-  adjustDocumentStructure,
-  decodeText,
-  DocumentStructureProblemError,
-  encodeBase64,
-  inferDocumentStructure,
-  inferFromCsv,
-  inferFromJson,
-  inferFromJsonSchema,
-  parseCsv,
-} from './document-structure-inference'
-
-export {
-  createCsvDocument,
-  documentStructureOrigins,
-  encodeText,
-  toUpload,
-  windows1252CsvSettings,
-} from './document-structure-origin'
+export { createCsvDocument, documentStructureOrigins } from './document-structure-origin'
 
 export {
   createLookupTables,
@@ -197,7 +178,7 @@ export function createHandlers(
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
-    documentStructures?: ReadonlyArray<DocumentStructure>
+    documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     lookupTables?: ReadonlyArray<LookupTableSummary>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
@@ -208,13 +189,11 @@ export function createHandlers(
   const channelStore = createChannelStore(channels)
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
-  const documentStructureStore = createDocumentStructureStore(documentStructures)
+  const documentStructureStore = toDocumentStructureStore(documentStructures)
 
   const mappingVersionStore = toMappingVersionStore(
     mappingVersions ?? [...seedMappingVersions, ...createMappingVersions(mappingDraftStore.all())],
   )
-
-  const liveDocumentStructures = documentStructureStore.entries
 
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
@@ -227,7 +206,7 @@ export function createHandlers(
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
       samples: mappingSamples,
-      documentStructures: liveDocumentStructures,
+      documentStructures: documentStructureStore,
     }),
     ...runDetailHandlers(apiUrl, {
       runs,
@@ -237,12 +216,12 @@ export function createHandlers(
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
     ...mappingHandlers(apiUrl, {
       mappings: mappingDraftStore,
-      documentStructures: liveDocumentStructures,
+      documentStructures: documentStructureStore,
     }),
     ...mappingPreviewHandlers(apiUrl, {
       mappings: mappingDraftStore,
       samples: mappingSamples,
-      documentStructures: liveDocumentStructures,
+      documentStructures: documentStructureStore,
     }),
     ...documentStructureHandlers(apiUrl, {
       documentStructures: documentStructureStore,

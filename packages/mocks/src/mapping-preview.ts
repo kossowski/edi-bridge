@@ -11,7 +11,11 @@ import {
   previewNoteKey,
 } from '@edi-bridge/contracts'
 
-import { seedDocumentStructures } from './document-structure'
+import {
+  type DocumentStructureStore,
+  seedDocumentStructures,
+  toDocumentStructureStore,
+} from './document-structure'
 import { documentValues, type Entry, renderEdifact, renderJson } from './document-values'
 import {
   type MappingDraftRecord,
@@ -86,10 +90,11 @@ export function mappingPreviewHandlers(
   }: {
     mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     samples?: ReadonlyArray<MappingSampleRecord>
-    documentStructures?: ReadonlyArray<DocumentStructure>
+    documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
   } = {},
 ) {
   const store = toMappingDraftStore(mappings)
+  const structures = toDocumentStructureStore(documentStructures)
 
   return [
     http.get<{ id: string }>(`${apiUrl}${mappingSamplesEndpoint.path}`, ({ params }) =>
@@ -128,7 +133,7 @@ export function mappingPreviewHandlers(
           mapping,
           graph,
           sample,
-          documentStructures,
+          documentStructures: structures.all(),
         })
 
         await delay()

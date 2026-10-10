@@ -1,7 +1,10 @@
 import { z } from 'zod'
 
 import {
+  arrayBasePath,
+  arrayPath,
   type CharacterEncoding,
+  childPath,
   csvRowsName,
   csvRowsPath,
   type CsvSettings,
@@ -9,12 +12,15 @@ import {
   type DocumentFieldType,
   type DocumentStructure,
   type DocumentStructureNode,
+  documentStructureNodes,
   type DocumentStructureProblem,
   type DocumentStructureProblemCode,
   type DocumentStructureOrigin,
   type InferredDocumentStructure,
   inferredDocumentStructureSchema,
-  type NodeAdjustment,
+  jsonItemsName,
+  jsonItemsPath,
+  nodeContent,
   type UpdateDocumentStructureBody,
 } from '@edi-bridge/contracts'
 
@@ -30,7 +36,7 @@ function fail(
   message: string,
   { path = null, line = null }: { path?: string | null; line?: number | null } = {},
 ): never {
-  throw new DocumentStructureProblemError({ code, message, path, line })
+  throw new DocumentStructureProblemError({ code, message, path, line, mappingVersions: null })
 }
 
 export function encodeBase64(bytes: Uint8Array) {
@@ -76,8 +82,12 @@ function mergeTypes(a: DocumentFieldType, b: DocumentFieldType): DocumentFieldTy
   return numeric.has(a) && numeric.has(b) ? 'number' : 'string'
 }
 
-function childPath(parentPath: string, segment: string) {
-  return parentPath === '' ? segment : `${parentPath}.${segment}`
+function listInList(
+  code: 'unsupportedJson' | 'unsupportedJsonSchema',
+  path: string,
+  itemsPath: string,
+): never {
+  return fail(code, `Lists inside lists are not supported (${itemsPath})`, { path })
 }
 
 function checkName(name: string, path: string, code: 'unsupportedJson' | 'unsupportedJsonSchema') {
@@ -158,7 +168,8 @@ function merge(a: Observed, b: Observed, path: string): Observed {
   }
 
   if (a.kind === 'array' && b.kind === 'array') {
-    const items = a.items && b.items ? merge(a.items, b.items, `${path}[]`) : (a.items ?? b.items)
+    const items =
+      a.items && b.items ? merge(a.items, b.items, arrayPath(path)) : (a.items ?? b.items)
 
     return { kind: 'array', items, optional: optionalEither }
   }
@@ -177,11 +188,11 @@ function observe(value: JsonValue, path: string): Observed {
     case 'value':
       return { kind: 'field', type: value.type, optional: false }
     case 'list': {
-      const itemPath = `${path}[]`
+      const itemPath = arrayPath(path)
 
       const items = value.items.reduce<Observed | undefined>((merged, item) => {
         if (item.kind === 'list') {
-          fail('unsupportedJson', `Lists inside lists are not supported (${itemPath})`, { path })
+          listInList('unsupportedJson', path, itemPath)
         }
 
         const observed = observe(item, itemPath)
@@ -230,18 +241,16 @@ function observedNode(name: string, observed: Observed, path: string): DocumentS
         children: observedNodes(observed.children, path),
       }
     case 'array': {
-      const arrayPath = `${path}[]`
-      const items = observedNode(name, observed.items ?? { kind: 'null' }, arrayPath)
+      const itemsPath = arrayPath(path)
+      const items = observedNode(name, observed.items ?? { kind: 'null' }, itemsPath)
 
       if (items.kind === 'array') {
-        return fail('unsupportedJson', `Lists inside lists are not supported (${arrayPath})`, {
-          path,
-        })
+        return listInList('unsupportedJson', path, itemsPath)
       }
 
       return {
         kind: 'array',
-        path: arrayPath,
+        path: itemsPath,
         name,
         required: !observed.optional,
         items: { ...items, required: true },
@@ -257,10 +266,26 @@ export function inferFromJson(text: string): InferredDocumentStructure {
     return fail('invalidJson', `The Document is not valid JSON: ${parsed.error}`)
   }
 
-  const observed = observe(jsonValueSchema.parse(parsed.value), '')
+  const value = jsonValueSchema.parse(parsed.value)
+
+  if (value.kind === 'list') {
+    const observed = observe(value, jsonItemsName)
+
+    if (observed.kind !== 'array' || observed.items === undefined) {
+      return fail('emptyDocument', 'The Document is an empty list')
+    }
+
+    return inferredDocumentStructureSchema.parse({
+      format: 'json',
+      root: 'array',
+      children: [{ ...observedNode(jsonItemsName, observed, jsonItemsName), required: true }],
+    })
+  }
+
+  const observed = observe(value, '')
 
   if (observed.kind !== 'object') {
-    return fail('unsupportedJson', 'The Document must be a JSON object at the top level')
+    return fail('unsupportedJson', 'The Document must be a JSON object or list at the top level')
   }
 
   if (observed.children.size === 0) {
@@ -269,6 +294,7 @@ export function inferFromJson(text: string): InferredDocumentStructure {
 
   return inferredDocumentStructureSchema.parse({
     format: 'json',
+    root: 'object',
     children: observedNodes(observed.children, ''),
   })
 }
@@ -415,7 +441,7 @@ export function inferFromCsv(text: string, csv: CsvSettings): InferredDocumentSt
 
     return {
       kind: 'field',
-      path: `${csvRowsPath}.${segment}`,
+      path: childPath(csvRowsPath, segment),
       name,
       type:
         filled
@@ -641,20 +667,20 @@ function schemaNode(
         children: schemaChildren(root, resolved.schema, path, resolved.refs, depth + 1),
       }
     case 'array': {
-      const arrayPath = `${path}[]`
+      const itemsPath = arrayPath(path)
       const items = resolved.schema.items ?? {}
 
       if (Array.isArray(items)) {
         return unsupportedSchema('Tuples are not supported', path)
       }
 
-      const itemNode = schemaNode(root, name, items, arrayPath, true, resolved.refs, depth + 1)
+      const itemNode = schemaNode(root, name, items, itemsPath, true, resolved.refs, depth + 1)
 
       if (itemNode.kind === 'array') {
-        return unsupportedSchema(`Lists inside lists are not supported (${arrayPath})`, path)
+        return listInList('unsupportedJsonSchema', path, itemsPath)
       }
 
-      return { kind: 'array', path: arrayPath, name, required: isRequired, items: itemNode }
+      return { kind: 'array', path: itemsPath, name, required: isRequired, items: itemNode }
     }
 
     default:
@@ -705,8 +731,21 @@ export function inferFromJsonSchema(text: string): InferredDocumentStructure {
 
   const resolved = resolve(root.data, root.data, '', new Set())
 
+  if (resolved.type === 'array') {
+    const items = schemaNode(root.data, jsonItemsName, root.data, jsonItemsName, true, new Set(), 0)
+
+    return inferredDocumentStructureSchema.parse({
+      format: 'json',
+      root: 'array',
+      children: [{ ...items, required: true }],
+    })
+  }
+
   if (resolved.type !== 'object') {
-    return unsupportedSchema('The JSON Schema must describe an object at the top level', null)
+    return unsupportedSchema(
+      'The JSON Schema must describe an object or list at the top level',
+      null,
+    )
   }
 
   const children = schemaChildren(root.data, resolved.schema, '', resolved.refs, 0)
@@ -715,7 +754,7 @@ export function inferFromJsonSchema(text: string): InferredDocumentStructure {
     return invalidSchema('The JSON Schema describes no properties', null)
   }
 
-  return inferredDocumentStructureSchema.parse({ format: 'json', children })
+  return inferredDocumentStructureSchema.parse({ format: 'json', root: 'object', children })
 }
 
 export function inferDocumentStructure(origin: DocumentStructureOrigin): InferredDocumentStructure {
@@ -730,58 +769,84 @@ export function inferDocumentStructure(origin: DocumentStructureOrigin): Inferre
 }
 
 function segmentOf(node: DocumentStructureNode, parentPath: string) {
-  const own = node.kind === 'array' ? node.path.slice(0, -2) : node.path
+  const own = arrayBasePath(node.path)
 
   return parentPath === '' ? own : own.slice(parentPath.length + 1)
 }
 
-export function changesPaths(structure: DocumentStructure, adjustment: NodeAdjustment) {
-  const node = findNode(structure.children, adjustment.path)
-
-  return (
-    node !== undefined &&
-    adjustment.repeating !== undefined &&
-    adjustment.repeating !== (node.kind === 'array')
-  )
-}
-
-export function findNode(
-  nodes: ReadonlyArray<DocumentStructureNode>,
-  path: string,
-): DocumentStructureNode | undefined {
-  for (const node of nodes) {
-    if (node.path === path) {
-      return node
-    }
-
-    const inner = node.kind === 'array' ? node.items : node
-    const found = inner.kind === 'object' ? findNode(inner.children, path) : undefined
-
-    if (found) {
-      return found
+export function visitedNode(nodes: ReadonlyArray<DocumentStructureNode>, path: string) {
+  for (const visited of documentStructureNodes(nodes)) {
+    if (visited.node.path === path) {
+      return visited
     }
   }
 
   return undefined
 }
 
-export function adjustDocumentStructure(
-  structure: DocumentStructure,
-  { name, csv, adjustments }: UpdateDocumentStructureBody,
-): DocumentStructure {
-  const pending = new Map(adjustments.map((adjustment) => [adjustment.path, adjustment]))
+export function findNode(nodes: ReadonlyArray<DocumentStructureNode>, path: string) {
+  return visitedNode(nodes, path)?.node
+}
 
-  if (structure.format === 'json' && csv) {
-    fail('notAdjustable', 'Only a CSV Document Structure has CSV settings')
+export function rootListPath(structure: InferredDocumentStructure) {
+  if (structure.format === 'csv') {
+    return csvRowsPath
   }
 
-  if (structure.format === 'csv') {
-    for (const adjustment of adjustments) {
-      if (adjustment.path === csvRowsPath || adjustment.repeating) {
-        fail('notAdjustable', 'The rows and columns of a CSV Document never nest or repeat', {
-          path: adjustment.path,
-        })
-      }
+  return structure.root === 'array' ? jsonItemsPath : undefined
+}
+
+export function sameCsvSettings(a: CsvSettings, b: CsvSettings) {
+  return a.delimiter === b.delimiter && a.headerRow === b.headerRow && a.encoding === b.encoding
+}
+
+function treeOf(
+  structure: DocumentStructure,
+  { csv, document }: UpdateDocumentStructureBody,
+): InferredDocumentStructure {
+  if (structure.format === 'json') {
+    if (csv || document) {
+      fail('notAdjustable', 'Only a CSV Document Structure has CSV settings and a CSV Document')
+    }
+
+    return structure
+  }
+
+  const settings = csv ?? structure.csv
+
+  if (document) {
+    return inferFromCsv(decodeText(document.content, settings.encoding), settings)
+  }
+
+  if (!sameCsvSettings(settings, structure.csv)) {
+    fail(
+      'csvDocumentRequired',
+      'Changing the CSV settings needs a CSV Document, which is read again with the new settings',
+    )
+  }
+
+  return structure
+}
+
+export function adjustDocumentStructure(
+  structure: DocumentStructure,
+  body: UpdateDocumentStructureBody,
+): DocumentStructure {
+  const tree = treeOf(structure, body)
+  const listPath = rootListPath(tree)
+  const pending = new Map(body.adjustments.map((adjustment) => [adjustment.path, adjustment]))
+
+  for (const adjustment of body.adjustments) {
+    if (adjustment.path === listPath) {
+      fail('notAdjustable', `The ${listPath} list of the Document always repeats`, {
+        path: adjustment.path,
+      })
+    }
+
+    if (tree.format === 'csv' && adjustment.repeating) {
+      fail('notAdjustable', 'The columns of a CSV Document never nest or repeat', {
+        path: adjustment.path,
+      })
     }
   }
 
@@ -794,10 +859,11 @@ export function adjustDocumentStructure(
       const adjustment = pending.get(node.path)
       pending.delete(node.path)
 
-      const inner = node.kind === 'array' ? node.items : node
+      const inner = nodeContent(node)
       const repeating = adjustment?.repeating ?? node.kind === 'array'
       const required = adjustment?.required ?? node.required
-      const path = childPath(newParent, segmentOf(node, oldParent)) + (repeating ? '[]' : '')
+      const ownPath = childPath(newParent, segmentOf(node, oldParent))
+      const path = repeating ? arrayPath(ownPath) : ownPath
 
       if (adjustment?.type && inner.kind !== 'field') {
         fail('notAdjustable', `${node.path} is not a field, so it has no type`, {
@@ -820,14 +886,12 @@ export function adjustDocumentStructure(
         : { ...content, required }
     })
 
-  const children = adjustNodes(structure.children, '', '')
+  const children = adjustNodes(tree.children, '', '')
   const [unknown] = pending.keys()
 
   if (unknown !== undefined) {
     fail('unknownPath', `The Document Structure has no node at ${unknown}`, { path: unknown })
   }
 
-  return structure.format === 'csv'
-    ? { ...structure, name, csv: csv ?? structure.csv, children }
-    : { ...structure, name, children }
+  return { ...structure, ...tree, name: body.name, children }
 }

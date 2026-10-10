@@ -46,9 +46,12 @@ export {
 } from './channel'
 
 export {
+  arrayBasePath,
+  arrayPath,
   characterEncodings,
   characterEncodingSchema,
   type CharacterEncoding,
+  childPath,
   type CreateDocumentStructureBody,
   createDocumentStructureBodySchema,
   createDocumentStructureEndpoint,
@@ -76,6 +79,7 @@ export {
   documentStructureEndpoint,
   type DocumentStructureNode,
   documentStructureNodeSchema,
+  documentStructureNodes,
   type DocumentStructureProblem,
   type DocumentStructureProblemCode,
   documentStructureProblemCodes,
@@ -89,17 +93,24 @@ export {
   type DocumentStructureSummary,
   documentStructureSummarySchema,
   documentStructuresEndpoint,
+  type EncodedFile,
+  encodedFileSchema,
   inferDocumentStructureEndpoint,
   type InferredDocumentStructure,
   inferredDocumentStructureSchema,
-  maxUploadBytes,
+  jsonItemsName,
+  jsonItemsPath,
+  type JsonRoot,
+  jsonRoots,
+  jsonRootSchema,
+  maxEncodedFileBytes,
+  nodeContent,
   type NodeAdjustment,
   nodeAdjustmentSchema,
   type UpdateDocumentStructureBody,
   updateDocumentStructureBodySchema,
   updateDocumentStructureEndpoint,
-  type Upload,
-  uploadSchema,
+  type VisitedNode,
 } from './document-structure'
 
 export {

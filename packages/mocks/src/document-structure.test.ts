@@ -20,16 +20,19 @@ import {
   createDocumentStructure,
   createDocumentStructures,
   createDocumentStructureStore,
-  documentStructureHandler,
   documentStructureHandlers,
   documentStructureLeaves,
   seedDocumentStructureOf,
   seedDocumentStructures,
   seedUnusedDocumentStructures,
 } from './document-structure'
-import { documentStructureOrigins } from './document-structure-origin'
+import { documentStructureOrigins, toEncodedFile } from './document-structure-origin'
 import { createMappingDraftStore, seedMappingDrafts } from './mapping'
-import { createMappingVersionStore } from './mapping-version'
+import {
+  createMappingVersionStore,
+  type MappingVersionRecord,
+  seedMappingVersions,
+} from './mapping-version'
 
 const apiUrl = 'http://api.test'
 
@@ -75,7 +78,7 @@ const purchaseOrder = seedDocumentStructures.find(({ name }) => name === 'ERP pu
 
 describe('GET /document-structures/:id', () => {
   it('serves a seed structure with nested objects and repeating line items', async () => {
-    server.use(documentStructureHandler(apiUrl))
+    server.use(...documentStructureHandlers(apiUrl))
 
     const response = await getStructure(purchaseOrder.id)
     const structure = documentStructureEndpoint.response.parse(await response.json())
@@ -86,14 +89,14 @@ describe('GET /document-structures/:id', () => {
   })
 
   it('answers 404 for an unknown structure', async () => {
-    server.use(documentStructureHandler(apiUrl))
+    server.use(...documentStructureHandlers(apiUrl))
 
     expect((await getStructure(crypto.randomUUID())).status).toBe(404)
   })
 
   it('serves a large generated structure', async () => {
     const large = createDocumentStructure({ fieldCount: 400 })
-    server.use(documentStructureHandler(apiUrl, [large]))
+    server.use(...documentStructureHandlers(apiUrl, { documentStructures: [large] }))
 
     const response = await getStructure(large.id)
     const structure = documentStructureEndpoint.response.parse(await response.json())
@@ -163,7 +166,13 @@ function put(id: string, body: UpdateDocumentStructureBody) {
   })
 }
 
-function useHandlers(documentStructures?: ReadonlyArray<DocumentStructure>) {
+function useHandlers({
+  documentStructures,
+  versions = seedMappingVersions,
+}: {
+  documentStructures?: ReadonlyArray<DocumentStructure>
+  versions?: ReadonlyArray<MappingVersionRecord>
+} = {}) {
   const store = createDocumentStructureStore(documentStructures)
   const mappings = createMappingDraftStore(seedMappingDrafts)
 
@@ -171,7 +180,7 @@ function useHandlers(documentStructures?: ReadonlyArray<DocumentStructure>) {
     ...documentStructureHandlers(apiUrl, {
       documentStructures: store,
       mappings,
-      versions: createMappingVersionStore(),
+      versions: createMappingVersionStore(versions),
     }),
   )
 
@@ -214,7 +223,7 @@ describe('GET /document-structures', () => {
   })
 
   it('serves an empty list', async () => {
-    useHandlers([])
+    useHandlers({ documentStructures: [] })
 
     const response = await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)
 
@@ -222,7 +231,7 @@ describe('GET /document-structures', () => {
   })
 
   it('serves a large list', async () => {
-    useHandlers(createDocumentStructures({ count: 300 }))
+    useHandlers({ documentStructures: createDocumentStructures({ count: 300 }) })
 
     const response = await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)
     const summaries = documentStructuresEndpoint.response.parse(await response.json())
@@ -235,7 +244,7 @@ describe('GET /document-structures', () => {
 describe('POST /document-structures/inference', () => {
   it('infers a structure without storing it', async () => {
     const store = useHandlers()
-    const count = store.entries.length
+    const count = store.all().length
 
     const response = await post(
       inferDocumentStructureEndpoint.path,
@@ -246,7 +255,7 @@ describe('POST /document-structures/inference', () => {
 
     expect(inferred).toMatchObject({ format: 'csv', csv: { encoding: 'windows-1252' } })
     expect(JSON.stringify(inferred)).toContain('Straße')
-    expect(store.entries).toHaveLength(count)
+    expect(store.all()).toHaveLength(count)
   })
 
   it('answers 400 for a body outside the contract', async () => {
@@ -315,10 +324,10 @@ describe('POST /document-structures', () => {
     ],
   ] as const)('answers a typed 422 for %s', async (_, origin, code) => {
     const store = useHandlers()
-    const count = store.entries.length
+    const count = store.all().length
 
     expect((await problemOf(await create(origin))).code).toBe(code)
-    expect(store.entries).toHaveLength(count)
+    expect(store.all()).toHaveLength(count)
   })
 })
 
@@ -344,8 +353,68 @@ describe('PUT /document-structures/:id', () => {
     expect(await (await getStructure(unused.id)).json()).toEqual(updated)
   })
 
-  it('lets a used structure change required-ness and types', async () => {
+  const orderVersions = seedMappingVersions.filter(
+    ({ documentStructureId }) => documentStructureId === purchaseOrder.id,
+  )
+
+  const pathsOf = ({ links, transformLinks }: MappingVersionRecord) => [
+    ...links.map(({ targetPath }) => targetPath),
+    ...transformLinks.flatMap(({ to }) => (to.kind === 'target' ? [to.path] : [])),
+  ]
+
+  it('refuses a required or type change of a field a published Mapping Version links', async () => {
     useHandlers()
+
+    const problem = await problemOf(
+      await put(purchaseOrder.id, {
+        name: purchaseOrder.name,
+        adjustments: [{ path: 'buyer.gln', required: false, type: 'integer' }],
+      }),
+    )
+
+    expect(problem).toMatchObject({ code: 'usedByMappingVersion', path: 'buyer.gln' })
+    expect(problem.message).toContain('Hansemarkt: ORDERS to ERP JSON v3')
+    expect(problem.mappingVersions?.map(({ id }) => id).sort()).toEqual(
+      orderVersions
+        .filter((version) => pathsOf(version).includes('buyer.gln'))
+        .map(({ id }) => id)
+        .sort(),
+    )
+  })
+
+  it('refuses a change above a node a published Mapping Version links', async () => {
+    useHandlers()
+
+    for (const adjustment of [
+      { path: 'buyer', required: false },
+      { path: 'lines[]', repeating: false },
+    ]) {
+      const problem = await problemOf(
+        await put(purchaseOrder.id, { name: purchaseOrder.name, adjustments: [adjustment] }),
+      )
+
+      expect(problem).toMatchObject({ code: 'usedByMappingVersion', path: adjustment.path })
+    }
+  })
+
+  it('lets a used structure change a node no published Mapping Version links', async () => {
+    useHandlers()
+    const linked = new Set(orderVersions.flatMap(pathsOf))
+
+    const unlinked = documentStructureLeaves(purchaseOrder).find(
+      ({ path }) => !linked.has(path) && !path.startsWith('lines[]'),
+    )!
+
+    const response = await put(purchaseOrder.id, {
+      name: purchaseOrder.name,
+      adjustments: [{ path: unlinked.path, required: !unlinked.required, type: 'integer' }],
+    })
+
+    expect(response.status).toBe(200)
+  })
+
+  it('lets a structure only Drafts use change required-ness and types', async () => {
+    useHandlers({ versions: [] })
 
     const response = await put(purchaseOrder.id, {
       name: purchaseOrder.name,
@@ -355,8 +424,8 @@ describe('PUT /document-structures/:id', () => {
     expect(response.status).toBe(200)
   })
 
-  it('refuses to turn a node a Mapping links into a list', async () => {
-    useHandlers()
+  it('refuses to turn a node a Mapping Draft links into a list', async () => {
+    useHandlers({ versions: [] })
 
     const problem = await problemOf(
       await put(seedDocumentStructureOf.ORDERS.id, {
@@ -365,7 +434,11 @@ describe('PUT /document-structures/:id', () => {
       }),
     )
 
-    expect(problem).toMatchObject({ code: 'linkedByMapping', path: 'lines[]' })
+    expect(problem).toMatchObject({
+      code: 'linkedByMapping',
+      path: 'lines[]',
+      mappingVersions: null,
+    })
   })
 
   it('answers a typed 422 for a node it does not have', async () => {
@@ -382,6 +455,104 @@ describe('PUT /document-structures/:id', () => {
     useHandlers()
 
     expect((await put(crypto.randomUUID(), { name: 'x', adjustments: [] })).status).toBe(404)
+  })
+})
+
+describe('PUT /document-structures/:id with CSV settings', () => {
+  const dispatch = seedUnusedDocumentStructures[0]!
+  const headerless = { delimiter: ',', headerRow: false, encoding: 'utf-8' } as const
+  const document = toEncodedFile('dispatch.csv', 'LS-1,24\r\nLS-2,12\r\n')
+
+  const dispatchVersion: MappingVersionRecord = {
+    id: crypto.randomUUID(),
+    mappingId: crypto.randomUUID(),
+    mappingName: 'Hansemarkt: ERP CSV to DESADV',
+    version: 1,
+    publishedAt: '2026-10-01T08:00:00.000Z',
+    messageType: 'DESADV',
+    documentStructureId: dispatch.id,
+    links: [],
+    transforms: [],
+    transformLinks: [],
+  }
+
+  it('reads the CSV Document of the update again with the new settings', async () => {
+    useHandlers()
+
+    const response = await put(dispatch.id, {
+      name: dispatch.name,
+      csv: headerless,
+      document,
+      adjustments: [],
+    })
+
+    const updated = updateDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(updated).toMatchObject({ csv: headerless })
+    expect(nodeAt(updated.children, 'rows[].column2')).toMatchObject({ type: 'integer' })
+    expect(nodeAt(updated.children, 'rows[].Straße')).toBeUndefined()
+    expect(await (await getStructure(dispatch.id)).json()).toEqual(updated)
+  })
+
+  it('answers csvDocumentRequired for new settings without a CSV Document', async () => {
+    const store = useHandlers()
+
+    const problem = await problemOf(
+      await put(dispatch.id, { name: dispatch.name, csv: headerless, adjustments: [] }),
+    )
+
+    expect(problem.code).toBe('csvDocumentRequired')
+    expect(store.get(dispatch.id)).toEqual(dispatch)
+  })
+
+  it('refuses new settings for a structure a published Mapping Version uses', async () => {
+    useHandlers({ versions: [...seedMappingVersions, dispatchVersion] })
+
+    const problem = await problemOf(
+      await put(dispatch.id, { name: dispatch.name, csv: headerless, adjustments: [] }),
+    )
+
+    expect(problem).toMatchObject({
+      code: 'usedByMappingVersion',
+      path: null,
+      mappingVersions: [{ id: dispatchVersion.id, version: 1 }],
+    })
+  })
+
+  it('refuses a CSV Document that changes a column a published Mapping Version links', async () => {
+    useHandlers({
+      versions: [
+        {
+          ...dispatchVersion,
+          links: [{ sourcePath: 'rows[].Menge', targetPath: 'QTY' }],
+        },
+      ],
+    })
+
+    const problem = await problemOf(
+      await put(dispatch.id, {
+        name: dispatch.name,
+        document: toEncodedFile('dispatch.csv', 'Lieferscheinnummer;Menge\r\nLS-1;viele\r\n'),
+        adjustments: [],
+      }),
+    )
+
+    expect(problem).toMatchObject({ code: 'usedByMappingVersion', path: 'rows[].Menge' })
+  })
+
+  it('refuses CSV settings on a JSON structure', async () => {
+    useHandlers()
+
+    const problem = await problemOf(
+      await put(purchaseOrder.id, {
+        name: purchaseOrder.name,
+        csv: headerless,
+        document,
+        adjustments: [],
+      }),
+    )
+
+    expect(problem.code).toBe('notAdjustable')
   })
 })
 

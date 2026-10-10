@@ -3,7 +3,7 @@ import {
   type CsvSettings,
   defaultCsvSettings,
   type DocumentStructureOrigin,
-  type Upload,
+  type EncodedFile,
 } from '@edi-bridge/contracts'
 
 import { encodeBase64 } from './document-structure-inference'
@@ -34,11 +34,11 @@ export function encodeText(text: string, encoding: CharacterEncoding): Uint8Arra
   })
 }
 
-export function toUpload(
+export function toEncodedFile(
   fileName: string,
   text: string,
   encoding: CharacterEncoding = 'utf-8',
-): Upload {
+): EncodedFile {
   return { fileName, content: encodeBase64(encodeText(text, encoding)) }
 }
 
@@ -55,6 +55,15 @@ const orderJson = JSON.stringify(
     ],
     tags: ['express'],
   },
+  null,
+  2,
+)
+
+const orderListJson = JSON.stringify(
+  [
+    { orderNumber: 'PO-2026-10417', orderDate: '2026-10-02', total: 45.36 },
+    { orderNumber: 'PO-2026-10418', orderDate: '2026-10-03', total: 120, note: 'Rampe 2' },
+  ],
   null,
   2,
 )
@@ -109,30 +118,37 @@ export const windows1252CsvSettings: CsvSettings = {
 }
 
 export const documentStructureOrigins = {
-  jsonDocument: { kind: 'jsonDocument', document: toUpload('order.json', orderJson) },
+  jsonDocument: { kind: 'jsonDocument', document: toEncodedFile('order.json', orderJson) },
+  jsonListDocument: {
+    kind: 'jsonDocument',
+    document: toEncodedFile('orders.json', orderListJson),
+  },
   csvDocument: {
     kind: 'csvDocument',
-    document: toUpload('lieferscheine.csv', dispatchCsv),
+    document: toEncodedFile('lieferscheine.csv', dispatchCsv),
     csv: defaultCsvSettings,
   },
   windows1252CsvDocument: {
     kind: 'csvDocument',
-    document: toUpload('lieferscheine-ansi.csv', dispatchCsv, 'windows-1252'),
+    document: toEncodedFile('lieferscheine-ansi.csv', dispatchCsv, 'windows-1252'),
     csv: windows1252CsvSettings,
   },
-  jsonSchema: { kind: 'jsonSchema', jsonSchema: toUpload('article.schema.json', articleSchema) },
+  jsonSchema: {
+    kind: 'jsonSchema',
+    jsonSchema: toEncodedFile('article.schema.json', articleSchema),
+  },
   invalidJsonDocument: {
     kind: 'jsonDocument',
-    document: toUpload('broken.json', '{ "orderNumber": "PO-1", '),
+    document: toEncodedFile('broken.json', '{ "orderNumber": "PO-1", '),
   },
   emptyCsvDocument: {
     kind: 'csvDocument',
-    document: toUpload('empty.csv', '\r\n'),
+    document: toEncodedFile('empty.csv', '\r\n'),
     csv: defaultCsvSettings,
   },
   invalidJsonSchema: {
     kind: 'jsonSchema',
-    jsonSchema: toUpload('broken.schema.json', '{ "type": "object", "properties": [] }'),
+    jsonSchema: toEncodedFile('broken.schema.json', '{ "type": "object", "properties": [] }'),
   },
 } as const satisfies Record<string, DocumentStructureOrigin>
 
@@ -144,7 +160,7 @@ export function createCsvDocument({
   rowCount: number
   encoding?: CharacterEncoding
   seed?: string
-}): Upload {
+}): EncodedFile {
   const faker = seededFaker(`${seed}:${rowCount}`)
   const cities = ['München', 'Köln', 'Düsseldorf', 'Nürnberg', 'Lübeck', 'Würzburg', 'Göttingen']
 
@@ -160,7 +176,7 @@ export function createCsvDocument({
     ].join(';'),
   )
 
-  return toUpload(
+  return toEncodedFile(
     `lieferscheine-${rowCount}.csv`,
     ['Lieferscheinnummer;Lieferdatum;Kunde;Ort;GTIN;Menge;Bemerkung', ...rows].join('\r\n'),
     encoding,
