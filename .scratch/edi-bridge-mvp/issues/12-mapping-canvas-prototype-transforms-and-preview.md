@@ -4,12 +4,16 @@
 
 **Blocked by:** 11 (Mapping canvas prototype: trees and links)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Every transform from the catalogue can be placed, connected and configured
-- [ ] The JSONata node offers an expression editor
-- [ ] A preview panel shows a mocked target Document for a chosen sample and updates when the Mapping changes
-- [ ] Invalid configurations are shown on the affected node
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Every transform from the catalogue can be placed, connected and configured
+- [x] The JSONata node offers an expression editor
+- [x] A preview panel shows a mocked target Document for a chosen sample and updates when the Mapping changes
+- [x] Invalid configurations are shown on the affected node
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #23, #24, #26, #27
