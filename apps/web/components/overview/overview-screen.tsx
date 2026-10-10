@@ -10,6 +10,10 @@ import { LoadError } from '@/components/load-error'
 import { BucketTable, ErrorRateChart, ThroughputChart } from '@/components/overview/overview-charts'
 import { type Totals, toBucketRows, totalsOf } from '@/components/overview/overview-data'
 import { useFormats } from '@/components/overview/overview-formats'
+import {
+  OverdueAcknowledgementsList,
+  TradingPartnerHealthList,
+} from '@/components/overview/overview-lists'
 import { overviewKeys, overviewQuery } from '@/lib/api/queries'
 import { type OverviewWindow, overviewWindows } from '@edi-bridge/contracts'
 import { Card } from '@edi-bridge/ui/components/card'
@@ -162,6 +166,15 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
                 <ErrorRateChart rows={rows} timeWindow={shownWindow} totals={totals} />
               </div>
               <BucketTable rows={rows} timeWindow={shownWindow} />
+            </>
+          )}
+          {data && (
+            <>
+              <TradingPartnerHealthList
+                timeWindow={shownWindow}
+                tradingPartners={data.tradingPartners}
+              />
+              <OverdueAcknowledgementsList overdueAcknowledgements={data.overdueAcknowledgements} />
             </>
           )}
         </div>

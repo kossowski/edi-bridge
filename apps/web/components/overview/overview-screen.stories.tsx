@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl'
-import { expect } from 'storybook/test'
+import { expect, within } from 'storybook/test'
 
 import { OverviewScreen } from '@/components/overview/overview-screen'
 import { apiUrl } from '@/lib/api/config'
@@ -24,6 +24,8 @@ export const Seeded = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('heading', { name: 'Throughput' })).toBeVisible()
     await expect(canvas.getByRole('heading', { name: 'Error rate' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'Trading Partner health' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'Overdue Acknowledgements' })).toBeVisible()
   },
 })
 
@@ -46,6 +48,19 @@ export const LargeVolume = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'Throughput' }, { timeout: 10_000 }),
     ).toBeVisible()
+
+    const health = canvas.getByRole('region', { name: 'Trading Partner health' })
+    const overdue = canvas.getByRole('region', { name: 'Overdue Acknowledgements' })
+
+    await expect(within(health).getAllByRole('row')).toHaveLength(11)
+    await expect(within(overdue).getAllByRole('row')).toHaveLength(11)
+
+    await expect(
+      within(overdue).getByRole('button', { name: 'Show all 400 Overdue Acknowledgements' }),
+    ).toBeVisible()
+    await expect(
+      within(health).getByRole('button', { name: 'Show all 240 Trading Partners' }),
+    ).toBeVisible()
   },
 })
 
@@ -55,6 +70,8 @@ export const Empty = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('No finished Runs')).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'No Trading Partners' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'No Overdue Acknowledgements' })).toBeVisible()
   },
 })
 
@@ -89,6 +106,12 @@ export const German = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('heading', { name: 'Durchsatz' })).toBeVisible()
+    await expect(
+      canvas.getByRole('heading', { name: 'Zustand der Trading Partners' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole('heading', { name: 'Überfällige Acknowledgements' }),
+    ).toBeVisible()
   },
 })
 
@@ -101,5 +124,6 @@ export const Dark = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('heading', { name: 'Throughput' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'Trading Partner health' })).toBeVisible()
   },
 })

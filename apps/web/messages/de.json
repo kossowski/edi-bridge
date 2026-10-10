@@ -99,6 +99,53 @@
         "period": "Zeitraum"
       }
     },
+    "showTop": "Top {count} anzeigen",
+    "health": {
+      "title": "Zustand der Trading Partners",
+      "summary": "{failing, number} fehlerhaft, {degraded, number} beeinträchtigt, {healthy, number} in Ordnung. Schlechteste zuerst.",
+      "allHealthy": "{count, plural, =0 {Noch kein Trading Partner.} one {Der Trading Partner ist in Ordnung.} other {Alle # Trading Partners sind in Ordnung.}}",
+      "caption": "Zustand pro Trading Partner, gezählt werden Runs in {period}, schlechteste zuerst",
+      "noRun": "Noch kein Run",
+      "showAll": "Alle {count, number} Trading Partners anzeigen",
+      "status": {
+        "healthy": "In Ordnung",
+        "degraded": "Beeinträchtigt",
+        "failing": "Fehlerhaft"
+      },
+      "columns": {
+        "tradingPartner": "Trading Partner",
+        "status": "Status",
+        "delivered": "Zugestellt",
+        "failed": "Fehlgeschlagen",
+        "errorRate": "Fehlerquote",
+        "overdue": "Überfällig",
+        "lastRun": "Letzter Run"
+      },
+      "empty": {
+        "title": "Keine Trading Partners",
+        "description": "Der Zustand jedes Trading Partners erscheint hier, sobald ein Trading Partner angelegt ist."
+      }
+    },
+    "overdue": {
+      "title": "Überfällige Acknowledgements",
+      "description": "{count, plural, =0 {Jedes gesendete Interchange wurde rechtzeitig bestätigt.} one {# gesendetes Interchange} other {# gesendete Interchanges}} ohne Acknowledgement innerhalb der Frist. Am längsten überfällige zuerst.",
+      "caption": "Überfällige Acknowledgements, am längsten überfällige zuerst",
+      "interchange": "Interchange",
+      "hours": "{hours, plural, one {# Stunde} other {# Stunden}}",
+      "showAll": "Alle {count, number} überfälligen Acknowledgements anzeigen",
+      "columns": {
+        "interchange": "Interchange",
+        "tradingPartner": "Trading Partner",
+        "messageType": "Message Type",
+        "sentAt": "Gesendet",
+        "timeLimit": "Frist",
+        "overdueSince": "Überfällig seit"
+      },
+      "empty": {
+        "title": "Keine überfälligen Acknowledgements",
+        "description": "Gesendete Interchanges, deren Acknowledgement die Frist überschreitet, erscheinen hier, am längsten überfällige zuerst."
+      }
+    },
     "empty": {
       "title": "Keine abgeschlossenen Runs",
       "description": "In {period} wurde kein Run zugestellt und keiner ist fehlgeschlagen. Die Diagramme erscheinen, sobald Runs abgeschlossen werden."

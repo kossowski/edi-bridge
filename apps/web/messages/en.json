@@ -99,6 +99,53 @@
         "period": "Period"
       }
     },
+    "showTop": "Show top {count}",
+    "health": {
+      "title": "Trading Partner health",
+      "summary": "{failing, number} failing, {degraded, number} degraded, {healthy, number} healthy. Worst first.",
+      "allHealthy": "{count, plural, =0 {No Trading Partner yet.} one {The Trading Partner is healthy.} other {All # Trading Partners are healthy.}}",
+      "caption": "Health per Trading Partner, counting Runs in {period}, worst first",
+      "noRun": "No Run yet",
+      "showAll": "Show all {count, number} Trading Partners",
+      "status": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "failing": "Failing"
+      },
+      "columns": {
+        "tradingPartner": "Trading Partner",
+        "status": "Status",
+        "delivered": "Delivered",
+        "failed": "Failed",
+        "errorRate": "Error rate",
+        "overdue": "Overdue",
+        "lastRun": "Last Run"
+      },
+      "empty": {
+        "title": "No Trading Partners",
+        "description": "The health of each Trading Partner appears here as soon as a Trading Partner is added."
+      }
+    },
+    "overdue": {
+      "title": "Overdue Acknowledgements",
+      "description": "{count, plural, =0 {Every sent Interchange was acknowledged in time.} one {# sent Interchange} other {# sent Interchanges}} without an Acknowledgement within the time limit. Longest Overdue first.",
+      "caption": "Overdue Acknowledgements, longest Overdue first",
+      "interchange": "Interchange",
+      "hours": "{hours, plural, one {# hour} other {# hours}}",
+      "showAll": "Show all {count, number} Overdue Acknowledgements",
+      "columns": {
+        "interchange": "Interchange",
+        "tradingPartner": "Trading Partner",
+        "messageType": "Message Type",
+        "sentAt": "Sent",
+        "timeLimit": "Time limit",
+        "overdueSince": "Overdue since"
+      },
+      "empty": {
+        "title": "No Overdue Acknowledgements",
+        "description": "Sent Interchanges whose Acknowledgement misses the time limit appear here, longest Overdue first."
+      }
+    },
     "empty": {
       "title": "No finished Runs",
       "description": "No Run was delivered or failed in {period}. The charts appear as soon as Runs finish."
