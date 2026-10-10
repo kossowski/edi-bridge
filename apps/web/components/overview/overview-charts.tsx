@@ -38,22 +38,13 @@ import {
   TableHeader,
   TableRow,
 } from '@edi-bridge/ui/components/table'
-
-const deliveredColor = 'var(--chart-1)'
-
-const failedColor = 'var(--chart-2)'
-
-const failedHatchStroke = 'color-mix(in oklab, var(--chart-2), black 45%)'
-
-const failedHatch = `repeating-linear-gradient(-45deg, ${failedHatchStroke} 0 1.5px, ${failedColor} 1.5px 4px)`
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 const chartConfig = {
-  delivered: { color: deliveredColor },
-  failed: { color: failedColor },
-  errorRate: { color: failedColor },
+  delivered: { color: 'var(--chart-1)' },
+  failed: { color: 'var(--chart-2)' },
+  errorRate: { color: 'var(--chart-2)' },
 } satisfies ChartConfig
-
-const chartClassName = 'aspect-auto h-64 w-full'
 
 const series = ['delivered', 'failed'] as const
 
@@ -61,8 +52,12 @@ function Swatch({ series }: { series: 'delivered' | 'failed' }) {
   return (
     <span
       aria-hidden
-      className="inline-block size-2.5 shrink-0 rounded-[2px]"
-      style={{ background: series === 'delivered' ? deliveredColor : failedHatch }}
+      className={cn(
+        'inline-block size-2.5 shrink-0 rounded-[2px]',
+        series === 'delivered'
+          ? 'bg-chart-1'
+          : 'bg-[repeating-linear-gradient(-45deg,var(--chart-2-hatch)_0_1.5px,var(--chart-2)_1.5px_4px)]',
+      )}
     />
   )
 }
@@ -194,7 +189,7 @@ export function ThroughputChart({ rows, totals, timeWindow }: OverviewSeries) {
         peak: peak ? peak.delivered + peak.failed : 0,
       })}
       title={title}>
-      <ChartContainer config={chartConfig} className={chartClassName}>
+      <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
         <BarChart
           data={toBarRows(rows)}
           margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
@@ -206,22 +201,22 @@ export function ThroughputChart({ rows, totals, timeWindow }: OverviewSeries) {
               patternTransform="rotate(45)"
               patternUnits="userSpaceOnUse"
               width="4">
-              <rect fill={failedColor} height="4" width="4" />
-              <line stroke={failedHatchStroke} strokeWidth="1.5" x1="0" x2="0" y1="0" y2="4" />
+              <rect fill="var(--color-failed)" height="4" width="4" />
+              <line stroke="var(--chart-2-hatch)" strokeWidth="1.5" x1="0" x2="0" y1="0" y2="4" />
             </pattern>
           </defs>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="start" minTickGap={24} tickFormatter={formats.tick} {...axisProps} />
           <YAxis allowDecimals={false} tickFormatter={formats.compact} width={40} {...axisProps} />
           <ChartTooltip content={<BucketTooltip rows={rows} timeWindow={timeWindow} />} />
-          <Bar {...barProps} dataKey="delivered" fill={deliveredColor} />
+          <Bar {...barProps} dataKey="delivered" fill="var(--color-delivered)" />
           <Bar {...barProps} dataKey="failed" fill={`url(#${hatchId})`} radius={[4, 4, 0, 0]} />
           <Bar
             {...barProps}
             {...inProgressBarProps}
             dataKey="deliveredInProgress"
-            fill={deliveredColor}
-            stroke={deliveredColor}
+            fill="var(--color-delivered)"
+            stroke="var(--color-delivered)"
           />
           <Bar
             {...barProps}
@@ -229,7 +224,7 @@ export function ThroughputChart({ rows, totals, timeWindow }: OverviewSeries) {
             dataKey="failedInProgress"
             fill={`url(#${hatchId})`}
             radius={[4, 4, 0, 0]}
-            stroke={failedColor}
+            stroke="var(--color-failed)"
           />
         </BarChart>
       </ChartContainer>
@@ -253,7 +248,14 @@ function rateDot(
 
   return (
     <g key={index}>
-      <circle cx={cx} cy={cy} fill={failedColor} r={4} stroke="var(--card)" strokeWidth={2} />
+      <circle
+        cx={cx}
+        cy={cy}
+        fill="var(--color-errorRate)"
+        r={4}
+        stroke="var(--card)"
+        strokeWidth={2}
+      />
       {index === lastIndex && (
         <text dominantBaseline="middle" x={cx + 8} y={cy} className="fill-foreground text-xs">
           {percent(rate)}
@@ -281,7 +283,7 @@ export function ErrorRateChart({ rows, totals, timeWindow }: OverviewSeries) {
         peakRate: peak?.errorRate == null ? '' : formats.percent(peak.errorRate),
       })}
       title={title}>
-      <ChartContainer config={chartConfig} className={chartClassName}>
+      <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
         <LineChart
           data={rows}
           margin={{ top: 8, right: 48, bottom: 0, left: 0 }}
@@ -297,11 +299,16 @@ export function ErrorRateChart({ rows, totals, timeWindow }: OverviewSeries) {
           />
           <ChartTooltip content={<BucketTooltip rows={rows} timeWindow={timeWindow} />} />
           <Line
-            activeDot={{ r: 5, fill: failedColor, stroke: 'var(--card)', strokeWidth: 2 }}
+            activeDot={{
+              r: 5,
+              fill: 'var(--color-errorRate)',
+              stroke: 'var(--card)',
+              strokeWidth: 2,
+            }}
             dataKey="errorRate"
             dot={(props) => rateDot(props, rows, lastIndex, formats.percent)}
             isAnimationActive={false}
-            stroke={failedColor}
+            stroke="var(--color-errorRate)"
             strokeWidth={2}
             type="linear"
           />
