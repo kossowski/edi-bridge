@@ -95,7 +95,7 @@ docker build -f apps/api/Dockerfile .
 
 ## CI
 
-GitHub Actions runs lint, check-types, test, the Playwright tests, build and the Storybook build on every pull request. Turborepo's `--affected` flag limits the run to the packages changed on the branch and the packages that depend on them.
+GitHub Actions runs lint, check-types, test, the Playwright tests, build and the Storybook build on every pull request. Turborepo's `--affected` flag limits the run to the packages changed on the branch and the packages that depend on them. A job whose tasks are all unaffected is skipped before it installs dependencies.
 
 ## Deployment
 
