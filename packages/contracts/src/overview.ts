@@ -26,16 +26,21 @@ export type OverviewQuery = z.output<typeof overviewQuerySchema>
 
 const countSchema = z.number().int().min(0)
 
-export const throughputBucketSchema = z.object({
-  start: z.iso.datetime(),
-  end: z.iso.datetime(),
+export const finishedRunCountsSchema = z.object({
   delivered: countSchema,
   failed: countSchema,
 })
 
+export type FinishedRunCounts = z.infer<typeof finishedRunCountsSchema>
+
+export const throughputBucketSchema = finishedRunCountsSchema.extend({
+  start: z.iso.datetime(),
+  end: z.iso.datetime(),
+})
+
 export type ThroughputBucket = z.infer<typeof throughputBucketSchema>
 
-export function errorRate({ delivered, failed }: { delivered: number; failed: number }) {
+export function errorRate({ delivered, failed }: FinishedRunCounts) {
   const finished = delivered + failed
 
   return finished === 0 ? null : failed / finished
@@ -53,11 +58,7 @@ export function healthStatusOf({
   delivered,
   failed,
   overdue,
-}: {
-  delivered: number
-  failed: number
-  overdue: number
-}): HealthStatus {
+}: FinishedRunCounts & { overdue: number }): HealthStatus {
   const rate = errorRate({ delivered, failed }) ?? 0
 
   if (rate >= healthThresholds.failing) {
@@ -67,21 +68,21 @@ export function healthStatusOf({
   return rate >= healthThresholds.degraded || overdue > 0 ? 'degraded' : 'healthy'
 }
 
-export const tradingPartnerHealthSchema = z.object({
+export const tradingPartnerHealthSchema = finishedRunCountsSchema.extend({
   tradingPartner: tradingPartnerSummarySchema,
   status: healthStatusSchema,
-  delivered: countSchema,
-  failed: countSchema,
   overdue: countSchema,
   lastRunAt: z.iso.datetime().nullable(),
 })
 
 export type TradingPartnerHealth = z.infer<typeof tradingPartnerHealthSchema>
 
+export const overdueAcknowledgementMessageTypes = ['DESADV', 'INVOIC'] as const
+
 export const overdueAcknowledgementSchema = z.object({
   interchange: z.object({ id: z.uuid(), controlReference: controlReferenceSchema }),
   tradingPartner: tradingPartnerSummarySchema,
-  messageType: messageTypeSchema.extract(['DESADV', 'INVOIC']),
+  messageType: messageTypeSchema.extract(overdueAcknowledgementMessageTypes),
   sentAt: z.iso.datetime(),
   acknowledgementTimeLimitHours: z.number().int().min(1),
   overdueSince: z.iso.datetime(),

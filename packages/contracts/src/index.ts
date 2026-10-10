@@ -302,12 +302,15 @@ export {
 
 export {
   errorRate,
+  type FinishedRunCounts,
+  finishedRunCountsSchema,
   type HealthStatus,
   healthStatuses,
   healthStatusOf,
   healthStatusSchema,
   healthThresholds,
   type OverdueAcknowledgement,
+  overdueAcknowledgementMessageTypes,
   overdueAcknowledgementSchema,
   type Overview,
   overviewEndpoint,
