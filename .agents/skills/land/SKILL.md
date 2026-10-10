@@ -66,6 +66,14 @@ git pull --ff-only
 
 Skip `unstack` for a single PR. Take the stack number from `gh stack view --short` or the PR page. Delete the stack file.
 
+Last, free the RAM that reviews and browser checks of these PRs left in `/tmp`, a tmpfs here:
+
+```bash
+bash .agents/skills/land/scripts/clean-tmp.sh <PR> ...
+```
+
+Pass every landed PR number. Add the deleted paths and the space freed to the report.
+
 ## Report
 
 ```markdown
@@ -73,4 +81,5 @@ Skip `unstack` for a single PR. Take the stack number from `gh stack view --shor
 
 - **Landed**: #<PR> <title>, ...
 - **Stopped at**: <check and reason>, or "nothing, stack complete"
+- **/tmp**: <space freed and deleted paths>, or "nothing to clean"
 ```
