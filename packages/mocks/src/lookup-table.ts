@@ -13,6 +13,7 @@ import {
   type LookupTableInput,
   lookupTableSchema,
   type LookupTableScope,
+  type LookupTableScopeInput,
   lookupTablesEndpoint,
   type LookupTableSummary,
   type TradingPartner,
@@ -22,31 +23,66 @@ import {
 import { applyImport, classifyImport } from './lookup-table-import'
 import { badRequest, conflict, notFound, unprocessable } from './responses'
 import { seedId } from './seed-id'
-import { seedTradingPartners } from './trading-partner'
+import {
+  seedTradingPartners,
+  toTradingPartnerStore,
+  type TradingPartnerStore,
+} from './trading-partner'
 
-export type LookupTableRecord = Omit<LookupTable, 'entryCount'>
-
-export function toLookupTable(record: LookupTableRecord): LookupTable {
-  return { ...record, entryCount: record.entries.length }
+export type LookupTableRecord = Omit<LookupTable, 'entryCount' | 'scope'> & {
+  scope: LookupTableScopeInput
 }
 
-export function toLookupTableSummary({ entries, ...table }: LookupTableRecord): LookupTableSummary {
-  return { ...table, entryCount: entries.length }
+type TradingPartnerNames = {
+  get: (id: string) => Pick<TradingPartner, 'id' | 'name'> | undefined
 }
 
-function validated(record: LookupTableRecord): LookupTableRecord {
-  lookupTableSchema.parse(toLookupTable(record))
-
-  return record
+function namesOf(tradingPartners: ReadonlyArray<Pick<TradingPartner, 'id' | 'name'>>) {
+  return { get: (id: string) => tradingPartners.find((tradingPartner) => tradingPartner.id === id) }
 }
 
-const workspace: LookupTableScope = { kind: 'workspace' }
+const workspace = { kind: 'workspace' } as const
 
-function partnerScope(tradingPartner: Pick<TradingPartner, 'id' | 'name'>): LookupTableScope {
+function scopeOf(
+  scope: LookupTableScopeInput,
+  tradingPartners: TradingPartnerNames,
+): LookupTableScope {
+  if (scope.kind === 'workspace') {
+    return workspace
+  }
+
+  const tradingPartner = tradingPartners.get(scope.tradingPartnerId)
+
+  if (!tradingPartner) {
+    throw new Error(`No Trading Partner with id ${scope.tradingPartnerId}`)
+  }
+
   return {
     kind: 'tradingPartner',
     tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
   }
+}
+
+export function toLookupTableSummary(
+  { entries, scope, ...table }: LookupTableRecord,
+  tradingPartners: TradingPartnerNames,
+): LookupTableSummary {
+  return { ...table, scope: scopeOf(scope, tradingPartners), entryCount: entries.length }
+}
+
+export function toLookupTable(
+  record: LookupTableRecord,
+  tradingPartners: TradingPartnerNames,
+): LookupTable {
+  return { ...toLookupTableSummary(record, tradingPartners), entries: record.entries }
+}
+
+function assertValid(record: LookupTableRecord, tradingPartners: TradingPartnerNames) {
+  lookupTableSchema.parse(toLookupTable(record, tradingPartners))
+}
+
+function partnerScope({ id }: Pick<TradingPartner, 'id'>): LookupTableScopeInput {
+  return { kind: 'tradingPartner', tradingPartnerId: id }
 }
 
 function entries(...pairs: ReadonlyArray<readonly [string, string]>): LookupTableEntry[] {
@@ -88,9 +124,12 @@ const seeds: ReadonlyArray<Omit<LookupTableRecord, 'id'>> = [
   },
 ]
 
-export const seedLookupTables: ReadonlyArray<LookupTableRecord> = seeds.map((seed, index) =>
-  validated({ id: seedId(8, index + 1), ...seed }),
-)
+export const seedLookupTables: ReadonlyArray<LookupTableRecord> = seeds.map((seed, index) => {
+  const record = { id: seedId(8, index + 1), ...seed }
+  assertValid(record, namesOf(seedTradingPartners))
+
+  return record
+})
 
 export function seedLookupTableNamed(name: string): LookupTableRecord {
   const found = seedLookupTables.find((table) => table.name === name)
@@ -130,7 +169,7 @@ export function createLookupTables({
     const tradingPartner = index % 3 === 0 ? null : faker.helpers.arrayElement(tradingPartners)
     const subject = faker.helpers.arrayElement(subjects)
 
-    return validated({
+    const record: LookupTableRecord = {
       id: faker.string.uuid(),
       name: tradingPartner
         ? `${tradingPartner.name.split(/[\s,]/)[0]} ${subject} ${index + 1}`
@@ -138,13 +177,18 @@ export function createLookupTables({
       scope: tradingPartner ? partnerScope(tradingPartner) : workspace,
       updatedAt: faker.date.past({ years: 1, refDate: now }).toISOString(),
       entries: generateEntries(faker, entryCount ?? faker.number.int({ min: 0, max: 12 })),
-    })
+    }
+
+    assertValid(record, namesOf(tradingPartners))
+
+    return record
   })
 }
 
 export type LookupTableStore = {
   all: () => readonly LookupTableRecord[]
   get: (id: string) => LookupTableRecord | undefined
+  translate: (id: string, value: string) => string | undefined
   set: (table: LookupTableRecord) => void
   delete: (id: string) => void
 }
@@ -157,6 +201,8 @@ export function createLookupTableStore(
   return {
     all: () => [...byId.values()],
     get: (id) => byId.get(id),
+    translate: (id, value) =>
+      byId.get(id)?.entries.find(({ sourceCode }) => sourceCode === value)?.targetCode,
     set: (table) => {
       byId.set(table.id, table)
     },
@@ -172,17 +218,19 @@ export function toLookupTableStore(
   return 'get' in lookupTables ? lookupTables : createLookupTableStore(lookupTables)
 }
 
-export function lookupTablesHandler(
+export function lookupTableListHandler(
   apiUrl: string,
   lookupTables: ReadonlyArray<LookupTableRecord> | LookupTableStore = seedLookupTables,
+  tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore = seedTradingPartners,
 ) {
   const store = toLookupTableStore(lookupTables)
+  const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
 
   return http.get(`${apiUrl}${lookupTablesEndpoint.path}`, () =>
     HttpResponse.json(
       store
         .all()
-        .map(toLookupTableSummary)
+        .map((table) => toLookupTableSummary(table, tradingPartnerStore))
         .sort((a, b) => a.name.localeCompare(b.name, 'de')),
     ),
   )
@@ -192,10 +240,10 @@ function sameName(a: string, b: string) {
   return a.localeCompare(b, 'de', { sensitivity: 'accent' }) === 0
 }
 
-function sameScope(a: LookupTableScope, b: LookupTableScope) {
+function sameScope(a: LookupTableScopeInput, b: LookupTableScopeInput) {
   return a.kind === 'workspace'
     ? b.kind === 'workspace'
-    : b.kind === 'tradingPartner' && a.tradingPartner.id === b.tradingPartner.id
+    : b.kind === 'tradingPartner' && a.tradingPartnerId === b.tradingPartnerId
 }
 
 export function lookupTableHandlers(
@@ -205,10 +253,20 @@ export function lookupTableHandlers(
     tradingPartners = seedTradingPartners,
   }: {
     lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore
-    tradingPartners?: ReadonlyArray<Pick<TradingPartner, 'id' | 'name'>>
+    tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
   } = {},
 ) {
   const store = toLookupTableStore(lookupTables)
+  const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
+
+  function nameTaken(name: string, scope: LookupTableScopeInput, ownId?: string) {
+    return store
+      .all()
+      .some(
+        (other) =>
+          other.id !== ownId && sameName(other.name, name) && sameScope(other.scope, scope),
+      )
+  }
 
   async function parseInput(
     request: Request,
@@ -222,27 +280,13 @@ export function lookupTableHandlers(
       return { response: badRequest(body.error.message) }
     }
 
-    const { name, entries, scope: scopeInput }: LookupTableInput = body.data
-    let scope: LookupTableScope = workspace
+    const { name, entries, scope }: LookupTableInput = body.data
 
-    if (scopeInput.kind === 'tradingPartner') {
-      const tradingPartner = tradingPartners.find(({ id }) => id === scopeInput.tradingPartnerId)
-
-      if (!tradingPartner) {
-        return { response: unprocessable('Unknown Trading Partner') }
-      }
-
-      scope = partnerScope(tradingPartner)
+    if (scope.kind === 'tradingPartner' && !tradingPartnerStore.get(scope.tradingPartnerId)) {
+      return { response: unprocessable('Unknown Trading Partner') }
     }
 
-    const taken = store
-      .all()
-      .some(
-        (other) =>
-          other.id !== ownId && sameName(other.name, name) && sameScope(other.scope, scope),
-      )
-
-    if (taken) {
+    if (nameTaken(name, scope, ownId)) {
       return { response: conflict('Another Lookup Table of this scope already uses this name') }
     }
 
@@ -267,11 +311,11 @@ export function lookupTableHandlers(
   }
 
   return [
-    lookupTablesHandler(apiUrl, store),
+    lookupTableListHandler(apiUrl, store, tradingPartnerStore),
     http.get<{ id: string }>(`${apiUrl}${lookupTableEndpoint.path}`, ({ params }) => {
       const table = store.get(params.id)
 
-      return table ? HttpResponse.json(toLookupTable(table)) : notFound()
+      return table ? HttpResponse.json(toLookupTable(table, tradingPartnerStore)) : notFound()
     }),
     http.post(`${apiUrl}${createLookupTableEndpoint.path}`, async ({ request }) => {
       const parsed = await parseInput(request)
@@ -288,7 +332,7 @@ export function lookupTableHandlers(
 
       store.set(created)
 
-      return HttpResponse.json(toLookupTable(created), { status: 201 })
+      return HttpResponse.json(toLookupTable(created, tradingPartnerStore), { status: 201 })
     }),
     http.put<{ id: string }>(
       `${apiUrl}${updateLookupTableEndpoint.path}`,
@@ -313,7 +357,7 @@ export function lookupTableHandlers(
 
         store.set(updated)
 
-        return HttpResponse.json(toLookupTable(updated))
+        return HttpResponse.json(toLookupTable(updated, tradingPartnerStore))
       },
     ),
     http.delete<{ id: string }>(`${apiUrl}${deleteLookupTableEndpoint.path}`, ({ params }) => {
@@ -350,7 +394,7 @@ export function lookupTableHandlers(
 
         store.set(imported)
 
-        return HttpResponse.json(toLookupTable(imported))
+        return HttpResponse.json(toLookupTable(imported, tradingPartnerStore))
       },
     ),
   ]

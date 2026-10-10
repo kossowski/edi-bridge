@@ -22,7 +22,7 @@ import {
   documentStructureLeaves,
 } from './document-structure'
 import { seedMappings } from './flow'
-import { createLookupTables, lookupTablesHandler, seedLookupTables } from './lookup-table'
+import { createLookupTables, lookupTableListHandler, seedLookupTables } from './lookup-table'
 import {
   createMappingDrafts,
   createMappingDraftStore,
@@ -276,7 +276,7 @@ describe('GET /mappings/:id/draft', () => {
   })
 
   it('picks Lookup Tables for its Lookup Table nodes from the listed ones', async () => {
-    server.use(...mappingHandlers(apiUrl), lookupTablesHandler(apiUrl))
+    server.use(...mappingHandlers(apiUrl), lookupTableListHandler(apiUrl))
     const drafts = await Promise.all(seedMappingDrafts.map(({ id }) => getDraft(id)))
 
     const listed = lookupTablesEndpoint.response.parse(
@@ -537,7 +537,7 @@ describe('GET /lookup-tables', () => {
   }
 
   it('lists the Lookup Tables of the Workspace and of single Trading Partners, by name', async () => {
-    server.use(lookupTablesHandler(apiUrl))
+    server.use(lookupTableListHandler(apiUrl))
     const tables = await listLookupTables()
 
     expect(new Set(tables.map(({ scope }) => scope.kind))).toEqual(
@@ -550,13 +550,13 @@ describe('GET /lookup-tables', () => {
   })
 
   it('serves an empty list', async () => {
-    server.use(lookupTablesHandler(apiUrl, []))
+    server.use(lookupTableListHandler(apiUrl, []))
 
     expect(await listLookupTables()).toEqual([])
   })
 
   it('serves a large volume of generated Lookup Tables', async () => {
-    server.use(lookupTablesHandler(apiUrl, createLookupTables({ count: 250 })))
+    server.use(lookupTableListHandler(apiUrl, createLookupTables({ count: 250 })))
     const tables = await listLookupTables()
 
     expect(tables).toHaveLength(250)

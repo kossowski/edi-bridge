@@ -296,6 +296,18 @@ describe('POST /lookup-tables/:id/import-preview', () => {
     ])
   })
 
+  it('matches the first row of a file that starts with a byte order mark', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const { rows } = await previewImport(units.id, '﻿ST;PCE\r\nKG;KGM')
+
+    expect(rows).toEqual([
+      { line: 1, status: 'unchanged', sourceCode: 'ST', targetCode: 'PCE' },
+      { line: 2, status: 'unchanged', sourceCode: 'KG', targetCode: 'KGM' },
+    ])
+  })
+
   it('rejects codes longer than the limit', async () => {
     server.use(...lookupTableHandlers(apiUrl))
     const units = seedLookupTableNamed('Units of measure')

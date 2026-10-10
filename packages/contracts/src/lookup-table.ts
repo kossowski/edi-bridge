@@ -11,9 +11,9 @@ export const lookupTableScopeSchema = z.discriminatedUnion('kind', [
 
 export type LookupTableScope = z.infer<typeof lookupTableScopeSchema>
 
-export const lookupCodeMaxLength = 70
+export const maxLookupCodeLength = 70
 
-const codeSchema = z.string().trim().min(1).max(lookupCodeMaxLength)
+const codeSchema = z.string().trim().min(1).max(maxLookupCodeLength)
 
 export const lookupTableEntrySchema = z.object({ sourceCode: codeSchema, targetCode: codeSchema })
 
@@ -141,7 +141,9 @@ export const lookupTableImportReasonSchema = z.enum(lookupTableImportReasons)
 
 export type LookupTableImportReason = z.infer<typeof lookupTableImportReasonSchema>
 
-const importedEntry = { line: z.number().int().positive(), ...lookupTableEntrySchema.shape }
+const line = z.number().int().positive()
+
+const importedEntry = { line, ...lookupTableEntrySchema.shape }
 
 export const lookupTableImportRowSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('added'), ...importedEntry }),
@@ -149,7 +151,7 @@ export const lookupTableImportRowSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('unchanged'), ...importedEntry }),
   z.object({
     status: z.literal('invalid'),
-    line: z.number().int().positive(),
+    line,
     cells: z.array(z.string()),
     reasons: z.array(lookupTableImportReasonSchema).min(1),
   }),

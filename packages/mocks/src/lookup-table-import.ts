@@ -1,8 +1,8 @@
 import {
-  lookupCodeMaxLength,
   type LookupTableEntry,
   type LookupTableImportReason,
   type LookupTableImportRow,
+  maxLookupCodeLength,
 } from '@edi-bridge/contracts'
 
 const delimiters = [';', ',', '\t'] as const
@@ -68,8 +68,8 @@ function reasonsOf(cells: ReadonlyArray<string>): LookupTableImportReason[] {
   return [
     ...(source === '' ? (['sourceCodeMissing'] as const) : []),
     ...(target === '' ? (['targetCodeMissing'] as const) : []),
-    ...(source.length > lookupCodeMaxLength ? (['sourceCodeTooLong'] as const) : []),
-    ...(target.length > lookupCodeMaxLength ? (['targetCodeTooLong'] as const) : []),
+    ...(source.length > maxLookupCodeLength ? (['sourceCodeTooLong'] as const) : []),
+    ...(target.length > maxLookupCodeLength ? (['targetCodeTooLong'] as const) : []),
   ]
 }
 
@@ -78,7 +78,12 @@ export function classifyImport(
   csv: string,
 ): LookupTableImportRow[] {
   const existing = new Map(entries.map(({ sourceCode, targetCode }) => [sourceCode, targetCode]))
-  const lines = csv.split(/\r?\n/).map((text, index) => ({ text, line: index + 1 }))
+
+  const lines = csv
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .map((text, index) => ({ text, line: index + 1 }))
+
   const filled = lines.filter(({ text }) => text.trim() !== '')
   const delimiter = delimiterOf(filled[0]?.text ?? '')
   const seen = new Set<string>()

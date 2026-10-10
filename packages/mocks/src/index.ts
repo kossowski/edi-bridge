@@ -38,7 +38,11 @@ import { messageTypeStructureHandler } from './message-type-structure'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
-import { seedTradingPartners, tradingPartnerHandlers } from './trading-partner'
+import {
+  createTradingPartnerStore,
+  seedTradingPartners,
+  tradingPartnerHandlers,
+} from './trading-partner'
 import { createWorkspaceStore, seedWorkspace, workspaceHandlers } from './workspace'
 
 export {
@@ -88,7 +92,7 @@ export {
   createLookupTableStore,
   lookupTableHandlers,
   type LookupTableRecord,
-  lookupTablesHandler,
+  lookupTableListHandler,
   type LookupTableStore,
   seedLookupTableNamed,
   seedLookupTables,
@@ -153,8 +157,10 @@ export {
 export {
   createTradingPartner,
   createTradingPartners,
+  createTradingPartnerStore,
   seedTradingPartners,
   tradingPartnerHandlers,
+  type TradingPartnerStore,
 } from './trading-partner'
 
 export {
@@ -191,6 +197,7 @@ export function createHandlers(
   } = {},
 ) {
   const runs = createRunStore(seedRuns())
+  const tradingPartnerStore = createTradingPartnerStore(tradingPartners)
   const workspaceStore = createWorkspaceStore(workspace)
   const channelStore = createChannelStore(channels)
   const flows = createFlowStore()
@@ -204,7 +211,10 @@ export function createHandlers(
 
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
-    ...tradingPartnerHandlers(apiUrl, { tradingPartners, workspace: workspaceStore }),
+    ...tradingPartnerHandlers(apiUrl, {
+      tradingPartners: tradingPartnerStore,
+      workspace: workspaceStore,
+    }),
     ...channelHandlers(apiUrl, { channels: channelStore }),
     ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings: mappingVersionStore }),
     publishedMappingVersionsHandler(apiUrl, mappingVersionStore),
@@ -238,6 +248,9 @@ export function createHandlers(
       versions: mappingVersionStore,
     }),
     messageTypeStructureHandler(apiUrl),
-    ...lookupTableHandlers(apiUrl, { lookupTables: lookupTableStore, tradingPartners }),
+    ...lookupTableHandlers(apiUrl, {
+      lookupTables: lookupTableStore,
+      tradingPartners: tradingPartnerStore,
+    }),
   ]
 }

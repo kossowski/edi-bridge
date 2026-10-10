@@ -7,10 +7,14 @@ import {
   createChannelEndpoint,
   createFlowEndpoint,
   createDocumentStructureEndpoint,
+  createLookupTableEndpoint,
+  createTradingPartnerEndpoint,
   documentStructureEndpoint,
   documentStructuresEndpoint,
   flowEndpoint,
   type FlowInput,
+  type LookupTableInput,
+  lookupTableEndpoint,
   lookupTablesEndpoint,
   type MappingGraph,
   mappingDraftEndpoint,
@@ -33,8 +37,11 @@ import {
   submitDocumentEndpoint,
   toPath,
   toSearchParams,
+  type TradingPartnerInput,
+  tradingPartnerSchema,
   updateDocumentStructureEndpoint,
   updateLookupTableEndpoint,
+  updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
@@ -48,6 +55,7 @@ import {
   seedFlows,
   seedLookupTableNamed,
   seedMappingDrafts,
+  seedTradingPartners,
 } from './index'
 
 const apiUrl = 'http://api.test'
@@ -70,6 +78,14 @@ async function getRun(id: string) {
   const response = await fetch(`${apiUrl}${toPath(runEndpoint.path, { id })}`)
 
   return runDetailSchema.parse(await response.json())
+}
+
+async function send(method: string, path: string, body: TradingPartnerInput | LookupTableInput) {
+  return fetch(`${apiUrl}${path}`, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 
 async function post(path: string, body?: ReprocessRunBody) {
@@ -366,6 +382,60 @@ describe('createHandlers', () => {
 
     server.resetHandlers(...createHandlers(apiUrl, { lookupTables: [] }))
     expect(await listLookupTables()).toEqual([])
+  })
+
+  it('scopes a Lookup Table to a Trading Partner created in the same session', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const partnerResponse = await send('POST', createTradingPartnerEndpoint.path, {
+      name: 'Havelland Feinkost GmbH',
+      gln: '4012345000009',
+      characterSet: 'UNOC',
+      acknowledgementTimeLimitHours: 24,
+    })
+
+    const partner = tradingPartnerSchema.parse(await partnerResponse.json())
+
+    const response = await send('POST', createLookupTableEndpoint.path, {
+      name: 'Havelland units',
+      scope: { kind: 'tradingPartner', tradingPartnerId: partner.id },
+      entries: [],
+    })
+
+    expect(response.status).toBe(201)
+    expect(lookupTableEndpoint.response.parse(await response.json()).scope).toEqual({
+      kind: 'tradingPartner',
+      tradingPartner: { id: partner.id, name: 'Havelland Feinkost GmbH' },
+    })
+  })
+
+  it('shows the current name of a renamed Trading Partner in Lookup Table scopes', async () => {
+    server.use(...createHandlers(apiUrl))
+    const hansemarkt = seedTradingPartners.find(({ name }) => name === 'Hansemarkt GmbH')!
+    const units = seedLookupTableNamed('Hansemarkt units')
+
+    await send('PUT', toPath(updateTradingPartnerEndpoint.path, hansemarkt), {
+      name: 'Hansemarkt Nord GmbH',
+      gln: hansemarkt.gln,
+      characterSet: hansemarkt.characterSet,
+      acknowledgementTimeLimitHours: hansemarkt.acknowledgementTimeLimitHours,
+    })
+
+    const table = lookupTableEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${toPath(lookupTableEndpoint.path, units)}`)).json(),
+    )
+
+    const listed = lookupTablesEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${lookupTablesEndpoint.path}`)).json(),
+    )
+
+    const renamed = {
+      kind: 'tradingPartner',
+      tradingPartner: { id: hansemarkt.id, name: 'Hansemarkt Nord GmbH' },
+    }
+
+    expect(table.scope).toEqual(renamed)
+    expect(listed.find(({ id }) => id === units.id)?.scope).toEqual(renamed)
   })
 
   it('previews a Lookup Table node with the entries saved for the table', async () => {

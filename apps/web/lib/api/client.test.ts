@@ -9,7 +9,7 @@ import {
   createWorkspace,
   documentStructureHandlers,
   documentStructureOrigins,
-  lookupTablesHandler,
+  lookupTableListHandler,
   mappingHandlers,
   mappingVersionHandlers,
   seedMappingDrafts,
@@ -274,7 +274,7 @@ describe('publishMappingDraft', () => {
 
 describe('listLookupTables', () => {
   it('lists the Lookup Tables with their scope, sorted by name', async () => {
-    server.use(lookupTablesHandler(apiUrl))
+    server.use(lookupTableListHandler(apiUrl))
 
     const tables = await listLookupTables()
 

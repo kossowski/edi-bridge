@@ -163,23 +163,49 @@ export function createTradingPartners({
   return tradingPartners
 }
 
+export type TradingPartnerStore = {
+  all: () => readonly TradingPartner[]
+  get: (id: string) => TradingPartner | undefined
+  set: (tradingPartner: TradingPartner) => void
+}
+
+export function createTradingPartnerStore(
+  tradingPartners: ReadonlyArray<TradingPartner> = seedTradingPartners,
+): TradingPartnerStore {
+  const byId = new Map(tradingPartners.map((tradingPartner) => [tradingPartner.id, tradingPartner]))
+
+  return {
+    all: () => [...byId.values()],
+    get: (id) => byId.get(id),
+    set: (tradingPartner) => {
+      byId.set(tradingPartner.id, tradingPartner)
+    },
+  }
+}
+
+export function toTradingPartnerStore(
+  tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore = seedTradingPartners,
+) {
+  return 'get' in tradingPartners ? tradingPartners : createTradingPartnerStore(tradingPartners)
+}
+
 export function tradingPartnerHandlers(
   apiUrl: string,
   {
     tradingPartners = seedTradingPartners,
     workspace = seedWorkspace,
   }: {
-    tradingPartners?: ReadonlyArray<TradingPartner>
+    tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
     workspace?: Workspace | WorkspaceStore
   } = {},
 ) {
-  const byId = new Map(tradingPartners.map((tradingPartner) => [tradingPartner.id, tradingPartner]))
+  const store = toTradingPartnerStore(tradingPartners)
   const workspaceStore = toWorkspaceStore(workspace)
 
   function glnTaken(gln: string, ownId?: string) {
-    return [...byId.values()].some(
-      (tradingPartner) => tradingPartner.gln === gln && tradingPartner.id !== ownId,
-    )
+    return store
+      .all()
+      .some((tradingPartner) => tradingPartner.gln === gln && tradingPartner.id !== ownId)
   }
 
   async function parseInput(
@@ -199,10 +225,10 @@ export function tradingPartnerHandlers(
 
   return [
     http.get(`${apiUrl}${tradingPartnersEndpoint.path}`, () =>
-      HttpResponse.json([...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'))),
+      HttpResponse.json([...store.all()].sort((a, b) => a.name.localeCompare(b.name, 'de'))),
     ),
     http.get<{ id: string }>(`${apiUrl}${tradingPartnerEndpoint.path}`, ({ params }) => {
-      const tradingPartner = byId.get(params.id)
+      const tradingPartner = store.get(params.id)
 
       return tradingPartner ? HttpResponse.json(tradingPartner) : notFound()
     }),
@@ -224,14 +250,14 @@ export function tradingPartnerHandlers(
         onboarding: notStarted,
       }
 
-      byId.set(created.id, created)
+      store.set(created)
 
       return HttpResponse.json(created, { status: 201 })
     }),
     http.put<{ id: string }>(
       `${apiUrl}${updateTradingPartnerEndpoint.path}`,
       async ({ params, request }) => {
-        const existing = byId.get(params.id)
+        const existing = store.get(params.id)
 
         if (!existing) {
           return notFound()
@@ -248,13 +274,13 @@ export function tradingPartnerHandlers(
         }
 
         const updated = { ...existing, ...parsed.input }
-        byId.set(updated.id, updated)
+        store.set(updated)
 
         return HttpResponse.json(updated)
       },
     ),
     http.post<{ id: string }>(`${apiUrl}${switchToProductionEndpoint.path}`, ({ params }) => {
-      const existing = byId.get(params.id)
+      const existing = store.get(params.id)
 
       if (!existing) {
         return notFound()
@@ -265,7 +291,7 @@ export function tradingPartnerHandlers(
       }
 
       const updated = { ...existing, testMode: false }
-      byId.set(updated.id, updated)
+      store.set(updated)
 
       return HttpResponse.json(updated)
     }),

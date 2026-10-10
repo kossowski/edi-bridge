@@ -224,7 +224,7 @@ export {
   createLookupTableEndpoint,
   deleteLookupTableEndpoint,
   importLookupTableEndpoint,
-  lookupCodeMaxLength,
+  maxLookupCodeLength,
   type LookupTable,
   lookupTableEndpoint,
   lookupTableEntriesSchema,

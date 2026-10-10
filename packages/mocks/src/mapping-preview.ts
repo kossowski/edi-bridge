@@ -48,10 +48,7 @@ function distinct(notes: ReadonlyArray<PreviewNote>) {
 
 export function lookUpIn(lookupTables: LookupTableStore): LookUp {
   return (lookupTableId, value) =>
-    lookupTableId === null
-      ? undefined
-      : lookupTables.get(lookupTableId)?.entries.find(({ sourceCode }) => sourceCode === value)
-          ?.targetCode
+    lookupTableId === null ? undefined : lookupTables.translate(lookupTableId, value)
 }
 
 export async function previewOutput({
