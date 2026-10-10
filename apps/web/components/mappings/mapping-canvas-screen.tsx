@@ -9,6 +9,7 @@ import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
+import { MappingPreviewPanel } from '@/components/mappings/mapping-preview-panel'
 import { documentTree, edifactTree, type TreeItem } from '@/components/mappings/mapping-tree'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
@@ -182,8 +183,13 @@ function MappingView({ draft }: { draft: MappingDraft }) {
       </dl>
       <DesktopOnlyNotice />
       {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
-      <div className="hidden min-h-[32rem] flex-1 flex-col lg:flex">
-        {desktop && <Canvas draft={draft} />}
+      <div className="hidden min-h-[32rem] flex-1 flex-col gap-4 lg:flex">
+        {desktop && (
+          <>
+            <Canvas draft={draft} />
+            <MappingPreviewPanel draft={draft} />
+          </>
+        )}
       </div>
     </MappingCanvasProvider>
   )

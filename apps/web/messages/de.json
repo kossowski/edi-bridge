@@ -1189,6 +1189,38 @@
       "inputTaken": "{input} ist bereits mit {source} verknüpft. Entfernen Sie zuerst diese Verknüpfung.",
       "circle": "{target} liefert bereits Werte an {source}; diese Verknüpfung würde einen Zirkelbezug erzeugen.",
       "needsPart": "{port} nimmt nur einen ganzen wiederholten Teil wie lines[] oder SG25 auf, kein einzelnes Feld oder Element."
+    },
+    "preview": {
+      "title": "Vorschau",
+      "show": "Vorschau einblenden",
+      "hide": "Vorschau ausblenden",
+      "sample": "Beispiel",
+      "source": "Beispiel-Document",
+      "target": "Ziel-Document",
+      "sourceLabel": "Beispiel-Document {name}",
+      "targetLabel": "Ziel-Document für {name}",
+      "size": "{format}, {count, plural, one {# Zeile} other {# Zeilen}}",
+      "loading": "Beispiele werden geladen",
+      "building": "Vorschau wird erstellt",
+      "updating": "Wird aktualisiert …",
+      "upToDate": "Aktuell",
+      "updated": "Vorschau für {name} aktualisiert",
+      "empty": {
+        "title": "Noch keine Beispiele",
+        "description": "Die Vorschau zeigt das Ziel-Document für ein Beispiel-Document der Quelle. Dieses Mapping hat noch keine Beispiele."
+      },
+      "error": {
+        "samples": "Die Beispiele konnten nicht geladen werden.",
+        "preview": "Die Vorschau konnte nicht erstellt werden.",
+        "retry": "Erneut versuchen"
+      },
+      "notes": {
+        "title": "{count, plural, one {# Ziel bleibt leer} other {# Ziele bleiben leer}}",
+        "invalidTransform": "{transform} ist ungültig konfiguriert.",
+        "noLookupMatch": "{transform} hat in seiner Lookup Table keinen Treffer gefunden.",
+        "expressionFailed": "{transform} ist bei diesem Beispiel fehlgeschlagen.",
+        "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispielen noch nicht in der Vorschau berechnet."
+      }
     }
   },
   "ManualSubmission": {
