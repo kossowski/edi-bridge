@@ -4,13 +4,17 @@
 
 **Blocked by:** 06 (Mock stack tracer)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Source and target trees render from mocked structures, including nested and repeating parts
-- [ ] Links can be drawn and removed with mouse and keyboard
-- [ ] Hovering or selecting an EDIFACT segment/element shows its meaning (e.g. DTM+137)
-- [ ] Works in both directions (Document Structure → Message Type and Message Type → Document Structure)
-- [ ] Below desktop width, a desktop-only notice replaces the canvas
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Source and target trees render from mocked structures, including nested and repeating parts
+- [x] Links can be drawn and removed with mouse and keyboard
+- [x] Hovering or selecting an EDIFACT segment/element shows its meaning (e.g. DTM+137)
+- [x] Works in both directions (Document Structure → Message Type and Message Type → Document Structure)
+- [x] Below desktop width, a desktop-only notice replaces the canvas
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #17, #18, #20, #21
