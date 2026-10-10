@@ -6,10 +6,18 @@ export type BucketRow = {
   delivered: number
   failed: number
   errorRate: number | null
+  inProgress: boolean
 }
 
-export function toBucketRows(throughput: ReadonlyArray<ThroughputBucket>): BucketRow[] {
-  return throughput.map((bucket) => ({ ...bucket, errorRate: errorRate(bucket) }))
+export function toBucketRows(
+  throughput: ReadonlyArray<ThroughputBucket>,
+  asOf: number,
+): BucketRow[] {
+  return throughput.map((bucket) => ({
+    ...bucket,
+    errorRate: errorRate(bucket),
+    inProgress: Date.parse(bucket.end) > asOf,
+  }))
 }
 
 export function totalsOf(rows: ReadonlyArray<BucketRow>) {
@@ -22,6 +30,14 @@ export function totalsOf(rows: ReadonlyArray<BucketRow>) {
     finished: delivered + failed,
     errorRate: errorRate({ delivered, failed }),
   }
+}
+
+export type Totals = ReturnType<typeof totalsOf>
+
+export type OverviewSeries = {
+  rows: BucketRow[]
+  totals: Totals
+  timeWindow: OverviewWindow
 }
 
 export function peakOf<Row>(rows: ReadonlyArray<Row>, value: (row: Row) => number | null) {
@@ -44,14 +60,16 @@ export function rateTicks(rows: ReadonlyArray<BucketRow>) {
   return Array.from({ length: count + 1 }, (_, index) => Math.round(index * step * 100) / 100)
 }
 
+const timeOfDay = { hour: 'numeric', minute: '2-digit' } as const
+
 export const tickFormats = {
-  '1h': { hour: 'numeric', minute: '2-digit' },
-  '24h': { hour: 'numeric', minute: '2-digit' },
-  '7d': { weekday: 'short', hour: 'numeric', minute: '2-digit' },
+  '1h': timeOfDay,
+  '24h': timeOfDay,
+  '7d': { weekday: 'short', ...timeOfDay },
 } as const satisfies Record<OverviewWindow, Intl.DateTimeFormatOptions>
 
 export const rangeFormats = {
-  '1h': { hour: 'numeric', minute: '2-digit' },
-  '24h': { hour: 'numeric', minute: '2-digit' },
-  '7d': { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' },
+  '1h': timeOfDay,
+  '24h': timeOfDay,
+  '7d': { weekday: 'short', day: 'numeric', month: 'short', ...timeOfDay },
 } as const satisfies Record<OverviewWindow, Intl.DateTimeFormatOptions>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { type ReactNode, useId } from 'react'
 import {
   Bar,
@@ -16,12 +16,11 @@ import {
 
 import {
   type BucketRow,
+  type OverviewSeries,
   peakOf,
-  rangeFormats,
   rateTicks,
-  tickFormats,
-  totalsOf,
 } from '@/components/overview/overview-data'
+import { useFormats } from '@/components/overview/overview-formats'
 import {
   Card,
   CardContent,
@@ -40,15 +39,13 @@ import {
   TableRow,
 } from '@edi-bridge/ui/components/table'
 
-import type { OverviewWindow } from '@edi-bridge/contracts'
-
 const deliveredColor = 'var(--chart-1)'
 
 const failedColor = 'var(--chart-2)'
 
-const failedInk = 'color-mix(in oklab, var(--chart-2), black 45%)'
+const failedHatchStroke = 'color-mix(in oklab, var(--chart-2), black 45%)'
 
-const failedHatch = `repeating-linear-gradient(-45deg, ${failedInk} 0 1.5px, ${failedColor} 1.5px 4px)`
+const failedHatch = `repeating-linear-gradient(-45deg, ${failedHatchStroke} 0 1.5px, ${failedColor} 1.5px 4px)`
 
 const chartConfig = {
   delivered: { color: deliveredColor },
@@ -58,19 +55,7 @@ const chartConfig = {
 
 const chartClassName = 'aspect-auto h-64 w-full'
 
-function useFormats(window: OverviewWindow) {
-  const format = useFormatter()
-
-  return {
-    tick: (start: string) => format.dateTime(new Date(start), tickFormats[window]),
-    range: ({ start, end }: Pick<BucketRow, 'start' | 'end'>) =>
-      format.dateTimeRange(new Date(start), new Date(end), rangeFormats[window]),
-    count: (value: number) => format.number(value),
-    compact: (value: number) => format.number(value, { notation: 'compact' }),
-    percent: (value: number) =>
-      format.number(value, { style: 'percent', maximumFractionDigits: 1 }),
-  }
-}
+const series = ['delivered', 'failed'] as const
 
 function Swatch({ series }: { series: 'delivered' | 'failed' }) {
   return (
@@ -86,10 +71,10 @@ function BucketTooltip({
   active,
   activeIndex,
   rows,
-  window,
-}: Partial<TooltipContentProps> & { rows: BucketRow[]; window: OverviewWindow }) {
+  timeWindow,
+}: Partial<TooltipContentProps> & Pick<OverviewSeries, 'rows' | 'timeWindow'>) {
   const t = useTranslations('Overview')
-  const formats = useFormats(window)
+  const formats = useFormats(timeWindow)
   const row = activeIndex === undefined ? undefined : rows[Number(activeIndex)]
 
   if (!active || !row) {
@@ -98,19 +83,22 @@ function BucketTooltip({
 
   return (
     <div className="bg-background border-border/50 grid min-w-40 gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl">
-      <p className="font-medium">{formats.range(row)}</p>
+      <p className="font-medium">
+        {formats.range(row)}
+        {row.inProgress && (
+          <span className="text-muted-foreground block font-normal">{t('inProgress')}</span>
+        )}
+      </p>
       <dl className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-1">
-        <Swatch series="failed" />
-        <dt className="text-muted-foreground">{t('series.failed')}</dt>
-        <dd className="text-right font-mono tabular-nums">{formats.count(row.failed)}</dd>
         <Swatch series="delivered" />
         <dt className="text-muted-foreground">{t('series.delivered')}</dt>
         <dd className="text-right font-mono tabular-nums">{formats.count(row.delivered)}</dd>
+        <Swatch series="failed" />
+        <dt className="text-muted-foreground">{t('series.failed')}</dt>
+        <dd className="text-right font-mono tabular-nums">{formats.count(row.failed)}</dd>
         <span aria-hidden />
         <dt className="text-muted-foreground">{t('series.errorRate')}</dt>
-        <dd className="text-right font-mono tabular-nums">
-          {row.errorRate === null ? t('table.noErrorRate') : formats.percent(row.errorRate)}
-        </dd>
+        <dd className="text-right font-mono tabular-nums">{formats.errorRate(row.errorRate)}</dd>
       </dl>
     </div>
   )
@@ -158,22 +146,42 @@ function ChartCard({
 
 const axisProps = { tickLine: false, axisLine: false, tickMargin: 8 } as const
 
-export function ThroughputChart({ rows, window }: { rows: BucketRow[]; window: OverviewWindow }) {
+function toBarRows(rows: ReadonlyArray<BucketRow>) {
+  return rows.map(({ start, delivered, failed, inProgress }) => ({
+    start,
+    delivered: inProgress ? null : delivered,
+    failed: inProgress ? null : failed,
+    deliveredInProgress: inProgress ? delivered : null,
+    failedInProgress: inProgress ? failed : null,
+  }))
+}
+
+const inProgressBarProps = { fillOpacity: 0.35, strokeDasharray: '3 2' } as const
+
+const barProps = {
+  isAnimationActive: false,
+  maxBarSize: 24,
+  stackId: 'runs',
+  stroke: 'var(--card)',
+  strokeWidth: 1,
+} as const
+
+export function ThroughputChart({ rows, totals, timeWindow }: OverviewSeries) {
   const t = useTranslations('Overview')
-  const formats = useFormats(window)
+  const formats = useFormats(timeWindow)
   const hatchId = `failed-hatch-${useId().replaceAll(/[^\w-]/g, '')}`
-  const totals = totalsOf(rows)
   const peak = peakOf(rows, (row) => row.delivered + row.failed)
+  const title = t('throughput.title')
 
   return (
     <ChartCard
-      description={t('throughput.description', { bucket: t(`bucket.${window}`) })}
+      description={t('throughput.description', { bucket: t(`bucket.${timeWindow}`) })}
       legend={
         <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          {(['delivered', 'failed'] as const).map((series) => (
-            <li key={series} className="flex items-center gap-1.5">
-              <Swatch series={series} />
-              {t(`series.${series}`)}
+          {series.map((key) => (
+            <li key={key} className="flex items-center gap-1.5">
+              <Swatch series={key} />
+              {t(`series.${key}`)}
             </li>
           ))}
         </ul>
@@ -181,13 +189,16 @@ export function ThroughputChart({ rows, window }: { rows: BucketRow[]; window: O
       summary={t('throughput.summary', {
         delivered: totals.delivered,
         failed: totals.failed,
-        period: t(`period.${window}`),
+        period: t(`period.${timeWindow}`),
         peakTime: peak ? formats.range(peak) : '',
         peak: peak ? peak.delivered + peak.failed : 0,
       })}
-      title={t('throughput.title')}>
+      title={title}>
       <ChartContainer config={chartConfig} className={chartClassName}>
-        <BarChart data={rows} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+        <BarChart
+          data={toBarRows(rows)}
+          margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+          aria-label={title}>
           <defs>
             <pattern
               id={hatchId}
@@ -196,31 +207,29 @@ export function ThroughputChart({ rows, window }: { rows: BucketRow[]; window: O
               patternUnits="userSpaceOnUse"
               width="4">
               <rect fill={failedColor} height="4" width="4" />
-              <line stroke={failedInk} strokeWidth="1.5" x1="0" x2="0" y1="0" y2="4" />
+              <line stroke={failedHatchStroke} strokeWidth="1.5" x1="0" x2="0" y1="0" y2="4" />
             </pattern>
           </defs>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="start" minTickGap={24} tickFormatter={formats.tick} {...axisProps} />
           <YAxis allowDecimals={false} tickFormatter={formats.compact} width={40} {...axisProps} />
-          <ChartTooltip content={<BucketTooltip rows={rows} window={window} />} />
+          <ChartTooltip content={<BucketTooltip rows={rows} timeWindow={timeWindow} />} />
+          <Bar {...barProps} dataKey="delivered" fill={deliveredColor} />
+          <Bar {...barProps} dataKey="failed" fill={`url(#${hatchId})`} radius={[4, 4, 0, 0]} />
           <Bar
-            dataKey="delivered"
+            {...barProps}
+            {...inProgressBarProps}
+            dataKey="deliveredInProgress"
             fill={deliveredColor}
-            isAnimationActive={false}
-            maxBarSize={24}
-            stackId="runs"
-            stroke="var(--card)"
-            strokeWidth={1}
+            stroke={deliveredColor}
           />
           <Bar
-            dataKey="failed"
+            {...barProps}
+            {...inProgressBarProps}
+            dataKey="failedInProgress"
             fill={`url(#${hatchId})`}
-            isAnimationActive={false}
-            maxBarSize={24}
             radius={[4, 4, 0, 0]}
-            stackId="runs"
-            stroke="var(--card)"
-            strokeWidth={1}
+            stroke={failedColor}
           />
         </BarChart>
       </ChartContainer>
@@ -254,26 +263,29 @@ function rateDot(
   )
 }
 
-export function ErrorRateChart({ rows, window }: { rows: BucketRow[]; window: OverviewWindow }) {
+export function ErrorRateChart({ rows, totals, timeWindow }: OverviewSeries) {
   const t = useTranslations('Overview')
-  const formats = useFormats(window)
-  const totals = totalsOf(rows)
+  const formats = useFormats(timeWindow)
   const peak = peakOf(rows, (row) => row.errorRate)
   const lastIndex = rows.findLastIndex((row) => row.errorRate !== null)
   const ticks = rateTicks(rows)
+  const title = t('errorRate.title')
 
   return (
     <ChartCard
-      description={t('errorRate.description', { bucket: t(`bucket.${window}`) })}
+      description={t('errorRate.description', { bucket: t(`bucket.${timeWindow}`) })}
       summary={t('errorRate.summary', {
-        period: t(`period.${window}`),
-        rate: totals.errorRate === null ? t('kpis.noErrorRate') : formats.percent(totals.errorRate),
+        period: t(`period.${timeWindow}`),
+        rate: formats.errorRate(totals.errorRate),
         peakTime: peak ? formats.range(peak) : '',
         peakRate: peak?.errorRate == null ? '' : formats.percent(peak.errorRate),
       })}
-      title={t('errorRate.title')}>
+      title={title}>
       <ChartContainer config={chartConfig} className={chartClassName}>
-        <LineChart data={rows} margin={{ top: 8, right: 48, bottom: 0, left: 0 }}>
+        <LineChart
+          data={rows}
+          margin={{ top: 8, right: 48, bottom: 0, left: 0 }}
+          aria-label={title}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="start" minTickGap={24} tickFormatter={formats.tick} {...axisProps} />
           <YAxis
@@ -283,7 +295,7 @@ export function ErrorRateChart({ rows, window }: { rows: BucketRow[]; window: Ov
             width={44}
             {...axisProps}
           />
-          <ChartTooltip content={<BucketTooltip rows={rows} window={window} />} />
+          <ChartTooltip content={<BucketTooltip rows={rows} timeWindow={timeWindow} />} />
           <Line
             activeDot={{ r: 5, fill: failedColor, stroke: 'var(--card)', strokeWidth: 2 }}
             dataKey="errorRate"
@@ -299,43 +311,48 @@ export function ErrorRateChart({ rows, window }: { rows: BucketRow[]; window: Ov
   )
 }
 
-export function BucketTable({ rows, window }: { rows: BucketRow[]; window: OverviewWindow }) {
+const cellClassName = 'px-1.5 whitespace-normal sm:px-2'
+
+const numberCellClassName = `${cellClassName} text-right tabular-nums`
+
+export function BucketTable({ rows, timeWindow }: Pick<OverviewSeries, 'rows' | 'timeWindow'>) {
   const t = useTranslations('Overview')
-  const formats = useFormats(window)
+  const formats = useFormats(timeWindow)
 
   return (
     <details className="group rounded-xl border">
       <summary className="hover:bg-muted/50 focus-visible:ring-ring/50 cursor-pointer rounded-xl px-4 py-3 text-sm font-medium outline-none focus-visible:ring-[3px]">
         {t('table.toggle')}
       </summary>
-      <Table>
+      <Table className="text-xs sm:text-sm">
         <TableCaption className="sr-only">
-          {t('table.caption', { bucket: t(`bucket.${window}`) })}
+          {t('table.caption', { bucket: t(`bucket.${timeWindow}`) })}
         </TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead scope="col">{t('table.columns.period')}</TableHead>
-            <TableHead scope="col" className="text-right">
-              {t('table.columns.delivered')}
+            <TableHead scope="col" className={cellClassName}>
+              {t('table.columns.period')}
             </TableHead>
-            <TableHead scope="col" className="text-right">
-              {t('table.columns.failed')}
-            </TableHead>
-            <TableHead scope="col" className="text-right">
-              {t('table.columns.errorRate')}
-            </TableHead>
+            {(['delivered', 'failed', 'errorRate'] as const).map((key) => (
+              <TableHead key={key} scope="col" className={`${cellClassName} text-right`}>
+                {t(`series.${key}`)}
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.start}>
-              <TableCell>{formats.range(row)}</TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formats.count(row.delivered)}
+              <TableCell className={cellClassName}>
+                {formats.range(row)}
+                {row.inProgress && (
+                  <span className="text-muted-foreground block">{t('inProgress')}</span>
+                )}
               </TableCell>
-              <TableCell className="text-right tabular-nums">{formats.count(row.failed)}</TableCell>
-              <TableCell className="text-right tabular-nums">
-                {row.errorRate === null ? t('table.noErrorRate') : formats.percent(row.errorRate)}
+              <TableCell className={numberCellClassName}>{formats.count(row.delivered)}</TableCell>
+              <TableCell className={numberCellClassName}>{formats.count(row.failed)}</TableCell>
+              <TableCell className={numberCellClassName}>
+                {formats.errorRate(row.errorRate)}
               </TableCell>
             </TableRow>
           ))}

@@ -1,20 +1,20 @@
 'use client'
 
-import { AlertCircleIcon, ChartLineData01Icon } from '@hugeicons/core-free-icons'
+import { ChartLineData01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useQuery } from '@tanstack/react-query'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
+import { LoadError } from '@/components/load-error'
 import { BucketTable, ErrorRateChart, ThroughputChart } from '@/components/overview/overview-charts'
-import { type BucketRow, toBucketRows, totalsOf } from '@/components/overview/overview-data'
-import { overviewQuery } from '@/lib/api/queries'
+import { type Totals, toBucketRows, totalsOf } from '@/components/overview/overview-data'
+import { useFormats } from '@/components/overview/overview-formats'
+import { overviewKeys, overviewQuery } from '@/lib/api/queries'
 import { type OverviewWindow, overviewWindows } from '@edi-bridge/contracts'
-import { Button } from '@edi-bridge/ui/components/button'
 import { Card } from '@edi-bridge/ui/components/card'
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -29,7 +29,7 @@ function WindowSwitch({
   onChange,
 }: {
   value: OverviewWindow
-  onChange: (window: OverviewWindow) => void
+  onChange: (timeWindow: OverviewWindow) => void
 }) {
   const t = useTranslations('Overview.window')
 
@@ -41,15 +41,15 @@ function WindowSwitch({
       variant="outline"
       aria-label={t('label')}
       onValueChange={(next) => {
-        const window = overviewWindows.find((candidate) => candidate === next[0])
+        const timeWindow = overviewWindows.find((candidate) => candidate === next[0])
 
-        if (window) {
-          onChange(window)
+        if (timeWindow) {
+          onChange(timeWindow)
         }
       }}>
-      {overviewWindows.map((window) => (
-        <ToggleGroupItem key={window} value={window}>
-          {t(window)}
+      {overviewWindows.map((timeWindow) => (
+        <ToggleGroupItem key={timeWindow} value={timeWindow}>
+          {t(timeWindow)}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
@@ -58,33 +58,28 @@ function WindowSwitch({
 
 const kpis = ['finished', 'delivered', 'failed', 'errorRate'] as const
 
-function Kpis({ rows, window }: { rows: BucketRow[] | undefined; window: OverviewWindow }) {
+function Kpis({ totals, timeWindow }: { totals: Totals | undefined; timeWindow: OverviewWindow }) {
   const t = useTranslations('Overview')
-  const format = useFormatter()
-  const totals = rows && totalsOf(rows)
+  const formats = useFormats(timeWindow)
 
-  function valueOf(kpi: (typeof kpis)[number]) {
+  function kpiValue(kpi: (typeof kpis)[number]) {
     if (!totals) {
       return <Skeleton className="h-8 w-20" />
     }
 
-    if (kpi === 'errorRate') {
-      return totals.errorRate === null
-        ? t('kpis.noErrorRate')
-        : format.number(totals.errorRate, { style: 'percent', maximumFractionDigits: 1 })
-    }
-
-    return format.number(totals[kpi])
+    return kpi === 'errorRate' ? formats.errorRate(totals.errorRate) : formats.count(totals[kpi])
   }
 
   return (
     <dl
-      aria-label={t('kpis.label', { period: t(`period.${window}`) })}
+      aria-label={t('kpis.label', { period: t(`period.${timeWindow}`) })}
       className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       {kpis.map((kpi) => (
         <Card key={kpi} size="sm" className="gap-1">
-          <dt className="text-muted-foreground px-3 text-sm">{t(`kpis.${kpi}`)}</dt>
-          <dd className="px-3 text-2xl font-semibold tracking-tight">{valueOf(kpi)}</dd>
+          <dt className="text-muted-foreground px-3 text-sm">
+            {kpi === 'finished' ? t('kpis.finished') : t(`series.${kpi}`)}
+          </dt>
+          <dd className="mt-auto px-3 text-2xl font-semibold tracking-tight">{kpiValue(kpi)}</dd>
         </Card>
       ))}
     </dl>
@@ -109,36 +104,35 @@ function LoadingCharts() {
 
 export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: OverviewWindow }) {
   const t = useTranslations()
-  const [window, setWindow] = useState<OverviewWindow>(defaultWindow)
-  const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(overviewQuery(window))
-  const rows = data && toBucketRows(data.throughput)
-  const shownWindow = data?.window ?? window
+  const [timeWindow, setTimeWindow] = useState<OverviewWindow>(defaultWindow)
+  const queryClient = useQueryClient()
+
+  const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(
+    overviewQuery(timeWindow),
+  )
+
+  const shownWindow = data?.window ?? timeWindow
+  const fetchedAt = queryClient.getQueryState(overviewKeys.window(shownWindow))?.dataUpdatedAt ?? 0
+  const rows = data && toBucketRows(data.throughput, fetchedAt)
+  const totals = rows && totalsOf(rows)
   const busy = isPending || isPlaceholderData
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{t('Navigation.overview')}</h1>
-        <WindowSwitch value={window} onChange={setWindow} />
+        <WindowSwitch value={timeWindow} onChange={setTimeWindow} />
       </div>
       <p aria-live="polite" className="sr-only">
-        {busy ? t('Overview.loading') : ''}
+        {busy && !isError ? t('Overview.loading') : ''}
       </p>
-      {isError && !data ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <HugeiconsIcon icon={AlertCircleIcon} strokeWidth={2} />
-            </EmptyMedia>
-            <EmptyTitle>{t('Overview.error.title')}</EmptyTitle>
-            <EmptyDescription>{t('Overview.error.description')}</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button variant="outline" onClick={() => void refetch()}>
-              {t('Overview.error.retry')}
-            </Button>
-          </EmptyContent>
-        </Empty>
+      {isError ? (
+        <LoadError
+          description={t('Overview.error.description')}
+          retryLabel={t('Overview.error.retry')}
+          title={t('Overview.error.title')}
+          onRetry={() => void refetch()}
+        />
       ) : (
         <div
           aria-busy={busy}
@@ -146,10 +140,10 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
             'flex flex-col gap-4',
             isPlaceholderData && 'opacity-60 transition-opacity',
           )}>
-          <Kpis rows={rows} window={shownWindow} />
-          {!rows ? (
+          <Kpis timeWindow={shownWindow} totals={totals} />
+          {!rows || !totals ? (
             <LoadingCharts />
-          ) : totalsOf(rows).finished === 0 ? (
+          ) : totals.finished === 0 ? (
             <Empty className="border">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -164,10 +158,10 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
           ) : (
             <>
               <div className="grid gap-4 lg:grid-cols-2">
-                <ThroughputChart rows={rows} window={shownWindow} />
-                <ErrorRateChart rows={rows} window={shownWindow} />
+                <ThroughputChart rows={rows} timeWindow={shownWindow} totals={totals} />
+                <ErrorRateChart rows={rows} timeWindow={shownWindow} totals={totals} />
               </div>
-              <BucketTable rows={rows} window={shownWindow} />
+              <BucketTable rows={rows} timeWindow={shownWindow} />
             </>
           )}
         </div>

@@ -38,7 +38,6 @@
   },
   "Placeholder": {
     "title": "Not built yet",
-    "overview": "Traffic, failed Runs and Overdue Interchanges at a glance.",
     "runs": "Every Run with its outcome, steps, errors and output.",
     "orderLifecycle": "All Messages that share one Business Reference, in order.",
     "tradingPartners": "The Trading Partners of this Workspace, their Channels and Flows.",
@@ -77,13 +76,11 @@
       "failed": "Failed",
       "errorRate": "Error rate"
     },
+    "noErrorRate": "None",
+    "inProgress": "In progress",
     "kpis": {
       "label": "Totals for {period}",
-      "finished": "Finished Runs",
-      "delivered": "Delivered",
-      "failed": "Failed",
-      "errorRate": "Error rate",
-      "noErrorRate": "None"
+      "finished": "Finished Runs"
     },
     "throughput": {
       "title": "Throughput",
@@ -99,12 +96,8 @@
       "toggle": "Show values as table",
       "caption": "Delivered and failed Runs and the error rate per {bucket}",
       "columns": {
-        "period": "Period",
-        "delivered": "Delivered",
-        "failed": "Failed",
-        "errorRate": "Error rate"
-      },
-      "noErrorRate": "–"
+        "period": "Period"
+      }
     },
     "empty": {
       "title": "No finished Runs",

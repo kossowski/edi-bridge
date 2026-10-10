@@ -38,7 +38,6 @@
   },
   "Placeholder": {
     "title": "Noch nicht gebaut",
-    "overview": "Datenverkehr, fehlgeschlagene Runs und überfällige Interchanges auf einen Blick.",
     "runs": "Jeder Run mit Ergebnis, Schritten, Fehlern und Ausgabe.",
     "orderLifecycle": "Alle Messages mit derselben Business Reference in zeitlicher Reihenfolge.",
     "tradingPartners": "Die Trading Partners dieses Workspace mit ihren Channels und Flows.",
@@ -77,13 +76,11 @@
       "failed": "Fehlgeschlagen",
       "errorRate": "Fehlerquote"
     },
+    "noErrorRate": "Keine",
+    "inProgress": "Läuft noch",
     "kpis": {
       "label": "Summen aus {period}",
-      "finished": "Abgeschlossene Runs",
-      "delivered": "Zugestellt",
-      "failed": "Fehlgeschlagen",
-      "errorRate": "Fehlerquote",
-      "noErrorRate": "Keine"
+      "finished": "Abgeschlossene Runs"
     },
     "throughput": {
       "title": "Durchsatz",
@@ -99,12 +96,8 @@
       "toggle": "Werte als Tabelle anzeigen",
       "caption": "Zugestellte und fehlgeschlagene Runs und die Fehlerquote pro {bucket}",
       "columns": {
-        "period": "Zeitraum",
-        "delivered": "Zugestellt",
-        "failed": "Fehlgeschlagen",
-        "errorRate": "Fehlerquote"
-      },
-      "noErrorRate": "–"
+        "period": "Zeitraum"
+      }
     },
     "empty": {
       "title": "Keine abgeschlossenen Runs",

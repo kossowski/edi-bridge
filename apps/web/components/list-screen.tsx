@@ -1,6 +1,6 @@
 'use client'
 
-import { Add01Icon, AlertCircleIcon } from '@hugeicons/core-free-icons'
+import { Add01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import Link from 'next/link'
 import { type ReactNode, useId, useState } from 'react'
@@ -8,7 +8,8 @@ import { type ReactNode, useId, useState } from 'react'
 import type { IconSvgElement } from '@hugeicons/react'
 
 import { BackLink } from '@/components/detail-parts'
-import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
+import { LoadError } from '@/components/load-error'
+import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Empty,
   EmptyContent,
@@ -131,20 +132,12 @@ export function ListTable<Item>({
 
   if (query.isError) {
     return (
-      <Empty className="border">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <HugeiconsIcon icon={AlertCircleIcon} strokeWidth={2} />
-          </EmptyMedia>
-          <EmptyTitle>{t('error.title')}</EmptyTitle>
-          <EmptyDescription>{t('error.description')}</EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Button variant="outline" onClick={() => query.refetch()}>
-            {t('error.retry')}
-          </Button>
-        </EmptyContent>
-      </Empty>
+      <LoadError
+        description={t('error.description')}
+        retryLabel={t('error.retry')}
+        title={t('error.title')}
+        onRetry={() => query.refetch()}
+      />
     )
   }
 
