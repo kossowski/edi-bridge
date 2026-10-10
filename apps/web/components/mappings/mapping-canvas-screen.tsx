@@ -6,8 +6,11 @@ import { type QueryKey, useQuery, type UseQueryOptions } from '@tanstack/react-q
 import { useLocale, useTranslations } from 'next-intl'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
+import { LinkSaveStatus } from '@/components/mappings/link-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
+import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
 import { documentTree, edifactTree, type TreeItem } from '@/components/mappings/mapping-tree'
+import { useSaveLinks } from '@/components/mappings/use-save-links'
 import { useDesktop } from '@/hooks/use-desktop'
 import { ApiError, getDocumentStructure, getMessageTypeStructure } from '@/lib/api/client'
 import { documentStructureKeys, mappingDraftQuery, messageTypeKeys } from '@/lib/api/queries'
@@ -106,6 +109,7 @@ function Canvas({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping.canvas')
   const source = useSide(draft.source)
   const target = useSide(draft.target)
+  const save = useSaveLinks(draft.mappingId)
 
   if (source.isError || target.isError) {
     return (
@@ -130,6 +134,7 @@ function Canvas({ draft }: { draft: MappingDraft }) {
       links={draft.links}
       source={{ title: source.title, items: source.items }}
       target={{ title: target.title, items: target.items }}
+      onChange={save}
     />
   )
 }
@@ -156,10 +161,11 @@ function MappingView({ draft }: { draft: MappingDraft }) {
   const desktop = useDesktop()
 
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-3">
+    <MappingCanvasProvider>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <Badge variant="outline">{t('draft')}</Badge>
+        <LinkSaveStatus mappingId={draft.mappingId} />
       </div>
       <dl
         aria-label={t('facts.label')}
@@ -174,7 +180,7 @@ function MappingView({ draft }: { draft: MappingDraft }) {
       <div className="hidden min-h-[32rem] flex-1 flex-col lg:flex">
         {desktop && <Canvas draft={draft} />}
       </div>
-    </>
+    </MappingCanvasProvider>
   )
 }
 

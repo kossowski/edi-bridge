@@ -6,20 +6,38 @@ import './mapping-canvas.css'
 import {
   Background,
   BackgroundVariant,
+  type Connection,
   Controls,
-  type Edge,
+  type IsValidConnection,
+  type OnConnectEnd,
   ReactFlow,
   type ReactFlowInstance,
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
+import { type MouseEvent, type Ref, useCallback, useEffect, useId, useMemo, useRef } from 'react'
 
 import {
-  MappingCanvasProvider,
+  LinkActionsContext,
+  type LinkActions,
+  LinkEdge,
+  type LinkFlowEdge,
+} from '@/components/mappings/link-edge'
+import {
   useCanvasStore,
   useCanvasStoreApi,
   useMeaningTooltip,
 } from '@/components/mappings/mapping-canvas-store'
+import {
+  addLink,
+  isLinkableRow,
+  leafPaths,
+  type Leaves,
+  type LinkChange,
+  linksOfItem,
+  removeLink,
+  type RowRef,
+  rowListingLinks,
+} from '@/components/mappings/mapping-links'
 import {
   canvasLinks,
   columnGap,
@@ -28,14 +46,23 @@ import {
   headingHeight,
   layoutTree,
   nodeId,
+  panelGutter,
+  rowOfNodeId,
   type Side,
   type TreeItem,
 } from '@/components/mappings/mapping-tree'
+import {
+  LinkHints,
+  type PanelActions,
+  PendingLink,
+  RowLinks,
+} from '@/components/mappings/row-links'
 import { RowMeaning } from '@/components/mappings/row-meaning-view'
 import {
   findRowButton,
   HeadingNode,
   type HeadingFlowNode,
+  rowOfButton,
   TreeNode,
   type TreeFlowNode,
 } from '@/components/mappings/tree-node'
@@ -48,14 +75,13 @@ type CanvasNode = TreeFlowNode | HeadingFlowNode
 
 const nodeTypes = { tree: TreeNode, heading: HeadingNode }
 
+const edgeTypes = { link: LinkEdge }
+
 const targetX = columnWidth + columnGap
 
 const canvasWidth = targetX + columnWidth
 
 const viewportPadding = 24
-
-// The zoom controls and the attribution sit in this left strip, so the trees start right of it.
-const panelGutter = 88
 
 // Below this the part labels shrink under a readable size; the user pans to the rest instead.
 const minInitialZoom = 0.85
@@ -70,6 +96,7 @@ type MappingCanvasProps = {
   links: ReadonlyArray<MappingLink>
   source: CanvasSide
   target: CanvasSide
+  onChange: (change: LinkChange) => void
 }
 
 // Mounted only while the tooltip shows a row, so that row's button can point at the tooltip.
@@ -109,34 +136,39 @@ function MeaningTooltip() {
 }
 
 function DetailsPanel({
-  source,
-  target,
-  onClear,
+  itemOf,
+  links,
+  leaves,
+  actions,
+  ref,
 }: {
-  source: CanvasSide
-  target: CanvasSide
-  onClear: () => void
+  itemOf: (row: RowRef) => TreeItem | undefined
+  links: ReadonlyArray<MappingLink>
+  leaves: Leaves
+  actions: PanelActions
+  ref: Ref<HTMLElement>
 }) {
   const t = useTranslations('Mapping')
   const heading = useId()
   const selected = useCanvasStore((state) => state.selected)
-  const items = selected?.side === 'target' ? target.items : source.items
-  const item = selected && findItem(items, selected.path)
+  const item = selected && itemOf(selected)
 
   return (
     <section
+      ref={ref}
       aria-labelledby={heading}
-      className="bg-card flex max-h-56 shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border px-4 py-3 2xl:max-h-none 2xl:w-72 2xl:gap-3 2xl:p-4">
+      className="bg-card flex max-h-72 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border px-4 py-3 2xl:max-h-none 2xl:w-80 2xl:p-4">
       <div className="flex min-h-8 items-center justify-between gap-2">
         <h2 id={heading} className="text-sm font-semibold">
           {t('details.title')}
         </h2>
         {item && (
-          <Button size="sm" variant="ghost" onClick={onClear}>
+          <Button size="sm" variant="ghost" onClick={actions.clear}>
             {t('details.clear')}
           </Button>
         )}
       </div>
+      <PendingLink onCancel={actions.cancel} />
       <div aria-live="polite" className="flex flex-col gap-1">
         {selected && item ? (
           <>
@@ -152,24 +184,51 @@ function DetailsPanel({
           <p className="text-muted-foreground text-sm">{t('details.empty')}</p>
         )}
       </div>
+      {selected && item && (
+        <RowLinks actions={actions} item={item} leaves={leaves} links={links} row={selected} />
+      )}
+      <p className="text-muted-foreground text-xs">{t('links.shortcut')}</p>
     </section>
   )
 }
 
-export function MappingCanvas(props: MappingCanvasProps) {
-  return (
-    <MappingCanvasProvider>
-      <MappingCanvasView {...props} />
-    </MappingCanvasProvider>
+// Focus moves once the change has rendered, when the button it goes to exists.
+function afterRender(focus: () => void) {
+  requestAnimationFrame(focus)
+}
+
+// About a second at 60 fps. The cached Draft updates a few frames after the click, once the
+// mutation has started; if it never does, focus still moves on rather than waiting forever.
+const renderWaitFrames = 60
+
+function whenRendered(done: () => boolean, then: () => void, frames = renderWaitFrames) {
+  requestAnimationFrame(() =>
+    done() || frames === 0 ? then() : whenRendered(done, then, frames - 1),
   )
 }
 
-function MappingCanvasView({ label, links, source, target }: MappingCanvasProps) {
+function rowsOfConnection(from: string, to: string) {
+  const fromRow = rowOfNodeId(from)
+  const toRow = rowOfNodeId(to)
+
+  return fromRow && toRow ? { from: fromRow, to: toRow } : null
+}
+
+export function MappingCanvas({ label, links, source, target, onChange }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
+  const tLinks = useTranslations('Mapping.links')
   const container = useRef<HTMLDivElement>(null)
+  const panel = useRef<HTMLElement>(null)
   const store = useCanvasStoreApi()
   const collapsed = useCanvasStore((state) => state.collapsed)
   const clearSelection = useCanvasStore((state) => state.clearSelection)
+  const hoverEdge = useCanvasStore((state) => state.hoverEdge)
+  const leaveEdge = useCanvasStore((state) => state.leaveEdge)
+
+  const leaves = useMemo(
+    () => ({ source: leafPaths(source.items), target: leafPaths(target.items) }),
+    [source.items, target.items],
+  )
 
   const { nodes, edges } = useMemo(() => {
     const layouts = {
@@ -226,11 +285,12 @@ function MappingCanvasView({ label, links, source, target }: MappingCanvasProps)
       domAttributes: plainNode,
     }))
 
-    const flowEdges = shown.map(({ id, sourcePath, targetPath, links: merged }): Edge => {
+    const flowEdges = shown.map(({ id, sourcePath, targetPath, links: merged }): LinkFlowEdge => {
       const [first] = merged
 
       return {
         id,
+        type: 'link',
         source: nodeId('source', sourcePath),
         target: nodeId('target', targetPath),
         data: { sourcePath, targetPath, links: merged },
@@ -254,7 +314,22 @@ function MappingCanvasView({ label, links, source, target }: MappingCanvasProps)
     }
   }, [collapsed, links, source.items, source.title, t, target.items, target.title])
 
-  const onInit = useCallback((instance: ReactFlowInstance<CanvasNode>) => {
+  const flow = useRef<ReactFlowInstance<CanvasNode, LinkFlowEdge>>(null)
+
+  // A point outside the pane, like the 0,0 of a synthetic event, is on no visible part of the
+  // edge; the button then falls back to the edge's middle.
+  const pointOf = (event: MouseEvent) => {
+    const pane = container.current?.getBoundingClientRect()
+    const { clientX: x, clientY: y } = event
+
+    return pane && x >= pane.left && x <= pane.right && y >= pane.top && y <= pane.bottom
+      ? flow.current?.screenToFlowPosition({ x, y })
+      : undefined
+  }
+
+  const onInit = useCallback((instance: ReactFlowInstance<CanvasNode, LinkFlowEdge>) => {
+    flow.current = instance
+
     const width = container.current?.clientWidth ?? canvasWidth
 
     const zoom = Math.min(
@@ -269,15 +344,167 @@ function MappingCanvasView({ label, links, source, target }: MappingCanvasProps)
     })
   }, [])
 
-  // Clearing removes the panel's clear button, so the focus goes back to the row it described.
-  const onClear = useCallback(() => {
-    const { selected } = store.getState()
+  const focusRow = useCallback((row: RowRef | null) => {
+    afterRender(() => {
+      if (row && container.current) {
+        findRowButton(container.current, row)?.focus()
+      }
+    })
+  }, [])
 
-    const row = selected && container.current && findRowButton(container.current, selected)
+  const itemOf = useCallback(
+    (row: RowRef) => findItem(row.side === 'source' ? source.items : target.items, row.path),
+    [source.items, target.items],
+  )
 
-    clearSelection()
-    row?.focus()
-  }, [clearSelection, store])
+  const labelOf = useCallback((row: RowRef) => itemOf(row)?.label ?? row.path, [itemOf])
+
+  const link = useCallback(
+    (from: RowRef, to: RowRef) => {
+      const { setProblem, cancelLink, announce } = store.getState()
+      const added = addLink(links, leaves, from, to)
+
+      setProblem(null)
+
+      if (added.ok) {
+        cancelLink()
+        onChange(added.change)
+      } else if (added.reason === 'alreadyLinked') {
+        setProblem(tLinks('alreadyLinked', { target: to.path, source: added.existing.sourcePath }))
+      } else {
+        announce(tLinks('notLinkable', { label: labelOf(to) }))
+      }
+
+      return added.ok
+    },
+    [labelOf, leaves, links, onChange, store, tLinks],
+  )
+
+  const remove = useCallback(
+    (removed: MappingLink) => {
+      store.getState().setProblem(null)
+      onChange(removeLink(links, removed))
+    },
+    [links, onChange, store],
+  )
+
+  const start = useCallback(
+    (row: RowRef) => {
+      const { startLink, select, announce } = store.getState()
+
+      startLink(row)
+      select(row)
+      announce(tLinks('started', { source: row.path }))
+    },
+    [store, tLinks],
+  )
+
+  const cancel = useCallback(() => {
+    const { linkFrom, cancelLink, announce } = store.getState()
+
+    if (linkFrom) {
+      cancelLink()
+      announce(tLinks('cancelled', { source: linkFrom.path }))
+    }
+  }, [store, tLinks])
+
+  // A panel button that goes away takes the focus with it, so each action moves it on.
+  const panelActions = useMemo((): PanelActions => {
+    const selectedRow = () => store.getState().selected
+
+    return {
+      clear: () => {
+        const row = selectedRow()
+
+        clearSelection()
+        focusRow(row)
+      },
+      start: (row) => {
+        start(row)
+        focusRow(row)
+      },
+      cancel: () => {
+        const row = store.getState().linkFrom
+
+        cancel()
+        focusRow(selectedRow() ?? row)
+      },
+      link: (from, to) => {
+        if (link(from, to)) {
+          focusRow(to)
+        }
+      },
+      remove: (removed, index) => {
+        const row = selectedRow()
+
+        const buttons = () =>
+          panel.current?.querySelectorAll<HTMLElement>('[data-remove-link]') ?? []
+
+        const before = buttons().length
+
+        remove(removed)
+        whenRendered(
+          () => buttons().length < before,
+          () => {
+            const left = buttons()
+            const next = left[Math.min(index, left.length - 1)]
+
+            if (next) {
+              next.focus()
+            } else {
+              focusRow(row)
+            }
+          },
+        )
+      },
+    }
+  }, [cancel, clearSelection, focusRow, link, remove, start, store])
+
+  const edgeActions = useMemo(
+    (): LinkActions => ({
+      remove,
+      show: (edge) => {
+        store.getState().select(rowListingLinks(edge))
+        afterRender(() => panel.current?.querySelector<HTMLElement>('[data-remove-link]')?.focus())
+      },
+    }),
+    [remove, store],
+  )
+
+  // A linked target is no valid drop, so the drag does not mark it as one.
+  const isValidConnection = useCallback<IsValidConnection<LinkFlowEdge>>(
+    ({ source: from, target: to }) => {
+      const rows = rowsOfConnection(from, to)
+
+      return rows !== null && addLink(links, leaves, rows.from, rows.to).ok
+    },
+    [leaves, links],
+  )
+
+  const onConnect = useCallback(
+    ({ source: from, target: to }: Connection) => {
+      const rows = rowsOfConnection(from, to)
+
+      if (rows) {
+        link(rows.from, rows.to)
+      }
+    },
+    [link],
+  )
+
+  // A drop on a handle that refused the link still says why.
+  const onConnectEnd = useCallback<OnConnectEnd>(
+    (_, { isValid, fromNode, toNode }) => {
+      const rows = !isValid && fromNode && toNode && rowsOfConnection(fromNode.id, toNode.id)
+
+      if (rows) {
+        link(rows.from, rows.to)
+      }
+    },
+    [link],
+  )
+
+  const onConnectStart = useCallback(() => store.getState().setProblem(null), [store])
 
   const tooltip = useMeaningTooltip()
   const area = useRef<HTMLDivElement>(null)
@@ -286,17 +513,83 @@ function MappingCanvasView({ label, links, source, target }: MappingCanvasProps)
   useEffect(() => {
     const element = area.current
 
+    const onLinkKey = (row: RowRef) => {
+      const { linkFrom, announce } = store.getState()
+
+      if (!isLinkableRow(leaves, row)) {
+        announce(tLinks('notLinkable', { label: labelOf(row) }))
+      } else if (row.side === 'source') {
+        start(row)
+      } else if (linkFrom) {
+        link(linkFrom, row)
+      } else {
+        announce(tLinks('startOnSource'))
+      }
+    }
+
+    const onDeleteKey = (row: RowRef) => {
+      const item = itemOf(row)
+      const own = item ? linksOfItem(links, row.side, item) : []
+      const [only] = own
+
+      if (own.length === 1 && only) {
+        remove(only)
+      } else if (own.length > 1) {
+        store
+          .getState()
+          .announce(tLinks('severalLinks', { label: labelOf(row), count: own.length }))
+      }
+    }
+
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      // The first Escape closes an open tooltip (WCAG 1.4.13); only the next one clears.
-      if (event.key === 'Escape' && store.getState().selected && !tooltip.handle.isOpen) {
-        clearSelection()
+      if (event.key === 'Escape') {
+        // The first Escape closes an open tooltip (WCAG 1.4.13), the next a pending link, and
+        // only the one after that clears the selection.
+        if (tooltip.handle.isOpen) {
+          return
+        }
+
+        if (store.getState().linkFrom) {
+          cancel()
+        } else if (store.getState().selected) {
+          clearSelection()
+        }
+
+        return
+      }
+
+      const row = rowOfButton(event.target)
+
+      if (!row || event.altKey || event.ctrlKey || event.metaKey) {
+        return
+      }
+
+      if (event.key === 'l' || event.key === 'L') {
+        event.preventDefault()
+        onLinkKey(row)
+      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault()
+        onDeleteKey(row)
       }
     }
 
     element?.addEventListener('keydown', onKeyDown)
 
     return () => element?.removeEventListener('keydown', onKeyDown)
-  }, [clearSelection, store, tooltip])
+  }, [
+    cancel,
+    clearSelection,
+    itemOf,
+    labelOf,
+    leaves,
+    link,
+    links,
+    remove,
+    start,
+    store,
+    tLinks,
+    tooltip,
+  ])
 
   return (
     // Beside the canvas the panel would cost the trees their room below 2xl, so it goes under it.
@@ -305,36 +598,54 @@ function MappingCanvasView({ label, links, source, target }: MappingCanvasProps)
         ref={container}
         className="mapping-canvas relative min-h-[32rem] flex-1 overflow-hidden rounded-lg border">
         <div className="absolute inset-0">
-          <ReactFlow<CanvasNode>
-            ariaLabelConfig={{
-              'controls.ariaLabel': t('controls.panel'),
-              'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
-              'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
-              'controls.fitView.ariaLabel': t('controls.fitView'),
-            }}
-            attributionPosition="bottom-left"
-            edges={edges}
-            edgesFocusable={false}
-            elementsSelectable={false}
-            maxZoom={1.5}
-            minZoom={0.2}
-            nodes={nodes}
-            nodesConnectable={false}
-            nodesDraggable={false}
-            nodesFocusable={false}
-            nodeTypes={nodeTypes}
-            panOnScroll
-            zoomOnDoubleClick={false}
-            aria-label={label}
-            onInit={onInit}
-            onPaneClick={clearSelection}>
-            <Background gap={16} variant={BackgroundVariant.Dots} />
-            <Controls position="top-left" showInteractive={false} />
-          </ReactFlow>
+          <LinkActionsContext value={edgeActions}>
+            <ReactFlow<CanvasNode, LinkFlowEdge>
+              ariaLabelConfig={{
+                'controls.ariaLabel': t('controls.panel'),
+                'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
+                'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
+                'controls.fitView.ariaLabel': t('controls.fitView'),
+              }}
+              attributionPosition="bottom-left"
+              edges={edges}
+              edgesFocusable={false}
+              edgeTypes={edgeTypes}
+              elementsSelectable={false}
+              isValidConnection={isValidConnection}
+              maxZoom={1.5}
+              minZoom={0.2}
+              nodes={nodes}
+              nodesConnectable
+              nodesDraggable={false}
+              nodesFocusable={false}
+              nodeTypes={nodeTypes}
+              panOnScroll
+              zoomOnDoubleClick={false}
+              aria-label={label}
+              onConnect={onConnect}
+              onConnectEnd={onConnectEnd}
+              onConnectStart={onConnectStart}
+              // A click shows the remove button too, for pointers that cannot hover.
+              onEdgeClick={(event, edge) => hoverEdge(edge.id, pointOf(event))}
+              onEdgeMouseEnter={(event, edge) => hoverEdge(edge.id, pointOf(event))}
+              onEdgeMouseLeave={(_, edge) => leaveEdge(edge.id)}
+              onInit={onInit}
+              onPaneClick={clearSelection}>
+              <Background gap={16} variant={BackgroundVariant.Dots} />
+              <Controls position="top-left" showInteractive={false} />
+            </ReactFlow>
+          </LinkActionsContext>
         </div>
       </div>
       <MeaningTooltip />
-      <DetailsPanel source={source} target={target} onClear={onClear} />
+      <LinkHints />
+      <DetailsPanel
+        actions={panelActions}
+        itemOf={itemOf}
+        leaves={leaves}
+        links={links}
+        ref={panel}
+      />
     </div>
   )
 }

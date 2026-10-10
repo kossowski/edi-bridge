@@ -1,3 +1,4 @@
+import type { RowRef } from '@/components/mappings/mapping-links'
 import type { Locale } from '@/i18n/locales'
 import type {
   DocumentStructureNode,
@@ -199,8 +200,21 @@ export const columnGap = 260
 
 export const headingHeight = 60
 
+// The zoom controls and the attribution sit in this left strip of the pane, so the trees and the
+// buttons on links stay right of it.
+export const panelGutter = 88
+
 export function nodeId(side: Side, path: string) {
   return `${side}:${path}`
+}
+
+export function rowOfNodeId(id: string): RowRef | null {
+  const colon = id.indexOf(':')
+  const side = id.slice(0, colon)
+
+  return colon > 0 && (side === 'source' || side === 'target')
+    ? { side, path: id.slice(colon + 1) }
+    : null
 }
 
 export function layoutTree(

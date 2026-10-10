@@ -7,6 +7,7 @@ import {
   type Node,
   type NodeProps,
   Position,
+  useConnection,
   useReactFlow,
   useStoreApi,
 } from '@xyflow/react'
@@ -15,14 +16,22 @@ import { type FocusEvent, memo, type ReactNode, useCallback } from 'react'
 
 import {
   isSameRow,
-  type RowRef,
   useCanvasStore,
+  useLinkHints,
   useMeaningTooltip,
 } from '@/components/mappings/mapping-canvas-store'
-import { nodeId, type Repeat, rowHeight, type TreeRow } from '@/components/mappings/mapping-tree'
+import {
+  nodeId,
+  type Repeat,
+  rowHeight,
+  rowOfNodeId,
+  type TreeRow,
+} from '@/components/mappings/mapping-tree'
 import { kindMeanings } from '@/components/mappings/row-meaning'
 import { TooltipTrigger } from '@edi-bridge/ui/components/tooltip'
 import { cn } from '@edi-bridge/ui/lib/utils'
+
+import type { RowRef } from '@/components/mappings/mapping-links'
 
 export type TreeNodeData = TreeRow & { linked: boolean }
 
@@ -38,6 +47,12 @@ export function findRowButton(container: ParentNode, row: RowRef) {
   return container.querySelector<HTMLElement>(
     `[${rowIdAttribute}="${CSS.escape(nodeId(row.side, row.path))}"]`,
   )
+}
+
+export function rowOfButton(element: EventTarget | null) {
+  const id = element instanceof HTMLElement ? element.getAttribute(rowIdAttribute) : null
+
+  return id ? rowOfNodeId(id) : null
 }
 
 const focusMargin = 24
@@ -130,20 +145,23 @@ function ToggleButton({ data }: { data: TreeNodeData }) {
 function RowButton({
   data,
   selected,
+  hint,
   children,
 }: {
   data: TreeNodeData
   selected: boolean
+  hint: string | null
   children: ReactNode
 }) {
   const tooltip = useMeaningTooltip()
   const toggleSelected = useCanvasStore((state) => state.toggleSelected)
   const described = useCanvasStore((state) => state.tooltipRowId === data.id)
+  const describedBy = [described && tooltip.id, hint].filter(Boolean).join(' ')
 
   const props = {
     type: 'button' as const,
     'aria-pressed': selected,
-    'aria-describedby': described ? tooltip.id : undefined,
+    'aria-describedby': describedBy || undefined,
     [rowIdAttribute]: data.id,
     className:
       'nodrag focus-visible:ring-ring/50 pointer-events-auto flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-3',
@@ -167,6 +185,20 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
   const showHandle = data.linkable || (data.expanded === false && data.linked)
   const onFocus = usePanIntoView()
   const selected = useCanvasStore((state) => isSameRow(state.selected, data))
+  const hints = useLinkHints()
+  const linkStart = useCanvasStore((state) => isSameRow(state.linkFrom, data))
+
+  // Only a free target leaf can take the pending link; a linked one would refuse it.
+  const linkTarget = useCanvasStore(
+    (state) => state.linkFrom !== null && data.side === 'target' && data.linkable && !data.linked,
+  )
+
+  // While a link is dragged, a linked target refuses it; the drop there still says why.
+  const unavailable = useConnection(
+    (connection) => connection.inProgress && data.side === 'target' && data.linkable && data.linked,
+  )
+
+  const hint = linkStart ? hints.linkStart : linkTarget ? hints.linkTarget : null
 
   return (
     <div
@@ -176,14 +208,25 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         data.kind === 'segmentGroup' && 'border-foreground/40 border-2',
         data.repeat !== null &&
           'border-muted-foreground border-dashed shadow-[3px_3px_0_-1px_var(--border)]',
-        selected && 'outline-primary outline-2 outline-offset-1',
+        linkTarget && 'outline-primary bg-primary/5 outline-2 outline-offset-1 outline-dashed',
+        linkStart && 'bg-primary/10',
+        selected && 'outline-primary outline-2 outline-offset-1 outline-solid',
+        unavailable && 'bg-muted',
       )}
       data-kind={data.kind}
+      data-link-target={linkTarget || undefined}
+      data-link-unavailable={unavailable || undefined}
       data-selected={selected || undefined}
       onFocus={onFocus}>
-      <div className="flex items-center gap-1.5 px-2" style={{ height: rowHeight - 2 }}>
+      <div
+        className={cn(
+          'flex items-center gap-1.5 px-2',
+          // Keeps the row button clear of the link handle that overlaps this edge of the part.
+          data.linkable && (data.side === 'source' ? 'pr-4' : 'pl-4'),
+        )}
+        style={{ height: rowHeight - 2 }}>
         {data.expanded !== null && <ToggleButton data={data} />}
-        <RowButton data={data} selected={selected}>
+        <RowButton data={data} hint={hint} selected={selected}>
           <code className={cn('shrink-0 font-mono', container && 'font-semibold')}>
             {data.label}
           </code>
@@ -203,10 +246,17 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         </RowButton>
       </div>
       <Handle
-        isConnectable={false}
+        isConnectable={data.linkable}
+        isConnectableEnd={data.side === 'target'}
+        isConnectableStart={data.side === 'source'}
         position={data.side === 'source' ? Position.Right : Position.Left}
         type={data.side === 'source' ? 'source' : 'target'}
-        className={cn(!showHandle && 'invisible')}
+        className={cn(
+          data.linkable ? 'link-handle' : 'part-handle',
+          !showHandle && 'invisible',
+          (linkStart || linkTarget) && 'link-handle-marked',
+          unavailable && 'link-handle-unavailable',
+        )}
         style={{ top: rowHeight / 2 }}
       />
     </div>

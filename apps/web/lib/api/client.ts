@@ -30,6 +30,8 @@ import {
   type ReprocessRunBody,
   reprocessRunEndpoint,
   retryRunEndpoint,
+  type SaveMappingLinksBody,
+  saveMappingLinksEndpoint,
   runEndpoint,
   type RunListQuery,
   runsEndpoint,
@@ -136,6 +138,13 @@ export function listMappings() {
 
 export function getMappingDraft(id: string) {
   return request(mappingDraftEndpoint, { path: toPath(mappingDraftEndpoint.path, { id }) })
+}
+
+export function saveMappingLinks(id: string, body: SaveMappingLinksBody) {
+  return request(saveMappingLinksEndpoint, {
+    path: toPath(saveMappingLinksEndpoint.path, { id }),
+    body,
+  })
 }
 
 export function getDocumentStructure(id: string) {
