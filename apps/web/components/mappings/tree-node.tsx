@@ -101,7 +101,7 @@ function ToggleButton({ data }: { data: TreeNodeData }) {
       type="button"
       aria-expanded={data.expanded ?? false}
       aria-label={t(data.expanded ? 'collapse' : 'expand', { label: data.label })}
-      className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 pointer-events-auto -ml-1 inline-flex size-6 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
+      className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 pointer-events-auto -ml-1.5 inline-flex size-7.5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
       onClick={() => data.onToggle(data)}>
       <HugeiconsIcon
         icon={ArrowRight01Icon}

@@ -91,6 +91,83 @@ export const CollapseParts = meta.story({
   },
 })
 
+const desktopViewports = {
+  viewport: {
+    options: {
+      laptop: { name: 'Laptop', styles: { width: '1024px', height: '900px' } },
+      desktop: { name: 'Desktop', styles: { width: '1440px', height: '900px' } },
+    },
+  },
+  a11y: { config: { rules: [{ id: 'target-size', enabled: true }] } },
+}
+
+function overlaps(a: DOMRect, b: DOMRect) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+}
+
+async function expectClearTargets(canvasElement: HTMLElement, zoom: string) {
+  const viewport = canvasElement.querySelector<HTMLElement>('.react-flow__viewport')!
+
+  await waitFor(() => expect(viewport.style.transform).toContain(`scale(${zoom})`))
+
+  for (const toggle of canvasElement.querySelectorAll('.react-flow__node button')) {
+    const { width, height } = toggle.getBoundingClientRect()
+
+    await expect(Math.min(width, height)).toBeGreaterThanOrEqual(24)
+  }
+
+  const pane = canvasElement.querySelector('.react-flow')!.getBoundingClientRect()
+
+  const panels = ['.react-flow__controls', '.react-flow__attribution'].map((selector) =>
+    canvasElement.querySelector(selector)!.getBoundingClientRect(),
+  )
+
+  const parts = [...canvasElement.querySelectorAll('.react-flow__node')].map((node) =>
+    node.getBoundingClientRect(),
+  )
+
+  for (const panel of panels) {
+    await expect(
+      parts.filter((part) => overlaps(part, pane) && overlaps(part, panel)),
+    ).toHaveLength(0)
+  }
+
+  await expect(
+    canvasElement.querySelector('.react-flow__attribution a')!.getBoundingClientRect().height,
+  ).toBeGreaterThanOrEqual(24)
+}
+
+export const Desktop = meta.story({
+  args: { id: inbound.id },
+  parameters: desktopViewports,
+  globals: { viewport: { value: 'desktop', isRotated: false } },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('button', { name: 'Collapse DTM+137' })
+    await expectClearTargets(canvasElement, '1')
+  },
+})
+
+export const MinimumZoom = meta.story({
+  args: { id: inbound.id },
+  parameters: desktopViewports,
+  globals: { viewport: { value: 'laptop', isRotated: false } },
+  decorators: [
+    // Stands in for the app sidebar, which narrows the canvas until it opens at the minimum zoom.
+    (Story) => (
+      <div className="flex flex-1">
+        <div className="w-64 shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Story />
+        </div>
+      </div>
+    ),
+  ],
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('button', { name: 'Collapse DTM+137' })
+    await expectClearTargets(canvasElement, '0.85')
+  },
+})
+
 export const EmptyDraft = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {

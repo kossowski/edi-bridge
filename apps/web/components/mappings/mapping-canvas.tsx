@@ -44,6 +44,9 @@ const canvasWidth = targetX + columnWidth
 
 const viewportPadding = 24
 
+// The zoom controls and the attribution sit in this left strip, so the trees start right of it.
+const panelGutter = 88
+
 // Below this the part labels shrink under a readable size; the user pans to the rest instead.
 const minInitialZoom = 0.85
 
@@ -173,7 +176,7 @@ export function MappingCanvas({
     const zoom = Math.min(1, Math.max(minInitialZoom, (width - 2 * viewportPadding) / canvasWidth))
 
     void instance.setViewport({
-      x: Math.max(viewportPadding, (width - canvasWidth * zoom) / 2),
+      x: Math.max(panelGutter, (width - canvasWidth * zoom) / 2),
       y: viewportPadding,
       zoom,
     })
@@ -191,6 +194,7 @@ export function MappingCanvas({
             'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
             'controls.fitView.ariaLabel': t('controls.fitView'),
           }}
+          attributionPosition="bottom-left"
           edges={edges}
           edgesFocusable={false}
           elementsSelectable={false}
@@ -206,7 +210,7 @@ export function MappingCanvas({
           aria-label={label}
           onInit={onInit}>
           <Background gap={16} variant={BackgroundVariant.Dots} />
-          <Controls showInteractive={false} />
+          <Controls position="top-left" showInteractive={false} />
         </ReactFlow>
       </div>
     </div>
