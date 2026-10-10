@@ -1,14 +1,34 @@
 'use client'
 
-import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  type MutationStatus,
+  useMutation,
+  useMutationState,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 
 import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
+import { revertChange } from '@/components/mappings/mapping-links'
 import { saveMappingLinks } from '@/lib/api/client'
 import { mappingDraftQuery, mappingKeys } from '@/lib/api/queries'
 
 import type { LinkChange } from '@/components/mappings/mapping-links'
 import type { MappingDraft } from '@edi-bridge/contracts'
+
+const messages = {
+  add: { saved: 'added', failed: 'addFailed' },
+  remove: { saved: 'removed', failed: 'removeFailed' },
+} as const satisfies Record<LinkChange['kind'], { saved: string; failed: string }>
+
+export type LinkSaveState = 'saving' | 'saved' | 'failed'
+
+const saveStates = {
+  idle: null,
+  pending: 'saving',
+  success: 'saved',
+  error: 'failed',
+} as const satisfies Record<MutationStatus, LinkSaveState | null>
 
 export function useSaveLinks(mappingId: string) {
   const t = useTranslations('Mapping.links')
@@ -26,39 +46,27 @@ export function useSaveLinks(mappingId: string) {
     mutationFn: ({ links }: LinkChange) => saveMappingLinks(mappingId, { links }),
     onMutate: async ({ links }) => {
       await queryClient.cancelQueries({ queryKey })
-      const previous = queryClient.getQueryData<MappingDraft>(queryKey)
-
       queryClient.setQueryData<MappingDraft>(queryKey, (draft) => draft && { ...draft, links })
-
-      return { previous }
     },
     onSuccess: (saved, { kind, link }) => {
       if (isLast()) {
         queryClient.setQueryData(queryKey, saved)
       }
 
-      store.getState().setLastSave('saved')
-      store.getState().announce(
-        t(kind === 'add' ? 'added' : 'removed', {
-          source: link.sourcePath,
-          target: link.targetPath,
-        }),
-      )
+      store
+        .getState()
+        .announce(t(messages[kind].saved, { source: link.sourcePath, target: link.targetPath }))
     },
-    onError: (_error, { kind, link }, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKey, context.previous)
-      }
+    onError: (_error, change) => {
+      const { kind, link } = change
 
-      const { setLastSave, setProblem } = store.getState()
-
-      setLastSave('failed')
-      setProblem(
-        t(kind === 'add' ? 'addFailed' : 'removeFailed', {
-          source: link.sourcePath,
-          target: link.targetPath,
-        }),
+      queryClient.setQueryData<MappingDraft>(
+        queryKey,
+        (draft) => draft && { ...draft, links: revertChange(draft.links, change) },
       )
+      store
+        .getState()
+        .setProblem(t(messages[kind].failed, { source: link.sourcePath, target: link.targetPath }))
     },
     onSettled: async () => {
       if (isLast()) {
@@ -70,6 +78,11 @@ export function useSaveLinks(mappingId: string) {
   return save.mutate
 }
 
-export function useSavingLinks(mappingId: string) {
-  return useIsMutating({ mutationKey: mappingKeys.links(mappingId) }) > 0
+export function useLinkSaveState(mappingId: string): LinkSaveState | null {
+  const statuses = useMutationState({
+    filters: { mutationKey: mappingKeys.links(mappingId) },
+    select: (mutation) => mutation.state.status,
+  })
+
+  return statuses.includes('pending') ? 'saving' : saveStates[statuses.at(-1) ?? 'idle']
 }

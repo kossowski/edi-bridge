@@ -9,11 +9,12 @@ import {
   type Connection,
   Controls,
   type IsValidConnection,
+  type OnConnectEnd,
   ReactFlow,
   type ReactFlowInstance,
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { type Ref, useCallback, useEffect, useId, useMemo, useRef } from 'react'
+import { type MouseEvent, type Ref, useCallback, useEffect, useId, useMemo, useRef } from 'react'
 
 import {
   LinkActionsContext,
@@ -22,22 +23,20 @@ import {
   type LinkFlowEdge,
 } from '@/components/mappings/link-edge'
 import {
-  isSameRow,
-  type RowRef,
   useCanvasStore,
   useCanvasStoreApi,
-  useLinkHints,
   useMeaningTooltip,
 } from '@/components/mappings/mapping-canvas-store'
 import {
   addLink,
-  canLink,
   isLinkableRow,
   leafPaths,
   type Leaves,
   type LinkChange,
   linksOfItem,
   removeLink,
+  type RowRef,
+  rowListingLinks,
 } from '@/components/mappings/mapping-links'
 import {
   canvasLinks,
@@ -47,10 +46,17 @@ import {
   headingHeight,
   layoutTree,
   nodeId,
+  panelGutter,
   rowOfNodeId,
   type Side,
   type TreeItem,
 } from '@/components/mappings/mapping-tree'
+import {
+  LinkHints,
+  type PanelActions,
+  PendingLink,
+  RowLinks,
+} from '@/components/mappings/row-links'
 import { RowMeaning } from '@/components/mappings/row-meaning-view'
 import {
   findRowButton,
@@ -76,9 +82,6 @@ const targetX = columnWidth + columnGap
 const canvasWidth = targetX + columnWidth
 
 const viewportPadding = 24
-
-// The zoom controls and the attribution sit in this left strip, so the trees start right of it.
-const panelGutter = 88
 
 // Below this the part labels shrink under a readable size; the user pans to the rest instead.
 const minInitialZoom = 0.85
@@ -132,106 +135,14 @@ function MeaningTooltip() {
   )
 }
 
-type PanelActions = {
-  clear: () => void
-  start: (row: RowRef) => void
-  cancel: () => void
-  link: (from: RowRef, to: RowRef) => void
-  remove: (link: MappingLink, index: number) => void
-}
-
-function PendingLink({ onCancel }: { onCancel: () => void }) {
-  const t = useTranslations('Mapping.links')
-  const linkFrom = useCanvasStore((state) => state.linkFrom)
-
-  if (!linkFrom) {
-    return null
-  }
-
-  return (
-    <div className="border-primary/40 bg-primary/5 flex flex-col items-start gap-2 rounded-md border px-3 py-2 text-sm">
-      <p className="[overflow-wrap:anywhere]">{t('pending', { source: linkFrom.path })}</p>
-      <Button size="sm" variant="outline" onClick={onCancel}>
-        {t('cancel')}
-      </Button>
-    </div>
-  )
-}
-
-function RowLinks({
-  row,
-  item,
-  links,
-  leaves,
-  actions,
-}: {
-  row: RowRef
-  item: TreeItem
-  links: ReadonlyArray<MappingLink>
-  leaves: Leaves
-  actions: PanelActions
-}) {
-  const t = useTranslations('Mapping.links')
-  const heading = useId()
-  const linkFrom = useCanvasStore((state) => state.linkFrom)
-  const own = linksOfItem(links, row.side, item)
-  const leaf = isLinkableRow(leaves, row)
-
-  return (
-    <section aria-labelledby={heading} className="flex flex-col gap-2">
-      <h3 id={heading} className="text-xs font-medium tracking-wide uppercase">
-        {t('heading')}
-      </h3>
-      {leaf && row.side === 'source' && !isSameRow(linkFrom, row) && (
-        <Button size="sm" className="w-fit" onClick={() => actions.start(row)}>
-          {t('linkFromHere')}
-        </Button>
-      )}
-      {leaf && row.side === 'target' && linkFrom && (
-        <Button size="sm" className="w-fit" onClick={() => actions.link(linkFrom, row)}>
-          {t('linkToHere')}
-        </Button>
-      )}
-      {own.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t('none')}</p>
-      ) : (
-        <ul className="flex flex-col gap-1.5">
-          {own.map((link, index) => (
-            <li
-              key={`${link.sourcePath}->${link.targetPath}`}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
-              <span className="min-w-0 font-mono [overflow-wrap:anywhere]">
-                {t('item', { source: link.sourcePath, target: link.targetPath })}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                aria-label={t('removeLabel', {
-                  source: link.sourcePath,
-                  target: link.targetPath,
-                })}
-                data-remove-link
-                onClick={() => actions.remove(link, index)}>
-                {t('remove')}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  )
-}
-
 function DetailsPanel({
-  source,
-  target,
+  itemOf,
   links,
   leaves,
   actions,
   ref,
 }: {
-  source: CanvasSide
-  target: CanvasSide
+  itemOf: (row: RowRef) => TreeItem | undefined
   links: ReadonlyArray<MappingLink>
   leaves: Leaves
   actions: PanelActions
@@ -240,8 +151,7 @@ function DetailsPanel({
   const t = useTranslations('Mapping')
   const heading = useId()
   const selected = useCanvasStore((state) => state.selected)
-  const items = selected?.side === 'target' ? target.items : source.items
-  const item = selected && findItem(items, selected.path)
+  const item = selected && itemOf(selected)
 
   return (
     <section
@@ -282,59 +192,26 @@ function DetailsPanel({
   )
 }
 
-// Rendered beside the page title, outside the canvas, so it reads the store only.
-export function LinkSaveStatus({ saving }: { saving: boolean }) {
-  const t = useTranslations('Mapping.links')
-  const lastSave = useCanvasStore((state) => state.lastSave)
-  const problem = useCanvasStore((state) => state.problem)
-  const announcement = useCanvasStore((state) => state.announcement)
-
-  const status = saving
-    ? t('saving')
-    : lastSave === 'saved'
-      ? t('saved')
-      : lastSave === 'failed'
-        ? t('saveFailed')
-        : null
-
-  return (
-    <>
-      {status && <span className="text-muted-foreground text-sm">{status}</span>}
-      <p role="status" className="sr-only">
-        {announcement}
-      </p>
-      <p role="alert" className="basis-full text-sm text-red-800 empty:hidden dark:text-red-300">
-        {problem}
-      </p>
-    </>
-  )
-}
-
-function LinkHints() {
-  const t = useTranslations('Mapping.links')
-  const hints = useLinkHints()
-  const linkFrom = useCanvasStore((state) => state.linkFrom)
-
-  return (
-    <>
-      <span id={hints.linkTarget} hidden>
-        {linkFrom && t('targetHint', { source: linkFrom.path })}
-      </span>
-      <span id={hints.linkStart} hidden>
-        {linkFrom && t('startHint')}
-      </span>
-    </>
-  )
-}
-
 // Focus moves once the change has rendered, when the button it goes to exists.
 function afterRender(focus: () => void) {
   requestAnimationFrame(focus)
 }
 
-// The cached Draft updates after the mutation starts, a few frames after the click.
-function once(done: () => boolean, then: () => void, frames = 60) {
-  requestAnimationFrame(() => (done() || frames === 0 ? then() : once(done, then, frames - 1)))
+// About a second at 60 fps. The cached Draft updates a few frames after the click, once the
+// mutation has started; if it never does, focus still moves on rather than waiting forever.
+const renderWaitFrames = 60
+
+function whenRendered(done: () => boolean, then: () => void, frames = renderWaitFrames) {
+  requestAnimationFrame(() =>
+    done() || frames === 0 ? then() : whenRendered(done, then, frames - 1),
+  )
+}
+
+function rowsOfConnection(from: string, to: string) {
+  const fromRow = rowOfNodeId(from)
+  const toRow = rowOfNodeId(to)
+
+  return fromRow && toRow ? { from: fromRow, to: toRow } : null
 }
 
 export function MappingCanvas({ label, links, source, target, onChange }: MappingCanvasProps) {
@@ -437,7 +314,22 @@ export function MappingCanvas({ label, links, source, target, onChange }: Mappin
     }
   }, [collapsed, links, source.items, source.title, t, target.items, target.title])
 
+  const flow = useRef<ReactFlowInstance<CanvasNode, LinkFlowEdge>>(null)
+
+  // A point outside the pane, like the 0,0 of a synthetic event, is on no visible part of the
+  // edge; the button then falls back to the edge's middle.
+  const pointOf = (event: MouseEvent) => {
+    const pane = container.current?.getBoundingClientRect()
+    const { clientX: x, clientY: y } = event
+
+    return pane && x >= pane.left && x <= pane.right && y >= pane.top && y <= pane.bottom
+      ? flow.current?.screenToFlowPosition({ x, y })
+      : undefined
+  }
+
   const onInit = useCallback((instance: ReactFlowInstance<CanvasNode, LinkFlowEdge>) => {
+    flow.current = instance
+
     const width = container.current?.clientWidth ?? canvasWidth
 
     const zoom = Math.min(
@@ -460,19 +352,21 @@ export function MappingCanvas({ label, links, source, target, onChange }: Mappin
     })
   }, [])
 
-  const labelOf = useCallback(
-    (row: RowRef) =>
-      findItem(row.side === 'source' ? source.items : target.items, row.path)?.label ?? row.path,
+  const itemOf = useCallback(
+    (row: RowRef) => findItem(row.side === 'source' ? source.items : target.items, row.path),
     [source.items, target.items],
   )
+
+  const labelOf = useCallback((row: RowRef) => itemOf(row)?.label ?? row.path, [itemOf])
 
   const link = useCallback(
     (from: RowRef, to: RowRef) => {
       const { setProblem, cancelLink, announce } = store.getState()
       const added = addLink(links, leaves, from, to)
 
+      setProblem(null)
+
       if (added.ok) {
-        setProblem(null)
         cancelLink()
         onChange(added.change)
       } else if (added.reason === 'alreadyLinked') {
@@ -549,7 +443,7 @@ export function MappingCanvas({ label, links, source, target, onChange }: Mappin
         const before = buttons().length
 
         remove(removed)
-        once(
+        whenRendered(
           () => buttons().length < before,
           () => {
             const left = buttons()
@@ -569,43 +463,48 @@ export function MappingCanvas({ label, links, source, target, onChange }: Mappin
   const edgeActions = useMemo(
     (): LinkActions => ({
       remove,
-      show: ({ sourcePath, targetPath, links: merged }) => {
-        const collapsedSource = merged.some((one) => one.sourcePath !== sourcePath)
-
-        store
-          .getState()
-          .select(
-            collapsedSource
-              ? { side: 'source', path: sourcePath }
-              : { side: 'target', path: targetPath },
-          )
+      show: (edge) => {
+        store.getState().select(rowListingLinks(edge))
         afterRender(() => panel.current?.querySelector<HTMLElement>('[data-remove-link]')?.focus())
       },
     }),
     [remove, store],
   )
 
+  // A linked target is no valid drop, so the drag does not mark it as one.
   const isValidConnection = useCallback<IsValidConnection<LinkFlowEdge>>(
     ({ source: from, target: to }) => {
-      const fromRow = rowOfNodeId(from)
-      const toRow = rowOfNodeId(to)
+      const rows = rowsOfConnection(from, to)
 
-      return fromRow !== null && toRow !== null && canLink(leaves, fromRow, toRow)
+      return rows !== null && addLink(links, leaves, rows.from, rows.to).ok
     },
-    [leaves],
+    [leaves, links],
   )
 
   const onConnect = useCallback(
     ({ source: from, target: to }: Connection) => {
-      const fromRow = rowOfNodeId(from)
-      const toRow = rowOfNodeId(to)
+      const rows = rowsOfConnection(from, to)
 
-      if (fromRow && toRow) {
-        link(fromRow, toRow)
+      if (rows) {
+        link(rows.from, rows.to)
       }
     },
     [link],
   )
+
+  // A drop on a handle that refused the link still says why.
+  const onConnectEnd = useCallback<OnConnectEnd>(
+    (_, { isValid, fromNode, toNode }) => {
+      const rows = !isValid && fromNode && toNode && rowsOfConnection(fromNode.id, toNode.id)
+
+      if (rows) {
+        link(rows.from, rows.to)
+      }
+    },
+    [link],
+  )
+
+  const onConnectStart = useCallback(() => store.getState().setProblem(null), [store])
 
   const tooltip = useMeaningTooltip()
   const area = useRef<HTMLDivElement>(null)
@@ -629,7 +528,7 @@ export function MappingCanvas({ label, links, source, target, onChange }: Mappin
     }
 
     const onDeleteKey = (row: RowRef) => {
-      const item = findItem(row.side === 'source' ? source.items : target.items, row.path)
+      const item = itemOf(row)
       const own = item ? linksOfItem(links, row.side, item) : []
       const [only] = own
 
@@ -680,16 +579,15 @@ export function MappingCanvas({ label, links, source, target, onChange }: Mappin
   }, [
     cancel,
     clearSelection,
+    itemOf,
     labelOf,
     leaves,
     link,
     links,
     remove,
-    source.items,
     start,
     store,
     tLinks,
-    target.items,
     tooltip,
   ])
 
@@ -725,9 +623,11 @@ export function MappingCanvas({ label, links, source, target, onChange }: Mappin
               zoomOnDoubleClick={false}
               aria-label={label}
               onConnect={onConnect}
+              onConnectEnd={onConnectEnd}
+              onConnectStart={onConnectStart}
               // A click shows the remove button too, for pointers that cannot hover.
-              onEdgeClick={(_, edge) => hoverEdge(edge.id)}
-              onEdgeMouseEnter={(_, edge) => hoverEdge(edge.id)}
+              onEdgeClick={(event, edge) => hoverEdge(edge.id, pointOf(event))}
+              onEdgeMouseEnter={(event, edge) => hoverEdge(edge.id, pointOf(event))}
               onEdgeMouseLeave={(_, edge) => leaveEdge(edge.id)}
               onInit={onInit}
               onPaneClick={clearSelection}>
@@ -741,11 +641,10 @@ export function MappingCanvas({ label, links, source, target, onChange }: Mappin
       <LinkHints />
       <DetailsPanel
         actions={panelActions}
+        itemOf={itemOf}
         leaves={leaves}
         links={links}
         ref={panel}
-        source={source}
-        target={target}
       />
     </div>
   )

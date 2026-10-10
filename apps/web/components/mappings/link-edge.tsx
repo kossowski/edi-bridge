@@ -8,11 +8,14 @@ import {
   EdgeLabelRenderer,
   type EdgeProps,
   getBezierPath,
+  useStore,
+  type XYPosition,
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { createContext, memo, useContext } from 'react'
+import { createContext, memo, useCallback, useContext, useState } from 'react'
 
 import { useCanvasStore } from '@/components/mappings/mapping-canvas-store'
+import { panelGutter } from '@/components/mappings/mapping-tree'
 
 import type { CanvasLink } from '@/components/mappings/mapping-tree'
 import type { MappingLink } from '@edi-bridge/contracts'
@@ -72,6 +75,78 @@ function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
   )
 }
 
+// Screen pixels kept between the button and the pane's border.
+const paneInset = 8
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
+function useSize() {
+  const [size, setSize] = useState({ width: 0, height: 0 })
+
+  const ref = useCallback((element: HTMLElement | null) => {
+    if (!element) {
+      return
+    }
+
+    const observer = new ResizeObserver(() =>
+      setSize({ width: element.offsetWidth, height: element.offsetHeight }),
+    )
+
+    observer.observe(element)
+
+    return () => observer.disconnect()
+  }, [])
+
+  return [size, ref] as const
+}
+
+// The button sits where the pointer met the edge and stays inside the pane, so a long edge whose
+// middle is out of view still shows it.
+function EdgeButtonAnchor({
+  id,
+  data,
+  midpoint,
+}: {
+  id: string
+  data: LinkEdgeData
+  midpoint: XYPosition
+}) {
+  const at = useCanvasStore((state) => state.edgeAnchor) ?? midpoint
+  const [x, y, zoom] = useStore((state) => state.transform)
+  const paneWidth = useStore((state) => state.width)
+  const paneHeight = useStore((state) => state.height)
+  const [size, measure] = useSize()
+
+  const left = clamp(
+    at.x,
+    (panelGutter - x) / zoom + size.width / 2,
+    (paneWidth - paneInset - x) / zoom - size.width / 2,
+  )
+
+  const top = clamp(
+    at.y,
+    (paneInset - y) / zoom + size.height / 2,
+    (paneHeight - paneInset - y) / zoom - size.height / 2,
+  )
+
+  return (
+    <EdgeLabelRenderer>
+      <div
+        ref={measure}
+        className="pointer-events-auto absolute"
+        // Above the edges, which sit on a raised layer so they cross the parts.
+        style={{
+          transform: `translate(-50%, -50%) translate(${left}px, ${top}px)`,
+          zIndex: 1000,
+        }}>
+        <EdgeButton id={id} data={data} />
+      </div>
+    </EdgeLabelRenderer>
+  )
+}
+
 function LinkEdgeView({
   id,
   data,
@@ -103,17 +178,7 @@ function LinkEdgeView({
         style={hovered ? { ...style, stroke: 'var(--foreground)', strokeWidth: 2.5 } : style}
       />
       {hovered && data && (
-        <EdgeLabelRenderer>
-          <div
-            className="pointer-events-auto absolute"
-            // Above the edges, which sit on a raised layer so they cross the parts.
-            style={{
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              zIndex: 1000,
-            }}>
-            <EdgeButton id={id} data={data} />
-          </div>
-        </EdgeLabelRenderer>
+        <EdgeButtonAnchor id={id} data={data} midpoint={{ x: labelX, y: labelY }} />
       )}
     </>
   )

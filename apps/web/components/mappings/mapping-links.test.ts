@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 
 import { messageTypeStructures, seedDocumentStructureOf } from '@edi-bridge/mocks'
 
-import { addLink, canLink, leafPaths, linksOfItem, removeLink } from './mapping-links'
+import {
+  addLink,
+  canLink,
+  leafPaths,
+  linksOfItem,
+  removeLink,
+  revertChange,
+  rowListingLinks,
+} from './mapping-links'
 import { documentTree, edifactTree, findItem } from './mapping-tree'
 
 const source = documentTree(seedDocumentStructureOf.ORDERS)
@@ -117,5 +125,56 @@ describe('linksOfItem', () => {
   it('gives a part the links of every leaf inside it', () => {
     expect(linksOfItem(links, 'source', findItem(source, 'lines[]')!)).toEqual([links[1], links[2]])
     expect(linksOfItem(links, 'target', findItem(target, 'SG25')!)).toEqual([links[1], links[2]])
+  })
+})
+
+describe('rowListingLinks', () => {
+  it('lists links merged from several sources at the source part', () => {
+    expect(
+      rowListingLinks({
+        sourcePath: 'lines[]',
+        targetPath: 'SG25',
+        links: [links[1]!, links[2]!],
+      }),
+    ).toEqual({ side: 'source', path: 'lines[]' })
+  })
+
+  it('lists links from one source at the target part', () => {
+    expect(
+      rowListingLinks({
+        sourcePath: 'orderNumber',
+        targetPath: 'BGM',
+        links: [links[0]!],
+      }),
+    ).toEqual({ side: 'target', path: 'BGM' })
+  })
+})
+
+describe('revertChange', () => {
+  const later = { sourcePath: 'orderDate', targetPath: 'DTM+137/C507/2380' }
+
+  it('takes back a failed add and keeps the changes made after it', () => {
+    const added = { sourcePath: 'buyer.gln', targetPath: 'SG2+BY/NAD+BY/C082/3039' }
+
+    expect(revertChange([...links, added, later], { kind: 'add', link: added })).toEqual([
+      ...links,
+      later,
+    ])
+  })
+
+  it('brings back a link whose removal failed and keeps the changes made after it', () => {
+    const [removed, ...rest] = links
+
+    expect(revertChange([...rest, later], { kind: 'remove', link: removed! })).toEqual([
+      ...rest,
+      later,
+      removed,
+    ])
+  })
+
+  it('does not bring back a link twice', () => {
+    const [removed] = links
+
+    expect(revertChange(links, { kind: 'remove', link: removed! })).toHaveLength(links.length)
   })
 })

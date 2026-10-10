@@ -6,10 +6,11 @@ import { type QueryKey, useQuery, type UseQueryOptions } from '@tanstack/react-q
 import { useLocale, useTranslations } from 'next-intl'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
-import { LinkSaveStatus, MappingCanvas } from '@/components/mappings/mapping-canvas'
+import { LinkSaveStatus } from '@/components/mappings/link-save-status'
+import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
 import { documentTree, edifactTree, type TreeItem } from '@/components/mappings/mapping-tree'
-import { useSaveLinks, useSavingLinks } from '@/components/mappings/use-save-links'
+import { useSaveLinks } from '@/components/mappings/use-save-links'
 import { useDesktop } from '@/hooks/use-desktop'
 import { ApiError, getDocumentStructure, getMessageTypeStructure } from '@/lib/api/client'
 import { documentStructureKeys, mappingDraftQuery, messageTypeKeys } from '@/lib/api/queries'
@@ -158,14 +159,13 @@ function MappingView({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping')
   const sideTitle = useSideTitle()
   const desktop = useDesktop()
-  const saving = useSavingLinks(draft.mappingId)
 
   return (
     <MappingCanvasProvider>
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <Badge variant="outline">{t('draft')}</Badge>
-        <LinkSaveStatus saving={saving} />
+        <LinkSaveStatus mappingId={draft.mappingId} />
       </div>
       <dl
         aria-label={t('facts.label')}

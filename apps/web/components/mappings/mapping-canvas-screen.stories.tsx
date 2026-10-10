@@ -19,7 +19,7 @@ import {
   seedMappingDrafts,
 } from '@edi-bridge/mocks'
 
-import type { RowRef } from '@/components/mappings/mapping-canvas-store'
+import type { RowRef } from '@/components/mappings/mapping-links'
 
 import preview from '../../.storybook/preview'
 
@@ -76,26 +76,58 @@ function centre(element: Element) {
 
 // React Flow follows mouse events on the document while a link is drawn; user-event moves no
 // real pointer, so the drag is dispatched as those events at the handles' positions.
-async function dragLink(canvasElement: HTMLElement, from: RowRef, to: RowRef) {
+async function startDrag(canvasElement: HTMLElement, from: RowRef) {
   const start = centre(handleOf(canvasElement, from))
-  const end = centre(handleOf(canvasElement, to))
-  const doc = canvasElement.ownerDocument
 
   await fireEvent.mouseDown(handleOf(canvasElement, from), { ...start, button: 0, buttons: 1 })
-  await fireEvent.mouseMove(doc, {
+  await fireEvent.mouseMove(canvasElement.ownerDocument, {
     clientX: start.clientX + 20,
     clientY: start.clientY,
     buttons: 1,
   })
-  await fireEvent.mouseMove(doc, { ...end, buttons: 1 })
+}
+
+async function dragOver(canvasElement: HTMLElement, to: RowRef) {
+  await fireEvent.mouseMove(canvasElement.ownerDocument, {
+    ...centre(handleOf(canvasElement, to)),
+    buttons: 1,
+  })
   await waitFor(() => expect(handleOf(canvasElement, to)).toHaveClass('connectingto'))
-  await fireEvent.mouseUp(doc, { ...end, button: 0 })
+}
+
+async function drop(canvasElement: HTMLElement, on: RowRef) {
+  await fireEvent.mouseUp(canvasElement.ownerDocument, {
+    ...centre(handleOf(canvasElement, on)),
+    button: 0,
+  })
+}
+
+async function dragLink(canvasElement: HTMLElement, from: RowRef, to: RowRef) {
+  await startDrag(canvasElement, from)
+  await dragOver(canvasElement, to)
+  await drop(canvasElement, to)
 }
 
 function edgeOf(canvasElement: HTMLElement, from: RowRef, to: RowRef) {
   return canvasElement.querySelector<SVGElement>(
     `.react-flow__edge[data-id="${CSS.escape(`${nodeId(from.side, from.path)}->${nodeId(to.side, to.path)}`)}"] .react-flow__edge-interaction`,
   )
+}
+
+function inside(box: DOMRect, pane: DOMRect) {
+  return (
+    box.left >= pane.left &&
+    box.right <= pane.right &&
+    box.top >= pane.top &&
+    box.bottom <= pane.bottom
+  )
+}
+
+function screenPoint(path: SVGGeometryElement, length: number) {
+  return new DOMPoint(
+    path.getPointAtLength(length).x,
+    path.getPointAtLength(length).y,
+  ).matrixTransform(path.getScreenCTM()!)
 }
 
 function liveStatus(canvasElement: HTMLElement) {
@@ -489,8 +521,10 @@ export const German = meta.story({
     ).toBeVisible()
     await expect(panel.getByRole('button', { name: 'Verknüpfen abbrechen' })).toBeVisible()
     await pressOn(await findRow(canvasElement, target('orderDate')), 'l')
-    await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'orderDate ist bereits mit DTM+137/C507/2380 verknüpft. Entfernen Sie zuerst diese Verknüpfung.',
+    await waitFor(() =>
+      expect(canvas.getByRole('alert')).toHaveTextContent(
+        'orderDate ist bereits mit DTM+137/C507/2380 verknüpft. Entfernen Sie zuerst diese Verknüpfung.',
+      ),
     )
 
     await userEvent.hover(edgeOf(canvasElement, source('BGM/1004'), target('orderNumber'))!)
@@ -604,7 +638,7 @@ export const SelectedRow = meta.story({
 
     await userEvent.click(panel.getByRole('button', { name: 'Clear selection' }))
     await expect(row).toHaveAttribute('aria-pressed', 'false')
-    await expect(row).toHaveFocus()
+    await waitFor(() => expect(row).toHaveFocus())
 
     await userEvent.click(row)
     await userEvent.click(row)
@@ -761,11 +795,14 @@ export const RemoveLinkByMouse = meta.story({
     await expect(panel.getAllByRole('button', { name: /^Remove link from packages/ })).toHaveLength(
       9,
     )
-    await expect(
-      panel.getByRole('button', {
-        name: 'Remove link from packages[].packageNumber to SG10/CPS/7164',
-      }),
-    ).toHaveFocus()
+    // Focus moves a frame after the panel lists the links.
+    await waitFor(() =>
+      expect(
+        panel.getByRole('button', {
+          name: 'Remove link from packages[].packageNumber to SG10/CPS/7164',
+        }),
+      ).toHaveFocus(),
+    )
     await expect(canvas.getByText('17 links')).toBeVisible()
   },
 })
@@ -812,6 +849,93 @@ export const RemoveLinkByKeyboard = meta.story({
   },
 })
 
+export const RemoveButtonOfLongEdge = meta.story({
+  args: { id: inbound.id },
+  parameters: linkStories,
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Collapse buyer' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Collapse SG2+BY' }))
+
+    const pane = canvasElement.querySelector('.react-flow')!.getBoundingClientRect()
+
+    const edge = await waitFor(() => {
+      const found = edgeOf(canvasElement, source('SG2+BY'), target('buyer'))
+
+      if (!(found instanceof SVGGeometryElement)) {
+        throw new Error('No edge from SG2+BY to buyer')
+      }
+
+      return found
+    })
+
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    const length = edge.getTotalLength()
+    const middle = screenPoint(edge, length / 2)
+
+    await expect(inside(new DOMRect(middle.x, middle.y), pane)).toBe(false)
+
+    // Hovered where the edge is in view, near the end that is on screen.
+    const lengths = Array.from({ length: 41 }, (_, step) => (length * step) / 40)
+
+    const shown = lengths
+      .map((at) => screenPoint(edge, at))
+      .find((point) => inside(new DOMRect(point.x - 20, point.y - 20, 40, 40), pane))!
+
+    await fireEvent.mouseOver(edge, { clientX: shown.x, clientY: shown.y })
+
+    const button = await canvas.findByRole('button', {
+      name: 'Show the 8 links from SG2+BY to buyer',
+    })
+
+    await expect(inside(button.getBoundingClientRect(), pane)).toBe(true)
+  },
+})
+
+export const DragOntoLinkedTarget = meta.story({
+  args: { id: outbound.id },
+  parameters: linkStories,
+  async play({ canvas, canvasElement }) {
+    const linked = target('BGM/1004')
+    const free = target('BGM/1225')
+
+    await pressOn(await findRow(canvasElement, source('despatchDate')), 'l')
+    await pressOn(await findRow(canvasElement, linked), 'l')
+    await waitFor(() => expect(canvas.getByRole('alert')).toHaveTextContent('already linked'))
+
+    // A new drag clears the problem of the attempt before it.
+    await startDrag(canvasElement, source('despatchDate'))
+    await waitFor(() => expect(canvas.getByRole('alert')).toBeEmptyDOMElement())
+
+    const nodeOf = (row: RowRef) => handleOf(canvasElement, row).closest('.react-flow__node')!
+
+    await waitFor(() =>
+      expect(nodeOf(linked).querySelector('[data-link-unavailable]')).not.toBeNull(),
+    )
+    await expect(nodeOf(free).querySelector('[data-link-unavailable]')).toBeNull()
+    await expect(handleOf(canvasElement, linked)).toHaveClass('link-handle-unavailable')
+
+    await dragOver(canvasElement, free)
+    await expect(handleOf(canvasElement, free)).toHaveClass('valid')
+
+    await dragOver(canvasElement, linked)
+    await expect(handleOf(canvasElement, linked)).not.toHaveClass('valid')
+
+    await drop(canvasElement, linked)
+
+    await waitFor(() =>
+      expect(canvas.getByRole('alert')).toHaveTextContent(
+        'BGM/1004 is already linked from despatchNumber. Remove that link first.',
+      ),
+    )
+    await expect(canvasElement.querySelector('[data-link-unavailable]')).toBeNull()
+    await expect(
+      canvas.queryByRole('img', { name: 'Link from despatchDate to BGM/1004' }),
+    ).toBeNull()
+    await expect(canvas.getByText('18 links')).toBeVisible()
+  },
+})
+
 export const TargetAlreadyLinked = meta.story({
   args: { id: outbound.id },
   parameters: linkStories,
@@ -827,8 +951,10 @@ export const TargetAlreadyLinked = meta.story({
 
     await pressOn(linked, 'l')
 
-    await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'DTM+137/C507/2380 is already linked from documentDate. Remove that link first.',
+    await waitFor(() =>
+      expect(canvas.getByRole('alert')).toHaveTextContent(
+        'DTM+137/C507/2380 is already linked from documentDate. Remove that link first.',
+      ),
     )
     await expect(
       canvas.queryByRole('img', { name: 'Link from despatchDate to DTM+137/C507/2380' }),
@@ -861,8 +987,10 @@ export const SaveErrorRollback = meta.story({
     ).toBeInTheDocument()
     await expect(canvas.getByText('Saving…')).toBeVisible()
 
-    await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The link from invoiceNumber to BGM/1004 could not be saved and was taken back. Try again.',
+    await waitFor(() =>
+      expect(canvas.getByRole('alert')).toHaveTextContent(
+        'The link from invoiceNumber to BGM/1004 could not be saved and was taken back. Try again.',
+      ),
     )
     await expect(
       canvas.queryByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),

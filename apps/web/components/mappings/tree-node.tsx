@@ -7,6 +7,7 @@ import {
   type Node,
   type NodeProps,
   Position,
+  useConnection,
   useReactFlow,
   useStoreApi,
 } from '@xyflow/react'
@@ -15,7 +16,6 @@ import { type FocusEvent, memo, type ReactNode, useCallback } from 'react'
 
 import {
   isSameRow,
-  type RowRef,
   useCanvasStore,
   useLinkHints,
   useMeaningTooltip,
@@ -30,6 +30,8 @@ import {
 import { kindMeanings } from '@/components/mappings/row-meaning'
 import { TooltipTrigger } from '@edi-bridge/ui/components/tooltip'
 import { cn } from '@edi-bridge/ui/lib/utils'
+
+import type { RowRef } from '@/components/mappings/mapping-links'
 
 export type TreeNodeData = TreeRow & { linked: boolean }
 
@@ -191,6 +193,11 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
     (state) => state.linkFrom !== null && data.side === 'target' && data.linkable && !data.linked,
   )
 
+  // While a link is dragged, a linked target refuses it; the drop there still says why.
+  const unavailable = useConnection(
+    (connection) => connection.inProgress && data.side === 'target' && data.linkable && data.linked,
+  )
+
   const hint = linkStart ? hints.linkStart : linkTarget ? hints.linkTarget : null
 
   return (
@@ -204,9 +211,11 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         linkTarget && 'outline-primary bg-primary/5 outline-2 outline-offset-1 outline-dashed',
         linkStart && 'bg-primary/10',
         selected && 'outline-primary outline-2 outline-offset-1 outline-solid',
+        unavailable && 'bg-muted',
       )}
       data-kind={data.kind}
       data-link-target={linkTarget || undefined}
+      data-link-unavailable={unavailable || undefined}
       data-selected={selected || undefined}
       onFocus={onFocus}>
       <div
@@ -246,6 +255,7 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
           data.linkable ? 'link-handle' : 'part-handle',
           !showHandle && 'invisible',
           (linkStart || linkTarget) && 'link-handle-marked',
+          unavailable && 'link-handle-unavailable',
         )}
         style={{ top: rowHeight / 2 }}
       />

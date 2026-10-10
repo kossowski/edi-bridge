@@ -1,4 +1,4 @@
-import type { Side, TreeItem } from '@/components/mappings/mapping-tree'
+import type { CanvasLink, Side, TreeItem } from '@/components/mappings/mapping-tree'
 import type { MappingLink } from '@edi-bridge/contracts'
 
 export type RowRef = { side: Side; path: string }
@@ -45,6 +45,10 @@ export function sameLink(a: MappingLink, b: MappingLink) {
   return a.sourcePath === b.sourcePath && a.targetPath === b.targetPath
 }
 
+export function linkInto(links: ReadonlyArray<MappingLink>, targetPath: string) {
+  return links.find((link) => link.targetPath === targetPath)
+}
+
 // A target takes one value; combining several sources needs a transform, so a second link into
 // a linked target is refused rather than replacing the first one.
 export function addLink(
@@ -57,7 +61,7 @@ export function addLink(
     return { ok: false, reason: 'notLinkable' }
   }
 
-  const existing = links.find(({ targetPath }) => targetPath === to.path)
+  const existing = linkInto(links, to.path)
 
   if (existing) {
     return { ok: false, reason: 'alreadyLinked', existing }
@@ -78,4 +82,22 @@ export function linksOfItem(links: ReadonlyArray<MappingLink>, side: Side, item:
   const key = side === 'source' ? 'sourcePath' : 'targetPath'
 
   return links.filter((link) => paths.has(link[key]))
+}
+
+// A merged edge lists its links at the part that was collapsed into it: the source part when
+// several sources were merged, otherwise the target part.
+export function rowListingLinks({ sourcePath, targetPath, links }: Omit<CanvasLink, 'id'>): RowRef {
+  return links.some((link) => link.sourcePath !== sourcePath)
+    ? { side: 'source', path: sourcePath }
+    : { side: 'target', path: targetPath }
+}
+
+// Saves overlap, so a failed one takes back only its own change and keeps the ones after it.
+export function revertChange(
+  links: ReadonlyArray<MappingLink>,
+  { kind, link }: Pick<LinkChange, 'kind' | 'link'>,
+): MappingLink[] {
+  const rest = links.filter((other) => !sameLink(other, link))
+
+  return kind === 'add' ? rest : [...rest, link]
 }

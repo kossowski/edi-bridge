@@ -3,24 +3,23 @@
 import { createContext, type ReactNode, useContext, useId, useState } from 'react'
 import { createStore, type StoreApi, useStore } from 'zustand'
 
+import type { XYPosition } from '@xyflow/react'
+
 import { createTooltipHandle } from '@edi-bridge/ui/components/tooltip'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
 import type { Side, TreeRow } from '@/components/mappings/mapping-tree'
 
-export type { RowRef } from '@/components/mappings/mapping-links'
-
 export type CanvasState = {
   collapsed: Readonly<Record<Side, ReadonlySet<string>>>
-  // Shown in the details panel.
   selected: RowRef | null
-  // The source of a link drawn by keyboard, waiting for its target.
   linkFrom: RowRef | null
   tooltipRowId: string | null
   hoveredEdge: string | null
+  // Where the pointer met the hovered edge, in flow coordinates; its middle may be out of view.
+  edgeAnchor: XYPosition | null
   announcement: string
   problem: string | null
-  lastSave: 'saved' | 'failed' | null
   toggleCollapsed: (row: RowRef) => void
   toggleSelected: (row: RowRef) => void
   select: (row: RowRef) => void
@@ -28,18 +27,17 @@ export type CanvasState = {
   startLink: (row: RowRef) => void
   cancelLink: () => void
   setTooltipRowId: (id: string | null) => void
-  hoverEdge: (id: string) => void
+  hoverEdge: (id: string, at?: XYPosition) => void
   leaveEdge: (id: string) => void
   announce: (text: string) => void
   setProblem: (problem: string | null) => void
-  setLastSave: (lastSave: 'saved' | 'failed') => void
 }
 
 export function isSameRow(a: RowRef | null, b: RowRef) {
   return a !== null && a.side === b.side && a.path === b.path
 }
 
-function ref({ side, path }: RowRef): RowRef {
+function toRowRef({ side, path }: RowRef): RowRef {
   return { side, path }
 }
 
@@ -55,9 +53,9 @@ export function createCanvasStore() {
     linkFrom: null,
     tooltipRowId: null,
     hoveredEdge: null,
+    edgeAnchor: null,
     announcement: '',
     problem: null,
-    lastSave: null,
     toggleCollapsed: ({ side, path }) =>
       set(({ collapsed }) => {
         const next = new Set(collapsed[side])
@@ -70,16 +68,19 @@ export function createCanvasStore() {
       }),
     toggleSelected: (row) =>
       set(({ selected }) => ({
-        selected: isSameRow(selected, row) ? null : ref(row),
+        selected: isSameRow(selected, row) ? null : toRowRef(row),
       })),
-    select: (row) => set({ selected: ref(row) }),
+    select: (row) => set({ selected: toRowRef(row) }),
     clearSelection: () => set({ selected: null }),
-    startLink: (row) => set({ linkFrom: ref(row), problem: null }),
+    startLink: (row) => set({ linkFrom: toRowRef(row), problem: null }),
     cancelLink: () => set({ linkFrom: null }),
     setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
-    hoverEdge: (id) => {
+    hoverEdge: (id, at) => {
       clearTimeout(leaveTimer)
-      set({ hoveredEdge: id })
+      set(({ hoveredEdge, edgeAnchor }) => ({
+        hoveredEdge: id,
+        edgeAnchor: at ?? (hoveredEdge === id ? edgeAnchor : null),
+      }))
     },
     leaveEdge: (id) => {
       clearTimeout(leaveTimer)
@@ -95,7 +96,6 @@ export function createCanvasStore() {
         announcement: announcement === text ? `${text}\u00a0` : text,
       })),
     setProblem: (problem) => set({ problem }),
-    setLastSave: (lastSave) => set({ lastSave }),
   }))
 }
 

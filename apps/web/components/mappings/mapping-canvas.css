@@ -59,6 +59,13 @@
   box-shadow: 0 0 0 3px var(--ring);
 }
 
+.mapping-canvas .react-flow__handle.link-handle.link-handle-unavailable::after {
+  inset: 9px;
+  border-color: var(--muted-foreground);
+  background: var(--background);
+  box-shadow: none;
+}
+
 .mapping-canvas .react-flow__handle.part-handle {
   pointer-events: none;
 }
