@@ -57,11 +57,7 @@ function DeleteConfirmation({
         <DialogClose disabled={remove.isPending} render={<Button variant="outline" />}>
           {t('cancel')}
         </DialogClose>
-        <Button
-          disabled={remove.isPending}
-          variant="destructive"
-          className="text-red-800 dark:text-red-300"
-          onClick={() => remove.mutate()}>
+        <Button disabled={remove.isPending} variant="destructive" onClick={() => remove.mutate()}>
           {remove.isPending ? t('pending') : t('confirm')}
         </Button>
       </DialogFooter>
