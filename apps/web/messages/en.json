@@ -128,9 +128,9 @@
     },
     "overdue": {
       "title": "Overdue Acknowledgements",
-      "description": "{count, plural, =0 {Every sent Interchange was acknowledged in time.} one {# sent Interchange} other {# sent Interchanges}} without an Acknowledgement within the time limit. Longest Overdue first.",
+      "description": "{count, plural, =0 {Every sent Interchange was acknowledged in time.} one {# sent Interchange without an Acknowledgement within the time limit. Longest Overdue first.} other {# sent Interchanges without an Acknowledgement within the time limit. Longest Overdue first.}}",
       "caption": "Overdue Acknowledgements, longest Overdue first",
-      "interchange": "Interchange",
+      "interchangeLink": "Interchange {controlReference}",
       "hours": "{hours, plural, one {# hour} other {# hours}}",
       "showAll": "Show all {count, number} Overdue Acknowledgements",
       "columns": {

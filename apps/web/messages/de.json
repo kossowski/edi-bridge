@@ -128,9 +128,9 @@
     },
     "overdue": {
       "title": "Überfällige Acknowledgements",
-      "description": "{count, plural, =0 {Jedes gesendete Interchange wurde rechtzeitig bestätigt.} one {# gesendetes Interchange} other {# gesendete Interchanges}} ohne Acknowledgement innerhalb der Frist. Am längsten überfällige zuerst.",
+      "description": "{count, plural, =0 {Für jedes gesendete Interchange kam das Acknowledgement rechtzeitig an.} one {# gesendetes Interchange ohne Acknowledgement innerhalb der Frist. Am längsten überfällige zuerst.} other {# gesendete Interchanges ohne Acknowledgement innerhalb der Frist. Am längsten überfällige zuerst.}}",
       "caption": "Überfällige Acknowledgements, am längsten überfällige zuerst",
-      "interchange": "Interchange",
+      "interchangeLink": "Interchange {controlReference}",
       "hours": "{hours, plural, one {# Stunde} other {# Stunden}}",
       "showAll": "Alle {count, number} überfälligen Acknowledgements anzeigen",
       "columns": {

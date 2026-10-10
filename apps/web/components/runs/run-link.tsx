@@ -5,6 +5,9 @@ import Link from 'next/link'
 
 import type { ComponentProps } from 'react'
 
+import { rowLinkClass } from '@/components/detail-parts'
+import { cn } from '@edi-bridge/ui/lib/utils'
+
 import type { RunSummary } from '@edi-bridge/contracts'
 
 export function RunLink({
@@ -18,10 +21,7 @@ export function RunLink({
   const format = useFormatter()
 
   return (
-    <Link
-      href={`/runs/${run.id}`}
-      className="focus-visible:after:ring-ring font-medium tabular-nums underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset"
-      {...props}>
+    <Link href={`/runs/${run.id}`} className={cn(rowLinkClass, 'tabular-nums')} {...props}>
       <time dateTime={run.receivedAt}>
         {format.dateTime(new Date(run.receivedAt), {
           dateStyle: 'medium',

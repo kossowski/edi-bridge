@@ -18,6 +18,8 @@ export function useFormats(timeWindow: OverviewWindow) {
     range: ({ start, end }: Pick<BucketRow, 'start' | 'end'>) =>
       format.dateTimeRange(new Date(start), new Date(end), rangeFormats[timeWindow]),
     count: (value: number) => format.number(value),
+    dateTime: (value: string) =>
+      format.dateTime(new Date(value), { dateStyle: 'medium', timeStyle: 'short' }),
     compact: (value: number) => format.number(value, { notation: 'compact' }),
     percent,
     errorRate: (value: number | null) => (value === null ? t('noErrorRate') : percent(value)),

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { rowLinkClass } from '@/components/detail-parts'
 import { ListScreen, ListTable } from '@/components/list-screen'
 import { mappingsQuery } from '@/lib/api/queries'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
@@ -19,9 +20,7 @@ function MappingRow({ mapping }: { mapping: MappingSummary }) {
   return (
     <TableRow className="relative">
       <TableCell>
-        <Link
-          href={`/mappings/${mapping.id}`}
-          className="focus-visible:after:ring-ring font-medium underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset">
+        <Link href={`/mappings/${mapping.id}`} className={rowLinkClass}>
           {mapping.name}
         </Link>
       </TableCell>

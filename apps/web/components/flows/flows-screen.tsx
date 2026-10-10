@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { rowLinkClass } from '@/components/detail-parts'
 import { useFlowReferences } from '@/components/flows/flow-parts'
 import { ListScreen, ListTable } from '@/components/list-screen'
 import { flowsQuery } from '@/lib/api/queries'
@@ -25,9 +26,7 @@ function FlowRow({ flow, references }: { flow: Flow; references: References }) {
   return (
     <TableRow className="relative">
       <TableCell>
-        <Link
-          href={`/flows/${flow.id}`}
-          className="focus-visible:after:ring-ring font-medium underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset">
+        <Link href={`/flows/${flow.id}`} className={rowLinkClass}>
           {flow.name}
         </Link>
       </TableCell>

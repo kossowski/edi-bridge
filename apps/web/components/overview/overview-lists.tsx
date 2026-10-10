@@ -6,6 +6,7 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { type ReactNode, useId, useState } from 'react'
 
+import { linkClass, rowLinkClass } from '@/components/detail-parts'
 import { HealthStatusBadge } from '@/components/overview/health-status'
 import { useFormats } from '@/components/overview/overview-formats'
 import {
@@ -29,6 +30,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@edi-bridge/ui/components/empty'
+import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import {
   TableBody,
   TableCaption,
@@ -37,14 +39,9 @@ import {
   TableHeader,
   TableRow,
 } from '@edi-bridge/ui/components/table'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 const topCount = 10
-
-const linkClassName =
-  'focus-visible:ring-ring rounded-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:underline focus-visible:ring-2'
-
-const rowLinkClassName =
-  'focus-visible:after:ring-ring font-medium underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset'
 
 const numberClassName = 'text-right tabular-nums'
 
@@ -138,32 +135,30 @@ function ListCard<Item>({
 }
 
 const healthColumns = [
-  'tradingPartner',
-  'status',
-  'delivered',
-  'failed',
-  'errorRate',
-  'overdue',
-  'lastRun',
+  { key: 'tradingPartner', numeric: false },
+  { key: 'status', numeric: false },
+  { key: 'delivered', numeric: true },
+  { key: 'failed', numeric: true },
+  { key: 'errorRate', numeric: true },
+  { key: 'overdue', numeric: true },
+  { key: 'lastRun', numeric: false },
 ] as const
 
-const numericHealthColumns = new Set<string>(['delivered', 'failed', 'errorRate', 'overdue'])
+type Formats = ReturnType<typeof useFormats>
 
 function HealthRow({
   health,
-  timeWindow,
+  formats,
+  noRunLabel,
 }: {
   health: TradingPartnerHealth
-  timeWindow: OverviewWindow
+  formats: Formats
+  noRunLabel: string
 }) {
-  const t = useTranslations('Overview.health')
-  const formats = useFormats(timeWindow)
-  const format = useFormatter()
-
   return (
     <TableRow className="relative">
       <TableCell>
-        <Link href={`/trading-partners/${health.tradingPartner.id}`} className={rowLinkClassName}>
+        <Link href={`/trading-partners/${health.tradingPartner.id}`} className={rowLinkClass}>
           {health.tradingPartner.name}
         </Link>
       </TableCell>
@@ -176,14 +171,9 @@ function HealthRow({
       <TableCell className={numberClassName}>{formats.count(health.overdue)}</TableCell>
       <TableCell className="tabular-nums">
         {health.lastRunAt === null ? (
-          <span className="text-muted-foreground">{t('noRun')}</span>
+          <span className="text-muted-foreground">{noRunLabel}</span>
         ) : (
-          <time dateTime={health.lastRunAt}>
-            {format.dateTime(new Date(health.lastRunAt), {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            })}
-          </time>
+          <time dateTime={health.lastRunAt}>{formats.dateTime(health.lastRunAt)}</time>
         )}
       </TableCell>
     </TableRow>
@@ -198,6 +188,7 @@ export function TradingPartnerHealthList({
   timeWindow: OverviewWindow
 }) {
   const t = useTranslations('Overview')
+  const formats = useFormats(timeWindow)
 
   const count = (status: TradingPartnerHealth['status']) =>
     tradingPartners.filter((health) => health.status === status).length
@@ -207,10 +198,10 @@ export function TradingPartnerHealthList({
   return (
     <ListCard
       caption={t('health.caption', { period: t(`period.${timeWindow}`) })}
-      columns={healthColumns.map((key) => ({
+      columns={healthColumns.map(({ key, numeric }) => ({
         key,
         label: t(`health.columns.${key}`),
-        numeric: numericHealthColumns.has(key),
+        numeric,
       }))}
       description={
         unhealthy === 0
@@ -228,7 +219,12 @@ export function TradingPartnerHealthList({
       }}
       items={tradingPartners}
       row={(health) => (
-        <HealthRow key={health.tradingPartner.id} health={health} timeWindow={timeWindow} />
+        <HealthRow
+          key={health.tradingPartner.id}
+          formats={formats}
+          health={health}
+          noRunLabel={t('health.noRun')}
+        />
       )}
       showAllLabel={t('health.showAll', { count: tradingPartners.length })}
       showTopLabel={t('showTop', { count: topCount })}
@@ -249,36 +245,35 @@ const overdueColumns = [
 function OverdueRow({
   acknowledgement,
   now,
+  formats,
 }: {
   acknowledgement: OverdueAcknowledgement
   now: Date
+  formats: Formats
 }) {
   const t = useTranslations('Overview.overdue')
   const format = useFormatter()
-
-  const dateTime = (value: string) =>
-    format.dateTime(new Date(value), { dateStyle: 'medium', timeStyle: 'short' })
 
   return (
     <TableRow>
       <TableCell>
         <Link
           href={`/interchanges/${acknowledgement.interchange.id}`}
-          className={`${linkClassName} font-mono text-xs tabular-nums`}>
-          <span className="sr-only">{t('interchange')} </span>
+          aria-label={t('interchangeLink', {
+            controlReference: acknowledgement.interchange.controlReference,
+          })}
+          className={cn(linkClass, 'font-mono text-xs tabular-nums')}>
           {acknowledgement.interchange.controlReference}
         </Link>
       </TableCell>
       <TableCell>
-        <Link
-          href={`/trading-partners/${acknowledgement.tradingPartner.id}`}
-          className={linkClassName}>
+        <Link href={`/trading-partners/${acknowledgement.tradingPartner.id}`} className={linkClass}>
           {acknowledgement.tradingPartner.name}
         </Link>
       </TableCell>
       <TableCell className="font-mono text-xs">{acknowledgement.messageType}</TableCell>
       <TableCell className="tabular-nums">
-        <time dateTime={acknowledgement.sentAt}>{dateTime(acknowledgement.sentAt)}</time>
+        <time dateTime={acknowledgement.sentAt}>{formats.dateTime(acknowledgement.sentAt)}</time>
       </TableCell>
       <TableCell className="tabular-nums">
         {t('hours', { hours: acknowledgement.acknowledgementTimeLimitHours })}
@@ -289,7 +284,7 @@ function OverdueRow({
             {format.relativeTime(new Date(acknowledgement.overdueSince), now)}
           </span>
           <span className="text-muted-foreground text-xs">
-            {dateTime(acknowledgement.overdueSince)}
+            {formats.dateTime(acknowledgement.overdueSince)}
           </span>
         </time>
       </TableCell>
@@ -299,11 +294,14 @@ function OverdueRow({
 
 export function OverdueAcknowledgementsList({
   overdueAcknowledgements,
+  timeWindow,
 }: {
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>
+  timeWindow: OverviewWindow
 }) {
   const t = useTranslations('Overview')
   const now = useNow({ updateInterval: 60_000 })
+  const formats = useFormats(timeWindow)
 
   return (
     <ListCard
@@ -320,6 +318,7 @@ export function OverdueAcknowledgementsList({
         <OverdueRow
           key={acknowledgement.interchange.id}
           acknowledgement={acknowledgement}
+          formats={formats}
           now={now}
         />
       )}
@@ -327,5 +326,51 @@ export function OverdueAcknowledgementsList({
       showTopLabel={t('showTop', { count: topCount })}
       title={t('overdue.title')}
     />
+  )
+}
+
+function ListCardSkeleton({ columns }: { columns: number }) {
+  return (
+    <Card aria-hidden className="min-w-0">
+      <CardHeader>
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-hidden rounded-lg border">
+          <table className="w-full text-sm">
+            <TableHeader>
+              <TableRow>
+                {Array.from({ length: columns }, (_, column) => (
+                  <TableHead key={column}>
+                    <Skeleton className="h-4 w-16" />
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }, (_, row) => (
+                <TableRow key={row}>
+                  {Array.from({ length: columns }, (_, column) => (
+                    <TableCell key={column}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function LoadingLists() {
+  return (
+    <>
+      <ListCardSkeleton columns={healthColumns.length} />
+      <ListCardSkeleton columns={overdueColumns.length} />
+    </>
   )
 }

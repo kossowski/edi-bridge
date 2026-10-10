@@ -11,6 +11,7 @@ import { BucketTable, ErrorRateChart, ThroughputChart } from '@/components/overv
 import { type Totals, toBucketRows, totalsOf } from '@/components/overview/overview-data'
 import { useFormats } from '@/components/overview/overview-formats'
 import {
+  LoadingLists,
   OverdueAcknowledgementsList,
   TradingPartnerHealthList,
 } from '@/components/overview/overview-lists'
@@ -168,14 +169,19 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
               <BucketTable rows={rows} timeWindow={shownWindow} />
             </>
           )}
-          {data && (
+          {data ? (
             <>
               <TradingPartnerHealthList
                 timeWindow={shownWindow}
                 tradingPartners={data.tradingPartners}
               />
-              <OverdueAcknowledgementsList overdueAcknowledgements={data.overdueAcknowledgements} />
+              <OverdueAcknowledgementsList
+                overdueAcknowledgements={data.overdueAcknowledgements}
+                timeWindow={shownWindow}
+              />
             </>
+          ) : (
+            <LoadingLists />
           )}
         </div>
       )}
