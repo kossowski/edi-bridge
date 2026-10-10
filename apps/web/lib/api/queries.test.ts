@@ -4,13 +4,19 @@ import { describe, expect, it } from 'vitest'
 import {
   createTradingPartner,
   seedDocumentStructures,
+  seedLookupTables,
   seedMappingDrafts,
+  seedTradingPartners,
+  toLookupTable,
   toMappingDraft,
 } from '@edi-bridge/mocks'
 
 import {
   documentStructureQuery,
   documentStructuresQuery,
+  forgetDeletedLookupTable,
+  lookupTableQuery,
+  lookupTablesQuery,
   mappingDraftQuery,
   mappingVersionsQuery,
   storePublishedMappingVersion,
@@ -74,5 +80,23 @@ describe('storeSavedDocumentStructure', () => {
 
     expect(queryClient.getQueryData(documentStructureQuery(saved!.id).queryKey)).toEqual(saved)
     expect(queryClient.getQueryState(documentStructuresQuery.queryKey)?.isInvalidated).toBe(true)
+  })
+})
+
+describe('forgetDeletedLookupTable', () => {
+  it('drops the deleted Lookup Table and marks the list as stale', () => {
+    const queryClient = new QueryClient()
+
+    const deleted = toLookupTable(seedLookupTables[0]!, {
+      get: (id) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
+    })
+
+    queryClient.setQueryData(lookupTablesQuery.queryKey, [])
+    queryClient.setQueryData(lookupTableQuery(deleted.id).queryKey, deleted)
+
+    forgetDeletedLookupTable(queryClient, deleted.id)
+
+    expect(queryClient.getQueryState(lookupTableQuery(deleted.id).queryKey)).toBeUndefined()
+    expect(queryClient.getQueryState(lookupTablesQuery.queryKey)?.isInvalidated).toBe(true)
   })
 })

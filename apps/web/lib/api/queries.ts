@@ -10,6 +10,7 @@ import type {
   DocumentStructure,
   DocumentStructureOrigin,
   Flow,
+  LookupTable,
   MappingComparisonQuery,
   MappingDraft,
   MappingGraph,
@@ -26,6 +27,7 @@ import {
   getDocumentStructure,
   getFlow,
   getInterchange,
+  getLookupTable,
   getMappingDraft,
   getMappingVersion,
   getRun,
@@ -207,12 +209,30 @@ export function storePublishedMappingVersion(
 export const lookupTableKeys = {
   all: () => ['lookup-tables'] as const,
   list: () => [...lookupTableKeys.all(), 'list'] as const,
+  detail: (id: string) => [...lookupTableKeys.all(), 'detail', id] as const,
 }
 
 export const lookupTablesQuery = queryOptions({
   queryKey: lookupTableKeys.list(),
   queryFn: listLookupTables,
 })
+
+export function lookupTableQuery(id: string) {
+  return queryOptions({
+    queryKey: lookupTableKeys.detail(id),
+    queryFn: () => getLookupTable(id),
+  })
+}
+
+export function storeSavedLookupTable(queryClient: QueryClient, saved: LookupTable) {
+  queryClient.setQueryData(lookupTableQuery(saved.id).queryKey, saved)
+  void queryClient.invalidateQueries({ queryKey: lookupTableKeys.list() })
+}
+
+export function forgetDeletedLookupTable(queryClient: QueryClient, id: string) {
+  queryClient.removeQueries({ queryKey: lookupTableKeys.detail(id) })
+  void queryClient.invalidateQueries({ queryKey: lookupTableKeys.list() })
+}
 
 export const tradingPartnerKeys = {
   all: () => ['trading-partners'] as const,

@@ -1,7 +1,8 @@
-import { PagePlaceholder, placeholderMetadata } from '@/components/page-placeholder'
+import { LookupTablesScreen } from '@/components/lookup-tables/lookup-tables-screen'
+import { placeholderMetadata } from '@/components/page-placeholder'
 
 export const generateMetadata = placeholderMetadata('lookupTables')
 
 export default function Page() {
-  return <PagePlaceholder page="lookupTables" />
+  return <LookupTablesScreen />
 }
