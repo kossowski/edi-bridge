@@ -15,6 +15,7 @@ import {
   flowsEndpoint,
   type FlowUpdate,
   interchangeEndpoint,
+  lookupTablesEndpoint,
   type ManualSubmissionInput,
   mappingDraftEndpoint,
   mappingsEndpoint,
@@ -161,6 +162,10 @@ export function getMessageTypeStructure(messageType: MessageType) {
 
 export function listPublishedMappingVersions(query: PublishedMappingVersionsQuery) {
   return request(publishedMappingVersionsEndpoint, { query })
+}
+
+export function listLookupTables() {
+  return request(lookupTablesEndpoint)
 }
 
 export function listTradingPartners() {

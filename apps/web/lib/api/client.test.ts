@@ -6,10 +6,12 @@ import {
   createRun,
   createTradingPartner as buildTradingPartner,
   createWorkspace,
+  lookupTablesHandler,
   mappingHandlers,
   seedMappingDrafts,
   runDetailHandlers,
   runsHandler,
+  seedLookupTables,
   tradingPartnerHandlers,
   workspaceHandlers,
 } from '@edi-bridge/mocks'
@@ -19,6 +21,7 @@ import {
   createTradingPartner,
   getChannel,
   getRun,
+  listLookupTables,
   listMappingVersions,
   listRuns,
   regenerateWebhookToken,
@@ -233,5 +236,19 @@ describe('saveMappingDraft', () => {
         transformLinks,
       }),
     ).rejects.toMatchObject({ status: 422 })
+  })
+})
+
+describe('listLookupTables', () => {
+  it('lists the Lookup Tables with their scope, sorted by name', async () => {
+    server.use(lookupTablesHandler(apiUrl))
+
+    const tables = await listLookupTables()
+
+    expect(tables).toHaveLength(seedLookupTables.length)
+    expect(tables[0]).toMatchObject({ name: 'Alpenfrisch article groups' })
+    expect(tables.find(({ name }) => name === 'Country codes')?.scope).toEqual({
+      kind: 'workspace',
+    })
   })
 })

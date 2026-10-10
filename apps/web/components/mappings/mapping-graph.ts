@@ -1,9 +1,12 @@
 import {
   type LinkEnd,
+  type LookupTableSummary,
   type LinkStart,
   type MappingGraph,
   type MappingLink,
   type MappingTransform,
+  type TransformIssue,
+  transformIssues,
   type TransformKind,
   type TransformLink,
   transformPorts,
@@ -11,7 +14,7 @@ import {
 
 import type { Leaves } from '@/components/mappings/mapping-links'
 
-import { defaultConfig, type PlaceableKind } from './transform-kinds'
+import { defaultConfig } from './transform-kinds'
 
 export type Graph = Pick<MappingGraph, 'links' | 'transforms' | 'transformLinks'>
 
@@ -33,7 +36,7 @@ export type GraphChange =
 
 export type Connected =
   | { ok: true; change: GraphChange }
-  | { ok: false; reason: 'notLinkable' | 'needsPart'; end: 'from' | 'to' }
+  | { ok: false; reason: 'notLinkable' | 'needsPart' | 'needsLoop'; end: 'from' | 'to' }
   | { ok: false; reason: 'circle' }
   | { ok: false; reason: 'alreadyLinked' | 'inputTaken'; existing: LinkStart }
 
@@ -115,24 +118,29 @@ function portExists(graph: Graph, end: LinkStart | LinkEnd) {
   return 'input' in end ? inputs.includes(end.input) : outputs.includes(end.output)
 }
 
-// A loop's items ports take whole repeating parts, not single fields; they are linked with the
-// loop's own settings.
+// Fields and elements take single values; repeating parts are linked whole, but only through a
+// loop's items ports, which take nothing else.
+export type LinkableRows = { leaves: Leaves; parts: Leaves }
+
+const partPort = 'items'
+
 export function takesPart(graph: Graph, end: LinkStart | LinkEnd) {
   const port = end.kind === 'transform' ? ('input' in end ? end.input : end.output) : null
 
   return (
-    port === 'items' &&
+    port === partPort &&
     end.kind === 'transform' &&
     transformById(graph, end.transformId)?.kind === 'loop'
   )
 }
 
-function startExists(graph: Graph, leaves: Leaves, from: LinkStart) {
-  return from.kind === 'source' ? leaves.source.has(from.path) : portExists(graph, from)
+// Only a loop has an items output, so a link pending from one looks for a repeating target part.
+export function isPartStart(from: LinkStart | null) {
+  return from?.kind === 'transform' && from.output === partPort
 }
 
-function endExists(graph: Graph, leaves: Leaves, to: LinkEnd) {
-  return to.kind === 'target' ? leaves.target.has(to.path) : portExists(graph, to)
+function rowRefused(rows: LinkableRows, side: 'source' | 'target', path: string) {
+  return rows.parts[side].has(path) ? 'needsLoop' : 'notLinkable'
 }
 
 function endTaken(graph: Graph, to: LinkEnd) {
@@ -170,17 +178,48 @@ function feeds(graph: Graph, from: string, to: string): boolean {
   return false
 }
 
-export function connect(graph: Graph, leaves: Leaves, from: LinkStart, to: LinkEnd): Connected {
-  if (takesPart(graph, to) || takesPart(graph, from)) {
-    return { ok: false, reason: 'needsPart', end: takesPart(graph, to) ? 'to' : 'from' }
+function refusedEnds(
+  graph: Graph,
+  rows: LinkableRows,
+  from: LinkStart,
+  to: LinkEnd,
+): Exclude<Connected, { ok: true }> | null {
+  if (takesPart(graph, to)) {
+    return from.kind === 'source' && rows.parts.source.has(from.path)
+      ? null
+      : { ok: false, reason: 'needsPart', end: 'to' }
   }
 
-  if (!endExists(graph, leaves, to)) {
-    return { ok: false, reason: 'notLinkable', end: 'to' }
+  if (takesPart(graph, from)) {
+    return to.kind === 'target' && rows.parts.target.has(to.path)
+      ? null
+      : { ok: false, reason: 'needsPart', end: 'from' }
   }
 
-  if (!startExists(graph, leaves, from)) {
-    return { ok: false, reason: 'notLinkable', end: 'from' }
+  if (to.kind === 'target' ? !rows.leaves.target.has(to.path) : !portExists(graph, to)) {
+    return {
+      ok: false,
+      reason: to.kind === 'target' ? rowRefused(rows, 'target', to.path) : 'notLinkable',
+      end: 'to',
+    }
+  }
+
+  if (from.kind === 'source' ? !rows.leaves.source.has(from.path) : !portExists(graph, from)) {
+    return {
+      ok: false,
+      reason: from.kind === 'source' ? rowRefused(rows, 'source', from.path) : 'notLinkable',
+      end: 'from',
+    }
+  }
+
+  return null
+}
+
+export function connect(graph: Graph, rows: LinkableRows, from: LinkStart, to: LinkEnd): Connected {
+  const refused = refusedEnds(graph, rows, from, to)
+
+  if (refused) {
+    return refused
   }
 
   const existing = endTaken(graph, to)
@@ -422,7 +461,7 @@ export function freeSlot(
 }
 
 export function newTransform(
-  kind: PlaceableKind,
+  kind: TransformKind,
   id: string,
   position: Position,
 ): MappingTransform {
@@ -445,4 +484,32 @@ export function transformNames(transforms: ReadonlyArray<MappingTransform>) {
       return [id, { kind, number }]
     }),
   )
+}
+
+export type CanvasIssue = TransformIssue | { field: string; code: 'unknownLookupTable' }
+
+// The contract cannot know which Lookup Tables exist; a chosen one missing from the loaded list
+// was deleted meanwhile. Until the list loads, nothing is reported.
+export function canvasIssues(
+  graph: Pick<Graph, 'transforms' | 'transformLinks'>,
+  lookupTables: ReadonlyArray<Pick<LookupTableSummary, 'id'>> | undefined,
+): Record<string, CanvasIssue[]> {
+  const issues: Record<string, CanvasIssue[]> = transformIssues(graph)
+  const known = new Set(lookupTables?.map(({ id }) => id))
+
+  for (const transform of graph.transforms) {
+    if (
+      lookupTables &&
+      transform.kind === 'lookupTable' &&
+      transform.config.lookupTableId !== null &&
+      !known.has(transform.config.lookupTableId)
+    ) {
+      issues[transform.id] = [
+        { field: 'lookupTableId', code: 'unknownLookupTable' },
+        ...(issues[transform.id] ?? []),
+      ]
+    }
+  }
+
+  return issues
 }

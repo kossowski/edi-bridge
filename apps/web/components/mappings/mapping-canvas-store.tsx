@@ -17,6 +17,8 @@ export type CanvasState = {
   selected: RowRef | null
   selectedTransform: string | null
   linkFrom: LinkStart | null
+  // A pending link from a repeating part or a loop's items output goes to a part, not a field.
+  linkFromPart: boolean
   tooltipRowId: string | null
   hoveredEdge: string | null
   // Where the pointer met the hovered edge, in flow coordinates; its middle may be out of view.
@@ -29,7 +31,7 @@ export type CanvasState = {
   toggleTransform: (id: string) => void
   selectTransform: (id: string) => void
   clearSelection: () => void
-  startLink: (start: LinkStart) => void
+  startLink: (start: LinkStart, part?: boolean) => void
   cancelLink: () => void
   setTooltipRowId: (id: string | null) => void
   hoverEdge: (id: string, at?: XYPosition) => void
@@ -61,6 +63,7 @@ export function createCanvasStore() {
     selected: null,
     selectedTransform: null,
     linkFrom: null,
+    linkFromPart: false,
     tooltipRowId: null,
     hoveredEdge: null,
     edgeAnchor: null,
@@ -89,8 +92,8 @@ export function createCanvasStore() {
       })),
     selectTransform: (id) => set({ selectedTransform: id, selected: null }),
     clearSelection: () => set({ selected: null, selectedTransform: null }),
-    startLink: (linkFrom) => set({ linkFrom, problem: null }),
-    cancelLink: () => set({ linkFrom: null }),
+    startLink: (linkFrom, part = false) => set({ linkFrom, linkFromPart: part, problem: null }),
+    cancelLink: () => set({ linkFrom: null, linkFromPart: false }),
     setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
     hoverEdge: (id, at) => {
       clearTimeout(leaveTimer)

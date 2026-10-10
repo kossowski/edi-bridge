@@ -3,6 +3,7 @@
 import '@xyflow/react/dist/style.css'
 import './mapping-canvas.css'
 
+import { useQuery } from '@tanstack/react-query'
 import {
   Background,
   BackgroundVariant,
@@ -39,12 +40,17 @@ import {
   useMeaningTooltip,
 } from '@/components/mappings/mapping-canvas-store'
 import {
+  type CanvasIssue,
+  canvasIssues,
   configureTransform,
   connect,
   freeSlot,
   type Graph,
   type GraphChange,
+  isPartStart,
+  type LinkableRows,
   linkIntoInput,
+  linkIntoTarget,
   maxTransformX,
   moveTransform,
   newTransform,
@@ -52,15 +58,17 @@ import {
   type Rect,
   removeTransform,
   sameStart,
+  takesPart,
   transformById,
   transformInset,
   transformWidth,
 } from '@/components/mappings/mapping-graph'
 import {
+  isLinkablePart,
   isLinkableRow,
   leafPaths,
-  type Leaves,
   linksOfItem,
+  repeatingPaths,
   type RowLink,
   type RowRef,
   rowListingLinks,
@@ -87,10 +95,10 @@ import {
 } from '@/components/mappings/row-links'
 import { RowMeaning } from '@/components/mappings/row-meaning-view'
 import {
+  type SourceField,
   TransformDetails,
   type TransformDetailsActions,
 } from '@/components/mappings/transform-details'
-import { type PlaceableKind } from '@/components/mappings/transform-kinds'
 import {
   findTransformButton,
   inputHandle,
@@ -112,7 +120,8 @@ import {
   TreeNode,
   type TreeFlowNode,
 } from '@/components/mappings/tree-node'
-import { transformIssues, transformPorts } from '@edi-bridge/contracts'
+import { lookupTablesQuery } from '@/lib/api/queries'
+import { transformPorts } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Tooltip, TooltipContent } from '@edi-bridge/ui/components/tooltip'
 
@@ -121,7 +130,7 @@ import type {
   LinkEnd,
   LinkStart,
   MappingTransform,
-  TransformIssue,
+  TransformKind,
   TransformLink,
 } from '@edi-bridge/contracts'
 
@@ -211,7 +220,8 @@ function DetailsPanel({
   itemOf,
   graph,
   issues,
-  leaves,
+  rows,
+  sourceFields,
   text,
   actions,
   transformActions,
@@ -219,8 +229,9 @@ function DetailsPanel({
 }: {
   itemOf: (row: RowRef) => TreeItem | undefined
   graph: Graph
-  issues: Readonly<Record<string, TransformIssue[]>>
-  leaves: Leaves
+  issues: Readonly<Record<string, CanvasIssue[]>>
+  rows: LinkableRows
+  sourceFields: ReadonlyArray<SourceField>
   text: GraphText
   actions: PanelActions
   transformActions: TransformDetailsActions
@@ -240,6 +251,7 @@ function DetailsPanel({
           actions={transformActions}
           graph={graph}
           issues={issues[transform.id] ?? []}
+          sourceFields={sourceFields}
           text={text}
           transform={transform}
         />
@@ -262,8 +274,8 @@ function DetailsPanel({
             actions={actions}
             graph={graph}
             item={item}
-            leaves={leaves}
             row={selected}
+            rows={rows}
             text={text}
           />
         </>
@@ -297,6 +309,18 @@ function DetailsPanel({
       <p className="text-muted-foreground text-xs">{t('links.shortcut')}</p>
     </section>
   )
+}
+
+function sourceFieldsOf(items: ReadonlyArray<TreeItem>, into: SourceField[] = []) {
+  for (const item of items) {
+    if (item.children === null) {
+      into.push({ path: item.path, label: item.name ?? item.label })
+    } else {
+      sourceFieldsOf(item.children, into)
+    }
+  }
+
+  return into
 }
 
 // Focus moves once the change has rendered, when the button it goes to exists.
@@ -404,7 +428,9 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
   const clearSelection = useCanvasStore((state) => state.clearSelection)
   const hoverEdge = useCanvasStore((state) => state.hoverEdge)
   const leaveEdge = useCanvasStore((state) => state.leaveEdge)
-  const text = useGraphText(graph.transforms)
+  const usesLookupTables = graph.transforms.some(({ kind }) => kind === 'lookupTable')
+  const lookupTables = useQuery({ ...lookupTablesQuery, enabled: usesLookupTables })
+  const text = useGraphText(graph.transforms, lookupTables.data)
 
   // Where dragged nodes are shown until the cached Draft, and so its transforms, changes.
   const [dragged, setDragged] = useState<{
@@ -423,14 +449,23 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     [onChange, text],
   )
 
-  const leaves = useMemo(
-    () => ({ source: leafPaths(source.items), target: leafPaths(target.items) }),
+  const rows = useMemo(
+    (): LinkableRows => ({
+      leaves: { source: leafPaths(source.items), target: leafPaths(target.items) },
+      parts: { source: repeatingPaths(source.items), target: repeatingPaths(target.items) },
+    }),
     [source.items, target.items],
   )
 
+  const sourceFields = useMemo(() => sourceFieldsOf(source.items), [source.items])
+
   const issues = useMemo(
-    () => transformIssues({ transforms: graph.transforms, transformLinks: graph.transformLinks }),
-    [graph.transforms, graph.transformLinks],
+    () =>
+      canvasIssues(
+        { transforms: graph.transforms, transformLinks: graph.transformLinks },
+        lookupTables.data,
+      ),
+    [graph.transforms, graph.transformLinks, lookupTables.data],
   )
 
   const flow = useRef<ReactFlowInstance<CanvasNode, LinkFlowEdge>>(null)
@@ -527,7 +562,11 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
       height: row.height,
       measured: { width: row.width, height: row.height },
       zIndex: row.depth,
-      data: { ...row, linked: linked.has(row.id) },
+      data: {
+        ...row,
+        linked: linked.has(row.id),
+        filled: row.side === 'target' && linkIntoTarget(graph, row.path) !== null,
+      },
       draggable: false,
       selectable: false,
       focusable: false,
@@ -546,6 +585,11 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
           port,
           label: text.input(port),
           linked: into !== null,
+          takesPart: takesPart(graph, {
+            kind: 'transform',
+            transformId: transform.id,
+            input: port,
+          }),
           status: into
             ? tTransforms('node.linkedFrom', { source: text.start(into.from) })
             : tTransforms('node.notLinked'),
@@ -563,6 +607,11 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
           port,
           label: text.output(port),
           linked: own.length > 0,
+          takesPart: takesPart(graph, {
+            kind: 'transform',
+            transformId: transform.id,
+            output: port,
+          }),
           status: tTransforms('node.linkedTo', {
             count: own.length,
             target: first ? text.end(first.to) : '',
@@ -689,7 +738,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
   const link = useCallback(
     (from: LinkStart, to: LinkEnd) => {
       const { setProblem, cancelLink, announce } = store.getState()
-      const connected = connect(graph, leaves, from, to)
+      const connected = connect(graph, rows, from, to)
 
       setProblem(null)
 
@@ -710,7 +759,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
 
       return false
     },
-    [graph, labelOf, leaves, save, store, text],
+    [graph, labelOf, rows, save, store, text],
   )
 
   const removeRowLink = useCallback(
@@ -729,7 +778,12 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     (from: LinkStart) => {
       const { startLink, select, announce } = store.getState()
 
-      startLink(from)
+      startLink(
+        from,
+        from.kind === 'source'
+          ? rows.parts.source.has(from.path) && !rows.leaves.source.has(from.path)
+          : isPartStart(from),
+      )
 
       if (from.kind === 'source') {
         select({ side: 'source', path: from.path })
@@ -737,7 +791,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
 
       announce(tLinks('started', { source: text.start(from) }))
     },
-    [store, tLinks, text],
+    [rows, store, tLinks, text],
   )
 
   const cancel = useCallback(() => {
@@ -790,7 +844,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
   )
 
   const place = useCallback(
-    (kind: PlaceableKind) => {
+    (kind: TransformKind) => {
       const pane = container.current?.getBoundingClientRect()
 
       // New transforms go where the user is looking, below the top of the visible canvas.
@@ -993,9 +1047,9 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     (connection) => {
       const ends = endsOfConnection(connection)
 
-      return ends !== null && connect(graph, leaves, ends.from, ends.to).ok
+      return ends !== null && connect(graph, rows, ends.from, ends.to).ok
     },
-    [graph, leaves],
+    [graph, rows],
   )
 
   const onConnect = useCallback(
@@ -1095,7 +1149,7 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     const onLinkKey = (row: RowRef) => {
       const { linkFrom, announce } = store.getState()
 
-      if (!isLinkableRow(leaves, row)) {
+      if (!isLinkableRow(rows.leaves, row) && !isLinkablePart(rows.parts, row)) {
         announce(tLinks('notLinkable', { label: labelOf(row) }))
       } else if (row.side === 'source') {
         start({ kind: 'source', path: row.path })
@@ -1229,12 +1283,12 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
     inputAction,
     itemOf,
     labelOf,
-    leaves,
     link,
     outputAction,
     panelActions,
     removeRowLink,
     removeTransformById,
+    rows,
     start,
     store,
     tLinks,
@@ -1302,8 +1356,9 @@ export function MappingCanvas({ label, graph, source, target, onChange }: Mappin
           graph={graph}
           issues={issues}
           itemOf={itemOf}
-          leaves={leaves}
           ref={panel}
+          rows={rows}
+          sourceFields={sourceFields}
           text={text}
           transformActions={detailsActions}
         />

@@ -16,10 +16,27 @@ export function leafPaths(items: ReadonlyArray<TreeItem>, into = new Set<string>
   return into
 }
 
+export function repeatingPaths(items: ReadonlyArray<TreeItem>, into = new Set<string>()) {
+  for (const item of items) {
+    if (item.repeat !== null) {
+      into.add(item.path)
+    }
+
+    repeatingPaths(item.children ?? [], into)
+  }
+
+  return into
+}
+
 export type Leaves = Readonly<Record<Side, ReadonlySet<string>>>
 
 export function isLinkableRow(leaves: Leaves, row: RowRef) {
   return leaves[row.side].has(row.path)
+}
+
+// A repeating part takes part in a link through a loop, so it is no dead end for the keyboard.
+export function isLinkablePart(parts: Leaves, row: RowRef) {
+  return parts[row.side].has(row.path)
 }
 
 export type RowLink =

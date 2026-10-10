@@ -19,6 +19,8 @@ export type PortView = {
   // Who the input is linked from, or where the output goes; read out with the port.
   status: string
   linked: boolean
+  // A loop's items take a whole repeating part rather than a single value.
+  takesPart: boolean
 }
 
 export type TransformNodeData = {
@@ -125,6 +127,7 @@ function InputPort({
     (state) =>
       state.linkFrom !== null &&
       !view.linked &&
+      state.linkFromPart === view.takesPart &&
       !(state.linkFrom.kind === 'transform' && state.linkFrom.transformId === transformId),
   )
 

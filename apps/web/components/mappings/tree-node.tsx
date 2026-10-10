@@ -34,7 +34,8 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
 
-export type TreeNodeData = TreeRow & { linked: boolean }
+// `filled` says a link ends at this very target, not only somewhere inside it.
+export type TreeNodeData = TreeRow & { linked: boolean; filled: boolean }
 
 export type TreeFlowNode = Node<TreeNodeData, 'tree'>
 
@@ -203,20 +204,27 @@ function RowButton({
 function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
   const t = useTranslations('Mapping.canvas')
   const container = !data.linkable
-  const showHandle = data.linkable || (data.expanded === false && data.linked)
+  // A repeating part is linked whole through a loop.
+  const part = container && data.repeat !== null
+  const linkable = data.linkable || part
+  const showHandle = linkable || (data.expanded === false && data.linked)
   const onFocus = usePanIntoView()
   const selected = useCanvasStore((state) => isSameRow(state.selected, data))
   const hints = useLinkHints()
   const linkStart = useCanvasStore((state) => isStartRow(state.linkFrom, data))
 
-  // Only a free target leaf can take the pending link; a linked one would refuse it.
+  // Only a free target can take the pending link: a leaf, or a repeating part for a loop's items.
   const linkTarget = useCanvasStore(
-    (state) => state.linkFrom !== null && data.side === 'target' && data.linkable && !data.linked,
+    (state) =>
+      state.linkFrom !== null &&
+      data.side === 'target' &&
+      !data.filled &&
+      (state.linkFromPart ? data.repeat !== null : data.linkable),
   )
 
-  // While a link is dragged, a linked target refuses it; the drop there still says why.
+  // While a link is dragged, a filled target refuses it; the drop there still says why.
   const unavailable = useConnection(
-    (connection) => connection.inProgress && data.side === 'target' && data.linkable && data.linked,
+    (connection) => connection.inProgress && data.side === 'target' && linkable && data.filled,
   )
 
   const hint = linkStart ? hints.linkStart : linkTarget ? hints.linkTarget : null
@@ -243,7 +251,7 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         className={cn(
           'flex items-center gap-1.5 px-2',
           // Keeps the row button clear of the link handle that overlaps this edge of the part.
-          data.linkable && (data.side === 'source' ? 'pr-4' : 'pl-4'),
+          linkable && (data.side === 'source' ? 'pr-4' : 'pl-4'),
         )}
         style={{ height: rowHeight - 2 }}>
         {data.expanded !== null && <ToggleButton data={data} />}
@@ -267,13 +275,13 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         </RowButton>
       </div>
       <Handle
-        isConnectable={data.linkable}
+        isConnectable={linkable}
         isConnectableEnd={data.side === 'target'}
         isConnectableStart={data.side === 'source'}
         position={data.side === 'source' ? Position.Right : Position.Left}
         type={data.side === 'source' ? 'source' : 'target'}
         className={cn(
-          data.linkable ? 'link-handle' : 'part-handle',
+          linkable ? 'link-handle' : 'part-handle',
           !showHandle && 'invisible',
           (linkStart || linkTarget) && 'link-handle-marked',
           unavailable && 'link-handle-unavailable',
