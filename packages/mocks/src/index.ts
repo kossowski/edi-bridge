@@ -6,7 +6,13 @@ import type {
 } from '@edi-bridge/contracts'
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
-import { documentStructureHandler, seedDocumentStructures } from './document-structure'
+import {
+  documentStructureHandlers,
+  type DocumentStructureStore,
+  seedDocumentStructures,
+  seedUnusedDocumentStructures,
+  toDocumentStructureStore,
+} from './document-structure'
 import { createFlowStore, flowHandlers } from './flow'
 import { lookupTablesHandler, seedLookupTables } from './lookup-table'
 import { manualSubmissionHandler } from './manual-submission'
@@ -64,11 +70,18 @@ export {
 
 export {
   createDocumentStructure,
-  documentStructureHandler,
+  createDocumentStructures,
+  createDocumentStructureStore,
+  documentStructureHandlers,
   documentStructureLeaves,
+  type DocumentStructureStore,
   seedDocumentStructureOf,
   seedDocumentStructures,
+  seedUnusedDocumentStructures,
+  toDocumentStructureStore,
 } from './document-structure'
+
+export { createCsvDocument, documentStructureOrigins } from './document-structure-origin'
 
 export {
   createLookupTables,
@@ -156,7 +169,7 @@ export function createHandlers(
     tradingPartners = seedTradingPartners,
     channels = seedChannels,
     mappingDrafts = seedMappingDrafts,
-    documentStructures = seedDocumentStructures,
+    documentStructures = [...seedDocumentStructures, ...seedUnusedDocumentStructures],
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
     mappingVersions,
@@ -165,7 +178,7 @@ export function createHandlers(
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
-    documentStructures?: ReadonlyArray<DocumentStructure>
+    documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     lookupTables?: ReadonlyArray<LookupTableSummary>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
@@ -176,6 +189,7 @@ export function createHandlers(
   const channelStore = createChannelStore(channels)
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
+  const documentStructureStore = toDocumentStructureStore(documentStructures)
 
   const mappingVersionStore = toMappingVersionStore(
     mappingVersions ?? [...seedMappingVersions, ...createMappingVersions(mappingDraftStore.all())],
@@ -192,7 +206,7 @@ export function createHandlers(
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
       samples: mappingSamples,
-      documentStructures,
+      documentStructures: documentStructureStore,
     }),
     ...runDetailHandlers(apiUrl, {
       runs,
@@ -200,13 +214,20 @@ export function createHandlers(
       mappingVersions: mappingVersionStore,
     }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
-    ...mappingHandlers(apiUrl, { mappings: mappingDraftStore, documentStructures }),
+    ...mappingHandlers(apiUrl, {
+      mappings: mappingDraftStore,
+      documentStructures: documentStructureStore,
+    }),
     ...mappingPreviewHandlers(apiUrl, {
       mappings: mappingDraftStore,
       samples: mappingSamples,
-      documentStructures,
+      documentStructures: documentStructureStore,
     }),
-    documentStructureHandler(apiUrl, documentStructures),
+    ...documentStructureHandlers(apiUrl, {
+      documentStructures: documentStructureStore,
+      mappings: mappingDraftStore,
+      versions: mappingVersionStore,
+    }),
     messageTypeStructureHandler(apiUrl),
     lookupTablesHandler(apiUrl, lookupTables),
   ]

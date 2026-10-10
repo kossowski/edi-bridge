@@ -28,12 +28,15 @@ import {
 
 import {
   documentStructureLeaves,
+  type DocumentStructureStore,
   seedDocumentStructureOf,
   seedDocumentStructures,
+  toDocumentStructureStore,
 } from './document-structure'
 import { seedMappings } from './flow'
 import { seedLookupTableNamed } from './lookup-table'
 import { edifactLeaves, messageTypeStructures } from './message-type-structure'
+import { containerOf } from './paths'
 import { badRequest, notFound, unprocessable } from './responses'
 import { seedId, stableUuid } from './seed-id'
 import { seededFaker } from './seeded-faker'
@@ -695,10 +698,6 @@ export function toMappingDraftStore(
   return 'get' in mappings ? mappings : createMappingDraftStore(mappings)
 }
 
-function containerOf(leaves: ReadonlySet<string>, path: string) {
-  return [...leaves].some((leaf) => leaf.startsWith(`${path}/`) || leaf.startsWith(`${path}.`))
-}
-
 type LinkedPath = { path: string; wholePart: boolean }
 
 export function unknownPaths(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
@@ -769,24 +768,25 @@ export function mappingHandlers(
     documentStructures = seedDocumentStructures,
   }: {
     mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
-    documentStructures?: DocumentStructures
+    documentStructures?: DocumentStructures | DocumentStructureStore
   } = {},
 ) {
   const store = toMappingDraftStore(mappings)
+  const structures = toDocumentStructureStore(documentStructures)
 
   return [
     http.get(`${apiUrl}${mappingsEndpoint.path}`, () =>
       HttpResponse.json(
         store
           .all()
-          .map((record) => toMappingSummary(record, documentStructures))
+          .map((record) => toMappingSummary(record, structures.all()))
           .sort((a, b) => a.name.localeCompare(b.name, 'de')),
       ),
     ),
     http.get<{ id: string }>(`${apiUrl}${mappingDraftEndpoint.path}`, ({ params }) => {
       const record = store.get(params.id)
 
-      return record ? HttpResponse.json(toMappingDraft(record, documentStructures)) : notFound()
+      return record ? HttpResponse.json(toMappingDraft(record, structures.all())) : notFound()
     }),
     http.put<{ id: string }>(
       `${apiUrl}${saveMappingDraftEndpoint.path}`,
@@ -803,7 +803,7 @@ export function mappingHandlers(
           return badRequest(body.error.message)
         }
 
-        const invalidLink = linkProblem(body.data, sideLeaves(existing, documentStructures))
+        const invalidLink = linkProblem(body.data, sideLeaves(existing, structures.all()))
 
         if (invalidLink) {
           return invalidLink
@@ -818,7 +818,7 @@ export function mappingHandlers(
 
         store.set(record)
 
-        return HttpResponse.json(toMappingDraft(record, documentStructures))
+        return HttpResponse.json(toMappingDraft(record, structures.all()))
       },
     ),
   ]

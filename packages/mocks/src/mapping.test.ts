@@ -18,7 +18,7 @@ import {
 
 import {
   createDocumentStructure,
-  documentStructureHandler,
+  documentStructureHandlers,
   documentStructureLeaves,
 } from './document-structure'
 import { seedMappings } from './flow'
@@ -219,7 +219,7 @@ describe('GET /mappings/:id/draft', () => {
     async (_, mapping: MappingDraftRecord) => {
       server.use(
         ...mappingHandlers(apiUrl),
-        documentStructureHandler(apiUrl),
+        ...documentStructureHandlers(apiUrl),
         messageTypeStructureHandler(apiUrl),
       )
       const draft = await getDraft(mapping.id)
@@ -313,7 +313,7 @@ describe('GET /mappings/:id/draft', () => {
 
     server.use(
       ...mappingHandlers(apiUrl, { mappings, documentStructures: [documentStructure] }),
-      documentStructureHandler(apiUrl, [documentStructure]),
+      ...documentStructureHandlers(apiUrl, { documentStructures: [documentStructure] }),
       messageTypeStructureHandler(apiUrl),
     )
 
