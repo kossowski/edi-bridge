@@ -7,14 +7,21 @@ import {
   type MappingDraft,
   mappingDraftEndpoint,
   mappingDraftSchema,
+  type MappingGraph,
   type MappingLink,
   type MappingSide,
   mappingsEndpoint,
   type MappingSummary,
   mappingSummarySchema,
+  type MappingTransform,
+  mappingTransformSchema,
   type MessageType,
   messageTypes,
-  saveMappingLinksEndpoint,
+  saveMappingDraftEndpoint,
+  type TransformConfig,
+  type TransformKind,
+  type TransformLink,
+  transformPorts,
 } from '@edi-bridge/contracts'
 
 import {
@@ -23,9 +30,11 @@ import {
   seedDocumentStructures,
 } from './document-structure'
 import { seedMappings } from './flow'
+import { seedLookupTableNamed } from './lookup-table'
 import { edifactLeaves, messageTypeStructures } from './message-type-structure'
 import { badRequest, notFound, unprocessable } from './responses'
-import { seedId } from './seed-id'
+import { seedId, stableUuid } from './seed-id'
+import { seededFaker } from './seeded-faker'
 
 export type MappingDraftRecord = {
   id: string
@@ -34,6 +43,8 @@ export type MappingDraftRecord = {
   documentStructureId: string
   latestVersion: number | null
   links: ReadonlyArray<MappingLink>
+  transforms: ReadonlyArray<MappingTransform>
+  transformLinks: ReadonlyArray<TransformLink>
   updatedAt: string
 }
 
@@ -157,6 +168,206 @@ function templateLinks(messageType: MessageType, share: number): MappingLink[] {
     .map((pair) => link(messageType, pair))
 }
 
+type TransformTemplate = {
+  kind: TransformKind
+  config: TransformConfig
+  inputs?: Readonly<Record<string, string>>
+  // Inputs fed by the output of another transform of the template, by its index.
+  fedBy?: Readonly<Record<string, number>>
+  outputs?: Readonly<Record<string, string>>
+}
+
+function node<Kind extends TransformKind>(
+  kind: Kind,
+  config: TransformConfig<Kind>,
+  ends: Pick<TransformTemplate, 'inputs' | 'fedBy' | 'outputs'> = {},
+): TransformTemplate {
+  return { kind, config, ...ends }
+}
+
+// Directions are fixed per Message Type: ORDERS and CONTRL come in, DESADV and INVOIC go out.
+// Some nodes are deliberately configured wrongly, so the canvas has invalid nodes to show.
+const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTemplate>>> = {
+  ORDERS: [
+    node(
+      'concatenate',
+      { inputCount: 2, separator: ' ' },
+      {
+        inputs: { part1: 'SG2+DP/NAD+DP/3251', part2: 'SG2+DP/NAD+DP/3164' },
+        outputs: { value: 'deliveryParty.city' },
+      },
+    ),
+    node(
+      'lookupTable',
+      { lookupTableId: seedLookupTableNamed('Country codes').id, fallback: 'keepValue' },
+      { inputs: { value: 'SG2+SU/NAD+SU/3207' }, outputs: { value: 'supplier.country' } },
+    ),
+    node(
+      'substring',
+      { start: 0, length: 35 },
+      { inputs: { value: 'SG2+SU/NAD+SU/C080/3036' }, outputs: { value: 'supplier.name' } },
+    ),
+    node(
+      'jsonata',
+      { expression: '$string(SG25.PIA' },
+      { outputs: { value: 'lines[].buyerArticleNumber' } },
+    ),
+    node('loop', { counterStart: 1 }, { inputs: { items: 'SG25' }, outputs: { items: 'lines[]' } }),
+    node('constant', { value: 'DE' }, { outputs: { value: 'invoicee.country' } }),
+  ],
+  DESADV: [
+    node('constant', { value: '351' }, { outputs: { value: 'BGM/C002/1001' } }),
+    node(
+      'substring',
+      { start: 0, length: 35 },
+      { inputs: { value: 'shipTo.street' }, outputs: { value: 'SG2+DP/NAD+DP/C059/3042' } },
+    ),
+    node(
+      'lookupTable',
+      { lookupTableId: null, fallback: 'fail' },
+      { inputs: { value: 'shipTo.country' }, outputs: { value: 'SG2+DP/NAD+DP/3207' } },
+    ),
+    node(
+      'jsonata',
+      { expression: '$count(packages.lines)' },
+      { outputs: { value: 'CNT+2/C270/6066' } },
+    ),
+    node(
+      'loop',
+      { counterStart: 1 },
+      { inputs: { items: 'packages[]' }, outputs: { items: 'SG10' } },
+    ),
+    node('constant', { value: '' }, { outputs: { value: 'SG10/SG17/QTY+12/C186/6411' } }),
+    node(
+      'concatenate',
+      { inputCount: 2, separator: ' ' },
+      {
+        inputs: { part1: 'shipTo.postalCode', part2: 'shipTo.city' },
+        outputs: { value: 'SG2+DP/NAD+DP/3164' },
+      },
+    ),
+  ],
+  INVOIC: [
+    node(
+      'conditional',
+      { operator: 'equals', compareTo: 'true' },
+      {
+        inputs: { value: 'isCreditNote' },
+        fedBy: { then: 1, else: 2 },
+        outputs: { value: 'BGM/C002/1001' },
+      },
+    ),
+    node('constant', { value: '381' }),
+    node('constant', { value: '380' }),
+    node(
+      'dateFormat',
+      { from: 'yyyy-MM-dd', to: 'yyyyMMdd' },
+      { inputs: { value: 'invoiceDate' }, outputs: { value: 'DTM+137/C507/2380' } },
+    ),
+    node(
+      'numberFormat',
+      { decimalPlaces: 9, decimalSeparator: '.' },
+      { inputs: { value: 'totals.invoiceTotal' }, outputs: { value: 'SG48/MOA+77/C516/5004' } },
+    ),
+    node(
+      'split',
+      { separator: '', index: 0 },
+      { inputs: { value: 'supplier.vatId' }, outputs: { value: 'SG2+SU/SG3/RFF+VA/C506/1154' } },
+    ),
+    node(
+      'jsonata',
+      { expression: '$sum(lines.lineAmount)' },
+      { outputs: { value: 'SG48/MOA+79/C516/5004' } },
+    ),
+    node(
+      'lookupTable',
+      { lookupTableId: seedLookupTableNamed('VAT categories').id, fallback: 'fail' },
+      { inputs: { value: 'lines[].vatRate' }, outputs: { value: 'SG25/SG33/TAX+7/C241/5153' } },
+    ),
+    node(
+      'loop',
+      { counterStart: 1 },
+      { inputs: { items: 'lines[]' }, outputs: { items: 'SG25', counter: 'SG25/LIN/1082' } },
+    ),
+  ],
+  CONTRL: [
+    node(
+      'conditional',
+      { operator: 'equals', compareTo: '' },
+      { inputs: { value: 'UCI/0083' }, fedBy: { then: 1, else: 2 }, outputs: { value: 'status' } },
+    ),
+    node('constant', { value: 'accepted' }),
+    node('constant', { value: 'rejected' }),
+    node(
+      'concatenate',
+      { inputCount: 1, separator: '' },
+      { inputs: { part1: 'UCI/S002/0004' }, outputs: { value: 'senderGln' } },
+    ),
+  ],
+}
+
+type TransformGraph = Pick<MappingGraph, 'transforms' | 'transformLinks'>
+
+function placed(id: string, index: number, { kind, config }: TransformTemplate): MappingTransform {
+  return mappingTransformSchema.parse({
+    id,
+    kind,
+    config,
+    position: { x: (index % 2) * 240, y: index * 120 },
+  })
+}
+
+function templateGraph(mappingId: string, messageType: MessageType, share: number): TransformGraph {
+  const template = transformTemplates[messageType]
+  const chosen = template.slice(0, Math.round(template.length * share))
+  const ids = chosen.map((_, index) => stableUuid(`${mappingId}:transform:${index}`))
+
+  const transformLinks = chosen.flatMap(
+    ({ inputs = {}, fedBy = {}, outputs = {} }, index): TransformLink[] => {
+      const into = (input: string) =>
+        ({ kind: 'transform', transformId: ids[index]!, input }) as const
+
+      return [
+        ...Object.entries(inputs).map(([input, path]): TransformLink => ({
+          from: { kind: 'source', path },
+          to: into(input),
+        })),
+        ...Object.entries(fedBy).flatMap(([input, feeding]): TransformLink[] => {
+          const transformId = ids[feeding]
+
+          return transformId
+            ? [{ from: { kind: 'transform', transformId, output: 'value' }, to: into(input) }]
+            : []
+        }),
+        ...Object.entries(outputs).map(([output, path]): TransformLink => ({
+          from: { kind: 'transform', transformId: ids[index]!, output },
+          to: { kind: 'target', path },
+        })),
+      ]
+    },
+  )
+
+  return {
+    transforms: chosen.map((transform, index) => placed(ids[index]!, index, transform)),
+    transformLinks,
+  }
+}
+
+function filledTargets({ transformLinks }: Pick<MappingGraph, 'transformLinks'>) {
+  return new Set(transformLinks.flatMap(({ to }) => (to.kind === 'target' ? [to.path] : [])))
+}
+
+// A target takes one value, so a transform that fills it replaces the plain link into it.
+function templateDraftGraph(mappingId: string, messageType: MessageType, share: number) {
+  const graph = templateGraph(mappingId, messageType, share)
+  const filled = filledTargets(graph)
+
+  return {
+    ...graph,
+    links: templateLinks(messageType, share).filter(({ targetPath }) => !filled.has(targetPath)),
+  }
+}
+
 const firstDraftChange = Date.parse('2026-04-06T08:15:00.000Z')
 
 function seedUpdatedAt(index: number) {
@@ -180,7 +391,11 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
       messageType: mapping.messageType,
       documentStructureId: seedDocumentStructureOf[mapping.messageType].id,
       latestVersion: newest.version,
-      links: templateLinks(mapping.messageType, linkShares[sameTypeBefore % linkShares.length]!),
+      ...templateDraftGraph(
+        mapping.mappingId,
+        mapping.messageType,
+        linkShares[sameTypeBefore % linkShares.length]!,
+      ),
       updatedAt: seedUpdatedAt(index),
     }
   }),
@@ -190,7 +405,7 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
     messageType: 'INVOIC',
     documentStructureId: seedDocumentStructureOf.INVOIC.id,
     latestVersion: null,
-    links: templateLinks('INVOIC', 0.3),
+    ...templateDraftGraph(seedId(7, 1), 'INVOIC', 0.3),
     updatedAt: seedUpdatedAt(seedMappings.length),
   },
 ]
@@ -222,6 +437,61 @@ function randomLinks(
   return Array.from({ length: count }, (_, index) =>
     link(record.messageType, [fields[index]!.path, elements[index]!.path]),
   )
+}
+
+const generatedConfigs: ReadonlyArray<Pick<TransformTemplate, 'kind' | 'config'>> = [
+  { kind: 'substring', config: { start: 0, length: 35 } },
+  { kind: 'dateFormat', config: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' } },
+  { kind: 'numberFormat', config: { decimalPlaces: 2, decimalSeparator: '.' } },
+  { kind: 'split', config: { separator: '-', index: 0 } },
+  { kind: 'lookupTable', config: { lookupTableId: null, fallback: 'keepValue' } },
+  { kind: 'concatenate', config: { inputCount: 2, separator: ' ' } },
+  { kind: 'conditional', config: { operator: 'isNotEmpty', compareTo: '' } },
+  { kind: 'constant', config: { value: '' } },
+  { kind: 'jsonata', config: { expression: '$now()' } },
+]
+
+// Drawn from its own faker, so adding transforms leaves the generated links as they were.
+function randomGraph(
+  record: Pick<MappingDraftRecord, 'id' | 'messageType'>,
+  documentStructure: DocumentStructure,
+  links: ReadonlyArray<MappingLink>,
+): TransformGraph {
+  const faker = seededFaker(`transforms:${record.id}`)
+
+  const { source, target } = oriented(record.messageType, {
+    document: documentStructureLeaves(documentStructure).map(({ path }) => path),
+    edifact: edifactLeaves(messageTypeStructures[record.messageType]).map(({ path }) => path),
+  })
+
+  const linked = new Set(links.map(({ targetPath }) => targetPath))
+  const free = faker.helpers.shuffle(target.filter((path) => !linked.has(path)))
+
+  const transforms = Array.from({ length: 30 }, (_, index) =>
+    placed(faker.string.uuid(), index, faker.helpers.arrayElement(generatedConfigs)),
+  )
+
+  const transformLinks = transforms.flatMap((transform, index): TransformLink[] => {
+    const { inputs } = transformPorts(transform)
+    const filling = free[index]
+
+    return [
+      ...inputs.map((input): TransformLink => ({
+        from: { kind: 'source', path: faker.helpers.arrayElement(source) },
+        to: { kind: 'transform', transformId: transform.id, input },
+      })),
+      ...(filling
+        ? [
+            {
+              from: { kind: 'transform', transformId: transform.id, output: 'value' },
+              to: { kind: 'target', path: filling },
+            } as const,
+          ]
+        : []),
+    ]
+  })
+
+  return { transforms, transformLinks }
 }
 
 // Cycles through the Message Types, so even two Drafts cover both directions.
@@ -257,12 +527,15 @@ export function createMappingDrafts({
       updatedAt: faker.date.between({ from: '2026-01-01', to: '2026-09-30' }).toISOString(),
     }
 
-    return {
-      ...record,
-      links: documentStructures
-        ? randomLinks(faker, record, documentStructure)
-        : templateLinks(messageType, faker.helpers.arrayElement([1, 0.75, 0.5, 0.25, 0])),
+    if (!documentStructures) {
+      const share = faker.helpers.arrayElement([1, 0.75, 0.5, 0.25, 0])
+
+      return { ...record, ...templateDraftGraph(record.id, messageType, share) }
     }
+
+    const links = randomLinks(faker, record, documentStructure)
+
+    return { ...record, links, ...randomGraph(record, documentStructure, links) }
   })
 }
 
@@ -306,6 +579,8 @@ export function toMappingDraft(
     name: record.name,
     direction: directionOf(record),
     links: record.links,
+    transforms: record.transforms,
+    transformLinks: record.transformLinks,
     updatedAt: record.updatedAt,
     ...oriented<MappingSide>(record.messageType, {
       document: {
@@ -344,14 +619,44 @@ export function toMappingDraftStore(
   return 'get' in mappings ? mappings : createMappingDraftStore(mappings)
 }
 
-function linkProblem(links: ReadonlyArray<MappingLink>, leaves: ReturnType<typeof sideLeaves>) {
-  for (const { sourcePath, targetPath } of links) {
+function containerOf(leaves: ReadonlySet<string>, path: string) {
+  return [...leaves].some((leaf) => leaf.startsWith(`${path}/`) || leaf.startsWith(`${path}.`))
+}
+
+function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
+  for (const { sourcePath, targetPath } of graph.links) {
     if (!leaves.source.has(sourcePath)) {
       return unprocessable(`The source has no field or element at ${sourcePath}`)
     }
 
     if (!leaves.target.has(targetPath)) {
       return unprocessable(`The target has no field or element at ${targetPath}`)
+    }
+  }
+
+  const loops = new Set(graph.transforms.flatMap(({ id, kind }) => (kind === 'loop' ? [id] : [])))
+
+  // A loop takes a whole repeated part and fills one; every other link ends at a field or element.
+  for (const { from, to } of graph.transformLinks) {
+    const intoLoop = to.kind === 'transform' && loops.has(to.transformId) && to.input === 'items'
+
+    const outOfLoop =
+      from.kind === 'transform' && loops.has(from.transformId) && from.output === 'items'
+
+    if (
+      from.kind === 'source' &&
+      !leaves.source.has(from.path) &&
+      !(intoLoop && containerOf(leaves.source, from.path))
+    ) {
+      return unprocessable(`The source has no field or element at ${from.path}`)
+    }
+
+    if (
+      to.kind === 'target' &&
+      !leaves.target.has(to.path) &&
+      !(outOfLoop && containerOf(leaves.target, to.path))
+    ) {
+      return unprocessable(`The target has no field or element at ${to.path}`)
     }
   }
 
@@ -385,7 +690,7 @@ export function mappingHandlers(
       return record ? HttpResponse.json(toMappingDraft(record, documentStructures)) : notFound()
     }),
     http.put<{ id: string }>(
-      `${apiUrl}${saveMappingLinksEndpoint.path}`,
+      `${apiUrl}${saveMappingDraftEndpoint.path}`,
       async ({ params, request }) => {
         const existing = store.get(params.id)
 
@@ -393,19 +698,19 @@ export function mappingHandlers(
           return notFound()
         }
 
-        const body = saveMappingLinksEndpoint.body.safeParse(await request.json())
+        const body = saveMappingDraftEndpoint.body.safeParse(await request.json())
 
         if (!body.success) {
           return badRequest(body.error.message)
         }
 
-        const invalidLink = linkProblem(body.data.links, sideLeaves(existing, documentStructures))
+        const invalidLink = linkProblem(body.data, sideLeaves(existing, documentStructures))
 
         if (invalidLink) {
           return invalidLink
         }
 
-        const record = { ...existing, links: body.data.links, updatedAt: new Date().toISOString() }
+        const record = { ...existing, ...body.data, updatedAt: new Date().toISOString() }
         store.set(record)
 
         return HttpResponse.json(toMappingDraft(record, documentStructures))

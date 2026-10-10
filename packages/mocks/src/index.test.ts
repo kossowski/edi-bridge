@@ -8,6 +8,7 @@ import {
   createFlowEndpoint,
   documentStructureEndpoint,
   type FlowInput,
+  lookupTablesEndpoint,
   mappingDraftEndpoint,
   mappingsEndpoint,
   mappingVersionsEndpoint,
@@ -248,5 +249,18 @@ describe('createHandlers', () => {
     expect(documentStructureEndpoint.response.parse(await structure.json())).toEqual(
       documentStructure,
     )
+  })
+
+  it('lists Lookup Tables for the Lookup Table node, and none when asked', async () => {
+    const listLookupTables = async () =>
+      lookupTablesEndpoint.response.parse(
+        await (await fetch(`${apiUrl}${lookupTablesEndpoint.path}`)).json(),
+      )
+
+    server.use(...createHandlers(apiUrl))
+    expect((await listLookupTables()).length).toBeGreaterThan(0)
+
+    server.resetHandlers(...createHandlers(apiUrl, { lookupTables: [] }))
+    expect(await listLookupTables()).toEqual([])
   })
 })

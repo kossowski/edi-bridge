@@ -2,6 +2,13 @@ import { z } from 'zod'
 
 import { messageTypeSchema } from './message-type'
 import { directionSchema } from './run'
+import {
+  type MappingTransform,
+  mappingTransformSchema,
+  type TransformLink,
+  transformLinkSchema,
+  transformPorts,
+} from './transform'
 
 import type { Endpoint } from './endpoint'
 
@@ -49,41 +56,137 @@ export const mappingLinkSchema = z.object({
 
 export type MappingLink = z.infer<typeof mappingLinkSchema>
 
-export const mappingLinksSchema = z
-  .array(mappingLinkSchema)
-  .refine(
-    (links) => new Set(links.map(({ targetPath }) => targetPath)).size === links.length,
-    'A target is linked at most once',
+type GraphParts = {
+  links: ReadonlyArray<MappingLink>
+  transforms: ReadonlyArray<MappingTransform>
+  transformLinks: ReadonlyArray<TransformLink>
+}
+
+function feedsInCircle({ transforms, transformLinks }: GraphParts) {
+  const next = new Map(transforms.map(({ id }) => [id, new Set<string>()]))
+
+  for (const { from, to } of transformLinks) {
+    if (from.kind === 'transform' && to.kind === 'transform') {
+      next.get(from.transformId)?.add(to.transformId)
+    }
+  }
+
+  const done = new Set<string>()
+  const visiting = new Set<string>()
+
+  const visit = (id: string): boolean => {
+    if (visiting.has(id)) {
+      return true
+    }
+
+    if (done.has(id)) {
+      return false
+    }
+
+    visiting.add(id)
+    const circle = [...(next.get(id) ?? [])].some(visit)
+    visiting.delete(id)
+    done.add(id)
+
+    return circle
+  }
+
+  return transforms.some(({ id }) => visit(id))
+}
+
+function graphProblems(graph: GraphParts): string[] {
+  const problems: string[] = []
+
+  const ports = new Map(
+    graph.transforms.map((transform) => [transform.id, transformPorts(transform)]),
   )
+
+  if (ports.size !== graph.transforms.length) {
+    problems.push('Every transform has its own id')
+  }
+
+  const targets = [
+    ...graph.links.map(({ targetPath }) => targetPath),
+    ...graph.transformLinks.flatMap(({ to }) => (to.kind === 'target' ? [to.path] : [])),
+  ]
+
+  if (new Set(targets).size !== targets.length) {
+    problems.push('A target is linked at most once')
+  }
+
+  const inputs = graph.transformLinks.flatMap(({ to }) =>
+    to.kind === 'transform' ? [`${to.transformId}/${to.input}`] : [],
+  )
+
+  if (new Set(inputs).size !== inputs.length) {
+    problems.push('A transform input is linked at most once')
+  }
+
+  for (const { from, to } of graph.transformLinks) {
+    if (from.kind === 'transform' && !ports.get(from.transformId)?.outputs.includes(from.output)) {
+      problems.push(`No transform ${from.transformId} with the output ${from.output}`)
+    }
+
+    if (to.kind === 'transform' && !ports.get(to.transformId)?.inputs.includes(to.input)) {
+      problems.push(`No transform ${to.transformId} with the input ${to.input}`)
+    }
+  }
+
+  if (feedsInCircle(graph)) {
+    problems.push('Transforms do not feed each other in a circle')
+  }
+
+  return problems
+}
+
+// Links and transforms form one graph and are saved together, since links end at transform inputs.
+const graphFields = {
+  links: z.array(mappingLinkSchema),
+  transforms: z.array(mappingTransformSchema),
+  transformLinks: z.array(transformLinkSchema),
+}
+
+function checkGraph(graph: GraphParts, context: z.RefinementCtx) {
+  for (const message of graphProblems(graph)) {
+    context.addIssue({ code: 'custom', message })
+  }
+}
+
+export const mappingGraphSchema = z.object(graphFields).superRefine(checkGraph)
+
+export type MappingGraph = z.infer<typeof mappingGraphSchema>
 
 const draftFields = {
   mappingId: z.uuid(),
   name: z.string().min(1),
-  links: mappingLinksSchema,
   updatedAt: z.iso.datetime(),
 }
 
 // Outbound Mappings turn the own systems' Document into EDIFACT, inbound ones the other way.
-export const mappingDraftSchema = z.discriminatedUnion('direction', [
-  z.object({
-    ...draftFields,
-    direction: z.literal('outbound'),
-    source: documentStructureSideSchema,
-    target: messageTypeSideSchema,
-  }),
-  z.object({
-    ...draftFields,
-    direction: z.literal('inbound'),
-    source: messageTypeSideSchema,
-    target: documentStructureSideSchema,
-  }),
-])
+export const mappingDraftSchema = z
+  .discriminatedUnion('direction', [
+    z.object({
+      ...draftFields,
+      ...graphFields,
+      direction: z.literal('outbound'),
+      source: documentStructureSideSchema,
+      target: messageTypeSideSchema,
+    }),
+    z.object({
+      ...draftFields,
+      ...graphFields,
+      direction: z.literal('inbound'),
+      source: messageTypeSideSchema,
+      target: documentStructureSideSchema,
+    }),
+  ])
+  .superRefine(checkGraph)
 
 export type MappingDraft = z.infer<typeof mappingDraftSchema>
 
-export const saveMappingLinksBodySchema = z.object({ links: mappingLinksSchema })
+export const saveMappingDraftBodySchema = mappingGraphSchema
 
-export type SaveMappingLinksBody = z.infer<typeof saveMappingLinksBodySchema>
+export type SaveMappingDraftBody = MappingGraph
 
 export const mappingsEndpoint: Endpoint<MappingSummary[]> = {
   method: 'GET',
@@ -102,14 +205,14 @@ export const mappingDraftEndpoint: Endpoint<
   response: mappingDraftSchema,
 }
 
-export const saveMappingLinksEndpoint: Endpoint<
+export const saveMappingDraftEndpoint: Endpoint<
   MappingDraft,
   undefined,
-  SaveMappingLinksBody,
-  '/mappings/:id/draft/links'
+  SaveMappingDraftBody,
+  '/mappings/:id/draft'
 > = {
   method: 'PUT',
-  path: '/mappings/:id/draft/links',
-  body: saveMappingLinksBodySchema,
+  path: '/mappings/:id/draft',
+  body: saveMappingDraftBodySchema,
   response: mappingDraftSchema,
 }

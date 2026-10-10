@@ -1,8 +1,14 @@
-import type { DocumentStructure, TradingPartner, Workspace } from '@edi-bridge/contracts'
+import type {
+  DocumentStructure,
+  LookupTableSummary,
+  TradingPartner,
+  Workspace,
+} from '@edi-bridge/contracts'
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
 import { documentStructureHandler, seedDocumentStructures } from './document-structure'
 import { createFlowStore, flowHandlers, seedMappings } from './flow'
+import { lookupTablesHandler, seedLookupTables } from './lookup-table'
 import { manualSubmissionHandler } from './manual-submission'
 import {
   type MappingDraftRecord,
@@ -49,6 +55,13 @@ export {
   seedDocumentStructureOf,
   seedDocumentStructures,
 } from './document-structure'
+
+export {
+  createLookupTables,
+  lookupTablesHandler,
+  seedLookupTableNamed,
+  seedLookupTables,
+} from './lookup-table'
 
 export { manualSubmissionHandler } from './manual-submission'
 
@@ -112,12 +125,14 @@ export function createHandlers(
     channels = seedChannels,
     mappingDrafts = seedMappingDrafts,
     documentStructures = seedDocumentStructures,
+    lookupTables = seedLookupTables,
   }: {
     workspace?: Workspace
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure>
+    lookupTables?: ReadonlyArray<LookupTableSummary>
   } = {},
 ) {
   const runs = createRunStore(seedRuns())
@@ -138,5 +153,6 @@ export function createHandlers(
     ...mappingHandlers(apiUrl, { mappings: mappingDrafts, documentStructures }),
     documentStructureHandler(apiUrl, documentStructures),
     messageTypeStructureHandler(apiUrl),
+    lookupTablesHandler(apiUrl, lookupTables),
   ]
 }

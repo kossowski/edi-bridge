@@ -24,7 +24,7 @@ import {
   regenerateWebhookToken,
   reprocessRun,
   retryRun,
-  saveMappingLinks,
+  saveMappingDraft,
   switchToProduction,
   updateCompanyIdentity,
   updateTradingPartner,
@@ -210,22 +210,28 @@ describe('Channel actions', () => {
   })
 })
 
-describe('saveMappingLinks', () => {
+describe('saveMappingDraft', () => {
   const draft = seedMappingDrafts.find(({ messageType }) => messageType === 'INVOIC')!
+  const transforms = [...draft.transforms]
+  const transformLinks = [...draft.transformLinks]
 
-  it('saves the links and returns the Draft', async () => {
+  it('saves the links and transforms and returns the Draft', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: [draft] }))
 
-    const links = draft.links.slice(1)
+    const graph = { links: draft.links.slice(1), transforms, transformLinks }
 
-    await expect(saveMappingLinks(draft.id, { links })).resolves.toMatchObject({ links })
+    await expect(saveMappingDraft(draft.id, graph)).resolves.toMatchObject(graph)
   })
 
   it('rejects with 422 when a link ends at a part that holds others', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: [draft] }))
 
     await expect(
-      saveMappingLinks(draft.id, { links: [{ sourcePath: 'invoiceNumber', targetPath: 'BGM' }] }),
+      saveMappingDraft(draft.id, {
+        links: [{ sourcePath: 'invoiceNumber', targetPath: 'BGM' }],
+        transforms,
+        transformLinks,
+      }),
     ).rejects.toMatchObject({ status: 422 })
   })
 })

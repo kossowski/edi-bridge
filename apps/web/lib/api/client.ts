@@ -30,8 +30,8 @@ import {
   type ReprocessRunBody,
   reprocessRunEndpoint,
   retryRunEndpoint,
-  type SaveMappingLinksBody,
-  saveMappingLinksEndpoint,
+  type SaveMappingDraftBody,
+  saveMappingDraftEndpoint,
   runEndpoint,
   type RunListQuery,
   runsEndpoint,
@@ -140,9 +140,9 @@ export function getMappingDraft(id: string) {
   return request(mappingDraftEndpoint, { path: toPath(mappingDraftEndpoint.path, { id }) })
 }
 
-export function saveMappingLinks(id: string, body: SaveMappingLinksBody) {
-  return request(saveMappingLinksEndpoint, {
-    path: toPath(saveMappingLinksEndpoint.path, { id }),
+export function saveMappingDraft(id: string, body: SaveMappingDraftBody) {
+  return request(saveMappingDraftEndpoint, {
+    path: toPath(saveMappingDraftEndpoint.path, { id }),
     body,
   })
 }
