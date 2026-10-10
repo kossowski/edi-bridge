@@ -10,7 +10,7 @@ import messagesDe from '@/messages/de.json'
 import {
   documentStructureEndpoint,
   mappingDraftEndpoint,
-  saveMappingLinksEndpoint,
+  saveMappingDraftEndpoint,
 } from '@edi-bridge/contracts'
 import {
   createDocumentStructure,
@@ -988,7 +988,7 @@ export const SaveErrorRollback = meta.story({
   parameters: linkStories,
   beforeEach({ msw }) {
     msw.use(
-      http.put(`${apiUrl}${saveMappingLinksEndpoint.path}`, async () => {
+      http.put(`${apiUrl}${saveMappingDraftEndpoint.path}`, async () => {
         await delay(400)
 
         return HttpResponse.json({ message: 'Unprocessable' }, { status: 422 })

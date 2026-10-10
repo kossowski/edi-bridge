@@ -3,13 +3,17 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   documentStructureEndpoint,
+  lookupTablesEndpoint,
   type MappingDraft,
   mappingDraftEndpoint,
-  type MappingLink,
+  type MappingGraph,
   mappingsEndpoint,
   messageTypeStructureEndpoint,
-  saveMappingLinksEndpoint,
+  saveMappingDraftEndpoint,
   toPath,
+  transformConfigIssues,
+  type TransformLink,
+  transformPorts,
 } from '@edi-bridge/contracts'
 
 import {
@@ -18,6 +22,7 @@ import {
   documentStructureLeaves,
 } from './document-structure'
 import { seedMappings } from './flow'
+import { createLookupTables, lookupTablesHandler, seedLookupTables } from './lookup-table'
 import {
   createMappingDrafts,
   createMappingDraftStore,
@@ -51,11 +56,11 @@ async function getDraft(id: string) {
   return mappingDraftEndpoint.response.parse(await response.json())
 }
 
-async function saveLinks(id: string, links: ReadonlyArray<MappingLink>) {
-  return fetch(`${apiUrl}${toPath(saveMappingLinksEndpoint.path, { id })}`, {
+async function saveDraft(id: string, graph: Partial<MappingGraph>) {
+  return fetch(`${apiUrl}${toPath(saveMappingDraftEndpoint.path, { id })}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ links }),
+    body: JSON.stringify({ links: [], transforms: [], transformLinks: [], ...graph }),
   })
 }
 
@@ -83,6 +88,33 @@ async function leavesOf(draft: MappingDraft) {
   }
 }
 
+function containerOf(leaves: ReadonlySet<string>, path: string) {
+  return [...leaves].some((leaf) => leaf.startsWith(`${path}/`) || leaf.startsWith(`${path}.`))
+}
+
+// Loops take and fill whole parts, every other link starts and ends at a field or element.
+function expectExistingEnds(draft: MappingDraft, leaves: Awaited<ReturnType<typeof leavesOf>>) {
+  const kindOf = new Map(draft.transforms.map(({ id, kind }) => [id, kind]))
+
+  for (const { from, to } of draft.transformLinks) {
+    if (from.kind === 'source') {
+      const intoLoop = to.kind === 'transform' && kindOf.get(to.transformId) === 'loop'
+
+      expect(
+        leaves.source.has(from.path) || (intoLoop && containerOf(leaves.source, from.path)),
+      ).toBe(true)
+    }
+
+    if (to.kind === 'target') {
+      const loopItems = from.kind === 'transform' && from.output === 'items'
+
+      expect(leaves.target.has(to.path) || (loopItems && containerOf(leaves.target, to.path))).toBe(
+        true,
+      )
+    }
+  }
+}
+
 function seeded(name: string) {
   return seedMappingDrafts.find((mapping) => mapping.name === name)!
 }
@@ -90,6 +122,8 @@ function seeded(name: string) {
 const hansemarktOrders = seeded('Hansemarkt: ORDERS to ERP JSON')
 
 const hansemarktDesadv = seeded('Hansemarkt: ERP JSON to DESADV')
+
+const hansemarktInvoic = seeded('Hansemarkt: ERP JSON to INVOIC')
 
 describe('GET /mappings', () => {
   it('lists the seed Mappings in both directions, sorted by name', async () => {
@@ -195,8 +229,71 @@ describe('GET /mappings/:id/draft', () => {
         expect(leaves.source).toContain(sourcePath)
         expect(leaves.target).toContain(targetPath)
       }
+
+      expectExistingEnds(draft, leaves)
     },
   )
+
+  it('places transforms on the seed Drafts, some of them configured wrongly', async () => {
+    server.use(...mappingHandlers(apiUrl))
+    const drafts = await Promise.all(seedMappingDrafts.map(({ id }) => getDraft(id)))
+    const transforms = drafts.flatMap((draft) => draft.transforms)
+
+    expect(new Set(transforms.map(({ kind }) => kind)).size).toBe(10)
+    expect(transforms.some((transform) => transformConfigIssues(transform).length > 0)).toBe(true)
+    expect(transforms.some((transform) => transformConfigIssues(transform).length === 0)).toBe(true)
+  })
+
+  it('links a source field through a transform into a target element', async () => {
+    server.use(...mappingHandlers(apiUrl))
+    const draft = await getDraft(hansemarktInvoic.id)
+
+    const dateFormat = draft.transforms.find(({ kind }) => kind === 'dateFormat')!
+
+    expect(draft.transformLinks).toEqual(
+      expect.arrayContaining([
+        {
+          from: { kind: 'source', path: 'invoiceDate' },
+          to: { kind: 'transform', transformId: dateFormat.id, input: 'value' },
+        },
+        {
+          from: { kind: 'transform', transformId: dateFormat.id, output: 'value' },
+          to: { kind: 'target', path: 'DTM+137/C507/2380' },
+        },
+      ]),
+    )
+    expect(draft.links.map(({ targetPath }) => targetPath)).not.toContain('DTM+137/C507/2380')
+  })
+
+  it('keeps the Draft without links free of transforms', async () => {
+    server.use(...mappingHandlers(apiUrl))
+    const drafts = await Promise.all(seedMappingDrafts.map(({ id }) => getDraft(id)))
+
+    for (const draft of drafts.filter(({ links }) => links.length === 0)) {
+      expect(draft.transforms).toEqual([])
+      expect(draft.transformLinks).toEqual([])
+    }
+  })
+
+  it('picks Lookup Tables for its Lookup Table nodes from the listed ones', async () => {
+    server.use(...mappingHandlers(apiUrl), lookupTablesHandler(apiUrl))
+    const drafts = await Promise.all(seedMappingDrafts.map(({ id }) => getDraft(id)))
+
+    const listed = lookupTablesEndpoint.response.parse(
+      await (await get(lookupTablesEndpoint.path)).json(),
+    )
+
+    const picked = drafts
+      .flatMap(({ transforms }) => transforms)
+      .flatMap((transform) =>
+        transform.kind === 'lookupTable' && transform.config.lookupTableId !== null
+          ? [transform.config.lookupTableId]
+          : [],
+      )
+
+    expect(picked.length).toBeGreaterThan(0)
+    expect(listed.map(({ id }) => id)).toEqual(expect.arrayContaining(picked))
+  })
 
   it('answers 404 for an unknown Mapping', async () => {
     server.use(...mappingHandlers(apiUrl))
@@ -225,59 +322,129 @@ describe('GET /mappings/:id/draft', () => {
       const leaves = await leavesOf(draft)
 
       expect(draft.links.length).toBeGreaterThan(50)
+      expect(draft.transforms.length).toBeGreaterThan(20)
 
       for (const { sourcePath, targetPath } of draft.links) {
         expect(leaves.source).toContain(sourcePath)
         expect(leaves.target).toContain(targetPath)
       }
+
+      expectExistingEnds(draft, leaves)
     }
   })
 })
 
-describe('PUT /mappings/:id/draft/links', () => {
+describe('PUT /mappings/:id/draft', () => {
   const links = [
     { sourcePath: 'BGM/1004', targetPath: 'orderNumber' },
     { sourcePath: 'SG2+BY/NAD+BY/C082/3039', targetPath: 'buyer.gln' },
   ]
 
-  it('saves the links of the Draft', async () => {
-    const store = createMappingDraftStore()
-    server.use(...mappingHandlers(apiUrl, { mappings: store }))
+  const dateFormat = {
+    id: '0000000a-0000-4000-8000-000000000001',
+    kind: 'dateFormat',
+    position: { x: 40, y: 80 },
+    config: { from: 'yyyyMMdd', to: 'yyyy-MM-dd' },
+  } as const
 
-    const response = await saveLinks(hansemarktOrders.id, links)
-    const saved = saveMappingLinksEndpoint.response.parse(await response.json())
+  const loop = {
+    id: '0000000a-0000-4000-8000-000000000002',
+    kind: 'loop',
+    position: { x: 40, y: 200 },
+    config: { counterStart: 1 },
+  } as const
 
-    expect(saved.links).toEqual(links)
+  const throughDateFormat: TransformLink[] = [
+    {
+      from: { kind: 'source', path: 'DTM+2/C507/2380' },
+      to: { kind: 'transform', transformId: dateFormat.id, input: 'value' },
+    },
+    {
+      from: { kind: 'transform', transformId: dateFormat.id, output: 'value' },
+      to: { kind: 'target', path: 'requestedDeliveryDate' },
+    },
+  ]
+
+  it('saves the links and transforms of the Draft together', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+
+    const graph = { links, transforms: [dateFormat], transformLinks: throughDateFormat }
+    const response = await saveDraft(hansemarktOrders.id, graph)
+    const saved = saveMappingDraftEndpoint.response.parse(await response.json())
+
+    expect(saved).toMatchObject(graph)
     expect(saved.updatedAt > hansemarktOrders.updatedAt).toBe(true)
     await expect(getDraft(hansemarktOrders.id)).resolves.toEqual(saved)
   })
 
-  it('removes every link', async () => {
+  it('saves a transform whose configuration is still invalid', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+    const unfinished = { ...dateFormat, config: { from: '', to: 'yyyyMMdd' } }
+
+    await saveDraft(hansemarktOrders.id, { transforms: [unfinished] })
+
+    expect((await getDraft(hansemarktOrders.id)).transforms).toEqual([unfinished])
+  })
+
+  it('loops over a repeated part and fills one', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
 
-    await saveLinks(hansemarktOrders.id, [])
+    const transformLinks: TransformLink[] = [
+      {
+        from: { kind: 'source', path: 'SG25' },
+        to: { kind: 'transform', transformId: loop.id, input: 'items' },
+      },
+      {
+        from: { kind: 'transform', transformId: loop.id, output: 'items' },
+        to: { kind: 'target', path: 'lines[]' },
+      },
+    ]
 
-    expect((await getDraft(hansemarktOrders.id)).links).toEqual([])
+    expect(
+      (await saveDraft(hansemarktOrders.id, { transforms: [loop], transformLinks })).status,
+    ).toBe(200)
+  })
+
+  it('removes every link and transform', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+
+    await saveDraft(hansemarktOrders.id, {})
+
+    expect(await getDraft(hansemarktOrders.id)).toMatchObject({
+      links: [],
+      transforms: [],
+      transformLinks: [],
+    })
   })
 
   it('keeps the changes of one handler set out of another', async () => {
     server.use(...mappingHandlers(apiUrl))
-    await saveLinks(hansemarktOrders.id, [])
+    await saveDraft(hansemarktOrders.id, {})
 
     server.resetHandlers(...mappingHandlers(apiUrl))
 
-    expect((await getDraft(hansemarktOrders.id)).links).toEqual(hansemarktOrders.links)
+    expect(await getDraft(hansemarktOrders.id)).toMatchObject({
+      links: hansemarktOrders.links,
+      transforms: hansemarktOrders.transforms,
+    })
   })
 
   it('rejects a second link into the same target', async () => {
     server.use(...mappingHandlers(apiUrl))
 
-    const response = await saveLinks(hansemarktOrders.id, [
-      ...links,
-      { sourcePath: 'SG2+SU/NAD+SU/C082/3039', targetPath: 'buyer.gln' },
-    ])
+    const response = await saveDraft(hansemarktOrders.id, {
+      links: [...links, { sourcePath: 'SG2+SU/NAD+SU/C082/3039', targetPath: 'buyer.gln' }],
+    })
 
     expect(response.status).toBe(400)
+  })
+
+  it('rejects a link into a transform that is not saved with it', async () => {
+    server.use(...mappingHandlers(apiUrl))
+
+    expect(
+      (await saveDraft(hansemarktOrders.id, { transformLinks: throughDateFormat })).status,
+    ).toBe(400)
   })
 
   it.each([
@@ -289,12 +456,110 @@ describe('PUT /mappings/:id/draft/links', () => {
   ])('rejects %s', async (_, link) => {
     server.use(...mappingHandlers(apiUrl))
 
-    expect((await saveLinks(hansemarktOrders.id, [link])).status).toBe(422)
+    expect((await saveDraft(hansemarktOrders.id, { links: [link] })).status).toBe(422)
+  })
+
+  it.each([
+    [
+      'a transform input fed from a field that does not exist',
+      {
+        from: { kind: 'source', path: 'XYZ/1004' },
+        to: { kind: 'transform', transformId: dateFormat.id, input: 'value' },
+      },
+    ],
+    [
+      'a transform input fed from a whole part',
+      {
+        from: { kind: 'source', path: 'SG25' },
+        to: { kind: 'transform', transformId: dateFormat.id, input: 'value' },
+      },
+    ],
+    [
+      'a transform output into a target that does not exist',
+      {
+        from: { kind: 'transform', transformId: dateFormat.id, output: 'value' },
+        to: { kind: 'target', path: 'order.no' },
+      },
+    ],
+    [
+      'a transform output into a whole part',
+      {
+        from: { kind: 'transform', transformId: dateFormat.id, output: 'value' },
+        to: { kind: 'target', path: 'lines[]' },
+      },
+    ],
+  ] as const)('rejects %s', async (_, link) => {
+    server.use(...mappingHandlers(apiUrl))
+
+    const response = await saveDraft(hansemarktOrders.id, {
+      transforms: [dateFormat],
+      transformLinks: [link],
+    })
+
+    expect(response.status).toBe(422)
   })
 
   it('answers 404 for an unknown Mapping', async () => {
     server.use(...mappingHandlers(apiUrl))
 
-    expect((await saveLinks(crypto.randomUUID(), links)).status).toBe(404)
+    expect((await saveDraft(crypto.randomUUID(), { links })).status).toBe(404)
+  })
+})
+
+describe('createMappingDrafts', () => {
+  it('connects only the ports its transforms have', () => {
+    const documentStructure = createDocumentStructure({ fieldCount: 400 })
+
+    for (const draft of createMappingDrafts({
+      count: 4,
+      documentStructures: [documentStructure],
+    })) {
+      const ports = new Map(
+        draft.transforms.map((transform) => [transform.id, transformPorts(transform)]),
+      )
+
+      for (const { from, to } of draft.transformLinks) {
+        if (from.kind === 'transform') {
+          expect(ports.get(from.transformId)?.outputs).toContain(from.output)
+        }
+
+        if (to.kind === 'transform') {
+          expect(ports.get(to.transformId)?.inputs).toContain(to.input)
+        }
+      }
+    }
+  })
+})
+
+describe('GET /lookup-tables', () => {
+  async function listLookupTables() {
+    return lookupTablesEndpoint.response.parse(await (await get(lookupTablesEndpoint.path)).json())
+  }
+
+  it('lists the Lookup Tables of the Workspace and of single Trading Partners, by name', async () => {
+    server.use(lookupTablesHandler(apiUrl))
+    const tables = await listLookupTables()
+
+    expect(new Set(tables.map(({ scope }) => scope.kind))).toEqual(
+      new Set(['workspace', 'tradingPartner']),
+    )
+    expect(tables.map(({ name }) => name)).toEqual(
+      tables.map(({ name }) => name).sort((a, b) => a.localeCompare(b, 'de')),
+    )
+    expect(tables).toHaveLength(seedLookupTables.length)
+  })
+
+  it('serves an empty list', async () => {
+    server.use(lookupTablesHandler(apiUrl, []))
+
+    expect(await listLookupTables()).toEqual([])
+  })
+
+  it('serves a large volume of generated Lookup Tables', async () => {
+    server.use(lookupTablesHandler(apiUrl, createLookupTables({ count: 250 })))
+    const tables = await listLookupTables()
+
+    expect(tables).toHaveLength(250)
+    expect(new Set(tables.map(({ scope }) => scope.kind)).size).toBe(2)
   })
 })

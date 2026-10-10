@@ -10,7 +10,7 @@ import { useTranslations } from 'next-intl'
 
 import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
 import { revertChange } from '@/components/mappings/mapping-links'
-import { saveMappingLinks } from '@/lib/api/client'
+import { saveMappingDraft } from '@/lib/api/client'
 import { mappingDraftQuery, mappingKeys } from '@/lib/api/queries'
 
 import type { LinkChange } from '@/components/mappings/mapping-links'
@@ -43,7 +43,17 @@ export function useSaveLinks(mappingId: string) {
 
   const save = useMutation({
     mutationKey,
-    mutationFn: ({ links }: LinkChange) => saveMappingLinks(mappingId, { links }),
+    mutationFn: ({ links }: LinkChange) => {
+      const draft = queryClient.getQueryData<MappingDraft>(queryKey)
+
+      if (!draft) {
+        throw new Error(`The Draft of Mapping ${mappingId} is not loaded`)
+      }
+
+      const { transforms, transformLinks } = draft
+
+      return saveMappingDraft(mappingId, { links, transforms, transformLinks })
+    },
     onMutate: async ({ links }) => {
       await queryClient.cancelQueries({ queryKey })
       queryClient.setQueryData<MappingDraft>(queryKey, (draft) => draft && { ...draft, links })

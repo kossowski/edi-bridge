@@ -134,9 +134,10 @@ export {
   type MappingDraft,
   mappingDraftEndpoint,
   mappingDraftSchema,
+  type MappingGraph,
+  mappingGraphSchema,
   type MappingLink,
   mappingLinkSchema,
-  mappingLinksSchema,
   type MappingSide,
   mappingSideSchema,
   mappingsEndpoint,
@@ -144,10 +145,18 @@ export {
   mappingSummarySchema,
   type MessageTypeSide,
   messageTypeSideSchema,
-  type SaveMappingLinksBody,
-  saveMappingLinksBodySchema,
-  saveMappingLinksEndpoint,
+  type SaveMappingDraftBody,
+  saveMappingDraftBodySchema,
+  saveMappingDraftEndpoint,
 } from './mapping'
+
+export {
+  type LookupTableScope,
+  lookupTableScopeSchema,
+  type LookupTableSummary,
+  lookupTableSummarySchema,
+  lookupTablesEndpoint,
+} from './lookup-table'
 
 export {
   type MappingVersionSummary,
@@ -217,6 +226,38 @@ export {
   type RunSummary,
   runSummarySchema,
 } from './run'
+
+export {
+  type ConditionOperator,
+  conditionOperators,
+  concatenateInputs,
+  decimalPlaces,
+  decimalSeparators,
+  type LinkEnd,
+  linkEndSchema,
+  type LinkStart,
+  linkStartSchema,
+  lookupFallbacks,
+  type MappingTransform,
+  mappingTransformSchema,
+  type TransformConfig,
+  type TransformConfigIssue,
+  transformConfigIssues,
+  transformConfigSchemas,
+  draftTransformConfigSchemas,
+  type TransformInputIssue,
+  type TransformIssue,
+  type TransformIssueCode,
+  transformIssueCodes,
+  transformIssues,
+  type TransformKind,
+  transformKinds,
+  type TransformLink,
+  transformLinkSchema,
+  transformLinkTargets,
+  type TransformPorts,
+  transformPorts,
+} from './transform'
 
 export {
   acknowledgementTimeLimitHours,

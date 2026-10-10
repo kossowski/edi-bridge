@@ -90,6 +90,14 @@ _Avoid_: Source schema, format definition, layout
 A declarative description of how a source Document is turned into a target Document, optionally using expressions for edge cases.
 _Avoid_: Transformation, template, script
 
+**Transform**:
+A step from a fixed catalogue, placed in a Mapping between source and target, that converts values on their way, e.g. a date format or a Lookup Table translation.
+_Avoid_: Transformation, function, operator
+
+**Transform Link**:
+A link in a Mapping that starts or ends at a Transform, unlike a plain link from a source field straight to a target element.
+_Avoid_: Edge, wire, connection
+
 **Lookup Table**:
 A maintained list of code translations, belonging to a Workspace or a single Trading Partner, used by Mappings, e.g. unit `ST` → `PCE`.
 _Avoid_: Code list, dictionary, translation table
