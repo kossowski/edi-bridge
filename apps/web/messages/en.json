@@ -31,6 +31,7 @@
     "channels": "Channels",
     "flows": "Flows",
     "mappings": "Mappings",
+    "documentStructures": "Document Structures",
     "lookupTables": "Lookup Tables",
     "settings": "Settings",
     "operator": "Operator"
@@ -44,6 +45,7 @@
     "channels": "The inbound and outbound Channels and their connection settings.",
     "flows": "The Flows that route Documents from a Channel through a Mapping Version to a destination Channel.",
     "mappings": "Mappings, their versions and the mapping canvas.",
+    "documentStructures": "The Document Structures that describe the JSON and CSV Documents of your own systems.",
     "lookupTables": "Lookup Tables for the Workspace and for single Trading Partners.",
     "settings": "Settings for this Workspace.",
     "operator": "Workspaces and their users, managed by the Operator."
@@ -1382,6 +1384,190 @@
         "title": "Outputs unavailable",
         "description": "The outputs for this Sample Document could not be built. Try again."
       }
+    }
+  },
+  "DocumentStructures": {
+    "caption": "Document Structures, by name",
+    "loading": "Loading Document Structures",
+    "count": "{count, plural, one {# Document Structure} other {# Document Structures}}",
+    "filteredCount": "{count} of {total} Document Structures",
+    "search": "Search by name or Mapping",
+    "noMatch": "No Document Structure matches the search.",
+    "new": "New Document Structure",
+    "notUsed": "Not used yet",
+    "fieldCount": "{count, plural, one {# field} other {# fields}}",
+    "columns": {
+      "name": "Name",
+      "format": "Format",
+      "fields": "Fields",
+      "mappings": "Used by Mappings"
+    },
+    "format": {
+      "json": "JSON",
+      "csv": "CSV"
+    },
+    "empty": {
+      "title": "No Document Structures yet",
+      "description": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Create one from a sample Document or a JSON Schema."
+    },
+    "error": {
+      "title": "Document Structures unavailable",
+      "description": "The Document Structures could not be loaded. Try again.",
+      "retry": "Try again"
+    }
+  },
+  "DocumentStructure": {
+    "title": "Document Structure",
+    "back": "Back to Document Structures",
+    "loading": "Loading Document Structure",
+    "notFound": {
+      "title": "Document Structure not found",
+      "description": "There is no Document Structure with this ID in this Workspace."
+    },
+    "error": {
+      "title": "Document Structure unavailable",
+      "description": "The Document Structure could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "facts": {
+      "label": "Document Structure details",
+      "format": "Format",
+      "fields": "Fields",
+      "mappings": "Used by Mappings"
+    },
+    "usedNote": "Published Mapping Versions never change, so EDI Bridge refuses changes to fields they use. Fields only a Draft links can change as long as they keep their place.",
+    "name": {
+      "label": "Name",
+      "description": "Shown in the Mapping list and on the mapping canvas."
+    },
+    "fields": "Fields",
+    "fieldsDescription": "Mark fields and objects as required or optional, as repeating or not, and adjust the type of a field. The changes apply when you save.",
+    "csvFieldsDescription": "Mark columns as required or optional and adjust their type. The rows of a CSV Document always repeat; its columns never do.",
+    "unsaved": "{count, plural, =0 {No unsaved changes} one {# unsaved change} other {# unsaved changes}}",
+    "save": "Save",
+    "saving": "Saving…",
+    "discard": "Discard changes",
+    "saved": "The Document Structure is saved.",
+    "failed": "The Document Structure could not be saved. Try again.",
+    "errors": {
+      "nameRequired": "Enter a name."
+    }
+  },
+  "DocumentStructureForm": {
+    "createTitle": "New Document Structure",
+    "back": "Back to Document Structures",
+    "origin": {
+      "label": "Create from",
+      "description": "EDI Bridge infers the fields, their nesting and repetitions from the file.",
+      "kinds": {
+        "jsonDocument": "A JSON Document",
+        "csvDocument": "A CSV Document",
+        "jsonSchema": "A JSON Schema"
+      }
+    },
+    "file": {
+      "label": "File",
+      "description": "A sample Document from your own systems, or the JSON Schema they provide. At most 5 MB.",
+      "drop": "Drop the file here or choose it."
+    },
+    "name": {
+      "label": "Name",
+      "description": "Shown in the Mapping list and on the mapping canvas."
+    },
+    "preview": {
+      "title": "Preview",
+      "description": "The Document Structure EDI Bridge infers from the file. Nothing is saved until you create it.",
+      "none": "Choose a file to see the Document Structure EDI Bridge infers from it.",
+      "loading": "Reading the file…",
+      "fields": "{count, plural, one {# field} other {# fields}}",
+      "failed": "The file could not be read. Try again.",
+      "retry": "Try again",
+      "adjustLater": "After creating it, you can mark fields as optional or repeating and adjust their types."
+    },
+    "create": "Create Document Structure",
+    "creating": "Creating…",
+    "failed": "The Document Structure could not be created. Try again.",
+    "errors": {
+      "nameRequired": "Enter a name.",
+      "fileRequired": "Choose a file.",
+      "empty": "The file is empty.",
+      "tooLarge": "The file is too large. It can have at most 5 MB.",
+      "unreadable": "Fix the problem in the file or choose another one."
+    }
+  },
+  "DocumentStructureTree": {
+    "label": "Fields of {name}",
+    "hint": "Use the arrow keys to move between rows and to open or close objects. Press Tab to reach the settings of the current row and Escape to return to the row.",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "columns": {
+      "name": "Field",
+      "type": "Type",
+      "required": "Required",
+      "repeats": "Repeats"
+    },
+    "types": {
+      "string": "Text",
+      "number": "Number",
+      "integer": "Whole number",
+      "boolean": "Yes or no",
+      "date": "Date"
+    },
+    "object": "Object",
+    "hidden": "{count, plural, one {# field hidden} other {# fields hidden}}",
+    "empty": "No fields",
+    "yes": "Yes",
+    "no": "No",
+    "always": "Always",
+    "requiredLabel": "{path} is required",
+    "repeatsLabel": "{path} repeats",
+    "typeLabel": "Type of {path}",
+    "changed": "Changed",
+    "marks": {
+      "usedByMappingVersion": "Used by published Mapping Versions",
+      "linkedByMapping": "Linked by a Mapping Draft",
+      "other": "Refused"
+    }
+  },
+  "CsvSettings": {
+    "title": "CSV settings",
+    "description": "EDI Bridge reads CSV Documents of this Document Structure with these settings.",
+    "delimiter": "Delimiter",
+    "headerRow": "Header row",
+    "encoding": "Character encoding",
+    "delimiters": {
+      "comma": "Comma (,)",
+      "semicolon": "Semicolon (;)",
+      "tab": "Tab",
+      "pipe": "Vertical bar (|)"
+    },
+    "headerRows": {
+      "yes": "The first row names the columns",
+      "no": "No header row"
+    }
+  },
+  "DocumentStructureProblem": {
+    "line": "Line {line}",
+    "path": "At <code>{path}</code>",
+    "details": "Details",
+    "showInTree": "Show {path} in the tree",
+    "versionsTitle": "Published Mapping Versions that use it:",
+    "version": "{mappingName}, version {version}",
+    "mappingsTitle": "Mappings that use this Document Structure:",
+    "codes": {
+      "unreadableContent": "The file cannot be read with its character encoding. Older ERP exports often use Windows-1252.",
+      "invalidJson": "The file is not valid JSON.",
+      "invalidCsv": "The file is not a valid CSV Document.",
+      "invalidJsonSchema": "The file is not a valid JSON Schema.",
+      "unsupportedJson": "The JSON Document has a shape a Document Structure cannot describe.",
+      "unsupportedJsonSchema": "The JSON Schema uses something a Document Structure cannot describe.",
+      "emptyDocument": "The Document has no fields to infer a Document Structure from.",
+      "inconsistentCsvRows": "The rows of the CSV Document do not have the same number of columns.",
+      "unknownPath": "The Document Structure has changed in the meantime. Reload the page and adjust it again.",
+      "notAdjustable": "This part of the Document Structure cannot change this way.",
+      "csvDocumentRequired": "Changing the CSV settings needs a CSV Document, which EDI Bridge reads again with the new settings.",
+      "linkedByMapping": "A Mapping Draft links a field this change would remove. Remove the link on the mapping canvas first, or undo the change.",
+      "usedByMappingVersion": "Published Mapping Versions use this part, and a published Mapping Version never changes. Undo the change, or create a new Document Structure for the new shape."
     }
   },
   "ManualSubmission": {

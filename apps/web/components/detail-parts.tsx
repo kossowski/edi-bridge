@@ -149,6 +149,7 @@ export function LoadFailure({
     | 'Flow'
     | 'Mapping'
     | 'Mapping.canvas'
+    | 'DocumentStructure'
     | 'Settings'
   onRetry: () => void
 }) {

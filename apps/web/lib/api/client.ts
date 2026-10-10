@@ -5,14 +5,21 @@ import {
   type ChannelUpdate,
   type CompanyIdentityInput,
   createChannelEndpoint,
+  type CreateDocumentStructureBody,
+  createDocumentStructureEndpoint,
   createFlowEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   documentStructureEndpoint,
+  type DocumentStructureOrigin,
+  type DocumentStructureProblem,
+  documentStructureProblemSchema,
+  documentStructuresEndpoint,
   type Endpoint,
   flowEndpoint,
   type FlowInput,
   flowsEndpoint,
+  inferDocumentStructureEndpoint,
   type FlowUpdate,
   interchangeEndpoint,
   lookupTablesEndpoint,
@@ -52,6 +59,8 @@ import {
   tradingPartnersEndpoint,
   updateChannelEndpoint,
   updateCompanyIdentityEndpoint,
+  type UpdateDocumentStructureBody,
+  updateDocumentStructureEndpoint,
   updateFlowEndpoint,
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
@@ -62,6 +71,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly path: string,
+    readonly problem: DocumentStructureProblem | null = null,
   ) {
     super(`API request to ${path} failed with status ${status}`)
     this.name = 'ApiError'
@@ -74,6 +84,17 @@ type RequestOptions<Query, Body> = {
   path?: string
   query?: Query
   body?: Body
+  problem?: typeof documentStructureProblemSchema
+}
+
+async function problemOf(response: Response, schema: RequestOptions<unknown, unknown>['problem']) {
+  if (!schema || response.status !== 422) {
+    return null
+  }
+
+  const parsed = schema.safeParse(await response.json().catch(() => null))
+
+  return parsed.success ? parsed.data : null
 }
 
 async function request<
@@ -82,7 +103,7 @@ async function request<
   Body = undefined,
 >(
   endpoint: Endpoint<Response, Query, Body>,
-  { path = endpoint.path, query, body }: RequestOptions<Query, Body> = {},
+  { path = endpoint.path, query, body, problem }: RequestOptions<Query, Body> = {},
 ): Promise<Response> {
   if (isMockingEnabled && typeof window !== 'undefined') {
     mockingStarted ??= import('./mock-worker').then(({ startMockWorker }) => startMockWorker())
@@ -100,7 +121,7 @@ async function request<
   })
 
   if (!response.ok) {
-    throw new ApiError(response.status, path)
+    throw new ApiError(response.status, path, await problemOf(response, problem))
   }
 
   return endpoint.response.parse(await response.json())
@@ -189,6 +210,36 @@ export function getDocumentStructure(id: string) {
   return request(documentStructureEndpoint, {
     path: toPath(documentStructureEndpoint.path, { id }),
   })
+}
+
+export function listDocumentStructures() {
+  return request(documentStructuresEndpoint)
+}
+
+export function inferDocumentStructure(origin: DocumentStructureOrigin) {
+  return request(inferDocumentStructureEndpoint, {
+    body: origin,
+    problem: documentStructureProblemSchema,
+  })
+}
+
+export function createDocumentStructure(body: CreateDocumentStructureBody) {
+  return request(createDocumentStructureEndpoint, {
+    body,
+    problem: documentStructureProblemSchema,
+  })
+}
+
+export function updateDocumentStructure(id: string, body: UpdateDocumentStructureBody) {
+  return request(updateDocumentStructureEndpoint, {
+    path: toPath(updateDocumentStructureEndpoint.path, { id }),
+    body,
+    problem: documentStructureProblemSchema,
+  })
+}
+
+export function documentStructureProblemOf(error: Error | null) {
+  return error instanceof ApiError ? error.problem : null
 }
 
 export function getMessageTypeStructure(messageType: MessageType) {
