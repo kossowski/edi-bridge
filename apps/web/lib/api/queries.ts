@@ -1,8 +1,14 @@
-import { keepPreviousData, type QueryClient, queryOptions } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  type QueryClient,
+  queryOptions,
+  useMutation,
+} from '@tanstack/react-query'
 
 import type {
   Channel,
   DocumentStructure,
+  DocumentStructureOrigin,
   Flow,
   MappingComparisonQuery,
   MappingDraft,
@@ -24,6 +30,7 @@ import {
   getMappingVersion,
   getRun,
   getTradingPartner,
+  inferDocumentStructure,
   listChannels,
   listDocumentStructures,
   listLookupTables,
@@ -144,6 +151,14 @@ export function storeSavedDocumentStructure(queryClient: QueryClient, saved: Doc
   void queryClient.invalidateQueries({ queryKey: documentStructureKeys.list() })
   void queryClient.invalidateQueries({ queryKey: mappingKeys.list() })
 }
+
+export function useDocumentStructureInference() {
+  return useMutation({
+    mutationFn: (origin: DocumentStructureOrigin) => inferDocumentStructure(origin),
+  })
+}
+
+export type DocumentStructureInference = ReturnType<typeof useDocumentStructureInference>
 
 export const messageTypeKeys = {
   all: () => ['message-types'] as const,

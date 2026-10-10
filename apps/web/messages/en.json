@@ -1452,6 +1452,20 @@
     "failed": "The Document Structure could not be saved. Try again.",
     "errors": {
       "nameRequired": "Enter a name."
+    },
+    "csv": {
+      "description": "EDI Bridge reads CSV Documents of this Document Structure with these settings. To change them, choose a CSV Document: EDI Bridge reads it again with the new settings and shows the fields it infers before you save.",
+      "document": {
+        "label": "CSV Document",
+        "description": "A current export from your own systems. Saving replaces the fields with the ones read from it. At most 5 MB."
+      },
+      "blocked": {
+        "documentNeeded": "Choose a CSV Document to read it again with the new settings.",
+        "unread": "Saving needs a CSV Document EDI Bridge can read with these settings."
+      },
+      "rereadFieldsDescription": "The fields EDI Bridge reads from {fileName} with the settings above. Saving replaces the current fields with these. Mark columns as required or optional and adjust their type.",
+      "reading": "Reading the CSV Document…",
+      "unread": "The fields appear once EDI Bridge can read the CSV Document. Adjust the CSV settings or choose another CSV Document."
     }
   },
   "DocumentStructureForm": {
@@ -1493,8 +1507,10 @@
       "fileRequired": "Choose a file.",
       "empty": "The file is empty.",
       "tooLarge": "The file is too large. It can have at most 5 MB.",
-      "unreadable": "Fix the problem in the file or choose another one."
-    }
+      "unreadable": "Fix the problem in the file or choose another one.",
+      "unreadableCsv": "Adjust the CSV settings, fix the problem in the file, or choose another one."
+    },
+    "csvDescription": "EDI Bridge reads the CSV Document with these settings. The preview follows each change."
   },
   "DocumentStructureTree": {
     "label": "Fields of {name}",
@@ -1534,9 +1550,8 @@
   },
   "CsvSettings": {
     "title": "CSV settings",
-    "description": "EDI Bridge reads CSV Documents of this Document Structure with these settings.",
     "delimiter": "Delimiter",
-    "headerRow": "Header row",
+    "headerRow": "The first row names the columns",
     "encoding": "Character encoding",
     "delimiters": {
       "comma": "Comma (,)",
@@ -1544,9 +1559,15 @@
       "tab": "Tab",
       "pipe": "Vertical bar (|)"
     },
-    "headerRows": {
-      "yes": "The first row names the columns",
-      "no": "No header row"
+    "delimiterDescription": "The character between two cells of a row.",
+    "encodingDescription": "Older ERP exports often use Windows-1252. If umlauts look wrong, choose another encoding.",
+    "headerRowDescription": "Without a header row, EDI Bridge names the columns column1, column2 and so on, and reads the first row as data.",
+    "firstRows": {
+      "title": "First rows",
+      "description": "As EDI Bridge reads them with {encoding} and the delimiter above.",
+      "label": "First rows of {fileName}",
+      "none": "The CSV Document has no rows below the header row.",
+      "column": "Column {number}"
     }
   },
   "DocumentStructureProblem": {
@@ -1571,7 +1592,8 @@
       "csvDocumentRequired": "Changing the CSV settings needs a CSV Document, which EDI Bridge reads again with the new settings.",
       "linkedByMapping": "A Mapping Draft links a field this change would remove. Remove the link on the mapping canvas first, or undo the change.",
       "usedByMappingVersion": "Published Mapping Versions use this part, and a published Mapping Version never changes. Undo the change, or create a new Document Structure for the new shape."
-    }
+    },
+    "csvSettingsUsedByMappingVersion": "Published Mapping Versions read CSV Documents with these settings, and a published Mapping Version never changes. Keep the saved CSV settings, or create a new Document Structure with the new ones."
   },
   "ManualSubmission": {
     "open": "Submit a Document",

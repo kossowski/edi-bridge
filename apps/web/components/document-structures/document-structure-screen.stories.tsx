@@ -1,21 +1,28 @@
 import { delay, http, HttpResponse } from 'msw'
-import { NextIntlClientProvider } from 'next-intl'
-import { type ReactNode } from 'react'
 import { expect, userEvent, within } from 'storybook/test'
 
 import { DocumentStructureScreen } from '@/components/document-structures/document-structure-screen'
+import {
+  besideSidebar,
+  darkMode,
+  german,
+  mobile,
+  tablet,
+  toFile,
+} from '@/components/document-structures/document-structure-story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import messagesDe from '@/messages/de.json'
 import {
   documentStructureEndpoint,
   type DocumentStructureProblem,
   documentStructuresEndpoint,
+  inferDocumentStructureEndpoint,
   toPath,
   updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 import {
   createDocumentStructure,
   createHandlers,
+  documentStructureOrigins,
   seedDocumentStructureOf,
   seedDocumentStructures,
   seedMappingDrafts,
@@ -39,8 +46,20 @@ const detailPath = (id: string) => `${apiUrl}${toPath(documentStructureEndpoint.
 const updatePath = (id: string) =>
   `${apiUrl}${toPath(updateDocumentStructureEndpoint.path, { id })}`
 
-function refuseUpdate(problem: DocumentStructureProblem) {
-  return http.put(updatePath(order.id), () => HttpResponse.json(problem, { status: 422 }))
+function refuseUpdate(problem: DocumentStructureProblem, id = order.id) {
+  return http.put(updatePath(id), () => HttpResponse.json(problem, { status: 422 }))
+}
+
+const ansiExport = toFile({
+  ...documentStructureOrigins.windows1252CsvDocument.document,
+  fileName: 'lieferscheine-oktober.csv',
+})
+
+async function chooseCsvDocument(canvasElement: HTMLElement, label = 'CSV Document') {
+  const canvas = within(canvasElement)
+
+  await userEvent.upload(await canvas.findByLabelText(label), ansiExport)
+  await canvas.findByRole('region', { name: /lieferscheine-oktober\.csv$/ })
 }
 
 const refusedByPublishedVersions = refuseUpdate({
@@ -57,28 +76,6 @@ const refusedByPublishedVersions = refuseUpdate({
     publishedAt: `2026-09-0${version}T08:00:00.000Z`,
   })),
 })
-
-const german = (Story: () => ReactNode) => (
-  <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-    <Story />
-  </NextIntlClientProvider>
-)
-
-// At 768px the app's sidebar takes 16rem of the width.
-const besideSidebar = (Story: () => ReactNode) => (
-  <div className="ml-64">
-    <Story />
-  </div>
-)
-
-const tablet = {
-  parameters: {
-    viewport: {
-      options: { tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } } },
-    },
-  },
-  globals: { viewport: { value: 'tablet', isRotated: false } },
-}
 
 async function expectReadableColumns(canvasElement: HTMLElement) {
   const [field, ...headers] = canvasElement.querySelectorAll('[role=treegrid] th')
@@ -131,9 +128,213 @@ export const Default = meta.story({
 export const Csv = meta.story({
   args: { id: csv!.id },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('heading', { name: 'CSV settings' })).toBeVisible()
-    await expect(canvas.getByText('Windows-1252')).toBeVisible()
+    await expect(await canvas.findByRole('group', { name: 'CSV settings' })).toBeVisible()
+    await expect(canvas.getByRole('combobox', { name: 'Character encoding' })).toHaveValue(
+      'windows-1252',
+    )
+    await expect(canvas.getByRole('combobox', { name: 'Delimiter' })).toHaveValue(';')
+    await expect(
+      canvas.getByRole('checkbox', { name: 'The first row names the columns' }),
+    ).toBeChecked()
     await expect(await canvas.findByText('Not used yet')).toBeVisible()
+  },
+})
+
+export const CsvReread = meta.story({
+  args: { id: csv!.id },
+  async play({ canvas, canvasElement }) {
+    await chooseCsvDocument(canvasElement)
+
+    const firstRows = await canvas.findByRole('region', {
+      name: 'First rows of lieferscheine-oktober.csv',
+    })
+
+    await expect(within(firstRows).getAllByText('Lübeck').length).toBeGreaterThan(0)
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'The first row names the columns' }))
+    await expect(await canvas.findByRole('columnheader', { name: 'column1' })).toBeVisible()
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expect(canvas.getByText('2 unsaved changes')).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
+    await expect(await canvas.findByText('The Document Structure is saved.')).toBeVisible()
+    await expect(
+      canvas.getByRole('checkbox', { name: 'The first row names the columns' }),
+    ).not.toBeChecked()
+  },
+})
+
+export const CsvRereadUnreadable = meta.story({
+  args: { id: csv!.id },
+  async play({ canvas, canvasElement }) {
+    await chooseCsvDocument(canvasElement)
+    await canvas.findByRole('treegrid')
+    await userEvent.selectOptions(
+      canvas.getByRole('combobox', { name: 'Character encoding' }),
+      'utf-8',
+    )
+    await expect(
+      await canvas.findByText(/^The file cannot be read with its character encoding/),
+    ).toBeVisible()
+    await expect(canvas.getAllByText(/L\uFFFDbeck/).length).toBeGreaterThan(0)
+    await expect(canvas.queryByRole('treegrid')).toBeNull()
+    await expect(canvas.getByLabelText('CSV Document')).not.toHaveAttribute('aria-invalid', 'true')
+    await expect(
+      canvas.getByText(
+        'Adjust the CSV settings, fix the problem in the file, or choose another one.',
+      ),
+    ).toBeVisible()
+
+    const save = canvas.getByRole('button', { name: 'Save' })
+
+    await expect(save).toBeDisabled()
+    await expect(save).toHaveAccessibleDescription(
+      'Saving needs a CSV Document EDI Bridge can read with these settings.',
+    )
+    await expect(canvas.getAllByRole('alert')).toHaveLength(1)
+  },
+})
+
+export const CsvRereading = meta.story({
+  args: { id: csv!.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${inferDocumentStructureEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await chooseCsvDocument(canvasElement)
+    await expect(await canvas.findByText('Reading the CSV Document…')).toBeInTheDocument()
+    await expect(canvas.getByRole('button', { name: 'Save' })).toBeDisabled()
+  },
+})
+
+const csvDocumentNeeded = 'Choose a CSV Document to read it again with the new settings.'
+
+export const CsvDocumentRequired = meta.story({
+  args: { id: csv!.id },
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(
+      await canvas.findByRole('checkbox', { name: 'The first row names the columns' }),
+    )
+    await expect(canvas.getByText('1 unsaved change')).toBeVisible()
+
+    const save = canvas.getByRole('button', { name: 'Save' })
+
+    await expect(save).toBeDisabled()
+    await expect(save).toHaveAccessibleDescription(csvDocumentNeeded)
+    await chooseCsvDocument(canvasElement)
+    await canvas.findByRole('treegrid')
+    await expect(save).toBeEnabled()
+    await expect(canvas.queryByText(csvDocumentNeeded)).toBeNull()
+  },
+})
+
+export const MobileCsvDocumentRequired = meta.story({
+  ...mobile,
+  args: { id: csv!.id },
+  async play({ canvas }) {
+    await userEvent.selectOptions(await canvas.findByRole('combobox', { name: 'Delimiter' }), ',')
+
+    const hint = canvas.getByText(csvDocumentNeeded)
+    const { bottom } = hint.getBoundingClientRect()
+
+    await expect(hint).toBeVisible()
+    await expect(bottom).toBeLessThanOrEqual(window.innerHeight)
+  },
+})
+
+const csvUsedByPublishedVersions = refuseUpdate(
+  {
+    code: 'usedByMappingVersion',
+    message:
+      'Published Mapping Versions read this Document Structure with its CSV settings: ERP dispatch to DESADV v1',
+    path: null,
+    line: null,
+    mappingVersions: [
+      {
+        id: '00000000-0000-4000-8000-000000000011',
+        mappingId: orderMapping.id,
+        mappingName: 'ERP dispatch to DESADV',
+        version: 1,
+        publishedAt: '2026-09-01T08:00:00.000Z',
+      },
+    ],
+  },
+  csv!.id,
+)
+
+export const CsvUsedByMappingVersion = meta.story({
+  args: { id: csv!.id },
+  beforeEach({ msw }) {
+    msw.use(csvUsedByPublishedVersions)
+  },
+  async play({ canvas, canvasElement }) {
+    await chooseCsvDocument(canvasElement)
+    await canvas.findByRole('treegrid')
+    await userEvent.selectOptions(canvas.getByRole('combobox', { name: 'Delimiter' }), '|')
+    await canvas.findByRole('treegrid')
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
+    await expect(
+      await canvas.findByText(/^Published Mapping Versions read CSV Documents with these settings/),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole('link', { name: 'ERP dispatch to DESADV, version 1' }),
+    ).toBeVisible()
+  },
+})
+
+export const CsvLinkedByMapping = meta.story({
+  args: { id: csv!.id },
+  beforeEach({ msw }) {
+    msw.use(
+      refuseUpdate(
+        {
+          code: 'linkedByMapping',
+          message:
+            'A Mapping Draft links rows[].Bemerkung, which the change at rows[].Bemerkung would remove',
+          path: 'rows[].Bemerkung',
+          line: null,
+          mappingVersions: null,
+        },
+        csv!.id,
+      ),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await chooseCsvDocument(canvasElement)
+    await canvas.findByRole('treegrid')
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'The first row names the columns' }))
+    await canvas.findByRole('treegrid')
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
+    await expect(
+      await canvas.findByText(/^A Mapping Draft links a field this change would remove/),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: /in the tree$/ })).toBeNull()
+  },
+})
+
+export const TabletCsvReread = meta.story({
+  ...tablet,
+  args: { id: csv!.id },
+  decorators: [besideSidebar, german],
+  async play({ canvas, canvasElement }) {
+    await chooseCsvDocument(canvasElement, 'CSV-Document')
+    await expect(
+      await canvas.findByRole('region', { name: 'Erste Zeilen von lieferscheine-oktober.csv' }),
+    ).toBeVisible()
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expectReadableColumns(canvasElement)
+  },
+})
+
+export const DarkCsvReread = meta.story({
+  args: { id: csv!.id },
+  beforeEach: darkMode,
+  async play({ canvas, canvasElement }) {
+    await chooseCsvDocument(canvasElement)
+    await expect(await canvas.findByRole('treegrid')).toBeVisible()
   },
 })
 
@@ -299,9 +500,8 @@ export const German = meta.story({
 export const Dark = meta.story({
   beforeEach({ msw }) {
     msw.use(refusedByPublishedVersions)
-    document.documentElement.classList.add('dark')
 
-    return () => document.documentElement.classList.remove('dark')
+    return darkMode()
   },
   async play({ canvas, canvasElement }) {
     await changeAndSave(canvasElement)

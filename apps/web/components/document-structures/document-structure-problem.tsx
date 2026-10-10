@@ -54,7 +54,11 @@ function ProblemAlert({
         className="mt-0.5 size-4 shrink-0 text-red-800 dark:text-red-300"
       />
       <div className="flex min-w-0 flex-col gap-2">
-        <p className="font-medium text-red-900 dark:text-red-200">{t(`codes.${problem.code}`)}</p>
+        <p className="font-medium text-red-900 dark:text-red-200">
+          {problem.code === 'usedByMappingVersion' && path === null
+            ? t('csvSettingsUsedByMappingVersion')
+            : t(`codes.${problem.code}`)}
+        </p>
         {(line !== null || path !== null) && (
           <p className="flex flex-wrap gap-x-3 gap-y-1">
             {line !== null && <span>{t('line', { line })}</span>}
@@ -119,7 +123,7 @@ export function RefusalAlert({
   error: Error | null
   failed: string
   mappings?: Mappings
-  onShowPath?: (path: string) => void
+  onShowPath?: ((path: string) => void) | undefined
   takeFocus?: boolean
   className?: string
   children?: ReactNode
