@@ -6,7 +6,12 @@ import type {
 } from '@edi-bridge/contracts'
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
-import { documentStructureHandler, seedDocumentStructures } from './document-structure'
+import {
+  createDocumentStructureStore,
+  documentStructureHandlers,
+  seedDocumentStructures,
+  seedUnusedDocumentStructures,
+} from './document-structure'
 import { createFlowStore, flowHandlers } from './flow'
 import { lookupTablesHandler, seedLookupTables } from './lookup-table'
 import { manualSubmissionHandler } from './manual-submission'
@@ -64,11 +69,38 @@ export {
 
 export {
   createDocumentStructure,
+  createDocumentStructures,
+  createDocumentStructureStore,
   documentStructureHandler,
+  documentStructureHandlers,
   documentStructureLeaves,
+  type DocumentStructureStore,
   seedDocumentStructureOf,
   seedDocumentStructures,
+  seedUnusedDocumentStructures,
+  toDocumentStructureStore,
+  toDocumentStructureSummary,
 } from './document-structure'
+
+export {
+  adjustDocumentStructure,
+  decodeText,
+  DocumentStructureProblemError,
+  encodeBase64,
+  inferDocumentStructure,
+  inferFromCsv,
+  inferFromJson,
+  inferFromJsonSchema,
+  parseCsv,
+} from './document-structure-inference'
+
+export {
+  createCsvDocument,
+  documentStructureOrigins,
+  encodeText,
+  toUpload,
+  windows1252CsvSettings,
+} from './document-structure-origin'
 
 export {
   createLookupTables,
@@ -156,7 +188,7 @@ export function createHandlers(
     tradingPartners = seedTradingPartners,
     channels = seedChannels,
     mappingDrafts = seedMappingDrafts,
-    documentStructures = seedDocumentStructures,
+    documentStructures = [...seedDocumentStructures, ...seedUnusedDocumentStructures],
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
     mappingVersions,
@@ -176,10 +208,13 @@ export function createHandlers(
   const channelStore = createChannelStore(channels)
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
+  const documentStructureStore = createDocumentStructureStore(documentStructures)
 
   const mappingVersionStore = toMappingVersionStore(
     mappingVersions ?? [...seedMappingVersions, ...createMappingVersions(mappingDraftStore.all())],
   )
+
+  const liveDocumentStructures = documentStructureStore.entries
 
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
@@ -192,7 +227,7 @@ export function createHandlers(
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
       samples: mappingSamples,
-      documentStructures,
+      documentStructures: liveDocumentStructures,
     }),
     ...runDetailHandlers(apiUrl, {
       runs,
@@ -200,13 +235,20 @@ export function createHandlers(
       mappingVersions: mappingVersionStore,
     }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
-    ...mappingHandlers(apiUrl, { mappings: mappingDraftStore, documentStructures }),
+    ...mappingHandlers(apiUrl, {
+      mappings: mappingDraftStore,
+      documentStructures: liveDocumentStructures,
+    }),
     ...mappingPreviewHandlers(apiUrl, {
       mappings: mappingDraftStore,
       samples: mappingSamples,
-      documentStructures,
+      documentStructures: liveDocumentStructures,
     }),
-    documentStructureHandler(apiUrl, documentStructures),
+    ...documentStructureHandlers(apiUrl, {
+      documentStructures: documentStructureStore,
+      mappings: mappingDraftStore,
+      versions: mappingVersionStore,
+    }),
     messageTypeStructureHandler(apiUrl),
     lookupTablesHandler(apiUrl, lookupTables),
   ]

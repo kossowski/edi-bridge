@@ -6,7 +6,9 @@ import {
   channelsEndpoint,
   createChannelEndpoint,
   createFlowEndpoint,
+  createDocumentStructureEndpoint,
   documentStructureEndpoint,
+  documentStructuresEndpoint,
   flowEndpoint,
   type FlowInput,
   lookupTablesEndpoint,
@@ -30,6 +32,7 @@ import {
   submitDocumentEndpoint,
   toPath,
   toSearchParams,
+  updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
@@ -37,7 +40,9 @@ import {
   createHandlers,
   createMappingDrafts,
   createMappingSample,
+  documentStructureOrigins,
   seedChannels,
+  seedDocumentStructureOf,
   seedFlows,
 } from './index'
 
@@ -298,6 +303,52 @@ describe('createHandlers', () => {
     expect(documentStructureEndpoint.response.parse(await structure.json())).toEqual(
       documentStructure,
     )
+  })
+
+  it('shows a renamed Document Structure in the Mapping list of the same call', async () => {
+    server.use(...createHandlers(apiUrl))
+    const { id } = seedDocumentStructureOf.ORDERS
+
+    await fetch(`${apiUrl}${toPath(updateDocumentStructureEndpoint.path, { id })}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'ERP order v2', adjustments: [] }),
+    })
+
+    const mappings = mappingsEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${mappingsEndpoint.path}`)).json(),
+    )
+
+    expect(mappings.filter(({ documentStructureId }) => documentStructureId === id)).not.toEqual([])
+
+    for (const mapping of mappings.filter(
+      ({ documentStructureId }) => documentStructureId === id,
+    )) {
+      expect(mapping.documentStructureName).toBe('ERP order v2')
+    }
+  })
+
+  it('lists a Document Structure created within the same createHandlers call', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const created = createDocumentStructureEndpoint.response.parse(
+      await (
+        await fetch(`${apiUrl}${createDocumentStructureEndpoint.path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            name: 'ERP order',
+            origin: documentStructureOrigins.jsonDocument,
+          }),
+        })
+      ).json(),
+    )
+
+    const summaries = documentStructuresEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)).json(),
+    )
+
+    expect(summaries.find(({ id }) => id === created.id)).toMatchObject({ mappings: [] })
   })
 
   it('lists Lookup Tables for the Lookup Table node, and none when asked', async () => {

@@ -1,20 +1,40 @@
 import { en, Faker } from '@faker-js/faker'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 
 import {
+  createDocumentStructureEndpoint,
   type DocumentField,
   type DocumentFieldType,
   documentFieldTypes,
   type DocumentStructure,
   documentStructureEndpoint,
   type DocumentStructureNode,
+  type DocumentStructureProblem,
   documentStructureSchema,
+  documentStructuresEndpoint,
+  type DocumentStructureSummary,
+  documentStructureSummarySchema,
+  inferDocumentStructureEndpoint,
+  type InferredDocumentStructure,
   type MessageType,
   messageTypes,
+  type UpdateDocumentStructureBody,
+  updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 
-import { notFound } from './responses'
+import {
+  adjustDocumentStructure,
+  changesPaths,
+  DocumentStructureProblemError,
+  findNode,
+  inferDocumentStructure,
+} from './document-structure-inference'
+import { documentStructureOrigins } from './document-structure-origin'
+import { badRequest, notFound } from './responses'
 import { seedId } from './seed-id'
+
+import type { MappingDraftStore } from './mapping'
+import type { MappingVersionStore } from './mapping-version'
 
 type FieldSpec = readonly [name: string, type: DocumentFieldType, required?: boolean]
 
@@ -345,4 +365,264 @@ export function documentStructureHandler(
 
     return found ? HttpResponse.json(found) : notFound()
   })
+}
+
+function named(id: string, name: string, inferred: InferredDocumentStructure): DocumentStructure {
+  return documentStructureSchema.parse({ id, name, ...inferred })
+}
+
+// Structures no Mapping uses yet, created the way an Admin would: from a CSV export and a JSON
+// Schema.
+export const seedUnusedDocumentStructures: ReadonlyArray<DocumentStructure> = [
+  named(
+    seedId(6, 5),
+    'ERP dispatch export (CSV)',
+    inferDocumentStructure(documentStructureOrigins.windows1252CsvDocument),
+  ),
+  named(
+    seedId(6, 6),
+    'ERP article master',
+    inferDocumentStructure(documentStructureOrigins.jsonSchema),
+  ),
+]
+
+export function createDocumentStructures({
+  count,
+  seed = 29,
+}: {
+  count: number
+  seed?: number
+}): DocumentStructure[] {
+  const faker = new Faker({ locale: [en], seed })
+  const csvSource = documentStructureOrigins.csvDocument
+
+  return Array.from({ length: count }, (_, index) => {
+    const name =
+      `${faker.company.name()} ${faker.helpers.arrayElement(['export', 'import', 'feed'])}`.slice(
+        0,
+        70,
+      )
+
+    return index % 4 === 3
+      ? named(faker.string.uuid(), name, inferDocumentStructure(csvSource))
+      : createDocumentStructure({
+          fieldCount: faker.number.int({ min: 5, max: 120 }),
+          seed: seed + index,
+          name,
+        })
+  })
+}
+
+export type DocumentStructureStore = {
+  // Updated in place, so the Mapping handlers holding it see created and renamed structures.
+  entries: ReadonlyArray<DocumentStructure>
+  get: (id: string) => DocumentStructure | undefined
+  set: (documentStructure: DocumentStructure) => void
+}
+
+export function createDocumentStructureStore(
+  documentStructures: ReadonlyArray<DocumentStructure> = [
+    ...seedDocumentStructures,
+    ...seedUnusedDocumentStructures,
+  ],
+): DocumentStructureStore {
+  const entries = [...documentStructures]
+
+  return {
+    entries,
+    get: (id) => entries.find((entry) => entry.id === id),
+    set: (documentStructure) => {
+      const index = entries.findIndex(({ id }) => id === documentStructure.id)
+
+      if (index === -1) {
+        entries.push(documentStructure)
+      } else {
+        entries[index] = documentStructure
+      }
+    },
+  }
+}
+
+export function toDocumentStructureStore(
+  documentStructures: ReadonlyArray<DocumentStructure> | DocumentStructureStore,
+) {
+  return 'get' in documentStructures
+    ? documentStructures
+    : createDocumentStructureStore(documentStructures)
+}
+
+type Usage = {
+  mappings?: MappingDraftStore | undefined
+  versions?: MappingVersionStore | undefined
+}
+
+export function toDocumentStructureSummary(
+  documentStructure: DocumentStructure,
+  { mappings }: Usage = {},
+): DocumentStructureSummary {
+  return documentStructureSummarySchema.parse({
+    id: documentStructure.id,
+    name: documentStructure.name,
+    format: documentStructure.format,
+    fieldCount: documentStructureLeaves(documentStructure).length,
+    mappings: (mappings?.all() ?? [])
+      .filter(({ documentStructureId }) => documentStructureId === documentStructure.id)
+      .map(({ id, name }) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+  })
+}
+
+function linkedPaths(documentStructureId: string, { mappings, versions }: Usage) {
+  return (mappings?.all() ?? [])
+    .filter((mapping) => mapping.documentStructureId === documentStructureId)
+    .flatMap((mapping) => [mapping, ...(versions?.of(mapping.id) ?? [])])
+    .flatMap(({ links, transformLinks }) => [
+      ...links.flatMap(({ sourcePath, targetPath }) => [sourcePath, targetPath]),
+      ...transformLinks.flatMap(({ from, to }) => [
+        ...(from.kind === 'source' ? [from.path] : []),
+        ...(to.kind === 'target' ? [to.path] : []),
+      ]),
+    ])
+}
+
+function isWithin(path: string, nodePath: string) {
+  return path === nodePath || path.startsWith(`${nodePath}.`) || path.startsWith(`${nodePath}[]`)
+}
+
+// Turning a node into a list or back renames the paths below it, which would cut the links of
+// every Mapping Version that uses them.
+function linkedChange(
+  documentStructure: DocumentStructure,
+  body: UpdateDocumentStructureBody,
+  usage: Usage,
+) {
+  const linked = linkedPaths(documentStructure.id, usage)
+
+  return body.adjustments
+    .filter((adjustment) => changesPaths(documentStructure, adjustment))
+    .find(({ path }) => {
+      const nodePath = findNode(documentStructure.children, path)!.path
+
+      return linked.some((linkedPath) => isWithin(linkedPath, nodePath))
+    })
+}
+
+function problemResponse(problem: DocumentStructureProblem) {
+  return HttpResponse.json(problem, { status: 422 })
+}
+
+function attempt<Result>(run: () => Result): { result: Result } | { response: Response } {
+  try {
+    return { result: run() }
+  } catch (error) {
+    if (error instanceof DocumentStructureProblemError) {
+      return { response: problemResponse(error.problem) }
+    }
+
+    throw error
+  }
+}
+
+export function documentStructureHandlers(
+  apiUrl: string,
+  {
+    documentStructures = createDocumentStructureStore(),
+    mappings,
+    versions,
+  }: {
+    documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
+  } & Usage = {},
+) {
+  const store = toDocumentStructureStore(documentStructures)
+  const usage = { mappings, versions }
+
+  return [
+    http.get(`${apiUrl}${documentStructuresEndpoint.path}`, async () => {
+      await delay()
+
+      return HttpResponse.json(
+        store.entries
+          .map((entry) => toDocumentStructureSummary(entry, usage))
+          .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+      )
+    }),
+    http.post(`${apiUrl}${inferDocumentStructureEndpoint.path}`, async ({ request }) => {
+      const body = inferDocumentStructureEndpoint.body.safeParse(await request.json())
+
+      if (!body.success) {
+        return badRequest(body.error.message)
+      }
+
+      await delay()
+
+      const inferred = attempt(() => inferDocumentStructure(body.data))
+
+      return 'response' in inferred ? inferred.response : HttpResponse.json(inferred.result)
+    }),
+    http.post(`${apiUrl}${createDocumentStructureEndpoint.path}`, async ({ request }) => {
+      const body = createDocumentStructureEndpoint.body.safeParse(await request.json())
+
+      if (!body.success) {
+        return badRequest(body.error.message)
+      }
+
+      await delay()
+
+      const inferred = attempt(() => inferDocumentStructure(body.data.origin))
+
+      if ('response' in inferred) {
+        return inferred.response
+      }
+
+      const created = named(crypto.randomUUID(), body.data.name, inferred.result)
+      store.set(created)
+
+      return HttpResponse.json(created, { status: 201 })
+    }),
+    http.get<{ id: string }>(`${apiUrl}${documentStructureEndpoint.path}`, ({ params }) => {
+      const found = store.get(params.id)
+
+      return found ? HttpResponse.json(found) : notFound()
+    }),
+    http.put<{ id: string }>(
+      `${apiUrl}${updateDocumentStructureEndpoint.path}`,
+      async ({ params, request }) => {
+        const existing = store.get(params.id)
+
+        if (!existing) {
+          return notFound()
+        }
+
+        const body = updateDocumentStructureEndpoint.body.safeParse(await request.json())
+
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
+
+        await delay()
+
+        const adjusted = attempt(() => adjustDocumentStructure(existing, body.data))
+
+        if ('response' in adjusted) {
+          return adjusted.response
+        }
+
+        const linked = linkedChange(existing, body.data, usage)
+
+        if (linked) {
+          return problemResponse({
+            code: 'linkedByMapping',
+            message: `A Mapping links fields at or below ${linked.path}, so it cannot turn into a list or back`,
+            path: linked.path,
+            line: null,
+          })
+        }
+
+        const updated = documentStructureSchema.parse(adjusted.result)
+        store.set(updated)
+
+        return HttpResponse.json(updated)
+      },
+    ),
+  ]
 }

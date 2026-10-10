@@ -2,18 +2,34 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  type CreateDocumentStructureBody,
+  createDocumentStructureEndpoint,
   type DocumentStructure,
   documentStructureEndpoint,
   type DocumentStructureNode,
+  documentStructureProblemSchema,
+  documentStructuresEndpoint,
+  type DocumentStructureOrigin,
+  inferDocumentStructureEndpoint,
   toPath,
+  type UpdateDocumentStructureBody,
+  updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
   createDocumentStructure,
+  createDocumentStructures,
+  createDocumentStructureStore,
   documentStructureHandler,
+  documentStructureHandlers,
   documentStructureLeaves,
+  seedDocumentStructureOf,
   seedDocumentStructures,
+  seedUnusedDocumentStructures,
 } from './document-structure'
+import { documentStructureOrigins } from './document-structure-origin'
+import { createMappingDraftStore, seedMappingDrafts } from './mapping'
+import { createMappingVersionStore } from './mapping-version'
 
 const apiUrl = 'http://api.test'
 
@@ -129,4 +145,248 @@ describe('seed Document Structures', () => {
       expect(new Set(paths).size).toBe(paths.length)
     },
   )
+})
+
+function post(path: string, body: CreateDocumentStructureBody | DocumentStructureOrigin) {
+  return fetch(`${apiUrl}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+function put(id: string, body: UpdateDocumentStructureBody) {
+  return fetch(`${apiUrl}${toPath(updateDocumentStructureEndpoint.path, { id })}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+function useHandlers(documentStructures?: ReadonlyArray<DocumentStructure>) {
+  const store = createDocumentStructureStore(documentStructures)
+  const mappings = createMappingDraftStore(seedMappingDrafts)
+
+  server.use(
+    ...documentStructureHandlers(apiUrl, {
+      documentStructures: store,
+      mappings,
+      versions: createMappingVersionStore(),
+    }),
+  )
+
+  return store
+}
+
+async function problemOf(response: Response) {
+  expect(response.status).toBe(422)
+
+  return documentStructureProblemSchema.parse(await response.json())
+}
+
+describe('GET /document-structures', () => {
+  it('lists the structures by name with the Mappings that use them', async () => {
+    useHandlers()
+
+    const response = await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)
+    const summaries = documentStructuresEndpoint.response.parse(await response.json())
+    const names = summaries.map(({ name }) => name)
+
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'de')))
+    const used = summaries.find(({ id }) => id === purchaseOrder.id)
+
+    expect(used).toMatchObject({
+      format: 'json',
+      fieldCount: documentStructureLeaves(purchaseOrder).length,
+    })
+    expect(used?.mappings.map(({ id }) => id)).toEqual(
+      expect.arrayContaining(
+        seedMappingDrafts
+          .filter(({ documentStructureId }) => documentStructureId === purchaseOrder.id)
+          .map(({ id }) => id),
+      ),
+    )
+    expect(used?.mappings).not.toEqual([])
+    expect(summaries.find(({ id }) => id === seedUnusedDocumentStructures[0]!.id)).toMatchObject({
+      format: 'csv',
+      mappings: [],
+    })
+  })
+
+  it('serves an empty list', async () => {
+    useHandlers([])
+
+    const response = await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)
+
+    expect(await response.json()).toEqual([])
+  })
+
+  it('serves a large list', async () => {
+    useHandlers(createDocumentStructures({ count: 300 }))
+
+    const response = await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)
+    const summaries = documentStructuresEndpoint.response.parse(await response.json())
+
+    expect(summaries).toHaveLength(300)
+    expect(new Set(summaries.map(({ format }) => format))).toEqual(new Set(['json', 'csv']))
+  })
+})
+
+describe('POST /document-structures/inference', () => {
+  it('infers a structure without storing it', async () => {
+    const store = useHandlers()
+    const count = store.entries.length
+
+    const response = await post(
+      inferDocumentStructureEndpoint.path,
+      documentStructureOrigins.windows1252CsvDocument,
+    )
+
+    const inferred = inferDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(inferred).toMatchObject({ format: 'csv', csv: { encoding: 'windows-1252' } })
+    expect(JSON.stringify(inferred)).toContain('Straße')
+    expect(store.entries).toHaveLength(count)
+  })
+
+  it('answers 400 for a body outside the contract', async () => {
+    useHandlers()
+
+    const response = await fetch(`${apiUrl}${inferDocumentStructureEndpoint.path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'xmlDocument' }),
+    })
+
+    expect(response.status).toBe(400)
+  })
+})
+
+describe('POST /document-structures', () => {
+  async function create(origin: DocumentStructureOrigin, name = 'ERP export') {
+    const body: CreateDocumentStructureBody = { name, origin }
+
+    return post(createDocumentStructureEndpoint.path, body)
+  }
+
+  it('creates a structure from a JSON Document and serves it afterwards', async () => {
+    useHandlers()
+
+    const response = await create(documentStructureOrigins.jsonDocument, 'ERP order')
+
+    expect(response.status).toBe(201)
+
+    const created = createDocumentStructureEndpoint.response.parse(await response.json())
+    const served = await getStructure(created.id)
+
+    expect(created).toMatchObject({ name: 'ERP order', format: 'json' })
+    expect(await served.json()).toEqual(created)
+  })
+
+  it('creates a structure from a JSON Schema', async () => {
+    useHandlers()
+
+    const response = await create(documentStructureOrigins.jsonSchema)
+    const created = createDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(nodeAt(created.children, 'prices[].amount')).toMatchObject({ type: 'number' })
+  })
+
+  it('reads a Windows-1252 CSV Document with umlauts', async () => {
+    useHandlers()
+
+    const response = await create(documentStructureOrigins.windows1252CsvDocument)
+    const created = createDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(nodeAt(created.children, 'rows[].Straße')).toMatchObject({ name: 'Straße' })
+  })
+
+  it.each([
+    ['an unparseable JSON Document', documentStructureOrigins.invalidJsonDocument, 'invalidJson'],
+    ['an invalid JSON Schema', documentStructureOrigins.invalidJsonSchema, 'invalidJsonSchema'],
+    ['an empty CSV Document', documentStructureOrigins.emptyCsvDocument, 'emptyDocument'],
+    [
+      'a Windows-1252 CSV Document read as UTF-8',
+      {
+        ...documentStructureOrigins.windows1252CsvDocument,
+        csv: documentStructureOrigins.csvDocument.csv,
+      },
+      'unreadableContent',
+    ],
+  ] as const)('answers a typed 422 for %s', async (_, origin, code) => {
+    const store = useHandlers()
+    const count = store.entries.length
+
+    expect((await problemOf(await create(origin))).code).toBe(code)
+    expect(store.entries).toHaveLength(count)
+  })
+})
+
+describe('PUT /document-structures/:id', () => {
+  const unused = seedUnusedDocumentStructures[1]!
+
+  it('renames a structure and adjusts its nodes', async () => {
+    useHandlers()
+
+    const response = await put(unused.id, {
+      name: 'Article master',
+      adjustments: [
+        { path: 'supplier', repeating: true },
+        { path: 'description', required: false },
+      ],
+    })
+
+    const updated = updateDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(updated.name).toBe('Article master')
+    expect(nodeAt(updated.children, 'supplier[]')).toMatchObject({ kind: 'array' })
+    expect(nodeAt(updated.children, 'description')).toMatchObject({ required: false })
+    expect(await (await getStructure(unused.id)).json()).toEqual(updated)
+  })
+
+  it('lets a used structure change required-ness and types', async () => {
+    useHandlers()
+
+    const response = await put(purchaseOrder.id, {
+      name: purchaseOrder.name,
+      adjustments: [{ path: 'buyer.gln', required: false, type: 'integer' }],
+    })
+
+    expect(response.status).toBe(200)
+  })
+
+  it('refuses to turn a node a Mapping links into a list', async () => {
+    useHandlers()
+
+    const problem = await problemOf(
+      await put(seedDocumentStructureOf.ORDERS.id, {
+        name: purchaseOrder.name,
+        adjustments: [{ path: 'lines[]', repeating: false }],
+      }),
+    )
+
+    expect(problem).toMatchObject({ code: 'linkedByMapping', path: 'lines[]' })
+  })
+
+  it('answers a typed 422 for a node it does not have', async () => {
+    useHandlers()
+
+    const problem = await problemOf(
+      await put(unused.id, { name: unused.name, adjustments: [{ path: 'iban', required: true }] }),
+    )
+
+    expect(problem).toMatchObject({ code: 'unknownPath', path: 'iban' })
+  })
+
+  it('answers 404 for an unknown structure', async () => {
+    useHandlers()
+
+    expect((await put(crypto.randomUUID(), { name: 'x', adjustments: [] })).status).toBe(404)
+  })
+})
+
+describe('createDocumentStructures', () => {
+  it('generates the same list for the same seed', () => {
+    expect(createDocumentStructures({ count: 8 })).toEqual(createDocumentStructures({ count: 8 }))
+  })
 })
