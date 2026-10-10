@@ -14,12 +14,13 @@ import { useTranslations } from 'next-intl'
 import { type FocusEvent, memo, type ReactNode, useCallback } from 'react'
 
 import {
-  isRow,
+  isSameRow,
+  type RowRef,
   useCanvasStore,
   useMeaningTooltip,
 } from '@/components/mappings/mapping-canvas-store'
-import { type Repeat, rowHeight, type TreeRow } from '@/components/mappings/mapping-tree'
-import { isEdifactKind } from '@/components/mappings/row-meaning'
+import { nodeId, type Repeat, rowHeight, type TreeRow } from '@/components/mappings/mapping-tree'
+import { kindMeanings } from '@/components/mappings/row-meaning'
 import { TooltipTrigger } from '@edi-bridge/ui/components/tooltip'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -30,6 +31,14 @@ export type TreeFlowNode = Node<TreeNodeData, 'tree'>
 export type HeadingNodeData = { side: string; title: string }
 
 export type HeadingFlowNode = Node<HeadingNodeData, 'heading'>
+
+const rowIdAttribute = 'data-row-id'
+
+export function findRowButton(container: ParentNode, row: RowRef) {
+  return container.querySelector<HTMLElement>(
+    `[${rowIdAttribute}="${CSS.escape(nodeId(row.side, row.path))}"]`,
+  )
+}
 
 const focusMargin = 24
 
@@ -118,25 +127,30 @@ function ToggleButton({ data }: { data: TreeNodeData }) {
   )
 }
 
-// Rows are buttons: hovering or focusing an EDIFACT row shows its meaning in the canvas tooltip,
-// and pressing a row selects it for the details panel.
-function RowButton({ data, children }: { data: TreeNodeData; children: ReactNode }) {
+function RowButton({
+  data,
+  selected,
+  children,
+}: {
+  data: TreeNodeData
+  selected: boolean
+  children: ReactNode
+}) {
   const tooltip = useMeaningTooltip()
-  const select = useCanvasStore((state) => state.select)
-  const selected = useCanvasStore((state) => isRow(state.selected, data.side, data.path))
-  const described = useCanvasStore((state) => state.hinted === data.id)
+  const toggleSelected = useCanvasStore((state) => state.toggleSelected)
+  const described = useCanvasStore((state) => state.tooltipRowId === data.id)
 
   const props = {
     type: 'button' as const,
     'aria-pressed': selected,
     'aria-describedby': described ? tooltip.id : undefined,
-    'data-row-id': data.id,
+    [rowIdAttribute]: data.id,
     className:
       'nodrag focus-visible:ring-ring/50 pointer-events-auto flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-3',
-    onClick: () => select(data),
+    onClick: () => toggleSelected(data),
   }
 
-  if (!isEdifactKind(data.kind)) {
+  if (!kindMeanings[data.kind].tooltip) {
     return <button {...props}>{children}</button>
   }
 
@@ -152,7 +166,7 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
   const container = !data.linkable
   const showHandle = data.linkable || (data.expanded === false && data.linked)
   const onFocus = usePanIntoView()
-  const selected = useCanvasStore((state) => isRow(state.selected, data.side, data.path))
+  const selected = useCanvasStore((state) => isSameRow(state.selected, data))
 
   return (
     <div
@@ -169,7 +183,7 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
       onFocus={onFocus}>
       <div className="flex items-center gap-1.5 px-2" style={{ height: rowHeight - 2 }}>
         {data.expanded !== null && <ToggleButton data={data} />}
-        <RowButton data={data}>
+        <RowButton data={data} selected={selected}>
           <code className={cn('shrink-0 font-mono', container && 'font-semibold')}>
             {data.label}
           </code>

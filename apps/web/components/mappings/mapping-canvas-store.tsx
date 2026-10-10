@@ -12,23 +12,22 @@ export type RowRef = { side: Side; path: string }
 export type CanvasState = {
   collapsed: Readonly<Record<Side, ReadonlySet<string>>>
   selected: RowRef | null
-  // The node id of the row whose meaning the tooltip shows, so that row can point at it.
-  hinted: string | null
+  tooltipRowId: string | null
   toggleCollapsed: (row: RowRef) => void
-  select: (row: RowRef) => void
+  toggleSelected: (row: RowRef) => void
   clearSelection: () => void
-  setHinted: (id: string | null) => void
+  setTooltipRowId: (id: string | null) => void
 }
 
-export function isRow(row: RowRef | null, side: Side, path: string) {
-  return row !== null && row.side === side && row.path === path
+export function isSameRow(a: RowRef | null, b: RowRef) {
+  return a !== null && a.side === b.side && a.path === b.path
 }
 
 export function createCanvasStore() {
   return createStore<CanvasState>()((set) => ({
     collapsed: { source: new Set(), target: new Set() },
     selected: null,
-    hinted: null,
+    tooltipRowId: null,
     toggleCollapsed: ({ side, path }) =>
       set(({ collapsed }) => {
         const next = new Set(collapsed[side])
@@ -39,12 +38,12 @@ export function createCanvasStore() {
 
         return { collapsed: { ...collapsed, [side]: next } }
       }),
-    select: (row) =>
+    toggleSelected: (row) =>
       set(({ selected }) => ({
-        selected: isRow(selected, row.side, row.path) ? null : { side: row.side, path: row.path },
+        selected: isSameRow(selected, row) ? null : { side: row.side, path: row.path },
       })),
     clearSelection: () => set({ selected: null }),
-    setHinted: (hinted) => set({ hinted }),
+    setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
   }))
 }
 
@@ -56,7 +55,7 @@ type CanvasContext = {
 const Context = createContext<CanvasContext | null>(null)
 
 // One store per mounted canvas, so two canvases (or two stories) never share a selection.
-export function CanvasStoreProvider({ children }: { children: ReactNode }) {
+export function MappingCanvasProvider({ children }: { children: ReactNode }) {
   const id = useId()
 
   const [value] = useState<CanvasContext>(() => ({
@@ -71,7 +70,7 @@ function useCanvasContext() {
   const context = useContext(Context)
 
   if (!context) {
-    throw new Error('useCanvasStore needs a CanvasStoreProvider')
+    throw new Error('useCanvasStore needs a MappingCanvasProvider')
   }
 
   return context

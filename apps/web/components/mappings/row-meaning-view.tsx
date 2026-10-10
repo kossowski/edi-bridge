@@ -2,7 +2,9 @@
 
 import { useTranslations } from 'next-intl'
 
-import { isEdifactKind, limitCodes, parseFormat } from '@/components/mappings/row-meaning'
+import type { ReactNode } from 'react'
+
+import { kindMeanings, limitCodes, parseFormat } from '@/components/mappings/row-meaning'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { TreeItem } from '@/components/mappings/mapping-tree'
@@ -11,6 +13,10 @@ export type MeaningItem = Omit<TreeItem, 'children'>
 
 function Term({ children }: { children: string }) {
   return <dt className="font-medium">{children}</dt>
+}
+
+function Value({ children }: { children: ReactNode }) {
+  return <dd className="min-w-0 [overflow-wrap:anywhere]">{children}</dd>
 }
 
 function FormatText({ format }: { format: string }) {
@@ -51,10 +57,10 @@ export function RowMeaning({
   className?: string
 }) {
   const t = useTranslations('Mapping.meaning')
-  const edifact = isEdifactKind(item.kind)
-  // Composites and elements repeat only with their segment, so their own repetition says nothing.
-  const showsRepetition = item.kind !== 'composite' && item.kind !== 'element'
-  const { shown, hidden } = limitCodes(item.codes, codeLimit ?? item.codes.length)
+  const kind = kindMeanings[item.kind]
+  const codes = item.edifact?.codes ?? []
+  const qualifier = item.edifact?.qualifier
+  const { shown, hidden } = limitCodes(codes, codeLimit ?? codes.length)
 
   return (
     <div className={cn('flex flex-col gap-2 text-xs', className)}>
@@ -62,34 +68,38 @@ export function RowMeaning({
         <span>{t(`kind.${item.kind}`)}</span>
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
           <code className="font-mono font-semibold">{item.label}</code>
-          {item.name && <span className="font-medium">{item.name}</span>}
+          {item.name && (
+            <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{item.name}</span>
+          )}
         </p>
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        {item.qualifier && (
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+        {qualifier && (
           <>
             <Term>{t('qualifier')}</Term>
-            <dd>
-              <code className="font-mono">{item.qualifier.code}</code> {item.qualifier.meaning}
-            </dd>
+            <Value>
+              <code className="font-mono">{qualifier.code}</code> {qualifier.meaning}
+            </Value>
           </>
         )}
         <Term>{t('status')}</Term>
-        <dd>
-          {edifact
-            ? t(item.required ? 'mandatory' : 'conditional')
-            : t(item.required ? 'required' : 'optional')}
-        </dd>
-        {showsRepetition && (
+        <Value>{t(item.required ? kind.required : kind.optional)}</Value>
+        {kind.repetition && (
           <>
             <Term>{t('repetition')}</Term>
-            <dd>{repetitionText(item, t)}</dd>
+            <Value>{repetitionText(item, t)}</Value>
           </>
         )}
         {item.detail !== null && (
           <>
-            <Term>{edifact ? t('format') : t('dataType')}</Term>
-            <dd>{edifact ? <FormatText format={item.detail} /> : <code>{item.detail}</code>}</dd>
+            <Term>{t(kind.detail)}</Term>
+            <Value>
+              {kind.detail === 'format' ? (
+                <FormatText format={item.detail} />
+              ) : (
+                <code>{item.detail}</code>
+              )}
+            </Value>
           </>
         )}
       </dl>
@@ -98,7 +108,7 @@ export function RowMeaning({
           <p className="font-medium">{t('codes')}</p>
           <ul className="flex flex-col gap-0.5">
             {shown.map(({ code, meaning }) => (
-              <li key={code}>
+              <li key={code} className="[overflow-wrap:anywhere]">
                 <code className="font-mono">{code}</code> {meaning}
               </li>
             ))}

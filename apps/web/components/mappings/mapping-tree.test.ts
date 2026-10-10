@@ -54,28 +54,77 @@ describe('edifactTree', () => {
       expect(find(english, 'DTM+137')).toMatchObject({
         name: 'Date/time/period',
         required: true,
-        qualifier: { code: '137', meaning: 'Document/message date/time' },
+        edifact: { qualifier: { code: '137', meaning: 'Document/message date/time' } },
       })
     })
 
     it('gives a qualified group the qualifier of its segment', () => {
-      expect(find(english, 'SG2+BY')?.qualifier).toEqual({ code: 'BY', meaning: 'Buyer' })
-      expect(find(english, 'SG2+BY/NAD+BY')?.qualifier).toEqual({ code: 'BY', meaning: 'Buyer' })
+      expect(find(english, 'SG2+BY')?.edifact?.qualifier).toEqual({ code: 'BY', meaning: 'Buyer' })
+      expect(find(english, 'SG2+BY/NAD+BY')?.edifact?.qualifier).toEqual({
+        code: 'BY',
+        meaning: 'Buyer',
+      })
     })
 
-    it('leaves an unqualified group without a qualifier', () => {
-      expect(find(english, 'SG25')?.qualifier).toBeNull()
+    it('takes a group qualifier from the qualifier of its trigger segment, not from its path', () => {
+      const group = edifactTree(
+        {
+          children: [
+            {
+              kind: 'segmentGroup',
+              path: 'SG9',
+              code: 'SG9',
+              name: { en: 'Price', de: 'Preis' },
+              required: false,
+              maxRepeat: 5,
+              children: [
+                {
+                  kind: 'segment',
+                  path: 'SG9/PRI+AAA',
+                  tag: 'PRI',
+                  qualifier: {
+                    code: 'AAA',
+                    meaning: { en: 'Calculation net', de: 'Nettoberechnung' },
+                  },
+                  name: { en: 'Price details', de: 'Preisangaben' },
+                  required: true,
+                  maxRepeat: 1,
+                  children: [],
+                },
+              ],
+            },
+          ],
+        },
+        'de',
+      )
+
+      expect(find(group, 'SG9')?.edifact?.qualifier).toEqual({
+        code: 'AAA',
+        meaning: 'Nettoberechnung',
+      })
+    })
+
+    it('leaves a group whose trigger segment is unqualified without a qualifier', () => {
+      expect(find(english, 'SG25')?.edifact?.qualifier).toBeNull()
+    })
+
+    it('gives Document Structure parts no EDIFACT meaning', () => {
+      expect(find(documentTree(seedDocumentStructureOf.ORDERS), 'buyer')).not.toHaveProperty(
+        'edifact',
+      )
     })
 
     it('lists the codes of a coded element in the locale', () => {
       expect(find(english, 'DTM+137/C507/2379')).toMatchObject({
         detail: 'an..3',
-        codes: [
-          { code: '102', meaning: 'CCYYMMDD' },
-          { code: '203', meaning: 'CCYYMMDDHHMM' },
-        ],
+        edifact: {
+          codes: [
+            { code: '102', meaning: 'CCYYMMDD' },
+            { code: '203', meaning: 'CCYYMMDDHHMM' },
+          ],
+        },
       })
-      expect(find(tree, 'DTM+137/C507/2379')?.codes[0]?.meaning).toBe('JJJJMMTT')
+      expect(find(tree, 'DTM+137/C507/2379')?.edifact?.codes[0]?.meaning).toBe('JJJJMMTT')
     })
   })
 })

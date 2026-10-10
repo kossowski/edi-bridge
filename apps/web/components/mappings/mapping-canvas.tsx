@@ -15,7 +15,7 @@ import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
 
 import {
-  CanvasStoreProvider,
+  MappingCanvasProvider,
   useCanvasStore,
   useCanvasStoreApi,
   useMeaningTooltip,
@@ -33,6 +33,7 @@ import {
 } from '@/components/mappings/mapping-tree'
 import { RowMeaning } from '@/components/mappings/row-meaning-view'
 import {
+  findRowButton,
   HeadingNode,
   type HeadingFlowNode,
   TreeNode,
@@ -72,14 +73,14 @@ type MappingCanvasProps = {
 }
 
 // Mounted only while the tooltip shows a row, so that row's button can point at the tooltip.
-function HintedRow({ id }: { id: string }) {
-  const setHinted = useCanvasStore((state) => state.setHinted)
+function TooltipRowId({ id }: { id: string }) {
+  const setTooltipRowId = useCanvasStore((state) => state.setTooltipRowId)
 
   useEffect(() => {
-    setHinted(id)
+    setTooltipRowId(id)
 
-    return () => setHinted(null)
-  }, [id, setHinted])
+    return () => setTooltipRowId(null)
+  }, [id, setTooltipRowId])
 
   return null
 }
@@ -98,7 +99,7 @@ function MeaningTooltip() {
             side={payload.side === 'source' ? 'right' : 'left'}
             sideOffset={8}
             className="max-w-sm flex-col items-stretch px-3 py-2">
-            <HintedRow id={payload.id} />
+            <TooltipRowId id={payload.id} />
             <RowMeaning codeLimit={5} item={payload} />
           </TooltipContent>
         )
@@ -125,7 +126,7 @@ function DetailsPanel({
   return (
     <section
       aria-labelledby={heading}
-      className="bg-card flex w-72 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border p-4">
+      className="bg-card flex max-h-56 shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border px-4 py-3 2xl:max-h-none 2xl:w-72 2xl:gap-3 2xl:p-4">
       <div className="flex min-h-8 items-center justify-between gap-2">
         <h2 id={heading} className="text-sm font-semibold">
           {t('details.title')}
@@ -142,7 +143,10 @@ function DetailsPanel({
             <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
               {t(`canvas.${selected.side}`)}
             </p>
-            <RowMeaning item={item} className="text-sm" />
+            <RowMeaning
+              item={item}
+              className="flex-row flex-wrap gap-x-8 gap-y-2 text-sm 2xl:flex-col"
+            />
           </>
         ) : (
           <p className="text-muted-foreground text-sm">{t('details.empty')}</p>
@@ -154,9 +158,9 @@ function DetailsPanel({
 
 export function MappingCanvas(props: MappingCanvasProps) {
   return (
-    <CanvasStoreProvider>
+    <MappingCanvasProvider>
       <MappingCanvasView {...props} />
-    </CanvasStoreProvider>
+    </MappingCanvasProvider>
   )
 }
 
@@ -252,7 +256,11 @@ function MappingCanvasView({ label, links, source, target }: MappingCanvasProps)
 
   const onInit = useCallback((instance: ReactFlowInstance<CanvasNode>) => {
     const width = container.current?.clientWidth ?? canvasWidth
-    const zoom = Math.min(1, Math.max(minInitialZoom, (width - 2 * viewportPadding) / canvasWidth))
+
+    const zoom = Math.min(
+      1,
+      Math.max(minInitialZoom, (width - panelGutter - viewportPadding) / canvasWidth),
+    )
 
     void instance.setViewport({
       x: Math.max(panelGutter, (width - canvasWidth * zoom) / 2),
@@ -265,11 +273,7 @@ function MappingCanvasView({ label, links, source, target }: MappingCanvasProps)
   const onClear = useCallback(() => {
     const { selected } = store.getState()
 
-    const row =
-      selected &&
-      container.current?.querySelector<HTMLElement>(
-        `[data-row-id="${CSS.escape(nodeId(selected.side, selected.path))}"]`,
-      )
+    const row = selected && container.current && findRowButton(container.current, selected)
 
     clearSelection()
     row?.focus()
@@ -295,7 +299,8 @@ function MappingCanvasView({ label, links, source, target }: MappingCanvasProps)
   }, [clearSelection, store, tooltip])
 
   return (
-    <div ref={area} className="flex min-h-[32rem] flex-1 gap-4">
+    // Beside the canvas the panel would cost the trees their room below 2xl, so it goes under it.
+    <div ref={area} className="flex min-h-[32rem] flex-1 flex-col gap-4 2xl:flex-row">
       <div
         ref={container}
         className="mapping-canvas relative min-h-[32rem] flex-1 overflow-hidden rounded-lg border">
