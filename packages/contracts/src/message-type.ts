@@ -3,7 +3,12 @@ import { z } from 'zod'
 import { edifactStructureNodeSchema, localizedTextSchema } from './edifact'
 
 import type { Endpoint } from './endpoint'
-import type { Direction } from './run'
+
+export const directions = ['inbound', 'outbound'] as const
+
+export const directionSchema = z.enum(directions)
+
+export type Direction = z.infer<typeof directionSchema>
 
 export const messageTypes = ['ORDERS', 'DESADV', 'INVOIC', 'CONTRL'] as const
 

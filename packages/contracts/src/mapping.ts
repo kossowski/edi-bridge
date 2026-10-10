@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
-import { messageTypeSchema } from './message-type'
-import { directionSchema } from './run'
+import { directionSchema, messageTypeSchema } from './message-type'
 import {
   type MappingTransform,
   mappingTransformSchema,
@@ -57,7 +56,7 @@ export const mappingLinkSchema = z.object({
 
 export type MappingLink = z.infer<typeof mappingLinkSchema>
 
-type GraphParts = {
+export type GraphParts = {
   links: ReadonlyArray<MappingLink>
   transforms: ReadonlyArray<MappingTransform>
   transformLinks: ReadonlyArray<TransformLink>
@@ -141,13 +140,13 @@ function graphProblems(graph: GraphParts): string[] {
 }
 
 // Links and transforms form one graph and are saved together, since links end at transform inputs.
-const graphFields = {
+export const graphFields = {
   links: z.array(mappingLinkSchema),
   transforms: z.array(mappingTransformSchema),
   transformLinks: z.array(transformLinkSchema),
 }
 
-function checkGraph(graph: GraphParts, context: z.RefinementCtx) {
+export function checkGraph(graph: GraphParts, context: z.RefinementCtx) {
   for (const message of graphProblems(graph)) {
     context.addIssue({ code: 'custom', message })
   }
@@ -157,31 +156,36 @@ export const mappingGraphSchema = z.object(graphFields).superRefine(checkGraph)
 
 export type MappingGraph = z.infer<typeof mappingGraphSchema>
 
+// Outbound Mappings turn the own systems' Document into EDIFACT, inbound ones the other way.
+export const outboundSides = {
+  direction: z.literal('outbound'),
+  source: documentStructureSideSchema,
+  target: messageTypeSideSchema,
+}
+
+export const inboundSides = {
+  direction: z.literal('inbound'),
+  source: messageTypeSideSchema,
+  target: documentStructureSideSchema,
+}
+
 const draftFields = {
   mappingId: z.uuid(),
   name: z.string().min(1),
   updatedAt: z.iso.datetime(),
+  latestVersion: z.number().int().min(1).nullable(),
+  unpublishedChanges: z.boolean(),
 }
 
-// Outbound Mappings turn the own systems' Document into EDIFACT, inbound ones the other way.
 export const mappingDraftSchema = z
   .discriminatedUnion('direction', [
-    z.object({
-      ...draftFields,
-      ...graphFields,
-      direction: z.literal('outbound'),
-      source: documentStructureSideSchema,
-      target: messageTypeSideSchema,
-    }),
-    z.object({
-      ...draftFields,
-      ...graphFields,
-      direction: z.literal('inbound'),
-      source: messageTypeSideSchema,
-      target: documentStructureSideSchema,
-    }),
+    z.object({ ...draftFields, ...graphFields, ...outboundSides }),
+    z.object({ ...draftFields, ...graphFields, ...inboundSides }),
   ])
   .superRefine(checkGraph)
+  .refine(({ latestVersion, unpublishedChanges }) => latestVersion !== null || unpublishedChanges, {
+    message: 'A Draft that was never published has unpublished changes',
+  })
 
 export type MappingDraft = z.infer<typeof mappingDraftSchema>
 

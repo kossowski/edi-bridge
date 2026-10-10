@@ -131,6 +131,7 @@ export {
 export {
   type DocumentStructureSide,
   documentStructureSideSchema,
+  type GraphParts,
   type MappingDraft,
   mappingDraftEndpoint,
   mappingDraftSchema,
@@ -179,16 +180,38 @@ export {
 } from './lookup-table'
 
 export {
+  type ComparisonOutputs,
+  comparisonOutputsSchema,
+  type DifferenceChange,
+  differenceChanges,
+  type MappingComparison,
+  mappingComparisonEndpoint,
+  type MappingComparisonQuery,
+  mappingComparisonQuerySchema,
+  mappingComparisonSchema,
+  type MappingDifference,
+  mappingDifferenceSchema,
+  type MappingVersion,
+  mappingVersionEndpoint,
+  mappingVersionSchema,
   type MappingVersionSummary,
   mappingVersionSummarySchema,
   mappingVersionsEndpoint,
+  type OutputDifference,
+  outputDifferenceSchema,
+  publishMappingDraftEndpoint,
   publishedMappingVersionsEndpoint,
   type PublishedMappingVersionsQuery,
   publishedMappingVersionsQuerySchema,
+  type VersionOutput,
+  versionOutputSchema,
 } from './mapping-version'
 
 export {
+  type Direction,
   directionOf,
+  directionSchema,
+  directions,
   messageTypeDirections,
   type MessageType,
   messageTypeSchema,
@@ -202,9 +225,6 @@ export {
 } from './message-type'
 
 export {
-  type Direction,
-  directionSchema,
-  directions,
   type ErrorPosition,
   errorPositionSchema,
   type FailureStage,

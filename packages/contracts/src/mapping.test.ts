@@ -18,6 +18,8 @@ const outbound: MappingDraft = {
   transforms: [],
   transformLinks: [],
   updatedAt: '2026-09-14T08:30:00.000Z',
+  latestVersion: 2,
+  unpublishedChanges: false,
 }
 
 const inbound: MappingDraft = {
@@ -34,6 +36,8 @@ const inbound: MappingDraft = {
   transforms: [],
   transformLinks: [],
   updatedAt: '2026-09-14T08:30:00.000Z',
+  latestVersion: 2,
+  unpublishedChanges: false,
 }
 
 describe('mappingDraftSchema', () => {
@@ -54,6 +58,18 @@ describe('mappingDraftSchema', () => {
     const swapped = { ...inbound, source: inbound.target, target: inbound.source }
 
     expect(mappingDraftSchema.safeParse(swapped).success).toBe(false)
+  })
+
+  it('accepts a Draft that was never published', () => {
+    const draft = { ...outbound, latestVersion: null, unpublishedChanges: true }
+
+    expect(mappingDraftSchema.parse(draft)).toEqual(draft)
+  })
+
+  it('rejects a Draft that was never published but has no unpublished changes', () => {
+    const draft = { ...outbound, latestVersion: null, unpublishedChanges: false }
+
+    expect(mappingDraftSchema.safeParse(draft).success).toBe(false)
   })
 })
 

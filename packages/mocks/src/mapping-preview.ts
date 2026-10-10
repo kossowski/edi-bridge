@@ -3,6 +3,7 @@ import { delay, http, HttpResponse } from 'msw'
 import {
   type DocumentContent,
   type DocumentStructure,
+  type MappingGraph,
   type MappingPreview,
   mappingPreviewEndpoint,
   mappingSamplesEndpoint,
@@ -11,7 +12,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedDocumentStructures } from './document-structure'
-import { documentValues, renderEdifact, renderJson } from './document-values'
+import { documentValues, type Entry, renderEdifact, renderJson } from './document-values'
 import {
   type MappingDraftRecord,
   type MappingDraftStore,
@@ -33,6 +34,47 @@ function distinct(notes: ReadonlyArray<PreviewNote>) {
 
     return !seen.has(key) && seen.add(key)
   })
+}
+
+export async function previewOutput({
+  mapping,
+  graph,
+  sample,
+  documentStructures,
+}: {
+  mapping: MappingDraftRecord
+  graph: MappingGraph
+  sample: MappingSampleRecord
+  documentStructures: ReadonlyArray<DocumentStructure>
+}): Promise<{ document: DocumentContent; notes: PreviewNote[]; entries: ReadonlyArray<Entry> }> {
+  const expressions = await evaluateExpressions(
+    graph,
+    sample.document.format === 'json' ? sample.document.content : undefined,
+  )
+
+  const { entries, notes } = previewEntries(
+    graph,
+    documentValues(sample.entries),
+    expressions,
+    unknownPaths(graph, sideLeaves(mapping, documentStructures)),
+  )
+
+  const values = documentValues(entries)
+
+  const documentStructure = documentStructures.find(({ id }) => id === mapping.documentStructureId)
+
+  const document = oriented<() => DocumentContent>(mapping.messageType, {
+    document: () => ({
+      format: 'json',
+      content: documentStructure ? renderJson(documentStructure, values) : {},
+    }),
+    edifact: () => ({
+      format: 'edifact',
+      content: renderEdifact(messageTypeStructures[mapping.messageType], values),
+    }),
+  }).target()
+
+  return { document, notes: distinct(notes), entries }
 }
 
 export function mappingPreviewHandlers(
@@ -82,41 +124,19 @@ export function mappingPreviewHandlers(
           return notFound()
         }
 
-        const expressions = await evaluateExpressions(
+        const { document, notes } = await previewOutput({
+          mapping,
           graph,
-          sample.document.format === 'json' ? sample.document.content : undefined,
-        )
-
-        const { entries, notes } = previewEntries(
-          graph,
-          documentValues(sample.entries),
-          expressions,
-          unknownPaths(graph, sideLeaves(mapping, documentStructures)),
-        )
-
-        const values = documentValues(entries)
-
-        const documentStructure = documentStructures.find(
-          ({ id }) => id === mapping.documentStructureId,
-        )
-
-        const document = oriented<() => DocumentContent>(mapping.messageType, {
-          document: () => ({
-            format: 'json',
-            content: documentStructure ? renderJson(documentStructure, values) : {},
-          }),
-          edifact: () => ({
-            format: 'edifact',
-            content: renderEdifact(messageTypeStructures[mapping.messageType], values),
-          }),
-        }).target()
+          sample,
+          documentStructures,
+        })
 
         await delay()
 
         return HttpResponse.json({
           sampleId,
           document,
-          notes: distinct(notes),
+          notes,
         } satisfies MappingPreview)
       },
     ),

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { type Direction, directionSchema } from './run'
+import { type Direction, directionSchema } from './message-type'
 
 import type { Endpoint } from './endpoint'
 

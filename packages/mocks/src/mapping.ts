@@ -20,6 +20,7 @@ import {
   saveMappingDraftEndpoint,
   type TransformConfig,
   type TransformKind,
+  transformIssues,
   type TransformLink,
   transformLinkTargets,
   transformPorts,
@@ -43,6 +44,7 @@ export type MappingDraftRecord = {
   messageType: MessageType
   documentStructureId: string
   latestVersion: number | null
+  unpublishedChanges: boolean
   links: ReadonlyArray<MappingLink>
   transforms: ReadonlyArray<MappingTransform>
   transformLinks: ReadonlyArray<TransformLink>
@@ -371,9 +373,37 @@ function templateGraph(mappingId: string, messageType: MessageType, share: numbe
   }
 }
 
+// Dropping a transform can leave the one it fed unconnected, so this repeats until none is left.
+function withoutInvalidTransforms(graph: TransformGraph): TransformGraph {
+  const invalid = new Set(
+    Object.entries(transformIssues(graph))
+      .filter(([, issues]) => issues.length > 0)
+      .map(([id]) => id),
+  )
+
+  if (invalid.size === 0) {
+    return graph
+  }
+
+  const touchesInvalid = ({ from, to }: TransformLink) =>
+    (from.kind === 'transform' && invalid.has(from.transformId)) ||
+    (to.kind === 'transform' && invalid.has(to.transformId))
+
+  return withoutInvalidTransforms({
+    transforms: graph.transforms.filter(({ id }) => !invalid.has(id)),
+    transformLinks: graph.transformLinks.filter((transformLink) => !touchesInvalid(transformLink)),
+  })
+}
+
 // A target takes one value, so a transform that fills it replaces the plain link into it.
-function templateDraftGraph(mappingId: string, messageType: MessageType, share: number) {
-  const graph = templateGraph(mappingId, messageType, share)
+function templateDraftGraph(
+  mappingId: string,
+  messageType: MessageType,
+  share: number,
+  { publishable = false } = {},
+) {
+  const template = templateGraph(mappingId, messageType, share)
+  const graph = publishable ? withoutInvalidTransforms(template) : template
   const filled = new Set(transformLinkTargets(graph.transformLinks))
 
   return {
@@ -391,15 +421,32 @@ function seedUpdatedAt(index: number) {
 export const unpublishedDraftId = seedId(7, 1)
 
 // Each Message Type has one complete Draft, one half-done and one without links.
-const linkShares = [1, 0.5, 0]
+const seedDraftStages = [
+  { linkShare: 1, unpublishedChanges: false },
+  { linkShare: 0.5, unpublishedChanges: true },
+  { linkShare: 0, unpublishedChanges: false },
+]
+
+function seedDraftStageOf(index: number) {
+  const { messageType } = seedMappings[index]!
+
+  const sameTypeBefore = seedMappings
+    .slice(0, index)
+    .filter((mapping) => mapping.messageType === messageType).length
+
+  return seedDraftStages[sameTypeBefore % seedDraftStages.length]!
+}
+
+// Only this half-done Draft keeps its invalid transform, so publishing it answers 422.
+export const incompleteDraftId = seedMappings.find(
+  ({ messageType }, index) =>
+    messageType === 'INVOIC' && seedDraftStageOf(index).unpublishedChanges,
+)!.mappingId
 
 export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
   ...seedMappings.map((mapping, index): MappingDraftRecord => {
     const newest = mapping.versions[0]!
-
-    const sameTypeBefore = seedMappings
-      .slice(0, index)
-      .filter(({ messageType }) => messageType === mapping.messageType).length
+    const { linkShare, unpublishedChanges } = seedDraftStageOf(index)
 
     return {
       id: mapping.mappingId,
@@ -407,11 +454,10 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
       messageType: mapping.messageType,
       documentStructureId: seedDocumentStructureOf[mapping.messageType].id,
       latestVersion: newest.version,
-      ...templateDraftGraph(
-        mapping.mappingId,
-        mapping.messageType,
-        linkShares[sameTypeBefore % linkShares.length]!,
-      ),
+      unpublishedChanges,
+      ...templateDraftGraph(mapping.mappingId, mapping.messageType, linkShare, {
+        publishable: unpublishedChanges && mapping.mappingId !== incompleteDraftId,
+      }),
       updatedAt: seedUpdatedAt(index),
     }
   }),
@@ -421,6 +467,7 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
     messageType: 'INVOIC',
     documentStructureId: seedDocumentStructureOf.INVOIC.id,
     latestVersion: null,
+    unpublishedChanges: true,
     ...templateDraftGraph(unpublishedDraftId, 'INVOIC', 0.3),
     updatedAt: seedUpdatedAt(seedMappings.length),
   },
@@ -510,6 +557,12 @@ function randomGraph(
   return { transforms, transformLinks }
 }
 
+const changedDraftEvery = 3
+
+function hasUnpublishedChanges(index: number, latestVersion: number | null) {
+  return latestVersion === null || index % changedDraftEvery === 0
+}
+
 // Cycles through the Message Types, so even two Drafts cover both directions.
 export function createMappingDrafts({
   count,
@@ -532,14 +585,19 @@ export function createMappingDrafts({
 
     const { source, target } = oriented(messageType, { document: 'ERP JSON', edifact: messageType })
 
+    const id = faker.string.uuid()
+
+    const latestVersion = faker.datatype.boolean({ probability: 0.8 })
+      ? faker.number.int({ min: 1, max: 9 })
+      : null
+
     const record = {
-      id: faker.string.uuid(),
+      id,
       name: `${company}: ${source} to ${target}`,
       messageType,
       documentStructureId: documentStructure.id,
-      latestVersion: faker.datatype.boolean({ probability: 0.8 })
-        ? faker.number.int({ min: 1, max: 9 })
-        : null,
+      latestVersion,
+      unpublishedChanges: hasUnpublishedChanges(index, latestVersion),
       updatedAt: faker.date.between({ from: '2026-01-01', to: '2026-09-30' }).toISOString(),
     }
 
@@ -555,7 +613,7 @@ export function createMappingDrafts({
   })
 }
 
-function structureOf(
+export function structureOf(
   record: Pick<MappingDraftRecord, 'id' | 'documentStructureId'>,
   documentStructures: DocumentStructures,
 ) {
@@ -598,6 +656,8 @@ export function toMappingDraft(
     transforms: record.transforms,
     transformLinks: record.transformLinks,
     updatedAt: record.updatedAt,
+    latestVersion: record.latestVersion,
+    unpublishedChanges: record.unpublishedChanges,
     ...oriented<MappingSide>(record.messageType, {
       document: {
         kind: 'documentStructure',
@@ -749,7 +809,13 @@ export function mappingHandlers(
           return invalidLink
         }
 
-        const record = { ...existing, ...body.data, updatedAt: new Date().toISOString() }
+        const record = {
+          ...existing,
+          ...body.data,
+          unpublishedChanges: true,
+          updatedAt: new Date().toISOString(),
+        }
+
         store.set(record)
 
         return HttpResponse.json(toMappingDraft(record, documentStructures))

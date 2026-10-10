@@ -7,7 +7,7 @@ import type {
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
 import { documentStructureHandler, seedDocumentStructures } from './document-structure'
-import { createFlowStore, flowHandlers, seedMappings } from './flow'
+import { createFlowStore, flowHandlers } from './flow'
 import { lookupTablesHandler, seedLookupTables } from './lookup-table'
 import { manualSubmissionHandler } from './manual-submission'
 import {
@@ -19,7 +19,15 @@ import {
 } from './mapping'
 import { mappingPreviewHandlers } from './mapping-preview'
 import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'
-import { createMappingCatalogue, publishedMappingVersionsHandler } from './mapping-version'
+import {
+  createMappingVersions,
+  mappingVersionHandlers,
+  type MappingVersionRecord,
+  type MappingVersionStore,
+  publishedMappingVersionsHandler,
+  seedMappingVersions,
+  toMappingVersionStore,
+} from './mapping-version'
 import { messageTypeStructureHandler } from './message-type-structure'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
@@ -42,9 +50,12 @@ export {
 export {
   createFlows,
   createFlowStore,
+  createMappingCatalogue,
   flowHandlers,
   type FlowRecord,
   type FlowStore,
+  type MappingCatalogue,
+  type MappingRecord,
   seedFlows,
   seedMappings,
   toFlow,
@@ -71,6 +82,7 @@ export { manualSubmissionHandler } from './manual-submission'
 export {
   createMappingDrafts,
   createMappingDraftStore,
+  incompleteDraftId,
   mappingHandlers,
   type MappingDraftRecord,
   type MappingDraftStore,
@@ -96,10 +108,18 @@ export {
 } from './message-type-structure'
 
 export {
-  createMappingCatalogue,
-  type MappingCatalogue,
-  type MappingRecord,
+  createMappingVersions,
+  createMappingVersionStore,
+  deriveMappingVersions,
+  mappingDifferences,
+  mappingVersionHandlers,
+  type MappingVersionRecord,
+  type MappingVersionStore,
   publishedMappingVersionsHandler,
+  seedMappingVersions,
+  toMappingVersion,
+  toMappingVersionStore,
+  toMappingVersionSummary,
 } from './mapping-version'
 
 export { createRun, createRuns, runsHandler, seedRuns } from './run'
@@ -139,6 +159,7 @@ export function createHandlers(
     documentStructures = seedDocumentStructures,
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
+    mappingVersions,
   }: {
     workspace?: Workspace
     tradingPartners?: ReadonlyArray<TradingPartner>
@@ -147,23 +168,37 @@ export function createHandlers(
     documentStructures?: ReadonlyArray<DocumentStructure>
     lookupTables?: ReadonlyArray<LookupTableSummary>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
+    mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
   } = {},
 ) {
   const runs = createRunStore(seedRuns())
   const workspaceStore = createWorkspaceStore(workspace)
   const channelStore = createChannelStore(channels)
-  const mappings = createMappingCatalogue(seedMappings)
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
+
+  const mappingVersionStore = toMappingVersionStore(
+    mappingVersions ?? [...seedMappingVersions, ...createMappingVersions(mappingDraftStore.all())],
+  )
 
   return [
     ...workspaceHandlers(apiUrl, workspaceStore),
     ...tradingPartnerHandlers(apiUrl, { tradingPartners, workspace: workspaceStore }),
     ...channelHandlers(apiUrl, { channels: channelStore }),
-    ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings }),
-    publishedMappingVersionsHandler(apiUrl, mappings),
+    ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings: mappingVersionStore }),
+    publishedMappingVersionsHandler(apiUrl, mappingVersionStore),
     runsHandler(apiUrl, runs),
-    ...runDetailHandlers(apiUrl, { runs, reprocessed: seedReprocessed() }),
+    ...mappingVersionHandlers(apiUrl, {
+      mappings: mappingDraftStore,
+      versions: mappingVersionStore,
+      samples: mappingSamples,
+      documentStructures,
+    }),
+    ...runDetailHandlers(apiUrl, {
+      runs,
+      reprocessed: seedReprocessed(),
+      mappingVersions: mappingVersionStore,
+    }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
     ...mappingHandlers(apiUrl, { mappings: mappingDraftStore, documentStructures }),
     ...mappingPreviewHandlers(apiUrl, {

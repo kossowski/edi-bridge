@@ -1,11 +1,10 @@
 import { z } from 'zod'
 
 import { mappingVersionSummarySchema } from './mapping-version'
-import { directionOf, messageTypeSchema } from './message-type'
+import { type Direction, directionOf, messageTypeSchema } from './message-type'
 
 import type { ChannelSummary } from './channel'
 import type { Endpoint } from './endpoint'
-import type { Direction } from './run'
 
 export const flowSummarySchema = z.object({
   id: z.uuid(),
