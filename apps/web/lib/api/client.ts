@@ -8,8 +8,10 @@ import {
   type CreateDocumentStructureBody,
   createDocumentStructureEndpoint,
   createFlowEndpoint,
+  createLookupTableEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
+  deleteLookupTableEndpoint,
   documentStructureEndpoint,
   type DocumentStructureOrigin,
   type DocumentStructureProblem,
@@ -22,6 +24,8 @@ import {
   inferDocumentStructureEndpoint,
   type FlowUpdate,
   interchangeEndpoint,
+  lookupTableEndpoint,
+  type LookupTableInput,
   lookupTablesEndpoint,
   type ManualSubmissionInput,
   mappingDraftEndpoint,
@@ -62,6 +66,7 @@ import {
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
   updateFlowEndpoint,
+  updateLookupTableEndpoint,
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
@@ -113,7 +118,7 @@ async function request<
     throw new ApiError(response.status, path, await response.text().catch(() => ''))
   }
 
-  return endpoint.response.parse(await response.json())
+  return endpoint.response.parse(response.status === 204 ? undefined : await response.json())
 }
 
 export function getCurrentWorkspace() {
@@ -246,6 +251,27 @@ export function listPublishedMappingVersions(query: PublishedMappingVersionsQuer
 
 export function listLookupTables() {
   return request(lookupTablesEndpoint)
+}
+
+export function getLookupTable(id: string) {
+  return request(lookupTableEndpoint, { path: toPath(lookupTableEndpoint.path, { id }) })
+}
+
+export function createLookupTable(body: LookupTableInput) {
+  return request(createLookupTableEndpoint, { body })
+}
+
+export function updateLookupTable(id: string, body: LookupTableInput) {
+  return request(updateLookupTableEndpoint, {
+    path: toPath(updateLookupTableEndpoint.path, { id }),
+    body,
+  })
+}
+
+export function deleteLookupTable(id: string) {
+  return request(deleteLookupTableEndpoint, {
+    path: toPath(deleteLookupTableEndpoint.path, { id }),
+  })
 }
 
 export function listTradingPartners() {

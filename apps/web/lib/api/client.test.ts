@@ -9,6 +9,7 @@ import {
   createWorkspace,
   documentStructureHandlers,
   documentStructureOrigins,
+  lookupTableHandlers,
   lookupTableListHandler,
   mappingHandlers,
   mappingVersionHandlers,
@@ -16,7 +17,9 @@ import {
   seedUnusedDocumentStructures,
   runDetailHandlers,
   runsHandler,
+  seedLookupTableNamed,
   seedLookupTables,
+  seedTradingPartners,
   tradingPartnerHandlers,
   workspaceHandlers,
 } from '@edi-bridge/mocks'
@@ -24,9 +27,12 @@ import {
 import {
   ApiError,
   createChannel,
+  createLookupTable,
   createTradingPartner,
+  deleteLookupTable,
   documentStructureProblemOf,
   getChannel,
+  getLookupTable,
   inferDocumentStructure,
   getRun,
   listLookupTables,
@@ -40,6 +46,7 @@ import {
   switchToProduction,
   updateCompanyIdentity,
   updateDocumentStructure,
+  updateLookupTable,
   updateTradingPartner,
 } from './client'
 import { apiUrl } from './config'
@@ -351,5 +358,42 @@ describe('Document Structure problems', () => {
 
     expect(error instanceof ApiError && JSON.parse(error.body)).toEqual(body)
     expect(documentStructureProblemOf(error)).toBeNull()
+  })
+})
+
+describe('Lookup Table actions', () => {
+  const units = seedLookupTableNamed('Units of measure')
+  const hansemarkt = seedTradingPartners[0]!
+
+  it('creates an empty Lookup Table for a Trading Partner', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const created = await createLookupTable({
+      name: 'Packaging types',
+      scope: { kind: 'tradingPartner', tradingPartnerId: hansemarkt.id },
+      entries: [],
+    })
+
+    expect(created).toMatchObject({
+      name: 'Packaging types',
+      scope: { kind: 'tradingPartner', tradingPartner: { name: hansemarkt.name } },
+      entryCount: 0,
+    })
+  })
+
+  it('renames a Lookup Table and keeps its entries', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+    const { entries } = await getLookupTable(units.id)
+
+    await expect(
+      updateLookupTable(units.id, { name: 'Units', scope: { kind: 'workspace' }, entries }),
+    ).resolves.toMatchObject({ name: 'Units', entries: units.entries })
+  })
+
+  it('deletes a Lookup Table from a response without a body', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    await expect(deleteLookupTable(units.id)).resolves.toBeUndefined()
+    await expect(getLookupTable(units.id)).rejects.toMatchObject({ status: 404 })
   })
 })
