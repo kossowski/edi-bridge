@@ -12,25 +12,35 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
 
+import {
+  MappingCanvasProvider,
+  useCanvasStore,
+  useCanvasStoreApi,
+  useMeaningTooltip,
+} from '@/components/mappings/mapping-canvas-store'
 import {
   canvasLinks,
   columnGap,
   columnWidth,
+  findItem,
   headingHeight,
   layoutTree,
   nodeId,
   type Side,
   type TreeItem,
-  type TreeRow,
 } from '@/components/mappings/mapping-tree'
+import { RowMeaning } from '@/components/mappings/row-meaning-view'
 import {
+  findRowButton,
   HeadingNode,
   type HeadingFlowNode,
   TreeNode,
   type TreeFlowNode,
 } from '@/components/mappings/tree-node'
+import { Button } from '@edi-bridge/ui/components/button'
+import { Tooltip, TooltipContent } from '@edi-bridge/ui/components/tooltip'
 
 import type { MappingLink } from '@edi-bridge/contracts'
 
@@ -55,38 +65,111 @@ const plainNode = { 'aria-roledescription': undefined, 'aria-describedby': undef
 
 export type CanvasSide = { title: string; items: ReadonlyArray<TreeItem> }
 
-type Collapsed = Readonly<Record<Side, ReadonlySet<string>>>
-
-export function MappingCanvas({
-  label,
-  links,
-  source,
-  target,
-}: {
+type MappingCanvasProps = {
   label: string
   links: ReadonlyArray<MappingLink>
   source: CanvasSide
   target: CanvasSide
+}
+
+// Mounted only while the tooltip shows a row, so that row's button can point at the tooltip.
+function TooltipRowId({ id }: { id: string }) {
+  const setTooltipRowId = useCanvasStore((state) => state.setTooltipRowId)
+
+  useEffect(() => {
+    setTooltipRowId(id)
+
+    return () => setTooltipRowId(null)
+  }, [id, setTooltipRowId])
+
+  return null
+}
+
+function MeaningTooltip() {
+  const tooltip = useMeaningTooltip()
+
+  return (
+    <Tooltip handle={tooltip.handle}>
+      {({ payload }) =>
+        payload && (
+          <TooltipContent
+            id={tooltip.id}
+            align="start"
+            role="tooltip"
+            side={payload.side === 'source' ? 'right' : 'left'}
+            sideOffset={8}
+            className="max-w-sm flex-col items-stretch px-3 py-2">
+            <TooltipRowId id={payload.id} />
+            <RowMeaning codeLimit={5} item={payload} />
+          </TooltipContent>
+        )
+      }
+    </Tooltip>
+  )
+}
+
+function DetailsPanel({
+  source,
+  target,
+  onClear,
+}: {
+  source: CanvasSide
+  target: CanvasSide
+  onClear: () => void
 }) {
+  const t = useTranslations('Mapping')
+  const heading = useId()
+  const selected = useCanvasStore((state) => state.selected)
+  const items = selected?.side === 'target' ? target.items : source.items
+  const item = selected && findItem(items, selected.path)
+
+  return (
+    <section
+      aria-labelledby={heading}
+      className="bg-card flex max-h-56 shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border px-4 py-3 2xl:max-h-none 2xl:w-72 2xl:gap-3 2xl:p-4">
+      <div className="flex min-h-8 items-center justify-between gap-2">
+        <h2 id={heading} className="text-sm font-semibold">
+          {t('details.title')}
+        </h2>
+        {item && (
+          <Button size="sm" variant="ghost" onClick={onClear}>
+            {t('details.clear')}
+          </Button>
+        )}
+      </div>
+      <div aria-live="polite" className="flex flex-col gap-1">
+        {selected && item ? (
+          <>
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              {t(`canvas.${selected.side}`)}
+            </p>
+            <RowMeaning
+              item={item}
+              className="flex-row flex-wrap gap-x-8 gap-y-2 text-sm 2xl:flex-col"
+            />
+          </>
+        ) : (
+          <p className="text-muted-foreground text-sm">{t('details.empty')}</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export function MappingCanvas(props: MappingCanvasProps) {
+  return (
+    <MappingCanvasProvider>
+      <MappingCanvasView {...props} />
+    </MappingCanvasProvider>
+  )
+}
+
+function MappingCanvasView({ label, links, source, target }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
   const container = useRef<HTMLDivElement>(null)
-
-  const [collapsed, setCollapsed] = useState<Collapsed>({
-    source: new Set(),
-    target: new Set(),
-  })
-
-  const onToggle = useCallback((row: TreeRow) => {
-    setCollapsed((previous) => {
-      const next = new Set(previous[row.side])
-
-      if (!next.delete(row.path)) {
-        next.add(row.path)
-      }
-
-      return { ...previous, [row.side]: next }
-    })
-  }, [])
+  const store = useCanvasStoreApi()
+  const collapsed = useCanvasStore((state) => state.collapsed)
+  const clearSelection = useCanvasStore((state) => state.clearSelection)
 
   const { nodes, edges } = useMemo(() => {
     const layouts = {
@@ -136,7 +219,7 @@ export function MappingCanvas({
       width: row.width,
       height: row.height,
       zIndex: row.depth,
-      data: { ...row, linked: linked.has(row.id), onToggle },
+      data: { ...row, linked: linked.has(row.id) },
       draggable: false,
       selectable: false,
       focusable: false,
@@ -169,11 +252,15 @@ export function MappingCanvas({
       ],
       edges: flowEdges,
     }
-  }, [collapsed, links, onToggle, source.items, source.title, t, target.items, target.title])
+  }, [collapsed, links, source.items, source.title, t, target.items, target.title])
 
   const onInit = useCallback((instance: ReactFlowInstance<CanvasNode>) => {
     const width = container.current?.clientWidth ?? canvasWidth
-    const zoom = Math.min(1, Math.max(minInitialZoom, (width - 2 * viewportPadding) / canvasWidth))
+
+    const zoom = Math.min(
+      1,
+      Math.max(minInitialZoom, (width - panelGutter - viewportPadding) / canvasWidth),
+    )
 
     void instance.setViewport({
       x: Math.max(panelGutter, (width - canvasWidth * zoom) / 2),
@@ -182,37 +269,72 @@ export function MappingCanvas({
     })
   }, [])
 
+  // Clearing removes the panel's clear button, so the focus goes back to the row it described.
+  const onClear = useCallback(() => {
+    const { selected } = store.getState()
+
+    const row = selected && container.current && findRowButton(container.current, selected)
+
+    clearSelection()
+    row?.focus()
+  }, [clearSelection, store])
+
+  const tooltip = useMeaningTooltip()
+  const area = useRef<HTMLDivElement>(null)
+
+  // Listened to natively: the area holds the canvas and the panel but is no control of its own.
+  useEffect(() => {
+    const element = area.current
+
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      // The first Escape closes an open tooltip (WCAG 1.4.13); only the next one clears.
+      if (event.key === 'Escape' && store.getState().selected && !tooltip.handle.isOpen) {
+        clearSelection()
+      }
+    }
+
+    element?.addEventListener('keydown', onKeyDown)
+
+    return () => element?.removeEventListener('keydown', onKeyDown)
+  }, [clearSelection, store, tooltip])
+
   return (
-    <div
-      ref={container}
-      className="mapping-canvas relative min-h-[32rem] flex-1 overflow-hidden rounded-lg border">
-      <div className="absolute inset-0">
-        <ReactFlow<CanvasNode>
-          ariaLabelConfig={{
-            'controls.ariaLabel': t('controls.panel'),
-            'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
-            'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
-            'controls.fitView.ariaLabel': t('controls.fitView'),
-          }}
-          attributionPosition="bottom-left"
-          edges={edges}
-          edgesFocusable={false}
-          elementsSelectable={false}
-          maxZoom={1.5}
-          minZoom={0.2}
-          nodes={nodes}
-          nodesConnectable={false}
-          nodesDraggable={false}
-          nodesFocusable={false}
-          nodeTypes={nodeTypes}
-          panOnScroll
-          zoomOnDoubleClick={false}
-          aria-label={label}
-          onInit={onInit}>
-          <Background gap={16} variant={BackgroundVariant.Dots} />
-          <Controls position="top-left" showInteractive={false} />
-        </ReactFlow>
+    // Beside the canvas the panel would cost the trees their room below 2xl, so it goes under it.
+    <div ref={area} className="flex min-h-[32rem] flex-1 flex-col gap-4 2xl:flex-row">
+      <div
+        ref={container}
+        className="mapping-canvas relative min-h-[32rem] flex-1 overflow-hidden rounded-lg border">
+        <div className="absolute inset-0">
+          <ReactFlow<CanvasNode>
+            ariaLabelConfig={{
+              'controls.ariaLabel': t('controls.panel'),
+              'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
+              'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
+              'controls.fitView.ariaLabel': t('controls.fitView'),
+            }}
+            attributionPosition="bottom-left"
+            edges={edges}
+            edgesFocusable={false}
+            elementsSelectable={false}
+            maxZoom={1.5}
+            minZoom={0.2}
+            nodes={nodes}
+            nodesConnectable={false}
+            nodesDraggable={false}
+            nodesFocusable={false}
+            nodeTypes={nodeTypes}
+            panOnScroll
+            zoomOnDoubleClick={false}
+            aria-label={label}
+            onInit={onInit}
+            onPaneClick={clearSelection}>
+            <Background gap={16} variant={BackgroundVariant.Dots} />
+            <Controls position="top-left" showInteractive={false} />
+          </ReactFlow>
+        </div>
       </div>
+      <MeaningTooltip />
+      <DetailsPanel source={source} target={target} onClear={onClear} />
     </div>
   )
 }

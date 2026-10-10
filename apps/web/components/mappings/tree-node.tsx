@@ -11,21 +11,34 @@ import {
   useStoreApi,
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { type FocusEvent, memo, useCallback } from 'react'
+import { type FocusEvent, memo, type ReactNode, useCallback } from 'react'
 
-import { type Repeat, rowHeight, type TreeRow } from '@/components/mappings/mapping-tree'
+import {
+  isSameRow,
+  type RowRef,
+  useCanvasStore,
+  useMeaningTooltip,
+} from '@/components/mappings/mapping-canvas-store'
+import { nodeId, type Repeat, rowHeight, type TreeRow } from '@/components/mappings/mapping-tree'
+import { kindMeanings } from '@/components/mappings/row-meaning'
+import { TooltipTrigger } from '@edi-bridge/ui/components/tooltip'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-export type TreeNodeData = TreeRow & {
-  linked: boolean
-  onToggle: (row: TreeRow) => void
-}
+export type TreeNodeData = TreeRow & { linked: boolean }
 
 export type TreeFlowNode = Node<TreeNodeData, 'tree'>
 
 export type HeadingNodeData = { side: string; title: string }
 
 export type HeadingFlowNode = Node<HeadingNodeData, 'heading'>
+
+const rowIdAttribute = 'data-row-id'
+
+export function findRowButton(container: ParentNode, row: RowRef) {
+  return container.querySelector<HTMLElement>(
+    `[${rowIdAttribute}="${CSS.escape(nodeId(row.side, row.path))}"]`,
+  )
+}
 
 const focusMargin = 24
 
@@ -95,6 +108,7 @@ function RepeatBadge({ repeat }: { repeat: Exclude<Repeat, null> }) {
 
 function ToggleButton({ data }: { data: TreeNodeData }) {
   const t = useTranslations('Mapping.canvas')
+  const toggleCollapsed = useCanvasStore((state) => state.toggleCollapsed)
 
   return (
     <button
@@ -102,7 +116,7 @@ function ToggleButton({ data }: { data: TreeNodeData }) {
       aria-expanded={data.expanded ?? false}
       aria-label={t(data.expanded ? 'collapse' : 'expand', { label: data.label })}
       className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 pointer-events-auto -ml-1.5 inline-flex size-7.5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
-      onClick={() => data.onToggle(data)}>
+      onClick={() => toggleCollapsed(data)}>
       <HugeiconsIcon
         icon={ArrowRight01Icon}
         strokeWidth={2}
@@ -113,11 +127,46 @@ function ToggleButton({ data }: { data: TreeNodeData }) {
   )
 }
 
+function RowButton({
+  data,
+  selected,
+  children,
+}: {
+  data: TreeNodeData
+  selected: boolean
+  children: ReactNode
+}) {
+  const tooltip = useMeaningTooltip()
+  const toggleSelected = useCanvasStore((state) => state.toggleSelected)
+  const described = useCanvasStore((state) => state.tooltipRowId === data.id)
+
+  const props = {
+    type: 'button' as const,
+    'aria-pressed': selected,
+    'aria-describedby': described ? tooltip.id : undefined,
+    [rowIdAttribute]: data.id,
+    className:
+      'nodrag focus-visible:ring-ring/50 pointer-events-auto flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-3',
+    onClick: () => toggleSelected(data),
+  }
+
+  if (!kindMeanings[data.kind].tooltip) {
+    return <button {...props}>{children}</button>
+  }
+
+  return (
+    <TooltipTrigger handle={tooltip.handle} payload={data} {...props}>
+      {children}
+    </TooltipTrigger>
+  )
+}
+
 function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
   const t = useTranslations('Mapping.canvas')
   const container = !data.linkable
   const showHandle = data.linkable || (data.expanded === false && data.linked)
   const onFocus = usePanIntoView()
+  const selected = useCanvasStore((state) => isSameRow(state.selected, data))
 
   return (
     <div
@@ -127,25 +176,31 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         data.kind === 'segmentGroup' && 'border-foreground/40 border-2',
         data.repeat !== null &&
           'border-muted-foreground border-dashed shadow-[3px_3px_0_-1px_var(--border)]',
+        selected && 'outline-primary outline-2 outline-offset-1',
       )}
       data-kind={data.kind}
+      data-selected={selected || undefined}
       onFocus={onFocus}>
       <div className="flex items-center gap-1.5 px-2" style={{ height: rowHeight - 2 }}>
         {data.expanded !== null && <ToggleButton data={data} />}
-        <code className={cn('shrink-0 font-mono', container && 'font-semibold')}>{data.label}</code>
-        {data.name && <span className="text-muted-foreground min-w-0 truncate">{data.name}</span>}
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">
-          {data.detail && <code className="text-muted-foreground font-mono">{data.detail}</code>}
-          {data.repeat !== null && <RepeatBadge repeat={data.repeat} />}
-          {container && data.childCount === 0 && (
-            <span className="text-muted-foreground">{t('emptyPart')}</span>
-          )}
-          {data.expanded === false && (
-            <span className="text-muted-foreground">
-              {t('hiddenParts', { count: data.childCount })}
-            </span>
-          )}
-        </span>
+        <RowButton data={data} selected={selected}>
+          <code className={cn('shrink-0 font-mono', container && 'font-semibold')}>
+            {data.label}
+          </code>
+          {data.name && <span className="text-muted-foreground min-w-0 truncate">{data.name}</span>}
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            {data.detail && <code className="text-muted-foreground font-mono">{data.detail}</code>}
+            {data.repeat !== null && <RepeatBadge repeat={data.repeat} />}
+            {container && data.childCount === 0 && (
+              <span className="text-muted-foreground">{t('emptyPart')}</span>
+            )}
+            {data.expanded === false && (
+              <span className="text-muted-foreground">
+                {t('hiddenParts', { count: data.childCount })}
+              </span>
+            )}
+          </span>
+        </RowButton>
       </div>
       <Handle
         isConnectable={false}

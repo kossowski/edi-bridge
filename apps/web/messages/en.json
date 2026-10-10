@@ -864,6 +864,37 @@
     "desktopOnly": {
       "title": "The Mapping canvas needs a larger screen",
       "description": "Open this Mapping on a screen at least 1024 pixels wide to see its source and target and their links."
+    },
+    "meaning": {
+      "kind": {
+        "segmentGroup": "Segment group",
+        "segment": "Segment",
+        "composite": "Composite data element",
+        "element": "Data element",
+        "field": "Field",
+        "object": "Object",
+        "array": "List"
+      },
+      "qualifier": "Qualifier",
+      "status": "Status",
+      "mandatory": "Mandatory",
+      "conditional": "Conditional",
+      "required": "Required",
+      "optional": "Optional",
+      "repetition": "Repetition",
+      "once": "Once",
+      "upTo": "Up to {count} times",
+      "unbounded": "Any number of times",
+      "format": "Format",
+      "formatText": "{characters, select, a {alphabetic} n {numeric} other {alphanumeric}}, {variable, select, variable {up to} other {exactly}} {length, plural, one {# character} other {# characters}}",
+      "dataType": "Data type",
+      "codes": "Codes",
+      "moreCodes": "{count, plural, one {And # more code. Select the part to see all codes.} other {And # more codes. Select the part to see all codes.}}"
+    },
+    "details": {
+      "title": "Meaning",
+      "empty": "Select a part to keep its meaning here. To take a quick look, point at a part or move the focus to it.",
+      "clear": "Clear selection"
     }
   },
   "ManualSubmission": {
