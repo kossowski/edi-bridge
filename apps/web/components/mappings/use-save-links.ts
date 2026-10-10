@@ -43,7 +43,6 @@ export function useSaveLinks(mappingId: string) {
 
   const save = useMutation({
     mutationKey,
-    // Links and transforms are saved together; this hook changes only the links.
     mutationFn: ({ links }: LinkChange) => {
       const draft = queryClient.getQueryData<MappingDraft>(queryKey)
 

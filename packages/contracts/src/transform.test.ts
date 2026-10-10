@@ -6,6 +6,8 @@ import {
   mappingTransformSchema,
   transformConfigIssues,
   transformConfigSchemas,
+  transformIssues,
+  type TransformLink,
   transformPorts,
 } from './transform'
 
@@ -153,6 +155,13 @@ describe('transformConfigIssues', () => {
     ])
   })
 
+  it('reports a configuration missing a field as invalid, never as valid', () => {
+    expect(transformConfigIssues({ kind: 'split', config: {} })).toEqual([
+      { field: 'separator', code: 'invalid' },
+      { field: 'index', code: 'invalid' },
+    ])
+  })
+
   it('keeps a Draft with invalid configurations loadable', () => {
     const constant = node({ kind: 'constant', config: { value: '' } })
 
@@ -198,6 +207,89 @@ describe('transformPorts', () => {
     expect(transformPorts(node({ kind: 'loop', config: { counterStart: 1 } }))).toEqual({
       inputs: ['items'],
       outputs: ['items', 'counter'],
+    })
+  })
+})
+
+function fromSource(path: string, transform: MappingTransform, input: string): TransformLink {
+  return {
+    from: { kind: 'source', path },
+    to: { kind: 'transform', transformId: transform.id, input },
+  }
+}
+
+describe('transformIssues', () => {
+  it('finds nothing wrong with a configured transform whose inputs are all linked', () => {
+    const dateFormat = node({ kind: 'dateFormat', config: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' } })
+
+    expect(
+      transformIssues({
+        transforms: [dateFormat],
+        transformLinks: [fromSource('invoiceDate', dateFormat, 'value')],
+      }),
+    ).toEqual({ [dateFormat.id]: [] })
+  })
+
+  it('reports every input of a concatenation that no link feeds', () => {
+    const concatenate = node({ kind: 'concatenate', config: { inputCount: 3, separator: ' ' } })
+
+    expect(
+      transformIssues({
+        transforms: [concatenate],
+        transformLinks: [fromSource('shipTo.postalCode', concatenate, 'part1')],
+      }),
+    ).toEqual({
+      [concatenate.id]: [
+        { input: 'part2', code: 'unconnected' },
+        { input: 'part3', code: 'unconnected' },
+      ],
+    })
+  })
+
+  it('lets a conditional go without an else value, but not without a then value', () => {
+    const conditional = node({
+      kind: 'conditional',
+      config: { operator: 'isEmpty', compareTo: '' },
+    })
+
+    expect(
+      transformIssues({
+        transforms: [conditional],
+        transformLinks: [fromSource('isCreditNote', conditional, 'value')],
+      }),
+    ).toEqual({ [conditional.id]: [{ input: 'then', code: 'unconnected' }] })
+  })
+
+  it('counts a link from another transform as feeding an input', () => {
+    const constant = node({ kind: 'constant', config: { value: '380' } })
+    const loop = node({ kind: 'loop', config: { counterStart: 1 } })
+    const substring = node({ kind: 'substring', config: { start: 0, length: 35 } })
+
+    expect(
+      transformIssues({
+        transforms: [constant, loop, substring],
+        transformLinks: [
+          {
+            from: { kind: 'transform', transformId: constant.id, output: 'value' },
+            to: { kind: 'transform', transformId: substring.id, input: 'value' },
+          },
+        ],
+      }),
+    ).toEqual({
+      [constant.id]: [],
+      [loop.id]: [{ input: 'items', code: 'unconnected' }],
+      [substring.id]: [],
+    })
+  })
+
+  it('reports configuration issues and unconnected inputs together', () => {
+    const split = node({ kind: 'split', config: { separator: '', index: 0 } })
+
+    expect(transformIssues({ transforms: [split], transformLinks: [] })).toEqual({
+      [split.id]: [
+        { field: 'separator', code: 'required' },
+        { input: 'value', code: 'unconnected' },
+      ],
     })
   })
 })

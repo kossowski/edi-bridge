@@ -21,6 +21,7 @@ import {
   type TransformConfig,
   type TransformKind,
   type TransformLink,
+  transformLinkTargets,
   transformPorts,
 } from '@edi-bridge/contracts'
 
@@ -172,15 +173,14 @@ type TransformTemplate = {
   kind: TransformKind
   config: TransformConfig
   inputs?: Readonly<Record<string, string>>
-  // Inputs fed by the output of another transform of the template, by its index.
-  fedBy?: Readonly<Record<string, number>>
+  feedingTransformIndex?: Readonly<Record<string, number>>
   outputs?: Readonly<Record<string, string>>
 }
 
-function node<Kind extends TransformKind>(
+function transformTemplate<Kind extends TransformKind>(
   kind: Kind,
   config: TransformConfig<Kind>,
-  ends: Pick<TransformTemplate, 'inputs' | 'fedBy' | 'outputs'> = {},
+  ends: Pick<TransformTemplate, 'inputs' | 'feedingTransformIndex' | 'outputs'> = {},
 ): TransformTemplate {
   return { kind, config, ...ends }
 }
@@ -189,7 +189,7 @@ function node<Kind extends TransformKind>(
 // Some nodes are deliberately configured wrongly, so the canvas has invalid nodes to show.
 const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTemplate>>> = {
   ORDERS: [
-    node(
+    transformTemplate(
       'concatenate',
       { inputCount: 2, separator: ' ' },
       {
@@ -197,48 +197,56 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
         outputs: { value: 'deliveryParty.city' },
       },
     ),
-    node(
+    transformTemplate(
       'lookupTable',
       { lookupTableId: seedLookupTableNamed('Country codes').id, fallback: 'keepValue' },
       { inputs: { value: 'SG2+SU/NAD+SU/3207' }, outputs: { value: 'supplier.country' } },
     ),
-    node(
+    transformTemplate(
       'substring',
       { start: 0, length: 35 },
       { inputs: { value: 'SG2+SU/NAD+SU/C080/3036' }, outputs: { value: 'supplier.name' } },
     ),
-    node(
+    transformTemplate(
       'jsonata',
       { expression: '$string(SG25.PIA' },
       { outputs: { value: 'lines[].buyerArticleNumber' } },
     ),
-    node('loop', { counterStart: 1 }, { inputs: { items: 'SG25' }, outputs: { items: 'lines[]' } }),
-    node('constant', { value: 'DE' }, { outputs: { value: 'invoicee.country' } }),
+    transformTemplate(
+      'loop',
+      { counterStart: 1 },
+      { inputs: { items: 'SG25' }, outputs: { items: 'lines[]' } },
+    ),
+    transformTemplate('constant', { value: 'DE' }, { outputs: { value: 'invoicee.country' } }),
   ],
   DESADV: [
-    node('constant', { value: '351' }, { outputs: { value: 'BGM/C002/1001' } }),
-    node(
+    transformTemplate('constant', { value: '351' }, { outputs: { value: 'BGM/C002/1001' } }),
+    transformTemplate(
       'substring',
       { start: 0, length: 35 },
       { inputs: { value: 'shipTo.street' }, outputs: { value: 'SG2+DP/NAD+DP/C059/3042' } },
     ),
-    node(
+    transformTemplate(
       'lookupTable',
       { lookupTableId: null, fallback: 'fail' },
       { inputs: { value: 'shipTo.country' }, outputs: { value: 'SG2+DP/NAD+DP/3207' } },
     ),
-    node(
+    transformTemplate(
       'jsonata',
       { expression: '$count(packages.lines)' },
       { outputs: { value: 'CNT+2/C270/6066' } },
     ),
-    node(
+    transformTemplate(
       'loop',
       { counterStart: 1 },
       { inputs: { items: 'packages[]' }, outputs: { items: 'SG10' } },
     ),
-    node('constant', { value: '' }, { outputs: { value: 'SG10/SG17/QTY+12/C186/6411' } }),
-    node(
+    transformTemplate(
+      'constant',
+      { value: '' },
+      { outputs: { value: 'SG10/SG17/QTY+12/C186/6411' } },
+    ),
+    transformTemplate(
       'concatenate',
       { inputCount: 2, separator: ' ' },
       {
@@ -248,57 +256,61 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
     ),
   ],
   INVOIC: [
-    node(
+    transformTemplate(
       'conditional',
       { operator: 'equals', compareTo: 'true' },
       {
         inputs: { value: 'isCreditNote' },
-        fedBy: { then: 1, else: 2 },
+        feedingTransformIndex: { then: 1, else: 2 },
         outputs: { value: 'BGM/C002/1001' },
       },
     ),
-    node('constant', { value: '381' }),
-    node('constant', { value: '380' }),
-    node(
+    transformTemplate('constant', { value: '381' }),
+    transformTemplate('constant', { value: '380' }),
+    transformTemplate(
       'dateFormat',
       { from: 'yyyy-MM-dd', to: 'yyyyMMdd' },
       { inputs: { value: 'invoiceDate' }, outputs: { value: 'DTM+137/C507/2380' } },
     ),
-    node(
+    transformTemplate(
       'numberFormat',
       { decimalPlaces: 9, decimalSeparator: '.' },
       { inputs: { value: 'totals.invoiceTotal' }, outputs: { value: 'SG48/MOA+77/C516/5004' } },
     ),
-    node(
+    transformTemplate(
       'split',
       { separator: '', index: 0 },
       { inputs: { value: 'supplier.vatId' }, outputs: { value: 'SG2+SU/SG3/RFF+VA/C506/1154' } },
     ),
-    node(
+    transformTemplate(
       'jsonata',
       { expression: '$sum(lines.lineAmount)' },
       { outputs: { value: 'SG48/MOA+79/C516/5004' } },
     ),
-    node(
+    transformTemplate(
       'lookupTable',
       { lookupTableId: seedLookupTableNamed('VAT categories').id, fallback: 'fail' },
       { inputs: { value: 'lines[].vatRate' }, outputs: { value: 'SG25/SG33/TAX+7/C241/5153' } },
     ),
-    node(
+    transformTemplate(
       'loop',
       { counterStart: 1 },
       { inputs: { items: 'lines[]' }, outputs: { items: 'SG25', counter: 'SG25/LIN/1082' } },
     ),
   ],
   CONTRL: [
-    node(
+    transformTemplate(
       'conditional',
       { operator: 'equals', compareTo: '' },
-      { inputs: { value: 'UCI/0083' }, fedBy: { then: 1, else: 2 }, outputs: { value: 'status' } },
+      {
+        inputs: { value: 'UCI/0083' },
+        feedingTransformIndex: { then: 1, else: 2 },
+        outputs: { value: 'status' },
+      },
     ),
-    node('constant', { value: 'accepted' }),
-    node('constant', { value: 'rejected' }),
-    node(
+    transformTemplate('constant', { value: 'accepted' }),
+    transformTemplate('constant', { value: 'rejected' }),
+    transformTemplate(
       'concatenate',
       { inputCount: 1, separator: '' },
       { inputs: { part1: 'UCI/S002/0004' }, outputs: { value: 'senderGln' } },
@@ -308,7 +320,11 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
 
 type TransformGraph = Pick<MappingGraph, 'transforms' | 'transformLinks'>
 
-function placed(id: string, index: number, { kind, config }: TransformTemplate): MappingTransform {
+function transformOnGrid(
+  id: string,
+  index: number,
+  { kind, config }: TransformTemplate,
+): MappingTransform {
   return mappingTransformSchema.parse({
     id,
     kind,
@@ -323,7 +339,7 @@ function templateGraph(mappingId: string, messageType: MessageType, share: numbe
   const ids = chosen.map((_, index) => stableUuid(`${mappingId}:transform:${index}`))
 
   const transformLinks = chosen.flatMap(
-    ({ inputs = {}, fedBy = {}, outputs = {} }, index): TransformLink[] => {
+    ({ inputs = {}, feedingTransformIndex = {}, outputs = {} }, index): TransformLink[] => {
       const into = (input: string) =>
         ({ kind: 'transform', transformId: ids[index]!, input }) as const
 
@@ -332,7 +348,7 @@ function templateGraph(mappingId: string, messageType: MessageType, share: numbe
           from: { kind: 'source', path },
           to: into(input),
         })),
-        ...Object.entries(fedBy).flatMap(([input, feeding]): TransformLink[] => {
+        ...Object.entries(feedingTransformIndex).flatMap(([input, feeding]): TransformLink[] => {
           const transformId = ids[feeding]
 
           return transformId
@@ -348,19 +364,15 @@ function templateGraph(mappingId: string, messageType: MessageType, share: numbe
   )
 
   return {
-    transforms: chosen.map((transform, index) => placed(ids[index]!, index, transform)),
+    transforms: chosen.map((transform, index) => transformOnGrid(ids[index]!, index, transform)),
     transformLinks,
   }
-}
-
-function filledTargets({ transformLinks }: Pick<MappingGraph, 'transformLinks'>) {
-  return new Set(transformLinks.flatMap(({ to }) => (to.kind === 'target' ? [to.path] : [])))
 }
 
 // A target takes one value, so a transform that fills it replaces the plain link into it.
 function templateDraftGraph(mappingId: string, messageType: MessageType, share: number) {
   const graph = templateGraph(mappingId, messageType, share)
-  const filled = filledTargets(graph)
+  const filled = new Set(transformLinkTargets(graph.transformLinks))
 
   return {
     ...graph,
@@ -465,26 +477,26 @@ function randomGraph(
   })
 
   const linked = new Set(links.map(({ targetPath }) => targetPath))
-  const free = faker.helpers.shuffle(target.filter((path) => !linked.has(path)))
+  const unlinkedTargets = faker.helpers.shuffle(target.filter((path) => !linked.has(path)))
 
   const transforms = Array.from({ length: 30 }, (_, index) =>
-    placed(faker.string.uuid(), index, faker.helpers.arrayElement(generatedConfigs)),
+    transformOnGrid(faker.string.uuid(), index, faker.helpers.arrayElement(generatedConfigs)),
   )
 
   const transformLinks = transforms.flatMap((transform, index): TransformLink[] => {
     const { inputs } = transformPorts(transform)
-    const filling = free[index]
+    const filledTarget = unlinkedTargets[index]
 
     return [
       ...inputs.map((input): TransformLink => ({
         from: { kind: 'source', path: faker.helpers.arrayElement(source) },
         to: { kind: 'transform', transformId: transform.id, input },
       })),
-      ...(filling
+      ...(filledTarget
         ? [
             {
               from: { kind: 'transform', transformId: transform.id, output: 'value' },
-              to: { kind: 'target', path: filling },
+              to: { kind: 'target', path: filledTarget },
             } as const,
           ]
         : []),
@@ -623,41 +635,55 @@ function containerOf(leaves: ReadonlySet<string>, path: string) {
   return [...leaves].some((leaf) => leaf.startsWith(`${path}/`) || leaf.startsWith(`${path}.`))
 }
 
+type LinkedPath = { path: string; wholePart: boolean }
+
 function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
-  for (const { sourcePath, targetPath } of graph.links) {
-    if (!leaves.source.has(sourcePath)) {
-      return unprocessable(`The source has no field or element at ${sourcePath}`)
-    }
-
-    if (!leaves.target.has(targetPath)) {
-      return unprocessable(`The target has no field or element at ${targetPath}`)
-    }
-  }
-
   const loops = new Set(graph.transforms.flatMap(({ id, kind }) => (kind === 'loop' ? [id] : [])))
 
   // A loop takes a whole repeated part and fills one; every other link ends at a field or element.
-  for (const { from, to } of graph.transformLinks) {
-    const intoLoop = to.kind === 'transform' && loops.has(to.transformId) && to.input === 'items'
+  const sourcePaths: LinkedPath[] = [
+    ...graph.links.map(({ sourcePath }) => ({ path: sourcePath, wholePart: false })),
+    ...graph.transformLinks.flatMap(({ from, to }) =>
+      from.kind === 'source'
+        ? [
+            {
+              path: from.path,
+              wholePart:
+                to.kind === 'transform' && loops.has(to.transformId) && to.input === 'items',
+            },
+          ]
+        : [],
+    ),
+  ]
 
-    const outOfLoop =
-      from.kind === 'transform' && loops.has(from.transformId) && from.output === 'items'
+  const targetPaths: LinkedPath[] = [
+    ...graph.links.map(({ targetPath }) => ({ path: targetPath, wholePart: false })),
+    ...graph.transformLinks.flatMap(({ from, to }) =>
+      to.kind === 'target'
+        ? [
+            {
+              path: to.path,
+              wholePart:
+                from.kind === 'transform' && loops.has(from.transformId) && from.output === 'items',
+            },
+          ]
+        : [],
+    ),
+  ]
 
-    if (
-      from.kind === 'source' &&
-      !leaves.source.has(from.path) &&
-      !(intoLoop && containerOf(leaves.source, from.path))
-    ) {
-      return unprocessable(`The source has no field or element at ${from.path}`)
-    }
+  const missing = (side: ReadonlySet<string>) => (linked: LinkedPath) =>
+    !side.has(linked.path) && !(linked.wholePart && containerOf(side, linked.path))
 
-    if (
-      to.kind === 'target' &&
-      !leaves.target.has(to.path) &&
-      !(outOfLoop && containerOf(leaves.target, to.path))
-    ) {
-      return unprocessable(`The target has no field or element at ${to.path}`)
-    }
+  const unknownSource = sourcePaths.find(missing(leaves.source))
+
+  if (unknownSource) {
+    return unprocessable(`The source has no field or element at ${unknownSource.path}`)
+  }
+
+  const unknownTarget = targetPaths.find(missing(leaves.target))
+
+  if (unknownTarget) {
+    return unprocessable(`The target has no field or element at ${unknownTarget.path}`)
   }
 
   return null

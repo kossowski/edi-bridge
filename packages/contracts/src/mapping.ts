@@ -7,6 +7,7 @@ import {
   mappingTransformSchema,
   type TransformLink,
   transformLinkSchema,
+  transformLinkTargets,
   transformPorts,
 } from './transform'
 
@@ -107,7 +108,7 @@ function graphProblems(graph: GraphParts): string[] {
 
   const targets = [
     ...graph.links.map(({ targetPath }) => targetPath),
-    ...graph.transformLinks.flatMap(({ to }) => (to.kind === 'target' ? [to.path] : [])),
+    ...transformLinkTargets(graph.transformLinks),
   ]
 
   if (new Set(targets).size !== targets.length) {
