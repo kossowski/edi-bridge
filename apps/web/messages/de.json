@@ -1623,7 +1623,6 @@
       "delete": "Löschen"
     },
     "announcements": {
-      "created": "Lookup Table {name} angelegt.",
       "saved": "Lookup Table {name} gespeichert.",
       "deleted": "Lookup Table {name} gelöscht."
     },
@@ -1688,6 +1687,97 @@
       "confirm": "Lookup Table löschen",
       "pending": "Wird gelöscht…",
       "failed": "Die Lookup Table konnte nicht gelöscht werden. Versuchen Sie es erneut."
+    }
+  },
+  "LookupTable": {
+    "title": "Lookup Table",
+    "back": "Zurück zu den Lookup Tables",
+    "loading": "Lookup Table wird geladen",
+    "notFound": {
+      "title": "Lookup Table nicht gefunden",
+      "description": "In diesem Workspace gibt es keine Lookup Table mit dieser ID."
+    },
+    "error": {
+      "title": "Lookup Table nicht verfügbar",
+      "description": "Die Lookup Table konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "entries": {
+      "title": "Einträge",
+      "description": "Jeder Eintrag übersetzt einen Ausgangscode in einen Zielcode. Ausgangscodes müssen eindeutig sein.",
+      "hint": "Mit den Pfeiltasten wechseln Sie zwischen Zellen, mit Enter bearbeiten Sie eine Zelle.",
+      "columns": {
+        "row": "Zeile",
+        "sourceCode": "Ausgangscode",
+        "targetCode": "Zielcode",
+        "actions": "Aktionen"
+      },
+      "cellLabel": "{column}, Zeile {row}",
+      "filter": "Nach Ausgangs- oder Zielcode filtern",
+      "count": "{count, plural, one {# Eintrag} other {# Einträge}}",
+      "filteredCount": "{count, number} von {total, number} Einträgen",
+      "noMatch": "Kein Eintrag passt zum Filter.",
+      "empty": {
+        "title": "Noch keine Einträge",
+        "description": "Fügen Sie den ersten Eintrag hinzu, z. B. Ausgangscode ST mit Zielcode PCE."
+      },
+      "add": "Eintrag hinzufügen",
+      "deleteRow": "Eintrag in Zeile {row} löschen",
+      "save": "Änderungen speichern",
+      "saving": "Wird gespeichert…",
+      "discard": "Änderungen verwerfen",
+      "unsaved": "Ungespeicherte Änderungen",
+      "upToDate": "Alle Änderungen gespeichert",
+      "errors": {
+        "required": "Geben Sie einen Code ein.",
+        "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
+        "duplicate": "Bereits in Zeile {row} verwendet.",
+        "summary": "{count, plural, one {# Eintrag muss} other {# Einträge müssen}} vor dem Speichern korrigiert werden.",
+        "saveFailed": "Die Einträge konnten nicht gespeichert werden. Versuchen Sie es erneut."
+      },
+      "announcements": {
+        "saved": "Einträge gespeichert.",
+        "added": "Eintrag in Zeile {row} hinzugefügt.",
+        "deleted": "Eintrag in Zeile {row} gelöscht.",
+        "discarded": "Änderungen verworfen."
+      },
+      "shortcuts": {
+        "title": "Tastenkürzel",
+        "items": {
+          "move": {
+            "keys": "Pfeiltasten, Pos1, Ende, Bild auf, Bild ab",
+            "action": "Zwischen Zellen wechseln"
+          },
+          "tab": {
+            "keys": "Tab, Umschalt+Tab",
+            "action": "Zur nächsten oder vorherigen Zelle"
+          },
+          "edit": {
+            "keys": "Enter, F2 oder lostippen",
+            "action": "Zelle bearbeiten"
+          },
+          "commit": {
+            "keys": "Enter",
+            "action": "Änderung übernehmen"
+          },
+          "cancel": {
+            "keys": "Esc",
+            "action": "Änderung in der Zelle zurücknehmen"
+          },
+          "add": {
+            "keys": "Strg+Enter (⌘+Enter auf dem Mac)",
+            "action": "Eintrag darunter hinzufügen"
+          },
+          "delete": {
+            "keys": "Strg+Entf (⌘+Rückschritt auf dem Mac)",
+            "action": "Eintrag löschen"
+          },
+          "save": {
+            "keys": "Strg+S (⌘+S auf dem Mac)",
+            "action": "Änderungen speichern"
+          }
+        }
+      }
     }
   },
   "ManualSubmission": {
@@ -1777,5 +1867,12 @@
     "button": "{label} kopieren",
     "copied": "Kopiert",
     "failed": "Kopieren fehlgeschlagen. Markieren Sie den Text und kopieren Sie ihn selbst."
+  },
+  "LeaveGuard": {
+    "title": "Ohne Speichern verlassen?",
+    "description": "Ihre ungespeicherten Änderungen gehen verloren.",
+    "stay": "Auf dieser Seite bleiben",
+    "leave": "Ohne Speichern verlassen",
+    "close": "Schließen"
   }
 }

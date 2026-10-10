@@ -147,6 +147,7 @@ export function LoadFailure({
     | 'TradingPartner'
     | 'Channel'
     | 'Flow'
+    | 'LookupTable'
     | 'Mapping'
     | 'Mapping.canvas'
     | 'DocumentStructure'
