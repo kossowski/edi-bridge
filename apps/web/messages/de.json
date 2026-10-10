@@ -1780,6 +1780,74 @@
           }
         }
       }
+    },
+    "import": {
+      "open": "CSV importieren",
+      "title": "CSV importieren",
+      "description": "Einträge aus einer CSV mit einem Ausgangscode und einem Zielcode pro Zeile hinzufügen und aktualisieren. Der Import führt zusammen: Er fügt neue Ausgangscodes hinzu und ändert Zielcodes; jeder Eintrag, der in der CSV fehlt, bleibt erhalten.",
+      "close": "Schließen",
+      "cancel": "Abbrechen",
+      "unsaved": {
+        "title": "Ungespeicherte Änderungen",
+        "description": "Die Einträge haben ungespeicherte Änderungen. Speichern oder verwerfen Sie sie, bevor Sie eine CSV importieren, damit der Import von den gespeicherten Einträgen ausgeht.",
+        "discard": "Änderungen verwerfen und fortfahren"
+      },
+      "file": {
+        "label": "CSV-Datei",
+        "description": "Der Inhalt einer gewählten Datei erscheint im CSV-Text darunter."
+      },
+      "text": {
+        "label": "CSV-Text",
+        "description": "Oder fügen Sie die CSV hier ein: ein Eintrag pro Zeile, Ausgangscode und Zielcode getrennt durch Semikolon, Komma oder Tabulator. Eine Kopfzeile wie source;target wird übersprungen."
+      },
+      "preview": "Vorschau anzeigen",
+      "previewing": "Vorschau wird geladen…",
+      "back": "CSV ändern",
+      "apply": "Import anwenden",
+      "applying": "Import wird angewendet…",
+      "errors": {
+        "empty": "Wählen Sie eine CSV-Datei oder fügen Sie CSV-Text ein.",
+        "tooLarge": "Die CSV ist zu groß. Sie darf höchstens {max, number} Zeichen haben.",
+        "readFailed": "Die Datei konnte nicht gelesen werden. Wählen Sie eine andere Datei.",
+        "previewFailed": "Die Vorschau konnte nicht geladen werden. Versuchen Sie es erneut.",
+        "applyFailed": "Der Import konnte nicht angewendet werden. Versuchen Sie es erneut."
+      },
+      "result": {
+        "title": "Vorschau",
+        "description": "Nichts ändert sich, bis Sie den Import anwenden. Einträge, die in der CSV fehlen, bleiben erhalten; ungültige Zeilen werden übersprungen.",
+        "noLines": "Die CSV enthält keine Eintragszeilen.",
+        "nothingToApply": "Die CSV fügt keinen Eintrag hinzu und ändert keinen, daher gibt es nichts anzuwenden.",
+        "filter": "Zeilen anzeigen",
+        "all": "Alle",
+        "lines": "Zeilen der CSV",
+        "showing": "{shown, number} von {total, number} Zeilen angezeigt",
+        "showMore": "{count, number} weitere Zeilen anzeigen",
+        "noMatch": "Keine Zeile hat diesen Status.",
+        "changedTarget": "geändert von {previous} zu {next}",
+        "invalidCells": "Zeileninhalt"
+      },
+      "statuses": {
+        "added": "Neu",
+        "changed": "Geändert",
+        "unchanged": "Unverändert",
+        "invalid": "Ungültig"
+      },
+      "columns": {
+        "line": "Zeile",
+        "status": "Status",
+        "sourceCode": "Ausgangscode",
+        "targetCode": "Zielcode",
+        "details": "Details"
+      },
+      "reasons": {
+        "columnCount": "Braucht genau zwei Spalten.",
+        "sourceCodeMissing": "Der Ausgangscode fehlt.",
+        "targetCodeMissing": "Der Zielcode fehlt.",
+        "sourceCodeTooLong": "Der Ausgangscode hat mehr als {max} Zeichen.",
+        "targetCodeTooLong": "Der Zielcode hat mehr als {max} Zeichen.",
+        "duplicateSourceCode": "Der Ausgangscode kommt schon in einer früheren Zeile vor."
+      },
+      "applied": "CSV importiert: {added, plural, one {# Eintrag hinzugefügt} other {# Einträge hinzugefügt}}, {changed, plural, one {# Eintrag geändert} other {# Einträge geändert}}."
     }
   },
   "ManualSubmission": {

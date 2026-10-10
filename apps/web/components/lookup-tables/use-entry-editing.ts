@@ -126,12 +126,17 @@ export function useEntryEditing(table: LookupTable, { onSaved }: { onSaved: () =
     return index
   }
 
-  function discard() {
-    setRows(toRows(baseline, nextKey.current))
-    nextKey.current += baseline.length
+  function load(entries: ReadonlyArray<LookupTableEntry>) {
+    setBaseline(entries)
+    setRows(toRows(entries, nextKey.current))
+    nextKey.current += entries.length
     setUntouchedNewRows(new Set())
     setAttempted(false)
     save.reset()
+  }
+
+  function discard() {
+    load(baseline)
   }
 
   function submit(): InvalidCell | null {
@@ -165,6 +170,7 @@ export function useEntryEditing(table: LookupTable, { onSaved }: { onSaved: () =
     markTouched,
     insertRow,
     removeRow,
+    load,
     discard,
     submit,
   }

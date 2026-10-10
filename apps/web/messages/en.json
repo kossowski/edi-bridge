@@ -1780,6 +1780,74 @@
           }
         }
       }
+    },
+    "import": {
+      "open": "Import CSV",
+      "title": "Import CSV",
+      "description": "Add and update entries from a CSV with a source code and a target code per line. The import merges: it adds new source codes and changes target codes, and it keeps every entry missing from the CSV.",
+      "close": "Close",
+      "cancel": "Cancel",
+      "unsaved": {
+        "title": "Unsaved changes",
+        "description": "The entries have unsaved changes. Save or discard them before you import a CSV, so the import starts from the saved entries.",
+        "discard": "Discard changes and continue"
+      },
+      "file": {
+        "label": "CSV file",
+        "description": "Choosing a file puts its content into the CSV text below."
+      },
+      "text": {
+        "label": "CSV text",
+        "description": "Or paste the CSV here: one entry per line, source code and target code separated by a semicolon, comma or tab. A header line such as source;target is skipped."
+      },
+      "preview": "Preview import",
+      "previewing": "Loading preview…",
+      "back": "Change CSV",
+      "apply": "Apply import",
+      "applying": "Applying import…",
+      "errors": {
+        "empty": "Choose a CSV file or paste CSV text.",
+        "tooLarge": "The CSV is too large. It can have at most {max, number} characters.",
+        "readFailed": "The file could not be read. Choose another file.",
+        "previewFailed": "The preview could not be loaded. Try again.",
+        "applyFailed": "The import could not be applied. Try again."
+      },
+      "result": {
+        "title": "Preview",
+        "description": "Nothing changes until you apply the import. Entries missing from the CSV are kept, and invalid lines are skipped.",
+        "noLines": "The CSV has no entry lines.",
+        "nothingToApply": "The CSV neither adds nor changes an entry, so there is nothing to apply.",
+        "filter": "Show lines",
+        "all": "All",
+        "lines": "Lines of the CSV",
+        "showing": "Showing {shown, number} of {total, number} lines",
+        "showMore": "Show {count, number} more lines",
+        "noMatch": "No line has this status.",
+        "changedTarget": "changed from {previous} to {next}",
+        "invalidCells": "Line content"
+      },
+      "statuses": {
+        "added": "Added",
+        "changed": "Changed",
+        "unchanged": "Unchanged",
+        "invalid": "Invalid"
+      },
+      "columns": {
+        "line": "Line",
+        "status": "Status",
+        "sourceCode": "Source code",
+        "targetCode": "Target code",
+        "details": "Details"
+      },
+      "reasons": {
+        "columnCount": "Needs exactly two columns.",
+        "sourceCodeMissing": "The source code is missing.",
+        "targetCodeMissing": "The target code is missing.",
+        "sourceCodeTooLong": "The source code has more than {max} characters.",
+        "targetCodeTooLong": "The target code has more than {max} characters.",
+        "duplicateSourceCode": "The source code already occurs in an earlier line."
+      },
+      "applied": "CSV imported: {added, plural, one {# entry added} other {# entries added}}, {changed, plural, one {# entry changed} other {# entries changed}}."
     }
   },
   "ManualSubmission": {

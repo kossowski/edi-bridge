@@ -23,8 +23,11 @@ import {
   flowsEndpoint,
   inferDocumentStructureEndpoint,
   type FlowUpdate,
+  importLookupTableEndpoint,
   interchangeEndpoint,
   lookupTableEndpoint,
+  type LookupTableImportBody,
+  lookupTableImportPreviewEndpoint,
   type LookupTableInput,
   lookupTablesEndpoint,
   type ManualSubmissionInput,
@@ -271,6 +274,20 @@ export function updateLookupTable(id: string, body: LookupTableInput) {
 export function deleteLookupTable(id: string) {
   return request(deleteLookupTableEndpoint, {
     path: toPath(deleteLookupTableEndpoint.path, { id }),
+  })
+}
+
+export function previewLookupTableImport(id: string, body: LookupTableImportBody) {
+  return request(lookupTableImportPreviewEndpoint, {
+    path: toPath(lookupTableImportPreviewEndpoint.path, { id }),
+    body,
+  })
+}
+
+export function importLookupTable(id: string, body: LookupTableImportBody) {
+  return request(importLookupTableEndpoint, {
+    path: toPath(importLookupTableEndpoint.path, { id }),
+    body,
   })
 }
 
