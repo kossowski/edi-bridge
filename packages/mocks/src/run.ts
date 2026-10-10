@@ -17,7 +17,7 @@ import { seedFlows } from './flow'
 import { type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
-function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
+export function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
   // Outbound Documents come from the ERP as JSON or CSV, so they never fail at EDIFACT parsing.
   // A CONTRL is linked to its Interchange, not mapped, so no Mapping Version could fix it.
   const stages: FailureStage[] =
@@ -42,7 +42,7 @@ const weightedFlows = seedFlows.flatMap((flow) => {
   return [{ value: { flow, tradingPartner }, weight: tradingPartner.testMode ? 0.003 : 1 }]
 })
 
-function generateRun(faker: Faker, receivedAt: Date) {
+export function generateRun(faker: Faker, receivedAt: Date) {
   const { flow, tradingPartner } = faker.helpers.weightedArrayElement(weightedFlows)
 
   const status = faker.helpers.weightedArrayElement<RunStatus>([

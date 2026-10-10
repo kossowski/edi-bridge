@@ -9,6 +9,7 @@ import {
   toDocumentStructureStore,
 } from './document-structure'
 import { createFlowStore, flowHandlers } from './flow'
+import { liveEventsHandler, type LiveEventsOptions } from './live-event'
 import {
   createLookupTableStore,
   lookupTableHandlers,
@@ -87,6 +88,7 @@ export {
 } from './document-structure'
 
 export { createCsvDocument, documentStructureOrigins } from './document-structure-origin'
+export { liveEventsHandler, type LiveEventsMode, type LiveEventsOptions } from './live-event'
 
 export {
   createLookupTables,
@@ -198,6 +200,7 @@ export function createHandlers(
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
     mappingVersions,
+    liveEvents = { mode: 'quiet' },
   }: {
     workspace?: Workspace
     tradingPartners?: ReadonlyArray<TradingPartner>
@@ -207,6 +210,7 @@ export function createHandlers(
     lookupTables?: ReadonlyArray<LookupTableRecord>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
+    liveEvents?: Omit<LiveEventsOptions, 'runs'>
   } = {},
 ) {
   const runs = createRunStore(seedRuns())
@@ -232,6 +236,7 @@ export function createHandlers(
     ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings: mappingVersionStore }),
     publishedMappingVersionsHandler(apiUrl, mappingVersionStore),
     runsHandler(apiUrl, runs),
+    liveEventsHandler(apiUrl, { ...liveEvents, runs }),
     overviewHandler(apiUrl, seedOverviewData(runs)),
     ...mappingVersionHandlers(apiUrl, {
       mappings: mappingDraftStore,
