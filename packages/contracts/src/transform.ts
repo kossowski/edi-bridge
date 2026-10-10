@@ -89,9 +89,23 @@ function datePattern(field: string, pattern: string): TransformConfigIssue | fal
   return !(known && complete) && { field, code: 'invalidPattern' }
 }
 
-const expressionSyntaxErrorSchema = z.object({ position: z.number(), message: z.string() })
+const jsonataErrorSchema = z.object({
+  position: z.number(),
+  message: z.string(),
+  code: z.string().optional(),
+  token: z.union([z.string(), z.number()]).optional(),
+  value: z.union([z.string(), z.number()]).optional(),
+})
 
-export type ExpressionSyntaxError = z.infer<typeof expressionSyntaxErrorSchema>
+// `code` is the parser's error code, e.g. S0203, so the message can be shown in the user's
+// language; `token` and `value` fill its gaps, and `message` is the parser's own English text.
+export type ExpressionSyntaxError = {
+  position: number
+  message: string
+  code: string | null
+  token: string | null
+  value: string | null
+}
 
 // `position` counts the characters up to and including the token the parser stopped at.
 export function expressionSyntaxError(expression: string): ExpressionSyntaxError | null {
@@ -100,11 +114,21 @@ export function expressionSyntaxError(expression: string): ExpressionSyntaxError
 
     return null
   } catch (error) {
-    const parsed = expressionSyntaxErrorSchema.safeParse(error)
+    const parsed = jsonataErrorSchema.safeParse(error)
 
-    return parsed.success
-      ? { position: parsed.data.position, message: parsed.data.message }
-      : { position: expression.length, message: '' }
+    if (!parsed.success) {
+      return { position: expression.length, message: '', code: null, token: null, value: null }
+    }
+
+    const { position, message, code, token, value } = parsed.data
+
+    return {
+      position,
+      message,
+      code: code ?? null,
+      token: token === undefined ? null : String(token),
+      value: value === undefined ? null : String(value),
+    }
   }
 }
 

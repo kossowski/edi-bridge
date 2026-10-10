@@ -200,11 +200,21 @@ describe('expressionSyntaxError', () => {
   })
 
   it('says where the parser stopped and why', () => {
-    expect(expressionSyntaxError('foo.bar]')).toEqual({ position: 8, message: 'Syntax error: "]"' })
+    expect(expressionSyntaxError('foo.bar]')).toEqual({
+      position: 8,
+      message: 'Syntax error: "]"',
+      code: 'S0201',
+      token: ']',
+      value: null,
+    })
     expect(expressionSyntaxError('$string(SG25.PIA')).toEqual({
       position: 16,
       message: 'Expected ")" before end of expression',
+      code: 'S0203',
+      token: '(end)',
+      value: ')',
     })
+    expect(expressionSyntaxError('a.2')).toMatchObject({ code: 'S0213', token: null, value: '2' })
   })
 })
 
