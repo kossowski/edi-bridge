@@ -7,6 +7,7 @@ import {
   createChannelEndpoint,
   createFlowEndpoint,
   documentStructureEndpoint,
+  flowEndpoint,
   type FlowInput,
   lookupTablesEndpoint,
   mappingDraftEndpoint,
@@ -15,6 +16,8 @@ import {
   mappingsEndpoint,
   mappingVersionsEndpoint,
   messageTypeStructureEndpoint,
+  publishedMappingVersionsEndpoint,
+  publishMappingDraftEndpoint,
   type ReprocessRunBody,
   reprocessRunEndpoint,
   retryRunEndpoint,
@@ -23,6 +26,7 @@ import {
   runEndpoint,
   runListSchema,
   runsEndpoint,
+  saveMappingDraftEndpoint,
   submitDocumentEndpoint,
   toPath,
   toSearchParams,
@@ -108,6 +112,48 @@ describe('createHandlers', () => {
     const { runs: listed } = await listRuns({ flowId: [failed.flow.id], pageSize: 1 })
 
     expect(listed[0]).toMatchObject({ id: replacing.id, status: 'delivered' })
+  })
+
+  it('offers a version published within the same createHandlers call to Flows and Reprocess', async () => {
+    server.use(...createHandlers(apiUrl))
+    const { runs } = await listRuns({ status: ['failed'], failureStage: ['mapping'] })
+    const details = await Promise.all(runs.map(({ id }) => getRun(id)))
+    const failed = details.find(({ replacedBy }) => replacedBy === null)!
+    const { mappingId } = failed.mappingVersion!
+
+    await fetch(`${apiUrl}${toPath(saveMappingDraftEndpoint.path, { id: mappingId })}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ links: [], transforms: [], transformLinks: [] }),
+    })
+
+    const published = publishMappingDraftEndpoint.response.parse(
+      await (
+        await fetch(`${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId })}`, {
+          method: 'POST',
+        })
+      ).json(),
+    )
+
+    const offered = publishedMappingVersionsEndpoint.response.parse(
+      await (
+        await fetch(
+          `${apiUrl}${publishedMappingVersionsEndpoint.path}?${toSearchParams({ messageType: failed.messageType })}`,
+        )
+      ).json(),
+    )
+
+    const flow = flowEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${toPath(flowEndpoint.path, { id: failed.flow.id })}`)).json(),
+    )
+
+    const replacing = await post(toPath(reprocessRunEndpoint.path, { id: failed.id }), {
+      mappingVersionId: published.id,
+    })
+
+    expect(offered).toContainEqual(published)
+    expect(flow.newerMappingVersions).toContainEqual(published)
+    expect(replacing.mappingVersion).toEqual(published)
   })
 
   it('keeps the changes of one createHandlers call out of another', async () => {

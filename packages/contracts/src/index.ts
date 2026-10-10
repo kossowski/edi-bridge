@@ -131,6 +131,7 @@ export {
 export {
   type DocumentStructureSide,
   documentStructureSideSchema,
+  type GraphParts,
   type MappingDraft,
   mappingDraftEndpoint,
   mappingDraftSchema,

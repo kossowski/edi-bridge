@@ -46,7 +46,6 @@ export const publishedMappingVersionsEndpoint: Endpoint<
 
 const summaryFields = mappingVersionSummarySchema.shape
 
-// A Mapping Version is immutable: its graph and sides stay as they were when the Draft was published.
 export const mappingVersionSchema = z
   .discriminatedUnion('direction', [
     z.object({ ...summaryFields, ...graphFields, ...outboundSides }),
@@ -160,7 +159,6 @@ export const mappingComparisonSchema = z
 
 export type MappingComparison = z.infer<typeof mappingComparisonSchema>
 
-// Without a Mapping Sample the comparison shows only the mapping differences.
 export const mappingComparisonQuerySchema = z
   .object({
     from: z.uuid(),

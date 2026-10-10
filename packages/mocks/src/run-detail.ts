@@ -20,6 +20,7 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
+import { mappingVersionsForFlow } from './flow'
 import {
   type GeneratedInterchange,
   type GeneratedMessage,
@@ -27,7 +28,7 @@ import {
   partiesOf,
   serializeInterchange,
 } from './interchange'
-import { mappingVersionsForFlow } from './mapping-version'
+import { type MappingVersionStore, toMappingVersionSummary } from './mapping-version'
 import { seedRuns } from './run'
 import { type RunStore, toRunStore } from './run-store'
 import { stableUuid } from './seed-id'
@@ -138,6 +139,7 @@ type Reprocessed = { replaced: string; replacing: string }
 export type RunDetailOptions = {
   runs?: ReadonlyArray<RunSummary> | RunStore
   reprocessed?: ReadonlyArray<Reprocessed>
+  mappingVersions?: MappingVersionStore
 }
 
 export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): Reprocessed[] {
@@ -435,6 +437,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   }
 
   function versionsOf(mappingId: string) {
+    if (options.mappingVersions) {
+      return options.mappingVersions.of(mappingId).map(toMappingVersionSummary)
+    }
+
     ensureIndexed()
     const flows = new Map(runs.all().map((run) => [run.flow.id, run]))
 
@@ -442,6 +448,15 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       .map(mappingVersionsForFlow)
       .find((versions) => versions[0]?.mappingId === mappingId)
   }
+
+  const versionListHandler = http.get<{ mappingId: string }>(
+    `${apiUrl}${mappingVersionsEndpoint.path}`,
+    ({ params }) => {
+      const versions = versionsOf(params.mappingId)
+
+      return versions ? HttpResponse.json(versions) : problem(404, 'Not Found')
+    },
+  )
 
   return [
     http.get<{ id: string }>(`${apiUrl}${runEndpoint.path}`, ({ params }) => {
@@ -484,7 +499,9 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
         const version =
           body.success &&
-          mappingVersionsForFlow(run).find(({ id }) => id === body.data.mappingVersionId)
+          versionsOf(mappingVersionsForFlow(run)[0]!.mappingId)?.find(
+            ({ id }) => id === body.data.mappingVersionId,
+          )
 
         if (!version) {
           return problem(422, 'The Mapping Version does not belong to the Mapping of this Run.')
@@ -499,11 +516,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
       return result ? HttpResponse.json(result) : problem(404, 'Not Found')
     }),
-
-    http.get<{ mappingId: string }>(`${apiUrl}${mappingVersionsEndpoint.path}`, ({ params }) => {
-      const versions = versionsOf(params.mappingId)
-
-      return versions ? HttpResponse.json(versions) : problem(404, 'Not Found')
-    }),
+    // Within createHandlers the Mapping Version handlers serve this list from the shared store.
+    ...(options.mappingVersions ? [] : [versionListHandler]),
   ]
 }

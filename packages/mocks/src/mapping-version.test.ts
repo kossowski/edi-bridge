@@ -24,6 +24,7 @@ import {
   type MappingDraftRecord,
   seedMappingDrafts,
 } from './mapping'
+import { seedMappingSamples } from './mapping-sample'
 import {
   createMappingVersions,
   deriveMappingVersions,
@@ -31,8 +32,7 @@ import {
   mappingVersionHandlers,
   seedMappingVersions,
   toMappingVersion,
-} from './mapping-history'
-import { seedMappingSamples } from './mapping-sample'
+} from './mapping-version'
 
 const apiUrl = 'http://api.test'
 
@@ -295,7 +295,7 @@ describe('GET /mappings/:mappingId/comparison', () => {
     expect(comparison.outputs).toBeNull()
   })
 
-  it('shows both outputs and their differences for the same Mapping Sample', async () => {
+  it('shows both outputs and their differences for the same Sample Document', async () => {
     server.use(...mappingVersionHandlers(apiUrl))
 
     const response = await compare(published.id, {
@@ -328,7 +328,7 @@ describe('GET /mappings/:mappingId/comparison', () => {
     expect((await compare(published.id, { from: to, to })).status).toBe(400)
   })
 
-  it('answers 404 for a version or Mapping Sample of another Mapping', async () => {
+  it('answers 404 for a version or Sample Document of another Mapping', async () => {
     server.use(...mappingVersionHandlers(apiUrl))
     const versions = await oldestAndLatest()
     const [foreign] = await listVersions(changed.id)

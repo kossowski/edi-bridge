@@ -174,7 +174,7 @@ describe('mappingComparisonSchema', () => {
 })
 
 describe('mappingComparisonQuerySchema', () => {
-  it('takes two versions and an optional Mapping Sample', () => {
+  it('takes two versions and an optional Sample Document', () => {
     expect(mappingComparisonQuerySchema.parse({ from: first.id, to: second.id })).toEqual({
       from: first.id,
       to: second.id,

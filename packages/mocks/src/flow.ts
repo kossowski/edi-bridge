@@ -16,19 +16,18 @@ import {
   flowSummarySchema,
   type FlowUpdate,
   messageTypes,
+  type MappingVersionSummary,
+  mappingVersionSummarySchema,
+  type MessageType,
   moveFlowMappingVersionEndpoint,
+  type RunSummary,
   updateFlowEndpoint,
 } from '@edi-bridge/contracts'
 
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
-import {
-  type MappingCatalogue,
-  mappingOfFlow,
-  type MappingRecord,
-  toMappingCatalogue,
-} from './mapping-version'
 import { badRequest, conflict, notFound, unprocessable } from './responses'
 import { seedId } from './seed-id'
+import { seededFaker } from './seeded-faker'
 import { hasTraffic, seedTradingPartners } from './trading-partner'
 
 export type FlowRecord = FlowSummary & Omit<FlowInput, keyof FlowSummary>
@@ -45,6 +44,82 @@ const seedSummaries: ReadonlyArray<FlowSummary> = seedTradingPartners
       }),
     ),
   )
+
+const firstPublication = Date.parse('2026-03-02T09:00:00.000Z')
+
+export function mappingVersionsForFlow({
+  flow,
+  messageType,
+}: Pick<RunSummary, 'flow' | 'messageType'>): MappingVersionSummary[] {
+  const faker = seededFaker(`mapping:${flow.id}`)
+  const mappingId = faker.string.uuid()
+  const tradingPartnerName = flow.name.split(' ')[0]
+
+  const mappingName =
+    directionOf({ messageType }) === 'outbound'
+      ? `${tradingPartnerName}: ERP JSON to ${messageType}`
+      : `${tradingPartnerName}: ${messageType} to ERP JSON`
+
+  const count = faker.number.int({ min: 1, max: 5 })
+
+  return Array.from({ length: count }, (_, index) => {
+    const version = count - index
+
+    return mappingVersionSummarySchema.parse({
+      id: faker.string.uuid(),
+      mappingId,
+      mappingName,
+      version,
+      publishedAt: new Date(firstPublication + (version - 1) * 23 * 86_400_000).toISOString(),
+    })
+  })
+}
+
+// A Mapping with its published versions, newest first. The Message Type is what the Mapping
+// reads or writes, so the Flow form only offers versions that fit the Flow.
+export type MappingRecord = {
+  mappingId: string
+  messageType: MessageType
+  versions: ReadonlyArray<MappingVersionSummary>
+}
+
+function mappingOfFlow(flow: FlowSummary): MappingRecord {
+  const versions = mappingVersionsForFlow({ flow, messageType: flow.messageType })
+
+  return { mappingId: versions[0]!.mappingId, messageType: flow.messageType, versions }
+}
+
+export type MappingCatalogue = {
+  published: (messageType?: MessageType) => MappingVersionSummary[]
+  find: (
+    mappingVersionId: string,
+  ) => { mapping: MappingRecord; version: MappingVersionSummary } | undefined
+}
+
+export function byNameAndNewest(a: MappingVersionSummary, b: MappingVersionSummary) {
+  return a.mappingName.localeCompare(b.mappingName, 'de') || b.version - a.version
+}
+
+export function createMappingCatalogue(mappings: ReadonlyArray<MappingRecord>): MappingCatalogue {
+  const byVersionId = new Map(
+    mappings.flatMap((mapping) =>
+      mapping.versions.map((version) => [version.id, { mapping, version }] as const),
+    ),
+  )
+
+  return {
+    published: (messageType) =>
+      mappings
+        .filter((mapping) => messageType === undefined || mapping.messageType === messageType)
+        .flatMap(({ versions }) => versions)
+        .sort(byNameAndNewest),
+    find: (mappingVersionId) => byVersionId.get(mappingVersionId),
+  }
+}
+
+export function toMappingCatalogue(mappings: ReadonlyArray<MappingRecord> | MappingCatalogue) {
+  return 'published' in mappings ? mappings : createMappingCatalogue(mappings)
+}
 
 export const seedMappings: ReadonlyArray<MappingRecord> = seedSummaries.map(mappingOfFlow)
 

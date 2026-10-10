@@ -19,12 +19,13 @@ import { type ChannelRecord, seedChannels } from './channel'
 import {
   createFlows,
   createFlowStore,
+  createMappingCatalogue,
   flowHandlers,
   type FlowRecord,
   seedFlows,
   seedMappings,
 } from './flow'
-import { createMappingCatalogue, publishedMappingVersionsHandler } from './mapping-version'
+import { publishedMappingVersionsHandler } from './mapping-version'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'

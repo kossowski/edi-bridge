@@ -391,9 +391,12 @@ function seedUpdatedAt(index: number) {
 
 export const unpublishedDraftId = seedId(7, 1)
 
-// Each Message Type has one complete Draft, one half-done and one without links. The half-done
-// ones carry changes since their latest version.
-const linkShares = [1, 0.5, 0]
+// Each Message Type has one complete Draft, one half-done and one without links.
+const seedDraftStages = [
+  { linkShare: 1, unpublishedChanges: false },
+  { linkShare: 0.5, unpublishedChanges: true },
+  { linkShare: 0, unpublishedChanges: false },
+]
 
 export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
   ...seedMappings.map((mapping, index): MappingDraftRecord => {
@@ -403,7 +406,8 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
       .slice(0, index)
       .filter(({ messageType }) => messageType === mapping.messageType).length
 
-    const share = linkShares[sameTypeBefore % linkShares.length]!
+    const { linkShare, unpublishedChanges } =
+      seedDraftStages[sameTypeBefore % seedDraftStages.length]!
 
     return {
       id: mapping.mappingId,
@@ -411,8 +415,8 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
       messageType: mapping.messageType,
       documentStructureId: seedDocumentStructureOf[mapping.messageType].id,
       latestVersion: newest.version,
-      unpublishedChanges: share === 0.5,
-      ...templateDraftGraph(mapping.mappingId, mapping.messageType, share),
+      unpublishedChanges,
+      ...templateDraftGraph(mapping.mappingId, mapping.messageType, linkShare),
       updatedAt: seedUpdatedAt(index),
     }
   }),
@@ -512,6 +516,12 @@ function randomGraph(
   return { transforms, transformLinks }
 }
 
+const changedDraftEvery = 3
+
+function hasUnpublishedChanges(index: number, latestVersion: number | null) {
+  return latestVersion === null || index % changedDraftEvery === 0
+}
+
 // Cycles through the Message Types, so even two Drafts cover both directions.
 export function createMappingDrafts({
   count,
@@ -546,7 +556,7 @@ export function createMappingDrafts({
       messageType,
       documentStructureId: documentStructure.id,
       latestVersion,
-      unpublishedChanges: latestVersion === null || index % 3 === 0,
+      unpublishedChanges: hasUnpublishedChanges(index, latestVersion),
       updatedAt: faker.date.between({ from: '2026-01-01', to: '2026-09-30' }).toISOString(),
     }
 
