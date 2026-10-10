@@ -2,12 +2,15 @@ name: CI
 
 on:
   pull_request:
+  # Fills the Turbo cache on main, which every new branch can restore.
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,9 +46,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Read Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter @edi-bridge/web exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+
       # Story tests (Vitest browser mode) and Playwright both run in Chromium.
       - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @edi-bridge/web exec playwright install --with-deps chromium
 
+      # The cache holds the browser, not the system libraries it needs.
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @edi-bridge/web exec playwright install-deps chromium
+
+      # Main runs every task, so its cache covers every package.
       - name: Lint, check-types, test and build affected packages
-        run: pnpm turbo run lint check-types test test:e2e build build-storybook --affected
+        run: pnpm turbo run lint check-types test test:e2e build build-storybook ${{ github.event_name == 'pull_request' && '--affected' || '' }}
