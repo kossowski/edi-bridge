@@ -15,7 +15,6 @@ import {
 } from '@edi-bridge/contracts'
 
 import { compatible, type DocumentValues, type Entry } from './document-values'
-import { seedId } from './seed-id'
 
 // A rough stand-in for the mapping engine of tickets 27 and 28: enough to show what a change does
 // to the target Document, not a faithful execution of the Mapping.
@@ -34,45 +33,7 @@ const failed = (transformId: string | null, code: PreviewNoteCode): Outcome => (
   code,
 })
 
-// A few rows per seed Lookup Table; ticket 14 brings the real entries.
-const lookupRows = new Map([
-  [
-    seedId(8, 1),
-    new Map([
-      ['ST', 'PCE'],
-      ['STK', 'PCE'],
-      ['KG', 'KGM'],
-      ['L', 'LTR'],
-    ]),
-  ],
-  [
-    seedId(8, 2),
-    new Map([
-      ['Deutschland', 'DE'],
-      ['Österreich', 'AT'],
-      ['Schweiz', 'CH'],
-    ]),
-  ],
-  [
-    seedId(8, 3),
-    new Map([
-      ['19', 'S'],
-      ['7', 'AA'],
-      ['0', 'Z'],
-    ]),
-  ],
-  [
-    seedId(8, 4),
-    new Map([
-      ['ST', 'PCE'],
-      ['KAR', 'CT'],
-    ]),
-  ],
-])
-
-function lookUp(lookupTableId: string | null, value: string) {
-  return lookupTableId === null ? undefined : lookupRows.get(lookupTableId)?.get(value)
-}
+export type LookUp = (lookupTableId: string | null, value: string) => string | undefined
 
 const dateTokens = ['yyyy', 'yy', 'MM', 'dd', 'HH', 'mm', 'ss'] as const
 
@@ -141,6 +102,7 @@ function holds(operator: ConditionOperator, value: string, compareTo: string) {
 function applyTransform(
   transform: MappingTransform,
   args: Readonly<Record<string, string>>,
+  lookUp: LookUp,
 ): string | undefined {
   const value = args.value ?? ''
 
@@ -266,7 +228,7 @@ export function previewEntries(
   graph: MappingGraph,
   values: DocumentValues,
   expressions: ExpressionResults,
-  unknown: UnknownPaths = noUnknownPaths,
+  { unknown = noUnknownPaths, lookUp }: { unknown?: UnknownPaths; lookUp: LookUp },
 ) {
   const issues = transformIssues(graph)
   const byId = new Map(graph.transforms.map((transform) => [transform.id, transform]))
@@ -351,7 +313,7 @@ export function previewEntries(
         ]),
       )
 
-      const value = applyTransform(transform, args)
+      const value = applyTransform(transform, args, lookUp)
 
       if (value === undefined) {
         return failed(transform.id, 'noLookupMatch')

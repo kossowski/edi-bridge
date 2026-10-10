@@ -12,6 +12,7 @@ import {
   flowEndpoint,
   type FlowInput,
   lookupTablesEndpoint,
+  type MappingGraph,
   mappingDraftEndpoint,
   mappingPreviewEndpoint,
   mappingSamplesEndpoint,
@@ -33,6 +34,7 @@ import {
   toPath,
   toSearchParams,
   updateDocumentStructureEndpoint,
+  updateLookupTableEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
@@ -44,6 +46,8 @@ import {
   seedChannels,
   seedDocumentStructureOf,
   seedFlows,
+  seedLookupTableNamed,
+  seedMappingDrafts,
 } from './index'
 
 const apiUrl = 'http://api.test'
@@ -362,6 +366,66 @@ describe('createHandlers', () => {
 
     server.resetHandlers(...createHandlers(apiUrl, { lookupTables: [] }))
     expect(await listLookupTables()).toEqual([])
+  })
+
+  it('previews a Lookup Table node with the entries saved for the table', async () => {
+    server.use(...createHandlers(apiUrl))
+    const vat = seedLookupTableNamed('VAT categories')
+    const invoic = seedMappingDrafts.find(({ name }) => name === 'Hansemarkt: ERP JSON to INVOIC')!
+    const transformId = '0000000b-0000-4000-8000-000000000001'
+
+    const graph: MappingGraph = {
+      links: [],
+      transforms: [
+        {
+          id: transformId,
+          kind: 'lookupTable',
+          position: { x: 0, y: 0 },
+          config: { lookupTableId: vat.id, fallback: 'fail' },
+        },
+      ],
+      transformLinks: [
+        {
+          from: { kind: 'source', path: 'lines[].vatRate' },
+          to: { kind: 'transform', transformId, input: 'value' },
+        },
+        {
+          from: { kind: 'transform', transformId, output: 'value' },
+          to: { kind: 'target', path: 'SG25/SG33/TAX+7/C241/5153' },
+        },
+      ],
+    }
+
+    const [sample] = mappingSamplesEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${toPath(mappingSamplesEndpoint.path, invoic)}`)).json(),
+    )
+
+    await fetch(`${apiUrl}${toPath(updateLookupTableEndpoint.path, vat)}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: vat.name,
+        scope: { kind: 'workspace' },
+        entries: [
+          { sourceCode: '19', targetCode: 'E' },
+          { sourceCode: '7', targetCode: 'E' },
+        ],
+      }),
+    })
+
+    const response = await fetch(`${apiUrl}${toPath(mappingPreviewEndpoint.path, invoic)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sampleId: sample!.id, graph }),
+    })
+
+    const preview = mappingPreviewEndpoint.response.parse(await response.json())
+    const lines = preview.document.format === 'edifact' ? preview.document.content.split('\n') : []
+    const taxLines = lines.filter((line) => line.startsWith('TAX+7+'))
+
+    expect(taxLines).not.toHaveLength(0)
+    expect(taxLines.every((line) => line.startsWith('TAX+7+E+'))).toBe(true)
+    expect(preview.notes).toEqual([])
   })
 
   it('serves the samples and previews of custom Mapping Drafts', async () => {

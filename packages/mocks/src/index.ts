@@ -1,9 +1,4 @@
-import type {
-  DocumentStructure,
-  LookupTableSummary,
-  TradingPartner,
-  Workspace,
-} from '@edi-bridge/contracts'
+import type { DocumentStructure, TradingPartner, Workspace } from '@edi-bridge/contracts'
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
 import {
@@ -14,7 +9,12 @@ import {
   toDocumentStructureStore,
 } from './document-structure'
 import { createFlowStore, flowHandlers } from './flow'
-import { lookupTablesHandler, seedLookupTables } from './lookup-table'
+import {
+  createLookupTableStore,
+  lookupTableHandlers,
+  type LookupTableRecord,
+  seedLookupTables,
+} from './lookup-table'
 import { manualSubmissionHandler } from './manual-submission'
 import {
   type MappingDraftRecord,
@@ -85,9 +85,15 @@ export { createCsvDocument, documentStructureOrigins } from './document-structur
 
 export {
   createLookupTables,
+  createLookupTableStore,
+  lookupTableHandlers,
+  type LookupTableRecord,
   lookupTablesHandler,
+  type LookupTableStore,
   seedLookupTableNamed,
   seedLookupTables,
+  toLookupTable,
+  toLookupTableSummary,
 } from './lookup-table'
 
 export { manualSubmissionHandler } from './manual-submission'
@@ -179,7 +185,7 @@ export function createHandlers(
     channels?: ReadonlyArray<ChannelRecord>
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
-    lookupTables?: ReadonlyArray<LookupTableSummary>
+    lookupTables?: ReadonlyArray<LookupTableRecord>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
   } = {},
@@ -190,6 +196,7 @@ export function createHandlers(
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
   const documentStructureStore = toDocumentStructureStore(documentStructures)
+  const lookupTableStore = createLookupTableStore(lookupTables)
 
   const mappingVersionStore = toMappingVersionStore(
     mappingVersions ?? [...seedMappingVersions, ...createMappingVersions(mappingDraftStore.all())],
@@ -207,6 +214,7 @@ export function createHandlers(
       versions: mappingVersionStore,
       samples: mappingSamples,
       documentStructures: documentStructureStore,
+      lookupTables: lookupTableStore,
     }),
     ...runDetailHandlers(apiUrl, {
       runs,
@@ -222,6 +230,7 @@ export function createHandlers(
       mappings: mappingDraftStore,
       samples: mappingSamples,
       documentStructures: documentStructureStore,
+      lookupTables: lookupTableStore,
     }),
     ...documentStructureHandlers(apiUrl, {
       documentStructures: documentStructureStore,
@@ -229,6 +238,6 @@ export function createHandlers(
       versions: mappingVersionStore,
     }),
     messageTypeStructureHandler(apiUrl),
-    lookupTablesHandler(apiUrl, lookupTables),
+    ...lookupTableHandlers(apiUrl, { lookupTables: lookupTableStore, tradingPartners }),
   ]
 }
