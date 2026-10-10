@@ -89,21 +89,38 @@ function datePattern(field: string, pattern: string): TransformConfigIssue | fal
   return !(known && complete) && { field, code: 'invalidPattern' }
 }
 
+const expressionSyntaxErrorSchema = z.object({ position: z.number(), message: z.string() })
+
+export type ExpressionSyntaxError = z.infer<typeof expressionSyntaxErrorSchema>
+
+// `position` counts the characters up to and including the token the parser stopped at.
+export function expressionSyntaxError(expression: string): ExpressionSyntaxError | null {
+  try {
+    jsonata(expression)
+
+    return null
+  } catch (error) {
+    const parsed = expressionSyntaxErrorSchema.safeParse(error)
+
+    return parsed.success
+      ? { position: parsed.data.position, message: parsed.data.message }
+      : { position: expression.length, message: '' }
+  }
+}
+
 function expression(field: string, value: string): TransformConfigIssue | false {
   if (blank(value)) {
     return { field, code: 'required' }
   }
 
-  try {
-    jsonata(value)
-
-    return false
-  } catch {
-    return { field, code: 'invalidExpression' }
-  }
+  return expressionSyntaxError(value) !== null && { field, code: 'invalidExpression' }
 }
 
-const operatorsWithOperand: ReadonlyArray<ConditionOperator> = ['equals', 'notEquals', 'contains']
+export const operatorsWithOperand: ReadonlyArray<ConditionOperator> = [
+  'equals',
+  'notEquals',
+  'contains',
+]
 
 const singleValue = (): TransformPorts => ({ inputs: ['value'], outputs: ['value'] })
 
