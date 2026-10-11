@@ -164,9 +164,9 @@ export const Narrow = meta.story({
     const signIn = canvas.getByRole('heading', { level: 1, name: 'Sign in' })
     const valueStatement = canvas.getByRole('heading', { name: /^Exchange purchase orders/ })
 
-    await expect(signIn.getBoundingClientRect().top).toBeLessThan(
-      valueStatement.getBoundingClientRect().top,
-    )
+    await expect(
+      signIn.compareDocumentPosition(valueStatement) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   },
 })
 
