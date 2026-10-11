@@ -21,6 +21,22 @@
       "label": "Language",
       "en": "English",
       "de": "Deutsch"
+    },
+    "session": {
+      "accountMenu": "Account of {name}",
+      "signedInAs": "Signed in as",
+      "role": {
+        "operator": "Operator",
+        "admin": "Admin",
+        "viewer": "Viewer"
+      },
+      "viewOnly": "View only",
+      "viewOnlyDescription": "You can see everything in this Workspace but change nothing.",
+      "signOut": "Sign out",
+      "signingOut": "Signing out…",
+      "signOutFailed": "Sign-out failed. Try again.",
+      "redirecting": "Your session has ended. Opening the sign-in page…",
+      "checkingAccess": "Checking access"
     }
   },
   "Navigation": {
@@ -51,6 +67,28 @@
   "NotFound": {
     "title": "Page not found",
     "description": "This page does not exist. Use the navigation to go to another screen."
+  },
+  "Login": {
+    "title": "Sign in to EDI Bridge",
+    "metaTitle": "Sign in",
+    "description": "Use the email address and password from your invite.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "errors": {
+      "emailRequired": "Enter your email address.",
+      "emailInvalid": "Enter a valid email address, for example name@example.com.",
+      "passwordRequired": "Enter your password.",
+      "wrongCredentials": "The email address or password is wrong.",
+      "failed": "Sign-in failed. Try again in a moment.",
+      "liveDemoFailed": "The live demo could not be opened. Try again in a moment."
+    },
+    "or": "or",
+    "liveDemo": "View live demo",
+    "liveDemoPending": "Opening live demo…",
+    "liveDemoDescription": "Explore the Showcase Workspace as a Viewer, without an account.",
+    "noAccount": "Accounts are created by invite from the Operator."
   },
   "Overview": {
     "loading": "Loading Overview",

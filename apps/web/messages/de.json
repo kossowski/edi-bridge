@@ -21,6 +21,22 @@
       "label": "Sprache",
       "en": "English",
       "de": "Deutsch"
+    },
+    "session": {
+      "accountMenu": "Konto von {name}",
+      "signedInAs": "Angemeldet als",
+      "role": {
+        "operator": "Operator",
+        "admin": "Admin",
+        "viewer": "Viewer"
+      },
+      "viewOnly": "Nur ansehen",
+      "viewOnlyDescription": "Sie sehen alles in diesem Workspace, können aber nichts ändern.",
+      "signOut": "Abmelden",
+      "signingOut": "Wird abgemeldet …",
+      "signOutFailed": "Abmelden fehlgeschlagen. Versuchen Sie es erneut.",
+      "redirecting": "Ihre Sitzung ist beendet. Die Anmeldeseite wird geöffnet …",
+      "checkingAccess": "Zugriff wird geprüft"
     }
   },
   "Navigation": {
@@ -51,6 +67,28 @@
   "NotFound": {
     "title": "Seite nicht gefunden",
     "description": "Diese Seite gibt es nicht. Wechseln Sie über die Navigation zu einer anderen Ansicht."
+  },
+  "Login": {
+    "title": "Bei EDI Bridge anmelden",
+    "metaTitle": "Anmelden",
+    "description": "Verwenden Sie die E-Mail-Adresse und das Passwort aus Ihrer Einladung.",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "submitting": "Wird angemeldet …",
+    "errors": {
+      "emailRequired": "Geben Sie Ihre E-Mail-Adresse ein.",
+      "emailInvalid": "Geben Sie eine gültige E-Mail-Adresse ein, zum Beispiel name@example.com.",
+      "passwordRequired": "Geben Sie Ihr Passwort ein.",
+      "wrongCredentials": "E-Mail-Adresse oder Passwort ist falsch.",
+      "failed": "Anmelden fehlgeschlagen. Versuchen Sie es gleich noch einmal.",
+      "liveDemoFailed": "Die Live-Demo konnte nicht geöffnet werden. Versuchen Sie es gleich noch einmal."
+    },
+    "or": "oder",
+    "liveDemo": "Live-Demo ansehen",
+    "liveDemoPending": "Live-Demo wird geöffnet …",
+    "liveDemoDescription": "Erkunden Sie den Showcase Workspace als Viewer, ohne Konto.",
+    "noAccount": "Konten entstehen über eine Einladung des Operators."
   },
   "Overview": {
     "loading": "Übersicht wird geladen",

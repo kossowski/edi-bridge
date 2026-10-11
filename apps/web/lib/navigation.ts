@@ -54,11 +54,13 @@ export const navigationGroups = [
       'lookupTables',
       'settings',
     ],
+    operatorOnly: false,
   },
-  { label: 'platformGroup', items: ['operator'] },
+  { label: 'platformGroup', items: ['operator'], operatorOnly: true },
 ] as const satisfies ReadonlyArray<{
   label: 'workspaceGroup' | 'platformGroup'
   items: ReadonlyArray<NavigationKey>
+  operatorOnly: boolean
 }>
 
 export function isActivePath(pathname: string, href: string) {

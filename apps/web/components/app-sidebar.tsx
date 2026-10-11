@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { useSession } from '@/hooks/use-session'
 import { appIcon, isActivePath, navigationGroups, navigationItems } from '@/lib/navigation'
 import {
   Sidebar,
@@ -25,6 +26,7 @@ export function AppSidebar() {
   const tNavigation = useTranslations('Navigation')
   const pathname = usePathname()
   const { setOpenMobile } = useSidebar()
+  const { operator } = useSession()
 
   return (
     <Sidebar collapsible="icon" label={tShell('mainNavigation')}>
@@ -36,34 +38,36 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <nav aria-label={tShell('mainNavigation')}>
-          {navigationGroups.map((group) => (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{tShell(group.label)}</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {group.items.map((key) => {
-                    const item = navigationItems[key]
-                    const isActive = isActivePath(pathname, item.href)
-                    const label = tNavigation(key)
+          {navigationGroups
+            .filter((group) => operator || !group.operatorOnly)
+            .map((group) => (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel>{tShell(group.label)}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.items.map((key) => {
+                      const item = navigationItems[key]
+                      const isActive = isActivePath(pathname, item.href)
+                      const label = tNavigation(key)
 
-                    return (
-                      <SidebarMenuItem key={key}>
-                        <SidebarMenuButton
-                          isActive={isActive}
-                          render={<Link href={item.href} />}
-                          tooltip={label}
-                          aria-current={isActive ? 'page' : undefined}
-                          onClick={() => setOpenMobile(false)}>
-                          <HugeiconsIcon icon={item.icon} strokeWidth={2} />
-                          <span>{label}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
+                      return (
+                        <SidebarMenuItem key={key}>
+                          <SidebarMenuButton
+                            isActive={isActive}
+                            render={<Link href={item.href} />}
+                            tooltip={label}
+                            aria-current={isActive ? 'page' : undefined}
+                            onClick={() => setOpenMobile(false)}>
+                            <HugeiconsIcon icon={item.icon} strokeWidth={2} />
+                            <span>{label}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      )
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
         </nav>
       </SidebarContent>
       <SidebarRail label={tShell('toggleSidebar')} />

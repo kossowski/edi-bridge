@@ -58,6 +58,11 @@ import {
   reprocessRunEndpoint,
   retryRunEndpoint,
   type SaveMappingDraftBody,
+  sessionEndpoint,
+  showcaseSignInEndpoint,
+  type SignInBody,
+  signInEndpoint,
+  signOutEndpoint,
   saveMappingDraftEndpoint,
   runEndpoint,
   type RunListQuery,
@@ -127,6 +132,7 @@ async function request<
 
   const response = await fetch(`${apiUrl}${path}${search}`, {
     method: endpoint.method,
+    credentials: 'include',
     ...(endpoint.body && {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(endpoint.body.parse(body)),
@@ -144,6 +150,26 @@ export async function openLiveEvents() {
   await mockingReady()
 
   return new EventSource(`${apiUrl}${liveEventsEndpoint.path}`)
+}
+
+export function getSession() {
+  return request(sessionEndpoint)
+}
+
+export function signIn(body: SignInBody) {
+  return request(signInEndpoint, { body })
+}
+
+export function signOut() {
+  return request(signOutEndpoint)
+}
+
+export function signInToShowcase() {
+  return request(showcaseSignInEndpoint)
+}
+
+export function isUnauthorized(error: Error | null) {
+  return error instanceof ApiError && error.status === 401
 }
 
 export function getCurrentWorkspace() {

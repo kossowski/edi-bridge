@@ -1,9 +1,11 @@
-import { getTranslations } from 'next-intl/server'
+'use client'
+
+import { useTranslations } from 'next-intl'
 
 import { Empty, EmptyDescription, EmptyHeader } from '@edi-bridge/ui/components/empty'
 
-export default async function NotFound() {
-  const t = await getTranslations('NotFound')
+export function NotFoundMessage() {
+  const t = useTranslations('NotFound')
 
   return (
     <div className="flex flex-1 flex-col p-6">
