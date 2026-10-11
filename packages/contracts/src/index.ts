@@ -466,10 +466,70 @@ export {
 } from './trading-partner'
 
 export {
+  createInviteEndpoint,
+  createWorkspaceEndpoint,
+  type Invite,
+  type InviteInput,
+  inviteInputSchema,
+  inviteSchema,
+  inviteValidityDays,
+  maxWorkspaceNameLength,
+  operatorWorkspacesEndpoint,
+  resetSandboxWorkspaceEndpoint,
+  type WorkspaceInput,
+  workspaceInputSchema,
+  workspaceInvitesEndpoint,
+  type WorkspaceSummary,
+  workspaceSummarySchema,
+} from './operator'
+
+export {
+  type Session,
+  sessionEndpoint,
+  sessionSchema,
+  type SessionUser,
+  sessionUserSchema,
+  type SessionWorkspace,
+  sessionWorkspaceSchema,
+  showcaseSignInEndpoint,
+  type SignedIn,
+  signedInSchema,
+  type SignedOut,
+  signedOutSchema,
+  type SignInBody,
+  signInBodySchema,
+  signInEndpoint,
+  signOutEndpoint,
+} from './session'
+
+export {
   type CompanyIdentityInput,
   companyIdentityInputSchema,
   currentWorkspaceEndpoint,
   updateCompanyIdentityEndpoint,
   type Workspace,
+  type WorkspaceKind,
+  workspaceKinds,
+  workspaceKindSchema,
+  type WorkspaceRole,
+  workspaceRoles,
+  workspaceRoleSchema,
   workspaceSchema,
 } from './workspace'
+
+export {
+  aiDailyTokenLimit,
+  aiDailyTokenLimitSchema,
+  type AiTokenBudget,
+  aiTokenBudgetSchema,
+  documentRetentionDays,
+  documentRetentionDaysSchema,
+  operatorWorkspaceSettingsEndpoint,
+  updateOperatorWorkspaceSettingsEndpoint,
+  updateWorkspaceSettingsEndpoint,
+  type WorkspaceSettings,
+  workspaceSettingsEndpoint,
+  type WorkspaceSettingsInput,
+  workspaceSettingsInputSchema,
+  workspaceSettingsSchema,
+} from './workspace-settings'

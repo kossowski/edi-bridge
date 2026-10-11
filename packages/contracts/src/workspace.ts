@@ -33,3 +33,15 @@ export const updateCompanyIdentityEndpoint: Endpoint<
   body: companyIdentityInputSchema,
   response: workspaceSchema,
 }
+
+export const workspaceKinds = ['standard', 'showcase', 'sandbox'] as const
+
+export const workspaceKindSchema = z.enum(workspaceKinds)
+
+export type WorkspaceKind = z.infer<typeof workspaceKindSchema>
+
+export const workspaceRoles = ['admin', 'viewer'] as const
+
+export const workspaceRoleSchema = z.enum(workspaceRoles)
+
+export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>

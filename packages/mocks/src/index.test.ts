@@ -9,12 +9,14 @@ import {
   createDocumentStructureEndpoint,
   createLookupTableEndpoint,
   createTradingPartnerEndpoint,
+  currentWorkspaceEndpoint,
   documentStructureEndpoint,
   documentStructuresEndpoint,
   flowEndpoint,
   type FlowInput,
   type LookupTableInput,
   lookupTableEndpoint,
+  showcaseSignInEndpoint,
   lookupTablesEndpoint,
   type MappingGraph,
   mappingDraftEndpoint,
@@ -23,6 +25,7 @@ import {
   mappingsEndpoint,
   mappingVersionsEndpoint,
   messageTypeStructureEndpoint,
+  operatorWorkspacesEndpoint,
   orderLifecyclesEndpoint,
   overviewEndpoint,
   publishedMappingVersionsEndpoint,
@@ -36,6 +39,10 @@ import {
   runListSchema,
   runsEndpoint,
   saveMappingDraftEndpoint,
+  sessionEndpoint,
+  sessionSchema,
+  signInEndpoint,
+  signOutEndpoint,
   submitDocumentEndpoint,
   toPath,
   toSearchParams,
@@ -43,7 +50,10 @@ import {
   tradingPartnerSchema,
   updateDocumentStructureEndpoint,
   updateLookupTableEndpoint,
+  updateCompanyIdentityEndpoint,
   updateTradingPartnerEndpoint,
+  updateWorkspaceSettingsEndpoint,
+  withCheckDigit,
 } from '@edi-bridge/contracts'
 
 import {
@@ -51,14 +61,19 @@ import {
   createHandlers,
   createMappingDrafts,
   createMappingSample,
+  createWorkspace,
   documentStructureOrigins,
+  mockCredentials,
   orderLifecycleReferences,
   seedChannels,
   seedDocumentStructureOf,
   seedFlows,
   seedLookupTableNamed,
   seedMappingDrafts,
+  seedSandboxWorkspace,
+  seedShowcaseWorkspace,
   seedTradingPartners,
+  seedWorkspace,
 } from './index'
 
 const apiUrl = 'http://api.test'
@@ -587,5 +602,102 @@ describe('createHandlers', () => {
 
     expect(samples.map(({ id }) => id)).toEqual([sample.id])
     expect(mappingPreviewEndpoint.response.parse(await preview.json()).sampleId).toBe(sample.id)
+  })
+
+  it('starts signed in as the Operator in the Workspace the screens show', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const session = sessionSchema.parse(
+      await (await fetch(`${apiUrl}${sessionEndpoint.path}`)).json(),
+    )
+
+    const current = currentWorkspaceEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${currentWorkspaceEndpoint.path}`)).json(),
+    )
+
+    expect(session).toMatchObject({ operator: true, role: 'admin' })
+    expect(session.workspace).toMatchObject({ id: current.id, name: current.name })
+  })
+
+  it('keeps a sign-out within one createHandlers call for the Operator area', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    await fetch(`${apiUrl}${signOutEndpoint.path}`, { method: 'POST' })
+    const signedOut = await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)
+
+    server.resetHandlers(...createHandlers(apiUrl))
+    const fresh = await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)
+
+    expect(signedOut.status).toBe(401)
+    expect(fresh.status).toBe(200)
+  })
+
+  it('keeps the Showcase Viewer from changing the Workspace settings', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    await fetch(`${apiUrl}${showcaseSignInEndpoint.path}`, { method: 'POST' })
+
+    const response = await fetch(`${apiUrl}${updateWorkspaceSettingsEndpoint.path}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ documentRetentionDays: 30, aiTokenBudget: { dailyLimit: 1 } }),
+    })
+
+    expect(response.status).toBe(403)
+  })
+
+  it.each([
+    ['the Showcase sign-in', 'showcase', seedShowcaseWorkspace],
+    ['the sandbox-admin sign-in', 'sandbox', seedSandboxWorkspace],
+  ] as const)('serves the session Workspace as current after %s', async (_, kind, expected) => {
+    server.use(...createHandlers(apiUrl))
+
+    await (kind === 'showcase'
+      ? fetch(`${apiUrl}${showcaseSignInEndpoint.path}`, { method: 'POST' })
+      : fetch(`${apiUrl}${signInEndpoint.path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(mockCredentials.sandboxAdmin),
+        }))
+
+    const current = currentWorkspaceEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${currentWorkspaceEndpoint.path}`)).json(),
+    )
+
+    expect(current).toEqual(expected)
+  })
+
+  it('shows a company identity change in the Operator Workspace list', async () => {
+    server.use(...createHandlers(apiUrl))
+    const gln = withCheckDigit('024567800000')
+
+    await fetch(`${apiUrl}${updateCompanyIdentityEndpoint.path}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ gln }),
+    })
+
+    const workspaces = operatorWorkspacesEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)).json(),
+    )
+
+    expect(workspaces.find(({ id }) => id === seedWorkspace.id)?.gln).toBe(gln)
+  })
+
+  it('serves a given Workspace as the current one of the Operator session', async () => {
+    const workspace = createWorkspace({ gln: null })
+    server.use(...createHandlers(apiUrl, { workspace }))
+
+    const current = await fetch(`${apiUrl}${currentWorkspaceEndpoint.path}`)
+    const session = await fetch(`${apiUrl}${sessionEndpoint.path}`)
+
+    expect(await current.json()).toEqual(workspace)
+    expect(sessionSchema.parse(await session.json()).workspace.id).toBe(workspace.id)
+  })
+
+  it('starts signed out when asked', async () => {
+    server.use(...createHandlers(apiUrl, { session: null }))
+
+    expect((await fetch(`${apiUrl}${sessionEndpoint.path}`)).status).toBe(401)
   })
 })

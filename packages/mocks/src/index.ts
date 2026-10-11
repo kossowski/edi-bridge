@@ -1,4 +1,12 @@
-import type { DocumentStructure, TradingPartner, Workspace } from '@edi-bridge/contracts'
+import type {
+  DocumentStructure,
+  Invite,
+  Session,
+  TradingPartner,
+  Workspace,
+  WorkspaceSettings,
+  WorkspaceSummary,
+} from '@edi-bridge/contracts'
 
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
 import {
@@ -36,17 +44,30 @@ import {
   toMappingVersionStore,
 } from './mapping-version'
 import { messageTypeStructureHandler } from './message-type-structure'
+import {
+  createOperatorStore,
+  operatorHandlers,
+  seedInvites,
+  seedWorkspaceSummaries,
+  sessionWorkspaceStore,
+} from './operator'
 import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
 import { overviewHandler, seedOverviewData } from './overview'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
+import { createSessionStore, seedSession, sessionHandlers } from './session'
 import {
   createTradingPartnerStore,
   seedTradingPartners,
   tradingPartnerHandlers,
 } from './trading-partner'
-import { createWorkspaceStore, seedWorkspace, workspaceHandlers } from './workspace'
+import { seedWorkspace, workspaceHandlers } from './workspace'
+import {
+  createWorkspaceSettingsStore,
+  seedWorkspaceSettings,
+  workspaceSettingsHandlers,
+} from './workspace-settings'
 
 export {
   channelHandlers,
@@ -151,6 +172,18 @@ export {
 } from './mapping-version'
 
 export {
+  createInvites,
+  createOperatorStore,
+  createWorkspaceSummaries,
+  operatorHandlers,
+  type OperatorStore,
+  seedInvites,
+  seedWorkspaceSummaries,
+  sessionWorkspaceStore,
+  toOperatorStore,
+} from './operator'
+
+export {
   orderLifecycleHandler,
   orderLifecycleReferences,
   type OrderLifecycleSeed,
@@ -192,6 +225,8 @@ export {
   createWorkspace,
   createWorkspaceStore,
   currentWorkspaceHandler,
+  seedSandboxWorkspace,
+  seedShowcaseWorkspace,
   seedWorkspace,
   workspaceHandlers,
   type WorkspaceStore,
@@ -199,10 +234,35 @@ export {
 
 export { createRunStore, type RunStore } from './run-store'
 
+export { type SessionStore } from './session-access'
+
+export {
+  createSessionStore,
+  mockCredentials,
+  seedSession,
+  sessionHandlers,
+  sandboxAdminSession,
+  showcaseViewerSession,
+  toSessionStore,
+} from './session'
+
+export {
+  createWorkspaceSettings,
+  createWorkspaceSettingsStore,
+  seedWorkspaceSettings,
+  toWorkspaceSettingsStore,
+  workspaceSettingsHandlers,
+  type WorkspaceSettingsStore,
+} from './workspace-settings'
+
 export function createHandlers(
   apiUrl: string,
   {
-    workspace = seedWorkspace,
+    session,
+    workspace,
+    workspaceSettings = seedWorkspaceSettings,
+    operatorWorkspaces = seedWorkspaceSummaries,
+    invites = seedInvites,
     tradingPartners = seedTradingPartners,
     channels = seedChannels,
     mappingDrafts = seedMappingDrafts,
@@ -212,7 +272,11 @@ export function createHandlers(
     mappingVersions,
     liveEvents = { mode: 'quiet' },
   }: {
+    session?: Session | null
     workspace?: Workspace
+    workspaceSettings?: WorkspaceSettings
+    operatorWorkspaces?: ReadonlyArray<WorkspaceSummary>
+    invites?: ReadonlyArray<Invite>
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
@@ -225,8 +289,37 @@ export function createHandlers(
 ) {
   const orderLifecycles = seedOrderLifecycles()
   const runs = createRunStore([...seedRuns(), ...orderLifecycles.runs])
+  const ownWorkspace = workspace ?? seedWorkspace
+  const operatorStore = createOperatorStore({ workspaces: operatorWorkspaces, invites })
+
+  if (workspace && !operatorStore.workspace(workspace.id)) {
+    operatorStore.setWorkspace({
+      ...workspace,
+      kind: 'standard',
+      memberCount: 1,
+      seeded: false,
+      createdAt: new Date().toISOString(),
+      lastResetAt: null,
+    })
+  }
+
+  const sessionStore = createSessionStore(
+    session === undefined
+      ? {
+          ...seedSession,
+          workspace: { id: ownWorkspace.id, name: ownWorkspace.name, kind: 'standard' },
+        }
+      : session,
+  )
+
+  const workspaceStore = sessionWorkspaceStore({
+    workspaces: operatorStore,
+    session: sessionStore,
+    fallback: ownWorkspace,
+  })
+
   const tradingPartnerStore = createTradingPartnerStore(tradingPartners)
-  const workspaceStore = createWorkspaceStore(workspace)
+  const workspaceSettingsStore = createWorkspaceSettingsStore(workspaceSettings)
   const channelStore = createChannelStore(channels)
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
@@ -238,7 +331,14 @@ export function createHandlers(
   )
 
   return [
-    ...workspaceHandlers(apiUrl, workspaceStore),
+    ...sessionHandlers(apiUrl, sessionStore),
+    ...workspaceHandlers(apiUrl, workspaceStore, sessionStore),
+    ...workspaceSettingsHandlers(apiUrl, {
+      settings: workspaceSettingsStore,
+      session: sessionStore,
+      workspaces: operatorStore,
+    }),
+    ...operatorHandlers(apiUrl, { workspaces: operatorStore, session: sessionStore }),
     ...tradingPartnerHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,
       workspace: workspaceStore,
