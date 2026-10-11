@@ -1,13 +1,9 @@
 import { en, Faker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
-import {
-  type LiveEvent,
-  liveEventsEndpoint,
-  type RunSummary,
-  runSummarySchema,
-} from '@edi-bridge/contracts'
+import { liveEventsEndpoint, type RunSummary, runSummarySchema } from '@edi-bridge/contracts'
 
+import { eventFrame, eventStreamHeaders, eventStreamOpened } from './event-stream'
 import { generateRun, pickFailureStage, seedRuns } from './run'
 import { type RunStore, toRunStore } from './run-store'
 
@@ -20,14 +16,6 @@ export type LiveEventsOptions = {
   dropAfter?: number
   seed?: number
   signal?: AbortSignal
-}
-
-const encoder = new TextEncoder()
-
-const opened = encoder.encode(': connected\n\n')
-
-function frameOf(event: LiveEvent) {
-  return encoder.encode(`data:${JSON.stringify(liveEventsEndpoint.event.parse(event))}\n\n`)
 }
 
 function receive(faker: Faker): RunSummary {
@@ -118,7 +106,7 @@ export function liveEventsHandler(
         }
 
         signal?.addEventListener('abort', close, { once: true })
-        controller.enqueue(opened)
+        controller.enqueue(eventStreamOpened)
 
         if (mode === 'quiet') {
           return
@@ -136,7 +124,7 @@ export function liveEventsHandler(
 
           try {
             for (const run of applyNextChanges()) {
-              controller.enqueue(frameOf({ type: 'run.changed', run }))
+              controller.enqueue(eventFrame(liveEventsEndpoint, { type: 'run.changed', run }))
               sent += 1
             }
           } catch {
@@ -149,8 +137,6 @@ export function liveEventsHandler(
 
     request.signal.addEventListener('abort', () => stop(), { once: true })
 
-    return new HttpResponse(body, {
-      headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
-    })
+    return new HttpResponse(body, { headers: eventStreamHeaders })
   })
 }

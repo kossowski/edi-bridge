@@ -309,6 +309,38 @@ describe('POST /mappings/:id/ai-draft states', () => {
     expect((await getDraft(withoutLinks.id)).aiReview).toBeNull()
   })
 
+  it('fails mid-run once the budget runs out and leaves the budget used up', async () => {
+    use({ state: 'budgetExhaustedMidRun' })
+
+    const { events, ended } = await readEvents(await requestAiDraft(withoutLinks.id))
+
+    expect(ended).toBe(true)
+    expect(stepsOf(events)).toEqual([
+      'readingSample',
+      'lookingUpSegments',
+      'linksDrafted',
+      'checkingAgainstSample',
+      'fixingErrors',
+    ])
+    expect(events.at(-1)).toEqual({ type: 'failed', reason: 'budgetExhausted' })
+    expect((await getDraft(withoutLinks.id)).aiReview).toBeNull()
+
+    const budget = await readBudget()
+
+    expect(budget.usedToday).toBeGreaterThanOrEqual(budget.dailyLimit)
+  })
+
+  it('fails mid-run when the AI is unavailable and leaves the Draft as it was', async () => {
+    use({ state: 'unavailable' })
+
+    const { events, ended } = await readEvents(await requestAiDraft(withoutLinks.id))
+
+    expect(ended).toBe(true)
+    expect(stepsOf(events)).toEqual(['readingSample', 'lookingUpSegments'])
+    expect(events.at(-1)).toEqual({ type: 'failed', reason: 'unavailable' })
+    expect((await getDraft(withoutLinks.id)).aiReview).toBeNull()
+  })
+
   it('rejects the request with the budget in the budget-exhausted state', async () => {
     use({ state: 'budgetExhausted' })
 

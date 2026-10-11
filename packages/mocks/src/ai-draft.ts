@@ -5,18 +5,16 @@ import {
   type AiBudget,
   aiBudgetEndpoint,
   aiBudgetExhausted,
-  type AiBudgetExhaustedProblem,
-  aiBudgetExhaustedStatus,
-  type AiDraftEvent,
+  type AiDraftFailureReason,
   type AiDraftStep,
   type AiProposal,
   type AiReview,
+  aiReviewKeys,
   type DocumentStructure,
   type MappingLink,
   requestAiDraftEndpoint,
   type Session,
   type TransformLink,
-  transformLinkKey,
   transformLinkTargets,
   type WorkspaceSettings,
 } from '@edi-bridge/contracts'
@@ -26,6 +24,7 @@ import {
   seedDocumentStructures,
   toDocumentStructureStore,
 } from './document-structure'
+import { eventFrame, eventStreamHeaders } from './event-stream'
 import {
   link,
   linkTemplates,
@@ -40,7 +39,7 @@ import {
   withoutInvalidTransforms,
 } from './mapping'
 import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'
-import { aiReviewOpen, badRequest, conflict, notFound } from './responses'
+import { aiBudgetExhaustedProblem, aiReviewOpen, badRequest, conflict, notFound } from './responses'
 import { seededFaker } from './seeded-faker'
 import { seedSession, toSessionStore } from './session'
 import { adminOnly, type SessionStore } from './session-access'
@@ -50,7 +49,15 @@ import {
   type WorkspaceSettingsStore,
 } from './workspace-settings'
 
-export type AiDraftState = 'proposing' | 'empty' | 'large' | 'loading' | 'error' | 'budgetExhausted'
+export type AiDraftState =
+  | 'proposing'
+  | 'empty'
+  | 'large'
+  | 'loading'
+  | 'error'
+  | 'budgetExhausted'
+  | 'budgetExhaustedMidRun'
+  | 'unavailable'
 
 export type AiProposalSize = 'regular' | 'large' | 'empty'
 
@@ -74,12 +81,14 @@ const proposalSizes: Readonly<Record<AiDraftState, AiProposalSize>> = {
   loading: 'regular',
   error: 'regular',
   budgetExhausted: 'regular',
+  budgetExhaustedMidRun: 'regular',
+  unavailable: 'regular',
 }
 
-const encoder = new TextEncoder()
-
-function frameOf(event: AiDraftEvent) {
-  return encoder.encode(`data:${JSON.stringify(requestAiDraftEndpoint.event.parse(event))}\n\n`)
+const failureReasons: Partial<Record<AiDraftState, AiDraftFailureReason>> = {
+  error: 'checkFailed',
+  budgetExhaustedMidRun: 'budgetExhausted',
+  unavailable: 'unavailable',
 }
 
 function nextMidnight(now: Date) {
@@ -193,21 +202,20 @@ export function aiProposalFor(
 }
 
 function reviewOf(sampleId: string, proposal: AiProposal): AiReview | null {
-  const empty =
-    proposal.links.length + proposal.transforms.length + proposal.transformLinks.length === 0
+  const keys = aiReviewKeys(proposal)
+  const empty = keys.links.length + keys.transforms.length + keys.transformLinks.length === 0
 
   return empty
     ? null
     : {
         sampleId,
-        proposedLinks: proposal.links.map(({ targetPath }) => targetPath),
-        proposedTransforms: proposal.transforms.map(({ id }) => id),
-        proposedTransformLinks: proposal.transformLinks.map(transformLinkKey),
+        proposedLinks: keys.links,
+        proposedTransforms: keys.transforms,
+        proposedTransformLinks: keys.transformLinks,
       }
 }
 
-// Puts the proposal into the Draft and marks it for review, as the api does once it passed the
-// check; stories use it to start from a Draft whose AI review is open.
+// Stories use it to start from a Draft whose AI review is open.
 export function withAiProposal(
   record: MappingDraftRecord,
   sampleId: string,
@@ -246,7 +254,7 @@ function segmentTags(proposal: AiProposal) {
   return tags.size > 0 ? [...tags] : ['BGM']
 }
 
-function linkCountOf(proposal: AiProposal) {
+function linkCountWithTransformLinks(proposal: AiProposal) {
   return proposal.links.length + proposal.transformLinks.length
 }
 
@@ -256,9 +264,9 @@ function stepsFor(state: AiDraftState, proposal: AiProposal): AiDraftStep[] {
     { kind: 'lookingUpSegments', round: 1, segmentTags: segmentTags(proposal) },
   ]
 
-  const count = linkCountOf(proposal)
+  const count = linkCountWithTransformLinks(proposal)
 
-  if (state === 'loading') {
+  if (state === 'loading' || state === 'unavailable') {
     return reading
   }
 
@@ -276,6 +284,10 @@ function stepsFor(state: AiDraftState, proposal: AiProposal): AiDraftStep[] {
     { kind: 'fixingErrors', round: number, errorCount },
   ]
 
+  if (state === 'budgetExhaustedMidRun') {
+    return [...reading, ...round(1, count + 2, 2)]
+  }
+
   if (state === 'error') {
     return [...reading, ...round(1, count + 2, 3), ...round(2, count + 1, 2), ...round(3, count, 1)]
   }
@@ -292,9 +304,9 @@ function aborted(signals: ReadonlyArray<AbortSignal | undefined>) {
   return signals.some((signal) => signal?.aborted)
 }
 
-function pause(ms: number, signals: ReadonlyArray<AbortSignal | undefined>) {
+function pause(signals: ReadonlyArray<AbortSignal | undefined>, ms?: number) {
   return new Promise<void>((resolve) => {
-    const timer = setTimeout(done, ms)
+    const timer = ms === undefined ? undefined : setTimeout(done, ms)
 
     function done() {
       clearTimeout(timer)
@@ -308,6 +320,10 @@ function pause(ms: number, signals: ReadonlyArray<AbortSignal | undefined>) {
 
     for (const signal of signals) {
       signal?.addEventListener('abort', done, { once: true })
+    }
+
+    if (aborted(signals)) {
+      done()
     }
   })
 }
@@ -342,12 +358,16 @@ export function aiDraftHandlers(
 
   function spend(workspaceId: string) {
     const current = settingsStore.get(workspaceId)
+    const { dailyLimit, usedToday } = current.aiTokenBudget
 
     settingsStore.set(workspaceId, {
       ...current,
       aiTokenBudget: {
         ...current.aiTokenBudget,
-        usedToday: current.aiTokenBudget.usedToday + aiDraftTokens,
+        usedToday:
+          state === 'budgetExhaustedMidRun'
+            ? Math.max(dailyLimit, usedToday)
+            : usedToday + aiDraftTokens,
       },
     })
   }
@@ -365,7 +385,7 @@ export function aiDraftHandlers(
     const body = new ReadableStream<Uint8Array>({
       async start(controller) {
         for (const step of steps) {
-          await pause(stepDelayMs, signals)
+          await pause(signals, stepDelayMs)
 
           if (aborted(signals)) {
             controller.close()
@@ -373,21 +393,17 @@ export function aiDraftHandlers(
             return
           }
 
-          controller.enqueue(frameOf({ type: 'step', step }))
+          controller.enqueue(eventFrame(requestAiDraftEndpoint, { type: 'step', step }))
         }
 
         if (state === 'loading') {
-          await new Promise<void>((resolve) => {
-            for (const each of signals) {
-              each?.addEventListener('abort', () => resolve(), { once: true })
-            }
-          })
+          await pause(signals)
           controller.close()
 
           return
         }
 
-        await pause(stepDelayMs, signals)
+        await pause(signals, stepDelayMs)
 
         if (aborted(signals)) {
           controller.close()
@@ -395,10 +411,16 @@ export function aiDraftHandlers(
           return
         }
 
-        spend(workspaceId)
+        const failure = failureReasons[state]
 
-        if (state === 'error') {
-          controller.enqueue(frameOf({ type: 'failed', reason: 'checkFailed' }))
+        if (failure !== 'unavailable') {
+          spend(workspaceId)
+        }
+
+        if (failure) {
+          controller.enqueue(
+            eventFrame(requestAiDraftEndpoint, { type: 'failed', reason: failure }),
+          )
           controller.close()
 
           return
@@ -409,15 +431,17 @@ export function aiDraftHandlers(
         store.set(drafted)
 
         controller.enqueue(
-          frameOf({ type: 'drafted', proposal, draft: toMappingDraft(drafted, structures.all()) }),
+          eventFrame(requestAiDraftEndpoint, {
+            type: 'drafted',
+            proposal,
+            draft: toMappingDraft(drafted, structures.all()),
+          }),
         )
         controller.close()
       },
     })
 
-    return new HttpResponse(body, {
-      headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
-    })
+    return new HttpResponse(body, { headers: eventStreamHeaders })
   }
 
   return [
@@ -455,14 +479,7 @@ export function aiDraftHandlers(
         const budget = budgetOf(workspace.id)
 
         if (aiBudgetExhausted(budget)) {
-          return HttpResponse.json(
-            {
-              code: 'aiBudgetExhausted',
-              message: 'The daily AI budget of the Workspace is used up.',
-              budget,
-            } satisfies AiBudgetExhaustedProblem,
-            { status: aiBudgetExhaustedStatus },
-          )
+          return aiBudgetExhaustedProblem(budget)
         }
 
         return stream(record, sample.id, workspace.id, request)

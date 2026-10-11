@@ -1,6 +1,11 @@
 import { HttpResponse } from 'msw'
 
-import { aiReviewOpenStatus } from '@edi-bridge/contracts'
+import {
+  type AiBudget,
+  type AiBudgetExhaustedProblem,
+  aiBudgetExhaustedStatus,
+  aiReviewOpenStatus,
+} from '@edi-bridge/contracts'
 
 function problem(status: number, message: string) {
   return HttpResponse.json({ message }, { status })
@@ -18,6 +23,16 @@ export const conflict = (message: string) => problem(409, message)
 
 export const aiReviewOpen = () =>
   problem(aiReviewOpenStatus, 'The AI review of the Draft is still open.')
+
+export const aiBudgetExhaustedProblem = (budget: AiBudget) =>
+  HttpResponse.json(
+    {
+      code: 'aiBudgetExhausted',
+      message: 'The daily AI budget of the Workspace is used up.',
+      budget,
+    } satisfies AiBudgetExhaustedProblem,
+    { status: aiBudgetExhaustedStatus },
+  )
 
 export const unprocessable = (message: string) => problem(422, message)
 
