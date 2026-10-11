@@ -1053,7 +1053,7 @@
     },
     "aiDraft": {
       "button": "Mit KI entwerfen",
-      "reviewOpen": "Die KI-Prüfung dieses Drafts ist noch offen.",
+      "reviewOpen": "Die Durchsicht des KI-Entwurfs für diesen Draft ist noch offen.",
       "title": "Mit KI entwerfen",
       "description": "Die KI entwirft Verknüpfungen aus einem Beispiel-Document und prüft sie daran. Das dauert einige Minuten. Die Verknüpfungen erscheinen erst auf der Zeichenfläche, wenn sie die Prüfung bestehen.",
       "samples": {
@@ -1076,11 +1076,10 @@
       },
       "start": "KI-Entwurf starten",
       "cancel": "Abbrechen",
-      "stop": "Abbrechen und schließen",
+      "stop": "Stoppen",
       "close": "Schließen",
       "closeDialog": "Dialog schließen",
       "retry": "Erneut versuchen",
-      "closeStops": "Wenn Sie diesen Dialog schließen, bricht der KI-Entwurf ab.",
       "progress": "Fortschritt",
       "starting": "KI-Entwurf wird gestartet…",
       "round": "Runde {round}",
@@ -1119,13 +1118,28 @@
           "description": "Die KI ist gerade nicht erreichbar. Es wurden keine Verknüpfungen hinzugefügt. Versuchen Sie es in einigen Minuten erneut."
         },
         "reviewOpen": {
-          "title": "KI-Prüfung noch offen",
-          "description": "Dieser Draft hat bereits von der KI vorgeschlagene Verknüpfungen, die Sie prüfen müssen. Schließen Sie diese Prüfung ab, bevor Sie einen weiteren KI-Entwurf anfordern."
+          "title": "Durchsicht des KI-Entwurfs noch offen",
+          "description": "Dieser Draft hat bereits von der KI vorgeschlagene Verknüpfungen, die Sie durchsehen müssen. Schließen Sie diese Durchsicht ab, bevor Sie einen weiteren KI-Entwurf anfordern."
         },
         "interrupted": {
           "title": "KI-Entwurf unterbrochen",
           "description": "Die Verbindung zum KI-Entwurf ist abgebrochen. Es wurden keine Verknüpfungen hinzugefügt. Versuchen Sie es erneut."
+        },
+        "stopped": {
+          "title": "KI-Entwurf gestoppt",
+          "description": "Sie haben den KI-Entwurf gestoppt. Es wurden keine Verknüpfungen hinzugefügt. Versuchen Sie es erneut."
         }
+      },
+      "closeKeepsRunning": "Der KI-Entwurf läuft weiter, wenn Sie diesen Dialog schließen. Stoppen beendet ihn.",
+      "running": "KI entwirft: {step}",
+      "ended": "KI-Entwurf beendet",
+      "stepShort": {
+        "starting": "Start",
+        "readingSample": "Lesen",
+        "lookingUpSegments": "Segmente nachschlagen",
+        "linksDrafted": "Verknüpfungen entworfen",
+        "checkingAgainstSample": "Prüfung",
+        "fixingErrors": "Fehler beheben"
       }
     },
     "facts": {

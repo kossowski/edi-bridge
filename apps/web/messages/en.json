@@ -1076,11 +1076,10 @@
       },
       "start": "Start the AI draft",
       "cancel": "Cancel",
-      "stop": "Stop and close",
+      "stop": "Stop",
       "close": "Close",
       "closeDialog": "Close dialog",
       "retry": "Try again",
-      "closeStops": "Closing this dialog stops the AI draft.",
       "progress": "Progress",
       "starting": "Starting the AI draft…",
       "round": "Round {round}",
@@ -1125,7 +1124,22 @@
         "interrupted": {
           "title": "AI draft interrupted",
           "description": "The connection to the AI draft broke off, so no links were added. Try again."
+        },
+        "stopped": {
+          "title": "AI draft stopped",
+          "description": "You stopped the AI draft, so no links were added. Try again."
         }
+      },
+      "closeKeepsRunning": "The AI draft keeps going when you close this dialog. Stop ends it.",
+      "running": "AI drafting: {step}",
+      "ended": "AI draft ended",
+      "stepShort": {
+        "starting": "Starting",
+        "readingSample": "Reading",
+        "lookingUpSegments": "Looking up segments",
+        "linksDrafted": "Links drafted",
+        "checkingAgainstSample": "Checking",
+        "fixingErrors": "Fixing errors"
       }
     },
     "facts": {

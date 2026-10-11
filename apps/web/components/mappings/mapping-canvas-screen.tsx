@@ -18,6 +18,7 @@ import {
   MappingVersionsLink,
   PublishDraft,
 } from '@/components/mappings/publish-draft'
+import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
 import { useSession } from '@/hooks/use-session'
@@ -110,6 +111,7 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
   const sideTitle = useSideTitle()
   const desktop = useDesktop()
   const stateId = useId()
+  const aiDraft = useAiDraftRun(draft.mappingId)
 
   return (
     <MappingCanvasProvider viewOnly={!canChange}>
@@ -120,7 +122,7 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
         <div className="ms-auto flex flex-wrap items-center gap-2">
           {canChange ? (
             <>
-              <AiDraftAction draft={draft} />
+              {desktop && <AiDraftAction aiDraft={aiDraft} draft={draft} />}
               <PublishDraft draft={draft} stateId={stateId} />
             </>
           ) : (

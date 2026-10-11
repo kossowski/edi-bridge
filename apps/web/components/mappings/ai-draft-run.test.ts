@@ -13,9 +13,14 @@ import type { AiDraftEvent, AiDraftStep, AiProposal } from '@edi-bridge/contract
 
 import {
   type AiDraftRun,
+  budgetBlocksStart,
+  canRetry,
+  chosenSampleId,
   idleRun,
+  isEnded,
+  lastRound,
+  outcomeKey,
   progressRounds,
-  roundsOf,
   runAfterEvent,
   runAfterProblem,
   shownSegmentTags,
@@ -139,10 +144,77 @@ describe('progressRounds', () => {
   })
 })
 
-describe('roundsOf', () => {
+describe('lastRound', () => {
   it('is the highest round the run reached', () => {
-    expect(roundsOf(running(steps))).toBe(2)
-    expect(roundsOf(startedRun)).toBe(0)
+    expect(lastRound(running(steps))).toBe(2)
+    expect(lastRound(startedRun)).toBe(0)
+  })
+})
+
+describe('outcomeKey', () => {
+  it('is the problem of a failed run and the status otherwise', () => {
+    const empty = runAfterEvent(
+      running(steps),
+      draftedEvent({ links: [], transforms: [], transformLinks: [] }),
+    )
+
+    const stopped = runAfterProblem(running(steps), 'stopped')
+
+    expect(isEnded(empty) && outcomeKey(empty)).toBe('empty')
+    expect(isEnded(stopped) && outcomeKey(stopped)).toBe('stopped')
+  })
+})
+
+describe('canRetry', () => {
+  it('offers a retry after problems another attempt can fix', () => {
+    expect(canRetry(runAfterProblem(running(steps), 'stopped'))).toBe(true)
+    expect(canRetry(runAfterProblem(running(steps), 'checkFailed'))).toBe(true)
+  })
+
+  it('offers no retry after a drafted run, a used-up budget or an open review', () => {
+    const drafted = runAfterEvent(
+      running(steps),
+      draftedEvent(aiProposalFor(record, seedDocumentStructures)),
+    )
+
+    expect(canRetry(drafted)).toBe(false)
+    expect(canRetry(runAfterProblem(running(steps), 'budgetExhausted'))).toBe(false)
+    expect(canRetry(runAfterProblem(running(steps), 'reviewOpen'))).toBe(false)
+  })
+
+  it('offers no retry before the run ended', () => {
+    expect(canRetry(idleRun)).toBe(false)
+    expect(canRetry(running(steps))).toBe(false)
+  })
+})
+
+describe('budgetBlocksStart', () => {
+  const resetsAt = '2026-10-12T00:00:00.000Z'
+
+  it('blocks a start when the budget is used up or turned off', () => {
+    expect(budgetBlocksStart({ dailyLimit: 1000, usedToday: 1000, resetsAt })).toBe(true)
+    expect(budgetBlocksStart({ dailyLimit: 0, usedToday: 0, resetsAt })).toBe(true)
+  })
+
+  it('lets a start through while tokens are left', () => {
+    expect(budgetBlocksStart({ dailyLimit: 1000, usedToday: 999, resetsAt })).toBe(false)
+  })
+})
+
+describe('chosenSampleId', () => {
+  const samples = [{ id: 'first' }, { id: 'second' }]
+
+  it('defaults to the first Sample Document', () => {
+    expect(chosenSampleId(null, samples)).toBe('first')
+  })
+
+  it('keeps the chosen Sample Document', () => {
+    expect(chosenSampleId('second', samples)).toBe('second')
+  })
+
+  it('has none without Sample Documents', () => {
+    expect(chosenSampleId(null, [])).toBeNull()
+    expect(chosenSampleId(null, undefined)).toBeNull()
   })
 })
 

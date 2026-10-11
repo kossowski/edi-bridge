@@ -1,6 +1,12 @@
-import type { AiDraftEvent, AiDraftFailureReason, AiDraftStep } from '@edi-bridge/contracts'
+import {
+  type AiBudget,
+  aiBudgetExhausted,
+  type AiDraftEvent,
+  type AiDraftFailureReason,
+  type AiDraftStep,
+} from '@edi-bridge/contracts'
 
-export type AiDraftProblem = AiDraftFailureReason | 'reviewOpen' | 'interrupted'
+export type AiDraftProblem = AiDraftFailureReason | 'reviewOpen' | 'interrupted' | 'stopped'
 
 export type AiDraftRun =
   | { status: 'idle' }
@@ -8,6 +14,10 @@ export type AiDraftRun =
   | { status: 'drafted'; steps: AiDraftStep[]; linkCount: number; transformCount: number }
   | { status: 'empty'; steps: AiDraftStep[] }
   | { status: 'failed'; steps: AiDraftStep[]; problem: AiDraftProblem }
+
+export type EndedAiDraftRun = Extract<AiDraftRun, { status: 'drafted' | 'empty' | 'failed' }>
+
+export type AiDraftOutcome = 'drafted' | 'empty' | AiDraftProblem
 
 export const idleRun: AiDraftRun = { status: 'idle' }
 
@@ -42,33 +52,68 @@ export function runAfterProblem(run: AiDraftRun, problem: AiDraftProblem): AiDra
   return run.status === 'running' ? { status: 'failed', steps: stepsOf(run), problem } : run
 }
 
-export function roundsOf(run: AiDraftRun) {
+export function lastRound(run: AiDraftRun) {
   return Math.max(0, ...stepsOf(run).map(({ round }) => round))
 }
 
 export type AiDraftStepState = 'done' | 'current' | 'stopped'
+
+export type AiDraftPhase = 'choosing' | 'running' | 'ended'
+
+const presentations = {
+  idle: { phase: 'choosing', lastStepState: 'done', tone: 'neutral' },
+  running: { phase: 'running', lastStepState: 'current', tone: 'neutral' },
+  drafted: { phase: 'ended', lastStepState: 'done', tone: 'success' },
+  empty: { phase: 'ended', lastStepState: 'done', tone: 'neutral' },
+  failed: { phase: 'ended', lastStepState: 'stopped', tone: 'failed' },
+} as const satisfies Record<
+  AiDraftRun['status'],
+  {
+    phase: AiDraftPhase
+    lastStepState: AiDraftStepState
+    tone: 'neutral' | 'success' | 'failed'
+  }
+>
+
+const retryable: Readonly<Record<AiDraftOutcome, boolean>> = {
+  drafted: false,
+  empty: true,
+  checkFailed: true,
+  unavailable: true,
+  interrupted: true,
+  stopped: true,
+  budgetExhausted: false,
+  reviewOpen: false,
+}
+
+export function runPresentation(run: AiDraftRun) {
+  return presentations[run.status]
+}
+
+export function isEnded(run: AiDraftRun): run is EndedAiDraftRun {
+  return runPresentation(run).phase === 'ended'
+}
+
+export function outcomeKey(run: EndedAiDraftRun): AiDraftOutcome {
+  return run.status === 'failed' ? run.problem : run.status
+}
+
+export function canRetry(run: AiDraftRun) {
+  return isEnded(run) && retryable[outcomeKey(run)]
+}
 
 export type AiDraftRound = {
   round: number
   steps: Array<{ step: AiDraftStep; state: AiDraftStepState }>
 }
 
-// The last step is still at work while the run goes on; a failed run stopped at it.
-const lastStepStates = {
-  idle: 'done',
-  running: 'current',
-  drafted: 'done',
-  empty: 'done',
-  failed: 'stopped',
-} as const satisfies Record<AiDraftRun['status'], AiDraftStepState>
-
 export function progressRounds(run: AiDraftRun): AiDraftRound[] {
   const steps = stepsOf(run)
-  const lastState = lastStepStates[run.status]
+  const { lastStepState } = runPresentation(run)
   const rounds: AiDraftRound[] = []
 
   steps.forEach((step, index) => {
-    const state = index === steps.length - 1 ? lastState : 'done'
+    const state = index === steps.length - 1 ? lastStepState : 'done'
     const current = rounds.at(-1)
 
     if (current?.round === step.round) {
@@ -85,4 +130,15 @@ export function shownSegmentTags(tags: ReadonlyArray<string>, max = 6) {
   return tags.length <= max
     ? { shown: tags, more: 0 }
     : { shown: tags.slice(0, max - 1), more: tags.length - (max - 1) }
+}
+
+export function budgetBlocksStart(budget: AiBudget) {
+  return budget.dailyLimit === 0 || aiBudgetExhausted(budget)
+}
+
+export function chosenSampleId(
+  chosen: string | null,
+  samples: ReadonlyArray<{ id: string }> | undefined,
+) {
+  return chosen ?? samples?.[0]?.id ?? null
 }
