@@ -29,6 +29,23 @@ export type EventStreamEndpoint<Event, Body = undefined, Path extends string = s
   ? { method?: 'GET'; body?: undefined }
   : { method: 'POST'; body: z.ZodType<Body> })
 
+export function parseStreamEvent<Event>(
+  endpoint: { event: z.ZodType<Event> },
+  data: string,
+): Event | null {
+  let json: unknown
+
+  try {
+    json = JSON.parse(data)
+  } catch {
+    return null
+  }
+
+  const event = endpoint.event.safeParse(json)
+
+  return event.success ? event.data : null
+}
+
 export function toPath<Path extends string>(path: Path, params: PathParams<Path>): string {
   const values: Readonly<Record<string, string>> = params
 

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { GraphParts } from './mapping'
+import type { GraphParts, MappingLink } from './mapping'
 import type { LinkEnd, MappingTransform, TransformLink } from './transform'
 
 // Each part a Draft can hold has its own key: a plain link its target path, a transform its id
@@ -11,6 +11,18 @@ export function linkEndKey(end: LinkEnd) {
 
 export function transformLinkKey({ to }: TransformLink) {
   return linkEndKey(to)
+}
+
+const linkKey = ({ targetPath }: MappingLink) => targetPath
+
+const transformKey = ({ id }: MappingTransform) => id
+
+export function aiReviewKeys(graph: GraphParts) {
+  return {
+    links: graph.links.map(linkKey),
+    transforms: graph.transforms.map(transformKey),
+    transformLinks: graph.transformLinks.map(transformLinkKey),
+  }
 }
 
 // While the review is open, the marks name the AI-proposed parts the Admin has neither rejected
@@ -25,14 +37,18 @@ export const aiReviewSchema = z.object({
 export type AiReview = z.infer<typeof aiReviewSchema>
 
 export function aiReviewProblems(review: AiReview, graph: GraphParts): string[] {
-  const links = new Set(graph.links.map(({ targetPath }) => targetPath))
-  const transforms = new Set(graph.transforms.map(({ id }) => id))
-  const transformLinks = new Set(graph.transformLinks.map(transformLinkKey))
+  const keys = aiReviewKeys(graph)
+
+  const missing = (marked: ReadonlyArray<string>, present: ReadonlyArray<string>) => {
+    const has = new Set(present)
+
+    return marked.filter((key) => !has.has(key))
+  }
 
   return [
-    ...review.proposedLinks.filter((key) => !links.has(key)),
-    ...review.proposedTransforms.filter((key) => !transforms.has(key)),
-    ...review.proposedTransformLinks.filter((key) => !transformLinks.has(key)),
+    ...missing(review.proposedLinks, keys.links),
+    ...missing(review.proposedTransforms, keys.transforms),
+    ...missing(review.proposedTransformLinks, keys.transformLinks),
   ].map((key) => `The AI review marks ${key}, which the Draft does not have`)
 }
 
@@ -42,7 +58,7 @@ const sameTransform = (before: MappingTransform, after: MappingTransform) =>
 const sameStart = (before: TransformLink, after: TransformLink) =>
   JSON.stringify(before.from) === JSON.stringify(after.from)
 
-function unchanged<Part>(
+function keptKeys<Part>(
   keys: ReadonlyArray<string>,
   before: ReadonlyArray<Part>,
   after: ReadonlyArray<Part>,
@@ -65,21 +81,21 @@ function unchanged<Part>(
 export function remainingAiReview(review: AiReview, before: GraphParts, after: GraphParts) {
   return {
     ...review,
-    proposedLinks: unchanged(
+    proposedLinks: keptKeys(
       review.proposedLinks,
       before.links,
       after.links,
-      ({ targetPath }) => targetPath,
+      linkKey,
       (was, is) => was.sourcePath === is.sourcePath,
     ),
-    proposedTransforms: unchanged(
+    proposedTransforms: keptKeys(
       review.proposedTransforms,
       before.transforms,
       after.transforms,
-      ({ id }) => id,
+      transformKey,
       sameTransform,
     ),
-    proposedTransformLinks: unchanged(
+    proposedTransformLinks: keptKeys(
       review.proposedTransformLinks,
       before.transformLinks,
       after.transformLinks,

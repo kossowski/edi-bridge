@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { type AiReview, remainingAiReview, transformLinkKey } from './ai-review'
+import { aiReviewKeys, type AiReview, remainingAiReview, transformLinkKey } from './ai-review'
 
 import type { GraphParts } from './mapping'
 import type { MappingTransform, TransformLink } from './transform'
@@ -42,6 +42,16 @@ describe('transformLinkKey', () => {
   it('names a transform link by the target element or transform input it ends at', () => {
     expect(transformLinkKey(intoDateFormat)).toBe(`input:${dateFormat.id}/value`)
     expect(transformLinkKey(outOfDateFormat)).toBe('target:DTM+137/C507/2380')
+  })
+})
+
+describe('aiReviewKeys', () => {
+  it('keys links by target path, transforms by id and transform links by where they end', () => {
+    expect(aiReviewKeys(proposed)).toEqual({
+      links: review.proposedLinks,
+      transforms: review.proposedTransforms,
+      transformLinks: review.proposedTransformLinks,
+    })
   })
 })
 

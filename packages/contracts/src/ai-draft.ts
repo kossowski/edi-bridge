@@ -1,10 +1,9 @@
 import { z } from 'zod'
 
-import { transformLinkKey } from './ai-review'
+import { aiReviewKeys } from './ai-review'
+import { type Endpoint, type EventStreamEndpoint, parseStreamEvent } from './endpoint'
 import { type MappingDraft, mappingDraftSchema, mappingGraphSchema } from './mapping'
 import { aiTokenBudgetSchema } from './workspace-settings'
-
-import type { Endpoint, EventStreamEndpoint } from './endpoint'
 
 export const requestAiDraftBodySchema = z.object({ sampleId: z.uuid() })
 
@@ -12,18 +11,18 @@ export type RequestAiDraftBody = z.infer<typeof requestAiDraftBodySchema>
 
 // A round starts with drafting links and ends with the check against the Sample Document; each
 // fix of the errors the check found starts the next round.
-const round = { round: z.number().int().min(1) }
+const roundField = { round: z.number().int().min(1) }
 
 export const aiDraftStepSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('readingSample'), ...round }),
+  z.object({ kind: z.literal('readingSample'), ...roundField }),
   z.object({
     kind: z.literal('lookingUpSegments'),
-    ...round,
+    ...roundField,
     segmentTags: z.array(z.string().min(1)).min(1),
   }),
-  z.object({ kind: z.literal('linksDrafted'), ...round, linkCount: z.number().int().min(0) }),
-  z.object({ kind: z.literal('checkingAgainstSample'), ...round }),
-  z.object({ kind: z.literal('fixingErrors'), ...round, errorCount: z.number().int().min(1) }),
+  z.object({ kind: z.literal('linksDrafted'), ...roundField, linkCount: z.number().int().min(0) }),
+  z.object({ kind: z.literal('checkingAgainstSample'), ...roundField }),
+  z.object({ kind: z.literal('fixingErrors'), ...roundField, errorCount: z.number().int().min(1) }),
 ])
 
 export type AiDraftStep = z.infer<typeof aiDraftStepSchema>
@@ -39,19 +38,18 @@ export const aiProposalSchema = mappingGraphSchema
 export type AiProposal = z.infer<typeof aiProposalSchema>
 
 function marksProposal(proposal: AiProposal, { aiReview }: MappingDraft) {
-  const marked = (keys: ReadonlyArray<string> | undefined, key: string) =>
-    keys?.includes(key) ?? false
+  const keys = aiReviewKeys(proposal)
+
+  const allMarked = (marked: ReadonlyArray<string> | undefined, present: ReadonlyArray<string>) =>
+    present.every((key) => marked?.includes(key) ?? false)
 
   return (
-    proposal.links.every(({ targetPath }) => marked(aiReview?.proposedLinks, targetPath)) &&
-    proposal.transforms.every(({ id }) => marked(aiReview?.proposedTransforms, id)) &&
-    proposal.transformLinks.every((transformLink) =>
-      marked(aiReview?.proposedTransformLinks, transformLinkKey(transformLink)),
-    )
+    allMarked(aiReview?.proposedLinks, keys.links) &&
+    allMarked(aiReview?.proposedTransforms, keys.transforms) &&
+    allMarked(aiReview?.proposedTransformLinks, keys.transformLinks)
   )
 }
 
-// Sent once the proposal passed the check; the Draft already holds it, marked for review.
 export const aiDraftedEventSchema = z
   .object({ type: z.literal('drafted'), proposal: aiProposalSchema, draft: mappingDraftSchema })
   .refine(({ proposal, draft }) => marksProposal(proposal, draft), {
@@ -91,17 +89,7 @@ export const requestAiDraftEndpoint: EventStreamEndpoint<
 }
 
 export function parseAiDraftEvent(data: string): AiDraftEvent | null {
-  let json: unknown
-
-  try {
-    json = JSON.parse(data)
-  } catch {
-    return null
-  }
-
-  const event = requestAiDraftEndpoint.event.safeParse(json)
-
-  return event.success ? event.data : null
+  return parseStreamEvent(requestAiDraftEndpoint, data)
 }
 
 export const acceptAiDraftEndpoint: Endpoint<

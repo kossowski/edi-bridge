@@ -2,6 +2,7 @@ export {
   type Endpoint,
   type EventStreamEndpoint,
   fromSearchParams,
+  parseStreamEvent,
   type PathParams,
   type QueryParams,
   toPath,
@@ -40,6 +41,7 @@ export {
 } from './ai-draft'
 
 export {
+  aiReviewKeys,
   type AiReview,
   aiReviewSchema,
   linkEndKey,
