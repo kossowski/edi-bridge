@@ -134,11 +134,12 @@ type GeneratedGroup = {
   interchange: (GeneratedInterchange & { controlReference: string }) | null
 }
 
-type Reprocessed = { replaced: string; replacing: string }
+export type Reprocessed = { replaced: string; replacing: string }
 
 export type RunDetailOptions = {
   runs?: ReadonlyArray<RunSummary> | RunStore
   reprocessed?: ReadonlyArray<Reprocessed>
+  businessReferences?: ReadonlyMap<string, string>
   mappingVersions?: MappingVersionStore
 }
 
@@ -283,7 +284,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     const messages = new Map(
       group.members.map(({ runId, run }, position) => [
         runId,
-        generateMessage(run, String(position + 1)),
+        generateMessage(run, String(position + 1), options.businessReferences?.get(runId)),
       ]),
     )
 

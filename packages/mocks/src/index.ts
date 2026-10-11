@@ -36,6 +36,7 @@ import {
   toMappingVersionStore,
 } from './mapping-version'
 import { messageTypeStructureHandler } from './message-type-structure'
+import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
 import { overviewHandler, seedOverviewData } from './overview'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
@@ -150,6 +151,14 @@ export {
 } from './mapping-version'
 
 export {
+  orderLifecycleHandler,
+  orderLifecycleReferences,
+  type OrderLifecycleSeed,
+  type OrderLifecycleState,
+  seedOrderLifecycles,
+} from './order-lifecycle'
+
+export {
   createOverdueAcknowledgement,
   createOverviewData,
   emptyOverviewData,
@@ -214,7 +223,8 @@ export function createHandlers(
     liveEvents?: Omit<LiveEventsOptions, 'runs'>
   } = {},
 ) {
-  const runs = createRunStore(seedRuns())
+  const orderLifecycles = seedOrderLifecycles()
+  const runs = createRunStore([...seedRuns(), ...orderLifecycles.runs])
   const tradingPartnerStore = createTradingPartnerStore(tradingPartners)
   const workspaceStore = createWorkspaceStore(workspace)
   const channelStore = createChannelStore(channels)
@@ -239,6 +249,7 @@ export function createHandlers(
     runsHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
     overviewHandler(apiUrl, seedOverviewData(runs)),
+    orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles),
     ...mappingVersionHandlers(apiUrl, {
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
@@ -248,7 +259,8 @@ export function createHandlers(
     }),
     ...runDetailHandlers(apiUrl, {
       runs,
-      reprocessed: seedReprocessed(),
+      reprocessed: [...seedReprocessed(), ...orderLifecycles.reprocessed],
+      businessReferences: orderLifecycles.businessReferences,
       mappingVersions: mappingVersionStore,
     }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
