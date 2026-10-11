@@ -44,7 +44,12 @@ import {
   toMappingVersionStore,
 } from './mapping-version'
 import { messageTypeStructureHandler } from './message-type-structure'
-import { operatorHandlers, seedInvites, seedWorkspaceSummaries } from './operator'
+import {
+  createOperatorStore,
+  operatorHandlers,
+  seedInvites,
+  seedWorkspaceSummaries,
+} from './operator'
 import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
 import { overviewHandler, seedOverviewData } from './overview'
 import { runsHandler, seedRuns } from './run'
@@ -57,7 +62,11 @@ import {
   tradingPartnerHandlers,
 } from './trading-partner'
 import { createWorkspaceStore, seedWorkspace, workspaceHandlers } from './workspace'
-import { seedWorkspaceSettings, workspaceSettingsHandlers } from './workspace-settings'
+import {
+  createWorkspaceSettingsStore,
+  seedWorkspaceSettings,
+  workspaceSettingsHandlers,
+} from './workspace-settings'
 
 export {
   channelHandlers,
@@ -169,6 +178,7 @@ export {
   type OperatorStore,
   seedInvites,
   seedWorkspaceSummaries,
+  toOperatorStore,
 } from './operator'
 
 export {
@@ -228,7 +238,7 @@ export {
   seedSession,
   sessionHandlers,
   type SessionStore,
-  showcaseAdminSession,
+  sandboxAdminSession,
   showcaseViewerSession,
   toSessionStore,
 } from './session'
@@ -237,6 +247,7 @@ export {
   createWorkspaceSettings,
   createWorkspaceSettingsStore,
   seedWorkspaceSettings,
+  toWorkspaceSettingsStore,
   workspaceSettingsHandlers,
   type WorkspaceSettingsStore,
 } from './workspace-settings'
@@ -278,6 +289,8 @@ export function createHandlers(
   const sessionStore = createSessionStore(session)
   const tradingPartnerStore = createTradingPartnerStore(tradingPartners)
   const workspaceStore = createWorkspaceStore(workspace)
+  const workspaceSettingsStore = createWorkspaceSettingsStore(workspaceSettings)
+  const operatorStore = createOperatorStore({ workspaces: operatorWorkspaces, invites })
   const channelStore = createChannelStore(channels)
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
@@ -291,12 +304,11 @@ export function createHandlers(
   return [
     ...sessionHandlers(apiUrl, sessionStore),
     ...workspaceHandlers(apiUrl, workspaceStore),
-    ...workspaceSettingsHandlers(apiUrl, { settings: workspaceSettings, session: sessionStore }),
-    ...operatorHandlers(apiUrl, {
-      workspaces: operatorWorkspaces,
-      invites,
+    ...workspaceSettingsHandlers(apiUrl, {
+      settings: workspaceSettingsStore,
       session: sessionStore,
     }),
+    ...operatorHandlers(apiUrl, { workspaces: operatorStore, session: sessionStore }),
     ...tradingPartnerHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,
       workspace: workspaceStore,

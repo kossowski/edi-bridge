@@ -484,7 +484,6 @@ export {
 } from './operator'
 
 export {
-  liveDemoSignInEndpoint,
   type Session,
   sessionEndpoint,
   sessionSchema,
@@ -492,6 +491,7 @@ export {
   sessionUserSchema,
   type SessionWorkspace,
   sessionWorkspaceSchema,
+  showcaseSignInEndpoint,
   type SignedIn,
   signedInSchema,
   type SignedOut,

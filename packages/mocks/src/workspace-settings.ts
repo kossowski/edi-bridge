@@ -13,8 +13,8 @@ import { badRequest } from './responses'
 import {
   seedSession,
   type SessionStore,
-  signedIn,
-  signedInOperator,
+  operatorOnly,
+  signedInOnly,
   toSessionStore,
 } from './session'
 
@@ -48,6 +48,12 @@ export function createWorkspaceSettingsStore(
   }
 }
 
+export function toWorkspaceSettingsStore(
+  settings: WorkspaceSettings | WorkspaceSettingsStore = seedWorkspaceSettings,
+) {
+  return 'get' in settings ? settings : createWorkspaceSettingsStore(settings)
+}
+
 export function workspaceSettingsHandlers(
   apiUrl: string,
   {
@@ -58,36 +64,35 @@ export function workspaceSettingsHandlers(
     session?: Session | null | SessionStore
   } = {},
 ) {
-  const store = 'get' in settings ? settings : createWorkspaceSettingsStore(settings)
+  const store = toWorkspaceSettingsStore(settings)
   const sessionStore = toSessionStore(session)
 
   return [
-    http.get(`${apiUrl}${workspaceSettingsEndpoint.path}`, () => {
-      const access = signedIn(sessionStore)
+    http.get(
+      `${apiUrl}${workspaceSettingsEndpoint.path}`,
+      signedInOnly(sessionStore, () => HttpResponse.json(store.get())),
+    ),
+    http.put(
+      `${apiUrl}${updateWorkspaceSettingsEndpoint.path}`,
+      operatorOnly(sessionStore, async ({ request }) => {
+        const body = updateWorkspaceSettingsEndpoint.body.safeParse(await request.json())
 
-      return 'response' in access ? access.response : HttpResponse.json(store.get())
-    }),
-    http.put(`${apiUrl}${updateWorkspaceSettingsEndpoint.path}`, async ({ request }) => {
-      const access = signedInOperator(sessionStore)
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
 
-      if ('response' in access) {
-        return access.response
-      }
+        const current = store.get()
 
-      const body = updateWorkspaceSettingsEndpoint.body.safeParse(await request.json())
+        store.set({
+          documentRetentionDays: body.data.documentRetentionDays,
+          aiTokenBudget: {
+            ...current.aiTokenBudget,
+            dailyLimit: body.data.aiTokenBudget.dailyLimit,
+          },
+        })
 
-      if (!body.success) {
-        return badRequest(body.error.message)
-      }
-
-      const current = store.get()
-
-      store.set({
-        documentRetentionDays: body.data.documentRetentionDays,
-        aiTokenBudget: { ...current.aiTokenBudget, dailyLimit: body.data.aiTokenBudget.dailyLimit },
-      })
-
-      return HttpResponse.json(store.get())
-    }),
+        return HttpResponse.json(store.get())
+      }),
+    ),
   ]
 }

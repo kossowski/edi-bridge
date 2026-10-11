@@ -6,6 +6,7 @@ import {
   createWorkspaceEndpoint,
   type InviteInput,
   inviteSchema,
+  inviteValidityDays,
   resetSandboxWorkspaceEndpoint,
   toPath,
   workspaceInvitesEndpoint,
@@ -15,6 +16,7 @@ import {
   workspaceSummarySchema,
 } from '@edi-bridge/contracts'
 
+import { dayMs } from './duration'
 import {
   createInvites,
   createWorkspaceSummaries,
@@ -22,7 +24,7 @@ import {
   seedInvites,
   seedWorkspaceSummaries,
 } from './operator'
-import { showcaseAdminSession } from './session'
+import { sandboxAdminSession } from './session'
 import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
 
 const apiUrl = 'http://api.test'
@@ -122,7 +124,7 @@ describe('GET /operator/workspaces', () => {
   })
 
   it('answers 403 for an Admin who is not the Operator', async () => {
-    server.use(...operatorHandlers(apiUrl, { session: showcaseAdminSession }))
+    server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
 
     const response = await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)
 
@@ -188,7 +190,7 @@ describe('POST /operator/workspaces', () => {
   })
 
   it('answers 403 for an Admin who is not the Operator', async () => {
-    server.use(...operatorHandlers(apiUrl, { session: showcaseAdminSession }))
+    server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
 
     const response = await post(createWorkspaceEndpoint.path, { name: 'Havelland', seed: true })
 
@@ -281,7 +283,7 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
     })
     expect(created.link).toMatch(/^https:\/\/app\.test\/invite\/[\w-]{16,}$/)
     expect(Date.parse(created.expiresAt) - Date.parse(created.createdAt)).toBe(
-      7 * 24 * 60 * 60 * 1000,
+      inviteValidityDays * dayMs,
     )
     expect(listed).toEqual(created)
   })
@@ -312,7 +314,7 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
   })
 
   it('answers 403 for an Admin who is not the Operator', async () => {
-    server.use(...operatorHandlers(apiUrl, { session: showcaseAdminSession }))
+    server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
 
     const response = await post(
       toPath(createInviteEndpoint.path, { workspaceId: seedSandboxWorkspace.id }),
@@ -357,7 +359,7 @@ describe('POST /operator/workspaces/:workspaceId/reset', () => {
   })
 
   it('answers 403 for the showcase-admin, Admin of the Sandbox Workspace', async () => {
-    server.use(...operatorHandlers(apiUrl, { session: showcaseAdminSession }))
+    server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
 
     expect((await reset(seedSandboxWorkspace.id)).status).toBe(403)
   })

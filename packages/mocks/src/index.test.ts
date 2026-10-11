@@ -16,7 +16,7 @@ import {
   type FlowInput,
   type LookupTableInput,
   lookupTableEndpoint,
-  liveDemoSignInEndpoint,
+  showcaseSignInEndpoint,
   lookupTablesEndpoint,
   type MappingGraph,
   mappingDraftEndpoint,
@@ -624,10 +624,10 @@ describe('createHandlers', () => {
     expect(fresh.status).toBe(200)
   })
 
-  it('keeps the live demo Viewer from changing the Workspace settings', async () => {
+  it('keeps the Showcase Viewer from changing the Workspace settings', async () => {
     server.use(...createHandlers(apiUrl))
 
-    await fetch(`${apiUrl}${liveDemoSignInEndpoint.path}`, { method: 'POST' })
+    await fetch(`${apiUrl}${showcaseSignInEndpoint.path}`, { method: 'POST' })
 
     const response = await fetch(`${apiUrl}${updateWorkspaceSettingsEndpoint.path}`, {
       method: 'PUT',

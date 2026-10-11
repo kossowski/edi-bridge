@@ -61,8 +61,8 @@ export const signOutEndpoint: Endpoint<SignedOut> = {
   response: signedOutSchema,
 }
 
-export const liveDemoSignInEndpoint: Endpoint<SignedIn> = {
+export const showcaseSignInEndpoint: Endpoint<SignedIn> = {
   method: 'POST',
-  path: '/auth/demo',
+  path: '/auth/sign-in/showcase',
   response: signedInSchema,
 }

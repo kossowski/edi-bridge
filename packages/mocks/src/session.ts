@@ -1,7 +1,7 @@
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse, type HttpResponseResolver, type PathParams } from 'msw'
 
 import {
-  liveDemoSignInEndpoint,
+  showcaseSignInEndpoint,
   type Session,
   sessionEndpoint,
   sessionSchema,
@@ -15,7 +15,7 @@ import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './wo
 
 export const mockCredentials = {
   operator: { email: 'operator@edi-bridge.example', password: 'edi-bridge-operator' },
-  showcaseAdmin: { email: 'showcase-admin@edi-bridge.example', password: 'edi-bridge-sandbox' },
+  sandboxAdmin: { email: 'showcase-admin@edi-bridge.example', password: 'edi-bridge-sandbox' },
 } as const
 
 export const seedSession: Session = sessionSchema.parse({
@@ -25,15 +25,15 @@ export const seedSession: Session = sessionSchema.parse({
   role: 'admin',
 })
 
-export const showcaseAdminSession: Session = sessionSchema.parse({
-  user: { id: seedId(9, 2), name: 'Showcase Admin', email: mockCredentials.showcaseAdmin.email },
+export const sandboxAdminSession: Session = sessionSchema.parse({
+  user: { id: seedId(9, 2), name: 'Showcase Admin', email: mockCredentials.sandboxAdmin.email },
   operator: false,
   workspace: { id: seedSandboxWorkspace.id, name: seedSandboxWorkspace.name, kind: 'sandbox' },
   role: 'admin',
 })
 
 export const showcaseViewerSession: Session = sessionSchema.parse({
-  user: { id: seedId(9, 3), name: 'Live demo', email: 'live-demo@edi-bridge.example' },
+  user: { id: seedId(9, 3), name: 'Showcase Viewer', email: 'showcase-viewer@edi-bridge.example' },
   operator: false,
   workspace: { id: seedShowcaseWorkspace.id, name: seedShowcaseWorkspace.name, kind: 'showcase' },
   role: 'viewer',
@@ -41,7 +41,7 @@ export const showcaseViewerSession: Session = sessionSchema.parse({
 
 const accounts = [
   { ...mockCredentials.operator, session: seedSession },
-  { ...mockCredentials.showcaseAdmin, session: showcaseAdminSession },
+  { ...mockCredentials.sandboxAdmin, session: sandboxAdminSession },
 ]
 
 export type SessionStore = {
@@ -64,18 +64,41 @@ export function toSessionStore(session: Session | null | SessionStore = seedSess
   return session !== null && 'get' in session ? session : createSessionStore(session)
 }
 
-export function signedIn(store: SessionStore): { session: Session } | { response: Response } {
-  const session = store.get()
+function guarded<Params extends PathParams<keyof Params>>(
+  store: SessionStore,
+  allowed: (session: Session) => boolean,
+  resolver: HttpResponseResolver<Params>,
+): HttpResponseResolver<Params> {
+  return (info) => {
+    const session = store.get()
 
-  return session ? { session } : { response: unauthorized() }
+    if (!session) {
+      return unauthorized()
+    }
+
+    return allowed(session) ? resolver(info) : forbidden()
+  }
 }
 
-export function signedInOperator(
+export function signedInOnly<Params extends PathParams<keyof Params>>(
   store: SessionStore,
-): { session: Session } | { response: Response } {
-  const result = signedIn(store)
+  resolver: HttpResponseResolver<Params>,
+) {
+  return guarded(store, () => true, resolver)
+}
 
-  return 'session' in result && !result.session.operator ? { response: forbidden() } : result
+export function operatorOnly<Params extends PathParams<keyof Params>>(
+  store: SessionStore,
+  resolver: HttpResponseResolver<Params>,
+) {
+  return guarded(store, (session) => session.operator, resolver)
+}
+
+export function adminOnly<Params extends PathParams<keyof Params>>(
+  store: SessionStore,
+  resolver: HttpResponseResolver<Params>,
+) {
+  return guarded(store, (session) => session.operator || session.role === 'admin', resolver)
 }
 
 export function sessionHandlers(
@@ -108,12 +131,12 @@ export function sessionHandlers(
       )
 
       if (!account) {
-        return HttpResponse.json({ message: 'Invalid email or password' }, { status: 401 })
+        return unauthorized('Invalid email or password')
       }
 
       return signIn(account.session)
     }),
-    http.post(`${apiUrl}${liveDemoSignInEndpoint.path}`, () => signIn(showcaseViewerSession)),
+    http.post(`${apiUrl}${showcaseSignInEndpoint.path}`, () => signIn(showcaseViewerSession)),
     http.post(`${apiUrl}${signOutEndpoint.path}`, () => {
       store.set(null)
 

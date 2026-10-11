@@ -8,7 +8,7 @@ import {
   workspaceSettingsSchema,
 } from '@edi-bridge/contracts'
 
-import { showcaseAdminSession, showcaseViewerSession } from './session'
+import { sandboxAdminSession, showcaseViewerSession } from './session'
 import { createWorkspaceSettings, workspaceSettingsHandlers } from './workspace-settings'
 
 const apiUrl = 'http://api.test'
@@ -93,7 +93,7 @@ describe('PUT /workspaces/current/settings', () => {
   })
 
   it('answers 403 for an Admin who is not the Operator', async () => {
-    server.use(...workspaceSettingsHandlers(apiUrl, { session: showcaseAdminSession }))
+    server.use(...workspaceSettingsHandlers(apiUrl, { session: sandboxAdminSession }))
 
     expect((await putSettings(input)).status).toBe(403)
   })

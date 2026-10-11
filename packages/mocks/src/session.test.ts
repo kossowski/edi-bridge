@@ -2,7 +2,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
-  liveDemoSignInEndpoint,
+  showcaseSignInEndpoint,
   type SignInBody,
   sessionEndpoint,
   sessionSchema,
@@ -68,16 +68,16 @@ describe('POST /auth/sign-out', () => {
 })
 
 describe('POST /auth/sign-in/email', () => {
-  it('signs the showcase-admin in as Admin of the Sandbox Workspace', async () => {
+  it('signs the shared showcase-admin login in as Admin of the Sandbox Workspace', async () => {
     server.use(...sessionHandlers(apiUrl, null))
 
-    const response = await post(signInEndpoint.path, mockCredentials.showcaseAdmin)
+    const response = await post(signInEndpoint.path, mockCredentials.sandboxAdmin)
     const session = sessionSchema.parse(await (await getSession()).json())
 
     expect(response.status).toBe(200)
     expect(signInEndpoint.response.parse(await response.json()).user).toEqual(session.user)
     expect(session).toMatchObject({
-      user: { email: mockCredentials.showcaseAdmin.email },
+      user: { email: mockCredentials.sandboxAdmin.email },
       operator: false,
       role: 'admin',
       workspace: { kind: 'sandbox' },
@@ -129,11 +129,11 @@ describe('POST /auth/sign-in/email', () => {
   })
 })
 
-describe('POST /auth/demo', () => {
+describe('POST /auth/sign-in/showcase', () => {
   it('signs a visitor in as the Viewer of the Showcase Workspace without credentials', async () => {
     server.use(...sessionHandlers(apiUrl, null))
 
-    const response = await post(liveDemoSignInEndpoint.path)
+    const response = await post(showcaseSignInEndpoint.path)
 
     expect(response.status).toBe(200)
     expect(sessionSchema.parse(await (await getSession()).json())).toMatchObject({

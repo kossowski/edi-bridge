@@ -6,7 +6,7 @@ function problem(status: number, message: string) {
 
 export const badRequest = (message: string) => problem(400, message)
 
-export const unauthorized = () => problem(401, 'Unauthorized')
+export const unauthorized = (message = 'Unauthorized') => problem(401, message)
 
 export const forbidden = () => problem(403, 'Forbidden')
 

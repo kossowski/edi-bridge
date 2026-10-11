@@ -16,6 +16,7 @@ import {
   workspaceSummarySchema,
 } from '@edi-bridge/contracts'
 
+import { dayMs } from './duration'
 import { randomGln } from './gln'
 import { badRequest, conflict, notFound } from './responses'
 import { seedId } from './seed-id'
@@ -25,7 +26,7 @@ import {
   seedSession,
   type SessionStore,
   showcaseViewerSession,
-  signedInOperator,
+  operatorOnly,
   toSessionStore,
 } from './session'
 import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
@@ -91,8 +92,6 @@ export function createWorkspaceSummaries({
 
 const defaultAppUrl = 'http://localhost:3000'
 
-const dayMs = 24 * 60 * 60 * 1000
-
 function inviteLink(appUrl: string, token: string) {
   return `${appUrl}/invite/${token}`
 }
@@ -153,7 +152,7 @@ const inviteSeeds: ReadonlyArray<
   },
   {
     workspaceId: seedSandboxWorkspace.id,
-    email: mockCredentials.showcaseAdmin.email,
+    email: mockCredentials.sandboxAdmin.email,
     role: 'admin',
     createdAt: '2026-02-02T08:06:00.000Z',
     acceptedAt: '2026-02-02T08:07:00.000Z',
@@ -252,6 +251,13 @@ export function createOperatorStore({
   }
 }
 
+export function toOperatorStore(
+  workspaces: ReadonlyArray<WorkspaceSummary> | OperatorStore = seedWorkspaceSummaries,
+  invites: ReadonlyArray<Invite> = seedInvites,
+) {
+  return 'workspace' in workspaces ? workspaces : createOperatorStore({ workspaces, invites })
+}
+
 export function operatorHandlers(
   apiUrl: string,
   {
@@ -266,78 +272,61 @@ export function operatorHandlers(
     appUrl?: string
   } = {},
 ) {
-  const store =
-    'workspaces' in workspaces ? workspaces : createOperatorStore({ workspaces, invites })
-
+  const store = toOperatorStore(workspaces, invites)
   const sessionStore = toSessionStore(session)
 
   return [
-    http.get(`${apiUrl}${operatorWorkspacesEndpoint.path}`, () => {
-      const access = signedInOperator(sessionStore)
+    http.get(
+      `${apiUrl}${operatorWorkspacesEndpoint.path}`,
+      operatorOnly(sessionStore, () =>
+        HttpResponse.json(
+          [...store.workspaces()].sort((a, b) => a.name.localeCompare(b.name, 'de')),
+        ),
+      ),
+    ),
+    http.post(
+      `${apiUrl}${createWorkspaceEndpoint.path}`,
+      operatorOnly(sessionStore, async ({ request }) => {
+        const body = createWorkspaceEndpoint.body.safeParse(await request.json())
 
-      if ('response' in access) {
-        return access.response
-      }
-
-      return HttpResponse.json(
-        [...store.workspaces()].sort((a, b) => a.name.localeCompare(b.name, 'de')),
-      )
-    }),
-    http.post(`${apiUrl}${createWorkspaceEndpoint.path}`, async ({ request }) => {
-      const access = signedInOperator(sessionStore)
-
-      if ('response' in access) {
-        return access.response
-      }
-
-      const body = createWorkspaceEndpoint.body.safeParse(await request.json())
-
-      if (!body.success) {
-        return badRequest(body.error.message)
-      }
-
-      const { name, seed } = body.data
-
-      if (store.workspaces().some((workspace) => sameName(workspace.name, name))) {
-        return conflict('Another Workspace already uses this name')
-      }
-
-      const id = crypto.randomUUID()
-
-      const created: WorkspaceSummary = {
-        id,
-        name,
-        gln: seed ? randomGln(seededFaker(`workspace:${id}`)) : null,
-        kind: 'standard',
-        memberCount: 0,
-        createdAt: new Date().toISOString(),
-        lastResetAt: null,
-      }
-
-      store.setWorkspace(created)
-
-      return HttpResponse.json(created, { status: 201 })
-    }),
-    http.get<{ workspaceId: string }>(`${apiUrl}${workspaceInvitesEndpoint.path}`, ({ params }) => {
-      const access = signedInOperator(sessionStore)
-
-      if ('response' in access) {
-        return access.response
-      }
-
-      return store.workspace(params.workspaceId)
-        ? HttpResponse.json(store.invites(params.workspaceId))
-        : notFound()
-    }),
-    http.post<{ workspaceId: string }>(
-      `${apiUrl}${createInviteEndpoint.path}`,
-      async ({ params, request }) => {
-        const access = signedInOperator(sessionStore)
-
-        if ('response' in access) {
-          return access.response
+        if (!body.success) {
+          return badRequest(body.error.message)
         }
 
+        const { name, seed } = body.data
+
+        if (store.workspaces().some((workspace) => sameName(workspace.name, name))) {
+          return conflict('Another Workspace already uses this name')
+        }
+
+        const id = crypto.randomUUID()
+
+        const created: WorkspaceSummary = {
+          id,
+          name,
+          gln: seed ? randomGln(seededFaker(`workspace:${id}`)) : null,
+          kind: 'standard',
+          memberCount: 0,
+          createdAt: new Date().toISOString(),
+          lastResetAt: null,
+        }
+
+        store.setWorkspace(created)
+
+        return HttpResponse.json(created, { status: 201 })
+      }),
+    ),
+    http.get<{ workspaceId: string }>(
+      `${apiUrl}${workspaceInvitesEndpoint.path}`,
+      operatorOnly(sessionStore, ({ params }) =>
+        store.workspace(params.workspaceId)
+          ? HttpResponse.json(store.invites(params.workspaceId))
+          : notFound(),
+      ),
+    ),
+    http.post<{ workspaceId: string }>(
+      `${apiUrl}${createInviteEndpoint.path}`,
+      operatorOnly(sessionStore, async ({ params, request }) => {
         if (!store.workspace(params.workspaceId)) {
           return notFound()
         }
@@ -363,17 +352,11 @@ export function operatorHandlers(
         store.addInvite(invite)
 
         return HttpResponse.json(invite, { status: 201 })
-      },
+      }),
     ),
     http.post<{ workspaceId: string }>(
       `${apiUrl}${resetSandboxWorkspaceEndpoint.path}`,
-      ({ params }) => {
-        const access = signedInOperator(sessionStore)
-
-        if ('response' in access) {
-          return access.response
-        }
-
+      operatorOnly(sessionStore, ({ params }) => {
         const workspace = store.workspace(params.workspaceId)
 
         if (!workspace) {
@@ -388,7 +371,7 @@ export function operatorHandlers(
         store.setWorkspace(reset)
 
         return HttpResponse.json(reset)
-      },
+      }),
     ),
   ]
 }
