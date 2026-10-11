@@ -112,25 +112,31 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
   const sideTitle = useSideTitle()
   const desktop = useDesktop()
   const stateId = useId()
+  const reviewSummaryId = useId()
+  const publishHintId = useId()
   const aiDraft = useAiDraftRun(draft.mappingId)
 
   return (
-    <MappingCanvasProvider aiReview={draft.aiReview} viewOnly={!canChange}>
+    <MappingCanvasProvider aiReview={canChange ? draft.aiReview : null} viewOnly={!canChange}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <DraftStateLabel id={stateId} draft={draft} />
         {canChange && <GraphSaveStatus mappingId={draft.mappingId} />}
-        <AiReviewState canChange={canChange} draft={draft} />
         <div className="ms-auto flex flex-wrap items-center gap-2">
           {canChange ? (
             <>
-              {desktop && <AiDraftAction aiDraft={aiDraft} draft={draft} />}
-              <PublishDraft draft={draft} stateId={stateId} />
+              {desktop && (
+                <AiDraftAction aiDraft={aiDraft} draft={draft} reviewSummaryId={reviewSummaryId} />
+              )}
+              <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
             </>
           ) : (
             <MappingVersionsLink mappingId={draft.mappingId} />
           )}
         </div>
+        {canChange && (
+          <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={reviewSummaryId} />
+        )}
       </div>
       <dl
         aria-label={t('facts.label')}

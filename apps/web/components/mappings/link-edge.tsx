@@ -16,6 +16,7 @@ import { createContext, memo, useCallback, useContext, useState } from 'react'
 
 import { useCanvasViewOnly, useCanvasStore } from '@/components/mappings/mapping-canvas-store'
 import { panelGutter } from '@/components/mappings/mapping-tree'
+import { useRemoveText } from '@/components/mappings/use-remove-text'
 
 import type { CanvasLink } from '@/components/mappings/mapping-tree'
 import type { MappingLink, TransformLink } from '@edi-bridge/contracts'
@@ -50,7 +51,7 @@ function useLinkActions() {
 
 function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
   const t = useTranslations('Mapping.links')
-  const tAi = useTranslations('Mapping.aiReview')
+  const removeText = useRemoveText()
   const actions = useLinkActions()
   const hoverEdge = useCanvasStore((state) => state.hoverEdge)
   const leaveEdge = useCanvasStore((state) => state.leaveEdge)
@@ -68,16 +69,13 @@ function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
     }
   }
 
-  const removeLabel = (names: { source: string; target: string }) =>
-    data.aiProposed ? tAi('rejectLinkLabel', names) : t('removeLabel', names)
-
   const label = () => {
     if (data.kind === 'transformLink') {
-      return removeLabel({ source: data.source, target: data.target })
+      return removeText.linkLabel(data.aiProposed, { source: data.source, target: data.target })
     }
 
     return single && only
-      ? removeLabel({ source: only.sourcePath, target: only.targetPath })
+      ? removeText.linkLabel(data.aiProposed, { source: only.sourcePath, target: only.targetPath })
       : t('showLinksLabel', {
           count: data.links.length,
           source: data.sourcePath,
@@ -214,7 +212,8 @@ function LinkEdgeView({
         style={{
           ...style,
           ...(data?.aiProposed && { stroke: 'var(--ai-proposed)', strokeDasharray: '6 3' }),
-          ...(hovered && { stroke: 'var(--foreground)', strokeWidth: 2.5 }),
+          ...(hovered && { strokeWidth: 2.5 }),
+          ...(hovered && !data?.aiProposed && { stroke: 'var(--foreground)' }),
         }}
       />
       {hovered && data && !viewOnly && (

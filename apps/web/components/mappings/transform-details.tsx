@@ -30,6 +30,7 @@ import {
   formFields,
   type FormValues,
 } from '@/components/mappings/transform-kinds'
+import { useRemoveText } from '@/components/mappings/use-remove-text'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import {
   conditionOperators,
@@ -725,9 +726,9 @@ export function TransformDetails({
   actions: TransformDetailsActions
 }) {
   const t = useTranslations('Mapping.transforms')
-  const tLinks = useTranslations('Mapping.links')
   const tAi = useTranslations('Mapping.aiReview')
   const marks = useAiMarks()
+  const removeText = useRemoveText()
   const proposed = marks.transform(transform.id)
   const name = text.name(transform.id)
   const ports = transformPorts(transform)
@@ -761,10 +762,10 @@ export function TransformDetails({
       <Button
         size="sm"
         variant="outline"
-        aria-label={linkProposed ? tAi('rejectLinkLabel', names) : tLinks('removeLabel', names)}
+        aria-label={removeText.linkLabel(linkProposed, names)}
         data-remove-link
         onClick={() => actions.removeLink(link, links.indexOf(link))}>
-        {linkProposed ? tAi('reject') : tLinks('remove')}
+        {removeText.link(linkProposed)}
       </Button>
     )
   }
@@ -892,7 +893,7 @@ export function TransformDetails({
             variant="outline"
             className="w-fit"
             onClick={() => actions.remove(transform)}>
-            {proposed ? tAi('rejectTransform', { name }) : t('details.removeLabel', { name })}
+            {removeText.transform(proposed, name)}
           </Button>
         </>
       )}

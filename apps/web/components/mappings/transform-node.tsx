@@ -6,7 +6,7 @@ import { Handle, type Node, type NodeProps, Position, useConnection } from '@xyf
 import { useTranslations } from 'next-intl'
 import { createContext, memo, useCallback, useContext, useId } from 'react'
 
-import { AiBadge } from '@/components/mappings/ai-badge'
+import { AiMarker } from '@/components/mappings/ai-badge'
 import {
   useCanvasViewOnly,
   useCanvasStore,
@@ -15,6 +15,7 @@ import {
 } from '@/components/mappings/mapping-canvas-store'
 import { sameStart, transformWidth } from '@/components/mappings/mapping-graph'
 import { usePanIntoView } from '@/components/mappings/tree-node'
+import { useRemoveText } from '@/components/mappings/use-remove-text'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { LinkEnd, LinkStart } from '@edi-bridge/contracts'
@@ -264,6 +265,7 @@ function OutputPort({
 function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
   const t = useTranslations('Mapping.transforms.node')
   const tAi = useTranslations('Mapping.aiReview')
+  const removeText = useRemoveText()
   const actions = useTransformActions()
   const onFocus = usePanIntoView({ whole: true })
   const issuesId = useId()
@@ -320,17 +322,13 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
           {/* Wraps rather than truncates, so the number that tells same-kind nodes apart stays. */}
           <span className="min-w-0 [overflow-wrap:anywhere]">{data.name}</span>
           {data.aiProposed && (
-            <AiBadge label={tAi('proposedTransform')} short className="ms-auto self-start" />
+            <AiMarker label={tAi('proposedTransform')} className="ms-auto self-start" />
           )}
         </button>
         {!viewOnly && (
           <button
             type="button"
-            aria-label={
-              data.aiProposed
-                ? tAi('rejectTransformLabel', { name: data.name })
-                : t('remove', { name: data.name })
-            }
+            aria-label={removeText.transformLabel(data.aiProposed, data.name)}
             className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground inline-flex size-7.5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
             onClick={() => actions.remove(data.transformId)}>
             <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden className="size-3.5" />

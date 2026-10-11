@@ -240,7 +240,7 @@ export const Drafted = meta.story({
     const action = await canvas.findByRole('button', { name: 'Draft with AI' })
 
     await expect(action).toHaveAttribute('aria-disabled', 'true')
-    await expect(action).toHaveAccessibleDescription('The AI review of this Draft is still open.')
+    await expect(action).toHaveAccessibleDescription(/AI proposals? to review$/)
   },
 })
 
@@ -369,8 +369,7 @@ export const ReviewOpen = meta.story({
     const action = await canvas.findByRole('button', { name: 'Draft with AI' })
 
     await expect(action).toHaveAttribute('aria-disabled', 'true')
-    await expect(action).toHaveAccessibleDescription('The AI review of this Draft is still open.')
-    await expect(canvas.getByText('The AI review of this Draft is still open.')).toBeVisible()
+    await expect(action).toHaveAccessibleDescription(/^AI review open \d+ AI proposals to review$/)
   },
 })
 

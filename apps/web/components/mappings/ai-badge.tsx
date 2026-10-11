@@ -4,34 +4,34 @@ import { useTranslations } from 'next-intl'
 
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-// The short marker fits a canvas row; the label is what a screen reader hears, or what a list shows.
-export function AiBadge({
-  label,
-  short = false,
-  className,
-}: {
-  label: string
-  short?: boolean
-  className?: string
-}) {
-  const t = useTranslations('Mapping.aiReview')
-
+export function AiBadge({ label, className }: { label: string; className?: string }) {
   return (
     <span
       className={cn(
-        'border-ai-proposed text-ai-proposed inline-flex shrink-0 items-center rounded-sm border border-dashed font-sans font-semibold',
-        short ? 'h-4 px-1 text-[10px] leading-none' : 'px-1.5 py-0.5 text-xs',
+        'border-ai-proposed text-ai-proposed inline-flex shrink-0 items-center rounded-sm border border-dashed px-1.5 py-0.5 font-sans text-xs font-semibold',
         className,
       )}
       data-ai-proposed>
-      {short ? (
-        <>
-          <span aria-hidden>{t('marker')}</span>
-          <span className="sr-only">{` ${label}`}</span>
-        </>
-      ) : (
-        label
-      )}
+      {label}
     </span>
+  )
+}
+
+export function AiMarker({ label, className }: { label: string; className?: string }) {
+  const t = useTranslations('Mapping.aiReview')
+
+  return (
+    <>
+      <span
+        aria-hidden
+        className={cn(
+          'border-ai-proposed text-ai-proposed inline-flex h-4 shrink-0 items-center rounded-sm border border-dashed px-1 font-sans text-[10px] leading-none font-semibold',
+          className,
+        )}
+        data-ai-proposed>
+        {t('marker')}
+      </span>
+      <span className="sr-only">{` ${label}`}</span>
+    </>
   )
 }

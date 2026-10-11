@@ -28,7 +28,7 @@ import {
   useState,
 } from 'react'
 
-import { useAiMarks } from '@/components/mappings/ai-marks'
+import { proposedLinkCount, useAiMarks } from '@/components/mappings/ai-marks'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
 import {
   LinkActionsContext,
@@ -466,44 +466,13 @@ export function MappingCanvas({
     [dragged, graph.transforms],
   )
 
-  // Removing an AI-proposed part rejects it, and the announcement says so.
-  const rejected = useCallback(
-    (change: GraphChange) => {
-      switch (change.kind) {
-        case 'removeLink':
-          return marks.link(change.link)
-            ? tAi('rejectedLink', {
-                source: change.link.sourcePath,
-                target: change.link.targetPath,
-              })
-            : null
-        case 'removeTransformLink':
-          return marks.transformLink(change.link)
-            ? tAi('rejectedLink', {
-                source: text.start(change.link.from),
-                target: text.end(change.link.to),
-              })
-            : null
-        case 'removeTransform':
-          return marks.transform(change.transform.id)
-            ? tAi('rejectedTransform', { name: text.name(change.transform.id) })
-            : null
-        default:
-          return null
-      }
-    },
-    [marks, tAi, text],
-  )
-
   const save = useCallback(
     (change: GraphChange) => {
       if (!viewOnly) {
-        const messages = text.change(change)
-
-        onChange({ change, ...messages, saved: rejected(change) ?? messages.saved })
+        onChange({ change, ...text.change(change) })
       }
     },
-    [onChange, rejected, viewOnly, text],
+    [onChange, viewOnly, text],
   )
 
   const rows = useMemo(
@@ -577,6 +546,16 @@ export function MappingCanvas({
       target: layouts.target.visible,
     })
 
+    const edgeLabel = (label: string, proposed: number, total: number) => {
+      if (proposed === 0) {
+        return label
+      }
+
+      return proposed === total
+        ? tAi('edgeLabel', { label })
+        : tAi('edgeLabelSome', { label, count: proposed, total })
+    }
+
     const transformEdges = graph.transformLinks.flatMap((link): LinkFlowEdge[] => {
       const from = startNode(link.from, layouts.source.visible)
       const to = endNode(link.to, layouts.target.visible)
@@ -600,7 +579,7 @@ export function MappingCanvas({
           selectable: false,
           focusable: false,
           zIndex: 100,
-          ariaLabel: aiProposed ? tAi('edgeLabel', { label: t('link', names) }) : t('link', names),
+          ariaLabel: edgeLabel(t('link', names), aiProposed ? 1 : 0, 1),
         },
       ]
     })
@@ -723,7 +702,7 @@ export function MappingCanvas({
 
     const plainEdges = shown.map(({ id, sourcePath, targetPath, links: merged }): LinkFlowEdge => {
       const [first] = merged
-      const aiProposed = merged.some((link) => marks.link(link))
+      const proposed = proposedLinkCount(marks, merged)
 
       const label =
         merged.length === 1 && first
@@ -735,11 +714,17 @@ export function MappingCanvas({
         type: 'link',
         source: nodeId('source', sourcePath),
         target: nodeId('target', targetPath),
-        data: { kind: 'link', sourcePath, targetPath, links: merged, aiProposed },
+        data: {
+          kind: 'link',
+          sourcePath,
+          targetPath,
+          links: merged,
+          aiProposed: proposed === merged.length,
+        },
         selectable: false,
         focusable: false,
         zIndex: 100,
-        ariaLabel: aiProposed ? tAi('edgeLabel', { label }) : label,
+        ariaLabel: edgeLabel(label, proposed, merged.length),
       }
     })
 

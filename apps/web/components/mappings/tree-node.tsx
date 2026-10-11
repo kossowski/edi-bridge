@@ -14,7 +14,7 @@ import {
 import { useTranslations } from 'next-intl'
 import { type FocusEvent, memo, type ReactNode, useCallback } from 'react'
 
-import { AiBadge } from '@/components/mappings/ai-badge'
+import { AiMarker } from '@/components/mappings/ai-badge'
 import {
   isSameRow,
   isStartRow,
@@ -37,8 +37,7 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
 
-// `filled` says a link ends at this very target, not only somewhere inside it; `aiProposed` that
-// this link is AI-proposed.
+// `filled` says a link ends at this very target, not only somewhere inside it.
 export type TreeNodeData = TreeRow & {
   linked: boolean
   filled: boolean
@@ -281,8 +280,8 @@ function TreeNodeView({ data, isConnectable }: NodeProps<TreeFlowNode>) {
                 {t('hiddenParts', { count: data.childCount })}
               </span>
             )}
-            {data.aiProposed && <AiBadge label={tAi('proposedLink')} short />}
           </span>
+          {data.aiProposed && <AiMarker label={tAi('proposedLink')} className="order-first" />}
         </RowButton>
       </div>
       <Handle

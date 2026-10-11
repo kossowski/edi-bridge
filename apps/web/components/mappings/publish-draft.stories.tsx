@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { useId } from 'react'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import { AiReviewState } from '@/components/mappings/ai-review-state'
 import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { apiUrl } from '@/lib/api/config'
 import { mappingDraftQuery } from '@/lib/api/queries'
@@ -45,14 +46,17 @@ const publishPath = `${apiUrl}${publishMappingDraftEndpoint.path}`
 function DraftHeader({ id }: { id: string }) {
   const { data: draft } = useQuery(mappingDraftQuery(id))
   const stateId = useId()
+  const summaryId = useId()
+  const publishHintId = useId()
 
   return draft ? (
     <div className="flex flex-wrap items-center gap-3 p-6">
       <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
       <DraftStateLabel id={stateId} draft={draft} />
       <div className="ms-auto">
-        <PublishDraft draft={draft} stateId={stateId} />
+        <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
       </div>
+      <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={summaryId} />
     </div>
   ) : null
 }
@@ -231,17 +235,15 @@ export const ReviewOpen = meta.story({
   beforeEach({ msw }) {
     msw.use(...createHandlers(apiUrl, { mappingDrafts: [inReview] }))
   },
-  async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByText('Accept the AI draft before publishing.')).toBeVisible()
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Accept the draft before publishing.')).toBeVisible()
 
     const publish = canvas.getByRole('button', { name: 'Publish' })
 
-    await expect(publish).toHaveAttribute('aria-disabled', 'true')
+    await expect(publish).toBeDisabled()
     await expect(publish).toHaveAccessibleDescription(
-      'Unpublished changes since Version 4 Accept the AI draft before publishing.',
+      'Unpublished changes since Version 4 Accept the draft before publishing.',
     )
-    await userEvent.click(publish)
-    await expect(dialog(canvasElement).queryByRole('dialog')).toBeNull()
   },
 })
 
@@ -261,7 +263,7 @@ export const ReviewOpenMeanwhile = meta.story({
 
     await expect(
       await dialog(canvasElement).findByText(
-        'The Draft cannot be published while its AI review is open. Accept the AI draft first, then publish.',
+        'The Draft cannot be published while its AI review is open. Accept the draft first, then publish.',
       ),
     ).toHaveAttribute('role', 'alert')
     await expect(confirm).toHaveFocus()

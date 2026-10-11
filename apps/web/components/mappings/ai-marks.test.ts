@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { AiReview, TransformLink } from '@edi-bridge/contracts'
 
-import { aiMarks, aiProposedCount, rowLinkProposed } from './ai-marks'
+import { aiMarks, aiProposedCount, proposedLinkCount, rowLinkProposed } from './ai-marks'
 
 const transformId = '0b8d5d1e-7f4e-4d6b-9a39-2a8f4c1f5e21'
 
@@ -65,6 +65,17 @@ describe('rowLinkProposed', () => {
       }),
     ).toBe(true)
     expect(rowLinkProposed(marks, { kind: 'transformLink', link: intoTarget })).toBe(false)
+  })
+})
+
+describe('proposedLinkCount', () => {
+  const marks = aiMarks(review)
+
+  it('counts only the AI-proposed links among merged ones', () => {
+    expect(
+      proposedLinkCount(marks, [{ targetPath: 'BGM/1004' }, { targetPath: 'DTM+137/C507/2380' }]),
+    ).toBe(1)
+    expect(proposedLinkCount(marks, [{ targetPath: 'DTM+137/C507/2380' }])).toBe(0)
   })
 })
 

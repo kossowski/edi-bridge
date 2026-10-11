@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
 
+import { useAiMarks } from '@/components/mappings/ai-marks'
 import {
   type CanvasIssue,
   type Connected,
@@ -42,6 +43,8 @@ export function useGraphText(
 ) {
   const t = useTranslations('Mapping.transforms')
   const tLinks = useTranslations('Mapping.links')
+  const tAi = useTranslations('Mapping.aiReview')
+  const marks = useAiMarks()
 
   return useMemo(() => {
     const names = transformNames(transforms)
@@ -123,18 +126,32 @@ export function useGraphText(
             target: graphChange.link.targetPath,
           }
 
-          return graphChange.kind === 'addLink'
-            ? { saved: tLinks('added', names), failed: tLinks('addFailed', names) }
-            : { saved: tLinks('removed', names), failed: tLinks('removeFailed', names) }
+          if (graphChange.kind === 'addLink') {
+            return { saved: tLinks('added', names), failed: tLinks('addFailed', names) }
+          }
+
+          return {
+            saved: marks.link(graphChange.link)
+              ? tAi('rejectedLink', names)
+              : tLinks('removed', names),
+            failed: tLinks('removeFailed', names),
+          }
         }
 
         case 'addTransformLink':
         case 'removeTransformLink': {
           const names = { source: start(graphChange.link.from), target: end(graphChange.link.to) }
 
-          return graphChange.kind === 'addTransformLink'
-            ? { saved: tLinks('added', names), failed: tLinks('addFailed', names) }
-            : { saved: tLinks('removed', names), failed: tLinks('removeFailed', names) }
+          if (graphChange.kind === 'addTransformLink') {
+            return { saved: tLinks('added', names), failed: tLinks('addFailed', names) }
+          }
+
+          return {
+            saved: marks.transformLink(graphChange.link)
+              ? tAi('rejectedLink', names)
+              : tLinks('removed', names),
+            failed: tLinks('removeFailed', names),
+          }
         }
 
         case 'addTransform': {
@@ -151,7 +168,9 @@ export function useGraphText(
           const removed = name(graphChange.transform.id)
 
           return {
-            saved: t('removed', { name: removed }),
+            saved: marks.transform(graphChange.transform.id)
+              ? tAi('rejectedTransform', { name: removed })
+              : t('removed', { name: removed }),
             failed: t('removeFailed', { name: removed }),
           }
         }
@@ -285,5 +304,5 @@ export function useGraphText(
     }
 
     return { kind, name, input, output, start, end, field, issue, change, failedLink, summary }
-  }, [lookupTables, t, tLinks, transforms])
+  }, [lookupTables, marks, t, tAi, tLinks, transforms])
 }

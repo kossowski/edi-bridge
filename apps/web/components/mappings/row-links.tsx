@@ -18,6 +18,7 @@ import {
   type RowLink,
   type RowRef,
 } from '@/components/mappings/mapping-links'
+import { useRemoveText } from '@/components/mappings/use-remove-text'
 import { Button } from '@edi-bridge/ui/components/button'
 
 import type { GraphText } from '@/components/mappings/graph-text'
@@ -75,6 +76,7 @@ export function RowLinks({
   const t = useTranslations('Mapping.links')
   const tAi = useTranslations('Mapping.aiReview')
   const marks = useAiMarks()
+  const removeText = useRemoveText()
   const heading = useId()
   const linkFrom = useCanvasStore((state) => state.linkFrom)
   const own = linksOfItem(graph, row.side, item)
@@ -118,10 +120,10 @@ export function RowLinks({
                   <Button
                     size="sm"
                     variant="outline"
-                    aria-label={proposed ? tAi('rejectLinkLabel', names) : t('removeLabel', names)}
+                    aria-label={removeText.linkLabel(proposed, names)}
                     data-remove-link
                     onClick={() => actions.remove(link, index)}>
-                    {proposed ? tAi('reject') : t('remove')}
+                    {removeText.link(proposed)}
                   </Button>
                 )}
               </li>

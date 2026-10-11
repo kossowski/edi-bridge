@@ -15,8 +15,15 @@ import { Button } from '@edi-bridge/ui/components/button'
 
 import type { MappingDraft } from '@edi-bridge/contracts'
 
-// While the review is open, a Viewer sees it as well, so the marks on the canvas make sense.
-export function AiReviewState({ draft, canChange }: { draft: MappingDraft; canChange: boolean }) {
+export function AiReviewState({
+  draft,
+  summaryId,
+  publishHintId,
+}: {
+  draft: MappingDraft
+  summaryId: string
+  publishHintId: string
+}) {
   const t = useTranslations('Mapping.aiReview')
   const queryClient = useQueryClient()
   const saving = useGraphSaveState(draft.mappingId) === 'saving'
@@ -44,7 +51,7 @@ export function AiReviewState({ draft, canChange }: { draft: MappingDraft; canCh
         ref={doneRef}
         role="status"
         tabIndex={-1}
-        className="inline-flex items-center gap-1.5 text-sm text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
+        className="inline-flex basis-full items-center gap-1.5 text-sm text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
         {accepted && !open && (
           <>
             <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} aria-hidden />
@@ -53,24 +60,27 @@ export function AiReviewState({ draft, canChange }: { draft: MappingDraft; canCh
         )}
       </p>
       {open && (
-        <span className="inline-flex flex-wrap items-center gap-2 text-sm">
-          <AiBadge label={t('open')} />
-          <span>{t('openSummary', { count: aiProposedCount(draft.aiReview) })}</span>
-          {canChange && (
-            <Button
-              disabled={accept.isPending || saving}
-              focusableWhenDisabled
-              size="sm"
-              onClick={() => accept.mutate()}>
-              {accept.isPending ? t('accepting') : t('accept')}
-            </Button>
-          )}
+        <div className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <span id={summaryId} className="inline-flex flex-wrap items-center gap-2">
+            <AiBadge label={t('open')} />
+            {t('openSummary', { count: aiProposedCount(draft.aiReview) })}
+          </span>
+          <Button
+            disabled={accept.isPending || saving}
+            focusableWhenDisabled
+            size="sm"
+            onClick={() => accept.mutate()}>
+            {accept.isPending ? t('accepting') : t('accept')}
+          </Button>
           {accept.isError && (
             <span role="alert" className="text-red-800 dark:text-red-300">
               {t('acceptFailed')}
             </span>
           )}
-        </span>
+          <span id={publishHintId} className="text-muted-foreground ms-auto">
+            {t('publishBlocked')}
+          </span>
+        </div>
       )}
     </>
   )

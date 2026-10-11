@@ -10,7 +10,6 @@ export type AiMarks = {
   link: (link: Pick<MappingLink, 'targetPath'>) => boolean
   transform: (transformId: string) => boolean
   transformLink: (link: TransformLink) => boolean
-  // Whatever ends here, a plain link or a transform link, is AI-proposed.
   end: (end: LinkEnd) => boolean
 }
 
@@ -31,6 +30,13 @@ export function aiMarks(review: AiReview | null | undefined): AiMarks {
 
 export function rowLinkProposed(marks: AiMarks, link: RowLink) {
   return link.kind === 'link' ? marks.link(link.link) : marks.transformLink(link.link)
+}
+
+export function proposedLinkCount(
+  marks: AiMarks,
+  links: ReadonlyArray<Pick<MappingLink, 'targetPath'>>,
+) {
+  return links.filter((link) => marks.link(link)).length
 }
 
 export function aiProposedCount(review: AiReview | null | undefined) {

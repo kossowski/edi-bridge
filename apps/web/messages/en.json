@@ -1048,13 +1048,12 @@
       "problem": {
         "noChanges": "The Draft has no changes since its latest Mapping Version, so there is nothing to publish.",
         "incomplete": "The Draft cannot be published yet: every link and Transform must be complete. Complete them, then publish again.",
-        "reviewOpen": "The Draft cannot be published while its AI review is open. Accept the AI draft first, then publish.",
+        "reviewOpen": "The Draft cannot be published while its AI review is open. Accept the draft first, then publish.",
         "failed": "The Draft could not be published. Try again."
       }
     },
     "aiDraft": {
       "button": "Draft with AI",
-      "reviewOpen": "The AI review of this Draft is still open.",
       "title": "Draft with AI",
       "description": "The AI drafts links from a Sample Document and checks them against it, which takes a few minutes. The links reach the canvas only once they pass the check.",
       "samples": {
@@ -1145,18 +1144,19 @@
     },
     "aiReview": {
       "open": "AI review open",
-      "openSummary": "{count, plural, one {# AI-proposed part to review} other {# AI-proposed parts to review}}",
+      "openSummary": "{count, plural, one {# AI proposal to review} other {# AI proposals to review}}",
       "accept": "Accept draft",
       "accepting": "Accepting…",
       "accepted": "AI draft accepted. The Draft stays editable and can be published now.",
       "acceptFailed": "The AI draft could not be accepted. Try again.",
-      "publishBlocked": "Accept the AI draft before publishing.",
+      "publishBlocked": "Accept the draft before publishing.",
       "marker": "AI",
       "proposed": "AI-proposed",
       "proposedLink": "AI-proposed link",
       "proposedTransform": "AI-proposed Transform",
       "proposedStatus": "AI-proposed.",
       "edgeLabel": "{label}, AI-proposed",
+      "edgeLabelSome": "{label}, {count} of {total} AI-proposed",
       "reject": "Reject",
       "rejectLinkLabel": "Reject the AI-proposed link from {source} to {target}",
       "rejectTransform": "Reject {name}",
