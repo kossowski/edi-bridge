@@ -1162,7 +1162,36 @@
       "rejectTransform": "Reject {name}",
       "rejectTransformLabel": "Reject the AI-proposed {name}",
       "rejectedLink": "AI-proposed link from {source} to {target} rejected.",
-      "rejectedTransform": "AI-proposed {name} rejected."
+      "rejectedTransform": "AI-proposed {name} rejected.",
+      "showPanel": "What needs attention",
+      "panel": {
+        "title": "AI review",
+        "description": "What needs attention before you accept the draft. Choose an entry to show it on the canvas.",
+        "unmapped": {
+          "title": "Required target elements left unmapped",
+          "detail": "Required, nothing is mapped to it yet.",
+          "empty": "Every required target element is mapped."
+        },
+        "transforms": {
+          "title": "AI-proposed links through Transforms",
+          "empty": "No AI-proposed link runs through a Transform or Lookup Table."
+        },
+        "through": "From {sources} through {transforms}",
+        "throughOnly": "Through {transforms}",
+        "fillsNothing": "{transforms} fills no target element yet.",
+        "lookupTable": "{name} ({table})",
+        "warnings": {
+          "title": "Warnings on the Sample Document",
+          "empty": "The preview shows no warnings on {name}.",
+          "emptyUnnamed": "The preview shows no warnings on the Sample Document.",
+          "loading": "Checking the Draft against the Sample Document",
+          "error": "The warnings could not be loaded."
+        },
+        "plain": {
+          "title": "Other AI-proposed links",
+          "detail": "From {source}"
+        }
+      }
     },
     "facts": {
       "label": "Mapping details",

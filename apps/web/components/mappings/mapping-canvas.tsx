@@ -177,8 +177,8 @@ const transformExtent: [[number, number], [number, number]] = [
 
 export type CanvasSide = { title: string; items: ReadonlyArray<TreeItem> }
 
-// The band under the canvas: the Details panel, and beside it whatever the screen adds, such as the
-// preview, which toggles the whole band and so needs to name the Details body it hides.
+// The band under the canvas: the Details panel, and beside it whatever panels the screen adds, such
+// as the preview, which toggles the whole band and so needs to name the Details body it hides.
 export type CanvasBand = { open: boolean; onToggle: () => void; controls: string }
 
 type MappingCanvasProps = {
@@ -1364,7 +1364,7 @@ export function MappingCanvas({
   ])
 
   return (
-    <div ref={root} className="flex min-h-0 flex-1 flex-col gap-3">
+    <div ref={root} className="flex min-h-0 flex-1 flex-col gap-3" data-mapping-canvas>
       {!viewOnly && <TransformPalette onPlace={place} />}
       <div ref={area} className="flex min-h-0 flex-1 flex-col gap-3">
         <div
@@ -1424,8 +1424,7 @@ export function MappingCanvas({
             height before the canvas goes below its minimum. */}
         <div
           className={cn(
-            'grid gap-3',
-            beside && 'grid-cols-2',
+            'grid auto-cols-[minmax(0,1fr)] grid-flow-col gap-3',
             bandOpen ? 'min-h-44 shrink basis-[22rem]' : 'shrink-0',
           )}>
           <DetailsPanel

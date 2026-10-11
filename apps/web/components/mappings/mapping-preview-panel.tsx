@@ -4,13 +4,13 @@ import { ArrowDown01Icon, ArrowUp01Icon, Loading03Icon } from '@hugeicons/core-f
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useId, useMemo, useState } from 'react'
+import { useId, useState } from 'react'
 
 import { Loading } from '@/components/detail-parts'
 import { useGraphText } from '@/components/mappings/graph-text'
-import { documentSize, documentText, previewGraph } from '@/components/mappings/mapping-preview'
-import { useDebouncedValue } from '@/hooks/use-debounced-value'
-import { mappingPreviewQuery, mappingSamplesQuery } from '@/lib/api/queries'
+import { documentSize, documentText } from '@/components/mappings/mapping-preview'
+import { useDraftPreview } from '@/components/mappings/use-draft-preview'
+import { mappingSamplesQuery } from '@/lib/api/queries'
 import {
   type DocumentContent,
   type MappingDraft,
@@ -30,12 +30,9 @@ import {
 } from '@edi-bridge/ui/components/select'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-// Long enough that typing into a transform's form does not send a preview per keystroke.
-const previewDelay = 600
-
 const views = ['target', 'source'] as const
 
-function Failure({ message, onRetry }: { message: string; onRetry: () => void }) {
+export function PreviewFailure({ message, onRetry }: { message: string; onRetry: () => void }) {
   const t = useTranslations('Mapping.preview.error')
 
   return (
@@ -147,14 +144,10 @@ function SamplePreview({
 }) {
   const t = useTranslations('Mapping.preview')
   const labelId = useId()
-  const graph = useMemo(() => previewGraph(draft), [draft])
-  const key = useMemo(() => JSON.stringify(graph), [graph])
-  const settled = useDebouncedValue(graph, key, previewDelay)
-  const preview = useQuery(mappingPreviewQuery(draft.mappingId, sample.id, settled.value))
-  const updating = settled.pending || preview.isFetching
+  const { preview, key, settledKey, updating } = useDraftPreview(draft, sample.id)
   const [firstKey] = useState(() => `${sample.id}|${key}`)
   const [shown, setShown] = useState<(typeof views)[number]>('target')
-  const changed = `${sample.id}|${settled.key}` !== firstKey
+  const changed = `${sample.id}|${settledKey}` !== firstKey
 
   // A polite message once each update has settled, never while the Mapping is still changing.
   const announcement =
@@ -232,7 +225,7 @@ function SamplePreview({
           document={preview.data?.document}
           label={t('targetLabel', { name: sample.name })}>
           {preview.isError ? (
-            <Failure message={t('error.preview')} onRetry={() => void preview.refetch()} />
+            <PreviewFailure message={t('error.preview')} onRetry={() => void preview.refetch()} />
           ) : preview.isPending ? (
             <Loading label={t('building')} rowClassName="h-4" />
           ) : undefined}
@@ -263,7 +256,7 @@ function PreviewContent({
   }
 
   if (samples.isError) {
-    return <Failure message={t('error.samples')} onRetry={() => void samples.refetch()} />
+    return <PreviewFailure message={t('error.samples')} onRetry={() => void samples.refetch()} />
   }
 
   const sample = samples.data.find(({ id }) => id === chosen) ?? samples.data[0]
@@ -289,15 +282,28 @@ export function MappingPreviewPanel({
   open,
   onToggle,
   controls,
+  reviewSampleId = null,
 }: {
   draft: MappingDraft
   open: boolean
   onToggle: () => void
   controls?: string
+  reviewSampleId?: string | null
 }) {
   const t = useTranslations('Mapping.preview')
-  // Held here, not in the content, which unmounts while the band is collapsed.
-  const [chosen, setChosen] = useState<string | null>(null)
+  // Held here, not in the content, which unmounts while the band is collapsed. An AI review that
+  // opens shows its Sample Document, which the Admin may then change.
+  const [chosen, setChosen] = useState<string | null>(reviewSampleId)
+  const [review, setReview] = useState(reviewSampleId)
+
+  if (review !== reviewSampleId) {
+    setReview(reviewSampleId)
+
+    if (reviewSampleId) {
+      setChosen(reviewSampleId)
+    }
+  }
+
   const headingId = useId()
   const contentId = useId()
 

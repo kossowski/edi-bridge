@@ -8,6 +8,7 @@ import { useId } from 'react'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
+import { AiReviewPanel } from '@/components/mappings/ai-review-panel'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
@@ -34,7 +35,7 @@ import {
 } from '@edi-bridge/ui/components/empty'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { MappingDraft } from '@edi-bridge/contracts'
+import type { AiReview, MappingDraft } from '@edi-bridge/contracts'
 
 function CanvasLoading() {
   const t = useTranslations('Mapping.canvas')
@@ -56,8 +57,17 @@ function CanvasLoading() {
   )
 }
 
-function Canvas({ draft }: { draft: MappingDraft }) {
+function Canvas({
+  draft,
+  aiReview,
+  reviewPanelId,
+}: {
+  draft: MappingDraft
+  aiReview: AiReview | null
+  reviewPanelId: string
+}) {
   const t = useTranslations('Mapping.canvas')
+  const reviewBodyId = useId()
   const source = useSide(draft.source)
   const target = useSide(draft.target)
   const save = useSaveGraph(draft.mappingId)
@@ -79,13 +89,34 @@ function Canvas({ draft }: { draft: MappingDraft }) {
     return <CanvasLoading />
   }
 
+  const targetItems = target.items
+
   return (
     <MappingCanvas
-      beside={(band) => <MappingPreviewPanel draft={draft} {...band} />}
+      beside={(band) => (
+        <>
+          {aiReview && (
+            <AiReviewPanel
+              id={reviewPanelId}
+              bodyId={reviewBodyId}
+              draft={draft}
+              open={band.open}
+              review={aiReview}
+              targetItems={targetItems}
+            />
+          )}
+          <MappingPreviewPanel
+            draft={draft}
+            {...band}
+            controls={aiReview ? `${band.controls} ${reviewBodyId}` : band.controls}
+            reviewSampleId={aiReview?.sampleId ?? null}
+          />
+        </>
+      )}
       graph={draft}
       label={t('label', { source: source.title, target: target.title })}
       source={{ title: source.title, items: source.items }}
-      target={{ title: target.title, items: target.items }}
+      target={{ title: target.title, items: targetItems }}
       onChange={save}
     />
   )
@@ -114,10 +145,12 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
   const stateId = useId()
   const reviewSummaryId = useId()
   const publishHintId = useId()
+  const reviewPanelId = useId()
   const aiDraft = useAiDraftRun(draft.mappingId)
+  const aiReview = canChange ? draft.aiReview : null
 
   return (
-    <MappingCanvasProvider aiReview={canChange ? draft.aiReview : null} viewOnly={!canChange}>
+    <MappingCanvasProvider aiReview={aiReview} viewOnly={!canChange}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <DraftStateLabel id={stateId} draft={draft} />
@@ -135,7 +168,12 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
           )}
         </div>
         {canChange && (
-          <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={reviewSummaryId} />
+          <AiReviewState
+            draft={draft}
+            publishHintId={publishHintId}
+            reviewPanelId={desktop ? reviewPanelId : null}
+            summaryId={reviewSummaryId}
+          />
         )}
       </div>
       <dl
@@ -154,7 +192,7 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
       <DesktopOnlyNotice />
       {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
       <div className="hidden min-h-0 flex-1 flex-col lg:flex">
-        {desktop && <Canvas draft={draft} />}
+        {desktop && <Canvas aiReview={aiReview} draft={draft} reviewPanelId={reviewPanelId} />}
       </div>
     </MappingCanvasProvider>
   )

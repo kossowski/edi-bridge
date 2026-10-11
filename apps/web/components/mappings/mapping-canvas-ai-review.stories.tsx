@@ -2,40 +2,21 @@ import { http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
-import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
-import type { BeforeEach } from 'storybook/internal/csf'
-
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
   detailsPanel,
   findSaveStatus,
+  inReview,
   liveStatus,
-  seeded,
+  reviewing,
   transformNodeOf,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { acceptAiDraftEndpoint } from '@edi-bridge/contracts'
-import {
-  type AiProposalSize,
-  aiProposalFor,
-  createHandlers,
-  type MappingDraftRecord,
-  seedDocumentStructures,
-  seedMappingDrafts,
-  seedMappingSamples,
-  withAiProposal,
-} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
-
-function inReview(name: string, size: AiProposalSize = 'regular') {
-  const record = seeded(name)
-  const sample = seedMappingSamples.find(({ mappingId }) => mappingId === record.id)!
-
-  return withAiProposal(record, sample.id, aiProposalFor(record, seedDocumentStructures, size))
-}
 
 // Links drafted next to the Admin's own, with a Lookup Table among the Transforms.
 const outbound = inReview('Alpenfrisch: ERP JSON to INVOIC')
@@ -45,16 +26,6 @@ const inbound = inReview('Rheinkauf: ORDERS to ERP JSON')
 const fromScratch = inReview('Rheinkauf: ERP JSON to INVOIC')
 
 const large = inReview('Bodensee: ERP JSON to INVOIC', 'large')
-
-function reviewing(record: MappingDraftRecord): BeforeEach<ReactRenderer> {
-  return ({ msw }: StoryContext) => {
-    msw.use(
-      ...createHandlers(apiUrl, {
-        mappingDrafts: seedMappingDrafts.map((draft) => (draft.id === record.id ? record : draft)),
-      }),
-    )
-  }
-}
 
 const proposedRow = /AI-proposed link$/
 
