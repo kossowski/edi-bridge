@@ -27,7 +27,7 @@ export function FormField({
 }: {
   id: string
   label: ReactNode
-  description: string
+  description?: string | undefined
   error: string | null
   children: ReactNode
 }) {
@@ -35,9 +35,11 @@ export function FormField({
     <div className="flex flex-col gap-1.5">
       {label}
       {children}
-      <p id={`${id}-description`} className="text-muted-foreground text-sm">
-        {description}
-      </p>
+      {description !== undefined && (
+        <p id={`${id}-description`} className="text-muted-foreground text-sm">
+          {description}
+        </p>
+      )}
       {error && (
         <p id={`${id}-error`} className="text-sm text-red-800 dark:text-red-300">
           {error}
@@ -47,8 +49,8 @@ export function FormField({
   )
 }
 
-export function describedBy(id: string, error: string | null) {
-  return error ? `${id}-description ${id}-error` : `${id}-description`
+export function describedBy(id: string, error: string | null, hasDescription = true) {
+  return [hasDescription && `${id}-description`, error && `${id}-error`].filter(Boolean).join(' ')
 }
 
 type FieldProps = {
@@ -66,7 +68,10 @@ function LabelledField({
   description,
   error,
   children,
-}: Omit<FieldProps, 'value' | 'onChange'> & { children: ReactNode }) {
+}: Omit<FieldProps, 'value' | 'onChange' | 'description'> & {
+  description?: string | undefined
+  children: ReactNode
+}) {
   return (
     <FormField
       id={id}
@@ -90,13 +95,15 @@ export function TextField({
   value,
   onChange,
   ...inputProps
-}: FieldProps & Omit<ComponentProps<'input'>, 'id' | 'value' | 'onChange'>) {
+}: Omit<FieldProps, 'description'> & {
+  description?: string | undefined
+} & Omit<ComponentProps<'input'>, 'id' | 'value' | 'onChange'>) {
   return (
     <LabelledField id={id} description={description} error={error} label={label}>
       <Input
         id={id}
         value={value}
-        aria-describedby={describedBy(id, error)}
+        aria-describedby={describedBy(id, error, description !== undefined) || undefined}
         aria-invalid={error !== null}
         onChange={(event) => onChange(event.target.value)}
         {...inputProps}

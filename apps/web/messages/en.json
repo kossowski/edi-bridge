@@ -21,6 +21,25 @@
       "label": "Language",
       "en": "English",
       "de": "Deutsch"
+    },
+    "session": {
+      "userMenu": "User menu of {name}",
+      "userMenuUnavailable": "User menu, session unavailable",
+      "signedInAs": "Signed in as",
+      "operator": "Operator",
+      "role": {
+        "admin": "Admin",
+        "viewer": "Viewer"
+      },
+      "viewOnly": "View only",
+      "viewOnlyDescription": "You can see everything in this Workspace but change nothing.",
+      "signOut": "Sign out",
+      "signingOut": "Signing out…",
+      "signOutFailed": "Sign-out failed. Try again.",
+      "unavailable": "Session unavailable",
+      "unavailableDescription": "Your session details could not be loaded. You can still sign out.",
+      "loading": "Loading session…",
+      "redirecting": "Your session has ended. Opening the sign-in page…"
     }
   },
   "Navigation": {
@@ -51,6 +70,28 @@
   "NotFound": {
     "title": "Page not found",
     "description": "This page does not exist. Use the navigation to go to another screen."
+  },
+  "Login": {
+    "title": "Sign in to EDI Bridge",
+    "metaTitle": "Sign in",
+    "description": "Use the email address and password from your invite.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "errors": {
+      "emailRequired": "Enter your email address.",
+      "emailInvalid": "Enter a valid email address, for example name@example.com.",
+      "passwordRequired": "Enter your password.",
+      "wrongCredentials": "The email address or password is wrong.",
+      "failed": "Sign-in failed. Try again in a moment.",
+      "showcaseFailed": "The Showcase Workspace could not be opened. Try again in a moment."
+    },
+    "or": "or",
+    "showcase": "View live demo",
+    "showcasePending": "Opening the Showcase Workspace…",
+    "showcaseDescription": "Explore the Showcase Workspace as a Viewer, no invite needed.",
+    "invitedByOperator": "Users are invited by the Operator."
   },
   "Overview": {
     "loading": "Loading Overview",

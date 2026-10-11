@@ -33,6 +33,7 @@ import {
   getMappingVersion,
   getOverview,
   getRun,
+  getSession,
   getTradingPartner,
   inferDocumentStructure,
   listChannels,
@@ -48,6 +49,11 @@ import {
   listTradingPartners,
   previewMapping,
 } from './client'
+
+export const sessionQuery = queryOptions({
+  queryKey: ['session'],
+  queryFn: getSession,
+})
 
 export const currentWorkspaceQuery = queryOptions({
   queryKey: ['workspaces', 'current'],
