@@ -10,6 +10,7 @@ import {
   useChannelKindLabel,
   useChannelTradingPartners,
 } from '@/components/channels/channel-parts'
+import { rowLinkClass } from '@/components/detail-parts'
 import { ListScreen, ListTable } from '@/components/list-screen'
 import { channelsQuery } from '@/lib/api/queries'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
@@ -30,9 +31,7 @@ function ChannelRow({
   return (
     <TableRow className="relative">
       <TableCell>
-        <Link
-          href={`/channels/${channel.id}`}
-          className="focus-visible:after:ring-ring font-medium underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset">
+        <Link href={`/channels/${channel.id}`} className={rowLinkClass}>
           {channel.name}
         </Link>
       </TableCell>

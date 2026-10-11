@@ -22,6 +22,9 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 export const linkClass =
   'focus-visible:ring-ring/50 rounded-sm font-medium underline underline-offset-4 outline-none focus-visible:ring-3'
 
+export const rowLinkClass =
+  'focus-visible:after:ring-ring font-medium underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset'
+
 export function BackToRuns({ label }: { label: string }) {
   return <BackLink href="/runs" label={label} />
 }
