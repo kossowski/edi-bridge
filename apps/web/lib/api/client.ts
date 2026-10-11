@@ -8,8 +8,10 @@ import {
   type CreateDocumentStructureBody,
   createDocumentStructureEndpoint,
   createFlowEndpoint,
+  createInviteEndpoint,
   createLookupTableEndpoint,
   createTradingPartnerEndpoint,
+  createWorkspaceEndpoint,
   currentWorkspaceEndpoint,
   deleteLookupTableEndpoint,
   documentStructureEndpoint,
@@ -22,6 +24,7 @@ import {
   type FlowInput,
   flowsEndpoint,
   inferDocumentStructureEndpoint,
+  type InviteInput,
   type FlowUpdate,
   importLookupTableEndpoint,
   interchangeEndpoint,
@@ -43,6 +46,8 @@ import {
   type MessageType,
   messageTypeStructureEndpoint,
   type MoveFlowMappingVersionBody,
+  operatorWorkspaceSettingsEndpoint,
+  operatorWorkspacesEndpoint,
   moveFlowMappingVersionEndpoint,
   type OrderLifecycleQuery,
   orderLifecyclesEndpoint,
@@ -80,9 +85,12 @@ import {
   updateDocumentStructureEndpoint,
   updateFlowEndpoint,
   updateLookupTableEndpoint,
+  updateOperatorWorkspaceSettingsEndpoint,
   updateTradingPartnerEndpoint,
   updateWorkspaceSettingsEndpoint,
   workspaceSettingsEndpoint,
+  type WorkspaceInput,
+  workspaceInvitesEndpoint,
   type WorkspaceSettingsInput,
 } from '@edi-bridge/contracts'
 
@@ -175,6 +183,10 @@ export function isUnauthorized(error: Error | null) {
   return error instanceof ApiError && error.status === 401
 }
 
+export function isConflict(error: Error | null) {
+  return error instanceof ApiError && error.status === 409
+}
+
 export function getCurrentWorkspace() {
   return request(currentWorkspaceEndpoint)
 }
@@ -189,6 +201,40 @@ export function getWorkspaceSettings() {
 
 export function updateWorkspaceSettings(body: WorkspaceSettingsInput) {
   return request(updateWorkspaceSettingsEndpoint, { body })
+}
+
+export function listOperatorWorkspaces() {
+  return request(operatorWorkspacesEndpoint)
+}
+
+export function createWorkspace(body: WorkspaceInput) {
+  return request(createWorkspaceEndpoint, { body })
+}
+
+export function listWorkspaceInvites(workspaceId: string) {
+  return request(workspaceInvitesEndpoint, {
+    path: toPath(workspaceInvitesEndpoint.path, { workspaceId }),
+  })
+}
+
+export function createInvite(workspaceId: string, body: InviteInput) {
+  return request(createInviteEndpoint, {
+    path: toPath(createInviteEndpoint.path, { workspaceId }),
+    body,
+  })
+}
+
+export function getOperatorWorkspaceSettings(workspaceId: string) {
+  return request(operatorWorkspaceSettingsEndpoint, {
+    path: toPath(operatorWorkspaceSettingsEndpoint.path, { workspaceId }),
+  })
+}
+
+export function updateOperatorWorkspaceSettings(workspaceId: string, body: WorkspaceSettingsInput) {
+  return request(updateOperatorWorkspaceSettingsEndpoint, {
+    path: toPath(updateOperatorWorkspaceSettingsEndpoint.path, { workspaceId }),
+    body,
+  })
 }
 
 export function getOverview(query: OverviewQuery) {

@@ -14,7 +14,7 @@ import {
   type TradingPartnerFormValues,
   validateTradingPartnerForm,
 } from '@/components/trading-partners/trading-partner-form-values'
-import { ApiError, createTradingPartner, updateTradingPartner } from '@/lib/api/client'
+import { createTradingPartner, isConflict, updateTradingPartner } from '@/lib/api/client'
 import { storeSavedTradingPartner } from '@/lib/api/queries'
 import {
   acknowledgementTimeLimitHours,
@@ -66,7 +66,7 @@ export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: Tradin
       router.push(`/trading-partners/${saved.id}`)
     },
     onError: (error, input) => {
-      if (error instanceof ApiError && error.status === 409) {
+      if (isConflict(error)) {
         setGlnTaken(input.gln)
       }
     },

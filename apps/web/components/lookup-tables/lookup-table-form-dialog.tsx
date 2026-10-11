@@ -16,7 +16,7 @@ import {
 } from '@/components/lookup-tables/lookup-table-form-values'
 import { scopeKey } from '@/components/lookup-tables/lookup-table-scope'
 import { useLookup } from '@/hooks/use-lookup'
-import { ApiError, createLookupTable, updateLookupTable } from '@/lib/api/client'
+import { createLookupTable, isConflict, updateLookupTable } from '@/lib/api/client'
 import { lookupTableQuery, storeSavedLookupTable, tradingPartnersQuery } from '@/lib/api/queries'
 import { lookupTableInputSchema } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -131,7 +131,7 @@ function LookupTableForm({
       onSaved(saved)
     },
     onError: (error, settings) => {
-      if (error instanceof ApiError && error.status === 409) {
+      if (isConflict(error)) {
         setTaken({ name: settings.name.toLocaleLowerCase(), scope: scopeKey(settings.scope) })
       }
     },

@@ -21,7 +21,7 @@ import {
 } from '@/components/channels/channel-form-values'
 import { useChannelKindLabel } from '@/components/channels/channel-parts'
 import { Fieldset, SelectField, TextareaField, TextField } from '@/components/form-field'
-import { ApiError, createChannel, updateChannel } from '@/lib/api/client'
+import { createChannel, isConflict, updateChannel } from '@/lib/api/client'
 import { storeSavedChannel, tradingPartnersQuery } from '@/lib/api/queries'
 import {
   type Channel,
@@ -227,7 +227,7 @@ export function ChannelForm({
     : t('fields.credential.description')
 
   const authorization = field('authorization')
-  const kindChanged = save.error instanceof ApiError && save.error.status === 409
+  const kindChanged = isConflict(save.error)
 
   return (
     <form noValidate ref={formRef} className="flex max-w-2xl flex-col gap-6" onSubmit={submit}>

@@ -8,7 +8,7 @@ import { TextField } from '@/components/form-field'
 import { SettingsSection } from '@/components/settings/settings-section'
 import { useSession } from '@/hooks/use-session'
 import { updateWorkspaceSettings } from '@/lib/api/client'
-import { workspaceSettingsQuery } from '@/lib/api/queries'
+import { storeSavedWorkspaceSettings, workspaceSettingsQuery } from '@/lib/api/queries'
 import {
   budgetUsage,
   groupSeparatorOf,
@@ -220,7 +220,7 @@ export function RetentionAndBudgetSection() {
 
   async function save(input: WorkspaceSettingsInput) {
     const updated = await updateWorkspaceSettings(input)
-    queryClient.setQueryData(workspaceSettingsQuery.queryKey, updated)
+    storeSavedWorkspaceSettings(queryClient, updated, session.session?.workspace.id)
 
     return updated
   }
