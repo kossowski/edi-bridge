@@ -1,6 +1,6 @@
 # 42: Partner onboarding and Test Mode
 
-**What to build:** New Trading Partners start in Test Mode: their Interchanges carry the test indicator in the UNB envelope. The onboarding checklist is derived from actual traffic (identity set → test Interchange sent → CONTRL received), and the switch to production is explicit.
+**What to build:** New Trading Partners start in Test Mode: their Interchanges carry the test indicator in the UNB envelope. The onboarding checklist is derived from actual traffic (identity set → test Interchange sent → CONTRL received), and the switch to production is explicit. Admins send a test Document to a partner in Test Mode from the partner page.
 
 **Blocked by:** 39 (CONTRL, Acknowledgements and Overdue)
 
@@ -11,3 +11,4 @@
 - [ ] Checklist steps complete based on real events, not manual ticks
 - [ ] Switching to production is only possible explicitly
 - [ ] With mock mode off, this area's screen (if it already exists) works against the real API without UI code changes; the area's MSW handlers stay in the mocks package and keep working against the same contract
+- [ ] Sending a test Document to a partner in Test Mode produces an Interchange with the test indicator and moves the checklist forward (ticket 62)

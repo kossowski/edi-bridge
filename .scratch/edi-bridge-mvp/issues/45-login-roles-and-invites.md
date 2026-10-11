@@ -1,6 +1,6 @@
 # 45: Login, roles and invites
 
-**What to build:** better-auth (email and password, no sign-up) runs in the api. The Operator creates invites for a Workspace with a role (Admin or Viewer) and copies the link; invited users set their password through it. Roles are enforced in the api and reflected in the UI. The fixed development Workspace is replaced by the logged-in user's Workspace.
+**What to build:** better-auth (email and password, no sign-up) runs in the api. The Operator creates invites for a Workspace with a role (Admin or Viewer) and copies the link; invited users set their password through it. Roles are enforced in the api and reflected in the UI. Workspace members are listed, and the Operator can revoke an open invite. The fixed development Workspace is replaced by the logged-in user's Workspace.
 
 **Blocked by:** 24 (Trading Partners live)
 
@@ -14,3 +14,5 @@
 - [ ] The development Workspace shortcut is removed
 - [ ] If this area's Zod contract doesn't exist yet, this ticket defines it in the contracts package; if it exists, the implementation conforms to it (or extends it, updating the MSW handlers alongside)
 - [ ] With mock mode off, this area's screen (if it already exists) works against the real API without UI code changes; the area's MSW handlers stay in the mocks package and keep working against the same contract
+- [ ] Members of a Workspace are listed with role and last activity (tickets 69 and 70)
+- [ ] The Operator can revoke an open invite; a revoked or expired link (after 7 days) no longer sets a password
