@@ -18,6 +18,7 @@ _On screen_: Workspace (DE: Arbeitsbereich)
 **Showcase Workspace**:
 A pristine, seeded Workspace that visitors browse read-only.
 _Avoid_: Demo, public workspace
+_On screen_: Demo (DE: Demo)
 
 **Sandbox Workspace**:
 A seeded Workspace where visitors may change anything; the Operator resets it to its seed on demand.

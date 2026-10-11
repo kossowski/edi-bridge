@@ -1,10 +1,17 @@
 'use client'
 
+import { ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
-
-import type { ComponentProps, ReactNode } from 'react'
+import { type ComponentProps, type ReactNode, useState } from 'react'
 
 import { Input } from '@edi-bridge/ui/components/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@edi-bridge/ui/components/input-group'
 import { RadioGroup, RadioGroupItem } from '@edi-bridge/ui/components/radio-group'
 import {
   Select,
@@ -108,6 +115,46 @@ export function TextField({
         onChange={(event) => onChange(event.target.value)}
         {...inputProps}
       />
+    </LabelledField>
+  )
+}
+
+export function PasswordField({
+  id,
+  label,
+  description,
+  error,
+  value,
+  onChange,
+  ...inputProps
+}: Omit<FieldProps, 'description'> & {
+  description?: string | undefined
+} & Omit<ComponentProps<'input'>, 'id' | 'value' | 'onChange' | 'type'>) {
+  const t = useTranslations('PasswordField')
+  const [visible, setVisible] = useState(false)
+
+  return (
+    <LabelledField id={id} description={description} error={error} label={label}>
+      <InputGroup>
+        <InputGroupInput
+          id={id}
+          type={visible ? 'text' : 'password'}
+          value={value}
+          aria-describedby={describedBy(id, error, description !== undefined) || undefined}
+          aria-invalid={error !== null}
+          onChange={(event) => onChange(event.target.value)}
+          {...inputProps}
+        />
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-xs"
+            aria-controls={id}
+            aria-label={visible ? t('hide') : t('show')}
+            onClick={() => setVisible((current) => !current)}>
+            <HugeiconsIcon icon={visible ? ViewOffIcon : ViewIcon} strokeWidth={2} />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
     </LabelledField>
   )
 }
