@@ -116,7 +116,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   function startEditing(key: number, field: EntryField, text: string | null) {
     const row = rows.find((candidate) => candidate.key === key)
 
-    if (!row || saving) {
+    if (!row || saving || !canChange) {
       return
     }
 
@@ -153,7 +153,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   }
 
   function add(afterKey?: number) {
-    if (saving) {
+    if (saving || !canChange) {
       return
     }
 
@@ -167,7 +167,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   }
 
   function remove(key: number) {
-    if (saving) {
+    if (saving || !canChange) {
       return
     }
 
@@ -220,7 +220,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   }
 
   const saveShortcut = useEffectEvent((event: globalThis.KeyboardEvent) => {
-    if (isSaveShortcut(event) && !dialogOpen()) {
+    if (canChange && isSaveShortcut(event) && !dialogOpen()) {
       event.preventDefault()
       submit()
     }
@@ -247,7 +247,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
 
   return (
     <section aria-labelledby={ids.title} className="flex min-w-0 flex-col gap-4">
-      <LeaveGuard when={dirty} />
+      <LeaveGuard when={canChange && dirty} />
       <p role="status" className="sr-only">
         {announcement}
       </p>
@@ -258,11 +258,11 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
           </h2>
           <p className="text-muted-foreground text-sm">{t('description')}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-sm">
-            {saving ? t('savingReadOnly') : dirty ? t('unsaved') : t('upToDate')}
-          </span>
-          {canChange && (
+        {canChange && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground text-sm">
+              {saving ? t('savingReadOnly') : dirty ? t('unsaved') : t('upToDate')}
+            </span>
             <Button
               disabled={saving}
               ref={importButton}
@@ -274,14 +274,17 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
               <HugeiconsIcon icon={FileImportIcon} strokeWidth={2} aria-hidden />
               {tImport('open')}
             </Button>
-          )}
-          <Button disabled={!dirty || saving} variant="outline" onClick={discard}>
-            {t('discard')}
-          </Button>
-          <Button disabled={!dirty || saving} aria-keyshortcuts="Control+S Meta+S" onClick={submit}>
-            {saving ? t('saving') : t('save')}
-          </Button>
-        </div>
+            <Button disabled={!dirty || saving} variant="outline" onClick={discard}>
+              {t('discard')}
+            </Button>
+            <Button
+              disabled={!dirty || saving}
+              aria-keyshortcuts="Control+S Meta+S"
+              onClick={submit}>
+              {saving ? t('saving') : t('save')}
+            </Button>
+          </div>
+        )}
       </div>
       {errorCount > 0 && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">
@@ -312,14 +315,16 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
               ? t('filteredCount', { count: visibleRows.length, total: rows.length })
               : t('count', { count: rows.length })}
           </p>
-          <Button
-            disabled={saving}
-            ref={addButton}
-            variant="outline"
-            onClick={() => add(active?.key)}>
-            <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden />
-            {t('add')}
-          </Button>
+          {canChange && (
+            <Button
+              disabled={saving}
+              ref={addButton}
+              variant="outline"
+              onClick={() => add(active?.key)}>
+              <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden />
+              {t('add')}
+            </Button>
+          )}
         </div>
       </div>
       {rows.length === 0 ? (
@@ -329,7 +334,9 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
               <HugeiconsIcon icon={Table01Icon} strokeWidth={2} />
             </EmptyMedia>
             <EmptyTitle>{t('empty.title')}</EmptyTitle>
-            <EmptyDescription>{t('empty.description')}</EmptyDescription>
+            <EmptyDescription>
+              {canChange ? t('empty.description') : t('empty.viewOnlyDescription')}
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : visibleRows.length === 0 ? (
@@ -339,7 +346,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
       ) : (
         <>
           <p id={ids.hint} className="text-muted-foreground text-sm">
-            {t('hint')}
+            {canChange ? t('hint') : t('viewOnlyHint')}
           </p>
           <LookupTableEntryGrid
             active={active}
@@ -350,20 +357,25 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
             labelledBy={ids.title}
             readOnly={saving}
             ref={grid}
+            viewOnly={!canChange}
             visibleRows={visibleRows}
           />
         </>
       )}
-      <Shortcuts />
-      <ImportCsvDialog
-        dirty={dirty}
-        finalFocus={importButton}
-        open={importOpen}
-        table={table}
-        onDiscard={discard}
-        onImported={applyImported}
-        onOpenChange={setImportOpen}
-      />
+      {canChange && (
+        <>
+          <Shortcuts />
+          <ImportCsvDialog
+            dirty={dirty}
+            finalFocus={importButton}
+            open={importOpen}
+            table={table}
+            onDiscard={discard}
+            onImported={applyImported}
+            onOpenChange={setImportOpen}
+          />
+        </>
+      )}
     </section>
   )
 }

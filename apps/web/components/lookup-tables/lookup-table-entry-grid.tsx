@@ -133,11 +133,17 @@ function cellAt(target: EventTarget): ActiveCell | null {
     : null
 }
 
-function GridRow({ className, ...props }: ComponentProps<'div'>) {
+function GridRow({ viewOnly, className, ...props }: ComponentProps<'div'> & { viewOnly: boolean }) {
   return (
     <div
       role="row"
-      className={cn('grid grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem]', className)}
+      className={cn(
+        'grid',
+        viewOnly
+          ? 'grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)]'
+          : 'grid-cols-[4rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem]',
+        className,
+      )}
       {...props}
     />
   )
@@ -199,6 +205,7 @@ function CodeCell({
   editing,
   error,
   errorId,
+  viewOnly,
   handlers,
 }: {
   row: EntryRow
@@ -208,6 +215,7 @@ function CodeCell({
   editing: boolean
   error: string | null
   errorId: string
+  viewOnly: boolean
   handlers: GridHandlers
 }) {
   const t = useTranslations('LookupTable.entries')
@@ -218,7 +226,7 @@ function CodeCell({
       role="gridcell"
       tabIndex={tabIndex}
       aria-invalid={error ? true : undefined}
-      className="cursor-text"
+      className={viewOnly ? undefined : 'cursor-text'}
       data-column={columnOf(field)}
       data-key={row.key}>
       {editing ? (
@@ -250,6 +258,7 @@ function EntryGridRow({
   errors,
   idPrefix,
   readOnly,
+  viewOnly,
   handlers,
 }: {
   visibleRow: VisibleRow
@@ -259,6 +268,7 @@ function EntryGridRow({
   errors: RowErrors | undefined
   idPrefix: string
   readOnly: boolean
+  viewOnly: boolean
   handlers: GridHandlers
 }) {
   const t = useTranslations('LookupTable.entries')
@@ -269,6 +279,7 @@ function EntryGridRow({
 
   return (
     <GridRow
+      viewOnly={viewOnly}
       aria-rowindex={position + 2}
       className={cn('absolute inset-x-0 border-b', errors && 'bg-red-50/60 dark:bg-red-950/30')}
       style={{ top: position * rowHeight, height: rowHeight }}>
@@ -294,23 +305,26 @@ function EntryGridRow({
             row={row}
             rowNumber={rowNumber}
             tabIndex={tabIndexOf(columnOf(field))}
+            viewOnly={viewOnly}
           />
         )
       })}
-      <div role="gridcell" className="flex items-center justify-center">
-        <Button
-          size="icon-sm"
-          tabIndex={tabIndexOf(columnOf('actions'))}
-          variant="ghost"
-          aria-disabled={readOnly || undefined}
-          aria-label={t('deleteRow', { row: rowNumber })}
-          className="scroll-mt-10"
-          data-column={columnOf('actions')}
-          data-key={row.key}
-          onClick={() => handlers.onDelete(row.key)}>
-          <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
-        </Button>
-      </div>
+      {!viewOnly && (
+        <div role="gridcell" className="flex items-center justify-center">
+          <Button
+            size="icon-sm"
+            tabIndex={tabIndexOf(columnOf('actions'))}
+            variant="ghost"
+            aria-disabled={readOnly || undefined}
+            aria-label={t('deleteRow', { row: rowNumber })}
+            className="scroll-mt-10"
+            data-column={columnOf('actions')}
+            data-key={row.key}
+            onClick={() => handlers.onDelete(row.key)}>
+            <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
+          </Button>
+        </div>
+      )}
     </GridRow>
   )
 }
@@ -321,6 +335,7 @@ export function LookupTableEntryGrid({
   editing,
   errors,
   readOnly,
+  viewOnly = false,
   ref,
   labelledBy,
   describedBy,
@@ -331,6 +346,7 @@ export function LookupTableEntryGrid({
   editing: Editing | null
   errors: ReadonlyMap<number, RowErrors>
   readOnly: boolean
+  viewOnly?: boolean
   ref: Ref<EntryGridHandle>
   labelledBy: string
   describedBy: string
@@ -342,6 +358,7 @@ export function LookupTableEntryGrid({
   const scroller = useRef<HTMLDivElement>(null)
   const { viewport, onScroll } = useViewport(scroller)
   const activePosition = active ? positionOf(visibleRows, active.key) : -1
+  const columns = viewOnly ? gridColumns.filter((column) => column !== 'actions') : gridColumns
 
   const current: CellPosition =
     active && activePosition >= 0
@@ -358,7 +375,7 @@ export function LookupTableEntryGrid({
 
   const size: GridSize = {
     rows: visibleRows.length,
-    columns: gridColumns.length,
+    columns: columns.length,
     editColumns: { first: columnOf('sourceCode'), last: columnOf('targetCode') },
     pageRows: Math.max(1, Math.floor(viewport.height / rowHeight) - 1),
   }
@@ -393,7 +410,7 @@ export function LookupTableEntryGrid({
     const command = gridCommand(event, editing !== null)
     const activeKey = currentRow?.row.key
 
-    if (!command || activeKey === undefined) {
+    if (!command || activeKey === undefined || (viewOnly && command.kind !== 'move')) {
       return
     }
 
@@ -454,7 +471,13 @@ export function LookupTableEntryGrid({
     const cell = cellAt(event.target)
     const field = cell ? fieldAt(cell.column) : null
 
-    if (cell && field && !readOnly && !(editing?.key === cell.key && editing.field === field)) {
+    if (
+      cell &&
+      field &&
+      !readOnly &&
+      !viewOnly &&
+      !(editing?.key === cell.key && editing.field === field)
+    ) {
       handlers.onStartEditing(cell.key, field, null)
     }
   }
@@ -476,10 +499,10 @@ export function LookupTableEntryGrid({
         role="grid"
         tabIndex={-1}
         aria-busy={readOnly || undefined}
-        aria-colcount={gridColumns.length}
+        aria-colcount={columns.length}
         aria-describedby={describedBy}
         aria-labelledby={labelledBy}
-        aria-readonly={readOnly || undefined}
+        aria-readonly={readOnly || viewOnly || undefined}
         aria-rowcount={visibleRows.length + 1}
         className={cn(
           'bg-card overflow-hidden rounded-lg border outline-none',
@@ -493,8 +516,12 @@ export function LookupTableEntryGrid({
           className="max-h-[min(35rem,calc(100dvh-18rem))] overflow-y-auto"
           onScroll={(event) => onScroll(event.currentTarget.scrollTop)}>
           <div role="rowgroup" className="bg-muted sticky top-0 z-10 border-b">
-            <GridRow aria-rowindex={1} className="items-center" style={{ height: headerHeight }}>
-              {gridColumns.map((key) => (
+            <GridRow
+              viewOnly={viewOnly}
+              aria-rowindex={1}
+              className="items-center"
+              style={{ height: headerHeight }}>
+              {columns.map((key) => (
                 <div
                   key={key}
                   role="columnheader"
@@ -525,6 +552,7 @@ export function LookupTableEntryGrid({
                   idPrefix={labelledBy}
                   position={position}
                   readOnly={readOnly}
+                  viewOnly={viewOnly}
                   visibleRow={item}
                 />
               )
