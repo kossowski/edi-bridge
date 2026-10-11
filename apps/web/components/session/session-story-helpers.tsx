@@ -1,9 +1,12 @@
 import { expect } from 'storybook/test'
 
-import type { ReactRenderer } from '@storybook/nextjs-vite'
+import type {
+  Decorator,
+  ReactRenderer,
+  StoryContext as ReactStoryContext,
+} from '@storybook/nextjs-vite'
 import type { RequestHandler } from 'msw'
-import type { ReactElement, ReactNode } from 'react'
-import type { StoryContext as CsfStoryContext } from 'storybook/internal/csf'
+import type { BeforeEach } from 'storybook/internal/csf'
 
 import { ViewOnlyBadge } from '@/components/session/view-only-badge'
 import { apiUrl } from '@/lib/api/config'
@@ -15,13 +18,11 @@ import {
 
 import type { Session } from '@edi-bridge/contracts'
 
-type StoryContext = CsfStoryContext<ReactRenderer>
-
 export function sessionHandlers(session: Session | SessionStore) {
   return mockSessionHandlers(apiUrl, session)
 }
 
-const withViewOnlyBadge = (Story: () => ReactNode) => (
+const withViewOnlyBadge: Decorator = (Story) => (
   <>
     <ViewOnlyBadge />
     <Story />
@@ -36,18 +37,18 @@ export function viewerStory({
   play,
 }: {
   handlers?: RequestHandler[]
-  decorators?: ((Story: () => ReactNode) => ReactElement)[]
-  beforeEach?: () => () => void
-  play: (context: StoryContext) => Promise<void>
+  decorators?: Decorator[]
+  beforeEach?: BeforeEach<ReactRenderer>
+  play: (context: ReactStoryContext) => Promise<void>
 }) {
   return {
-    beforeEach({ msw }: StoryContext) {
-      msw.use(...sessionHandlers(showcaseViewerSession), ...handlers)
+    beforeEach(context: ReactStoryContext) {
+      context.msw.use(...sessionHandlers(showcaseViewerSession), ...handlers)
 
-      return beforeEach?.()
+      return beforeEach?.(context)
     },
     decorators: [...decorators, withViewOnlyBadge],
-    async play(context: StoryContext) {
+    async play(context: ReactStoryContext) {
       await expect(await context.canvas.findByText('View only')).toBeVisible()
       await play(context)
     },
