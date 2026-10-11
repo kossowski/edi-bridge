@@ -42,6 +42,7 @@ import {
   listMappingSamples,
   listMappings,
   listMappingVersions,
+  listOrderLifecycles,
   listPublishedMappingVersions,
   listRuns,
   listTradingPartners,
@@ -63,6 +64,18 @@ export function overviewQuery(window: OverviewWindow) {
     queryKey: overviewKeys.window(window),
     queryFn: () => getOverview({ window }),
     placeholderData: keepPreviousData,
+  })
+}
+
+export const orderLifecycleKeys = {
+  all: () => ['order-lifecycles'] as const,
+  search: (businessReference: string) => [...orderLifecycleKeys.all(), businessReference] as const,
+}
+
+export function orderLifecyclesQuery(businessReference: string) {
+  return queryOptions({
+    queryKey: orderLifecycleKeys.search(businessReference),
+    queryFn: () => listOrderLifecycles({ businessReference }),
   })
 }
 

@@ -39,7 +39,6 @@
   "Placeholder": {
     "title": "Not built yet",
     "runs": "Every Run with its outcome, steps, errors and output.",
-    "orderLifecycle": "All Messages that share one Business Reference, in order.",
     "tradingPartners": "The Trading Partners of this Workspace, their Channels and Flows.",
     "channels": "The inbound and outbound Channels and their connection settings.",
     "flows": "The Flows that route Documents from a Channel through a Mapping Version to a destination Channel.",
@@ -379,6 +378,40 @@
       },
       "openRun": "– open Run of Message {messageReference}, {messageType}"
     }
+  },
+  "OrderLifecycle": {
+    "loading": "Loading the Order Lifecycle for {businessReference}",
+    "search": {
+      "label": "Business Reference",
+      "hint": "Enter a Business Reference, such as an order number.",
+      "submit": "Search"
+    },
+    "initial": {
+      "title": "Search for a Business Reference",
+      "description": "Enter a Business Reference, such as an order number, to see its Order Lifecycle: ORDERS, DESADV and INVOIC in order."
+    },
+    "noResult": {
+      "title": "No Order Lifecycle found",
+      "description": "No Message carries the Business Reference {businessReference}. Check the reference and search again."
+    },
+    "error": {
+      "title": "Order Lifecycle unavailable",
+      "description": "The Order Lifecycle for {businessReference} could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "resultCount": "{count, plural, one {# Order Lifecycle} other {# Order Lifecycles}} for the Business Reference {businessReference}",
+    "timelineLabel": "Order Lifecycle with {tradingPartner}",
+    "messageCount": "{count, plural, one {# Message} other {# Messages}}",
+    "open": {
+      "label": "Open",
+      "description": "No {messageType} yet."
+    },
+    "missing": {
+      "label": "Not found",
+      "description": "No {messageType} found."
+    },
+    "failureStage": "Failure Stage",
+    "noInterchange": "No Interchange"
   },
   "TradingPartners": {
     "new": "New Trading Partner",

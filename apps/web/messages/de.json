@@ -39,7 +39,6 @@
   "Placeholder": {
     "title": "Noch nicht gebaut",
     "runs": "Jeder Run mit Ergebnis, Schritten, Fehlern und Ausgabe.",
-    "orderLifecycle": "Alle Messages mit derselben Business Reference in zeitlicher Reihenfolge.",
     "tradingPartners": "Die Trading Partners dieses Workspace mit ihren Channels und Flows.",
     "channels": "Die eingehenden und ausgehenden Channels und ihre Verbindungseinstellungen.",
     "flows": "Die Flows, die Documents von einem Channel über eine Mapping Version an einen Ziel-Channel leiten.",
@@ -379,6 +378,40 @@
       },
       "openRun": "– Run zu Message {messageReference} öffnen, {messageType}"
     }
+  },
+  "OrderLifecycle": {
+    "loading": "Order Lifecycle für {businessReference} wird geladen",
+    "search": {
+      "label": "Business Reference",
+      "hint": "Geben Sie eine Business Reference ein, etwa eine Bestellnummer.",
+      "submit": "Suchen"
+    },
+    "initial": {
+      "title": "Nach einer Business Reference suchen",
+      "description": "Geben Sie eine Business Reference ein, etwa eine Bestellnummer, um ihren Order Lifecycle zu sehen: ORDERS, DESADV und INVOIC in zeitlicher Reihenfolge."
+    },
+    "noResult": {
+      "title": "Kein Order Lifecycle gefunden",
+      "description": "Keine Message trägt die Business Reference {businessReference}. Prüfen Sie die Referenz und suchen Sie erneut."
+    },
+    "error": {
+      "title": "Order Lifecycle nicht verfügbar",
+      "description": "Der Order Lifecycle für {businessReference} konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "resultCount": "{count, plural, one {# Order Lifecycle} other {# Order Lifecycles}} zur Business Reference {businessReference}",
+    "timelineLabel": "Order Lifecycle mit {tradingPartner}",
+    "messageCount": "{count, plural, one {# Message} other {# Messages}}",
+    "open": {
+      "label": "Offen",
+      "description": "Noch keine {messageType}."
+    },
+    "missing": {
+      "label": "Nicht gefunden",
+      "description": "Keine {messageType} gefunden."
+    },
+    "failureStage": "Failure Stage",
+    "noInterchange": "Kein Interchange"
   },
   "TradingPartners": {
     "new": "Neuer Trading Partner",
