@@ -127,17 +127,17 @@ type CanvasContext = {
   store: StoreApi<CanvasState>
   tooltip: { handle: ReturnType<typeof createTooltipHandle<TreeRow>>; id: string }
   hints: { linkTarget: string; linkStart: string }
-  readOnly: boolean
+  viewOnly: boolean
 }
 
 const Context = createContext<CanvasContext | null>(null)
 
 // One store per mounted canvas, so two canvases (or two stories) never share a selection.
 export function MappingCanvasProvider({
-  readOnly = false,
+  viewOnly = false,
   children,
 }: {
-  readOnly?: boolean
+  viewOnly?: boolean
   children: ReactNode
 }) {
   const id = useId()
@@ -148,7 +148,7 @@ export function MappingCanvasProvider({
     hints: { linkTarget: `${id}link-target`, linkStart: `${id}link-start` },
   }))
 
-  const value = useMemo<CanvasContext>(() => ({ ...shared, readOnly }), [shared, readOnly])
+  const value = useMemo<CanvasContext>(() => ({ ...shared, viewOnly }), [shared, viewOnly])
 
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
@@ -171,8 +171,8 @@ export function useCanvasStoreApi() {
   return useCanvasContext().store
 }
 
-export function useCanvasReadOnly() {
-  return useCanvasContext().readOnly
+export function useCanvasViewOnly() {
+  return useCanvasContext().viewOnly
 }
 
 export function useMeaningTooltip() {

@@ -20,7 +20,7 @@ import {
   knownSyntaxError,
   textPosition,
 } from '@/components/mappings/expression-text'
-import { useCanvasReadOnly } from '@/components/mappings/mapping-canvas-store'
+import { useCanvasViewOnly } from '@/components/mappings/mapping-canvas-store'
 import { type CanvasIssue, linkIntoInput, type Graph } from '@/components/mappings/mapping-graph'
 import {
   type FieldInput,
@@ -274,6 +274,22 @@ function useSyntaxErrorText() {
   }
 }
 
+function ValidSyntax() {
+  const t = useTranslations('Mapping.transforms.expression')
+
+  return (
+    <p className="flex items-center gap-1.5 text-sm">
+      <HugeiconsIcon
+        icon={CheckmarkCircle02Icon}
+        strokeWidth={2}
+        aria-hidden
+        className="size-4 shrink-0 text-green-700 dark:text-green-300"
+      />
+      {t('valid')}
+    </p>
+  )
+}
+
 function ExpressionInput({
   id,
   label,
@@ -385,15 +401,7 @@ function ExpressionInput({
           </Button>
         )
       ) : (
-        <p className="flex items-center gap-1.5 text-sm">
-          <HugeiconsIcon
-            icon={CheckmarkCircle02Icon}
-            strokeWidth={2}
-            aria-hidden
-            className="size-4 shrink-0 text-green-700 dark:text-green-300"
-          />
-          {t('valid')}
-        </p>
+        <ValidSyntax />
       )}
       <div className="flex flex-col items-start gap-2 pt-1">
         <SelectField
@@ -435,17 +443,45 @@ function choiceView(useChoices: () => ReadonlyArray<Choice>) {
 }
 
 function LookupTableView({ value }: { value: string }) {
+  const t = useTranslations('Mapping.transforms.lookupTables')
+  const scopeOf = useScopeText()
   const tables = useQuery(lookupTablesQuery)
-  const name = tables.data?.find((table) => table.id === value)?.name
+  const chosen = tables.data?.find((table) => table.id === value)
 
-  return name ? name : <CodeView value={value} />
+  if (!chosen) {
+    return <CodeView value={value} />
+  }
+
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span>{chosen.name}</span>
+      <span>{t('scope', { scope: scopeOf(chosen) })}</span>
+    </span>
+  )
 }
 
 function ExpressionView({ value }: { value: string }) {
-  return value === '' ? (
-    <NotSet />
-  ) : (
-    <pre className="font-mono text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">{value}</pre>
+  const t = useTranslations('Mapping.transforms.expression')
+  const syntaxText = useSyntaxErrorText()
+
+  if (value.trim() === '') {
+    return <NotSet />
+  }
+
+  const syntax = expressionSyntaxError(value)
+  const at = syntax && textPosition(value, syntax.position)
+
+  return (
+    <span className="flex flex-col gap-1.5">
+      <pre className="font-mono text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">{value}</pre>
+      {at ? (
+        <span className="text-red-800 dark:text-red-300">
+          {t('syntaxError', { line: at.line, column: at.column, message: syntaxText(syntax) })}
+        </span>
+      ) : (
+        <ValidSyntax />
+      )}
+    </span>
   )
 }
 
@@ -494,6 +530,17 @@ function read(kind: MappingTransform['kind'], values: FormValues) {
   }
 }
 
+function shownFields(kind: MappingTransform['kind'], values: FormValues) {
+  return formFields(kind).filter(({ visibleWhen }) => visibleWhen?.(values) ?? true)
+}
+
+function useFieldDescription() {
+  const t = useTranslations('Mapping.transforms.fieldDescriptions')
+
+  // SAFETY: the form fields are exactly the keys under `fieldDescriptions.<kind>`.
+  return (kind: MappingTransform['kind'], name: string) => t(`${kind}.${name}` as never)
+}
+
 function sameValues(kind: MappingTransform['kind'], a: FormValues, b: FormValues) {
   return formFields(kind).every(({ name }) => a[name] === b[name])
 }
@@ -512,6 +559,7 @@ function TransformSettings({
   onConfigure: (config: MappingTransform['config']) => void
 }) {
   const t = useTranslations('Mapping.transforms')
+  const descriptionOf = useFieldDescription()
   const id = useId()
   const saved = valuesOf(transform)
   const [base, setBase] = useState(saved)
@@ -561,21 +609,16 @@ function TransformSettings({
       : text.issue(transform.kind, issue)
   }
 
-  const shown = formFields(transform.kind).filter(
-    ({ visibleWhen }) => visibleWhen?.(values) ?? true,
-  )
-
   return (
     <div className="flex flex-col gap-4">
-      {shown.map((field) => {
+      {shownFields(transform.kind, values).map((field) => {
         const { Widget } = inputKinds[field.input]
 
         return (
           <Widget
             key={field.name}
             id={`${id}${field.name}`}
-            // SAFETY: the form fields are exactly the keys under `fieldDescriptions.<kind>`.
-            description={t(`fieldDescriptions.${transform.kind}.${field.name}` as never)}
+            description={descriptionOf(transform.kind, field.name)}
             error={errorOf(field)}
             label={text.field(transform.kind, field.name)}
             saved={saved[field.name] ?? ''}
@@ -602,15 +645,12 @@ function TransformSettingsView({
   transform: MappingTransform
   text: GraphText
 }) {
+  const descriptionOf = useFieldDescription()
   const values = valuesOf(transform)
-
-  const shown = formFields(transform.kind).filter(
-    ({ visibleWhen }) => visibleWhen?.(values) ?? true,
-  )
 
   return (
     <dl className="flex flex-col gap-3 text-sm">
-      {shown.map(({ name, input }) => {
+      {shownFields(transform.kind, values).map(({ name, input }) => {
         const { View } = inputKinds[input]
 
         return (
@@ -619,6 +659,7 @@ function TransformSettingsView({
             <dd className="min-w-0 [overflow-wrap:anywhere]">
               <View value={values[name] ?? ''} />
             </dd>
+            <dd className="text-muted-foreground">{descriptionOf(transform.kind, name)}</dd>
           </div>
         )
       })}
@@ -685,10 +726,10 @@ export function TransformDetails({
   const tLinks = useTranslations('Mapping.links')
   const name = text.name(transform.id)
   const ports = transformPorts(transform)
-  const readOnly = useCanvasReadOnly()
+  const viewOnly = useCanvasViewOnly()
 
   // The form shows its own fields' problems beside them.
-  const shownInForm = readOnly ? [] : formFields(transform.kind).map(({ name }) => name)
+  const shownInForm = viewOnly ? [] : formFields(transform.kind).map(({ name }) => name)
 
   const outgoing = graph.transformLinks.filter(
     ({ from }) => from.kind === 'transform' && from.transformId === transform.id,
@@ -704,7 +745,7 @@ export function TransformDetails({
   ]
 
   const removeButton = (link: TransformLink) => {
-    if (readOnly) {
+    if (viewOnly) {
       return null
     }
 
@@ -738,7 +779,7 @@ export function TransformDetails({
       />
       <section className="flex flex-col gap-3">
         <h3 className="text-xs font-medium tracking-wide uppercase">{t('details.settings')}</h3>
-        {readOnly ? (
+        {viewOnly ? (
           <TransformSettingsView text={text} transform={transform} />
         ) : (
           <TransformSettings
@@ -808,7 +849,7 @@ export function TransformDetails({
           })}
         </ul>
       </section>
-      {!readOnly && (
+      {!viewOnly && (
         <>
           <section className="flex flex-col gap-2">
             <h3 className="text-xs font-medium tracking-wide uppercase">{t('details.position')}</h3>

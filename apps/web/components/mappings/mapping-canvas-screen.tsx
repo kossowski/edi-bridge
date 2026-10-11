@@ -112,7 +112,7 @@ function MappingView({ draft }: { draft: MappingDraft }) {
   const canChange = useCanChange()
 
   return (
-    <MappingCanvasProvider readOnly={!canChange}>
+    <MappingCanvasProvider viewOnly={!canChange}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <DraftStateLabel id={stateId} draft={draft} />

@@ -5,7 +5,7 @@ import { useId } from 'react'
 
 import {
   isStartRow,
-  useCanvasReadOnly,
+  useCanvasViewOnly,
   useCanvasStore,
   useLinkHints,
 } from '@/components/mappings/mapping-canvas-store'
@@ -74,8 +74,8 @@ export function RowLinks({
   const heading = useId()
   const linkFrom = useCanvasStore((state) => state.linkFrom)
   const own = linksOfItem(graph, row.side, item)
-  const readOnly = useCanvasReadOnly()
-  const linkable = !readOnly && isLinkableRow(rows, row)
+  const viewOnly = useCanvasViewOnly()
+  const linkable = !viewOnly && isLinkableRow(rows, row)
 
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-2">
@@ -106,7 +106,7 @@ export function RowLinks({
                 <span className="min-w-0 font-mono [overflow-wrap:anywhere]">
                   {t('item', names)}
                 </span>
-                {!readOnly && (
+                {!viewOnly && (
                   <Button
                     size="sm"
                     variant="outline"

@@ -677,8 +677,8 @@ export const Viewer = meta.story({
       ).toBeNull()
       await expect(dateFormat.getByText('Linked from invoiceDate.')).toBeInTheDocument()
       await expect(handleOf(canvasElement, source('invoiceDate'))).not.toHaveClass('connectable')
+      await expect(handleOf(canvasElement, source('invoiceDate'))).not.toHaveClass('link-handle')
 
-      // The keys that link and remove on an Admin's canvas change nothing here.
       const row = await findRow(canvasElement, source('invoiceDate'))
 
       await pressOn(row, '{Delete}')
@@ -702,8 +702,21 @@ export const Viewer = meta.story({
       await expect(panel.getByRole('heading', { name: 'Date format 1' })).toBeVisible()
       await expect(panel.getByText('From pattern')).toBeVisible()
       await expect(panel.getByText('yyyy-MM-dd')).toBeVisible()
+      await expect(panel.getByText(/^The pattern of the incoming date/)).toBeVisible()
       await expectNoSettingsInputs(canvasElement)
       await expect(panel.queryByRole('button', { name: /^(Remove|Move) / })).toBeNull()
+
+      const lookup = await findNode(canvasElement, 'Lookup Table 1')
+
+      await userEvent.click(lookup.getByRole('button', { name: 'Lookup Table 1' }))
+      await expect(await panel.findByText('VAT categories')).toBeVisible()
+      await expect(panel.getByText('Belongs to: Workspace')).toBeVisible()
+
+      const jsonata = await findNode(canvasElement, 'JSONata expression 1')
+
+      await userEvent.click(jsonata.getByRole('button', { name: 'JSONata expression 1' }))
+      await expect(panel.getByText('$sum(lines.lineAmount)')).toBeVisible()
+      await expect(panel.getByText('The syntax is valid.')).toBeVisible()
 
       await pressOn(await findRow(canvasElement, source('invoiceNumber')), '{Enter}')
       await expect(panel.getByRole('heading', { name: 'Links' })).toBeVisible()
