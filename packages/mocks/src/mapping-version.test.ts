@@ -2,6 +2,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  aiReviewOpenStatus,
   directionOf,
   mappingComparisonEndpoint,
   type MappingComparisonQuery,
@@ -268,6 +269,27 @@ describe('POST /mappings/:mappingId/versions', () => {
     expect(Object.fromEntries(statuses)).toEqual(
       Object.fromEntries(changedDrafts.map(({ id }) => [id, id === incompleteDraftId ? 422 : 201])),
     )
+  })
+
+  it('answers 423 while the AI review of the Draft is open', async () => {
+    const draft = publishable.find(({ links }) => links.length > 0)!
+
+    const reviewing: MappingDraftRecord = {
+      ...draft,
+      aiReview: {
+        sampleId: '00000008-0000-4000-8000-000000000001',
+        proposedLinks: [draft.links[0]!.targetPath],
+        proposedTransforms: [],
+        proposedTransformLinks: [],
+      },
+    }
+
+    server.use(
+      ...mappingVersionHandlers(apiUrl, { mappings: createMappingDraftStore([reviewing]) }),
+    )
+
+    expect((await publish(reviewing.id)).status).toBe(aiReviewOpenStatus)
+    expect(aiReviewOpenStatus).toBe(423)
   })
 
   it('answers 404 for an unknown Mapping', async () => {

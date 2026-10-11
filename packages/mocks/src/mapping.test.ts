@@ -499,6 +499,47 @@ describe('PUT /mappings/:id/draft', () => {
     expect(response.status).toBe(422)
   })
 
+  it('drops the AI review marks of rejected and edited parts, but keeps the others', async () => {
+    const graph = { links, transforms: [dateFormat], transformLinks: throughDateFormat }
+
+    const reviewing: MappingDraftRecord = {
+      ...hansemarktOrders,
+      ...graph,
+      aiReview: {
+        sampleId: '00000008-0000-4000-8000-000000000001',
+        proposedLinks: ['orderNumber', 'buyer.gln'],
+        proposedTransforms: [dateFormat.id],
+        proposedTransformLinks: ['target:requestedDeliveryDate'],
+      },
+    }
+
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore([reviewing]) }))
+
+    await saveDraft(reviewing.id, {
+      links: [{ sourcePath: 'BGM/1004', targetPath: 'orderNumber' }],
+      transforms: [{ ...dateFormat, position: { x: 400, y: 400 } }],
+      transformLinks: [
+        throughDateFormat[0]!,
+        { ...throughDateFormat[1]!, to: { kind: 'target', path: 'orderDate' } },
+      ],
+    })
+
+    expect((await getDraft(reviewing.id)).aiReview).toEqual({
+      ...reviewing.aiReview,
+      proposedLinks: ['orderNumber'],
+      proposedTransforms: [dateFormat.id],
+      proposedTransformLinks: [],
+    })
+  })
+
+  it('saves a Draft without an AI review as one without', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+
+    await saveDraft(hansemarktOrders.id, { links })
+
+    expect((await getDraft(hansemarktOrders.id)).aiReview).toBeNull()
+  })
+
   it('answers 404 for an unknown Mapping', async () => {
     server.use(...mappingHandlers(apiUrl))
 
