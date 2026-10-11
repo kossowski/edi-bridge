@@ -202,7 +202,7 @@ function RowButton({
   )
 }
 
-function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
+function TreeNodeView({ data, isConnectable }: NodeProps<TreeFlowNode>) {
   const t = useTranslations('Mapping.canvas')
   const container = !data.linkable
   const linkable = data.linkable || data.wholePart
@@ -275,7 +275,7 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         </RowButton>
       </div>
       <Handle
-        isConnectable={linkable}
+        isConnectable={isConnectable && linkable}
         isConnectableEnd={data.side === 'target'}
         isConnectableStart={data.side === 'source'}
         position={data.side === 'source' ? Position.Right : Position.Left}

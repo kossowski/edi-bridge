@@ -32,6 +32,7 @@ import {
   type SampleSelection,
   trailOf,
 } from '@/components/mappings/version-comparison'
+import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import {
   lookupTablesQuery,
@@ -867,6 +868,7 @@ function InvalidSelection({ same }: { same: boolean }) {
 function Comparison({ mappingId, initial }: { mappingId: string; initial: ComparisonRequest }) {
   const t = useTranslations('MappingComparison')
   const [request, setRequest] = useState(initial)
+  const canChange = useCanChange()
   const versions = useQuery(mappingVersionsQuery(mappingId))
   const samples = useQuery(mappingSamplesQuery(mappingId))
   const selection = versions.data ? resolveVersions(versions.data, request) : undefined
@@ -907,7 +909,7 @@ function Comparison({ mappingId, initial }: { mappingId: string; initial: Compar
   if (selection?.kind === 'tooFew') {
     return (
       <Notice
-        description={t('tooFew.description')}
+        description={canChange ? t('tooFew.description') : t('tooFew.viewOnlyDescription')}
         icon={WorkHistoryIcon}
         title={t('tooFew.title')}>
         <Link href={`/mappings/${mappingId}`} className={buttonVariants({ variant: 'outline' })}>

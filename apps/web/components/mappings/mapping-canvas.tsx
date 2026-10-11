@@ -37,6 +37,7 @@ import {
 } from '@/components/mappings/link-edge'
 import {
   LinkableRowsContext,
+  useCanvasReadOnly,
   useCanvasStore,
   useCanvasStoreApi,
   useMeaningTooltip,
@@ -251,6 +252,7 @@ function DetailsPanel({
 }) {
   const t = useTranslations('Mapping')
   const heading = useId()
+  const readOnly = useCanvasReadOnly()
   const selected = useCanvasStore((state) => state.selected)
   const selectedTransform = useCanvasStore((state) => state.selectedTransform)
   const item = selected && itemOf(selected)
@@ -323,7 +325,7 @@ function DetailsPanel({
         className="focus-visible:ring-ring/50 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto border-t px-4 py-3 outline-none focus-visible:ring-3">
         <PendingLink text={text} onCancel={actions.cancel} />
         {content()}
-        <p className="text-muted-foreground text-xs">{t('links.shortcut')}</p>
+        {!readOnly && <p className="text-muted-foreground text-xs">{t('links.shortcut')}</p>}
       </div>
     </section>
   )
@@ -438,6 +440,7 @@ export function MappingCanvas({
   const panel = useRef<HTMLElement>(null)
   const detailsBodyId = useId()
   const store = useCanvasStoreApi()
+  const readOnly = useCanvasReadOnly()
   const bandOpen = useCanvasStore((state) => state.bandOpen)
   const toggleBand = useCanvasStore((state) => state.toggleBand)
   const collapsed = useCanvasStore((state) => state.collapsed)
@@ -461,8 +464,12 @@ export function MappingCanvas({
   )
 
   const save = useCallback(
-    (change: GraphChange) => onChange({ change, ...text.change(change) }),
-    [onChange, text],
+    (change: GraphChange) => {
+      if (!readOnly) {
+        onChange({ change, ...text.change(change) })
+      }
+    },
+    [onChange, readOnly, text],
   )
 
   const rows = useMemo(
@@ -667,7 +674,7 @@ export function MappingCanvas({
           inputs,
           outputs,
         },
-        draggable: true,
+        draggable: !readOnly,
         selectable: false,
         focusable: false,
         domAttributes: plainNode,
@@ -710,6 +717,7 @@ export function MappingCanvas({
     graph,
     heights,
     issues,
+    readOnly,
     rows,
     source.items,
     source.title,
@@ -1280,7 +1288,7 @@ export function MappingCanvas({
       const linkKey = event.key === 'l' || event.key === 'L'
       const deleteKey = event.key === 'Delete' || event.key === 'Backspace'
 
-      if ((!linkKey && !deleteKey) || event.altKey || event.ctrlKey || event.metaKey) {
+      if (readOnly || (!linkKey && !deleteKey) || event.altKey || event.ctrlKey || event.metaKey) {
         return
       }
 
@@ -1314,6 +1322,7 @@ export function MappingCanvas({
     link,
     outputAction,
     panelActions,
+    readOnly,
     removeRowLink,
     removeTransformById,
     rows,
@@ -1326,7 +1335,7 @@ export function MappingCanvas({
 
   return (
     <div ref={root} className="flex min-h-0 flex-1 flex-col gap-3">
-      <TransformPalette onPlace={place} />
+      {!readOnly && <TransformPalette onPlace={place} />}
       <div ref={area} className="flex min-h-0 flex-1 flex-col gap-3">
         <div
           ref={container}
@@ -1346,13 +1355,14 @@ export function MappingCanvas({
                     deleteKeyCode={null}
                     edges={edges}
                     edgesFocusable={false}
+                    edgesReconnectable={false}
                     edgeTypes={edgeTypes}
                     elementsSelectable={false}
                     isValidConnection={isValidConnection}
                     maxZoom={1.5}
                     minZoom={0.2}
                     nodes={nodes}
-                    nodesConnectable
+                    nodesConnectable={!readOnly}
                     nodesDraggable={false}
                     nodesFocusable={false}
                     nodeTypes={nodeTypes}

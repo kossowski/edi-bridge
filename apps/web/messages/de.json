@@ -1409,7 +1409,8 @@
         "moveRight": "{name} nach rechts verschieben",
         "moveUp": "{name} nach oben verschieben",
         "moveDown": "{name} nach unten verschieben",
-        "removeLabel": "{name} entfernen"
+        "removeLabel": "{name} entfernen",
+        "notSet": "Nicht festgelegt"
       },
       "added": "{name} hinzugefügt.",
       "addFailed": "{name} konnte nicht gespeichert werden und wurde zurückgenommen. Versuchen Sie es erneut.",
@@ -1513,7 +1514,8 @@
     },
     "tooFew": {
       "title": "Noch nichts zu vergleichen",
-      "description": "Ein Vergleich braucht mindestens zwei Mapping Versions. Veröffentlichen Sie den Draft im Canvas, um eine weitere zu erstellen."
+      "description": "Ein Vergleich braucht mindestens zwei Mapping Versions. Veröffentlichen Sie den Draft im Canvas, um eine weitere zu erstellen.",
+      "viewOnlyDescription": "Ein Vergleich braucht mindestens zwei Mapping Versions. Eine weitere erscheint hier, sobald ein Admin den Draft veröffentlicht."
     },
     "unknownVersion": {
       "title": "Mapping Version nicht gefunden",
@@ -1925,6 +1927,7 @@
       "title": "Einträge",
       "description": "Jeder Eintrag übersetzt einen Ausgangscode in einen Zielcode. Ausgangscodes müssen eindeutig sein.",
       "hint": "Mit den Pfeiltasten wechseln Sie zwischen Zellen, mit Enter bearbeiten Sie eine Zelle.",
+      "viewOnlyHint": "Mit den Pfeiltasten wechseln Sie zwischen Zellen.",
       "columns": {
         "row": "Zeile",
         "sourceCode": "Ausgangscode",
@@ -1939,7 +1942,8 @@
       "noMatch": "Kein Eintrag passt zum Filter.",
       "empty": {
         "title": "Noch keine Einträge",
-        "description": "Fügen Sie den ersten Eintrag hinzu, z. B. Ausgangscode ST mit Zielcode PCE."
+        "description": "Fügen Sie den ersten Eintrag hinzu, z. B. Ausgangscode ST mit Zielcode PCE.",
+        "viewOnlyDescription": "Einträge erscheinen hier, sobald ein Admin sie hinzufügt."
       },
       "add": "Eintrag hinzufügen",
       "deleteRow": "Eintrag in Zeile {row} löschen",

@@ -1409,7 +1409,8 @@
         "moveRight": "Move {name} right",
         "moveUp": "Move {name} up",
         "moveDown": "Move {name} down",
-        "removeLabel": "Remove {name}"
+        "removeLabel": "Remove {name}",
+        "notSet": "Not set"
       },
       "added": "{name} added.",
       "addFailed": "{name} could not be saved and was taken back. Try again.",
@@ -1513,7 +1514,8 @@
     },
     "tooFew": {
       "title": "Nothing to compare yet",
-      "description": "A comparison needs at least two Mapping Versions. Publish the Draft on the canvas to create another one."
+      "description": "A comparison needs at least two Mapping Versions. Publish the Draft on the canvas to create another one.",
+      "viewOnlyDescription": "A comparison needs at least two Mapping Versions. Another one appears here once an Admin publishes the Draft."
     },
     "unknownVersion": {
       "title": "Mapping Version not found",
@@ -1925,6 +1927,7 @@
       "title": "Entries",
       "description": "Each entry translates a source code into a target code. Source codes must be unique.",
       "hint": "Use the arrow keys to move between cells and Enter to edit a cell.",
+      "viewOnlyHint": "Use the arrow keys to move between cells.",
       "columns": {
         "row": "Row",
         "sourceCode": "Source code",
@@ -1939,7 +1942,8 @@
       "noMatch": "No entry matches the filter.",
       "empty": {
         "title": "No entries yet",
-        "description": "Add the first entry, e.g. source code ST with target code PCE."
+        "description": "Add the first entry, e.g. source code ST with target code PCE.",
+        "viewOnlyDescription": "Entries appear here once an Admin adds them."
       },
       "add": "Add entry",
       "deleteRow": "Delete entry in row {row}",

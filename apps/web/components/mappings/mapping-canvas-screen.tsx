@@ -12,9 +12,14 @@ import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
 import { MappingPreviewPanel } from '@/components/mappings/mapping-preview-panel'
 import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
-import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
+import {
+  DraftStateLabel,
+  MappingVersionsLink,
+  PublishDraft,
+} from '@/components/mappings/publish-draft'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
+import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { mappingDraftQuery } from '@/lib/api/queries'
 import {
@@ -104,15 +109,20 @@ function MappingView({ draft }: { draft: MappingDraft }) {
   const sideTitle = useSideTitle()
   const desktop = useDesktop()
   const stateId = useId()
+  const canChange = useCanChange()
 
   return (
-    <MappingCanvasProvider>
+    <MappingCanvasProvider readOnly={!canChange}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <DraftStateLabel id={stateId} draft={draft} />
-        <GraphSaveStatus mappingId={draft.mappingId} />
+        {canChange && <GraphSaveStatus mappingId={draft.mappingId} />}
         <div className="ms-auto">
-          <PublishDraft draft={draft} stateId={stateId} />
+          {canChange ? (
+            <PublishDraft draft={draft} stateId={stateId} />
+          ) : (
+            <MappingVersionsLink mappingId={draft.mappingId} />
+          )}
         </div>
       </div>
       <dl

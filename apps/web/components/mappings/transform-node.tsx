@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { createContext, memo, useCallback, useContext, useId } from 'react'
 
 import {
+  useCanvasReadOnly,
   useCanvasStore,
   useLinkHints,
   usePendingPartLink,
@@ -111,6 +112,27 @@ export function portOfHandle(handle: string | null | undefined, prefix: 'in' | '
 const portButton =
   'nodrag nopan hover:bg-muted focus-visible:ring-ring/50 flex h-7.5 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-sm text-left outline-none focus-visible:ring-3'
 
+function ReadOnlyPort({ view, end }: { view: PortView; end: 'start' | 'end' }) {
+  return (
+    <span
+      className={cn(
+        'flex h-7.5 min-w-0 flex-1 items-center gap-1',
+        end === 'end' ? 'justify-end pr-1' : 'pl-1',
+      )}>
+      <span className="truncate">{view.label}</span>
+      <span className="sr-only">{view.status}</span>
+      {end === 'start' && !view.linked && (
+        <HugeiconsIcon
+          icon={Alert02Icon}
+          strokeWidth={2}
+          aria-hidden
+          className="size-3.5 shrink-0 text-amber-700 dark:text-amber-300"
+        />
+      )}
+    </span>
+  )
+}
+
 function InputPort({
   transformId,
   name,
@@ -136,11 +158,13 @@ function InputPort({
   )
 
   const unavailable = useConnection((connection) => connection.inProgress && view.linked)
+  const readOnly = useCanvasReadOnly()
 
   return (
     <div className="relative flex items-center pr-1 pl-3.5">
       <Handle
         id={inputHandle(view.port)}
+        isConnectable={!readOnly}
         isConnectableStart={false}
         position={Position.Left}
         type="target"
@@ -150,28 +174,34 @@ function InputPort({
           unavailable && 'link-handle-unavailable',
         )}
       />
-      <button
-        type="button"
-        aria-describedby={[status, target && hints.linkTarget].filter(Boolean).join(' ')}
-        aria-label={t('inputLabel', { port: view.label, transform: name })}
-        className={cn(portButton, 'pl-1', target && 'outline-primary outline-1 outline-dashed')}
-        data-link-target={target || undefined}
-        data-port={inputHandle(view.port)}
-        data-transform-id={transformId}
-        onClick={() => actions.input(end)}>
-        <span className="truncate">{view.label}</span>
-        {!view.linked && (
-          <HugeiconsIcon
-            icon={Alert02Icon}
-            strokeWidth={2}
-            aria-hidden
-            className="size-3.5 shrink-0 text-amber-700 dark:text-amber-300"
-          />
-        )}
-      </button>
-      <span id={status} hidden>
-        {view.status}
-      </span>
+      {readOnly ? (
+        <ReadOnlyPort end="start" view={view} />
+      ) : (
+        <button
+          type="button"
+          aria-describedby={[status, target && hints.linkTarget].filter(Boolean).join(' ')}
+          aria-label={t('inputLabel', { port: view.label, transform: name })}
+          className={cn(portButton, 'pl-1', target && 'outline-primary outline-1 outline-dashed')}
+          data-link-target={target || undefined}
+          data-port={inputHandle(view.port)}
+          data-transform-id={transformId}
+          onClick={() => actions.input(end)}>
+          <span className="truncate">{view.label}</span>
+          {!view.linked && (
+            <HugeiconsIcon
+              icon={Alert02Icon}
+              strokeWidth={2}
+              aria-hidden
+              className="size-3.5 shrink-0 text-amber-700 dark:text-amber-300"
+            />
+          )}
+        </button>
+      )}
+      {!readOnly && (
+        <span id={status} hidden>
+          {view.status}
+        </span>
+      )}
     </div>
   )
 }
@@ -191,25 +221,33 @@ function OutputPort({
   const status = useId()
   const start: LinkStart = { kind: 'transform', transformId, output: view.port }
   const pending = useCanvasStore((state) => sameStart(state.linkFrom, start))
+  const readOnly = useCanvasReadOnly()
 
   return (
     <div className="relative flex items-center pr-3.5 pl-1">
-      <button
-        type="button"
-        aria-describedby={[status, pending && hints.linkStart].filter(Boolean).join(' ')}
-        aria-label={t('outputLabel', { port: view.label, transform: name })}
-        aria-pressed={pending}
-        className={cn(portButton, 'justify-end pr-1', pending && 'bg-primary/10')}
-        data-port={outputHandle(view.port)}
-        data-transform-id={transformId}
-        onClick={() => actions.output(start)}>
-        <span className="truncate">{view.label}</span>
-      </button>
-      <span id={status} hidden>
-        {view.status}
-      </span>
+      {readOnly ? (
+        <ReadOnlyPort end="end" view={view} />
+      ) : (
+        <button
+          type="button"
+          aria-describedby={[status, pending && hints.linkStart].filter(Boolean).join(' ')}
+          aria-label={t('outputLabel', { port: view.label, transform: name })}
+          aria-pressed={pending}
+          className={cn(portButton, 'justify-end pr-1', pending && 'bg-primary/10')}
+          data-port={outputHandle(view.port)}
+          data-transform-id={transformId}
+          onClick={() => actions.output(start)}>
+          <span className="truncate">{view.label}</span>
+        </button>
+      )}
+      {!readOnly && (
+        <span id={status} hidden>
+          {view.status}
+        </span>
+      )}
       <Handle
         id={outputHandle(view.port)}
+        isConnectable={!readOnly}
         isConnectableEnd={false}
         position={Position.Right}
         type="source"
@@ -225,6 +263,7 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
   const onFocus = usePanIntoView({ whole: true })
   const issuesId = useId()
   const selected = useCanvasStore((state) => state.selectedTransform === data.transformId)
+  const readOnly = useCanvasReadOnly()
   const invalid = data.issues.length > 0
   const { reportHeight } = actions
   const { transformId } = data
@@ -250,7 +289,7 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
       role="group"
       aria-label={t('label', { name: data.name })}
       className={cn(
-        'bg-card text-foreground flex flex-col gap-1 rounded-md border-2 py-1 text-xs shadow-sm',
+        'bg-card text-foreground pointer-events-auto flex flex-col gap-1 rounded-md border-2 py-1 text-xs shadow-sm',
         invalid ? 'border-dashed border-amber-700 dark:border-amber-300' : 'border-border',
         selected && 'outline-primary outline-2 outline-offset-2 outline-solid',
       )}
@@ -278,13 +317,15 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
           {/* Wraps rather than truncates, so the number that tells same-kind nodes apart stays. */}
           <span className="min-w-0 [overflow-wrap:anywhere]">{data.name}</span>
         </button>
-        <button
-          type="button"
-          aria-label={t('remove', { name: data.name })}
-          className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground inline-flex size-7.5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
-          onClick={() => actions.remove(data.transformId)}>
-          <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            aria-label={t('remove', { name: data.name })}
+            className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground inline-flex size-7.5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
+            onClick={() => actions.remove(data.transformId)}>
+            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
+          </button>
+        )}
       </div>
       {/* Not a control, so a drag that starts here moves the node. */}
       <p title={data.summary} className="text-muted-foreground truncate px-2.5 font-mono">

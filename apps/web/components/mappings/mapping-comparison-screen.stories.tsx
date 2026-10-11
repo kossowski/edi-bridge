@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, within } from 'storybook/test'
 
 import { MappingComparisonScreen } from '@/components/mappings/mapping-comparison-screen'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { mappingComparisonEndpoint, toPath } from '@edi-bridge/contracts'
@@ -13,8 +14,11 @@ import {
   seedDocumentStructures,
   seedMappingDrafts,
   seedMappingSamples,
+  showcaseViewerSession,
   toMappingVersionSummary,
 } from '@edi-bridge/mocks'
+
+import type { Session } from '@edi-bridge/contracts'
 
 import preview from '../../.storybook/preview'
 
@@ -147,16 +151,19 @@ export const NoDifferences = meta.story({
   },
 })
 
+function tooFewVersions(options: { session?: Session } = {}) {
+  const draft = { ...published, latestVersion: 1, unpublishedChanges: true }
+
+  return createHandlers(apiUrl, {
+    ...options,
+    mappingDrafts: [draft],
+    mappingVersions: createMappingVersions([draft]),
+  })
+}
+
 export const TooFewVersions = meta.story({
   beforeEach({ msw }) {
-    const draft = { ...published, latestVersion: 1, unpublishedChanges: true }
-
-    msw.use(
-      ...createHandlers(apiUrl, {
-        mappingDrafts: [draft],
-        mappingVersions: createMappingVersions([draft]),
-      }),
-    )
+    msw.use(...tooFewVersions())
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('Nothing to compare yet')).toBeVisible()
@@ -165,6 +172,22 @@ export const TooFewVersions = meta.story({
       `/mappings/${published.id}`,
     )
   },
+})
+
+export const ViewerTooFewVersions = meta.story({
+  ...viewerStory({
+    beforeEach({ msw }) {
+      msw.use(...tooFewVersions({ session: showcaseViewerSession }))
+    },
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByText(
+          'A comparison needs at least two Mapping Versions. Another one appears here once an Admin publishes the Draft.',
+        ),
+      ).toBeVisible()
+      await expect(canvas.getByRole('link', { name: 'Open the Draft' })).toBeVisible()
+    },
+  }),
 })
 
 export const NoSampleDocuments = meta.story({
