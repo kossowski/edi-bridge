@@ -64,8 +64,7 @@
     "mappings": "Mappings, their versions and the mapping canvas.",
     "documentStructures": "The Document Structures that describe the JSON and CSV Documents of your own systems.",
     "lookupTables": "Lookup Tables for the Workspace and for single Trading Partners.",
-    "settings": "Settings for this Workspace.",
-    "operator": "Workspaces and their users, managed by the Operator."
+    "settings": "Settings for this Workspace."
   },
   "NotFound": {
     "title": "Page not found",
@@ -2186,5 +2185,147 @@
     "stay": "Stay on this page",
     "leave": "Leave without saving",
     "close": "Close"
+  },
+  "Operator": {
+    "kind": {
+      "standard": "Standard",
+      "showcase": "Showcase",
+      "sandbox": "Sandbox"
+    },
+    "workspaces": {
+      "title": "Workspaces",
+      "subtitle": "Every Workspace on the platform. Create a Workspace, then invite its users.",
+      "new": "Create Workspace",
+      "caption": "Workspaces, by name",
+      "loading": "Loading Workspaces",
+      "count": "{count, plural, one {# Workspace} other {# Workspaces}}",
+      "filteredCount": "{count} of {total} Workspaces",
+      "search": "Search by name or GLN",
+      "noMatch": "No Workspace matches the search.",
+      "noGln": "No GLN",
+      "seeded": {
+        "yes": "Yes",
+        "no": "No"
+      },
+      "columns": {
+        "name": "Name",
+        "kind": "Kind",
+        "gln": "GLN",
+        "members": "Members",
+        "seeded": "Seed data",
+        "createdAt": "Created"
+      },
+      "created": "Workspace {name} created.",
+      "open": "Open {name}",
+      "empty": {
+        "title": "No Workspaces yet",
+        "description": "Create the first Workspace, then invite its users."
+      },
+      "error": {
+        "title": "Workspaces unavailable",
+        "description": "The Workspaces could not be loaded. Try again.",
+        "retry": "Try again"
+      }
+    },
+    "createWorkspace": {
+      "title": "Create Workspace",
+      "description": "A new Workspace has no users yet. You invite them on the Workspace's page.",
+      "close": "Close",
+      "cancel": "Cancel",
+      "create": "Create Workspace",
+      "creating": "Creating…",
+      "name": {
+        "label": "Name",
+        "description": "The company's name, unique on the platform, at most {max} characters."
+      },
+      "seed": {
+        "label": "Start from seed data",
+        "description": "Fills the Workspace with example Trading Partners, Mappings and Runs, so it can be explored right away."
+      },
+      "errors": {
+        "required": "Enter a name.",
+        "tooLong": "Use at most {max} characters.",
+        "taken": "Another Workspace already uses this name.",
+        "failed": "The Workspace could not be created. Try again."
+      }
+    },
+    "workspace": {
+      "title": "Workspace",
+      "back": "All Workspaces",
+      "loading": "Loading Workspace",
+      "facts": {
+        "label": "Workspace details",
+        "gln": "GLN",
+        "members": "Members",
+        "seeded": "Seed data",
+        "createdAt": "Created"
+      },
+      "notFound": {
+        "title": "Workspace not found",
+        "description": "This Workspace does not exist. Go back to all Workspaces."
+      },
+      "error": {
+        "title": "Workspace unavailable",
+        "description": "The Workspace could not be loaded. Try again.",
+        "retry": "Try again"
+      }
+    },
+    "invites": {
+      "title": "Invites",
+      "description": "Invite a user to this Workspace as Admin or Viewer. No email is sent: copy the invite link and pass it on yourself.",
+      "caption": "Invites of this Workspace, newest first",
+      "loading": "Loading invites",
+      "count": "{count, plural, one {# invite} other {# invites}}",
+      "empty": "No invites yet.",
+      "failed": "The invites could not be loaded.",
+      "retry": "Try again",
+      "linkLabel": "link",
+      "columns": {
+        "email": "Email",
+        "role": "Role",
+        "createdAt": "Created",
+        "expiresAt": "Expires",
+        "status": "Status"
+      },
+      "role": {
+        "admin": "Admin",
+        "viewer": "Viewer"
+      },
+      "status": {
+        "accepted": "Accepted on {date}",
+        "pending": "Pending",
+        "expired": "Expired"
+      },
+      "form": {
+        "title": "Create invite",
+        "email": {
+          "label": "Email",
+          "description": "The address the user signs in with."
+        },
+        "role": {
+          "label": "Role",
+          "description": "An Admin has full control in the Workspace. A Viewer sees everything but changes nothing.",
+          "admin": "Admin",
+          "viewer": "Viewer"
+        },
+        "submit": "Create invite",
+        "creating": "Creating…",
+        "created": {
+          "announcement": "Invite for {email} created. Copy its link below.",
+          "title": "Invite for {email} created",
+          "description": "No email is sent. Copy the link and pass it on yourself. It is valid until {date}.",
+          "linkLabel": "invite link"
+        },
+        "errors": {
+          "required": "Enter an email address.",
+          "invalid": "Enter a valid email address, for example name@example.com.",
+          "failed": "The invite could not be created. Try again."
+        }
+      }
+    },
+    "settings": {
+      "title": "Retention and AI budget",
+      "description": "How long this Workspace keeps raw Documents and how many AI tokens it may use per day."
+    }
   }
 }

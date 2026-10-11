@@ -64,8 +64,7 @@
     "mappings": "Mappings, ihre Versionen und der Mapping-Canvas.",
     "documentStructures": "Die Document Structures, die die JSON- und CSV-Documents Ihrer eigenen Systeme beschreiben.",
     "lookupTables": "Lookup Tables für den Workspace und für einzelne Trading Partners.",
-    "settings": "Einstellungen für diesen Workspace.",
-    "operator": "Workspaces und ihre Benutzer, verwaltet vom Operator."
+    "settings": "Einstellungen für diesen Workspace."
   },
   "NotFound": {
     "title": "Seite nicht gefunden",
@@ -2186,5 +2185,147 @@
     "stay": "Auf dieser Seite bleiben",
     "leave": "Ohne Speichern verlassen",
     "close": "Schließen"
+  },
+  "Operator": {
+    "kind": {
+      "standard": "Standard",
+      "showcase": "Showcase",
+      "sandbox": "Sandbox"
+    },
+    "workspaces": {
+      "title": "Workspaces",
+      "subtitle": "Alle Workspaces der Plattform. Legen Sie einen Workspace an und laden Sie danach seine Benutzer ein.",
+      "new": "Workspace anlegen",
+      "caption": "Workspaces, nach Name",
+      "loading": "Workspaces werden geladen",
+      "count": "{count, plural, one {# Workspace} other {# Workspaces}}",
+      "filteredCount": "{count} von {total} Workspaces",
+      "search": "Nach Name oder GLN suchen",
+      "noMatch": "Kein Workspace passt zur Suche.",
+      "noGln": "Keine GLN",
+      "seeded": {
+        "yes": "Ja",
+        "no": "Nein"
+      },
+      "columns": {
+        "name": "Name",
+        "kind": "Art",
+        "gln": "GLN",
+        "members": "Mitglieder",
+        "seeded": "Seed-Daten",
+        "createdAt": "Angelegt"
+      },
+      "created": "Workspace {name} angelegt.",
+      "open": "{name} öffnen",
+      "empty": {
+        "title": "Noch keine Workspaces",
+        "description": "Legen Sie den ersten Workspace an und laden Sie danach seine Benutzer ein."
+      },
+      "error": {
+        "title": "Workspaces nicht verfügbar",
+        "description": "Die Workspaces konnten nicht geladen werden. Versuchen Sie es erneut.",
+        "retry": "Erneut versuchen"
+      }
+    },
+    "createWorkspace": {
+      "title": "Workspace anlegen",
+      "description": "Ein neuer Workspace hat noch keine Benutzer. Sie laden sie auf der Seite des Workspaces ein.",
+      "close": "Schließen",
+      "cancel": "Abbrechen",
+      "create": "Workspace anlegen",
+      "creating": "Wird angelegt…",
+      "name": {
+        "label": "Name",
+        "description": "Der Name des Unternehmens, eindeutig auf der Plattform, höchstens {max} Zeichen."
+      },
+      "seed": {
+        "label": "Mit Seed-Daten starten",
+        "description": "Füllt den Workspace mit Beispieldaten aus Trading Partners, Mappings und Runs, damit er sofort erkundet werden kann."
+      },
+      "errors": {
+        "required": "Geben Sie einen Namen ein.",
+        "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
+        "taken": "Ein anderer Workspace verwendet diesen Namen bereits.",
+        "failed": "Der Workspace konnte nicht angelegt werden. Versuchen Sie es erneut."
+      }
+    },
+    "workspace": {
+      "title": "Workspace",
+      "back": "Alle Workspaces",
+      "loading": "Workspace wird geladen",
+      "facts": {
+        "label": "Angaben zum Workspace",
+        "gln": "GLN",
+        "members": "Mitglieder",
+        "seeded": "Seed-Daten",
+        "createdAt": "Angelegt"
+      },
+      "notFound": {
+        "title": "Workspace nicht gefunden",
+        "description": "Diesen Workspace gibt es nicht. Gehen Sie zurück zu allen Workspaces."
+      },
+      "error": {
+        "title": "Workspace nicht verfügbar",
+        "description": "Der Workspace konnte nicht geladen werden. Versuchen Sie es erneut.",
+        "retry": "Erneut versuchen"
+      }
+    },
+    "invites": {
+      "title": "Einladungen",
+      "description": "Laden Sie einen Benutzer als Admin oder Viewer in diesen Workspace ein. Es wird keine E-Mail versendet: Kopieren Sie den Einladungslink und geben Sie ihn selbst weiter.",
+      "caption": "Einladungen dieses Workspaces, neueste zuerst",
+      "loading": "Einladungen werden geladen",
+      "count": "{count, plural, one {# Einladung} other {# Einladungen}}",
+      "empty": "Noch keine Einladungen.",
+      "failed": "Die Einladungen konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "linkLabel": "Link",
+      "columns": {
+        "email": "E-Mail",
+        "role": "Rolle",
+        "createdAt": "Erstellt",
+        "expiresAt": "Läuft ab",
+        "status": "Status"
+      },
+      "role": {
+        "admin": "Admin",
+        "viewer": "Viewer"
+      },
+      "status": {
+        "accepted": "Angenommen am {date}",
+        "pending": "Offen",
+        "expired": "Abgelaufen"
+      },
+      "form": {
+        "title": "Einladung erstellen",
+        "email": {
+          "label": "E-Mail",
+          "description": "Die Adresse, mit der sich der Benutzer anmeldet."
+        },
+        "role": {
+          "label": "Rolle",
+          "description": "Ein Admin hat volle Kontrolle im Workspace. Ein Viewer sieht alles, ändert aber nichts.",
+          "admin": "Admin",
+          "viewer": "Viewer"
+        },
+        "submit": "Einladung erstellen",
+        "creating": "Wird erstellt…",
+        "created": {
+          "announcement": "Einladung für {email} erstellt. Kopieren Sie den Link unten.",
+          "title": "Einladung für {email} erstellt",
+          "description": "Es wird keine E-Mail versendet. Kopieren Sie den Link und geben Sie ihn selbst weiter. Er gilt bis {date}.",
+          "linkLabel": "Einladungslink"
+        },
+        "errors": {
+          "required": "Geben Sie eine E-Mail-Adresse ein.",
+          "invalid": "Geben Sie eine gültige E-Mail-Adresse ein, zum Beispiel name@example.com.",
+          "failed": "Die Einladung konnte nicht erstellt werden. Versuchen Sie es erneut."
+        }
+      }
+    },
+    "settings": {
+      "title": "Aufbewahrung und KI-Budget",
+      "description": "Wie lange dieser Workspace Roh-Documents aufbewahrt und wie viele KI-Tokens er pro Tag verbrauchen darf."
+    }
   }
 }

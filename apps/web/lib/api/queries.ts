@@ -19,6 +19,7 @@ import type {
   OverviewWindow,
   RunListQuery,
   TradingPartner,
+  WorkspaceSummary,
 } from '@edi-bridge/contracts'
 
 import {
@@ -31,6 +32,7 @@ import {
   getLookupTable,
   getMappingDraft,
   getMappingVersion,
+  getOperatorWorkspaceSettings,
   getOverview,
   getRun,
   getSession,
@@ -44,10 +46,12 @@ import {
   listMappingSamples,
   listMappings,
   listMappingVersions,
+  listOperatorWorkspaces,
   listOrderLifecycles,
   listPublishedMappingVersions,
   listRuns,
   listTradingPartners,
+  listWorkspaceInvites,
   previewMapping,
 } from './client'
 
@@ -65,6 +69,42 @@ export const workspaceSettingsQuery = queryOptions({
   queryKey: ['workspaces', 'current', 'settings'],
   queryFn: getWorkspaceSettings,
 })
+
+export const operatorKeys = {
+  all: () => ['operator', 'workspaces'] as const,
+  list: () => [...operatorKeys.all(), 'list'] as const,
+  detail: (id: string) => [...operatorKeys.all(), 'detail', id] as const,
+  invites: (id: string) => [...operatorKeys.detail(id), 'invites'] as const,
+  settings: (id: string) => [...operatorKeys.detail(id), 'settings'] as const,
+}
+
+export const operatorWorkspacesQuery = queryOptions({
+  queryKey: operatorKeys.list(),
+  queryFn: listOperatorWorkspaces,
+})
+
+export function workspaceInvitesQuery(workspaceId: string) {
+  return queryOptions({
+    queryKey: operatorKeys.invites(workspaceId),
+    queryFn: () => listWorkspaceInvites(workspaceId),
+  })
+}
+
+export function operatorWorkspaceSettingsQuery(workspaceId: string) {
+  return queryOptions({
+    queryKey: operatorKeys.settings(workspaceId),
+    queryFn: () => getOperatorWorkspaceSettings(workspaceId),
+  })
+}
+
+export function storeCreatedWorkspace(queryClient: QueryClient, created: WorkspaceSummary) {
+  queryClient.setQueryData<WorkspaceSummary[]>(
+    operatorWorkspacesQuery.queryKey,
+    (workspaces) =>
+      workspaces && [...workspaces, created].sort((a, b) => a.name.localeCompare(b.name, 'de')),
+  )
+  void queryClient.invalidateQueries({ queryKey: operatorWorkspacesQuery.queryKey })
+}
 
 export const overviewKeys = {
   all: () => ['overview'] as const,

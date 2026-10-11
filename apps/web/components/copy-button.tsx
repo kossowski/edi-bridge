@@ -9,7 +9,15 @@ import { Button } from '@edi-bridge/ui/components/button'
 
 type CopyState = 'idle' | 'copied' | 'failed'
 
-export function CopyButton({ value, label }: { value: string; label: string }) {
+export function CopyButton({
+  value,
+  label,
+  describedBy,
+}: {
+  value: string
+  label: string
+  describedBy?: string
+}) {
   const t = useTranslations('Copy')
   const [state, setState] = useState<CopyState>('idle')
 
@@ -34,7 +42,12 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button size="sm" type="button" variant="outline" onClick={() => void copy()}>
+      <Button
+        size="sm"
+        type="button"
+        variant="outline"
+        aria-describedby={describedBy}
+        onClick={() => void copy()}>
         <HugeiconsIcon
           icon={state === 'copied' ? Tick02Icon : Copy01Icon}
           strokeWidth={2}
