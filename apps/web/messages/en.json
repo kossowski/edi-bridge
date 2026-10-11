@@ -2139,7 +2139,7 @@
         "description": "Raw Documents older than this are deleted. A Run can only be reprocessed while its raw Document is kept.",
         "label": "Retention period in days",
         "hint": "Between {min} and {max} days.",
-        "value": "{days, plural, one {# day} other {# days}}",
+        "value": "{value, plural, one {# day} other {# days}}",
         "errors": {
           "required": "Enter a retention period.",
           "notWhole": "Enter a whole number of days.",
@@ -2151,11 +2151,11 @@
         "description": "The daily limit of AI tokens, for example when the AI drafts a Mapping. Usage starts again at zero every day.",
         "label": "Daily limit in tokens",
         "hint": "Between {min} and {max} tokens. 0 turns AI off for this Workspace.",
-        "value": "{limit} tokens per day",
+        "value": "{value, plural, one {# token per day} other {# tokens per day}}",
         "usedLabel": "Used today",
         "used": "{used} of {limit} tokens ({share})",
         "exhausted": "Today's AI token budget is used up. AI features are available again tomorrow.",
-        "off": "AI is turned off for this Workspace.",
+        "turnedOff": "AI is turned off for this Workspace.",
         "errors": {
           "required": "Enter a daily limit.",
           "notWhole": "Enter a whole number of tokens.",

@@ -1,6 +1,8 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, userEvent } from 'storybook/test'
+import { expect, userEvent, waitFor } from 'storybook/test'
+
+import type { ReactNode } from 'react'
 
 import { SettingsScreen } from '@/components/settings/settings-screen'
 import { apiUrl } from '@/lib/api/config'
@@ -8,6 +10,7 @@ import messagesDe from '@/messages/de.json'
 import {
   currentWorkspaceEndpoint,
   type Session,
+  sessionEndpoint,
   updateWorkspaceSettingsEndpoint,
   workspaceSettingsEndpoint,
   type WorkspaceSettings,
@@ -37,6 +40,22 @@ function signedInAs(session: Session, settings?: WorkspaceSettings) {
   ]
 }
 
+function darkMode() {
+  document.documentElement.classList.add('dark')
+
+  return () => document.documentElement.classList.remove('dark')
+}
+
+const german = (Story: () => ReactNode) => (
+  <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+    <Story />
+  </NextIntlClientProvider>
+)
+
+const exhausted = createWorkspaceSettings({
+  aiTokenBudget: { dailyLimit: 200_000, usedToday: 200_000 },
+})
+
 const largeNumbers = createWorkspaceSettings({
   documentRetentionDays: 730,
   aiTokenBudget: { dailyLimit: 10_000_000, usedToday: 9_876_543 },
@@ -56,7 +75,7 @@ export const Default = meta.story({
     await expect(await canvas.findByLabelText('GLN')).toHaveValue(seedWorkspace.gln)
     await expect(await canvas.findByLabelText('Retention period in days')).toHaveValue('90')
     await expect(canvas.getByLabelText('Daily limit in tokens')).toHaveValue('200,000')
-    await expect(canvas.getByRole('meter', { name: 'Used today' })).toHaveAttribute(
+    await expect(canvas.getByRole('progressbar', { name: 'Used today' })).toHaveAttribute(
       'aria-valuetext',
       '48,350 of 200,000 tokens (24%)',
     )
@@ -68,8 +87,45 @@ export const OperatorSaves = meta.story({
     const retention = await canvas.findByLabelText('Retention period in days')
     await userEvent.clear(retention)
     await userEvent.type(retention, '30')
+    const limit = canvas.getByLabelText('Daily limit in tokens')
+    await userEvent.clear(limit)
+    await userEvent.type(limit, '40000')
     await userEvent.click(canvas.getByRole('button', { name: 'Save retention and AI budget' }))
     await expect(await canvas.findByText('Retention and AI budget saved.')).toBeVisible()
+    await expect(limit).toHaveValue('40,000')
+  },
+})
+
+export const SaveKeepsFocus = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.put(`${apiUrl}${updateWorkspaceSettingsEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const save = await canvas.findByRole('button', { name: 'Save retention and AI budget' })
+    save.focus()
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'))
+    await expect(save).toHaveTextContent('Saving…')
+    await expect(save).toHaveFocus()
+  },
+})
+
+export const SessionUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${sessionEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(/The Operator sets the retention period/)).toBeVisible()
+    await expect(canvas.queryByRole('textbox')).toBeNull()
+    await expect(canvas.queryByRole('button')).toBeNull()
   },
 })
 
@@ -98,18 +154,62 @@ export const ViewerReadOnly = meta.story({
   },
 })
 
+export const ViewerReadOnlyGerman = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(showcaseViewerSession))
+  },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(await canvas.findByText(/Der Operator legt die Aufbewahrungsdauer/)).toBeVisible()
+    await expect(canvas.getByText('90 Tage')).toBeVisible()
+    await expect(canvas.getByText('200.000 Tokens pro Tag')).toBeVisible()
+    await expect(canvas.queryByRole('textbox')).toBeNull()
+  },
+})
+
+export const ViewerReadOnlyDark = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(showcaseViewerSession))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(/The Operator sets the retention period/)).toBeVisible()
+    await expect(canvas.getByRole('progressbar', { name: 'Used today' })).toBeVisible()
+  },
+})
+
 export const BudgetExhausted = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      ...signedInAs(
-        seedSession,
-        createWorkspaceSettings({ aiTokenBudget: { dailyLimit: 200_000, usedToday: 200_000 } }),
-      ),
-    )
+    msw.use(...signedInAs(seedSession, exhausted))
   },
   async play({ canvas }) {
     await expect(await canvas.findByText(/AI token budget is used up/)).toBeVisible()
     await expect(canvas.getByText('200,000 of 200,000 tokens (100%)')).toBeVisible()
+  },
+})
+
+export const BudgetExhaustedGerman = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(seedSession, exhausted))
+  },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(/KI-Token-Budget für heute ist aufgebraucht/),
+    ).toBeVisible()
+    await expect(canvas.getByText('200.000 von 200.000 Tokens (100 %)')).toBeVisible()
+  },
+})
+
+export const BudgetExhaustedDark = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(seedSession, exhausted))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(/AI token budget is used up/)).toBeVisible()
   },
 })
 
@@ -150,6 +250,26 @@ export const ValidationError = meta.story({
     await expect(await canvas.findByText('Enter between 7 and 730 days.')).toBeVisible()
     await expect(canvas.getByText('Enter a whole number of tokens.')).toBeVisible()
     await expect(retention).toHaveAttribute('aria-invalid', 'true')
+  },
+})
+
+export const ValidationErrorGerman = meta.story({
+  decorators: [german],
+  async play({ canvas }) {
+    const retention = await canvas.findByLabelText('Aufbewahrungsdauer in Tagen')
+    const limit = canvas.getByLabelText('Tageslimit in Tokens')
+    await userEvent.clear(retention)
+    await userEvent.type(retention, '3')
+    await userEvent.clear(limit)
+    await userEvent.type(limit, '1,500')
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Aufbewahrung und KI-Budget speichern' }),
+    )
+    await expect(
+      await canvas.findByText('Geben Sie einen Wert zwischen 7 und 730 Tagen ein.'),
+    ).toBeVisible()
+    await expect(canvas.getByText('Geben Sie eine ganze Zahl von Tokens ein.')).toBeVisible()
+    await expect(limit).toHaveAttribute('aria-invalid', 'true')
   },
 })
 
@@ -241,13 +361,7 @@ export const German = meta.story({
   beforeEach({ msw }) {
     msw.use(...signedInAs(seedSession, largeNumbers))
   },
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
-    ),
-  ],
+  decorators: [german],
   async play({ canvas }) {
     await expect(
       await canvas.findByRole('heading', { name: 'Unternehmensidentität' }),
@@ -265,12 +379,11 @@ export const Dark = meta.story({
         createWorkspaceSettings({ aiTokenBudget: { dailyLimit: 200_000, usedToday: 210_000 } }),
       ),
     )
-    document.documentElement.classList.add('dark')
 
-    return () => document.documentElement.classList.remove('dark')
+    return darkMode()
   },
   async play({ canvas }) {
     await expect(await canvas.findByLabelText('GLN')).toBeVisible()
-    await expect(await canvas.findByRole('meter', { name: 'Used today' })).toBeVisible()
+    await expect(await canvas.findByRole('progressbar', { name: 'Used today' })).toBeVisible()
   },
 })

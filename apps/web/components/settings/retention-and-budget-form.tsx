@@ -1,87 +1,64 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import { type FormEvent, type ReactNode, useId, useState } from 'react'
 
-import { LoadFailure } from '@/components/detail-parts'
 import { TextField } from '@/components/form-field'
+import { SettingsSection } from '@/components/settings/settings-section'
 import { useSession } from '@/hooks/use-session'
 import { updateWorkspaceSettings } from '@/lib/api/client'
 import { workspaceSettingsQuery } from '@/lib/api/queries'
 import {
   budgetUsage,
-  toWorkspaceSettingsInput,
+  groupSeparatorOf,
+  toWorkspaceSettingsValues,
+  validateWorkspaceSettings,
   type WholeNumberError,
-  workspaceSettingsErrors,
+  type WorkspaceSettingsField,
+  workspaceSettingsFields,
   type WorkspaceSettingsValues,
 } from '@/lib/forms/workspace-settings'
-import {
-  type AiTokenBudget,
-  aiDailyTokenLimit,
-  documentRetentionDays,
-  type WorkspaceSettings,
-  type WorkspaceSettingsInput,
-} from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
+import { Progress, ProgressLabel, ProgressValue } from '@edi-bridge/ui/components/progress'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-function Group({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return (
-    <div role="group" aria-labelledby={id} className="flex flex-col gap-3">
-      <h3 id={id} className="text-base font-semibold">
-        {title}
-      </h3>
-      {children}
-    </div>
-  )
-}
+import type {
+  AiTokenBudget,
+  WorkspaceSettings,
+  WorkspaceSettingsInput,
+} from '@edi-bridge/contracts'
 
 function BudgetUsage({ budget }: { budget: AiTokenBudget }) {
   const t = useTranslations('Settings.retentionAndBudget.budget')
   const format = useFormatter()
-  const id = useId()
-  const { off, exhausted, share } = budgetUsage(budget)
+  const usage = budgetUsage(budget)
 
-  if (off) {
-    return <p className="text-sm">{t('off')}</p>
+  if (usage.turnedOff) {
+    return <p className="text-sm">{t('turnedOff')}</p>
   }
 
   const used = t('used', {
     used: format.number(budget.usedToday),
     limit: format.number(budget.dailyLimit),
-    share: format.number(budget.usedToday / budget.dailyLimit, {
-      style: 'percent',
-      maximumFractionDigits: 0,
-    }),
+    share: format.number(usage.share, { style: 'percent', maximumFractionDigits: 0 }),
   })
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
-        <span id={`${id}-label`} className="font-medium">
-          {t('usedLabel')}
-        </span>
-        <span className="tabular-nums">{used}</span>
-      </div>
-      <div
-        role="meter"
-        aria-labelledby={`${id}-label`}
-        aria-valuemax={budget.dailyLimit}
-        aria-valuemin={0}
-        aria-valuenow={Math.min(budget.usedToday, budget.dailyLimit)}
-        aria-valuetext={used}
-        className="bg-muted h-2 overflow-hidden rounded-full border border-neutral-400 dark:border-neutral-500">
-        <div
-          className={cn(
-            'h-full rounded-full',
-            exhausted ? 'bg-red-700 dark:bg-red-400' : 'bg-primary',
-          )}
-          style={{ width: `${share * 100}%` }}
-        />
-      </div>
-      {exhausted && (
+      <Progress
+        getAriaValueText={() => used}
+        max={1}
+        value={usage.filled}
+        className={cn(
+          'gap-x-4 gap-y-2 *:data-[slot=progress-track]:h-2 *:data-[slot=progress-track]:border *:data-[slot=progress-track]:border-neutral-400 dark:*:data-[slot=progress-track]:border-neutral-500',
+          usage.exhausted &&
+            '**:data-[slot=progress-indicator]:bg-red-700 dark:**:data-[slot=progress-indicator]:bg-red-400',
+        )}>
+        <ProgressLabel>{t('usedLabel')}</ProgressLabel>
+        <ProgressValue className="text-foreground">{() => used}</ProgressValue>
+      </Progress>
+      {usage.exhausted && (
         <p className="rounded-lg border border-red-700/40 bg-red-500/10 p-3 text-sm">
           {t('exhausted')}
         </p>
@@ -90,25 +67,51 @@ function BudgetUsage({ budget }: { budget: AiTokenBudget }) {
   )
 }
 
-function useFieldError() {
+function Setting({
+  field,
+  settings,
+  input,
+  children,
+}: {
+  field: WorkspaceSettingsField
+  settings: WorkspaceSettings
+  input: {
+    value: string
+    error: WholeNumberError | undefined
+    onChange: (value: string) => void
+  } | null
+  children?: ReactNode
+}) {
   const t = useTranslations('Settings.retentionAndBudget')
   const format = useFormatter()
+  const id = useId()
+  const { messages, bounds, of } = workspaceSettingsFields[field]
+  const range = { min: format.number(bounds.min), max: format.number(bounds.max) }
 
-  return (field: keyof WorkspaceSettingsValues, error: WholeNumberError | undefined) => {
-    if (error === undefined) {
-      return null
-    }
-
-    const [key, bounds] =
-      field === 'documentRetentionDays'
-        ? (['retention', documentRetentionDays] as const)
-        : (['budget', aiDailyTokenLimit] as const)
-
-    return t(`${key}.errors.${error}`, {
-      min: format.number(bounds.min),
-      max: format.number(bounds.max),
-    })
-  }
+  return (
+    <div role="group" aria-labelledby={id} className="flex flex-col gap-3">
+      <h3 id={id} className="text-base font-semibold">
+        {t(`${messages}.title`)}
+      </h3>
+      <p className="text-muted-foreground text-sm">{t(`${messages}.description`)}</p>
+      {input ? (
+        <TextField
+          id={`${id}-input`}
+          autoComplete="off"
+          description={t(`${messages}.hint`, range)}
+          error={input.error ? t(`${messages}.errors.${input.error}`, range) : null}
+          inputMode="numeric"
+          label={t(`${messages}.label`)}
+          value={input.value}
+          className="max-w-48"
+          onChange={input.onChange}
+        />
+      ) : (
+        <p className="text-sm font-medium">{t(`${messages}.value`, { value: of(settings) })}</p>
+      )}
+      {children}
+    </div>
+  )
 }
 
 export function RetentionAndBudgetForm({
@@ -122,109 +125,78 @@ export function RetentionAndBudgetForm({
 }) {
   const t = useTranslations('Settings.retentionAndBudget')
   const format = useFormatter()
-  const fieldError = useFieldError()
-  const id = useId()
+  const groupSeparator = groupSeparatorOf(useLocale())
+  const formatNumber = (value: number) => format.number(value)
 
-  const [values, setValues] = useState<WorkspaceSettingsValues>(() => ({
-    documentRetentionDays: format.number(settings.documentRetentionDays),
-    dailyLimit: format.number(settings.aiTokenBudget.dailyLimit),
-  }))
-
+  const [values, setValues] = useState(() => toWorkspaceSettingsValues(settings, formatNumber))
   const [submitted, setSubmitted] = useState(false)
   const mutation = useMutation({ mutationFn: save })
 
-  const errors = workspaceSettingsErrors(values)
-  const shown = submitted ? errors : {}
+  const result = validateWorkspaceSettings(values, groupSeparator)
+  const shown = submitted && 'errors' in result ? result.errors : {}
 
-  function change(field: keyof WorkspaceSettingsValues, value: string) {
-    setValues((current) => ({ ...current, [field]: value }))
-    mutation.reset()
+  function input(field: WorkspaceSettingsField) {
+    if (!editable) {
+      return null
+    }
+
+    return {
+      value: values[field],
+      error: shown[field],
+      onChange: (value: string) => {
+        setValues((current): WorkspaceSettingsValues => ({ ...current, [field]: value }))
+        mutation.reset()
+      },
+    }
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    if (mutation.isPending) {
+      return
+    }
+
     setSubmitted(true)
     mutation.reset()
 
-    if (Object.keys(errors).length === 0) {
-      mutation.mutate(toWorkspaceSettingsInput(values))
+    if ('input' in result) {
+      mutation.mutate(result.input, {
+        onSuccess: (updated) => setValues(toWorkspaceSettingsValues(updated, formatNumber)),
+      })
     }
   }
 
-  const bounds = {
-    retention: {
-      min: format.number(documentRetentionDays.min),
-      max: format.number(documentRetentionDays.max),
-    },
-    budget: {
-      min: format.number(aiDailyTokenLimit.min),
-      max: format.number(aiDailyTokenLimit.max),
-    },
-  }
-
-  const retention = (
-    <Group id={`${id}-retention`} title={t('retention.title')}>
-      <p className="text-muted-foreground text-sm">{t('retention.description')}</p>
-      {editable ? (
-        <TextField
-          id={`${id}-retention-days`}
-          autoComplete="off"
-          description={t('retention.hint', bounds.retention)}
-          error={fieldError('documentRetentionDays', shown.documentRetentionDays)}
-          inputMode="numeric"
-          label={t('retention.label')}
-          value={values.documentRetentionDays}
-          className="max-w-48"
-          onChange={(value) => change('documentRetentionDays', value)}
-        />
-      ) : (
-        <p className="text-sm font-medium">
-          {t('retention.value', { days: settings.documentRetentionDays })}
-        </p>
-      )}
-    </Group>
-  )
-
-  const budget = (
-    <Group id={`${id}-budget`} title={t('budget.title')}>
-      <p className="text-muted-foreground text-sm">{t('budget.description')}</p>
-      {editable ? (
-        <TextField
-          id={`${id}-daily-limit`}
-          autoComplete="off"
-          description={t('budget.hint', bounds.budget)}
-          error={fieldError('dailyLimit', shown.dailyLimit)}
-          inputMode="numeric"
-          label={t('budget.label')}
-          value={values.dailyLimit}
-          className="max-w-48"
-          onChange={(value) => change('dailyLimit', value)}
-        />
-      ) : (
-        <p className="text-sm font-medium">
-          {t('budget.value', { limit: format.number(settings.aiTokenBudget.dailyLimit) })}
-        </p>
-      )}
-      <BudgetUsage budget={settings.aiTokenBudget} />
-    </Group>
+  const fields = (
+    <>
+      <Setting
+        field="documentRetentionDays"
+        input={input('documentRetentionDays')}
+        settings={settings}
+      />
+      <Setting field="dailyLimit" input={input('dailyLimit')} settings={settings}>
+        <BudgetUsage budget={settings.aiTokenBudget} />
+      </Setting>
+    </>
   )
 
   if (!editable) {
     return (
       <div className="flex max-w-xl flex-col gap-6">
         <p className="rounded-lg border p-3 text-sm">{t('setByOperator')}</p>
-        {retention}
-        {budget}
+        {fields}
       </div>
     )
   }
 
   return (
     <form noValidate className="flex max-w-xl flex-col gap-6" onSubmit={submit}>
-      {retention}
-      {budget}
+      {fields}
       <div className="flex flex-wrap items-center gap-3">
-        <Button disabled={mutation.isPending} type="submit">
+        <Button
+          type="submit"
+          aria-disabled={mutation.isPending || undefined}
+          className="aria-disabled:cursor-progress aria-disabled:opacity-50">
           {mutation.isPending ? t('saving') : t('save')}
         </Button>
         <p role="status" className="text-sm">
@@ -241,10 +213,10 @@ export function RetentionAndBudgetForm({
 }
 
 export function RetentionAndBudgetSection() {
-  const t = useTranslations('Settings')
+  const t = useTranslations('Settings.retentionAndBudget')
   const queryClient = useQueryClient()
   const session = useSession()
-  const { data, isPending, refetch } = useQuery(workspaceSettingsQuery)
+  const { data, status, refetch } = useQuery(workspaceSettingsQuery)
 
   async function save(input: WorkspaceSettingsInput) {
     const updated = await updateWorkspaceSettings(input)
@@ -254,26 +226,12 @@ export function RetentionAndBudgetSection() {
   }
 
   return (
-    <section aria-labelledby="retention-and-budget" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id="retention-and-budget" className="text-lg font-semibold">
-          {t('retentionAndBudget.title')}
-        </h2>
-        <p className="text-muted-foreground text-sm">{t('retentionAndBudget.description')}</p>
-      </div>
-      {isPending || session.isPending ? (
-        <div aria-busy className="flex max-w-xl flex-col gap-4">
-          <p role="status" className="sr-only">
-            {t('loading')}
-          </p>
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      ) : data ? (
-        <RetentionAndBudgetForm editable={session.operator} save={save} settings={data} />
-      ) : (
-        <LoadFailure namespace="Settings" notFound={false} onRetry={() => void refetch()} />
-      )}
-    </section>
+    <SettingsSection
+      description={t('description')}
+      status={session.isPending ? 'pending' : status}
+      title={t('title')}
+      onRetry={() => void refetch()}>
+      {data && <RetentionAndBudgetForm editable={session.operator} save={save} settings={data} />}
+    </SettingsSection>
   )
 }

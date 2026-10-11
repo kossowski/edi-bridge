@@ -2139,11 +2139,11 @@
         "description": "Ältere Roh-Documents werden gelöscht. Ein Run lässt sich nur per Reprocess erneut verarbeiten, solange sein Roh-Document aufbewahrt wird.",
         "label": "Aufbewahrungsdauer in Tagen",
         "hint": "Zwischen {min} und {max} Tagen.",
-        "value": "{days, plural, one {# Tag} other {# Tage}}",
+        "value": "{value, plural, one {# Tag} other {# Tage}}",
         "errors": {
           "required": "Geben Sie eine Aufbewahrungsdauer ein.",
           "notWhole": "Geben Sie eine ganze Zahl von Tagen ein.",
-          "outOfRange": "Geben Sie zwischen {min} und {max} Tagen ein."
+          "outOfRange": "Geben Sie einen Wert zwischen {min} und {max} Tagen ein."
         }
       },
       "budget": {
@@ -2151,15 +2151,15 @@
         "description": "Das tägliche Limit an KI-Tokens, zum Beispiel, wenn die KI ein Mapping entwirft. Der Verbrauch beginnt jeden Tag wieder bei null.",
         "label": "Tageslimit in Tokens",
         "hint": "Zwischen {min} und {max} Tokens. 0 schaltet KI für diesen Workspace aus.",
-        "value": "{limit} Tokens pro Tag",
+        "value": "{value, plural, one {# Token pro Tag} other {# Tokens pro Tag}}",
         "usedLabel": "Heute verbraucht",
         "used": "{used} von {limit} Tokens ({share})",
         "exhausted": "Das KI-Token-Budget für heute ist aufgebraucht. KI-Funktionen sind morgen wieder verfügbar.",
-        "off": "KI ist für diesen Workspace ausgeschaltet.",
+        "turnedOff": "KI ist für diesen Workspace ausgeschaltet.",
         "errors": {
           "required": "Geben Sie ein Tageslimit ein.",
           "notWhole": "Geben Sie eine ganze Zahl von Tokens ein.",
-          "outOfRange": "Geben Sie zwischen {min} und {max} Tokens ein."
+          "outOfRange": "Geben Sie einen Wert zwischen {min} und {max} Tokens ein."
         }
       },
       "save": "Aufbewahrung und KI-Budget speichern",
