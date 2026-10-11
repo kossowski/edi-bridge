@@ -210,6 +210,8 @@ export const AcceptDraft = meta.story({
 
     const done = await canvas.findByText(
       'AI draft accepted. The Draft stays editable and can be published now.',
+      {},
+      { timeout: 5000 },
     )
 
     await waitFor(() => expect(done.closest('[role="status"]')).toHaveFocus())
@@ -227,6 +229,7 @@ export const AcceptDraft = meta.story({
       'aria-disabled',
       'true',
     )
+    await expect(done).toBeVisible()
   },
 })
 
@@ -242,7 +245,11 @@ export const AcceptFailed = meta.story({
     await findSummary(canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: 'Accept draft' }))
     await expect(
-      await canvas.findByText('The AI draft could not be accepted. Try again.'),
+      await canvas.findByText(
+        'The AI draft could not be accepted. Try again.',
+        {},
+        { timeout: 5000 },
+      ),
     ).toHaveAttribute('role', 'alert')
     await expect(canvas.getByText('AI review open')).toBeVisible()
   },

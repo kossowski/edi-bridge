@@ -4,7 +4,7 @@ import { CheckmarkCircle02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { AiBadge } from '@/components/mappings/ai-badge'
 import { aiProposedCount } from '@/components/mappings/ai-marks'
@@ -35,7 +35,6 @@ export function AiReviewState({
     onSuccess: (saved) => {
       storeAcceptedAiDraft(queryClient, saved)
       setAccepted(true)
-      requestAnimationFrame(() => doneRef.current?.focus())
     },
     onError: () =>
       void queryClient.invalidateQueries({
@@ -44,6 +43,13 @@ export function AiReviewState({
   })
 
   const open = draft.aiReview !== null
+  const done = accepted && !open
+
+  useEffect(() => {
+    if (done) {
+      doneRef.current?.focus()
+    }
+  }, [done])
 
   return (
     <>
@@ -52,7 +58,7 @@ export function AiReviewState({
         role="status"
         tabIndex={-1}
         className="inline-flex basis-full items-center gap-1.5 text-sm text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
-        {accepted && !open && (
+        {done && (
           <>
             <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} aria-hidden />
             {t('accepted')}
