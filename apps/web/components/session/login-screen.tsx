@@ -4,8 +4,6 @@ import {
   CheckmarkCircle02Icon,
   Clock01Icon,
   PlayIcon,
-  ViewIcon,
-  ViewOffIcon,
   Wrench01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -14,18 +12,12 @@ import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useId, useRef, useState } from 'react'
 
-import { describedBy, FormField, TextField } from '@/components/form-field'
+import { PasswordField, TextField } from '@/components/form-field'
 import { focusMainContentOnNextPage } from '@/components/main-content-focus'
 import { isUnauthorized, signIn, signInToShowcase } from '@/lib/api/client'
 import { sessionQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@edi-bridge/ui/components/card'
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from '@edi-bridge/ui/components/input-group'
 
 import type { SignedIn } from '@edi-bridge/contracts'
 
@@ -61,12 +53,10 @@ function isEntering(mutation: { isPending: boolean; isSuccess: boolean }) {
 export function LoginScreen() {
   const t = useTranslations('Login')
   const id = useId()
-  const passwordId = `${id}-password`
   const emailRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
   const [values, setValues] = useState<SignInValues>({ email: '', password: '' })
   const [submitted, setSubmitted] = useState(false)
-  const [passwordVisible, setPasswordVisible] = useState(false)
 
   const credentialsSignIn = useEnterWorkspace(signIn)
   const showcaseSignIn = useEnterWorkspace(signInToShowcase)
@@ -129,40 +119,16 @@ export function LoginScreen() {
                 value={values.email}
                 onChange={(value) => change('email', value)}
               />
-              <FormField
-                id={passwordId}
+              <PasswordField
+                id={`${id}-password`}
+                autoComplete="current-password"
                 error={passwordError}
-                label={
-                  <label htmlFor={passwordId} className="text-sm font-medium">
-                    {t('password')}
-                  </label>
-                }>
-                <InputGroup>
-                  <InputGroupInput
-                    id={passwordId}
-                    autoComplete="current-password"
-                    name="password"
-                    ref={passwordRef}
-                    type={passwordVisible ? 'text' : 'password'}
-                    value={values.password}
-                    aria-describedby={describedBy(passwordId, passwordError, false) || undefined}
-                    aria-invalid={passwordError !== null}
-                    onChange={(event) => change('password', event.target.value)}
-                  />
-                  <InputGroupAddon align="inline-end">
-                    <InputGroupButton
-                      size="icon-xs"
-                      aria-controls={passwordId}
-                      aria-label={passwordVisible ? t('hidePassword') : t('showPassword')}
-                      onClick={() => setPasswordVisible((visible) => !visible)}>
-                      <HugeiconsIcon
-                        icon={passwordVisible ? ViewOffIcon : ViewIcon}
-                        strokeWidth={2}
-                      />
-                    </InputGroupButton>
-                  </InputGroupAddon>
-                </InputGroup>
-              </FormField>
+                label={t('password')}
+                name="password"
+                ref={passwordRef}
+                value={values.password}
+                onChange={(value) => change('password', value)}
+              />
               <div role="alert" className="text-sm text-red-800 empty:hidden dark:text-red-300">
                 {credentialsError}
               </div>

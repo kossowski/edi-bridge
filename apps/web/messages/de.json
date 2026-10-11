@@ -76,8 +76,6 @@
     "description": "Verwenden Sie die E-Mail-Adresse aus Ihrer Einladung.",
     "email": "E-Mail",
     "password": "Passwort",
-    "showPassword": "Passwort anzeigen",
-    "hidePassword": "Passwort verbergen",
     "submit": "Anmelden",
     "submitting": "Wird angemeldet …",
     "errors": {
@@ -2352,6 +2350,10 @@
       "format": "Eine GLN hat genau 13 Ziffern.",
       "checkDigit": "Die Prüfziffer stimmt nicht. Prüfen Sie die GLN auf Tippfehler."
     }
+  },
+  "PasswordField": {
+    "show": "Passwort anzeigen",
+    "hide": "Passwort verbergen"
   },
   "Copy": {
     "button": "{label} kopieren",
