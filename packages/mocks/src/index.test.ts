@@ -23,6 +23,7 @@ import {
   mappingsEndpoint,
   mappingVersionsEndpoint,
   messageTypeStructureEndpoint,
+  overviewEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   type ReprocessRunBody,
@@ -116,6 +117,32 @@ describe('createHandlers', () => {
       status: 'delivered',
       failureStage: null,
     })
+  })
+
+  it('counts a retried Run as delivered on the Overview', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const { runs } = await listRuns({
+      status: ['failed'],
+      failureStage: ['delivery'],
+      receivedFrom: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString(),
+    })
+
+    const failed = runs[0]!
+
+    const failedInWindow = async () => {
+      const response = await fetch(`${apiUrl}${overviewEndpoint.path}?window=24h`)
+      const { tradingPartners } = overviewEndpoint.response.parse(await response.json())
+
+      return tradingPartners.find(
+        ({ tradingPartner }) => tradingPartner.id === failed.tradingPartner.id,
+      )?.failed
+    }
+
+    const before = await failedInWindow()
+    await post(toPath(retryRunEndpoint.path, { id: failed.id }))
+
+    expect(await failedInWindow()).toBe(before! - 1)
   })
 
   it('lists the Run that a Reprocess started', async () => {
