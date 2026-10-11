@@ -2,7 +2,6 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
 
 import { BackLink, Fact, Failure } from '@/components/detail-parts'
 import { SandboxReset } from '@/components/operator/sandbox-reset'
@@ -24,13 +23,18 @@ import {
   operatorWorkspacesQuery,
   storeSavedOperatorWorkspaceSettings,
 } from '@/lib/api/queries'
-import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Separator } from '@edi-bridge/ui/components/separator'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { WorkspaceSettingsInput, WorkspaceSummary } from '@edi-bridge/contracts'
 
-function WorkspaceFacts({ workspace }: { workspace: WorkspaceSummary }) {
+function WorkspaceFacts({
+  workspace,
+  isSandbox,
+}: {
+  workspace: WorkspaceSummary
+  isSandbox: boolean
+}) {
   const t = useTranslations('Operator.workspace.facts')
 
   return (
@@ -49,7 +53,7 @@ function WorkspaceFacts({ workspace }: { workspace: WorkspaceSummary }) {
       <Fact label={t('createdAt')}>
         <WorkspaceCreatedAt createdAt={workspace.createdAt} />
       </Fact>
-      {workspace.kind === 'sandbox' && (
+      {isSandbox && (
         <Fact label={t('lastResetAt')}>
           <WorkspaceLastReset lastResetAt={workspace.lastResetAt} />
         </Fact>
@@ -83,8 +87,7 @@ function WorkspaceSettingsSection({ workspaceId }: { workspaceId: string }) {
 }
 
 function WorkspaceView({ workspace }: { workspace: WorkspaceSummary }) {
-  const t = useTranslations('Operator.reset')
-  const [reset, setReset] = useState(false)
+  const isSandbox = workspace.kind === 'sandbox'
 
   return (
     <>
@@ -95,20 +98,9 @@ function WorkspaceView({ workspace }: { workspace: WorkspaceSummary }) {
           </h1>
           <WorkspaceKindBadge kind={workspace.kind} />
         </div>
-        {workspace.kind === 'sandbox' && (
-          <SandboxReset workspace={workspace} onReset={() => setReset(true)} />
-        )}
+        {isSandbox && <SandboxReset workspace={workspace} />}
       </div>
-      {workspace.kind === 'sandbox' && (
-        <div role="status">
-          {reset && (
-            <Alert role={undefined} variant="success">
-              <AlertDescription>{t('done', { name: workspace.name })}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-      )}
-      <WorkspaceFacts workspace={workspace} />
+      <WorkspaceFacts isSandbox={isSandbox} workspace={workspace} />
       <WorkspaceInvites workspaceId={workspace.id} />
       <Separator />
       <WorkspaceSettingsSection workspaceId={workspace.id} />

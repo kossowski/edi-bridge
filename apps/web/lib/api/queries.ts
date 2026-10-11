@@ -153,7 +153,8 @@ export function storeResetSandboxWorkspace(
 
   if (currentWorkspaceId === reset.id) {
     void queryClient.invalidateQueries({
-      predicate: ({ queryKey }) => queryKey[0] !== 'session' && queryKey[0] !== 'operator',
+      predicate: ({ queryKey }) =>
+        queryKey[0] !== sessionQuery.queryKey[0] && queryKey[0] !== operatorKeys.all()[0],
     })
   }
 }

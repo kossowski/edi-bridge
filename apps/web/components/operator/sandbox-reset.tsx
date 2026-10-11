@@ -7,6 +7,7 @@ import { useRef, useState } from 'react'
 import { useSession } from '@/hooks/use-session'
 import { resetSandboxWorkspace } from '@/lib/api/client'
 import { storeResetSandboxWorkspace } from '@/lib/api/queries'
+import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,13 +22,7 @@ import { Button } from '@edi-bridge/ui/components/button'
 
 import type { WorkspaceSummary } from '@edi-bridge/contracts'
 
-export function SandboxReset({
-  workspace,
-  onReset,
-}: {
-  workspace: WorkspaceSummary
-  onReset: (reset: WorkspaceSummary) => void
-}) {
+export function SandboxReset({ workspace }: { workspace: WorkspaceSummary }) {
   const t = useTranslations('Operator.reset')
   const queryClient = useQueryClient()
   const { session } = useSession()
@@ -40,7 +35,6 @@ export function SandboxReset({
     onSuccess: (summary) => {
       storeResetSandboxWorkspace(queryClient, summary, session?.workspace.id)
       setOpen(false)
-      onReset(summary)
     },
   })
 
@@ -56,43 +50,60 @@ export function SandboxReset({
     setOpen(next)
   }
 
+  const done = reset.isSuccess ? t('done', { name: workspace.name }) : null
+
   return (
-    <AlertDialog open={open} onOpenChange={changeOpen}>
-      <Button ref={trigger} variant="destructive" onClick={() => changeOpen(true)}>
-        {t('trigger')}
-      </Button>
-      <AlertDialogContent
-        finalFocus={trigger}
-        initialFocus={cancel}
-        aria-busy={reset.isPending || undefined}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t('title', { name: workspace.name })}</AlertDialogTitle>
-          <AlertDialogDescription render={<div />} className="flex flex-col gap-2">
-            <p>{t('replaced')}</p>
-            <p>{t('untouched')}</p>
-            <p className="text-foreground font-medium">{t('irreversible')}</p>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        {reset.isError && (
-          <p role="alert" className="text-sm text-red-800 dark:text-red-300">
-            {t('failed')}
-          </p>
-        )}
-        <AlertDialogFooter>
-          <AlertDialogCancel ref={cancel}>{t('cancel')}</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            aria-disabled={reset.isPending || undefined}
-            className="aria-disabled:cursor-progress aria-disabled:opacity-50"
-            onClick={() => {
-              if (!reset.isPending) {
-                reset.mutate()
-              }
-            }}>
-            {reset.isPending ? t('resetting') : t('confirm')}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      <AlertDialog open={open} onOpenChange={changeOpen}>
+        <Button ref={trigger} variant="destructive" onClick={() => changeOpen(true)}>
+          {t('trigger')}
+        </Button>
+        <AlertDialogContent
+          finalFocus={trigger}
+          initialFocus={cancel}
+          aria-busy={reset.isPending || undefined}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('title', { name: workspace.name })}</AlertDialogTitle>
+            <AlertDialogDescription render={<div />} className="flex flex-col gap-2">
+              <p>{t('replaced')}</p>
+              <p>{t('untouched')}</p>
+              <p className="text-foreground font-medium">{t('irreversible')}</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {reset.isError && (
+            <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+              {t('failed')}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              ref={cancel}
+              aria-disabled={reset.isPending || undefined}
+              className="aria-disabled:cursor-progress aria-disabled:opacity-50">
+              {t('cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              aria-disabled={reset.isPending || undefined}
+              className="aria-disabled:cursor-progress aria-disabled:opacity-50"
+              onClick={() => {
+                if (!reset.isPending) {
+                  reset.mutate()
+                }
+              }}>
+              {reset.isPending ? t('resetting') : t('confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <p role="status" className="sr-only">
+        {done}
+      </p>
+      {done && (
+        <Alert role={undefined} variant="success" aria-hidden className="mt-3 basis-full">
+          <AlertDescription>{done}</AlertDescription>
+        </Alert>
+      )}
+    </>
   )
 }

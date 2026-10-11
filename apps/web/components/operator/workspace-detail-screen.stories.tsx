@@ -163,6 +163,16 @@ async function openResetDialog(canvas: { findByRole: typeof screen.findByRole })
   }
 }
 
+const resetDone = `${seedSandboxWorkspace.name} was reset to its seed data.`
+
+function resetStatus(canvas: { queryByText: typeof screen.queryByText }) {
+  return canvas.queryByText(resetDone, { selector: '[role="status"]' })
+}
+
+function resetAlert(canvas: { queryByText: typeof screen.queryByText }) {
+  return canvas.queryByText(resetDone, { selector: '[data-slot="alert-description"]' })
+}
+
 function lastResetValue(canvas: { getByText: typeof screen.getByText }) {
   return canvas.getByText('Last reset').nextElementSibling
 }
@@ -215,7 +225,8 @@ export const ResetCancelled = meta.story({
     await userEvent.click(cancel)
     await waitFor(() => expect(dialog).not.toBeInTheDocument())
     await waitFor(() => expect(trigger).toHaveFocus())
-    await expect(canvas.queryByText(/was reset to its seed data/)).toBeNull()
+    await expect(resetStatus(canvas)).toBeNull()
+    await expect(resetAlert(canvas)).toBeNull()
   },
 })
 
@@ -231,8 +242,9 @@ export const ResetSucceeds = meta.story({
 
     await waitFor(() => expect(dialog).not.toBeInTheDocument())
     await waitFor(() => expect(trigger).toHaveFocus())
-    const done = await canvas.findByText(`${seedSandboxWorkspace.name} was reset to its seed data.`)
-    await expect(done.closest('[role="status"]')).not.toBeNull()
+    await waitFor(() => expect(resetStatus(canvas)).not.toBeNull())
+    await expect(resetAlert(canvas)).toBeVisible()
+    await expect(resetAlert(canvas)?.closest('[aria-hidden="true"]')).not.toBeNull()
     await waitFor(() => expect(lastResetValue(canvas)?.querySelector('time')).not.toBeNull())
     await expect(lastResetValue(canvas)).not.toHaveTextContent('Never')
   },
@@ -248,14 +260,17 @@ export const ResetPending = meta.story({
     )
   },
   async play({ canvas }) {
-    const { dialog, confirm } = await openResetDialog(canvas)
+    const { dialog, cancel, confirm } = await openResetDialog(canvas)
     await userEvent.click(confirm)
     await expect(await within(dialog).findByRole('button', { name: 'Resetting…' })).toHaveAttribute(
       'aria-disabled',
       'true',
     )
+    await expect(cancel).toHaveAttribute('aria-disabled', 'true')
     await expect(confirm).toHaveFocus()
     await userEvent.keyboard('{Escape}')
+    await expect(dialog).toBeVisible()
+    await userEvent.click(cancel)
     await expect(dialog).toBeVisible()
   },
 })
@@ -281,7 +296,42 @@ export const ResetFails = meta.story({
 
     await userEvent.click(confirm)
     await waitFor(() => expect(dialog).not.toBeInTheDocument())
-    await expect(await canvas.findByText(/was reset to its seed data/)).toBeVisible()
+    await waitFor(() => expect(resetAlert(canvas)).toBeVisible())
+    await expect(resetStatus(canvas)).not.toBeNull()
+  },
+})
+
+export const ResetSucceedsThenFailsOnReopen = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  beforeEach({ msw }) {
+    let calls = 0
+    msw.use(
+      http.post(`${apiUrl}${resetSandboxWorkspaceEndpoint.path}`, () => {
+        calls += 1
+
+        return calls > 1
+          ? HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 })
+          : undefined
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const first = await openResetDialog(canvas)
+    await userEvent.click(first.confirm)
+    await waitFor(() => expect(first.dialog).not.toBeInTheDocument())
+    await waitFor(() => expect(resetAlert(canvas)).toBeVisible())
+
+    const second = await openResetDialog(canvas)
+    await expect(resetAlert(canvas)).toBeNull()
+    await expect(resetStatus(canvas)).toBeNull()
+    await userEvent.click(second.confirm)
+    await expect(await within(second.dialog).findByRole('alert')).toHaveTextContent(
+      'The Sandbox could not be reset. Try again.',
+    )
+    await userEvent.click(second.cancel)
+    await waitFor(() => expect(second.dialog).not.toBeInTheDocument())
+    await expect(resetAlert(canvas)).toBeNull()
+    await expect(resetStatus(canvas)).toBeNull()
   },
 })
 
