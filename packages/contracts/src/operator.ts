@@ -9,6 +9,7 @@ export const maxWorkspaceNameLength = 70
 export const workspaceSummarySchema = workspaceSchema.extend({
   kind: workspaceKindSchema,
   memberCount: z.number().int().min(0),
+  seeded: z.boolean(),
   createdAt: z.iso.datetime(),
   lastResetAt: z.iso.datetime().nullable(),
 })

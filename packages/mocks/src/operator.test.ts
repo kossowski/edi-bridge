@@ -64,6 +64,10 @@ describe('seedWorkspaceSummaries', () => {
     )
   })
 
+  it('marks every seed Workspace as seeded', () => {
+    expect(seedWorkspaceSummaries.every(({ seeded }) => seeded)).toBe(true)
+  })
+
   it('uses valid GLNs from the restricted-circulation prefixes 020–029', () => {
     for (const { gln } of seedWorkspaceSummaries) {
       expect(gln).toMatch(/^02\d{11}$/)
@@ -150,11 +154,12 @@ describe('POST /operator/workspaces', () => {
       kind: 'standard',
       memberCount: 0,
       lastResetAt: null,
+      seeded: false,
     })
     expect(await listWorkspaces()).toEqual([created])
   })
 
-  it('creates a seeded Workspace that starts with the seed company identity', async () => {
+  it('creates a seeded Workspace with a valid company GLN and lists it as seeded', async () => {
     server.use(...operatorHandlers(apiUrl, { workspaces: [] }))
 
     const response = await post(createWorkspaceEndpoint.path, {
@@ -162,8 +167,11 @@ describe('POST /operator/workspaces', () => {
       seed: true,
     })
 
-    const { gln } = createWorkspaceEndpoint.response.parse(await response.json())
+    const { gln, seeded } = createWorkspaceEndpoint.response.parse(await response.json())
+    const [listed] = await listWorkspaces()
 
+    expect(seeded).toBe(true)
+    expect(listed?.seeded).toBe(true)
     expect(gln).toMatch(/^02\d{11}$/)
     expect(glnIssue(gln!)).toBeNull()
   })

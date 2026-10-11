@@ -297,6 +297,7 @@ export function createHandlers(
       ...workspace,
       kind: 'standard',
       memberCount: 1,
+      seeded: false,
       createdAt: new Date().toISOString(),
       lastResetAt: null,
     })
