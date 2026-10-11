@@ -30,8 +30,7 @@ export function EditScreen<Item extends { name: string }>({
     <AppPage
       busy={busy}
       name={data?.name}
-      title={data ? t(`${namespace}Form.editTitle`, { name: data.name }) : t('Breadcrumb.edit')}
-      className="gap-6">
+      title={data ? t(`${namespace}Form.editTitle`, { name: data.name }) : t('Breadcrumb.edit')}>
       {isPending ? (
         <div aria-busy className={`flex ${width} flex-col gap-6`}>
           <p role="status" className="sr-only">

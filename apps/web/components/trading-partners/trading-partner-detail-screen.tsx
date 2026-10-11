@@ -1,7 +1,5 @@
 'use client'
 
-import { PencilEdit02Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
@@ -11,12 +9,12 @@ import type { ReactNode } from 'react'
 import { AppPage } from '@/components/app-page'
 import { useChannelKindLabel } from '@/components/channels/channel-parts'
 import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { EditLink } from '@/components/edit-link'
 import { useRunFilters } from '@/components/runs/run-filters-store'
 import { RunLink } from '@/components/runs/run-link'
 import { RunStatusBadge } from '@/components/runs/run-status'
 import { OnboardingChecklist } from '@/components/trading-partners/onboarding-checklist'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
-import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import {
   channelsQuery,
@@ -25,7 +23,6 @@ import {
   runsQuery,
   tradingPartnerQuery,
 } from '@/lib/api/queries'
-import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -190,17 +187,6 @@ function RecentRuns({ tradingPartner }: { tradingPartner: TradingPartner }) {
   )
 }
 
-function EditLink({ id }: { id: string }) {
-  const t = useTranslations('TradingPartner')
-
-  return (
-    <Link href={`/trading-partners/${id}/edit`} className={buttonVariants({ variant: 'outline' })}>
-      <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-      {t('edit')}
-    </Link>
-  )
-}
-
 function TradingPartnerView({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner')
   const workspace = useQuery(currentWorkspaceQuery)
@@ -242,17 +228,13 @@ function TradingPartnerLoading() {
 }
 
 export function TradingPartnerDetailScreen({ id }: { id: string }) {
-  const t = useTranslations()
   const { data, error, isPending, refetch } = useQuery(tradingPartnerQuery(id))
-  const canChange = useCanChange()
 
   return (
     <AppPage
-      actions={data && canChange && <EditLink id={data.id} />}
+      changeActions={data && <EditLink href={`/trading-partners/${data.id}/edit`} />}
       meta={data && <TestModeBadge testMode={data.testMode} />}
-      name={data?.name}
-      title={data?.name ?? t('Breadcrumb.details')}
-      className="gap-6">
+      name={data?.name}>
       {isPending ? (
         <TradingPartnerLoading />
       ) : data ? (

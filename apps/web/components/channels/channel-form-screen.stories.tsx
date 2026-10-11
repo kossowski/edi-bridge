@@ -37,7 +37,9 @@ const meta = preview.meta({
 
 export const NewInboundSftp = meta.story({
   async play({ canvas }) {
-    await expect(canvas.getByRole('heading', { level: 1, name: 'New Channel' })).toBeInTheDocument()
+    await expect(
+      canvas.getByRole('heading', { level: 1, name: 'New connection' }),
+    ).toBeInTheDocument()
     await expect(canvas.getByRole('radio', { name: /^Inbound SFTP/ })).toBeChecked()
     await expect(canvas.getByLabelText('Polling interval (minutes)')).toHaveValue(1)
     await expect(canvas.getByLabelText('Port')).toHaveValue(22)

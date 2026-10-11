@@ -130,8 +130,7 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
     <AppPage
       actions={<WindowSwitch value={timeWindow} onChange={setTimeWindow} />}
       meta={<LiveIndicator status={liveStatus} />}
-      title={t('Navigation.overview')}
-      className="gap-6">
+      title={t('Sidebar.items.home.label')}>
       <p aria-live="polite" className="sr-only">
         {busy && !isError ? t('Overview.loading') : ''}
       </p>

@@ -2,7 +2,7 @@ import { expect } from 'storybook/test'
 
 import { AppHeader } from '@/components/app-header'
 import { AppPage } from '@/components/app-page'
-import { sessionHandlers } from '@/components/session/session-story-helpers'
+import { sessionHandlers, viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, mobile } from '@/components/story-helpers'
 import { sandboxAdminSession } from '@edi-bridge/mocks'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -67,8 +67,46 @@ export const MetaAndActions = meta.story({
   },
 })
 
+export const ChangeActionsForAdmins = meta.story({
+  args: { changeActions: <Button>New trading partner</Button> },
+  beforeEach({ msw }) {
+    msw.use(...sessionHandlers(sandboxAdminSession))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('button', { name: 'New trading partner' })).toBeVisible()
+  },
+})
+
+export const ChangeActionsHiddenFromViewers = meta.story({
+  args: { changeActions: <Button>New trading partner</Button> },
+  ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      await expect(canvas.queryByRole('button', { name: 'New trading partner' })).toBeNull()
+      await expect(canvasElement.querySelector('h1')?.nextElementSibling).toHaveTextContent(
+        'Content of the page',
+      )
+    },
+  }),
+})
+
+export const NameAsTitle = meta.story({
+  args: { title: undefined, name: 'Nordwind Handel GmbH' },
+  async play({ canvas }) {
+    await expect(
+      canvas.getByRole('heading', { level: 1, name: 'Nordwind Handel GmbH' }),
+    ).toBeInTheDocument()
+  },
+})
+
+export const DetailsBeforeTheName = meta.story({
+  args: { title: undefined },
+  async play({ canvas }) {
+    await expect(canvas.getByRole('heading', { level: 1, name: 'Details' })).toBeInTheDocument()
+  },
+})
+
 export const NamesTheBreadcrumb = meta.story({
-  args: { title: 'Nordwind Handel GmbH', name: 'Nordwind Handel GmbH', meta: pageMeta },
+  args: { title: undefined, name: 'Nordwind Handel GmbH', meta: pageMeta },
   parameters: { nextjs: { navigation: { pathname: '/trading-partners/tp-1' } } },
   decorators: [
     (Story) => (

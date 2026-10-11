@@ -125,14 +125,11 @@ function InterchangeLoading() {
 export function InterchangeScreen({ id }: { id: string }) {
   const t = useTranslations('Interchange')
   const { data, error, isPending, refetch } = useQuery(interchangeQuery(id))
-  const heading = data && t('heading', { controlReference: data.controlReference })
 
   return (
     <AppPage
       meta={data && <span className="font-mono break-all">{data.id}</span>}
-      name={heading}
-      title={heading ?? t('title')}
-      className="gap-6">
+      name={data && t('name', { controlReference: data.controlReference })}>
       {isPending ? (
         <InterchangeLoading />
       ) : data ? (

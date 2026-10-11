@@ -457,7 +457,7 @@ export function DocumentStructureScreen({ id }: { id: string }) {
   const session = useSession()
 
   return (
-    <AppPage name={data?.name} title={data?.name ?? t('title')} className="gap-6">
+    <AppPage name={data?.name}>
       {isPending || session.isPending ? (
         <div aria-busy className="flex flex-col gap-4">
           <p role="status" className="sr-only">

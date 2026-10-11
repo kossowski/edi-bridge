@@ -45,7 +45,7 @@ const meta = preview.meta({
 export const Default = meta.story({
   async play({ canvas }) {
     await expect(
-      canvas.getByRole('heading', { level: 1, name: 'New Document Structure' }),
+      canvas.getByRole('heading', { level: 1, name: 'New data format' }),
     ).toBeInTheDocument()
     await expect(
       canvas.getByText('Choose a file to see the Document Structure EDI Bridge infers from it.'),

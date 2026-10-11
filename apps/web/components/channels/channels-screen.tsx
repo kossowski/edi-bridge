@@ -12,8 +12,7 @@ import {
   useChannelTradingPartners,
 } from '@/components/channels/channel-parts'
 import { rowLinkClass } from '@/components/detail-parts'
-import { ListTable, NewLink } from '@/components/list-screen'
-import { useCanChange } from '@/hooks/use-session'
+import { ListTable, NewLink } from '@/components/list-table'
 import { channelsQuery } from '@/lib/api/queries'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 
@@ -79,12 +78,12 @@ function ChannelsTable() {
 
 export function ChannelsScreen() {
   const t = useTranslations()
-  const canChange = useCanChange()
 
   return (
     <AppPage
-      actions={canChange && <NewLink href="/channels/new" label={t('Channels.new')} />}
-      title={t('Navigation.channels')}>
+      changeActions={<NewLink href="/channels/new" label={t('Channels.new')} />}
+      title={t('Sidebar.items.allConnections.label')}
+      className="gap-4">
       <ChannelsTable />
     </AppPage>
   )

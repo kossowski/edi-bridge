@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 import { AppPage } from '@/components/app-page'
 import { rowLinkClass } from '@/components/detail-parts'
-import { ListTable } from '@/components/list-screen'
+import { ListTable } from '@/components/list-table'
 import { mappingsQuery } from '@/lib/api/queries'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 
@@ -47,7 +47,7 @@ export function MappingsScreen() {
   const mappings = useQuery(mappingsQuery)
 
   return (
-    <AppPage title={t('Navigation.mappings')}>
+    <AppPage title={t('Sidebar.items.mappings.label')} className="gap-4">
       <ListTable
         columns={columns.map((key) => ({ key, label: tMappings(`columns.${key}`) }))}
         emptyIcon={FlowConnectionIcon}

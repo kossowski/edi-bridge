@@ -54,10 +54,8 @@ function DraftHeader({ id }: { id: string }) {
     <AppPage
       actions={<PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />}
       meta={<DraftStateLabel id={stateId} draft={draft} />}
-      title={draft.name}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={summaryId} />
-      </div>
+      name={draft.name}>
+      <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={summaryId} />
     </AppPage>
   ) : null
 }

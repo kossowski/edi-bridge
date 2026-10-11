@@ -8,10 +8,10 @@ import { RetentionAndBudgetSection } from '@/components/settings/retention-and-b
 import { Separator } from '@edi-bridge/ui/components/separator'
 
 export function SettingsScreen() {
-  const t = useTranslations('Navigation')
+  const t = useTranslations('Shell.session')
 
   return (
-    <AppPage title={t('settings')} className="gap-6">
+    <AppPage title={t('settings')}>
       <CompanyIdentitySection />
       <Separator />
       <RetentionAndBudgetSection />

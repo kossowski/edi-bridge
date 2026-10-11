@@ -120,7 +120,7 @@ export function OrderLifecycleScreen({
   const searched = parsed.success ? parsed.data : undefined
 
   return (
-    <AppPage title={t('Navigation.orderLifecycle')} className="gap-6">
+    <AppPage title={t('Sidebar.items.orders.label')}>
       <SearchForm
         businessReference={searched}
         onSearch={(next) => {

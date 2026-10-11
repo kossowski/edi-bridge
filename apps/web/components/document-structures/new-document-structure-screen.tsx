@@ -190,7 +190,7 @@ export function NewDocumentStructureScreen() {
   }
 
   return (
-    <AppPage title={t('createTitle')} className="gap-6">
+    <AppPage title={t('createTitle')}>
       <form
         noValidate
         aria-busy={create.isPending || undefined}

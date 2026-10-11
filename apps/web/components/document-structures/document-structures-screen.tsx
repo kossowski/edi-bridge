@@ -8,8 +8,7 @@ import Link from 'next/link'
 import { AppPage } from '@/components/app-page'
 import { linkClass } from '@/components/detail-parts'
 import { UsedByMappings } from '@/components/document-structures/mapping-list'
-import { ListTable, NewLink } from '@/components/list-screen'
-import { useCanChange } from '@/hooks/use-session'
+import { ListTable, NewLink } from '@/components/list-table'
 import { documentStructuresQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
@@ -46,12 +45,12 @@ export function DocumentStructuresScreen() {
   const tList = useTranslations('DocumentStructures')
   const summaries = useQuery(documentStructuresQuery)
   const newLink = { href: '/document-structures/new', label: tList('new') }
-  const canChange = useCanChange()
 
   return (
     <AppPage
-      actions={canChange && <NewLink {...newLink} />}
-      title={t('Navigation.documentStructures')}>
+      changeActions={<NewLink {...newLink} />}
+      title={t('Sidebar.items.dataFormats.label')}
+      className="gap-4">
       <ListTable
         columns={columns.map((key) => ({ key, label: tList(`columns.${key}`) }))}
         emptyIcon={HierarchySquare02Icon}

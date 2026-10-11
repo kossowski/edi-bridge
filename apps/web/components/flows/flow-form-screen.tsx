@@ -13,7 +13,7 @@ export function NewFlowScreen() {
   const t = useTranslations()
 
   return (
-    <AppPage title={t('FlowForm.createTitle')} className="gap-6">
+    <AppPage title={t('FlowForm.createTitle')}>
       <FlowForm />
     </AppPage>
   )

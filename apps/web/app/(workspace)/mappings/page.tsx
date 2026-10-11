@@ -1,7 +1,7 @@
 import { MappingsScreen } from '@/components/mappings/mappings-screen'
-import { placeholderMetadata } from '@/components/page-placeholder'
+import { pageMetadata } from '@/components/page-metadata'
 
-export const generateMetadata = placeholderMetadata('mappings')
+export const generateMetadata = pageMetadata('mappings')
 
 export default function Page() {
   return <MappingsScreen />

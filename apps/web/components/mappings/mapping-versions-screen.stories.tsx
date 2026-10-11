@@ -41,7 +41,9 @@ const meta = preview.meta({
 export const Default = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('3 Mapping Versions')).toBeVisible()
-    await expect(canvas.getByRole('heading', { name: 'Mapping Versions' })).toBeVisible()
+    await expect(
+      canvas.getByRole('heading', { level: 1, name: `Versions of ${published.name}` }),
+    ).toBeInTheDocument()
     await expect(canvas.getByText('No changes since Version 3')).toBeVisible()
 
     const newest = within(canvas.getByText('Version 3').closest('tr')!)

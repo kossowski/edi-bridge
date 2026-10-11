@@ -51,8 +51,7 @@ export function NewChannelScreen() {
         created
           ? t('ChannelForm.created.title', { name: created.channel.name })
           : t('ChannelForm.createTitle')
-      }
-      className="gap-6">
+      }>
       {created ? <CreatedWebhook created={created} /> : <ChannelForm onCreated={setCreated} />}
     </AppPage>
   )

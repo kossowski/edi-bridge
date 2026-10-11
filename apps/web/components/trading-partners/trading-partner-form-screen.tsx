@@ -12,7 +12,7 @@ export function NewTradingPartnerScreen() {
   const t = useTranslations()
 
   return (
-    <AppPage title={t('TradingPartnerForm.createTitle')} className="gap-6">
+    <AppPage title={t('TradingPartnerForm.createTitle')}>
       <TradingPartnerForm />
     </AppPage>
   )

@@ -343,7 +343,7 @@
   },
   "RunDetail": {
     "title": "Run",
-    "name": "Run {id}",
+    "name": "Document {id}",
     "loading": "Loading Run",
     "notFound": {
       "title": "Run not found",
@@ -453,7 +453,7 @@
   },
   "Interchange": {
     "title": "Interchange",
-    "heading": "Interchange {controlReference}",
+    "name": "Transmission {controlReference}",
     "loading": "Loading Interchange",
     "notFound": {
       "title": "Interchange not found",
@@ -566,7 +566,6 @@
   "TradingPartner": {
     "title": "Trading Partner",
     "loading": "Loading Trading Partner",
-    "edit": "Edit",
     "notFound": {
       "title": "Trading Partner not found",
       "description": "No Trading Partner with this ID exists in this Workspace."
@@ -642,7 +641,7 @@
     }
   },
   "TradingPartnerForm": {
-    "createTitle": "New Trading Partner",
+    "createTitle": "New trading partner",
     "editTitle": "Edit {name}",
     "editPageTitle": "Edit Trading Partner",
     "testModeNotice": "A new Trading Partner starts in Test Mode. Every Interchange with it is flagged as a test until you switch it to production.",
@@ -719,7 +718,6 @@
   "Channel": {
     "title": "Channel",
     "loading": "Loading Channel",
-    "edit": "Edit",
     "notFound": {
       "title": "Channel not found",
       "description": "There is no Channel with this ID in this Workspace."
@@ -781,7 +779,7 @@
     }
   },
   "ChannelForm": {
-    "createTitle": "New Channel",
+    "createTitle": "New connection",
     "editTitle": "Edit {name}",
     "editPageTitle": "Edit Channel",
     "webhookNotice": "EDI Bridge generates the webhook URL and token when you create the Channel.",
@@ -936,7 +934,6 @@
   "Flow": {
     "title": "Flow",
     "loading": "Loading Flow",
-    "edit": "Edit",
     "unknownChannel": "Unknown Channel",
     "notFound": {
       "title": "Flow not found",
@@ -975,7 +972,7 @@
     }
   },
   "FlowForm": {
-    "createTitle": "New Flow",
+    "createTitle": "New document route",
     "editTitle": "Edit {name}",
     "editPageTitle": "Edit Flow",
     "sections": {
@@ -1656,6 +1653,7 @@
   },
   "MappingVersions": {
     "title": "Mapping Versions",
+    "heading": "Versions of {name}",
     "openDraft": "Open the Draft",
     "caption": "Mapping Versions, newest first",
     "loading": "Loading Mapping Versions",
@@ -1684,6 +1682,7 @@
   },
   "MappingComparison": {
     "title": "Compare Mapping Versions",
+    "heading": "Compare versions of {name}",
     "loading": "Loading the comparison",
     "openDraft": "Open the Draft",
     "from": "From",
@@ -1876,7 +1875,7 @@
     "viewOnlyFieldsDescription": "The fields EDI Bridge expects in Documents of this Document Structure, with their type and whether they are required or repeat."
   },
   "DocumentStructureForm": {
-    "createTitle": "New Document Structure",
+    "createTitle": "New data format",
     "origin": {
       "label": "Create from",
       "description": "EDI Bridge infers the fields, their nesting and repetitions from the file.",

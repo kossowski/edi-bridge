@@ -8,7 +8,7 @@ import Link from 'next/link'
 
 import { AppPage } from '@/components/app-page'
 import { linkClass, LoadFailure } from '@/components/detail-parts'
-import { ListTable } from '@/components/list-screen'
+import { ListTable } from '@/components/list-table'
 import { DraftStateLabel } from '@/components/mappings/publish-draft'
 import { comparisonHref, newestFirst } from '@/components/mappings/version-comparison'
 import { ApiError } from '@/lib/api/client'
@@ -120,6 +120,7 @@ function VersionsLoading() {
 
 export function MappingVersionsScreen({ id }: { id: string }) {
   const t = useTranslations('MappingVersions')
+  const tBreadcrumb = useTranslations('Breadcrumb')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
   const versions = useQuery({ ...mappingVersionsQuery(id), enabled: data !== undefined })
 
@@ -134,7 +135,8 @@ export function MappingVersionsScreen({ id }: { id: string }) {
         )
       }
       name={data?.name}
-      title={t('title')}>
+      title={data ? t('heading', { name: data.name }) : tBreadcrumb('versions')}
+      className="gap-4">
       {isPending ? (
         <VersionsLoading />
       ) : data ? (

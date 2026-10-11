@@ -1,7 +1,7 @@
 import { ChannelsScreen } from '@/components/channels/channels-screen'
-import { placeholderMetadata } from '@/components/page-placeholder'
+import { pageMetadata } from '@/components/page-metadata'
 
-export const generateMetadata = placeholderMetadata('channels')
+export const generateMetadata = pageMetadata('allConnections')
 
 export default function Page() {
   return <ChannelsScreen />

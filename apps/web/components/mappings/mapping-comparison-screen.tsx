@@ -984,10 +984,14 @@ function Comparison({ mappingId, initial }: { mappingId: string; initial: Compar
 
 export function MappingComparisonScreen({ id, ...initial }: { id: string } & ComparisonRequest) {
   const t = useTranslations('MappingComparison')
+  const tBreadcrumb = useTranslations('Breadcrumb')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
 
   return (
-    <AppPage name={data?.name} title={t('title')}>
+    <AppPage
+      name={data?.name}
+      title={data ? t('heading', { name: data.name }) : tBreadcrumb('compare')}
+      className="gap-4">
       {isPending ? (
         <Loading label={t('loading')} rows={6} />
       ) : data ? (

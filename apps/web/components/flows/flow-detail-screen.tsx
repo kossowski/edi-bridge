@@ -1,7 +1,5 @@
 'use client'
 
-import { PencilEdit02Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
@@ -10,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AppPage } from '@/components/app-page'
 import { useChannelKindLabel } from '@/components/channels/channel-parts'
 import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { EditLink } from '@/components/edit-link'
 import {
   useFlowChannels,
   useFlowReferences,
@@ -20,7 +19,6 @@ import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { flowQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
-import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { Flow } from '@edi-bridge/contracts'
@@ -106,17 +104,6 @@ function PinnedMappingVersion({ flow }: { flow: Flow }) {
   )
 }
 
-function EditLink({ id }: { id: string }) {
-  const t = useTranslations('Flow')
-
-  return (
-    <Link href={`/flows/${id}/edit`} className={buttonVariants({ variant: 'outline' })}>
-      <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-      {t('edit')}
-    </Link>
-  )
-}
-
 function FlowView({ flow }: { flow: Flow }) {
   const t = useTranslations('Flow')
 
@@ -159,17 +146,13 @@ function FlowLoading() {
 }
 
 export function FlowDetailScreen({ id }: { id: string }) {
-  const t = useTranslations()
   const { data, error, isPending, refetch } = useQuery(flowQuery(id))
-  const canChange = useCanChange()
 
   return (
     <AppPage
-      actions={data && canChange && <EditLink id={data.id} />}
+      changeActions={data && <EditLink href={`/flows/${data.id}/edit`} />}
       meta={data && <Badge variant="outline">{data.messageType}</Badge>}
-      name={data?.name}
-      title={data?.name ?? t('Breadcrumb.details')}
-      className="gap-6">
+      name={data?.name}>
       {isPending ? (
         <FlowLoading />
       ) : data ? (

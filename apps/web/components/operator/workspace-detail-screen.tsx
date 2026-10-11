@@ -116,7 +116,6 @@ function WorkspaceLoading() {
 
 export function WorkspaceDetailScreen({ id }: { id: string }) {
   const t = useTranslations('Operator.workspace')
-  const tBreadcrumb = useTranslations('Breadcrumb')
 
   const { data, isPending, isError, refetch } = useQuery({
     ...operatorWorkspacesQuery,
@@ -127,9 +126,7 @@ export function WorkspaceDetailScreen({ id }: { id: string }) {
     <AppPage
       actions={data?.kind === 'sandbox' && <SandboxReset workspace={data} />}
       meta={data && <WorkspaceKindBadge kind={data.kind} />}
-      name={data?.name}
-      title={data?.name ?? tBreadcrumb('details')}
-      className="gap-6">
+      name={data?.name}>
       {isPending ? (
         <WorkspaceLoading />
       ) : data ? (

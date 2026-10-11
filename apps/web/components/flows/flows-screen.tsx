@@ -9,8 +9,7 @@ import Link from 'next/link'
 import { AppPage } from '@/components/app-page'
 import { rowLinkClass } from '@/components/detail-parts'
 import { useFlowReferences } from '@/components/flows/flow-parts'
-import { ListTable, NewLink } from '@/components/list-screen'
-import { useCanChange } from '@/hooks/use-session'
+import { ListTable, NewLink } from '@/components/list-table'
 import { flowsQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
@@ -94,12 +93,12 @@ function FlowsTable() {
 
 export function FlowsScreen() {
   const t = useTranslations()
-  const canChange = useCanChange()
 
   return (
     <AppPage
-      actions={canChange && <NewLink href="/flows/new" label={t('Flows.new')} />}
-      title={t('Navigation.flows')}>
+      changeActions={<NewLink href="/flows/new" label={t('Flows.new')} />}
+      title={t('Sidebar.items.allDocumentRoutes.label')}
+      className="gap-4">
       <FlowsTable />
     </AppPage>
   )

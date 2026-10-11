@@ -190,9 +190,7 @@ export function RunDetailScreen({ id }: { id: string }) {
   return (
     <AppPage
       meta={data && <RunMeta run={data} />}
-      name={data && t('name', { id: shortId(data.id) })}
-      title={t('title')}
-      className="gap-6">
+      name={data && t('name', { id: shortId(data.id) })}>
       {isPending ? (
         <RunDetailLoading />
       ) : data ? (

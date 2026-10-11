@@ -21,7 +21,6 @@ function focusIfNothingFocused(heading: HTMLHeadingElement | null) {
 export function LookupTableEditorScreen({ id }: { id: string }) {
   const t = useTranslations('LookupTable')
   const tLookupTables = useTranslations('LookupTables')
-  const tBreadcrumb = useTranslations('Breadcrumb')
   const { data, error, isPending, refetch } = useQuery(lookupTableQuery(id))
   const session = useSession()
 
@@ -38,9 +37,7 @@ export function LookupTableEditorScreen({ id }: { id: string }) {
         )
       }
       name={data?.name}
-      title={data?.name ?? tBreadcrumb('details')}
-      titleRef={data && !session.isPending ? focusIfNothingFocused : undefined}
-      className="gap-6">
+      titleRef={data && !session.isPending ? focusIfNothingFocused : undefined}>
       {isPending || session.isPending ? (
         <div aria-busy className="flex flex-col gap-6">
           <p role="status" className="sr-only">

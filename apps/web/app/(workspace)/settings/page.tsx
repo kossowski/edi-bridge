@@ -1,7 +1,7 @@
-import { placeholderMetadata } from '@/components/page-placeholder'
+import { pageMetadata } from '@/components/page-metadata'
 import { SettingsScreen } from '@/components/settings/settings-screen'
 
-export const generateMetadata = placeholderMetadata('settings')
+export const generateMetadata = pageMetadata('settings')
 
 export default function Page() {
   return <SettingsScreen />

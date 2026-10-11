@@ -81,7 +81,7 @@ export function AiReviewState({
         ref={doneRef}
         role="status"
         tabIndex={-1}
-        className="inline-flex basis-full items-center gap-1.5 text-sm text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
+        className="inline-flex items-center gap-1.5 text-sm text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
         {done && (
           <>
             <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} aria-hidden />
@@ -90,7 +90,7 @@ export function AiReviewState({
         )}
       </p>
       {open && (
-        <div className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <span id={summaryId} className="inline-flex flex-wrap items-center gap-2">
             <AiBadge label={t('open')} />
             {t('openSummary', { count: aiProposedCount(draft.aiReview) })}

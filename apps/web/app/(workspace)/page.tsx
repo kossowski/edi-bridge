@@ -1,7 +1,7 @@
 import { OverviewScreen } from '@/components/overview/overview-screen'
-import { placeholderMetadata } from '@/components/page-placeholder'
+import { pageMetadata } from '@/components/page-metadata'
 
-export const generateMetadata = placeholderMetadata('overview')
+export const generateMetadata = pageMetadata('home')
 
 export default function Page() {
   return <OverviewScreen />
