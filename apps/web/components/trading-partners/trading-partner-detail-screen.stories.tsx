@@ -35,7 +35,9 @@ const meta = preview.meta({
 export const InProduction = meta.story({
   args: { id: inProduction.id },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('heading', { name: 'Hansemarkt GmbH' })).toBeVisible()
+    await expect(
+      await canvas.findByRole('heading', { level: 1, name: 'Hansemarkt GmbH' }),
+    ).toBeInTheDocument()
     await expect(await canvas.findByText('Hansemarkt SFTP inbox')).toBeVisible()
     const flows = within(canvas.getByRole('region', { name: 'Flows' }))
     await expect(

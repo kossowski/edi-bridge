@@ -518,7 +518,7 @@ export const NotFound = meta.story({
   args: { id: '00000000-0000-4000-8000-000000000000' },
   async play({ canvas }) {
     await expect(await canvas.findByText('Workspace not found')).toBeVisible()
-    await expect(canvas.getByRole('link', { name: 'All Workspaces' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { level: 1, name: 'Details' })).toBeInTheDocument()
   },
 })
 

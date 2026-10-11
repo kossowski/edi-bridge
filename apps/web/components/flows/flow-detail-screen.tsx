@@ -7,8 +7,9 @@ import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { useChannelKindLabel } from '@/components/channels/channel-parts'
-import { BackLink, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
 import {
   useFlowChannels,
   useFlowReferences,
@@ -105,24 +106,22 @@ function PinnedMappingVersion({ flow }: { flow: Flow }) {
   )
 }
 
+function EditLink({ id }: { id: string }) {
+  const t = useTranslations('Flow')
+
+  return (
+    <Link href={`/flows/${id}/edit`} className={buttonVariants({ variant: 'outline' })}>
+      <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
+      {t('edit')}
+    </Link>
+  )
+}
+
 function FlowView({ flow }: { flow: Flow }) {
   const t = useTranslations('Flow')
-  const canChange = useCanChange()
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{flow.name}</h1>
-          <Badge variant="outline">{flow.messageType}</Badge>
-        </div>
-        {canChange && (
-          <Link href={`/flows/${flow.id}/edit`} className={buttonVariants({ variant: 'outline' })}>
-            <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-            {t('edit')}
-          </Link>
-        )}
-      </div>
       <dl
         aria-label={t('facts.label')}
         className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
@@ -154,19 +153,23 @@ function FlowLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-64" />
       <Skeleton className="h-32 w-full" />
     </div>
   )
 }
 
 export function FlowDetailScreen({ id }: { id: string }) {
-  const t = useTranslations('Flow')
+  const t = useTranslations()
   const { data, error, isPending, refetch } = useQuery(flowQuery(id))
+  const canChange = useCanChange()
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/flows" label={t('back')} />
+    <AppPage
+      actions={data && canChange && <EditLink id={data.id} />}
+      meta={data && <Badge variant="outline">{data.messageType}</Badge>}
+      name={data?.name}
+      title={data?.name ?? t('Breadcrumb.details')}
+      className="gap-6">
       {isPending ? (
         <FlowLoading />
       ) : data ? (
@@ -178,6 +181,6 @@ export function FlowDetailScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }

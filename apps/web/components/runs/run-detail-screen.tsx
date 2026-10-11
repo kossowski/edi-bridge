@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
-import { BackToRuns, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { AppPage } from '@/components/app-page'
+import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
 import { MessageTree } from '@/components/runs/message-tree'
 import { RawInterchange } from '@/components/runs/raw-interchange'
 import { shortId } from '@/components/runs/run-link'
@@ -118,23 +119,25 @@ function RunErrorNotice({ error }: { error: NonNullable<RunDetail['error']> }) {
   )
 }
 
+function RunMeta({ run }: { run: RunDetail }) {
+  return (
+    <>
+      <RunStatusBadge status={run.status} />
+      {run.failureStage && (
+        <span className="text-foreground">
+          <FailureStageLabel failureStage={run.failureStage} />
+        </span>
+      )}
+      <span className="font-mono break-all">{run.id}</span>
+    </>
+  )
+}
+
 function RunDetailView({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail')
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-          <RunStatusBadge status={run.status} />
-          {run.failureStage && (
-            <span className="text-sm">
-              <FailureStageLabel failureStage={run.failureStage} />
-            </span>
-          )}
-        </div>
-        <p className="text-muted-foreground font-mono text-sm break-all">{run.id}</p>
-      </div>
       <RunFacts run={run} />
       {run.error && <RunErrorNotice error={run.error} />}
       <RunRemedyPanel run={run} />
@@ -171,7 +174,6 @@ function RunDetailLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-48" />
       <Skeleton className="h-28 w-full" />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Skeleton className="h-56 w-full" />
@@ -186,8 +188,11 @@ export function RunDetailScreen({ id }: { id: string }) {
   const { data, error, isPending, refetch } = useQuery(runQuery(id))
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackToRuns label={t('back')} />
+    <AppPage
+      meta={data && <RunMeta run={data} />}
+      name={data && t('name', { id: shortId(data.id) })}
+      title={t('title')}
+      className="gap-6">
       {isPending ? (
         <RunDetailLoading />
       ) : data ? (
@@ -199,6 +204,6 @@ export function RunDetailScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }

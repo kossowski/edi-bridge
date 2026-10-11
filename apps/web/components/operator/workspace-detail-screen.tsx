@@ -3,7 +3,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 
-import { BackLink, Fact, Failure } from '@/components/detail-parts'
+import { AppPage } from '@/components/app-page'
+import { Fact, Failure } from '@/components/detail-parts'
 import { SandboxReset } from '@/components/operator/sandbox-reset'
 import { WorkspaceInvites } from '@/components/operator/workspace-invites'
 import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
@@ -91,15 +92,6 @@ function WorkspaceView({ workspace }: { workspace: WorkspaceSummary }) {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h1 className="min-w-0 text-2xl font-semibold tracking-tight break-words">
-            {workspace.name}
-          </h1>
-          <WorkspaceKindBadge kind={workspace.kind} />
-        </div>
-        {isSandbox && <SandboxReset workspace={workspace} />}
-      </div>
       <WorkspaceFacts isSandbox={isSandbox} workspace={workspace} />
       <WorkspaceInvites workspaceId={workspace.id} />
       <Separator />
@@ -116,7 +108,6 @@ function WorkspaceLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-64" />
       <Skeleton className="h-20 w-full" />
       <Skeleton className="h-64 w-full" />
     </div>
@@ -125,6 +116,7 @@ function WorkspaceLoading() {
 
 export function WorkspaceDetailScreen({ id }: { id: string }) {
   const t = useTranslations('Operator.workspace')
+  const tBreadcrumb = useTranslations('Breadcrumb')
 
   const { data, isPending, isError, refetch } = useQuery({
     ...operatorWorkspacesQuery,
@@ -132,8 +124,12 @@ export function WorkspaceDetailScreen({ id }: { id: string }) {
   })
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/operator" label={t('back')} />
+    <AppPage
+      actions={data?.kind === 'sandbox' && <SandboxReset workspace={data} />}
+      meta={data && <WorkspaceKindBadge kind={data.kind} />}
+      name={data?.name}
+      title={data?.name ?? tBreadcrumb('details')}
+      className="gap-6">
       {isPending ? (
         <WorkspaceLoading />
       ) : data ? (
@@ -151,6 +147,6 @@ export function WorkspaceDetailScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }

@@ -35,7 +35,9 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   async play({ canvas }) {
-    await expect(await canvas.findByRole('heading', { name: 'Units of measure' })).toBeVisible()
+    await expect(
+      await canvas.findByRole('heading', { level: 1, name: 'Units of measure' }),
+    ).toBeInTheDocument()
     await expect(canvas.getByRole('grid', { name: 'Entries' })).toBeVisible()
     await expect(canvas.getByRole('gridcell', { name: 'KGM' })).toBeVisible()
     await expect(canvas.getByText('4 entries')).toBeVisible()

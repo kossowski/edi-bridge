@@ -522,7 +522,7 @@ export const Viewer = meta.story({
       ).toBeVisible()
       await expect(
         canvas.getByRole('heading', { level: 1, name: 'ERP purchase order' }),
-      ).toBeVisible()
+      ).toBeInTheDocument()
       await expectNothingToChange(canvasElement)
       await expect(canvas.queryByRole('button', { name: 'Save' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: 'Discard changes' })).toBeNull()

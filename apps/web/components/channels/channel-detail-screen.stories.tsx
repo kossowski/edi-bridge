@@ -38,8 +38,8 @@ export const InboundSftp = meta.story({
   args: { id: sftpInbox.id },
   async play({ canvas }) {
     await expect(
-      await canvas.findByRole('heading', { name: 'Hansemarkt SFTP inbox' }),
-    ).toBeVisible()
+      await canvas.findByRole('heading', { level: 1, name: 'Hansemarkt SFTP inbox' }),
+    ).toBeInTheDocument()
     await expect(canvas.getByText('Polled folder')).toBeVisible()
     await expect(await canvas.findByRole('link', { name: 'Hansemarkt GmbH' })).toBeVisible()
     await expect(canvas.queryByText(/whk_/)).toBeNull()
@@ -191,8 +191,8 @@ export const ViewerInboundSftp = meta.story({
   ...viewerStory({
     async play({ canvas }) {
       await expect(
-        await canvas.findByRole('heading', { name: 'Hansemarkt SFTP inbox' }),
-      ).toBeVisible()
+        await canvas.findByRole('heading', { level: 1, name: 'Hansemarkt SFTP inbox' }),
+      ).toBeInTheDocument()
       await expect(canvas.queryByRole('button', { name: 'Submit a Document' })).toBeNull()
       await expect(canvas.queryByRole('link', { name: 'Edit' })).toBeNull()
     },

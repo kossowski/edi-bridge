@@ -20,7 +20,7 @@ export function AppPage({
   meta?: ReactNode
   actions?: ReactNode
   busy?: boolean
-  titleRef?: Ref<HTMLHeadingElement>
+  titleRef?: Ref<HTMLHeadingElement> | undefined
   className?: string
   children: ReactNode
 }) {

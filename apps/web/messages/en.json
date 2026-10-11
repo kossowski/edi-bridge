@@ -343,7 +343,7 @@
   },
   "RunDetail": {
     "title": "Run",
-    "back": "Back to Runs",
+    "name": "Run {id}",
     "loading": "Loading Run",
     "notFound": {
       "title": "Run not found",
@@ -454,7 +454,6 @@
   "Interchange": {
     "title": "Interchange",
     "heading": "Interchange {controlReference}",
-    "back": "Back to Runs",
     "loading": "Loading Interchange",
     "notFound": {
       "title": "Interchange not found",
@@ -566,7 +565,6 @@
   },
   "TradingPartner": {
     "title": "Trading Partner",
-    "back": "Back to Trading Partners",
     "loading": "Loading Trading Partner",
     "edit": "Edit",
     "notFound": {
@@ -720,7 +718,6 @@
   },
   "Channel": {
     "title": "Channel",
-    "back": "Back to Channels",
     "loading": "Loading Channel",
     "edit": "Edit",
     "notFound": {
@@ -938,7 +935,6 @@
   },
   "Flow": {
     "title": "Flow",
-    "back": "Back to Flows",
     "loading": "Loading Flow",
     "edit": "Edit",
     "unknownChannel": "Unknown Channel",
@@ -1076,7 +1072,6 @@
   },
   "Mapping": {
     "title": "Mapping",
-    "back": "Back to Mappings",
     "loading": "Loading Mapping",
     "notFound": {
       "title": "Mapping not found",
@@ -1830,7 +1825,6 @@
   },
   "DocumentStructure": {
     "title": "Document Structure",
-    "back": "Back to Document Structures",
     "loading": "Loading Document Structure",
     "notFound": {
       "title": "Document Structure not found",
@@ -2109,7 +2103,6 @@
   },
   "LookupTable": {
     "title": "Lookup Table",
-    "back": "Back to Lookup Tables",
     "loading": "Loading Lookup Table",
     "notFound": {
       "title": "Lookup Table not found",
@@ -2475,7 +2468,6 @@
     },
     "workspace": {
       "title": "Workspace",
-      "back": "All Workspaces",
       "loading": "Loading Workspace",
       "facts": {
         "label": "Workspace details",

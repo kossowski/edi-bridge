@@ -8,8 +8,9 @@ import Link from 'next/link'
 
 import type { ReactNode } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { useChannelKindLabel } from '@/components/channels/channel-parts'
-import { BackLink, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
 import { useRunFilters } from '@/components/runs/run-filters-store'
 import { RunLink } from '@/components/runs/run-link'
 import { RunStatusBadge } from '@/components/runs/run-status'
@@ -189,27 +190,23 @@ function RecentRuns({ tradingPartner }: { tradingPartner: TradingPartner }) {
   )
 }
 
+function EditLink({ id }: { id: string }) {
+  const t = useTranslations('TradingPartner')
+
+  return (
+    <Link href={`/trading-partners/${id}/edit`} className={buttonVariants({ variant: 'outline' })}>
+      <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
+      {t('edit')}
+    </Link>
+  )
+}
+
 function TradingPartnerView({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner')
   const workspace = useQuery(currentWorkspaceQuery)
-  const canChange = useCanChange()
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{tradingPartner.name}</h1>
-          <TestModeBadge testMode={tradingPartner.testMode} />
-        </div>
-        {canChange && (
-          <Link
-            href={`/trading-partners/${tradingPartner.id}/edit`}
-            className={buttonVariants({ variant: 'outline' })}>
-            <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-            {t('edit')}
-          </Link>
-        )}
-      </div>
       <TradingPartnerFacts tradingPartner={tradingPartner} />
       <Section id="trading-partner-onboarding" title={t('onboarding.title')}>
         {workspace.isPending ? (
@@ -238,7 +235,6 @@ function TradingPartnerLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-64" />
       <Skeleton className="h-20 w-full" />
       <Skeleton className="h-64 w-full" />
     </div>
@@ -246,12 +242,17 @@ function TradingPartnerLoading() {
 }
 
 export function TradingPartnerDetailScreen({ id }: { id: string }) {
-  const t = useTranslations('TradingPartner')
+  const t = useTranslations()
   const { data, error, isPending, refetch } = useQuery(tradingPartnerQuery(id))
+  const canChange = useCanChange()
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/trading-partners" label={t('back')} />
+    <AppPage
+      actions={data && canChange && <EditLink id={data.id} />}
+      meta={data && <TestModeBadge testMode={data.testMode} />}
+      name={data?.name}
+      title={data?.name ?? t('Breadcrumb.details')}
+      className="gap-6">
       {isPending ? (
         <TradingPartnerLoading />
       ) : data ? (
@@ -263,6 +264,6 @@ export function TradingPartnerDetailScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }
