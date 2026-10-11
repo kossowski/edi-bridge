@@ -18,10 +18,4 @@ On the passing PRs, Nothing To Publish took 308 ms, and Large Windows 1252 Csv D
 
 ## Comments
 
-2026-10-11, in #63:
-
-- Nothing To Publish now waits with `waitFor` until the alert is visible, like the Confirm story.
-- Large Windows 1252 Csv Document now uses 1,000 rows (71 KB) instead of 20,000 (1.4 MB). The preview decodes only the first 48 KB, so the story still covers a cut-off preview after the encoding switch, and the small Windows 1252 Umlauts story covers the decoding. Locally the story went from 589 ms to 263 ms.
-- Large Csv Document keeps its 20,000 rows for the large-volume state from ticket 13, and now waits up to 5 s for the tree grid. It took 2.25 s on #61.
-
 Resolved in #63.
