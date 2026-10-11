@@ -13,15 +13,22 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
-  it('adds a detail crumb and the steps below it', () => {
+  it('adds a detail crumb and the subpages below it', () => {
     expect(breadcrumbTrail('/trading-partners/tp-1/edit')).toEqual([
       { href: '/trading-partners', label: { kind: 'item', key: 'tradingPartners' } },
       { href: '/trading-partners/tp-1', label: { kind: 'detail' } },
-      { href: '/trading-partners/tp-1/edit', label: { kind: 'step', key: 'edit' } },
+      { href: '/trading-partners/tp-1/edit', label: { kind: 'subpage', key: 'edit' } },
     ])
     expect(breadcrumbTrail('/channels/new')).toEqual([
       { href: '/channels', label: { kind: 'item', key: 'allConnections' } },
-      { href: '/channels/new', label: { kind: 'step', key: 'new' } },
+      { href: '/channels/new', label: { kind: 'subpage', key: 'new' } },
+    ])
+  })
+
+  it('names a page with two sidebar items after the first one', () => {
+    expect(breadcrumbTrail('/runs/run-1')).toEqual([
+      { href: '/runs', label: { kind: 'item', key: 'documents' } },
+      { href: '/runs/run-1', label: { kind: 'detail' } },
     ])
   })
 

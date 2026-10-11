@@ -16,6 +16,7 @@ export function AppHeader() {
         <SidebarTrigger label={t('toggleSidebar')} />
         <AppBreadcrumb />
         <ViewOnlyBadge />
+        <div className="flex shrink-0 items-center gap-2 empty:hidden" data-slot="header-actions" />
       </div>
       <div id={headerTabsId} className="bg-muted/60 border-t px-4 py-1.5 empty:hidden" />
     </header>

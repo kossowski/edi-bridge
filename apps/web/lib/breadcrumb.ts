@@ -1,13 +1,13 @@
-import type { Messages } from 'next-intl'
+import { navigationItems, type SidebarItemKey, sidebarItem, sidebarItems } from './navigation'
 
-import { navigationItems, type SidebarItemKey, sidebarGroups } from './navigation'
+const subpageKeys = ['new', 'edit', 'versions', 'compare'] as const
 
-type StepKey = keyof Omit<Messages['Breadcrumb'], 'label' | 'showPath' | 'details'>
+type SubpageKey = (typeof subpageKeys)[number]
 
 export type CrumbLabel =
   | { kind: 'item'; key: SidebarItemKey }
   | { kind: 'session'; key: 'settings' | 'operatorArea' }
-  | { kind: 'step'; key: StepKey }
+  | { kind: 'subpage'; key: SubpageKey }
   | { kind: 'detail' }
   | { kind: 'notFound' }
 
@@ -15,22 +15,27 @@ export type Crumb = { href: string; label: CrumbLabel }
 
 type Section = { label: CrumbLabel; href: string; skip?: ReadonlyArray<string> }
 
-function sidebarSection(key: SidebarItemKey): Section {
-  const item = sidebarGroups.flatMap((group) => group.items).find((entry) => entry.key === key)
+function itemSection(key: SidebarItemKey): Section {
+  return { label: { kind: 'item', key }, href: sidebarItem(key).href }
+}
 
-  return { label: { kind: 'item', key }, href: item?.href ?? '/' }
+function sidebarSections() {
+  const byFirstSegment = new Map<string, Section>()
+
+  for (const item of sidebarItems) {
+    const segment = item.href.split('/').find(Boolean)
+
+    if (segment !== undefined && !byFirstSegment.has(segment)) {
+      byFirstSegment.set(segment, itemSection(item.key))
+    }
+  }
+
+  return byFirstSegment
 }
 
 const sections = new Map<string, Section>([
-  ['runs', sidebarSection('documents')],
-  ['order-lifecycle', sidebarSection('orders')],
-  ['trading-partners', sidebarSection('tradingPartners')],
-  ['mappings', sidebarSection('mappings')],
-  ['lookup-tables', sidebarSection('codeTranslations')],
-  ['document-structures', sidebarSection('dataFormats')],
-  ['channels', sidebarSection('allConnections')],
-  ['flows', sidebarSection('allDocumentRoutes')],
-  ['interchanges', sidebarSection('transmissions')],
+  ...sidebarSections(),
+  ['interchanges', itemSection('transmissions')],
   [
     'settings',
     { label: { kind: 'session', key: 'settings' }, href: navigationItems.settings.href },
@@ -45,17 +50,15 @@ const sections = new Map<string, Section>([
   ],
 ])
 
-const steps = new Set<string>(['new', 'edit', 'versions', 'compare'])
-
-function isStep(segment: string): segment is StepKey {
-  return steps.has(segment)
+function subpageKey(segment: string) {
+  return subpageKeys.find((key) => key === segment)
 }
 
 export function breadcrumbTrail(pathname: string): ReadonlyArray<Crumb> {
   const [first, ...rest] = pathname.split('/').filter(Boolean)
 
   if (first === undefined) {
-    return [sidebarSection('home')]
+    return [itemSection('home')]
   }
 
   const section = sections.get(first)
@@ -74,10 +77,9 @@ export function breadcrumbTrail(pathname: string): ReadonlyArray<Crumb> {
       continue
     }
 
-    trail.push({
-      href: path,
-      label: isStep(segment) ? { kind: 'step', key: segment } : { kind: 'detail' },
-    })
+    const key = subpageKey(segment)
+
+    trail.push({ href: path, label: key ? { kind: 'subpage', key } : { kind: 'detail' } })
   }
 
   return trail

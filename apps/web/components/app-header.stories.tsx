@@ -3,7 +3,7 @@ import { expect, screen, userEvent, waitFor } from 'storybook/test'
 import { AppHeader } from '@/components/app-header'
 import { HeaderTabs, headerTabsId } from '@/components/header-tabs'
 import { sessionHandlers } from '@/components/session/session-story-helpers'
-import { besideSidebar, darkMode, german, tablet } from '@/components/story-helpers'
+import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
 import { useBreadcrumbName } from '@/hooks/use-breadcrumb-name'
 import { sandboxAdminSession, seedSession, showcaseViewerSession } from '@edi-bridge/mocks'
 import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
@@ -38,6 +38,10 @@ function tabRow(canvasElement: HTMLElement) {
   return canvasElement.querySelector(`#${headerTabsId}`)
 }
 
+function headerActions(canvasElement: HTMLElement) {
+  return canvasElement.querySelector('[data-slot="header-actions"]')
+}
+
 const meta = preview.meta({
   title: 'Shell/AppHeader',
   component: AppHeader,
@@ -66,6 +70,7 @@ export const Admin = meta.story({
     await expect(canvas.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
     await expect(tabRow(canvasElement)).not.toBeVisible()
+    await expect(headerActions(canvasElement)).not.toBeVisible()
   },
 })
 
@@ -268,5 +273,28 @@ export const Tablet = meta.story({
         }),
       ).toBeVisible(),
     )
+    await expect(screen.getByRole('menuitem', { name: 'Versions' })).toBeVisible()
+    await expect(screen.queryByRole('menuitem', { name: 'Mappings' })).toBeNull()
+  },
+})
+
+export const Mobile = meta.story({
+  ...mobile,
+  parameters: {
+    ...mobile.parameters,
+    nextjs: { navigation: { pathname: '/channels/ch-1/edit' } },
+  },
+  beforeEach({ msw }) {
+    msw.use(...sessionHandlers(sandboxAdminSession))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('link', { name: 'All connections' })).toBeVisible()
+    await expect(canvas.getByRole('link', { name: 'Edit' })).toHaveAttribute('aria-current', 'page')
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Show the whole path' }))
+    await waitFor(async () =>
+      expect(await screen.findByRole('menuitem', { name: 'Details' })).toBeVisible(),
+    )
+    await expect(screen.queryByRole('menuitem', { name: 'All connections' })).toBeNull()
   },
 })

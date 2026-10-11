@@ -97,10 +97,22 @@ export const sidebarGroups: ReadonlyArray<SidebarGroup> = sidebarGroupSources.ma
   })),
 }))
 
+export const sidebarItems = sidebarGroups.flatMap((group) => group.items)
+
+export function sidebarItem(key: SidebarItemKey) {
+  const item = sidebarItems.find((entry) => entry.key === key)
+
+  if (!item) {
+    throw new Error(`No sidebar item for ${key}`)
+  }
+
+  return item
+}
+
 export function activeSidebarItem(pathname: string) {
   let active: SidebarItem | undefined
 
-  for (const item of sidebarGroups.flatMap((group) => group.items)) {
+  for (const item of sidebarItems) {
     if (isActivePath(pathname, item.href) && (!active || item.href.length > active.href.length)) {
       active = item
     }

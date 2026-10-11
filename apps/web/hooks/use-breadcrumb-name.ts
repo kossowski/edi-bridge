@@ -5,35 +5,35 @@ import { useEffect, useSyncExternalStore } from 'react'
 
 import { detailCrumbHref } from '@/lib/breadcrumb'
 
-type Names = ReadonlyMap<string, string>
+type BreadcrumbNames = ReadonlyMap<string, string>
 
-const noNames: Names = new Map()
+const noBreadcrumbNames: BreadcrumbNames = new Map()
 
-let names: Names = noNames
+let breadcrumbNames: BreadcrumbNames = noBreadcrumbNames
 
-const listeners = new Set<() => void>()
+const breadcrumbNameListeners = new Set<() => void>()
 
-function update(next: Names) {
-  names = next
+function updateBreadcrumbNames(next: BreadcrumbNames) {
+  breadcrumbNames = next
 
-  for (const listener of listeners) {
+  for (const listener of breadcrumbNameListeners) {
     listener()
   }
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener)
+function subscribeToBreadcrumbNames(listener: () => void) {
+  breadcrumbNameListeners.add(listener)
 
   return () => {
-    listeners.delete(listener)
+    breadcrumbNameListeners.delete(listener)
   }
 }
 
 export function useBreadcrumbNames() {
   return useSyncExternalStore(
-    subscribe,
-    () => names,
-    () => noNames,
+    subscribeToBreadcrumbNames,
+    () => breadcrumbNames,
+    () => noBreadcrumbNames,
   )
 }
 
@@ -45,12 +45,12 @@ export function useBreadcrumbName(name: string | undefined) {
       return
     }
 
-    update(new Map(names).set(href, name))
+    updateBreadcrumbNames(new Map(breadcrumbNames).set(href, name))
 
     return () => {
-      const next = new Map(names)
+      const next = new Map(breadcrumbNames)
       next.delete(href)
-      update(next)
+      updateBreadcrumbNames(next)
     }
   }, [href, name])
 }

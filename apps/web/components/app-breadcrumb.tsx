@@ -35,7 +35,7 @@ function useCrumbText() {
         return t(`Sidebar.items.${label.key}.label`)
       case 'session':
         return t(`Shell.session.${label.key}`)
-      case 'step':
+      case 'subpage':
         return t(`Breadcrumb.${label.key}`)
       case 'detail':
         return names.get(href) ?? t('Breadcrumb.details')
@@ -45,20 +45,34 @@ function useCrumbText() {
   }
 }
 
-function PathMenu({ crumbs, className }: { crumbs: ReadonlyArray<Crumb>; className: string }) {
+function shownFrom(index: number) {
+  return index === 0
+    ? { crumb: 'hidden @xs:inline-flex', separator: 'hidden @xs:block', hidden: '@xs:hidden' }
+    : { crumb: 'hidden @lg:inline-flex', separator: 'hidden @lg:block', hidden: '@lg:hidden' }
+}
+
+function pathMenuStarts(count: number) {
+  return Array.from({ length: count }, (_, index) => index).filter(
+    (index) => index === 0 || shownFrom(index).hidden !== shownFrom(index - 1).hidden,
+  )
+}
+
+function PathMenu({ crumbs, firstHidden }: { crumbs: ReadonlyArray<Crumb>; firstHidden: number }) {
   const t = useTranslations('Breadcrumb')
   const crumbText = useCrumbText()
+  const shownBefore = firstHidden > 0 ? shownFrom(firstHidden - 1) : undefined
+  const hiddenFrom = shownFrom(firstHidden).hidden
 
   return (
     <>
-      <BreadcrumbItem className={className}>
+      <BreadcrumbItem className={cn(shownBefore?.crumb, hiddenFrom)}>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={<Button size="icon-xs" variant="ghost" aria-label={t('showPath')} />}>
             <BreadcrumbEllipsis />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-auto max-w-80">
-            {crumbs.map((crumb) => (
+            {crumbs.slice(firstHidden).map((crumb) => (
               <DropdownMenuItem key={crumb.href} render={<Link href={crumb.href} />}>
                 <span className="truncate">{crumbText(crumb)}</span>
               </DropdownMenuItem>
@@ -66,7 +80,7 @@ function PathMenu({ crumbs, className }: { crumbs: ReadonlyArray<Crumb>; classNa
           </DropdownMenuContent>
         </DropdownMenu>
       </BreadcrumbItem>
-      <BreadcrumbSeparator className={className} />
+      <BreadcrumbSeparator className={cn(shownBefore?.separator, hiddenFrom)} />
     </>
   )
 }
@@ -83,25 +97,19 @@ export function AppBreadcrumb() {
       <BreadcrumbList className="flex-nowrap">
         {ancestors.map((crumb, index) => (
           <Fragment key={crumb.href}>
-            <BreadcrumbItem
-              className={cn('hidden min-w-0', index === 0 ? '@xs:inline-flex' : '@lg:inline-flex')}>
+            <BreadcrumbItem className={cn('min-w-0', shownFrom(index).crumb)}>
               <BreadcrumbLink
                 render={<Link href={crumb.href} />}
                 className="focus-visible:ring-ring/50 max-w-48 truncate rounded-sm outline-none focus-visible:ring-[3px]">
                 {crumbText(crumb)}
               </BreadcrumbLink>
             </BreadcrumbItem>
-            <BreadcrumbSeparator
-              className={cn('hidden', index === 0 ? '@xs:block' : '@lg:block')}
-            />
+            <BreadcrumbSeparator className={shownFrom(index).separator} />
           </Fragment>
         ))}
-        {ancestors.length > 0 && (
-          <PathMenu
-            crumbs={ancestors}
-            className={ancestors.length > 1 ? '@lg:hidden' : '@xs:hidden'}
-          />
-        )}
+        {pathMenuStarts(ancestors.length).map((firstHidden) => (
+          <PathMenu key={firstHidden} crumbs={ancestors} firstHidden={firstHidden} />
+        ))}
         {current && (
           <BreadcrumbItem className="min-w-0">
             <BreadcrumbPage className="truncate">{crumbText(current)}</BreadcrumbPage>
