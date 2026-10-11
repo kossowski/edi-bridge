@@ -2,16 +2,23 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { type FormEvent, useId, useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 
 import { CopyableValue, CopyButton } from '@/components/copy-button'
+import { Failure, Loading } from '@/components/detail-parts'
 import { RadioField, TextField } from '@/components/form-field'
+import { useValidatedSubmit } from '@/hooks/use-validated-submit'
 import { createInvite } from '@/lib/api/client'
-import { workspaceInvitesQuery } from '@/lib/api/queries'
+import { storeCreatedInvite, workspaceInvitesQuery } from '@/lib/api/queries'
 import { inviteStatus, validateInviteForm } from '@/lib/forms/operator'
-import { type Invite, workspaceRoles, type WorkspaceRole } from '@edi-bridge/contracts'
+import {
+  type Invite,
+  type InviteInput,
+  workspaceRoles,
+  type WorkspaceRole,
+} from '@edi-bridge/contracts'
+import { Alert, AlertDescription, AlertTitle } from '@edi-bridge/ui/components/alert'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import {
   Table,
   TableBody,
@@ -23,7 +30,13 @@ import {
 } from '@edi-bridge/ui/components/table'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-const columns = ['email', 'role', 'createdAt', 'expiresAt', 'status'] as const
+const columns = [
+  { key: 'email', className: '' },
+  { key: 'role', className: 'hidden @2xl:table-cell' },
+  { key: 'createdAt', className: 'hidden @2xl:table-cell' },
+  { key: 'expiresAt', className: 'hidden @2xl:table-cell' },
+  { key: 'status', className: '' },
+] as const
 
 function InviteRow({ invite, now }: { invite: Invite; now: Date }) {
   const t = useTranslations('Operator.invites')
@@ -34,21 +47,34 @@ function InviteRow({ invite, now }: { invite: Invite; now: Date }) {
 
   return (
     <TableRow>
-      <TableCell id={`${id}-email`} className="min-w-40 font-medium break-all whitespace-normal">
-        {invite.email}
+      <TableCell className="min-w-40 whitespace-normal">
+        <span id={`${id}-email`} className="font-medium wrap-anywhere">
+          {invite.email}
+        </span>
+        <span className="text-muted-foreground mt-0.5 block text-xs @2xl:hidden">
+          {t('details', {
+            role: t(`role.${invite.role}`),
+            createdAt: date(invite.createdAt),
+            expiresAt: date(invite.expiresAt),
+          })}
+        </span>
       </TableCell>
-      <TableCell>{t(`role.${invite.role}`)}</TableCell>
-      <TableCell className="tabular-nums">{date(invite.createdAt)}</TableCell>
-      <TableCell className="tabular-nums">{date(invite.expiresAt)}</TableCell>
-      <TableCell>
+      <TableCell className="hidden @2xl:table-cell">{t(`role.${invite.role}`)}</TableCell>
+      <TableCell className="hidden tabular-nums @2xl:table-cell">
+        {date(invite.createdAt)}
+      </TableCell>
+      <TableCell className="hidden tabular-nums @2xl:table-cell">
+        {date(invite.expiresAt)}
+      </TableCell>
+      <TableCell className="whitespace-normal">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span
             className={cn(
               status === 'accepted' && 'text-emerald-800 dark:text-emerald-300',
               status === 'expired' && 'text-muted-foreground',
             )}>
-            {status === 'accepted'
-              ? t('status.accepted', { date: date(invite.acceptedAt ?? invite.createdAt) })
+            {invite.acceptedAt !== null
+              ? t('status.accepted', { date: date(invite.acceptedAt) })
               : t(`status.${status}`)}
           </span>
           {status === 'pending' && (
@@ -66,25 +92,20 @@ function InviteList({ workspaceId }: { workspaceId: string }) {
   const invites = useQuery(workspaceInvitesQuery(workspaceId))
 
   if (invites.isPending) {
-    return (
-      <div aria-busy className="flex flex-col gap-2">
-        <p role="status" className="sr-only">
-          {t('loading')}
-        </p>
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    )
+    return <Loading label={t('loading')} rowClassName="h-10" rows={2} />
   }
 
   if (invites.isError) {
     return (
-      <div className="flex flex-col items-start gap-2">
-        <p className="text-sm text-red-800 dark:text-red-300">{t('failed')}</p>
-        <Button size="sm" variant="outline" onClick={() => void invites.refetch()}>
-          {t('retry')}
-        </Button>
-      </div>
+      <Failure
+        error={{
+          title: t('error.title'),
+          description: t('error.description'),
+          retry: t('error.retry'),
+        }}
+        notFound={null}
+        onRetry={() => void invites.refetch()}
+      />
     )
   }
 
@@ -95,14 +116,14 @@ function InviteList({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-muted-foreground text-sm">{t('count', { count: invites.data.length })}</p>
-      <div className="rounded-lg border">
+      <div className="@container rounded-lg border">
         <Table>
           <TableCaption className="sr-only">{t('caption')}</TableCaption>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column} scope="col">
-                  {t(`columns.${column}`)}
+                <TableHead key={column.key} scope="col" className={column.className}>
+                  {t(`columns.${column.key}`)}
                 </TableHead>
               ))}
             </TableRow>
@@ -126,41 +147,25 @@ function CreateInviteForm({ workspaceId }: { workspaceId: string }) {
   const emailInput = useRef<HTMLInputElement>(null)
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<WorkspaceRole>('viewer')
-  const [submitted, setSubmitted] = useState(false)
 
   const create = useMutation({
-    mutationFn: (input: Parameters<typeof createInvite>[1]) => createInvite(workspaceId, input),
+    mutationFn: (input: InviteInput) => createInvite(workspaceId, input),
     onSuccess: (invite) => {
-      queryClient.setQueryData<Invite[]>(
-        workspaceInvitesQuery(workspaceId).queryKey,
-        (invites) => invites && [invite, ...invites],
-      )
+      storeCreatedInvite(queryClient, workspaceId, invite)
       setEmail('')
-      setSubmitted(false)
     },
   })
 
   const result = validateInviteForm({ email, role })
+
+  const { submitted, submit } = useValidatedSubmit({
+    result,
+    mutation: create,
+    firstInvalid: emailInput,
+  })
+
   const emailError = submitted && 'error' in result ? t(`errors.${result.error}`) : null
   const invite = create.data
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (create.isPending) {
-      return
-    }
-
-    setSubmitted(true)
-
-    if ('error' in result) {
-      emailInput.current?.focus()
-
-      return
-    }
-
-    create.mutate(result.input)
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -213,17 +218,17 @@ function CreateInviteForm({ workspaceId }: { workspaceId: string }) {
         {invite && t('created.announcement', { email: invite.email })}
       </p>
       {invite && (
-        <div className="flex max-w-xl flex-col gap-3 rounded-lg border border-emerald-700/40 bg-emerald-500/10 p-4">
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium">{t('created.title', { email: invite.email })}</p>
-            <p className="text-sm">
+        <Alert role={undefined} variant="success" className="max-w-xl">
+          <AlertTitle>{t('created.title', { email: invite.email })}</AlertTitle>
+          <AlertDescription className="flex flex-col gap-3">
+            <div>
               {t('created.description', {
                 date: format.dateTime(new Date(invite.expiresAt), { dateStyle: 'medium' }),
               })}
-            </p>
-          </div>
-          <CopyableValue label={t('created.linkLabel')} value={invite.link} />
-        </div>
+            </div>
+            <CopyableValue label={t('created.linkLabel')} value={invite.link} />
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   )

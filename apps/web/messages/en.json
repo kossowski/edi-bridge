@@ -2192,6 +2192,13 @@
       "showcase": "Showcase",
       "sandbox": "Sandbox"
     },
+    "values": {
+      "noGln": "No GLN",
+      "seeded": {
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
     "workspaces": {
       "title": "Workspaces",
       "subtitle": "Every Workspace on the platform. Create a Workspace, then invite its users.",
@@ -2202,11 +2209,6 @@
       "filteredCount": "{count} of {total} Workspaces",
       "search": "Search by name or GLN",
       "noMatch": "No Workspace matches the search.",
-      "noGln": "No GLN",
-      "seeded": {
-        "yes": "Yes",
-        "no": "No"
-      },
       "columns": {
         "name": "Name",
         "kind": "Kind",
@@ -2277,9 +2279,13 @@
       "loading": "Loading invites",
       "count": "{count, plural, one {# invite} other {# invites}}",
       "empty": "No invites yet.",
-      "failed": "The invites could not be loaded.",
-      "retry": "Try again",
+      "error": {
+        "title": "Invites unavailable",
+        "description": "The invites could not be loaded.",
+        "retry": "Try again"
+      },
       "linkLabel": "link",
+      "details": "{role} · Created {createdAt} · Expires {expiresAt}",
       "columns": {
         "email": "Email",
         "role": "Role",

@@ -2192,6 +2192,13 @@
       "showcase": "Showcase",
       "sandbox": "Sandbox"
     },
+    "values": {
+      "noGln": "Keine GLN",
+      "seeded": {
+        "yes": "Ja",
+        "no": "Nein"
+      }
+    },
     "workspaces": {
       "title": "Workspaces",
       "subtitle": "Alle Workspaces der Plattform. Legen Sie einen Workspace an und laden Sie danach seine Benutzer ein.",
@@ -2202,11 +2209,6 @@
       "filteredCount": "{count} von {total} Workspaces",
       "search": "Nach Name oder GLN suchen",
       "noMatch": "Kein Workspace passt zur Suche.",
-      "noGln": "Keine GLN",
-      "seeded": {
-        "yes": "Ja",
-        "no": "Nein"
-      },
       "columns": {
         "name": "Name",
         "kind": "Art",
@@ -2277,9 +2279,13 @@
       "loading": "Einladungen werden geladen",
       "count": "{count, plural, one {# Einladung} other {# Einladungen}}",
       "empty": "Noch keine Einladungen.",
-      "failed": "Die Einladungen konnten nicht geladen werden.",
-      "retry": "Erneut versuchen",
+      "error": {
+        "title": "Einladungen nicht verfügbar",
+        "description": "Die Einladungen konnten nicht geladen werden.",
+        "retry": "Erneut versuchen"
+      },
       "linkLabel": "Link",
+      "details": "{role} · Erstellt {createdAt} · Läuft ab {expiresAt}",
       "columns": {
         "email": "E-Mail",
         "role": "Rolle",

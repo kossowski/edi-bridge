@@ -10,6 +10,7 @@ import type {
   DocumentStructure,
   DocumentStructureOrigin,
   Flow,
+  Invite,
   LookupTable,
   MappingComparisonQuery,
   MappingDraft,
@@ -19,9 +20,11 @@ import type {
   OverviewWindow,
   RunListQuery,
   TradingPartner,
+  WorkspaceSettings,
   WorkspaceSummary,
 } from '@edi-bridge/contracts'
 
+import { compareWorkspaceNames } from '../forms/operator'
 import {
   compareMappingVersions,
   getChannel,
@@ -73,9 +76,8 @@ export const workspaceSettingsQuery = queryOptions({
 export const operatorKeys = {
   all: () => ['operator', 'workspaces'] as const,
   list: () => [...operatorKeys.all(), 'list'] as const,
-  detail: (id: string) => [...operatorKeys.all(), 'detail', id] as const,
-  invites: (id: string) => [...operatorKeys.detail(id), 'invites'] as const,
-  settings: (id: string) => [...operatorKeys.detail(id), 'settings'] as const,
+  invites: (id: string) => [...operatorKeys.all(), id, 'invites'] as const,
+  settings: (id: string) => [...operatorKeys.all(), id, 'settings'] as const,
 }
 
 export const operatorWorkspacesQuery = queryOptions({
@@ -97,13 +99,45 @@ export function operatorWorkspaceSettingsQuery(workspaceId: string) {
   })
 }
 
+export function storeSavedWorkspaceSettings(
+  queryClient: QueryClient,
+  saved: WorkspaceSettings,
+  workspaceId: string | undefined,
+) {
+  queryClient.setQueryData(workspaceSettingsQuery.queryKey, saved)
+
+  if (workspaceId !== undefined) {
+    void queryClient.invalidateQueries({ queryKey: operatorKeys.settings(workspaceId) })
+  }
+}
+
 export function storeCreatedWorkspace(queryClient: QueryClient, created: WorkspaceSummary) {
   queryClient.setQueryData<WorkspaceSummary[]>(
     operatorWorkspacesQuery.queryKey,
     (workspaces) =>
-      workspaces && [...workspaces, created].sort((a, b) => a.name.localeCompare(b.name, 'de')),
+      workspaces && [...workspaces, created].sort((a, b) => compareWorkspaceNames(a.name, b.name)),
   )
   void queryClient.invalidateQueries({ queryKey: operatorWorkspacesQuery.queryKey })
+}
+
+export function storeCreatedInvite(queryClient: QueryClient, workspaceId: string, created: Invite) {
+  queryClient.setQueryData<Invite[]>(
+    workspaceInvitesQuery(workspaceId).queryKey,
+    (invites) => invites && [created, ...invites],
+  )
+}
+
+export function storeSavedOperatorWorkspaceSettings(
+  queryClient: QueryClient,
+  workspaceId: string,
+  saved: WorkspaceSettings,
+  currentWorkspaceId: string | undefined,
+) {
+  queryClient.setQueryData(operatorWorkspaceSettingsQuery(workspaceId).queryKey, saved)
+
+  if (currentWorkspaceId === workspaceId) {
+    void queryClient.invalidateQueries({ queryKey: workspaceSettingsQuery.queryKey })
+  }
 }
 
 export const overviewKeys = {

@@ -109,11 +109,29 @@ export const Default = meta.story({
       await canvas.findByRole('heading', { level: 1, name: seedWorkspace.name }),
     ).toBeVisible()
     await expect(canvas.getByText(seedWorkspace.gln ?? '')).toBeVisible()
-    await expect(await canvas.findByRole('cell', { name: pendingEmail })).toBeVisible()
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
     await expect(canvas.getByText('4 invites')).toBeVisible()
     await expect(canvas.getAllByRole('button', { name: 'Copy link' })).toHaveLength(1)
     await expect(canvas.getByText(/No email is sent/)).toBeVisible()
     await expect(await canvas.findByLabelText('Retention period in days')).toHaveValue('90')
+  },
+})
+
+export const InvitesOnPhone = meta.story({
+  parameters: {
+    viewport: {
+      options: { phone: { name: 'Phone', styles: { width: '390px', height: '844px' } } },
+    },
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  async play({ canvas }) {
+    const table = await canvas.findByRole('table', { name: /Invites of this Workspace/ })
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
+    await expect(canvas.getByRole('columnheader', { name: 'Status' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Copy link' })).toBeVisible()
+    await expect(canvas.getAllByText(/^Viewer · Created .+ · Expires .+$/)[0]).toBeVisible()
+    await expect(canvas.queryByRole('columnheader', { name: 'Role' })).toBeNull()
+    await expect(table.scrollWidth).toBeLessThanOrEqual(table.parentElement!.clientWidth)
   },
 })
 
@@ -198,9 +216,7 @@ export const CreateInviteAndCopyLink = meta.story({
       await canvas.findByText('Invite for ana.berg@nordwind-handel.example created'),
     ).toBeVisible()
     await expect(email).toHaveValue('')
-    await expect(
-      await canvas.findByRole('cell', { name: 'ana.berg@nordwind-handel.example' }),
-    ).toBeVisible()
+    await expect(await canvas.findByText('ana.berg@nordwind-handel.example')).toBeVisible()
 
     const link = canvas.getByText(/\/invite\//, { selector: 'code' })
     await userEvent.click(canvas.getByRole('button', { name: 'Copy invite link' }))
@@ -302,7 +318,7 @@ export const German = meta.story({
   decorators: [german],
   async play({ canvas }) {
     await expect(await canvas.findByRole('heading', { name: 'Einladungen' })).toBeVisible()
-    await expect(await canvas.findByRole('cell', { name: pendingEmail })).toBeVisible()
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Link kopieren' })).toBeVisible()
     await expect(canvas.getByRole('radio', { name: 'Viewer' })).toBeChecked()
   },
@@ -315,7 +331,7 @@ export const Dark = meta.story({
     return () => document.documentElement.classList.remove('dark')
   },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('cell', { name: pendingEmail })).toBeVisible()
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
     await waitFor(() => expect(canvas.getByLabelText('Retention period in days')).toBeVisible())
   },
 })

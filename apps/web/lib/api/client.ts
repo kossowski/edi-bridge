@@ -183,6 +183,10 @@ export function isUnauthorized(error: Error | null) {
   return error instanceof ApiError && error.status === 401
 }
 
+export function isConflict(error: Error | null) {
+  return error instanceof ApiError && error.status === 409
+}
+
 export function getCurrentWorkspace() {
   return request(currentWorkspaceEndpoint)
 }

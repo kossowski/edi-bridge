@@ -2,10 +2,11 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { type FormEvent, type RefObject, useId, useRef, useState } from 'react'
+import { type RefObject, useId, useRef, useState } from 'react'
 
 import { TextField } from '@/components/form-field'
-import { ApiError, createWorkspace } from '@/lib/api/client'
+import { useValidatedSubmit } from '@/hooks/use-validated-submit'
+import { createWorkspace, isConflict } from '@/lib/api/client'
 import { storeCreatedWorkspace } from '@/lib/api/queries'
 import { sameWorkspaceName, validateWorkspaceForm } from '@/lib/forms/operator'
 import { maxWorkspaceNameLength, type WorkspaceSummary } from '@edi-bridge/contracts'
@@ -28,7 +29,6 @@ function CreateWorkspaceForm({ onCreated }: { onCreated: (created: WorkspaceSumm
   const nameInput = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
   const [seed, setSeed] = useState(true)
-  const [submitted, setSubmitted] = useState(false)
   const [taken, setTaken] = useState<string | null>(null)
 
   const create = useMutation({
@@ -38,7 +38,7 @@ function CreateWorkspaceForm({ onCreated }: { onCreated: (created: WorkspaceSumm
       onCreated(created)
     },
     onError: (error, input) => {
-      if (error instanceof ApiError && error.status === 409) {
+      if (isConflict(error)) {
         setTaken(input.name)
         nameInput.current?.focus()
       }
@@ -47,30 +47,18 @@ function CreateWorkspaceForm({ onCreated }: { onCreated: (created: WorkspaceSumm
 
   const result = validateWorkspaceForm({ name, seed })
 
+  const { submitted, submit } = useValidatedSubmit({
+    result,
+    mutation: create,
+    firstInvalid: nameInput,
+  })
+
   const nameError =
     submitted && 'error' in result
       ? t(`errors.${result.error}`, { max: maxWorkspaceNameLength })
       : taken !== null && sameWorkspaceName(name, taken)
         ? t('errors.taken')
         : null
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (create.isPending) {
-      return
-    }
-
-    setSubmitted(true)
-
-    if ('error' in result) {
-      nameInput.current?.focus()
-
-      return
-    }
-
-    create.mutate(result.input)
-  }
 
   return (
     <form noValidate aria-busy={create.isPending} className="flex flex-col gap-4" onSubmit={submit}>
@@ -98,7 +86,7 @@ function CreateWorkspaceForm({ onCreated }: { onCreated: (created: WorkspaceSumm
           {t('seed.description')}
         </p>
       </div>
-      {create.isError && !(create.error instanceof ApiError && create.error.status === 409) && (
+      {create.isError && !isConflict(create.error) && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('errors.failed')}
         </p>

@@ -1,11 +1,17 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 
 import { BackLink, Fact, Failure } from '@/components/detail-parts'
 import { WorkspaceInvites } from '@/components/operator/workspace-invites'
 import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
+import {
+  WorkspaceCreatedAt,
+  WorkspaceGln,
+  WorkspaceMembers,
+  WorkspaceSeeded,
+} from '@/components/operator/workspace-values'
 import { RetentionAndBudgetForm } from '@/components/settings/retention-and-budget-form'
 import { SettingsSection } from '@/components/settings/settings-section'
 import { useSession } from '@/hooks/use-session'
@@ -13,7 +19,7 @@ import { updateOperatorWorkspaceSettings } from '@/lib/api/client'
 import {
   operatorWorkspaceSettingsQuery,
   operatorWorkspacesQuery,
-  workspaceSettingsQuery,
+  storeSavedOperatorWorkspaceSettings,
 } from '@/lib/api/queries'
 import { Separator } from '@edi-bridge/ui/components/separator'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
@@ -22,24 +28,22 @@ import type { WorkspaceSettingsInput, WorkspaceSummary } from '@edi-bridge/contr
 
 function WorkspaceFacts({ workspace }: { workspace: WorkspaceSummary }) {
   const t = useTranslations('Operator.workspace.facts')
-  const tList = useTranslations('Operator.workspaces')
-  const format = useFormatter()
 
   return (
     <dl
       aria-label={t('label')}
       className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
       <Fact label={t('gln')}>
-        {workspace.gln ? (
-          <span className="font-mono tabular-nums">{workspace.gln}</span>
-        ) : (
-          <span className="text-muted-foreground">{tList('noGln')}</span>
-        )}
+        <WorkspaceGln gln={workspace.gln} />
       </Fact>
-      <Fact label={t('members')}>{format.number(workspace.memberCount)}</Fact>
-      <Fact label={t('seeded')}>{workspace.seeded ? tList('seeded.yes') : tList('seeded.no')}</Fact>
+      <Fact label={t('members')}>
+        <WorkspaceMembers count={workspace.memberCount} />
+      </Fact>
+      <Fact label={t('seeded')}>
+        <WorkspaceSeeded seeded={workspace.seeded} />
+      </Fact>
       <Fact label={t('createdAt')}>
-        {format.dateTime(new Date(workspace.createdAt), { dateStyle: 'medium' })}
+        <WorkspaceCreatedAt createdAt={workspace.createdAt} />
       </Fact>
     </dl>
   )
@@ -49,16 +53,11 @@ function WorkspaceSettingsSection({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Operator.settings')
   const queryClient = useQueryClient()
   const { session } = useSession()
-  const settingsQuery = operatorWorkspaceSettingsQuery(workspaceId)
-  const { data, status, refetch } = useQuery(settingsQuery)
+  const { data, status, refetch } = useQuery(operatorWorkspaceSettingsQuery(workspaceId))
 
   async function save(input: WorkspaceSettingsInput) {
     const updated = await updateOperatorWorkspaceSettings(workspaceId, input)
-    queryClient.setQueryData(settingsQuery.queryKey, updated)
-
-    if (session?.workspace.id === workspaceId) {
-      void queryClient.invalidateQueries({ queryKey: workspaceSettingsQuery.queryKey })
-    }
+    storeSavedOperatorWorkspaceSettings(queryClient, workspaceId, updated, session?.workspace.id)
 
     return updated
   }

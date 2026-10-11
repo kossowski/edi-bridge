@@ -53,6 +53,12 @@ export function inviteStatus(invite: Invite, now: Date): InviteStatus {
   return Date.parse(invite.expiresAt) <= now.getTime() ? 'expired' : 'pending'
 }
 
+const workspaceNameCollator = new Intl.Collator('de', { sensitivity: 'accent' })
+
+export function compareWorkspaceNames(a: string, b: string) {
+  return workspaceNameCollator.compare(a, b)
+}
+
 export function sameWorkspaceName(a: string, b: string) {
-  return a.trim().localeCompare(b.trim(), 'de', { sensitivity: 'accent' }) === 0
+  return compareWorkspaceNames(a.trim(), b.trim()) === 0
 }

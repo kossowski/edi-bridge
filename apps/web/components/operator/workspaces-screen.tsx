@@ -3,7 +3,7 @@
 import { Add01Icon, Building03Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { type Ref, useRef, useState } from 'react'
 
@@ -11,7 +11,14 @@ import { linkClass, rowLinkClass } from '@/components/detail-parts'
 import { ListScreen, ListTable } from '@/components/list-screen'
 import { CreateWorkspaceDialog } from '@/components/operator/create-workspace-dialog'
 import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
+import {
+  WorkspaceCreatedAt,
+  WorkspaceGln,
+  WorkspaceMembers,
+  WorkspaceSeeded,
+} from '@/components/operator/workspace-values'
 import { operatorWorkspacesQuery } from '@/lib/api/queries'
+import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Button } from '@edi-bridge/ui/components/button'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 
@@ -20,9 +27,6 @@ import type { WorkspaceSummary } from '@edi-bridge/contracts'
 const columns = ['name', 'kind', 'gln', 'members', 'seeded', 'createdAt'] as const
 
 function WorkspaceRow({ workspace }: { workspace: WorkspaceSummary }) {
-  const t = useTranslations('Operator.workspaces')
-  const format = useFormatter()
-
   return (
     <TableRow className="relative">
       <TableCell className="max-w-72 truncate">
@@ -33,13 +37,17 @@ function WorkspaceRow({ workspace }: { workspace: WorkspaceSummary }) {
       <TableCell>
         <WorkspaceKindBadge kind={workspace.kind} />
       </TableCell>
-      <TableCell className="font-mono tabular-nums">
-        {workspace.gln ?? <span className="text-muted-foreground font-sans">{t('noGln')}</span>}
+      <TableCell>
+        <WorkspaceGln gln={workspace.gln} />
       </TableCell>
-      <TableCell className="tabular-nums">{format.number(workspace.memberCount)}</TableCell>
-      <TableCell>{workspace.seeded ? t('seeded.yes') : t('seeded.no')}</TableCell>
-      <TableCell className="tabular-nums">
-        {format.dateTime(new Date(workspace.createdAt), { dateStyle: 'medium' })}
+      <TableCell>
+        <WorkspaceMembers count={workspace.memberCount} />
+      </TableCell>
+      <TableCell>
+        <WorkspaceSeeded seeded={workspace.seeded} />
+      </TableCell>
+      <TableCell>
+        <WorkspaceCreatedAt createdAt={workspace.createdAt} />
       </TableCell>
     </TableRow>
   )
@@ -84,12 +92,14 @@ export function WorkspacesScreen() {
       title={t('title')}>
       <div role="status">
         {created && (
-          <p className="rounded-lg border border-emerald-700/40 bg-emerald-500/10 p-3 text-sm">
-            {t('created', { name: created.name })}{' '}
-            <Link href={`/operator/workspaces/${created.id}`} className={linkClass}>
-              {t('open', { name: created.name })}
-            </Link>
-          </p>
+          <Alert role={undefined} variant="success">
+            <AlertDescription>
+              {t('created', { name: created.name })}{' '}
+              <Link href={`/operator/workspaces/${created.id}`} className={linkClass}>
+                {t('open', { name: created.name })}
+              </Link>
+            </AlertDescription>
+          </Alert>
         )}
       </div>
       <ListTable
