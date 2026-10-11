@@ -153,7 +153,7 @@ export function CsvSettingsFacts({ id, csv }: { id: string; csv: CsvSettings }) 
         <h2 id={id} className="font-semibold">
           {t('title')}
         </h2>
-        <p className="text-muted-foreground max-w-prose text-sm">{t('readDescription')}</p>
+        <p className="text-muted-foreground max-w-prose text-sm">{t('viewOnlyDescription')}</p>
       </div>
       <dl className="grid gap-4 sm:grid-cols-3">
         <Fact label={t('delimiter')}>{t(`delimiters.${delimiterKeys[csv.delimiter]}`)}</Fact>

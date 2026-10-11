@@ -268,7 +268,9 @@ function StructureView({ structure }: { structure: DocumentStructure }) {
           <h2 id={`${id}-fields`} className="font-semibold">
             {t('fields')}
           </h2>
-          <p className="text-muted-foreground max-w-prose text-sm">{t('readFieldsDescription')}</p>
+          <p className="text-muted-foreground max-w-prose text-sm">
+            {t('viewOnlyFieldsDescription')}
+          </p>
         </div>
         <StructureTreeGrid name={structure.name} tree={structure} />
       </section>

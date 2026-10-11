@@ -1679,7 +1679,7 @@
       "reading": "Reading the CSV Document…",
       "unread": "The fields appear once EDI Bridge can read the CSV Document. Adjust the CSV settings or choose another CSV Document."
     },
-    "readFieldsDescription": "The fields EDI Bridge expects in Documents of this Document Structure, with their type and whether they are required or repeat."
+    "viewOnlyFieldsDescription": "The fields EDI Bridge expects in Documents of this Document Structure, with their type and whether they are required or repeat."
   },
   "DocumentStructureForm": {
     "createTitle": "New Document Structure",
@@ -1728,7 +1728,7 @@
   "DocumentStructureTree": {
     "label": "Fields of {name}",
     "hint": "Use the arrow keys to move between rows and to open or close objects. Press Tab to reach the settings of the current row and Escape to return to the row.",
-    "readHint": "Use the arrow keys to move between rows and to open or close objects.",
+    "viewOnlyHint": "Use the arrow keys to move between rows and to open or close objects.",
     "expandAll": "Expand all",
     "collapseAll": "Collapse all",
     "columns": {
@@ -1783,7 +1783,7 @@
       "none": "The CSV Document has no rows below the header row.",
       "column": "Column {number}"
     },
-    "readDescription": "EDI Bridge reads CSV Documents of this Document Structure with these settings.",
+    "viewOnlyDescription": "EDI Bridge reads CSV Documents of this Document Structure with these settings.",
     "headerRowFact": "Header row",
     "headerRowPresent": "The first row names the columns",
     "headerRowAbsent": "None, the columns are named column1, column2 and so on"

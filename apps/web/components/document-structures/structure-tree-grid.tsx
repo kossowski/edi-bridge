@@ -397,7 +397,7 @@ export function StructureTreeGrid({
     <div ref={container} className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p id={hintId} className="text-muted-foreground max-w-prose text-sm">
-          {editing ? t('hint') : t('readHint')}
+          {editing ? t('hint') : t('viewOnlyHint')}
         </p>
         <div className="flex gap-2">
           <Button
