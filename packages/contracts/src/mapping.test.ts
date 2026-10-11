@@ -20,6 +20,7 @@ const outbound: MappingDraft = {
   updatedAt: '2026-09-14T08:30:00.000Z',
   latestVersion: 2,
   unpublishedChanges: false,
+  aiReview: null,
 }
 
 const inbound: MappingDraft = {
@@ -38,6 +39,7 @@ const inbound: MappingDraft = {
   updatedAt: '2026-09-14T08:30:00.000Z',
   latestVersion: 2,
   unpublishedChanges: false,
+  aiReview: null,
 }
 
 describe('mappingDraftSchema', () => {
@@ -68,6 +70,50 @@ describe('mappingDraftSchema', () => {
 
   it('rejects a Draft that was never published but has no unpublished changes', () => {
     const draft = { ...outbound, latestVersion: null, unpublishedChanges: false }
+
+    expect(mappingDraftSchema.safeParse(draft).success).toBe(false)
+  })
+
+  it('reads a Draft from before AI drafting as one without an AI review', () => {
+    const withoutReview: Partial<MappingDraft> = { ...outbound }
+    delete withoutReview.aiReview
+
+    expect(mappingDraftSchema.parse(withoutReview)).toEqual({ ...outbound, aiReview: null })
+  })
+
+  it('accepts a Draft whose open AI review marks parts the Draft has', () => {
+    const draft = {
+      ...outbound,
+      ...graph({ links: outbound.links }),
+      unpublishedChanges: true,
+      aiReview: {
+        sampleId: '00000008-0000-4000-8000-000000000001',
+        proposedLinks: ['BGM/1004'],
+        proposedTransforms: [dateFormat.id],
+        proposedTransformLinks: [`input:${dateFormat.id}/value`, 'target:DTM+137/C507/2380'],
+      },
+    }
+
+    expect(mappingDraftSchema.parse(draft)).toEqual(draft)
+  })
+
+  it.each([
+    ['a link', { proposedLinks: ['BGM/1001'] }],
+    ['a transform', { proposedTransforms: ['0000000a-0000-4000-8000-000000000009'] }],
+    ['a transform link', { proposedTransformLinks: ['target:BGM/1004'] }],
+  ])('rejects an AI review that marks %s the Draft does not have', (_, marks) => {
+    const draft = {
+      ...outbound,
+      ...graph({ links: outbound.links }),
+      unpublishedChanges: true,
+      aiReview: {
+        sampleId: '00000008-0000-4000-8000-000000000001',
+        proposedLinks: [],
+        proposedTransforms: [],
+        proposedTransformLinks: [],
+        ...marks,
+      },
+    }
 
     expect(mappingDraftSchema.safeParse(draft).success).toBe(false)
   })

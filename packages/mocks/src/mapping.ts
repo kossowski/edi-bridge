@@ -2,6 +2,7 @@ import { en, Faker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
 import {
+  type AiReview,
   directionOf,
   type DocumentStructure,
   type MappingDraft,
@@ -17,6 +18,7 @@ import {
   mappingTransformSchema,
   type MessageType,
   messageTypes,
+  remainingAiReview,
   saveMappingDraftEndpoint,
   type TransformConfig,
   type TransformKind,
@@ -52,6 +54,7 @@ export type MappingDraftRecord = {
   transforms: ReadonlyArray<MappingTransform>
   transformLinks: ReadonlyArray<TransformLink>
   updatedAt: string
+  aiReview?: AiReview | null
 }
 
 type DocumentStructures = ReadonlyArray<DocumentStructure>
@@ -162,7 +165,10 @@ export function oriented<Side>(
     : { source: document, target: edifact }
 }
 
-function link(messageType: MessageType, [field, element]: readonly [string, string]): MappingLink {
+export function link(
+  messageType: MessageType,
+  [field, element]: readonly [string, string],
+): MappingLink {
   const { source, target } = oriented(messageType, { document: field, edifact: element })
 
   return { sourcePath: source, targetPath: target }
@@ -325,7 +331,7 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
   ],
 }
 
-type TransformGraph = Pick<MappingGraph, 'transforms' | 'transformLinks'>
+export type TransformGraph = Pick<MappingGraph, 'transforms' | 'transformLinks'>
 
 function transformOnGrid(
   id: string,
@@ -340,10 +346,15 @@ function transformOnGrid(
   })
 }
 
-function templateGraph(mappingId: string, messageType: MessageType, share: number): TransformGraph {
+export function templateGraph(
+  mappingId: string,
+  messageType: MessageType,
+  share: number,
+  idKey = 'transform',
+): TransformGraph {
   const template = transformTemplates[messageType]
   const chosen = template.slice(0, Math.round(template.length * share))
-  const ids = chosen.map((_, index) => stableUuid(`${mappingId}:transform:${index}`))
+  const ids = chosen.map((_, index) => stableUuid(`${mappingId}:${idKey}:${index}`))
 
   const transformLinks = chosen.flatMap(
     ({ inputs = {}, feedingTransformIndex = {}, outputs = {} }, index): TransformLink[] => {
@@ -377,7 +388,7 @@ function templateGraph(mappingId: string, messageType: MessageType, share: numbe
 }
 
 // Dropping a transform can leave the one it fed unconnected, so this repeats until none is left.
-function withoutInvalidTransforms(graph: TransformGraph): TransformGraph {
+export function withoutInvalidTransforms(graph: TransformGraph): TransformGraph {
   const invalid = new Set(
     Object.entries(transformIssues(graph))
       .filter(([, issues]) => issues.length > 0)
@@ -661,6 +672,7 @@ export function toMappingDraft(
     updatedAt: record.updatedAt,
     latestVersion: record.latestVersion,
     unpublishedChanges: record.unpublishedChanges,
+    aiReview: record.aiReview ?? null,
     ...oriented<MappingSide>(record.messageType, {
       document: {
         kind: 'documentStructure',
@@ -812,6 +824,9 @@ export function mappingHandlers(
         const record = {
           ...existing,
           ...body.data,
+          aiReview: existing.aiReview
+            ? remainingAiReview(existing.aiReview, existing, body.data)
+            : null,
           unpublishedChanges: true,
           updatedAt: new Date().toISOString(),
         }

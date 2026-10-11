@@ -1,8 +1,7 @@
 import { z } from 'zod'
 
+import { type EventStreamEndpoint, parseStreamEvent } from './endpoint'
 import { runSummarySchema } from './run'
-
-import type { EventStreamEndpoint } from './endpoint'
 
 export const runChangedEventSchema = z.object({
   type: z.literal('run.changed'),
@@ -23,15 +22,5 @@ export const liveEventsEndpoint: EventStreamEndpoint<LiveEvent> = {
 }
 
 export function parseLiveEvent(data: string): LiveEvent | null {
-  let json: unknown
-
-  try {
-    json = JSON.parse(data)
-  } catch {
-    return null
-  }
-
-  const event = liveEventsEndpoint.event.safeParse(json)
-
-  return event.success ? event.data : null
+  return parseStreamEvent(liveEventsEndpoint, data)
 }

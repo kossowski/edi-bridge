@@ -14,7 +14,7 @@ Existing commercial tools (e.g. Lobster) solve this, but they are closed and hea
 
 EDI Bridge is an open-source integration platform that receives Documents on Channels (SFTP, webhook, Manual Submission), routes them through Flows, converts them with versioned Mappings between JSON/CSV and EDIFACT in both directions, validates outgoing EDIFACT, delivers it on outbound Channels (SFTP, HTTP), and tracks Acknowledgements.
 
-- **Integration engineers** onboard Trading Partners (identity, Test Mode, onboarding checklist), build Mappings on a drag-and-drop canvas (or let the AI draft one for review link by link), maintain Lookup Tables, and publish immutable Mapping Versions.
+- **Integration engineers** onboard Trading Partners (identity, Test Mode, onboarding checklist), build Mappings on a drag-and-drop canvas (or let the AI draft one and review the Draft as a whole), maintain Lookup Tables, and publish immutable Mapping Versions.
 - **Operations staff** watch live traffic, inspect each Run (step timeline, raw Interchange with the error position highlighted, parsed tree), Retry delivery failures, Reprocess mapping failures with a chosen Mapping Version, and see Duplicates and Overdue Acknowledgements.
 - **Business users** search by Business Reference and see the Order Lifecycle (ORDERS → DESADV → INVOIC with Acknowledgements).
 
@@ -83,8 +83,8 @@ The platform is fully usable on its own. A separately maintained Partner Simulat
 ### AI-drafted Mappings
 
 45. As an Admin, I want the AI to propose a Mapping from a sample Document and a target Message Type, so that I start from a draft rather than a blank canvas.
-46. As an Admin, I want AI-proposed links to appear on the canvas as they are produced, so that I can follow what the AI is doing.
-47. As an Admin, I want each AI-proposed link marked as such and individually accepted or rejected, so that nothing the AI made goes live unreviewed.
+46. As an Admin, I want to see the AI's progress steps while it drafts, so that I can follow what it is doing during a run that takes minutes.
+47. As an Admin, I want AI-proposed links marked as such, the links that need attention listed first, and to reject or edit individual links before accepting the Draft as a whole, so that nothing the AI made goes live unreviewed without clicking through every link.
 48. As an Admin, I want the AI to check its own draft against the sample and fix validation errors before presenting it, so that drafts are mostly correct.
 49. As the Operator, I want a daily AI token budget per Workspace, so that the shared showcase-admin login can't exhaust the API budget.
 50. As a Viewer, I want AI features unavailable, so that read-only access has no cost.
@@ -179,7 +179,7 @@ The platform is fully usable on its own. A separately maintained Partner Simulat
 - Outbound: one Message per Interchange.
 - Linking: the Business Reference (order number from BGM or RFF+ON) links Messages into an Order Lifecycle. The Interchange control reference links a CONTRL to the sent Interchange.
 - Mapping: a declarative, versioned document validated by a Zod schema; transform nodes from the fixed catalogue; JSONata as the only expression language. One Draft per Mapping; publishing creates an immutable Mapping Version; Flows pin a Mapping Version; Runs record the version they used.
-- The AI produces a flat list of proposed links (not the nested Mapping) via structured output. The links are converted into a Draft and marked as AI-proposed until accepted or rejected. The model has tools to look up segment definitions and to run its draft against the sample.
+- The AI produces a flat list of proposed links (not the nested Mapping) via structured output. The links are converted into a Draft and marked as AI-proposed until the Admin accepts the Draft; individual links can be rejected or edited before that. A Draft with an open AI review can't be published; after acceptance it stays an editable Draft. The client sees progress steps during the run and receives the links only after they pass the check against the Sample Document. The model has tools to look up segment definitions and to run its draft against the sample.
 - Document Structures describe JSON and CSV Documents on either side of a Mapping, inferred from a sample or created from a JSON Schema. Every source format is parsed into one common tree, so XML can be added later without redesign.
 - Trading Partner holds GLN, syntax settings, Test Mode, Acknowledgement time limit and onboarding state. The Workspace holds the company's own GLN.
 - Lookup Tables belong to a Workspace or to a single Trading Partner.

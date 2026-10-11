@@ -58,7 +58,7 @@ import {
 } from './mapping'
 import { lookUpIn, previewOutput } from './mapping-preview'
 import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'
-import { badRequest, conflict, notFound, unprocessable } from './responses'
+import { aiReviewOpen, badRequest, conflict, notFound, unprocessable } from './responses'
 import { stableUuid } from './seed-id'
 
 import type { Entry } from './document-values'
@@ -391,6 +391,10 @@ export function mappingVersionHandlers(
 
         if (!draft) {
           return notFound()
+        }
+
+        if (draft.aiReview) {
+          return aiReviewOpen()
         }
 
         if (!draft.unpublishedChanges) {

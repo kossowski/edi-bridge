@@ -22,9 +22,28 @@ export type Endpoint<
 } & (Query extends QueryParams ? { query: z.ZodType<Query, unknown> } : { query?: undefined }) &
   ([Body] extends [undefined] ? { body?: undefined } : { body: z.ZodType<Body> })
 
-export type EventStreamEndpoint<Event> = {
-  path: string
+export type EventStreamEndpoint<Event, Body = undefined, Path extends string = string> = {
+  path: Path
   event: z.ZodType<Event>
+} & ([Body] extends [undefined]
+  ? { method?: 'GET'; body?: undefined }
+  : { method: 'POST'; body: z.ZodType<Body> })
+
+export function parseStreamEvent<Event>(
+  endpoint: { event: z.ZodType<Event> },
+  data: string,
+): Event | null {
+  let json: unknown
+
+  try {
+    json = JSON.parse(data)
+  } catch {
+    return null
+  }
+
+  const event = endpoint.event.safeParse(json)
+
+  return event.success ? event.data : null
 }
 
 export function toPath<Path extends string>(path: Path, params: PathParams<Path>): string {

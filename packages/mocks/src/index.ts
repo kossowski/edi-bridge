@@ -8,6 +8,7 @@ import type {
   WorkspaceSummary,
 } from '@edi-bridge/contracts'
 
+import { aiDraftHandlers, type AiDraftOptions } from './ai-draft'
 import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
 import {
   documentStructureHandlers,
@@ -68,6 +69,16 @@ import {
   seedWorkspaceSettings,
   workspaceSettingsHandlers,
 } from './workspace-settings'
+
+export {
+  aiDraftHandlers,
+  type AiDraftOptions,
+  type AiDraftState,
+  aiDraftTokens,
+  aiProposalFor,
+  type AiProposalSize,
+  withAiProposal,
+} from './ai-draft'
 
 export {
   channelHandlers,
@@ -271,6 +282,7 @@ export function createHandlers(
     mappingSamples = seedMappingSamples,
     mappingVersions,
     liveEvents = { mode: 'quiet' },
+    aiDraft = {},
   }: {
     session?: Session | null
     workspace?: Workspace
@@ -285,6 +297,7 @@ export function createHandlers(
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
     liveEvents?: Omit<LiveEventsOptions, 'runs'>
+    aiDraft?: Pick<AiDraftOptions, 'state' | 'stepDelayMs' | 'signal'>
   } = {},
 ) {
   const orderLifecycles = seedOrderLifecycles()
@@ -367,6 +380,14 @@ export function createHandlers(
     ...mappingHandlers(apiUrl, {
       mappings: mappingDraftStore,
       documentStructures: documentStructureStore,
+    }),
+    ...aiDraftHandlers(apiUrl, {
+      ...aiDraft,
+      mappings: mappingDraftStore,
+      samples: mappingSamples,
+      documentStructures: documentStructureStore,
+      session: sessionStore,
+      settings: workspaceSettingsStore,
     }),
     ...mappingPreviewHandlers(apiUrl, {
       mappings: mappingDraftStore,
