@@ -4,16 +4,21 @@ import { CircleIcon, DashedLineCircleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useId } from 'react'
+import { useId, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
+import { AcknowledgementBadge } from '@/components/order-lifecycle/acknowledgement-status'
 import {
+  acknowledgementCounts,
+  latestMessageCount,
   type OrderLifecycleStep,
   orderLifecycleSteps,
+  shownMessages,
 } from '@/components/order-lifecycle/order-lifecycle-steps'
 import { RunLink, shortId } from '@/components/runs/run-link'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { Badge } from '@edi-bridge/ui/components/badge'
+import { Button } from '@edi-bridge/ui/components/button'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { OrderLifecycle, OrderLifecycleMessage } from '@edi-bridge/contracts'
@@ -51,7 +56,7 @@ function MessageEntry({
           )}
         </span>
       </div>
-      <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+      <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1.5">
         <span>
           {interchange ? (
             <Link href={`/interchanges/${interchange.id}`} className={cn(linkClass, 'relative')}>
@@ -61,6 +66,12 @@ function MessageEntry({
             t('noInterchange')
           )}
         </span>
+        {interchange?.acknowledgement && (
+          <span className="flex items-center gap-1.5">
+            {t('acknowledgement.label')}
+            <AcknowledgementBadge state={interchange.acknowledgement} />
+          </span>
+        )}
         {run.replacedBy && (
           <span>
             {tRun('facts.replacedBy')}{' '}
@@ -84,6 +95,10 @@ function Step({
   tradingPartner: string
 }) {
   const t = useTranslations('OrderLifecycle')
+  const [expanded, setExpanded] = useState(false)
+  const listId = useId()
+  const collapsible = step.messages.length > latestMessageCount
+  const counts = collapsible ? acknowledgementCounts(step.messages) : []
 
   return (
     <li className="relative flex gap-3 pb-6 last:pb-0">
@@ -117,15 +132,51 @@ function Step({
             })}
           </p>
         ) : (
-          <ol className="flex flex-col gap-2">
-            {step.messages.map((message) => (
-              <MessageEntry
-                key={message.run.id}
-                message={message}
-                tradingPartner={tradingPartner}
-              />
-            ))}
-          </ol>
+          <>
+            {counts.length > 0 && (
+              <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm">
+                {t('acknowledgement.summary')}
+                <ul
+                  aria-label={t('acknowledgement.summaryLabel', {
+                    messageType: step.messageType,
+                  })}
+                  className="flex flex-wrap gap-1.5">
+                  {counts.map(({ state, count }) => (
+                    <li key={state}>
+                      <AcknowledgementBadge count={count} state={state} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {collapsible && !expanded && (
+              <p className="text-muted-foreground text-sm">
+                {t('latestShown', { shown: latestMessageCount, count: step.messages.length })}
+              </p>
+            )}
+            <ol id={listId} className="flex flex-col gap-2">
+              {shownMessages(step.messages, expanded).map((message) => (
+                <MessageEntry
+                  key={message.run.id}
+                  message={message}
+                  tradingPartner={tradingPartner}
+                />
+              ))}
+            </ol>
+            {collapsible && (
+              <Button
+                size="sm"
+                variant="outline"
+                aria-controls={listId}
+                aria-expanded={expanded}
+                className="self-start"
+                onClick={() => setExpanded((value) => !value)}>
+                {expanded
+                  ? t('showLatest', { count: latestMessageCount })
+                  : t('showAll', { count: step.messages.length, messageType: step.messageType })}
+              </Button>
+            )}
+          </>
         )}
       </div>
     </li>

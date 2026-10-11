@@ -1,4 +1,6 @@
 import {
+  type AcknowledgementState,
+  acknowledgementStates,
   type OrderLifecycleMessage,
   type OrderLifecycleMessageType,
   openMessageTypes,
@@ -32,4 +34,24 @@ export function orderLifecycleSteps(
         .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
     }
   })
+}
+
+export const latestMessageCount = 5
+
+export function shownMessages<Message>(
+  messages: ReadonlyArray<Message>,
+  expanded: boolean,
+): ReadonlyArray<Message> {
+  return expanded ? messages : messages.slice(-latestMessageCount)
+}
+
+export function acknowledgementCounts(
+  messages: ReadonlyArray<OrderLifecycleMessage>,
+): Array<{ state: AcknowledgementState; count: number }> {
+  return acknowledgementStates
+    .map((state) => ({
+      state,
+      count: messages.filter((message) => message.interchange?.acknowledgement === state).length,
+    }))
+    .filter(({ count }) => count > 0)
 }

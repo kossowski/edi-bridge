@@ -1,20 +1,33 @@
 import { describe, expect, it } from 'vitest'
 
-import type { OrderLifecycleMessage } from '@edi-bridge/contracts'
+import type { AcknowledgementState, OrderLifecycleMessage } from '@edi-bridge/contracts'
 
-import { orderLifecycleSteps } from './order-lifecycle-steps'
+import {
+  acknowledgementCounts,
+  latestMessageCount,
+  orderLifecycleSteps,
+  shownMessages,
+} from './order-lifecycle-steps'
 
 function message(
   messageType: OrderLifecycleMessage['messageType'],
   receivedAt: string,
   id: string,
+  acknowledgement?: AcknowledgementState | null,
 ): OrderLifecycleMessage {
   return {
     messageType,
     direction: messageType === 'ORDERS' ? 'inbound' : 'outbound',
     receivedAt,
     run: { id, status: 'delivered', failureStage: null, replacedBy: null },
-    interchange: null,
+    interchange:
+      acknowledgement === undefined
+        ? null
+        : {
+            id: '00000000-0000-4000-8000-000000000000',
+            controlReference: id,
+            acknowledgement,
+          },
   }
 }
 
@@ -53,6 +66,35 @@ describe('orderLifecycleSteps', () => {
       ['ORDERS', false, true],
       ['DESADV', false, false],
       ['INVOIC', true, false],
+    ])
+  })
+})
+
+describe('shownMessages', () => {
+  const messages = Array.from({ length: latestMessageCount + 3 }, (_, index) => index)
+
+  it('shows only the latest Messages while collapsed', () => {
+    expect(shownMessages(messages, false)).toEqual(messages.slice(3))
+  })
+
+  it('shows every Message when expanded', () => {
+    expect(shownMessages(messages, true)).toEqual(messages)
+  })
+})
+
+describe('acknowledgementCounts', () => {
+  it('counts each Acknowledgement state in a fixed order and skips absent states', () => {
+    expect(
+      acknowledgementCounts([
+        message('DESADV', '2026-10-01T10:00:00.000Z', 'a', 'overdue'),
+        message('DESADV', '2026-10-02T10:00:00.000Z', 'b', 'accepted'),
+        message('DESADV', '2026-10-03T10:00:00.000Z', 'c', 'accepted'),
+        message('DESADV', '2026-10-04T10:00:00.000Z', 'd', null),
+        message('DESADV', '2026-10-05T10:00:00.000Z', 'e'),
+      ]),
+    ).toEqual([
+      { state: 'accepted', count: 2 },
+      { state: 'overdue', count: 1 },
     ])
   })
 })

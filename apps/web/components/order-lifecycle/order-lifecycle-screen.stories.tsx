@@ -1,9 +1,12 @@
-import { NextIntlClientProvider } from 'next-intl'
-import { expect, within } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 
+import {
+  besideSidebar,
+  darkMode,
+  german,
+} from '@/components/document-structures/document-structure-story-helpers'
 import { OrderLifecycleScreen } from '@/components/order-lifecycle/order-lifecycle-screen'
 import { apiUrl } from '@/lib/api/config'
-import messagesDe from '@/messages/de.json'
 import { orderLifecycleHandler, orderLifecycleReferences } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -19,6 +22,10 @@ const meta = preview.meta({
 
 function stepOf(timeline: HTMLElement, messageType: string) {
   return within(timeline).getByRole('heading', { level: 3, name: messageType }).closest('li')!
+}
+
+function runLinks(step: HTMLElement) {
+  return within(step).getAllByRole('link', { name: /open Run from / })
 }
 
 export const Initial = meta.story({
@@ -67,6 +74,9 @@ export const Full = meta.story({
     })
 
     await expect(within(timeline).queryByText('Open')).toBeNull()
+    await expect(within(stepOf(timeline, 'ORDERS')).queryByText('Acknowledgement')).toBeNull()
+    await expect(within(stepOf(timeline, 'DESADV')).getByText('Accepted')).toBeVisible()
+    await expect(within(stepOf(timeline, 'INVOIC')).getByText('Accepted')).toBeVisible()
     await expect(within(stepOf(timeline, 'ORDERS')).getByText('Received')).toBeVisible()
     await expect(within(stepOf(timeline, 'INVOIC')).getByText('Received')).toBeVisible()
     await expect(
@@ -85,6 +95,7 @@ export const Partial = meta.story({
 
     await expect(within(stepOf(timeline, 'INVOIC')).getByText('No INVOIC yet.')).toBeVisible()
     await expect(within(stepOf(timeline, 'DESADV')).queryByText('Open')).toBeNull()
+    await expect(within(stepOf(timeline, 'DESADV')).getByText('Pending')).toBeVisible()
   },
 })
 
@@ -98,6 +109,12 @@ export const TwoTradingPartners = meta.story({
       canvas.getByRole('heading', { level: 2, name: 'Alpenfrisch Märkte AG' }),
     ).toBeVisible()
     await expect(canvas.getByRole('heading', { level: 2, name: 'Hansemarkt GmbH' })).toBeVisible()
+
+    const alpenfrisch = canvas.getByRole('list', {
+      name: 'Order Lifecycle with Alpenfrisch Märkte AG',
+    })
+
+    await expect(within(stepOf(alpenfrisch, 'DESADV')).getByText('Overdue')).toBeVisible()
   },
 })
 
@@ -112,6 +129,8 @@ export const Failures = meta.story({
 
     await expect(desadv.getByText('2 Messages')).toBeVisible()
     await expect(desadv.getByText('Mapping')).toBeVisible()
+    await expect(desadv.getAllByText('Acknowledgement')).toHaveLength(1)
+    await expect(desadv.getByText('Rejected')).toBeVisible()
     await expect(desadv.getByRole('link', { name: /^Run [0-9a-f]{8}$/ })).toBeVisible()
     await expect(within(stepOf(timeline, 'INVOIC')).getByText('Delivery')).toBeVisible()
   },
@@ -119,29 +138,101 @@ export const Failures = meta.story({
 
 export const German = meta.story({
   args: { businessReference: orderLifecycleReferences.partial },
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
-    ),
-  ],
+  decorators: [german],
   async play({ canvas }) {
     await expect(await canvas.findByText('Noch keine INVOIC.')).toBeVisible()
+    await expect(canvas.getByText('Ausstehend')).toBeVisible()
     await expect(canvas.getByRole('searchbox', { name: 'Business Reference' })).toHaveValue('4712')
   },
 })
 
 export const Dark = meta.story({
   args: { businessReference: orderLifecycleReferences.failures },
-  beforeEach() {
-    document.documentElement.classList.add('dark')
-
-    return () => document.documentElement.classList.remove('dark')
-  },
+  beforeEach: darkMode,
   async play({ canvas }) {
     await expect(
       await canvas.findByRole('heading', { level: 2, name: 'Elbtal Warenhaus KG' }),
     ).toBeVisible()
+  },
+})
+
+export const LargeVolume = meta.story({
+  args: { businessReference: orderLifecycleReferences.largeVolume },
+  async play({ canvas }) {
+    const timeline = await canvas.findByRole('list', {
+      name: 'Order Lifecycle with Hansemarkt GmbH',
+    })
+
+    const desadv = stepOf(timeline, 'DESADV')
+    const invoic = stepOf(timeline, 'INVOIC')
+
+    await expect(within(desadv).getByText('34 Messages')).toBeVisible()
+    await expect(within(desadv).getByText('Latest 5 of 34')).toBeVisible()
+    await expect(runLinks(desadv)).toHaveLength(5)
+    await expect(runLinks(invoic)).toHaveLength(5)
+
+    const desadvSummary = within(
+      within(desadv).getByRole('list', { name: 'Acknowledgements of the DESADV Messages' }),
+    )
+
+    await expect(desadvSummary.getByText('Accepted')).toBeVisible()
+    await expect(desadvSummary.getByText('Overdue')).toBeVisible()
+    await expect(desadvSummary.getByText('Pending')).toBeVisible()
+    await expect(
+      within(invoic).getByRole('list', { name: 'Acknowledgements of the INVOIC Messages' }),
+    ).toHaveTextContent('Rejected')
+
+    const showAll = within(desadv).getByRole('button', { name: 'Show all 34 DESADV Messages' })
+
+    await expect(showAll).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(showAll)
+    await expect(runLinks(desadv)).toHaveLength(34)
+    await expect(showAll).toHaveAttribute('aria-expanded', 'true')
+    await expect(showAll).toHaveAccessibleName('Show the latest 5')
+    await expect(runLinks(invoic)).toHaveLength(5)
+  },
+})
+
+export const LargeVolumeGerman = meta.story({
+  args: { businessReference: orderLifecycleReferences.largeVolume },
+  decorators: [besideSidebar, german],
+  async play({ canvas }) {
+    const timeline = await canvas.findByRole('list', {
+      name: 'Order Lifecycle mit Hansemarkt GmbH',
+    })
+
+    const desadv = within(stepOf(timeline, 'DESADV'))
+
+    await expect(desadv.getByText('Neueste 5 von 34')).toBeVisible()
+    await expect(
+      desadv.getByRole('list', { name: 'Acknowledgements der DESADV-Messages' }),
+    ).toHaveTextContent('Überfällig')
+    await expect(
+      within(stepOf(timeline, 'INVOIC')).getByRole('list', {
+        name: 'Acknowledgements der INVOIC-Messages',
+      }),
+    ).toHaveTextContent('Abgelehnt')
+    await userEvent.click(desadv.getByRole('button', { name: 'Alle 34 DESADV-Messages anzeigen' }))
+    await expect(
+      desadv.getByRole('button', { name: 'Nur die neuesten 5 anzeigen' }),
+    ).toHaveAttribute('aria-expanded', 'true')
+  },
+})
+
+export const LargeVolumeDark = meta.story({
+  args: { businessReference: orderLifecycleReferences.largeVolume },
+  beforeEach: darkMode,
+  async play({ canvas }) {
+    const timeline = await canvas.findByRole('list', {
+      name: 'Order Lifecycle with Hansemarkt GmbH',
+    })
+
+    for (const messageType of ['DESADV', 'INVOIC']) {
+      await userEvent.click(
+        within(stepOf(timeline, messageType)).getByRole('button', { name: /^Show all / }),
+      )
+    }
+
+    await expect(runLinks(stepOf(timeline, 'INVOIC'))).toHaveLength(30)
   },
 })
