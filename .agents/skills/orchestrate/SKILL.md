@@ -109,7 +109,13 @@ gh stack link <PR of part 1> <PR of part 2> ... <PR of part k>
 
 The first call creates the stack on GitHub, later calls add the new PR to it. PRs already in the stack are kept. Don't use `gh stack init`, `add`, `submit`, `checkout`, or `sync`: the worktrees hold the branches, and these commands want to check them out or create PRs themselves.
 
-**e. Wait for CI.** Run `bash .agents/skills/orchestrate/scripts/wait-for-ci.sh <PR>` in the background. If CI fails, a fresh implementer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again.
+**e. Wait for CI.** Run this in the background:
+
+```bash
+bash .agents/skills/orchestrate/scripts/wait-for-ci.sh <PR> $(git -C <worktree> rev-parse HEAD)
+```
+
+The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh implementer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again.
 
 ### 4. Resolve the ticket on the top part
 
@@ -144,4 +150,4 @@ git -C <worktree> rebase <branch of the part below>
 git -C <worktree> push --force-with-lease
 ```
 
-Wait for CI on every PR you pushed. The stack on GitHub needs no change: its PRs and bases stay the same.
+Wait for CI on every PR you pushed, as in step 3e. The stack on GitHub needs no change: its PRs and bases stay the same.
