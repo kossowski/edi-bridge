@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
+import { useCanChange } from '@/hooks/use-session'
 import { switchToProduction } from '@/lib/api/client'
 import { storeSavedTradingPartner } from '@/lib/api/queries'
 import {
@@ -118,8 +119,9 @@ function StepDetail({
   onSwitched: () => void
 }) {
   const t = useTranslations('TradingPartner.onboarding')
+  const canChange = useCanChange()
 
-  if (item.step === 'identity' && item.state === 'current') {
+  if (item.step === 'identity' && item.state === 'current' && canChange) {
     return (
       <Link href="/settings" className={cn(linkClass, 'w-fit text-sm')}>
         {t('setIdentity')}
@@ -127,7 +129,7 @@ function StepDetail({
     )
   }
 
-  if (item.step === 'production' && item.state === 'current') {
+  if (item.step === 'production' && item.state === 'current' && canChange) {
     return <ProductionSwitch tradingPartner={tradingPartner} onSwitched={onSwitched} />
   }
 

@@ -4,6 +4,11 @@ import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { emptyRunFilters, useRunFilters } from '@/components/runs/run-filters-store'
 import { RunsScreen } from '@/components/runs/runs-screen'
+import {
+  expectSignedInAsViewer,
+  viewerSessionHandlers,
+  withViewOnlyBadge,
+} from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { runsEndpoint } from '@edi-bridge/contracts'
@@ -43,7 +48,7 @@ export const ManualSubmission = meta.story({
       Number((await canvas.findByText(/^[\d,]+ Runs$/)).textContent.replaceAll(/\D/g, ''))
 
     const before = await count()
-    await userEvent.click(canvas.getByRole('button', { name: 'Submit a Document' }))
+    await userEvent.click(await canvas.findByRole('button', { name: 'Submit a Document' }))
     const dialog = within(await screen.findByRole('dialog', { name: 'Manual Submission' }))
     const trigger = dialog.getByRole('combobox', { name: 'Inbound Channel' })
     await waitFor(() => expect(trigger).not.toHaveAttribute('aria-disabled'))
@@ -157,5 +162,17 @@ export const Dark = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('40 Runs')).toBeVisible()
+  },
+})
+
+export const Viewer = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...viewerSessionHandlers(), runsHandler(apiUrl, createRuns({ count: 40 })))
+  },
+  decorators: [withViewOnlyBadge],
+  async play({ canvas }) {
+    await expectSignedInAsViewer(canvas)
+    await expect(await canvas.findByText('40 Runs')).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Submit a Document' })).toBeNull()
   },
 })

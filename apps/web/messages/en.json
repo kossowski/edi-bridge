@@ -492,7 +492,8 @@
     },
     "empty": {
       "title": "No Trading Partners yet",
-      "description": "Create a Trading Partner to start onboarding it."
+      "description": "Create a Trading Partner to start onboarding it.",
+      "viewOnlyDescription": "Trading Partners appear here once an Admin creates one."
     },
     "error": {
       "title": "Trading Partners unavailable",
@@ -645,7 +646,8 @@
     },
     "empty": {
       "title": "No Channels yet",
-      "description": "Create a Channel to receive Documents or deliver them."
+      "description": "Create a Channel to receive Documents or deliver them.",
+      "viewOnlyDescription": "Channels appear here once an Admin creates one."
     },
     "error": {
       "title": "Channels unavailable",
@@ -863,7 +865,8 @@
     },
     "empty": {
       "title": "No Flows yet",
-      "description": "Create a Flow to route Documents of one Message Type from a Trading Partner to a destination Channel."
+      "description": "Create a Flow to route Documents of one Message Type from a Trading Partner to a destination Channel.",
+      "viewOnlyDescription": "Flows appear here once an Admin creates one."
     },
     "error": {
       "title": "Flows unavailable",
@@ -1611,7 +1614,8 @@
     },
     "empty": {
       "title": "No Document Structures yet",
-      "description": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Create one from a sample Document or a JSON Schema."
+      "description": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Create one from a sample Document or a JSON Schema.",
+      "viewOnlyDescription": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Document Structures appear here once an Admin creates one."
     },
     "error": {
       "title": "Document Structures unavailable",
@@ -1831,7 +1835,8 @@
     },
     "empty": {
       "title": "No Lookup Tables yet",
-      "description": "Create a Lookup Table to translate codes in Mappings, e.g. unit ST to PCE."
+      "description": "Create a Lookup Table to translate codes in Mappings, e.g. unit ST to PCE.",
+      "viewOnlyDescription": "Lookup Tables translate codes in Mappings, e.g. unit ST to PCE. They appear here once an Admin creates one."
     },
     "error": {
       "title": "Lookup Tables unavailable",

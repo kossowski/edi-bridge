@@ -86,6 +86,7 @@ function FlowsTable() {
       query={flows}
       row={(flow) => <FlowRow key={flow.id} flow={flow} references={references} />}
       t={t}
+      viewOnlyEmptyDescription={t('empty.viewOnlyDescription')}
     />
   )
 }

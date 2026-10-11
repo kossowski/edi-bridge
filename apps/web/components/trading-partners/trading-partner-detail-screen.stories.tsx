@@ -2,6 +2,11 @@ import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import {
+  expectSignedInAsViewer,
+  viewerSessionHandlers,
+  withViewOnlyBadge,
+} from '@/components/session/session-story-helpers'
 import { TradingPartnerDetailScreen } from '@/components/trading-partners/trading-partner-detail-screen'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
@@ -172,5 +177,39 @@ export const Dark = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('heading', { name: 'Onboarding' })).toBeVisible()
+  },
+})
+
+export const ViewerReadyForProduction = meta.story({
+  args: { id: readyForProduction.id },
+  beforeEach({ msw }) {
+    msw.use(...viewerSessionHandlers())
+  },
+  decorators: [withViewOnlyBadge],
+  async play({ canvas }) {
+    await expectSignedInAsViewer(canvas)
+    await expect(await canvas.findByRole('listitem', { current: 'step' })).toHaveTextContent(
+      'Production on',
+    )
+    await expect(canvas.queryByRole('button', { name: 'Switch to production' })).toBeNull()
+    await expect(canvas.queryByRole('link', { name: 'Edit' })).toBeNull()
+  },
+})
+
+export const ViewerWorkspaceWithoutGln = meta.story({
+  args: { id: withoutTraffic.id },
+  beforeEach({ msw }) {
+    msw.use(
+      ...viewerSessionHandlers(),
+      ...createHandlers(apiUrl, { workspace: createWorkspace({ gln: null }) }),
+    )
+  },
+  decorators: [withViewOnlyBadge],
+  async play({ canvas }) {
+    await expectSignedInAsViewer(canvas)
+    await expect(await canvas.findByRole('listitem', { current: 'step' })).toBeVisible()
+    await expect(
+      canvas.queryByRole('link', { name: "Record your company's GLN in Settings" }),
+    ).toBeNull()
   },
 })

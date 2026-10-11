@@ -94,6 +94,7 @@ function TradingPartnersTable() {
         />
       )}
       t={t}
+      viewOnlyEmptyDescription={t('empty.viewOnlyDescription')}
     />
   )
 }

@@ -2,6 +2,11 @@ import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect } from 'storybook/test'
 
+import {
+  expectSignedInAsViewer,
+  viewerSessionHandlers,
+  withViewOnlyBadge,
+} from '@/components/session/session-story-helpers'
 import { TradingPartnersScreen } from '@/components/trading-partners/trading-partners-screen'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
@@ -95,5 +100,31 @@ export const Dark = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('link', { name: 'Hansemarkt GmbH' })).toBeVisible()
+  },
+})
+
+export const Viewer = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...viewerSessionHandlers())
+  },
+  decorators: [withViewOnlyBadge],
+  async play({ canvas }) {
+    await expectSignedInAsViewer(canvas)
+    await expect(await canvas.findByRole('link', { name: 'Hansemarkt GmbH' })).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: 'New Trading Partner' })).toBeNull()
+  },
+})
+
+export const ViewerEmpty = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...viewerSessionHandlers(), ...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
+  },
+  decorators: [withViewOnlyBadge],
+  async play({ canvas }) {
+    await expectSignedInAsViewer(canvas)
+    await expect(
+      await canvas.findByText('Trading Partners appear here once an Admin creates one.'),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: 'New Trading Partner' })).toBeNull()
   },
 })

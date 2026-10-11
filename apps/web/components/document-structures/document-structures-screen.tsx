@@ -60,6 +60,7 @@ export function DocumentStructuresScreen() {
         query={summaries}
         row={(summary) => <DocumentStructureRow key={summary.id} summary={summary} />}
         t={tList}
+        viewOnlyEmptyDescription={tList('empty.viewOnlyDescription')}
       />
     </ListScreen>
   )

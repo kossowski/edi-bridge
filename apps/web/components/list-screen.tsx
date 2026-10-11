@@ -9,6 +9,7 @@ import type { IconSvgElement } from '@hugeicons/react'
 
 import { BackLink } from '@/components/detail-parts'
 import { LoadError } from '@/components/load-error'
+import { useCanChange } from '@/hooks/use-session'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -69,6 +70,8 @@ export function ListScreen({
   action?: ReactNode
   children: ReactNode
 }) {
+  const canChange = useCanChange()
+
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
       {back && <BackLink href={back.href} label={back.label} />}
@@ -77,7 +80,7 @@ export function ListScreen({
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
         </div>
-        {newLink && <NewLink href={newLink.href} label={newLink.label} />}
+        {newLink && canChange && <NewLink href={newLink.href} label={newLink.label} />}
         {action}
       </div>
       {children}
@@ -104,6 +107,7 @@ export function ListTable<Item>({
   emptyIcon,
   newLink,
   emptyAction,
+  viewOnlyEmptyDescription,
   toolbar,
   filter,
   columns,
@@ -121,6 +125,7 @@ export function ListTable<Item>({
   emptyIcon: IconSvgElement
   newLink?: { href: string; label: string }
   emptyAction?: ReactNode
+  viewOnlyEmptyDescription?: string
   toolbar?: ReactNode
   filter?: ((item: Item) => boolean) | undefined
   columns: ReadonlyArray<{ key: string; label: string; hidden?: boolean }>
@@ -129,6 +134,7 @@ export function ListTable<Item>({
 }) {
   const searchId = useId()
   const [search, setSearch] = useState('')
+  const canChange = useCanChange()
 
   if (query.isError) {
     return (
@@ -149,9 +155,11 @@ export function ListTable<Item>({
             <HugeiconsIcon icon={emptyIcon} strokeWidth={2} />
           </EmptyMedia>
           <EmptyTitle>{t('empty.title')}</EmptyTitle>
-          <EmptyDescription>{t('empty.description')}</EmptyDescription>
+          <EmptyDescription>
+            {(!canChange && viewOnlyEmptyDescription) || t('empty.description')}
+          </EmptyDescription>
         </EmptyHeader>
-        {(newLink || emptyAction) && (
+        {canChange && (newLink || emptyAction) && (
           <EmptyContent>
             {newLink && <NewLink href={newLink.href} label={newLink.label} />}
             {emptyAction}

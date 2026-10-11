@@ -3,6 +3,11 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
 import { FlowDetailScreen } from '@/components/flows/flow-detail-screen'
+import {
+  expectSignedInAsViewer,
+  viewerSessionHandlers,
+  withViewOnlyBadge,
+} from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { flowEndpoint, moveFlowMappingVersionEndpoint } from '@edi-bridge/contracts'
@@ -48,7 +53,9 @@ export const NewerVersionAvailable = meta.story({
   args: { id: oneBehind.id },
   async play({ canvas }) {
     await expect(await canvas.findByText('A newer version is available: version 4.')).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Move to a newer version' })).toBeVisible()
+    await expect(
+      await canvas.findByRole('button', { name: 'Move to a newer version' }),
+    ).toBeVisible()
   },
 })
 
@@ -58,7 +65,7 @@ export const MoveToNewerVersion = meta.story({
     await expect(
       await canvas.findByText('2 newer versions are available, up to version 4.'),
     ).toBeVisible()
-    await userEvent.click(canvas.getByRole('button', { name: 'Move to a newer version' }))
+    await userEvent.click(await canvas.findByRole('button', { name: 'Move to a newer version' }))
     await expect(canvas.getByText(/Runs already processed keep the version/)).toHaveFocus()
     await expect(canvas.getByRole('radio', { name: /^Version 4/ })).toBeChecked()
     await userEvent.click(canvas.getByRole('radio', { name: /^Version 3/ }))
@@ -157,5 +164,19 @@ export const Dark = meta.story({
   async play({ canvas }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Move to a newer version' }))
     await expect(canvas.getByRole('button', { name: 'Move to version 4' })).toBeVisible()
+  },
+})
+
+export const ViewerNewerVersionAvailable = meta.story({
+  args: { id: oneBehind.id },
+  beforeEach({ msw }) {
+    msw.use(...viewerSessionHandlers())
+  },
+  decorators: [withViewOnlyBadge],
+  async play({ canvas }) {
+    await expectSignedInAsViewer(canvas)
+    await expect(await canvas.findByText(/^A newer version is available/)).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Move to a newer version' })).toBeNull()
+    await expect(canvas.queryByRole('link', { name: 'Edit' })).toBeNull()
   },
 })

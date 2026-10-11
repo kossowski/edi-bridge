@@ -29,6 +29,7 @@ import {
   type VisibleRow,
 } from '@/components/lookup-tables/lookup-table-entry-grid'
 import { useEntryEditing } from '@/components/lookup-tables/use-entry-editing'
+import { useCanChange } from '@/hooks/use-session'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -87,6 +88,7 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   const addButton = useRef<HTMLButtonElement>(null)
   const focusAddButton = useRef(false)
   const term = useDeferredValue(filter.trim().toLocaleLowerCase())
+  const canChange = useCanChange()
 
   const entries = useEntryEditing(table, {
     onSaved: () => setAnnouncement(t('announcements.saved')),
@@ -260,17 +262,19 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
           <span className="text-muted-foreground text-sm">
             {saving ? t('savingReadOnly') : dirty ? t('unsaved') : t('upToDate')}
           </span>
-          <Button
-            disabled={saving}
-            ref={importButton}
-            variant="outline"
-            onClick={() => {
-              setEditing(null)
-              setImportOpen(true)
-            }}>
-            <HugeiconsIcon icon={FileImportIcon} strokeWidth={2} aria-hidden />
-            {tImport('open')}
-          </Button>
+          {canChange && (
+            <Button
+              disabled={saving}
+              ref={importButton}
+              variant="outline"
+              onClick={() => {
+                setEditing(null)
+                setImportOpen(true)
+              }}>
+              <HugeiconsIcon icon={FileImportIcon} strokeWidth={2} aria-hidden />
+              {tImport('open')}
+            </Button>
+          )}
           <Button disabled={!dirty || saving} variant="outline" onClick={discard}>
             {t('discard')}
           </Button>

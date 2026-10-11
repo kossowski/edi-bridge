@@ -23,6 +23,7 @@ import {
   workspaceScopeKey,
 } from '@/components/lookup-tables/lookup-table-scope'
 import { ScopeLabel } from '@/components/lookup-tables/lookup-table-scope-label'
+import { useCanChange } from '@/hooks/use-session'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
@@ -77,12 +78,10 @@ function LookupTableActions({
 
 function LookupTableRow({
   table,
-  onEdit,
-  onDelete,
+  actions,
 }: {
   table: LookupTableSummary
-  onEdit: RowAction
-  onDelete: RowAction
+  actions: { onEdit: RowAction; onDelete: RowAction } | null
 }) {
   const t = useTranslations('LookupTables')
   const format = useFormatter()
@@ -103,9 +102,11 @@ function LookupTableRow({
       <TableCell className="tabular-nums">
         {format.dateTime(new Date(table.updatedAt), { dateStyle: 'medium', timeStyle: 'short' })}
       </TableCell>
-      <TableCell className="relative w-px text-right">
-        <LookupTableActions table={table} onDelete={onDelete} onEdit={onEdit} />
-      </TableCell>
+      {actions && (
+        <TableCell className="relative w-px text-right">
+          <LookupTableActions table={table} onDelete={actions.onDelete} onEdit={actions.onEdit} />
+        </TableCell>
+      )}
     </TableRow>
   )
 }
@@ -216,6 +217,7 @@ export function LookupTablesScreen() {
   const [announcement, setAnnouncement] = useState('')
   const dialogs = useLookupTableDialogs(newButton)
   const scopeFilter = useScopeFilter(lookupTables.data)
+  const canChange = useCanChange()
 
   function saved(table: LookupTable) {
     if (!dialogs.state.form.table) {
@@ -235,17 +237,17 @@ export function LookupTablesScreen() {
 
   return (
     <ListScreen
-      action={<NewLookupTableButton ref={newButton} onClick={dialogs.create} />}
+      action={canChange && <NewLookupTableButton ref={newButton} onClick={dialogs.create} />}
       title={tNavigation('lookupTables')}>
       <p role="status" className="sr-only">
         {announcement}
       </p>
       <ListTable
-        columns={columns.map((key) => ({
-          key,
-          label: t(`columns.${key}`),
-          hidden: key === 'actions',
-        }))}
+        columns={columns.flatMap((key) =>
+          canChange || key !== 'actions'
+            ? [{ key, label: t(`columns.${key}`), hidden: key === 'actions' }]
+            : [],
+        )}
         emptyAction={<NewLookupTableButton onClick={dialogs.create} />}
         emptyIcon={Table01Icon}
         filter={scopeFilter.filter}
@@ -259,13 +261,13 @@ export function LookupTablesScreen() {
         row={(table) => (
           <LookupTableRow
             key={table.id}
+            actions={canChange ? { onEdit: dialogs.edit, onDelete: dialogs.remove } : null}
             table={table}
-            onDelete={dialogs.remove}
-            onEdit={dialogs.edit}
           />
         )}
         t={t}
         toolbar={scopeFilter.element}
+        viewOnlyEmptyDescription={t('empty.viewOnlyDescription')}
       />
       <LookupTableFormDialog
         finalFocus={dialogs.returnFocus}

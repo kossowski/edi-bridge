@@ -10,6 +10,7 @@ import { useId, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
 import { runRemedy } from '@/components/runs/run-remedy'
+import { useCanChange } from '@/hooks/use-session'
 import { reprocessRun, retryRun } from '@/lib/api/client'
 import { interchangeKeys, mappingVersionsQuery, runKeys, runQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -152,6 +153,7 @@ export function RunRemedyPanel({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail.remedy')
   const tRuns = useTranslations('Runs')
   const remedy = runRemedy(run)
+  const canChange = useCanChange()
 
   if (remedy === 'none' && run.status !== 'failed') {
     return null
@@ -162,8 +164,18 @@ export function RunRemedyPanel({ run }: { run: RunDetail }) {
       <h2 id="run-remedy" className="font-semibold">
         {remedy === 'awaitingResend' ? t('awaitingResend.title') : t('title')}
       </h2>
-      {remedy === 'retry' && <RetryAction run={run} />}
-      {remedy === 'reprocess' && <ReprocessAction run={run} />}
+      {remedy === 'retry' &&
+        (canChange ? (
+          <RetryAction run={run} />
+        ) : (
+          <p className="text-sm">{t('retry.description')}</p>
+        ))}
+      {remedy === 'reprocess' &&
+        (canChange ? (
+          <ReprocessAction run={run} />
+        ) : (
+          <p className="text-sm">{t('reprocess.description')}</p>
+        ))}
       {remedy === 'awaitingResend' && run.failureStage !== null && (
         <p className="flex items-start gap-2 text-sm">
           <HugeiconsIcon

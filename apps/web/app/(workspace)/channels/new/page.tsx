@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server'
 import type { Metadata } from 'next'
 
 import { NewChannelScreen } from '@/components/channels/channel-form-screen'
+import { CanChangeOnly } from '@/components/session/can-change-only'
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations()
@@ -11,5 +12,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function Page() {
-  return <NewChannelScreen />
+  return (
+    <CanChangeOnly>
+      <NewChannelScreen />
+    </CanChangeOnly>
+  )
 }

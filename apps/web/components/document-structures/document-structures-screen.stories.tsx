@@ -3,6 +3,11 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, within } from 'storybook/test'
 
 import { DocumentStructuresScreen } from '@/components/document-structures/document-structures-screen'
+import {
+  expectSignedInAsViewer,
+  viewerSessionHandlers,
+  withViewOnlyBadge,
+} from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { documentStructuresEndpoint } from '@edi-bridge/contracts'
@@ -34,10 +39,9 @@ export const Default = meta.story({
 
     await expect(csv.getByText('CSV')).toBeVisible()
     await expect(csv.getByText('Not used yet')).toBeVisible()
-    await expect(canvas.getByRole('link', { name: 'New Document Structure' })).toHaveAttribute(
-      'href',
-      '/document-structures/new',
-    )
+    await expect(
+      await canvas.findByRole('link', { name: 'New Document Structure' }),
+    ).toHaveAttribute('href', '/document-structures/new')
   },
 })
 
@@ -112,5 +116,31 @@ export const Dark = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('link', { name: 'ERP purchase order' })).toBeVisible()
+  },
+})
+
+export const Viewer = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...viewerSessionHandlers())
+  },
+  decorators: [withViewOnlyBadge],
+  async play({ canvas }) {
+    await expectSignedInAsViewer(canvas)
+    await expect(await canvas.findByRole('link', { name: 'ERP purchase order' })).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: 'New Document Structure' })).toBeNull()
+  },
+})
+
+export const ViewerEmpty = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...viewerSessionHandlers(), ...createHandlers(apiUrl, { documentStructures: [] }))
+  },
+  decorators: [withViewOnlyBadge],
+  async play({ canvas }) {
+    await expectSignedInAsViewer(canvas)
+    await expect(
+      await canvas.findByText(/Document Structures appear here once an Admin creates one\./),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: 'New Document Structure' })).toBeNull()
   },
 })

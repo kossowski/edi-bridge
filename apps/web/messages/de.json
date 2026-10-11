@@ -492,7 +492,8 @@
     },
     "empty": {
       "title": "Noch keine Trading Partners",
-      "description": "Legen Sie einen Trading Partner an, um sein Onboarding zu beginnen."
+      "description": "Legen Sie einen Trading Partner an, um sein Onboarding zu beginnen.",
+      "viewOnlyDescription": "Trading Partners erscheinen hier, sobald ein Admin einen anlegt."
     },
     "error": {
       "title": "Trading Partners nicht verfügbar",
@@ -645,7 +646,8 @@
     },
     "empty": {
       "title": "Noch keine Channels",
-      "description": "Legen Sie einen Channel an, um Documents zu empfangen oder zuzustellen."
+      "description": "Legen Sie einen Channel an, um Documents zu empfangen oder zuzustellen.",
+      "viewOnlyDescription": "Channels erscheinen hier, sobald ein Admin einen anlegt."
     },
     "error": {
       "title": "Channels nicht verfügbar",
@@ -863,7 +865,8 @@
     },
     "empty": {
       "title": "Noch keine Flows",
-      "description": "Legen Sie einen Flow an, um Documents eines Message Types von einem Trading Partner an einen Ziel-Channel zu leiten."
+      "description": "Legen Sie einen Flow an, um Documents eines Message Types von einem Trading Partner an einen Ziel-Channel zu leiten.",
+      "viewOnlyDescription": "Flows erscheinen hier, sobald ein Admin einen anlegt."
     },
     "error": {
       "title": "Flows nicht verfügbar",
@@ -1611,7 +1614,8 @@
     },
     "empty": {
       "title": "Noch keine Document Structures",
-      "description": "Eine Document Structure beschreibt die JSON- oder CSV-Documents Ihrer eigenen Systeme, damit ein Mapping deren Felder kennt. Erstellen Sie eine aus einem Beispiel-Document oder einem JSON Schema."
+      "description": "Eine Document Structure beschreibt die JSON- oder CSV-Documents Ihrer eigenen Systeme, damit ein Mapping deren Felder kennt. Erstellen Sie eine aus einem Beispiel-Document oder einem JSON Schema.",
+      "viewOnlyDescription": "Eine Document Structure beschreibt die JSON- oder CSV-Documents Ihrer eigenen Systeme, damit ein Mapping deren Felder kennt. Document Structures erscheinen hier, sobald ein Admin eine anlegt."
     },
     "error": {
       "title": "Document Structures nicht verfügbar",
@@ -1831,7 +1835,8 @@
     },
     "empty": {
       "title": "Noch keine Lookup Tables",
-      "description": "Legen Sie eine Lookup Table an, um Codes in Mappings zu übersetzen, z. B. die Einheit ST in PCE."
+      "description": "Legen Sie eine Lookup Table an, um Codes in Mappings zu übersetzen, z. B. die Einheit ST in PCE.",
+      "viewOnlyDescription": "Lookup Tables übersetzen Codes in Mappings, z. B. die Einheit ST in PCE. Sie erscheinen hier, sobald ein Admin eine anlegt."
     },
     "error": {
       "title": "Lookup Tables nicht verfügbar",

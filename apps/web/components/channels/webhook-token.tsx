@@ -10,6 +10,7 @@ import { flushSync } from 'react-dom'
 import { MaskedSecretText } from '@/components/channels/channel-parts'
 import { CopyableValue } from '@/components/copy-button'
 import { Fact } from '@/components/detail-parts'
+import { useCanChange } from '@/hooks/use-session'
 import { regenerateWebhookToken } from '@/lib/api/client'
 import { storeSavedChannel } from '@/lib/api/queries'
 import { webhookAuthorization, webhookTokenHeader } from '@edi-bridge/contracts'
@@ -145,6 +146,7 @@ export function WebhookAccess({ channel }: { channel: WebhookChannel }) {
   const t = useTranslations('Channel.webhook')
   const [revealed, setRevealed] = useState<string | null>(null)
   const regenerateButton = useRef<HTMLButtonElement>(null)
+  const canChange = useCanChange()
 
   // Hiding the token removes the focused button, so focus moves on instead of dropping to <body>.
   function hideToken() {
@@ -179,7 +181,9 @@ export function WebhookAccess({ channel }: { channel: WebhookChannel }) {
           </Button>
         </WebhookTokenReveal>
       )}
-      <RegenerateToken button={regenerateButton} channel={channel} onRegenerated={setRevealed} />
+      {canChange && (
+        <RegenerateToken button={regenerateButton} channel={channel} onRegenerated={setRevealed} />
+      )}
     </div>
   )
 }
