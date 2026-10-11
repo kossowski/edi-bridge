@@ -1,15 +1,9 @@
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, within } from 'storybook/test'
 
-import {
-  besideSidebar,
-  darkMode,
-  german,
-  mobile,
-  tablet,
-  toFile,
-} from '@/components/document-structures/document-structure-story-helpers'
+import { toFile } from '@/components/document-structures/document-structure-story-helpers'
 import { NewDocumentStructureScreen } from '@/components/document-structures/new-document-structure-screen'
+import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   createDocumentStructureEndpoint,

@@ -51,7 +51,9 @@ export function acknowledgementCounts(
   return acknowledgementStates
     .map((state) => ({
       state,
-      count: messages.filter((message) => message.interchange?.acknowledgement === state).length,
+      count: messages.filter(
+        (message) => !message.run.replacedBy && message.interchange?.acknowledgement === state,
+      ).length,
     }))
     .filter(({ count }) => count > 0)
 }

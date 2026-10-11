@@ -4,10 +4,11 @@ import { CircleIcon, DashedLineCircleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 import { linkClass } from '@/components/detail-parts'
-import { AcknowledgementBadge } from '@/components/order-lifecycle/acknowledgement-status'
+import { AcknowledgementStateBadge } from '@/components/order-lifecycle/acknowledgement-state'
 import {
   acknowledgementCounts,
   latestMessageCount,
@@ -69,7 +70,7 @@ function MessageEntry({
         {interchange?.acknowledgement && (
           <span className="flex items-center gap-1.5">
             {t('acknowledgement.label')}
-            <AcknowledgementBadge state={interchange.acknowledgement} />
+            <AcknowledgementStateBadge state={interchange.acknowledgement} />
           </span>
         )}
         {run.replacedBy && (
@@ -97,6 +98,7 @@ function Step({
   const t = useTranslations('OrderLifecycle')
   const [expanded, setExpanded] = useState(false)
   const listId = useId()
+  const toggleRef = useRef<HTMLButtonElement>(null)
   const collapsible = step.messages.length > latestMessageCount
   const counts = collapsible ? acknowledgementCounts(step.messages) : []
 
@@ -143,7 +145,7 @@ function Step({
                   className="flex flex-wrap gap-1.5">
                   {counts.map(({ state, count }) => (
                     <li key={state}>
-                      <AcknowledgementBadge count={count} state={state} />
+                      <AcknowledgementStateBadge count={count} state={state} />
                     </li>
                   ))}
                 </ul>
@@ -165,12 +167,19 @@ function Step({
             </ol>
             {collapsible && (
               <Button
+                ref={toggleRef}
                 size="sm"
                 variant="outline"
                 aria-controls={listId}
                 aria-expanded={expanded}
                 className="self-start"
-                onClick={() => setExpanded((value) => !value)}>
+                onClick={() => {
+                  flushSync(() => setExpanded(!expanded))
+
+                  if (expanded) {
+                    toggleRef.current?.scrollIntoView({ block: 'nearest' })
+                  }
+                }}>
                 {expanded
                   ? t('showLatest', { count: latestMessageCount })
                   : t('showAll', { count: step.messages.length, messageType: step.messageType })}

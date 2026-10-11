@@ -97,4 +97,15 @@ describe('acknowledgementCounts', () => {
       { state: 'overdue', count: 1 },
     ])
   })
+
+  it('skips Messages whose Run was Reprocessed', () => {
+    const superseded = message('DESADV', '2026-10-01T10:00:00.000Z', 'a', 'rejected')
+
+    expect(
+      acknowledgementCounts([
+        { ...superseded, run: { ...superseded.run, replacedBy: { id: 'b' } } },
+        message('DESADV', '2026-10-02T10:00:00.000Z', 'b', 'accepted'),
+      ]),
+    ).toEqual([{ state: 'accepted', count: 1 }])
+  })
 })

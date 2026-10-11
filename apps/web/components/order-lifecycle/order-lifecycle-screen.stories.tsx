@@ -1,11 +1,7 @@
 import { expect, userEvent, within } from 'storybook/test'
 
-import {
-  besideSidebar,
-  darkMode,
-  german,
-} from '@/components/document-structures/document-structure-story-helpers'
 import { OrderLifecycleScreen } from '@/components/order-lifecycle/order-lifecycle-screen'
+import { besideSidebar, darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { orderLifecycleHandler, orderLifecycleReferences } from '@edi-bridge/mocks'
 
@@ -58,11 +54,54 @@ export const Unavailable = meta.story({
   },
 })
 
+export const UnavailableGerman = meta.story({
+  args: { businessReference: orderLifecycleReferences.full },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(orderLifecycleHandler(apiUrl, 'error'))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Order Lifecycle nicht verfügbar')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Erneut versuchen' })).toBeVisible()
+  },
+})
+
+export const UnavailableDark = meta.story({
+  args: { businessReference: orderLifecycleReferences.full },
+  beforeEach({ msw }) {
+    msw.use(orderLifecycleHandler(apiUrl, 'error'))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Order Lifecycle unavailable')).toBeVisible()
+  },
+})
+
 export const NoResult = meta.story({
   args: { businessReference: orderLifecycleReferences.noMatch },
   async play({ canvas }) {
     await expect(await canvas.findByText('No Order Lifecycle found')).toBeVisible()
     await expect(canvas.getByText(/No Message carries the Business Reference 0000\./)).toBeVisible()
+  },
+})
+
+export const NoResultGerman = meta.story({
+  args: { businessReference: orderLifecycleReferences.noMatch },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Kein Order Lifecycle gefunden')).toBeVisible()
+    await expect(
+      canvas.getByText(/Keine Message trägt die Business Reference 0000\./),
+    ).toBeVisible()
+  },
+})
+
+export const NoResultDark = meta.story({
+  args: { businessReference: orderLifecycleReferences.noMatch },
+  beforeEach: darkMode,
+  async play({ canvas }) {
+    await expect(await canvas.findByText('No Order Lifecycle found')).toBeVisible()
   },
 })
 
@@ -234,5 +273,37 @@ export const LargeVolumeDark = meta.story({
     }
 
     await expect(runLinks(stepOf(timeline, 'INVOIC'))).toHaveLength(30)
+  },
+})
+
+export const LargeVolumeCollapse = meta.story({
+  ...mobile,
+  args: { businessReference: orderLifecycleReferences.largeVolume },
+  async play({ canvas }) {
+    const timeline = await canvas.findByRole('list', {
+      name: 'Order Lifecycle with Hansemarkt GmbH',
+    })
+
+    const desadv = stepOf(timeline, 'DESADV')
+    const toggle = within(desadv).getByRole('button', { name: 'Show all 34 DESADV Messages' })
+
+    await userEvent.click(toggle)
+    toggle.scrollIntoView({ block: 'end' })
+    await userEvent.click(toggle)
+
+    const { top, bottom } = toggle.getBoundingClientRect()
+
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(toggle).toHaveFocus()
+    await expect(top).toBeGreaterThanOrEqual(0)
+    await expect(bottom).toBeLessThanOrEqual(window.innerHeight)
+
+    await userEvent.click(toggle)
+    toggle.scrollIntoView({ block: 'end' })
+    await userEvent.keyboard('{Enter}')
+
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(toggle).toHaveFocus()
+    await expect(toggle.getBoundingClientRect().top).toBeGreaterThanOrEqual(0)
   },
 })
