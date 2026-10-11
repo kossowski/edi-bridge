@@ -43,6 +43,10 @@ describe('publishProblem', () => {
     expect(publishProblem(422)).toBe('incomplete')
   })
 
+  it('reads 423 as a Draft whose AI review is still open', () => {
+    expect(publishProblem(423)).toBe('reviewOpen')
+  })
+
   it('reads any other failure as a failed publish', () => {
     expect(publishProblem(500)).toBe('failed')
     expect(publishProblem(null)).toBe('failed')

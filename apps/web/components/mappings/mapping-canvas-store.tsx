@@ -5,12 +5,13 @@ import { createStore, type StoreApi, useStore } from 'zustand'
 
 import type { XYPosition } from '@xyflow/react'
 
+import { aiMarks, AiMarksContext } from '@/components/mappings/ai-marks'
 import { sameStart, startsAtPart } from '@/components/mappings/mapping-graph'
 import { createTooltipHandle } from '@edi-bridge/ui/components/tooltip'
 
 import type { LinkableRows, RowRef } from '@/components/mappings/mapping-links'
 import type { Side, TreeRow } from '@/components/mappings/mapping-tree'
-import type { LinkStart } from '@edi-bridge/contracts'
+import type { AiReview, LinkStart } from '@edi-bridge/contracts'
 
 export type CanvasState = {
   collapsed: Readonly<Record<Side, ReadonlySet<string>>>
@@ -135,9 +136,11 @@ const Context = createContext<CanvasContext | null>(null)
 // One store per mounted canvas, so two canvases (or two stories) never share a selection.
 export function MappingCanvasProvider({
   viewOnly = false,
+  aiReview = null,
   children,
 }: {
   viewOnly?: boolean
+  aiReview?: AiReview | null
   children: ReactNode
 }) {
   const id = useId()
@@ -149,8 +152,13 @@ export function MappingCanvasProvider({
   }))
 
   const value = useMemo<CanvasContext>(() => ({ ...shared, viewOnly }), [shared, viewOnly])
+  const marks = useMemo(() => aiMarks(aiReview), [aiReview])
 
-  return <Context.Provider value={value}>{children}</Context.Provider>
+  return (
+    <Context.Provider value={value}>
+      <AiMarksContext value={marks}>{children}</AiMarksContext>
+    </Context.Provider>
+  )
 }
 
 function useCanvasContext() {

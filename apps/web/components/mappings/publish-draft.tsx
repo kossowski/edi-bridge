@@ -5,7 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 
 import {
   draftState,
@@ -69,7 +69,10 @@ export function MappingVersionsLink({ mappingId }: { mappingId: string }) {
 
 export function PublishDraft({ draft, stateId }: { draft: MappingDraft; stateId?: string }) {
   const t = useTranslations('Mapping.publish')
+  const tAi = useTranslations('Mapping.aiReview')
   const queryClient = useQueryClient()
+  const reasonId = useId()
+  const reviewOpen = draft.aiReview !== null
   const saving = useGraphSaveState(draft.mappingId) === 'saving'
   const [open, setOpen] = useState(false)
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null)
@@ -87,7 +90,7 @@ export function PublishDraft({ draft, stateId }: { draft: MappingDraft; stateId?
       setOpen(false)
     },
     onError: (error) => {
-      if (problemOf(error) === 'noChanges') {
+      if (['noChanges', 'reviewOpen'].includes(problemOf(error))) {
         void queryClient.invalidateQueries({
           queryKey: mappingDraftQuery(draft.mappingId).queryKey,
         })
@@ -109,53 +112,68 @@ export function PublishDraft({ draft, stateId }: { draft: MappingDraft; stateId?
         className="absolute end-0 top-full mt-1 text-sm whitespace-nowrap text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
         {justPublished && t('done', { version: publishedVersion })}
       </p>
+      {reviewOpen && (
+        <span id={reasonId} className="text-muted-foreground text-sm">
+          {tAi('publishBlocked')}
+        </span>
+      )}
       <MappingVersionsLink mappingId={draft.mappingId} />
-      <Dialog
-        open={open}
-        onOpenChange={(next) => {
-          if (publish.isPending) {
-            return
-          }
-
-          if (next) {
-            publish.reset()
-          }
-
-          setOpen(next)
-        }}>
-        <DialogTrigger
-          disabled={!draft.unpublishedChanges || saving}
-          render={<Button />}
-          aria-describedby={stateId}>
+      {reviewOpen && !open ? (
+        <Button
+          disabled
+          focusableWhenDisabled
+          aria-describedby={`${stateId ?? ''} ${reasonId}`.trim()}>
           <HugeiconsIcon icon={CloudUploadIcon} strokeWidth={2} aria-hidden />
           {t('button')}
-        </DialogTrigger>
-        <DialogContent
-          closeLabel={t('close')}
-          finalFocus={publish.isSuccess ? doneRef : true}
-          showCloseButton={!publish.isPending}>
-          <DialogHeader>
-            <DialogTitle>{t('title', { version })}</DialogTitle>
-            <DialogDescription>{t('description')}</DialogDescription>
-          </DialogHeader>
-          {publish.isError && (
-            <p role="alert" className="text-sm text-red-800 dark:text-red-300">
-              {t(`problem.${problemOf(publish.error)}`)}
-            </p>
-          )}
-          <DialogFooter>
-            <DialogClose disabled={publish.isPending} render={<Button variant="outline" />}>
-              {t('cancel')}
-            </DialogClose>
-            <Button
-              disabled={publish.isPending}
-              focusableWhenDisabled
-              onClick={() => publish.mutate()}>
-              {publish.isPending ? t('pending') : t('confirm', { version })}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </Button>
+      ) : (
+        <Dialog
+          open={open}
+          onOpenChange={(next) => {
+            if (publish.isPending) {
+              return
+            }
+
+            if (next) {
+              publish.reset()
+            }
+
+            setOpen(next)
+          }}>
+          <DialogTrigger
+            disabled={!draft.unpublishedChanges || saving}
+            render={<Button />}
+            aria-describedby={stateId}>
+            <HugeiconsIcon icon={CloudUploadIcon} strokeWidth={2} aria-hidden />
+            {t('button')}
+          </DialogTrigger>
+          <DialogContent
+            closeLabel={t('close')}
+            finalFocus={publish.isSuccess ? doneRef : true}
+            showCloseButton={!publish.isPending}>
+            <DialogHeader>
+              <DialogTitle>{t('title', { version })}</DialogTitle>
+              <DialogDescription>{t('description')}</DialogDescription>
+            </DialogHeader>
+            {publish.isError && (
+              <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+                {t(`problem.${problemOf(publish.error)}`)}
+              </p>
+            )}
+            <DialogFooter>
+              <DialogClose disabled={publish.isPending} render={<Button variant="outline" />}>
+                {t('cancel')}
+              </DialogClose>
+              <Button
+                disabled={publish.isPending}
+                focusableWhenDisabled
+                onClick={() => publish.mutate()}>
+                {publish.isPending ? t('pending') : t('confirm', { version })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import {
+  acceptAiDraftEndpoint,
   aiBudgetEndpoint,
   type AiBudgetExhaustedProblem,
   aiBudgetExhaustedProblemSchema,
@@ -310,6 +311,10 @@ export function publishMappingDraft(mappingId: string) {
   return request(publishMappingDraftEndpoint, {
     path: toPath(publishMappingDraftEndpoint.path, { mappingId }),
   })
+}
+
+export function acceptAiDraft(id: string) {
+  return request(acceptAiDraftEndpoint, { path: toPath(acceptAiDraftEndpoint.path, { id }) })
 }
 
 export function getAiBudget() {

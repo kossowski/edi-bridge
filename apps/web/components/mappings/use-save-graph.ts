@@ -11,8 +11,7 @@ import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
 import { applyChange, type GraphChange, revertChange } from '@/components/mappings/mapping-graph'
 import { saveMappingDraft } from '@/lib/api/client'
 import { mappingDraftQuery, mappingKeys } from '@/lib/api/queries'
-
-import type { MappingDraft } from '@edi-bridge/contracts'
+import { type AiReview, type MappingDraft, remainingAiReview } from '@edi-bridge/contracts'
 
 // The canvas words the messages, since it still knows the names of what a change removes.
 export type GraphSave = { change: GraphChange; saved: string; failed: string }
@@ -43,7 +42,7 @@ export function useSaveGraph(mappingId: string) {
     MappingDraft,
     Error,
     GraphSave,
-    { unpublishedChanges: boolean | undefined }
+    { unpublishedChanges: boolean | undefined; aiReview: AiReview | null | undefined }
   >({
     mutationKey,
     scope: { id: mutationKey.join('/') },
@@ -63,12 +62,23 @@ export function useSaveGraph(mappingId: string) {
 
       const before = queryClient.getQueryData<MappingDraft>(queryKey)
 
-      queryClient.setQueryData<MappingDraft>(
-        queryKey,
-        (draft) => draft && { ...draft, ...applyChange(draft, change), unpublishedChanges: true },
-      )
+      // A rejected or edited part loses its mark at once, as the save will answer.
+      queryClient.setQueryData<MappingDraft>(queryKey, (draft) => {
+        if (!draft) {
+          return draft
+        }
 
-      return { unpublishedChanges: before?.unpublishedChanges }
+        const after = applyChange(draft, change)
+
+        return {
+          ...draft,
+          ...after,
+          aiReview: draft.aiReview && remainingAiReview(draft.aiReview, draft, after),
+          unpublishedChanges: true,
+        }
+      })
+
+      return { unpublishedChanges: before?.unpublishedChanges, aiReview: before?.aiReview }
     },
     onSuccess: (saved, { saved: message }) => {
       if (isLast()) {
@@ -80,6 +90,7 @@ export function useSaveGraph(mappingId: string) {
     onError: (_error, { change, failed }, context) => {
       // A save still running keeps its own change on the Draft, so only the last one restores the flag.
       const unpublishedChanges = isLast() ? context?.unpublishedChanges : undefined
+      const aiReview = isLast() ? context?.aiReview : undefined
 
       queryClient.setQueryData<MappingDraft>(
         queryKey,
@@ -88,6 +99,7 @@ export function useSaveGraph(mappingId: string) {
             ...draft,
             ...revertChange(draft, change),
             unpublishedChanges: unpublishedChanges ?? draft.unpublishedChanges,
+            aiReview: aiReview === undefined ? draft.aiReview : aiReview,
           },
       )
       store.getState().setProblem(failed)

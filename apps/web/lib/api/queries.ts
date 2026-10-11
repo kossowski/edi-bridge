@@ -341,6 +341,10 @@ export function storeAiBudget(queryClient: QueryClient, budget: AiBudget) {
   queryClient.setQueryData(aiBudgetQuery.queryKey, budget)
 }
 
+export function storeAcceptedAiDraft(queryClient: QueryClient, draft: MappingDraft) {
+  queryClient.setQueryData(mappingDraftQuery(draft.mappingId).queryKey, draft)
+}
+
 export function storeAiDraftedDraft(queryClient: QueryClient, draft: MappingDraft) {
   const { queryKey } = mappingDraftQuery(draft.mappingId)
 

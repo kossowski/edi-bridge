@@ -14,6 +14,8 @@ import { useTranslations } from 'next-intl'
 import { type ComponentType, useEffect, useId, useRef, useState } from 'react'
 
 import { RadioField, SelectField, TextareaField, TextField } from '@/components/form-field'
+import { AiBadge } from '@/components/mappings/ai-badge'
+import { useAiMarks } from '@/components/mappings/ai-marks'
 import {
   insertText,
   jsonataPath,
@@ -724,6 +726,9 @@ export function TransformDetails({
 }) {
   const t = useTranslations('Mapping.transforms')
   const tLinks = useTranslations('Mapping.links')
+  const tAi = useTranslations('Mapping.aiReview')
+  const marks = useAiMarks()
+  const proposed = marks.transform(transform.id)
   const name = text.name(transform.id)
   const ports = transformPorts(transform)
   const viewOnly = useCanvasViewOnly()
@@ -750,18 +755,22 @@ export function TransformDetails({
     }
 
     const names = { source: text.start(link.from), target: text.end(link.to) }
+    const linkProposed = marks.transformLink(link)
 
     return (
       <Button
         size="sm"
         variant="outline"
-        aria-label={tLinks('removeLabel', names)}
+        aria-label={linkProposed ? tAi('rejectLinkLabel', names) : tLinks('removeLabel', names)}
         data-remove-link
         onClick={() => actions.removeLink(link, links.indexOf(link))}>
-        {tLinks('remove')}
+        {linkProposed ? tAi('reject') : tLinks('remove')}
       </Button>
     )
   }
+
+  const linkBadge = (link: TransformLink) =>
+    marks.transformLink(link) && <AiBadge label={tAi('proposed')} className="ms-2" />
 
   return (
     <div className="flex flex-col gap-4">
@@ -769,7 +778,10 @@ export function TransformDetails({
         <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
           {text.kind(transform.kind)}
         </p>
-        <h3 className="text-sm font-semibold">{name}</h3>
+        <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+          {name}
+          {proposed && <AiBadge label={tAi('proposedTransform')} />}
+        </h3>
         <p className="text-muted-foreground text-sm">{t(`descriptions.${transform.kind}`)}</p>
       </div>
       <IssueList
@@ -811,6 +823,7 @@ export function TransformDetails({
                     <span className="font-mono">
                       {link ? text.start(link.from) : t('details.noLink')}
                     </span>
+                    {link && linkBadge(link)}
                   </span>
                   {link && removeButton(link)}
                 </li>
@@ -839,6 +852,7 @@ export function TransformDetails({
                       className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <span className="min-w-0 font-mono [overflow-wrap:anywhere]">
                         {text.end(link.to)}
+                        {linkBadge(link)}
                       </span>
                       {removeButton(link)}
                     </span>
@@ -878,7 +892,7 @@ export function TransformDetails({
             variant="outline"
             className="w-fit"
             onClick={() => actions.remove(transform)}>
-            {t('details.removeLabel', { name })}
+            {proposed ? tAi('rejectTransform', { name }) : t('details.removeLabel', { name })}
           </Button>
         </>
       )}

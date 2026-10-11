@@ -1,0 +1,325 @@
+import { http, HttpResponse } from 'msw'
+import { NextIntlClientProvider } from 'next-intl'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
+
+import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
+import type { BeforeEach } from 'storybook/internal/csf'
+
+import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
+import {
+  detailsPanel,
+  findSaveStatus,
+  liveStatus,
+  seeded,
+  transformNodeOf,
+} from '@/components/mappings/mapping-canvas-story-helpers'
+import { viewerStory } from '@/components/session/session-story-helpers'
+import { apiUrl } from '@/lib/api/config'
+import messagesDe from '@/messages/de.json'
+import { acceptAiDraftEndpoint } from '@edi-bridge/contracts'
+import {
+  type AiProposalSize,
+  aiProposalFor,
+  createHandlers,
+  type MappingDraftRecord,
+  seedDocumentStructures,
+  seedMappingDrafts,
+  seedMappingSamples,
+  withAiProposal,
+} from '@edi-bridge/mocks'
+
+import preview from '../../.storybook/preview'
+
+function inReview(name: string, size: AiProposalSize = 'regular') {
+  const record = seeded(name)
+  const sample = seedMappingSamples.find(({ mappingId }) => mappingId === record.id)!
+
+  return withAiProposal(record, sample.id, aiProposalFor(record, seedDocumentStructures, size))
+}
+
+// Links drafted next to the Admin's own, with a Lookup Table among the Transforms.
+const outbound = inReview('Alpenfrisch: ERP JSON to INVOIC')
+
+const inbound = inReview('Rheinkauf: ORDERS to ERP JSON')
+
+const fromScratch = inReview('Rheinkauf: ERP JSON to INVOIC')
+
+const large = inReview('Bodensee: ERP JSON to INVOIC', 'large')
+
+function reviewing(record: MappingDraftRecord): BeforeEach<ReactRenderer> {
+  return ({ msw }: StoryContext) => {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        mappingDrafts: seedMappingDrafts.map((draft) => (draft.id === record.id ? record : draft)),
+      }),
+    )
+  }
+}
+
+const proposedRow = /AI-proposed link$/
+
+const proposedEdge = /, AI-proposed$/
+
+function aiMarks(canvasElement: HTMLElement) {
+  return canvasElement.querySelectorAll('[data-ai-proposed]')
+}
+
+async function findSummary(canvasElement: HTMLElement) {
+  return within(canvasElement).findByText(/AI-proposed parts? to review$/)
+}
+
+const meta = preview.meta({
+  title: 'Mappings/MappingCanvasScreen/AiReview',
+  component: MappingCanvasScreen,
+  parameters: { layout: 'fullscreen' },
+  args: { id: outbound.id },
+  decorators: [
+    (Story) => (
+      <div className="flex min-h-svh flex-col">
+        <Story />
+      </div>
+    ),
+  ],
+  beforeEach: reviewing(outbound),
+})
+
+export const ReviewOpen = meta.story({
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText('AI review open')).toBeVisible()
+    await expect(await findSummary(canvasElement)).toHaveTextContent(
+      '16 AI-proposed parts to review',
+    )
+
+    const rows = await canvas.findAllByRole('button', { name: proposedRow })
+
+    await expect(rows.length).toBeGreaterThan(0)
+    await expect(canvas.getAllByRole('img', { name: proposedEdge }).length).toBeGreaterThan(
+      rows.length - 1,
+    )
+    await expect(canvas.getAllByRole('img', { name: /^Link from/ }).length).toBeGreaterThan(
+      canvas.getAllByRole('img', { name: proposedEdge }).length,
+    )
+
+    const lookup = transformNodeOf(canvasElement, 'Lookup Table 1')
+
+    await expect(within(lookup).getByRole('group')).toHaveAttribute('data-ai-proposed', 'true')
+    await expect(
+      within(lookup).getByRole('button', { name: 'Lookup Table 1 AI-proposed Transform' }),
+    ).toBeVisible()
+    await expect(
+      within(lookup).getByRole('button', { name: 'Reject the AI-proposed Lookup Table 1' }),
+    ).toBeVisible()
+
+    const publish = canvas.getByRole('button', { name: 'Publish' })
+
+    await expect(publish).toHaveAttribute('aria-disabled', 'true')
+    await expect(publish).toHaveAccessibleDescription(/Accept the AI draft before publishing\.$/)
+    await expect(canvas.getByText('Accept the AI draft before publishing.')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Accept draft' })).toBeVisible()
+  },
+})
+
+export const InboundWithLookupTable = meta.story({
+  args: { id: inbound.id },
+  beforeEach: reviewing(inbound),
+  async play({ canvas, canvasElement }) {
+    await findSummary(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: /^Lookup Table 1/ }))
+
+    const panel = detailsPanel(canvasElement)
+
+    await expect(
+      panel.getByRole('heading', { name: 'Lookup Table 1 AI-proposed Transform' }),
+    ).toBeVisible()
+    await expect(panel.getAllByText('AI-proposed').length).toBeGreaterThan(0)
+    await expect(
+      panel.getAllByRole('button', { name: /^Reject the AI-proposed link from/ }).length,
+    ).toBeGreaterThan(0)
+
+    await userEvent.click(panel.getByRole('button', { name: 'Reject Lookup Table 1' }))
+    await waitFor(() =>
+      expect(liveStatus(canvasElement)).toHaveTextContent('AI-proposed Lookup Table 1 rejected.'),
+    )
+    await expect(canvas.queryByRole('group', { name: 'Transform Lookup Table 1' })).toBeNull()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
+  },
+})
+
+export const RejectLink = meta.story({
+  async play({ canvas, canvasElement }) {
+    const summary = await findSummary(canvasElement)
+    const [row] = await canvas.findAllByRole('button', { name: proposedRow })
+
+    await userEvent.click(row!)
+
+    const panel = detailsPanel(canvasElement)
+
+    await expect(panel.getByText('AI-proposed')).toBeVisible()
+
+    const reject = panel.getByRole('button', { name: /^Reject the AI-proposed link from/ })
+    const [, source, target] = /from (.+) to (.+)$/.exec(reject.getAttribute('aria-label')!)!
+
+    await expect(reject).toHaveTextContent('Reject')
+    await userEvent.click(reject)
+
+    await waitFor(() =>
+      expect(liveStatus(canvasElement)).toHaveTextContent(
+        `AI-proposed link from ${source} to ${target} rejected.`,
+      ),
+    )
+    await expect(panel.getByText('This part has no links yet.')).toBeVisible()
+    await expect(summary).toHaveTextContent('15 AI-proposed parts to review')
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
+    await expect(summary).toHaveTextContent('15 AI-proposed parts to review')
+  },
+})
+
+export const EditTransform = meta.story({
+  args: { id: fromScratch.id },
+  beforeEach: reviewing(fromScratch),
+  async play({ canvas, canvasElement }) {
+    const summary = await findSummary(canvasElement)
+    const before = Number(/\d+/.exec(summary.textContent)![0])
+
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Constant 1 AI-proposed Transform' }),
+    )
+
+    const panel = detailsPanel(canvasElement)
+    const value = panel.getByRole('textbox', { name: 'Value' })
+
+    await userEvent.clear(value)
+    await userEvent.type(value, '389')
+    await userEvent.tab()
+
+    await waitFor(() =>
+      expect(liveStatus(canvasElement)).toHaveTextContent('Settings of Constant 1 saved.'),
+    )
+    await expect(canvas.getByRole('button', { name: 'Constant 1' })).toBeVisible()
+    await expect(
+      within(transformNodeOf(canvasElement, 'Constant 1')).getByRole('group'),
+    ).not.toHaveAttribute('data-ai-proposed')
+    await expect(panel.queryByText('AI-proposed Transform')).toBeNull()
+    await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
+    await expect(summary).toHaveTextContent(`${before - 1} AI-proposed parts to review`)
+  },
+})
+
+export const AcceptDraft = meta.story({
+  async play({ canvas, canvasElement }) {
+    await findSummary(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: 'Accept draft' }))
+
+    const done = await canvas.findByText(
+      'AI draft accepted. The Draft stays editable and can be published now.',
+    )
+
+    await waitFor(() => expect(done.closest('[role="status"]')).toHaveFocus())
+    await expect(canvas.queryByText('AI review open')).toBeNull()
+    await expect(aiMarks(canvasElement)).toHaveLength(0)
+    await expect(canvas.queryAllByRole('img', { name: proposedEdge })).toHaveLength(0)
+    await expect(canvas.queryByText('Accept the AI draft before publishing.')).toBeNull()
+    await expect(canvas.getByRole('button', { name: 'Publish' })).toBeEnabled()
+
+    await userEvent.click(transformNodeOf(canvasElement, 'Lookup Table 1').querySelector('button')!)
+    await expect(
+      detailsPanel(canvasElement).getByRole('button', { name: 'Remove Lookup Table 1' }),
+    ).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Draft with AI' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+  },
+})
+
+export const AcceptFailed = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${acceptAiDraftEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'The AI draft could not be accepted.' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await findSummary(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: 'Accept draft' }))
+    await expect(
+      await canvas.findByText('The AI draft could not be accepted. Try again.'),
+    ).toHaveAttribute('role', 'alert')
+    await expect(canvas.getByText('AI review open')).toBeVisible()
+  },
+})
+
+export const Viewer = meta.story({
+  ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      await expect(await canvas.findByText('AI review open')).toBeVisible()
+      await expect(await findSummary(canvasElement)).toBeVisible()
+      await expect(
+        (await canvas.findAllByRole('button', { name: proposedRow })).length,
+      ).toBeGreaterThan(0)
+      await expect(canvas.getAllByRole('img', { name: proposedEdge }).length).toBeGreaterThan(0)
+      await expect(canvas.queryByRole('button', { name: 'Accept draft' })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: /^Reject/ })).toBeNull()
+
+      const [row] = canvas.getAllByRole('button', { name: proposedRow })
+
+      await userEvent.click(row!)
+      await expect(detailsPanel(canvasElement).getByText('AI-proposed')).toBeVisible()
+      await expect(
+        detailsPanel(canvasElement).queryByRole('button', { name: /^Reject/ }),
+      ).toBeNull()
+    },
+  }),
+})
+
+export const LargeVolume = meta.story({
+  args: { id: large.id },
+  beforeEach: reviewing(large),
+  async play({ canvas, canvasElement }) {
+    await findSummary(canvasElement)
+    await waitFor(() =>
+      expect(canvas.getAllByRole('img', { name: proposedEdge }).length).toBeGreaterThan(20),
+    )
+  },
+})
+
+export const German = meta.story({
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Durchsicht des KI-Entwurfs offen')).toBeVisible()
+    await expect(canvas.getByText('16 KI-Vorschläge zu prüfen')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'KI-Entwurf übernehmen' })).toBeVisible()
+    await expect(
+      canvas.getByText('Übernehmen Sie den KI-Entwurf, bevor Sie veröffentlichen.'),
+    ).toBeVisible()
+    await expect(
+      (await canvas.findAllByRole('button', { name: /Von der KI vorgeschlagene Verknüpfung$/ }))
+        .length,
+    ).toBeGreaterThan(0)
+  },
+})
+
+function darkMode() {
+  document.documentElement.classList.add('dark')
+
+  return () => document.documentElement.classList.remove('dark')
+}
+
+export const Dark = meta.story({
+  beforeEach: [reviewing(outbound), darkMode],
+  async play({ canvas, canvasElement }) {
+    await findSummary(canvasElement)
+
+    const [row] = await canvas.findAllByRole('button', { name: proposedRow })
+
+    await userEvent.click(row!)
+    await expect(detailsPanel(canvasElement).getByText('AI-proposed')).toBeVisible()
+  },
+})

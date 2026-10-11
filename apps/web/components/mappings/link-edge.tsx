@@ -22,9 +22,10 @@ import type { MappingLink, TransformLink } from '@edi-bridge/contracts'
 
 export type PlainEdgeData = Omit<CanvasLink, 'id'>
 
-export type LinkEdgeData =
+export type LinkEdgeData = (
   | ({ kind: 'link' } & PlainEdgeData)
   | { kind: 'transformLink'; link: TransformLink; source: string; target: string }
+) & { aiProposed: boolean }
 
 export type LinkFlowEdge = Edge<LinkEdgeData, 'link'>
 
@@ -49,6 +50,7 @@ function useLinkActions() {
 
 function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
   const t = useTranslations('Mapping.links')
+  const tAi = useTranslations('Mapping.aiReview')
   const actions = useLinkActions()
   const hoverEdge = useCanvasStore((state) => state.hoverEdge)
   const leaveEdge = useCanvasStore((state) => state.leaveEdge)
@@ -66,13 +68,16 @@ function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
     }
   }
 
+  const removeLabel = (names: { source: string; target: string }) =>
+    data.aiProposed ? tAi('rejectLinkLabel', names) : t('removeLabel', names)
+
   const label = () => {
     if (data.kind === 'transformLink') {
-      return t('removeLabel', { source: data.source, target: data.target })
+      return removeLabel({ source: data.source, target: data.target })
     }
 
     return single && only
-      ? t('removeLabel', { source: only.sourcePath, target: only.targetPath })
+      ? removeLabel({ source: only.sourcePath, target: only.targetPath })
       : t('showLinksLabel', {
           count: data.links.length,
           source: data.sourcePath,
@@ -206,7 +211,11 @@ function LinkEdgeView({
       <BaseEdge
         interactionWidth={interactionWidth}
         path={path}
-        style={hovered ? { ...style, stroke: 'var(--foreground)', strokeWidth: 2.5 } : style}
+        style={{
+          ...style,
+          ...(data?.aiProposed && { stroke: 'var(--ai-proposed)', strokeDasharray: '6 3' }),
+          ...(hovered && { stroke: 'var(--foreground)', strokeWidth: 2.5 }),
+        }}
       />
       {hovered && data && !viewOnly && (
         <EdgeButtonAnchor id={id} data={data} midpoint={{ x: labelX, y: labelY }} />

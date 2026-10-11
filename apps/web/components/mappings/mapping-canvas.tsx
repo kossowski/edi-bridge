@@ -28,6 +28,7 @@ import {
   useState,
 } from 'react'
 
+import { useAiMarks } from '@/components/mappings/ai-marks'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
 import {
   LinkActionsContext,
@@ -433,6 +434,7 @@ export function MappingCanvas({
   beside,
 }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
+  const tAi = useTranslations('Mapping.aiReview')
   const tLinks = useTranslations('Mapping.links')
   const tTransforms = useTranslations('Mapping.transforms')
   const root = useRef<HTMLDivElement>(null)
@@ -450,6 +452,7 @@ export function MappingCanvas({
   const usesLookupTables = graph.transforms.some(({ kind }) => kind === 'lookupTable')
   const lookupTables = useQuery({ ...lookupTablesQuery, enabled: usesLookupTables })
   const text = useGraphText(graph.transforms, lookupTables.data)
+  const marks = useAiMarks()
 
   // Where dragged nodes are shown until the cached Draft, and so its transforms, changes.
   const [dragged, setDragged] = useState<{
@@ -463,13 +466,44 @@ export function MappingCanvas({
     [dragged, graph.transforms],
   )
 
+  // Removing an AI-proposed part rejects it, and the announcement says so.
+  const rejected = useCallback(
+    (change: GraphChange) => {
+      switch (change.kind) {
+        case 'removeLink':
+          return marks.link(change.link)
+            ? tAi('rejectedLink', {
+                source: change.link.sourcePath,
+                target: change.link.targetPath,
+              })
+            : null
+        case 'removeTransformLink':
+          return marks.transformLink(change.link)
+            ? tAi('rejectedLink', {
+                source: text.start(change.link.from),
+                target: text.end(change.link.to),
+              })
+            : null
+        case 'removeTransform':
+          return marks.transform(change.transform.id)
+            ? tAi('rejectedTransform', { name: text.name(change.transform.id) })
+            : null
+        default:
+          return null
+      }
+    },
+    [marks, tAi, text],
+  )
+
   const save = useCallback(
     (change: GraphChange) => {
       if (!viewOnly) {
-        onChange({ change, ...text.change(change) })
+        const messages = text.change(change)
+
+        onChange({ change, ...messages, saved: rejected(change) ?? messages.saved })
       }
     },
-    [onChange, viewOnly, text],
+    [onChange, rejected, viewOnly, text],
   )
 
   const rows = useMemo(
@@ -552,6 +586,7 @@ export function MappingCanvas({
       }
 
       const names = { source: text.start(link.from), target: text.end(link.to) }
+      const aiProposed = marks.transformLink(link)
 
       return [
         {
@@ -561,11 +596,11 @@ export function MappingCanvas({
           sourceHandle: from.handle,
           target: to.node,
           targetHandle: to.handle,
-          data: { kind: 'transformLink', link, ...names },
+          data: { kind: 'transformLink', link, ...names, aiProposed },
           selectable: false,
           focusable: false,
           zIndex: 100,
-          ariaLabel: t('link', names),
+          ariaLabel: aiProposed ? tAi('edgeLabel', { label: t('link', names) }) : t('link', names),
         },
       ]
     })
@@ -605,6 +640,7 @@ export function MappingCanvas({
         linked: linked.has(row.id),
         filled: row.side === 'target' && linkIntoTarget(graph, row.path) !== null,
         wholePart: isWholePart(rows, row),
+        aiProposed: row.side === 'target' && marks.end({ kind: 'target', path: row.path }),
       },
       draggable: false,
       selectable: false,
@@ -619,6 +655,11 @@ export function MappingCanvas({
 
       const inputs = ports.inputs.map((port) => {
         const into = linkIntoInput(graph, transform.id, port)
+        const aiProposed = into !== null && marks.transformLink(into)
+
+        const status = into
+          ? tTransforms('node.linkedFrom', { source: text.start(into.from) })
+          : tTransforms('node.notLinked')
 
         return {
           port,
@@ -629,9 +670,7 @@ export function MappingCanvas({
             transformId: transform.id,
             input: port,
           }),
-          status: into
-            ? tTransforms('node.linkedFrom', { source: text.start(into.from) })
-            : tTransforms('node.notLinked'),
+          status: aiProposed ? `${status} ${tAi('proposedStatus')}` : status,
         }
       })
 
@@ -673,6 +712,7 @@ export function MappingCanvas({
           issues: (issues[transform.id] ?? []).map((issue) => text.issue(transform.kind, issue)),
           inputs,
           outputs,
+          aiProposed: marks.transform(transform.id),
         },
         draggable: !viewOnly,
         selectable: false,
@@ -683,20 +723,23 @@ export function MappingCanvas({
 
     const plainEdges = shown.map(({ id, sourcePath, targetPath, links: merged }): LinkFlowEdge => {
       const [first] = merged
+      const aiProposed = merged.some((link) => marks.link(link))
+
+      const label =
+        merged.length === 1 && first
+          ? t('link', { source: first.sourcePath, target: first.targetPath })
+          : t('links', { count: merged.length, source: sourcePath, target: targetPath })
 
       return {
         id,
         type: 'link',
         source: nodeId('source', sourcePath),
         target: nodeId('target', targetPath),
-        data: { kind: 'link', sourcePath, targetPath, links: merged },
+        data: { kind: 'link', sourcePath, targetPath, links: merged, aiProposed },
         selectable: false,
         focusable: false,
         zIndex: 100,
-        ariaLabel:
-          merged.length === 1 && first
-            ? t('link', { source: first.sourcePath, target: first.targetPath })
-            : t('links', { count: merged.length, source: sourcePath, target: targetPath }),
+        ariaLabel: aiProposed ? tAi('edgeLabel', { label }) : label,
       }
     })
 
@@ -717,11 +760,13 @@ export function MappingCanvas({
     graph,
     heights,
     issues,
+    marks,
     viewOnly,
     rows,
     source.items,
     source.title,
     t,
+    tAi,
     tTransforms,
     target.items,
     target.title,
