@@ -29,7 +29,6 @@ import {
   type VisibleRow,
 } from '@/components/lookup-tables/lookup-table-entry-grid'
 import { useEntryEditing } from '@/components/lookup-tables/use-entry-editing'
-import { useCanChange } from '@/hooks/use-session'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -73,7 +72,13 @@ function Shortcuts() {
   )
 }
 
-export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
+export function LookupTableEntryEditor({
+  table,
+  canChange,
+}: {
+  table: LookupTable
+  canChange: boolean
+}) {
   const t = useTranslations('LookupTable.entries')
   const tImport = useTranslations('LookupTable.import')
   const ids = { title: useId(), hint: useId(), filter: useId() }
@@ -88,7 +93,6 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
   const addButton = useRef<HTMLButtonElement>(null)
   const focusAddButton = useRef(false)
   const term = useDeferredValue(filter.trim().toLocaleLowerCase())
-  const canChange = useCanChange()
 
   const entries = useEntryEditing(table, {
     onSaved: () => setAnnouncement(t('announcements.saved')),

@@ -144,6 +144,7 @@ function InvalidEntries() {
   return (
     <div className="p-6">
       <LookupTableEntryEditor
+        canChange
         table={{
           ...unitsOfMeasure,
           scope: { kind: 'workspace' },
