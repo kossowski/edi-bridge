@@ -14,7 +14,7 @@ Existing commercial tools (e.g. Lobster) solve this, but they are closed and hea
 
 EDI Bridge is an open-source integration platform that receives Documents on Channels (SFTP, webhook, Manual Submission), routes them through Flows, converts them with versioned Mappings between JSON/CSV and EDIFACT in both directions, validates outgoing EDIFACT, delivers it on outbound Channels (SFTP, HTTP), and tracks Acknowledgements.
 
-- **Integration engineers** onboard Trading Partners (identity, Test Mode, onboarding checklist), build Mappings on a drag-and-drop canvas (or let the AI draft one for review link by link), maintain Lookup Tables, and publish immutable Mapping Versions.
+- **Integration engineers** onboard Trading Partners (identity, Test Mode, onboarding checklist), build Mappings on a drag-and-drop canvas (or let the AI draft one and review the Draft as a whole), maintain Lookup Tables, and publish immutable Mapping Versions.
 - **Operations staff** watch live traffic, inspect each Run (step timeline, raw Interchange with the error position highlighted, parsed tree), Retry delivery failures, Reprocess mapping failures with a chosen Mapping Version, and see Duplicates and Overdue Acknowledgements.
 - **Business users** search by Business Reference and see the Order Lifecycle (ORDERS → DESADV → INVOIC with Acknowledgements).
 
