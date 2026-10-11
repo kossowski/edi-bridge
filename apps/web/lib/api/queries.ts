@@ -36,7 +36,6 @@ import {
   getSession,
   getTradingPartner,
   inferDocumentStructure,
-  isUnauthorized,
   listChannels,
   listDocumentStructures,
   listLookupTables,
@@ -54,7 +53,6 @@ import {
 export const sessionQuery = queryOptions({
   queryKey: ['session'],
   queryFn: getSession,
-  retry: (failureCount, error) => !isUnauthorized(error) && failureCount < 3,
 })
 
 export const currentWorkspaceQuery = queryOptions({

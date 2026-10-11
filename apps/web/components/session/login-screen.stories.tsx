@@ -33,6 +33,7 @@ export const Default = meta.story({
   async play({ canvas }) {
     await expect(canvas.getByRole('heading', { name: 'Sign in to EDI Bridge' })).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'View live demo' })).toBeEnabled()
+    await expect(canvas.getByText('Users are invited by the Operator.')).toBeVisible()
     await expect(canvas.queryByRole('link')).toBeNull()
   },
 })
@@ -97,14 +98,31 @@ export const ServerError = meta.story({
   },
 })
 
-export const LiveDemo = meta.story({
+export const Showcase = meta.story({
   async play({ canvas }) {
     await userEvent.click(canvas.getByRole('button', { name: 'View live demo' }))
     await waitFor(() => expect(getRouter().replace).toHaveBeenCalledWith('/'))
   },
 })
 
-export const LiveDemoError = meta.story({
+export const ShowcasePending = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${showcaseSignInEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(canvas.getByRole('button', { name: 'View live demo' }))
+    await expect(
+      await canvas.findByRole('button', { name: 'Opening the Showcase Workspace…' }),
+    ).toBeDisabled()
+    await expect(canvas.getByRole('button', { name: 'Sign in' })).toBeDisabled()
+  },
+})
+
+export const ShowcaseError = meta.story({
   beforeEach({ msw }) {
     msw.use(
       http.post(`${apiUrl}${showcaseSignInEndpoint.path}`, () =>
@@ -115,7 +133,7 @@ export const LiveDemoError = meta.story({
   async play({ canvas }) {
     await userEvent.click(canvas.getByRole('button', { name: 'View live demo' }))
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The live demo could not be opened.',
+      'The Showcase Workspace could not be opened.',
     )
   },
 })

@@ -23,10 +23,11 @@
       "de": "Deutsch"
     },
     "session": {
-      "accountMenu": "Konto von {name}",
+      "userMenu": "Benutzermenü von {name}",
+      "userMenuUnavailable": "Benutzermenü, Sitzung nicht verfügbar",
       "signedInAs": "Angemeldet als",
+      "operator": "Operator",
       "role": {
-        "operator": "Operator",
         "admin": "Admin",
         "viewer": "Viewer"
       },
@@ -35,8 +36,10 @@
       "signOut": "Abmelden",
       "signingOut": "Wird abgemeldet …",
       "signOutFailed": "Abmelden fehlgeschlagen. Versuchen Sie es erneut.",
-      "redirecting": "Ihre Sitzung ist beendet. Die Anmeldeseite wird geöffnet …",
-      "checkingAccess": "Zugriff wird geprüft"
+      "unavailable": "Sitzung nicht verfügbar",
+      "unavailableDescription": "Ihre Sitzungsdaten konnten nicht geladen werden. Abmelden ist trotzdem möglich.",
+      "loading": "Sitzung wird geladen …",
+      "redirecting": "Ihre Sitzung ist beendet. Die Anmeldeseite wird geöffnet …"
     }
   },
   "Navigation": {
@@ -82,13 +85,13 @@
       "passwordRequired": "Geben Sie Ihr Passwort ein.",
       "wrongCredentials": "E-Mail-Adresse oder Passwort ist falsch.",
       "failed": "Anmelden fehlgeschlagen. Versuchen Sie es gleich noch einmal.",
-      "liveDemoFailed": "Die Live-Demo konnte nicht geöffnet werden. Versuchen Sie es gleich noch einmal."
+      "showcaseFailed": "Der Showcase Workspace konnte nicht geöffnet werden. Versuchen Sie es gleich noch einmal."
     },
     "or": "oder",
-    "liveDemo": "Live-Demo ansehen",
-    "liveDemoPending": "Live-Demo wird geöffnet …",
-    "liveDemoDescription": "Erkunden Sie den Showcase Workspace als Viewer, ohne Konto.",
-    "noAccount": "Konten entstehen über eine Einladung des Operators."
+    "showcase": "Live-Demo ansehen",
+    "showcasePending": "Showcase Workspace wird geöffnet …",
+    "showcaseDescription": "Erkunden Sie den Showcase Workspace als Viewer, ohne Einladung.",
+    "invitedByOperator": "Benutzer werden vom Operator eingeladen."
   },
   "Overview": {
     "loading": "Übersicht wird geladen",

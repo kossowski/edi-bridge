@@ -1,5 +1,5 @@
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { expect, waitFor } from 'storybook/test'
 
 import { SessionGate } from '@/components/session/session-gate'
@@ -22,12 +22,28 @@ export const SignedIn = meta.story({
   },
 })
 
+export const Loading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${sessionEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await expect(canvas.getByRole('status')).toHaveTextContent('Loading session…')
+    await expect(canvas.queryByText('Workspace content')).toBeNull()
+  },
+})
+
 export const SignedOut = meta.story({
   beforeEach({ msw }) {
     msw.use(...sessionHandlers(apiUrl, createSessionStore(null)))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('status')).toHaveTextContent('Your session has ended.')
+    await waitFor(() =>
+      expect(canvas.getByRole('status')).toHaveTextContent('Your session has ended.'),
+    )
     await waitFor(() => expect(getRouter().replace).toHaveBeenCalledWith('/login'))
   },
 })

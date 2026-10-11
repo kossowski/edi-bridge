@@ -3,7 +3,8 @@
 import { useTranslations } from 'next-intl'
 
 import { LocaleSwitcher } from '@/components/locale-switcher'
-import { UserMenu, ViewOnlyBadge } from '@/components/session/user-menu'
+import { UserMenu } from '@/components/session/user-menu'
+import { ViewOnlyBadge } from '@/components/session/view-only-badge'
 import { ThemeSwitcher } from '@/components/theme-switcher'
 import { WorkspaceName } from '@/components/workspace-name'
 import { SidebarTrigger } from '@edi-bridge/ui/components/sidebar'

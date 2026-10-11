@@ -3,12 +3,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { type ComponentProps, type FormEvent, useId, useRef, useState } from 'react'
+import { type FormEvent, useId, useRef, useState } from 'react'
 
+import { TextField } from '@/components/form-field'
+import { focusMainContentOnNextPage } from '@/components/main-content-focus'
 import { isUnauthorized, signIn, signInToShowcase } from '@/lib/api/client'
 import { sessionQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Input } from '@edi-bridge/ui/components/input'
 
 import type { SignedIn } from '@edi-bridge/contracts'
 
@@ -24,38 +25,15 @@ function useEnterWorkspace<Variables>(signInWith: (variables: Variables) => Prom
       queryClient.clear()
       await queryClient.prefetchQuery(sessionQuery)
     },
-    onSuccess: () => router.replace('/'),
+    onSuccess: () => {
+      focusMainContentOnNextPage()
+      router.replace('/')
+    },
   })
 }
 
-function LoginField({
-  id,
-  label,
-  error,
-  ...inputProps
-}: {
-  id: string
-  label: string
-  error: string | null
-} & Omit<ComponentProps<typeof Input>, 'id'>) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
-      <Input
-        id={id}
-        aria-describedby={error ? `${id}-error` : undefined}
-        aria-invalid={error !== null}
-        {...inputProps}
-      />
-      {error && (
-        <p id={`${id}-error`} className="text-sm text-red-800 dark:text-red-300">
-          {error}
-        </p>
-      )}
-    </div>
-  )
+function isEntering(mutation: { isPending: boolean; isSuccess: boolean }) {
+  return mutation.isPending || mutation.isSuccess
 }
 
 export function LoginScreen() {
@@ -66,11 +44,9 @@ export function LoginScreen() {
   const [values, setValues] = useState<SignInValues>({ email: '', password: '' })
   const [submitted, setSubmitted] = useState(false)
 
-  const credentials = useEnterWorkspace(signIn)
-  const showcase = useEnterWorkspace(signInToShowcase)
-
-  const pending =
-    credentials.isPending || showcase.isPending || credentials.isSuccess || showcase.isSuccess
+  const credentialsSignIn = useEnterWorkspace(signIn)
+  const showcaseSignIn = useEnterWorkspace(signInToShowcase)
+  const pending = isEntering(credentialsSignIn) || isEntering(showcaseSignIn)
 
   const fieldErrors = signInFieldErrors(values)
   const emailError = submitted && fieldErrors.email ? t(`errors.${fieldErrors.email}`) : null
@@ -78,28 +54,28 @@ export function LoginScreen() {
   const passwordError =
     submitted && fieldErrors.password ? t(`errors.${fieldErrors.password}`) : null
 
-  const serverError = credentials.isError
-    ? t(isUnauthorized(credentials.error) ? 'errors.wrongCredentials' : 'errors.failed')
-    : showcase.isError
-      ? t('errors.liveDemoFailed')
+  const serverError = credentialsSignIn.isError
+    ? t(isUnauthorized(credentialsSignIn.error) ? 'errors.wrongCredentials' : 'errors.failed')
+    : showcaseSignIn.isError
+      ? t('errors.showcaseFailed')
       : null
 
   function change(field: keyof SignInValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }))
-    credentials.reset()
+    credentialsSignIn.reset()
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitted(true)
-    showcase.reset()
+    showcaseSignIn.reset()
 
     if (fieldErrors.email) {
       emailRef.current?.focus()
     } else if (fieldErrors.password) {
       passwordRef.current?.focus()
     } else {
-      credentials.mutate(toSignInBody(values))
+      credentialsSignIn.mutate(toSignInBody(values))
     }
   }
 
@@ -116,7 +92,7 @@ export function LoginScreen() {
         aria-labelledby={`${id}-title`}
         className="flex flex-col gap-4"
         onSubmit={submit}>
-        <LoginField
+        <TextField
           id={`${id}-email`}
           autoComplete="email"
           error={emailError}
@@ -126,9 +102,9 @@ export function LoginScreen() {
           spellCheck={false}
           type="email"
           value={values.email}
-          onChange={(event) => change('email', event.target.value)}
+          onChange={(value) => change('email', value)}
         />
-        <LoginField
+        <TextField
           id={`${id}-password`}
           autoComplete="current-password"
           error={passwordError}
@@ -137,13 +113,13 @@ export function LoginScreen() {
           ref={passwordRef}
           type="password"
           value={values.password}
-          onChange={(event) => change('password', event.target.value)}
+          onChange={(value) => change('password', value)}
         />
         <div role="alert" className="text-sm text-red-800 empty:hidden dark:text-red-300">
           {serverError}
         </div>
         <Button disabled={pending} type="submit" className="w-full">
-          {credentials.isPending || credentials.isSuccess ? t('submitting') : t('submit')}
+          {isEntering(credentialsSignIn) ? t('submitting') : t('submit')}
         </Button>
       </form>
       <div className="text-muted-foreground flex items-center gap-3 text-xs uppercase">
@@ -156,20 +132,20 @@ export function LoginScreen() {
           disabled={pending}
           type="button"
           variant="outline"
-          aria-describedby={`${id}-live-demo`}
+          aria-describedby={`${id}-showcase`}
           className="w-full"
           onClick={() => {
             setSubmitted(false)
-            credentials.reset()
-            showcase.mutate(undefined)
+            credentialsSignIn.reset()
+            showcaseSignIn.mutate(undefined)
           }}>
-          {showcase.isPending || showcase.isSuccess ? t('liveDemoPending') : t('liveDemo')}
+          {isEntering(showcaseSignIn) ? t('showcasePending') : t('showcase')}
         </Button>
-        <p id={`${id}-live-demo`} className="text-muted-foreground text-center text-sm">
-          {t('liveDemoDescription')}
+        <p id={`${id}-showcase`} className="text-muted-foreground text-center text-sm">
+          {t('showcaseDescription')}
         </p>
       </div>
-      <p className="text-muted-foreground border-t pt-4 text-sm">{t('noAccount')}</p>
+      <p className="text-muted-foreground border-t pt-4 text-sm">{t('invitedByOperator')}</p>
     </div>
   )
 }

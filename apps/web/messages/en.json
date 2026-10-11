@@ -23,10 +23,11 @@
       "de": "Deutsch"
     },
     "session": {
-      "accountMenu": "Account of {name}",
+      "userMenu": "User menu of {name}",
+      "userMenuUnavailable": "User menu, session unavailable",
       "signedInAs": "Signed in as",
+      "operator": "Operator",
       "role": {
-        "operator": "Operator",
         "admin": "Admin",
         "viewer": "Viewer"
       },
@@ -35,8 +36,10 @@
       "signOut": "Sign out",
       "signingOut": "Signing out…",
       "signOutFailed": "Sign-out failed. Try again.",
-      "redirecting": "Your session has ended. Opening the sign-in page…",
-      "checkingAccess": "Checking access"
+      "unavailable": "Session unavailable",
+      "unavailableDescription": "Your session details could not be loaded. You can still sign out.",
+      "loading": "Loading session…",
+      "redirecting": "Your session has ended. Opening the sign-in page…"
     }
   },
   "Navigation": {
@@ -82,13 +85,13 @@
       "passwordRequired": "Enter your password.",
       "wrongCredentials": "The email address or password is wrong.",
       "failed": "Sign-in failed. Try again in a moment.",
-      "liveDemoFailed": "The live demo could not be opened. Try again in a moment."
+      "showcaseFailed": "The Showcase Workspace could not be opened. Try again in a moment."
     },
     "or": "or",
-    "liveDemo": "View live demo",
-    "liveDemoPending": "Opening live demo…",
-    "liveDemoDescription": "Explore the Showcase Workspace as a Viewer, without an account.",
-    "noAccount": "Accounts are created by invite from the Operator."
+    "showcase": "View live demo",
+    "showcasePending": "Opening the Showcase Workspace…",
+    "showcaseDescription": "Explore the Showcase Workspace as a Viewer, no invite needed.",
+    "invitedByOperator": "Users are invited by the Operator."
   },
   "Overview": {
     "loading": "Loading Overview",

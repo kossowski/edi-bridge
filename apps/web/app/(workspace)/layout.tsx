@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 
 import { AppHeader } from '@/components/app-header'
 import { AppSidebar } from '@/components/app-sidebar'
+import { MainContentFocus } from '@/components/main-content-focus'
 import { SessionGate } from '@/components/session/session-gate'
 import {
   SIDEBAR_COOKIE_NAME,
@@ -25,6 +26,7 @@ export default async function WorkspaceLayout({
           <AppHeader />
           <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col outline-none">
             {children}
+            <MainContentFocus />
           </div>
         </SidebarInset>
       </SidebarProvider>

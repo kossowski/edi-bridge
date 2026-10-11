@@ -6,9 +6,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 
+import { focusMainContentOnNextPage } from '@/components/main-content-focus'
 import { useSession } from '@/hooks/use-session'
 import { signOut } from '@/lib/api/client'
-import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   DropdownMenu,
@@ -19,46 +19,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@edi-bridge/ui/components/dropdown-menu'
-
-export function ViewOnlyBadge() {
-  const t = useTranslations('Shell.session')
-  const { viewer } = useSession()
-
-  if (!viewer) {
-    return null
-  }
-
-  return (
-    <Badge variant="secondary" className="shrink-0">
-      {t('viewOnly')}
-      <span className="sr-only">: {t('viewOnlyDescription')}</span>
-    </Badge>
-  )
-}
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 export function UserMenu() {
   const t = useTranslations('Shell.session')
   const queryClient = useQueryClient()
   const router = useRouter()
-  const { session } = useSession()
+  const { session, unavailable, operator, role } = useSession()
 
-  const leave = useMutation({
+  const signOutMutation = useMutation({
     mutationFn: signOut,
     onSuccess: () => {
-      router.replace('/login')
       queryClient.clear()
+      focusMainContentOnNextPage()
+      router.replace('/login')
     },
   })
 
-  if (!session) {
+  if (!session && !unavailable) {
     return null
   }
 
-  const role = session.operator ? 'operator' : session.role
-
   return (
     <>
-      {leave.isError && (
+      {signOutMutation.isError && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {t('signOutFailed')}
         </p>
@@ -68,28 +52,40 @@ export function UserMenu() {
           render={
             <Button
               variant="ghost"
-              aria-label={t('accountMenu', { name: session.user.name })}
+              aria-label={
+                session ? t('userMenu', { name: session.user.name }) : t('userMenuUnavailable')
+              }
               className="max-w-48"
             />
           }>
           <HugeiconsIcon icon={UserCircleIcon} strokeWidth={2} />
-          <span className="hidden truncate sm:inline">{session.user.name}</span>
+          <span className={cn('truncate', session && 'hidden sm:inline')}>
+            {session ? session.user.name : t('unavailable')}
+          </span>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuContent align="end" className="w-64">
           <DropdownMenuGroup>
-            <DropdownMenuLabel className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground text-xs">{t('signedInAs')}</span>
-              <span className="text-foreground truncate font-medium">{session.user.name}</span>
-              <span className="truncate">{session.user.email}</span>
-              <span>
-                {t(`role.${role}`)} · {session.workspace.name}
-              </span>
-            </DropdownMenuLabel>
+            {session ? (
+              <DropdownMenuLabel className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground text-xs">{t('signedInAs')}</span>
+                <span className="text-foreground font-medium break-words">{session.user.name}</span>
+                <span className="break-all">{session.user.email}</span>
+                <span>
+                  {[operator && t('operator'), role && t(`role.${role}`), session.workspace.name]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </DropdownMenuLabel>
+            ) : (
+              <DropdownMenuLabel>{t('unavailableDescription')}</DropdownMenuLabel>
+            )}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={leave.isPending} onClick={() => leave.mutate()}>
+          <DropdownMenuItem
+            disabled={signOutMutation.isPending}
+            onClick={() => signOutMutation.mutate()}>
             <HugeiconsIcon icon={Logout03Icon} strokeWidth={2} />
-            {leave.isPending ? t('signingOut') : t('signOut')}
+            {signOutMutation.isPending ? t('signingOut') : t('signOut')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

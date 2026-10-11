@@ -5,8 +5,9 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { AppBrand } from '@/components/app-brand'
 import { useSession } from '@/hooks/use-session'
-import { appIcon, isActivePath, navigationGroups, navigationItems } from '@/lib/navigation'
+import { isActivePath, navigationGroups, navigationItems } from '@/lib/navigation'
 import {
   Sidebar,
   SidebarContent,
@@ -31,10 +32,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" label={tShell('mainNavigation')}>
       <SidebarHeader>
-        <div className="flex h-8 items-center gap-2 px-2 font-semibold">
-          <HugeiconsIcon icon={appIcon} strokeWidth={2} className="size-4 shrink-0" />
-          <span className="truncate group-data-[collapsible=icon]:hidden">{tShell('appName')}</span>
-        </div>
+        <AppBrand className="h-8 px-2" />
       </SidebarHeader>
       <SidebarContent>
         <nav aria-label={tShell('mainNavigation')}>
