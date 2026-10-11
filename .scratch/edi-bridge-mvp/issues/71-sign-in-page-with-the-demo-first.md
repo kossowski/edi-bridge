@@ -4,12 +4,16 @@
 
 **Blocked by:** 54 (UI components from the UX lab), 55 (On-screen labels and task-first navigation)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Two columns on desktop, stacked on narrow screens, with the form first
-- [ ] "Try the demo" is as prominent as signing in; there is no sign-up link
-- [ ] The password can be shown and hidden; errors are announced to screen readers
-- [ ] The current login screen and its stories are replaced; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Two columns on desktop, stacked on narrow screens, with the form first
+- [x] "Try the demo" is as prominent as signing in; there is no sign-up link
+- [x] The password can be shown and hidden; errors are announced to screen readers
+- [x] The current login screen and its stories are replaced; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #76.
