@@ -20,24 +20,23 @@ import { findItem, type TreeItem } from '@/components/mappings/mapping-tree'
 import { findTransformButton } from '@/components/mappings/transform-node'
 import { findRowButton } from '@/components/mappings/tree-node'
 import { useDraftPreview } from '@/components/mappings/use-draft-preview'
+import { whenRendered } from '@/components/mappings/when-rendered'
 import { lookupTablesQuery, mappingSamplesQuery } from '@/lib/api/queries'
-import { type AiReview, type MappingDraft, previewNoteKey } from '@edi-bridge/contracts'
+import {
+  type AiReview,
+  type MappingDraft,
+  type PreviewNote,
+  previewNoteKey,
+} from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 
-// About a second at 60 fps: an expanded part shows its rows a few frames after the click.
-const focusWaitFrames = 60
-
-function focusWhenShown(find: () => HTMLElement | null | undefined, frames = focusWaitFrames) {
-  requestAnimationFrame(() => {
-    const element = find()
-
-    if (element) {
-      element.focus()
-    } else if (frames > 0) {
-      focusWhenShown(find, frames - 1)
-    }
-  })
+// The canvas pans the focused part into view itself, so the page does not scroll to it.
+function focusWhenShown(find: () => HTMLElement | null | undefined) {
+  whenRendered(
+    () => Boolean(find()),
+    () => find()?.focus({ preventScroll: true }),
+  )
 }
 
 function TargetName({ item, path }: { item: TreeItem | undefined; path: string }) {
@@ -46,12 +45,14 @@ function TargetName({ item, path }: { item: TreeItem | undefined; path: string }
   return (
     <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
       {name && name !== path && <span className="font-medium">{name}</span>}
-      <span className="font-mono text-xs break-all">{path}</span>
+      <span className="font-mono text-xs break-all" data-target-path={path}>
+        {path}
+      </span>
     </span>
   )
 }
 
-function Item({
+function AttentionItem({
   onActivate,
   children,
 }: {
@@ -76,11 +77,15 @@ function Item({
   )
 }
 
-function Detail({ children }: { children: ReactNode }) {
-  return <span className="text-muted-foreground text-xs">{children}</span>
+function AttentionDetail({ children }: { children: ReactNode }) {
+  return (
+    <span className="text-muted-foreground group-hover/button:text-foreground text-xs">
+      {children}
+    </span>
+  )
 }
 
-function Group({
+function AttentionGroup({
   title,
   count,
   empty,
@@ -193,6 +198,14 @@ export function AiReviewPanel({
       : t('throughOnly', { transforms })
   }
 
+  const noteAction = ({ transformId, targetPath }: PreviewNote) => {
+    if (transformId) {
+      return () => showTransform(transformId)
+    }
+
+    return itemOf(targetPath) ? () => showTarget(targetPath) : undefined
+  }
+
   const warnings = () => {
     if (preview.isError) {
       return (
@@ -211,20 +224,12 @@ export function AiReviewPanel({
     }
 
     return attention.warnings.map((note) => (
-      <Item
-        key={previewNoteKey(note)}
-        onActivate={
-          note.transformId
-            ? () => showTransform(note.transformId!)
-            : itemOf(note.targetPath)
-              ? () => showTarget(note.targetPath)
-              : undefined
-        }>
+      <AttentionItem key={previewNoteKey(note)} onActivate={noteAction(note)}>
         <TargetName item={itemOf(note.targetPath)} path={note.targetPath} />
-        <Detail>
+        <AttentionDetail>
           {tNotes(note.code, { transform: note.transformId ? text.name(note.transformId) : '' })}
-        </Detail>
-      </Item>
+        </AttentionDetail>
+      </AttentionItem>
     ))
   }
 
@@ -245,41 +250,45 @@ export function AiReviewPanel({
         hidden={!open}
         className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border-t px-2 py-3">
         <p className="text-muted-foreground px-2 text-sm">{t('description')}</p>
-        <Group
+        <AttentionGroup
           count={attention.unmapped.length}
           empty={t('unmapped.empty')}
           title={t('unmapped.title')}>
           {attention.unmapped.map((item) => (
-            <Item key={item.path} onActivate={() => showTarget(item.path)}>
+            <AttentionItem key={item.path} onActivate={() => showTarget(item.path)}>
               <TargetName item={item} path={item.path} />
-              <Detail>{t('unmapped.detail')}</Detail>
-            </Item>
+              <AttentionDetail>{t('unmapped.detail')}</AttentionDetail>
+            </AttentionItem>
           ))}
-        </Group>
-        <Group
+        </AttentionGroup>
+        <AttentionGroup
           count={attention.chains.length}
           empty={t('transforms.empty')}
           title={t('transforms.title')}>
-          {attention.chains.map((chain) => (
-            <Item
-              key={chain.targetPath ?? chain.transformIds.join()}
-              onActivate={() => showTransform(chain.transformIds[0]!)}>
-              {chain.targetPath === null ? (
-                <span className="font-medium">{text.name(chain.transformIds[0]!)}</span>
-              ) : (
-                <TargetName item={itemOf(chain.targetPath)} path={chain.targetPath} />
-              )}
-              <Detail>{chainDetail(chain)}</Detail>
-            </Item>
-          ))}
-        </Group>
-        <Group
+          {attention.chains.map((chain) => {
+            const [first] = chain.transformIds
+
+            return (
+              <AttentionItem
+                key={chain.targetPath ?? chain.transformIds.join()}
+                onActivate={first === undefined ? undefined : () => showTransform(first)}>
+                {chain.targetPath !== null ? (
+                  <TargetName item={itemOf(chain.targetPath)} path={chain.targetPath} />
+                ) : (
+                  first !== undefined && <span className="font-medium">{text.name(first)}</span>
+                )}
+                <AttentionDetail>{chainDetail(chain)}</AttentionDetail>
+              </AttentionItem>
+            )
+          })}
+        </AttentionGroup>
+        <AttentionGroup
           busy={updating}
           count={attention.warnings?.length ?? null}
           empty={sample ? t('warnings.empty', { name: sample.name }) : t('warnings.emptyUnnamed')}
           title={t('warnings.title')}>
           {warnings()}
-        </Group>
+        </AttentionGroup>
         {attention.plain.length > 0 && (
           <div className="flex flex-col gap-1">
             <h3 className="text-sm font-medium">
@@ -301,10 +310,14 @@ export function AiReviewPanel({
             <ul id={otherId} hidden={!showOther} aria-label={t('plain.title')}>
               {showOther &&
                 attention.plain.map((link) => (
-                  <Item key={link.targetPath} onActivate={() => showTarget(link.targetPath)}>
+                  <AttentionItem
+                    key={link.targetPath}
+                    onActivate={() => showTarget(link.targetPath)}>
                     <TargetName item={itemOf(link.targetPath)} path={link.targetPath} />
-                    <Detail>{t('plain.detail', { source: link.sourcePath })}</Detail>
-                  </Item>
+                    <AttentionDetail>
+                      {t('plain.detail', { source: link.sourcePath })}
+                    </AttentionDetail>
+                  </AttentionItem>
                 ))}
             </ul>
           </div>

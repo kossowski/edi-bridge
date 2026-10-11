@@ -174,7 +174,6 @@ describe('proposedChains', () => {
         targetPath: 'DTM+137/2380',
         transformIds: [lookupId, dateId],
         sourcePaths: ['date'],
-        lookupTable: true,
       },
     ])
   })
@@ -183,7 +182,7 @@ describe('proposedChains', () => {
     const marks = aiMarks(review({ proposedTransforms: [constantId] }))
 
     expect(proposedChains(graph, marks)).toEqual([
-      { targetPath: null, transformIds: [constantId], sourcePaths: [], lookupTable: false },
+      { targetPath: null, transformIds: [constantId], sourcePaths: [] },
     ])
   })
 })

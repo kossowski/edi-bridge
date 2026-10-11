@@ -89,7 +89,7 @@ function Canvas({
     return <CanvasLoading />
   }
 
-  const targetItems = target.items
+  const targetSide = { title: target.title, items: target.items }
 
   return (
     <MappingCanvas
@@ -102,7 +102,7 @@ function Canvas({
               draft={draft}
               open={band.open}
               review={aiReview}
-              targetItems={targetItems}
+              targetItems={targetSide.items}
             />
           )}
           <MappingPreviewPanel
@@ -116,7 +116,7 @@ function Canvas({
       graph={draft}
       label={t('label', { source: source.title, target: target.title })}
       source={{ title: source.title, items: source.items }}
-      target={{ title: target.title, items: targetItems }}
+      target={targetSide}
       onChange={save}
     />
   )

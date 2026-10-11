@@ -1166,7 +1166,7 @@
       "showPanel": "Was zu prüfen ist",
       "panel": {
         "title": "Durchsicht des KI-Entwurfs",
-        "description": "Was vor dem Übernehmen des KI-Entwurfs Aufmerksamkeit braucht. Wählen Sie einen Eintrag, um ihn im Canvas zu zeigen.",
+        "description": "Was vor dem Übernehmen des KI-Entwurfs Aufmerksamkeit braucht. Wählen Sie einen Eintrag, um ihn auf der Zeichenfläche zu zeigen.",
         "unmapped": {
           "title": "Pflicht-Zielelemente ohne Verknüpfung",
           "detail": "Pflichtfeld, noch nichts verknüpft.",

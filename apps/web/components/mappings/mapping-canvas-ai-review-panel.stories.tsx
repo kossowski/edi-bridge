@@ -53,7 +53,7 @@ function countOf(element: HTMLElement) {
 }
 
 function pathOf(item: HTMLElement) {
-  return item.querySelector('.font-mono')!.textContent
+  return item.querySelector<HTMLElement>('[data-target-path]')!.dataset.targetPath!
 }
 
 function itemsUnder(panel: HTMLElement, name: RegExp) {

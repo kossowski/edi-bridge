@@ -124,6 +124,7 @@ import {
   TreeNode,
   type TreeFlowNode,
 } from '@/components/mappings/tree-node'
+import { whenRendered } from '@/components/mappings/when-rendered'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import { transformPorts } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -335,16 +336,6 @@ function DetailsPanel({
 // Focus moves once the change has rendered, when the button it goes to exists.
 function afterRender(focus: () => void) {
   requestAnimationFrame(focus)
-}
-
-// About a second at 60 fps. The cached Draft updates a few frames after the click, once the
-// mutation has started; if it never does, focus still moves on rather than waiting forever.
-const renderWaitFrames = 60
-
-function whenRendered(done: () => boolean, then: () => void, frames = renderWaitFrames) {
-  requestAnimationFrame(() =>
-    done() || frames === 0 ? then() : whenRendered(done, then, frames - 1),
-  )
 }
 
 // React Flow keeps a new node hidden until it has measured it, and a hidden button takes no focus.

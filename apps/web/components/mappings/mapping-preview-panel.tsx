@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@edi-bridge/ui/components/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@edi-bridge/ui/components/tooltip'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 const views = ['target', 'source'] as const
@@ -306,28 +307,37 @@ export function MappingPreviewPanel({
 
   const headingId = useId()
   const contentId = useId()
+  const toggleLabel = open ? t('hide') : t('show')
 
   return (
     <section
       aria-labelledby={headingId}
-      className="bg-card flex min-h-0 min-w-0 flex-col rounded-lg border">
+      className="bg-card @container flex min-h-0 min-w-0 flex-col rounded-lg border">
       <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 px-4 py-1.5">
         <h2 id={headingId} className="text-sm font-semibold">
           {t('title')}
         </h2>
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-controls={controls ? `${controls} ${contentId}` : contentId}
-          aria-expanded={open}
-          onClick={onToggle}>
-          <HugeiconsIcon
-            icon={open ? ArrowDown01Icon : ArrowUp01Icon}
-            strokeWidth={2}
-            aria-hidden
-          />
-          {open ? t('hide') : t('show')}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-controls={controls ? `${controls} ${contentId}` : contentId}
+                aria-expanded={open}
+                className="px-1.5 @sm:px-2.5"
+                onClick={onToggle}
+              />
+            }>
+            <HugeiconsIcon
+              icon={open ? ArrowDown01Icon : ArrowUp01Icon}
+              strokeWidth={2}
+              aria-hidden
+            />
+            <span className="sr-only @sm:not-sr-only">{toggleLabel}</span>
+          </TooltipTrigger>
+          <TooltipContent>{toggleLabel}</TooltipContent>
+        </Tooltip>
       </div>
       <div
         id={contentId}
