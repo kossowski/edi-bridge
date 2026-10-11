@@ -23,6 +23,7 @@ import {
   mappingsEndpoint,
   mappingVersionsEndpoint,
   messageTypeStructureEndpoint,
+  orderLifecyclesEndpoint,
   overviewEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
@@ -51,6 +52,7 @@ import {
   createMappingDrafts,
   createMappingSample,
   documentStructureOrigins,
+  orderLifecycleReferences,
   seedChannels,
   seedDocumentStructureOf,
   seedFlows,
@@ -278,6 +280,38 @@ describe('createHandlers', () => {
 
     expect(response.status).toBe(201)
   })
+
+  it.each(['full', 'partial', 'multiPartner', 'failures', 'largeVolume'] as const)(
+    'links each Message of the %s Order Lifecycle to its Run detail',
+    async (name) => {
+      server.use(...createHandlers(apiUrl))
+      const businessReference = orderLifecycleReferences[name]
+
+      const response = await fetch(
+        `${apiUrl}${orderLifecyclesEndpoint.path}?${toSearchParams({ businessReference })}`,
+      )
+
+      const lifecycles = orderLifecyclesEndpoint.response.parse(await response.json())
+
+      for (const { run, interchange } of lifecycles.flatMap(({ messages }) => messages)) {
+        const detail = await getRun(run.id)
+        const referenceTag = detail.messageType === 'ORDERS' ? 'BGM' : 'RFF'
+        const reference = detail.message?.segments.find(({ tag }) => tag === referenceTag)
+
+        expect(detail).toMatchObject({
+          status: run.status,
+          failureStage: run.failureStage,
+          replacedBy: run.replacedBy,
+        })
+        expect(detail.interchange?.id ?? null).toBe(interchange?.id ?? null)
+        expect(detail.interchange?.controlReference).toBe(interchange?.controlReference)
+
+        if (detail.message) {
+          expect(reference?.elements.flat()).toContain(businessReference)
+        }
+      }
+    },
+  )
 
   it('lists and shows the Runs of a Manual Submission', async () => {
     server.use(...createHandlers(apiUrl))

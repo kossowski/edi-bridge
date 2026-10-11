@@ -26,6 +26,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { hash } from './hash'
+import { hour, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
 import { seedRuns } from './run'
 import { controlReferenceOf, interchangeIdOf } from './run-detail'
@@ -39,8 +40,6 @@ export type OverviewData = {
 }
 
 const minute = 60 * 1000
-
-const hour = 60 * minute
 
 const overdueLookback = 72 * hour
 
@@ -271,7 +270,7 @@ export function seedOverdueAcknowledgements(
     }
 
     const { acknowledgementTimeLimitHours } = tradingPartner
-    const overdueSince = Date.parse(run.receivedAt) + acknowledgementTimeLimitHours * hour
+    const overdueSince = overdueSinceOf(run.receivedAt, tradingPartner)
 
     if (overdueSince > now.getTime()) {
       return []
