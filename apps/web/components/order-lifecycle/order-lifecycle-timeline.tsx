@@ -11,7 +11,7 @@ import {
   type OrderLifecycleStep,
   orderLifecycleSteps,
 } from '@/components/order-lifecycle/order-lifecycle-steps'
-import { RunLink } from '@/components/runs/run-link'
+import { RunLink, shortId } from '@/components/runs/run-link'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -27,14 +27,15 @@ function MessageEntry({
 }) {
   const t = useTranslations('OrderLifecycle')
   const tRuns = useTranslations('Runs')
+  const tRun = useTranslations('RunDetail')
   const { run, interchange } = message
 
   return (
     <li className="hover:bg-muted/50 relative flex flex-col gap-1.5 rounded-lg border p-3 text-sm">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className="font-medium">{t(`direction.${message.direction}`)}</span>
+        <span className="font-medium">{tRun(`direction.${message.direction}`)}</span>
         <span className="flex flex-wrap items-baseline gap-x-1.5">
-          <span className="text-muted-foreground">{t(`time.${message.direction}`)}</span>
+          <span className="text-muted-foreground">{tRuns('columns.receivedAt')}</span>
           <RunLink
             description={tRuns('openRun', { tradingPartner, messageType: message.messageType })}
             run={{ id: run.id, receivedAt: message.receivedAt }}
@@ -52,15 +53,19 @@ function MessageEntry({
       </div>
       <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
         <span>
-          {interchange
-            ? t('controlReference', { controlReference: interchange.controlReference })
-            : t('noInterchange')}
+          {interchange ? (
+            <Link href={`/interchanges/${interchange.id}`} className={cn(linkClass, 'relative')}>
+              {tRun('interchangeLink', { controlReference: interchange.controlReference })}
+            </Link>
+          ) : (
+            t('noInterchange')
+          )}
         </span>
         {run.replacedBy && (
           <span>
-            {t('replacedBy')}{' '}
+            {tRun('facts.replacedBy')}{' '}
             <Link href={`/runs/${run.replacedBy.id}`} className={cn(linkClass, 'relative')}>
-              {t('runLink', { id: run.replacedBy.id.slice(0, 8) })}
+              {tRun('runLink', { id: shortId(run.replacedBy.id) })}
             </Link>
           </span>
         )}
@@ -84,20 +89,20 @@ function Step({
     <li className="relative flex gap-3 pb-6 last:pb-0">
       {!last && <span aria-hidden className="bg-border absolute top-7 bottom-1 left-2.5 w-px" />}
       <HugeiconsIcon
-        icon={step.open ? DashedLineCircleIcon : CircleIcon}
+        icon={step.open || step.missing ? DashedLineCircleIcon : CircleIcon}
         strokeWidth={2}
         aria-hidden
         className={cn(
           'relative mt-0.5 size-5 shrink-0',
-          step.open ? 'text-muted-foreground' : 'text-foreground',
+          step.open || step.missing ? 'text-muted-foreground' : 'text-foreground',
         )}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-mono font-semibold">{step.messageType}</h3>
-          {step.open ? (
+          {step.open || step.missing ? (
             <Badge variant="outline" className="text-muted-foreground border-dashed">
-              {t('open.label')}
+              {t(step.open ? 'open.label' : 'missing.label')}
             </Badge>
           ) : (
             <span className="text-muted-foreground text-sm">
@@ -105,9 +110,11 @@ function Step({
             </span>
           )}
         </div>
-        {step.open ? (
+        {step.open || step.missing ? (
           <p className="text-muted-foreground text-sm">
-            {t('open.description', { messageType: step.messageType })}
+            {t(step.open ? 'open.description' : 'missing.description', {
+              messageType: step.messageType,
+            })}
           </p>
         ) : (
           <ol className="flex flex-col gap-2">

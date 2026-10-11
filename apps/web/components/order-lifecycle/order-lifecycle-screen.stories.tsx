@@ -68,7 +68,10 @@ export const Full = meta.story({
 
     await expect(within(timeline).queryByText('Open')).toBeNull()
     await expect(within(stepOf(timeline, 'ORDERS')).getByText('Received')).toBeVisible()
-    await expect(within(stepOf(timeline, 'INVOIC')).getByText('Run started')).toBeVisible()
+    await expect(within(stepOf(timeline, 'INVOIC')).getByText('Received')).toBeVisible()
+    await expect(
+      within(stepOf(timeline, 'ORDERS')).getByRole('link', { name: /^Control reference / }),
+    ).toHaveAttribute('href', expect.stringMatching(/^\/interchanges\//))
     await expect(
       within(timeline).getAllByRole('link', { name: /open Run from Hansemarkt GmbH/ }),
     ).toHaveLength(3)

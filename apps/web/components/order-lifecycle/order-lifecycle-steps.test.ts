@@ -39,10 +39,20 @@ describe('orderLifecycleSteps', () => {
   it('keeps Message Types that have not happened yet as open steps', () => {
     const steps = orderLifecycleSteps([message('ORDERS', '2026-10-01T10:00:00.000Z', 'orders')])
 
-    expect(steps.map(({ messageType, open }) => [messageType, open])).toEqual([
-      ['ORDERS', false],
-      ['DESADV', true],
-      ['INVOIC', true],
+    expect(steps.map(({ messageType, open, missing }) => [messageType, open, missing])).toEqual([
+      ['ORDERS', false, false],
+      ['DESADV', true, false],
+      ['INVOIC', true, false],
+    ])
+  })
+
+  it('marks a Message Type without Messages before a later step as not found, not open', () => {
+    const steps = orderLifecycleSteps([message('DESADV', '2026-10-02T10:00:00.000Z', 'desadv')])
+
+    expect(steps.map(({ messageType, open, missing }) => [messageType, open, missing])).toEqual([
+      ['ORDERS', false, true],
+      ['DESADV', false, false],
+      ['INVOIC', true, false],
     ])
   })
 })

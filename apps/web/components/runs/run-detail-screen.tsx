@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { BackToRuns, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
 import { MessageTree } from '@/components/runs/message-tree'
 import { RawInterchange } from '@/components/runs/raw-interchange'
+import { shortId } from '@/components/runs/run-link'
 import { RunRemedyPanel } from '@/components/runs/run-remedy-panel'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { RunTimeline } from '@/components/runs/run-timeline'
@@ -17,10 +18,6 @@ import { runQuery } from '@/lib/api/queries'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { ErrorPosition, RunDetail } from '@edi-bridge/contracts'
-
-function shortId(id: string) {
-  return id.slice(0, 8)
-}
 
 function PositionText({ position }: { position: ErrorPosition }) {
   const t = useTranslations('RunDetail.failure')

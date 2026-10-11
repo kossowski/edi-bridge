@@ -10,6 +10,10 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { RunSummary } from '@edi-bridge/contracts'
 
+export function shortId(id: string) {
+  return id.slice(0, 8)
+}
+
 export function RunLink({
   run,
   description,

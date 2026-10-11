@@ -8,19 +8,28 @@ import {
 export type OrderLifecycleStep = {
   messageType: OrderLifecycleMessageType
   open: boolean
+  missing: boolean
   messages: OrderLifecycleMessage[]
 }
 
 export function orderLifecycleSteps(
   messages: ReadonlyArray<OrderLifecycleMessage>,
 ): OrderLifecycleStep[] {
-  const open = openMessageTypes(messages)
+  const openTypes = openMessageTypes(messages)
 
-  return orderLifecycleMessageTypes.map((messageType) => ({
-    messageType,
-    open: open.includes(messageType),
-    messages: messages
-      .filter((message) => message.messageType === messageType)
-      .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
-  }))
+  return orderLifecycleMessageTypes.map((messageType, index) => {
+    const empty = openTypes.includes(messageType)
+
+    const open =
+      empty && orderLifecycleMessageTypes.slice(index).every((type) => openTypes.includes(type))
+
+    return {
+      messageType,
+      open,
+      missing: empty && !open,
+      messages: messages
+        .filter((message) => message.messageType === messageType)
+        .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
+    }
+  })
 }

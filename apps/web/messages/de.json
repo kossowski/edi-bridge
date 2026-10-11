@@ -406,19 +406,12 @@
       "label": "Offen",
       "description": "Noch keine {messageType}."
     },
-    "direction": {
-      "inbound": "Eingehend",
-      "outbound": "Ausgehend"
-    },
-    "time": {
-      "inbound": "Empfangen",
-      "outbound": "Run gestartet"
+    "missing": {
+      "label": "Nicht gefunden",
+      "description": "Keine {messageType} gefunden."
     },
     "failureStage": "Failure Stage",
-    "controlReference": "Interchange-Kontrollreferenz {controlReference}",
-    "noInterchange": "Kein Interchange",
-    "replacedBy": "Ersetzt durch",
-    "runLink": "Run {id}"
+    "noInterchange": "Kein Interchange"
   },
   "TradingPartners": {
     "new": "Neuer Trading Partner",
