@@ -1,0 +1,53 @@
+'use client'
+
+import {
+  CheckmarkCircle02Icon,
+  InformationCircleIcon,
+  Alert02Icon,
+  MultiplicationSignCircleIcon,
+  Loading03Icon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { useTheme } from 'next-themes'
+import { Toaster as Sonner, type ToasterProps } from 'sonner'
+
+const themes = ['light', 'dark', 'system'] as const
+
+const Toaster = ({ ...props }: ToasterProps) => {
+  const { theme } = useTheme()
+
+  return (
+    <Sonner
+      icons={{
+        success: <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-4" />,
+        info: <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} className="size-4" />,
+        warning: <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} className="size-4" />,
+        error: (
+          <HugeiconsIcon icon={MultiplicationSignCircleIcon} strokeWidth={2} className="size-4" />
+        ),
+        loading: (
+          <HugeiconsIcon icon={Loading03Icon} strokeWidth={2} className="size-4 animate-spin" />
+        ),
+      }}
+      theme={themes.find((candidate) => candidate === theme) ?? 'system'}
+      toastOptions={{
+        classNames: {
+          toast: 'cn-toast',
+        },
+      }}
+      className="toaster group"
+      style={
+        // SAFETY: CSSProperties has no index signature for custom properties; these keys are plain CSS variables.
+        {
+          '--normal-bg': 'var(--popover)',
+          '--normal-text': 'var(--popover-foreground)',
+          '--normal-border': 'var(--border)',
+          '--border-radius': 'var(--radius)',
+        } as React.CSSProperties
+      }
+      {...props}
+    />
+  )
+}
+
+export { Toaster }
