@@ -49,6 +49,7 @@ import {
   operatorHandlers,
   seedInvites,
   seedWorkspaceSummaries,
+  sessionWorkspaceStore,
 } from './operator'
 import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
 import { overviewHandler, seedOverviewData } from './overview'
@@ -61,7 +62,7 @@ import {
   seedTradingPartners,
   tradingPartnerHandlers,
 } from './trading-partner'
-import { createWorkspaceStore, seedWorkspace, workspaceHandlers } from './workspace'
+import { seedWorkspace, workspaceHandlers } from './workspace'
 import {
   createWorkspaceSettingsStore,
   seedWorkspaceSettings,
@@ -178,6 +179,7 @@ export {
   type OperatorStore,
   seedInvites,
   seedWorkspaceSummaries,
+  sessionWorkspaceStore,
   toOperatorStore,
 } from './operator'
 
@@ -232,12 +234,13 @@ export {
 
 export { createRunStore, type RunStore } from './run-store'
 
+export { type SessionStore } from './session-access'
+
 export {
   createSessionStore,
   mockCredentials,
   seedSession,
   sessionHandlers,
-  type SessionStore,
   sandboxAdminSession,
   showcaseViewerSession,
   toSessionStore,
@@ -255,8 +258,8 @@ export {
 export function createHandlers(
   apiUrl: string,
   {
-    session = seedSession,
-    workspace = seedWorkspace,
+    session,
+    workspace,
     workspaceSettings = seedWorkspaceSettings,
     operatorWorkspaces = seedWorkspaceSummaries,
     invites = seedInvites,
@@ -286,11 +289,36 @@ export function createHandlers(
 ) {
   const orderLifecycles = seedOrderLifecycles()
   const runs = createRunStore([...seedRuns(), ...orderLifecycles.runs])
-  const sessionStore = createSessionStore(session)
-  const tradingPartnerStore = createTradingPartnerStore(tradingPartners)
-  const workspaceStore = createWorkspaceStore(workspace)
-  const workspaceSettingsStore = createWorkspaceSettingsStore(workspaceSettings)
+  const ownWorkspace = workspace ?? seedWorkspace
   const operatorStore = createOperatorStore({ workspaces: operatorWorkspaces, invites })
+
+  if (workspace && !operatorStore.workspace(workspace.id)) {
+    operatorStore.setWorkspace({
+      ...workspace,
+      kind: 'standard',
+      memberCount: 1,
+      createdAt: new Date().toISOString(),
+      lastResetAt: null,
+    })
+  }
+
+  const sessionStore = createSessionStore(
+    session === undefined
+      ? {
+          ...seedSession,
+          workspace: { id: ownWorkspace.id, name: ownWorkspace.name, kind: 'standard' },
+        }
+      : session,
+  )
+
+  const workspaceStore = sessionWorkspaceStore({
+    workspaces: operatorStore,
+    session: sessionStore,
+    fallback: ownWorkspace,
+  })
+
+  const tradingPartnerStore = createTradingPartnerStore(tradingPartners)
+  const workspaceSettingsStore = createWorkspaceSettingsStore(workspaceSettings)
   const channelStore = createChannelStore(channels)
   const flows = createFlowStore()
   const mappingDraftStore = toMappingDraftStore(mappingDrafts)
@@ -303,7 +331,7 @@ export function createHandlers(
 
   return [
     ...sessionHandlers(apiUrl, sessionStore),
-    ...workspaceHandlers(apiUrl, workspaceStore),
+    ...workspaceHandlers(apiUrl, workspaceStore, sessionStore),
     ...workspaceSettingsHandlers(apiUrl, {
       settings: workspaceSettingsStore,
       session: sessionStore,

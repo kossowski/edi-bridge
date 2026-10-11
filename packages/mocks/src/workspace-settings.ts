@@ -14,13 +14,8 @@ import {
 
 import { type OperatorStore, seedWorkspaceSummaries, toOperatorStore } from './operator'
 import { badRequest, notFound } from './responses'
-import {
-  seedSession,
-  type SessionStore,
-  operatorOnly,
-  signedInOnly,
-  toSessionStore,
-} from './session'
+import { seedSession, toSessionStore } from './session'
+import { operatorOnly, type SessionStore, signedInOnly } from './session-access'
 
 export function createWorkspaceSettings(
   overrides: Partial<WorkspaceSettings> = {},

@@ -12,6 +12,7 @@ import {
   type WorkspaceRole,
   operatorWorkspacesEndpoint,
   type Session,
+  type Workspace,
   type WorkspaceSummary,
   workspaceSummarySchema,
 } from '@edi-bridge/contracts'
@@ -21,15 +22,15 @@ import { randomGln } from './gln'
 import { badRequest, conflict, notFound } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
+import { mockCredentials, seedSession, showcaseViewerSession, toSessionStore } from './session'
+import { operatorOnly, type SessionStore } from './session-access'
 import {
-  mockCredentials,
-  seedSession,
-  type SessionStore,
-  showcaseViewerSession,
-  operatorOnly,
-  toSessionStore,
-} from './session'
-import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
+  createWorkspaceStore,
+  seedSandboxWorkspace,
+  seedShowcaseWorkspace,
+  seedWorkspace,
+  type WorkspaceStore,
+} from './workspace'
 
 export const seedWorkspaceSummaries: ReadonlyArray<WorkspaceSummary> = [
   {
@@ -256,6 +257,36 @@ export function toOperatorStore(
   invites: ReadonlyArray<Invite> = seedInvites,
 ) {
   return 'workspace' in workspaces ? workspaces : createOperatorStore({ workspaces, invites })
+}
+
+export function sessionWorkspaceStore({
+  workspaces,
+  session,
+  fallback,
+}: {
+  workspaces: OperatorStore
+  session: SessionStore
+  fallback: Workspace
+}): WorkspaceStore {
+  const own = createWorkspaceStore(fallback)
+  const listed = () => workspaces.workspace(session.get()?.workspace.id ?? fallback.id)
+
+  return {
+    get: () => {
+      const summary = listed()
+
+      return summary ? { id: summary.id, name: summary.name, gln: summary.gln } : own.get()
+    },
+    set: (next) => {
+      const summary = workspaces.workspace(next.id)
+
+      if (summary) {
+        workspaces.setWorkspace({ ...summary, ...next })
+      } else {
+        own.set(next)
+      }
+    },
+  }
 }
 
 export function operatorHandlers(

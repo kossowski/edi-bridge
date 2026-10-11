@@ -1,8 +1,9 @@
 import { faker } from '@faker-js/faker'
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse, type HttpResponseResolver } from 'msw'
 
 import {
   currentWorkspaceEndpoint,
+  type Session,
   updateCompanyIdentityEndpoint,
   withCheckDigit,
   type Workspace,
@@ -10,6 +11,8 @@ import {
 } from '@edi-bridge/contracts'
 
 import { randomGln } from './gln'
+import { badRequest } from './responses'
+import { adminOnly, type SessionStore, sessionStoreOf, signedInOnly } from './session-access'
 
 export function createWorkspace(overrides: Partial<Workspace> = {}): Workspace {
   const workspace: Workspace = {
@@ -63,32 +66,41 @@ export function toWorkspaceStore(workspace: Workspace | WorkspaceStore = seedWor
 export function currentWorkspaceHandler(
   apiUrl: string,
   workspace: Workspace | WorkspaceStore = seedWorkspace,
+  session?: Session | null | SessionStore,
 ) {
   const store = toWorkspaceStore(workspace)
+  const respond = () => HttpResponse.json(store.get())
 
-  return http.get<never, never, Workspace>(`${apiUrl}${currentWorkspaceEndpoint.path}`, () =>
-    HttpResponse.json(store.get()),
+  return http.get(
+    `${apiUrl}${currentWorkspaceEndpoint.path}`,
+    session === undefined ? respond : signedInOnly(sessionStoreOf(session), respond),
   )
 }
 
 export function workspaceHandlers(
   apiUrl: string,
   workspace: Workspace | WorkspaceStore = seedWorkspace,
+  session?: Session | null | SessionStore,
 ) {
   const store = toWorkspaceStore(workspace)
 
+  const updateIdentity: HttpResponseResolver = async ({ request }) => {
+    const body = updateCompanyIdentityEndpoint.body.safeParse(await request.json())
+
+    if (!body.success) {
+      return badRequest(body.error.message)
+    }
+
+    store.set({ ...store.get(), gln: body.data.gln })
+
+    return HttpResponse.json(store.get())
+  }
+
   return [
-    currentWorkspaceHandler(apiUrl, store),
-    http.put(`${apiUrl}${updateCompanyIdentityEndpoint.path}`, async ({ request }) => {
-      const body = updateCompanyIdentityEndpoint.body.safeParse(await request.json())
-
-      if (!body.success) {
-        return HttpResponse.json({ message: body.error.message }, { status: 400 })
-      }
-
-      store.set({ ...store.get(), gln: body.data.gln })
-
-      return HttpResponse.json(store.get())
-    }),
+    currentWorkspaceHandler(apiUrl, store, session),
+    http.put(
+      `${apiUrl}${updateCompanyIdentityEndpoint.path}`,
+      session === undefined ? updateIdentity : adminOnly(sessionStoreOf(session), updateIdentity),
+    ),
   ]
 }

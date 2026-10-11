@@ -41,6 +41,7 @@ import {
   saveMappingDraftEndpoint,
   sessionEndpoint,
   sessionSchema,
+  signInEndpoint,
   signOutEndpoint,
   submitDocumentEndpoint,
   toPath,
@@ -49,8 +50,10 @@ import {
   tradingPartnerSchema,
   updateDocumentStructureEndpoint,
   updateLookupTableEndpoint,
+  updateCompanyIdentityEndpoint,
   updateTradingPartnerEndpoint,
   updateWorkspaceSettingsEndpoint,
+  withCheckDigit,
 } from '@edi-bridge/contracts'
 
 import {
@@ -58,14 +61,19 @@ import {
   createHandlers,
   createMappingDrafts,
   createMappingSample,
+  createWorkspace,
   documentStructureOrigins,
+  mockCredentials,
   orderLifecycleReferences,
   seedChannels,
   seedDocumentStructureOf,
   seedFlows,
   seedLookupTableNamed,
   seedMappingDrafts,
+  seedSandboxWorkspace,
+  seedShowcaseWorkspace,
   seedTradingPartners,
+  seedWorkspace,
 } from './index'
 
 const apiUrl = 'http://api.test'
@@ -636,6 +644,55 @@ describe('createHandlers', () => {
     })
 
     expect(response.status).toBe(403)
+  })
+
+  it.each([
+    ['the Showcase sign-in', 'showcase', seedShowcaseWorkspace],
+    ['the sandbox-admin sign-in', 'sandbox', seedSandboxWorkspace],
+  ] as const)('serves the session Workspace as current after %s', async (_, kind, expected) => {
+    server.use(...createHandlers(apiUrl))
+
+    await (kind === 'showcase'
+      ? fetch(`${apiUrl}${showcaseSignInEndpoint.path}`, { method: 'POST' })
+      : fetch(`${apiUrl}${signInEndpoint.path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(mockCredentials.sandboxAdmin),
+        }))
+
+    const current = currentWorkspaceEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${currentWorkspaceEndpoint.path}`)).json(),
+    )
+
+    expect(current).toEqual(expected)
+  })
+
+  it('shows a company identity change in the Operator Workspace list', async () => {
+    server.use(...createHandlers(apiUrl))
+    const gln = withCheckDigit('024567800000')
+
+    await fetch(`${apiUrl}${updateCompanyIdentityEndpoint.path}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ gln }),
+    })
+
+    const workspaces = operatorWorkspacesEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)).json(),
+    )
+
+    expect(workspaces.find(({ id }) => id === seedWorkspace.id)?.gln).toBe(gln)
+  })
+
+  it('serves a given Workspace as the current one of the Operator session', async () => {
+    const workspace = createWorkspace({ gln: null })
+    server.use(...createHandlers(apiUrl, { workspace }))
+
+    const current = await fetch(`${apiUrl}${currentWorkspaceEndpoint.path}`)
+    const session = await fetch(`${apiUrl}${sessionEndpoint.path}`)
+
+    expect(await current.json()).toEqual(workspace)
+    expect(sessionSchema.parse(await session.json()).workspace.id).toBe(workspace.id)
   })
 
   it('starts signed out when asked', async () => {
