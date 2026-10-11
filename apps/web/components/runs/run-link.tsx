@@ -14,7 +14,7 @@ export function RunLink({
   run,
   description,
   ...props
-}: { run: RunSummary; description: string } & Omit<
+}: { run: Pick<RunSummary, 'id' | 'receivedAt'>; description: string } & Omit<
   ComponentProps<typeof Link>,
   'href' | 'className' | 'children'
 >) {

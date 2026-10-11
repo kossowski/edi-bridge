@@ -44,6 +44,8 @@ import {
   messageTypeStructureEndpoint,
   type MoveFlowMappingVersionBody,
   moveFlowMappingVersionEndpoint,
+  type OrderLifecycleQuery,
+  orderLifecyclesEndpoint,
   overviewEndpoint,
   type OverviewQuery,
   publishedMappingVersionsEndpoint,
@@ -154,6 +156,10 @@ export function updateCompanyIdentity(body: CompanyIdentityInput) {
 
 export function getOverview(query: OverviewQuery) {
   return request(overviewEndpoint, { query })
+}
+
+export function listOrderLifecycles(query: OrderLifecycleQuery) {
+  return request(orderLifecyclesEndpoint, { query })
 }
 
 export function listRuns(query: RunListQuery) {
