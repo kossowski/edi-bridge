@@ -134,6 +134,18 @@ async function mockingReady() {
   }
 }
 
+async function send(path: string, search: string, init: RequestInit) {
+  await mockingReady()
+
+  const response = await fetch(`${apiUrl}${path}${search}`, { ...init, credentials: 'include' })
+
+  if (!response.ok) {
+    throw new ApiError(response.status, path, await response.text().catch(() => ''))
+  }
+
+  return response
+}
+
 type RequestOptions<Query, Body> = {
   path?: string
   query?: Query
@@ -148,22 +160,15 @@ async function request<
   endpoint: Endpoint<Response, Query, Body>,
   { path = endpoint.path, query, body }: RequestOptions<Query, Body> = {},
 ): Promise<Response> {
-  await mockingReady()
-
   const search = query ? `?${toSearchParams(query)}` : ''
 
-  const response = await fetch(`${apiUrl}${path}${search}`, {
+  const response = await send(path, search, {
     method: endpoint.method,
-    credentials: 'include',
     ...(endpoint.body && {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(endpoint.body.parse(body)),
     }),
   })
-
-  if (!response.ok) {
-    throw new ApiError(response.status, path, await response.text().catch(() => ''))
-  }
 
   return endpoint.response.parse(response.status === 204 ? undefined : await response.json())
 }
@@ -316,20 +321,17 @@ export async function streamAiDraft(
   body: RequestAiDraftBody,
   { signal, onEvent }: { signal: AbortSignal; onEvent: (event: AiDraftEvent) => void },
 ) {
-  await mockingReady()
-
   const path = toPath(requestAiDraftEndpoint.path, { id: mappingId })
 
-  const response = await fetch(`${apiUrl}${path}`, {
+  const response = await send(path, '', {
     method: requestAiDraftEndpoint.method,
-    credentials: 'include',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
     body: JSON.stringify(requestAiDraftEndpoint.body.parse(body)),
     signal,
   })
 
-  if (!response.ok || !response.body) {
-    throw new ApiError(response.status, path, await response.text().catch(() => ''))
+  if (!response.body) {
+    throw new ApiError(response.status, path)
   }
 
   for await (const data of eventStreamData(response.body)) {
