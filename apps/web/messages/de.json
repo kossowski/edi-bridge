@@ -1678,7 +1678,8 @@
       "rereadFieldsDescription": "Die Felder, die EDI Bridge mit den Einstellungen oben aus {fileName} liest. Beim Speichern ersetzen sie die bisherigen Felder. Markieren Sie Spalten als Pflicht oder optional und passen Sie ihren Typ an.",
       "reading": "CSV-Document wird gelesen…",
       "unread": "Die Felder erscheinen, sobald EDI Bridge das CSV-Document lesen kann. Passen Sie die CSV-Einstellungen an oder wählen Sie ein anderes CSV-Document."
-    }
+    },
+    "viewOnlyFieldsDescription": "Die Felder, die EDI Bridge in Documents dieser Document Structure erwartet, mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen."
   },
   "DocumentStructureForm": {
     "createTitle": "Neue Document Structure",
@@ -1727,6 +1728,7 @@
   "DocumentStructureTree": {
     "label": "Felder von {name}",
     "hint": "Mit den Pfeiltasten wechseln Sie zwischen den Zeilen und öffnen oder schließen Objekte. Mit Tab erreichen Sie die Einstellungen der aktuellen Zeile, mit Escape kehren Sie zur Zeile zurück.",
+    "viewOnlyHint": "Mit den Pfeiltasten wechseln Sie zwischen den Zeilen und öffnen oder schließen Objekte.",
     "expandAll": "Alle öffnen",
     "collapseAll": "Alle schließen",
     "columns": {
@@ -1780,7 +1782,11 @@
       "label": "Erste Zeilen von {fileName}",
       "none": "Das CSV-Document hat keine Zeilen unter der Kopfzeile.",
       "column": "Spalte {number}"
-    }
+    },
+    "viewOnlyDescription": "EDI Bridge liest CSV-Documents dieser Document Structure mit diesen Einstellungen.",
+    "headerRowFact": "Kopfzeile",
+    "headerRowPresent": "Die erste Zeile benennt die Spalten",
+    "headerRowAbsent": "Keine, die Spalten heißen column1, column2 und so weiter"
   },
   "DocumentStructureProblem": {
     "line": "Zeile {line}",

@@ -5,7 +5,11 @@ import { useTranslations } from 'next-intl'
 import { type ReactNode, useId, useState } from 'react'
 
 import { BackLink, Fact, LoadFailure, Loading } from '@/components/detail-parts'
-import { CsvSettingsFields, FirstRows } from '@/components/document-structures/csv-settings'
+import {
+  CsvSettingsFacts,
+  CsvSettingsFields,
+  FirstRows,
+} from '@/components/document-structures/csv-settings'
 import { sameCsvSettings } from '@/components/document-structures/csv-text'
 import {
   encodeFile,
@@ -29,6 +33,7 @@ import {
   StructureTreeGrid,
 } from '@/components/document-structures/structure-tree-grid'
 import { TextField } from '@/components/form-field'
+import { useSession } from '@/hooks/use-session'
 import { ApiError, documentStructureProblemOf, updateDocumentStructure } from '@/lib/api/client'
 import {
   documentStructureQuery,
@@ -41,6 +46,7 @@ import {
   defaultCsvSettings,
   type DocumentStructure,
   type DocumentStructureProblem,
+  type DocumentStructureSummary,
   type EncodedFile,
   maxDocumentStructureNameLength,
   type UpdateDocumentStructureBody,
@@ -214,13 +220,69 @@ function Fields({
   )
 }
 
-function Editor({ structure }: { structure: DocumentStructure }) {
+function useMappings(id: string) {
+  const summaries = useQuery(documentStructuresQuery)
+
+  return summaries.data?.find((summary) => summary.id === id)?.mappings
+}
+
+function StructureFacts({
+  structure,
+  mappings,
+}: {
+  structure: DocumentStructure
+  mappings: DocumentStructureSummary['mappings'] | undefined
+}) {
   const t = useTranslations('DocumentStructure')
   const tList = useTranslations('DocumentStructures')
+
+  return (
+    <dl aria-label={t('facts.label')} className="grid gap-4 rounded-lg border p-4 sm:grid-cols-3">
+      <Fact label={t('facts.format')}>
+        <Badge variant="outline">{tList(`format.${structure.format}`)}</Badge>
+      </Fact>
+      <Fact label={t('facts.fields')}>
+        {tList('fieldCount', { count: leafCount(structure.children) })}
+      </Fact>
+      <Fact label={t('facts.mappings')}>
+        {mappings ? (
+          <UsedByMappings mappings={mappings} />
+        ) : (
+          <Loading label={t('facts.mappingsLoading')} rowClassName="h-4 w-32" rows={1} />
+        )}
+      </Fact>
+    </dl>
+  )
+}
+
+function StructureView({ structure }: { structure: DocumentStructure }) {
+  const t = useTranslations('DocumentStructure')
+  const id = useId()
+
+  return (
+    <div className="flex flex-col gap-6">
+      <StructureFacts mappings={useMappings(structure.id)} structure={structure} />
+      {structure.format === 'csv' && <CsvSettingsFacts id={`${id}-csv`} csv={structure.csv} />}
+      <section aria-labelledby={`${id}-fields`} className="flex min-w-0 flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 id={`${id}-fields`} className="font-semibold">
+            {t('fields')}
+          </h2>
+          <p className="text-muted-foreground max-w-prose text-sm">
+            {t('viewOnlyFieldsDescription')}
+          </p>
+        </div>
+        <StructureTreeGrid name={structure.name} tree={structure} />
+      </section>
+    </div>
+  )
+}
+
+function Editor({ structure }: { structure: DocumentStructure }) {
+  const t = useTranslations('DocumentStructure')
   const id = useId()
   const queryClient = useQueryClient()
-  const summaries = useQuery(documentStructuresQuery)
-  const mappings = summaries.data?.find((summary) => summary.id === structure.id)?.mappings
+  const mappings = useMappings(structure.id)
   const [name, setName] = useState(structure.name)
   const [adjustments, setAdjustments] = useState<Adjustments>(new Map())
   const [reveal, setReveal] = useState<Reveal | null>(null)
@@ -274,21 +336,7 @@ function Editor({ structure }: { structure: DocumentStructure }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <dl aria-label={t('facts.label')} className="grid gap-4 rounded-lg border p-4 sm:grid-cols-3">
-        <Fact label={t('facts.format')}>
-          <Badge variant="outline">{tList(`format.${structure.format}`)}</Badge>
-        </Fact>
-        <Fact label={t('facts.fields')}>
-          {tList('fieldCount', { count: leafCount(structure.children) })}
-        </Fact>
-        <Fact label={t('facts.mappings')}>
-          {mappings ? (
-            <UsedByMappings mappings={mappings} />
-          ) : (
-            <Loading label={t('facts.mappingsLoading')} rowClassName="h-4 w-32" rows={1} />
-          )}
-        </Fact>
-      </dl>
+      <StructureFacts mappings={mappings} structure={structure} />
       {mappings && mappings.length > 0 && (
         <p className="text-muted-foreground max-w-prose text-sm">{t('usedNote')}</p>
       )}
@@ -405,12 +453,13 @@ function Editor({ structure }: { structure: DocumentStructure }) {
 export function DocumentStructureScreen({ id }: { id: string }) {
   const t = useTranslations('DocumentStructure')
   const { data, error, isPending, refetch } = useQuery(documentStructureQuery(id))
+  const session = useSession()
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <BackLink href="/document-structures" label={t('back')} />
       <h1 className="text-2xl font-semibold tracking-tight">{data?.name ?? t('title')}</h1>
-      {isPending ? (
+      {isPending || session.isPending ? (
         <div aria-busy className="flex flex-col gap-4">
           <p role="status" className="sr-only">
             {t('loading')}
@@ -419,7 +468,11 @@ export function DocumentStructureScreen({ id }: { id: string }) {
           <Skeleton className="h-96 w-full" />
         </div>
       ) : data ? (
-        <Editor structure={data} />
+        session.canChange ? (
+          <Editor structure={data} />
+        ) : (
+          <StructureView structure={data} />
+        )
       ) : (
         <LoadFailure
           namespace="DocumentStructure"

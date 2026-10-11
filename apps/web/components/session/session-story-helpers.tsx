@@ -1,8 +1,12 @@
 import { expect } from 'storybook/test'
 
+import type {
+  Decorator,
+  ReactRenderer,
+  StoryContext as ReactStoryContext,
+} from '@storybook/nextjs-vite'
 import type { RequestHandler } from 'msw'
-import type { ReactNode } from 'react'
-import type { StoryContext } from 'storybook/internal/csf'
+import type { BeforeEach } from 'storybook/internal/csf'
 
 import { ViewOnlyBadge } from '@/components/session/view-only-badge'
 import { apiUrl } from '@/lib/api/config'
@@ -18,7 +22,7 @@ export function sessionHandlers(session: Session | SessionStore) {
   return mockSessionHandlers(apiUrl, session)
 }
 
-const withViewOnlyBadge = (Story: () => ReactNode) => (
+const withViewOnlyBadge: Decorator = (Story) => (
   <>
     <ViewOnlyBadge />
     <Story />
@@ -28,17 +32,23 @@ const withViewOnlyBadge = (Story: () => ReactNode) => (
 // Waiting for the badge proves the Viewer session has loaded, so absent actions are not just pending.
 export function viewerStory({
   handlers = [],
+  decorators = [],
+  beforeEach,
   play,
 }: {
   handlers?: RequestHandler[]
-  play: (context: StoryContext) => Promise<void>
+  decorators?: Decorator[]
+  beforeEach?: BeforeEach<ReactRenderer>
+  play: (context: ReactStoryContext) => Promise<void>
 }) {
   return {
-    beforeEach({ msw }: StoryContext) {
-      msw.use(...sessionHandlers(showcaseViewerSession), ...handlers)
+    beforeEach(context: ReactStoryContext) {
+      context.msw.use(...sessionHandlers(showcaseViewerSession), ...handlers)
+
+      return beforeEach?.(context)
     },
-    decorators: [withViewOnlyBadge],
-    async play(context: StoryContext) {
+    decorators: [...decorators, withViewOnlyBadge],
+    async play(context: ReactStoryContext) {
       await expect(await context.canvas.findByText('View only')).toBeVisible()
       await play(context)
     },

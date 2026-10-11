@@ -3,6 +3,7 @@ import { expect, userEvent, within } from 'storybook/test'
 
 import { DocumentStructureScreen } from '@/components/document-structures/document-structure-screen'
 import { toFile } from '@/components/document-structures/document-structure-story-helpers'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
@@ -501,4 +502,80 @@ export const Dark = meta.story({
     await changeAndSave(canvasElement)
     await expect(await canvas.findByRole('alert')).toBeVisible()
   },
+})
+
+async function expectNothingToChange(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement)
+
+  await expect(canvas.queryAllByRole('textbox')).toHaveLength(0)
+  await expect(canvas.queryAllByRole('combobox')).toHaveLength(0)
+  await expect(canvas.queryAllByRole('checkbox')).toHaveLength(0)
+  await expect(canvasElement.querySelector('input[type=file]')).toBeNull()
+  await expect(canvasElement.querySelector('form')).toBeNull()
+}
+
+export const Viewer = meta.story({
+  ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      await expect(
+        await canvas.findByRole('treegrid', { name: 'Fields of ERP purchase order' }),
+      ).toBeVisible()
+      await expect(
+        canvas.getByRole('heading', { level: 1, name: 'ERP purchase order' }),
+      ).toBeVisible()
+      await expectNothingToChange(canvasElement)
+      await expect(canvas.queryByRole('button', { name: 'Save' })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: 'Discard changes' })).toBeNull()
+      await expect(canvas.queryByText('No unsaved changes')).toBeNull()
+      await expect(
+        canvas.getByText('Use the arrow keys to move between rows and to open or close objects.'),
+      ).toBeVisible()
+
+      const [first, second] = canvas.getAllByRole('row').slice(1)
+      first!.focus()
+      await userEvent.keyboard('{ArrowDown}')
+      await expect(second).toHaveFocus()
+    },
+  }),
+})
+
+export const ViewerCsv = meta.story({
+  args: { id: csv!.id },
+  ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      const settings = await canvas.findByRole('region', { name: 'CSV settings' })
+      await expect(within(settings).getByText('Semicolon (;)')).toBeVisible()
+      await expect(within(settings).getByText('Windows-1252')).toBeVisible()
+      await expect(within(settings).getByText('The first row names the columns')).toBeVisible()
+      await expect(await canvas.findByRole('treegrid')).toBeVisible()
+      await expect(await canvas.findByText('Not used yet')).toBeVisible()
+      await expectNothingToChange(canvasElement)
+      await expect(canvas.queryByRole('button', { name: 'Save' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerGerman = meta.story({
+  args: { id: csv!.id },
+  ...viewerStory({
+    decorators: [german],
+    async play({ canvas, canvasElement }) {
+      const settings = await canvas.findByRole('region', { name: 'CSV-Einstellungen' })
+      await expect(within(settings).getByText('Semikolon (;)')).toBeVisible()
+      await expect(within(settings).getByText('Kopfzeile')).toBeVisible()
+      await expect(await canvas.findByRole('treegrid', { name: /^Felder von / })).toBeVisible()
+      await expectNothingToChange(canvasElement)
+      await expect(canvas.queryByRole('button', { name: 'Speichern' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerDark = meta.story({
+  ...viewerStory({
+    beforeEach: darkMode,
+    async play({ canvas, canvasElement }) {
+      await expect(await canvas.findByRole('treegrid')).toBeVisible()
+      await expectNothingToChange(canvasElement)
+    },
+  }),
 })

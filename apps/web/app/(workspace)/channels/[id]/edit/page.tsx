@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server'
 import type { Metadata } from 'next'
 
 import { EditChannelScreen } from '@/components/channels/channel-form-screen'
+import { CanChangeOnly } from '@/components/session/can-change-only'
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations()
@@ -15,5 +16,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Page({ params }: PageProps<'/channels/[id]/edit'>) {
   const { id } = await params
 
-  return <EditChannelScreen id={id} />
+  return (
+    <CanChangeOnly>
+      <EditChannelScreen id={id} />
+    </CanChangeOnly>
+  )
 }

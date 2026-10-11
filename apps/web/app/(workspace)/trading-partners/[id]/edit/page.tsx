@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import type { Metadata } from 'next'
 
+import { CanChangeOnly } from '@/components/session/can-change-only'
 import { EditTradingPartnerScreen } from '@/components/trading-partners/trading-partner-form-screen'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -15,5 +16,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Page({ params }: PageProps<'/trading-partners/[id]/edit'>) {
   const { id } = await params
 
-  return <EditTradingPartnerScreen id={id} />
+  return (
+    <CanChangeOnly>
+      <EditTradingPartnerScreen id={id} />
+    </CanChangeOnly>
+  )
 }
