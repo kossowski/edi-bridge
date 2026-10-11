@@ -236,15 +236,16 @@ function ActionLabel({ run }: { run: AiDraftRun }) {
 export function AiDraftAction({
   draft,
   aiDraft,
+  reviewSummaryId,
 }: {
   draft: MappingDraft
   aiDraft: AiDraftRunControls
+  reviewSummaryId?: string
 }) {
   const t = useTranslations('Mapping.aiDraft')
   const [open, setOpen] = useState(false)
   const [seenRun, setSeenRun] = useState<AiDraftRun | null>(null)
   const outcomeDescription = useOutcomeDescription()
-  const reasonId = useId()
   const sampleRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const outcomeRef = useRef<HTMLHeadingElement>(null)
@@ -269,11 +270,6 @@ export function AiDraftAction({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {reviewBlocks && (
-        <span id={reasonId} className="text-muted-foreground text-sm">
-          {t('reviewOpen')}
-        </span>
-      )}
       <p role="status" className="sr-only">
         {!open && isEnded(run) && run !== seenRun ? outcomeDescription(run) : ''}
       </p>
@@ -281,7 +277,7 @@ export function AiDraftAction({
         disabled={reviewBlocks}
         focusableWhenDisabled
         variant="outline"
-        aria-describedby={reviewBlocks ? reasonId : undefined}
+        aria-describedby={reviewBlocks ? reviewSummaryId : undefined}
         onClick={() => changeOpen(true)}>
         <ActionLabel run={run} />
       </Button>

@@ -67,9 +67,18 @@ export function MappingVersionsLink({ mappingId }: { mappingId: string }) {
   )
 }
 
-export function PublishDraft({ draft, stateId }: { draft: MappingDraft; stateId?: string }) {
+export function PublishDraft({
+  draft,
+  stateId,
+  reviewHintId,
+}: {
+  draft: MappingDraft
+  stateId?: string
+  reviewHintId?: string
+}) {
   const t = useTranslations('Mapping.publish')
   const queryClient = useQueryClient()
+  const reviewOpen = draft.aiReview !== null
   const saving = useGraphSaveState(draft.mappingId) === 'saving'
   const [open, setOpen] = useState(false)
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null)
@@ -87,7 +96,7 @@ export function PublishDraft({ draft, stateId }: { draft: MappingDraft; stateId?
       setOpen(false)
     },
     onError: (error) => {
-      if (problemOf(error) === 'noChanges') {
+      if (['noChanges', 'reviewOpen'].includes(problemOf(error))) {
         void queryClient.invalidateQueries({
           queryKey: mappingDraftQuery(draft.mappingId).queryKey,
         })
@@ -124,9 +133,11 @@ export function PublishDraft({ draft, stateId }: { draft: MappingDraft; stateId?
           setOpen(next)
         }}>
         <DialogTrigger
-          disabled={!draft.unpublishedChanges || saving}
+          disabled={!draft.unpublishedChanges || saving || reviewOpen}
           render={<Button />}
-          aria-describedby={stateId}>
+          aria-describedby={
+            [stateId, reviewOpen && reviewHintId].filter(Boolean).join(' ') || undefined
+          }>
           <HugeiconsIcon icon={CloudUploadIcon} strokeWidth={2} aria-hidden />
           {t('button')}
         </DialogTrigger>

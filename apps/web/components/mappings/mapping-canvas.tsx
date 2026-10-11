@@ -28,6 +28,7 @@ import {
   useState,
 } from 'react'
 
+import { proposedLinkCount, useAiMarks } from '@/components/mappings/ai-marks'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
 import {
   LinkActionsContext,
@@ -433,6 +434,7 @@ export function MappingCanvas({
   beside,
 }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
+  const tAi = useTranslations('Mapping.aiReview')
   const tLinks = useTranslations('Mapping.links')
   const tTransforms = useTranslations('Mapping.transforms')
   const root = useRef<HTMLDivElement>(null)
@@ -450,6 +452,7 @@ export function MappingCanvas({
   const usesLookupTables = graph.transforms.some(({ kind }) => kind === 'lookupTable')
   const lookupTables = useQuery({ ...lookupTablesQuery, enabled: usesLookupTables })
   const text = useGraphText(graph.transforms, lookupTables.data)
+  const marks = useAiMarks()
 
   // Where dragged nodes are shown until the cached Draft, and so its transforms, changes.
   const [dragged, setDragged] = useState<{
@@ -543,6 +546,16 @@ export function MappingCanvas({
       target: layouts.target.visible,
     })
 
+    const edgeLabel = (label: string, proposed: number, total: number) => {
+      if (proposed === 0) {
+        return label
+      }
+
+      return proposed === total
+        ? tAi('edgeLabel', { label })
+        : tAi('edgeLabelSome', { label, count: proposed, total })
+    }
+
     const transformEdges = graph.transformLinks.flatMap((link): LinkFlowEdge[] => {
       const from = startNode(link.from, layouts.source.visible)
       const to = endNode(link.to, layouts.target.visible)
@@ -552,6 +565,7 @@ export function MappingCanvas({
       }
 
       const names = { source: text.start(link.from), target: text.end(link.to) }
+      const aiProposed = marks.transformLink(link)
 
       return [
         {
@@ -561,11 +575,11 @@ export function MappingCanvas({
           sourceHandle: from.handle,
           target: to.node,
           targetHandle: to.handle,
-          data: { kind: 'transformLink', link, ...names },
+          data: { kind: 'transformLink', link, ...names, aiProposed },
           selectable: false,
           focusable: false,
           zIndex: 100,
-          ariaLabel: t('link', names),
+          ariaLabel: edgeLabel(t('link', names), aiProposed ? 1 : 0, 1),
         },
       ]
     })
@@ -605,6 +619,7 @@ export function MappingCanvas({
         linked: linked.has(row.id),
         filled: row.side === 'target' && linkIntoTarget(graph, row.path) !== null,
         wholePart: isWholePart(rows, row),
+        aiProposed: row.side === 'target' && marks.end({ kind: 'target', path: row.path }),
       },
       draggable: false,
       selectable: false,
@@ -619,6 +634,11 @@ export function MappingCanvas({
 
       const inputs = ports.inputs.map((port) => {
         const into = linkIntoInput(graph, transform.id, port)
+        const aiProposed = into !== null && marks.transformLink(into)
+
+        const status = into
+          ? tTransforms('node.linkedFrom', { source: text.start(into.from) })
+          : tTransforms('node.notLinked')
 
         return {
           port,
@@ -629,9 +649,7 @@ export function MappingCanvas({
             transformId: transform.id,
             input: port,
           }),
-          status: into
-            ? tTransforms('node.linkedFrom', { source: text.start(into.from) })
-            : tTransforms('node.notLinked'),
+          status: aiProposed ? `${status} ${tAi('proposedStatus')}` : status,
         }
       })
 
@@ -673,6 +691,7 @@ export function MappingCanvas({
           issues: (issues[transform.id] ?? []).map((issue) => text.issue(transform.kind, issue)),
           inputs,
           outputs,
+          aiProposed: marks.transform(transform.id),
         },
         draggable: !viewOnly,
         selectable: false,
@@ -683,20 +702,29 @@ export function MappingCanvas({
 
     const plainEdges = shown.map(({ id, sourcePath, targetPath, links: merged }): LinkFlowEdge => {
       const [first] = merged
+      const proposed = proposedLinkCount(marks, merged)
+
+      const label =
+        merged.length === 1 && first
+          ? t('link', { source: first.sourcePath, target: first.targetPath })
+          : t('links', { count: merged.length, source: sourcePath, target: targetPath })
 
       return {
         id,
         type: 'link',
         source: nodeId('source', sourcePath),
         target: nodeId('target', targetPath),
-        data: { kind: 'link', sourcePath, targetPath, links: merged },
+        data: {
+          kind: 'link',
+          sourcePath,
+          targetPath,
+          links: merged,
+          aiProposed: proposed === merged.length,
+        },
         selectable: false,
         focusable: false,
         zIndex: 100,
-        ariaLabel:
-          merged.length === 1 && first
-            ? t('link', { source: first.sourcePath, target: first.targetPath })
-            : t('links', { count: merged.length, source: sourcePath, target: targetPath }),
+        ariaLabel: edgeLabel(label, proposed, merged.length),
       }
     })
 
@@ -717,11 +745,13 @@ export function MappingCanvas({
     graph,
     heights,
     issues,
+    marks,
     viewOnly,
     rows,
     source.items,
     source.title,
     t,
+    tAi,
     tTransforms,
     target.items,
     target.title,

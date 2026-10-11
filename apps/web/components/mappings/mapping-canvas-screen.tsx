@@ -8,6 +8,7 @@ import { useId } from 'react'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
+import { AiReviewState } from '@/components/mappings/ai-review-state'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
@@ -111,10 +112,12 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
   const sideTitle = useSideTitle()
   const desktop = useDesktop()
   const stateId = useId()
+  const reviewSummaryId = useId()
+  const publishHintId = useId()
   const aiDraft = useAiDraftRun(draft.mappingId)
 
   return (
-    <MappingCanvasProvider viewOnly={!canChange}>
+    <MappingCanvasProvider aiReview={canChange ? draft.aiReview : null} viewOnly={!canChange}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <DraftStateLabel id={stateId} draft={draft} />
@@ -122,13 +125,18 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
         <div className="ms-auto flex flex-wrap items-center gap-2">
           {canChange ? (
             <>
-              {desktop && <AiDraftAction aiDraft={aiDraft} draft={draft} />}
-              <PublishDraft draft={draft} stateId={stateId} />
+              {desktop && (
+                <AiDraftAction aiDraft={aiDraft} draft={draft} reviewSummaryId={reviewSummaryId} />
+              )}
+              <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
             </>
           ) : (
             <MappingVersionsLink mappingId={draft.mappingId} />
           )}
         </div>
+        {canChange && (
+          <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={reviewSummaryId} />
+        )}
       </div>
       <dl
         aria-label={t('facts.label')}

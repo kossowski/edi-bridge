@@ -1,4 +1,4 @@
-import type { MappingDraft } from '@edi-bridge/contracts'
+import { aiReviewOpenStatus, type MappingDraft } from '@edi-bridge/contracts'
 
 export type DraftState =
   | { kind: 'neverPublished' }
@@ -21,7 +21,7 @@ export function nextVersion({ latestVersion }: VersionFacts) {
   return (latestVersion ?? 0) + 1
 }
 
-export type PublishProblem = 'noChanges' | 'incomplete' | 'failed'
+export type PublishProblem = 'noChanges' | 'incomplete' | 'reviewOpen' | 'failed'
 
 export function publishProblem(status: number | null): PublishProblem {
   switch (status) {
@@ -29,6 +29,8 @@ export function publishProblem(status: number | null): PublishProblem {
       return 'noChanges'
     case 422:
       return 'incomplete'
+    case aiReviewOpenStatus:
+      return 'reviewOpen'
     default:
       return 'failed'
   }

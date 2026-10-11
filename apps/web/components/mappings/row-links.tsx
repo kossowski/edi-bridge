@@ -3,6 +3,8 @@
 import { useTranslations } from 'next-intl'
 import { useId } from 'react'
 
+import { AiBadge } from '@/components/mappings/ai-badge'
+import { rowLinkProposed, useAiMarks } from '@/components/mappings/ai-marks'
 import {
   isStartRow,
   useCanvasViewOnly,
@@ -16,6 +18,7 @@ import {
   type RowLink,
   type RowRef,
 } from '@/components/mappings/mapping-links'
+import { useRemoveText } from '@/components/mappings/use-remove-text'
 import { Button } from '@edi-bridge/ui/components/button'
 
 import type { GraphText } from '@/components/mappings/graph-text'
@@ -71,6 +74,9 @@ export function RowLinks({
   actions: PanelActions
 }) {
   const t = useTranslations('Mapping.links')
+  const tAi = useTranslations('Mapping.aiReview')
+  const marks = useAiMarks()
+  const removeText = useRemoveText()
   const heading = useId()
   const linkFrom = useCanvasStore((state) => state.linkFrom)
   const own = linksOfItem(graph, row.side, item)
@@ -98,22 +104,26 @@ export function RowLinks({
         <ul className="flex flex-col gap-1.5">
           {own.map((link, index) => {
             const names = rowLinkNames(link, text)
+            const proposed = rowLinkProposed(marks, link)
 
             return (
               <li
                 key={`${names.source}->${names.target}`}
                 className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
-                <span className="min-w-0 font-mono [overflow-wrap:anywhere]">
-                  {t('item', names)}
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="min-w-0 font-mono [overflow-wrap:anywhere]">
+                    {t('item', names)}
+                  </span>
+                  {proposed && <AiBadge label={tAi('proposed')} />}
                 </span>
                 {!viewOnly && (
                   <Button
                     size="sm"
                     variant="outline"
-                    aria-label={t('removeLabel', names)}
+                    aria-label={removeText.linkLabel(proposed, names)}
                     data-remove-link
                     onClick={() => actions.remove(link, index)}>
-                    {t('remove')}
+                    {removeText.link(proposed)}
                   </Button>
                 )}
               </li>

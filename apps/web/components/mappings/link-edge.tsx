@@ -16,15 +16,17 @@ import { createContext, memo, useCallback, useContext, useState } from 'react'
 
 import { useCanvasViewOnly, useCanvasStore } from '@/components/mappings/mapping-canvas-store'
 import { panelGutter } from '@/components/mappings/mapping-tree'
+import { useRemoveText } from '@/components/mappings/use-remove-text'
 
 import type { CanvasLink } from '@/components/mappings/mapping-tree'
 import type { MappingLink, TransformLink } from '@edi-bridge/contracts'
 
 export type PlainEdgeData = Omit<CanvasLink, 'id'>
 
-export type LinkEdgeData =
+export type LinkEdgeData = (
   | ({ kind: 'link' } & PlainEdgeData)
   | { kind: 'transformLink'; link: TransformLink; source: string; target: string }
+) & { aiProposed: boolean }
 
 export type LinkFlowEdge = Edge<LinkEdgeData, 'link'>
 
@@ -49,6 +51,7 @@ function useLinkActions() {
 
 function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
   const t = useTranslations('Mapping.links')
+  const removeText = useRemoveText()
   const actions = useLinkActions()
   const hoverEdge = useCanvasStore((state) => state.hoverEdge)
   const leaveEdge = useCanvasStore((state) => state.leaveEdge)
@@ -68,11 +71,11 @@ function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
 
   const label = () => {
     if (data.kind === 'transformLink') {
-      return t('removeLabel', { source: data.source, target: data.target })
+      return removeText.linkLabel(data.aiProposed, { source: data.source, target: data.target })
     }
 
     return single && only
-      ? t('removeLabel', { source: only.sourcePath, target: only.targetPath })
+      ? removeText.linkLabel(data.aiProposed, { source: only.sourcePath, target: only.targetPath })
       : t('showLinksLabel', {
           count: data.links.length,
           source: data.sourcePath,
@@ -206,7 +209,12 @@ function LinkEdgeView({
       <BaseEdge
         interactionWidth={interactionWidth}
         path={path}
-        style={hovered ? { ...style, stroke: 'var(--foreground)', strokeWidth: 2.5 } : style}
+        style={{
+          ...style,
+          ...(data?.aiProposed && { stroke: 'var(--ai-proposed)', strokeDasharray: '6 3' }),
+          ...(hovered && { strokeWidth: 2.5 }),
+          ...(hovered && !data?.aiProposed && { stroke: 'var(--foreground)' }),
+        }}
       />
       {hovered && data && !viewOnly && (
         <EdgeButtonAnchor id={id} data={data} midpoint={{ x: labelX, y: labelY }} />

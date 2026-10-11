@@ -1048,12 +1048,12 @@
       "problem": {
         "noChanges": "Der Draft hat seit der neuesten Mapping Version keine Änderungen, es gibt also nichts zu veröffentlichen.",
         "incomplete": "Der Draft lässt sich noch nicht veröffentlichen: Jede Verknüpfung und jeder Transform muss vollständig sein. Vervollständigen Sie sie und veröffentlichen Sie dann erneut.",
+        "reviewOpen": "Der Draft lässt sich nicht veröffentlichen, solange die Durchsicht des KI-Entwurfs offen ist. Übernehmen Sie zuerst den KI-Entwurf und veröffentlichen Sie dann.",
         "failed": "Der Draft konnte nicht veröffentlicht werden. Versuchen Sie es erneut."
       }
     },
     "aiDraft": {
       "button": "Mit KI entwerfen",
-      "reviewOpen": "Die Durchsicht des KI-Entwurfs für diesen Draft ist noch offen.",
       "title": "Mit KI entwerfen",
       "description": "Die KI entwirft Verknüpfungen aus einem Beispiel-Document und prüft sie daran. Das dauert einige Minuten. Die Verknüpfungen erscheinen erst auf der Zeichenfläche, wenn sie die Prüfung bestehen.",
       "samples": {
@@ -1141,6 +1141,28 @@
         "checkingAgainstSample": "Prüfung",
         "fixingErrors": "Fehler beheben"
       }
+    },
+    "aiReview": {
+      "open": "Durchsicht des KI-Entwurfs offen",
+      "openSummary": "{count, plural, one {# KI-Vorschlag zu prüfen} other {# KI-Vorschläge zu prüfen}}",
+      "accept": "KI-Entwurf übernehmen",
+      "accepting": "Wird übernommen…",
+      "accepted": "KI-Entwurf übernommen. Der Draft bleibt bearbeitbar und lässt sich jetzt veröffentlichen.",
+      "acceptFailed": "Der KI-Entwurf konnte nicht übernommen werden. Versuchen Sie es erneut.",
+      "publishBlocked": "Übernehmen Sie den KI-Entwurf, bevor Sie veröffentlichen.",
+      "marker": "KI",
+      "proposed": "KI-Vorschlag",
+      "proposedLink": "Von der KI vorgeschlagene Verknüpfung",
+      "proposedTransform": "Von der KI vorgeschlagener Transform",
+      "proposedStatus": "Von der KI vorgeschlagen.",
+      "edgeLabel": "{label}, von der KI vorgeschlagen",
+      "edgeLabelSome": "{label}, {count} von {total} von der KI vorgeschlagen",
+      "reject": "Ablehnen",
+      "rejectLinkLabel": "KI-Vorschlag ablehnen: Verknüpfung von {source} zu {target}",
+      "rejectTransform": "{name} ablehnen",
+      "rejectTransformLabel": "KI-Vorschlag ablehnen: {name}",
+      "rejectedLink": "KI-Vorschlag abgelehnt: Verknüpfung von {source} zu {target} entfernt.",
+      "rejectedTransform": "KI-Vorschlag abgelehnt: {name} entfernt."
     },
     "facts": {
       "label": "Mapping-Details",

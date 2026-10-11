@@ -6,6 +6,7 @@ import { Handle, type Node, type NodeProps, Position, useConnection } from '@xyf
 import { useTranslations } from 'next-intl'
 import { createContext, memo, useCallback, useContext, useId } from 'react'
 
+import { AiMarker } from '@/components/mappings/ai-badge'
 import {
   useCanvasViewOnly,
   useCanvasStore,
@@ -14,6 +15,7 @@ import {
 } from '@/components/mappings/mapping-canvas-store'
 import { sameStart, transformWidth } from '@/components/mappings/mapping-graph'
 import { usePanIntoView } from '@/components/mappings/tree-node'
+import { useRemoveText } from '@/components/mappings/use-remove-text'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { LinkEnd, LinkStart } from '@edi-bridge/contracts'
@@ -34,6 +36,7 @@ export type TransformNodeData = {
   inputs: PortView[]
   outputs: PortView[]
   issues: string[]
+  aiProposed: boolean
 }
 
 export type TransformFlowNode = Node<TransformNodeData, 'transform'>
@@ -261,6 +264,8 @@ function OutputPort({
 
 function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
   const t = useTranslations('Mapping.transforms.node')
+  const tAi = useTranslations('Mapping.aiReview')
+  const removeText = useRemoveText()
   const actions = useTransformActions()
   const onFocus = usePanIntoView({ whole: true })
   const issuesId = useId()
@@ -292,10 +297,15 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
       aria-label={t('label', { name: data.name })}
       className={cn(
         'bg-card text-foreground pointer-events-auto flex flex-col gap-1 rounded-md border-2 py-1 text-xs shadow-sm',
-        invalid ? 'border-dashed border-amber-700 dark:border-amber-300' : 'border-border',
+        invalid
+          ? 'border-dashed border-amber-700 dark:border-amber-300'
+          : data.aiProposed
+            ? 'border-ai-proposed border-dashed'
+            : 'border-border',
         selected && 'outline-primary outline-2 outline-offset-2 outline-solid',
       )}
       style={{ width: transformWidth }}
+      data-ai-proposed={data.aiProposed || undefined}
       data-invalid={invalid || undefined}
       data-selected={selected || undefined}
       onFocus={onFocus}>
@@ -311,11 +321,14 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
           {invalid && <WarningIcon className="size-4" />}
           {/* Wraps rather than truncates, so the number that tells same-kind nodes apart stays. */}
           <span className="min-w-0 [overflow-wrap:anywhere]">{data.name}</span>
+          {data.aiProposed && (
+            <AiMarker label={tAi('proposedTransform')} className="ms-auto self-start" />
+          )}
         </button>
         {!viewOnly && (
           <button
             type="button"
-            aria-label={t('remove', { name: data.name })}
+            aria-label={removeText.transformLabel(data.aiProposed, data.name)}
             className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground inline-flex size-7.5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
             onClick={() => actions.remove(data.transformId)}>
             <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
