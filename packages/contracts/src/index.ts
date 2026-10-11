@@ -524,6 +524,8 @@ export {
   aiTokenBudgetSchema,
   documentRetentionDays,
   documentRetentionDaysSchema,
+  operatorWorkspaceSettingsEndpoint,
+  updateOperatorWorkspaceSettingsEndpoint,
   updateWorkspaceSettingsEndpoint,
   type WorkspaceSettings,
   workspaceSettingsEndpoint,

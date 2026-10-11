@@ -64,10 +64,15 @@ export function toSessionStore(session: Session | null | SessionStore = seedSess
   return session !== null && 'get' in session ? session : createSessionStore(session)
 }
 
+type SessionResolver<Params extends PathParams<keyof Params>> = (
+  info: Parameters<HttpResponseResolver<Params>>[0],
+  session: Session,
+) => ReturnType<HttpResponseResolver<Params>>
+
 function guarded<Params extends PathParams<keyof Params>>(
   store: SessionStore,
   allowed: (session: Session) => boolean,
-  resolver: HttpResponseResolver<Params>,
+  resolver: SessionResolver<Params>,
 ): HttpResponseResolver<Params> {
   return (info) => {
     const session = store.get()
@@ -76,27 +81,27 @@ function guarded<Params extends PathParams<keyof Params>>(
       return unauthorized()
     }
 
-    return allowed(session) ? resolver(info) : forbidden()
+    return allowed(session) ? resolver(info, session) : forbidden()
   }
 }
 
 export function signedInOnly<Params extends PathParams<keyof Params>>(
   store: SessionStore,
-  resolver: HttpResponseResolver<Params>,
+  resolver: SessionResolver<Params>,
 ) {
   return guarded(store, () => true, resolver)
 }
 
 export function operatorOnly<Params extends PathParams<keyof Params>>(
   store: SessionStore,
-  resolver: HttpResponseResolver<Params>,
+  resolver: SessionResolver<Params>,
 ) {
   return guarded(store, (session) => session.operator, resolver)
 }
 
 export function adminOnly<Params extends PathParams<keyof Params>>(
   store: SessionStore,
-  resolver: HttpResponseResolver<Params>,
+  resolver: SessionResolver<Params>,
 ) {
   return guarded(store, (session) => session.operator || session.role === 'admin', resolver)
 }

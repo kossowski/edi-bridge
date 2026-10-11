@@ -307,6 +307,7 @@ export function createHandlers(
     ...workspaceSettingsHandlers(apiUrl, {
       settings: workspaceSettingsStore,
       session: sessionStore,
+      workspaces: operatorStore,
     }),
     ...operatorHandlers(apiUrl, { workspaces: operatorStore, session: sessionStore }),
     ...tradingPartnerHandlers(apiUrl, {

@@ -58,3 +58,26 @@ export const updateWorkspaceSettingsEndpoint: Endpoint<
   body: workspaceSettingsInputSchema,
   response: workspaceSettingsSchema,
 }
+
+export const operatorWorkspaceSettingsEndpoint: Endpoint<
+  WorkspaceSettings,
+  undefined,
+  undefined,
+  '/operator/workspaces/:workspaceId/settings'
+> = {
+  method: 'GET',
+  path: '/operator/workspaces/:workspaceId/settings',
+  response: workspaceSettingsSchema,
+}
+
+export const updateOperatorWorkspaceSettingsEndpoint: Endpoint<
+  WorkspaceSettings,
+  undefined,
+  WorkspaceSettingsInput,
+  '/operator/workspaces/:workspaceId/settings'
+> = {
+  method: 'PUT',
+  path: '/operator/workspaces/:workspaceId/settings',
+  body: workspaceSettingsInputSchema,
+  response: workspaceSettingsSchema,
+}
