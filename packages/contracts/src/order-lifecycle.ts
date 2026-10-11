@@ -19,7 +19,6 @@ export const acknowledgementStateSchema = z.enum(acknowledgementStates)
 
 export type AcknowledgementState = z.infer<typeof acknowledgementStateSchema>
 
-// The Business Reference is a document number (data element 1004, an..35).
 export const businessReferenceSchema = z.string().trim().min(1).max(35)
 
 export const orderLifecycleQuerySchema = z.object({

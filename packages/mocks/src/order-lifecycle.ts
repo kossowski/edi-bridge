@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  type AcknowledgementState,
   directionOf,
   type FailureStage,
   fromSearchParams,
@@ -16,6 +17,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedFlows } from './flow'
+import { hour, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
 import { controlReferenceOf, interchangeIdOf, type Reprocessed } from './run-detail'
 import { stableUuid } from './seed-id'
@@ -31,14 +33,14 @@ export const orderLifecycleReferences = {
   serverError: '5000',
 } as const
 
-type Acknowledgement = 'accepted' | 'rejected'
+type AcknowledgementOutcome = Extract<AcknowledgementState, 'accepted' | 'rejected'>
 
 type MessageSeed = {
   messageType: OrderLifecycleMessageType
   hoursAgo: number
   outcome: 'delivered' | FailureStage
-  acknowledgement?: Acknowledgement | undefined
-  reprocessed?: { hoursAgo: number; acknowledgement: Acknowledgement }
+  acknowledgement?: AcknowledgementOutcome | undefined
+  reprocessed?: { hoursAgo: number; acknowledgement: AcknowledgementOutcome }
 }
 
 type LifecycleSeed = {
@@ -49,7 +51,6 @@ type LifecycleSeed = {
 
 const deliveryCount = 30
 
-// A large order is shipped in daily part deliveries, each with its own DESADV and INVOIC.
 function partDeliveries(): MessageSeed[] {
   return Array.from({ length: deliveryCount }, (_, delivery): MessageSeed[] => {
     const hoursAgo = (deliveryCount - delivery) * 24 - 2
@@ -160,8 +161,6 @@ const lifecycleSeeds: LifecycleSeed[] = [
   },
 ]
 
-const hour = 60 * 60 * 1000
-
 export type OrderLifecycleSeed = {
   runs: RunSummary[]
   reprocessed: Reprocessed[]
@@ -171,7 +170,7 @@ export type OrderLifecycleSeed = {
 
 function interchangeOf(
   run: RunSummary,
-  acknowledgement: Acknowledgement | undefined,
+  acknowledgement: AcknowledgementOutcome | undefined,
   tradingPartner: TradingPartner,
   now: Date,
 ): OrderLifecycleInterchange | null {
@@ -184,8 +183,7 @@ function interchangeOf(
   const id = interchangeIdOf(run)
   const sent = outbound && run.status === 'delivered'
 
-  const overdueSince =
-    Date.parse(run.receivedAt) + tradingPartner.acknowledgementTimeLimitHours * hour
+  const overdueSince = overdueSinceOf(run.receivedAt, tradingPartner)
 
   return {
     id,
@@ -203,7 +201,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
 
   const orderLifecycles = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
     const tradingPartner = seedTradingPartners.find(({ name }) => name === seed.tradingPartner)!
-    const partner = { id: tradingPartner.id, name: tradingPartner.name }
+    const tradingPartnerSummary = { id: tradingPartner.id, name: tradingPartner.name }
 
     function toRun(
       key: string,
@@ -215,10 +213,10 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
       )!
 
       const base = {
-        id: stableUuid(`order-lifecycle:${businessReference}:${partner.id}:${key}`),
+        id: stableUuid(`order-lifecycle:${businessReference}:${tradingPartnerSummary.id}:${key}`),
         // The seconds keep two inbound Runs from sharing an Interchange.
         receivedAt: new Date(now.getTime() - hoursAgo * hour - runs.length * 1000).toISOString(),
-        tradingPartner: partner,
+        tradingPartner: tradingPartnerSummary,
         messageType,
         flow: { id: flow.id, name: flow.name },
         manualSubmission: false,
@@ -238,7 +236,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
 
     const toMessage = (
       run: RunSummary,
-      acknowledgement: Acknowledgement | undefined,
+      acknowledgement: AcknowledgementOutcome | undefined,
       replacedBy: RunSummary | null = null,
     ) =>
       orderLifecycleMessageSchema.parse({
@@ -277,7 +275,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
 
     return orderLifecycleSchema.parse({
       businessReference,
-      tradingPartner: partner,
+      tradingPartner: tradingPartnerSummary,
       messages: entries.toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
     })
   })

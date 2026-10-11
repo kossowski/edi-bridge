@@ -11,3 +11,7 @@
 - [ ] Search returns the full chain in chronological order, including partial lifecycles
 - [ ] If this area's Zod contract doesn't exist yet, this ticket defines it in the contracts package; if it exists, the implementation conforms to it (or extends it, updating the MSW handlers alongside)
 - [ ] With mock mode off, this area's screen (if it already exists) works against the real API without UI code changes; the area's MSW handlers stay in the mocks package and keep working against the same contract
+
+## Comments
+
+- The Order Lifecycle contract from ticket 17 also lists outbound Runs that failed before an EDIFACT Message existed (for example at mapping, with `interchange: null`). For those Runs, take the Business Reference from the source Document, because there is no BGM or RFF+ON to extract it from.
