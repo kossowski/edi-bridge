@@ -1,6 +1,6 @@
 # 29: Mappings live
 
-**What to build:** Mappings are stored via the real api: one Draft per Mapping, publishing creates an immutable Mapping Version, versions can be listed and compared (including outputs for the same Document), and the live preview runs the real engine.
+**What to build:** Mappings are stored via the real api: one Draft per Mapping, publishing creates an immutable Mapping Version, versions can be listed and compared (including outputs for the same Document), each version carries a change note, an earlier version can be restored into the Draft, and the live preview runs the real engine.
 
 **Blocked by:** 27 (Mapping engine: outbound), 25 (Lookup Tables live)
 
@@ -13,3 +13,5 @@
 - [ ] Preview runs the real mapping engine against a sample
 - [ ] If this area's Zod contract doesn't exist yet, this ticket defines it in the contracts package; if it exists, the implementation conforms to it (or extends it, updating the MSW handlers alongside)
 - [ ] With mock mode off, this area's screen (if it already exists) works against the real API without UI code changes; the area's MSW handlers stay in the mocks package and keep working against the same contract
+- [ ] Publishing takes a change note that the version history returns (ticket 65)
+- [ ] Restoring a Mapping Version copies it into the Draft without changing any published version or Flow
