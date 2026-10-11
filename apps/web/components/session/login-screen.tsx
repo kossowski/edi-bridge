@@ -139,7 +139,7 @@ export function LoginScreen() {
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/5 ring-primary/40">
+        <Card className="bg-highlight/10 ring-highlight ring-2">
           <CardHeader>
             <h2 className="font-heading text-lg leading-snug font-semibold">
               {t('showcaseTitle')}
@@ -156,7 +156,6 @@ export function LoginScreen() {
               disabled={pending}
               size="lg"
               type="button"
-              variant="outline"
               aria-describedby={`${id}-showcase`}
               className="w-full"
               onClick={() => {
