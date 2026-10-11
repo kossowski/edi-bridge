@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { AiBadge } from '@/components/mappings/ai-badge'
 import { aiProposedCount } from '@/components/mappings/ai-marks'
+import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
 import { useGraphSaveState } from '@/components/mappings/use-save-graph'
 import { acceptAiDraft } from '@/lib/api/client'
 import { mappingDraftQuery, storeAcceptedAiDraft } from '@/lib/api/queries'
@@ -15,14 +16,37 @@ import { Button } from '@edi-bridge/ui/components/button'
 
 import type { MappingDraft } from '@edi-bridge/contracts'
 
+function ShowReviewPanel({ panelId }: { panelId: string }) {
+  const t = useTranslations('Mapping.aiReview')
+  const store = useCanvasStoreApi()
+
+  const show = () => {
+    const { bandOpen, toggleBand } = store.getState()
+
+    if (!bandOpen) {
+      toggleBand()
+    }
+
+    requestAnimationFrame(() => document.getElementById(panelId)?.focus())
+  }
+
+  return (
+    <Button size="sm" variant="outline" onClick={show}>
+      {t('showPanel')}
+    </Button>
+  )
+}
+
 export function AiReviewState({
   draft,
   summaryId,
   publishHintId,
+  reviewPanelId = null,
 }: {
   draft: MappingDraft
   summaryId: string
   publishHintId: string
+  reviewPanelId?: string | null
 }) {
   const t = useTranslations('Mapping.aiReview')
   const queryClient = useQueryClient()
@@ -71,6 +95,7 @@ export function AiReviewState({
             <AiBadge label={t('open')} />
             {t('openSummary', { count: aiProposedCount(draft.aiReview) })}
           </span>
+          {reviewPanelId && <ShowReviewPanel panelId={reviewPanelId} />}
           <Button
             disabled={accept.isPending || saving}
             focusableWhenDisabled

@@ -27,6 +27,7 @@ export type CanvasState = {
   bandOpen: boolean
   toggleBand: () => void
   toggleCollapsed: (row: RowRef) => void
+  expand: (side: Side, paths: ReadonlyArray<string>) => void
   toggleSelected: (row: RowRef) => void
   select: (row: RowRef) => void
   toggleTransform: (id: string) => void
@@ -78,6 +79,14 @@ export function createCanvasStore() {
         if (!next.delete(path)) {
           next.add(path)
         }
+
+        return { collapsed: { ...collapsed, [side]: next } }
+      }),
+    expand: (side, paths) =>
+      set(({ collapsed }) => {
+        const next = new Set(collapsed[side])
+
+        paths.forEach((path) => next.delete(path))
 
         return { collapsed: { ...collapsed, [side]: next } }
       }),

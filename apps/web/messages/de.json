@@ -1162,7 +1162,36 @@
       "rejectTransform": "{name} ablehnen",
       "rejectTransformLabel": "KI-Vorschlag ablehnen: {name}",
       "rejectedLink": "KI-Vorschlag abgelehnt: Verknüpfung von {source} zu {target} entfernt.",
-      "rejectedTransform": "KI-Vorschlag abgelehnt: {name} entfernt."
+      "rejectedTransform": "KI-Vorschlag abgelehnt: {name} entfernt.",
+      "showPanel": "Was zu prüfen ist",
+      "panel": {
+        "title": "Durchsicht des KI-Entwurfs",
+        "description": "Was vor dem Übernehmen des KI-Entwurfs Aufmerksamkeit braucht. Wählen Sie einen Eintrag, um ihn auf der Zeichenfläche zu zeigen.",
+        "unmapped": {
+          "title": "Pflicht-Zielelemente ohne Verknüpfung",
+          "detail": "Pflichtfeld, noch nichts verknüpft.",
+          "empty": "Alle Pflicht-Zielelemente sind verknüpft."
+        },
+        "transforms": {
+          "title": "KI-Verknüpfungen über Transforms",
+          "empty": "Keine von der KI vorgeschlagene Verknüpfung läuft über einen Transform oder eine Lookup Table."
+        },
+        "through": "Von {sources} über {transforms}",
+        "throughOnly": "Über {transforms}",
+        "fillsNothing": "{transforms} füllt noch kein Zielelement.",
+        "lookupTable": "{name} ({table})",
+        "warnings": {
+          "title": "Warnungen zum Beispiel-Document",
+          "empty": "Die Vorschau zeigt für {name} keine Warnungen.",
+          "emptyUnnamed": "Die Vorschau zeigt für das Beispiel-Document keine Warnungen.",
+          "loading": "Der Draft wird mit dem Beispiel-Document geprüft",
+          "error": "Die Warnungen konnten nicht geladen werden."
+        },
+        "plain": {
+          "title": "Weitere KI-Verknüpfungen",
+          "detail": "Von {source}"
+        }
+      }
     },
     "facts": {
       "label": "Mapping-Details",

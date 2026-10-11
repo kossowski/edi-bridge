@@ -1,13 +1,48 @@
 import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test'
 
+import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
+import type { BeforeEach } from 'storybook/internal/csf'
+
 import { nodeId } from '@/components/mappings/mapping-tree'
 import { findRowButton } from '@/components/mappings/tree-node'
-import { seedMappingDrafts } from '@edi-bridge/mocks'
+import { apiUrl } from '@/lib/api/config'
+import {
+  type AiProposalSize,
+  aiProposalFor,
+  createHandlers,
+  type MappingDraftRecord,
+  seedDocumentStructures,
+  seedMappingDrafts,
+  seedMappingSamples,
+  withAiProposal,
+} from '@edi-bridge/mocks'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
+import type { AiProposal } from '@edi-bridge/contracts'
 
 export function seeded(name: string) {
   return seedMappingDrafts.find((draft) => draft.name === name && draft.latestVersion !== null)!
+}
+
+export function inReviewWith(name: string, proposal: AiProposal) {
+  const record = seeded(name)
+  const sample = seedMappingSamples.find(({ mappingId }) => mappingId === record.id)!
+
+  return withAiProposal(record, sample.id, proposal)
+}
+
+export function inReview(name: string, size: AiProposalSize = 'regular') {
+  return inReviewWith(name, aiProposalFor(seeded(name), seedDocumentStructures, size))
+}
+
+export function reviewing(record: MappingDraftRecord): BeforeEach<ReactRenderer> {
+  return ({ msw }: StoryContext) => {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        mappingDrafts: seedMappingDrafts.map((draft) => (draft.id === record.id ? record : draft)),
+      }),
+    )
+  }
 }
 
 // The tooltip renders in a portal outside the story's root.

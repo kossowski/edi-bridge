@@ -124,6 +124,7 @@ import {
   TreeNode,
   type TreeFlowNode,
 } from '@/components/mappings/tree-node'
+import { whenRendered } from '@/components/mappings/when-rendered'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import { transformPorts } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -177,8 +178,8 @@ const transformExtent: [[number, number], [number, number]] = [
 
 export type CanvasSide = { title: string; items: ReadonlyArray<TreeItem> }
 
-// The band under the canvas: the Details panel, and beside it whatever the screen adds, such as the
-// preview, which toggles the whole band and so needs to name the Details body it hides.
+// The band under the canvas: the Details panel, and beside it whatever panels the screen adds, such
+// as the preview, which toggles the whole band and so needs to name the Details body it hides.
 export type CanvasBand = { open: boolean; onToggle: () => void; controls: string }
 
 type MappingCanvasProps = {
@@ -335,16 +336,6 @@ function DetailsPanel({
 // Focus moves once the change has rendered, when the button it goes to exists.
 function afterRender(focus: () => void) {
   requestAnimationFrame(focus)
-}
-
-// About a second at 60 fps. The cached Draft updates a few frames after the click, once the
-// mutation has started; if it never does, focus still moves on rather than waiting forever.
-const renderWaitFrames = 60
-
-function whenRendered(done: () => boolean, then: () => void, frames = renderWaitFrames) {
-  requestAnimationFrame(() =>
-    done() || frames === 0 ? then() : whenRendered(done, then, frames - 1),
-  )
 }
 
 // React Flow keeps a new node hidden until it has measured it, and a hidden button takes no focus.
@@ -1364,7 +1355,7 @@ export function MappingCanvas({
   ])
 
   return (
-    <div ref={root} className="flex min-h-0 flex-1 flex-col gap-3">
+    <div ref={root} className="flex min-h-0 flex-1 flex-col gap-3" data-mapping-canvas>
       {!viewOnly && <TransformPalette onPlace={place} />}
       <div ref={area} className="flex min-h-0 flex-1 flex-col gap-3">
         <div
@@ -1424,8 +1415,7 @@ export function MappingCanvas({
             height before the canvas goes below its minimum. */}
         <div
           className={cn(
-            'grid gap-3',
-            beside && 'grid-cols-2',
+            'grid auto-cols-[minmax(0,1fr)] grid-flow-col gap-3',
             bandOpen ? 'min-h-44 shrink basis-[22rem]' : 'shrink-0',
           )}>
           <DetailsPanel

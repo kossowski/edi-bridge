@@ -4,14 +4,18 @@
 
 **Blocked by:** 12 (Mapping canvas prototype: transforms and preview)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A mocked stream shows the AI's progress steps (e.g. reading the sample, looking up segments, links drafted, checking against the sample, fixing errors); links reach the canvas only after the check
-- [ ] AI-proposed links are visually distinct on the canvas until the Draft is accepted
-- [ ] A review panel lists what needs attention first: required target elements left unmapped, links with Transforms or Lookup Tables, validation warnings
-- [ ] Individual AI-proposed links can be rejected or edited; an edited link no longer counts as AI-proposed
-- [ ] "Accept draft" ends the review; publishing is unavailable while the review is open, and the accepted Draft stays editable
-- [ ] Budget-exhausted state and the Viewer state (AI hidden) are covered
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] A mocked stream shows the AI's progress steps (e.g. reading the sample, looking up segments, links drafted, checking against the sample, fixing errors); links reach the canvas only after the check
+- [x] AI-proposed links are visually distinct on the canvas until the Draft is accepted
+- [x] A review panel lists what needs attention first: required target elements left unmapped, links with Transforms or Lookup Tables, validation warnings
+- [x] Individual AI-proposed links can be rejected or edited; an edited link no longer counts as AI-proposed
+- [x] "Accept draft" ends the review; publishing is unavailable while the review is open, and the accepted Draft stays editable
+- [x] Budget-exhausted state and the Viewer state (AI hidden) are covered
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #64, #65, #67, #68.
