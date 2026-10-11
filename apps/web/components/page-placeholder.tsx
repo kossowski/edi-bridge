@@ -2,6 +2,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { getTranslations } from 'next-intl/server'
 
 import type { Metadata } from 'next'
+import type { Messages } from 'next-intl'
 
 import { type NavigationKey, navigationItems } from '@/lib/navigation'
 import {
@@ -21,7 +22,9 @@ export function placeholderMetadata(page: NavigationKey) {
   }
 }
 
-export async function PagePlaceholder({ page }: { page: NavigationKey }) {
+type PlaceholderPage = Exclude<keyof Messages['Placeholder'], 'title'>
+
+export async function PagePlaceholder({ page }: { page: PlaceholderPage }) {
   const t = await getTranslations()
 
   return (

@@ -38,7 +38,6 @@
   },
   "Placeholder": {
     "title": "Not built yet",
-    "overview": "Traffic, failed Runs and Overdue Interchanges at a glance.",
     "runs": "Every Run with its outcome, steps, errors and output.",
     "orderLifecycle": "All Messages that share one Business Reference, in order.",
     "tradingPartners": "The Trading Partners of this Workspace, their Channels and Flows.",
@@ -53,6 +52,62 @@
   "NotFound": {
     "title": "Page not found",
     "description": "This page does not exist. Use the navigation to go to another screen."
+  },
+  "Overview": {
+    "loading": "Loading Overview",
+    "window": {
+      "label": "Time window",
+      "1h": "1 hour",
+      "24h": "24 hours",
+      "7d": "7 days"
+    },
+    "period": {
+      "1h": "the last hour",
+      "24h": "the last 24 hours",
+      "7d": "the last 7 days"
+    },
+    "bucket": {
+      "1h": "5 minutes",
+      "24h": "hour",
+      "7d": "6 hours"
+    },
+    "series": {
+      "delivered": "Delivered",
+      "failed": "Failed",
+      "errorRate": "Error rate"
+    },
+    "noErrorRate": "None",
+    "inProgress": "In progress",
+    "kpis": {
+      "label": "Totals for {period}",
+      "finished": "Finished Runs"
+    },
+    "throughput": {
+      "title": "Throughput",
+      "description": "Delivered and failed Runs per {bucket}",
+      "summary": "{delivered, plural, one {# Run} other {# Runs}} delivered and {failed, plural, one {# Run} other {# Runs}} failed in {period}. Most Runs finished at {peakTime}: {peak, number}."
+    },
+    "errorRate": {
+      "title": "Error rate",
+      "description": "Share of finished Runs that failed, per {bucket}",
+      "summary": "The error rate over {period} is {rate}. It was highest at {peakTime}: {peakRate}. Periods without finished Runs have no error rate."
+    },
+    "table": {
+      "toggle": "Show values as table",
+      "caption": "Delivered and failed Runs and the error rate per {bucket}",
+      "columns": {
+        "period": "Period"
+      }
+    },
+    "empty": {
+      "title": "No finished Runs",
+      "description": "No Run was delivered or failed in {period}. The charts appear as soon as Runs finish."
+    },
+    "error": {
+      "title": "Overview unavailable",
+      "description": "The Overview could not be loaded. Try again.",
+      "retry": "Try again"
+    }
   },
   "Runs": {
     "caption": "Runs, newest first",

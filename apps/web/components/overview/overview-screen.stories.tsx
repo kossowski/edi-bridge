@@ -1,0 +1,105 @@
+import { NextIntlClientProvider } from 'next-intl'
+import { expect } from 'storybook/test'
+
+import { OverviewScreen } from '@/components/overview/overview-screen'
+import { apiUrl } from '@/lib/api/config'
+import messagesDe from '@/messages/de.json'
+import { overviewHandler, seedRuns } from '@edi-bridge/mocks'
+
+import preview from '../../.storybook/preview'
+
+const meta = preview.meta({
+  title: 'Overview/OverviewScreen',
+  component: OverviewScreen,
+  parameters: { layout: 'fullscreen' },
+  beforeEach() {
+    seedRuns()
+  },
+})
+
+export const Seeded = meta.story({
+  beforeEach({ msw }) {
+    msw.use(overviewHandler(apiUrl))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('heading', { name: 'Throughput' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'Error rate' })).toBeVisible()
+  },
+})
+
+export const LastHour = meta.story({
+  args: { defaultWindow: '1h' },
+  beforeEach({ msw }) {
+    msw.use(overviewHandler(apiUrl))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Show values as table')).toBeVisible()
+  },
+})
+
+export const LargeVolume = meta.story({
+  args: { defaultWindow: '7d' },
+  beforeEach({ msw }) {
+    msw.use(overviewHandler(apiUrl, 'large'))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'Throughput' }, { timeout: 10_000 }),
+    ).toBeVisible()
+  },
+})
+
+export const Empty = meta.story({
+  beforeEach({ msw }) {
+    msw.use(overviewHandler(apiUrl, 'empty'))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('No finished Runs')).toBeVisible()
+  },
+})
+
+export const Loading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(overviewHandler(apiUrl, 'loading'))
+  },
+  async play({ canvas }) {
+    await expect(canvas.getByText('Loading Overview')).toBeInTheDocument()
+  },
+})
+
+export const Unavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(overviewHandler(apiUrl, 'error'))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Overview unavailable')).toBeVisible()
+  },
+})
+
+export const German = meta.story({
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  beforeEach({ msw }) {
+    msw.use(overviewHandler(apiUrl))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('heading', { name: 'Durchsatz' })).toBeVisible()
+  },
+})
+
+export const Dark = meta.story({
+  beforeEach({ msw }) {
+    msw.use(overviewHandler(apiUrl))
+    document.documentElement.classList.add('dark')
+
+    return () => document.documentElement.classList.remove('dark')
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('heading', { name: 'Throughput' })).toBeVisible()
+  },
+})
