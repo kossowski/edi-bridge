@@ -6,6 +6,7 @@ import { type FormEvent, useId, useState } from 'react'
 
 import { LoadFailure } from '@/components/detail-parts'
 import { GlnField, useGlnErrorMessage } from '@/components/form-field'
+import { useSession } from '@/hooks/use-session'
 import { updateCompanyIdentity } from '@/lib/api/client'
 import { currentWorkspaceQuery } from '@/lib/api/queries'
 import { glnError, normalizeGln } from '@/lib/forms/gln'
@@ -13,6 +14,36 @@ import { Button } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { Workspace } from '@edi-bridge/contracts'
+
+function MissingGln() {
+  const t = useTranslations('Settings.companyIdentity')
+
+  return (
+    <p className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm">
+      {t('missing')}
+    </p>
+  )
+}
+
+function IdentityView({ workspace }: { workspace: Workspace }) {
+  const t = useTranslations('Settings.companyIdentity')
+
+  return (
+    <div className="flex max-w-xl flex-col gap-6">
+      {workspace.gln === null && <MissingGln />}
+      <dl className="flex flex-col gap-4">
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-muted-foreground text-xs">{t('companyName')}</dt>
+          <dd className="text-sm">{workspace.name}</dd>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-muted-foreground text-xs">{t('gln.label')}</dt>
+          <dd className="font-mono text-sm">{workspace.gln ?? t('notSet')}</dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
 
 function IdentityForm({ workspace }: { workspace: Workspace }) {
   const t = useTranslations('Settings.companyIdentity')
@@ -44,11 +75,7 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
 
   return (
     <form noValidate className="flex max-w-xl flex-col gap-6" onSubmit={submit}>
-      {workspace.gln === null && (
-        <p className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm">
-          {t('missing')}
-        </p>
-      )}
+      {workspace.gln === null && <MissingGln />}
       <dl className="flex flex-col gap-0.5">
         <dt className="text-muted-foreground text-xs">{t('companyName')}</dt>
         <dd className="text-sm">{workspace.name}</dd>
@@ -83,6 +110,7 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
 
 export function CompanyIdentitySection() {
   const t = useTranslations('Settings')
+  const session = useSession()
   const { data, isPending, refetch } = useQuery(currentWorkspaceQuery)
 
   return (
@@ -93,7 +121,7 @@ export function CompanyIdentitySection() {
         </h2>
         <p className="text-muted-foreground text-sm">{t('companyIdentity.description')}</p>
       </div>
-      {isPending ? (
+      {isPending || session.isPending ? (
         <div aria-busy className="flex max-w-xl flex-col gap-4">
           <p role="status" className="sr-only">
             {t('loading')}
@@ -102,7 +130,11 @@ export function CompanyIdentitySection() {
           <Skeleton className="h-16 w-full" />
         </div>
       ) : data ? (
-        <IdentityForm workspace={data} />
+        session.viewer ? (
+          <IdentityView workspace={data} />
+        ) : (
+          <IdentityForm workspace={data} />
+        )
       ) : (
         <LoadFailure namespace="Settings" notFound={false} onRetry={() => void refetch()} />
       )}

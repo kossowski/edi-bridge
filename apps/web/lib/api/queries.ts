@@ -35,6 +35,7 @@ import {
   getRun,
   getSession,
   getTradingPartner,
+  getWorkspaceSettings,
   inferDocumentStructure,
   listChannels,
   listDocumentStructures,
@@ -58,6 +59,11 @@ export const sessionQuery = queryOptions({
 export const currentWorkspaceQuery = queryOptions({
   queryKey: ['workspaces', 'current'],
   queryFn: getCurrentWorkspace,
+})
+
+export const workspaceSettingsQuery = queryOptions({
+  queryKey: ['workspaces', 'current', 'settings'],
+  queryFn: getWorkspaceSettings,
 })
 
 export const overviewKeys = {

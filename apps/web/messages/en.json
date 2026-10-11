@@ -2124,10 +2124,48 @@
         "label": "GLN",
         "description": "Your company's 13-digit Global Location Number, including the check digit."
       },
+      "notSet": "Not set",
       "save": "Save company identity",
       "saving": "Saving…",
       "saved": "Company identity saved.",
       "failed": "The company identity could not be saved. Try again."
+    },
+    "retentionAndBudget": {
+      "title": "Retention and AI budget",
+      "description": "How long this Workspace keeps raw Documents and how many AI tokens it may use per day.",
+      "setByOperator": "The Operator sets the retention period and the AI token budget for each Workspace.",
+      "retention": {
+        "title": "Document retention period",
+        "description": "Raw Documents older than this are deleted. A Run can only be reprocessed while its raw Document is kept.",
+        "label": "Retention period in days",
+        "hint": "Between {min} and {max} days.",
+        "value": "{days, plural, one {# day} other {# days}}",
+        "errors": {
+          "required": "Enter a retention period.",
+          "notWhole": "Enter a whole number of days.",
+          "outOfRange": "Enter between {min} and {max} days."
+        }
+      },
+      "budget": {
+        "title": "AI token budget",
+        "description": "The daily limit of AI tokens, for example when the AI drafts a Mapping. Usage starts again at zero every day.",
+        "label": "Daily limit in tokens",
+        "hint": "Between {min} and {max} tokens. 0 turns AI off for this Workspace.",
+        "value": "{limit} tokens per day",
+        "usedLabel": "Used today",
+        "used": "{used} of {limit} tokens ({share})",
+        "exhausted": "Today's AI token budget is used up. AI features are available again tomorrow.",
+        "off": "AI is turned off for this Workspace.",
+        "errors": {
+          "required": "Enter a daily limit.",
+          "notWhole": "Enter a whole number of tokens.",
+          "outOfRange": "Enter between {min} and {max} tokens."
+        }
+      },
+      "save": "Save retention and AI budget",
+      "saving": "Saving…",
+      "saved": "Retention and AI budget saved.",
+      "failed": "The retention period and AI budget could not be saved. Try again."
     }
   },
   "GlnField": {
