@@ -346,6 +346,7 @@
         "description": "The delivery failed. Retry repeats the delivery step unchanged.",
         "button": "Retry",
         "pending": "Retrying",
+        "viewOnly": "An Admin can retry the delivery step.",
         "failed": "The Retry did not start. Try again."
       },
       "reprocess": {
@@ -355,6 +356,7 @@
         "used": "{option} (used by this Run)",
         "button": "Reprocess",
         "pending": "Reprocessing",
+        "viewOnly": "An Admin can reprocess this Run with a chosen Mapping Version.",
         "failed": "The Reprocess did not start. Try again.",
         "versionsUnavailable": "The Mapping Versions could not be loaded."
       },
@@ -492,7 +494,8 @@
     },
     "empty": {
       "title": "No Trading Partners yet",
-      "description": "Create a Trading Partner to start onboarding it."
+      "description": "Create a Trading Partner to start onboarding it.",
+      "viewOnlyDescription": "Trading Partners appear here once an Admin creates one."
     },
     "error": {
       "title": "Trading Partners unavailable",
@@ -547,6 +550,7 @@
         }
       },
       "setIdentity": "Record your company's GLN in Settings",
+      "identityViewOnly": "An Admin records your company's GLN in Settings.",
       "productionLocked": {
         "identity": "You can switch to production once your company's GLN is recorded.",
         "testInterchange": "You can switch to production once the test Interchange is sent.",
@@ -645,7 +649,8 @@
     },
     "empty": {
       "title": "No Channels yet",
-      "description": "Create a Channel to receive Documents or deliver them."
+      "description": "Create a Channel to receive Documents or deliver them.",
+      "viewOnlyDescription": "Channels appear here once an Admin creates one."
     },
     "error": {
       "title": "Channels unavailable",
@@ -863,7 +868,8 @@
     },
     "empty": {
       "title": "No Flows yet",
-      "description": "Create a Flow to route Documents of one Message Type from a Trading Partner to a destination Channel."
+      "description": "Create a Flow to route Documents of one Message Type from a Trading Partner to a destination Channel.",
+      "viewOnlyDescription": "Flows appear here once an Admin creates one."
     },
     "error": {
       "title": "Flows unavailable",
@@ -1001,7 +1007,8 @@
     },
     "empty": {
       "title": "No Mappings yet",
-      "description": "Mappings describe how a Document is turned into EDIFACT and back. Once a Mapping exists, it is listed here."
+      "description": "Mappings describe how a Document is turned into EDIFACT and back. Once a Mapping exists, it is listed here.",
+      "viewOnlyDescription": "Mappings describe how a Document is turned into EDIFACT and back. They appear here once an Admin creates one."
     },
     "error": {
       "title": "Mappings unavailable",
@@ -1469,7 +1476,8 @@
     },
     "empty": {
       "title": "No Mapping Versions yet",
-      "description": "The Draft of this Mapping was never published. Publish it on the canvas to create Version 1, which Flows can then be pinned to."
+      "description": "The Draft of this Mapping was never published. Publish it on the canvas to create Version 1, which Flows can then be pinned to.",
+      "viewOnlyDescription": "The Draft of this Mapping was never published. Version 1 appears here once an Admin publishes it."
     },
     "error": {
       "title": "Mapping Versions unavailable",
@@ -1611,7 +1619,8 @@
     },
     "empty": {
       "title": "No Document Structures yet",
-      "description": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Create one from a sample Document or a JSON Schema."
+      "description": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Create one from a sample Document or a JSON Schema.",
+      "viewOnlyDescription": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Document Structures appear here once an Admin creates one."
     },
     "error": {
       "title": "Document Structures unavailable",
@@ -1831,7 +1840,8 @@
     },
     "empty": {
       "title": "No Lookup Tables yet",
-      "description": "Create a Lookup Table to translate codes in Mappings, e.g. unit ST to PCE."
+      "description": "Create a Lookup Table to translate codes in Mappings, e.g. unit ST to PCE.",
+      "viewOnlyDescription": "Lookup Tables translate codes in Mappings, e.g. unit ST to PCE. They appear here once an Admin creates one."
     },
     "error": {
       "title": "Lookup Tables unavailable",
@@ -2222,7 +2232,8 @@
       "open": "Open {name}",
       "empty": {
         "title": "No Workspaces yet",
-        "description": "Create the first Workspace, then invite its users."
+        "description": "Create the first Workspace, then invite its users.",
+        "viewOnlyDescription": "Workspaces appear here once an Operator creates one."
       },
       "error": {
         "title": "Workspaces unavailable",

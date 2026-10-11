@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { ChannelDetailScreen } from '@/components/channels/channel-detail-screen'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { channelEndpoint, regenerateWebhookTokenEndpoint } from '@edi-bridge/contracts'
@@ -183,4 +184,27 @@ export const Dark = meta.story({
       await canvas.findByRole('heading', { name: 'Copy the webhook token now' }),
     ).toBeVisible()
   },
+})
+
+export const ViewerInboundSftp = meta.story({
+  args: { id: sftpInbox.id },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByRole('heading', { name: 'Hansemarkt SFTP inbox' }),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Submit a Document' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'Edit' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerWebhook = meta.story({
+  args: { id: webhook.id },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByRole('heading', { name: 'Webhook' })).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Regenerate token' })).toBeNull()
+    },
+  }),
 })

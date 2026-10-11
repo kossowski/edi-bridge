@@ -346,6 +346,7 @@
         "description": "Die Zustellung ist fehlgeschlagen. Retry wiederholt den Zustellschritt unverändert.",
         "button": "Retry",
         "pending": "Retry läuft",
+        "viewOnly": "Ein Admin kann den Zustellschritt per Retry wiederholen.",
         "failed": "Der Retry wurde nicht gestartet. Versuchen Sie es erneut."
       },
       "reprocess": {
@@ -355,6 +356,7 @@
         "used": "{option} (von diesem Run verwendet)",
         "button": "Reprocess",
         "pending": "Reprocess läuft",
+        "viewOnly": "Ein Admin kann diesen Run per Reprocess mit einer gewählten Mapping Version erneut verarbeiten.",
         "failed": "Der Reprocess wurde nicht gestartet. Versuchen Sie es erneut.",
         "versionsUnavailable": "Die Mapping Versions konnten nicht geladen werden."
       },
@@ -492,7 +494,8 @@
     },
     "empty": {
       "title": "Noch keine Trading Partners",
-      "description": "Legen Sie einen Trading Partner an, um sein Onboarding zu beginnen."
+      "description": "Legen Sie einen Trading Partner an, um sein Onboarding zu beginnen.",
+      "viewOnlyDescription": "Trading Partners erscheinen hier, sobald ein Admin einen anlegt."
     },
     "error": {
       "title": "Trading Partners nicht verfügbar",
@@ -547,6 +550,7 @@
         }
       },
       "setIdentity": "GLN Ihres Unternehmens in den Einstellungen erfassen",
+      "identityViewOnly": "Ein Admin erfasst die GLN Ihres Unternehmens in den Einstellungen.",
       "productionLocked": {
         "identity": "Sie können auf Produktion umstellen, sobald die GLN Ihres Unternehmens erfasst ist.",
         "testInterchange": "Sie können auf Produktion umstellen, sobald das Test-Interchange gesendet ist.",
@@ -645,7 +649,8 @@
     },
     "empty": {
       "title": "Noch keine Channels",
-      "description": "Legen Sie einen Channel an, um Documents zu empfangen oder zuzustellen."
+      "description": "Legen Sie einen Channel an, um Documents zu empfangen oder zuzustellen.",
+      "viewOnlyDescription": "Channels erscheinen hier, sobald ein Admin einen anlegt."
     },
     "error": {
       "title": "Channels nicht verfügbar",
@@ -863,7 +868,8 @@
     },
     "empty": {
       "title": "Noch keine Flows",
-      "description": "Legen Sie einen Flow an, um Documents eines Message Types von einem Trading Partner an einen Ziel-Channel zu leiten."
+      "description": "Legen Sie einen Flow an, um Documents eines Message Types von einem Trading Partner an einen Ziel-Channel zu leiten.",
+      "viewOnlyDescription": "Flows erscheinen hier, sobald ein Admin einen anlegt."
     },
     "error": {
       "title": "Flows nicht verfügbar",
@@ -1001,7 +1007,8 @@
     },
     "empty": {
       "title": "Noch keine Mappings",
-      "description": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sobald es ein Mapping gibt, steht es hier."
+      "description": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sobald es ein Mapping gibt, steht es hier.",
+      "viewOnlyDescription": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sie erscheinen hier, sobald ein Admin eines anlegt."
     },
     "error": {
       "title": "Mappings nicht verfügbar",
@@ -1469,7 +1476,8 @@
     },
     "empty": {
       "title": "Noch keine Mapping Versions",
-      "description": "Der Draft dieses Mappings wurde nie veröffentlicht. Veröffentlichen Sie ihn im Canvas, um Version 1 zu erstellen, auf die Flows dann festgelegt werden können."
+      "description": "Der Draft dieses Mappings wurde nie veröffentlicht. Veröffentlichen Sie ihn im Canvas, um Version 1 zu erstellen, auf die Flows dann festgelegt werden können.",
+      "viewOnlyDescription": "Der Draft dieses Mappings wurde nie veröffentlicht. Version 1 erscheint hier, sobald ein Admin ihn veröffentlicht."
     },
     "error": {
       "title": "Mapping Versions nicht verfügbar",
@@ -1611,7 +1619,8 @@
     },
     "empty": {
       "title": "Noch keine Document Structures",
-      "description": "Eine Document Structure beschreibt die JSON- oder CSV-Documents Ihrer eigenen Systeme, damit ein Mapping deren Felder kennt. Erstellen Sie eine aus einem Beispiel-Document oder einem JSON Schema."
+      "description": "Eine Document Structure beschreibt die JSON- oder CSV-Documents Ihrer eigenen Systeme, damit ein Mapping deren Felder kennt. Erstellen Sie eine aus einem Beispiel-Document oder einem JSON Schema.",
+      "viewOnlyDescription": "Eine Document Structure beschreibt die JSON- oder CSV-Documents Ihrer eigenen Systeme, damit ein Mapping deren Felder kennt. Document Structures erscheinen hier, sobald ein Admin eine anlegt."
     },
     "error": {
       "title": "Document Structures nicht verfügbar",
@@ -1831,7 +1840,8 @@
     },
     "empty": {
       "title": "Noch keine Lookup Tables",
-      "description": "Legen Sie eine Lookup Table an, um Codes in Mappings zu übersetzen, z. B. die Einheit ST in PCE."
+      "description": "Legen Sie eine Lookup Table an, um Codes in Mappings zu übersetzen, z. B. die Einheit ST in PCE.",
+      "viewOnlyDescription": "Lookup Tables übersetzen Codes in Mappings, z. B. die Einheit ST in PCE. Sie erscheinen hier, sobald ein Admin eine anlegt."
     },
     "error": {
       "title": "Lookup Tables nicht verfügbar",
@@ -2222,7 +2232,8 @@
       "open": "{name} öffnen",
       "empty": {
         "title": "Noch keine Workspaces",
-        "description": "Legen Sie den ersten Workspace an und laden Sie danach seine Benutzer ein."
+        "description": "Legen Sie den ersten Workspace an und laden Sie danach seine Benutzer ein.",
+        "viewOnlyDescription": "Workspaces erscheinen hier, sobald ein Operator einen anlegt."
       },
       "error": {
         "title": "Workspaces nicht verfügbar",

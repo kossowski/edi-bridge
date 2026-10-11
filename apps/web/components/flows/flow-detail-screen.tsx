@@ -15,6 +15,7 @@ import {
   useMappingVersionLabel,
 } from '@/components/flows/flow-parts'
 import { MoveMappingVersion } from '@/components/flows/move-mapping-version'
+import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { flowQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -70,6 +71,7 @@ function PinnedMappingVersion({ flow }: { flow: Flow }) {
   const tMove = useTranslations('Flow.move')
   const { mappingVersion, newerMappingVersions } = flow
   const latest = newerMappingVersions[0]
+  const canChange = useCanChange()
 
   useEffect(() => {
     if (movedTo !== null) {
@@ -98,13 +100,14 @@ function PinnedMappingVersion({ flow }: { flow: Flow }) {
           ? t('newer', { count: newerMappingVersions.length, latest: latest.version })
           : t('newest')}
       </p>
-      <MoveMappingVersion flow={flow} onMoved={setMovedTo} />
+      {canChange && <MoveMappingVersion flow={flow} onMoved={setMovedTo} />}
     </div>
   )
 }
 
 function FlowView({ flow }: { flow: Flow }) {
   const t = useTranslations('Flow')
+  const canChange = useCanChange()
 
   return (
     <>
@@ -113,10 +116,12 @@ function FlowView({ flow }: { flow: Flow }) {
           <h1 className="text-2xl font-semibold tracking-tight">{flow.name}</h1>
           <Badge variant="outline">{flow.messageType}</Badge>
         </div>
-        <Link href={`/flows/${flow.id}/edit`} className={buttonVariants({ variant: 'outline' })}>
-          <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-          {t('edit')}
-        </Link>
+        {canChange && (
+          <Link href={`/flows/${flow.id}/edit`} className={buttonVariants({ variant: 'outline' })}>
+            <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
+            {t('edit')}
+          </Link>
+        )}
       </div>
       <dl
         aria-label={t('facts.label')}

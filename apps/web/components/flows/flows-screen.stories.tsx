@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, within } from 'storybook/test'
 
 import { FlowsScreen } from '@/components/flows/flows-screen'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { flowsEndpoint } from '@edi-bridge/contracts'
@@ -105,4 +106,27 @@ export const Dark = meta.story({
       await canvas.findByRole('link', { name: 'Hansemarkt ORDERS inbound' }),
     ).toBeVisible()
   },
+})
+
+export const Viewer = meta.story({
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByRole('link', { name: 'Hansemarkt DESADV outbound' }),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('link', { name: 'New Flow' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerEmpty = meta.story({
+  ...viewerStory({
+    handlers: [...flowHandlers(apiUrl, { flows: [] })],
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByText('Flows appear here once an Admin creates one.'),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('link', { name: 'New Flow' })).toBeNull()
+    },
+  }),
 })

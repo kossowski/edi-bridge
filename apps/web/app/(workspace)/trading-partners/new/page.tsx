@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import type { Metadata } from 'next'
 
+import { CanChangeOnly } from '@/components/session/can-change-only'
 import { NewTradingPartnerScreen } from '@/components/trading-partners/trading-partner-form-screen'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -11,5 +12,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function Page() {
-  return <NewTradingPartnerScreen />
+  return (
+    <CanChangeOnly>
+      <NewTradingPartnerScreen />
+    </CanChangeOnly>
+  )
 }

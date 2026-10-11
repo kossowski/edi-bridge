@@ -15,6 +15,7 @@ import { RunLink } from '@/components/runs/run-link'
 import { RunStatusBadge } from '@/components/runs/run-status'
 import { OnboardingChecklist } from '@/components/trading-partners/onboarding-checklist'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
+import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import {
   channelsQuery,
@@ -191,6 +192,7 @@ function RecentRuns({ tradingPartner }: { tradingPartner: TradingPartner }) {
 function TradingPartnerView({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner')
   const workspace = useQuery(currentWorkspaceQuery)
+  const canChange = useCanChange()
 
   return (
     <>
@@ -199,12 +201,14 @@ function TradingPartnerView({ tradingPartner }: { tradingPartner: TradingPartner
           <h1 className="text-2xl font-semibold tracking-tight">{tradingPartner.name}</h1>
           <TestModeBadge testMode={tradingPartner.testMode} />
         </div>
-        <Link
-          href={`/trading-partners/${tradingPartner.id}/edit`}
-          className={buttonVariants({ variant: 'outline' })}>
-          <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-          {t('edit')}
-        </Link>
+        {canChange && (
+          <Link
+            href={`/trading-partners/${tradingPartner.id}/edit`}
+            className={buttonVariants({ variant: 'outline' })}>
+            <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
+            {t('edit')}
+          </Link>
+        )}
       </div>
       <TradingPartnerFacts tradingPartner={tradingPartner} />
       <Section id="trading-partner-onboarding" title={t('onboarding.title')}>

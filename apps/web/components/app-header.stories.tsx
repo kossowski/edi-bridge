@@ -4,16 +4,15 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, screen, userEvent, waitFor } from 'storybook/test'
 
 import { AppHeader } from '@/components/app-header'
+import { sessionHandlers } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { sessionEndpoint, signOutEndpoint } from '@edi-bridge/contracts'
 import {
-  createSessionStore,
   createWorkspace,
   currentWorkspaceHandler,
   sandboxAdminSession,
   seedSession,
-  sessionHandlers,
   showcaseViewerSession,
 } from '@edi-bridge/mocks'
 import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
@@ -24,7 +23,7 @@ import preview from '../.storybook/preview'
 
 function signedInAs(session: Session) {
   return [
-    ...sessionHandlers(apiUrl, createSessionStore(session)),
+    ...sessionHandlers(session),
     currentWorkspaceHandler(apiUrl, createWorkspace({ name: session.workspace.name })),
   ]
 }

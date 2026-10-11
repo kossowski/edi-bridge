@@ -4,6 +4,7 @@ import { expect, userEvent } from 'storybook/test'
 
 import { LookupTableEditorScreen } from '@/components/lookup-tables/lookup-table-editor-screen'
 import { LookupTableEntryEditor } from '@/components/lookup-tables/lookup-table-entry-editor'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { lookupTableEndpoint, updateLookupTableEndpoint } from '@edi-bridge/contracts'
@@ -199,4 +200,13 @@ export const DarkValidationErrors = meta.story({
 
     return () => document.documentElement.classList.remove('dark')
   },
+})
+
+export const Viewer = meta.story({
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByRole('grid', { name: 'Entries' })).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Import CSV' })).toBeNull()
+    },
+  }),
 })

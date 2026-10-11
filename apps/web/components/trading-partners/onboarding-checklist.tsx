@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
+import { useCanChange } from '@/hooks/use-session'
 import { switchToProduction } from '@/lib/api/client'
 import { storeSavedTradingPartner } from '@/lib/api/queries'
 import {
@@ -110,25 +111,31 @@ function StepDetail({
   item,
   blockedBy,
   tradingPartner,
+  canChange,
   onSwitched,
 }: {
   item: OnboardingChecklistItem
   blockedBy: OnboardingStep | undefined
   tradingPartner: TradingPartner
+  canChange: boolean
   onSwitched: () => void
 }) {
   const t = useTranslations('TradingPartner.onboarding')
 
   if (item.step === 'identity' && item.state === 'current') {
-    return (
+    return canChange ? (
       <Link href="/settings" className={cn(linkClass, 'w-fit text-sm')}>
         {t('setIdentity')}
       </Link>
+    ) : (
+      <p className="text-muted-foreground text-sm">{t('identityViewOnly')}</p>
     )
   }
 
   if (item.step === 'production' && item.state === 'current') {
-    return <ProductionSwitch tradingPartner={tradingPartner} onSwitched={onSwitched} />
+    return canChange ? (
+      <ProductionSwitch tradingPartner={tradingPartner} onSwitched={onSwitched} />
+    ) : null
   }
 
   if (
@@ -156,6 +163,7 @@ export function OnboardingChecklist({
   const blockedBy = checklist.find(({ state }) => state === 'current')?.step
   const [switched, setSwitched] = useState(false)
   const productionTitle = useRef<HTMLParagraphElement>(null)
+  const canChange = useCanChange()
 
   useEffect(() => {
     if (switched && !tradingPartner.testMode) {
@@ -197,6 +205,7 @@ export function OnboardingChecklist({
             )}
             <StepDetail
               blockedBy={blockedBy}
+              canChange={canChange}
               item={item}
               tradingPartner={tradingPartner}
               onSwitched={() => setSwitched(true)}

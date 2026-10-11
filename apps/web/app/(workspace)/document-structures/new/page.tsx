@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server'
 import type { Metadata } from 'next'
 
 import { NewDocumentStructureScreen } from '@/components/document-structures/new-document-structure-screen'
+import { CanChangeOnly } from '@/components/session/can-change-only'
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations()
@@ -13,5 +14,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function Page() {
-  return <NewDocumentStructureScreen />
+  return (
+    <CanChangeOnly>
+      <NewDocumentStructureScreen />
+    </CanChangeOnly>
+  )
 }

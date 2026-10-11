@@ -9,7 +9,8 @@ import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
-import { runRemedy } from '@/components/runs/run-remedy'
+import { type RunRemedy, runRemedy } from '@/components/runs/run-remedy'
+import { useCanChange } from '@/hooks/use-session'
 import { reprocessRun, retryRun } from '@/lib/api/client'
 import { interchangeKeys, mappingVersionsQuery, runKeys, runQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -148,10 +149,36 @@ function ReprocessAction({ run }: { run: RunDetail }) {
   )
 }
 
+const remedyActions = { retry: RetryAction, reprocess: ReprocessAction }
+
+type ActionRemedy = keyof typeof remedyActions
+
+function hasAction(remedy: RunRemedy): remedy is ActionRemedy {
+  return remedy in remedyActions
+}
+
+function RemedyAction({ remedy, run }: { remedy: ActionRemedy; run: RunDetail }) {
+  const Action = remedyActions[remedy]
+
+  return <Action run={run} />
+}
+
+function ViewOnlyRemedy({ remedy }: { remedy: ActionRemedy }) {
+  const t = useTranslations('RunDetail.remedy')
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-sm">{t(`${remedy}.description`)}</p>
+      <p className="text-muted-foreground text-sm">{t(`${remedy}.viewOnly`)}</p>
+    </div>
+  )
+}
+
 export function RunRemedyPanel({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail.remedy')
   const tRuns = useTranslations('Runs')
   const remedy = runRemedy(run)
+  const canChange = useCanChange()
 
   if (remedy === 'none' && run.status !== 'failed') {
     return null
@@ -162,8 +189,12 @@ export function RunRemedyPanel({ run }: { run: RunDetail }) {
       <h2 id="run-remedy" className="font-semibold">
         {remedy === 'awaitingResend' ? t('awaitingResend.title') : t('title')}
       </h2>
-      {remedy === 'retry' && <RetryAction run={run} />}
-      {remedy === 'reprocess' && <ReprocessAction run={run} />}
+      {hasAction(remedy) &&
+        (canChange ? (
+          <RemedyAction remedy={remedy} run={run} />
+        ) : (
+          <ViewOnlyRemedy remedy={remedy} />
+        ))}
       {remedy === 'awaitingResend' && run.failureStage !== null && (
         <p className="flex items-start gap-2 text-sm">
           <HugeiconsIcon

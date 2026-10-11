@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect } from 'storybook/test'
 
 import { ChannelsScreen } from '@/components/channels/channels-screen'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { channelsEndpoint } from '@edi-bridge/contracts'
@@ -97,4 +98,25 @@ export const Dark = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
   },
+})
+
+export const Viewer = meta.story({
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
+      await expect(canvas.queryByRole('link', { name: 'New Channel' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerEmpty = meta.story({
+  ...viewerStory({
+    handlers: [...channelHandlers(apiUrl, { channels: [] })],
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByText('Channels appear here once an Admin creates one.'),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('link', { name: 'New Channel' })).toBeNull()
+    },
+  }),
 })
