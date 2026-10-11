@@ -19,9 +19,11 @@ export function SessionGate({ children }: { children: ReactNode }) {
 
   if (isPending || signedOut) {
     return (
-      <p role="status" className="text-muted-foreground p-6 text-sm">
-        {t(signedOut ? 'redirecting' : 'loading')}
-      </p>
+      <div aria-busy>
+        <p role="status" className="text-muted-foreground p-6 text-sm">
+          {t(signedOut ? 'redirecting' : 'loading')}
+        </p>
+      </div>
     )
   }
 

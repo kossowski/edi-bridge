@@ -31,7 +31,9 @@ export const Loading = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(canvas.getByRole('status')).toHaveTextContent('Loading session…')
+    const status = canvas.getByRole('status')
+    await expect(status).toHaveTextContent('Loading session…')
+    await expect(status.closest('[aria-busy="true"]')).not.toBeNull()
     await expect(canvas.queryByText('Workspace content')).toBeNull()
   },
 })
@@ -44,6 +46,7 @@ export const SignedOut = meta.story({
     await waitFor(() =>
       expect(canvas.getByRole('status')).toHaveTextContent('Your session has ended.'),
     )
+    await expect(canvas.getByRole('status').closest('[aria-busy="true"]')).not.toBeNull()
     await waitFor(() => expect(getRouter().replace).toHaveBeenCalledWith('/login'))
   },
 })
