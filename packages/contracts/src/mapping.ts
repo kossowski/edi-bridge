@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { aiReviewProblems, aiReviewSchema } from './ai-review'
 import { directionSchema, messageTypeSchema } from './message-type'
 import {
   type MappingTransform,
@@ -175,6 +176,7 @@ const draftFields = {
   updatedAt: z.iso.datetime(),
   latestVersion: z.number().int().min(1).nullable(),
   unpublishedChanges: z.boolean(),
+  aiReview: aiReviewSchema.nullable().default(null),
 }
 
 export const mappingDraftSchema = z
@@ -185,6 +187,11 @@ export const mappingDraftSchema = z
   .superRefine(checkGraph)
   .refine(({ latestVersion, unpublishedChanges }) => latestVersion !== null || unpublishedChanges, {
     message: 'A Draft that was never published has unpublished changes',
+  })
+  .superRefine((draft, context) => {
+    for (const message of draft.aiReview ? aiReviewProblems(draft.aiReview, draft) : []) {
+      context.addIssue({ code: 'custom', path: ['aiReview'], message })
+    }
   })
 
 export type MappingDraft = z.infer<typeof mappingDraftSchema>
