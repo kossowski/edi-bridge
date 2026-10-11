@@ -35,3 +35,16 @@ export function WorkspaceCreatedAt({ createdAt }: { createdAt: string }) {
     </span>
   )
 }
+
+export function WorkspaceLastReset({ lastResetAt }: { lastResetAt: string | null }) {
+  const t = useTranslations('Operator.values')
+  const format = useFormatter()
+
+  return lastResetAt ? (
+    <time dateTime={lastResetAt} className="tabular-nums">
+      {format.dateTime(new Date(lastResetAt), { dateStyle: 'medium', timeStyle: 'short' })}
+    </time>
+  ) : (
+    <span className="text-muted-foreground">{t('neverReset')}</span>
+  )
+}

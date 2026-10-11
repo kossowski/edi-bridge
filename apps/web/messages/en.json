@@ -2197,7 +2197,8 @@
       "seeded": {
         "yes": "Yes",
         "no": "No"
-      }
+      },
+      "neverReset": "Never"
     },
     "workspaces": {
       "title": "Workspaces",
@@ -2260,7 +2261,8 @@
         "gln": "GLN",
         "members": "Members",
         "seeded": "Seed data",
-        "createdAt": "Created"
+        "createdAt": "Created",
+        "lastResetAt": "Last reset"
       },
       "notFound": {
         "title": "Workspace not found",
@@ -2332,6 +2334,18 @@
     "settings": {
       "title": "Retention and AI budget",
       "description": "How long this Workspace keeps raw Documents and how many AI tokens it may use per day."
+    },
+    "reset": {
+      "trigger": "Reset Sandbox",
+      "title": "Reset {name}?",
+      "replaced": "All changes in the Sandbox Workspace are replaced by its seed data: Trading Partners, Mappings, Runs and every other change made since the last reset.",
+      "untouched": "Other Workspaces are not affected.",
+      "irreversible": "This cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Reset Sandbox",
+      "resetting": "Resetting…",
+      "failed": "The Sandbox could not be reset. Try again.",
+      "done": "{name} was reset to its seed data."
     }
   }
 }
