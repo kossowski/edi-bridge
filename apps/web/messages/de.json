@@ -71,11 +71,13 @@
     "description": "Diese Seite gibt es nicht. Wechseln Sie über die Navigation zu einer anderen Ansicht."
   },
   "Login": {
-    "title": "Bei EDI Bridge anmelden",
+    "title": "Anmelden",
     "metaTitle": "Anmelden",
-    "description": "Verwenden Sie die E-Mail-Adresse und das Passwort aus Ihrer Einladung.",
+    "description": "Verwenden Sie die E-Mail-Adresse aus Ihrer Einladung.",
     "email": "E-Mail",
     "password": "Passwort",
+    "showPassword": "Passwort anzeigen",
+    "hidePassword": "Passwort verbergen",
     "submit": "Anmelden",
     "submitting": "Wird angemeldet …",
     "errors": {
@@ -84,13 +86,28 @@
       "passwordRequired": "Geben Sie Ihr Passwort ein.",
       "wrongCredentials": "E-Mail-Adresse oder Passwort ist falsch.",
       "failed": "Anmelden fehlgeschlagen. Versuchen Sie es gleich noch einmal.",
-      "showcaseFailed": "Der Showcase Workspace konnte nicht geöffnet werden. Versuchen Sie es gleich noch einmal."
+      "showcaseFailed": "Die Demo konnte nicht geöffnet werden. Versuchen Sie es gleich noch einmal."
     },
-    "or": "oder",
-    "showcase": "Live-Demo ansehen",
-    "showcasePending": "Showcase Workspace wird geöffnet …",
-    "showcaseDescription": "Erkunden Sie den Showcase Workspace als Viewer, ohne Einladung.",
-    "invitedByOperator": "Benutzer werden vom Operator eingeladen."
+    "showcaseTitle": "Demo ausprobieren",
+    "showcaseDescription": "Ohne Konto. Sehen Sie sich einen Arbeitsbereich voller Beispielbestellungen an. Sie können nur lesen, nichts wird gespeichert.",
+    "showcase": "Demo öffnen",
+    "showcasePending": "Demo wird geöffnet …",
+    "noAccount": "Kein Konto? Bitten Sie den Operator um eine Einladung.",
+    "valueStatement": "Tauschen Sie Bestellungen, Lieferavise und Rechnungen mit Ihren Handelspartnern aus und wissen Sie immer, was passiert ist.",
+    "points": {
+      "erp": {
+        "title": "Ihr ERP bleibt, wie es ist",
+        "text": "Bestellungen kommen in Ihrem ERP im Format an, das es schon versteht. Sie installieren nichts Neues."
+      },
+      "nextStep": {
+        "title": "Zu jedem Problem gibt es einen nächsten Schritt",
+        "text": "Scheitert ein Dokument, lesen Sie in einfachen Worten, was falsch ist und wer es behebt."
+      },
+      "orders": {
+        "title": "Wissen, wo jede Bestellung steht",
+        "text": "Verfolgen Sie jede Bestellung bis zur Rechnung und sehen Sie, was noch offen ist."
+      }
+    }
   },
   "Overview": {
     "loading": "Übersicht wird geladen",

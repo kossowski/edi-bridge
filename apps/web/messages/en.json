@@ -71,11 +71,13 @@
     "description": "This page does not exist. Use the navigation to go to another screen."
   },
   "Login": {
-    "title": "Sign in to EDI Bridge",
+    "title": "Sign in",
     "metaTitle": "Sign in",
-    "description": "Use the email address and password from your invite.",
+    "description": "Use the email address from your invite.",
     "email": "Email",
     "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "submit": "Sign in",
     "submitting": "Signing in…",
     "errors": {
@@ -84,13 +86,28 @@
       "passwordRequired": "Enter your password.",
       "wrongCredentials": "The email address or password is wrong.",
       "failed": "Sign-in failed. Try again in a moment.",
-      "showcaseFailed": "The Showcase Workspace could not be opened. Try again in a moment."
+      "showcaseFailed": "The demo could not be opened. Try again in a moment."
     },
-    "or": "or",
-    "showcase": "View live demo",
-    "showcasePending": "Opening the Showcase Workspace…",
-    "showcaseDescription": "Explore the Showcase Workspace as a Viewer, no invite needed.",
-    "invitedByOperator": "Users are invited by the Operator."
+    "showcaseTitle": "Try the demo",
+    "showcaseDescription": "No account needed. Look around a Workspace full of example orders. It is read only, so nothing you do is saved.",
+    "showcase": "Open the demo",
+    "showcasePending": "Opening the demo…",
+    "noAccount": "No account? Ask the Operator for an invite.",
+    "valueStatement": "Exchange purchase orders, dispatch advices and invoices with your trading partners, and always know what happened.",
+    "points": {
+      "erp": {
+        "title": "Your ERP stays as it is",
+        "text": "Orders arrive in your ERP in the format it already understands. You install nothing new."
+      },
+      "nextStep": {
+        "title": "Problems come with a next step",
+        "text": "When a document fails, you read in plain words what is wrong and who fixes it."
+      },
+      "orders": {
+        "title": "Know where every order stands",
+        "text": "Follow each order from purchase order to invoice and see what is still open."
+      }
+    }
   },
   "Overview": {
     "loading": "Loading Overview",

@@ -1,19 +1,41 @@
 'use client'
 
+import {
+  CheckmarkCircle02Icon,
+  Clock01Icon,
+  PlayIcon,
+  ViewIcon,
+  ViewOffIcon,
+  Wrench01Icon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useId, useRef, useState } from 'react'
 
-import { TextField } from '@/components/form-field'
+import { describedBy, FormField, TextField } from '@/components/form-field'
 import { focusMainContentOnNextPage } from '@/components/main-content-focus'
 import { isUnauthorized, signIn, signInToShowcase } from '@/lib/api/client'
 import { sessionQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
+import { Card, CardContent, CardDescription, CardHeader } from '@edi-bridge/ui/components/card'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@edi-bridge/ui/components/input-group'
 
 import type { SignedIn } from '@edi-bridge/contracts'
 
 import { type SignInValues, signInFieldErrors, toSignInBody } from './sign-in-values'
+
+const points = [
+  { key: 'erp', icon: CheckmarkCircle02Icon },
+  { key: 'nextStep', icon: Wrench01Icon },
+  { key: 'orders', icon: Clock01Icon },
+] as const
 
 function useEnterWorkspace<Variables>(signInWith: (variables: Variables) => Promise<SignedIn>) {
   const queryClient = useQueryClient()
@@ -39,10 +61,12 @@ function isEntering(mutation: { isPending: boolean; isSuccess: boolean }) {
 export function LoginScreen() {
   const t = useTranslations('Login')
   const id = useId()
+  const passwordId = `${id}-password`
   const emailRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
   const [values, setValues] = useState<SignInValues>({ email: '', password: '' })
   const [submitted, setSubmitted] = useState(false)
+  const [passwordVisible, setPasswordVisible] = useState(false)
 
   const credentialsSignIn = useEnterWorkspace(signIn)
   const showcaseSignIn = useEnterWorkspace(signInToShowcase)
@@ -54,11 +78,9 @@ export function LoginScreen() {
   const passwordError =
     submitted && fieldErrors.password ? t(`errors.${fieldErrors.password}`) : null
 
-  const serverError = credentialsSignIn.isError
+  const credentialsError = credentialsSignIn.isError
     ? t(isUnauthorized(credentialsSignIn.error) ? 'errors.wrongCredentials' : 'errors.failed')
-    : showcaseSignIn.isError
-      ? t('errors.showcaseFailed')
-      : null
+    : null
 
   function change(field: keyof SignInValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }))
@@ -80,72 +102,133 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="flex w-full max-w-sm flex-col gap-6">
-      <div className="flex flex-col gap-1.5">
-        <h1 id={`${id}-title`} className="text-2xl font-semibold tracking-tight">
-          {t('title')}
-        </h1>
-        <p className="text-muted-foreground text-sm">{t('description')}</p>
+    <div className="grid w-full max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-16">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <Card>
+          <CardHeader>
+            <h1 id={`${id}-title`} className="font-heading text-lg leading-snug font-semibold">
+              {t('title')}
+            </h1>
+            <CardDescription>{t('description')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              noValidate
+              aria-labelledby={`${id}-title`}
+              className="flex flex-col gap-4"
+              onSubmit={submit}>
+              <TextField
+                id={`${id}-email`}
+                autoComplete="email"
+                error={emailError}
+                label={t('email')}
+                name="email"
+                ref={emailRef}
+                spellCheck={false}
+                type="email"
+                value={values.email}
+                onChange={(value) => change('email', value)}
+              />
+              <FormField
+                id={passwordId}
+                error={passwordError}
+                label={
+                  <label htmlFor={passwordId} className="text-sm font-medium">
+                    {t('password')}
+                  </label>
+                }>
+                <InputGroup>
+                  <InputGroupInput
+                    id={passwordId}
+                    autoComplete="current-password"
+                    name="password"
+                    ref={passwordRef}
+                    type={passwordVisible ? 'text' : 'password'}
+                    value={values.password}
+                    aria-describedby={describedBy(passwordId, passwordError, false) || undefined}
+                    aria-invalid={passwordError !== null}
+                    onChange={(event) => change('password', event.target.value)}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton
+                      size="icon-xs"
+                      aria-controls={passwordId}
+                      aria-label={passwordVisible ? t('hidePassword') : t('showPassword')}
+                      onClick={() => setPasswordVisible((visible) => !visible)}>
+                      <HugeiconsIcon
+                        icon={passwordVisible ? ViewOffIcon : ViewIcon}
+                        strokeWidth={2}
+                      />
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
+              </FormField>
+              <div role="alert" className="text-sm text-red-800 empty:hidden dark:text-red-300">
+                {credentialsError}
+              </div>
+              <Button disabled={pending} size="lg" type="submit" className="w-full">
+                {isEntering(credentialsSignIn) ? t('submitting') : t('submit')}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-primary/5 ring-primary/40">
+          <CardHeader>
+            <h2 className="font-heading text-lg leading-snug font-semibold">
+              {t('showcaseTitle')}
+            </h2>
+            <CardDescription id={`${id}-showcase`} className="text-foreground">
+              {t('showcaseDescription')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div role="alert" className="text-sm text-red-800 empty:hidden dark:text-red-300">
+              {showcaseSignIn.isError ? t('errors.showcaseFailed') : null}
+            </div>
+            <Button
+              disabled={pending}
+              size="lg"
+              type="button"
+              variant="outline"
+              aria-describedby={`${id}-showcase`}
+              className="w-full"
+              onClick={() => {
+                setSubmitted(false)
+                credentialsSignIn.reset()
+                showcaseSignIn.mutate(undefined)
+              }}>
+              <HugeiconsIcon icon={PlayIcon} strokeWidth={2} data-icon="inline-start" />
+              {isEntering(showcaseSignIn) ? t('showcasePending') : t('showcase')}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <p className="text-muted-foreground text-center text-sm">{t('noAccount')}</p>
       </div>
-      <form
-        noValidate
-        aria-labelledby={`${id}-title`}
-        className="flex flex-col gap-4"
-        onSubmit={submit}>
-        <TextField
-          id={`${id}-email`}
-          autoComplete="email"
-          error={emailError}
-          label={t('email')}
-          name="email"
-          ref={emailRef}
-          spellCheck={false}
-          type="email"
-          value={values.email}
-          onChange={(value) => change('email', value)}
-        />
-        <TextField
-          id={`${id}-password`}
-          autoComplete="current-password"
-          error={passwordError}
-          label={t('password')}
-          name="password"
-          ref={passwordRef}
-          type="password"
-          value={values.password}
-          onChange={(value) => change('password', value)}
-        />
-        <div role="alert" className="text-sm text-red-800 empty:hidden dark:text-red-300">
-          {serverError}
-        </div>
-        <Button disabled={pending} type="submit" className="w-full">
-          {isEntering(credentialsSignIn) ? t('submitting') : t('submit')}
-        </Button>
-      </form>
-      <div className="text-muted-foreground flex items-center gap-3 text-xs uppercase">
-        <span aria-hidden className="bg-border h-px flex-1" />
-        {t('or')}
-        <span aria-hidden className="bg-border h-px flex-1" />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Button
-          disabled={pending}
-          type="button"
-          variant="outline"
-          aria-describedby={`${id}-showcase`}
-          className="w-full"
-          onClick={() => {
-            setSubmitted(false)
-            credentialsSignIn.reset()
-            showcaseSignIn.mutate(undefined)
-          }}>
-          {isEntering(showcaseSignIn) ? t('showcasePending') : t('showcase')}
-        </Button>
-        <p id={`${id}-showcase`} className="text-muted-foreground text-center text-sm">
-          {t('showcaseDescription')}
-        </p>
-      </div>
-      <p className="text-muted-foreground border-t pt-4 text-sm">{t('invitedByOperator')}</p>
+
+      <section
+        aria-labelledby={`${id}-value`}
+        className="mx-auto flex w-full max-w-md flex-col gap-8 lg:order-first lg:max-w-none">
+        <h2
+          id={`${id}-value`}
+          className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl lg:text-4xl">
+          {t('valueStatement')}
+        </h2>
+        <ul className="flex flex-col gap-5">
+          {points.map((point) => (
+            <li key={point.key} className="flex gap-3">
+              <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+                <HugeiconsIcon icon={point.icon} strokeWidth={2} className="size-5" />
+              </span>
+              <div>
+                <p className="font-medium">{t(`points.${point.key}.title`)}</p>
+                <p className="text-muted-foreground text-sm">{t(`points.${point.key}.text`)}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   )
 }

@@ -1,11 +1,10 @@
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
-import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
 import { LoginScreen } from '@/components/session/login-screen'
+import { darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import messagesDe from '@/messages/de.json'
 import { showcaseSignInEndpoint, signInEndpoint } from '@edi-bridge/contracts'
 import { createSessionStore, mockCredentials, sessionHandlers } from '@edi-bridge/mocks'
 
@@ -14,7 +13,7 @@ import preview from '../../.storybook/preview'
 const meta = preview.meta({
   title: 'Session/LoginScreen',
   component: LoginScreen,
-  parameters: { layout: 'centered' },
+  parameters: { layout: 'padded' },
   beforeEach({ msw }) {
     msw.use(...sessionHandlers(apiUrl, createSessionStore(null)))
   },
@@ -31,9 +30,11 @@ async function fillIn(
 
 export const Default = meta.story({
   async play({ canvas }) {
-    await expect(canvas.getByRole('heading', { name: 'Sign in to EDI Bridge' })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'View live demo' })).toBeEnabled()
-    await expect(canvas.getByText('Users are invited by the Operator.')).toBeVisible()
+    await expect(canvas.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'Try the demo' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Open the demo' })).toBeEnabled()
+    await expect(canvas.getAllByRole('listitem')).toHaveLength(3)
+    await expect(canvas.getByText('No account? Ask the Operator for an invite.')).toBeVisible()
     await expect(canvas.queryByRole('link')).toBeNull()
   },
 })
@@ -46,11 +47,32 @@ export const SignsIn = meta.story({
   },
 })
 
+export const ShowsAndHidesPassword = meta.story({
+  async play({ canvas }) {
+    const password = canvas.getByLabelText('Password')
+
+    await userEvent.type(password, 'secret')
+    await expect(password).toHaveAttribute('type', 'password')
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Show password' }))
+    await expect(password).toHaveAttribute('type', 'text')
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Hide password' }))
+    await expect(password).toHaveAttribute('type', 'password')
+    await expect(password).toHaveValue('secret')
+  },
+})
+
 export const MissingFields = meta.story({
   async play({ canvas }) {
     await userEvent.click(canvas.getByRole('button', { name: 'Sign in' }))
-    await expect(canvas.getByText('Enter your email address.')).toBeVisible()
-    await expect(canvas.getByText('Enter your password.')).toBeVisible()
+    await expect(canvas.getByLabelText('Email')).toHaveAccessibleDescription(
+      'Enter your email address.',
+    )
+    await expect(canvas.getByLabelText('Password')).toHaveAccessibleDescription(
+      'Enter your password.',
+    )
+    await expect(canvas.getByLabelText('Password')).toBeInvalid()
     await expect(canvas.getByLabelText('Email')).toHaveFocus()
   },
 })
@@ -77,7 +99,7 @@ export const Pending = meta.story({
     await fillIn(canvas, mockCredentials.operator.email, mockCredentials.operator.password)
     await userEvent.click(canvas.getByRole('button', { name: 'Sign in' }))
     await expect(await canvas.findByRole('button', { name: 'Signing in…' })).toBeDisabled()
-    await expect(canvas.getByRole('button', { name: 'View live demo' })).toBeDisabled()
+    await expect(canvas.getByRole('button', { name: 'Open the demo' })).toBeDisabled()
   },
 })
 
@@ -100,7 +122,7 @@ export const ServerError = meta.story({
 
 export const Showcase = meta.story({
   async play({ canvas }) {
-    await userEvent.click(canvas.getByRole('button', { name: 'View live demo' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Open the demo' }))
     await waitFor(() => expect(getRouter().replace).toHaveBeenCalledWith('/'))
   },
 })
@@ -114,10 +136,8 @@ export const ShowcasePending = meta.story({
     )
   },
   async play({ canvas }) {
-    await userEvent.click(canvas.getByRole('button', { name: 'View live demo' }))
-    await expect(
-      await canvas.findByRole('button', { name: 'Opening the Showcase Workspace…' }),
-    ).toBeDisabled()
+    await userEvent.click(canvas.getByRole('button', { name: 'Open the demo' }))
+    await expect(await canvas.findByRole('button', { name: 'Opening the demo…' })).toBeDisabled()
     await expect(canvas.getByRole('button', { name: 'Sign in' })).toBeDisabled()
   },
 })
@@ -131,33 +151,36 @@ export const ShowcaseError = meta.story({
     )
   },
   async play({ canvas }) {
-    await userEvent.click(canvas.getByRole('button', { name: 'View live demo' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Open the demo' }))
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The Showcase Workspace could not be opened.',
+      'The demo could not be opened.',
+    )
+  },
+})
+
+export const Narrow = meta.story({
+  ...mobile,
+  async play({ canvas }) {
+    const signIn = canvas.getByRole('heading', { level: 1, name: 'Sign in' })
+    const valueStatement = canvas.getByRole('heading', { name: /^Exchange purchase orders/ })
+
+    await expect(signIn.getBoundingClientRect().top).toBeLessThan(
+      valueStatement.getBoundingClientRect().top,
     )
   },
 })
 
 export const German = meta.story({
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
-    ),
-  ],
+  decorators: [german],
   async play({ canvas }) {
-    await expect(canvas.getByRole('heading', { name: 'Bei EDI Bridge anmelden' })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Live-Demo ansehen' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { level: 1, name: 'Anmelden' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Demo öffnen' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Passwort anzeigen' })).toBeVisible()
   },
 })
 
 export const Dark = meta.story({
-  beforeEach() {
-    document.documentElement.classList.add('dark')
-
-    return () => document.documentElement.classList.remove('dark')
-  },
+  beforeEach: darkMode,
   async play({ canvas }) {
     await userEvent.click(canvas.getByRole('button', { name: 'Sign in' }))
     await expect(canvas.getByText('Enter your email address.')).toBeVisible()
