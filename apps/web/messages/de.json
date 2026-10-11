@@ -90,6 +90,28 @@
       }
     }
   },
+  "Search": {
+    "trigger": "Aufträge, Handelspartner, Belege suchen …",
+    "title": "Suche",
+    "description": "Einen Auftrag, einen Handelspartner, einen Beleg oder eine Seite finden",
+    "placeholder": "Bestellnummer, Handelspartner, Beleg …",
+    "loading": "Wird gesucht …",
+    "empty": "Nichts gefunden.",
+    "groups": {
+      "orders": "Aufträge",
+      "tradingPartners": "Handelspartner",
+      "documents": "Belege",
+      "pages": "Seiten",
+      "unavailable": "Nicht verfügbar"
+    },
+    "order": "Auftrag {businessReference}",
+    "unavailable": {
+      "orders": "Aufträge konnten nicht durchsucht werden",
+      "tradingPartners": "Handelspartner konnten nicht geladen werden",
+      "documents": "Belege konnten nicht geladen werden"
+    },
+    "retry": "Erneut versuchen"
+  },
   "Breadcrumb": {
     "label": "Navigationspfad",
     "showPath": "Ganzen Pfad anzeigen",

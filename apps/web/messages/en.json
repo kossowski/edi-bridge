@@ -90,6 +90,28 @@
       }
     }
   },
+  "Search": {
+    "trigger": "Search orders, partners, documents…",
+    "title": "Search",
+    "description": "Find an order, a trading partner, a document or a page",
+    "placeholder": "Order number, partner, document…",
+    "loading": "Searching…",
+    "empty": "Nothing found.",
+    "groups": {
+      "orders": "Orders",
+      "tradingPartners": "Trading partners",
+      "documents": "Documents",
+      "pages": "Pages",
+      "unavailable": "Not available"
+    },
+    "order": "Order {businessReference}",
+    "unavailable": {
+      "orders": "Orders could not be searched",
+      "tradingPartners": "Trading partners could not be loaded",
+      "documents": "Documents could not be loaded"
+    },
+    "retry": "Try again"
+  },
   "Breadcrumb": {
     "label": "Breadcrumb",
     "showPath": "Show the whole path",
