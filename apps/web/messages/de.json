@@ -2197,7 +2197,8 @@
       "seeded": {
         "yes": "Ja",
         "no": "Nein"
-      }
+      },
+      "neverReset": "Nie"
     },
     "workspaces": {
       "title": "Workspaces",
@@ -2260,7 +2261,8 @@
         "gln": "GLN",
         "members": "Mitglieder",
         "seeded": "Seed-Daten",
-        "createdAt": "Angelegt"
+        "createdAt": "Angelegt",
+        "lastResetAt": "Zuletzt zurückgesetzt"
       },
       "notFound": {
         "title": "Workspace nicht gefunden",
@@ -2332,6 +2334,18 @@
     "settings": {
       "title": "Aufbewahrung und KI-Budget",
       "description": "Wie lange dieser Workspace Roh-Documents aufbewahrt und wie viele KI-Tokens er pro Tag verbrauchen darf."
+    },
+    "reset": {
+      "trigger": "Sandbox zurücksetzen",
+      "title": "{name} zurücksetzen?",
+      "replaced": "Alle Änderungen im Sandbox-Workspace werden durch seine Seed-Daten ersetzt: Trading Partners, Mappings, Runs und jede andere Änderung seit dem letzten Zurücksetzen.",
+      "untouched": "Andere Workspaces bleiben unverändert.",
+      "irreversible": "Das kann nicht rückgängig gemacht werden.",
+      "cancel": "Abbrechen",
+      "confirm": "Sandbox zurücksetzen",
+      "resetting": "Wird zurückgesetzt…",
+      "failed": "Die Sandbox konnte nicht zurückgesetzt werden. Versuchen Sie es erneut.",
+      "done": "{name} wurde auf seine Seed-Daten zurückgesetzt."
     }
   }
 }

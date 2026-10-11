@@ -61,6 +61,7 @@ import {
   regenerateWebhookTokenEndpoint,
   type ReprocessRunBody,
   reprocessRunEndpoint,
+  resetSandboxWorkspaceEndpoint,
   retryRunEndpoint,
   type SaveMappingDraftBody,
   sessionEndpoint,
@@ -221,6 +222,12 @@ export function createInvite(workspaceId: string, body: InviteInput) {
   return request(createInviteEndpoint, {
     path: toPath(createInviteEndpoint.path, { workspaceId }),
     body,
+  })
+}
+
+export function resetSandboxWorkspace(workspaceId: string) {
+  return request(resetSandboxWorkspaceEndpoint, {
+    path: toPath(resetSandboxWorkspaceEndpoint.path, { workspaceId }),
   })
 }
 

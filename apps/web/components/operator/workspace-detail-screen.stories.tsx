@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, fn, userEvent, waitFor } from 'storybook/test'
+import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import type { ReactNode } from 'react'
 
@@ -13,7 +13,9 @@ import {
   type Invite,
   inviteValidityDays,
   operatorWorkspacesEndpoint,
+  resetSandboxWorkspaceEndpoint,
   workspaceInvitesEndpoint,
+  type WorkspaceSummary,
 } from '@edi-bridge/contracts'
 import {
   createInvites,
@@ -25,6 +27,7 @@ import {
   seedSandboxWorkspace,
   seedSession,
   seedWorkspace,
+  seedWorkspaceSummaries,
   sessionHandlers,
   workspaceSettingsHandlers,
 } from '@edi-bridge/mocks'
@@ -53,9 +56,14 @@ const invitesWithPending = seedInvites.map((invite) =>
 function operatorMocks({
   invites = invitesWithPending,
   session = seedSession,
-}: { invites?: ReadonlyArray<Invite>; session?: typeof seedSession } = {}) {
+  workspaceSummaries = seedWorkspaceSummaries,
+}: {
+  invites?: ReadonlyArray<Invite>
+  session?: typeof seedSession
+  workspaceSummaries?: ReadonlyArray<WorkspaceSummary>
+} = {}) {
   const sessionStore = createSessionStore(session)
-  const workspaces = createOperatorStore({ invites })
+  const workspaces = createOperatorStore({ workspaces: workspaceSummaries, invites })
 
   return [
     ...sessionHandlers(apiUrl, sessionStore),
@@ -114,6 +122,8 @@ export const Default = meta.story({
     await expect(canvas.getAllByRole('button', { name: 'Copy link' })).toHaveLength(1)
     await expect(canvas.getByText(/No email is sent/)).toBeVisible()
     await expect(await canvas.findByLabelText('Retention period in days')).toHaveValue('90')
+    await expect(canvas.queryByRole('button', { name: 'Reset Sandbox' })).toBeNull()
+    await expect(canvas.queryByText('Last reset')).toBeNull()
   },
 })
 
@@ -135,6 +145,38 @@ export const InvitesOnPhone = meta.story({
   },
 })
 
+const neverResetWorkspaces = seedWorkspaceSummaries.map((workspace) =>
+  workspace.kind === 'sandbox' ? { ...workspace, lastResetAt: null } : workspace,
+)
+
+async function openResetDialog(canvas: { findByRole: typeof screen.findByRole }) {
+  const trigger = await canvas.findByRole('button', { name: 'Reset Sandbox' })
+  await userEvent.click(trigger)
+  const dialog = await screen.findByRole('alertdialog')
+  await waitFor(() => expect(dialog).toBeVisible())
+
+  return {
+    trigger,
+    dialog,
+    cancel: within(dialog).getByRole('button', { name: 'Cancel' }),
+    confirm: within(dialog).getByRole('button', { name: 'Reset Sandbox' }),
+  }
+}
+
+const resetDone = `${seedSandboxWorkspace.name} was reset to its seed data.`
+
+function resetStatus(canvas: { queryByText: typeof screen.queryByText }) {
+  return canvas.queryByText(resetDone, { selector: '[role="status"]' })
+}
+
+function resetAlert(canvas: { queryByText: typeof screen.queryByText }) {
+  return canvas.queryByText(resetDone, { selector: '[data-slot="alert-description"]' })
+}
+
+function lastResetValue(canvas: { getByText: typeof screen.getByText }) {
+  return canvas.getByText('Last reset').nextElementSibling
+}
+
 export const SandboxWorkspace = meta.story({
   args: { id: seedSandboxWorkspace.id },
   async play({ canvas }) {
@@ -142,6 +184,181 @@ export const SandboxWorkspace = meta.story({
       await canvas.findByRole('heading', { level: 1, name: seedSandboxWorkspace.name }),
     ).toBeVisible()
     await expect(canvas.getByText('Sandbox')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Reset Sandbox' })).toBeVisible()
+    await expect(lastResetValue(canvas)?.querySelector('time')).toHaveAttribute(
+      'datetime',
+      '2026-10-09T17:45:00.000Z',
+    )
+  },
+})
+
+export const SandboxNeverReset = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  beforeEach({ msw }) {
+    msw.use(...operatorMocks({ workspaceSummaries: neverResetWorkspaces }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Last reset')).toBeVisible()
+    await expect(lastResetValue(canvas)).toHaveTextContent('Never')
+  },
+})
+
+export const ResetConfirmation = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  async play({ canvas }) {
+    const { dialog, cancel, confirm } = await openResetDialog(canvas)
+    await expect(
+      within(dialog).getByRole('heading', { name: `Reset ${seedSandboxWorkspace.name}?` }),
+    ).toBeVisible()
+    await expect(dialog).toHaveAccessibleDescription(/replaced by its seed data/)
+    await expect(dialog).toHaveTextContent('Other Workspaces are not affected.')
+    await expect(dialog).toHaveTextContent('This cannot be undone.')
+    await waitFor(() => expect(cancel).toHaveFocus())
+    await expect(confirm).toBeVisible()
+  },
+})
+
+export const ResetCancelled = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  async play({ canvas }) {
+    const { trigger, dialog, cancel } = await openResetDialog(canvas)
+    await userEvent.click(cancel)
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
+    await expect(resetStatus(canvas)).toBeNull()
+    await expect(resetAlert(canvas)).toBeNull()
+  },
+})
+
+export const ResetSucceeds = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  beforeEach({ msw }) {
+    msw.use(...operatorMocks({ workspaceSummaries: neverResetWorkspaces }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Never')).toBeVisible()
+    const { trigger, dialog, confirm } = await openResetDialog(canvas)
+    await userEvent.click(confirm)
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
+    await waitFor(() => expect(resetStatus(canvas)).not.toBeNull())
+    await expect(resetAlert(canvas)).toBeVisible()
+    await expect(resetAlert(canvas)?.closest('[aria-hidden="true"]')).not.toBeNull()
+    await waitFor(() => expect(lastResetValue(canvas)?.querySelector('time')).not.toBeNull())
+    await expect(lastResetValue(canvas)).not.toHaveTextContent('Never')
+  },
+})
+
+export const ResetPending = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${resetSandboxWorkspaceEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const { dialog, cancel, confirm } = await openResetDialog(canvas)
+    await userEvent.click(confirm)
+    await expect(await within(dialog).findByRole('button', { name: 'Resetting…' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    await expect(cancel).toHaveAttribute('aria-disabled', 'true')
+    await expect(confirm).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    await expect(dialog).toBeVisible()
+    await userEvent.click(cancel)
+    await expect(dialog).toBeVisible()
+  },
+})
+
+export const ResetFails = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(
+        `${apiUrl}${resetSandboxWorkspaceEndpoint.path}`,
+        () => HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+        { once: true },
+      ),
+    )
+  },
+  async play({ canvas }) {
+    const { dialog, confirm } = await openResetDialog(canvas)
+    await userEvent.click(confirm)
+    await expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The Sandbox could not be reset. Try again.',
+    )
+    await expect(dialog).toBeVisible()
+
+    await userEvent.click(confirm)
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    await waitFor(() => expect(resetAlert(canvas)).toBeVisible())
+    await expect(resetStatus(canvas)).not.toBeNull()
+  },
+})
+
+export const ResetSucceedsThenFailsOnReopen = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  beforeEach({ msw }) {
+    let calls = 0
+    msw.use(
+      http.post(`${apiUrl}${resetSandboxWorkspaceEndpoint.path}`, () => {
+        calls += 1
+
+        return calls > 1
+          ? HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 })
+          : undefined
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const first = await openResetDialog(canvas)
+    await userEvent.click(first.confirm)
+    await waitFor(() => expect(first.dialog).not.toBeInTheDocument())
+    await waitFor(() => expect(resetAlert(canvas)).toBeVisible())
+
+    const second = await openResetDialog(canvas)
+    await expect(resetAlert(canvas)).toBeNull()
+    await expect(resetStatus(canvas)).toBeNull()
+    await userEvent.click(second.confirm)
+    await expect(await within(second.dialog).findByRole('alert')).toHaveTextContent(
+      'The Sandbox could not be reset. Try again.',
+    )
+    await userEvent.click(second.cancel)
+    await waitFor(() => expect(second.dialog).not.toBeInTheDocument())
+    await expect(resetAlert(canvas)).toBeNull()
+    await expect(resetStatus(canvas)).toBeNull()
+  },
+})
+
+export const SandboxGerman = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Zuletzt zurückgesetzt')).toBeVisible()
+    await userEvent.click(await canvas.findByRole('button', { name: 'Sandbox zurücksetzen' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toHaveFocus(),
+    )
+    await expect(dialog).toHaveTextContent('Andere Workspaces bleiben unverändert.')
+  },
+})
+
+export const SandboxDark = meta.story({
+  args: { id: seedSandboxWorkspace.id },
+  beforeEach() {
+    document.documentElement.classList.add('dark')
+
+    return () => document.documentElement.classList.remove('dark')
+  },
+  async play({ canvas }) {
+    const { dialog } = await openResetDialog(canvas)
+    await expect(dialog).toHaveTextContent('This cannot be undone.')
   },
 })
 

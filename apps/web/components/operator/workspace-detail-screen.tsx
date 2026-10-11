@@ -4,11 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 
 import { BackLink, Fact, Failure } from '@/components/detail-parts'
+import { SandboxReset } from '@/components/operator/sandbox-reset'
 import { WorkspaceInvites } from '@/components/operator/workspace-invites'
 import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
 import {
   WorkspaceCreatedAt,
   WorkspaceGln,
+  WorkspaceLastReset,
   WorkspaceMembers,
   WorkspaceSeeded,
 } from '@/components/operator/workspace-values'
@@ -26,7 +28,13 @@ import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { WorkspaceSettingsInput, WorkspaceSummary } from '@edi-bridge/contracts'
 
-function WorkspaceFacts({ workspace }: { workspace: WorkspaceSummary }) {
+function WorkspaceFacts({
+  workspace,
+  isSandbox,
+}: {
+  workspace: WorkspaceSummary
+  isSandbox: boolean
+}) {
   const t = useTranslations('Operator.workspace.facts')
 
   return (
@@ -45,6 +53,11 @@ function WorkspaceFacts({ workspace }: { workspace: WorkspaceSummary }) {
       <Fact label={t('createdAt')}>
         <WorkspaceCreatedAt createdAt={workspace.createdAt} />
       </Fact>
+      {isSandbox && (
+        <Fact label={t('lastResetAt')}>
+          <WorkspaceLastReset lastResetAt={workspace.lastResetAt} />
+        </Fact>
+      )}
     </dl>
   )
 }
@@ -74,6 +87,8 @@ function WorkspaceSettingsSection({ workspaceId }: { workspaceId: string }) {
 }
 
 function WorkspaceView({ workspace }: { workspace: WorkspaceSummary }) {
+  const isSandbox = workspace.kind === 'sandbox'
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -83,8 +98,9 @@ function WorkspaceView({ workspace }: { workspace: WorkspaceSummary }) {
           </h1>
           <WorkspaceKindBadge kind={workspace.kind} />
         </div>
+        {isSandbox && <SandboxReset workspace={workspace} />}
       </div>
-      <WorkspaceFacts workspace={workspace} />
+      <WorkspaceFacts isSandbox={isSandbox} workspace={workspace} />
       <WorkspaceInvites workspaceId={workspace.id} />
       <Separator />
       <WorkspaceSettingsSection workspaceId={workspace.id} />

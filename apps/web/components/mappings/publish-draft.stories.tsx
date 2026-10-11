@@ -52,7 +52,11 @@ async function confirmPublish(canvasElement: HTMLElement) {
 
   await userEvent.click(await canvas.findByRole('button', { name: 'Publish' }))
 
-  const confirm = await dialog(canvasElement).findByRole('button', { name: /^Publish Version/ })
+  const confirmation = await dialog(canvasElement).findByRole('dialog')
+
+  await waitFor(() => expect(confirmation).toBeVisible())
+
+  const confirm = within(confirmation).getByRole('button', { name: /^Publish Version/ })
 
   await userEvent.click(confirm)
 

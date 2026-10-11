@@ -140,6 +140,25 @@ export function storeSavedOperatorWorkspaceSettings(
   }
 }
 
+export function storeResetSandboxWorkspace(
+  queryClient: QueryClient,
+  reset: WorkspaceSummary,
+  currentWorkspaceId: string | undefined,
+) {
+  queryClient.setQueryData<WorkspaceSummary[]>(operatorWorkspacesQuery.queryKey, (workspaces) =>
+    workspaces?.map((workspace) => (workspace.id === reset.id ? reset : workspace)),
+  )
+  void queryClient.invalidateQueries({ queryKey: operatorKeys.invites(reset.id) })
+  void queryClient.invalidateQueries({ queryKey: operatorKeys.settings(reset.id) })
+
+  if (currentWorkspaceId === reset.id) {
+    void queryClient.invalidateQueries({
+      predicate: ({ queryKey }) =>
+        queryKey[0] !== sessionQuery.queryKey[0] && queryKey[0] !== operatorKeys.all()[0],
+    })
+  }
+}
+
 export const overviewKeys = {
   all: () => ['overview'] as const,
   window: (window: OverviewWindow) => [...overviewKeys.all(), window] as const,
