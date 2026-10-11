@@ -1,4 +1,10 @@
 import {
+  aiBudgetEndpoint,
+  type AiBudgetExhaustedProblem,
+  aiBudgetExhaustedProblemSchema,
+  aiBudgetExhaustedStatus,
+  type AiDraftEvent,
+  aiReviewOpenStatus,
   channelEndpoint,
   type ChannelInput,
   channelsEndpoint,
@@ -47,6 +53,7 @@ import {
   messageTypeStructureEndpoint,
   type MoveFlowMappingVersionBody,
   operatorWorkspaceSettingsEndpoint,
+  parseAiDraftEvent,
   operatorWorkspacesEndpoint,
   moveFlowMappingVersionEndpoint,
   type OrderLifecycleQuery,
@@ -60,6 +67,8 @@ import {
   type QueryParams,
   regenerateWebhookTokenEndpoint,
   type ReprocessRunBody,
+  type RequestAiDraftBody,
+  requestAiDraftEndpoint,
   reprocessRunEndpoint,
   resetSandboxWorkspaceEndpoint,
   retryRunEndpoint,
@@ -96,6 +105,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { apiUrl, isMockingEnabled } from './config'
+import { eventStreamData } from './event-stream'
 
 export class ApiError extends Error {
   constructor(
@@ -295,6 +305,58 @@ export function publishMappingDraft(mappingId: string) {
   return request(publishMappingDraftEndpoint, {
     path: toPath(publishMappingDraftEndpoint.path, { mappingId }),
   })
+}
+
+export function getAiBudget() {
+  return request(aiBudgetEndpoint)
+}
+
+export async function streamAiDraft(
+  mappingId: string,
+  body: RequestAiDraftBody,
+  { signal, onEvent }: { signal: AbortSignal; onEvent: (event: AiDraftEvent) => void },
+) {
+  await mockingReady()
+
+  const path = toPath(requestAiDraftEndpoint.path, { id: mappingId })
+
+  const response = await fetch(`${apiUrl}${path}`, {
+    method: requestAiDraftEndpoint.method,
+    credentials: 'include',
+    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+    body: JSON.stringify(requestAiDraftEndpoint.body.parse(body)),
+    signal,
+  })
+
+  if (!response.ok || !response.body) {
+    throw new ApiError(response.status, path, await response.text().catch(() => ''))
+  }
+
+  for await (const data of eventStreamData(response.body)) {
+    const event = parseAiDraftEvent(data)
+
+    if (event) {
+      onEvent(event)
+    }
+  }
+}
+
+export function isAiReviewOpen(error: Error | null) {
+  return error instanceof ApiError && error.status === aiReviewOpenStatus
+}
+
+export function aiBudgetExhaustedProblemOf(error: Error | null): AiBudgetExhaustedProblem | null {
+  if (!(error instanceof ApiError) || error.status !== aiBudgetExhaustedStatus) {
+    return null
+  }
+
+  try {
+    const parsed = aiBudgetExhaustedProblemSchema.safeParse(JSON.parse(error.body))
+
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
 }
 
 export function listMappings() {
