@@ -4,9 +4,13 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The listed components, their dependencies (`packages/ui/package.json`, `sonner` in `apps/web`) and the lockfile changes are on the branch; nothing from `apps/web/components/lab/**` or `apps/web/app/(lab)/**` comes over
-- [ ] Clicking an `InputGroupAddon` focuses the input again (the lab's lint fixes removed this), built in a way that passes the lint rules
-- [ ] `Sheet` accepts the `overlay` prop; `globals.css` defines `--ai-attention` for dark and light mode
-- [ ] Pre-commit hooks and CI pass without disabling rules
+- [x] The listed components, their dependencies (`packages/ui/package.json`, `sonner` in `apps/web`) and the lockfile changes are on the branch; nothing from `apps/web/components/lab/**` or `apps/web/app/(lab)/**` comes over
+- [x] Clicking an `InputGroupAddon` focuses the input again (the lab's lint fixes removed this), built in a way that passes the lint rules
+- [x] `Sheet` accepts the `overlay` prop; `globals.css` defines `--ai-attention` for dark and light mode
+- [x] Pre-commit hooks and CI pass without disabling rules
+
+## Comments
+
+Resolved in #71.
