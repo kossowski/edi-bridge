@@ -28,14 +28,14 @@ export const AddonFocusesInput: Story = {
       <InputGroupAddon>
         <InputGroupText>GLN</InputGroupText>
       </InputGroupAddon>
-      <InputGroupInput aria-label="Partner" />
+      <InputGroupInput aria-label="Trading partner" />
       <InputGroupAddon align="inline-end">
         <InputGroupButton onClick={onClear}>Clear</InputGroupButton>
       </InputGroupAddon>
     </InputGroup>
   ),
   async play({ args, canvas, userEvent }) {
-    const input = canvas.getByRole('textbox', { name: 'Partner' })
+    const input = canvas.getByRole('textbox', { name: 'Trading partner' })
 
     await userEvent.click(canvas.getByText('GLN'))
     await expect(input).toHaveFocus()
@@ -51,12 +51,12 @@ export const AddonFocusesTextarea: Story = {
     <InputGroup>
       <InputGroupTextarea aria-label="Note" />
       <InputGroupAddon align="block-end">
-        <InputGroupText>Shown to the partner</InputGroupText>
+        <InputGroupText>Shown to the trading partner</InputGroupText>
       </InputGroupAddon>
     </InputGroup>
   ),
   async play({ canvas, userEvent }) {
-    await userEvent.click(canvas.getByText('Shown to the partner'))
+    await userEvent.click(canvas.getByText('Shown to the trading partner'))
     await expect(canvas.getByRole('textbox', { name: 'Note' })).toHaveFocus()
   },
 }
