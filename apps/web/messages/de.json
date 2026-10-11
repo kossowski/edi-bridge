@@ -31,7 +31,7 @@
       "settings": "Einstellungen",
       "operatorArea": "Operator-Bereich",
       "viewOnly": "Nur ansehen",
-      "viewOnlyDescription": "Sie sehen alles in diesem Workspace, können aber nichts ändern.",
+      "viewOnlyDescription": "Sie sehen alles in diesem Arbeitsbereich, können aber nichts ändern.",
       "signOut": "Abmelden",
       "signingOut": "Wird abgemeldet …",
       "signOutFailed": "Abmelden fehlgeschlagen. Versuchen Sie es erneut.",

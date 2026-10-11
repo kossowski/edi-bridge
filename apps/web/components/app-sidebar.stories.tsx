@@ -1,10 +1,10 @@
-import { expect, screen, userEvent, waitFor } from 'storybook/test'
-
-import type { ReactNode } from 'react'
+import { usePathname } from '@storybook/nextjs-vite/navigation.mock'
+import { useState } from 'react'
+import { expect, mocked, screen, userEvent, waitFor } from 'storybook/test'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { accountMenuOf, sessionHandlers } from '@/components/session/session-story-helpers'
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import { darkMode, german, mobile, withSidebarProvider } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   createWorkspace,
@@ -13,7 +13,6 @@ import {
   seedSession,
   showcaseViewerSession,
 } from '@edi-bridge/mocks'
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@edi-bridge/ui/components/sidebar'
 
 import type { Session } from '@edi-bridge/contracts'
 
@@ -26,19 +25,21 @@ function signedInAs(session: Session) {
   ]
 }
 
-function withSidebarProvider(
-  Story: () => ReactNode,
-  { parameters }: { parameters: { sidebarOpen?: boolean } },
-) {
+function NavigatesToAllConnections() {
+  const [, setPathname] = useState('/')
+
+  function navigate() {
+    mocked(usePathname).mockReturnValue('/channels')
+    setPathname('/channels')
+  }
+
   return (
-    <SidebarProvider defaultOpen={parameters.sidebarOpen ?? true}>
-      <Story />
-      <SidebarInset>
-        <div className="p-4">
-          <SidebarTrigger label="Toggle sidebar" />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <>
+      <AppSidebar />
+      <button type="button" onClick={navigate}>
+        Navigate to all connections
+      </button>
+    </>
   )
 }
 
@@ -131,6 +132,26 @@ export const AdvancedOpenOnItsPage = meta.story({
       'aria-current',
       'page',
     )
+  },
+})
+
+export const AdvancedOpensOnNavigation = meta.story({
+  render: () => <NavigatesToAllConnections />,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession))
+  },
+  async play({ canvas }) {
+    const advanced = await canvas.findByRole('button', { name: 'Advanced' })
+
+    await expect(advanced).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(canvas.getByRole('button', { name: 'Navigate to all connections' }))
+    await expect(await canvas.findByRole('link', { name: 'All connections' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await expect(advanced).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(advanced)
+    await expect(advanced).toHaveAttribute('aria-expanded', 'false')
   },
 })
 

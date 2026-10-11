@@ -2,6 +2,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { type ReactNode } from 'react'
 
 import messagesDe from '@/messages/de.json'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@edi-bridge/ui/components/sidebar'
 
 export function darkMode() {
   document.documentElement.classList.add('dark')
@@ -20,6 +21,20 @@ export const besideSidebar = (Story: () => ReactNode) => (
   <div className="ml-64">
     <Story />
   </div>
+)
+
+export const withSidebarProvider = (
+  Story: () => ReactNode,
+  { parameters }: { parameters: { sidebarOpen?: boolean } },
+) => (
+  <SidebarProvider defaultOpen={parameters.sidebarOpen ?? true}>
+    <Story />
+    <SidebarInset>
+      <div className="p-4">
+        <SidebarTrigger label="Toggle sidebar" />
+      </div>
+    </SidebarInset>
+  </SidebarProvider>
 )
 
 export const tablet = {

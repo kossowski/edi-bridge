@@ -45,10 +45,12 @@ import {
   useSidebar,
 } from '@edi-bridge/ui/components/sidebar'
 
+const systemTheme = { value: 'system', icon: ComputerIcon } as const
+
 const themes = [
   { value: 'light', icon: Sun03Icon },
   { value: 'dark', icon: Moon02Icon },
-  { value: 'system', icon: ComputerIcon },
+  systemTheme,
 ] as const
 
 function initialsOf(name: string) {
@@ -88,14 +90,14 @@ export function AccountMenu() {
     .filter(Boolean)
     .join(' · ')
 
-  const currentTheme = themes.find((option) => option.value === theme) ?? themes[2]
+  const currentTheme = themes.find((option) => option.value === theme) ?? systemTheme
 
   return (
     <>
       {signOutMutation.isError && (
         <p
           role="alert"
-          className="px-2 text-sm text-red-800 group-data-[collapsible=icon]:sr-only dark:text-red-300">
+          className="text-destructive-text px-2 text-sm group-data-[collapsible=icon]:sr-only">
           {t('session.signOutFailed')}
         </p>
       )}

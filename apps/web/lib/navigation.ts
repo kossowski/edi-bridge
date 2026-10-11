@@ -43,6 +43,8 @@ export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = 
 
 export type SidebarItemKey = keyof Messages['Sidebar']['items']
 
+type SidebarItemSource = { key: SidebarItemKey; page: NavigationKey; icon?: IconSvgElement }
+
 type SidebarItem = NavigationItem & { key: SidebarItemKey }
 
 type SidebarGroup = {
@@ -51,36 +53,49 @@ type SidebarGroup = {
   items: ReadonlyArray<SidebarItem>
 }
 
-export const sidebarGroups: ReadonlyArray<SidebarGroup> = [
+type SidebarGroupSource = Omit<SidebarGroup, 'items'> & {
+  items: ReadonlyArray<SidebarItemSource>
+}
+
+const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
   {
     key: 'dailyWork',
     collapsible: false,
     items: [
-      { key: 'home', href: '/', icon: DashboardSquare01Icon },
-      { key: 'documents', href: '/runs', icon: File02Icon },
-      { key: 'orders', href: '/order-lifecycle', icon: ShoppingBasket01Icon },
+      { key: 'home', page: 'overview' },
+      { key: 'documents', page: 'runs', icon: File02Icon },
+      { key: 'orders', page: 'orderLifecycle', icon: ShoppingBasket01Icon },
     ],
   },
   {
     key: 'setup',
     collapsible: false,
     items: [
-      { key: 'tradingPartners', href: '/trading-partners', icon: UserMultiple02Icon },
-      { key: 'mappings', href: '/mappings', icon: FlowConnectionIcon },
-      { key: 'codeTranslations', href: '/lookup-tables', icon: Table01Icon },
-      { key: 'dataFormats', href: '/document-structures', icon: HierarchySquare02Icon },
+      { key: 'tradingPartners', page: 'tradingPartners' },
+      { key: 'mappings', page: 'mappings' },
+      { key: 'codeTranslations', page: 'lookupTables' },
+      { key: 'dataFormats', page: 'documentStructures' },
     ],
   },
   {
     key: 'advanced',
     collapsible: true,
     items: [
-      { key: 'allConnections', href: '/channels', icon: PlugSocketIcon },
-      { key: 'allDocumentRoutes', href: '/flows', icon: WorkflowSquare03Icon },
-      { key: 'transmissions', href: '/runs', icon: Route01Icon },
+      { key: 'allConnections', page: 'channels' },
+      { key: 'allDocumentRoutes', page: 'flows' },
+      { key: 'transmissions', page: 'runs', icon: Route01Icon },
     ],
   },
 ]
+
+export const sidebarGroups: ReadonlyArray<SidebarGroup> = sidebarGroupSources.map((group) => ({
+  ...group,
+  items: group.items.map(({ key, page, icon }) => ({
+    key,
+    href: navigationItems[page].href,
+    icon: icon ?? navigationItems[page].icon,
+  })),
+}))
 
 export function activeSidebarItem(pathname: string) {
   let active: SidebarItem | undefined

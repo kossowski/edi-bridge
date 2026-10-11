@@ -31,9 +31,12 @@ import {
   useSidebar,
 } from '@edi-bridge/ui/components/sidebar'
 
-type Group = (typeof sidebarGroups)[number]
+type GroupProps = {
+  group: (typeof sidebarGroups)[number]
+  activeKey: SidebarItemKey | undefined
+}
 
-function GroupMenu({ group, activeKey }: { group: Group; activeKey: SidebarItemKey | undefined }) {
+function GroupMenu({ group, activeKey }: GroupProps) {
   const t = useTranslations('Sidebar.items')
   const { setOpenMobile } = useSidebar()
 
@@ -63,25 +66,34 @@ function GroupMenu({ group, activeKey }: { group: Group; activeKey: SidebarItemK
   )
 }
 
-function CollapsibleGroup({
-  group,
-  activeKey,
-}: {
-  group: Group
-  activeKey: SidebarItemKey | undefined
-}) {
+function PlainGroup({ group, activeKey }: GroupProps) {
+  const t = useTranslations('Sidebar.groups')
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>{t(group.key)}</SidebarGroupLabel>
+      <GroupMenu activeKey={activeKey} group={group} />
+    </SidebarGroup>
+  )
+}
+
+function CollapsibleGroup({ group, activeKey }: GroupProps) {
   const t = useTranslations('Sidebar.groups')
   const { isMobile, state } = useSidebar()
   const containsActive = group.items.some((item) => item.key === activeKey)
   const [open, setOpen] = useState(containsActive)
+  const [containedActive, setContainedActive] = useState(containsActive)
+
+  if (containsActive !== containedActive) {
+    setContainedActive(containsActive)
+
+    if (containsActive) {
+      setOpen(true)
+    }
+  }
 
   if (state === 'collapsed' && !isMobile) {
-    return (
-      <SidebarGroup>
-        <SidebarGroupLabel>{t(group.key)}</SidebarGroupLabel>
-        <GroupMenu activeKey={activeKey} group={group} />
-      </SidebarGroup>
-    )
+    return <PlainGroup activeKey={activeKey} group={group} />
   }
 
   return (
@@ -107,7 +119,6 @@ function CollapsibleGroup({
 
 export function AppSidebar() {
   const tShell = useTranslations('Shell')
-  const tGroups = useTranslations('Sidebar.groups')
   const activeKey = activeSidebarItem(usePathname())
 
   return (
@@ -124,10 +135,7 @@ export function AppSidebar() {
             group.collapsible ? (
               <CollapsibleGroup key={group.key} activeKey={activeKey} group={group} />
             ) : (
-              <SidebarGroup key={group.key}>
-                <SidebarGroupLabel>{tGroups(group.key)}</SidebarGroupLabel>
-                <GroupMenu activeKey={activeKey} group={group} />
-              </SidebarGroup>
+              <PlainGroup key={group.key} activeKey={activeKey} group={group} />
             ),
           )}
         </nav>

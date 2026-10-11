@@ -6,34 +6,21 @@ import type { ReactNode } from 'react'
 
 import { AccountMenu } from '@/components/session/account-menu'
 import { accountMenuOf, sessionHandlers } from '@/components/session/session-story-helpers'
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import { darkMode, german, mobile, withSidebarProvider } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { sessionEndpoint, signOutEndpoint } from '@edi-bridge/contracts'
 import { sandboxAdminSession, seedSession, showcaseViewerSession } from '@edi-bridge/mocks'
-import {
-  Sidebar,
-  SidebarFooter,
-  SidebarProvider,
-  SidebarTrigger,
-} from '@edi-bridge/ui/components/sidebar'
+import { Sidebar, SidebarFooter } from '@edi-bridge/ui/components/sidebar'
 
 import preview from '../../.storybook/preview'
 
-function inSidebar(
-  Story: () => ReactNode,
-  { parameters }: { parameters: { sidebarOpen?: boolean } },
-) {
+function inSidebarFooter(Story: () => ReactNode) {
   return (
-    <SidebarProvider defaultOpen={parameters.sidebarOpen ?? true}>
-      <Sidebar collapsible="icon" label="Main navigation">
-        <SidebarFooter className="mt-auto">
-          <Story />
-        </SidebarFooter>
-      </Sidebar>
-      <div className="p-4">
-        <SidebarTrigger label="Toggle sidebar" />
-      </div>
-    </SidebarProvider>
+    <Sidebar collapsible="icon" label="Main navigation">
+      <SidebarFooter className="mt-auto">
+        <Story />
+      </SidebarFooter>
+    </Sidebar>
   )
 }
 
@@ -47,7 +34,7 @@ const meta = preview.meta({
   title: 'Shell/AccountMenu',
   component: AccountMenu,
   parameters: { layout: 'fullscreen' },
-  decorators: [inSidebar],
+  decorators: [inSidebarFooter, withSidebarProvider],
 })
 
 export const Admin = meta.story({
