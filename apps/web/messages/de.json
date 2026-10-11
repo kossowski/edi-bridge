@@ -346,6 +346,7 @@
         "description": "Die Zustellung ist fehlgeschlagen. Retry wiederholt den Zustellschritt unverändert.",
         "button": "Retry",
         "pending": "Retry läuft",
+        "viewOnly": "Ein Admin kann den Zustellschritt per Retry wiederholen.",
         "failed": "Der Retry wurde nicht gestartet. Versuchen Sie es erneut."
       },
       "reprocess": {
@@ -355,6 +356,7 @@
         "used": "{option} (von diesem Run verwendet)",
         "button": "Reprocess",
         "pending": "Reprocess läuft",
+        "viewOnly": "Ein Admin kann diesen Run per Reprocess mit einer gewählten Mapping Version erneut verarbeiten.",
         "failed": "Der Reprocess wurde nicht gestartet. Versuchen Sie es erneut.",
         "versionsUnavailable": "Die Mapping Versions konnten nicht geladen werden."
       },
@@ -548,6 +550,7 @@
         }
       },
       "setIdentity": "GLN Ihres Unternehmens in den Einstellungen erfassen",
+      "identityViewOnly": "Ein Admin erfasst die GLN Ihres Unternehmens in den Einstellungen.",
       "productionLocked": {
         "identity": "Sie können auf Produktion umstellen, sobald die GLN Ihres Unternehmens erfasst ist.",
         "testInterchange": "Sie können auf Produktion umstellen, sobald das Test-Interchange gesendet ist.",
@@ -1004,7 +1007,8 @@
     },
     "empty": {
       "title": "Noch keine Mappings",
-      "description": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sobald es ein Mapping gibt, steht es hier."
+      "description": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sobald es ein Mapping gibt, steht es hier.",
+      "viewOnlyDescription": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sie erscheinen hier, sobald ein Admin eines anlegt."
     },
     "error": {
       "title": "Mappings nicht verfügbar",
@@ -1472,7 +1476,8 @@
     },
     "empty": {
       "title": "Noch keine Mapping Versions",
-      "description": "Der Draft dieses Mappings wurde nie veröffentlicht. Veröffentlichen Sie ihn im Canvas, um Version 1 zu erstellen, auf die Flows dann festgelegt werden können."
+      "description": "Der Draft dieses Mappings wurde nie veröffentlicht. Veröffentlichen Sie ihn im Canvas, um Version 1 zu erstellen, auf die Flows dann festgelegt werden können.",
+      "viewOnlyDescription": "Der Draft dieses Mappings wurde nie veröffentlicht. Version 1 erscheint hier, sobald ein Admin ihn veröffentlicht."
     },
     "error": {
       "title": "Mapping Versions nicht verfügbar",
@@ -2227,7 +2232,8 @@
       "open": "{name} öffnen",
       "empty": {
         "title": "Noch keine Workspaces",
-        "description": "Legen Sie den ersten Workspace an und laden Sie danach seine Benutzer ein."
+        "description": "Legen Sie den ersten Workspace an und laden Sie danach seine Benutzer ein.",
+        "viewOnlyDescription": "Workspaces erscheinen hier, sobald ein Operator einen anlegt."
       },
       "error": {
         "title": "Workspaces nicht verfügbar",

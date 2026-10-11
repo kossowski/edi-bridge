@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
-import { runRemedy } from '@/components/runs/run-remedy'
+import { type RunRemedy, runRemedy } from '@/components/runs/run-remedy'
 import { useCanChange } from '@/hooks/use-session'
 import { reprocessRun, retryRun } from '@/lib/api/client'
 import { interchangeKeys, mappingVersionsQuery, runKeys, runQuery } from '@/lib/api/queries'
@@ -149,6 +149,31 @@ function ReprocessAction({ run }: { run: RunDetail }) {
   )
 }
 
+const remedyActions = { retry: RetryAction, reprocess: ReprocessAction }
+
+type ActionRemedy = keyof typeof remedyActions
+
+function hasAction(remedy: RunRemedy): remedy is ActionRemedy {
+  return remedy in remedyActions
+}
+
+function RemedyAction({ remedy, run }: { remedy: ActionRemedy; run: RunDetail }) {
+  const Action = remedyActions[remedy]
+
+  return <Action run={run} />
+}
+
+function ViewOnlyRemedy({ remedy }: { remedy: ActionRemedy }) {
+  const t = useTranslations('RunDetail.remedy')
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-sm">{t(`${remedy}.description`)}</p>
+      <p className="text-muted-foreground text-sm">{t(`${remedy}.viewOnly`)}</p>
+    </div>
+  )
+}
+
 export function RunRemedyPanel({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail.remedy')
   const tRuns = useTranslations('Runs')
@@ -164,17 +189,11 @@ export function RunRemedyPanel({ run }: { run: RunDetail }) {
       <h2 id="run-remedy" className="font-semibold">
         {remedy === 'awaitingResend' ? t('awaitingResend.title') : t('title')}
       </h2>
-      {remedy === 'retry' &&
+      {hasAction(remedy) &&
         (canChange ? (
-          <RetryAction run={run} />
+          <RemedyAction remedy={remedy} run={run} />
         ) : (
-          <p className="text-sm">{t('retry.description')}</p>
-        ))}
-      {remedy === 'reprocess' &&
-        (canChange ? (
-          <ReprocessAction run={run} />
-        ) : (
-          <p className="text-sm">{t('reprocess.description')}</p>
+          <ViewOnlyRemedy remedy={remedy} />
         ))}
       {remedy === 'awaitingResend' && run.failureStage !== null && (
         <p className="flex items-start gap-2 text-sm">

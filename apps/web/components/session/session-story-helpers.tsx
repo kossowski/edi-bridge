@@ -1,25 +1,46 @@
 import { expect } from 'storybook/test'
 
+import type { RequestHandler } from 'msw'
 import type { ReactNode } from 'react'
+import type { StoryContext } from 'storybook/internal/csf'
 
 import { ViewOnlyBadge } from '@/components/session/view-only-badge'
 import { apiUrl } from '@/lib/api/config'
-import { createSessionStore, sessionHandlers, showcaseViewerSession } from '@edi-bridge/mocks'
+import {
+  sessionHandlers as mockSessionHandlers,
+  type SessionStore,
+  showcaseViewerSession,
+} from '@edi-bridge/mocks'
 
-export function viewerSessionHandlers() {
-  return sessionHandlers(apiUrl, createSessionStore(showcaseViewerSession))
+import type { Session } from '@edi-bridge/contracts'
+
+export function sessionHandlers(session: Session | SessionStore) {
+  return mockSessionHandlers(apiUrl, session)
 }
 
-// The badge only shows once the Viewer session has loaded, so absent actions are not just pending.
-export const withViewOnlyBadge = (Story: () => ReactNode) => (
+const withViewOnlyBadge = (Story: () => ReactNode) => (
   <>
     <ViewOnlyBadge />
     <Story />
   </>
 )
 
-export async function expectSignedInAsViewer(canvas: {
-  findByText: (text: string) => Promise<HTMLElement>
+// Waiting for the badge proves the Viewer session has loaded, so absent actions are not just pending.
+export function viewerStory({
+  handlers = [],
+  play,
+}: {
+  handlers?: RequestHandler[]
+  play: (context: StoryContext) => Promise<void>
 }) {
-  await expect(await canvas.findByText('View only')).toBeVisible()
+  return {
+    beforeEach({ msw }: StoryContext) {
+      msw.use(...sessionHandlers(showcaseViewerSession), ...handlers)
+    },
+    decorators: [withViewOnlyBadge],
+    async play(context: StoryContext) {
+      await expect(await context.canvas.findByText('View only')).toBeVisible()
+      await play(context)
+    },
+  }
 }

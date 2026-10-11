@@ -3,11 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, within } from 'storybook/test'
 
 import { FlowsScreen } from '@/components/flows/flows-screen'
-import {
-  expectSignedInAsViewer,
-  viewerSessionHandlers,
-  withViewOnlyBadge,
-} from '@/components/session/session-story-helpers'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { flowsEndpoint } from '@edi-bridge/contracts'
@@ -113,29 +109,24 @@ export const Dark = meta.story({
 })
 
 export const Viewer = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...viewerSessionHandlers())
-  },
-  decorators: [withViewOnlyBadge],
-  async play({ canvas }) {
-    await expectSignedInAsViewer(canvas)
-    await expect(
-      await canvas.findByRole('link', { name: 'Hansemarkt DESADV outbound' }),
-    ).toBeVisible()
-    await expect(canvas.queryByRole('link', { name: 'New Flow' })).toBeNull()
-  },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByRole('link', { name: 'Hansemarkt DESADV outbound' }),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('link', { name: 'New Flow' })).toBeNull()
+    },
+  }),
 })
 
 export const ViewerEmpty = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...viewerSessionHandlers(), ...flowHandlers(apiUrl, { flows: [] }))
-  },
-  decorators: [withViewOnlyBadge],
-  async play({ canvas }) {
-    await expectSignedInAsViewer(canvas)
-    await expect(
-      await canvas.findByText('Flows appear here once an Admin creates one.'),
-    ).toBeVisible()
-    await expect(canvas.queryByRole('link', { name: 'New Flow' })).toBeNull()
-  },
+  ...viewerStory({
+    handlers: [...flowHandlers(apiUrl, { flows: [] })],
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByText('Flows appear here once an Admin creates one.'),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('link', { name: 'New Flow' })).toBeNull()
+    },
+  }),
 })

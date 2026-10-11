@@ -3,11 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect } from 'storybook/test'
 
 import { LookupTablesScreen } from '@/components/lookup-tables/lookup-tables-screen'
-import {
-  expectSignedInAsViewer,
-  viewerSessionHandlers,
-  withViewOnlyBadge,
-} from '@/components/session/session-story-helpers'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { lookupTablesEndpoint } from '@edi-bridge/contracts'
@@ -107,29 +103,24 @@ export const Dark = meta.story({
 })
 
 export const Viewer = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...viewerSessionHandlers())
-  },
-  decorators: [withViewOnlyBadge],
-  async play({ canvas }) {
-    await expectSignedInAsViewer(canvas)
-    await expect(await canvas.findByRole('cell', { name: 'Units of measure' })).toBeVisible()
-    await expect(canvas.queryByRole('button', { name: 'New Lookup Table' })).toBeNull()
-    await expect(canvas.queryByRole('button', { name: 'Actions for Country codes' })).toBeNull()
-    await expect(canvas.queryByRole('columnheader', { name: 'Actions' })).toBeNull()
-  },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByRole('cell', { name: 'Units of measure' })).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'New Lookup Table' })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: 'Actions for Country codes' })).toBeNull()
+      await expect(canvas.queryByRole('columnheader', { name: 'Actions' })).toBeNull()
+    },
+  }),
 })
 
 export const ViewerEmpty = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...viewerSessionHandlers(), ...lookupTableHandlers(apiUrl, { lookupTables: [] }))
-  },
-  decorators: [withViewOnlyBadge],
-  async play({ canvas }) {
-    await expectSignedInAsViewer(canvas)
-    await expect(
-      await canvas.findByText(/They appear here once an Admin creates one\./),
-    ).toBeVisible()
-    await expect(canvas.queryByRole('button', { name: 'New Lookup Table' })).toBeNull()
-  },
+  ...viewerStory({
+    handlers: [...lookupTableHandlers(apiUrl, { lookupTables: [] })],
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByText(/They appear here once an Admin creates one\./),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'New Lookup Table' })).toBeNull()
+    },
+  }),
 })

@@ -3,11 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
 import { FlowDetailScreen } from '@/components/flows/flow-detail-screen'
-import {
-  expectSignedInAsViewer,
-  viewerSessionHandlers,
-  withViewOnlyBadge,
-} from '@/components/session/session-story-helpers'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { flowEndpoint, moveFlowMappingVersionEndpoint } from '@edi-bridge/contracts'
@@ -169,14 +165,11 @@ export const Dark = meta.story({
 
 export const ViewerNewerVersionAvailable = meta.story({
   args: { id: oneBehind.id },
-  beforeEach({ msw }) {
-    msw.use(...viewerSessionHandlers())
-  },
-  decorators: [withViewOnlyBadge],
-  async play({ canvas }) {
-    await expectSignedInAsViewer(canvas)
-    await expect(await canvas.findByText(/^A newer version is available/)).toBeVisible()
-    await expect(canvas.queryByRole('button', { name: 'Move to a newer version' })).toBeNull()
-    await expect(canvas.queryByRole('link', { name: 'Edit' })).toBeNull()
-  },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByText(/^A newer version is available/)).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Move to a newer version' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'Edit' })).toBeNull()
+    },
+  }),
 })

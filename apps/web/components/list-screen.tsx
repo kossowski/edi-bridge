@@ -43,6 +43,7 @@ type ListMessageKey =
   | 'error.retry'
   | 'empty.title'
   | 'empty.description'
+  | 'empty.viewOnlyDescription'
 
 type ListTranslator = (key: ListMessageKey, values?: { count: number; total?: number }) => string
 
@@ -107,7 +108,6 @@ export function ListTable<Item>({
   emptyIcon,
   newLink,
   emptyAction,
-  viewOnlyEmptyDescription,
   toolbar,
   filter,
   columns,
@@ -125,7 +125,6 @@ export function ListTable<Item>({
   emptyIcon: IconSvgElement
   newLink?: { href: string; label: string }
   emptyAction?: ReactNode
-  viewOnlyEmptyDescription?: string
   toolbar?: ReactNode
   filter?: ((item: Item) => boolean) | undefined
   columns: ReadonlyArray<{ key: string; label: string; hidden?: boolean }>
@@ -156,7 +155,7 @@ export function ListTable<Item>({
           </EmptyMedia>
           <EmptyTitle>{t('empty.title')}</EmptyTitle>
           <EmptyDescription>
-            {(!canChange && viewOnlyEmptyDescription) || t('empty.description')}
+            {canChange ? t('empty.description') : t('empty.viewOnlyDescription')}
           </EmptyDescription>
         </EmptyHeader>
         {canChange && (newLink || emptyAction) && (

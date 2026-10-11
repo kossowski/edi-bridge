@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor } from 'storybook/test'
 
 import type { ReactNode } from 'react'
 
+import { sessionHandlers } from '@/components/session/session-story-helpers'
 import { SettingsScreen } from '@/components/settings/settings-screen'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
@@ -22,7 +23,6 @@ import {
   sandboxAdminSession,
   seedSession,
   seedWorkspace,
-  sessionHandlers,
   showcaseViewerSession,
   workspaceHandlers,
   workspaceSettingsHandlers,
@@ -34,7 +34,7 @@ function signedInAs(session: Session, settings?: WorkspaceSettings) {
   const store = createSessionStore(session)
 
   return [
-    ...sessionHandlers(apiUrl, store),
+    ...sessionHandlers(store),
     ...workspaceHandlers(apiUrl, seedWorkspace, store),
     ...workspaceSettingsHandlers(apiUrl, { session: store, ...(settings && { settings }) }),
   ]

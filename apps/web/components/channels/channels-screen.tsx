@@ -71,7 +71,6 @@ function ChannelsTable() {
         />
       )}
       t={t}
-      viewOnlyEmptyDescription={t('empty.viewOnlyDescription')}
     />
   )
 }

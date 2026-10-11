@@ -267,7 +267,6 @@ export function LookupTablesScreen() {
         )}
         t={t}
         toolbar={scopeFilter.element}
-        viewOnlyEmptyDescription={t('empty.viewOnlyDescription')}
       />
       <LookupTableFormDialog
         finalFocus={dialogs.returnFocus}

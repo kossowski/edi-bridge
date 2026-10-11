@@ -111,26 +111,31 @@ function StepDetail({
   item,
   blockedBy,
   tradingPartner,
+  canChange,
   onSwitched,
 }: {
   item: OnboardingChecklistItem
   blockedBy: OnboardingStep | undefined
   tradingPartner: TradingPartner
+  canChange: boolean
   onSwitched: () => void
 }) {
   const t = useTranslations('TradingPartner.onboarding')
-  const canChange = useCanChange()
 
-  if (item.step === 'identity' && item.state === 'current' && canChange) {
-    return (
+  if (item.step === 'identity' && item.state === 'current') {
+    return canChange ? (
       <Link href="/settings" className={cn(linkClass, 'w-fit text-sm')}>
         {t('setIdentity')}
       </Link>
+    ) : (
+      <p className="text-muted-foreground text-sm">{t('identityViewOnly')}</p>
     )
   }
 
-  if (item.step === 'production' && item.state === 'current' && canChange) {
-    return <ProductionSwitch tradingPartner={tradingPartner} onSwitched={onSwitched} />
+  if (item.step === 'production' && item.state === 'current') {
+    return canChange ? (
+      <ProductionSwitch tradingPartner={tradingPartner} onSwitched={onSwitched} />
+    ) : null
   }
 
   if (
@@ -158,6 +163,7 @@ export function OnboardingChecklist({
   const blockedBy = checklist.find(({ state }) => state === 'current')?.step
   const [switched, setSwitched] = useState(false)
   const productionTitle = useRef<HTMLParagraphElement>(null)
+  const canChange = useCanChange()
 
   useEffect(() => {
     if (switched && !tradingPartner.testMode) {
@@ -199,6 +205,7 @@ export function OnboardingChecklist({
             )}
             <StepDetail
               blockedBy={blockedBy}
+              canChange={canChange}
               item={item}
               tradingPartner={tradingPartner}
               onSwitched={() => setSwitched(true)}

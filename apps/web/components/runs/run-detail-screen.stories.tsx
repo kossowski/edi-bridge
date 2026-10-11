@@ -3,11 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { expect } from 'storybook/test'
 
 import { RunDetailScreen } from '@/components/runs/run-detail-screen'
-import {
-  expectSignedInAsViewer,
-  viewerSessionHandlers,
-  withViewOnlyBadge,
-} from '@/components/session/session-story-helpers'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { type FailureStage, type MessageType, runEndpoint } from '@edi-bridge/contracts'
@@ -270,29 +266,27 @@ export const Dark = meta.story({
 
 export const ViewerDeliveryFailure = meta.story({
   args: { id: deliveryFailure.id },
-  beforeEach({ msw }) {
-    msw.use(...viewerSessionHandlers())
-  },
-  decorators: [withViewOnlyBadge],
-  async play({ canvas }) {
-    await expectSignedInAsViewer(canvas)
-    await expect(
-      await canvas.findByText('The delivery failed. Retry repeats the delivery step unchanged.'),
-    ).toBeVisible()
-    await expect(canvas.queryByRole('button', { name: 'Retry' })).toBeNull()
-  },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByText('The delivery failed. Retry repeats the delivery step unchanged.'),
+      ).toBeVisible()
+      await expect(canvas.getByText('An Admin can retry the delivery step.')).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Retry' })).toBeNull()
+    },
+  }),
 })
 
 export const ViewerMappingFailure = meta.story({
   args: { id: mappingFailure.id },
-  beforeEach({ msw }) {
-    msw.use(...viewerSessionHandlers())
-  },
-  decorators: [withViewOnlyBadge],
-  async play({ canvas }) {
-    await expectSignedInAsViewer(canvas)
-    await expect(await canvas.findByText(/^The mapping failed\./)).toBeVisible()
-    await expect(canvas.queryByRole('button', { name: 'Reprocess' })).toBeNull()
-    await expect(canvas.queryByRole('combobox', { name: 'Mapping Version' })).toBeNull()
-  },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByText(/^The mapping failed\./)).toBeVisible()
+      await expect(
+        canvas.getByText('An Admin can reprocess this Run with a chosen Mapping Version.'),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Reprocess' })).toBeNull()
+      await expect(canvas.queryByRole('combobox', { name: 'Mapping Version' })).toBeNull()
+    },
+  }),
 })
