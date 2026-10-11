@@ -4,11 +4,15 @@
 
 **Blocked by:** 06 (Mock stack tracer)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Search by Business Reference with no-result and partial-lifecycle states
-- [ ] Timeline across Message Types with Acknowledgement state per Interchange (pending, accepted, rejected, overdue)
-- [ ] Each entry links to its Run detail
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Search by Business Reference with no-result and partial-lifecycle states
+- [x] Timeline across Message Types with Acknowledgement state per Interchange (pending, accepted, rejected, overdue)
+- [x] Each entry links to its Run detail
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #50, #52, #54.

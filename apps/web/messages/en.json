@@ -411,7 +411,21 @@
       "description": "No {messageType} found."
     },
     "failureStage": "Failure Stage",
-    "noInterchange": "No Interchange"
+    "noInterchange": "No Interchange",
+    "acknowledgement": {
+      "label": "Acknowledgement",
+      "summary": "Acknowledgements",
+      "summaryLabel": "Acknowledgements of the {messageType} Messages",
+      "state": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "overdue": "Overdue"
+      }
+    },
+    "showAll": "Show all {count, number} {messageType} Messages",
+    "showLatest": "Show the latest {count, number}",
+    "latestShown": "Latest {shown, number} of {count, number}"
   },
   "TradingPartners": {
     "new": "New Trading Partner",

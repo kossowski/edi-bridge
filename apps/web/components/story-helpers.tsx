@@ -1,14 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { type ReactNode } from 'react'
 
-import { decodeBase64 } from '@/components/document-structures/document-file'
 import messagesDe from '@/messages/de.json'
-
-import type { EncodedFile } from '@edi-bridge/contracts'
-
-export function toFile({ fileName, content }: EncodedFile) {
-  return new File([decodeBase64(content)], fileName)
-}
 
 export function darkMode() {
   document.documentElement.classList.add('dark')
