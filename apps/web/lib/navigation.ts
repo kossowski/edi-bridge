@@ -1,12 +1,14 @@
 import {
   ArrowDataTransferHorizontalIcon,
   DashboardSquare01Icon,
+  File02Icon,
   FlowConnectionIcon,
   HierarchySquare02Icon,
   PlayListIcon,
   PlugSocketIcon,
   Route01Icon,
   Settings02Icon,
+  ShoppingBasket01Icon,
   Table01Icon,
   UserMultiple02Icon,
   UserShield01Icon,
@@ -39,29 +41,58 @@ export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = 
   operator: { href: '/operator', icon: UserShield01Icon },
 }
 
-export const navigationGroups = [
+export type SidebarItemKey = keyof Messages['Sidebar']['items']
+
+type SidebarItem = NavigationItem & { key: SidebarItemKey }
+
+type SidebarGroup = {
+  key: keyof Messages['Sidebar']['groups']
+  collapsible: boolean
+  items: ReadonlyArray<SidebarItem>
+}
+
+export const sidebarGroups: ReadonlyArray<SidebarGroup> = [
   {
-    label: 'workspaceGroup',
+    key: 'dailyWork',
+    collapsible: false,
     items: [
-      'overview',
-      'runs',
-      'orderLifecycle',
-      'tradingPartners',
-      'channels',
-      'flows',
-      'mappings',
-      'documentStructures',
-      'lookupTables',
-      'settings',
+      { key: 'home', href: '/', icon: DashboardSquare01Icon },
+      { key: 'documents', href: '/runs', icon: File02Icon },
+      { key: 'orders', href: '/order-lifecycle', icon: ShoppingBasket01Icon },
     ],
-    operatorOnly: false,
   },
-  { label: 'platformGroup', items: ['operator'], operatorOnly: true },
-] as const satisfies ReadonlyArray<{
-  label: 'workspaceGroup' | 'platformGroup'
-  items: ReadonlyArray<NavigationKey>
-  operatorOnly: boolean
-}>
+  {
+    key: 'setup',
+    collapsible: false,
+    items: [
+      { key: 'tradingPartners', href: '/trading-partners', icon: UserMultiple02Icon },
+      { key: 'mappings', href: '/mappings', icon: FlowConnectionIcon },
+      { key: 'codeTranslations', href: '/lookup-tables', icon: Table01Icon },
+      { key: 'dataFormats', href: '/document-structures', icon: HierarchySquare02Icon },
+    ],
+  },
+  {
+    key: 'advanced',
+    collapsible: true,
+    items: [
+      { key: 'allConnections', href: '/channels', icon: PlugSocketIcon },
+      { key: 'allDocumentRoutes', href: '/flows', icon: WorkflowSquare03Icon },
+      { key: 'transmissions', href: '/runs', icon: Route01Icon },
+    ],
+  },
+]
+
+export function activeSidebarItem(pathname: string) {
+  let active: SidebarItem | undefined
+
+  for (const item of sidebarGroups.flatMap((group) => group.items)) {
+    if (isActivePath(pathname, item.href) && (!active || item.href.length > active.href.length)) {
+      active = item
+    }
+  }
+
+  return active?.key
+}
 
 export function isActivePath(pathname: string, href: string) {
   if (href === '/') {
