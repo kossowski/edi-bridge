@@ -1051,6 +1051,97 @@
         "failed": "The Draft could not be published. Try again."
       }
     },
+    "aiDraft": {
+      "button": "Draft with AI",
+      "reviewOpen": "The AI review of this Draft is still open.",
+      "title": "Draft with AI",
+      "description": "The AI drafts links from a Sample Document and checks them against it, which takes a few minutes. The links reach the canvas only once they pass the check.",
+      "samples": {
+        "label": "Sample Document",
+        "loading": "Loading the Sample Documents",
+        "error": "The Sample Documents could not be loaded.",
+        "retry": "Try again",
+        "empty": "This Mapping has no Sample Documents yet. The AI needs one to draft the links from and to check them against."
+      },
+      "source": "Source",
+      "target": "Target",
+      "budget": {
+        "label": "AI token budget",
+        "loading": "Loading the AI token budget",
+        "error": "The AI token budget could not be loaded.",
+        "retry": "Try again",
+        "remaining": "{remaining} of {limit} tokens left today.",
+        "exhausted": "Today's AI token budget is used up. AI drafts are available again tomorrow.",
+        "turnedOff": "AI is turned off for this Workspace. The Operator sets the AI token budget."
+      },
+      "start": "Start the AI draft",
+      "cancel": "Cancel",
+      "stop": "Stop",
+      "close": "Close",
+      "closeDialog": "Close dialog",
+      "retry": "Try again",
+      "progress": "Progress",
+      "starting": "Starting the AI draft…",
+      "round": "Round {round}",
+      "state": {
+        "done": "Done",
+        "current": "In progress",
+        "stopped": "Stopped"
+      },
+      "step": {
+        "readingSample": "Reading the Sample Document",
+        "lookingUpSegments": "Looking up segments: {tags}",
+        "lookingUpManySegments": "Looking up segments: {tags} and {count} more",
+        "linksDrafted": "{count, plural, =0 {No links drafted} one {# link drafted} other {# links drafted}}",
+        "checkingAgainstSample": "Checking against the Sample Document",
+        "fixingErrors": "Fixing {count, plural, one {# error} other {# errors}}"
+      },
+      "outcome": {
+        "drafted": {
+          "title": "Links added to the canvas",
+          "description": "The AI-proposed links passed the check against the Sample Document: {links, plural, one {# link} other {# links}} and {transforms, plural, one {# Transform} other {# Transforms}} are on the canvas now."
+        },
+        "empty": {
+          "title": "The AI found no links",
+          "description": "The AI found nothing in the Sample Document to link to a free target, so the Draft is unchanged. Try again with another Sample Document."
+        },
+        "checkFailed": {
+          "title": "The links did not pass the check",
+          "description": "The AI could not fix every error the check against the Sample Document found within {rounds, plural, one {# round} other {# rounds}}, so no links were added. Try again or pick another Sample Document."
+        },
+        "budgetExhausted": {
+          "title": "AI token budget used up",
+          "description": "Today's AI token budget is used up, so no links were added. AI drafts are available again tomorrow."
+        },
+        "unavailable": {
+          "title": "The AI is unavailable",
+          "description": "The AI cannot be reached right now, so no links were added. Try again in a few minutes."
+        },
+        "reviewOpen": {
+          "title": "AI review still open",
+          "description": "This Draft already has AI-proposed links to review. Finish that review before you ask for another AI draft."
+        },
+        "interrupted": {
+          "title": "AI draft interrupted",
+          "description": "The connection to the AI draft broke off, so no links were added. Try again."
+        },
+        "stopped": {
+          "title": "AI draft stopped",
+          "description": "You stopped the AI draft, so no links were added. Try again."
+        }
+      },
+      "closeKeepsRunning": "The AI draft keeps going when you close this dialog. Stop ends it.",
+      "running": "AI drafting: {step}",
+      "ended": "AI draft ended",
+      "stepShort": {
+        "starting": "Starting",
+        "readingSample": "Reading",
+        "lookingUpSegments": "Looking up segments",
+        "linksDrafted": "Links drafted",
+        "checkingAgainstSample": "Checking",
+        "fixingErrors": "Fixing errors"
+      }
+    },
     "facts": {
       "label": "Mapping details",
       "direction": "Direction",

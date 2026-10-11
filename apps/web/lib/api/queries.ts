@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query'
 
 import type {
+  AiBudget,
   Channel,
   DocumentStructure,
   DocumentStructureOrigin,
@@ -27,6 +28,7 @@ import type {
 import { compareWorkspaceNames } from '../forms/operator'
 import {
   compareMappingVersions,
+  getAiBudget,
   getChannel,
   getCurrentWorkspace,
   getDocumentStructure,
@@ -323,6 +325,28 @@ export function mappingComparisonQuery(mappingId: string, query: MappingComparis
     queryFn: () => compareMappingVersions(mappingId, query),
     staleTime: Infinity,
   })
+}
+
+export const aiKeys = {
+  all: () => ['ai'] as const,
+  budget: () => [...aiKeys.all(), 'budget'] as const,
+}
+
+export const aiBudgetQuery = queryOptions({
+  queryKey: aiKeys.budget(),
+  queryFn: getAiBudget,
+})
+
+export function storeAiBudget(queryClient: QueryClient, budget: AiBudget) {
+  queryClient.setQueryData(aiBudgetQuery.queryKey, budget)
+}
+
+export function storeAiDraftedDraft(queryClient: QueryClient, draft: MappingDraft) {
+  const { queryKey } = mappingDraftQuery(draft.mappingId)
+
+  void queryClient.cancelQueries({ queryKey })
+  queryClient.setQueryData(queryKey, draft)
+  void queryClient.invalidateQueries({ queryKey: mappingKeys.list() })
 }
 
 export function storePublishedMappingVersion(
