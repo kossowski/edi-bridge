@@ -81,6 +81,9 @@ import {
   updateFlowEndpoint,
   updateLookupTableEndpoint,
   updateTradingPartnerEndpoint,
+  updateWorkspaceSettingsEndpoint,
+  workspaceSettingsEndpoint,
+  type WorkspaceSettingsInput,
 } from '@edi-bridge/contracts'
 
 import { apiUrl, isMockingEnabled } from './config'
@@ -178,6 +181,14 @@ export function getCurrentWorkspace() {
 
 export function updateCompanyIdentity(body: CompanyIdentityInput) {
   return request(updateCompanyIdentityEndpoint, { body })
+}
+
+export function getWorkspaceSettings() {
+  return request(workspaceSettingsEndpoint)
+}
+
+export function updateWorkspaceSettings(body: WorkspaceSettingsInput) {
+  return request(updateWorkspaceSettingsEndpoint, { body })
 }
 
 export function getOverview(query: OverviewQuery) {

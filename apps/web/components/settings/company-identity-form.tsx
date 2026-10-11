@@ -4,15 +4,45 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { type FormEvent, useId, useState } from 'react'
 
-import { LoadFailure } from '@/components/detail-parts'
 import { GlnField, useGlnErrorMessage } from '@/components/form-field'
+import { SettingsSection } from '@/components/settings/settings-section'
+import { useSession } from '@/hooks/use-session'
 import { updateCompanyIdentity } from '@/lib/api/client'
 import { currentWorkspaceQuery } from '@/lib/api/queries'
 import { glnError, normalizeGln } from '@/lib/forms/gln'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { Workspace } from '@edi-bridge/contracts'
+
+function MissingGln() {
+  const t = useTranslations('Settings.companyIdentity')
+
+  return (
+    <p className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm">
+      {t('missing')}
+    </p>
+  )
+}
+
+function IdentityView({ workspace }: { workspace: Workspace }) {
+  const t = useTranslations('Settings.companyIdentity')
+
+  return (
+    <div className="flex max-w-xl flex-col gap-6">
+      {workspace.gln === null && <MissingGln />}
+      <dl className="flex flex-col gap-4">
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-muted-foreground text-xs">{t('companyName')}</dt>
+          <dd className="text-sm">{workspace.name}</dd>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-muted-foreground text-xs">{t('gln.label')}</dt>
+          <dd className="font-mono text-sm">{workspace.gln ?? t('notSet')}</dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
 
 function IdentityForm({ workspace }: { workspace: Workspace }) {
   const t = useTranslations('Settings.companyIdentity')
@@ -34,6 +64,11 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    if (save.isPending) {
+      return
+    }
+
     setSubmitted(true)
     save.reset()
 
@@ -44,11 +79,7 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
 
   return (
     <form noValidate className="flex max-w-xl flex-col gap-6" onSubmit={submit}>
-      {workspace.gln === null && (
-        <p className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm">
-          {t('missing')}
-        </p>
-      )}
+      {workspace.gln === null && <MissingGln />}
       <dl className="flex flex-col gap-0.5">
         <dt className="text-muted-foreground text-xs">{t('companyName')}</dt>
         <dd className="text-sm">{workspace.name}</dd>
@@ -65,7 +96,10 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
         }}
       />
       <div className="flex flex-wrap items-center gap-3">
-        <Button disabled={save.isPending} type="submit">
+        <Button
+          type="submit"
+          aria-disabled={save.isPending || undefined}
+          className="aria-disabled:cursor-progress aria-disabled:opacity-50">
           {save.isPending ? t('saving') : t('save')}
         </Button>
         <p role="status" className="text-sm">
@@ -82,30 +116,18 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
 }
 
 export function CompanyIdentitySection() {
-  const t = useTranslations('Settings')
-  const { data, isPending, refetch } = useQuery(currentWorkspaceQuery)
+  const t = useTranslations('Settings.companyIdentity')
+  const session = useSession()
+  const { data, status, refetch } = useQuery(currentWorkspaceQuery)
 
   return (
-    <section aria-labelledby="company-identity" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id="company-identity" className="text-lg font-semibold">
-          {t('companyIdentity.title')}
-        </h2>
-        <p className="text-muted-foreground text-sm">{t('companyIdentity.description')}</p>
-      </div>
-      {isPending ? (
-        <div aria-busy className="flex max-w-xl flex-col gap-4">
-          <p role="status" className="sr-only">
-            {t('loading')}
-          </p>
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-16 w-full" />
-        </div>
-      ) : data ? (
-        <IdentityForm workspace={data} />
-      ) : (
-        <LoadFailure namespace="Settings" notFound={false} onRetry={() => void refetch()} />
-      )}
-    </section>
+    <SettingsSection
+      description={t('description')}
+      status={session.isPending ? 'pending' : status}
+      title={t('title')}
+      onRetry={() => void refetch()}>
+      {data &&
+        (session.canChange ? <IdentityForm workspace={data} /> : <IdentityView workspace={data} />)}
+    </SettingsSection>
   )
 }
