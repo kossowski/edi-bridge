@@ -170,9 +170,10 @@ export const NothingToPublish = meta.story({
   },
   async play({ canvasElement }) {
     await confirmPublish(canvasElement)
-    await expect(
-      await dialog(canvasElement).findByText(/there is nothing to publish/),
-    ).toBeVisible()
+
+    const alert = await dialog(canvasElement).findByText(/there is nothing to publish/)
+
+    await waitFor(() => expect(alert).toBeVisible())
   },
 })
 

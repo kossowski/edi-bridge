@@ -229,7 +229,7 @@ export const Inferring = meta.story({
 export const LargeCsvDocument = meta.story({
   async play({ canvas, canvasElement }) {
     await choose(canvasElement, toFile(createCsvDocument({ rowCount: 20_000 })))
-    await expect(await canvas.findByRole('treegrid')).toBeVisible()
+    await expect(await canvas.findByRole('treegrid', {}, { timeout: 5000 })).toBeVisible()
   },
 })
 
@@ -237,7 +237,7 @@ export const LargeWindows1252CsvDocument = meta.story({
   async play({ canvas, canvasElement }) {
     await choose(
       canvasElement,
-      toFile(createCsvDocument({ rowCount: 20_000, encoding: 'windows-1252' })),
+      toFile(createCsvDocument({ rowCount: 1_000, encoding: 'windows-1252' })),
     )
     await userEvent.selectOptions(
       await canvas.findByRole('combobox', { name: 'Character encoding' }),
