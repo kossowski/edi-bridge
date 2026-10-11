@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { type ReactNode, useMemo } from 'react'
 
+import { Fact } from '@/components/detail-parts'
 import {
   csvColumnNames,
   decodeFirstBytes,
@@ -140,6 +141,28 @@ export function CsvSettingsFields({
       </div>
       {children}
     </fieldset>
+  )
+}
+
+export function CsvSettingsFacts({ id, csv }: { id: string; csv: CsvSettings }) {
+  const t = useTranslations('CsvSettings')
+
+  return (
+    <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3 rounded-lg border p-4">
+      <div className="flex flex-col gap-1">
+        <h2 id={id} className="font-semibold">
+          {t('title')}
+        </h2>
+        <p className="text-muted-foreground max-w-prose text-sm">{t('readDescription')}</p>
+      </div>
+      <dl className="grid gap-4 sm:grid-cols-3">
+        <Fact label={t('delimiter')}>{t(`delimiters.${delimiterKeys[csv.delimiter]}`)}</Fact>
+        <Fact label={t('encoding')}>{encodingLabels[csv.encoding]}</Fact>
+        <Fact label={t('headerRowFact')}>
+          {csv.headerRow ? t('headerRowPresent') : t('headerRowAbsent')}
+        </Fact>
+      </dl>
+    </section>
   )
 }
 
