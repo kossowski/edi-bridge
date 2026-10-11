@@ -1,0 +1,364 @@
+import { setupServer } from 'msw/node'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+
+import {
+  createInviteEndpoint,
+  createWorkspaceEndpoint,
+  type InviteInput,
+  inviteSchema,
+  resetSandboxWorkspaceEndpoint,
+  toPath,
+  workspaceInvitesEndpoint,
+  glnIssue,
+  type WorkspaceInput,
+  operatorWorkspacesEndpoint,
+  workspaceSummarySchema,
+} from '@edi-bridge/contracts'
+
+import {
+  createInvites,
+  createWorkspaceSummaries,
+  operatorHandlers,
+  seedInvites,
+  seedWorkspaceSummaries,
+} from './operator'
+import { showcaseAdminSession } from './session'
+import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
+
+const apiUrl = 'http://api.test'
+
+const server = setupServer()
+
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+afterEach(() => server.resetHandlers())
+
+afterAll(() => server.close())
+
+async function post(path: string, body?: Partial<WorkspaceInput> | Partial<InviteInput>) {
+  return fetch(`${apiUrl}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: body === undefined ? null : JSON.stringify(body),
+  })
+}
+
+async function listWorkspaces() {
+  const response = await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)
+
+  return operatorWorkspacesEndpoint.response.parse(await response.json())
+}
+
+describe('seedWorkspaceSummaries', () => {
+  it('holds the seed Workspace, a Showcase and a Sandbox Workspace', () => {
+    expect(seedWorkspaceSummaries.map(({ kind }) => kind).sort()).toEqual([
+      'sandbox',
+      'showcase',
+      'standard',
+    ])
+
+    expect(seedWorkspaceSummaries.find(({ kind }) => kind === 'standard')).toMatchObject(
+      seedWorkspace,
+    )
+  })
+
+  it('uses valid GLNs from the restricted-circulation prefixes 020–029', () => {
+    for (const { gln } of seedWorkspaceSummaries) {
+      expect(gln).toMatch(/^02\d{11}$/)
+      expect(glnIssue(gln!)).toBeNull()
+    }
+  })
+})
+
+describe('createWorkspaceSummaries', () => {
+  it('generates hundreds of valid Workspaces with unique names', () => {
+    const workspaces = createWorkspaceSummaries({ count: 300 })
+
+    expect(workspaces).toHaveLength(300)
+    expect(new Set(workspaces.map(({ id }) => id)).size).toBe(300)
+    expect(new Set(workspaces.map(({ name }) => name)).size).toBe(300)
+
+    for (const workspace of workspaces) {
+      expect(workspaceSummarySchema.parse(workspace)).toEqual(workspace)
+      expect(workspace.gln === null || /^02\d{11}$/.test(workspace.gln)).toBe(true)
+    }
+  })
+
+  it('generates the same Workspaces for the same seed and date', () => {
+    const now = new Date('2026-10-11T08:00:00.000Z')
+
+    expect(createWorkspaceSummaries({ count: 5, seed: 3, now })).toEqual(
+      createWorkspaceSummaries({ count: 5, seed: 3, now }),
+    )
+  })
+})
+
+describe('GET /operator/workspaces', () => {
+  it('lists the seeded Workspaces sorted by name', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const workspaces = await listWorkspaces()
+
+    expect(workspaces.map(({ id }) => id).sort()).toEqual(
+      seedWorkspaceSummaries.map(({ id }) => id).sort(),
+    )
+    expect(workspaces.map(({ name }) => name)).toEqual(
+      workspaces.map(({ name }) => name).sort((a, b) => a.localeCompare(b, 'de')),
+    )
+  })
+
+  it('lists no Workspaces for the empty state', async () => {
+    server.use(...operatorHandlers(apiUrl, { workspaces: [] }))
+
+    expect(await listWorkspaces()).toEqual([])
+  })
+
+  it('answers 401 when signed out', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: null }))
+
+    const response = await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)
+
+    expect(response.status).toBe(401)
+  })
+
+  it('answers 403 for an Admin who is not the Operator', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: showcaseAdminSession }))
+
+    const response = await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)
+
+    expect(response.status).toBe(403)
+  })
+})
+
+describe('POST /operator/workspaces', () => {
+  it('creates an empty standard Workspace and lists it', async () => {
+    server.use(...operatorHandlers(apiUrl, { workspaces: [] }))
+
+    const response = await post(createWorkspaceEndpoint.path, {
+      name: '  Havelland Feinkost GmbH ',
+      seed: false,
+    })
+
+    const created = createWorkspaceEndpoint.response.parse(await response.json())
+
+    expect(response.status).toBe(201)
+    expect(created).toMatchObject({
+      name: 'Havelland Feinkost GmbH',
+      gln: null,
+      kind: 'standard',
+      memberCount: 0,
+      lastResetAt: null,
+    })
+    expect(await listWorkspaces()).toEqual([created])
+  })
+
+  it('creates a seeded Workspace that starts with the seed company identity', async () => {
+    server.use(...operatorHandlers(apiUrl, { workspaces: [] }))
+
+    const response = await post(createWorkspaceEndpoint.path, {
+      name: 'Havelland Feinkost GmbH',
+      seed: true,
+    })
+
+    const { gln } = createWorkspaceEndpoint.response.parse(await response.json())
+
+    expect(gln).toMatch(/^02\d{11}$/)
+    expect(glnIssue(gln!)).toBeNull()
+  })
+
+  it('answers 409 for a name another Workspace already uses', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const response = await post(createWorkspaceEndpoint.path, {
+      name: seedWorkspace.name,
+      seed: false,
+    })
+
+    expect(response.status).toBe(409)
+  })
+
+  it.each([
+    ['an empty name', { name: '  ', seed: false }],
+    ['a name over 70 characters', { name: 'x'.repeat(71), seed: false }],
+    ['a missing seed option', { name: 'Havelland Feinkost GmbH' }],
+  ])('answers 400 for %s', async (_, body) => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await post(createWorkspaceEndpoint.path, body)).status).toBe(400)
+  })
+
+  it('answers 403 for an Admin who is not the Operator', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: showcaseAdminSession }))
+
+    const response = await post(createWorkspaceEndpoint.path, { name: 'Havelland', seed: true })
+
+    expect(response.status).toBe(403)
+  })
+})
+
+const unknownWorkspaceId = '00000000-0000-4000-8000-000000000000'
+
+async function listInvites(workspaceId: string) {
+  return fetch(`${apiUrl}${toPath(workspaceInvitesEndpoint.path, { workspaceId })}`)
+}
+
+describe('createInvites', () => {
+  it('generates hundreds of valid invites with unique emails for one Workspace', () => {
+    const invites = createInvites({ count: 250, workspaceId: seedWorkspace.id })
+
+    expect(invites).toHaveLength(250)
+    expect(new Set(invites.map(({ email }) => email)).size).toBe(250)
+
+    for (const invite of invites) {
+      expect(inviteSchema.parse(invite)).toEqual(invite)
+      expect(invite.workspaceId).toBe(seedWorkspace.id)
+    }
+  })
+})
+
+describe('GET /operator/workspaces/:workspaceId/invites', () => {
+  it('lists the invites of one Workspace, newest first', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const response = await listInvites(seedWorkspace.id)
+    const invites = workspaceInvitesEndpoint.response.parse(await response.json())
+
+    expect(invites.length).toBeGreaterThan(0)
+    expect(invites.every(({ workspaceId }) => workspaceId === seedWorkspace.id)).toBe(true)
+    expect(invites.map(({ createdAt }) => createdAt)).toEqual(
+      invites
+        .map(({ createdAt }) => createdAt)
+        .sort()
+        .reverse(),
+    )
+  })
+
+  it('seeds Admin and Viewer invites, accepted and pending', () => {
+    const own = seedInvites.filter(({ workspaceId }) => workspaceId === seedWorkspace.id)
+
+    expect(new Set(own.map(({ role }) => role))).toEqual(new Set(['admin', 'viewer']))
+    expect(own.some(({ acceptedAt }) => acceptedAt === null)).toBe(true)
+    expect(own.some(({ acceptedAt }) => acceptedAt !== null)).toBe(true)
+  })
+
+  it('lists no invites for a Workspace without any', async () => {
+    server.use(...operatorHandlers(apiUrl, { invites: [] }))
+
+    const response = await listInvites(seedWorkspace.id)
+
+    expect(await response.json()).toEqual([])
+  })
+
+  it('answers 404 for an unknown Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await listInvites(unknownWorkspaceId)).status).toBe(404)
+  })
+})
+
+describe('POST /operator/workspaces/:workspaceId/invites', () => {
+  const invite: InviteInput = { email: 'jonas.weber@havelland.example', role: 'viewer' }
+
+  it('creates a pending invite with a link to copy and lists it first', async () => {
+    server.use(...operatorHandlers(apiUrl, { appUrl: 'https://app.test' }))
+
+    const response = await post(
+      toPath(createInviteEndpoint.path, { workspaceId: seedSandboxWorkspace.id }),
+      invite,
+    )
+
+    const created = createInviteEndpoint.response.parse(await response.json())
+
+    const [listed] = workspaceInvitesEndpoint.response.parse(
+      await (await listInvites(seedSandboxWorkspace.id)).json(),
+    )
+
+    expect(response.status).toBe(201)
+    expect(created).toMatchObject({
+      ...invite,
+      workspaceId: seedSandboxWorkspace.id,
+      acceptedAt: null,
+    })
+    expect(created.link).toMatch(/^https:\/\/app\.test\/invite\/[\w-]{16,}$/)
+    expect(Date.parse(created.expiresAt) - Date.parse(created.createdAt)).toBe(
+      7 * 24 * 60 * 60 * 1000,
+    )
+    expect(listed).toEqual(created)
+  })
+
+  it.each<[string, Partial<InviteInput>]>([
+    ['an invalid email', { email: 'jonas', role: 'viewer' }],
+    ['a missing role', { email: 'jonas.weber@havelland.example' }],
+  ])('answers 400 for %s', async (_, body) => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const response = await post(
+      toPath(createInviteEndpoint.path, { workspaceId: seedWorkspace.id }),
+      body,
+    )
+
+    expect(response.status).toBe(400)
+  })
+
+  it('answers 404 for an unknown Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const response = await post(
+      toPath(createInviteEndpoint.path, { workspaceId: unknownWorkspaceId }),
+      invite,
+    )
+
+    expect(response.status).toBe(404)
+  })
+
+  it('answers 403 for an Admin who is not the Operator', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: showcaseAdminSession }))
+
+    const response = await post(
+      toPath(createInviteEndpoint.path, { workspaceId: seedSandboxWorkspace.id }),
+      invite,
+    )
+
+    expect(response.status).toBe(403)
+  })
+})
+
+describe('POST /operator/workspaces/:workspaceId/reset', () => {
+  const reset = (workspaceId: string) =>
+    post(toPath(resetSandboxWorkspaceEndpoint.path, { workspaceId }))
+
+  it('resets the Sandbox Workspace and records when', async () => {
+    server.use(...operatorHandlers(apiUrl))
+    const before = Date.now()
+
+    const response = await reset(seedSandboxWorkspace.id)
+    const workspace = resetSandboxWorkspaceEndpoint.response.parse(await response.json())
+    const listed = (await listWorkspaces()).find(({ id }) => id === seedSandboxWorkspace.id)
+
+    expect(response.status).toBe(200)
+    expect(workspace).toMatchObject({ id: seedSandboxWorkspace.id, kind: 'sandbox' })
+    expect(Date.parse(workspace.lastResetAt!)).toBeGreaterThanOrEqual(before)
+    expect(listed).toEqual(workspace)
+  })
+
+  it.each([
+    ['a standard Workspace', seedWorkspace.id],
+    ['the Showcase Workspace', seedShowcaseWorkspace.id],
+  ])('answers 409 for %s', async (_, workspaceId) => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await reset(workspaceId)).status).toBe(409)
+  })
+
+  it('answers 404 for an unknown Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await reset(unknownWorkspaceId)).status).toBe(404)
+  })
+
+  it('answers 403 for the showcase-admin, Admin of the Sandbox Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: showcaseAdminSession }))
+
+    expect((await reset(seedSandboxWorkspace.id)).status).toBe(403)
+  })
+})

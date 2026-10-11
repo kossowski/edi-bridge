@@ -9,12 +9,14 @@ import {
   createDocumentStructureEndpoint,
   createLookupTableEndpoint,
   createTradingPartnerEndpoint,
+  currentWorkspaceEndpoint,
   documentStructureEndpoint,
   documentStructuresEndpoint,
   flowEndpoint,
   type FlowInput,
   type LookupTableInput,
   lookupTableEndpoint,
+  liveDemoSignInEndpoint,
   lookupTablesEndpoint,
   type MappingGraph,
   mappingDraftEndpoint,
@@ -23,6 +25,7 @@ import {
   mappingsEndpoint,
   mappingVersionsEndpoint,
   messageTypeStructureEndpoint,
+  operatorWorkspacesEndpoint,
   orderLifecyclesEndpoint,
   overviewEndpoint,
   publishedMappingVersionsEndpoint,
@@ -36,6 +39,9 @@ import {
   runListSchema,
   runsEndpoint,
   saveMappingDraftEndpoint,
+  sessionEndpoint,
+  sessionSchema,
+  signOutEndpoint,
   submitDocumentEndpoint,
   toPath,
   toSearchParams,
@@ -44,6 +50,7 @@ import {
   updateDocumentStructureEndpoint,
   updateLookupTableEndpoint,
   updateTradingPartnerEndpoint,
+  updateWorkspaceSettingsEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
@@ -587,5 +594,53 @@ describe('createHandlers', () => {
 
     expect(samples.map(({ id }) => id)).toEqual([sample.id])
     expect(mappingPreviewEndpoint.response.parse(await preview.json()).sampleId).toBe(sample.id)
+  })
+
+  it('starts signed in as the Operator in the Workspace the screens show', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const session = sessionSchema.parse(
+      await (await fetch(`${apiUrl}${sessionEndpoint.path}`)).json(),
+    )
+
+    const current = currentWorkspaceEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${currentWorkspaceEndpoint.path}`)).json(),
+    )
+
+    expect(session).toMatchObject({ operator: true, role: 'admin' })
+    expect(session.workspace).toMatchObject({ id: current.id, name: current.name })
+  })
+
+  it('keeps a sign-out within one createHandlers call for the Operator area', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    await fetch(`${apiUrl}${signOutEndpoint.path}`, { method: 'POST' })
+    const signedOut = await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)
+
+    server.resetHandlers(...createHandlers(apiUrl))
+    const fresh = await fetch(`${apiUrl}${operatorWorkspacesEndpoint.path}`)
+
+    expect(signedOut.status).toBe(401)
+    expect(fresh.status).toBe(200)
+  })
+
+  it('keeps the live demo Viewer from changing the Workspace settings', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    await fetch(`${apiUrl}${liveDemoSignInEndpoint.path}`, { method: 'POST' })
+
+    const response = await fetch(`${apiUrl}${updateWorkspaceSettingsEndpoint.path}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ documentRetentionDays: 30, aiTokenBudget: { dailyLimit: 1 } }),
+    })
+
+    expect(response.status).toBe(403)
+  })
+
+  it('starts signed out when asked', async () => {
+    server.use(...createHandlers(apiUrl, { session: null }))
+
+    expect((await fetch(`${apiUrl}${sessionEndpoint.path}`)).status).toBe(401)
   })
 })

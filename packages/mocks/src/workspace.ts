@@ -28,6 +28,18 @@ export const seedWorkspace = createWorkspace({
   gln: withCheckDigit('021234500000'),
 })
 
+export const seedShowcaseWorkspace = createWorkspace({
+  id: '5f0c3a52-7d1e-4b8a-9c61-2e4f8d9a1b08',
+  name: 'Lindenhof Feinkost GmbH',
+  gln: withCheckDigit('022345600000'),
+})
+
+export const seedSandboxWorkspace = createWorkspace({
+  id: '5f0c3a52-7d1e-4b8a-9c61-2e4f8d9a1b09',
+  name: 'Kranichsee Getränke GmbH',
+  gln: withCheckDigit('023456700000'),
+})
+
 export type WorkspaceStore = {
   get: () => Workspace
   set: (workspace: Workspace) => void
