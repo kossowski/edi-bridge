@@ -1,20 +1,28 @@
 #!/usr/bin/env bash
 # Waits for the CI runs on a pull request's latest commit.
 #
-# Usage: scripts/wait-for-ci.sh <PR>
+# Usage: scripts/wait-for-ci.sh <PR> [<pushed commit>]
 #
 # The GitHub token cannot read check runs, so this uses the Actions API. It
 # follows the pull request's head: when a new commit is pushed while waiting,
-# it waits for that commit's runs instead. Prints each job's result. Exits 0
-# when every run succeeded, 1 when one failed, 2 after 10 minutes.
+# it waits for that commit's runs instead. Right after a push, GitHub can
+# still report the previous head for a while; pass the pushed commit to wait
+# until the head has moved to it. Prints each job's result. Exits 0 when every
+# run succeeded, 1 when one failed, 2 after 10 minutes.
 set -euo pipefail
 
-pr=${1:?Usage: scripts/wait-for-ci.sh <PR>}
+pr=${1:?Usage: scripts/wait-for-ci.sh <PR> [<pushed commit>]}
+pushed=${2:+$(git rev-parse --verify "$2^{commit}")}
 repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 
 deadline=$((SECONDS + 10 * 60))
 while ((SECONDS < deadline)); do
   sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
+  if [[ -n $pushed && $sha != "$pushed" ]]; then
+    sleep 10
+    continue
+  fi
+  pushed=
   runs=$(gh api "repos/$repo/actions/runs?head_sha=$sha&event=pull_request&per_page=100" \
     --jq '[.workflow_runs[] | {id, status, conclusion}]')
 
