@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { useId } from 'react'
 
 import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
+import { AiDraftAction } from '@/components/mappings/ai-draft'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
@@ -116,9 +117,12 @@ function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boo
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <DraftStateLabel id={stateId} draft={draft} />
         {canChange && <GraphSaveStatus mappingId={draft.mappingId} />}
-        <div className="ms-auto">
+        <div className="ms-auto flex flex-wrap items-center gap-2">
           {canChange ? (
-            <PublishDraft draft={draft} stateId={stateId} />
+            <>
+              <AiDraftAction draft={draft} />
+              <PublishDraft draft={draft} stateId={stateId} />
+            </>
           ) : (
             <MappingVersionsLink mappingId={draft.mappingId} />
           )}
