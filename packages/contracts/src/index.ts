@@ -1,5 +1,6 @@
 export {
   type Endpoint,
+  type EventStreamEndpoint,
   fromSearchParams,
   type PathParams,
   type QueryParams,
@@ -219,6 +220,16 @@ export {
   previewNoteKey,
   previewNoteSchema,
 } from './mapping-preview'
+
+export {
+  type LiveEvent,
+  liveEventSchema,
+  liveEventsEndpoint,
+  type LiveEventType,
+  parseLiveEvent,
+  type RunChangedEvent,
+  runChangedEventSchema,
+} from './live-event'
 
 export {
   createLookupTableEndpoint,

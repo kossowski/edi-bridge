@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
+import { LiveIndicator } from '@/components/live-indicator'
 import { LoadError } from '@/components/load-error'
 import { BucketTable, ErrorRateChart, ThroughputChart } from '@/components/overview/overview-charts'
 import { type Totals, toBucketRows, totalsOf } from '@/components/overview/overview-data'
@@ -15,6 +16,7 @@ import {
   OverdueAcknowledgementsList,
   TradingPartnerHealthList,
 } from '@/components/overview/overview-lists'
+import { useLiveEvents } from '@/hooks/use-live-events'
 import { overviewKeys, overviewQuery } from '@/lib/api/queries'
 import { type OverviewWindow, overviewWindows } from '@edi-bridge/contracts'
 import { Card } from '@edi-bridge/ui/components/card'
@@ -111,6 +113,7 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
   const t = useTranslations()
   const [timeWindow, setTimeWindow] = useState<OverviewWindow>(defaultWindow)
   const queryClient = useQueryClient()
+  const liveStatus = useLiveEvents()
 
   const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(
     overviewQuery(timeWindow),
@@ -125,7 +128,10 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('Navigation.overview')}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">{t('Navigation.overview')}</h1>
+          <LiveIndicator status={liveStatus} />
+        </div>
         <WindowSwitch value={timeWindow} onChange={setTimeWindow} />
       </div>
       <p aria-live="polite" className="sr-only">

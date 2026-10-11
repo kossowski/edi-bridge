@@ -25,11 +25,11 @@ import {
   type TradingPartnerHealth,
 } from '@edi-bridge/contracts'
 
+import { hash } from './hash'
 import { badRequest, serverError } from './responses'
 import { seedRuns } from './run'
 import { controlReferenceOf, interchangeIdOf } from './run-detail'
 import { type RunStore, toRunStore } from './run-store'
-import { seededFaker } from './seeded-faker'
 import { createTradingPartners, seedTradingPartners } from './trading-partner'
 
 export type OverviewData = {
@@ -243,6 +243,10 @@ export function createOverviewData({
   return { runs, tradingPartners, overdueAcknowledgements }
 }
 
+function isUnacknowledged(run: RunSummary) {
+  return hash(`overdue:${run.id}`) / 2 ** 32 < 0.02
+}
+
 // An outbound Run delivers its own Interchange, so a few recent delivered ones stand for sent
 // Interchanges whose Acknowledgement never arrived. Test Mode traffic is checked during onboarding.
 export function seedOverdueAcknowledgements(
@@ -261,7 +265,7 @@ export function seedOverdueAcknowledgements(
       run.status !== 'delivered' ||
       Date.parse(run.receivedAt) < now.getTime() - overdueLookback ||
       directionOf(run) !== 'outbound' ||
-      !seededFaker(`overdue:${run.id}`).datatype.boolean({ probability: 0.02 })
+      !isUnacknowledged(run)
     ) {
       return []
     }
@@ -288,11 +292,17 @@ export function seedOverdueAcknowledgements(
   })
 }
 
-export function seedOverviewData(runs: ReadonlyArray<RunSummary> | RunStore = seedRuns()) {
+export function seedOverviewData(
+  runs: ReadonlyArray<RunSummary> | RunStore = seedRuns(),
+): OverviewData {
+  const store = toRunStore(runs)
+
   return {
-    runs,
+    runs: store,
     tradingPartners: seedTradingPartners,
-    overdueAcknowledgements: seedOverdueAcknowledgements(toRunStore(runs).all()),
+    get overdueAcknowledgements() {
+      return seedOverdueAcknowledgements(store.all())
+    },
   }
 }
 

@@ -55,6 +55,20 @@
   },
   "Overview": {
     "loading": "Loading Overview",
+    "live": {
+      "label": "Live updates",
+      "status": {
+        "connecting": "Connecting",
+        "connected": "Live",
+        "reconnecting": "Reconnecting",
+        "offline": "Offline"
+      },
+      "announcement": {
+        "connected": "Live updates resumed.",
+        "reconnecting": "Live updates interrupted. Reconnecting.",
+        "offline": "Live updates are offline. Values may be outdated until the connection returns."
+      }
+    },
     "window": {
       "label": "Time window",
       "1h": "1 hour",

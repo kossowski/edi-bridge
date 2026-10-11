@@ -55,6 +55,20 @@
   },
   "Overview": {
     "loading": "Übersicht wird geladen",
+    "live": {
+      "label": "Live-Aktualisierung",
+      "status": {
+        "connecting": "Verbinde",
+        "connected": "Live",
+        "reconnecting": "Verbinde neu",
+        "offline": "Offline"
+      },
+      "announcement": {
+        "connected": "Live-Aktualisierung läuft wieder.",
+        "reconnecting": "Live-Aktualisierung unterbrochen. Verbinde neu.",
+        "offline": "Live-Aktualisierung ist offline. Die Werte sind womöglich veraltet, bis die Verbindung zurück ist."
+      }
+    },
     "window": {
       "label": "Zeitraum",
       "1h": "1 Stunde",
