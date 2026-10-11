@@ -355,9 +355,8 @@ export function LookupTableEntryEditor({ table }: { table: LookupTable }) {
             errors={entries.errors}
             handlers={handlers}
             labelledBy={ids.title}
-            readOnly={saving}
+            mode={!canChange ? 'view' : saving ? 'saving' : 'edit'}
             ref={grid}
-            viewOnly={!canChange}
             visibleRows={visibleRows}
           />
         </>
