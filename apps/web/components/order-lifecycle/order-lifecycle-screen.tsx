@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { useId } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { Loading, Notice } from '@/components/detail-parts'
 import { LoadError } from '@/components/load-error'
 import { OrderLifecycleTimeline } from '@/components/order-lifecycle/order-lifecycle-timeline'
@@ -119,8 +120,7 @@ export function OrderLifecycleScreen({
   const searched = parsed.success ? parsed.data : undefined
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{t('Navigation.orderLifecycle')}</h1>
+    <AppPage title={t('Navigation.orderLifecycle')} className="gap-6">
       <SearchForm
         businessReference={searched}
         onSearch={(next) => {
@@ -140,6 +140,6 @@ export function OrderLifecycleScreen({
       ) : (
         <Results key={searched} businessReference={searched} />
       )}
-    </div>
+    </AppPage>
   )
 }

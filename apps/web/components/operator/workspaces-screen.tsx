@@ -7,8 +7,9 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { type Ref, useRef, useState } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { linkClass, rowLinkClass } from '@/components/detail-parts'
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { ListTable } from '@/components/list-screen'
 import { CreateWorkspaceDialog } from '@/components/operator/create-workspace-dialog'
 import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
 import {
@@ -86,9 +87,8 @@ export function WorkspacesScreen() {
   }
 
   return (
-    <ListScreen
-      action={<CreateWorkspaceButton ref={createButton} onClick={openDialog} />}
-      subtitle={t('subtitle')}
+    <AppPage
+      actions={<CreateWorkspaceButton ref={createButton} onClick={openDialog} />}
       title={t('title')}>
       <div role="status">
         {created && (
@@ -125,6 +125,6 @@ export function WorkspacesScreen() {
         }}
         onOpenChange={(open) => !open && closeDialog()}
       />
-    </ListScreen>
+    </AppPage>
   )
 }

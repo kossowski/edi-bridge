@@ -7,7 +7,6 @@ import { type ReactNode, useId, useState } from 'react'
 
 import type { IconSvgElement } from '@hugeicons/react'
 
-import { BackLink } from '@/components/detail-parts'
 import { LoadError } from '@/components/load-error'
 import { useCanChange } from '@/hooks/use-session'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
@@ -47,45 +46,12 @@ type ListMessageKey =
 
 type ListTranslator = (key: ListMessageKey, values?: { count: number; total?: number }) => string
 
-function NewLink({ href, label }: { href: string; label: string }) {
+export function NewLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} className={buttonVariants()}>
       <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden />
       {label}
     </Link>
-  )
-}
-
-export function ListScreen({
-  title,
-  subtitle,
-  back,
-  newLink,
-  action,
-  children,
-}: {
-  title: string
-  subtitle?: string | undefined
-  back?: { href: string; label: string }
-  newLink?: { href: string; label: string }
-  action?: ReactNode
-  children: ReactNode
-}) {
-  const canChange = useCanChange()
-
-  return (
-    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6">
-      {back && <BackLink href={back.href} label={back.label} />}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
-        </div>
-        {newLink && canChange && <NewLink href={newLink.href} label={newLink.label} />}
-        {action}
-      </div>
-      {children}
-    </div>
   )
 }
 

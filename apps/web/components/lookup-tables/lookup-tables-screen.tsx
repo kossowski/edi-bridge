@@ -14,7 +14,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type Ref, type RefObject, useMemo, useRef, useState } from 'react'
 
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { AppPage } from '@/components/app-page'
+import { ListTable } from '@/components/list-screen'
 import { DeleteLookupTableDialog } from '@/components/lookup-tables/delete-lookup-table-dialog'
 import { LookupTableFormDialog } from '@/components/lookup-tables/lookup-table-form-dialog'
 import {
@@ -236,8 +237,8 @@ export function LookupTablesScreen() {
   }
 
   return (
-    <ListScreen
-      action={canChange && <NewLookupTableButton ref={newButton} onClick={dialogs.create} />}
+    <AppPage
+      actions={canChange && <NewLookupTableButton ref={newButton} onClick={dialogs.create} />}
       title={tNavigation('lookupTables')}>
       <p role="status" className="sr-only">
         {announcement}
@@ -282,6 +283,6 @@ export function LookupTablesScreen() {
         onDeleted={deleted}
         onOpenChange={(open) => !open && dialogs.close('delete')}
       />
-    </ListScreen>
+    </AppPage>
   )
 }

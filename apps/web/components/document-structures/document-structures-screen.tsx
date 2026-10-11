@@ -5,9 +5,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { AppPage } from '@/components/app-page'
 import { linkClass } from '@/components/detail-parts'
 import { UsedByMappings } from '@/components/document-structures/mapping-list'
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { ListTable, NewLink } from '@/components/list-screen'
+import { useCanChange } from '@/hooks/use-session'
 import { documentStructuresQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
@@ -44,9 +46,12 @@ export function DocumentStructuresScreen() {
   const tList = useTranslations('DocumentStructures')
   const summaries = useQuery(documentStructuresQuery)
   const newLink = { href: '/document-structures/new', label: tList('new') }
+  const canChange = useCanChange()
 
   return (
-    <ListScreen newLink={newLink} title={t('Navigation.documentStructures')}>
+    <AppPage
+      actions={canChange && <NewLink {...newLink} />}
+      title={t('Navigation.documentStructures')}>
       <ListTable
         columns={columns.map((key) => ({ key, label: tList(`columns.${key}`) }))}
         emptyIcon={HierarchySquare02Icon}
@@ -61,6 +66,6 @@ export function DocumentStructuresScreen() {
         row={(summary) => <DocumentStructureRow key={summary.id} summary={summary} />}
         t={tList}
       />
-    </ListScreen>
+    </AppPage>
   )
 }

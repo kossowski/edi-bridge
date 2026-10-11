@@ -5,9 +5,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { AppPage } from '@/components/app-page'
 import { rowLinkClass } from '@/components/detail-parts'
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { ListTable, NewLink } from '@/components/list-screen'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
+import { useCanChange } from '@/hooks/use-session'
 import { currentWorkspaceQuery, tradingPartnersQuery } from '@/lib/api/queries'
 import { onboardingChecklist, type TradingPartner } from '@edi-bridge/contracts'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
@@ -100,12 +102,15 @@ function TradingPartnersTable() {
 
 export function TradingPartnersScreen() {
   const t = useTranslations()
+  const canChange = useCanChange()
 
   return (
-    <ListScreen
-      newLink={{ href: '/trading-partners/new', label: t('TradingPartners.new') }}
+    <AppPage
+      actions={
+        canChange && <NewLink href="/trading-partners/new" label={t('TradingPartners.new')} />
+      }
       title={t('Navigation.tradingPartners')}>
       <TradingPartnersTable />
-    </ListScreen>
+    </AppPage>
   )
 }

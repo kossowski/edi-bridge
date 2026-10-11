@@ -13,8 +13,8 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { Fragment, type ReactNode, useEffect, useId, useState } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { Failure as FailureNotice, Loading, LoadFailure, Notice } from '@/components/detail-parts'
-import { ListScreen } from '@/components/list-screen'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
 import { documentSize } from '@/components/mappings/mapping-preview'
 import { DocumentText, PreviewNotes } from '@/components/mappings/mapping-preview-panel'
@@ -987,10 +987,7 @@ export function MappingComparisonScreen({ id, ...initial }: { id: string } & Com
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
 
   return (
-    <ListScreen
-      back={{ href: `/mappings/${id}/versions`, label: t('back') }}
-      subtitle={data?.name}
-      title={t('title')}>
+    <AppPage name={data?.name} title={t('title')}>
       {isPending ? (
         <Loading label={t('loading')} rows={6} />
       ) : data ? (
@@ -1002,6 +999,6 @@ export function MappingComparisonScreen({ id, ...initial }: { id: string } & Com
           onRetry={() => void refetch()}
         />
       )}
-    </ListScreen>
+    </AppPage>
   )
 }

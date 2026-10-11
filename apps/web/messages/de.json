@@ -112,17 +112,6 @@
     "settings": "Einstellungen",
     "operator": "Operator"
   },
-  "Placeholder": {
-    "title": "Noch nicht gebaut",
-    "runs": "Jeder Run mit Ergebnis, Schritten, Fehlern und Ausgabe.",
-    "tradingPartners": "Die Trading Partners dieses Workspace mit ihren Channels und Flows.",
-    "channels": "Die eingehenden und ausgehenden Channels und ihre Verbindungseinstellungen.",
-    "flows": "Die Flows, die Documents von einem Channel über eine Mapping Version an einen Ziel-Channel leiten.",
-    "mappings": "Mappings, ihre Versionen und der Mapping-Canvas.",
-    "documentStructures": "Die Document Structures, die die JSON- und CSV-Documents Ihrer eigenen Systeme beschreiben.",
-    "lookupTables": "Lookup Tables für den Workspace und für einzelne Trading Partners.",
-    "settings": "Einstellungen für diesen Workspace."
-  },
   "NotFound": {
     "title": "Seite nicht gefunden",
     "description": "Diese Seite gibt es nicht. Wechseln Sie über die Navigation zu einer anderen Ansicht."
@@ -658,7 +647,6 @@
     "createTitle": "Neuer Trading Partner",
     "editTitle": "{name} bearbeiten",
     "editPageTitle": "Trading Partner bearbeiten",
-    "backTo": "Zurück zu {name}",
     "testModeNotice": "Ein neuer Trading Partner startet im Test Mode. Jedes Interchange mit ihm ist als Test markiert, bis Sie ihn auf Produktion umstellen.",
     "fields": {
       "name": {
@@ -799,7 +787,6 @@
     "createTitle": "Neuer Channel",
     "editTitle": "{name} bearbeiten",
     "editPageTitle": "Channel bearbeiten",
-    "backTo": "Zurück zu {name}",
     "webhookNotice": "EDI Bridge erzeugt Webhook-URL und Token, wenn Sie den Channel anlegen.",
     "sections": {
       "sftp": "SFTP-Verbindung",
@@ -995,7 +982,6 @@
     "createTitle": "Neuer Flow",
     "editTitle": "{name} bearbeiten",
     "editPageTitle": "Flow bearbeiten",
-    "backTo": "Zurück zu {name}",
     "sections": {
       "channels": "Channels",
       "mappingVersion": "Mapping Version"
@@ -1675,7 +1661,6 @@
   },
   "MappingVersions": {
     "title": "Mapping Versions",
-    "back": "Zurück zum Draft",
     "openDraft": "Draft öffnen",
     "caption": "Mapping Versions, neueste zuerst",
     "loading": "Mapping Versions werden geladen",
@@ -1704,7 +1689,6 @@
   },
   "MappingComparison": {
     "title": "Mapping Versions vergleichen",
-    "back": "Zurück zu den Mapping Versions",
     "loading": "Vergleich wird geladen",
     "openDraft": "Draft öffnen",
     "from": "Von",
@@ -1899,7 +1883,6 @@
   },
   "DocumentStructureForm": {
     "createTitle": "Neue Document Structure",
-    "back": "Zurück zu den Document Structures",
     "origin": {
       "label": "Erstellen aus",
       "description": "EDI Bridge leitet die Felder, ihre Verschachtelung und Wiederholungen aus der Datei ab.",
@@ -2440,7 +2423,6 @@
     },
     "workspaces": {
       "title": "Workspaces",
-      "subtitle": "Alle Workspaces der Plattform. Legen Sie einen Workspace an und laden Sie danach seine Benutzer ein.",
       "new": "Workspace anlegen",
       "caption": "Workspaces, nach Name",
       "loading": "Workspaces werden geladen",

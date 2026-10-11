@@ -5,10 +5,10 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useState } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { ChannelForm } from '@/components/channels/channel-form'
 import { WebhookTokenReveal } from '@/components/channels/webhook-token'
 import { CopyableValue } from '@/components/copy-button'
-import { BackLink } from '@/components/detail-parts'
 import { EditScreen } from '@/components/edit-screen'
 import { channelQuery } from '@/lib/api/queries'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
@@ -46,15 +46,15 @@ export function NewChannelScreen() {
   const [created, setCreated] = useState<CreatedChannel | null>(null)
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/channels" label={t('Channel.back')} />
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {created
+    <AppPage
+      title={
+        created
           ? t('ChannelForm.created.title', { name: created.channel.name })
-          : t('ChannelForm.createTitle')}
-      </h1>
+          : t('ChannelForm.createTitle')
+      }
+      className="gap-6">
       {created ? <CreatedWebhook created={created} /> : <ChannelForm onCreated={setCreated} />}
-    </div>
+    </AppPage>
   )
 }
 
@@ -62,11 +62,7 @@ export function EditChannelScreen({ id }: { id: string }) {
   const query = useQuery(channelQuery(id))
 
   return (
-    <EditScreen
-      detailHref={`/channels/${id}`}
-      listHref="/channels"
-      namespace="Channel"
-      query={query}>
+    <EditScreen namespace="Channel" query={query}>
       {(channel) => <ChannelForm channel={channel} />}
     </EditScreen>
   )
