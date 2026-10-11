@@ -48,10 +48,23 @@ function InputGroupAddon({
 }: React.ComponentProps<'div'> & VariantProps<typeof inputGroupAddonVariants>) {
   return (
     <div
-      role="group"
+      role="presentation"
       className={cn(inputGroupAddonVariants({ align }), className)}
       data-align={align}
       data-slot="input-group-addon"
+      onClick={(event) => {
+        if (event.target instanceof Element && event.target.closest('button')) {
+          return
+        }
+
+        const control = event.currentTarget.parentElement?.querySelector(
+          '[data-slot=input-group-control]',
+        )
+
+        if (control instanceof HTMLElement) {
+          control.focus()
+        }
+      }}
       {...props}
     />
   )
