@@ -4,13 +4,17 @@
 
 **Blocked by:** 06 (Mock stack tracer)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Login page without any sign-up path, plus a 'View live demo' button
-- [ ] Workspace settings for company identity, retention period and AI budget
-- [ ] Operator area: Workspace list and creation (with a 'seed' option), invite creation with Admin/Viewer role and a copy-link action
-- [ ] Sandbox reset action with a confirmation step
-- [ ] Viewer state: all changing actions are unavailable
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Login page without any sign-up path, plus a 'View live demo' button
+- [x] Workspace settings for company identity, retention period and AI budget
+- [x] Operator area: Workspace list and creation (with a 'seed' option), invite creation with Admin/Viewer role and a copy-link action
+- [x] Sandbox reset action with a confirmation step
+- [x] Viewer state: all changing actions are unavailable
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #51, #55, #57, #58, #59, #60, #61, #62.

@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, userEvent } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 
 import { LookupTableEditorScreen } from '@/components/lookup-tables/lookup-table-editor-screen'
 import { LookupTableEntryEditor } from '@/components/lookup-tables/lookup-table-entry-editor'
@@ -46,7 +46,7 @@ export const Empty = meta.story({
   args: { id: emptyTable.id },
   async play({ canvas }) {
     await expect(await canvas.findByText('No entries yet')).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Add entry' })).toBeEnabled()
+    await expect(await canvas.findByRole('button', { name: 'Add entry' })).toBeEnabled()
   },
 })
 
@@ -102,6 +102,7 @@ export const OneTabStop = meta.story({
   async play({ canvas }) {
     const grid = await canvas.findByRole('grid', { name: 'Entries' })
 
+    await canvas.findByRole('button', { name: 'Add entry' })
     await userEvent.click(canvas.getByLabelText('Filter by source or target code'))
     await userEvent.tab()
     await expect(canvas.getByRole('button', { name: 'Add entry' })).toHaveFocus()
@@ -121,7 +122,8 @@ export const Saving = meta.story({
     )
   },
   async play({ canvas }) {
-    await userEvent.click(await canvas.findByRole('gridcell', { name: 'KGM' }))
+    await canvas.findByRole('button', { name: 'Add entry' })
+    await userEvent.click(canvas.getByRole('gridcell', { name: 'KGM' }))
     await userEvent.keyboard('X{Enter}')
     await userEvent.click(canvas.getByRole('button', { name: 'Save changes' }))
 
@@ -142,6 +144,7 @@ function InvalidEntries() {
   return (
     <div className="p-6">
       <LookupTableEntryEditor
+        canChange
         table={{
           ...unitsOfMeasure,
           scope: { kind: 'workspace' },
@@ -202,11 +205,87 @@ export const DarkValidationErrors = meta.story({
   },
 })
 
+async function expectEntriesReadOnly(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement)
+  const grid = await canvas.findByRole('grid', { name: 'Entries' })
+
+  await expect(grid).toHaveAttribute('aria-readonly', 'true')
+  await expect(canvas.queryByRole('textbox')).toBeNull()
+
+  for (const name of ['Import CSV', 'Add entry', 'Discard changes', 'Save changes']) {
+    await expect(canvas.queryByRole('button', { name })).toBeNull()
+  }
+
+  await expect(canvas.queryByRole('button', { name: /^Delete entry/ })).toBeNull()
+  await expect(canvas.queryByText('All changes saved')).toBeNull()
+
+  return grid
+}
+
 export const Viewer = meta.story({
   ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      const grid = await expectEntriesReadOnly(canvasElement)
+
+      await expect(canvas.getByText('Use the arrow keys to move between cells.')).toBeVisible()
+
+      const cell = canvas.getByRole('gridcell', { name: 'KGM' })
+
+      await userEvent.click(cell)
+      await expect(canvas.queryByRole('textbox')).toBeNull()
+      await userEvent.keyboard('{Enter}x{Control>}{Enter}{/Control}{Control>}{Delete}{/Control}')
+      await expect(canvas.queryByRole('textbox')).toBeNull()
+      await expect(canvas.getByText('4 entries')).toBeVisible()
+      await expect(within(grid).getAllByRole('columnheader')).toHaveLength(3)
+      await userEvent.keyboard('{ArrowLeft}')
+      await expect(cell.previousElementSibling).toHaveFocus()
+    },
+  }),
+})
+
+export const ViewerEmpty = meta.story({
+  args: { id: emptyTable.id },
+  ...viewerStory({
     async play({ canvas }) {
-      await expect(await canvas.findByRole('grid', { name: 'Entries' })).toBeVisible()
-      await expect(canvas.queryByRole('button', { name: 'Import CSV' })).toBeNull()
+      await expect(
+        await canvas.findByText('Entries appear here once an Admin adds them.'),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Add entry' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerGerman = meta.story({
+  ...viewerStory({
+    decorators: [
+      (Story) => (
+        <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+          <Story />
+        </NextIntlClientProvider>
+      ),
+    ],
+    async play({ canvas }) {
+      await expect(await canvas.findByRole('grid', { name: 'Einträge' })).toHaveAttribute(
+        'aria-readonly',
+        'true',
+      )
+      await expect(
+        canvas.getByText('Mit den Pfeiltasten wechseln Sie zwischen Zellen.'),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Eintrag hinzufügen' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerDark = meta.story({
+  ...viewerStory({
+    beforeEach() {
+      document.documentElement.classList.add('dark')
+
+      return () => document.documentElement.classList.remove('dark')
+    },
+    async play({ canvasElement }) {
+      await expectEntriesReadOnly(canvasElement)
     },
   }),
 })

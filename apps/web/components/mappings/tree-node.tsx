@@ -18,6 +18,7 @@ import {
   isSameRow,
   isStartRow,
   useCanvasStore,
+  useCanvasViewOnly,
   useLinkHints,
   useMeaningTooltip,
   usePendingPartLink,
@@ -202,11 +203,12 @@ function RowButton({
   )
 }
 
-function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
+function TreeNodeView({ data, isConnectable }: NodeProps<TreeFlowNode>) {
   const t = useTranslations('Mapping.canvas')
   const container = !data.linkable
   const linkable = data.linkable || data.wholePart
-  const showHandle = linkable || (data.expanded === false && data.linked)
+  const viewOnly = useCanvasViewOnly()
+  const showHandle = viewOnly ? data.linked : linkable || (data.expanded === false && data.linked)
   const onFocus = usePanIntoView()
   const selected = useCanvasStore((state) => isSameRow(state.selected, data))
   const hints = useLinkHints()
@@ -275,13 +277,13 @@ function TreeNodeView({ data }: NodeProps<TreeFlowNode>) {
         </RowButton>
       </div>
       <Handle
-        isConnectable={linkable}
+        isConnectable={isConnectable && linkable}
         isConnectableEnd={data.side === 'target'}
         isConnectableStart={data.side === 'source'}
         position={data.side === 'source' ? Position.Right : Position.Left}
         type={data.side === 'source' ? 'source' : 'target'}
         className={cn(
-          linkable ? 'link-handle' : 'part-handle',
+          linkable && !viewOnly ? 'link-handle' : 'part-handle',
           !showHandle && 'invisible',
           (linkStart || linkTarget) && 'link-handle-marked',
           unavailable && 'link-handle-unavailable',

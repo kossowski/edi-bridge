@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, type ReactNode, useContext, useId, useState } from 'react'
+import { createContext, type ReactNode, useContext, useId, useMemo, useState } from 'react'
 import { createStore, type StoreApi, useStore } from 'zustand'
 
 import type { XYPosition } from '@xyflow/react'
@@ -127,19 +127,28 @@ type CanvasContext = {
   store: StoreApi<CanvasState>
   tooltip: { handle: ReturnType<typeof createTooltipHandle<TreeRow>>; id: string }
   hints: { linkTarget: string; linkStart: string }
+  viewOnly: boolean
 }
 
 const Context = createContext<CanvasContext | null>(null)
 
 // One store per mounted canvas, so two canvases (or two stories) never share a selection.
-export function MappingCanvasProvider({ children }: { children: ReactNode }) {
+export function MappingCanvasProvider({
+  viewOnly = false,
+  children,
+}: {
+  viewOnly?: boolean
+  children: ReactNode
+}) {
   const id = useId()
 
-  const [value] = useState<CanvasContext>(() => ({
+  const [shared] = useState(() => ({
     store: createCanvasStore(),
     tooltip: { handle: createTooltipHandle<TreeRow>(), id: `${id}meaning` },
     hints: { linkTarget: `${id}link-target`, linkStart: `${id}link-start` },
   }))
+
+  const value = useMemo<CanvasContext>(() => ({ ...shared, viewOnly }), [shared, viewOnly])
 
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
@@ -160,6 +169,10 @@ export function useCanvasStore<Selected>(selector: (state: CanvasState) => Selec
 
 export function useCanvasStoreApi() {
   return useCanvasContext().store
+}
+
+export function useCanvasViewOnly() {
+  return useCanvasContext().viewOnly
 }
 
 export function useMeaningTooltip() {

@@ -20,6 +20,7 @@ import {
   knownSyntaxError,
   textPosition,
 } from '@/components/mappings/expression-text'
+import { useCanvasViewOnly } from '@/components/mappings/mapping-canvas-store'
 import { type CanvasIssue, linkIntoInput, type Graph } from '@/components/mappings/mapping-graph'
 import {
   type FieldInput,
@@ -72,7 +73,11 @@ type WidgetProps = {
   onCommit: (value: string) => void
 }
 
-type InputKind = { read: (value: string) => ReadValue; Widget: ComponentType<WidgetProps> }
+type InputKind = {
+  read: (value: string) => ReadValue
+  Widget: ComponentType<WidgetProps>
+  View: ComponentType<{ value: string }>
+}
 
 function valuesOf(transform: MappingTransform): FormValues {
   // SAFETY: every config is a flat object of strings, numbers and nulls, keyed by its field names.
@@ -269,6 +274,22 @@ function useSyntaxErrorText() {
   }
 }
 
+function ValidSyntax() {
+  const t = useTranslations('Mapping.transforms.expression')
+
+  return (
+    <p className="flex items-center gap-1.5 text-sm">
+      <HugeiconsIcon
+        icon={CheckmarkCircle02Icon}
+        strokeWidth={2}
+        aria-hidden
+        className="size-4 shrink-0 text-green-700 dark:text-green-300"
+      />
+      {t('valid')}
+    </p>
+  )
+}
+
 function ExpressionInput({
   id,
   label,
@@ -380,15 +401,7 @@ function ExpressionInput({
           </Button>
         )
       ) : (
-        <p className="flex items-center gap-1.5 text-sm">
-          <HugeiconsIcon
-            icon={CheckmarkCircle02Icon}
-            strokeWidth={2}
-            aria-hidden
-            className="size-4 shrink-0 text-green-700 dark:text-green-300"
-          />
-          {t('valid')}
-        </p>
+        <ValidSyntax />
       )}
       <div className="flex flex-col items-start gap-2 pt-1">
         <SelectField
@@ -411,18 +424,84 @@ function ExpressionInput({
   )
 }
 
+function NotSet() {
+  const t = useTranslations('Mapping.transforms.details')
+
+  return <span className="text-muted-foreground">{t('notSet')}</span>
+}
+
+function CodeView({ value }: { value: string }) {
+  return value === '' ? <NotSet /> : <code className="font-mono">{value}</code>
+}
+
+function choiceView(useChoices: () => ReadonlyArray<Choice>) {
+  return function ChoiceView({ value }: { value: string }) {
+    const label = useChoices().find((choice) => choice.value === value)?.label
+
+    return label ? label : <CodeView value={value} />
+  }
+}
+
+function LookupTableView({ value }: { value: string }) {
+  const t = useTranslations('Mapping.transforms.lookupTables')
+  const scopeOf = useScopeText()
+  const tables = useQuery(lookupTablesQuery)
+  const chosen = tables.data?.find((table) => table.id === value)
+
+  if (!chosen) {
+    return <CodeView value={value} />
+  }
+
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span>{chosen.name}</span>
+      <span>{t('scope', { scope: scopeOf(chosen) })}</span>
+    </span>
+  )
+}
+
+function ExpressionView({ value }: { value: string }) {
+  const t = useTranslations('Mapping.transforms.expression')
+  const syntaxText = useSyntaxErrorText()
+
+  if (value.trim() === '') {
+    return <NotSet />
+  }
+
+  const syntax = expressionSyntaxError(value)
+  const at = syntax && textPosition(value, syntax.position)
+
+  return (
+    <span className="flex flex-col gap-1.5">
+      <pre className="font-mono text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">{value}</pre>
+      {at ? (
+        <span className="text-red-800 dark:text-red-300">
+          {t('syntaxError', { line: at.line, column: at.column, message: syntaxText(syntax) })}
+        </span>
+      ) : (
+        <ValidSyntax />
+      )}
+    </span>
+  )
+}
+
 const inputKinds: Readonly<Record<FieldInput, InputKind>> = {
-  text: { read: asText, Widget: PlainTextInput },
-  integer: { read: asInteger(true), Widget: NumberInput },
-  optionalInteger: { read: asInteger(false), Widget: NumberInput },
-  decimalSeparator: { read: asText, Widget: radioInput(useSeparators) },
+  text: { read: asText, Widget: PlainTextInput, View: CodeView },
+  integer: { read: asInteger(true), Widget: NumberInput, View: CodeView },
+  optionalInteger: { read: asInteger(false), Widget: NumberInput, View: CodeView },
+  decimalSeparator: {
+    read: asText,
+    Widget: radioInput(useSeparators),
+    View: choiceView(useSeparators),
+  },
   lookupTable: {
     read: (value) => ({ value: value === '' ? null : value }),
     Widget: LookupTableInput,
+    View: LookupTableView,
   },
-  fallback: { read: asText, Widget: radioInput(useFallbacks) },
-  operator: { read: asText, Widget: radioInput(useOperators) },
-  expression: { read: asText, Widget: ExpressionInput },
+  fallback: { read: asText, Widget: radioInput(useFallbacks), View: choiceView(useFallbacks) },
+  operator: { read: asText, Widget: radioInput(useOperators), View: choiceView(useOperators) },
+  expression: { read: asText, Widget: ExpressionInput, View: ExpressionView },
 }
 
 function read(kind: MappingTransform['kind'], values: FormValues) {
@@ -451,6 +530,17 @@ function read(kind: MappingTransform['kind'], values: FormValues) {
   }
 }
 
+function shownFields(kind: MappingTransform['kind'], values: FormValues) {
+  return formFields(kind).filter(({ visibleWhen }) => visibleWhen?.(values) ?? true)
+}
+
+function useFieldDescription() {
+  const t = useTranslations('Mapping.transforms.fieldDescriptions')
+
+  // SAFETY: the form fields are exactly the keys under `fieldDescriptions.<kind>`.
+  return (kind: MappingTransform['kind'], name: string) => t(`${kind}.${name}` as never)
+}
+
 function sameValues(kind: MappingTransform['kind'], a: FormValues, b: FormValues) {
   return formFields(kind).every(({ name }) => a[name] === b[name])
 }
@@ -469,6 +559,7 @@ function TransformSettings({
   onConfigure: (config: MappingTransform['config']) => void
 }) {
   const t = useTranslations('Mapping.transforms')
+  const descriptionOf = useFieldDescription()
   const id = useId()
   const saved = valuesOf(transform)
   const [base, setBase] = useState(saved)
@@ -518,21 +609,16 @@ function TransformSettings({
       : text.issue(transform.kind, issue)
   }
 
-  const shown = formFields(transform.kind).filter(
-    ({ visibleWhen }) => visibleWhen?.(values) ?? true,
-  )
-
   return (
     <div className="flex flex-col gap-4">
-      {shown.map((field) => {
+      {shownFields(transform.kind, values).map((field) => {
         const { Widget } = inputKinds[field.input]
 
         return (
           <Widget
             key={field.name}
             id={`${id}${field.name}`}
-            // SAFETY: the form fields are exactly the keys under `fieldDescriptions.<kind>`.
-            description={t(`fieldDescriptions.${transform.kind}.${field.name}` as never)}
+            description={descriptionOf(transform.kind, field.name)}
             error={errorOf(field)}
             label={text.field(transform.kind, field.name)}
             saved={saved[field.name] ?? ''}
@@ -549,6 +635,35 @@ function TransformSettings({
         )
       })}
     </div>
+  )
+}
+
+function TransformSettingsView({
+  transform,
+  text,
+}: {
+  transform: MappingTransform
+  text: GraphText
+}) {
+  const descriptionOf = useFieldDescription()
+  const values = valuesOf(transform)
+
+  return (
+    <dl className="flex flex-col gap-3 text-sm">
+      {shownFields(transform.kind, values).map(({ name, input }) => {
+        const { View } = inputKinds[input]
+
+        return (
+          <div key={name} className="flex flex-col gap-0.5">
+            <dt className="font-medium">{text.field(transform.kind, name)}</dt>
+            <dd className="min-w-0 [overflow-wrap:anywhere]">
+              <View value={values[name] ?? ''} />
+            </dd>
+            <dd className="text-muted-foreground">{descriptionOf(transform.kind, name)}</dd>
+          </div>
+        )
+      })}
+    </dl>
   )
 }
 
@@ -611,9 +726,10 @@ export function TransformDetails({
   const tLinks = useTranslations('Mapping.links')
   const name = text.name(transform.id)
   const ports = transformPorts(transform)
+  const viewOnly = useCanvasViewOnly()
 
   // The form shows its own fields' problems beside them.
-  const shownInForm = formFields(transform.kind).map(({ name }) => name)
+  const shownInForm = viewOnly ? [] : formFields(transform.kind).map(({ name }) => name)
 
   const outgoing = graph.transformLinks.filter(
     ({ from }) => from.kind === 'transform' && from.transformId === transform.id,
@@ -629,6 +745,10 @@ export function TransformDetails({
   ]
 
   const removeButton = (link: TransformLink) => {
+    if (viewOnly) {
+      return null
+    }
+
     const names = { source: text.start(link.from), target: text.end(link.to) }
 
     return (
@@ -659,14 +779,18 @@ export function TransformDetails({
       />
       <section className="flex flex-col gap-3">
         <h3 className="text-xs font-medium tracking-wide uppercase">{t('details.settings')}</h3>
-        <TransformSettings
-          key={transform.id}
-          issues={issues}
-          sourceFields={sourceFields}
-          text={text}
-          transform={transform}
-          onConfigure={(config) => actions.configure(transform, config)}
-        />
+        {viewOnly ? (
+          <TransformSettingsView text={text} transform={transform} />
+        ) : (
+          <TransformSettings
+            key={transform.id}
+            issues={issues}
+            sourceFields={sourceFields}
+            text={text}
+            transform={transform}
+            onConfigure={(config) => actions.configure(transform, config)}
+          />
+        )}
       </section>
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-medium tracking-wide uppercase">{t('details.inputs')}</h3>
@@ -725,35 +849,39 @@ export function TransformDetails({
           })}
         </ul>
       </section>
-      <section className="flex flex-col gap-2">
-        <h3 className="text-xs font-medium tracking-wide uppercase">{t('details.position')}</h3>
-        <div className="flex flex-wrap gap-1">
-          {(
-            [
-              ['moveLeft', ArrowLeft01Icon, -moveStep, 0],
-              ['moveUp', ArrowUp01Icon, 0, -moveStep],
-              ['moveDown', ArrowDown01Icon, 0, moveStep],
-              ['moveRight', ArrowRight01Icon, moveStep, 0],
-            ] as const
-          ).map(([label, icon, dx, dy]) => (
-            <Button
-              key={label}
-              size="icon-sm"
-              variant="outline"
-              aria-label={t(`details.${label}`, { name })}
-              onClick={() => actions.move(transform, dx, dy)}>
-              <HugeiconsIcon icon={icon} strokeWidth={2} aria-hidden />
-            </Button>
-          ))}
-        </div>
-      </section>
-      <Button
-        size="sm"
-        variant="outline"
-        className="w-fit"
-        onClick={() => actions.remove(transform)}>
-        {t('details.removeLabel', { name })}
-      </Button>
+      {!viewOnly && (
+        <>
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-medium tracking-wide uppercase">{t('details.position')}</h3>
+            <div className="flex flex-wrap gap-1">
+              {(
+                [
+                  ['moveLeft', ArrowLeft01Icon, -moveStep, 0],
+                  ['moveUp', ArrowUp01Icon, 0, -moveStep],
+                  ['moveDown', ArrowDown01Icon, 0, moveStep],
+                  ['moveRight', ArrowRight01Icon, moveStep, 0],
+                ] as const
+              ).map(([label, icon, dx, dy]) => (
+                <Button
+                  key={label}
+                  size="icon-sm"
+                  variant="outline"
+                  aria-label={t(`details.${label}`, { name })}
+                  onClick={() => actions.move(transform, dx, dy)}>
+                  <HugeiconsIcon icon={icon} strokeWidth={2} aria-hidden />
+                </Button>
+              ))}
+            </div>
+          </section>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-fit"
+            onClick={() => actions.remove(transform)}>
+            {t('details.removeLabel', { name })}
+          </Button>
+        </>
+      )}
     </div>
   )
 }

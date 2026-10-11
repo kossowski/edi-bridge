@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { createContext, memo, useCallback, useContext, useId } from 'react'
 
 import {
+  useCanvasViewOnly,
   useCanvasStore,
   useLinkHints,
   usePendingPartLink,
@@ -111,6 +112,31 @@ export function portOfHandle(handle: string | null | undefined, prefix: 'in' | '
 const portButton =
   'nodrag nopan hover:bg-muted focus-visible:ring-ring/50 flex h-7.5 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-sm text-left outline-none focus-visible:ring-3'
 
+function WarningIcon({ className }: { className: string }) {
+  return (
+    <HugeiconsIcon
+      icon={Alert02Icon}
+      strokeWidth={2}
+      aria-hidden
+      className={cn('shrink-0 text-amber-700 dark:text-amber-300', className)}
+    />
+  )
+}
+
+function ViewOnlyPort({ view, side }: { view: PortView; side: 'input' | 'output' }) {
+  return (
+    <span
+      className={cn(
+        'flex h-7.5 min-w-0 flex-1 items-center gap-1',
+        side === 'output' ? 'justify-end pr-1' : 'pl-1',
+      )}>
+      <span className="truncate">{view.label}</span>
+      <span className="sr-only">{view.status}</span>
+      {side === 'input' && !view.linked && <WarningIcon className="size-3.5" />}
+    </span>
+  )
+}
+
 function InputPort({
   transformId,
   name,
@@ -136,42 +162,44 @@ function InputPort({
   )
 
   const unavailable = useConnection((connection) => connection.inProgress && view.linked)
+  const viewOnly = useCanvasViewOnly()
 
   return (
     <div className="relative flex items-center pr-1 pl-3.5">
       <Handle
         id={inputHandle(view.port)}
+        isConnectable={!viewOnly}
         isConnectableStart={false}
         position={Position.Left}
         type="target"
         className={cn(
-          'link-handle',
+          viewOnly ? 'part-handle' : 'link-handle',
+          viewOnly && !view.linked && 'invisible',
           target && 'link-handle-marked',
           unavailable && 'link-handle-unavailable',
         )}
       />
-      <button
-        type="button"
-        aria-describedby={[status, target && hints.linkTarget].filter(Boolean).join(' ')}
-        aria-label={t('inputLabel', { port: view.label, transform: name })}
-        className={cn(portButton, 'pl-1', target && 'outline-primary outline-1 outline-dashed')}
-        data-link-target={target || undefined}
-        data-port={inputHandle(view.port)}
-        data-transform-id={transformId}
-        onClick={() => actions.input(end)}>
-        <span className="truncate">{view.label}</span>
-        {!view.linked && (
-          <HugeiconsIcon
-            icon={Alert02Icon}
-            strokeWidth={2}
-            aria-hidden
-            className="size-3.5 shrink-0 text-amber-700 dark:text-amber-300"
-          />
-        )}
-      </button>
-      <span id={status} hidden>
-        {view.status}
-      </span>
+      {viewOnly ? (
+        <ViewOnlyPort side="input" view={view} />
+      ) : (
+        <button
+          type="button"
+          aria-describedby={[status, target && hints.linkTarget].filter(Boolean).join(' ')}
+          aria-label={t('inputLabel', { port: view.label, transform: name })}
+          className={cn(portButton, 'pl-1', target && 'outline-primary outline-1 outline-dashed')}
+          data-link-target={target || undefined}
+          data-port={inputHandle(view.port)}
+          data-transform-id={transformId}
+          onClick={() => actions.input(end)}>
+          <span className="truncate">{view.label}</span>
+          {!view.linked && <WarningIcon className="size-3.5" />}
+        </button>
+      )}
+      {!viewOnly && (
+        <span id={status} hidden>
+          {view.status}
+        </span>
+      )}
     </div>
   )
 }
@@ -191,29 +219,41 @@ function OutputPort({
   const status = useId()
   const start: LinkStart = { kind: 'transform', transformId, output: view.port }
   const pending = useCanvasStore((state) => sameStart(state.linkFrom, start))
+  const viewOnly = useCanvasViewOnly()
 
   return (
     <div className="relative flex items-center pr-3.5 pl-1">
-      <button
-        type="button"
-        aria-describedby={[status, pending && hints.linkStart].filter(Boolean).join(' ')}
-        aria-label={t('outputLabel', { port: view.label, transform: name })}
-        aria-pressed={pending}
-        className={cn(portButton, 'justify-end pr-1', pending && 'bg-primary/10')}
-        data-port={outputHandle(view.port)}
-        data-transform-id={transformId}
-        onClick={() => actions.output(start)}>
-        <span className="truncate">{view.label}</span>
-      </button>
-      <span id={status} hidden>
-        {view.status}
-      </span>
+      {viewOnly ? (
+        <ViewOnlyPort side="output" view={view} />
+      ) : (
+        <button
+          type="button"
+          aria-describedby={[status, pending && hints.linkStart].filter(Boolean).join(' ')}
+          aria-label={t('outputLabel', { port: view.label, transform: name })}
+          aria-pressed={pending}
+          className={cn(portButton, 'justify-end pr-1', pending && 'bg-primary/10')}
+          data-port={outputHandle(view.port)}
+          data-transform-id={transformId}
+          onClick={() => actions.output(start)}>
+          <span className="truncate">{view.label}</span>
+        </button>
+      )}
+      {!viewOnly && (
+        <span id={status} hidden>
+          {view.status}
+        </span>
+      )}
       <Handle
         id={outputHandle(view.port)}
+        isConnectable={!viewOnly}
         isConnectableEnd={false}
         position={Position.Right}
         type="source"
-        className={cn('link-handle', pending && 'link-handle-marked')}
+        className={cn(
+          viewOnly ? 'part-handle' : 'link-handle',
+          viewOnly && !view.linked && 'invisible',
+          pending && 'link-handle-marked',
+        )}
       />
     </div>
   )
@@ -225,6 +265,7 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
   const onFocus = usePanIntoView({ whole: true })
   const issuesId = useId()
   const selected = useCanvasStore((state) => state.selectedTransform === data.transformId)
+  const viewOnly = useCanvasViewOnly()
   const invalid = data.issues.length > 0
   const { reportHeight } = actions
   const { transformId } = data
@@ -250,7 +291,7 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
       role="group"
       aria-label={t('label', { name: data.name })}
       className={cn(
-        'bg-card text-foreground flex flex-col gap-1 rounded-md border-2 py-1 text-xs shadow-sm',
+        'bg-card text-foreground pointer-events-auto flex flex-col gap-1 rounded-md border-2 py-1 text-xs shadow-sm',
         invalid ? 'border-dashed border-amber-700 dark:border-amber-300' : 'border-border',
         selected && 'outline-primary outline-2 outline-offset-2 outline-solid',
       )}
@@ -267,24 +308,19 @@ function TransformNodeView({ data }: NodeProps<TransformFlowNode>) {
           className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 flex min-h-7.5 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm px-1 py-1 text-left leading-tight font-semibold outline-none focus-visible:ring-3"
           data-transform-id={data.transformId}
           onClick={() => actions.toggle(data.transformId)}>
-          {invalid && (
-            <HugeiconsIcon
-              icon={Alert02Icon}
-              strokeWidth={2}
-              aria-hidden
-              className="size-4 shrink-0 text-amber-700 dark:text-amber-300"
-            />
-          )}
+          {invalid && <WarningIcon className="size-4" />}
           {/* Wraps rather than truncates, so the number that tells same-kind nodes apart stays. */}
           <span className="min-w-0 [overflow-wrap:anywhere]">{data.name}</span>
         </button>
-        <button
-          type="button"
-          aria-label={t('remove', { name: data.name })}
-          className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground inline-flex size-7.5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
-          onClick={() => actions.remove(data.transformId)}>
-          <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
-        </button>
+        {!viewOnly && (
+          <button
+            type="button"
+            aria-label={t('remove', { name: data.name })}
+            className="nodrag nopan hover:bg-muted focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground inline-flex size-7.5 shrink-0 items-center justify-center rounded-sm outline-none focus-visible:ring-3"
+            onClick={() => actions.remove(data.transformId)}>
+            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
+          </button>
+        )}
       </div>
       {/* Not a control, so a drag that starts here moves the node. */}
       <p title={data.summary} className="text-muted-foreground truncate px-2.5 font-mono">

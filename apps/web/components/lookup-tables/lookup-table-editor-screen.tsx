@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { BackLink, LoadFailure } from '@/components/detail-parts'
 import { LookupTableEntryEditor } from '@/components/lookup-tables/lookup-table-entry-editor'
 import { ScopeLabel } from '@/components/lookup-tables/lookup-table-scope-label'
+import { useSession } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { lookupTableQuery } from '@/lib/api/queries'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
@@ -20,11 +21,12 @@ export function LookupTableEditorScreen({ id }: { id: string }) {
   const t = useTranslations('LookupTable')
   const tLookupTables = useTranslations('LookupTables')
   const { data, error, isPending, refetch } = useQuery(lookupTableQuery(id))
+  const session = useSession()
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <BackLink href="/lookup-tables" label={t('back')} />
-      {isPending ? (
+      {isPending || session.isPending ? (
         <div aria-busy className="flex flex-col gap-6">
           <p role="status" className="sr-only">
             {t('loading')}
@@ -48,7 +50,7 @@ export function LookupTableEditorScreen({ id }: { id: string }) {
               </dd>
             </dl>
           </div>
-          <LookupTableEntryEditor key={data.id} table={data} />
+          <LookupTableEntryEditor key={data.id} canChange={session.canChange} table={data} />
         </>
       ) : (
         <LoadFailure

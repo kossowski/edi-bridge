@@ -12,9 +12,14 @@ import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
 import { MappingPreviewPanel } from '@/components/mappings/mapping-preview-panel'
 import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
-import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
+import {
+  DraftStateLabel,
+  MappingVersionsLink,
+  PublishDraft,
+} from '@/components/mappings/publish-draft'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { useDesktop } from '@/hooks/use-desktop'
+import { useSession } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { mappingDraftQuery } from '@/lib/api/queries'
 import {
@@ -99,20 +104,24 @@ function DesktopOnlyNotice() {
   )
 }
 
-function MappingView({ draft }: { draft: MappingDraft }) {
+function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boolean }) {
   const t = useTranslations('Mapping')
   const sideTitle = useSideTitle()
   const desktop = useDesktop()
   const stateId = useId()
 
   return (
-    <MappingCanvasProvider>
+    <MappingCanvasProvider viewOnly={!canChange}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
         <DraftStateLabel id={stateId} draft={draft} />
-        <GraphSaveStatus mappingId={draft.mappingId} />
+        {canChange && <GraphSaveStatus mappingId={draft.mappingId} />}
         <div className="ms-auto">
-          <PublishDraft draft={draft} stateId={stateId} />
+          {canChange ? (
+            <PublishDraft draft={draft} stateId={stateId} />
+          ) : (
+            <MappingVersionsLink mappingId={draft.mappingId} />
+          )}
         </div>
       </div>
       <dl
@@ -155,16 +164,17 @@ function MappingLoading() {
 export function MappingCanvasScreen({ id }: { id: string }) {
   const t = useTranslations('Mapping')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
+  const session = useSession()
 
   // On desktop the screen takes the viewport below the app header (h-14), so the canvas and the
   // band under it share the height without page scrolling.
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 lg:h-[calc(100svh-3.5rem)] lg:flex-none lg:gap-3 lg:py-4">
       <BackLink href="/mappings" label={t('back')} />
-      {isPending ? (
+      {isPending || session.isPending ? (
         <MappingLoading />
       ) : data ? (
-        <MappingView draft={data} />
+        <MappingView canChange={session.canChange} draft={data} />
       ) : (
         <LoadFailure
           namespace="Mapping"

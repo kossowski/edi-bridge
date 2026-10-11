@@ -5,6 +5,7 @@ import { useId } from 'react'
 
 import {
   isStartRow,
+  useCanvasViewOnly,
   useCanvasStore,
   useLinkHints,
 } from '@/components/mappings/mapping-canvas-store'
@@ -73,7 +74,8 @@ export function RowLinks({
   const heading = useId()
   const linkFrom = useCanvasStore((state) => state.linkFrom)
   const own = linksOfItem(graph, row.side, item)
-  const linkable = isLinkableRow(rows, row)
+  const viewOnly = useCanvasViewOnly()
+  const linkable = !viewOnly && isLinkableRow(rows, row)
 
   return (
     <section aria-labelledby={heading} className="flex flex-col gap-2">
@@ -104,14 +106,16 @@ export function RowLinks({
                 <span className="min-w-0 font-mono [overflow-wrap:anywhere]">
                   {t('item', names)}
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  aria-label={t('removeLabel', names)}
-                  data-remove-link
-                  onClick={() => actions.remove(link, index)}>
-                  {t('remove')}
-                </Button>
+                {!viewOnly && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label={t('removeLabel', names)}
+                    data-remove-link
+                    onClick={() => actions.remove(link, index)}>
+                    {t('remove')}
+                  </Button>
+                )}
               </li>
             )
           })}

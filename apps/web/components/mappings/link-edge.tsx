@@ -14,7 +14,7 @@ import {
 import { useTranslations } from 'next-intl'
 import { createContext, memo, useCallback, useContext, useState } from 'react'
 
-import { useCanvasStore } from '@/components/mappings/mapping-canvas-store'
+import { useCanvasViewOnly, useCanvasStore } from '@/components/mappings/mapping-canvas-store'
 import { panelGutter } from '@/components/mappings/mapping-tree'
 
 import type { CanvasLink } from '@/components/mappings/mapping-tree'
@@ -190,6 +190,7 @@ function LinkEdgeView({
   interactionWidth = 20,
 }: EdgeProps<LinkFlowEdge>) {
   const hovered = useCanvasStore((state) => state.hoveredEdge === id)
+  const viewOnly = useCanvasViewOnly()
 
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
@@ -207,7 +208,7 @@ function LinkEdgeView({
         path={path}
         style={hovered ? { ...style, stroke: 'var(--foreground)', strokeWidth: 2.5 } : style}
       />
-      {hovered && data && (
+      {hovered && data && !viewOnly && (
         <EdgeButtonAnchor id={id} data={data} midpoint={{ x: labelX, y: labelY }} />
       )}
     </>

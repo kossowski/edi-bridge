@@ -8,6 +8,7 @@ import {
   dragLink,
   findRow,
   findSaveStatus,
+  handleOf,
   liveStatus,
   pressOn,
   seeded,
@@ -15,6 +16,7 @@ import {
   target,
   transformNodeOf,
 } from '@/components/mappings/mapping-canvas-story-helpers'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { mappingDraftEndpoint, saveMappingDraftEndpoint, toPath } from '@edi-bridge/contracts'
@@ -576,15 +578,19 @@ export const OverlappingSaveRollback = meta.story({
   },
 })
 
-export const German = meta.story({
-  args: { id: invoic.id },
-  // The band's Details column is narrowest on a laptop, where its fields have to fit.
+// The band's Details column is narrowest on a laptop, where its fields have to fit.
+const onLaptop = {
   parameters: {
     viewport: {
       options: { laptop: { name: 'Laptop', styles: { width: '1024px', height: '900px' } } },
     },
   },
   globals: { viewport: { value: 'laptop', isRotated: false } },
+}
+
+export const German = meta.story({
+  args: { id: invoic.id },
+  ...onLaptop,
   decorators: [
     (Story) => (
       <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
@@ -643,4 +649,126 @@ export const Dark = meta.story({
       canvas.getByRole('button', { name: 'Result output of Date format 1' }),
     ).toHaveAttribute('aria-pressed', 'true')
   },
+})
+
+async function expectNoSettingsInputs(canvasElement: HTMLElement) {
+  const panel = detailsPanel(canvasElement)
+
+  for (const role of ['textbox', 'radio', 'combobox'] as const) {
+    await expect(panel.queryAllByRole(role)).toHaveLength(0)
+  }
+}
+
+export const Viewer = meta.story({
+  args: { id: invoic.id },
+  ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      const dateFormat = await findNode(canvasElement, 'Date format 1')
+      const header = dateFormat.getByRole('button', { name: 'Date format 1' })
+      const linked = 'Link from invoiceDate to Date format 1 (Value)'
+
+      await expect(canvas.queryByRole('region', { name: 'Add a Transform' })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: /^Add / })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: 'Publish' })).toBeNull()
+      await expect(canvas.getByRole('link', { name: 'Mapping Versions' })).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: /^Remove / })).toBeNull()
+      await expect(
+        dateFormat.queryByRole('button', { name: 'Value input of Date format 1' }),
+      ).toBeNull()
+      await expect(dateFormat.getByText('Linked from invoiceDate.')).toBeInTheDocument()
+      await expect(handleOf(canvasElement, source('invoiceDate'))).not.toHaveClass('connectable')
+      await expect(handleOf(canvasElement, source('invoiceDate'))).not.toHaveClass('link-handle')
+
+      const row = await findRow(canvasElement, source('invoiceDate'))
+
+      await pressOn(row, '{Delete}')
+      await pressOn(row, 'l')
+      await pressOn(header, '{Delete}')
+      await expect(canvas.getByText('9 Transforms')).toBeVisible()
+      await expect(canvas.getByRole('img', { name: linked })).toBeInTheDocument()
+      await expect(canvas.queryByText(/^Linking from/)).toBeNull()
+
+      const edge = edgeNamed(canvasElement, linked)
+      const path = edge.parentElement!.querySelector<SVGPathElement>('.react-flow__edge-path')!
+
+      await userEvent.hover(edge)
+      await waitFor(() => expect(path.style.strokeWidth).toBe('2.5'))
+      await expect(canvas.queryByRole('button', { name: /^Remove link/ })).toBeNull()
+
+      await pressOn(header, '{Enter}')
+
+      const panel = detailsPanel(canvasElement)
+
+      await expect(panel.getByRole('heading', { name: 'Date format 1' })).toBeVisible()
+      await expect(panel.getByText('From pattern')).toBeVisible()
+      await expect(panel.getByText('yyyy-MM-dd')).toBeVisible()
+      await expect(panel.getByText(/^The pattern of the incoming date/)).toBeVisible()
+      await expectNoSettingsInputs(canvasElement)
+      await expect(panel.queryByRole('button', { name: /^(Remove|Move) / })).toBeNull()
+
+      const lookup = await findNode(canvasElement, 'Lookup Table 1')
+
+      await userEvent.click(lookup.getByRole('button', { name: 'Lookup Table 1' }))
+      await expect(await panel.findByText('VAT categories')).toBeVisible()
+      await expect(panel.getByText('Belongs to: Workspace')).toBeVisible()
+
+      const jsonata = await findNode(canvasElement, 'JSONata expression 1')
+
+      await userEvent.click(jsonata.getByRole('button', { name: 'JSONata expression 1' }))
+      await expect(panel.getByText('$sum(lines.lineAmount)')).toBeVisible()
+      await expect(panel.getByText('The syntax is valid.')).toBeVisible()
+
+      await pressOn(await findRow(canvasElement, source('invoiceNumber')), '{Enter}')
+      await expect(panel.getByRole('heading', { name: 'Links' })).toBeVisible()
+      await expect(panel.queryByRole('button', { name: 'Link from here' })).toBeNull()
+      await userEvent.keyboard('{Escape}')
+      await expect(panel.getByText(/Select a part to keep its meaning/)).toBeVisible()
+    },
+  }),
+})
+
+export const ViewerGerman = meta.story({
+  args: { id: invoic.id },
+  ...onLaptop,
+  ...viewerStory({
+    decorators: [
+      (Story) => (
+        <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+          <Story />
+        </NextIntlClientProvider>
+      ),
+    ],
+    async play({ canvas, canvasElement }) {
+      const split = await findNode(canvasElement, 'Teilen 1')
+
+      await expect(canvas.queryByRole('button', { name: 'Veröffentlichen' })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: /hinzufügen$/ })).toBeNull()
+      await userEvent.click(split.getByRole('button', { name: 'Teilen 1' }))
+
+      const panel = detailsPanel(canvasElement)
+
+      await expect(panel.getByText('Nicht festgelegt')).toBeVisible()
+      await expect(panel.getByText('Trennzeichen: Angabe erforderlich.')).toBeVisible()
+      await expect(panel.queryByRole('button', { name: 'Teilen 1 entfernen' })).toBeNull()
+      await expectNoSettingsInputs(canvasElement)
+    },
+  }),
+})
+
+export const ViewerDark = meta.story({
+  args: { id: invoic.id },
+  ...viewerStory({
+    beforeEach() {
+      document.documentElement.classList.add('dark')
+
+      return () => document.documentElement.classList.remove('dark')
+    },
+    async play({ canvasElement }) {
+      const numberFormat = await findNode(canvasElement, 'Number format 1')
+
+      await userEvent.click(numberFormat.getByRole('button', { name: 'Number format 1' }))
+      await expect(detailsPanel(canvasElement).getByText('Decimal places')).toBeVisible()
+      await expectNoSettingsInputs(canvasElement)
+    },
+  }),
 })
