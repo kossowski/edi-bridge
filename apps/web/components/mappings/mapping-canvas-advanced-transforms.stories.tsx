@@ -499,12 +499,12 @@ export const LinkOutsideLoop = meta.story({
     const loop = await findNode(canvasElement, 'Loop over line items 1')
 
     const problem =
-      'The link from invoiceNumber to SG25/QTY+47/C186/6411 leaves the loop: links run once per item only between fields beneath the looped parts.'
+      'The link from invoiceNumber to SG25/QTY+47/C186/6063 leaves the loop: links run once per item only between fields beneath the looped parts.'
 
     await expect(loop.queryByText(problem)).toBeNull()
 
     await pressOn(await findRow(canvasElement, source('invoiceNumber')), 'l')
-    await pressOn(await findRow(canvasElement, target('SG25/QTY+47/C186/6411')), 'l')
+    await pressOn(await findRow(canvasElement, target('SG25/QTY+47/C186/6063')), 'l')
 
     await expect(await loop.findByText(problem)).toBeVisible()
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()

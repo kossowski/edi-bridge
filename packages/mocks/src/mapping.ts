@@ -239,11 +239,6 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
       { inputs: { value: 'SG2+SU/NAD+SU/3207' }, outputs: { value: 'supplier.country' } },
     ),
     transformTemplate(
-      'lookupTable',
-      { lookupTableId: seedLookupTableNamed('Units of measure').id, fallback: 'fail' },
-      { inputs: { value: 'SG25/QTY+21/C186/6411' }, outputs: { value: 'lines[].unit' } },
-    ),
-    transformTemplate(
       'substring',
       { start: 0, length: 35 },
       { inputs: { value: 'SG2+SU/NAD+SU/C080/3036' }, outputs: { value: 'supplier.name' } },
@@ -285,7 +280,7 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
     transformTemplate(
       'constant',
       { value: '' },
-      { outputs: { value: 'SG10/SG17/QTY+12/C186/6411' } },
+      { outputs: { value: 'SG10/SG17/QTY+12/C186/6063' } },
     ),
     transformTemplate(
       'concatenate',
@@ -293,6 +288,14 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
       {
         inputs: { part1: 'shipTo.postalCode', part2: 'shipTo.city' },
         outputs: { value: 'SG2+DP/NAD+DP/3164' },
+      },
+    ),
+    transformTemplate(
+      'lookupTable',
+      { lookupTableId: seedLookupTableNamed('Units of measure').id, fallback: 'fail' },
+      {
+        inputs: { value: 'packages[].lines[].unit' },
+        outputs: { value: 'SG10/SG17/QTY+12/C186/6411' },
       },
     ),
   ],
@@ -337,6 +340,11 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
       'loop',
       { counterStart: 1 },
       { inputs: { items: 'lines[]' }, outputs: { items: 'SG25', counter: 'SG25/LIN/1082' } },
+    ),
+    transformTemplate(
+      'lookupTable',
+      { lookupTableId: seedLookupTableNamed('Units of measure').id, fallback: 'fail' },
+      { inputs: { value: 'lines[].unit' }, outputs: { value: 'SG25/QTY+47/C186/6411' } },
     ),
   ],
   CONTRL: [

@@ -817,7 +817,7 @@ export const RemoveLinkByMouse = meta.story({
 
     // The panel also lists the loop that takes the whole part.
     await expect(panel.getAllByRole('button', { name: /^Remove link from packages/ })).toHaveLength(
-      10,
+      11,
     )
     // Focus moves a frame after the panel lists the links.
     await waitFor(() =>
@@ -868,7 +868,7 @@ export const RemoveLinkByKeyboard = meta.story({
     await pressOn(await findRow(canvasElement, source('packages[]')), '{Delete}')
     await waitFor(() =>
       expect(liveStatus(canvasElement)).toHaveTextContent(
-        'packages has 10 links. Select it to remove them one by one.',
+        'packages has 11 links. Select it to remove them one by one.',
       ),
     )
     await expectSavedLinkCount(outbound.id, 28)

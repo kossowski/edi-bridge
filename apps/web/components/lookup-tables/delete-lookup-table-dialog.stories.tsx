@@ -36,7 +36,7 @@ const meta = preview.meta({
 export const Default = meta.story({
   async play() {
     await dialog()
-    await expect(screen.getByText(/its 5 entries are deleted/)).toBeVisible()
+    await expect(screen.getByText(/its 4 entries are deleted/)).toBeVisible()
     await expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
   },
 })

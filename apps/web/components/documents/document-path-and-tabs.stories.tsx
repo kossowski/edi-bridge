@@ -32,7 +32,7 @@ const unreadable = storyRun(2, 'ORDERS', 'parse')
 
 const invalidContent = storyRun(3, 'ORDERS', 'validation')
 
-const missingCode = storyRun(4, 'ORDERS', 'mapping')
+const missingGtin = storyRun(4, 'ORDERS', 'mapping')
 
 const unreachable = storyRun(5, 'INVOIC', 'delivery')
 
@@ -52,7 +52,7 @@ const runs = [
   delivered,
   unreadable,
   invalidContent,
-  missingCode,
+  missingGtin,
   unreachable,
   processing,
   duplicate,
@@ -215,7 +215,7 @@ export const PathFailedAtCheck = meta.story({
 })
 
 export const PathFailedAtTranslate = meta.story({
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   async play({ canvasElement }) {
     await expect((await pathSteps(canvasElement))[3]).toBe('Translated: failed here')
   },
@@ -255,7 +255,7 @@ export const PathDuplicate = meta.story({
 })
 
 export const PathHintOnFocus = meta.story({
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   async play({ canvas }) {
     const step = await canvas.findByRole('button', { name: 'Translated: failed here' })
     const hint = 'EDI Bridge converted the document into the format of your ERP.'
@@ -316,7 +316,7 @@ export const ChooseTechnicalTab = meta.story({
 
 export const Content = meta.story({
   ...contentTab,
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   async play({ canvas }) {
     const table = await canvas.findByRole('region', { name: 'Lines of the document' })
 
@@ -325,7 +325,7 @@ export const Content = meta.story({
       .map((header) => header.textContent)
 
     await expect(headers).toEqual(['Line', 'Article number (GTIN)', 'Quantity', 'Unit'])
-    await expect(within(table).getByText('KRT (no translation)')).toBeVisible()
+    await expect(within(table).getByText('missing')).toBeVisible()
   },
 })
 
@@ -449,7 +449,7 @@ export const LargeTechnicalDetails = meta.story({
 
 export const German = meta.story({
   ...contentTab,
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   decorators: [german],
   async play({ canvas }) {
     const path = await canvas.findByRole('list', { name: 'Der Weg dieses Belegs' })
@@ -460,7 +460,7 @@ export const German = meta.story({
       'aria-selected',
       'true',
     )
-    await expect(canvas.getByText('KRT (keine Übersetzung)')).toBeVisible()
+    await expect(canvas.getByText('fehlt')).toBeVisible()
   },
 })
 
@@ -488,12 +488,12 @@ export const DarkPath = meta.story({
 
 export const DarkContent = meta.story({
   ...contentTab,
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   beforeEach() {
     return darkMode()
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('KRT (no translation)')).toBeVisible()
+    await expect(await canvas.findByText('missing')).toBeVisible()
   },
 })
 
@@ -513,7 +513,7 @@ export const DarkTechnicalDetails = meta.story({
 
 export const MobilePath = meta.story({
   ...mobile,
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   async play({ canvas, canvasElement }) {
     const path = await canvas.findByRole('list', { name: 'The path of this document' })
     await expectNoPageScroll(canvasElement)
@@ -523,7 +523,7 @@ export const MobilePath = meta.story({
 
 export const GermanMobilePath = meta.story({
   ...mobile,
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   decorators: [german],
   async play({ canvasElement }) {
     await expectWholeGermanWords(canvasElement)
@@ -542,7 +542,7 @@ export const GermanLaptopPath = meta.story({
 export const MobileContent = meta.story({
   ...mobile,
   parameters: { ...mobile.parameters, ...contentQuery },
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('region', { name: 'Lines of the document' })).toBeVisible()
     await expectNoPageScroll(canvasElement)
@@ -552,7 +552,7 @@ export const MobileContent = meta.story({
 export const DesktopContent = meta.story({
   ...desktop,
   parameters: { ...desktop.parameters, ...contentQuery },
-  args: { id: missingCode.id },
+  args: { id: missingGtin.id },
   async play({ canvas }) {
     const table = await canvas.findByRole('region', { name: 'Lines of the document' })
     const line = within(table).getByRole('columnheader', { name: 'Line' })

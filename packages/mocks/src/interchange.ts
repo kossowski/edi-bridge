@@ -13,6 +13,9 @@ import {
   withCheckDigit,
 } from '@edi-bridge/contracts'
 
+import { seedFlows } from './flow'
+import { seedLookupTableNamed } from './lookup-table-seed'
+import { publishedVersionsByMapping, seedMappingDrafts } from './mapping'
 import { seededFaker } from './seeded-faker'
 import { seedGln } from './trading-partner'
 import { seedWorkspace } from './workspace'
@@ -56,6 +59,39 @@ export type GeneratedMessage = Failure & {
 }
 
 const missingUnit = { kind: 'lookupTable', name: 'Units of measure', code: 'KRT' } as const
+
+let unitReadingFlowIds: ReadonlySet<string> | undefined
+
+// Only outbound Mappings translate your units for the partner, so only their Runs miss one.
+function readsUnits(run: RunSummary) {
+  unitReadingFlowIds ??= unitReadingFlows()
+
+  return unitReadingFlowIds.has(run.flow.id)
+}
+
+function unitReadingFlows() {
+  const units = seedLookupTableNamed(missingUnit.name).id
+  const versions = publishedVersionsByMapping(seedMappingDrafts)
+
+  const mappingIds = new Set(
+    seedMappingDrafts
+      .filter(({ transforms }) =>
+        transforms.some(
+          (transform) =>
+            transform.kind === 'lookupTable' && transform.config.lookupTableId === units,
+        ),
+      )
+      .map(({ id }) => id),
+  )
+
+  return new Set(
+    seedFlows
+      .filter(({ mappingVersionId }) =>
+        mappingIds.has(versions.find(mappingVersionId)?.version.mappingId ?? ''),
+      )
+      .map(({ id }) => id),
+  )
+}
 
 const partyGlnFields = { BY: 'buyer.gln', SU: 'supplier.gln' } as const
 
@@ -311,7 +347,23 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
     }
 
     case 'mapping': {
-      if (outbound && faker.datatype.boolean()) {
+      if (!outbound) {
+        const lin = indexOf(segments, 'LIN')
+
+        return {
+          segments: segments.with(lin, setComponent(segments[lin]!, 3, 1, '')),
+          fault: {
+            segment: lin,
+            element: 3,
+            component: 1,
+            code: 'missingSourceField',
+            message: 'The required source field "lines[1].gtin" is missing.',
+          },
+          broken: { kind: 'mapping', fieldPath: 'lines[].gtin' },
+        }
+      }
+
+      if (!readsUnits(run)) {
         return intact
       }
 

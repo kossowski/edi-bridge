@@ -311,8 +311,18 @@ describe('the problem of a failed Run', () => {
     ).toEqual(new Set(partyFields.values()))
   })
 
-  it('points a missing code at the Lookup Table that lacks it', async () => {
-    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
+  it('points a missing unit of an outbound document at the Lookup Table that lacks it', async () => {
+    const flow = seedFlows.find(({ name }) => name === invoicFlow.name)!
+
+    const run = createRun({
+      id: '00000000-0000-4000-8000-000000000001',
+      tradingPartner: hansemarkt,
+      messageType: 'INVOIC',
+      flow: { id: flow.id, name: flow.name },
+      status: 'failed',
+      failureStage: 'mapping',
+    })
+
     const units = seedLookupTableNamed('Units of measure')
     server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
 
@@ -323,6 +333,20 @@ describe('the problem of a failed Run', () => {
       whoFixes: 'you',
       fixTarget: { kind: 'lookupTable', lookupTableId: units.id, name: units.name, code: 'KRT' },
     })
+  })
+
+  it('points an inbound document without a GTIN at the Mapping field that reads it', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+    const lin = body?.message?.segments.find(({ tag }) => tag === 'LIN')
+
+    expect(body?.problem).toMatchObject({
+      reason: 'missingField',
+      fixTarget: { kind: 'mapping', fieldPath: 'lines[].gtin' },
+    })
+    expect(lin?.elements[2]?.[0]).toBe('')
   })
 
   it('points a missing ERP field at the Mapping field that reads it', async () => {

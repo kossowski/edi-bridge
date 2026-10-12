@@ -40,7 +40,7 @@ export const Default = meta.story({
     ).toBeInTheDocument()
     await expect(canvas.getByRole('grid', { name: 'Entries' })).toBeVisible()
     await expect(canvas.getByRole('gridcell', { name: 'KGM' })).toBeVisible()
-    await expect(canvas.getByText('5 entries')).toBeVisible()
+    await expect(canvas.getByText('4 entries')).toBeVisible()
   },
 })
 
@@ -241,7 +241,7 @@ export const Viewer = meta.story({
       await expect(canvas.queryByRole('textbox')).toBeNull()
       await userEvent.keyboard('{Enter}x{Control>}{Enter}{/Control}{Control>}{Delete}{/Control}')
       await expect(canvas.queryByRole('textbox')).toBeNull()
-      await expect(canvas.getByText('5 entries')).toBeVisible()
+      await expect(canvas.getByText('4 entries')).toBeVisible()
       await expect(within(grid).getAllByRole('columnheader')).toHaveLength(3)
       await userEvent.keyboard('{ArrowLeft}')
       await expect(cell.previousElementSibling).toHaveFocus()

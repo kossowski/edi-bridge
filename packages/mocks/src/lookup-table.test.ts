@@ -370,7 +370,6 @@ describe('POST /lookup-tables/:id/import', () => {
     expect(imported.entries).toEqual([
       { sourceCode: 'ST', targetCode: 'PCE' },
       { sourceCode: 'STK', targetCode: 'PCE' },
-      { sourceCode: 'PCE', targetCode: 'PCE' },
       { sourceCode: 'KG', targetCode: 'KGS' },
       { sourceCode: 'L', targetCode: 'LTR' },
       { sourceCode: 'KAR', targetCode: 'CT' },
@@ -387,30 +386,30 @@ describe('POST /lookup-tables/:id/import', () => {
   })
 })
 
-const hansemarktOrdersFlow = seedFlows.find(
+const hansemarktInvoicFlow = seedFlows.find(
   ({ tradingPartnerId, messageType }) =>
-    tradingPartnerId === hansemarkt.id && messageType === 'ORDERS',
+    tradingPartnerId === hansemarkt.id && messageType === 'INVOIC',
 )!
 
-function failedOrders(id: string, receivedAt: string): RunSummary {
+function failedInvoic(id: string, receivedAt: string): RunSummary {
   return createRun({
     id,
     tradingPartner: { id: hansemarkt.id, name: hansemarkt.name },
-    messageType: 'ORDERS',
-    direction: 'inbound',
-    flow: { id: hansemarktOrdersFlow.id, name: hansemarktOrdersFlow.name },
+    messageType: 'INVOIC',
+    direction: 'outbound',
+    flow: { id: hansemarktInvoicFlow.id, name: hansemarktInvoicFlow.name },
     receivedAt,
     status: 'failed',
     failureStage: 'mapping',
   })
 }
 
-const olderFailure = failedOrders(
+const olderFailure = failedInvoic(
   '00000000-0000-4000-8000-000000000001',
   '2026-10-01T08:00:00.000Z',
 )
 
-const newerFailure = failedOrders(
+const newerFailure = failedInvoic(
   '00000000-0000-4000-8000-000000000002',
   '2026-10-03T08:00:00.000Z',
 )
@@ -420,7 +419,7 @@ function failedRunAt(receivedAt: string) {
     id: olderFailure.id,
     receivedAt,
     tradingPartner: { id: hansemarkt.id, name: hansemarkt.name },
-    messageType: 'ORDERS' as const,
+    messageType: 'INVOIC' as const,
     businessReference: null,
   }
 }
@@ -452,7 +451,7 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
           id: newerFailure.id,
           receivedAt: newerFailure.receivedAt,
           tradingPartner: { id: hansemarkt.id, name: hansemarkt.name },
-          messageType: 'ORDERS',
+          messageType: 'INVOIC',
           businessReference: newerFailure.businessReference,
         },
         expect.objectContaining({ id: olderFailure.id }),
@@ -602,16 +601,40 @@ describe('Lookup Table uses', () => {
     }
   })
 
-  it('names the ORDERS Mappings that read the units the blocking KRT is missing from', async () => {
+  it('names the outbound Mappings that translate your units for the partner', async () => {
     server.use(...lookupTableHandlers(apiUrl))
     const units = seedLookupTableNamed('Units of measure')
 
     const { uses, missingCodeCounts } = await getLookupTable(units.id)
 
     expect(missingCodeCounts.blocking).toBe(1)
-    expect(uses.length).toBeGreaterThan(0)
-    expect(new Set(uses.map(({ messageType }) => messageType))).toEqual(new Set(['ORDERS']))
+    expect(new Set(uses.map(({ messageType }) => messageType))).toEqual(
+      new Set(['DESADV', 'INVOIC']),
+    )
+    expect(uses.every(({ direction }) => direction === 'outbound')).toBe(true)
     expect(uses.every(({ tradingPartners }) => tradingPartners.length > 0)).toBe(true)
+  })
+
+  it('names the Trading Partner and message type of every Run that KRT made fail', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const { uses } = await getLookupTable(units.id)
+    const [krt] = await getMissingCodes(units.id)
+    const failedRuns = krt?.urgency === 'blocking' ? krt.failedRuns : []
+
+    expect(failedRuns.length).toBeGreaterThan(0)
+
+    for (const { messageType, tradingPartner } of failedRuns) {
+      expect(['DESADV', 'INVOIC']).toContain(messageType)
+      expect(
+        uses.some(
+          (use) =>
+            use.messageType === messageType &&
+            use.tradingPartners.some(({ id }) => id === tradingPartner.id),
+        ),
+      ).toBe(true)
+    }
   })
 
   it('names only the Trading Partner a partner table belongs to', async () => {

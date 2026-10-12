@@ -67,7 +67,7 @@ const seeds: ReadonlyArray<Omit<LookupTableRecord, 'id'>> = [
     kind: 'units',
     scope: workspaceScope,
     updatedAt: '2026-09-14T08:30:00.000Z',
-    entries: entries(['ST', 'PCE'], ['STK', 'PCE'], ['PCE', 'PCE'], ['KG', 'KGM'], ['L', 'LTR']),
+    entries: entries(['ST', 'PCE'], ['STK', 'PCE'], ['KG', 'KGM'], ['L', 'LTR']),
     upcomingCodes: [
       { code: 'BTL', itemCount: 14 },
       { code: 'SET', itemCount: 3 },

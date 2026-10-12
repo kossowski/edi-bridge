@@ -213,29 +213,33 @@ describe('POST /mappings/:id/preview', () => {
     })
   })
 
-  it('translates the units of an inbound sample through units of measure', async () => {
+  it('translates your units of an outbound sample through units of measure', async () => {
     server.use(...mappingPreviewHandlers(apiUrl))
-    const [sample] = await samplesOf(hansemarktOrders.id)
-    const { links, transforms, transformLinks } = hansemarktOrders
+    const [invoice] = await samplesOf(hansemarktInvoic.id)
+    const { links, transforms, transformLinks } = hansemarktInvoic
 
     const units = transforms.find(
-      ({ kind, config }) =>
-        kind === 'lookupTable' &&
-        'lookupTableId' in config &&
-        config.lookupTableId === seedLookupTableNamed('Units of measure').id,
+      (transform) =>
+        transform.kind === 'lookupTable' &&
+        transform.config.lookupTableId === seedLookupTableNamed('Units of measure').id,
     )!
 
-    const preview = await previewOf(hansemarktOrders.id, sample!.id, {
+    const preview = await previewOf(hansemarktInvoic.id, invoice!.id, {
       links: [...links],
       transforms: [...transforms],
       transformLinks: [...transformLinks],
     })
 
-    const content = z
+    const { lines } = z
       .object({ lines: z.array(z.object({ unit: z.string() })) })
-      .parse(preview.document.content)
+      .parse(invoice!.document.content)
 
-    expect(content.lines.map(({ unit }) => unit)).toEqual(['PCE', 'PCE', 'PCE'])
+    expect(lines.map(({ unit }) => unit)).toEqual(['ST', 'KG', 'ST'])
+    expect(edifactLines(preview).filter((line) => line.startsWith('QTY+47'))).toEqual([
+      expect.stringMatching(/^QTY\+47:\d+:PCE'$/),
+      expect.stringMatching(/^QTY\+47:\d+:KGM'$/),
+      expect.stringMatching(/^QTY\+47:\d+:PCE'$/),
+    ])
     expect(preview.notes.filter(({ transformId }) => transformId === units.id)).toEqual([])
   })
 

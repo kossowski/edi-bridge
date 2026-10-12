@@ -96,7 +96,7 @@ export const AllGroups = meta.story({
 
     await expect(countOf(panel.getByRole('heading', { name: unmappedHeading }))).toBeGreaterThan(0)
     await expect(
-      panel.getByRole('heading', { name: heading('AI-proposed links through Transforms', 2) }),
+      panel.getByRole('heading', { name: heading('AI-proposed links through Transforms', 3) }),
     ).toBeVisible()
     await expect(
       await panel.findByRole('heading', { name: /^Warnings on the Sample Document\s*\d+$/ }, wait),
@@ -169,7 +169,7 @@ export const PreviewError = meta.story({
       await expect(panel.getByRole('button', { name: 'Try again' })).toBeVisible()
     }, wait)
     await expect(
-      panel.getByRole('heading', { name: heading('AI-proposed links through Transforms', 2) }),
+      panel.getByRole('heading', { name: heading('AI-proposed links through Transforms', 3) }),
     ).toBeVisible()
   },
 })
@@ -329,7 +329,7 @@ export const German = meta.story({
       ),
     ).toBeGreaterThan(0)
     await expect(
-      panel.getByRole('heading', { name: heading('KI-Verknüpfungen über Transforms', 2) }),
+      panel.getByRole('heading', { name: heading('KI-Verknüpfungen über Transforms', 3) }),
     ).toBeVisible()
     await expect(
       panel.getByRole('button', { name: /^Weitere KI-Verknüpfungen\s*7$/ }),
