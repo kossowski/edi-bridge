@@ -2203,15 +2203,35 @@
     },
     "publish": {
       "button": "Veröffentlichen",
-      "title": "Draft als Version {version} veröffentlichen?",
-      "description": "Eine veröffentlichte Mapping Version lässt sich nicht mehr ändern. Flows behalten ihre festgelegte Mapping Version, bis Sie sie auf eine neuere umstellen.",
+      "title": "Version {version} veröffentlichen?",
+      "description": "Ihre unveröffentlichten Änderungen werden zu Version {version}. Eine veröffentlichte Version lässt sich nicht mehr ändern. Für einen Partner ändert sich nichts, bis Sie seinen Belegweg auf die neue Version umstellen.",
+      "note": {
+        "label": "Was hat sich geändert?",
+        "description": "Erscheint in der Versionshistorie. Bis zu {max} Zeichen.",
+        "placeholder": "Zum Beispiel: Liefertermin ergänzt",
+        "missing": "Beschreiben Sie, was sich geändert hat, damit die Versionshistorie es zeigt.",
+        "tooLong": "Kürzen Sie die Notiz auf {max} Zeichen. Sie hat jetzt {length}."
+      },
+      "routes": {
+        "legend": "Belegwege",
+        "loading": "Belegwege werden geladen",
+        "none": "Noch nutzt kein Partner dieses Mapping. Für Ihre Partner ändert das Veröffentlichen nichts.",
+        "error": "Die Belegwege konnten nicht geladen werden. Beim Veröffentlichen wird jetzt keiner umgestellt.",
+        "retry": "Belegwege erneut laden",
+        "move": "{route} ({partner}) auf Version {version} umstellen",
+        "current": "Nutzt jetzt Version {version}.",
+        "keep": "{count, plural, =0 {Alle Belegwege werden auf Version {version} umgestellt.} one {{routes} behält seine Version, bis Sie ihn umstellen.} other {{routes} behalten ihre Versionen, bis Sie sie umstellen.}}",
+        "keepMany": "{count} Belegwege behalten ihre Versionen, bis Sie sie umstellen.",
+        "keepRoute": "{route} ({partner})"
+      },
       "confirm": "Version {version} veröffentlichen",
       "pending": "Wird veröffentlicht…",
       "cancel": "Abbrechen",
       "close": "Schließen",
       "done": "Als Version {version} veröffentlicht.",
+      "doneMoved": "Als Version {version} veröffentlicht. {count, plural, one {# Belegweg wurde} other {# Belegwege wurden}} darauf umgestellt.",
       "problem": {
-        "noChanges": "Der Draft hat seit der neuesten Mapping Version keine Änderungen, es gibt also nichts zu veröffentlichen.",
+        "noChanges": "Der Draft hat seit der neuesten Version keine Änderungen, es gibt also nichts zu veröffentlichen.",
         "incomplete": "Der Draft lässt sich noch nicht veröffentlichen: Jede Verknüpfung und jeder Transform muss vollständig sein. Vervollständigen Sie sie und veröffentlichen Sie dann erneut.",
         "reviewOpen": "Der Draft lässt sich nicht veröffentlichen, solange die Durchsicht des KI-Entwurfs offen ist. Übernehmen Sie zuerst den KI-Entwurf und veröffentlichen Sie dann.",
         "failed": "Der Draft konnte nicht veröffentlicht werden. Versuchen Sie es erneut."

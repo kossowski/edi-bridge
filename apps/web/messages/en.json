@@ -2203,15 +2203,35 @@
     },
     "publish": {
       "button": "Publish",
-      "title": "Publish the Draft as Version {version}?",
-      "description": "A Mapping Version cannot be changed once it is published. Flows keep the Mapping Version they are pinned to until you move them to a newer one.",
-      "confirm": "Publish Version {version}",
+      "title": "Publish version {version}?",
+      "description": "Your unpublished changes become version {version}. A published version cannot be changed. Nothing changes for a partner until you move its document route to the new version.",
+      "note": {
+        "label": "What changed?",
+        "description": "Shown in the version history. Up to {max} characters.",
+        "placeholder": "For example: delivery date added",
+        "missing": "Describe what changed, so the version history shows it.",
+        "tooLong": "Shorten the note to {max} characters. It has {length} now."
+      },
+      "routes": {
+        "legend": "Document routes",
+        "loading": "Loading the document routes",
+        "none": "No partner uses this Mapping yet. Publishing changes nothing for your partners.",
+        "error": "The document routes could not be loaded. Publishing now moves none of them.",
+        "retry": "Load the routes again",
+        "move": "Move {route} ({partner}) to version {version}",
+        "current": "Uses version {version} now.",
+        "keep": "{count, plural, =0 {Every document route moves to version {version}.} one {{routes} keeps its version until you move it.} other {{routes} keep their versions until you move them.}}",
+        "keepMany": "{count} document routes keep their versions until you move them.",
+        "keepRoute": "{route} ({partner})"
+      },
+      "confirm": "Publish version {version}",
       "pending": "Publishing…",
       "cancel": "Cancel",
       "close": "Close",
-      "done": "Published as Version {version}.",
+      "done": "Published as version {version}.",
+      "doneMoved": "Published as version {version}. {count, plural, one {# document route} other {# document routes}} moved to it.",
       "problem": {
-        "noChanges": "The Draft has no changes since its latest Mapping Version, so there is nothing to publish.",
+        "noChanges": "The Draft has no changes since its latest version, so there is nothing to publish.",
         "incomplete": "The Draft cannot be published yet: every link and Transform must be complete. Complete them, then publish again.",
         "reviewOpen": "The Draft cannot be published while its AI review is open. Accept the draft first, then publish.",
         "failed": "The Draft could not be published. Try again."
