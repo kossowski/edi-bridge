@@ -16,11 +16,19 @@ export const documentFieldTypeSchema = z.enum(documentFieldTypes)
 
 export type DocumentFieldType = z.infer<typeof documentFieldTypeSchema>
 
-// Every node carries its path, e.g. `lines[].gtin`, which Mapping links point at. An array's
-// items share the array's path.
+export const maxFieldLabelLength = 70
+
+export const fieldLabelSchema = z.string().trim().min(1).max(maxFieldLabelLength)
+
+// Every node carries its path, e.g. `lines[].gtin`, which Mapping links point at, and a plain name
+// (`label`) with the reason it was chosen, or no reason when a person named it by hand. An array's
+// items share the array's path and plain name.
 const node = {
   path: z.string().min(1),
   name: z.string().min(1),
+  label: fieldLabelSchema,
+  labelReason: z.string().trim().min(1).nullable(),
+  labelUnsure: z.boolean(),
   required: z.boolean(),
 }
 
@@ -37,6 +45,9 @@ export type DocumentField = z.infer<typeof documentFieldSchema>
 export const documentObjectSchema = z.object({
   path: node.path,
   name: node.name,
+  label: node.label,
+  labelReason: node.labelReason,
+  labelUnsure: node.labelUnsure,
   required: node.required,
   kind: z.literal('object'),
   get children(): z.ZodArray<
@@ -53,6 +64,9 @@ export type DocumentObject = z.infer<typeof documentObjectSchema>
 export const documentArraySchema = z.object({
   path: node.path,
   name: node.name,
+  label: node.label,
+  labelReason: node.labelReason,
+  labelUnsure: node.labelUnsure,
   required: node.required,
   kind: z.literal('array'),
   get items(): z.ZodUnion<[typeof documentFieldSchema, typeof documentObjectSchema]> {
@@ -169,9 +183,21 @@ function treeProblems(tree: DocumentTree): string[] {
 
     paths.add(node.path)
 
+    if (node.labelReason === null && node.labelUnsure) {
+      problems.push(`The plain name of ${node.path} was given by hand, so it cannot be unsure`)
+    }
+
     if (node.kind === 'array') {
       if (node.items.path !== node.path) {
         problems.push(`The items of ${node.path} must share its path`)
+      }
+
+      if (
+        node.items.label !== node.label ||
+        node.items.labelReason !== node.labelReason ||
+        node.items.labelUnsure !== node.labelUnsure
+      ) {
+        problems.push(`The items of ${node.path} must share its plain name`)
       }
 
       if (!node.items.required) {
@@ -210,10 +236,31 @@ const formatFields = {
   csv: { format: z.literal('csv'), csv: csvSettingsSchema },
 }
 
+const fileNameSchema = z.string().trim().min(1).max(255)
+
+// The decoded text of the sample Document a structure was read from. A structure created from a
+// JSON Schema has none.
+export const documentStructureSampleSchema = z.object({
+  fileName: fileNameSchema,
+  text: z.string().min(1),
+  takenAt: z.iso.datetime(),
+})
+
+export type DocumentStructureSample = z.infer<typeof documentStructureSampleSchema>
+
+const sampleFields = { sample: documentStructureSampleSchema.nullable() }
+
+const count = z.number().int().min(0)
+
+const factFields = {
+  json: { facts: z.object({ fieldCount: count }) },
+  csv: { facts: z.object({ columnCount: count, rowCount: count }) },
+}
+
 export const inferredDocumentStructureSchema = z
   .discriminatedUnion('format', [
-    z.object({ ...formatFields.json, ...treeFields }),
-    z.object({ ...formatFields.csv, ...treeFields }),
+    z.object({ ...formatFields.json, ...factFields.json, ...sampleFields, ...treeFields }),
+    z.object({ ...formatFields.csv, ...factFields.csv, ...sampleFields, ...treeFields }),
   ])
   .superRefine(checkTree)
 
@@ -223,8 +270,8 @@ const identityFields = { id: z.uuid(), name: structureName }
 
 export const documentStructureSchema = z
   .discriminatedUnion('format', [
-    z.object({ ...identityFields, ...formatFields.json, ...treeFields }),
-    z.object({ ...identityFields, ...formatFields.csv, ...treeFields }),
+    z.object({ ...identityFields, ...formatFields.json, ...sampleFields, ...treeFields }),
+    z.object({ ...identityFields, ...formatFields.csv, ...sampleFields, ...treeFields }),
   ])
   .superRefine(checkTree)
 
@@ -241,11 +288,24 @@ export const documentStructureEndpoint: Endpoint<
   response: documentStructureSchema,
 }
 
+export const samplePreviewLineCount = 7
+
+export function samplePreview(text: string) {
+  return text.split(/\r?\n/).slice(0, samplePreviewLineCount).join('\n')
+}
+
+export const summaryFieldLabelCount = 3
+
 export const documentStructureSummarySchema = z.object({
   id: z.uuid(),
   name: structureName,
   format: documentFormatSchema,
-  fieldCount: z.number().int().min(0),
+  fieldCount: count,
+  firstFieldLabels: z.array(fieldLabelSchema).max(summaryFieldLabelCount),
+  sample: documentStructureSampleSchema
+    .omit({ text: true })
+    .extend({ preview: z.string() })
+    .nullable(),
   mappings: z.array(z.object({ id: z.uuid(), name: z.string().min(1) })),
 })
 
@@ -261,7 +321,7 @@ export const maxEncodedFileBytes = 5_000_000
 
 // Base64 keeps the raw bytes, so a Windows-1252 Document is decoded only once its encoding is known.
 export const encodedFileSchema = z.object({
-  fileName: z.string().trim().min(1).max(255),
+  fileName: fileNameSchema,
   content: z
     .base64()
     .min(1)
@@ -293,9 +353,23 @@ export const inferDocumentStructureEndpoint: Endpoint<
   response: inferredDocumentStructureSchema,
 }
 
+function onePerPath(entries: ReadonlyArray<{ path: string }>) {
+  return new Set(entries.map(({ path }) => path)).size === entries.length
+}
+
+// A plain name the same as the inferred one confirms it and keeps its reason; another one renames
+// the field by hand and has no reason. Either way the name is no longer unsure.
+export const fieldLabelChoiceSchema = z.object({ path: z.string().min(1), label: fieldLabelSchema })
+
+export type FieldLabelChoice = z.infer<typeof fieldLabelChoiceSchema>
+
 export const createDocumentStructureBodySchema = z.object({
   name: structureName,
   origin: documentStructureOriginSchema,
+  labels: z
+    .array(fieldLabelChoiceSchema)
+    .refine(onePerPath, { message: 'Each node is named once' })
+    .optional(),
 })
 
 export type CreateDocumentStructureBody = z.infer<typeof createDocumentStructureBodySchema>
@@ -320,10 +394,14 @@ export const nodeAdjustmentSchema = z
     required: z.boolean().optional(),
     repeating: z.boolean().optional(),
     type: documentFieldTypeSchema.optional(),
+    label: fieldLabelSchema.optional(),
   })
   .refine(
-    ({ required, repeating, type }) =>
-      required !== undefined || repeating !== undefined || type !== undefined,
+    ({ required, repeating, type, label }) =>
+      required !== undefined ||
+      repeating !== undefined ||
+      type !== undefined ||
+      label !== undefined,
     { message: 'An adjustment changes at least one property' },
   )
 
@@ -335,12 +413,7 @@ export const updateDocumentStructureBodySchema = z.object({
   document: encodedFileSchema.optional(),
   adjustments: z
     .array(nodeAdjustmentSchema)
-    .refine(
-      (adjustments) => new Set(adjustments.map(({ path }) => path)).size === adjustments.length,
-      {
-        message: 'Each node is adjusted once',
-      },
-    ),
+    .refine(onePerPath, { message: 'Each node is adjusted once' }),
 })
 
 export type UpdateDocumentStructureBody = z.infer<typeof updateDocumentStructureBodySchema>

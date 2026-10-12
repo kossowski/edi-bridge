@@ -378,7 +378,16 @@ export const EmptyPart = meta.story({
         HttpResponse.json({
           ...createDocumentStructure({ fieldCount: 1 }),
           children: [
-            { kind: 'object', path: 'header', name: 'header', required: true, children: [] },
+            {
+              kind: 'object',
+              path: 'header',
+              name: 'header',
+              label: 'Header',
+              labelReason: '"header" is a common name for "Header".',
+              labelUnsure: false,
+              required: true,
+              children: [],
+            },
           ],
         }),
       ),

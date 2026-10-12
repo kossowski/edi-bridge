@@ -21,10 +21,10 @@ import {
   createDocumentStructure,
   createDocumentStructures,
   documentStructureHandlers,
-  documentStructureLeaves,
   seedDocumentStructureOf,
   seedDocumentStructures,
 } from './document-structure'
+import { documentStructureLeaves } from './document-structure-inference'
 import { seedFlows, seedMappings } from './flow'
 import { createLookupTables, lookupTableListHandler, seedLookupTables } from './lookup-table'
 import {

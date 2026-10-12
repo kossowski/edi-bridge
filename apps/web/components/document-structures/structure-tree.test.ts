@@ -15,6 +15,8 @@ import {
   withAdjustment,
 } from './structure-tree'
 
+const plainName = { label: 'Name', labelReason: 'A name for the test.', labelUnsure: false }
+
 const order = seedDocumentStructureOf.ORDERS
 
 function nodeAt(path: string) {
@@ -36,14 +38,23 @@ const csvTree = {
       kind: 'array',
       path: 'rows[]',
       name: 'rows',
+      ...plainName,
       required: true,
       items: {
         kind: 'object',
         path: 'rows[]',
         name: 'rows',
+        ...plainName,
         required: true,
         children: [
-          { kind: 'field', path: 'rows[].gtin', name: 'gtin', required: true, type: 'string' },
+          {
+            kind: 'field',
+            path: 'rows[].gtin',
+            name: 'gtin',
+            ...plainName,
+            required: true,
+            type: 'string',
+          },
         ],
       },
     },

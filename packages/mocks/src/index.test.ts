@@ -13,6 +13,7 @@ import {
   currentWorkspaceEndpoint,
   documentStructureEndpoint,
   documentStructuresEndpoint,
+  inferDocumentStructureEndpoint,
   flowEndpoint,
   type FlowInput,
   type LookupTableInput,
@@ -682,6 +683,25 @@ describe('createHandlers', () => {
     )
 
     expect(summaries.find(({ id }) => id === created.id)).toMatchObject({ mappings: [] })
+  })
+
+  it('fails the Document Structures when asked', async () => {
+    server.use(...createHandlers(apiUrl, { documentStructuresState: 'error' }))
+
+    expect((await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)).status).toBe(500)
+  })
+
+  it('fails only the inference of a Document Structure when asked', async () => {
+    server.use(...createHandlers(apiUrl, { documentStructureInferenceState: 'error' }))
+
+    const inference = await fetch(`${apiUrl}${inferDocumentStructureEndpoint.path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(documentStructureOrigins.invoiceCsvDocument),
+    })
+
+    expect(inference.status).toBe(500)
+    expect((await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)).status).toBe(200)
   })
 
   it('lists Lookup Tables for the Lookup Table node, and none when asked', async () => {

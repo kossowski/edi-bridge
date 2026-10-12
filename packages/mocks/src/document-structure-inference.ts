@@ -12,17 +12,23 @@ import {
   type DocumentFieldType,
   type DocumentStructure,
   type DocumentStructureNode,
+  type DocumentStructureSample,
   documentStructureNodes,
   type DocumentStructureProblem,
   type DocumentStructureProblemCode,
+  documentStructureSchema,
   type DocumentStructureOrigin,
+  type FieldLabelChoice,
   type InferredDocumentStructure,
   inferredDocumentStructureSchema,
   jsonItemsName,
   jsonItemsPath,
+  type JsonRoot,
   nodeContent,
   type UpdateDocumentStructureBody,
 } from '@edi-bridge/contracts'
+
+import { type PlainName, plainNameOf } from './field-label'
 
 export class DocumentStructureProblemError extends Error {
   constructor(readonly problem: DocumentStructureProblem) {
@@ -227,16 +233,17 @@ function observedNodes(
 }
 
 function observedNode(name: string, observed: Observed, path: string): DocumentStructureNode {
+  const named = { path, name, ...plainNameOf(name) }
+
   switch (observed.kind) {
     case 'null':
-      return { kind: 'field', path, name, type: 'string', required: false }
+      return { kind: 'field', ...named, type: 'string', required: false }
     case 'field':
-      return { kind: 'field', path, name, type: observed.type, required: !observed.optional }
+      return { kind: 'field', ...named, type: observed.type, required: !observed.optional }
     case 'object':
       return {
         kind: 'object',
-        path,
-        name,
+        ...named,
         required: !observed.optional,
         children: observedNodes(observed.children, path),
       }
@@ -250,13 +257,36 @@ function observedNode(name: string, observed: Observed, path: string): DocumentS
 
       return {
         kind: 'array',
+        ...named,
         path: itemsPath,
-        name,
         required: !observed.optional,
         items: { ...items, required: true },
       }
     }
   }
+}
+
+export function documentStructureLeaves(
+  documentStructure: Pick<DocumentStructure, 'children'>,
+): DocumentField[] {
+  return [...documentStructureNodes(documentStructure.children)].flatMap(({ node }) => {
+    const content = nodeContent(node)
+
+    return content.kind === 'field' ? [content] : []
+  })
+}
+
+function inferredJson(
+  root: 'object' | 'array',
+  children: DocumentStructureNode[],
+): InferredDocumentStructure {
+  return inferredDocumentStructureSchema.parse({
+    format: 'json',
+    root,
+    facts: { fieldCount: documentStructureLeaves({ children }).length },
+    sample: null,
+    children,
+  })
 }
 
 export function inferFromJson(text: string): InferredDocumentStructure {
@@ -275,11 +305,9 @@ export function inferFromJson(text: string): InferredDocumentStructure {
       return fail('emptyDocument', 'The Document is an empty list')
     }
 
-    return inferredDocumentStructureSchema.parse({
-      format: 'json',
-      root: 'array',
-      children: [{ ...observedNode(jsonItemsName, observed, jsonItemsName), required: true }],
-    })
+    return inferredJson('array', [
+      { ...observedNode(jsonItemsName, observed, jsonItemsName), required: true },
+    ])
   }
 
   const observed = observe(value, '')
@@ -292,11 +320,7 @@ export function inferFromJson(text: string): InferredDocumentStructure {
     return fail('emptyDocument', 'The Document has no fields')
   }
 
-  return inferredDocumentStructureSchema.parse({
-    format: 'json',
-    root: 'object',
-    children: observedNodes(observed.children, ''),
-  })
+  return inferredJson('object', observedNodes(observed.children, ''))
 }
 
 type CsvRow = { line: number; cells: string[] }
@@ -443,6 +467,7 @@ export function inferFromCsv(text: string, csv: CsvSettings): InferredDocumentSt
       kind: 'field',
       path: childPath(csvRowsPath, segment),
       name,
+      ...plainNameOf(name, filled),
       type:
         filled
           .map(cellType)
@@ -454,23 +479,20 @@ export function inferFromCsv(text: string, csv: CsvSettings): InferredDocumentSt
     }
   })
 
+  const rowList = {
+    path: csvRowsPath,
+    name: csvRowsName,
+    ...plainNameOf(csvRowsName),
+    required: true,
+  }
+
   return inferredDocumentStructureSchema.parse({
     format: 'csv',
     csv,
+    facts: { columnCount: fields.length, rowCount: dataRows.length },
+    sample: null,
     children: [
-      {
-        kind: 'array',
-        path: csvRowsPath,
-        name: csvRowsName,
-        required: true,
-        items: {
-          kind: 'object',
-          path: csvRowsPath,
-          name: csvRowsName,
-          required: true,
-          children: fields,
-        },
-      },
+      { kind: 'array', ...rowList, items: { kind: 'object', ...rowList, children: fields } },
     ],
   })
 }
@@ -656,13 +678,13 @@ function schemaNode(
 
   const resolved = resolve(root, schema, path, refs)
   const isRequired = required && !resolved.nullable
+  const named = { path, name, ...plainNameOf(name) }
 
   switch (resolved.type) {
     case 'object':
       return {
         kind: 'object',
-        path,
-        name,
+        ...named,
         required: isRequired,
         children: schemaChildren(root, resolved.schema, path, resolved.refs, depth + 1),
       }
@@ -680,14 +702,13 @@ function schemaNode(
         return listInList('unsupportedJsonSchema', path, itemsPath)
       }
 
-      return { kind: 'array', path: itemsPath, name, required: isRequired, items: itemNode }
+      return { kind: 'array', ...named, path: itemsPath, required: isRequired, items: itemNode }
     }
 
     default:
       return {
         kind: 'field',
-        path,
-        name,
+        ...named,
         type: schemaFieldType(resolved.type, resolved.schema),
         required: isRequired,
       }
@@ -734,11 +755,7 @@ export function inferFromJsonSchema(text: string): InferredDocumentStructure {
   if (resolved.type === 'array') {
     const items = schemaNode(root.data, jsonItemsName, root.data, jsonItemsName, true, new Set(), 0)
 
-    return inferredDocumentStructureSchema.parse({
-      format: 'json',
-      root: 'array',
-      children: [{ ...items, required: true }],
-    })
+    return inferredJson('array', [{ ...items, required: true }])
   }
 
   if (resolved.type !== 'object') {
@@ -754,17 +771,95 @@ export function inferFromJsonSchema(text: string): InferredDocumentStructure {
     return invalidSchema('The JSON Schema describes no properties', null)
   }
 
-  return inferredDocumentStructureSchema.parse({ format: 'json', root: 'object', children })
+  return inferredJson('object', children)
 }
 
-export function inferDocumentStructure(origin: DocumentStructureOrigin): InferredDocumentStructure {
+function withSample(
+  inferred: InferredDocumentStructure,
+  sample: DocumentStructureSample,
+): InferredDocumentStructure {
+  return { ...inferred, sample }
+}
+
+export function inferDocumentStructure(
+  origin: DocumentStructureOrigin,
+  { takenAt = new Date().toISOString() }: { takenAt?: string } = {},
+): InferredDocumentStructure {
   switch (origin.kind) {
-    case 'jsonDocument':
-      return inferFromJson(decodeText(origin.document.content, 'utf-8'))
-    case 'csvDocument':
-      return inferFromCsv(decodeText(origin.document.content, origin.csv.encoding), origin.csv)
+    case 'jsonDocument': {
+      const text = decodeText(origin.document.content, 'utf-8')
+
+      return withSample(inferFromJson(text), { fileName: origin.document.fileName, text, takenAt })
+    }
+
+    case 'csvDocument': {
+      const text = decodeText(origin.document.content, origin.csv.encoding)
+
+      return withSample(inferFromCsv(text, origin.csv), {
+        fileName: origin.document.fileName,
+        text,
+        takenAt,
+      })
+    }
+
     case 'jsonSchema':
       return inferFromJsonSchema(decodeText(origin.jsonSchema.content, 'utf-8'))
+  }
+}
+
+function plainNameOfNode({ label, labelReason, labelUnsure }: PlainName): PlainName {
+  return { label, labelReason, labelUnsure }
+}
+
+function chosenName(current: PlainName, label: string): PlainName {
+  return label === current.label
+    ? { label, labelReason: current.labelReason, labelUnsure: false }
+    : { label, labelReason: null, labelUnsure: false }
+}
+
+function renamedNodes(
+  nodes: ReadonlyArray<DocumentStructureNode>,
+  nameAt: (node: DocumentStructureNode) => PlainName | undefined,
+): DocumentStructureNode[] {
+  return nodes.map((node): DocumentStructureNode => {
+    const plainName = nameAt(node) ?? plainNameOfNode(node)
+
+    switch (node.kind) {
+      case 'field':
+        return { ...node, ...plainName }
+      case 'object':
+        return { ...node, ...plainName, children: renamedNodes(node.children, nameAt) }
+      case 'array': {
+        const items =
+          node.items.kind === 'object'
+            ? { ...node.items, ...plainName, children: renamedNodes(node.items.children, nameAt) }
+            : { ...node.items, ...plainName }
+
+        return { ...node, ...plainName, items }
+      }
+    }
+  })
+}
+
+export function applyLabels<Tree extends { children: DocumentStructureNode[] }>(
+  tree: Tree,
+  labels: ReadonlyArray<FieldLabelChoice>,
+): Tree {
+  const byPath = new Map(labels.map(({ path, label }) => [path, label]))
+
+  for (const { path } of labels) {
+    if (!findNode(tree.children, path)) {
+      fail('unknownPath', `The Document Structure has no node at ${path}`, { path })
+    }
+  }
+
+  return {
+    ...tree,
+    children: renamedNodes(tree.children, (node) => {
+      const label = byPath.get(node.path)
+
+      return label === undefined ? undefined : chosenName(node, label)
+    }),
   }
 }
 
@@ -788,7 +883,7 @@ export function findNode(nodes: ReadonlyArray<DocumentStructureNode>, path: stri
   return visitedNode(nodes, path)?.node
 }
 
-export function rootListPath(structure: InferredDocumentStructure) {
+export function rootListPath(structure: { format: 'csv' } | { format: 'json'; root: JsonRoot }) {
   if (structure.format === 'csv') {
     return csvRowsPath
   }
@@ -803,7 +898,7 @@ export function sameCsvSettings(a: CsvSettings, b: CsvSettings) {
 function treeOf(
   structure: DocumentStructure,
   { csv, document }: UpdateDocumentStructureBody,
-): InferredDocumentStructure {
+): DocumentStructure {
   if (structure.format === 'json') {
     if (csv || document) {
       fail('notAdjustable', 'Only a CSV Document Structure has CSV settings and a CSV Document')
@@ -815,7 +910,20 @@ function treeOf(
   const settings = csv ?? structure.csv
 
   if (document) {
-    return inferFromCsv(decodeText(document.content, settings.encoding), settings)
+    const text = decodeText(document.content, settings.encoding)
+    const read = inferFromCsv(text, settings)
+
+    return documentStructureSchema.parse({
+      ...read,
+      id: structure.id,
+      name: structure.name,
+      sample: { fileName: document.fileName, text, takenAt: new Date().toISOString() },
+      children: renamedNodes(read.children, (node) => {
+        const previous = findNode(structure.children, node.path)
+
+        return previous && plainNameOfNode(previous)
+      }),
+    })
   }
 
   if (!sameCsvSettings(settings, structure.csv)) {
@@ -837,7 +945,9 @@ export function adjustDocumentStructure(
   const pending = new Map(body.adjustments.map((adjustment) => [adjustment.path, adjustment]))
 
   for (const adjustment of body.adjustments) {
-    if (adjustment.path === listPath) {
+    const { path, required, repeating, type } = adjustment
+
+    if (path === listPath && [required, repeating, type].some((value) => value !== undefined)) {
       fail('notAdjustable', `The ${listPath} list of the Document always repeats`, {
         path: adjustment.path,
       })
@@ -871,18 +981,21 @@ export function adjustDocumentStructure(
         })
       }
 
+      const named = {
+        name: node.name,
+        path,
+        ...(adjustment?.label === undefined
+          ? plainNameOfNode(node)
+          : chosenName(node, adjustment.label)),
+      }
+
       const content: DocumentStructureNode =
         inner.kind === 'field'
-          ? { ...inner, name: node.name, path, type: adjustment?.type ?? inner.type }
-          : {
-              ...inner,
-              name: node.name,
-              path,
-              children: adjustNodes(inner.children, node.path, path),
-            }
+          ? { ...inner, ...named, type: adjustment?.type ?? inner.type }
+          : { ...inner, ...named, children: adjustNodes(inner.children, node.path, path) }
 
       return repeating
-        ? { kind: 'array', path, name: node.name, required, items: { ...content, required: true } }
+        ? { kind: 'array', ...named, required, items: { ...content, required: true } }
         : { ...content, required }
     })
 

@@ -11,26 +11,29 @@ import {
   type DocumentStructure,
   documentStructureEndpoint,
   type DocumentStructureNode,
-  documentStructureNodes,
   type DocumentStructureProblem,
   documentStructureSchema,
   documentStructuresEndpoint,
   type DocumentStructureSummary,
   documentStructureSummarySchema,
+  samplePreview,
   type GraphParts,
   inferDocumentStructureEndpoint,
   type InferredDocumentStructure,
+  type JsonContent,
   type MappingVersionSummary,
   mappingVersionSummarySchema,
   type MessageType,
   messageTypes,
-  nodeContent,
+  summaryFieldLabelCount,
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
   adjustDocumentStructure,
+  applyLabels,
+  documentStructureLeaves,
   DocumentStructureProblemError,
   findNode,
   inferDocumentStructure,
@@ -38,10 +41,12 @@ import {
   visitedNode,
 } from './document-structure-inference'
 import { documentStructureOrigins } from './document-structure-origin'
+import { knownFieldNames, plainNameOf } from './field-label'
 import { byNameAndNewest } from './flow'
 import { containerOf } from './paths'
-import { badRequest, notFound } from './responses'
+import { badRequest, notFound, serverError } from './responses'
 import { seedId } from './seed-id'
+import { seededFaker } from './seeded-faker'
 
 import type { MappingDraftStore } from './mapping'
 import type { MappingVersionStore } from './mapping-version'
@@ -62,7 +67,14 @@ function toNodes(specs: ReadonlyArray<Spec>, parentPath: string): DocumentStruct
     if (isField(spec)) {
       const [name, type, required = true] = spec
 
-      return { kind: 'field', path: childPath(parentPath, name), name, type, required }
+      return {
+        kind: 'field',
+        path: childPath(parentPath, name),
+        name,
+        ...plainNameOf(name),
+        type,
+        required,
+      }
     }
 
     if ('object' in spec) {
@@ -72,36 +84,109 @@ function toNodes(specs: ReadonlyArray<Spec>, parentPath: string): DocumentStruct
         kind: 'object',
         path,
         name: spec.object,
+        ...plainNameOf(spec.object),
         required: spec.required ?? true,
         children: toNodes(spec.fields, path),
       }
     }
 
     const path = arrayPath(childPath(parentPath, spec.array))
+    const named = { path, name: spec.array, ...plainNameOf(spec.array) }
 
     return {
       kind: 'array',
-      path,
-      name: spec.array,
+      ...named,
       required: spec.required ?? true,
-      items: {
-        kind: 'object',
-        path,
-        name: spec.array,
-        required: true,
-        children: toNodes(spec.fields, path),
-      },
+      items: { kind: 'object', ...named, required: true, children: toNodes(spec.fields, path) },
     }
   })
 }
 
-function structure(index: number, name: string, specs: ReadonlyArray<Spec>): DocumentStructure {
+const sampleTexts = new Map<string, ReadonlyArray<string>>([
+  ['gln', ['4012345000016', '4098765000013', '4012345000023']],
+  ['gtin', ['04012345123456', '04012345654321', '04012345777777']],
+  ['sscc', ['340123450000000017', '340123450000000024']],
+  ['currency', ['EUR']],
+  ['country', ['DE']],
+  ['city', ['Lübeck', 'Hamburg', 'Bremen']],
+  ['name', ['Hansemarkt GmbH', 'Nordfrost Logistik GmbH', 'Alpenfrisch Märkte AG']],
+  ['unit', ['PCE', 'KGM']],
+  ['street', ['Hafenstraße 12', 'Industrieweg 4', 'Am Markt 1']],
+  ['postalCode', ['23552', '20457', '28195']],
+  ['description', ['Haferdrink Bio 1 l', 'Dinkeldrink 1 l', 'Haferdrink Barista 1 l']],
+  ['note', ['Rampe 2', 'Kühlware']],
+  ['email', ['einkauf@hansemarkt.example']],
+  ['phone', ['+49 451 123456']],
+  ['status', ['accepted']],
+])
+
+// Every array gets two items, so the sample shows that the list repeats.
+function sampleOf(
+  nodes: ReadonlyArray<DocumentStructureNode>,
+  faker: Faker,
+): Record<string, JsonContent> {
+  const valueOf = (node: DocumentField | DocumentStructureNode): JsonContent => {
+    switch (node.kind) {
+      case 'object':
+        return sampleOf(node.children, faker)
+      case 'array':
+        return [valueOf(node.items), valueOf(node.items)]
+      default:
+        return fieldValue(node, faker)
+    }
+  }
+
+  return Object.fromEntries(nodes.map((node) => [node.name, valueOf(node)]))
+}
+
+function fieldValue(field: DocumentField, faker: Faker): JsonContent {
+  const known = sampleTexts.get(field.name)
+
+  if (known) {
+    return faker.helpers.arrayElement(known)
+  }
+
+  switch (field.type) {
+    case 'number':
+      return faker.number.float({ min: 1, max: 500, fractionDigits: 2 })
+    case 'integer':
+      return faker.number.int({ min: 1, max: 48 })
+    case 'boolean':
+      return faker.datatype.boolean()
+    case 'date':
+      return `2026-10-${String(faker.number.int({ min: 1, max: 28 })).padStart(2, '0')}`
+    default:
+      return `${faker.string.alpha({ length: 2, casing: 'upper' })}-${faker.string.numeric(5)}`
+  }
+}
+
+function jsonSample(
+  fileName: string,
+  children: ReadonlyArray<DocumentStructureNode>,
+  takenAt: string,
+) {
+  return {
+    fileName,
+    text: JSON.stringify(sampleOf(children, seededFaker(`sample:${fileName}`)), null, 2),
+    takenAt,
+  }
+}
+
+function structure(
+  index: number,
+  name: string,
+  fileName: string,
+  specs: ReadonlyArray<Spec>,
+): DocumentStructure {
+  const children = toNodes(specs, '')
+
   return documentStructureSchema.parse({
     id: seedId(6, index),
     name,
     format: 'json',
     root: 'object',
-    children: toNodes(specs, ''),
+    sample: jsonSample(fileName, children, `2026-09-${String(10 + index)}T10:00:00.000Z`),
+    children,
   })
 }
 
@@ -123,7 +208,7 @@ const party = (name: string, required = true, extra: ReadonlyArray<Spec> = []): 
 const vatId: FieldSpec = ['vatId', 'string', false]
 
 export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStructure>> = {
-  ORDERS: structure(1, 'ERP purchase order', [
+  ORDERS: structure(1, 'ERP purchase order', 'order-4711.json', [
     ['orderNumber', 'string'],
     ['orderDate', 'date'],
     ['requestedDeliveryDate', 'date', false],
@@ -161,7 +246,7 @@ export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStruc
     },
     ['lineCount', 'integer', false],
   ]),
-  DESADV: structure(2, 'ERP dispatch advice', [
+  DESADV: structure(2, 'ERP dispatch advice', 'dispatch-4715.json', [
     ['despatchNumber', 'string'],
     ['despatchDate', 'date'],
     ['documentDate', 'date'],
@@ -190,7 +275,7 @@ export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStruc
       ],
     },
   ]),
-  INVOIC: structure(3, 'ERP invoice', [
+  INVOIC: structure(3, 'ERP invoice', 'invoice-r-2026-1188.json', [
     ['invoiceNumber', 'string'],
     ['invoiceDate', 'date'],
     ['isCreditNote', 'boolean'],
@@ -233,7 +318,7 @@ export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStruc
       ],
     },
   ]),
-  CONTRL: structure(4, 'ERP acknowledgement status', [
+  CONTRL: structure(4, 'ERP acknowledgement status', 'acknowledgement-0815.json', [
     ['interchangeReference', 'string'],
     ['senderGln', 'string'],
     ['recipientGln', 'string'],
@@ -260,19 +345,18 @@ export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStruc
   ]),
 }
 
-export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = messageTypes.map(
-  (messageType) => seedDocumentStructureOf[messageType],
+export const seedInvoiceExportDocumentStructure = toDocumentStructure(
+  seedId(6, 7),
+  'ERP invoice export (CSV)',
+  inferDocumentStructure(documentStructureOrigins.invoiceCsvDocument, {
+    takenAt: '2026-10-08T16:30:00.000Z',
+  }),
 )
 
-export function documentStructureLeaves(
-  documentStructure: Pick<DocumentStructure, 'children'>,
-): DocumentField[] {
-  return [...documentStructureNodes(documentStructure.children)].flatMap(({ node }) => {
-    const content = nodeContent(node)
-
-    return content.kind === 'field' ? [content] : []
-  })
-}
+export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = [
+  ...messageTypes.map((messageType) => seedDocumentStructureOf[messageType]),
+  seedInvoiceExportDocumentStructure,
+]
 
 // Spreads the fields over plain fields, objects and arrays of objects with a nested array, so a
 // large structure still shows every kind of nesting.
@@ -286,7 +370,7 @@ export function createDocumentStructure({
   name?: string
 }): DocumentStructure {
   const faker = new Faker({ locale: [en], seed })
-  const used = new Set<string>()
+  const used = new Set<string>(knownFieldNames)
 
   const uniqueName = () => {
     const base =
@@ -308,52 +392,60 @@ export function createDocumentStructure({
 
   let remaining = fieldCount
 
+  const fieldName = (siblings: Set<string>) => {
+    const free = knownFieldNames.filter((known) => !siblings.has(known))
+
+    const chosen =
+      free.length === 0 || faker.datatype.boolean({ probability: 0.05 })
+        ? uniqueName()
+        : faker.helpers.arrayElement(free)
+
+    siblings.add(chosen)
+
+    return chosen
+  }
+
   const takeFields = (count: number): FieldSpec[] => {
     const taken = Math.min(count, remaining)
+    const siblings = new Set<string>()
     remaining -= taken
 
     return Array.from({ length: taken }, () => [
-      uniqueName(),
+      fieldName(siblings),
       faker.helpers.arrayElement(documentFieldTypes),
       faker.datatype.boolean({ probability: 0.6 }),
     ])
   }
 
-  const specs: Spec[] = []
+  const specs: Spec[] = takeFields(faker.number.int({ min: 2, max: 5 }))
 
   for (let section = 0; remaining > 0; section++) {
-    switch (section % 3) {
-      case 0:
-        specs.push(...takeFields(faker.number.int({ min: 2, max: 5 })))
-        break
-      case 1:
-        specs.push({
-          object: uniqueName(),
-          fields: takeFields(faker.number.int({ min: 3, max: 8 })),
-        })
-        break
-      default: {
-        const fields: Spec[] = takeFields(faker.number.int({ min: 3, max: 8 }))
-        const nested = takeFields(faker.number.int({ min: 2, max: 4 }))
+    if (section % 2 === 0) {
+      specs.push({ object: uniqueName(), fields: takeFields(faker.number.int({ min: 3, max: 8 })) })
+    } else {
+      const fields: Spec[] = takeFields(faker.number.int({ min: 3, max: 8 }))
+      const nested = takeFields(faker.number.int({ min: 2, max: 4 }))
 
-        if (nested.length > 0) {
-          fields.push({ array: uniqueName(), required: false, fields: nested })
-        }
-
-        specs.push({ array: uniqueName(), fields })
+      if (nested.length > 0) {
+        fields.push({ array: uniqueName(), required: false, fields: nested })
       }
+
+      specs.push({ array: uniqueName(), fields })
     }
   }
+
+  const children = toNodes(
+    specs.filter((spec) => isField(spec) || spec.fields.length > 0),
+    '',
+  )
 
   return documentStructureSchema.parse({
     id: faker.string.uuid(),
     name,
     format: 'json',
     root: 'object',
-    children: toNodes(
-      specs.filter((spec) => isField(spec) || spec.fields.length > 0),
-      '',
-    ),
+    sample: jsonSample(`export-${seed}.json`, children, '2026-09-20T10:00:00.000Z'),
+    children,
   })
 }
 
@@ -369,7 +461,9 @@ export const seedUnusedDocumentStructures: ReadonlyArray<DocumentStructure> = [
   toDocumentStructure(
     seedId(6, 5),
     'ERP dispatch export (CSV)',
-    inferDocumentStructure(documentStructureOrigins.windows1252CsvDocument),
+    inferDocumentStructure(documentStructureOrigins.windows1252CsvDocument, {
+      takenAt: '2026-09-18T10:00:00.000Z',
+    }),
   ),
   toDocumentStructure(
     seedId(6, 6),
@@ -396,7 +490,11 @@ export function createDocumentStructures({
       )
 
     return index % 4 === 3
-      ? toDocumentStructure(faker.string.uuid(), name, inferDocumentStructure(csvOrigin))
+      ? toDocumentStructure(
+          faker.string.uuid(),
+          name,
+          inferDocumentStructure(csvOrigin, { takenAt: '2026-09-25T10:00:00.000Z' }),
+        )
       : createDocumentStructure({
           fieldCount: faker.number.int({ min: 5, max: 120 }),
           seed: seed + index,
@@ -449,11 +547,20 @@ function toDocumentStructureSummary(
   documentStructure: DocumentStructure,
   { mappings }: MappingUse = {},
 ): DocumentStructureSummary {
+  const leaves = documentStructureLeaves(documentStructure)
+  const { sample } = documentStructure
+
   return documentStructureSummarySchema.parse({
     id: documentStructure.id,
     name: documentStructure.name,
     format: documentStructure.format,
-    fieldCount: documentStructureLeaves(documentStructure).length,
+    fieldCount: leaves.length,
+    firstFieldLabels: leaves.slice(0, summaryFieldLabelCount).map(({ label }) => label),
+    sample: sample && {
+      fileName: sample.fileName,
+      takenAt: sample.takenAt,
+      preview: samplePreview(sample.text),
+    },
     mappings: (mappings?.all() ?? [])
       .filter(({ documentStructureId }) => documentStructureId === documentStructure.id)
       .map(({ id, name }) => ({ id, name }))
@@ -481,19 +588,25 @@ function summaries(versions: ReadonlyArray<MappingVersionSummary>) {
   return versions.map((version) => mappingVersionSummarySchema.parse(version)).sort(byNameAndNewest)
 }
 
+// Plain names only label a node, so a rename changes no shape a Mapping relies on.
+const linkedNodeKeys = ['path', 'name', 'kind', 'required', 'type', 'children', 'items']
+
 function fingerprintAt(nodes: ReadonlyArray<DocumentStructureNode>, path: string) {
   const visited = visitedNode(nodes, path)
 
   return (
     visited &&
-    JSON.stringify([
-      ...visited.ancestors.map(({ path: ancestorPath, kind, required }) => ({
-        path: ancestorPath,
-        kind,
-        required,
-      })),
-      visited.node,
-    ])
+    JSON.stringify(
+      [
+        ...visited.ancestors.map(({ path: ancestorPath, kind, required }) => ({
+          path: ancestorPath,
+          kind,
+          required,
+        })),
+        visited.node,
+      ],
+      linkedNodeKeys,
+    )
   )
 }
 
@@ -510,11 +623,11 @@ function usedByMappingVersion(
   message: string,
   path: string | null,
 ): DocumentStructureProblem {
-  const named = versions.map(({ mappingName, version }) => `${mappingName} v${version}`)
+  const versionNames = versions.map(({ mappingName, version }) => `${mappingName} v${version}`)
 
   return {
     code: 'usedByMappingVersion',
-    message: `${message}: ${named.join(', ')}`,
+    message: `${message}: ${versionNames.join(', ')}`,
     path,
     line: null,
     mappingVersions: [...versions],
@@ -609,16 +722,42 @@ function attempt<Result>(run: () => Result): { result: Result } | { response: Re
   }
 }
 
+export type DocumentStructuresState = 'loading' | 'error'
+
+async function respondIn(state: DocumentStructuresState) {
+  if (state === 'loading') {
+    await delay('infinite')
+  }
+
+  return serverError()
+}
+
 export function documentStructureHandlers(
   apiUrl: string,
   {
     documentStructures = createDocumentStructureStore(),
     mappings,
     versions,
+    state,
+    inferenceState,
   }: {
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
+    state?: DocumentStructuresState | undefined
+    inferenceState?: DocumentStructuresState | undefined
   } & MappingUse = {},
 ) {
+  if (state) {
+    const respond = () => respondIn(state)
+
+    return [
+      http.get(`${apiUrl}${documentStructuresEndpoint.path}`, respond),
+      http.post(`${apiUrl}${inferDocumentStructureEndpoint.path}`, respond),
+      http.post(`${apiUrl}${createDocumentStructureEndpoint.path}`, respond),
+      http.get(`${apiUrl}${documentStructureEndpoint.path}`, respond),
+      http.put(`${apiUrl}${updateDocumentStructureEndpoint.path}`, respond),
+    ]
+  }
+
   const store = toDocumentStructureStore(documentStructures)
   const use = { mappings, versions }
 
@@ -634,6 +773,10 @@ export function documentStructureHandlers(
       )
     }),
     http.post(`${apiUrl}${inferDocumentStructureEndpoint.path}`, async ({ request }) => {
+      if (inferenceState) {
+        return respondIn(inferenceState)
+      }
+
       const body = inferDocumentStructureEndpoint.body.safeParse(await request.json())
 
       if (!body.success) {
@@ -655,7 +798,8 @@ export function documentStructureHandlers(
 
       await delay()
 
-      const inferred = attempt(() => inferDocumentStructure(body.data.origin))
+      const { origin, labels = [] } = body.data
+      const inferred = attempt(() => applyLabels(inferDocumentStructure(origin), labels))
 
       if ('response' in inferred) {
         return inferred.response

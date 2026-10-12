@@ -18,6 +18,7 @@ import {
 } from './channel'
 import {
   documentStructureHandlers,
+  type DocumentStructuresState,
   type DocumentStructureStore,
   seedDocumentStructures,
   seedUnusedDocumentStructures,
@@ -145,13 +146,15 @@ export {
   createDocumentStructures,
   createDocumentStructureStore,
   documentStructureHandlers,
-  documentStructureLeaves,
+  type DocumentStructuresState,
   type DocumentStructureStore,
   seedDocumentStructureOf,
   seedDocumentStructures,
   seedUnusedDocumentStructures,
   toDocumentStructureStore,
 } from './document-structure'
+
+export { documentStructureLeaves } from './document-structure-inference'
 
 export { createCsvDocument, documentStructureOrigins } from './document-structure-origin'
 
@@ -352,6 +355,8 @@ export function createHandlers(
     testInterchange = {},
     mappingDrafts = seedMappingDrafts,
     documentStructures = [...seedDocumentStructures, ...seedUnusedDocumentStructures],
+    documentStructuresState,
+    documentStructureInferenceState,
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
     mappingVersions,
@@ -370,6 +375,8 @@ export function createHandlers(
     testInterchange?: TestInterchangeOptions
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
+    documentStructuresState?: DocumentStructuresState
+    documentStructureInferenceState?: DocumentStructuresState
     lookupTables?: ReadonlyArray<LookupTableRecord>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
@@ -519,6 +526,8 @@ export function createHandlers(
       documentStructures: documentStructureStore,
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
+      state: documentStructuresState,
+      inferenceState: documentStructureInferenceState,
     }),
     messageTypeStructureHandler(apiUrl),
     ...lookupTableHandlers(apiUrl, {

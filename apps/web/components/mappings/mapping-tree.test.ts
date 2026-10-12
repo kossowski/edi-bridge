@@ -10,6 +10,8 @@ import {
   layoutTree,
 } from './mapping-tree'
 
+const plainName = { label: 'Name', labelReason: 'A name for the test.', labelUnsure: false }
+
 describe('documentTree', () => {
   const tree = documentTree(seedDocumentStructureOf.ORDERS)
 
@@ -160,7 +162,14 @@ describe('layoutTree', () => {
     const { rows } = layoutTree(
       documentTree({
         children: [
-          { kind: 'object', path: 'header', name: 'header', required: false, children: [] },
+          {
+            kind: 'object',
+            path: 'header',
+            name: 'header',
+            ...plainName,
+            required: false,
+            children: [],
+          },
         ],
       }),
       { side: 'source', x: 0, y: 0, collapsed: new Set() },

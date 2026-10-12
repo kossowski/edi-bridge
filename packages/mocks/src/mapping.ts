@@ -36,12 +36,13 @@ import {
 } from '@edi-bridge/contracts'
 
 import {
-  documentStructureLeaves,
   type DocumentStructureStore,
   seedDocumentStructureOf,
   seedDocumentStructures,
+  seedInvoiceExportDocumentStructure,
   toDocumentStructureStore,
 } from './document-structure'
+import { documentStructureLeaves } from './document-structure-inference'
 import {
   createFlows,
   type FlowRecord,
@@ -499,12 +500,12 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
   }),
   {
     id: unpublishedDraftId,
-    name: 'Spreewald: ERP JSON to INVOIC',
+    name: 'Spreewald: ERP CSV to INVOIC',
     messageType: 'INVOIC',
-    documentStructureId: seedDocumentStructureOf.INVOIC.id,
+    documentStructureId: seedInvoiceExportDocumentStructure.id,
     latestVersion: null,
     unpublishedChanges: true,
-    ...templateDraftGraph(unpublishedDraftId, 'INVOIC', 0.3),
+    ...templateDraftGraph(unpublishedDraftId, 'INVOIC', 0),
     updatedAt: seedUpdatedAt(seedMappings.length),
   },
 ]
