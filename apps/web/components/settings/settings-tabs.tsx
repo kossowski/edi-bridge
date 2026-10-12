@@ -6,10 +6,12 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { HeaderTabs } from '@/components/header-tabs'
 import { CompanyTab } from '@/components/settings/company-tab'
 import { DataTab } from '@/components/settings/data-tab'
+import { MembersTab } from '@/components/settings/members-tab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
 const settingsTabs = [
   { value: 'company', Panel: CompanyTab },
+  { value: 'members', Panel: MembersTab },
   { value: 'data', Panel: DataTab },
 ] as const
 
