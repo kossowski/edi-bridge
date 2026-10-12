@@ -1,8 +1,8 @@
 import {
+  type Fixer,
   type FixTarget,
   type MappingVersionSummary,
   type ProblemReason,
-  type RunError,
   type RunProblem,
   type RunSummary,
   whoFixes,
@@ -10,7 +10,7 @@ import {
 
 import type { ChannelStore } from './channel'
 import type { FlowStore } from './flow'
-import type { MissingPiece } from './interchange'
+import type { BrokenPiece, GeneratedErrorCode, GeneratedMessage } from './interchange'
 import type { LookupTableStore } from './lookup-table'
 
 export type ProblemSources = {
@@ -19,89 +19,93 @@ export type ProblemSources = {
   lookupTables: LookupTableStore
 }
 
-const reasons = new Map<string, ProblemReason>([
-  ['invalidCharacter', 'unreadable'],
-  ['segmentCountMismatch', 'unreadable'],
-  ['missingComponent', 'invalidContent'],
-  ['unknownCode', 'invalidContent'],
-  ['invalidDate', 'invalidContent'],
-  ['lookupMissing', 'missingCode'],
-  ['missingSourceField', 'missingField'],
-  ['destinationUnreachable', 'unreachable'],
-  ['destinationUnavailable', 'unreachable'],
-])
+const reasons = {
+  invalidCharacter: 'unreadable',
+  segmentCountMismatch: 'unreadable',
+  missingComponent: 'invalidContent',
+  unknownCode: 'invalidContent',
+  invalidDate: 'invalidContent',
+  lookupMissing: 'missingCode',
+  missingSourceField: 'missingField',
+  destinationUnreachable: 'unreachable',
+  destinationUnavailable: 'unreachable',
+} as const satisfies Record<GeneratedErrorCode, ProblemReason>
 
-function mappingTarget(mapping: MappingVersionSummary | null, fieldPath: string): FixTarget | null {
-  return (
-    mapping && {
-      kind: 'mapping',
-      mappingId: mapping.mappingId,
-      name: mapping.mappingName,
-      fieldPath,
+function brokenPieceTarget(
+  broken: BrokenPiece | null,
+  mapping: MappingVersionSummary | null,
+  sources: ProblemSources,
+): FixTarget | null {
+  switch (broken?.kind) {
+    case undefined: {
+      return null
     }
-  )
+
+    case 'mapping': {
+      return (
+        mapping && {
+          kind: 'mapping',
+          mappingId: mapping.mappingId,
+          name: mapping.mappingName,
+          fieldPath: broken.fieldPath,
+        }
+      )
+    }
+
+    case 'lookupTable': {
+      const table = sources.lookupTables.all().find(({ name }) => name === broken.name)
+
+      return table
+        ? { kind: 'lookupTable', lookupTableId: table.id, name: table.name, code: broken.code }
+        : null
+    }
+  }
 }
 
 function fixTargetOf(
   run: RunSummary,
-  reason: ProblemReason,
-  missing: MissingPiece | null,
+  fixer: Fixer,
+  broken: BrokenPiece | null,
   mapping: MappingVersionSummary | null,
   sources: ProblemSources,
 ): FixTarget | null {
-  switch (reason) {
-    case 'unreadable':
-    case 'invalidContent': {
-      return run.direction === 'inbound'
-        ? {
-            kind: 'tradingPartner',
-            tradingPartnerId: run.tradingPartner.id,
-            name: run.tradingPartner.name,
-          }
-        : mappingTarget(mapping, 'supplier.gln')
-    }
-
-    case 'missingCode': {
-      if (missing?.kind !== 'code') {
-        return null
+  switch (fixer) {
+    case 'tradingPartner': {
+      return {
+        kind: 'tradingPartner',
+        tradingPartnerId: run.tradingPartner.id,
+        name: run.tradingPartner.name,
       }
-
-      const table = sources.lookupTables.all().find(({ name }) => name === missing.lookupTableName)
-
-      return table
-        ? { kind: 'lookupTable', lookupTableId: table.id, name: table.name, code: missing.code }
-        : null
     }
 
-    case 'missingField': {
-      return missing?.kind === 'field' ? mappingTarget(mapping, missing.fieldPath) : null
-    }
-
-    case 'unreachable': {
+    case 'retry': {
       const flow = sources.flows.get(run.flow.id)
       const channel = flow && sources.channels.get(flow.destinationChannelId)
 
       return channel ? { kind: 'channel', channelId: channel.id, name: channel.name } : null
+    }
+
+    case 'you': {
+      return brokenPieceTarget(broken, mapping, sources)
     }
   }
 }
 
 export function problemOf(
   run: RunSummary,
-  { error, missing }: { error: RunError | null; missing: MissingPiece | null },
+  { error, broken }: Pick<GeneratedMessage, 'error' | 'broken'>,
   mapping: MappingVersionSummary | null,
   sources: ProblemSources,
 ): RunProblem | null {
   const fixer = whoFixes(run)
-  const reason = error && reasons.get(error.code)
 
-  if (fixer === null || !error || !reason) {
+  if (fixer === null || error === null) {
     return null
   }
 
   return {
-    reason,
+    reason: reasons[error.code],
     whoFixes: fixer,
-    fixTarget: fixTargetOf(run, reason, missing, mapping, sources),
+    fixTarget: fixTargetOf(run, fixer, broken, mapping, sources),
   }
 }

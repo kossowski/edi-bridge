@@ -483,8 +483,8 @@
       "whatToDo": "What to do"
     },
     "whoFixes": {
-      "partner": "Your partner fixes this",
       "retry": "Just try again",
+      "tradingPartner": "Your partner fixes this",
       "you": "You fix this"
     },
     "pagination": {

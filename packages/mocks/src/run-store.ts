@@ -80,9 +80,11 @@ function place(runs: ReadonlyArray<RunSummary>, replaces: ReadonlyMap<string, st
     const key = bundleKeyOf(run)
     const id = interchangeIdOf(run)
 
+    // A Duplicate carries the control reference of the Interchange it repeats.
     const group = bundles.get(key) ?? {
       id,
-      controlReference: controlReferenceOf(id),
+      controlReference:
+        (run.status === 'duplicate' && run.interchange?.controlReference) || controlReferenceOf(id),
       formsInterchange: false,
       messageOwners: [],
       allRunIds: [],

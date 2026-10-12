@@ -32,8 +32,8 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 import type { RunSummary } from '@edi-bridge/contracts'
 
 const fixerIcons: Record<Fixer, IconSvgElement> = {
-  partner: UserMultiple02Icon,
   retry: Refresh01Icon,
+  tradingPartner: UserMultiple02Icon,
   you: UserIcon,
 }
 

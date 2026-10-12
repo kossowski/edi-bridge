@@ -21,7 +21,7 @@ export const failureStageSchema = z.enum(failureStages)
 
 export type FailureStage = z.infer<typeof failureStageSchema>
 
-export const fixers = ['you', 'retry', 'partner'] as const
+export const fixers = ['you', 'retry', 'tradingPartner'] as const
 
 export const fixerSchema = z.enum(fixers)
 
@@ -42,7 +42,7 @@ export function whoFixes(run: {
 
     case 'parse':
     case 'validation': {
-      return run.direction === 'inbound' ? 'partner' : 'you'
+      return run.direction === 'inbound' ? 'tradingPartner' : 'you'
     }
 
     case 'mapping': {
@@ -236,7 +236,7 @@ const unfailedFields = {
   failureStage: z.null(),
   error: z.null(),
   problem: z.null(),
-  waitingForPartnerSince: z.null(),
+  waitingForTradingPartnerSince: z.null(),
 }
 
 export const runDetailSchema = z
@@ -247,7 +247,7 @@ export const runDetailSchema = z
       failureStage: failureStageSchema,
       error: runErrorSchema,
       problem: runProblemSchema,
-      waitingForPartnerSince: z.iso.datetime().nullable(),
+      waitingForTradingPartnerSince: z.iso.datetime().nullable(),
       duplicateOf: z.null(),
     }),
     runSummaryBaseSchema.extend({
@@ -272,10 +272,10 @@ export const runDetailSchema = z
       })
     }
 
-    if (run.waitingForPartnerSince !== null && run.problem?.whoFixes !== 'partner') {
+    if (run.waitingForTradingPartnerSince !== null && run.problem?.whoFixes !== 'tradingPartner') {
       context.addIssue({
         code: 'custom',
-        path: ['waitingForPartnerSince'],
+        path: ['waitingForTradingPartnerSince'],
         message: 'Only a Run that the Trading Partner fixes waits for the Trading Partner',
       })
     }
@@ -295,14 +295,14 @@ export const retryRunEndpoint: Endpoint<RunDetail, undefined, undefined, '/runs/
   response: runDetailSchema,
 }
 
-export const waitForPartnerEndpoint: Endpoint<
+export const waitForTradingPartnerRunEndpoint: Endpoint<
   RunDetail,
   undefined,
   undefined,
-  '/runs/:id/wait-for-partner'
+  '/runs/:id/wait-for-trading-partner'
 > = {
   method: 'POST',
-  path: '/runs/:id/wait-for-partner',
+  path: '/runs/:id/wait-for-trading-partner',
   response: runDetailSchema,
 }
 

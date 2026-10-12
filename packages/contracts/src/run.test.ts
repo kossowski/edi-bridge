@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { runDetailSchema, waitForPartnerEndpoint, whoFixes } from './run'
+import { runDetailSchema, waitForTradingPartnerRunEndpoint, whoFixes } from './run'
 
 const base = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -21,9 +21,9 @@ const base = {
 
 const error = { code: 'segmentCountMismatch', message: 'UNT declares 9 segments.', position: null }
 
-const partnerProblem = {
+const tradingPartnerProblem = {
   reason: 'unreadable',
-  whoFixes: 'partner',
+  whoFixes: 'tradingPartner',
   fixTarget: {
     kind: 'tradingPartner',
     tradingPartnerId: base.tradingPartner.id,
@@ -36,8 +36,8 @@ const unreadable = {
   status: 'failed',
   failureStage: 'parse',
   error,
-  problem: partnerProblem,
-  waitingForPartnerSince: null,
+  problem: tradingPartnerProblem,
+  waitingForTradingPartnerSince: null,
   duplicateOf: null,
 } as const
 
@@ -47,8 +47,8 @@ describe('whoFixes', () => {
   })
 
   it('asks the Trading Partner to resend an inbound Run that could not be read or validated', () => {
-    expect(whoFixes({ failureStage: 'parse', direction: 'inbound' })).toBe('partner')
-    expect(whoFixes({ failureStage: 'validation', direction: 'inbound' })).toBe('partner')
+    expect(whoFixes({ failureStage: 'parse', direction: 'inbound' })).toBe('tradingPartner')
+    expect(whoFixes({ failureStage: 'validation', direction: 'inbound' })).toBe('tradingPartner')
   })
 
   it('leaves an outbound validation failure to the Workspace', () => {
@@ -96,7 +96,7 @@ describe('runDetailSchema', () => {
   })
 
   it('marks a Run as waiting for the Trading Partner only when the Trading Partner fixes it', () => {
-    const waiting = { ...unreadable, waitingForPartnerSince: '2026-10-02T09:00:00.000Z' }
+    const waiting = { ...unreadable, waitingForTradingPartnerSince: '2026-10-02T09:00:00.000Z' }
 
     const retry = {
       ...waiting,
@@ -117,7 +117,7 @@ describe('runDetailSchema', () => {
       failureStage: null,
       error: null,
       problem: null,
-      waitingForPartnerSince: null,
+      waitingForTradingPartnerSince: null,
       duplicateOf: original,
     }
 
@@ -126,11 +126,11 @@ describe('runDetailSchema', () => {
   })
 })
 
-describe('waitForPartnerEndpoint', () => {
+describe('waitForTradingPartnerRunEndpoint', () => {
   it('marks a Run at its own path and answers with the Run detail', () => {
-    expect(waitForPartnerEndpoint).toMatchObject({
+    expect(waitForTradingPartnerRunEndpoint).toMatchObject({
       method: 'POST',
-      path: '/runs/:id/wait-for-partner',
+      path: '/runs/:id/wait-for-trading-partner',
     })
   })
 })

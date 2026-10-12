@@ -3,6 +3,7 @@ import type { Faker } from '@faker-js/faker'
 import {
   directionOf,
   type ErrorPosition,
+  type FixTarget,
   type InterchangeParty,
   type MessageType,
   type ParsedMessage,
@@ -18,33 +19,51 @@ import { seedWorkspace } from './workspace'
 
 type Segment = { tag: string; elements: string[][] }
 
-type FaultyMessage = { segments: Segment[]; fault: Fault | null }
+export type GeneratedErrorCode =
+  | 'invalidCharacter'
+  | 'segmentCountMismatch'
+  | 'missingComponent'
+  | 'unknownCode'
+  | 'invalidDate'
+  | 'lookupMissing'
+  | 'missingSourceField'
+  | 'destinationUnreachable'
+  | 'destinationUnavailable'
+
+export type GeneratedError = RunError & { code: GeneratedErrorCode }
+
+export type BrokenPiece =
+  | Pick<Extract<FixTarget, { kind: 'mapping' }>, 'kind' | 'fieldPath'>
+  | Pick<Extract<FixTarget, { kind: 'lookupTable' }>, 'kind' | 'name' | 'code'>
 
 type Fault = {
   segment: number
   element: number | null
   component: number | null
-  code: string
+  code: GeneratedErrorCode
   message: string
 }
 
-export type MissingPiece =
-  { kind: 'code'; lookupTableName: string; code: string } | { kind: 'field'; fieldPath: string }
+type FaultyMessage = { segments: Segment[]; fault: Fault | null; broken: BrokenPiece | null }
 
-export type GeneratedMessage = {
+type Failure = { error: GeneratedError | null; broken: BrokenPiece | null }
+
+export type GeneratedMessage = Failure & {
   reference: string
   segments: Segment[]
   parsed: ParsedMessage | null
   fault: Fault | null
-  error: RunError | null
-  missing: MissingPiece | null
 }
 
-const missingUnit = { lookupTableName: 'Units of measure', code: 'KRT' } as const
+const missingUnit = { kind: 'lookupTable', name: 'Units of measure', code: 'KRT' } as const
 
-const gtinFields: Readonly<Partial<Record<MessageType, string>>> = {
-  DESADV: 'packages[].lines[].gtin',
-  INVOIC: 'lines[].gtin',
+const partyGlnFields = { BY: 'buyer.gln', SU: 'supplier.gln' } as const
+
+const lineLists: Readonly<Record<MessageType, string>> = {
+  ORDERS: 'lines',
+  DESADV: 'packages[].lines',
+  INVOIC: 'lines',
+  CONTRL: 'lines',
 }
 
 const segmentNames = new Map(
@@ -196,8 +215,10 @@ function setComponent(segment: Segment, element: number, component: number, valu
 }
 
 function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): FaultyMessage {
+  const intact = { segments, fault: null, broken: null }
+
   if (run.status !== 'failed') {
-    return { segments, fault: null }
+    return intact
   }
 
   const outbound = directionOf(run) === 'outbound'
@@ -219,6 +240,7 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
             code: 'invalidCharacter',
             message: `Numeric component "${broken}" contains the character "O".`,
           },
+          broken: null,
         }
       }
 
@@ -234,12 +256,14 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
           code: 'segmentCountMismatch',
           message: `UNT declares ${declared} segments, but the Message has ${segments.length}.`,
         },
+        broken: null,
       }
     }
 
     case 'validation': {
       if (outbound) {
-        const nad = indexOf(segments, 'NAD', 'SU')
+        const party = faker.helpers.objectKey(partyGlnFields)
+        const nad = indexOf(segments, 'NAD', party)
 
         return {
           segments: segments.with(nad, setComponent(segments[nad]!, 2, 1, '')),
@@ -248,8 +272,9 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
             element: 2,
             component: 1,
             code: 'missingComponent',
-            message: 'Required component 3039 (party identification) of NAD+SU is empty.',
+            message: `Required component 3039 (party identification) of NAD+${party} is empty.`,
           },
+          broken: { kind: 'mapping', fieldPath: partyGlnFields[party] },
         }
       }
 
@@ -265,6 +290,7 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
             code: 'unknownCode',
             message: 'Code "9" is not in code list 0083 (action, coded).',
           },
+          broken: null,
         }
       }
 
@@ -280,12 +306,13 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
           code: 'invalidDate',
           message: `"${date}" is not a valid date in format 102 (CCYYMMDD).`,
         },
+        broken: null,
       }
     }
 
     case 'mapping': {
       if (outbound && faker.datatype.boolean()) {
-        return { segments, fault: null }
+        return intact
       }
 
       const qty = indexOf(segments, 'QTY')
@@ -297,68 +324,56 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
           element: 1,
           component: 3,
           code: 'lookupMissing',
-          message: `The Lookup Table "${missingUnit.lookupTableName}" has no entry for "${missingUnit.code}".`,
+          message: `The Lookup Table "${missingUnit.name}" has no entry for "${missingUnit.code}".`,
         },
+        broken: missingUnit,
       }
     }
 
     default: {
-      return { segments, fault: null }
+      return intact
     }
   }
 }
 
-function gtinFieldOf(run: Pick<RunSummary, 'messageType'>) {
-  return gtinFields[run.messageType] ?? 'lines[].gtin'
-}
-
-function missingIn(run: RunSummary, error: RunError | null): MissingPiece | null {
-  switch (error?.code) {
-    case 'lookupMissing': {
-      return { kind: 'code', ...missingUnit }
-    }
-
-    case 'missingSourceField': {
-      return { kind: 'field', fieldPath: gtinFieldOf(run) }
-    }
-
-    default: {
-      return null
-    }
-  }
-}
-
-function errorFor(run: RunSummary, faker: Faker, fault: Fault | null): RunError | null {
+function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessage): Failure {
   if (run.status !== 'failed') {
-    return null
+    return { error: null, broken: null }
   }
 
   if (fault !== null) {
-    return { code: fault.code, message: fault.message, position: null }
+    return { error: { code: fault.code, message: fault.message, position: null }, broken }
   }
 
   if (run.failureStage === 'mapping') {
     const line = faker.number.int({ min: 1, max: 5 })
-    const field = gtinFieldOf(run).replace('lines[]', `lines[${line}]`)
+    const lines = lineLists[run.messageType]
 
     return {
-      code: 'missingSourceField',
-      message: `The required source field "${field}" is missing.`,
-      position: null,
+      error: {
+        code: 'missingSourceField',
+        message: `The required source field "${lines}[${line}].gtin" is missing.`,
+        position: null,
+      },
+      broken: { kind: 'mapping', fieldPath: `${lines}[].gtin` },
     }
   }
 
-  return directionOf(run) === 'outbound'
-    ? {
-        code: 'destinationUnreachable',
-        message: `The SFTP server of ${run.tradingPartner.name} refused the connection (ECONNREFUSED).`,
-        position: null,
-      }
-    : {
-        code: 'destinationUnavailable',
-        message: 'The ERP answered the HTTP POST with 503 Service Unavailable.',
-        position: null,
-      }
+  return {
+    error:
+      directionOf(run) === 'outbound'
+        ? {
+            code: 'destinationUnreachable',
+            message: `The SFTP server of ${run.tradingPartner.name} refused the connection (ECONNREFUSED).`,
+            position: null,
+          }
+        : {
+            code: 'destinationUnavailable',
+            message: 'The ERP answered the HTTP POST with 503 Service Unavailable.',
+            position: null,
+          },
+    broken: null,
+  }
 }
 
 type Parties = { sender: InterchangeParty; receiver: InterchangeParty }
@@ -400,15 +415,12 @@ export function generateMessage(run: RunSummary, reference: string): GeneratedMe
           })),
         }
 
-  const error = errorFor(run, faker, faulty.fault)
-
   return {
     reference,
     segments: faulty.segments,
     parsed,
     fault: faulty.fault,
-    error,
-    missing: missingIn(run, error),
+    ...failureOf(run, faker, faulty),
   }
 }
 

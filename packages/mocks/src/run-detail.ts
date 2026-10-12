@@ -17,7 +17,7 @@ import {
   type RunStepStage,
   type RunSummary,
   runSummarySchema,
-  waitForPartnerEndpoint,
+  waitForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
 
 import { type ChannelStore, toChannelStore } from './channel'
@@ -220,16 +220,17 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       ? null
       : (chosenVersions.get(id) ?? pinnedVersion(run))
 
-    const failed = run.status === 'failed' && message.error
+    const runError = run.status === 'failed' ? message.error : null
 
     return runDetailSchema.parse({
       ...run,
       steps: timeSteps(run),
-      error: failed
-        ? { ...message.error, position: interchange?.positions.get(messageOwner) ?? null }
-        : null,
-      problem: failed ? problemOf(run, message, mappingVersion, problemSources) : null,
-      waitingForPartnerSince: waitingSince.get(id) ?? null,
+      error: runError && {
+        ...runError,
+        position: interchange?.positions.get(messageOwner) ?? null,
+      },
+      problem: runError && problemOf(run, message, mappingVersion, problemSources),
+      waitingForTradingPartnerSince: waitingSince.get(id) ?? null,
       duplicateOf: run.status === 'duplicate' ? originalOf(run) : null,
       interchange: interchange && {
         id: group.id,
@@ -247,26 +248,35 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   }
 
   function originalOf(duplicate: RunSummary) {
+    const controlReference = duplicate.interchange?.controlReference
     const receivedAt = Date.parse(duplicate.receivedAt)
 
-    const original = runs()
-      .newestFirst()
-      .find(
+    if (controlReference === undefined) {
+      return null
+    }
+
+    const candidates = runs()
+      .all()
+      .filter(
         (run) =>
           run.status !== 'duplicate' &&
-          run.flow.id === duplicate.flow.id &&
           run.tradingPartner.id === duplicate.tradingPartner.id &&
+          run.interchange?.controlReference === controlReference &&
           Date.parse(run.receivedAt) < receivedAt,
       )
+
+    const original =
+      candidates.find((run) => run.businessReference === duplicate.businessReference) ??
+      candidates[0]
 
     return original ? { id: original.id } : null
   }
 
-  function waitForPartner(run: RunDetail) {
+  function waitForTradingPartner(run: RunDetail) {
     const since = waitingSince.get(run.id) ?? new Date().toISOString()
     waitingSince.set(run.id, since)
 
-    return runDetailSchema.parse({ ...run, waitingForPartnerSince: since })
+    return runDetailSchema.parse({ ...run, waitingForTradingPartnerSince: since })
   }
 
   function retry(run: RunDetail) {
@@ -278,7 +288,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       failureStage: null,
       error: null,
       problem: null,
-      waitingForPartnerSince: null,
+      waitingForTradingPartnerSince: null,
       steps: run.steps.map((step) =>
         step.stage === 'delivery'
           ? {
@@ -385,21 +395,21 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       return HttpResponse.json(retry(run))
     }),
 
-    http.post<{ id: string }>(`${apiUrl}${waitForPartnerEndpoint.path}`, ({ params }) => {
+    http.post<{ id: string }>(`${apiUrl}${waitForTradingPartnerRunEndpoint.path}`, ({ params }) => {
       const run = detail(params.id)
 
       if (run === undefined) {
         return problem(404, 'Not Found')
       }
 
-      if (run.problem?.whoFixes !== 'partner') {
+      if (run.problem?.whoFixes !== 'tradingPartner') {
         return problem(
           409,
           'Only a Run that the Trading Partner fixes can wait for the Trading Partner.',
         )
       }
 
-      return HttpResponse.json(waitForPartner(run))
+      return HttpResponse.json(waitForTradingPartner(run))
     }),
 
     http.post<{ id: string }>(
@@ -411,10 +421,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
           return problem(404, 'Not Found')
         }
 
-        if (run.status !== 'failed' || run.failureStage !== 'mapping' || run.replacedBy) {
+        if (run.problem?.whoFixes !== 'you' || run.replacedBy) {
           return problem(
             409,
-            'Only a Run that failed at mapping and is not replaced can be reprocessed.',
+            'Only a failed Run that the Workspace fixes and that is not replaced can be reprocessed.',
           )
         }
 
