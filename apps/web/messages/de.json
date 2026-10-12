@@ -726,36 +726,45 @@
     "latestShown": "Neueste {shown, number} von {count, number}"
   },
   "TradingPartners": {
-    "new": "Neuer Trading Partner",
-    "caption": "Trading Partners, nach Name",
-    "loading": "Trading Partners werden geladen",
-    "count": "{count, plural, one {# Trading Partner} other {# Trading Partners}}",
-    "filteredCount": "{count} von {total} Trading Partners",
-    "search": "Nach Name oder GLN suchen",
-    "noMatch": "Kein Trading Partner passt zur Suche.",
-    "nextStep": "Nächster Schritt: {step}",
-    "complete": "Abgeschlossen",
+    "add": "Handelspartner hinzufügen",
+    "list": "Handelspartner",
+    "loading": "Handelspartner werden geladen",
+    "count": "{count, plural, one {# Handelspartner} other {# Handelspartner}}",
+    "open": "Partner öffnen<hidden> {name}</hidden>",
     "hours": "{hours, plural, one {# Stunde} other {# Stunden}}",
-    "columns": {
-      "name": "Name",
-      "gln": "GLN",
-      "mode": "Modus",
-      "onboarding": "Onboarding",
-      "characterSet": "Zeichensatz",
-      "acknowledgementTimeLimit": "Frist für Acknowledgements"
-    },
     "mode": {
-      "test": "Test Mode",
-      "production": "Produktion"
+      "test": "Testbetrieb",
+      "production": "Live"
+    },
+    "setup": {
+      "label": "Einrichtung",
+      "progress": "{done} von {total} Schritten",
+      "next": "Nächster Schritt: {step}",
+      "complete": "Eingerichtet, echte Belege werden ausgetauscht",
+      "steps": {
+        "identity": "GLN Ihres Unternehmens erfassen",
+        "connections": "Verbindung hinzufügen",
+        "documents": "Belege auswählen, die Sie austauschen",
+        "testInterchange": "Testbeleg senden",
+        "contrl": "Auf die Empfangsbestätigung warten",
+        "production": "Live schalten"
+      }
+    },
+    "facts": {
+      "documentsToday": "Belege heute",
+      "openProblems": "Offene Probleme",
+      "lastActivity": "Letzte Aktivität",
+      "noActivity": "Noch keine"
     },
     "empty": {
-      "title": "Noch keine Trading Partners",
-      "description": "Legen Sie einen Trading Partner an, um sein Onboarding zu beginnen.",
-      "viewOnlyDescription": "Trading Partners erscheinen hier, sobald ein Admin einen anlegt."
+      "title": "Noch keine Handelspartner",
+      "description": "Ein Handelspartner ist ein Unternehmen, mit dem Sie Belege austauschen, zum Beispiel ein Händler, der bei Ihnen bestellt.",
+      "viewOnlyDescription": "Handelspartner erscheinen hier, sobald ein Admin einen hinzufügt.",
+      "action": "Ersten Handelspartner hinzufügen"
     },
     "error": {
-      "title": "Trading Partners nicht verfügbar",
-      "description": "Die Trading Partners konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Handelspartner nicht verfügbar",
+      "description": "Die Handelspartner konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     }
   },

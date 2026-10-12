@@ -49,9 +49,38 @@ type ListTranslator = (key: ListMessageKey, values?: { count: number; total?: nu
 export function NewLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} className={buttonVariants()}>
-      <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden />
+      <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden data-icon="inline-start" />
       {label}
     </Link>
+  )
+}
+
+export function ListEmpty({
+  icon,
+  title,
+  description,
+  viewOnlyDescription,
+  action,
+}: {
+  icon: IconSvgElement
+  title: string
+  description: string
+  viewOnlyDescription: string
+  action?: ReactNode
+}) {
+  const canChange = useCanChange()
+
+  return (
+    <Empty className="border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <HugeiconsIcon icon={icon} strokeWidth={2} />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{canChange ? description : viewOnlyDescription}</EmptyDescription>
+      </EmptyHeader>
+      {canChange && action !== undefined && <EmptyContent>{action}</EmptyContent>}
+    </Empty>
   )
 }
 
@@ -99,7 +128,6 @@ export function ListTable<Item>({
 }) {
   const searchId = useId()
   const [search, setSearch] = useState('')
-  const canChange = useCanChange()
 
   if (query.isError) {
     return (
@@ -114,23 +142,20 @@ export function ListTable<Item>({
 
   if (query.data?.length === 0) {
     return (
-      <Empty className="border">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <HugeiconsIcon icon={emptyIcon} strokeWidth={2} />
-          </EmptyMedia>
-          <EmptyTitle>{t('empty.title')}</EmptyTitle>
-          <EmptyDescription>
-            {canChange ? t('empty.description') : t('empty.viewOnlyDescription')}
-          </EmptyDescription>
-        </EmptyHeader>
-        {canChange && (newLink || emptyAction) && (
-          <EmptyContent>
-            {newLink && <NewLink href={newLink.href} label={newLink.label} />}
-            {emptyAction}
-          </EmptyContent>
-        )}
-      </Empty>
+      <ListEmpty
+        action={
+          newLink || emptyAction ? (
+            <>
+              {newLink && <NewLink href={newLink.href} label={newLink.label} />}
+              {emptyAction}
+            </>
+          ) : undefined
+        }
+        description={t('empty.description')}
+        icon={emptyIcon}
+        title={t('empty.title')}
+        viewOnlyDescription={t('empty.viewOnlyDescription')}
+      />
     )
   }
 
