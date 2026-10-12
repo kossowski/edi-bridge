@@ -62,7 +62,6 @@ export {
   channelsEndpoint,
   type ChannelTestFailureReason,
   channelTestFailureReasons,
-  channelTestFailureReasonsByType,
   channelTestFailureReasonSchema,
   type ChannelTestResult,
   channelTestResultSchema,

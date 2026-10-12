@@ -14,16 +14,18 @@ export const openProblemListLimit = 20
 
 export const tradingPartnerActivitySchema = z.object({
   tradingPartnerId: z.uuid(),
-  documentsToday: countSchema,
+  runsToday: countSchema,
   openProblems: countSchema,
   lastActivityAt: z.iso.datetime().nullable(),
+  channelCount: countSchema,
+  flowCount: countSchema,
 })
 
 export type TradingPartnerActivity = z.infer<typeof tradingPartnerActivitySchema>
 
 export const activityDaySchema = z.object({
   date: z.iso.date(),
-  documents: countSchema,
+  runs: countSchema,
   failed: countSchema,
 })
 
@@ -31,7 +33,7 @@ export type ActivityDay = z.infer<typeof activityDaySchema>
 
 export const flowActivitySchema = z.object({
   flow: flowSummarySchema.pick({ id: true, name: true }),
-  documents: countSchema,
+  runs: countSchema,
 })
 
 export type FlowActivity = z.infer<typeof flowActivitySchema>
@@ -47,7 +49,6 @@ export const openProblemSchema = z.discriminatedUnion('kind', [
 export type OpenProblem = z.infer<typeof openProblemSchema>
 
 export const tradingPartnerActivityDetailSchema = tradingPartnerActivitySchema.extend({
-  lastAcknowledgementAt: z.iso.datetime().nullable(),
   days: z.array(activityDaySchema).length(activityDays),
   flows: z.array(flowActivitySchema),
   problems: z.array(openProblemSchema).max(openProblemListLimit),

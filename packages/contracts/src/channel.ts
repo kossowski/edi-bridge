@@ -271,12 +271,6 @@ export const channelTestFailureReasonSchema = z.enum(channelTestFailureReasons)
 
 export type ChannelTestFailureReason = z.infer<typeof channelTestFailureReasonSchema>
 
-export const channelTestFailureReasonsByType = {
-  sftp: ['loginRejected', 'hostUnreachable', 'timedOut', 'remotePathMissing', 'permissionDenied'],
-  webhook: [],
-  http: ['loginRejected', 'hostUnreachable', 'timedOut', 'unexpectedResponse'],
-} as const satisfies Record<ChannelType, ReadonlyArray<ChannelTestFailureReason>>
-
 export const channelTestResultSchema = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('succeeded'), testedAt: z.iso.datetime() }),
   z.object({
