@@ -78,8 +78,14 @@ export const PartnerErrors = meta.story({
 export const GlnLater = meta.story({
   async play({ canvas }) {
     await fillPartner(canvas, '123')
+    await userEvent.click(canvas.getByRole('button', { name: 'Continue' }))
+    const gln = canvas.getByLabelText('Location number (GLN)')
+    await expect(gln).toHaveAttribute('aria-invalid', 'true')
+
     await userEvent.click(canvas.getByRole('checkbox', { name: "I'll add it later" }))
-    await expect(canvas.getByLabelText('Location number (GLN)')).toBeDisabled()
+    await expect(gln).toBeDisabled()
+    await expect(gln).not.toHaveAttribute('aria-invalid', 'true')
+    await expect(canvas.queryByText('A GLN has exactly 13 digits.')).not.toBeInTheDocument()
     await continueTo(canvas, 'Which documents do you exchange?')
   },
 })
@@ -102,8 +108,15 @@ export const DocumentsError = meta.story({
   async play({ canvas }) {
     await toDocuments(canvas)
     await userEvent.click(canvas.getByRole('button', { name: 'Continue' }))
-    await expect(canvas.getByText('Choose at least one document.')).toBeVisible()
-    await expect(canvas.getAllByRole('checkbox')[0]).toHaveFocus()
+    const group = canvas.getByRole('group', { name: 'Which documents do you exchange?' })
+    await expect(group).toHaveAccessibleDescription('Choose at least one document.')
+
+    const checkboxes = within(group).getAllByRole('checkbox')
+    await expect(checkboxes[0]).toHaveFocus()
+
+    for (const checkbox of checkboxes) {
+      await expect(checkbox).not.toHaveAttribute('aria-invalid')
+    }
   },
 })
 
@@ -127,10 +140,10 @@ export const Review = meta.story({
     await continueTo(canvas, 'How do documents travel?')
     await continueTo(canvas, 'Which mapping does each document use?')
     await continueTo(canvas, 'Review and create')
-    await userEvent.click(canvas.getByRole('button', { name: 'Create partner in Test Mode' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create partner for testing' }))
     await expect(args.onFinish).toHaveBeenCalledWith(
       expect.objectContaining({
-        partner: { name: 'Kieler Kontor GmbH', gln: '0234567890129', glnLater: false },
+        partner: { name: 'Kieler Kontor GmbH', gln: '0234567890129' },
         documents: ['ORDERS'],
       }),
     )

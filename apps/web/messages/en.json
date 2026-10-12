@@ -1548,13 +1548,17 @@
         "required": "Enter the company name.",
         "tooLong": "Use at most {max} characters."
       },
-      "glnRequired": "Enter the GLN, or choose “I'll add it later”.",
-      "documents": "Choose at least one document."
+      "gln": {
+        "required": "Enter the GLN, or choose “I'll add it later”."
+      },
+      "documents": {
+        "required": "Choose at least one document."
+      }
     },
     "cancel": "Cancel",
     "back": "Back",
     "continue": "Continue",
-    "finish": "Create partner in Test Mode"
+    "finish": "Create partner for testing"
   },
   "Channels": {
     "new": "New Channel",

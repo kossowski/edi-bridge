@@ -1548,8 +1548,12 @@
         "required": "Geben Sie den Firmennamen ein.",
         "tooLong": "Verwenden Sie höchstens {max} Zeichen."
       },
-      "glnRequired": "Geben Sie die GLN ein oder wählen Sie „Ich trage sie später ein“.",
-      "documents": "Wählen Sie mindestens einen Beleg."
+      "gln": {
+        "required": "Geben Sie die GLN ein oder wählen Sie „Ich trage sie später ein“."
+      },
+      "documents": {
+        "required": "Wählen Sie mindestens einen Beleg."
+      }
     },
     "cancel": "Abbrechen",
     "back": "Zurück",

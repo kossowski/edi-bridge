@@ -9,7 +9,9 @@ import { flushSync } from 'react-dom'
 
 import { AppPage } from '@/components/app-page'
 import { GlnField, TextField, useGlnErrorMessage } from '@/components/form-field'
+import { CheckboxCards } from '@/components/trading-partners/choice-cards'
 import {
+  firstInvalidField,
   initialWizardState,
   type PartnerWizardState,
   stepErrors,
@@ -17,7 +19,8 @@ import {
   type WizardErrors,
   type WizardField,
   wizardDocuments,
-  wizardFields,
+  type WizardResult,
+  wizardResult,
   type WizardStep,
   wizardSteps,
 } from '@/components/trading-partners/partner-wizard-state'
@@ -26,27 +29,39 @@ import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Checkbox } from '@edi-bridge/ui/components/checkbox'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-function useErrorMessages() {
+const focusable = 'input:not([type="hidden"]), [role="checkbox"], [role="radio"], button, textarea'
+
+function useErrorMessage() {
   const t = useTranslations('PartnerWizard.errors')
   const glnErrorMessage = useGlnErrorMessage()
 
-  return (errors: WizardErrors) => ({
-    name:
-      errors.name &&
-      (errors.name === 'tooLong'
-        ? t('name.tooLong', { max: tradingPartnerInputSchema.shape.name.maxLength ?? 0 })
-        : t('name.required')),
-    gln: errors.gln && (errors.gln === 'required' ? t('glnRequired') : glnErrorMessage(errors.gln)),
-    documents: errors.documents && t('documents'),
-  })
+  return (errors: WizardErrors, field: WizardField): string | null => {
+    switch (field) {
+      case 'name':
+        if (errors.name === undefined) {
+          return null
+        }
+
+        return errors.name === 'tooLong'
+          ? t('name.tooLong', { max: tradingPartnerInputSchema.shape.name.maxLength ?? 0 })
+          : t('name.required')
+      case 'gln':
+        if (errors.gln === undefined) {
+          return null
+        }
+
+        return errors.gln === 'required' ? t('gln.required') : glnErrorMessage(errors.gln)
+      case 'documents':
+        return errors.documents === undefined ? null : t('documents.required')
+    }
+  }
 }
 
-export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardState) => void }) {
+export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) => void }) {
   const t = useTranslations('PartnerWizard')
-  const errorMessages = useErrorMessages()
+  const errorMessage = useErrorMessage()
   const baseId = useId()
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const documentsRef = useRef<HTMLDivElement>(null)
   const [state, setState] = useState(initialWizardState)
   const [step, setStep] = useState<WizardStep>('partner')
   const [attempted, setAttempted] = useState(false)
@@ -54,12 +69,10 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
   const index = wizardSteps.indexOf(step)
   const errors = attempted ? stepErrors(step, state) : {}
 
-  const ids = {
-    heading: `${baseId}-heading`,
-    name: `${baseId}-name`,
-    gln: `${baseId}-gln`,
-    glnLater: `${baseId}-gln-later`,
-    documents: `${baseId}-documents`,
+  const glnLaterId = `${baseId}-gln-later`
+
+  function fieldId(field: WizardField) {
+    return `${baseId}-${field}`
   }
 
   function updatePartner(changes: Partial<PartnerWizardState['partner']>) {
@@ -67,10 +80,11 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
   }
 
   function focusField(field: WizardField) {
-    const target =
-      field === 'documents'
-        ? documentsRef.current?.querySelector<HTMLElement>('[role="checkbox"]')
-        : document.getElementById(ids[field])
+    const element = document.getElementById(fieldId(field))
+
+    const target = element?.matches(focusable)
+      ? element
+      : element?.querySelector<HTMLElement>(focusable)
 
     target?.focus()
   }
@@ -87,7 +101,7 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
     event.preventDefault()
 
     const found = stepErrors(step, state)
-    const first = wizardFields.find((field) => found[field] !== undefined)
+    const first = firstInvalidField(found)
 
     if (first) {
       flushSync(() => setAttempted(true))
@@ -101,15 +115,11 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
     if (next) {
       goTo(next)
     } else {
-      onFinish(state)
+      onFinish(wizardResult(state))
     }
   }
 
   const previous = wizardSteps[index - 1]
-  const messages = errorMessages(errors)
-  const nameError = messages.name ?? null
-  const glnError = messages.gln ?? null
-  const documentsError = messages.documents ?? null
 
   return (
     <AppPage title={t('title')}>
@@ -157,11 +167,7 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
             <p className="text-muted-foreground text-sm">
               {t('stepOf', { current: index + 1, total: wizardSteps.length })}
             </p>
-            <h2
-              id={ids.heading}
-              ref={headingRef}
-              tabIndex={-1}
-              className="text-lg font-semibold outline-none">
+            <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">
               {t(`steps.${step}.title`)}
             </h2>
             <p className="text-muted-foreground text-sm">{t(`steps.${step}.description`)}</p>
@@ -170,10 +176,10 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
           {step === 'partner' && (
             <div className="flex flex-col gap-6">
               <TextField
-                id={ids.name}
+                id={fieldId('name')}
                 autoComplete="organization"
                 description={t('fields.name.description')}
-                error={nameError}
+                error={errorMessage(errors, 'name')}
                 label={t('fields.name.label')}
                 name="name"
                 value={state.partner.name}
@@ -181,10 +187,10 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
               />
               <div className="flex flex-col gap-3">
                 <GlnField
-                  id={ids.gln}
+                  id={fieldId('gln')}
                   description={t('fields.gln.description')}
                   disabled={state.partner.glnLater}
-                  error={glnError}
+                  error={errorMessage(errors, 'gln')}
                   label={t('fields.gln.label')}
                   value={state.partner.gln}
                   onChange={(gln) => updatePartner({ gln })}
@@ -193,13 +199,13 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
                   <label className="flex w-fit items-center gap-2 text-sm">
                     <Checkbox
                       checked={state.partner.glnLater}
-                      aria-describedby={`${ids.glnLater}-description`}
+                      aria-describedby={`${glnLaterId}-description`}
                       onCheckedChange={(glnLater) => updatePartner({ glnLater })}
                     />
                     {t('fields.glnLater.label')}
                   </label>
                   <p
-                    id={`${ids.glnLater}-description`}
+                    id={`${glnLaterId}-description`}
                     className="text-muted-foreground pl-6 text-sm">
                     {t('fields.glnLater.description')}
                   </p>
@@ -209,42 +215,24 @@ export function PartnerWizard({ onFinish }: { onFinish: (state: PartnerWizardSta
           )}
 
           {step === 'documents' && (
-            <div
-              ref={documentsRef}
-              role="group"
-              aria-describedby={documentsError ? `${ids.documents}-error` : undefined}
-              aria-labelledby={ids.heading}
-              className="flex flex-col gap-2">
-              {wizardDocuments.map((messageType) => (
-                <label
-                  key={messageType}
-                  className="has-data-checked:border-primary has-data-checked:bg-muted/50 grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 gap-y-0.5 rounded-lg border p-3">
-                  <Checkbox
-                    checked={state.documents.includes(messageType)}
-                    aria-describedby={`${ids.documents}-${messageType}`}
-                    aria-invalid={documentsError !== null || undefined}
-                    className="mt-0.5"
-                    onCheckedChange={(checked) =>
-                      setState((current) => ({
-                        ...current,
-                        documents: toggleDocument(current.documents, messageType, checked),
-                      }))
-                    }
-                  />
-                  <span className="text-sm font-medium">{t(`documents.${messageType}.title`)}</span>
-                  <span
-                    id={`${ids.documents}-${messageType}`}
-                    className="text-muted-foreground col-start-2 text-sm">
-                    {t(`documents.${messageType}.benefit`)}
-                  </span>
-                </label>
-              ))}
-              {documentsError && (
-                <p id={`${ids.documents}-error`} className="text-sm text-red-800 dark:text-red-300">
-                  {documentsError}
-                </p>
-              )}
-            </div>
+            <CheckboxCards
+              id={fieldId('documents')}
+              error={errorMessage(errors, 'documents')}
+              hideLabel
+              items={wizardDocuments.map((messageType) => ({
+                value: messageType,
+                title: t(`documents.${messageType}.title`),
+                description: t(`documents.${messageType}.benefit`),
+              }))}
+              label={t('steps.documents.title')}
+              value={state.documents}
+              onChange={(messageType, checked) =>
+                setState((current) => ({
+                  ...current,
+                  documents: toggleDocument(current.documents, messageType, checked),
+                }))
+              }
+            />
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">

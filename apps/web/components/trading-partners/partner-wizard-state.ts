@@ -4,10 +4,12 @@ import {
   directions,
   type MessageType,
   newMappingMessageTypes,
+  type TradingPartnerInput,
   tradingPartnerInputSchema,
 } from '@edi-bridge/contracts'
 
-import { type GlnError, glnError } from '../../lib/forms/gln'
+import { tooLongOr } from '../../lib/forms/field-errors'
+import { type GlnError, glnError, normalizeGln } from '../../lib/forms/gln'
 
 export const wizardSteps = ['partner', 'documents', 'connections', 'mappings', 'review'] as const
 
@@ -33,14 +35,18 @@ export type PartnerWizardState = {
   mappings: Partial<Record<WizardDocument, WizardMapping>>
 }
 
-export const wizardFields = ['name', 'gln', 'documents'] as const
+export type WizardFieldErrors = {
+  name: 'required' | 'tooLong'
+  gln: GlnError
+  documents: 'required'
+}
 
-export type WizardField = (typeof wizardFields)[number]
+export type WizardField = keyof WizardFieldErrors
 
-export type WizardErrors = {
-  name?: 'required' | 'tooLong'
-  gln?: GlnError
-  documents?: 'required'
+export type WizardErrors = { [Field in WizardField]?: WizardFieldErrors[Field] }
+
+export type WizardResult = Omit<PartnerWizardState, 'partner'> & {
+  partner: Pick<TradingPartnerInput, 'name' | 'gln'>
 }
 
 export const initialWizardState: PartnerWizardState = {
@@ -52,20 +58,13 @@ export const initialWizardState: PartnerWizardState = {
 
 function partnerErrors({ partner }: PartnerWizardState): WizardErrors {
   const name = tradingPartnerInputSchema.shape.name.safeParse(partner.name)
+  const nameIssue = name.error?.issues[0]
   const gln = partner.glnLater ? null : glnError(partner.gln)
-  const errors: WizardErrors = {}
 
-  if (!name.success) {
-    errors.name = name.error.issues.some((issue) => issue.code === 'too_big')
-      ? 'tooLong'
-      : 'required'
+  return {
+    ...(nameIssue && { name: tooLongOr(nameIssue, 'required' as const) }),
+    ...(gln !== null && { gln }),
   }
-
-  if (gln !== null) {
-    errors.gln = gln
-  }
-
-  return errors
 }
 
 export function stepErrors(step: WizardStep, state: PartnerWizardState): WizardErrors {
@@ -78,6 +77,23 @@ export function stepErrors(step: WizardStep, state: PartnerWizardState): WizardE
     case 'mappings':
     case 'review':
       return {}
+  }
+}
+
+function isInvalidField(errors: WizardErrors, key: string): key is WizardField {
+  return Object.entries(errors).some(([field, error]) => field === key && error !== undefined)
+}
+
+export function firstInvalidField(errors: WizardErrors): WizardField | undefined {
+  return Object.keys(errors).find((key): key is WizardField => isInvalidField(errors, key))
+}
+
+export function wizardResult(state: PartnerWizardState): WizardResult {
+  const { name, gln, glnLater } = state.partner
+
+  return {
+    ...state,
+    partner: { name: name.trim(), gln: glnLater ? null : normalizeGln(gln) },
   }
 }
 

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  firstInvalidField,
   initialWizardState,
   neededDirections,
   type PartnerWizardState,
   stepErrors,
   toggleDocument,
+  wizardResult,
   wizardSteps,
 } from './partner-wizard-state'
 
@@ -64,6 +66,35 @@ describe('stepErrors', () => {
 
   it.each(wizardSteps.slice(2))('has nothing to check on the %s step yet', (step) => {
     expect(stepErrors(step, initialWizardState)).toEqual({})
+  })
+})
+
+describe('firstInvalidField', () => {
+  it('finds the first invalid field in the order of the step', () => {
+    expect(firstInvalidField(stepErrors('partner', initialWizardState))).toBe('name')
+    expect(firstInvalidField(stepErrors('partner', withPartner({ name: 'Kieler Kontor' })))).toBe(
+      'gln',
+    )
+    expect(firstInvalidField(stepErrors('documents', initialWizardState))).toBe('documents')
+  })
+
+  it('finds nothing on a valid step', () => {
+    expect(firstInvalidField(stepErrors('partner', withPartner(validPartner)))).toBeUndefined()
+  })
+})
+
+describe('wizardResult', () => {
+  it('hands on the trimmed name and the GLN without spaces', () => {
+    expect(
+      wizardResult(withPartner({ name: ' Kieler Kontor GmbH ', gln: '0234 5678 90129' })).partner,
+    ).toEqual({ name: 'Kieler Kontor GmbH', gln: '0234567890129' })
+  })
+
+  it('hands on no GLN when it is added later, though the step keeps the typed one', () => {
+    const state = withPartner({ ...validPartner, glnLater: true })
+
+    expect(wizardResult(state).partner).toEqual({ name: validPartner.name, gln: null })
+    expect(state.partner.gln).toBe(validPartner.gln)
   })
 })
 
