@@ -10,9 +10,11 @@ import { flushSync } from 'react-dom'
 import { AppPage } from '@/components/app-page'
 import { GlnField, TextField, useGlnErrorMessage } from '@/components/form-field'
 import { CheckboxCards } from '@/components/trading-partners/choice-cards'
+import { ConnectionsStep } from '@/components/trading-partners/partner-wizard-connections'
 import {
   firstInvalidField,
   initialWizardState,
+  type PartnerField,
   type PartnerWizardState,
   stepErrors,
   toggleDocument,
@@ -35,7 +37,7 @@ function useErrorMessage() {
   const t = useTranslations('PartnerWizard.errors')
   const glnErrorMessage = useGlnErrorMessage()
 
-  return (errors: WizardErrors, field: WizardField): string | null => {
+  return (errors: WizardErrors, field: PartnerField): string | null => {
     switch (field) {
       case 'name':
         if (errors.name === undefined) {
@@ -72,7 +74,7 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
   const glnLaterId = `${baseId}-gln-later`
 
   function fieldId(field: WizardField) {
-    return `${baseId}-${field}`
+    return `${baseId}-${field.replace('.', '-')}`
   }
 
   function updatePartner(changes: Partial<PartnerWizardState['partner']>) {
@@ -230,6 +232,23 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
                 setState((current) => ({
                   ...current,
                   documents: toggleDocument(current.documents, messageType, checked),
+                }))
+              }
+            />
+          )}
+
+          {step === 'connections' && (
+            <ConnectionsStep
+              errors={errors}
+              idPrefix={baseId}
+              state={state}
+              onUpdate={(direction, update) =>
+                setState((current) => ({
+                  ...current,
+                  connections: {
+                    ...current.connections,
+                    [direction]: update(current.connections[direction]),
+                  },
                 }))
               }
             />

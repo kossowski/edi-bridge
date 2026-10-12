@@ -1543,6 +1543,37 @@
         "benefit": "Your invoices reach the partner's accounting without email or paper."
       }
     },
+    "documentNames": {
+      "ORDERS": "purchase orders",
+      "DESADV": "dispatch advices",
+      "INVOIC": "invoices"
+    },
+    "connections": {
+      "inbound": {
+        "label": "{name} sends you {documents}"
+      },
+      "outbound": {
+        "label": "You send {documents} to {name}"
+      },
+      "ask": {
+        "title": "We'll ask the partner for these details",
+        "description": "Continue now and send the partner the ready-made request below."
+      },
+      "webhookNotice": "EDI Bridge creates the web address and a key when you finish. You then pass both on to {name}.",
+      "request": {
+        "title": "Request for {name}",
+        "description": "Send this message to the partner, for example by email. Their answer has everything that is still missing. You add it later on the partner page.",
+        "copy": "request"
+      }
+    },
+    "request": {
+      "greeting": "Hello,",
+      "intro": "we would like to exchange EDI documents with you. To set this up, please send us:",
+      "inbound": "For the {documents} you send us: the address and port of your SFTP server, the folder, the user name, and the password or private key. If you would rather send them to a web address, tell us, and we will send you our address and a key.",
+      "outbound": "For the {documents} we send you: the address and port of your SFTP server, the folder, the user name, and the password or private key. Or a web address (URL) and, if needed, the value of the Authorization header.",
+      "gln": "Your location number (GLN).",
+      "closing": "Thank you!"
+    },
     "errors": {
       "name": {
         "required": "Enter the company name.",
@@ -1553,6 +1584,9 @@
       },
       "documents": {
         "required": "Choose at least one document."
+      },
+      "way": {
+        "required": "Choose how the documents travel."
       }
     },
     "cancel": "Cancel",
