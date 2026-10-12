@@ -120,8 +120,10 @@ export const lookupTableScopeInputSchema = z.discriminatedUnion('kind', [
 
 export type LookupTableScopeInput = z.infer<typeof lookupTableScopeInputSchema>
 
+export const maxLookupTableNameLength = 70
+
 export const lookupTableInputSchema = z.object({
-  name: z.string().trim().min(1).max(70),
+  name: z.string().trim().min(1).max(maxLookupTableNameLength),
   kind: lookupTableKindSchema,
   scope: lookupTableScopeInputSchema,
   entries: lookupTableEntriesSchema,

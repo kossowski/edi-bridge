@@ -361,6 +361,7 @@ export {
   lookupTablesEndpoint,
   maxLookupCodeLength,
   maxLookupTableCsvLength,
+  maxLookupTableNameLength,
   type MissingCode,
   type MissingCodeCounts,
   missingCodeCountsSchema,
