@@ -162,8 +162,8 @@ function pressedValues(canvasElement: HTMLElement) {
   return [...canvasElement.querySelectorAll('[data-sample-value][aria-pressed=true]')]
 }
 
-// The first story of the file renders cold. Its Mapping links wait for the list of Document
-// Structures, which answers after a delay, and a busy CI runner takes longer than a second for both.
+// The Mapping link waits for the list request, whose mock handler adds a random delay; the detail
+// has none. On a busy CI runner the cold first story needs more than the default second.
 const firstRender = { timeout: 5000 }
 
 export const Default = meta.story({

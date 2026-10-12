@@ -248,9 +248,9 @@ export const Unavailable = meta.story({
       ),
     )
   },
-  // The comparison is asked for only once the Mapping and its versions have loaded, a chain of
-  // requests that a busy CI runner answers later than the default second.
   async play({ canvas }) {
+    // The comparison is asked for only once the Mapping and its versions have loaded, a chain of
+    // requests that a busy CI runner answers later than the default second.
     await expect(
       await canvas.findByText('Mapping differences unavailable', {}, { timeout: 5000 }),
     ).toBeVisible()
