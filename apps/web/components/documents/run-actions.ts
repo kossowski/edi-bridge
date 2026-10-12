@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-query'
 
 import { reprocessRun, retryRun, waitForTradingPartner } from '@/lib/api/client'
-import { interchangeKeys, runKeys, runQuery, taskKeys } from '@/lib/api/queries'
+import { homeKeys, interchangeKeys, runKeys, runQuery, taskKeys } from '@/lib/api/queries'
 import { type RunDetail, runDetailSchema } from '@edi-bridge/contracts'
 
 export type RunActionResult = { action: 'retried' | 'reprocessed'; run: RunDetail }
@@ -22,6 +22,7 @@ function storeRun(queryClient: QueryClient, run: RunDetail) {
   void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
   void queryClient.invalidateQueries({ queryKey: interchangeKeys.all() })
   void queryClient.invalidateQueries({ queryKey: taskKeys.all() })
+  void queryClient.invalidateQueries({ queryKey: homeKeys.all() })
 }
 
 export function useRetryRun(id: string) {
