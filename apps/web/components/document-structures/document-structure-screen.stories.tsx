@@ -41,7 +41,7 @@ const invoiceExport = seedDocumentStructures.find(
   ({ name }) => name === 'ERP invoice export (CSV)',
 )!
 
-const large = createDocumentStructure({ fieldCount: 2000 })
+const large = createDocumentStructure({ fieldCount: 400 })
 
 const orderMapping = seedMappingDrafts.find(
   ({ name }) => name === 'Hansemarkt: ORDERS to ERP JSON',
