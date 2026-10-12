@@ -11,6 +11,7 @@ import {
   reviewing,
   seeded,
   target,
+  findSheet,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { findRowButton } from '@/components/mappings/tree-node'
 import { viewerStory } from '@/components/session/session-story-helpers'
@@ -189,7 +190,9 @@ export const ItemShowsOnCanvas = meta.story({
 
     await userEvent.click(unmapped!)
     await waitFor(() => expect(findRowButton(canvasElement, target(path))).toHaveFocus())
-    await expect(detailsPanel(canvasElement).getByText('This part has no links yet.')).toBeVisible()
+    await expect(
+      (await detailsPanel(canvasElement)).getByText('This part has no links yet.'),
+    ).toBeVisible()
 
     const [chain] = itemsUnder(region, heading('AI-proposed links through Transforms'))
 
@@ -200,7 +203,7 @@ export const ItemShowsOnCanvas = meta.story({
       ).not.toBeNull(),
     )
     await expect(
-      detailsPanel(canvasElement).getByRole('heading', { name: /AI-proposed Transform$/ }),
+      (await detailsPanel(canvasElement)).getByRole('heading', { name: /AI-proposed Transform$/ }),
     ).toBeVisible()
   },
 })
@@ -219,7 +222,7 @@ export const RejectUpdatesList = meta.story({
     await userEvent.click(item!)
     await waitFor(() => expect(findRowButton(canvasElement, target(path))).toHaveFocus())
     await userEvent.click(
-      detailsPanel(canvasElement).getByRole('button', {
+      (await detailsPanel(canvasElement)).getByRole('button', {
         name: /^Reject the AI-proposed link from/,
       }),
     )
@@ -234,7 +237,6 @@ export const HeaderShowsPanel = meta.story({
   async play({ canvas, canvasElement }) {
     const region = await findPanel(canvasElement)
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Hide details and preview' }))
     await userEvent.click(canvas.getByRole('button', { name: 'What needs attention' }))
     await waitFor(() => expect(region).toHaveFocus())
     await expect(within(region).getByRole('heading', { name: unmappedHeading })).toBeVisible()
@@ -245,7 +247,9 @@ export const PreviewShowsReviewSample = meta.story({
   async play({ canvas, canvasElement }) {
     await findPanel(canvasElement)
 
-    const preview = within(canvas.getByRole('region', { name: 'Preview' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Preview' }))
+
+    const preview = await findSheet(canvasElement, 'Preview')
 
     await expect(await preview.findByRole('combobox', { name: 'Sample Document' })).toBeVisible()
     await expect(
@@ -320,7 +324,7 @@ export const Viewer = meta.story({
       ).toBeGreaterThan(0)
       await expect(canvas.queryByRole('region', { name: 'AI review' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: 'What needs attention' })).toBeNull()
-      await expect(canvas.getByRole('region', { name: 'Preview' })).toBeVisible()
+      await expect(canvas.getByRole('button', { name: 'Preview' })).toBeVisible()
     },
   }),
 })

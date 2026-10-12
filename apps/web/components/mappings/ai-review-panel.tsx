@@ -120,16 +120,12 @@ export function AiReviewPanel({
   draft,
   review,
   targetItems,
-  open,
   id,
-  bodyId,
 }: {
   draft: MappingDraft
   review: AiReview
   targetItems: ReadonlyArray<TreeItem>
-  open: boolean
   id: string
-  bodyId: string
 }) {
   const t = useTranslations('Mapping.aiReview.panel')
   const tNotes = useTranslations('Mapping.preview.notes')
@@ -239,16 +235,13 @@ export function AiReviewPanel({
       ref={ref}
       tabIndex={-1}
       aria-labelledby={headingId}
-      className="bg-card focus-visible:ring-ring/50 flex min-h-0 min-w-0 flex-col rounded-lg border outline-none focus-visible:ring-3">
+      className="bg-card focus-visible:ring-ring/50 flex min-h-0 w-80 shrink-0 flex-col rounded-lg border outline-none focus-visible:ring-3 xl:w-96">
       <div className="flex min-h-11 shrink-0 items-center px-4 py-1.5">
         <h2 id={headingId} className="text-sm font-semibold">
           {t('title')}
         </h2>
       </div>
-      <div
-        id={bodyId}
-        hidden={!open}
-        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border-t px-2 py-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border-t px-2 py-3">
         <p className="text-muted-foreground px-2 text-sm">{t('description')}</p>
         <AttentionGroup
           count={attention.unmapped.length}

@@ -24,8 +24,11 @@ export type CanvasState = {
   edgeAnchor: XYPosition | null
   announcement: string
   problem: string | null
-  bandOpen: boolean
-  toggleBand: () => void
+  // Opened from the toolbar; a selection shows the Details sheet anyway. A pending link does not,
+  // so the sheet never covers the targets a link is being drawn to.
+  detailsOpen: boolean
+  openDetails: () => void
+  closeDetails: () => void
   toggleCollapsed: (row: RowRef) => void
   expand: (side: Side, paths: ReadonlyArray<string>) => void
   toggleSelected: (row: RowRef) => void
@@ -40,6 +43,10 @@ export type CanvasState = {
   leaveEdge: (id: string) => void
   announce: (text: string) => void
   setProblem: (problem: string | null) => void
+}
+
+export function detailsShown(state: CanvasState) {
+  return Boolean(state.detailsOpen || state.selected || state.selectedTransform || state.linkFrom)
 }
 
 export function isSameRow(a: RowRef | null, b: RowRef) {
@@ -70,8 +77,10 @@ export function createCanvasStore() {
     edgeAnchor: null,
     announcement: '',
     problem: null,
-    bandOpen: true,
-    toggleBand: () => set(({ bandOpen }) => ({ bandOpen: !bandOpen })),
+    detailsOpen: false,
+    openDetails: () => set({ detailsOpen: true }),
+    closeDetails: () =>
+      set({ detailsOpen: false, selected: null, selectedTransform: null, linkFrom: null }),
     toggleCollapsed: ({ side, path }) =>
       set(({ collapsed }) => {
         const next = new Set(collapsed[side])
@@ -91,22 +100,19 @@ export function createCanvasStore() {
         return { collapsed: { ...collapsed, [side]: next } }
       }),
     toggleSelected: (row) =>
-      set(({ selected, bandOpen }) => ({
+      set(({ selected }) => ({
         selected: isSameRow(selected, row) ? null : toRowRef(row),
         selectedTransform: null,
-        bandOpen: bandOpen || !isSameRow(selected, row),
       })),
-    select: (row) => set({ selected: toRowRef(row), selectedTransform: null, bandOpen: true }),
+    select: (row) => set({ selected: toRowRef(row), selectedTransform: null }),
     toggleTransform: (id) =>
-      set(({ selectedTransform, bandOpen }) => ({
+      set(({ selectedTransform }) => ({
         selectedTransform: selectedTransform === id ? null : id,
         selected: null,
-        bandOpen: bandOpen || selectedTransform !== id,
       })),
-    selectTransform: (id) => set({ selectedTransform: id, selected: null, bandOpen: true }),
+    selectTransform: (id) => set({ selectedTransform: id, selected: null }),
     clearSelection: () => set({ selected: null, selectedTransform: null }),
-    // A selection or a pending link shows its details, and focus may move there, so the band opens.
-    startLink: (linkFrom) => set({ linkFrom, problem: null, bandOpen: true }),
+    startLink: (linkFrom) => set({ linkFrom, problem: null }),
     cancelLink: () => set({ linkFrom: null }),
     setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
     hoverEdge: (id, at) => {

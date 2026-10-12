@@ -95,7 +95,7 @@ export const InboundWithLookupTable = meta.story({
     await findSummary(canvasElement)
     await userEvent.click(await canvas.findByRole('button', { name: /^Lookup Table 1/ }))
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
 
     await expect(
       panel.getByRole('heading', { name: 'Lookup Table 1 AI-proposed Transform' }),
@@ -121,7 +121,7 @@ export const RejectLink = meta.story({
 
     await userEvent.click(row!)
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
 
     await expect(panel.getByText('AI-proposed')).toBeVisible()
 
@@ -154,7 +154,7 @@ export const EditTransform = meta.story({
       await canvas.findByRole('button', { name: 'Constant 1 AI-proposed Transform' }),
     )
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
     const value = panel.getByRole('textbox', { name: 'Value' })
 
     await userEvent.clear(value)
@@ -194,7 +194,7 @@ export const AcceptDraft = meta.story({
 
     await userEvent.click(transformNodeOf(canvasElement, 'Lookup Table 1').querySelector('button')!)
     await expect(
-      detailsPanel(canvasElement).getByRole('button', { name: 'Remove Lookup Table 1' }),
+      (await detailsPanel(canvasElement)).getByRole('button', { name: 'Remove Lookup Table 1' }),
     ).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Draft with AI' })).not.toHaveAttribute(
       'aria-disabled',
@@ -242,9 +242,9 @@ export const Viewer = meta.story({
 
       await userEvent.click(canvas.getByRole('button', { name: 'Lookup Table 1' }))
       await expect(
-        detailsPanel(canvasElement).getByRole('heading', { name: 'Lookup Table 1' }),
+        (await detailsPanel(canvasElement)).getByRole('heading', { name: 'Lookup Table 1' }),
       ).toBeVisible()
-      await expect(detailsPanel(canvasElement).queryByText(/AI-proposed/)).toBeNull()
+      await expect((await detailsPanel(canvasElement)).queryByText(/AI-proposed/)).toBeNull()
     },
   }),
 })
@@ -296,6 +296,6 @@ export const Dark = meta.story({
     const [row] = await canvas.findAllByRole('button', { name: proposedRow })
 
     await userEvent.click(row!)
-    await expect(detailsPanel(canvasElement).getByText('AI-proposed')).toBeVisible()
+    await expect((await detailsPanel(canvasElement)).getByText('AI-proposed')).toBeVisible()
   },
 })

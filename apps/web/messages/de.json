@@ -2466,7 +2466,9 @@
     "details": {
       "title": "Details",
       "empty": "Wählen Sie einen Teil aus, um seine Bedeutung und Verknüpfungen hier zu behalten. Für einen schnellen Blick zeigen Sie auf einen Teil oder setzen Sie den Fokus darauf.",
-      "clear": "Auswahl aufheben"
+      "clear": "Auswahl aufheben",
+      "description": "Was auf der Zeichenfläche ausgewählt ist, mit Bedeutung und Verknüpfungen. Ohne Auswahl die Eckdaten dieses Mappings.",
+      "close": "Details schließen"
     },
     "transforms": {
       "kinds": {
@@ -2511,7 +2513,10 @@
       "palette": {
         "heading": "Transform hinzufügen",
         "add": "{kind} hinzufügen",
-        "note": "Wählen Sie einen platzierten Transform aus, um seine Einstellungen unter Details zu ändern. Seine Ein- und Ausgänge verknüpfen Sie wie Felder und Elemente."
+        "note": "Wählen Sie einen platzierten Transform aus, um seine Einstellungen unter Details zu ändern. Seine Ein- und Ausgänge verknüpfen Sie wie Felder und Elemente.",
+        "hint": "Klicken Sie zum Hinzufügen, oder ziehen Sie einen Transform auf die Zeichenfläche.",
+        "show": "Transforms einblenden",
+        "hide": "Transforms ausblenden"
       },
       "node": {
         "label": "Transform {name}",
@@ -2734,8 +2739,6 @@
     },
     "preview": {
       "title": "Vorschau",
-      "show": "Details und Vorschau einblenden",
-      "hide": "Details und Vorschau ausblenden",
       "sample": "Beispiel-Document",
       "source": "Beispiel-Document",
       "target": "Ziel-Document",
@@ -2764,7 +2767,9 @@
         "expressionFailed": "{transform} ist bei diesem Beispiel-Document fehlgeschlagen.",
         "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispiel-Documents noch nicht in der Vorschau berechnet.",
         "brokenLink": "Eine Verknüpfung hier führt zu einem Feld oder Element, das ihre Seite nicht hat; die Vorschau überspringt sie."
-      }
+      },
+      "description": "Das Ziel-Document, das dieses Mapping aus einem Beispiel-Document macht, mit den Verknüpfungen in ihrem aktuellen Stand.",
+      "close": "Vorschau schließen"
     }
   },
   "MappingVersions": {

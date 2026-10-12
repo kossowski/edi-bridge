@@ -2466,7 +2466,9 @@
     "details": {
       "title": "Details",
       "empty": "Select a part to keep its meaning and links here. To take a quick look, point at a part or move the focus to it.",
-      "clear": "Clear selection"
+      "clear": "Clear selection",
+      "description": "What is selected on the canvas, with its meaning and links. With nothing selected, the facts of this Mapping.",
+      "close": "Close details"
     },
     "transforms": {
       "kinds": {
@@ -2511,7 +2513,10 @@
       "palette": {
         "heading": "Add a Transform",
         "add": "Add {kind}",
-        "note": "Select a placed Transform to change its settings under Details. Its inputs and outputs are linked like fields and elements."
+        "note": "Select a placed Transform to change its settings under Details. Its inputs and outputs are linked like fields and elements.",
+        "hint": "Click to add, or drag onto the canvas.",
+        "show": "Show the Transforms",
+        "hide": "Hide the Transforms"
       },
       "node": {
         "label": "Transform {name}",
@@ -2734,8 +2739,6 @@
     },
     "preview": {
       "title": "Preview",
-      "show": "Show details and preview",
-      "hide": "Hide details and preview",
       "sample": "Sample Document",
       "source": "Sample Document",
       "target": "Target Document",
@@ -2764,7 +2767,9 @@
         "expressionFailed": "{transform} failed on this Sample Document.",
         "expressionNotPreviewed": "{transform} is not previewed on EDIFACT Sample Documents yet.",
         "brokenLink": "A link here reaches a field or element its side does not have, so the preview skips it."
-      }
+      },
+      "description": "The target Document this Mapping makes of a Sample Document, with the links as they are now.",
+      "close": "Close preview"
     }
   },
   "MappingVersions": {

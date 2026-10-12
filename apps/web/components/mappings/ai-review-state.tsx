@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from 'react'
 
 import { AiBadge } from '@/components/mappings/ai-badge'
 import { aiProposedCount } from '@/components/mappings/ai-marks'
-import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
 import { useGraphSaveState } from '@/components/mappings/use-save-graph'
 import { acceptAiDraft } from '@/lib/api/client'
 import { mappingDraftQuery, storeAcceptedAiDraft } from '@/lib/api/queries'
@@ -18,20 +17,9 @@ import type { MappingDraft } from '@edi-bridge/contracts'
 
 function ShowReviewPanel({ panelId }: { panelId: string }) {
   const t = useTranslations('Mapping.aiReview')
-  const store = useCanvasStoreApi()
-
-  const show = () => {
-    const { bandOpen, toggleBand } = store.getState()
-
-    if (!bandOpen) {
-      toggleBand()
-    }
-
-    requestAnimationFrame(() => document.getElementById(panelId)?.focus())
-  }
 
   return (
-    <Button size="sm" variant="outline" onClick={show}>
+    <Button size="sm" variant="outline" onClick={() => document.getElementById(panelId)?.focus()}>
       {t('showPanel')}
     </Button>
   )
