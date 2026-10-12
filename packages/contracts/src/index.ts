@@ -75,6 +75,7 @@ export {
   createdChannelSchema,
   type MaskedSecret,
   maskedSecretSchema,
+  maxChannelNameLength,
   pollingIntervalMinutes,
   regeneratedWebhookTokenSchema,
   type RegeneratedWebhookToken,
