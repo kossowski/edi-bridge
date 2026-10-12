@@ -158,10 +158,6 @@ export const deleteLookupTableEndpoint: Endpoint<
   response: z.undefined(),
 }
 
-export const missingCodeUrgencies = ['blocking', 'upcoming'] as const
-
-export type MissingCodeUrgency = (typeof missingCodeUrgencies)[number]
-
 export const failedRunReferenceSchema = z.object({
   id: z.uuid(),
   receivedAt: z.iso.datetime(),
@@ -178,17 +174,25 @@ const missingCodeFields = {
   suggestions: z.array(codeMeaningSchema),
 }
 
+export const blockingMissingCodeSchema = z.object({
+  urgency: z.literal('blocking'),
+  ...missingCodeFields,
+  failedRuns: z.array(failedRunReferenceSchema).min(1),
+})
+
+export type BlockingMissingCode = z.infer<typeof blockingMissingCodeSchema>
+
+export const upcomingMissingCodeSchema = z.object({
+  urgency: z.literal('upcoming'),
+  ...missingCodeFields,
+  itemCount: z.number().int().positive(),
+})
+
+export type UpcomingMissingCode = z.infer<typeof upcomingMissingCodeSchema>
+
 export const missingCodeSchema = z.discriminatedUnion('urgency', [
-  z.object({
-    urgency: z.literal('blocking'),
-    ...missingCodeFields,
-    failedRuns: z.array(failedRunReferenceSchema).min(1),
-  }),
-  z.object({
-    urgency: z.literal('upcoming'),
-    ...missingCodeFields,
-    itemCount: z.number().int().positive(),
-  }),
+  blockingMissingCodeSchema,
+  upcomingMissingCodeSchema,
 ])
 
 export type MissingCode = z.infer<typeof missingCodeSchema>
