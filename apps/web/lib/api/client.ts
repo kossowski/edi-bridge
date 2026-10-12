@@ -53,6 +53,7 @@ import {
   type MessageType,
   messageTypeStructureEndpoint,
   type MoveFlowMappingVersionBody,
+  operatorWorkspaceMembersEndpoint,
   operatorWorkspaceSettingsEndpoint,
   parseAiDraftEvent,
   operatorWorkspacesEndpoint,
@@ -72,6 +73,7 @@ import {
   requestAiDraftEndpoint,
   reprocessRunEndpoint,
   resetSandboxWorkspaceEndpoint,
+  revokeInviteEndpoint,
   retryRunEndpoint,
   type SaveMappingDraftBody,
   sessionEndpoint,
@@ -238,6 +240,18 @@ export function createInvite(workspaceId: string, body: InviteInput) {
   return request(createInviteEndpoint, {
     path: toPath(createInviteEndpoint.path, { workspaceId }),
     body,
+  })
+}
+
+export function revokeInvite(workspaceId: string, inviteId: string) {
+  return request(revokeInviteEndpoint, {
+    path: toPath(revokeInviteEndpoint.path, { workspaceId, inviteId }),
+  })
+}
+
+export function listOperatorWorkspaceMembers(workspaceId: string) {
+  return request(operatorWorkspaceMembersEndpoint, {
+    path: toPath(operatorWorkspaceMembersEndpoint.path, { workspaceId }),
   })
 }
 

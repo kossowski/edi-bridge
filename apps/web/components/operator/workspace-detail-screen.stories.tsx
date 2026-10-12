@@ -11,17 +11,21 @@ import {
   createInviteEndpoint,
   type Invite,
   inviteValidityDays,
+  operatorWorkspaceMembersEndpoint,
   operatorWorkspaceSettingsEndpoint,
   operatorWorkspacesEndpoint,
   resetSandboxWorkspaceEndpoint,
+  revokeInviteEndpoint,
   updateOperatorWorkspaceSettingsEndpoint,
   workspaceInvitesEndpoint,
+  type WorkspaceMember,
   type WorkspaceSettings,
 } from '@edi-bridge/contracts'
 import {
   createInvites,
   createOperatorStore,
   createSessionStore,
+  createWorkspaceMembers,
   createWorkspaceSettings,
   operatorHandlers,
   sandboxAdminSession,
@@ -61,11 +65,13 @@ const invitesWithPending = seedInvites.map((invite) =>
 
 function operatorMocks({
   invites = invitesWithPending,
+  members,
   session = seedSession,
   settings,
   workspaceSummaries = seedWorkspaceSummaries,
 }: {
   invites?: ReadonlyArray<Invite>
+  members?: ReadonlyArray<WorkspaceMember>
   session?: typeof seedSession
   settings?: WorkspaceSettings
   workspaceSummaries?: ReadonlyArray<WorkspaceSummaryRecord>
@@ -75,7 +81,11 @@ function operatorMocks({
 
   return [
     ...sessionHandlers(apiUrl, sessionStore),
-    ...operatorHandlers(apiUrl, { workspaces, session: sessionStore }),
+    ...operatorHandlers(apiUrl, {
+      workspaces,
+      session: sessionStore,
+      ...(members && { members }),
+    }),
     ...workspaceSettingsHandlers(apiUrl, {
       workspaces,
       session: sessionStore,
@@ -298,53 +308,95 @@ export const UnknownTabShowsOverview = meta.story({
   },
 })
 
-export const Invites = meta.story({
+export const MembersAndInvites = meta.story({
   ...membersTab,
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('tab', { name: 'Members & invites' })).toHaveAttribute(
       'aria-selected',
       'true',
     )
+    await expect(await canvas.findByText('Mara Olsen')).toBeVisible()
+    await expect(canvas.getByText('4 members')).toBeVisible()
     await expect(await canvas.findByText(pendingEmail)).toBeVisible()
-    await expect(canvas.getByText('4 invites')).toBeVisible()
+    await expect(canvas.getByText('1 open invite')).toBeVisible()
     await expect(canvas.getAllByRole('button', { name: 'Copy link' })).toHaveLength(1)
-    await expect(canvas.getByText(/No email is sent/)).toBeVisible()
+    await expect(canvas.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1)
+    await expect(canvas.getByText('3 earlier invites')).toBeVisible()
+    await expect(canvas.getByText(/The link is valid for 7 days/)).toBeVisible()
+    await expect(canvas.getByRole('radio', { name: 'Viewer' })).toBeChecked()
+    await expect(canvas.getByRole('radio', { name: 'Admin' })).toHaveAccessibleDescription(
+      'Full control: may change everything in this Workspace.',
+    )
+    await expect(panel(canvasElement).queryByText(/\bsen[dt]\b|by email/i)).toBeNull()
   },
 })
 
-export const InvitesOnPhone = meta.story({
-  ...mobile,
-  parameters: { ...mobile.parameters, ...membersTab.parameters },
-  async play({ canvas }) {
-    const table = await canvas.findByRole('table', { name: /Invites of this Workspace/ })
-    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
-    await expect(canvas.getByRole('columnheader', { name: 'Status' })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Copy link' })).toBeVisible()
-    await expect(canvas.getAllByText(/^Viewer · Created .+ · Expires .+$/)[0]).toBeVisible()
-    await expect(canvas.queryByRole('columnheader', { name: 'Role' })).toBeNull()
-    await expect(table.scrollWidth).toBeLessThanOrEqual(table.parentElement!.clientWidth)
-  },
-})
-
-export const NoInvites = meta.story({
-  ...membersTab,
-  beforeEach({ msw }) {
-    msw.use(...operatorMocks({ invites: [] }))
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText('No invites yet.')).toBeVisible()
-    await expect(canvas.queryByRole('table')).toBeNull()
-  },
-})
-
-export const ManyInvites = meta.story({
+export const EarlierInvites = meta.story({
   ...membersTab,
   beforeEach({ msw }) {
     msw.use(
       ...operatorMocks({
         invites: [
-          ...createInvites({ count: 200, workspaceId: seedWorkspace.id }),
-          pendingSince(seedInvites[3]!, 2),
+          ...invitesWithPending,
+          {
+            ...pendingSince(seedInvites[3]!, 9),
+            id: crypto.randomUUID(),
+            email: 'old.invite@nordwind-handel.example',
+          },
+        ],
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByText('4 earlier invites'))
+    await expect(canvas.getByText('old.invite@nordwind-handel.example')).toBeVisible()
+    await expect(canvas.getByText(/^Expired on /)).toBeVisible()
+    await expect(canvas.getAllByText(/^Accepted on /)).toHaveLength(3)
+    await expect(canvas.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1)
+  },
+})
+
+export const NobodyYet = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...operatorMocks({ invites: [], members: [] }))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText('Nobody here yet. Invite the first member below.'),
+    ).toBeVisible()
+    await expect(canvas.getByText('No open invites')).toBeVisible()
+    await expect(canvas.getByText('Nobody is waiting to join.')).toBeVisible()
+    await expect(canvas.queryByText(/earlier invite/)).toBeNull()
+  },
+})
+
+export const OnlyInvitesYet = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...operatorMocks({ members: [] }))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText('No members yet. People show up here once they accept their invite.'),
+    ).toBeVisible()
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
+  },
+})
+
+export const ManyMembersAndInvites = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(
+      ...operatorMocks({
+        members: createWorkspaceMembers({ count: 200 }),
+        invites: [
+          ...createInvites({ count: 200, workspaceId: seedWorkspace.id }).map((invite) =>
+            invite.acceptedAt === null ? pendingSince(invite, 30) : invite,
+          ),
+          ...createInvites({ count: 120, workspaceId: seedWorkspace.id, seed: 7 }).map((invite) =>
+            pendingSince(invite, 1),
+          ),
         ],
       }),
     )
@@ -356,8 +408,33 @@ export const ManyInvites = meta.story({
     a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } },
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('201 invites')).toBeVisible()
-    await expect(canvas.getAllByRole('row')).toHaveLength(202)
+    await expect(await canvas.findByText('200 members')).toBeVisible()
+    await expect(canvas.getByRole('searchbox', { name: 'Find a member' })).toBeVisible()
+    await expect(await canvas.findByText('120 open invites')).toBeVisible()
+    await expect(canvas.getAllByRole('button', { name: 'Revoke' })).toHaveLength(120)
+    await expect(canvas.getByText('200 earlier invites')).toBeVisible()
+  },
+})
+
+export const MembersAndInvitesOnPhone = meta.story({
+  ...mobile,
+  parameters: { ...mobile.parameters, ...membersTab.parameters },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Copy link' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Revoke' })).toBeVisible()
+    await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const MembersLoading = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(pending(operatorWorkspaceMembersEndpoint.path))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Loading members')).toBeInTheDocument()
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
   },
 })
 
@@ -368,6 +445,19 @@ export const InvitesLoading = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('Loading invites')).toBeInTheDocument()
+    await expect(await canvas.findByText('Mara Olsen')).toBeVisible()
+  },
+})
+
+export const MembersUnavailable = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(failing(operatorWorkspaceMembersEndpoint.path))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('The members could not be loaded.')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
   },
 })
 
@@ -382,22 +472,37 @@ export const InvitesUnavailable = meta.story({
   },
 })
 
+const workspacesFetched = fn()
+
+function countWorkspaceFetches() {
+  workspacesFetched.mockClear()
+
+  return http.get(`${apiUrl}${operatorWorkspacesEndpoint.path}`, () => {
+    workspacesFetched()
+  })
+}
+
 export const CreateInviteAndCopyLink = meta.story({
   ...membersTab,
-  beforeEach() {
+  beforeEach({ msw }) {
+    msw.use(countWorkspaceFetches())
+
     return stubClipboard()
   },
   async play({ canvas }) {
     const email = await canvas.findByRole('textbox', { name: 'Email' })
+    await waitFor(() => expect(workspacesFetched).toHaveBeenCalledOnce())
     await userEvent.type(email, 'ana.berg@nordwind-handel.example')
     await userEvent.click(canvas.getByRole('radio', { name: 'Admin' }))
-    await userEvent.click(canvas.getByRole('button', { name: 'Create invite' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create invite link' }))
 
     await expect(
-      await canvas.findByText('Invite for ana.berg@nordwind-handel.example created'),
+      await canvas.findByText('Invite link for ana.berg@nordwind-handel.example created'),
     ).toBeVisible()
+    await expect(canvas.getByText(/^Valid for 7 days, until /)).toBeVisible()
     await expect(email).toHaveValue('')
-    await expect(await canvas.findByText('ana.berg@nordwind-handel.example')).toBeVisible()
+    await expect(await canvas.findByText('2 open invites')).toBeVisible()
+    await waitFor(() => expect(workspacesFetched).toHaveBeenCalledTimes(2))
 
     const link = canvas.getByText(/\/invite\//, { selector: 'code' })
     await userEvent.click(canvas.getByRole('button', { name: 'Copy invite link' }))
@@ -406,16 +511,29 @@ export const CreateInviteAndCopyLink = meta.story({
   },
 })
 
+export const CopyPendingLink = meta.story({
+  ...membersTab,
+  beforeEach() {
+    return stubClipboard()
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Copy link' }))
+    await expect(writeText).toHaveBeenCalledWith(
+      invitesWithPending.find((invite) => invite.email === pendingEmail)?.link,
+    )
+  },
+})
+
 export const CreateInviteValidation = meta.story({
   ...membersTab,
   async play({ canvas }) {
     const email = await canvas.findByRole('textbox', { name: 'Email' })
-    await userEvent.click(canvas.getByRole('button', { name: 'Create invite' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create invite link' }))
     await expect(await canvas.findByText('Enter an email address.')).toBeVisible()
     await expect(email).toHaveFocus()
 
     await userEvent.type(email, 'ana@')
-    await userEvent.click(canvas.getByRole('button', { name: 'Create invite' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create invite link' }))
     await expect(await canvas.findByText(/Enter a valid email address/)).toBeVisible()
     await expect(email).toHaveAttribute('aria-invalid', 'true')
   },
@@ -431,24 +549,115 @@ export const CreateInviteFailed = meta.story({
       await canvas.findByRole('textbox', { name: 'Email' }),
       'ana.berg@nordwind-handel.example',
     )
-    await userEvent.click(canvas.getByRole('button', { name: 'Create invite' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create invite link' }))
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
       'The invite could not be created. Try again.',
     )
   },
 })
 
-export const InvitesGerman = meta.story({
+export const RevokeConfirmation = meta.story({
+  ...membersTab,
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Revoke' }))
+
+    const dialog = await screen.findByRole('alertdialog', {
+      name: `Revoke the invite for ${pendingEmail}?`,
+    })
+
+    await expect(dialog).toHaveAccessibleDescription(/stops working at once/)
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+    )
+  },
+})
+
+export const RevokeCancelled = meta.story({
+  ...membersTab,
+  async play({ canvas }) {
+    const trigger = await canvas.findByRole('button', { name: 'Revoke' })
+    await userEvent.click(trigger)
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    await waitFor(() => expect(trigger).toHaveFocus())
+    await expect(canvas.getByText(pendingEmail)).toBeVisible()
+  },
+})
+
+export const RevokeSucceeds = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(countWorkspaceFetches())
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Revoke' }))
+    await waitFor(() => expect(workspacesFetched).toHaveBeenCalledOnce())
+    await userEvent.click(await screen.findByRole('button', { name: 'Revoke invite' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    const count = await canvas.findByText('No open invites')
+    await waitFor(() => expect(count).toHaveFocus())
+    await expect(canvas.queryByText(pendingEmail)).toBeNull()
+    await expect(canvas.getByText(`Invite for ${pendingEmail} revoked.`)).toBeInTheDocument()
+    await waitFor(() => expect(workspacesFetched).toHaveBeenCalledTimes(2))
+  },
+})
+
+export const RevokeFails = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(
+      http.delete(`${apiUrl}${revokeInviteEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Revoke' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Revoke invite' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The invite could not be revoked. Try again.',
+    )
+    await expect(canvas.getByText(pendingEmail)).toBeVisible()
+  },
+})
+
+export const MembersAndInvitesGerman = meta.story({
   ...membersTab,
   decorators: [german],
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await expect(
       await canvas.findByRole('tab', { name: 'Mitglieder & Einladungen' }),
     ).toHaveAttribute('aria-selected', 'true')
     await expect(await canvas.findByRole('heading', { name: 'Einladungen' })).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'Jemanden einladen' })).toBeVisible()
     await expect(await canvas.findByText(pendingEmail)).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Link kopieren' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Zurückziehen' })).toBeVisible()
     await expect(canvas.getByRole('radio', { name: 'Viewer' })).toBeChecked()
+    await expect(panel(canvasElement).queryByText(/Workspace/)).toBeNull()
+  },
+})
+
+export const MembersAndInvitesOnPhoneGerman = meta.story({
+  ...mobile,
+  parameters: { ...mobile.parameters, ...membersTab.parameters },
+  decorators: [german],
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
+    await expect(await canvas.findByText('Mara Olsen')).toBeVisible()
+    await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const MembersAndInvitesDark = meta.story({
+  ...membersTab,
+  beforeEach() {
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
+    await expect(await canvas.findByText('Mara Olsen')).toBeVisible()
   },
 })
 

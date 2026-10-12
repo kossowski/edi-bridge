@@ -58,6 +58,13 @@ describe('inviteStatus', () => {
     expect(inviteStatus(pending, new Date(expiresAt.getTime() - 1))).toBe('pending')
     expect(inviteStatus(pending, expiresAt)).toBe('expired')
   })
+
+  it('marks a revoked invite as revoked, even after it expires', () => {
+    const revoked = { ...pending, revokedAt: pending.createdAt }
+
+    expect(inviteStatus(revoked, new Date(expiresAt.getTime() - 1))).toBe('revoked')
+    expect(inviteStatus(revoked, expiresAt)).toBe('revoked')
+  })
 })
 
 describe('sameWorkspaceName', () => {

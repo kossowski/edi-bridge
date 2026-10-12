@@ -78,7 +78,7 @@ function ListNote({ children }: { children: ReactNode }) {
   return <p className="text-muted-foreground rounded-lg border p-3 text-sm">{children}</p>
 }
 
-function MemberList({
+export function MemberList({
   members,
   userId,
 }: {

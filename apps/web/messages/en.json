@@ -2690,54 +2690,80 @@
         "retry": "Try again"
       }
     },
+    "members": {
+      "title": "Members",
+      "description": "Everyone who can sign in to this Workspace.",
+      "loading": "Loading members",
+      "error": {
+        "title": "Members unavailable",
+        "description": "The members could not be loaded.",
+        "retry": "Try again"
+      },
+      "nobody": "Nobody here yet. Invite the first member below.",
+      "none": "No members yet. People show up here once they accept their invite."
+    },
     "invites": {
       "title": "Invites",
-      "description": "Invite a user to this Workspace as Admin or Viewer. No email is sent: copy the invite link and pass it on yourself.",
-      "caption": "Invites of this Workspace, newest first",
+      "description": "An open invite waits until the person signs in with its link. Copy the link again or revoke the invite.",
       "loading": "Loading invites",
-      "count": "{count, plural, one {# invite} other {# invites}}",
-      "empty": "No invites yet.",
+      "count": "{count, plural, =0 {No open invites} one {# open invite} other {# open invites}}",
+      "empty": "Nobody is waiting to join.",
       "error": {
         "title": "Invites unavailable",
         "description": "The invites could not be loaded.",
         "retry": "Try again"
       },
       "linkLabel": "link",
-      "details": "{role} · Created {createdAt} · Expires {expiresAt}",
-      "columns": {
-        "email": "Email",
-        "role": "Role",
-        "createdAt": "Created",
-        "expiresAt": "Expires",
-        "status": "Status"
-      },
+      "details": "Created {createdAt} · Valid until {expiresAt}",
       "role": {
         "admin": "Admin",
         "viewer": "Viewer"
       },
       "status": {
         "accepted": "Accepted on {date}",
-        "pending": "Pending",
-        "expired": "Expired"
+        "revoked": "Revoked on {date}",
+        "expired": "Expired on {date}",
+        "pending": "Valid until {date}"
+      },
+      "earlier": {
+        "summary": "{count, plural, one {# earlier invite} other {# earlier invites}}",
+        "description": "Accepted, expired and revoked invites. Nothing left to do here."
+      },
+      "revoke": {
+        "trigger": "Revoke",
+        "title": "Revoke the invite for {email}?",
+        "description": "Its link stops working at once. You can create a new invite at any time.",
+        "cancel": "Cancel",
+        "confirm": "Revoke invite",
+        "revoking": "Revoking…",
+        "failed": "The invite could not be revoked. Try again.",
+        "done": "Invite for {email} revoked."
       },
       "form": {
-        "title": "Create invite",
+        "title": "Invite someone",
+        "description": "Creates a link that you copy and pass on yourself. The link is valid for {days} days.",
         "email": {
           "label": "Email",
-          "description": "The address the user signs in with."
+          "description": "The address the person signs in with."
         },
         "role": {
           "label": "Role",
-          "description": "An Admin has full control in the Workspace. A Viewer sees everything but changes nothing.",
-          "admin": "Admin",
-          "viewer": "Viewer"
+          "description": "What the person may do in this Workspace.",
+          "admin": {
+            "label": "Admin",
+            "detail": "Full control: may change everything in this Workspace."
+          },
+          "viewer": {
+            "label": "Viewer",
+            "detail": "Sees everything but changes nothing."
+          }
         },
-        "submit": "Create invite",
+        "submit": "Create invite link",
         "creating": "Creating…",
         "created": {
-          "announcement": "Invite for {email} created. Copy its link below.",
-          "title": "Invite for {email} created",
-          "description": "No email is sent. Copy the link and pass it on yourself. It is valid until {date}.",
+          "announcement": "Invite link for {email} created. Copy it below.",
+          "title": "Invite link for {email} created",
+          "description": "Valid for {days} days, until {date}. Copy the link and pass it on yourself.",
           "linkLabel": "invite link"
         },
         "errors": {

@@ -43,11 +43,15 @@ export function validateInviteForm(values: {
   return parsed.success ? { input: parsed.data } : { error: 'invalid' }
 }
 
-export type InviteStatus = 'accepted' | 'pending' | 'expired'
+export type InviteStatus = 'accepted' | 'revoked' | 'pending' | 'expired'
 
 export function inviteStatus(invite: Invite, now: Date): InviteStatus {
   if (invite.acceptedAt !== null) {
     return 'accepted'
+  }
+
+  if (invite.revokedAt !== null) {
+    return 'revoked'
   }
 
   return Date.parse(invite.expiresAt) <= now.getTime() ? 'expired' : 'pending'

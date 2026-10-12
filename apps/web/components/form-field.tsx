@@ -314,10 +314,20 @@ export function RadioField<Value extends string>({
           }
         }}>
         {items.map((item) => (
-          <label key={item.value} className="flex min-h-6 items-center gap-2 text-sm">
-            <RadioGroupItem value={item.value} />
-            {item.label}
-          </label>
+          <div key={item.value} className="flex flex-col">
+            <label className="flex min-h-6 items-center gap-2 text-sm">
+              <RadioGroupItem
+                value={item.value}
+                aria-describedby={item.detail === undefined ? undefined : `${id}-${item.value}`}
+              />
+              {item.label}
+            </label>
+            {item.detail !== undefined && (
+              <p id={`${id}-${item.value}`} className="text-muted-foreground pl-6 text-sm">
+                {item.detail}
+              </p>
+            )}
+          </div>
         ))}
       </RadioGroup>
     </FormField>

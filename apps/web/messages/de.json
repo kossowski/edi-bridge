@@ -2690,54 +2690,80 @@
         "retry": "Erneut versuchen"
       }
     },
+    "members": {
+      "title": "Mitglieder",
+      "description": "Alle, die sich in diesem Arbeitsbereich anmelden können.",
+      "loading": "Mitglieder werden geladen",
+      "error": {
+        "title": "Mitglieder nicht verfügbar",
+        "description": "Die Mitglieder konnten nicht geladen werden.",
+        "retry": "Erneut versuchen"
+      },
+      "nobody": "Noch niemand hier. Laden Sie unten das erste Mitglied ein.",
+      "none": "Noch keine Mitglieder. Eingeladene erscheinen hier, sobald sie ihre Einladung annehmen."
+    },
     "invites": {
       "title": "Einladungen",
-      "description": "Laden Sie einen Benutzer als Admin oder Viewer in diesen Workspace ein. Es wird keine E-Mail versendet: Kopieren Sie den Einladungslink und geben Sie ihn selbst weiter.",
-      "caption": "Einladungen dieses Workspaces, neueste zuerst",
+      "description": "Eine offene Einladung wartet, bis sich die Person mit ihrem Link anmeldet. Kopieren Sie den Link erneut oder ziehen Sie die Einladung zurück.",
       "loading": "Einladungen werden geladen",
-      "count": "{count, plural, one {# Einladung} other {# Einladungen}}",
-      "empty": "Noch keine Einladungen.",
+      "count": "{count, plural, =0 {Keine offenen Einladungen} one {# offene Einladung} other {# offene Einladungen}}",
+      "empty": "Niemand wartet auf Zugang.",
       "error": {
         "title": "Einladungen nicht verfügbar",
         "description": "Die Einladungen konnten nicht geladen werden.",
         "retry": "Erneut versuchen"
       },
       "linkLabel": "Link",
-      "details": "{role} · Erstellt {createdAt} · Läuft ab {expiresAt}",
-      "columns": {
-        "email": "E-Mail",
-        "role": "Rolle",
-        "createdAt": "Erstellt",
-        "expiresAt": "Läuft ab",
-        "status": "Status"
-      },
+      "details": "Erstellt {createdAt} · Gültig bis {expiresAt}",
       "role": {
         "admin": "Admin",
         "viewer": "Viewer"
       },
       "status": {
         "accepted": "Angenommen am {date}",
-        "pending": "Offen",
-        "expired": "Abgelaufen"
+        "revoked": "Zurückgezogen am {date}",
+        "expired": "Abgelaufen am {date}",
+        "pending": "Gültig bis {date}"
+      },
+      "earlier": {
+        "summary": "{count, plural, one {# frühere Einladung} other {# frühere Einladungen}}",
+        "description": "Angenommene, abgelaufene und zurückgezogene Einladungen. Hier ist nichts mehr zu tun."
+      },
+      "revoke": {
+        "trigger": "Zurückziehen",
+        "title": "Einladung für {email} zurückziehen?",
+        "description": "Ihr Link funktioniert dann sofort nicht mehr. Sie können jederzeit eine neue Einladung erstellen.",
+        "cancel": "Abbrechen",
+        "confirm": "Einladung zurückziehen",
+        "revoking": "Wird zurückgezogen…",
+        "failed": "Die Einladung konnte nicht zurückgezogen werden. Versuchen Sie es erneut.",
+        "done": "Einladung für {email} zurückgezogen."
       },
       "form": {
-        "title": "Einladung erstellen",
+        "title": "Jemanden einladen",
+        "description": "Erstellt einen Link, den Sie kopieren und selbst weitergeben. Der Link gilt {days} Tage.",
         "email": {
           "label": "E-Mail",
-          "description": "Die Adresse, mit der sich der Benutzer anmeldet."
+          "description": "Die Adresse, mit der sich die Person anmeldet."
         },
         "role": {
           "label": "Rolle",
-          "description": "Ein Admin hat volle Kontrolle im Workspace. Ein Viewer sieht alles, ändert aber nichts.",
-          "admin": "Admin",
-          "viewer": "Viewer"
+          "description": "Was die Person in diesem Arbeitsbereich darf.",
+          "admin": {
+            "label": "Admin",
+            "detail": "Volle Kontrolle: darf alles in diesem Arbeitsbereich ändern."
+          },
+          "viewer": {
+            "label": "Viewer",
+            "detail": "Sieht alles, ändert aber nichts."
+          }
         },
-        "submit": "Einladung erstellen",
+        "submit": "Einladungslink erstellen",
         "creating": "Wird erstellt…",
         "created": {
-          "announcement": "Einladung für {email} erstellt. Kopieren Sie den Link unten.",
-          "title": "Einladung für {email} erstellt",
-          "description": "Es wird keine E-Mail versendet. Kopieren Sie den Link und geben Sie ihn selbst weiter. Er gilt bis {date}.",
+          "announcement": "Einladungslink für {email} erstellt. Kopieren Sie ihn unten.",
+          "title": "Einladungslink für {email} erstellt",
+          "description": "Gilt {days} Tage, bis {date}. Kopieren Sie den Link und geben Sie ihn selbst weiter.",
           "linkLabel": "Einladungslink"
         },
         "errors": {
