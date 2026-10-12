@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
+  openEmptyEditor,
   expectTransformCount,
   findRow,
   findSaveStatus,
@@ -162,6 +163,8 @@ export const PendingLinkKeepsDetailsClosed = meta.story({
 export const HideTransforms = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await userEvent.click(await canvas.findByRole('button', { name: 'Hide the Transforms' }))
 
     const show = canvas.getByRole('button', { name: 'Show the Transforms' })
@@ -196,6 +199,8 @@ export const TransformsRemainHidden = meta.story({
 export const DropTransform = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     const add = await canvas.findByRole('button', { name: 'Add Concatenate' })
     const pane = canvasElement.querySelector<HTMLElement>('.mapping-canvas')!
     const box = pane.getBoundingClientRect()

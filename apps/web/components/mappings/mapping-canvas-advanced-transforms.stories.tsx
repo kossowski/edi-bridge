@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
+  openEmptyEditor,
   detailsPanel,
   dragLink,
   findRow,
@@ -100,6 +101,8 @@ async function chooseOption(canvasElement: HTMLElement, combobox: HTMLElement, n
 export const PlaceLookupTableAndConditional = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     const palette = within(await canvas.findByRole('region', { name: 'Add a Transform' }))
 
     await expect(palette.getAllByRole('button', { name: /^Add / })).toHaveLength(10)
@@ -125,6 +128,8 @@ export const PlaceLookupTableAndConditional = meta.story({
 export const PlaceLoopAndJsonata = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await place(canvasElement, 'Loop over line items', 'Loop over line items 1')
 
     const panel = await detailsPanel(canvasElement)
@@ -385,6 +390,8 @@ export const LoopByKeyboard = meta.story({
   args: { id: withoutLinks.id },
   ...onWideScreen,
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await place(canvasElement, 'Loop over line items', 'Loop over line items 1')
 
     const loop = within(transformNodeOf(canvasElement, 'Loop over line items 1'))
@@ -447,6 +454,8 @@ export const LoopByKeyboard = meta.story({
 export const LoopByMouse = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await place(canvasElement, 'Loop over line items', 'Loop over line items 1')
 
     await dragLink(canvasElement, source('lines[]'), {
@@ -510,6 +519,8 @@ export const LinkOutsideLoop = meta.story({
 export const LongNames = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await place(canvasElement, 'Loop over line items', 'Loop over line items 1')
     await place(canvasElement, 'Loop over line items', 'Loop over line items 2')
     await place(canvasElement, 'JSONata expression', 'JSONata expression 1')

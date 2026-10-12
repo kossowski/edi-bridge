@@ -14,6 +14,7 @@ import {
   type IsValidConnection,
   type OnConnectEnd,
   type OnNodeDrag,
+  Panel,
   ReactFlow,
   type ReactFlowInstance,
 } from '@xyflow/react'
@@ -24,12 +25,14 @@ import {
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
 } from 'react'
 
 import { proposedLinkCount, useAiMarks } from '@/components/mappings/ai-marks'
+import { type FailingField } from '@/components/mappings/failing-field'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
 import {
   LinkEdge,
@@ -56,6 +59,7 @@ import {
   freeSlot,
   type Graph,
   type GraphChange,
+  isEmptyGraph,
   linkIntoInput,
   linkIntoTarget,
   maxTransformX,
@@ -91,6 +95,7 @@ import {
   layoutTree,
   nodeId,
   panelGutter,
+  rowHeight,
   rowOfNodeId,
   type Side,
   transformNodeId,
@@ -114,6 +119,7 @@ import {
   draggedTransform,
   TransformList,
   transformDragType,
+  transformsHiddenKey,
 } from '@/components/mappings/transform-list'
 import {
   findTransformButton,
@@ -138,6 +144,7 @@ import {
 import { useLinkMenu } from '@/components/mappings/use-link-menu'
 import { useLinkTabStop } from '@/components/mappings/use-link-tab-stop'
 import { whenRendered } from '@/components/mappings/when-rendered'
+import { useStoredFlag } from '@/hooks/use-stored-flag'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import { transformPorts } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -186,6 +193,23 @@ const transformExtent: [[number, number], [number, number]] = [
 
 export type CanvasSide = { title: string; items: ReadonlyArray<TreeItem> }
 
+export type MappingCanvasHandle = { showFailingField: () => void; focusFirstRow: () => void }
+
+// From the source column's left the view reaches to the field's right end, where its mark sits.
+function reachOf(node: CanvasNode) {
+  const fieldRight = node.position.x + (node.width ?? columnWidth)
+
+  return { fieldRight, right: Math.max(fieldRight, columnWidth) }
+}
+
+function freeWidth(pane: HTMLElement) {
+  return pane.clientWidth - panelGutter - viewportPadding
+}
+
+function fitsAtFloor(pane: HTMLElement, node: CanvasNode) {
+  return reachOf(node).right * minInitialZoom <= freeWidth(pane)
+}
+
 type MappingCanvasProps = {
   label: string
   graph: Graph
@@ -193,6 +217,8 @@ type MappingCanvasProps = {
   target: CanvasSide
   onChange: (save: GraphSave) => void
   detailsFacts?: ReactNode
+  failingField?: FailingField | null
+  ref?: Ref<MappingCanvasHandle>
 }
 
 // Mounted only while the tooltip shows a row, so that row's button can point at the tooltip.
@@ -455,6 +481,8 @@ export function MappingCanvas({
   target,
   onChange,
   detailsFacts,
+  failingField = null,
+  ref,
 }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
   const tAi = useTranslations('Mapping.aiReview')
@@ -469,6 +497,7 @@ export function MappingCanvas({
   const clearSelection = useCanvasStore((state) => state.clearSelection)
   const hoverEdge = useCanvasStore((state) => state.hoverEdge)
   const leaveEdge = useCanvasStore((state) => state.leaveEdge)
+  const [transformsHidden] = useStoredFlag(transformsHiddenKey)
   const usesLookupTables = graph.transforms.some(({ kind }) => kind === 'lookupTable')
   const lookupTables = useQuery({ ...lookupTablesQuery, enabled: usesLookupTables })
   const text = useGraphText(graph.transforms, lookupTables.data)
@@ -603,6 +632,17 @@ export function MappingCanvas({
       ]
     })
 
+    const failingRow = failingField?.row
+    const failingShownAt = failingRow && layouts[failingRow.side].visible.get(failingRow.path)
+
+    const failing = (row: TreeRow) => {
+      if (row.side !== failingRow?.side || row.path !== failingShownAt) {
+        return null
+      }
+
+      return row.path === failingRow.path ? 'field' : 'inside'
+    }
+
     const linked = new Set([
       ...shown.flatMap((link) => [
         nodeId('source', link.sourcePath),
@@ -639,6 +679,7 @@ export function MappingCanvas({
         filled: row.side === 'target' && linkIntoTarget(graph, row.path) !== null,
         wholePart: isWholePart(rows, row),
         aiProposed: row.side === 'target' && marks.end({ kind: 'target', path: row.path }),
+        failing: failing(row),
       },
       draggable: false,
       selectable: false,
@@ -760,6 +801,7 @@ export function MappingCanvas({
   }, [
     collapsed,
     draggedTo,
+    failingField,
     graph,
     heights,
     issues,
@@ -792,6 +834,111 @@ export function MappingCanvas({
       zoom,
     })
   }, [])
+
+  // Never below the zoom floor. The field's whole row stays in view beside the source column; where
+  // both do not fit, the field stays whole with as much of the source column as fits. The first
+  // source fields stay in view while their whole tree fits the pane's height.
+  const centreOn = useCallback((row: RowRef) => {
+    const instance = flow.current
+    const pane = container.current
+    const node = instance?.getNode(nodeId(row.side, row.path))
+
+    if (!instance || !pane || !node) {
+      return
+    }
+
+    const { fieldRight, right } = reachOf(node)
+    const free = freeWidth(pane)
+    const zoom = Math.max(minInitialZoom, Math.min(instance.getViewport().zoom, free / right))
+    const left = panelGutter + viewportPadding / 2
+
+    const x =
+      canvasWidth * zoom <= free
+        ? left + (free - canvasWidth * zoom) / 2
+        : right * zoom <= free
+          ? left
+          : left + free - fieldRight * zoom
+
+    const height = pane.clientHeight
+
+    const sourceBottom = Math.max(
+      ...instance
+        .getNodes()
+        .filter(({ id }) => rowOfNodeId(id)?.side === 'source')
+        .map(({ position, height: nodeHeight = 0 }) => position.y + nodeHeight),
+    )
+
+    const centred = height / 2 - (node.position.y + rowHeight / 2) * zoom
+
+    const sourceTop =
+      sourceBottom * zoom <= height - 2 * viewportPadding ? viewportPadding : -Infinity
+
+    const rowInView = height - viewportPadding - (node.position.y + rowHeight) * zoom
+
+    void instance.setViewport({ x, y: Math.min(Math.max(centred, sourceTop), rowInView), zoom })
+  }, [])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      // Room for the field beside the source column: the details close and, where that is not
+      // enough, the Transforms fold to their rail for this visit only.
+      showFailingField: () => {
+        if (!failingField) {
+          return
+        }
+
+        const { row, ancestors } = failingField
+        const { closeDetails, expand, foldTransforms, select, transformsFolded } = store.getState()
+        const button = () => (container.current ? findRowButton(container.current, row) : null)
+        const transformsShown = !viewOnly && !transformsHidden && !transformsFolded
+
+        closeDetails()
+        expand(
+          row.side,
+          ancestors.map(({ path }) => path),
+        )
+        select(row)
+        whenRendered(
+          () => flow.current !== null && shown(button()),
+          () => {
+            button()?.focus({ preventScroll: true })
+
+            const pane = container.current
+            const node = flow.current?.getNode(nodeId(row.side, row.path))
+
+            if (!pane || !node || !transformsShown || fitsAtFloor(pane, node)) {
+              centreOn(row)
+
+              return
+            }
+
+            const width = pane.clientWidth
+
+            foldTransforms()
+            whenRendered(
+              () => pane.clientWidth !== width,
+              () => centreOn(row),
+            )
+          },
+        )
+      },
+      focusFirstRow: () => {
+        const first = source.items[0]
+
+        const button = () =>
+          first && container.current
+            ? findRowButton(container.current, { side: 'source', path: first.path })
+            : null
+
+        whenRendered(
+          () => shown(button()),
+          () => button()?.focus(),
+        )
+      },
+    }),
+    [centreOn, failingField, source.items, store, transformsHidden, viewOnly],
+  )
 
   const focusRow = useCallback((row: RowRef | null) => {
     afterRender(() => {
@@ -1522,6 +1669,13 @@ export function MappingCanvas({
                     onPaneClick={clearSelection}>
                     <Background gap={16} variant={BackgroundVariant.Dots} />
                     <Controls position="top-left" showInteractive={false} />
+                    {viewOnly && isEmptyGraph(graph) && (
+                      <Panel
+                        position="bottom-center"
+                        className="bg-background text-muted-foreground rounded-md border px-3 py-1.5 text-sm shadow-sm">
+                        {t('nothingLinked')}
+                      </Panel>
+                    )}
                   </ReactFlow>
                 </LinkableRowsContext>
               </TransformActionsContext>

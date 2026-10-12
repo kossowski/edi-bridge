@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
+  openEmptyEditor,
   detailsPanel,
   dragLink,
   openDetails,
@@ -271,6 +272,8 @@ export const MinimumZoom = meta.story({
 export const EmptyDraft = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await expect(await canvas.findByText('invoiceNumber')).toBeVisible()
     await expect(canvasElement.querySelector('.react-flow__edge')).toBeNull()
     await expect((await openDetails(canvasElement)).getByText('No links yet')).toBeVisible()
@@ -701,6 +704,8 @@ export const DrawLinkByMouse = meta.story({
   args: { id: withoutLinks.id },
   parameters: linkStories,
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await userEvent.click(await canvas.findByRole('button', { name: 'Collapse UNH' }))
     await findRow(canvasElement, target('BGM/1004'))
 
@@ -723,6 +728,8 @@ export const DrawLinkByKeyboard = meta.story({
   args: { id: withoutLinks.id },
   parameters: linkStories,
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     const from = await findRow(canvasElement, source('invoiceNumber'))
     const to = await findRow(canvasElement, target('BGM/1004'))
 
@@ -1106,6 +1113,8 @@ export const SaveErrorRollback = meta.story({
     )
   },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await pressOn(await findRow(canvasElement, source('invoiceNumber')), 'l')
     await pressOn(await findRow(canvasElement, target('BGM/1004')), 'l')
 

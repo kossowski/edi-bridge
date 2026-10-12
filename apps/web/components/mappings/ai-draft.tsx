@@ -230,17 +230,21 @@ function useActionLabel(run: AiDraftRun) {
   }
 }
 
+// The dialog's open state belongs to the editor, which also opens it from "Start here".
 export function AiDraftAction({
   draft,
   aiDraft,
   reviewSummaryId,
+  open,
+  onOpenChange,
 }: {
   draft: MappingDraft
   aiDraft: AiDraftRunControls
   reviewSummaryId?: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }) {
   const t = useTranslations('Mapping.aiDraft')
-  const [open, setOpen] = useState(false)
   const [seenRun, setSeenRun] = useState<AiDraftRun | null>(null)
   const outcomeDescription = useOutcomeDescription()
   const sampleRef = useRef<HTMLButtonElement>(null)
@@ -255,7 +259,7 @@ export function AiDraftAction({
       setSeenRun(run)
     }
 
-    setOpen(next)
+    onOpenChange(next)
   }
 
   function afterOpenChange(nowOpen: boolean) {

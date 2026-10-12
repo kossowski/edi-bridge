@@ -2463,6 +2463,7 @@
       "repeatsUpToLabel": "Repeats up to {count} times",
       "hiddenParts": "{count, plural, one {# part hidden} other {# parts hidden}}",
       "emptyPart": "Empty",
+      "nothingLinked": "Nothing is linked yet.",
       "error": {
         "title": "Structures unavailable",
         "description": "The source or target structure could not be loaded. Try again.",
@@ -2516,6 +2517,37 @@
     "desktopOnly": {
       "title": "The Mapping canvas needs a larger screen",
       "description": "Open this Mapping on a screen at least 1024 pixels wide to see its source and target and their links."
+    },
+    "startHere": {
+      "title": "Start here",
+      "description": "This Mapping is empty: nothing links {source} and {target} yet.",
+      "ai": {
+        "title": "AI draft from an example document",
+        "recommended": "Recommended",
+        "description": "Choose a real example document. The AI proposes a link for every field it can fill and marks what it is unsure about. You review the links, then publish.",
+        "button": "Start an AI draft"
+      },
+      "manual": {
+        "title": "Link the fields yourself",
+        "step1": "Drag from a field of the source on the left.",
+        "step2": "Drop it on the target field it fills, on the right.",
+        "step3": "Check the preview, then publish.",
+        "button": "Open the empty editor"
+      }
+    },
+    "failingField": {
+      "mark": "Failed here",
+      "markInside": "Failed inside",
+      "title": "A document failed at <code>{field}</code>",
+      "where": "The field is in the {side, select, source {source} other {target}}: {structure}.",
+      "marked": "It is marked on the canvas.",
+      "fix": "Correct its links, publish the Draft, then process the failed document again.",
+      "show": "Show the field",
+      "back": "Back to documents",
+      "notFound": {
+        "title": "Field not found in this Mapping",
+        "description": "The failed document points at <code>{path}</code>, which neither the source nor the target of this Mapping has. The structures may have changed since it failed."
+      }
     },
     "meaning": {
       "kind": {

@@ -2,6 +2,7 @@ import { expect, userEvent, waitFor } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
+  openEmptyEditor,
   findRow,
   findSaveStatus,
   page,
@@ -37,6 +38,8 @@ const meta = preview.meta({
 export const UpdatesAfterChange = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await userEvent.click(await canvas.findByRole('button', { name: 'Preview' }))
 
     const panel = await findSheet(canvasElement, 'Preview')

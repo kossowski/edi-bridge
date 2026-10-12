@@ -2195,7 +2195,7 @@
       "description": "Das Mapping konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     },
-    "draft": "Draft",
+    "draft": "Entwurf",
     "state": {
       "neverPublished": "Nie veröffentlicht",
       "unpublishedChanges": "Unveröffentlichte Änderungen seit Version {version}",
@@ -2463,6 +2463,7 @@
       "repeatsUpToLabel": "Bis zu {count}-mal wiederholt",
       "hiddenParts": "{count, plural, one {# Teil ausgeblendet} other {# Teile ausgeblendet}}",
       "emptyPart": "Leer",
+      "nothingLinked": "Noch ist nichts verknüpft.",
       "error": {
         "title": "Strukturen nicht verfügbar",
         "description": "Die Quell- oder Zielstruktur konnte nicht geladen werden. Versuchen Sie es erneut.",
@@ -2516,6 +2517,37 @@
     "desktopOnly": {
       "title": "Die Mapping-Zeichenfläche braucht einen größeren Bildschirm",
       "description": "Öffnen Sie dieses Mapping auf einem Bildschirm mit mindestens 1024 Pixeln Breite, um Quelle, Ziel und ihre Verknüpfungen zu sehen."
+    },
+    "startHere": {
+      "title": "Hier beginnen",
+      "description": "Dieses Mapping ist leer: Noch verbindet nichts {source} und {target}.",
+      "ai": {
+        "title": "KI-Entwurf aus einem Beispielbeleg",
+        "recommended": "Empfohlen",
+        "description": "Wählen Sie einen echten Beispielbeleg. Die KI schlägt für jedes Feld, das sie füllen kann, eine Verknüpfung vor und markiert, wo sie unsicher ist. Sie prüfen die Verknüpfungen und veröffentlichen dann.",
+        "button": "KI-Entwurf starten"
+      },
+      "manual": {
+        "title": "Felder selbst verknüpfen",
+        "step1": "Ziehen Sie links von einem Feld der Quelle.",
+        "step2": "Legen Sie es rechts auf dem Zielfeld ab, das es füllt.",
+        "step3": "Prüfen Sie die Vorschau und veröffentlichen Sie dann.",
+        "button": "Leeren Editor öffnen"
+      }
+    },
+    "failingField": {
+      "mark": "Fehler hier",
+      "markInside": "Fehler darin",
+      "title": "Ein Beleg ist an <code>{field}</code> gescheitert",
+      "where": "{side, select, source {Das Feld liegt in der Quelle} other {Das Feld liegt im Ziel}}: {structure}.",
+      "marked": "Es ist auf der Zeichenfläche markiert.",
+      "fix": "Korrigieren Sie seine Verknüpfungen, veröffentlichen Sie den Entwurf und verarbeiten Sie den Beleg dann erneut.",
+      "show": "Feld zeigen",
+      "back": "Zurück zu den Belegen",
+      "notFound": {
+        "title": "Feld in diesem Mapping nicht gefunden",
+        "description": "Der gescheiterte Beleg verweist auf <code>{path}</code>, das weder die Quelle noch das Ziel dieses Mappings enthält. Die Strukturen haben sich womöglich geändert, seit er gescheitert ist."
+      }
     },
     "meaning": {
       "kind": {

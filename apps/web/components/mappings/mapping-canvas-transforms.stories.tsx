@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
+  openEmptyEditor,
   detailsPanel,
   openDetails,
   dragLink,
@@ -169,6 +170,8 @@ export const PanToWholeNode = meta.story({
 export const PlaceTransform = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await canvas.findByRole('button', { name: 'Add Date format' })
     await expectTransformCount(canvasElement, 0)
 
@@ -208,6 +211,8 @@ export const PlaceTransform = meta.story({
 export const ConnectByKeyboard = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await place(canvasElement, 'Date format', 'Date format 1')
 
     const dateFormat = node(canvasElement, 'Date format 1')
@@ -274,6 +279,8 @@ export const ConnectByKeyboard = meta.story({
 export const ConnectByMouse = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await place(canvasElement, 'Concatenate', 'Concatenate 1')
 
     await dragLink(canvasElement, source('invoiceNumber'), {
@@ -531,6 +538,8 @@ export const SaveErrorRollback = meta.story({
     )
   },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await userEvent.click(await canvas.findByRole('button', { name: 'Add Constant' }))
 
     await expect(await canvas.findByRole('group', { name: 'Transform Constant 1' })).toBeVisible()
@@ -568,6 +577,8 @@ export const OverlappingSaveRollback = meta.story({
     )
   },
   async play({ canvas, canvasElement }) {
+    await openEmptyEditor(canvasElement)
+
     await userEvent.click(await canvas.findByRole('button', { name: 'Add Constant' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Add Split' }))
     await expect(await canvas.findByRole('group', { name: 'Transform Split 1' })).toBeVisible()

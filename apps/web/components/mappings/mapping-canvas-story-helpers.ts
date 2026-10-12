@@ -51,6 +51,25 @@ export function page(canvasElement: HTMLElement) {
   return within(canvasElement.ownerDocument.body)
 }
 
+export async function findAlert(canvasElement: HTMLElement, title: string) {
+  const alert = await waitFor(
+    () => {
+      const found = within(canvasElement)
+        .getAllByRole('alert')
+        .find((element) => element.textContent.includes(title))
+
+      if (!found) {
+        throw new Error(`No alert with ${title}`)
+      }
+
+      return found
+    },
+    { timeout: 5000 },
+  )
+
+  return within(alert)
+}
+
 export async function findRow(canvasElement: HTMLElement, ref: RowRef) {
   return waitFor(() => {
     const row = findRowButton(canvasElement, ref)
@@ -219,4 +238,9 @@ export async function openLinkMenuByKeyboard(
   await pressOn(await within(canvasElement).findByRole('group', { name }), keys)
 
   return findLinkMenu(canvasElement)
+}
+
+// An empty Mapping opens on "Start here"; this takes the path that opens the empty editor.
+export async function openEmptyEditor(canvasElement: HTMLElement, name = 'Open the empty editor') {
+  await userEvent.click(await within(canvasElement).findByRole('button', { name }))
 }

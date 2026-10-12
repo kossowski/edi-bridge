@@ -41,6 +41,10 @@ export type Connected =
   | { ok: false; reason: 'circle' }
   | { ok: false; reason: 'alreadyLinked' | 'inputTaken'; existing: LinkStart }
 
+export function isEmptyGraph({ links, transformLinks }: Pick<Graph, 'links' | 'transformLinks'>) {
+  return links.length + transformLinks.length === 0
+}
+
 export function transformById(graph: Pick<Graph, 'transforms'>, transformId: string) {
   return graph.transforms.find(({ id }) => id === transformId)
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight01Icon, RepeatIcon } from '@hugeicons/core-free-icons'
+import { Alert02Icon, ArrowRight01Icon, RepeatIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   Handle,
@@ -43,6 +43,7 @@ export type TreeNodeData = TreeRow & {
   filled: boolean
   wholePart: boolean
   aiProposed: boolean
+  failing: 'field' | 'inside' | null
 }
 
 export type TreeFlowNode = Node<TreeNodeData, 'tree'>
@@ -151,6 +152,17 @@ function RepeatBadge({ repeat }: { repeat: Exclude<Repeat, null> }) {
   )
 }
 
+function FailingMark({ failing }: { failing: Exclude<TreeNodeData['failing'], null> }) {
+  const t = useTranslations('Mapping.failingField')
+
+  return (
+    <span className="border-destructive text-destructive-text bg-background inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border px-1.5 text-[11px] font-semibold">
+      <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} aria-hidden className="size-3" />
+      {t(failing === 'field' ? 'mark' : 'markInside')}
+    </span>
+  )
+}
+
 function ToggleButton({ data }: { data: TreeNodeData }) {
   const t = useTranslations('Mapping.canvas')
   const toggleCollapsed = useCanvasStore((state) => state.toggleCollapsed)
@@ -250,7 +262,9 @@ function TreeNodeView({ data, isConnectable }: NodeProps<TreeFlowNode>) {
         linkStart && 'bg-primary/10',
         selected && 'outline-primary outline-2 outline-offset-1 outline-solid',
         unavailable && 'bg-muted',
+        data.failing && 'border-destructive bg-destructive/10 ring-destructive ring-2',
       )}
+      data-failing={data.failing ?? undefined}
       data-kind={data.kind}
       data-link-target={linkTarget || undefined}
       data-link-unavailable={unavailable || undefined}
@@ -271,6 +285,7 @@ function TreeNodeView({ data, isConnectable }: NodeProps<TreeFlowNode>) {
           {data.name && <span className="text-muted-foreground min-w-0 truncate">{data.name}</span>}
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
             {data.detail && <code className="text-muted-foreground font-mono">{data.detail}</code>}
+            {data.failing && <FailingMark failing={data.failing} />}
             {data.repeat !== null && <RepeatBadge repeat={data.repeat} />}
             {container && data.childCount === 0 && (
               <span className="text-muted-foreground">{t('emptyPart')}</span>

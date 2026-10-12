@@ -19,6 +19,7 @@ import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import { type DragEvent, useId, useRef } from 'react'
 
+import { useCanvasStore } from '@/components/mappings/mapping-canvas-store'
 import { useStoredFlag } from '@/hooks/use-stored-flag'
 import { type TransformKind, transformKinds } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -122,13 +123,17 @@ export function TransformList({ onPlace }: { onPlace: (kind: TransformKind) => v
   const t = useTranslations('Mapping.transforms')
   const heading = useId()
   const note = useId()
-  const [hidden, setHidden] = useStoredFlag(transformsHiddenKey)
+  const [storedHidden, setStoredHidden] = useStoredFlag(transformsHiddenKey)
+  const folded = useCanvasStore((state) => state.transformsFolded)
+  const unfold = useCanvasStore((state) => state.unfoldTransforms)
+  const hidden = storedHidden || folded
   const toggleRef = useRef<HTMLButtonElement>(null)
   const toggleLabel = hidden ? t('palette.show') : t('palette.hide')
 
   // The toggle moves between the list and the rail, and the focus goes with it.
   const onToggle = () => {
-    setHidden(!hidden)
+    unfold()
+    setStoredHidden(!hidden)
     requestAnimationFrame(() => toggleRef.current?.focus())
   }
 
