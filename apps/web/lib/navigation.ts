@@ -18,6 +18,8 @@ import {
 import type { IconSvgElement } from '@hugeicons/react'
 import type { Messages } from 'next-intl'
 
+import type { FixTarget } from '@edi-bridge/contracts'
+
 import type { SearchParamsReader } from './search-params'
 
 export const documentViews = ['documents', 'transmissions'] as const
@@ -196,4 +198,36 @@ export function interchangeHref(controlReference: string) {
   const search = new URLSearchParams({ view: 'transmissions', q: controlReference })
 
   return `${navigationItems.documents.href}?${search}`
+}
+
+export function documentHref(id: string) {
+  return `${navigationItems.documents.href}/${id}`
+}
+
+export function orderHref(businessReference: string) {
+  return `${navigationItems.orderLifecycle.href}?${new URLSearchParams({ businessReference })}`
+}
+
+export function fixTargetHref(target: FixTarget) {
+  switch (target.kind) {
+    case 'mapping': {
+      const search = new URLSearchParams({ field: target.fieldPath })
+
+      return `${navigationItems.mappings.href}/${target.mappingId}?${search}`
+    }
+
+    case 'lookupTable': {
+      const search = new URLSearchParams({ code: target.code })
+
+      return `${navigationItems.lookupTables.href}/${target.lookupTableId}?${search}`
+    }
+
+    case 'channel': {
+      return `${navigationItems.channels.href}/${target.channelId}`
+    }
+
+    case 'tradingPartner': {
+      return `${navigationItems.tradingPartners.href}/${target.tradingPartnerId}`
+    }
+  }
 }

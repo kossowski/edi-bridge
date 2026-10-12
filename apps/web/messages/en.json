@@ -552,6 +552,88 @@
       }
     }
   },
+  "Document": {
+    "title": "Document",
+    "loading": "Loading document",
+    "notFound": {
+      "title": "Document not found",
+      "description": "No document with this ID exists in this workspace. It may have been removed, or the link is incomplete.",
+      "back": "Back to all documents"
+    },
+    "error": {
+      "title": "Document unavailable",
+      "description": "The document could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "header": {
+      "receivedAt": "{direction, select, inbound {Received} other {Created}}",
+      "uploaded": "uploaded by hand",
+      "order": "View the whole order {reference}"
+    },
+    "problem": {
+      "whatHappened": "What happened",
+      "whatToDo": "What to do",
+      "reason": {
+        "unreadable": {
+          "title": "{tradingPartner} sent a damaged file",
+          "description": "The file is damaged or incomplete, so EDI Bridge could not read it. {tradingPartner} has been told automatically with a receipt confirmation."
+        },
+        "invalidContent": {
+          "title": "{direction, select, inbound {The content breaks the EDI rules} other {A required value is empty}}",
+          "description": "{direction, select, inbound {EDI Bridge could read the file, but a value in it breaks the rules for this kind of document, for example a wrong date or an unknown code.} other {The translated document breaks the EDI rules for {tradingPartner}: a required value is empty. The mapping fills it from your field “{field}”.}}",
+          "descriptionWithoutTarget": "EDI Bridge could not fill a required value for {tradingPartner}. The mapping takes it from one of your fields."
+        },
+        "missingCode": {
+          "title": "The code “{code}” has no translation",
+          "description": "The document uses the code “{code}”, but the code translation “{lookupTable}” has no entry for it. EDI Bridge cannot tell which code {tradingPartner} expects instead.",
+          "titleWithoutTarget": "A code has no translation",
+          "descriptionWithoutTarget": "The document uses a code that its code translation has no entry for, so EDI Bridge cannot tell which code {tradingPartner} expects."
+        },
+        "missingField": {
+          "title": "A required field is empty",
+          "description": "The mapping reads the field “{field}”, but the document from your ERP leaves it empty. Fill it in your ERP and send the document again, or change the mapping to take the value from another field.",
+          "descriptionWithoutTarget": "The mapping reads a field that the document from your ERP leaves empty. Fill it in your ERP and send the document again, or change the mapping to take the value from another field."
+        },
+        "unreachable": {
+          "title": "{direction, select, inbound {Your ERP did not answer} other {The server of {tradingPartner} did not answer}}",
+          "description": "{direction, select, inbound {The document was translated, but your ERP did not accept it when EDI Bridge delivered it.} other {The document is ready, but the upload to {tradingPartner} failed.}} This is usually temporary."
+        }
+      },
+      "whoFixes": {
+        "you": "This one is on your side. You can fix it yourself.",
+        "tradingPartner": "Nothing to fix on your side. {tradingPartner} has to send a corrected file.",
+        "retry": "Nothing is wrong with the document itself. Trying again usually works."
+      },
+      "waiting": "Marked as waiting for {tradingPartner} since <time>{since}</time>.",
+      "steps": {
+        "fixCause": "Fix the cause.",
+        "checkConnection": "If it keeps failing, check the connection details.",
+        "contactTradingPartner": "Ask {tradingPartner} to send a corrected file. Their contact details are on the partner page."
+      },
+      "fixLink": {
+        "mapping": "Open “{name}” at this field",
+        "lookupTable": "Add {code} to “{name}”",
+        "channel": "Check the connection “{name}”",
+        "tradingPartner": "Open {name}"
+      }
+    },
+    "verdict": {
+      "delivered": {
+        "title": "All good, nothing to do",
+        "description": "{direction, select, inbound {This {messageTypeName} from {tradingPartner} was translated and passed to your ERP.} other {This {messageTypeName} was translated and sent to {tradingPartner}.}}"
+      },
+      "inProgress": {
+        "title": "Still being processed",
+        "description": "This usually takes a few seconds. You do not need to do anything."
+      },
+      "duplicate": {
+        "title": "{direction, select, inbound {Received twice} other {Created twice}}, ignored to avoid a double order",
+        "description": "{direction, select, inbound {{tradingPartner} sent this file a second time. EDI Bridge recognised it and did not pass it on again, so your ERP has only one order {reference}.} other {Your ERP created this document a second time. EDI Bridge recognised it and did not send it again, so {tradingPartner} has only one order {reference}.}}",
+        "descriptionWithoutReference": "{direction, select, inbound {{tradingPartner} sent this file a second time. EDI Bridge recognised it and did not pass it on again, so your ERP has only one order.} other {Your ERP created this document a second time. EDI Bridge recognised it and did not send it again, so {tradingPartner} has only one order.}}",
+        "original": "Open the original document"
+      }
+    }
+  },
   "Runs": {
     "openRun": "– open Run from {tradingPartner}, {messageType}",
     "noFailureStage": "No Failure Stage",

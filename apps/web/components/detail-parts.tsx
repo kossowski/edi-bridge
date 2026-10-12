@@ -103,13 +103,15 @@ export function Failure({
   error,
   onRetry,
 }: {
-  notFound: { title: string; description: string } | null
+  notFound: { title: string; description: string; action?: ReactNode } | null
   error: { title: string; description: string; retry: string }
   onRetry: () => void
 }) {
   if (notFound) {
     return (
-      <Notice description={notFound.description} icon={FileNotFoundIcon} title={notFound.title} />
+      <Notice description={notFound.description} icon={FileNotFoundIcon} title={notFound.title}>
+        {notFound.action}
+      </Notice>
     )
   }
 
@@ -124,11 +126,14 @@ export function Failure({
 
 export function LoadFailure({
   notFound,
+  notFoundAction,
   namespace,
   onRetry,
 }: {
   notFound: boolean
+  notFoundAction?: ReactNode
   namespace:
+    | 'Document'
     | 'RunDetail'
     | 'TradingPartner'
     | 'Channel'
@@ -150,7 +155,13 @@ export function LoadFailure({
         retry: t('error.retry'),
       }}
       notFound={
-        notFound ? { title: t('notFound.title'), description: t('notFound.description') } : null
+        notFound
+          ? {
+              title: t('notFound.title'),
+              description: t('notFound.description'),
+              action: notFoundAction,
+            }
+          : null
       }
       onRetry={onRetry}
     />
