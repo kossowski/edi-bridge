@@ -4,18 +4,22 @@
 
 **Blocked by:** 57 (Help & glossary page and plain names)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Key-number cards are links, follow the chosen time window and are readable without colour
+- [x] Key-number cards are links, follow the chosen time window and are readable without colour
 - [ ] The promo card sits under the key numbers and above the charts; its button creates a Mapping from an example and opens it with the AI draft running, without asking anything first
-- [ ] Charts are visible right away, switch between 24 h, 7 days and 30 days, and offer their values as a table
-- [ ] Partner cards show mode (live or testing), documents today and open problems, and open the partner
-- [ ] Home has no task list; overdue receipt confirmations and failing partners appear on `/tasks`
-- [ ] First steps derives each step's state from the Workspace (GLN set, ERP connection, first partner, first published Mapping, test sent, live); the next open step is highlighted with its action
-- [ ] `/tasks` groups items by who acts, gives each one action that deep-links to the fix, and has an "all good" empty state
-- [ ] The bell shows the open count, lists the newest tasks and links to `/tasks`
-- [ ] The tasks and Home data come from Zod contracts in the contracts package (tasks with who acts and a deep-link target; key numbers per time window); the live API follows in ticket 41
-- [ ] The Overview screen, its route content and its stories are replaced; existing stories and tests stay green or are updated in the same PR
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Charts are visible right away, switch between 24 h, 7 days and 30 days, and offer their values as a table
+- [x] Partner cards show mode (live or testing), documents today and open problems, and open the partner
+- [x] Home has no task list; overdue receipt confirmations and failing partners appear on `/tasks`
+- [x] First steps derives each step's state from the Workspace (GLN set, ERP connection, first partner, first published Mapping, test sent, live); the next open step is highlighted with its action
+- [x] `/tasks` groups items by who acts, gives each one action that deep-links to the fix, and has an "all good" empty state
+- [x] The bell shows the open count, lists the newest tasks and links to `/tasks`
+- [x] The tasks and Home data come from Zod contracts in the contracts package (tasks with who acts and a deep-link target; key numbers per time window); the live API follows in ticket 41
+- [x] The Overview screen, its route content and its stories are replaced; existing stories and tests stay green or are updated in the same PR
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #106, #108, #114, #117, #122.
