@@ -292,6 +292,56 @@
       "retry": "Erneut versuchen"
     }
   },
+  "PlainNames": {
+    "messageType": {
+      "ORDERS": {
+        "name": "Bestellung",
+        "plural": "Bestellungen"
+      },
+      "DESADV": {
+        "name": "Lieferavis",
+        "plural": "Lieferavise"
+      },
+      "INVOIC": {
+        "name": "Rechnung",
+        "plural": "Rechnungen"
+      },
+      "CONTRL": {
+        "name": "Empfangsbestätigung",
+        "plural": "Empfangsbestätigungen"
+      }
+    },
+    "runStatus": {
+      "received": "Empfangen",
+      "processing": "In Bearbeitung",
+      "delivered": "Zugestellt",
+      "failed": "Handlungsbedarf",
+      "duplicate": "Duplikat ignoriert"
+    },
+    "failureStage": {
+      "parse": {
+        "title": "Die Datei konnte nicht gelesen werden",
+        "summary": "Die Datei ist kein gültiges EDI. Ihr Handelspartner wurde automatisch informiert und muss eine korrigierte Datei senden."
+      },
+      "validation": {
+        "title": "Der Beleg verstößt gegen die EDI-Regeln",
+        "summary": "Ein Pflichtwert fehlt oder hat das falsche Format. Bei eingehenden Belegen muss Ihr Handelspartner erneut senden, bei ausgehenden muss das Mapping korrigiert werden."
+      },
+      "mapping": {
+        "title": "Der Beleg konnte nicht übersetzt werden",
+        "summary": "Ein Feld ließ sich nicht zwischen Ihrem Format und EDI umwandeln. Korrigieren Sie das Mapping oder die Code-Übersetzung und verarbeiten Sie den Beleg dann erneut."
+      },
+      "delivery": {
+        "title": "Der Beleg konnte nicht zugestellt werden",
+        "summary": "Das empfangende System hat den Beleg nicht angenommen, oft weil es nicht erreichbar war. Versuchen Sie es erneut, sobald es wieder erreichbar ist."
+      }
+    },
+    "whoFixes": {
+      "you": "Sie beheben das",
+      "partner": "Ihr Handelspartner behebt das",
+      "retry": "Einfach erneut versuchen"
+    }
+  },
   "Runs": {
     "caption": "Runs, neueste zuerst",
     "loading": "Runs werden geladen",
@@ -306,19 +356,6 @@
       "messageType": "Message Type",
       "flow": "Flow",
       "source": "Quelle"
-    },
-    "status": {
-      "received": "Empfangen",
-      "processing": "In Verarbeitung",
-      "delivered": "Zugestellt",
-      "failed": "Fehlgeschlagen",
-      "duplicate": "Duplicate"
-    },
-    "failureStage": {
-      "parse": "Parsen",
-      "validation": "Validierung",
-      "mapping": "Mapping",
-      "delivery": "Zustellung"
     },
     "timeRange": {
       "any": "Beliebiger Zeitraum",
@@ -445,7 +482,7 @@
       },
       "awaitingResend": {
         "title": "Wartet auf erneutes Senden durch den Trading Partner",
-        "description": "Das Interchange von {tradingPartner} ist bei {failureStage} fehlgeschlagen. EDI Bridge hat es mit einem CONTRL abgelehnt. Nur ein korrigiertes erneutes Senden durch den Trading Partner behebt den Fehler."
+        "description": "{failureStage}: EDI Bridge hat das Interchange von {tradingPartner} mit einem CONTRL abgelehnt. Nur ein korrigiertes erneutes Senden durch den Trading Partner behebt den Fehler."
       },
       "replaced": {
         "description": "Ein Reprocess hat diesen Run ersetzt.",

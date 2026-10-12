@@ -176,7 +176,7 @@ function ViewOnlyRemedy({ remedy }: { remedy: ActionRemedy }) {
 
 export function RunRemedyPanel({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail.remedy')
-  const tRuns = useTranslations('Runs')
+  const tFailureStage = useTranslations('PlainNames.failureStage')
   const remedy = runRemedy(run)
   const canChange = useCanChange()
 
@@ -205,7 +205,7 @@ export function RunRemedyPanel({ run }: { run: RunDetail }) {
           />
           {t('awaitingResend.description', {
             tradingPartner: run.tradingPartner.name,
-            failureStage: tRuns(`failureStage.${run.failureStage}`),
+            failureStage: tFailureStage(`${run.failureStage}.title`),
           })}
         </p>
       )}

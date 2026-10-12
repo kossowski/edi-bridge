@@ -43,7 +43,7 @@ export const failureStageIcons: Record<FailureStage, IconSvgElement> = {
 }
 
 export function RunStatusBadge({ status }: { status: RunStatus }) {
-  const t = useTranslations('Runs.status')
+  const t = useTranslations('PlainNames.runStatus')
 
   return (
     <Badge variant="outline" className={cn('gap-1', runStatusStyles[status])}>
@@ -55,6 +55,7 @@ export function RunStatusBadge({ status }: { status: RunStatus }) {
 
 export function FailureStageLabel({ failureStage }: { failureStage: FailureStage | null }) {
   const t = useTranslations('Runs')
+  const tFailureStage = useTranslations('PlainNames.failureStage')
 
   if (failureStage === null) {
     return (
@@ -75,7 +76,7 @@ export function FailureStageLabel({ failureStage }: { failureStage: FailureStage
         aria-hidden
         className="size-4"
       />
-      {t(`failureStage.${failureStage}`)}
+      {tFailureStage(`${failureStage}.title`)}
     </span>
   )
 }

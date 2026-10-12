@@ -28,6 +28,8 @@ import {
 
 export function RunFilters() {
   const t = useTranslations('Runs')
+  const tRunStatus = useTranslations('PlainNames.runStatus')
+  const tFailureStage = useTranslations('PlainNames.failureStage')
   const filters = useRunFilters()
   const { data: tradingPartners = [] } = useQuery(tradingPartnersQuery)
   const { data: flows = [] } = useQuery(flowsQuery)
@@ -45,7 +47,7 @@ export function RunFilters() {
         label={t('columns.status')}
         options={runStatuses.map((status) => ({
           value: status,
-          label: t(`status.${status}`),
+          label: tRunStatus(status),
           icon: runStatusIcons[status],
         }))}
         selected={filters.status}
@@ -56,7 +58,7 @@ export function RunFilters() {
         label={t('columns.failureStage')}
         options={failureStages.map((stage) => ({
           value: stage,
-          label: t(`failureStage.${stage}`),
+          label: tFailureStage(`${stage}.title`),
           icon: failureStageIcons[stage],
         }))}
         selected={filters.failureStage}
