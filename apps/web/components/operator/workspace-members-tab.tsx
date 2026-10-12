@@ -428,9 +428,21 @@ function Invites({ workspaceId }: { workspaceId: string }) {
   )
 }
 
+function FirstMemberHint() {
+  const t = useTranslations('Operator.members.first')
+
+  return (
+    <Alert>
+      <AlertTitle>{t('title')}</AlertTitle>
+      <AlertDescription>{t('description')}</AlertDescription>
+    </Alert>
+  )
+}
+
 export function WorkspaceMembersTab({ workspace }: { workspace: WorkspaceSummary }) {
   return (
     <>
+      {workspace.memberCount === 0 && workspace.pendingInviteCount === 0 && <FirstMemberHint />}
       <Members workspaceId={workspace.id} />
       <CreateInvite workspaceId={workspace.id} />
       <Invites workspaceId={workspace.id} />

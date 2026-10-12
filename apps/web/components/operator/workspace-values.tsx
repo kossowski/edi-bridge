@@ -14,12 +14,6 @@ export function WorkspaceGln({ gln }: { gln: WorkspaceSummary['gln'] }) {
   )
 }
 
-export function WorkspaceMembers({ count }: { count: number }) {
-  const format = useFormatter()
-
-  return <span className="tabular-nums">{format.number(count)}</span>
-}
-
 export function WorkspaceSeeded({ seeded }: { seeded: boolean }) {
   const t = useTranslations('Operator.values')
 

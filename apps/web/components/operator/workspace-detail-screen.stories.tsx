@@ -5,12 +5,18 @@ import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 import { AppHeader } from '@/components/app-header'
 import { WorkspaceDetailScreen } from '@/components/operator/workspace-detail-screen'
 import { OperatorOnly } from '@/components/session/operator-only'
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import {
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+  pendingSince,
+  withWorkspace,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   createInviteEndpoint,
   type Invite,
-  inviteValidityDays,
   operatorWorkspaceMembersEndpoint,
   operatorWorkspaceSettingsEndpoint,
   operatorWorkspacesEndpoint,
@@ -42,20 +48,6 @@ import {
 import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
 
 import preview from '../../.storybook/preview'
-
-const dayMs = 24 * 60 * 60 * 1000
-
-function pendingSince(invite: Invite, days: number): Invite {
-  const createdAt = Date.now() - days * dayMs
-
-  return {
-    ...invite,
-    acceptedAt: null,
-    revokedAt: null,
-    createdAt: new Date(createdAt).toISOString(),
-    expiresAt: new Date(createdAt + inviteValidityDays * dayMs).toISOString(),
-  }
-}
 
 const pendingEmail = 'jan.petersen@nordwind-handel.example'
 
@@ -92,12 +84,6 @@ function operatorMocks({
       ...(settings && { settings }),
     }),
   ]
-}
-
-function withWorkspace(id: string, changes: Partial<WorkspaceSummaryRecord>) {
-  return seedWorkspaceSummaries.map((workspace) =>
-    workspace.id === id ? { ...workspace, ...changes } : workspace,
-  )
 }
 
 function failing(path: string, method: 'get' | 'put' | 'post' = 'get') {
@@ -188,6 +174,7 @@ export const Overview = meta.story({
       'true',
     )
     const overview = panel(canvasElement)
+    await expect(overview.getByText('Customer')).toBeVisible()
     await expect(
       overview.getByText("A customer's own Workspace with real documents."),
     ).toBeVisible()
@@ -259,12 +246,6 @@ export const OverviewLargeNumbers = meta.story({
     await expect(canvas.getByText('120 open invites')).toBeVisible()
   },
 })
-
-async function expectNoPageScroll(canvasElement: HTMLElement) {
-  const page = canvasElement.ownerDocument.documentElement
-
-  await expect(page.scrollWidth).toBeLessThanOrEqual(page.clientWidth)
-}
 
 export const OverviewOnPhone = meta.story({
   ...mobile,
@@ -359,13 +340,20 @@ export const EarlierInvites = meta.story({
 export const NobodyYet = meta.story({
   ...membersTab,
   beforeEach({ msw }) {
-    msw.use(...operatorMocks({ invites: [], members: [] }))
+    msw.use(
+      ...operatorMocks({
+        invites: [],
+        members: [],
+        workspaceSummaries: withWorkspace(seedWorkspace.id, { memberCount: 0 }),
+      }),
+    )
   },
   async play({ canvas }) {
     await expect(
       await canvas.findByText('No members yet. People show up here once they accept their invite.'),
     ).toBeVisible()
-    await expect(canvas.getByText('No open invites')).toBeVisible()
+    await expect(canvas.getByRole('alert')).toHaveTextContent('Invite the first member')
+    await expect(await canvas.findByText('No open invites')).toBeVisible()
     await expect(canvas.getByText('Nobody is waiting to join.')).toBeVisible()
     await expect(canvas.queryByText(/earlier invite/)).toBeNull()
   },
@@ -1049,7 +1037,7 @@ export const DangerZoneGerman = meta.story({
     await waitFor(() =>
       expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toHaveFocus(),
     )
-    await expect(dialog).toHaveTextContent('Andere Workspaces bleiben unverändert.')
+    await expect(dialog).toHaveTextContent('Andere Arbeitsbereiche bleiben unverändert.')
   },
 })
 
@@ -1119,6 +1107,7 @@ export const German = meta.story({
       'true',
     )
     await expect(canvas.getByText('Belege heute')).toBeVisible()
+    await expect(canvas.getByText('Kunde')).toBeVisible()
     await expect(canvas.getByText('1 offene Einladung')).toBeVisible()
     await expect(canvas.getByText('Unternehmens-ID (GLN)')).toBeVisible()
   },

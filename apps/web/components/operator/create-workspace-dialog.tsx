@@ -11,7 +11,6 @@ import { storeCreatedWorkspace } from '@/lib/api/queries'
 import { sameWorkspaceName, validateWorkspaceForm } from '@/lib/forms/operator'
 import { maxWorkspaceNameLength, type WorkspaceSummary } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Checkbox } from '@edi-bridge/ui/components/checkbox'
 import {
   Dialog,
   DialogClose,
@@ -21,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@edi-bridge/ui/components/dialog'
+import { Switch } from '@edi-bridge/ui/components/switch'
 
 function CreateWorkspaceForm({ onCreated }: { onCreated: (created: WorkspaceSummary) => void }) {
   const t = useTranslations('Operator.createWorkspace')
@@ -73,18 +73,22 @@ function CreateWorkspaceForm({ onCreated }: { onCreated: (created: WorkspaceSumm
         value={name}
         onChange={setName}
       />
-      <div className="flex flex-col gap-1.5">
-        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
-          <Checkbox
-            checked={seed}
-            aria-describedby={`${id}-seed-description`}
-            onCheckedChange={setSeed}
-          />
-          {t('seed.label')}
-        </label>
-        <p id={`${id}-seed-description`} className="text-muted-foreground text-sm">
-          {t('seed.description')}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <label htmlFor={`${id}-seed`} className="w-fit cursor-pointer text-sm font-medium">
+            {t('seed.label')}
+          </label>
+          <p id={`${id}-seed-description`} className="text-muted-foreground text-sm">
+            {t('seed.description')}
+          </p>
+        </div>
+        <Switch
+          id={`${id}-seed`}
+          checked={seed}
+          aria-describedby={`${id}-seed-description`}
+          className="mt-0.5"
+          onCheckedChange={setSeed}
+        />
       </div>
       {create.isError && !isConflict(create.error) && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">

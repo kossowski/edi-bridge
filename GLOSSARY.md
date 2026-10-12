@@ -15,6 +15,10 @@ An isolated area holding one company's trading partners, mappings and traffic. W
 _Avoid_: Tenant, organization, account
 _On screen_: Workspace (DE: Arbeitsbereich)
 
+**Customer Workspace**:
+A Workspace for one real company that exchanges real documents with its Trading Partners, unlike a Showcase or Sandbox Workspace.
+_On screen_: Customer (DE: Kunde)
+
 **Showcase Workspace**:
 A pristine, seeded Workspace that visitors browse read-only.
 _Avoid_: Demo, public workspace

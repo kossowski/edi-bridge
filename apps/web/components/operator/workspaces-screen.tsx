@@ -3,54 +3,121 @@
 import { Add01Icon, Building03Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { type Ref, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { type ReactNode, type Ref, useId, useRef, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
-import { linkClass, rowLinkClass } from '@/components/detail-parts'
-import { ListTable } from '@/components/list-table'
+import { Notice, rowLinkClass } from '@/components/detail-parts'
+import { LoadError } from '@/components/load-error'
 import { CreateWorkspaceDialog } from '@/components/operator/create-workspace-dialog'
-import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
-import {
-  WorkspaceCreatedAt,
-  WorkspaceGln,
-  WorkspaceMembers,
-  WorkspaceSeeded,
-} from '@/components/operator/workspace-values'
+import { WorkspaceLastActivity } from '@/components/operator/workspace-values'
 import { operatorWorkspacesQuery } from '@/lib/api/queries'
-import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
+import { workspaceKinds, type WorkspaceKind, type WorkspaceSummary } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
-import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
+import { Card, CardContent, CardHeader } from '@edi-bridge/ui/components/card'
+import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { WorkspaceSummary } from '@edi-bridge/contracts'
-
-const columns = ['name', 'kind', 'gln', 'members', 'seeded', 'createdAt'] as const
-
-function WorkspaceRow({ workspace }: { workspace: WorkspaceSummary }) {
+function CardFact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <TableRow className="relative">
-      <TableCell className="max-w-72 truncate">
-        <Link href={`/operator/workspaces/${workspace.id}`} className={rowLinkClass}>
-          {workspace.name}
-        </Link>
-      </TableCell>
-      <TableCell>
-        <WorkspaceKindBadge kind={workspace.kind} />
-      </TableCell>
-      <TableCell>
-        <WorkspaceGln gln={workspace.gln} />
-      </TableCell>
-      <TableCell>
-        <WorkspaceMembers count={workspace.memberCount} />
-      </TableCell>
-      <TableCell>
-        <WorkspaceSeeded seeded={workspace.seeded} />
-      </TableCell>
-      <TableCell>
-        <WorkspaceCreatedAt createdAt={workspace.createdAt} />
-      </TableCell>
-    </TableRow>
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="tabular-nums">{children}</dd>
+    </div>
+  )
+}
+
+function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
+  const t = useTranslations('Operator.workspaces.card')
+  const format = useFormatter()
+
+  return (
+    <li className="min-w-0">
+      <Card size="sm" className="relative h-full">
+        <CardHeader>
+          <h3 className="truncate font-medium">
+            <Link href={`/operator/workspaces/${workspace.id}`} className={rowLinkClass}>
+              {workspace.name}
+            </Link>
+          </h3>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid grid-cols-2 gap-3">
+            <CardFact label={t('documentsToday')}>
+              {format.number(workspace.documentsToday)}
+            </CardFact>
+            <CardFact label={t('lastActivity')}>
+              <WorkspaceLastActivity lastActivityAt={workspace.lastActivityAt} />
+            </CardFact>
+            <CardFact label={t('members')}>{format.number(workspace.memberCount)}</CardFact>
+            {workspace.pendingInviteCount > 0 && (
+              <CardFact label={t('openInvites')}>
+                {format.number(workspace.pendingInviteCount)}
+              </CardFact>
+            )}
+          </dl>
+        </CardContent>
+      </Card>
+    </li>
+  )
+}
+
+function KindGroup({
+  kind,
+  workspaces,
+}: {
+  kind: WorkspaceKind
+  workspaces: ReadonlyArray<WorkspaceSummary>
+}) {
+  const t = useTranslations('Operator.workspaces')
+  const format = useFormatter()
+  const id = useId()
+
+  return (
+    <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 id={id} className="font-semibold">
+          {t(`groups.${kind}.title`)}{' '}
+          <span className="text-muted-foreground font-normal tabular-nums">
+            ({format.number(workspaces.length)})
+          </span>
+        </h2>
+        <p className="text-muted-foreground text-sm">{t(`groups.${kind}.description`)}</p>
+      </div>
+      {workspaces.length === 0 ? (
+        <p className="text-muted-foreground rounded-xl border border-dashed p-4 text-sm">
+          {t(`groups.${kind}.empty`)}
+        </p>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {workspaces.map((workspace) => (
+            <WorkspaceCard key={workspace.id} workspace={workspace} />
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function WorkspacesLoading() {
+  const t = useTranslations('Operator.workspaces')
+
+  return (
+    <div aria-busy className="flex flex-col gap-8">
+      <p role="status" className="sr-only">
+        {t('loading')}
+      </p>
+      {workspaceKinds.map((kind) => (
+        <div key={kind} className="flex flex-col gap-3">
+          <Skeleton className="h-5 w-40" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <Skeleton className="h-32 rounded-xl" />
+            <Skeleton className="h-32 rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -65,7 +132,7 @@ function CreateWorkspaceButton({
 
   return (
     <Button ref={ref} onClick={onClick}>
-      <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden />
+      <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden data-icon="inline-start" />
       {t('new')}
     </Button>
   )
@@ -75,9 +142,9 @@ export function WorkspacesScreen() {
   const t = useTranslations('Operator.workspaces')
   const tSession = useTranslations('Shell.session')
   const workspaces = useQuery(operatorWorkspacesQuery)
+  const router = useRouter()
   const createButton = useRef<HTMLButtonElement>(null)
   const [dialog, setDialog] = useState({ open: false, run: 0 })
-  const [created, setCreated] = useState<WorkspaceSummary | null>(null)
 
   function openDialog() {
     setDialog((current) => ({ open: true, run: current.run + 1 }))
@@ -91,39 +158,35 @@ export function WorkspacesScreen() {
     <AppPage
       actions={<CreateWorkspaceButton ref={createButton} onClick={openDialog} />}
       title={tSession('operatorArea')}
-      className="gap-4">
-      <div role="status">
-        {created && (
-          <Alert role={undefined} variant="success">
-            <AlertDescription>
-              {t('created', { name: created.name })}{' '}
-              <Link href={`/operator/workspaces/${created.id}`} className={linkClass}>
-                {t('open', { name: created.name })}
-              </Link>
-            </AlertDescription>
-          </Alert>
-        )}
-      </div>
-      <ListTable
-        columns={columns.map((key) => ({ key, label: t(`columns.${key}`) }))}
-        emptyAction={<CreateWorkspaceButton onClick={openDialog} />}
-        emptyIcon={Building03Icon}
-        matches={(workspace, term) =>
-          workspace.name.toLocaleLowerCase().includes(term) ||
-          (workspace.gln?.includes(term) ?? false)
-        }
-        pending={false}
-        query={workspaces}
-        row={(workspace) => <WorkspaceRow key={workspace.id} workspace={workspace} />}
-        t={t}
-      />
+      className="gap-8">
+      {workspaces.isPending ? (
+        <WorkspacesLoading />
+      ) : workspaces.isError ? (
+        <LoadError
+          description={t('error.description')}
+          retryLabel={t('error.retry')}
+          title={t('error.title')}
+          onRetry={() => void workspaces.refetch()}
+        />
+      ) : workspaces.data.length === 0 ? (
+        <Notice description={t('empty.description')} icon={Building03Icon} title={t('empty.title')}>
+          <CreateWorkspaceButton onClick={openDialog} />
+        </Notice>
+      ) : (
+        workspaceKinds.map((kind) => (
+          <KindGroup
+            key={kind}
+            kind={kind}
+            workspaces={workspaces.data.filter((workspace) => workspace.kind === kind)}
+          />
+        ))
+      )}
       <CreateWorkspaceDialog
         key={dialog.run}
         finalFocus={createButton}
         open={dialog.open}
         onCreated={(workspace) => {
-          setCreated(workspace)
-          closeDialog()
+          router.push(`/operator/workspaces/${workspace.id}?tab=members`)
         }}
         onOpenChange={(open) => !open && closeDialog()}
       />

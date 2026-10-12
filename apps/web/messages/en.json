@@ -2590,8 +2590,8 @@
   },
   "Operator": {
     "kind": {
-      "standard": "Standard",
-      "showcase": "Showcase",
+      "standard": "Customer",
+      "showcase": "Demo",
       "sandbox": "Sandbox"
     },
     "values": {
@@ -2604,28 +2604,34 @@
       "noActivity": "No activity yet"
     },
     "workspaces": {
-      "title": "Workspaces",
       "new": "Create Workspace",
-      "caption": "Workspaces, by name",
       "loading": "Loading Workspaces",
-      "count": "{count, plural, one {# Workspace} other {# Workspaces}}",
-      "filteredCount": "{count} of {total} Workspaces",
-      "search": "Search by name or GLN",
-      "noMatch": "No Workspace matches the search.",
-      "columns": {
-        "name": "Name",
-        "kind": "Kind",
-        "gln": "GLN",
-        "members": "Members",
-        "seeded": "Seed data",
-        "createdAt": "Created"
+      "groups": {
+        "standard": {
+          "title": "Customers",
+          "description": "Real companies exchanging real documents. You invite their members.",
+          "empty": "No customer Workspaces yet."
+        },
+        "showcase": {
+          "title": "Demo",
+          "description": "The public demo. Visitors look around in its example data but cannot change anything.",
+          "empty": "No Demo yet."
+        },
+        "sandbox": {
+          "title": "Sandbox",
+          "description": "A Workspace for trying things out, with example data. Visitors may change anything, and you reset it to its example data.",
+          "empty": "No Sandbox yet."
+        }
       },
-      "created": "Workspace {name} created.",
-      "open": "Open {name}",
+      "card": {
+        "documentsToday": "Documents today",
+        "lastActivity": "Last activity",
+        "members": "Members",
+        "openInvites": "Open invites"
+      },
       "empty": {
         "title": "No Workspaces yet",
-        "description": "Create the first Workspace, then invite its users.",
-        "viewOnlyDescription": "Workspaces appear here once an Operator creates one."
+        "description": "Create the first Workspace, then invite its members."
       },
       "error": {
         "title": "Workspaces unavailable",
@@ -2635,7 +2641,7 @@
     },
     "createWorkspace": {
       "title": "Create Workspace",
-      "description": "A new Workspace has no users yet. You invite them on the Workspace's page.",
+      "description": "A separate Workspace for one customer company. You invite its first member next.",
       "close": "Close",
       "cancel": "Cancel",
       "create": "Create Workspace",
@@ -2645,8 +2651,8 @@
         "description": "The company's name, unique on the platform, at most {max} characters."
       },
       "seed": {
-        "label": "Start from seed data",
-        "description": "Fills the Workspace with example Trading Partners, Mappings and Runs, so it can be explored right away."
+        "label": "Start with example data",
+        "description": "Fills the Workspace with example trading partners, mappings and documents, so it can be explored right away. Turn it off for a customer who starts from scratch."
       },
       "errors": {
         "required": "Enter a name.",
@@ -2701,7 +2707,11 @@
         "description": "The members could not be loaded.",
         "retry": "Try again"
       },
-      "empty": "No members yet. People show up here once they accept their invite."
+      "empty": "No members yet. People show up here once they accept their invite.",
+      "first": {
+        "title": "Invite the first member",
+        "description": "Nobody can sign in to this Workspace yet. Create an invite link below and pass it on."
+      }
     },
     "invites": {
       "title": "Invites",
