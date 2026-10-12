@@ -107,6 +107,7 @@ import {
   updateLookupTableEndpoint,
   updateOperatorWorkspaceSettingsEndpoint,
   updateTradingPartnerEndpoint,
+  waitForTradingPartnerRunEndpoint,
   workspaceSettingsEndpoint,
   type WorkspaceInput,
   workspaceInvitesEndpoint,
@@ -303,6 +304,12 @@ export function retryRun(id: string) {
 
 export function reprocessRun(id: string, body: ReprocessRunBody) {
   return request(reprocessRunEndpoint, { path: toPath(reprocessRunEndpoint.path, { id }), body })
+}
+
+export function waitForTradingPartner(id: string) {
+  return request(waitForTradingPartnerRunEndpoint, {
+    path: toPath(waitForTradingPartnerRunEndpoint.path, { id }),
+  })
 }
 
 export function listInterchanges(query: InterchangeListQuery) {

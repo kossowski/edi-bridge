@@ -1,12 +1,15 @@
 import { delay, http, HttpResponse } from 'msw'
-import { expect } from 'storybook/test'
+import { expect, fn, screen, userEvent, waitFor } from 'storybook/test'
 
 import { DocumentScreen } from '@/components/documents/document-screen'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   type FailureStage,
   type MessageType,
+  reprocessRunEndpoint,
+  retryRunEndpoint,
   runDetailSchema,
   runEndpoint,
   type RunStatus,
@@ -18,9 +21,11 @@ import {
   createLookupTableStore,
   createRun,
   interchangeIdOf,
+  mappingHandlers,
   runDetailHandlers,
   seedChannels,
   seedFlows,
+  seedMappingDrafts,
   seedMappingVersions,
   seedTradingPartners,
   toMappingVersionSummary,
@@ -135,6 +140,10 @@ const duplicate = {
 
 const duplicateFromErp = storyRun(14, 'INVOIC', 'duplicate')
 
+const replaced = storyRun(15, 'ORDERS', 'mapping')
+
+const replacing = storyRun(16, 'ORDERS', 'delivered')
+
 const runs = [
   missingField,
   unreadable,
@@ -150,6 +159,8 @@ const runs = [
   original,
   duplicate,
   duplicateFromErp,
+  replaced,
+  replacing,
 ]
 
 const channel = seedChannels.find(({ id }) => id === flowFor('INVOIC').destinationChannelId)!
@@ -163,10 +174,49 @@ const meta = preview.meta({
       http.get(`${apiUrl}${toPath(runEndpoint.path, { id: missingField.id })}`, () =>
         HttpResponse.json(missingFieldDetail),
       ),
-      ...runDetailHandlers(apiUrl, { runs }),
+      ...runDetailHandlers(apiUrl, {
+        runs,
+        reprocessed: [{ replaced: replaced.id, replacing: replacing.id }],
+      }),
     )
   },
 })
+
+const ordersMappingId = seedMappingVersions.find(
+  ({ id }) => id === flowFor('ORDERS').mappingVersionId,
+)!.mappingId
+
+const ordersMapping = seedMappingDrafts.find(({ id }) => id === ordersMappingId)!
+
+function ordersMappingDraft(unpublishedChanges: boolean) {
+  return mappingHandlers(apiUrl, {
+    mappings: seedMappingDrafts.map((draft) =>
+      draft.id === ordersMappingId ? { ...draft, unpublishedChanges } : draft,
+    ),
+  })
+}
+
+function failing(path: string) {
+  return http.post(`${apiUrl}${path}`, () =>
+    HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+  )
+}
+
+const writeText = fn<(text: string) => Promise<void>>(() => Promise.resolve())
+
+function stubClipboard() {
+  writeText.mockClear()
+  const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+
+  return () => {
+    if (original) {
+      Object.defineProperty(navigator, 'clipboard', original)
+    } else {
+      Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  }
+}
 
 async function expectFixLink(link: HTMLElement, href: string) {
   await expect(link).toBeVisible()
@@ -215,6 +265,7 @@ export const WaitingForPartner = meta.story({
     await expect(
       await canvas.findByText(`Marked as waiting for ${partner.name} since`, { exact: false }),
     ).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Marked as waiting' })).toBeDisabled()
   },
 })
 
@@ -264,7 +315,8 @@ export const WithoutFixTarget = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'A code has no translation' }),
     ).toBeVisible()
-    await expect(canvas.queryByRole('heading', { name: 'What to do' })).toBeNull()
+    await expect(canvas.queryByText('Fix the cause.')).toBeNull()
+    await expect(await canvas.findByRole('button', { name: 'Process again' })).toBeVisible()
   },
 })
 
@@ -402,6 +454,274 @@ export const NotFound = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('Document not found')).toBeVisible()
     await expectFixLink(canvas.getByRole('link', { name: 'Back to all documents' }), '/documents')
+  },
+})
+
+export const ProcessAgain = meta.story({
+  args: { id: missingCode.id },
+  beforeEach({ msw }) {
+    msw.use(...ordersMappingDraft(false))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(
+        `Process it again. EDI Bridge uses the original file, so ${partner.name} does not have to send anything again.`,
+      ),
+    ).toBeVisible()
+    const version = canvas.getByRole('combobox', { name: 'Version' })
+    await waitFor(() => expect(version).toBeEnabled())
+    await expect(canvas.queryByText(/has unpublished changes/)).toBeNull()
+
+    await userEvent.click(version)
+    const options = await screen.findAllByRole('option')
+    await expect(options[0]).toHaveTextContent(/\(newest/)
+    await expect(options.some((option) => /used before\)$/.test(option.textContent))).toBe(true)
+    await userEvent.keyboard('{Escape}')
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Process again' }))
+    await expect(await canvas.findByText('Processing again')).toBeVisible()
+    const links = await canvas.findAllByRole('link', { name: 'Open the new attempt' })
+
+    for (const link of links) {
+      await expect(link.getAttribute('href')).toMatch(/^\/documents\/[\w-]+$/)
+      await expect(link.getAttribute('href')).not.toBe(`/documents/${missingCode.id}`)
+    }
+  },
+})
+
+export const UnpublishedChanges = meta.story({
+  args: { id: missingCode.id },
+  beforeEach({ msw }) {
+    msw.use(...ordersMappingDraft(true))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(`“${ordersMapping.name}” has unpublished changes.`, {
+        exact: false,
+      }),
+    ).toBeVisible()
+    await expectFixLink(
+      canvas.getByRole('link', { name: `Open “${ordersMapping.name}”` }),
+      `/mappings/${ordersMappingId}`,
+    )
+  },
+})
+
+export const ProcessAgainFailed = meta.story({
+  args: { id: missingCode.id },
+  beforeEach({ msw }) {
+    msw.use(...ordersMappingDraft(false), failing(reprocessRunEndpoint.path))
+  },
+  async play({ canvas }) {
+    const button = await canvas.findByRole('button', { name: 'Process again' })
+    await waitFor(() => expect(button).toBeEnabled())
+    await userEvent.click(button)
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'Processing again did not start. Try again.',
+    )
+  },
+})
+
+export const ProcessedAgain = meta.story({
+  args: { id: replaced.id },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText('This document was processed again. The new attempt replaces it.'),
+    ).toBeVisible()
+    await expectFixLink(
+      canvas.getByRole('link', { name: 'Open the new attempt' }),
+      `/documents/${replacing.id}`,
+    )
+    await expect(canvas.queryByRole('button', { name: 'Process again' })).toBeNull()
+  },
+})
+
+export const TryAgain = meta.story({
+  args: { id: unreachableOutbound.id },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(
+        'Try again. The finished document is sent once more, nothing is translated again.',
+      ),
+    ).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))
+    await expect(await canvas.findByText('Delivering again')).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'EDI Bridge is sending the finished document once more. The result appears here.',
+      ),
+    ).toBeVisible()
+    await expect(
+      await canvas.findByRole('heading', { name: 'All good, nothing to do' }),
+    ).toBeVisible()
+  },
+})
+
+export const TryAgainFailed = meta.story({
+  args: { id: unreachableOutbound.id },
+  beforeEach({ msw }) {
+    msw.use(failing(retryRunEndpoint.path))
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Try again' }))
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'The delivery did not start again. Try once more.',
+    )
+  },
+})
+
+export const TellTradingPartner = meta.story({
+  args: { id: invalidContentInbound.id },
+  beforeEach: stubClipboard,
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: `Copy a message for ${partner.name}` }),
+    )
+    await expect(await canvas.findByText('Message copied')).toBeVisible()
+    await expect(writeText).toHaveBeenCalledOnce()
+    const message = writeText.mock.calls[0]![0]
+    await expect(message).toMatch(new RegExp(`^Hello ${partner.name},\n\nwe could not process`))
+    await expect(message).toContain(invalidContentInbound.businessReference)
+    await expect(message).toMatch(/control reference \w+\./)
+    await expect(message).toMatch(/Technical detail: .+ \(error code \w+/)
+  },
+})
+
+export const CopyFailed = meta.story({
+  args: { id: invalidContentInbound.id },
+  beforeEach() {
+    const restore = stubClipboard()
+    writeText.mockRejectedValueOnce(new Error('Denied'))
+
+    return restore
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: `Copy a message for ${partner.name}` }),
+    )
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'The message could not be copied.',
+    )
+  },
+})
+
+export const MarkWaiting = meta.story({
+  args: { id: invalidContentInbound.id },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Mark as waiting for partner' }),
+    )
+    await expect(await canvas.findByRole('button', { name: 'Marked as waiting' })).toBeDisabled()
+    await expect(
+      canvas.getByText(`Marked as waiting for ${partner.name} since`, { exact: false }),
+    ).toBeVisible()
+  },
+})
+
+export const MarkWaitingFailed = meta.story({
+  args: { id: invalidContentInbound.id },
+  beforeEach({ msw }) {
+    msw.use(failing(waitForTradingPartnerRunEndpoint.path))
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Mark as waiting for partner' }),
+    )
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'The mark was not set. Try again.',
+    )
+  },
+})
+
+export const ViewerProcessAgain = meta.story({
+  args: { id: missingCode.id },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByText('An Admin can process it again.')).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Process again' })).toBeNull()
+      await expect(canvas.queryByRole('combobox', { name: 'Version' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerTryAgain = meta.story({
+  args: { id: unreachableOutbound.id },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByText('An Admin can try again.')).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Try again' })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerTellTradingPartner = meta.story({
+  args: { id: invalidContentInbound.id },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByRole('button', { name: `Copy a message for ${partner.name}` }),
+      ).toBeVisible()
+      await expect(canvas.getByText('An Admin can mark it.')).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Mark as waiting for partner' })).toBeNull()
+    },
+  }),
+})
+
+export const GermanActions = meta.story({
+  args: { id: invalidContentInbound.id },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('button', { name: `Nachricht für ${partner.name} kopieren` }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole('button', { name: 'Als wartend auf Partner markieren' }),
+    ).toBeVisible()
+  },
+})
+
+export const GermanProcessAgain = meta.story({
+  args: { id: missingCode.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...ordersMappingDraft(true))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('button', { name: 'Erneut verarbeiten' })).toBeVisible()
+    await expect(
+      await canvas.findByText(`„${ordersMapping.name}“ hat unveröffentlichte Änderungen.`, {
+        exact: false,
+      }),
+    ).toBeVisible()
+  },
+})
+
+export const DarkActions = meta.story({
+  args: { id: missingCode.id },
+  beforeEach({ msw }) {
+    msw.use(...ordersMappingDraft(true))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(`“${ordersMapping.name}” has unpublished changes.`, {
+        exact: false,
+      }),
+    ).toBeVisible()
+  },
+})
+
+export const DarkTryAgainFailed = meta.story({
+  args: { id: unreachableOutbound.id },
+  beforeEach({ msw }) {
+    msw.use(failing(retryRunEndpoint.path))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Try again' }))
+    await expect(await canvas.findByRole('alert')).toBeVisible()
   },
 })
 

@@ -8,6 +8,14 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { FixerBadge, fixerIcons } from '@/components/documents/fixer-badge'
+import {
+  CopyPartnerMessage,
+  MarkWaitingStep,
+  ProcessAgainStep,
+  ProcessedAgain,
+  reprocessMappingId,
+  TryAgainStep,
+} from '@/components/documents/problem-actions'
 import { fixTargetHref } from '@/lib/navigation'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@edi-bridge/ui/components/card'
@@ -109,45 +117,65 @@ function StepBody({ text, children }: { text: string; children?: ReactNode }) {
   )
 }
 
-export function useFixSteps({ problem, tradingPartner }: FailedRun): WhatToDoStep[] {
+export function useFixSteps(run: FailedRun): WhatToDoStep[] {
   const t = useTranslations('Document.problem.steps')
+  const { problem, tradingPartner } = run
   const target = problem.fixTarget
 
   switch (problem.whoFixes) {
-    case 'you':
-    case 'retry': {
-      const you = problem.whoFixes === 'you'
+    case 'you': {
+      const mappingId = reprocessMappingId(run)
 
-      return target
-        ? [
-            {
-              key: 'fix',
-              content: (
-                <StepBody text={t(you ? 'fixCause' : 'checkConnection')}>
-                  <FixLink primary={you} target={target} />
-                </StepBody>
-              ),
-            },
-          ]
-        : []
+      return [
+        target && {
+          key: 'fix',
+          content: (
+            <StepBody text={t('fixCause')}>
+              <FixLink primary target={target} />
+            </StepBody>
+          ),
+        },
+        mappingId !== null && {
+          key: 'processAgain',
+          content: <ProcessAgainStep mappingId={mappingId} run={run} />,
+        },
+      ].filter((step) => step !== null && step !== false)
+    }
+
+    case 'retry': {
+      return [
+        { key: 'tryAgain', content: <TryAgainStep run={run} /> },
+        target && {
+          key: 'fix',
+          content: (
+            <StepBody text={t('checkConnection')}>
+              <FixLink primary={false} target={target} />
+            </StepBody>
+          ),
+        },
+      ].filter((step) => step !== null)
     }
 
     case 'tradingPartner': {
       return [
         {
-          key: 'fix',
+          key: 'tell',
           content: (
-            <StepBody text={t('contactTradingPartner', { tradingPartner: tradingPartner.name })}>
-              {target && <FixLink primary={false} target={target} />}
+            <StepBody text={t('tellTradingPartner', { tradingPartner: tradingPartner.name })}>
+              <div className="flex flex-wrap items-center gap-2">
+                <CopyPartnerMessage run={run} />
+                {target && <FixLink primary={false} target={target} />}
+              </div>
             </StepBody>
           ),
         },
+        { key: 'markWaiting', content: <MarkWaitingStep run={run} /> },
       ]
     }
   }
 }
 
-function WhatToDo({ steps }: { steps: ReadonlyArray<WhatToDoStep> }) {
+function WhatToDo({ children }: { children: ReactNode }) {
   const t = useTranslations('Document.problem')
 
   return (
@@ -155,19 +183,25 @@ function WhatToDo({ steps }: { steps: ReadonlyArray<WhatToDoStep> }) {
       <h3 id="what-to-do" className="text-sm font-semibold">
         {t('whatToDo')}
       </h3>
-      <ol className="flex flex-col gap-4 text-sm">
-        {steps.map((step, index) => (
-          <li key={step.key} className="flex gap-3">
-            <span
-              aria-hidden
-              className="bg-muted flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-              {index + 1}
-            </span>
-            {step.content}
-          </li>
-        ))}
-      </ol>
+      {children}
     </section>
+  )
+}
+
+function Steps({ steps }: { steps: ReadonlyArray<WhatToDoStep> }) {
+  return (
+    <ol className="flex flex-col gap-4 text-sm">
+      {steps.map((step, index) => (
+        <li key={step.key} className="flex gap-3">
+          <span
+            aria-hidden
+            className="bg-muted flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+            {index + 1}
+          </span>
+          {step.content}
+        </li>
+      ))}
+    </ol>
   )
 }
 
@@ -230,7 +264,17 @@ export function ProblemCard({ run }: { run: FailedRun }) {
             <WaitingNote run={run} since={run.waitingForTradingPartnerSince} />
           )}
         </section>
-        {steps.length > 0 && <WhatToDo steps={steps} />}
+        {run.replacedBy ? (
+          <WhatToDo>
+            <ProcessedAgain replacedBy={run.replacedBy} />
+          </WhatToDo>
+        ) : (
+          steps.length > 0 && (
+            <WhatToDo>
+              <Steps steps={steps} />
+            </WhatToDo>
+          )
+        )}
       </CardContent>
     </Card>
   )

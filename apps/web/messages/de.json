@@ -608,7 +608,10 @@
       "steps": {
         "fixCause": "Beheben Sie die Ursache.",
         "checkConnection": "Wenn es weiter fehlschlägt, prüfen Sie die Verbindungsdaten.",
-        "contactTradingPartner": "Bitten Sie {tradingPartner}, eine korrigierte Datei zu senden. Die Kontaktdaten stehen auf der Partnerseite."
+        "processAgain": "Verarbeiten Sie den Beleg erneut. EDI Bridge nutzt die Originaldatei, {direction, select, inbound {{tradingPartner} muss} other {Ihr ERP muss}} also nichts erneut senden.",
+        "tryAgain": "Versuchen Sie es erneut. Der fertige Beleg wird noch einmal gesendet, nichts wird neu übersetzt.",
+        "tellTradingPartner": "Informieren Sie {tradingPartner} und bitten Sie um eine korrigierte Datei. Die Nachricht enthält die technischen Details für das IT-Team. Die Kontaktdaten stehen auf der Partnerseite.",
+        "markWaiting": "Markieren Sie den Beleg, damit Ihr Team weiß, dass Sie auf {tradingPartner} warten."
       },
       "fixLink": {
         "mapping": "„{name}“ an diesem Feld öffnen",
@@ -616,6 +619,74 @@
         "channel": "Verbindung „{name}“ prüfen",
         "tradingPartner": "{name} öffnen"
       }
+    },
+    "actions": {
+      "version": "Version",
+      "versionOption": {
+        "option": "Version {version}, veröffentlicht am {publishedAt}",
+        "newest": "Version {version}, veröffentlicht am {publishedAt} (neueste)",
+        "usedBefore": "Version {version}, veröffentlicht am {publishedAt} (zuvor verwendet)",
+        "newestUsedBefore": "Version {version}, veröffentlicht am {publishedAt} (neueste, zuvor verwendet)"
+      },
+      "versionsUnavailable": "Die Versionen konnten nicht geladen werden.",
+      "unpublished": {
+        "description": "„{mapping}“ hat unveröffentlichte Änderungen. Veröffentlichen Sie Ihre Korrektur zuerst, sonst nutzt dieser Versuch sie nicht.",
+        "link": "„{mapping}“ öffnen"
+      },
+      "processAgain": {
+        "button": "Erneut verarbeiten",
+        "pending": "Wird erneut verarbeitet",
+        "failed": "Die erneute Verarbeitung ist nicht gestartet. Versuchen Sie es noch einmal.",
+        "viewOnly": "Ein Admin kann den Beleg erneut verarbeiten."
+      },
+      "tryAgain": {
+        "button": "Erneut versuchen",
+        "pending": "Wird erneut versucht",
+        "failed": "Die Zustellung ist nicht erneut gestartet. Versuchen Sie es noch einmal.",
+        "viewOnly": "Ein Admin kann es erneut versuchen."
+      },
+      "copyMessage": {
+        "button": "Nachricht für {tradingPartner} kopieren",
+        "copied": "Nachricht kopiert",
+        "failed": "Die Nachricht konnte nicht kopiert werden. Erlauben Sie den Zugriff auf die Zwischenablage und versuchen Sie es erneut."
+      },
+      "markWaiting": {
+        "button": "Als wartend auf Partner markieren",
+        "pending": "Wird markiert",
+        "marked": "Als wartend markiert",
+        "failed": "Die Markierung wurde nicht gesetzt. Versuchen Sie es erneut.",
+        "viewOnly": "Ein Admin kann den Beleg markieren."
+      }
+    },
+    "result": {
+      "reprocessed": {
+        "title": "Wird erneut verarbeitet",
+        "description": "EDI Bridge hat einen neuen Versuch mit der Originaldatei und Version {version} gestartet.",
+        "descriptionWithoutVersion": "EDI Bridge hat einen neuen Versuch mit der Originaldatei gestartet.",
+        "link": "Neuen Versuch öffnen"
+      },
+      "retried": {
+        "title": "Wird erneut zugestellt",
+        "description": "EDI Bridge sendet den fertigen Beleg noch einmal. Das Ergebnis erscheint hier."
+      },
+      "replaced": {
+        "description": "Dieser Beleg wurde erneut verarbeitet. Der neue Versuch ersetzt ihn.",
+        "link": "Neuen Versuch öffnen"
+      }
+    },
+    "partnerMessage": {
+      "greeting": "Hallo {tradingPartner},",
+      "intro": "wir konnten Ihren Beleg „{messageTypeName} {reference}“ ({messageType}) nicht verarbeiten.",
+      "introWithoutReference": "wir konnten Ihren Beleg „{messageTypeName}“ ({messageType}) nicht verarbeiten.",
+      "transmission": "Er kam in der Übertragung mit der Kontrollreferenz {controlReference}.",
+      "reason": "{reason, select, unreadable {Die Datei ist beschädigt oder unvollständig und konnte deshalb nicht gelesen werden.} invalidContent {Ein Wert darin verstößt gegen die EDIFACT-Regeln für diese Belegart.} other {Er konnte nicht verarbeitet werden.}}",
+      "technical": "Technische Details: {message} (Fehlercode {code}).",
+      "technicalAt": "Technische Details: {message} (Fehlercode {code}, {position}).",
+      "segment": "Segment {segment} ({tag})",
+      "element": "Element {element}",
+      "component": "Komponente {component}",
+      "request": "Könnten Sie die Datei prüfen und eine korrigierte Fassung senden?",
+      "closing": "Vielen Dank"
     },
     "verdict": {
       "delivered": {
