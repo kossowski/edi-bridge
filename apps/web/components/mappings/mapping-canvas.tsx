@@ -32,6 +32,7 @@ import {
 } from 'react'
 
 import { proposedLinkCount, useAiMarks } from '@/components/mappings/ai-marks'
+import { type AttentionMarks, noAttention } from '@/components/mappings/ai-review-attention'
 import { type FailingField } from '@/components/mappings/failing-field'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
 import {
@@ -218,6 +219,7 @@ type MappingCanvasProps = {
   onChange: (save: GraphSave) => void
   detailsFacts?: ReactNode
   failingField?: FailingField | null
+  aiAttention?: AttentionMarks
   ref?: Ref<MappingCanvasHandle>
 }
 
@@ -482,6 +484,7 @@ export function MappingCanvas({
   onChange,
   detailsFacts,
   failingField = null,
+  aiAttention = noAttention,
   ref,
 }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
@@ -595,7 +598,7 @@ export function MappingCanvas({
       target: layouts.target.visible,
     })
 
-    const edgeLabel = (label: string, proposed: number, total: number) => {
+    const proposedLabel = (label: string, proposed: number, total: number) => {
       if (proposed === 0) {
         return label
       }
@@ -603,6 +606,12 @@ export function MappingCanvas({
       return proposed === total
         ? tAi('edgeLabel', { label })
         : tAi('edgeLabelSome', { label, count: proposed, total })
+    }
+
+    const edgeLabel = (label: string, proposed: number, total: number, attention: boolean) => {
+      const named = proposedLabel(label, proposed, total)
+
+      return attention ? tAi('edgeLabelAttention', { label: named }) : named
     }
 
     const transformEdges = graph.transformLinks.flatMap((link): LinkFlowEdge[] => {
@@ -615,6 +624,7 @@ export function MappingCanvas({
 
       const names = { source: text.start(link.from), target: text.end(link.to) }
       const aiProposed = marks.transformLink(link)
+      const aiAttentionNeeded = aiAttention.transformLink(link)
 
       return [
         {
@@ -624,10 +634,16 @@ export function MappingCanvas({
           sourceHandle: from.handle,
           target: to.node,
           targetHandle: to.handle,
-          data: { kind: 'transformLink', link, ...names, aiProposed },
+          data: {
+            kind: 'transformLink',
+            link,
+            ...names,
+            aiProposed,
+            aiAttention: aiAttentionNeeded,
+          },
           selectable: false,
           ...menuEdge,
-          ariaLabel: edgeLabel(t('link', names), aiProposed ? 1 : 0, 1),
+          ariaLabel: edgeLabel(t('link', names), aiProposed ? 1 : 0, 1, aiAttentionNeeded),
         },
       ]
     })
@@ -763,6 +779,7 @@ export function MappingCanvas({
     const plainEdges = shown.map(({ id, sourcePath, targetPath, links: merged }): LinkFlowEdge => {
       const [first] = merged
       const proposed = proposedLinkCount(marks, merged)
+      const attention = merged.some((link) => aiAttention.link(link))
 
       const label =
         merged.length === 1 && first
@@ -780,10 +797,11 @@ export function MappingCanvas({
           targetPath,
           links: merged,
           aiProposed: proposed === merged.length,
+          aiAttention: attention,
         },
         selectable: false,
         ...menuEdge,
-        ariaLabel: edgeLabel(label, proposed, merged.length),
+        ariaLabel: edgeLabel(label, proposed, merged.length, attention),
       }
     })
 
@@ -799,6 +817,7 @@ export function MappingCanvas({
       edges: [...plainEdges, ...transformEdges],
     }
   }, [
+    aiAttention,
     collapsed,
     draggedTo,
     failingField,

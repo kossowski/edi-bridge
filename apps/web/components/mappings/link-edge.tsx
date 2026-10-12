@@ -14,7 +14,7 @@ export type PlainEdgeData = Omit<CanvasLink, 'id'>
 export type LinkEdgeData = (
   | ({ kind: 'link' } & PlainEdgeData)
   | { kind: 'transformLink'; link: TransformLink; source: string; target: string }
-) & { aiProposed: boolean }
+) & { aiProposed: boolean; aiAttention: boolean }
 
 export type LinkFlowEdge = Edge<LinkEdgeData, 'link'>
 
@@ -111,7 +111,13 @@ function LinkEdgeView({
         style={{
           ...style,
           ...(data?.aiProposed && { stroke: 'var(--ai-proposed)', strokeDasharray: '6 3' }),
-          ...(highlighted && { strokeWidth: 2.5 }),
+          // Dash-dot and thicker as well, so the amber is not the only sign.
+          ...(data?.aiAttention && {
+            stroke: 'var(--ai-attention)',
+            strokeDasharray: '10 3 2 3',
+            strokeWidth: 2.5,
+          }),
+          ...(highlighted && { strokeWidth: data?.aiAttention ? 3.5 : 2.5 }),
           ...(highlighted && !data?.aiProposed && { stroke: 'var(--foreground)' }),
         }}
       />

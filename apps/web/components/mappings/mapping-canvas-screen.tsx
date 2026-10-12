@@ -9,6 +9,7 @@ import { type RefObject, useId, useRef, useState } from 'react'
 import { AppPage } from '@/components/app-page'
 import { Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
+import { AiReviewSheet } from '@/components/mappings/ai-review-sheet'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
 import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { type FailingField } from '@/components/mappings/failing-field'
@@ -29,6 +30,7 @@ import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-dra
 import { StartHere } from '@/components/mappings/start-here'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
+import { useReviewAttention } from '@/components/mappings/use-review-attention'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { VersionsSheet } from '@/components/mappings/versions-sheet'
 import { whenRendered } from '@/components/mappings/when-rendered'
@@ -85,6 +87,7 @@ function Canvas({
 }) {
   const t = useTranslations('Mapping.canvas')
   const save = useSaveGraph(draft.mappingId)
+  const { onCanvas } = useReviewAttention(draft, target.items)
 
   if (source.isError || target.isError) {
     return (
@@ -105,6 +108,7 @@ function Canvas({
 
   return (
     <MappingCanvas
+      aiAttention={onCanvas}
       detailsFacts={<MappingFacts draft={draft} />}
       failingField={failingField}
       graph={draft}
@@ -323,6 +327,7 @@ export function MappingCanvasScreen({ id, field }: { id: string; field?: string 
         actions={
           draft && (
             <>
+              {aiReview && desktop && <AiReviewSheet draft={draft} review={aiReview} />}
               {canChange && desktop && (
                 <AiDraftAction
                   aiDraft={aiDraft}
@@ -357,7 +362,6 @@ export function MappingCanvasScreen({ id, field }: { id: string; field?: string 
               <AiReviewState
                 draft={draft}
                 publishHintId={publishHintId}
-                showReview={desktop}
                 summaryId={reviewSummaryId}
               />
             )}

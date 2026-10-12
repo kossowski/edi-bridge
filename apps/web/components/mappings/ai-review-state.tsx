@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from 'react'
 
 import { AiBadge } from '@/components/mappings/ai-badge'
 import { aiProposedCount } from '@/components/mappings/ai-marks'
-import { AiReviewSheet } from '@/components/mappings/ai-review-panel'
 import { useGraphSaveState } from '@/components/mappings/use-save-graph'
 import { acceptAiDraft } from '@/lib/api/client'
 import { mappingDraftQuery, storeAcceptedAiDraft } from '@/lib/api/queries'
@@ -20,12 +19,10 @@ export function AiReviewState({
   draft,
   summaryId,
   publishHintId,
-  showReview = false,
 }: {
   draft: MappingDraft
   summaryId: string
   publishHintId: string
-  showReview?: boolean
 }) {
   const t = useTranslations('Mapping.aiReview')
   const queryClient = useQueryClient()
@@ -75,7 +72,6 @@ export function AiReviewState({
             <AiBadge label={t('open')} />
             {t('openSummary', { count: aiProposedCount(review) })}
           </span>
-          {showReview && <AiReviewSheet draft={draft} review={review} />}
           <Button
             disabled={accept.isPending || saving}
             focusableWhenDisabled

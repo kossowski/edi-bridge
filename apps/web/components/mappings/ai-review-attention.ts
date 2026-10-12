@@ -181,3 +181,37 @@ export function reviewAttention({
     plain: sortByTarget(plainProposedLinks(graph, marks), (link) => link.targetPath, order),
   }
 }
+
+export type ReviewAttention = ReturnType<typeof reviewAttention>
+
+// Other proposed links are listed for a look, but do not count as needing attention.
+export function attentionCount({ unmapped, chains, warnings }: ReviewAttention) {
+  return unmapped.length + chains.length + (warnings?.length ?? 0)
+}
+
+export type AttentionMarks = {
+  link: (link: Pick<MappingLink, 'targetPath'>) => boolean
+  transformLink: (link: TransformLink) => boolean
+}
+
+export const noAttention: AttentionMarks = { link: () => false, transformLink: () => false }
+
+// A proposed link needs attention when it belongs to a chain through Transforms, or when a warning
+// on the example document names the field it fills.
+export function attentionMarks(
+  marks: AiMarks,
+  { chains, warnings }: Pick<ReviewAttention, 'chains' | 'warnings'>,
+): AttentionMarks {
+  const transformIds = new Set(chains.flatMap((chain) => chain.transformIds))
+  const targets = new Set(chains.map((chain) => chain.targetPath))
+  const warned = new Set(warnings?.map((note) => note.targetPath))
+
+  return {
+    link: (link) => marks.link(link) && warned.has(link.targetPath),
+    transformLink: (link) =>
+      marks.transformLink(link) &&
+      (link.to.kind === 'target'
+        ? targets.has(link.to.path)
+        : transformIds.has(link.to.transformId)),
+  }
+}
