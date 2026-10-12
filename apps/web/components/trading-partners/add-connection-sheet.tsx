@@ -150,7 +150,7 @@ function AddConnectionForm({
 
   const result = validateNewChannel(values)
   const errors = submitted && 'errors' in result ? result.errors : {}
-  const fields = useChannelFields(setValues, values, errors)
+  const fields = useChannelFields(values, setValues, errors)
   const nameField = fields.field('name')
 
   const create = useMutation({
@@ -213,11 +213,11 @@ function AddConnectionForm({
       {direction && (
         <>
           <ChoiceCards
-            items={kindKeysTravelling(direction).map((value, index) => ({
+            items={kindKeysTravelling(direction).map((value) => ({
               value,
               title: t(`how.${value}.title`, { name }),
               description: t(`how.${value}.description`),
-              badge: index === 0 ? t('how.recommended') : undefined,
+              badge: value === defaultKindKey(direction) ? t('how.recommended') : undefined,
             }))}
             label={t('how.label')}
             value={values.kind}

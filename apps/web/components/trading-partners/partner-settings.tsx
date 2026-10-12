@@ -31,7 +31,7 @@ function PartnerDetails({ tradingPartner }: { tradingPartner: TradingPartner }) 
   )
 }
 
-export function PartnerSettings({ tradingPartner }: Pick<PartnerPanelProps, 'tradingPartner'>) {
+export function PartnerSettings({ tradingPartner }: PartnerPanelProps) {
   const t = useTranslations('TradingPartner.settings')
   const session = useSession()
 

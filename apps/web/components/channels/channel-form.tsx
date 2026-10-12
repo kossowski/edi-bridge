@@ -8,6 +8,7 @@ import { type Dispatch, type FormEvent, type SetStateAction, useId, useRef, useS
 
 import {
   type ChannelField,
+  type ChannelFieldErrors,
   type ChannelFormValues,
   channelKindKeys,
   channelKindOf,
@@ -128,7 +129,7 @@ type Submission = { create: ChannelInput } | { id: string; update: ChannelUpdate
 function toSubmission(
   values: ChannelFormValues,
   channel?: Channel,
-): { submission: Submission } | { errors: Partial<Record<ChannelField, FieldError>> } {
+): { submission: Submission } | { errors: ChannelFieldErrors } {
   if (channel) {
     const result = validateChannelUpdate(values, channel)
 
@@ -140,11 +141,9 @@ function toSubmission(
   return 'input' in result ? { submission: { create: result.input } } : result
 }
 
-export type ChannelFieldErrors = Partial<Record<ChannelField, FieldError>>
-
 export function useChannelFields(
-  setValues: Dispatch<SetStateAction<ChannelFormValues>>,
   values: ChannelFormValues,
+  setValues: Dispatch<SetStateAction<ChannelFormValues>>,
   errors: ChannelFieldErrors,
 ) {
   const errorMessage = useFieldErrorMessage()
@@ -370,7 +369,7 @@ export function ChannelForm({
 
   const result = toSubmission(values, channel)
   const errors = submitted && 'errors' in result ? result.errors : {}
-  const fields = useChannelFields(setValues, values, errors)
+  const fields = useChannelFields(values, setValues, errors)
   const { baseId, update, field } = fields
 
   function submit(event: FormEvent<HTMLFormElement>) {

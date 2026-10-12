@@ -278,7 +278,10 @@ export function PartnerLoading({ label }: { label: string }) {
   )
 }
 
-export function PartnerOverview({ tradingPartner, onAddConnection }: PartnerPanelProps) {
+export function PartnerOverview({
+  tradingPartner,
+  onAddConnection,
+}: PartnerPanelProps & { onAddConnection: () => void }) {
   const t = useTranslations('TradingPartner')
   const activity = useQuery(tradingPartnerActivityQuery(tradingPartner.id))
 

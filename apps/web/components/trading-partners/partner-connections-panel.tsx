@@ -8,7 +8,7 @@ import {
   Loading03Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, type UseMutationResult, useQuery } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { type ReactNode, useId, useRef, useState } from 'react'
@@ -70,6 +70,26 @@ function TestOutcome({ result }: { result: ChannelTestResult }) {
   )
 }
 
+function TestStatus({
+  channel,
+  test,
+}: {
+  channel: Channel
+  test: Pick<UseMutationResult<ChannelTestResult>, 'isPending' | 'isError' | 'data'>
+}) {
+  const t = useTranslations('TradingPartner.connections.test')
+
+  if (test.isPending) {
+    return <p className="sr-only">{t('pendingStatus', { name: channel.name })}</p>
+  }
+
+  if (test.isError) {
+    return <p className="text-destructive-text text-sm">{t('requestFailed')}</p>
+  }
+
+  return test.data ? <TestOutcome result={test.data} /> : null
+}
+
 function TestConnection({ channel }: { channel: Channel }) {
   const t = useTranslations('TradingPartner.connections.test')
 
@@ -100,13 +120,7 @@ function TestConnection({ channel }: { channel: Channel }) {
         <span className="sr-only"> {channel.name}</span>
       </Button>
       <div aria-live="polite" className="basis-full empty:hidden">
-        {test.isPending ? (
-          <p className="sr-only">{t('pendingStatus', { name: channel.name })}</p>
-        ) : test.isError ? (
-          <p className="text-destructive-text text-sm">{t('requestFailed')}</p>
-        ) : (
-          test.data && <TestOutcome result={test.data} />
-        )}
+        <TestStatus channel={channel} test={test} />
       </div>
     </>
   )
@@ -192,7 +206,10 @@ export function PartnerConnections({
   tradingPartner,
   addingConnection,
   onAddingConnectionChange,
-}: PartnerPanelProps) {
+}: PartnerPanelProps & {
+  addingConnection: boolean
+  onAddingConnectionChange: (adding: boolean) => void
+}) {
   const t = useTranslations('TradingPartner.connections')
   const channels = useQuery(channelsQuery)
   const session = useSession()

@@ -54,8 +54,9 @@ export type ChannelField = Exclude<keyof ChannelFormValues, 'kind' | 'sendAuthor
 
 export type FieldError = 'required' | 'tooLong' | 'range' | 'format'
 
-export type ChannelFormResult<Input> =
-  { input: Input } | { errors: Partial<Record<ChannelField, FieldError>> }
+export type ChannelFieldErrors = Partial<Record<ChannelField, FieldError>>
+
+export type ChannelFormResult<Input> = { input: Input } | { errors: ChannelFieldErrors }
 
 // Choice fields cannot be left empty from the form, so their errors get the generic message.
 const fieldKinds = {

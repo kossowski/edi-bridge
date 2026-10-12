@@ -1,8 +1,11 @@
-import { channelKinds, type ChannelSummary, type Direction } from '@edi-bridge/contracts'
+import {
+  channelKinds,
+  type ChannelSummary,
+  type Direction,
+  maxChannelNameLength,
+} from '@edi-bridge/contracts'
 
 import { type ChannelKindKey, channelKindKey } from '../channels/channel-form-values'
-
-const nameLength = 70
 
 export function partnerConnections<Item extends Pick<ChannelSummary, 'tradingPartnerId'>>(
   channels: ReadonlyArray<Item>,
@@ -28,10 +31,15 @@ export function kindKeysTravelling(direction: Direction): ReadonlyArray<ChannelK
   )
 }
 
+const defaultKindKeys = {
+  inbound: 'sftp-inbound',
+  outbound: 'sftp-outbound',
+} as const satisfies { [Way in Direction]: Extract<ChannelKindKey, `${string}-${Way}`> }
+
 export function defaultKindKey(direction: Direction): ChannelKindKey {
-  return kindKeysTravelling(direction)[0] ?? 'sftp-inbound'
+  return defaultKindKeys[direction]
 }
 
 export function suggestedName(name: string) {
-  return name.slice(0, nameLength).trim()
+  return name.slice(0, maxChannelNameLength).trim()
 }

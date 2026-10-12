@@ -7,9 +7,6 @@ import {
 
 export type PartnerPanelProps = {
   tradingPartner: TradingPartner
-  addingConnection: boolean
-  onAddingConnectionChange: (adding: boolean) => void
-  onAddConnection: () => void
 }
 
 export type PartnerActivityProps = {

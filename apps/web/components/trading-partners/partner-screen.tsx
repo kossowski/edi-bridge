@@ -2,17 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { type ComponentType, Suspense, useState } from 'react'
+import { Suspense, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadFailure } from '@/components/detail-parts'
 import { HeaderTabs } from '@/components/header-tabs'
 import { PartnerConnections } from '@/components/trading-partners/partner-connections-panel'
 import { PartnerLoading, PartnerOverview } from '@/components/trading-partners/partner-overview'
-import {
-  awaitsReceiptConfirmation,
-  type PartnerPanelProps,
-} from '@/components/trading-partners/partner-page-helpers'
+import { awaitsReceiptConfirmation } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSettings } from '@/components/trading-partners/partner-settings'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
 import { useUrlTab } from '@/hooks/use-url-tab'
@@ -24,14 +21,9 @@ import type { TradingPartner } from '@edi-bridge/contracts'
 
 export const receiptConfirmationPollMs = 3000
 
-const partnerTabs: readonly {
-  value: 'overview' | 'connections' | 'settings'
-  Panel: ComponentType<PartnerPanelProps>
-}[] = [
-  { value: 'overview', Panel: PartnerOverview },
-  { value: 'connections', Panel: PartnerConnections },
-  { value: 'settings', Panel: PartnerSettings },
-]
+const partnerTabs = [{ value: 'overview' }, { value: 'connections' }, { value: 'settings' }] as const
+
+type PartnerTab = (typeof partnerTabs)[number]['value']
 
 function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner.tabs')
@@ -41,6 +33,23 @@ function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
   function addConnection() {
     changeTab('connections')
     setAddingConnection(true)
+  }
+
+  function panel(value: PartnerTab) {
+    switch (value) {
+      case 'overview':
+        return <PartnerOverview tradingPartner={tradingPartner} onAddConnection={addConnection} />
+      case 'connections':
+        return (
+          <PartnerConnections
+            addingConnection={addingConnection}
+            tradingPartner={tradingPartner}
+            onAddingConnectionChange={setAddingConnection}
+          />
+        )
+      case 'settings':
+        return <PartnerSettings tradingPartner={tradingPartner} />
+    }
   }
 
   return (
@@ -54,14 +63,9 @@ function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
           ))}
         </TabsList>
       </HeaderTabs>
-      {partnerTabs.map(({ value, Panel }) => (
+      {partnerTabs.map(({ value }) => (
         <TabsContent key={value} value={value} className="flex flex-col gap-4">
-          <Panel
-            addingConnection={addingConnection}
-            tradingPartner={tradingPartner}
-            onAddConnection={addConnection}
-            onAddingConnectionChange={setAddingConnection}
-          />
+          {panel(value)}
         </TabsContent>
       ))}
     </Tabs>
