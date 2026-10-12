@@ -69,8 +69,10 @@ describe('findFailingField', () => {
 })
 
 describe('failingFieldName', () => {
-  it('names a field by the parts down to it', () => {
-    expect(failingFieldName(findFailingField('lines[].gtin', inbound)!)).toBe('lines › gtin')
+  it('names a field by the parts down to it, with its plain name', () => {
+    expect(failingFieldName(findFailingField('lines[].gtin', inbound)!)).toBe(
+      'lines › gtin (Article number (GTIN))',
+    )
   })
 
   it('adds the meaning of an EDIFACT element', () => {
