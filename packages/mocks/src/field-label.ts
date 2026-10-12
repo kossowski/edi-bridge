@@ -203,6 +203,8 @@ for (const [names, label] of englishNames) {
   add(names, { label })
 }
 
+export const knownFieldNames: ReadonlyArray<string> = englishNames.map(([[name]]) => name!)
+
 function normalized(name: string) {
   return name.toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, '')
 }

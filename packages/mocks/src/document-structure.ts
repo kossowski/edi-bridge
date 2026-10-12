@@ -41,7 +41,7 @@ import {
   visitedNode,
 } from './document-structure-inference'
 import { documentStructureOrigins } from './document-structure-origin'
-import { plainNameOf } from './field-label'
+import { knownFieldNames, plainNameOf } from './field-label'
 import { byNameAndNewest } from './flow'
 import { containerOf } from './paths'
 import { badRequest, notFound, serverError } from './responses'
@@ -345,9 +345,18 @@ export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStruc
   ]),
 }
 
-export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = messageTypes.map(
-  (messageType) => seedDocumentStructureOf[messageType],
+export const seedInvoiceExportDocumentStructure = toDocumentStructure(
+  seedId(6, 7),
+  'ERP invoice export (CSV)',
+  inferDocumentStructure(documentStructureOrigins.invoiceCsvDocument, {
+    takenAt: '2026-10-08T16:30:00.000Z',
+  }),
 )
+
+export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = [
+  ...messageTypes.map((messageType) => seedDocumentStructureOf[messageType]),
+  seedInvoiceExportDocumentStructure,
+]
 
 // Spreads the fields over plain fields, objects and arrays of objects with a nested array, so a
 // large structure still shows every kind of nesting.
@@ -361,7 +370,7 @@ export function createDocumentStructure({
   name?: string
 }): DocumentStructure {
   const faker = new Faker({ locale: [en], seed })
-  const used = new Set<string>()
+  const used = new Set<string>(knownFieldNames)
 
   const uniqueName = () => {
     const base =
@@ -383,40 +392,45 @@ export function createDocumentStructure({
 
   let remaining = fieldCount
 
+  const fieldName = (siblings: Set<string>) => {
+    const free = knownFieldNames.filter((known) => !siblings.has(known))
+
+    const chosen =
+      free.length === 0 || faker.datatype.boolean({ probability: 0.05 })
+        ? uniqueName()
+        : faker.helpers.arrayElement(free)
+
+    siblings.add(chosen)
+
+    return chosen
+  }
+
   const takeFields = (count: number): FieldSpec[] => {
     const taken = Math.min(count, remaining)
+    const siblings = new Set<string>()
     remaining -= taken
 
     return Array.from({ length: taken }, () => [
-      uniqueName(),
+      fieldName(siblings),
       faker.helpers.arrayElement(documentFieldTypes),
       faker.datatype.boolean({ probability: 0.6 }),
     ])
   }
 
-  const specs: Spec[] = []
+  const specs: Spec[] = takeFields(faker.number.int({ min: 2, max: 5 }))
 
   for (let section = 0; remaining > 0; section++) {
-    switch (section % 3) {
-      case 0:
-        specs.push(...takeFields(faker.number.int({ min: 2, max: 5 })))
-        break
-      case 1:
-        specs.push({
-          object: uniqueName(),
-          fields: takeFields(faker.number.int({ min: 3, max: 8 })),
-        })
-        break
-      default: {
-        const fields: Spec[] = takeFields(faker.number.int({ min: 3, max: 8 }))
-        const nested = takeFields(faker.number.int({ min: 2, max: 4 }))
+    if (section % 2 === 0) {
+      specs.push({ object: uniqueName(), fields: takeFields(faker.number.int({ min: 3, max: 8 })) })
+    } else {
+      const fields: Spec[] = takeFields(faker.number.int({ min: 3, max: 8 }))
+      const nested = takeFields(faker.number.int({ min: 2, max: 4 }))
 
-        if (nested.length > 0) {
-          fields.push({ array: uniqueName(), required: false, fields: nested })
-        }
-
-        specs.push({ array: uniqueName(), fields })
+      if (nested.length > 0) {
+        fields.push({ array: uniqueName(), required: false, fields: nested })
       }
+
+      specs.push({ array: uniqueName(), fields })
     }
   }
 
@@ -455,13 +469,6 @@ export const seedUnusedDocumentStructures: ReadonlyArray<DocumentStructure> = [
     seedId(6, 6),
     'ERP article master',
     inferDocumentStructure(documentStructureOrigins.jsonSchema),
-  ),
-  toDocumentStructure(
-    seedId(6, 7),
-    'ERP invoice export (CSV)',
-    inferDocumentStructure(documentStructureOrigins.invoiceCsvDocument, {
-      takenAt: '2026-10-08T16:30:00.000Z',
-    }),
   ),
 ]
 

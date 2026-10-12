@@ -132,6 +132,14 @@ describe('createDocumentStructure', () => {
     expect(new Set(paths).size).toBe(paths.length)
   })
 
+  it('mostly uses names it knows, so it is unsure about only a few', () => {
+    const leaves = documentStructureLeaves(createDocumentStructure({ fieldCount: 400 }))
+    const unsure = leaves.filter((leaf) => leaf.labelUnsure)
+
+    expect(unsure.length).toBeGreaterThan(0)
+    expect(unsure.length).toBeLessThan(leaves.length / 5)
+  })
+
   it('generates the same structure for the same seed', () => {
     expect(createDocumentStructure({ fieldCount: 30 })).toEqual(
       createDocumentStructure({ fieldCount: 30 }),
@@ -178,6 +186,14 @@ describe('seed Document Structures', () => {
       labelUnsure: false,
     })
     expect(invoices.sample?.text).toContain('EPreis')
+  })
+
+  it('lets a seeded Mapping read the invoice export with its German column names', () => {
+    const invoices = allSeeds.find(({ name }) => name === 'ERP invoice export (CSV)')!
+
+    expect(seedMappingDrafts.map(({ documentStructureId }) => documentStructureId)).toContain(
+      invoices.id,
+    )
   })
 
   it('is unsure about only a few plain names', () => {
