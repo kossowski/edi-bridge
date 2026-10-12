@@ -99,11 +99,11 @@ export const EveryKind = meta.story({
     )
     await expect(within(you).getByRole('link', { name: 'Fix it' })).toHaveAttribute(
       'href',
-      expect.stringMatching(/^\/runs\//),
+      expect.stringMatching(/^\/documents\//),
     )
     await expect(within(retry).getByRole('link', { name: 'Open and try again' })).toHaveAttribute(
       'href',
-      expect.stringMatching(/^\/runs\//),
+      expect.stringMatching(/^\/documents\//),
     )
     await expect(
       within(tradingPartner).getByRole('heading', {
