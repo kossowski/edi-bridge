@@ -33,9 +33,9 @@ type OwnCodeHint = { meaning: string | null; suggestions: ReadonlyArray<string> 
 
 const ownCodeHints: Readonly<Record<LookupTableKind, ReadonlyMap<string, OwnCodeHint>>> = {
   units: new Map([
-    ['KRT', { meaning: 'carton', suggestions: ['CT', 'PK', 'BX'] }],
-    ['BTL', { meaning: 'bottle', suggestions: ['BO', 'PCE'] }],
-    ['SET', { meaning: 'set', suggestions: ['SET', 'PCE'] }],
+    ['KRT', { meaning: 'Carton', suggestions: ['CT', 'PK', 'BX'] }],
+    ['BTL', { meaning: 'Bottle', suggestions: ['BO', 'PCE'] }],
+    ['SET', { meaning: 'Set', suggestions: ['SET', 'PCE'] }],
   ]),
   countries: new Map([['Polen', { meaning: null, suggestions: ['PL'] }]]),
   addresses: new Map(),
