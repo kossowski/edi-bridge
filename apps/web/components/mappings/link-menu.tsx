@@ -1,9 +1,10 @@
 'use client'
 
-import { Delete02Icon, ViewIcon } from '@hugeicons/core-free-icons'
+import { CheckmarkCircle02Icon, Delete02Icon, ViewIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import { useRef } from 'react'
+import { toast } from 'sonner'
 
 import { singleLink } from '@/components/mappings/link-edge'
 import {
@@ -23,6 +24,7 @@ import {
 
 import type { LinkEdgeData, PlainEdgeData } from '@/components/mappings/link-edge'
 import type { RowRef } from '@/components/mappings/mapping-links'
+import type { AiAccept } from '@/components/mappings/use-ai-accept'
 
 export type LinkMenuEnd =
   { kind: 'row'; row: RowRef } | { kind: 'transform'; transformId: string; name: string }
@@ -54,9 +56,11 @@ function names(data: LinkEdgeData) {
 export function LinkMenu({
   target,
   actions,
+  aiAccept,
 }: {
   target: LinkMenuTarget | null
   actions: LinkMenuActions
+  aiAccept: AiAccept | undefined
 }) {
   const t = useTranslations('Mapping.links.menu')
   const tAi = useTranslations('Mapping.aiReview')
@@ -72,7 +76,9 @@ export function LinkMenu({
   }
 
   const { data, ends } = target
-  const merged = data.kind === 'link' && !singleLink(data) ? data : null
+  const single = singleLink(data)
+  const merged = data.kind === 'link' && !single ? data : null
+  const acceptParts = !viewOnly && single && aiAccept ? aiAccept.partsOf(single) : null
 
   const act = (action: () => void) => {
     actedOn.current = anchor
@@ -154,6 +160,23 @@ export function LinkMenu({
         {!merged && !viewOnly && (
           <>
             <DropdownMenuSeparator />
+            {acceptParts && aiAccept && (
+              // Accepting keeps the link, so the menu hands the focus back to it.
+              <DropdownMenuItem
+                disabled={aiAccept.pending}
+                onClick={() =>
+                  aiAccept.accept(acceptParts, {
+                    onSuccess: () =>
+                      toast.success(
+                        tAi(acceptParts.links.length > 0 ? 'acceptedLink' : 'acceptedChain'),
+                      ),
+                    onError: () => toast.error(tAi('acceptPartsFailed')),
+                  })
+                }>
+                <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} aria-hidden />
+                {tAi(acceptParts.links.length > 0 ? 'acceptLink' : 'acceptChain')}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               variant="destructive"
               onClick={() => act(() => actions.remove(data, anchor.linkFocused))}>

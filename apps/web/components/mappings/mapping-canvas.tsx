@@ -151,6 +151,7 @@ import { transformPorts } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Tooltip, TooltipContent } from '@edi-bridge/ui/components/tooltip'
 
+import type { AiAccept } from '@/components/mappings/use-ai-accept'
 import type { GraphSave } from '@/components/mappings/use-save-graph'
 import type {
   LinkEnd,
@@ -220,6 +221,7 @@ type MappingCanvasProps = {
   detailsFacts?: ReactNode
   failingField?: FailingField | null
   aiAttention?: AttentionMarks
+  aiAccept?: AiAccept | undefined
   ref?: Ref<MappingCanvasHandle>
 }
 
@@ -485,6 +487,7 @@ export function MappingCanvas({
   detailsFacts,
   failingField = null,
   aiAttention = noAttention,
+  aiAccept,
   ref,
 }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
@@ -1718,7 +1721,7 @@ export function MappingCanvas({
       </div>
       <MeaningTooltip />
       <LinkHints text={text} />
-      <LinkMenu actions={linkMenuActions} target={linkMenuTarget} />
+      <LinkMenu actions={linkMenuActions} aiAccept={aiAccept} target={linkMenuTarget} />
     </div>
   )
 }

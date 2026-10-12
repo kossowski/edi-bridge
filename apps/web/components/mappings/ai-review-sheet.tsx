@@ -21,15 +21,20 @@ import {
 } from '@/components/mappings/ai-review-attention'
 import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { useGraphText } from '@/components/mappings/graph-text'
-import { useCanvasRefs, useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
+import {
+  useCanvasRefs,
+  useCanvasStoreApi,
+  useCanvasViewOnly,
+} from '@/components/mappings/mapping-canvas-store'
 import { PreviewFailure } from '@/components/mappings/mapping-preview-panel'
 import { findItem, type TreeItem } from '@/components/mappings/mapping-tree'
 import { findTransformButton } from '@/components/mappings/transform-node'
 import { findRowButton } from '@/components/mappings/tree-node'
+import { type AiAccept } from '@/components/mappings/use-ai-accept'
 import { type ReviewState } from '@/components/mappings/use-review-attention'
 import { whenRendered } from '@/components/mappings/when-rendered'
 import { lookupTablesQuery, mappingSamplesQuery } from '@/lib/api/queries'
-import { type MappingDraft, previewNoteKey } from '@edi-bridge/contracts'
+import { type AiReviewParts, type MappingDraft, previewNoteKey } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
@@ -44,6 +49,7 @@ type Entry = {
   name: string | undefined
   detail: string
   show: (() => void) | undefined
+  accept: AiReviewParts | null
 }
 
 // The canvas pans the focused part into view itself, so the page does not scroll to it.
@@ -137,15 +143,22 @@ function EntryGroup({
 function EntryDetail({
   entry,
   headingRef,
+  pending,
+  failed,
+  onAccept,
   onBack,
 }: {
   entry: Entry
   headingRef: RefObject<HTMLHeadingElement | null>
+  pending: boolean
+  failed: boolean
+  onAccept: ((parts: AiReviewParts) => void) | undefined
   onBack: () => void
 }) {
   const t = useTranslations('Mapping.aiReview.panel')
+  const tAi = useTranslations('Mapping.aiReview')
   const whatToDoId = useId()
-  const { show } = entry
+  const { show, accept } = entry
 
   return (
     <div className="flex flex-col gap-4">
@@ -166,11 +179,26 @@ function EntryDetail({
         </h4>
         <p className="text-muted-foreground">{t(`${entry.group}.explain`)}</p>
       </section>
-      {show && (
-        <Button className="self-start" onClick={show}>
-          <HugeiconsIcon icon={Location01Icon} strokeWidth={2} data-icon="inline-start" />
-          {t('show')}
-        </Button>
+      <div className="flex flex-wrap gap-2">
+        {accept && onAccept && (
+          <Button disabled={pending} focusableWhenDisabled onClick={() => onAccept(accept)}>
+            <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} data-icon="inline-start" />
+            {pending
+              ? tAi('accepting')
+              : tAi(accept.links.length > 0 ? 'acceptLink' : 'acceptChain')}
+          </Button>
+        )}
+        {show && (
+          <Button variant={accept && onAccept ? 'outline' : 'default'} onClick={show}>
+            <HugeiconsIcon icon={Location01Icon} strokeWidth={2} data-icon="inline-start" />
+            {t('show')}
+          </Button>
+        )}
+      </div>
+      {failed && (
+        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+          {tAi('acceptPartsFailed')}
+        </p>
       )}
     </div>
   )
@@ -180,11 +208,13 @@ function ReviewEntries({
   draft,
   targetItems,
   state,
+  aiAccept,
   onShow,
 }: {
   draft: MappingDraft
   targetItems: ReadonlyArray<TreeItem>
   state: ReviewState & { attention: ReviewAttention }
+  aiAccept: AiAccept | undefined
   onShow: (focus: () => void) => void
 }) {
   const t = useTranslations('Mapping.aiReview.panel')
@@ -193,8 +223,11 @@ function ReviewEntries({
   const store = useCanvasStoreApi()
   const body = useRef<HTMLDivElement>(null)
   const detailHeading = useRef<HTMLHeadingElement>(null)
+  const viewOnly = useCanvasViewOnly()
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
-  const returnTo = useRef<string | null>(null)
+  const [failedKey, setFailedKey] = useState<string | null>(null)
+  // Back to the entry, or after accepting, to the one now in its place.
+  const returnTo = useRef<{ key: string; index: number } | null>(null)
   const usesLookupTables = draft.transforms.some(({ kind }) => kind === 'lookupTable')
   const lookupTables = useQuery({ ...lookupTablesQuery, enabled: usesLookupTables })
   const text = useGraphText(draft.transforms, lookupTables.data)
@@ -259,6 +292,7 @@ function ReviewEntries({
     name: nameOf(item),
     detail: t('unmapped.detail'),
     show: showTarget(item.path),
+    accept: null,
   }))
 
   const chains = attention.chains.map((chain): Entry => {
@@ -272,6 +306,7 @@ function ReviewEntries({
       name: chain.targetPath === null ? firstName : nameAt(chain.targetPath),
       detail: chainDetail(chain),
       show: first === undefined ? undefined : showTransform(first),
+      accept: aiAccept?.partsOfChain(chain) ?? null,
     }
   })
 
@@ -291,6 +326,7 @@ function ReviewEntries({
       name: nameAt(note.targetPath),
       detail: tNotes(note.code, { transform: note.transformId ? text.name(note.transformId) : '' }),
       show: showNote(),
+      accept: aiAccept?.partsAt(note.targetPath) ?? null,
     }
   })
 
@@ -301,12 +337,11 @@ function ReviewEntries({
     name: nameAt(link.targetPath),
     detail: t('plain.detail', { source: link.sourcePath }),
     show: showTarget(link.targetPath),
+    accept: aiAccept?.partsAt(link.targetPath) ?? null,
   }))
 
-  const selected =
-    [...unmapped, ...chains, ...(warnings ?? []), ...plain].find(
-      (entry) => entry.key === selectedKey,
-    ) ?? null
+  const entries = [...unmapped, ...chains, ...(warnings ?? []), ...plain]
+  const selected = entries.find((entry) => entry.key === selectedKey) ?? null
 
   const shownKey = selected?.key ?? null
 
@@ -318,20 +353,51 @@ function ReviewEntries({
       return
     }
 
-    const key = returnTo.current
+    const target = returnTo.current
 
     returnTo.current = null
 
-    if (key !== null) {
-      body.current?.querySelector<HTMLElement>(`[data-entry="${CSS.escape(key)}"]`)?.focus()
+    if (target === null || !body.current) {
+      return
     }
+
+    const listed = [...body.current.querySelectorAll<HTMLElement>('[data-entry]')]
+
+    const next =
+      listed.find((button) => button.dataset.entry === target.key) ??
+      listed[Math.min(target.index, listed.length - 1)] ??
+      body.current.closest<HTMLElement>('[role="dialog"]')
+
+    next?.focus()
   }, [shownKey])
 
-  const open = (entry: Entry) => setSelectedKey(entry.key)
+  const open = (entry: Entry) => {
+    setFailedKey(null)
+    setSelectedKey(entry.key)
+  }
 
   const back = () => {
-    returnTo.current = selectedKey
+    if (selected) {
+      returnTo.current = { key: selected.key, index: entries.indexOf(selected) }
+    }
+
     setSelectedKey(null)
+  }
+
+  // The accepted entry can leave the list before the answer arrives, so the way back is set first.
+  const accept = (parts: AiReviewParts) => {
+    const entry = selected
+
+    if (!entry || !aiAccept) {
+      return
+    }
+
+    returnTo.current = { key: entry.key, index: entries.indexOf(entry) }
+    setFailedKey(null)
+    aiAccept.accept(parts, {
+      onSuccess: () => setSelectedKey(null),
+      onError: () => setFailedKey(entry.key),
+    })
   }
 
   const warningsFallback = () => {
@@ -347,7 +413,14 @@ function ReviewEntries({
   return (
     <div ref={body} className="flex flex-col gap-5">
       {selected ? (
-        <EntryDetail entry={selected} headingRef={detailHeading} onBack={back} />
+        <EntryDetail
+          entry={selected}
+          failed={failedKey === selected.key}
+          headingRef={detailHeading}
+          pending={aiAccept?.pending ?? false}
+          onAccept={viewOnly ? undefined : accept}
+          onBack={back}
+        />
       ) : (
         <>
           <EntryGroup
@@ -381,10 +454,12 @@ export function AiReviewSheet({
   draft,
   targetItems,
   state,
+  aiAccept,
 }: {
   draft: MappingDraft
   targetItems: ReadonlyArray<TreeItem> | undefined
   state: ReviewState
+  aiAccept?: AiAccept | undefined
 }) {
   const t = useTranslations('Mapping.aiReview')
   const tCanvas = useTranslations('Mapping.canvas')
@@ -437,6 +512,7 @@ export function AiReviewSheet({
         className="data-[side=right]:sm:max-w-md">
         {targetItems && attention ? (
           <ReviewEntries
+            aiAccept={aiAccept}
             draft={draft}
             state={{ ...state, attention }}
             targetItems={targetItems}

@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
@@ -9,13 +9,17 @@ import {
   findSaveStatus,
   inReview,
   liveStatus,
+  openLinkMenuByKeyboard,
+  openLinkMenuByMouse,
+  page,
   reviewing,
   transformNodeOf,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { acceptAiDraftEndpoint } from '@edi-bridge/contracts'
+import { acceptAiDraftEndpoint, acceptAiProposedPartsEndpoint } from '@edi-bridge/contracts'
+import { Toaster } from '@edi-bridge/ui/components/sonner'
 
 import preview from '../../.storybook/preview'
 
@@ -34,6 +38,23 @@ const proposedEdge = /, AI-proposed(, needs attention)?$/
 
 const attentionEdge = /, needs attention$/
 
+const acceptPartsUrl = `${apiUrl}${acceptAiProposedPartsEndpoint.path}`
+
+// A link the AI proposed that needs no attention, drawn on its own.
+async function findPlainProposedLink(canvasElement: HTMLElement) {
+  const links = await within(canvasElement).findAllByRole('group', {
+    name: /^Link from \S+ to \S+, AI-proposed$/,
+  })
+
+  return links[0]!.getAttribute('aria-label')!
+}
+
+async function expectToast(canvasElement: HTMLElement, text: string) {
+  const toast = await page(canvasElement).findByText(text, {}, { timeout: 5000 })
+
+  await waitFor(() => expect(toast).toBeVisible())
+}
+
 function aiMarks(canvasElement: HTMLElement) {
   return canvasElement.querySelectorAll('[data-ai-proposed]')
 }
@@ -51,6 +72,7 @@ const meta = preview.meta({
     (Story) => (
       <div className="flex min-h-svh flex-col">
         <Story />
+        <Toaster />
       </div>
     ),
   ],
@@ -256,6 +278,94 @@ export const AcceptFailed = meta.story({
   },
 })
 
+export const AcceptLinkFromMenu = meta.story({
+  async play({ canvas, canvasElement }) {
+    const summary = await findSummary(canvasElement)
+    const name = await findPlainProposedLink(canvasElement)
+    const plainName = name.replace(/, AI-proposed$/, '')
+    const menu = await openLinkMenuByKeyboard(canvasElement, name)
+
+    await userEvent.click(menu.getByRole('menuitem', { name: 'Accept link' }))
+
+    await expectToast(canvasElement, 'AI-proposed link accepted.')
+    await expect(summary).toHaveTextContent('15 AI proposals to review')
+    await expect(canvas.getByRole('group', { name: plainName })).toHaveFocus()
+    await expect(canvas.queryByRole('group', { name })).toBeNull()
+  },
+})
+
+export const AcceptChainFromMenu = meta.story({
+  async play({ canvas, canvasElement }) {
+    const summary = await findSummary(canvasElement)
+    const attention = await canvas.findAllByRole('group', { name: attentionEdge })
+    const name = attention[0]!.getAttribute('aria-label')!
+    const menu = await openLinkMenuByMouse(canvasElement, name)
+
+    await userEvent.click(menu.getByRole('menuitem', { name: 'Accept the links and Transforms' }))
+
+    await expectToast(canvasElement, 'AI-proposed links and Transforms accepted.')
+    await waitFor(() =>
+      expect(canvas.queryAllByRole('group', { name: attentionEdge }).length).toBeLessThan(
+        attention.length,
+      ),
+    )
+    await expect(canvas.queryByRole('group', { name })).toBeNull()
+    await expect(summary).not.toHaveTextContent('16 AI proposals to review')
+  },
+})
+
+export const AcceptFromMenuPending = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(acceptPartsUrl, async () => {
+        await delay('infinite')
+
+        return HttpResponse.json({})
+      }),
+    )
+  },
+  async play({ canvasElement }) {
+    await findSummary(canvasElement)
+
+    const name = await findPlainProposedLink(canvasElement)
+
+    await userEvent.click(
+      (await openLinkMenuByKeyboard(canvasElement, name)).getByRole('menuitem', {
+        name: 'Accept link',
+      }),
+    )
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
+
+    const reopened = await openLinkMenuByKeyboard(canvasElement, name)
+
+    await expect(reopened.getByRole('menuitem', { name: 'Accept link' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
+  },
+})
+
+export const AcceptFromMenuFailed = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(acceptPartsUrl, () => HttpResponse.json({ message: 'Down' }, { status: 500 })),
+    )
+  },
+  async play({ canvasElement }) {
+    const summary = await findSummary(canvasElement)
+    const name = await findPlainProposedLink(canvasElement)
+    const menu = await openLinkMenuByKeyboard(canvasElement, name)
+
+    await userEvent.click(menu.getByRole('menuitem', { name: 'Accept link' }))
+
+    await expectToast(canvasElement, 'The AI proposal could not be accepted. Try again.')
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
+    await expect(summary).toHaveTextContent('16 AI proposals to review')
+  },
+})
+
 export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas, canvasElement }) {
@@ -275,6 +385,13 @@ export const Viewer = meta.story({
         (await detailsPanel(canvasElement)).getByRole('heading', { name: 'Lookup Table 1' }),
       ).toBeVisible()
       await expect((await detailsPanel(canvasElement)).queryByText(/AI-proposed/)).toBeNull()
+
+      const [link] = canvas.getAllByRole('group', { name: /^Link from \S+ to \S+$/ })
+      const menu = await openLinkMenuByKeyboard(canvasElement, link!.getAttribute('aria-label')!)
+
+      await expect(menu.queryByRole('menuitem', { name: /^Accept/ })).toBeNull()
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
     },
   }),
 })
@@ -298,7 +415,7 @@ export const German = meta.story({
       </NextIntlClientProvider>
     ),
   ],
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await expect(await canvas.findByText('Durchsicht des KI-Entwurfs offen')).toBeVisible()
     await expect(canvas.getByText('19 KI-Vorschläge zu prüfen')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'KI-Entwurf übernehmen' })).toBeVisible()
@@ -309,6 +426,17 @@ export const German = meta.story({
       (await canvas.findAllByRole('button', { name: /Von der KI vorgeschlagene Verknüpfung$/ }))
         .length,
     ).toBeGreaterThan(0)
+
+    const [link] = canvas.getAllByRole('group', { name: /, von der KI vorgeschlagen$/ })
+    const menu = await openLinkMenuByKeyboard(canvasElement, link!.getAttribute('aria-label')!)
+
+    await expect(
+      menu.getByRole('menuitem', {
+        name: /^(Verknüpfung|Verknüpfungen und Transforms) übernehmen$/,
+      }),
+    ).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
   },
 })
 
@@ -327,5 +455,21 @@ export const Dark = meta.story({
 
     await userEvent.click(row!)
     await expect((await openDetails(canvasElement)).getByText('AI-proposed')).toBeVisible()
+  },
+})
+
+export const DarkLinkMenu = meta.story({
+  beforeEach: [reviewing(outbound), darkMode],
+  async play({ canvasElement }) {
+    await findSummary(canvasElement)
+
+    const menu = await openLinkMenuByKeyboard(
+      canvasElement,
+      await findPlainProposedLink(canvasElement),
+    )
+
+    await expect(menu.getByRole('menuitem', { name: 'Accept link' })).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
   },
 })

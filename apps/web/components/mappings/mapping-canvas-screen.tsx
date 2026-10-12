@@ -29,6 +29,7 @@ import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
 import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { StartHere } from '@/components/mappings/start-here'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
+import { type AiAccept, useAiAccept } from '@/components/mappings/use-ai-accept'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { type ReviewState, useReviewAttention } from '@/components/mappings/use-review-attention'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
@@ -78,6 +79,7 @@ function Canvas({
   target,
   failingField,
   review,
+  aiAccept,
   ref,
 }: {
   draft: MappingDraft
@@ -85,6 +87,7 @@ function Canvas({
   target: SideQuery
   failingField: FailingField | null
   review: ReviewState
+  aiAccept: AiAccept | undefined
   ref: RefObject<MappingCanvasHandle | null>
 }) {
   const t = useTranslations('Mapping.canvas')
@@ -109,6 +112,7 @@ function Canvas({
 
   return (
     <MappingCanvas
+      aiAccept={aiAccept}
       aiAttention={review.onCanvas}
       detailsFacts={<MappingFacts draft={draft} />}
       failingField={failingField}
@@ -219,6 +223,7 @@ function EditorBody({
   source,
   target,
   review,
+  aiAccept,
   field,
   canChange,
   startHere,
@@ -229,6 +234,7 @@ function EditorBody({
   source: SideQuery
   target: SideQuery
   review: ReviewState
+  aiAccept: AiAccept
   field: string | undefined
   canChange: boolean
   startHere: boolean
@@ -277,6 +283,7 @@ function EditorBody({
         <div className="hidden min-h-0 flex-1 flex-col lg:flex">
           {desktop && (
             <Canvas
+              aiAccept={canChange ? aiAccept : undefined}
               draft={draft}
               failingField={failingField}
               ref={canvas}
@@ -325,6 +332,7 @@ function MappingEditor({
   const source = useSide(draft.source)
   const target = useSide(draft.target)
   const review = useReviewAttention(draft, target.items, desktop)
+  const aiAccept = useAiAccept(draft)
   const [aiDraftOpen, setAiDraftOpen] = useState(false)
   // Per visit: once the Mapping has links, or the user chose to link the fields, the editor stays.
   const [started, setStarted] = useState(false)
@@ -342,7 +350,12 @@ function MappingEditor({
       actions={
         <>
           {aiReview && desktop && (
-            <AiReviewSheet draft={draft} state={review} targetItems={target.items} />
+            <AiReviewSheet
+              aiAccept={aiAccept}
+              draft={draft}
+              state={review}
+              targetItems={target.items}
+            />
           )}
           {canChange && desktop && (
             <AiDraftAction
@@ -370,9 +383,15 @@ function MappingEditor({
       name={draft.name}
       className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
       {canChange && (
-        <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={reviewSummaryId} />
+        <AiReviewState
+          acceptedInParts={aiAccept.closedReview}
+          draft={draft}
+          publishHintId={publishHintId}
+          summaryId={reviewSummaryId}
+        />
       )}
       <EditorBody
+        aiAccept={aiAccept}
         canChange={canChange}
         draft={draft}
         field={field}

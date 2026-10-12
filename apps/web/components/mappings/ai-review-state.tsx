@@ -19,8 +19,10 @@ export function AiReviewState({
   draft,
   summaryId,
   publishHintId,
+  acceptedInParts = false,
 }: {
   draft: MappingDraft
+  acceptedInParts?: boolean
   summaryId: string
   publishHintId: string
 }) {
@@ -44,7 +46,7 @@ export function AiReviewState({
 
   const review = draft.aiReview
   const open = review !== null
-  const done = accepted && !open
+  const done = (accepted || acceptedInParts) && !open
 
   useEffect(() => {
     if (done) {
