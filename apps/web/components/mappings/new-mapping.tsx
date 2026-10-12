@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useId } from 'react'
 
+import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
 import { DirectionHint } from '@/components/mappings/direction-path'
 import { usePlainNames } from '@/components/plain-names'
 import { ApiError, createMapping } from '@/lib/api/client'
@@ -35,12 +36,12 @@ type NewMessageType = CreateMappingBody['messageType']
 
 function Choice({
   messageType,
-  busy,
+  locked,
   chosen,
   onChoose,
 }: {
   messageType: NewMessageType
-  busy: boolean
+  locked: boolean
   chosen: boolean
   onChoose: () => void
 }) {
@@ -57,7 +58,7 @@ function Choice({
         <DirectionHint direction={direction} />
       </span>
       <button
-        disabled={busy}
+        disabled={locked}
         type="button"
         aria-describedby={pathId}
         className="flex items-center justify-between gap-2 text-left font-medium outline-none after:absolute after:inset-0 after:rounded-lg disabled:cursor-not-allowed"
@@ -84,7 +85,7 @@ export function NewMappingChoices({
   direction,
   className,
 }: {
-  direction?: Direction | null
+  direction: Direction | null
   className?: string
 }) {
   const t = useTranslations('Mappings.new')
@@ -95,11 +96,11 @@ export function NewMappingChoices({
     mutationFn: createMapping,
     onSuccess: (created) => {
       storeCreatedMapping(queryClient, created)
-      router.push(`/mappings/${created.id}?ai-draft=start`)
+      router.push(aiDraftStartHref(created.id))
     },
   })
 
-  const busy = create.isPending || create.isSuccess
+  const locked = create.isPending || create.isSuccess
   const noDocumentStructure = create.error instanceof ApiError && create.error.status === 422
 
   const shown = newMappingMessageTypes.filter(
@@ -112,8 +113,8 @@ export function NewMappingChoices({
         {shown.map((messageType) => (
           <Choice
             key={messageType}
-            busy={busy}
-            chosen={busy && create.variables?.messageType === messageType}
+            chosen={locked && create.variables?.messageType === messageType}
+            locked={locked}
             messageType={messageType}
             onChoose={() => create.mutate({ messageType })}
           />

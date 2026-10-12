@@ -12,6 +12,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useId } from 'react'
 
+import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
 import { DirectionPath } from '@/components/mappings/direction-path'
 import { mappingState, type MappingState } from '@/components/mappings/mapping-state'
 import { usePlainNames } from '@/components/plain-names'
@@ -130,30 +131,32 @@ function MappingPath({ mapping }: { mapping: MappingSummary }) {
   )
 }
 
-function nextAction(href: string, state: MappingState) {
+function nextAction(mappingId: string, state: MappingState) {
+  const href = `/mappings/${mappingId}`
+
   switch (state) {
     case 'failing':
       return { href, icon: Alert02Icon }
     case 'draft':
       return { href, icon: PencilEdit02Icon }
     case 'new':
-      return { href: `${href}?ai-draft=start`, icon: AiMagicIcon }
+      return { href: aiDraftStartHref(mappingId), icon: AiMagicIcon }
     case 'live':
       return { href, icon: null }
   }
 }
 
 function NextAction({
-  mappingHref,
+  mappingId,
   state,
   describedBy,
 }: {
-  mappingHref: string
+  mappingId: string
   state: MappingState
   describedBy: string
 }) {
   const t = useTranslations('Mappings.action')
-  const { href, icon } = nextAction(mappingHref, state)
+  const { href, icon } = nextAction(mappingId, state)
 
   return (
     <Link
@@ -203,7 +206,7 @@ export function MappingCard({ mapping }: { mapping: MappingSummary }) {
               })
             : t('neverPublished')}
         </span>
-        <NextAction describedBy={titleId} mappingHref={href} state={state} />
+        <NextAction describedBy={titleId} mappingId={mapping.id} state={state} />
       </CardFooter>
     </Card>
   )

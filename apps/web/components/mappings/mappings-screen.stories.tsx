@@ -280,7 +280,9 @@ export const EmptyWorkspace = meta.story({
       await canvas.findByRole('heading', { name: 'Translate your first document' }),
     ).toBeVisible()
     await expect(
-      canvas.getByText('The AI drafts it from an example, you check every link.'),
+      canvas.getByText(
+        'The AI drafts the Mapping from an example document, and you check every link.',
+      ),
     ).toBeVisible()
 
     for (const name of choices) {

@@ -1291,7 +1291,7 @@
     "new": {
       "button": "Neues Mapping",
       "title": "Neues Mapping",
-      "description": "Wählen Sie den Beleg. Die KI entwirft das Mapping aus einem Beispiel, Sie prüfen jede Verknüpfung.",
+      "description": "Wählen Sie den Beleg. Die KI entwirft das Mapping aus einem Beispielbeleg, und Sie prüfen jede Verknüpfung.",
       "choice": "{documents}, die Sie {direction, select, inbound {empfangen} other {senden}}",
       "aiHint": "Mit KI entwerfen",
       "creating": "Mapping wird angelegt…",
@@ -1303,7 +1303,7 @@
     "first": {
       "title": "Übersetzen Sie Ihren ersten Beleg",
       "partners": "Ihre Partner",
-      "description": "Die KI entwirft ihn aus einem Beispiel, Sie prüfen jede Verknüpfung.",
+      "description": "Die KI entwirft das Mapping aus einem Beispielbeleg, und Sie prüfen jede Verknüpfung.",
       "viewOnlyDescription": "Mappings erscheinen hier, sobald ein Admin eines anlegt."
     }
   },

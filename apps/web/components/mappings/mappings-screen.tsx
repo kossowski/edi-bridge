@@ -6,7 +6,6 @@ import {
   ArrowDownLeft01Icon,
   ArrowRight02Icon,
   ArrowUpRight01Icon,
-  DatabaseIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
@@ -15,7 +14,7 @@ import { useId, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadError } from '@/components/load-error'
-import { DirectionHint } from '@/components/mappings/direction-path'
+import { DirectionHint, ErpEnd, PartnerEnd } from '@/components/mappings/direction-path'
 import { MappingCard } from '@/components/mappings/mapping-card'
 import {
   byState,
@@ -109,18 +108,15 @@ function FirstMapping({ canChange }: { canChange: boolean }) {
   return (
     <section
       aria-labelledby={titleId}
-      className="bg-muted/40 mx-auto flex w-full max-w-3xl flex-col items-center gap-6 rounded-2xl border px-4 py-10 text-center sm:px-10">
-      <div aria-hidden className="flex items-center gap-3 text-sm">
-        <span className="bg-background rounded-full border px-3 py-1.5">{t('first.partners')}</span>
+      className="bg-muted/40 @container mx-auto flex w-full max-w-5xl flex-col items-center gap-6 rounded-2xl border px-4 py-10 text-center sm:px-10">
+      <p aria-hidden className="flex items-center gap-3 text-sm">
+        <PartnerEnd>{t('first.partners')}</PartnerEnd>
         <span className="text-muted-foreground flex flex-col items-center leading-none">
           <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} className="size-4" />
           <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} className="size-4 rotate-180" />
         </span>
-        <span className="bg-primary text-primary-foreground flex items-center gap-2 rounded-full px-3 py-1.5">
-          <HugeiconsIcon icon={DatabaseIcon} strokeWidth={2} className="size-4" />
-          {t('lane.erp')}
-        </span>
-      </div>
+        <ErpEnd>{t('lane.erp')}</ErpEnd>
+      </p>
       <div className="flex flex-col gap-1">
         <h2 id={titleId} className="text-xl font-semibold text-balance">
           {t('first.title')}
@@ -129,7 +125,12 @@ function FirstMapping({ canChange }: { canChange: boolean }) {
           {canChange ? t('first.description') : t('first.viewOnlyDescription')}
         </p>
       </div>
-      {canChange && <NewMappingChoices className="w-full text-left sm:grid-cols-3" />}
+      {canChange && (
+        <NewMappingChoices
+          direction={null}
+          className="w-full text-left @xl:grid-cols-2 @4xl:grid-cols-3"
+        />
+      )}
     </section>
   )
 }

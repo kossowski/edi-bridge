@@ -1291,7 +1291,7 @@
     "new": {
       "button": "New Mapping",
       "title": "New Mapping",
-      "description": "Pick the document. The AI drafts the Mapping from an example, you check every link.",
+      "description": "Pick the document. The AI drafts the Mapping from an example document, and you check every link.",
       "choice": "{documents} {direction, select, inbound {you receive} other {you send}}",
       "aiHint": "Draft with AI",
       "creating": "Creating the Mapping…",
@@ -1303,7 +1303,7 @@
     "first": {
       "title": "Translate your first document",
       "partners": "Your partners",
-      "description": "The AI drafts it from an example, you check every link.",
+      "description": "The AI drafts the Mapping from an example document, and you check every link.",
       "viewOnlyDescription": "Mappings appear here once an Admin creates one."
     }
   },
