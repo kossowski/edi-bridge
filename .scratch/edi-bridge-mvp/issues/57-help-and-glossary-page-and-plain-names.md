@@ -4,10 +4,14 @@
 
 **Blocked by:** 56 (App frame with account menu and two-row header)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `/help` lists every on-screen label from ticket 55 with its technical term and explanation, and can be searched
-- [ ] Message Types, Run statuses and Failure Stages have plain names in one shared place; the EDIFACT code stays available as secondary text
-- [ ] The term component explains a word on hover and keyboard focus and links to its entry on `/help`
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] `/help` lists every on-screen label from ticket 55 with its technical term and explanation, and can be searched
+- [x] Message Types, Run statuses and Failure Stages have plain names in one shared place; the EDIFACT code stays available as secondary text
+- [x] The term component explains a word on hover and keyboard focus and links to its entry on `/help`
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #80, #83, #86.
