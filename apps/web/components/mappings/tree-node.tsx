@@ -43,7 +43,6 @@ export type TreeNodeData = TreeRow & {
   filled: boolean
   wholePart: boolean
   aiProposed: boolean
-  // The field a failed document points at, or the collapsed part that holds it.
   failing: 'field' | 'inside' | null
 }
 
@@ -153,7 +152,7 @@ function RepeatBadge({ repeat }: { repeat: Exclude<Repeat, null> }) {
   )
 }
 
-function FailingMark({ failing }: { failing: 'field' | 'inside' }) {
+function FailingMark({ failing }: { failing: Exclude<TreeNodeData['failing'], null> }) {
   const t = useTranslations('Mapping.failingField')
 
   return (

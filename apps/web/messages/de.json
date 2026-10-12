@@ -2463,6 +2463,7 @@
       "repeatsUpToLabel": "Bis zu {count}-mal wiederholt",
       "hiddenParts": "{count, plural, one {# Teil ausgeblendet} other {# Teile ausgeblendet}}",
       "emptyPart": "Leer",
+      "nothingLinked": "Noch ist nichts verknüpft.",
       "error": {
         "title": "Strukturen nicht verfügbar",
         "description": "Die Quell- oder Zielstruktur konnte nicht geladen werden. Versuchen Sie es erneut.",
@@ -2539,8 +2540,7 @@
       "markInside": "Fehler darin",
       "title": "Ein Beleg ist an <code>{field}</code> gescheitert",
       "where": "{side, select, source {Das Feld liegt in der Quelle} other {Das Feld liegt im Ziel}}: {structure}.",
-      "marked": "Es ist auf dem Canvas markiert.",
-      "smallScreen": "Öffnen Sie dieses Mapping auf einem Bildschirm mit mindestens 1024 Pixeln Breite, um es auf dem Canvas zu sehen.",
+      "marked": "Es ist auf der Zeichenfläche markiert.",
       "fix": "Korrigieren Sie seine Verknüpfungen, veröffentlichen Sie den Entwurf und verarbeiten Sie den Beleg dann erneut.",
       "show": "Feld zeigen",
       "back": "Zurück zu den Belegen",

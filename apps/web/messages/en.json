@@ -2463,6 +2463,7 @@
       "repeatsUpToLabel": "Repeats up to {count} times",
       "hiddenParts": "{count, plural, one {# part hidden} other {# parts hidden}}",
       "emptyPart": "Empty",
+      "nothingLinked": "Nothing is linked yet.",
       "error": {
         "title": "Structures unavailable",
         "description": "The source or target structure could not be loaded. Try again.",
@@ -2540,7 +2541,6 @@
       "title": "A document failed at <code>{field}</code>",
       "where": "The field is in the {side, select, source {source} other {target}}: {structure}.",
       "marked": "It is marked on the canvas.",
-      "smallScreen": "Open this Mapping on a screen at least 1024 pixels wide to see it on the canvas.",
       "fix": "Correct its links, publish the Draft, then process the failed document again.",
       "show": "Show the field",
       "back": "Back to documents",

@@ -67,3 +67,5 @@ export function useSide(side: MappingSide) {
 
   return { title, items, isError, refetch }
 }
+
+export type SideQuery = ReturnType<typeof useSide>

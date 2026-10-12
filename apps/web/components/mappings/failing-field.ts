@@ -4,7 +4,6 @@ import type { Side, TreeItem } from '@/components/mappings/mapping-tree'
 export type FailingField = {
   row: RowRef
   item: TreeItem
-  // From the top of the tree down to the field's parent, the parts that hold it.
   ancestors: ReadonlyArray<TreeItem>
 }
 
@@ -15,11 +14,11 @@ export function repetitionFree(path: string) {
   return path.trim().replaceAll(/\[\d*\]/g, '[]')
 }
 
-function bare(path: string) {
+function withoutRepetitionMarks(path: string) {
   return path.replaceAll('[]', '')
 }
 
-function search(
+function findInTree(
   items: ReadonlyArray<TreeItem>,
   matches: (item: TreeItem) => boolean,
   ancestors: ReadonlyArray<TreeItem>,
@@ -29,7 +28,7 @@ function search(
       return { item, ancestors }
     }
 
-    const found = item.children && search(item.children, matches, [...ancestors, item])
+    const found = item.children && findInTree(item.children, matches, [...ancestors, item])
 
     if (found) {
       return found
@@ -53,12 +52,12 @@ export function findFailingField(
 
   const matchers = [
     (item: TreeItem) => item.path === wanted,
-    (item: TreeItem) => bare(item.path) === bare(wanted),
+    (item: TreeItem) => withoutRepetitionMarks(item.path) === withoutRepetitionMarks(wanted),
   ]
 
   for (const matches of matchers) {
     for (const side of sides) {
-      const found = search(trees[side], matches, [])
+      const found = findInTree(trees[side], matches, [])
 
       if (found) {
         return { row: { side, path: found.item.path }, ...found }
@@ -69,7 +68,6 @@ export function findFailingField(
   return null
 }
 
-// Named by the parts down to it, e.g. `lines › gtin`, with an EDIFACT element's meaning after it.
 export function failingFieldName({ item, ancestors }: Pick<FailingField, 'item' | 'ancestors'>) {
   const trail = [...ancestors, item].map(({ label }) => label).join(' › ')
 

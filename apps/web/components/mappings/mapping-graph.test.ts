@@ -12,6 +12,7 @@ import {
   connect,
   freeSlot,
   type Graph,
+  isEmptyGraph,
   maxTransformX,
   newTransform,
   removeTransform,
@@ -72,6 +73,18 @@ const graph: Graph = {
   transforms: [dateFormat, concatenate, loop],
   transformLinks: [intoDate, dateIntoTarget, ...joinParts],
 }
+
+describe('isEmptyGraph', () => {
+  it('finds a graph without links empty, also with unlinked transforms', () => {
+    expect(isEmptyGraph({ links: [], transformLinks: [] })).toBe(true)
+    expect(isEmptyGraph({ ...graph, links: [], transformLinks: [] })).toBe(true)
+  })
+
+  it('finds a graph with a link or a transform link not empty', () => {
+    expect(isEmptyGraph({ links: graph.links, transformLinks: [] })).toBe(false)
+    expect(isEmptyGraph({ links: [], transformLinks: [intoDate] })).toBe(false)
+  })
+})
 
 describe('connect', () => {
   it('links a source field straight into a free target as a plain link', () => {

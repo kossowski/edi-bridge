@@ -4,36 +4,41 @@ import { Alert02Icon, ArrowLeft01Icon, Target02Icon } from '@hugeicons/core-free
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useMemo } from 'react'
+import { type ReactNode, useMemo } from 'react'
 
 import {
   type FailingField,
   failingFieldName,
   findFailingField,
 } from '@/components/mappings/failing-field'
-import { useSide } from '@/components/mappings/mapping-side'
 import { navigationItems } from '@/lib/navigation'
 import { Alert, AlertDescription, AlertTitle } from '@edi-bridge/ui/components/alert'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 
-import type { MappingDraft } from '@edi-bridge/contracts'
+import type { SideQuery } from '@/components/mappings/mapping-side'
 
 export type FailingFieldLookup =
+  | { status: 'none' }
   | { status: 'loading' }
   | { status: 'found'; field: FailingField; structure: string }
   | { status: 'notFound'; path: string }
 
-export function useFailingField(draft: MappingDraft, path: string): FailingFieldLookup {
-  const source = useSide(draft.source)
-  const target = useSide(draft.target)
-
+export function useFailingField(
+  path: string | undefined,
+  source: SideQuery,
+  target: SideQuery,
+): FailingFieldLookup {
   const field = useMemo(
     () =>
-      source.items && target.items
+      path !== undefined && source.items && target.items
         ? findFailingField(path, { source: source.items, target: target.items })
         : undefined,
     [path, source.items, target.items],
   )
+
+  if (path === undefined) {
+    return { status: 'none' }
+  }
 
   if (field === undefined) {
     return { status: 'loading' }
@@ -49,6 +54,8 @@ export function useFailingField(draft: MappingDraft, path: string): FailingField
     structure: field.row.side === 'source' ? source.title : target.title,
   }
 }
+
+const code = (chunks: ReactNode) => <code className="font-mono break-all">{chunks}</code>
 
 function BackToDocuments() {
   const t = useTranslations('Mapping.failingField')
@@ -66,11 +73,13 @@ function BackToDocuments() {
 export function FailingFieldAlert({
   lookup,
   canChange,
+  marked,
   onShow,
 }: {
-  lookup: Exclude<FailingFieldLookup, { status: 'loading' }>
+  lookup: Extract<FailingFieldLookup, { status: 'found' | 'notFound' }>
   canChange: boolean
-  // Left out where the canvas is not shown, e.g. on a small screen.
+  marked: boolean
+  // Left out on a small screen, where the editor is not shown.
   onShow?: (() => void) | undefined
 }) {
   const t = useTranslations('Mapping.failingField')
@@ -81,12 +90,7 @@ export function FailingFieldAlert({
         <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} aria-hidden />
         <AlertTitle>{t('notFound.title')}</AlertTitle>
         <AlertDescription className="flex flex-col items-start gap-2">
-          <p>
-            {t.rich('notFound.description', {
-              path: lookup.path,
-              code: (chunks) => <code className="font-mono break-all">{chunks}</code>,
-            })}
-          </p>
+          <p>{t.rich('notFound.description', { path: lookup.path, code })}</p>
           <BackToDocuments />
         </AlertDescription>
       </Alert>
@@ -98,16 +102,11 @@ export function FailingFieldAlert({
   return (
     <Alert variant="destructive" className="flex-none">
       <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} aria-hidden />
-      <AlertTitle>
-        {t.rich('title', {
-          field: failingFieldName(field),
-          code: (chunks) => <code className="font-mono break-all">{chunks}</code>,
-        })}
-      </AlertTitle>
+      <AlertTitle>{t.rich('title', { field: failingFieldName(field), code })}</AlertTitle>
       <AlertDescription className="flex flex-col items-start gap-2">
         <p>
-          {t('where', { side: field.row.side, structure })}{' '}
-          {onShow ? t('marked') : t('smallScreen')}
+          {t('where', { side: field.row.side, structure })}
+          {marked && ` ${t('marked')}`}
           {canChange && ` ${t('fix')}`}
         </p>
         <div className="flex flex-wrap gap-2">

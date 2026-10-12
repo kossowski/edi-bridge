@@ -51,6 +51,25 @@ export function page(canvasElement: HTMLElement) {
   return within(canvasElement.ownerDocument.body)
 }
 
+export async function findAlert(canvasElement: HTMLElement, title: string) {
+  const alert = await waitFor(
+    () => {
+      const found = within(canvasElement)
+        .getAllByRole('alert')
+        .find((element) => element.textContent.includes(title))
+
+      if (!found) {
+        throw new Error(`No alert with ${title}`)
+      }
+
+      return found
+    },
+    { timeout: 5000 },
+  )
+
+  return within(alert)
+}
+
 export async function findRow(canvasElement: HTMLElement, ref: RowRef) {
   return waitFor(() => {
     const row = findRowButton(canvasElement, ref)

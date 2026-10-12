@@ -22,6 +22,7 @@ import {
   useCanvasStore,
   useCanvasStoreApi,
 } from '@/components/mappings/mapping-canvas-store'
+import { isEmptyGraph } from '@/components/mappings/mapping-graph'
 import { MappingPreviewSheet } from '@/components/mappings/mapping-preview-panel'
 import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
 import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
@@ -46,6 +47,7 @@ import {
 import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
+import type { SideQuery } from '@/components/mappings/mapping-side'
 import type { MappingDraft } from '@edi-bridge/contracts'
 
 function CanvasLoading() {
@@ -70,16 +72,18 @@ function CanvasLoading() {
 
 function Canvas({
   draft,
+  source,
+  target,
   failingField,
   ref,
 }: {
   draft: MappingDraft
+  source: SideQuery
+  target: SideQuery
   failingField: FailingField | null
   ref: RefObject<MappingCanvasHandle | null>
 }) {
   const t = useTranslations('Mapping.canvas')
-  const source = useSide(draft.source)
-  const target = useSide(draft.target)
   const save = useSaveGraph(draft.mappingId)
 
   if (source.isError || target.isError) {
@@ -222,28 +226,36 @@ function EditorBody({
 }) {
   const desktop = useDesktop()
   const canvas = useRef<MappingCanvasHandle>(null)
-  const { canvas: canvasRoot } = useCanvasRefs()
-  const lookup = useFailingField(draft, field ?? '')
-  const failingField = field !== undefined && lookup.status === 'found' ? lookup.field : null
+  const source = useSide(draft.source)
+  const target = useSide(draft.target)
+  const lookup = useFailingField(field, source, target)
+  const failingField = lookup.status === 'found' ? lookup.field : null
 
-  // The chosen button goes with "Start here", so the focus moves on to the first source field.
-  const linkYourself = () => {
-    const firstRow = () => canvasRoot.current?.querySelector<HTMLElement>('[data-row-id]')
-
-    onLinkYourself()
+  // Under "Start here" the editor mounts first; the canvas then takes over from the chosen button.
+  const withCanvas = (then: (handle: MappingCanvasHandle) => void) =>
     whenRendered(
-      () => Boolean(firstRow()),
-      () => firstRow()?.focus(),
+      () => canvas.current !== null,
+      () => canvas.current && then(canvas.current),
     )
+
+  const linkYourself = () => {
+    onLinkYourself()
+    withCanvas((handle) => handle.focusFirstRow())
+  }
+
+  const showField = () => {
+    onLinkYourself()
+    withCanvas((handle) => handle.showFailingField())
   }
 
   return (
     <>
-      {field !== undefined && lookup.status !== 'loading' && (
+      {(lookup.status === 'found' || lookup.status === 'notFound') && (
         <FailingFieldAlert
           canChange={canChange}
           lookup={lookup}
-          onShow={desktop && !startHere ? () => canvas.current?.showFailingField() : undefined}
+          marked={desktop && !startHere}
+          onShow={desktop ? showField : undefined}
         />
       )}
       <DesktopOnlyNotice />
@@ -254,15 +266,19 @@ function EditorBody({
       ) : (
         // The canvas only mounts on desktop: React Flow cannot measure a hidden container.
         <div className="hidden min-h-0 flex-1 flex-col lg:flex">
-          {desktop && <Canvas draft={draft} failingField={failingField} ref={canvas} />}
+          {desktop && (
+            <Canvas
+              draft={draft}
+              failingField={failingField}
+              ref={canvas}
+              source={source}
+              target={target}
+            />
+          )}
         </div>
       )}
     </>
   )
-}
-
-function isEmpty(draft: MappingDraft) {
-  return draft.links.length + draft.transformLinks.length === 0
 }
 
 function MappingLoading() {
@@ -293,7 +309,7 @@ export function MappingCanvasScreen({ id, field }: { id: string; field?: string 
   // Per visit: once the Mapping has links, or the user chose to link the fields, the editor stays.
   const [started, setStarted] = useState(false)
 
-  if (draft && !started && !isEmpty(draft)) {
+  if (draft && !started && !isEmptyGraph(draft)) {
     setStarted(true)
   }
 

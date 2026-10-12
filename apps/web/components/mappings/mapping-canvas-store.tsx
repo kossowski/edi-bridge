@@ -42,6 +42,10 @@ export type CanvasState = {
   detailsOpen: boolean
   openDetails: () => void
   closeDetails: () => void
+  // Folded to its rail for this visit only, unlike the hidden state the user chooses and keeps.
+  transformsFolded: boolean
+  foldTransforms: () => void
+  unfoldTransforms: () => void
   toggleCollapsed: (row: RowRef) => void
   expand: (side: Side, paths: ReadonlyArray<string>) => void
   toggleSelected: (row: RowRef) => void
@@ -91,6 +95,9 @@ export function createCanvasStore() {
     detailsOpen: false,
     openDetails: () => set({ detailsOpen: true }),
     closeDetails: () => set({ detailsOpen: false, selectedTransform: null }),
+    transformsFolded: false,
+    foldTransforms: () => set({ transformsFolded: true }),
+    unfoldTransforms: () => set({ transformsFolded: false }),
     toggleCollapsed: ({ side, path }) =>
       set(({ collapsed }) => {
         const next = new Set(collapsed[side])

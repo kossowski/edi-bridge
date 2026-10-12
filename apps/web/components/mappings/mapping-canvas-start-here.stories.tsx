@@ -3,6 +3,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
+  findAlert,
   findRow,
   findSheet,
   openDetails,
@@ -79,12 +80,33 @@ export const ChooseLinkYourself = meta.story({
   },
 })
 
+// The failed document's field is shown in the empty editor, which leaves "Start here".
+export const FailingField = meta.story({
+  args: { field: 'invoiceNumber' },
+  async play({ canvas, canvasElement }) {
+    const alert = await findAlert(canvasElement, 'A document failed at invoiceNumber')
+
+    await expect(alert.queryByText(/marked on the canvas/)).toBeNull()
+    await expect(alert.queryByText(/1024 pixels/)).toBeNull()
+    await expect(canvas.getByRole('heading', { name: 'Start here' })).toBeVisible()
+    await userEvent.click(alert.getByRole('button', { name: 'Show the field' }))
+
+    const row = await findRow(canvasElement, { side: 'source', path: 'invoiceNumber' })
+
+    await waitFor(() => expect(row).toHaveFocus())
+    await expect(row.closest('[data-failing]')).toHaveAttribute('data-failing', 'field')
+    await expect(canvas.queryByRole('heading', { name: 'Start here' })).toBeNull()
+    await expect(alert.getByText(/It is marked on the canvas\./)).toBeVisible()
+  },
+})
+
 export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas, canvasElement }) {
       await findRow(canvasElement, { side: 'source', path: 'invoiceNumber' })
       await expect(canvas.queryByRole('heading', { name: 'Start here' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: 'Open the empty editor' })).toBeNull()
+      await expect(canvas.getByText('Nothing is linked yet.')).toBeVisible()
     },
   }),
 })
