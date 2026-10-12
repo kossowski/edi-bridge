@@ -1,18 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { errorRate, homeKeyNumbersOf, homeQuerySchema, homeSchema } from './home'
+import { homeKeyNumbersOf, homeQuerySchema, homeSchema } from './home'
 
 const tradingPartner = { id: '10000000-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' }
-
-describe('errorRate', () => {
-  it('is the share of failed Runs among finished Runs', () => {
-    expect(errorRate({ delivered: 45, failed: 5 })).toBe(0.1)
-  })
-
-  it('is null when no Run finished, so a chart shows a gap instead of 0 %', () => {
-    expect(errorRate({ delivered: 0, failed: 0 })).toBeNull()
-  })
-})
 
 describe('homeQuerySchema', () => {
   it('defaults to the last 24 hours', () => {

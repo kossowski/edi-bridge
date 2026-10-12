@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { tradingPartnerSummarySchema } from './trading-partner'
+import { finishedRunCountsSchema } from './trading-partner-health'
 
 import type { Endpoint } from './endpoint'
 import type { TaskCounts } from './task'
@@ -11,12 +12,12 @@ export const homeWindowSchema = z.enum(homeWindows)
 
 export type HomeWindow = z.infer<typeof homeWindowSchema>
 
-const day = 24 * 60
+const minutesPerDay = 24 * 60
 
 export const homeWindowSizes = {
-  '24h': { durationMinutes: day, bucketMinutes: 60 },
-  '7d': { durationMinutes: 7 * day, bucketMinutes: day },
-  '30d': { durationMinutes: 30 * day, bucketMinutes: day },
+  '24h': { durationMinutes: minutesPerDay, bucketMinutes: 60 },
+  '7d': { durationMinutes: 7 * minutesPerDay, bucketMinutes: minutesPerDay },
+  '30d': { durationMinutes: 30 * minutesPerDay, bucketMinutes: minutesPerDay },
 } as const satisfies Record<HomeWindow, { durationMinutes: number; bucketMinutes: number }>
 
 export const homeQuerySchema = z.object({
@@ -27,25 +28,12 @@ export type HomeQuery = z.output<typeof homeQuerySchema>
 
 const countSchema = z.number().int().min(0)
 
-export const finishedRunCountsSchema = z.object({
-  delivered: countSchema,
-  failed: countSchema,
-})
-
-export type FinishedRunCounts = z.infer<typeof finishedRunCountsSchema>
-
 export const throughputBucketSchema = finishedRunCountsSchema.extend({
   start: z.iso.datetime(),
   end: z.iso.datetime(),
 })
 
 export type ThroughputBucket = z.infer<typeof throughputBucketSchema>
-
-export function errorRate({ delivered, failed }: FinishedRunCounts) {
-  const finished = delivered + failed
-
-  return finished === 0 ? null : failed / finished
-}
 
 // Only delivered counts the window: the others are open now, so each card matches the list it opens.
 export const homeKeyNumbersSchema = z.object({

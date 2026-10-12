@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
 import { controlReferenceSchema } from './edifact'
-import { errorRate, type FinishedRunCounts } from './home'
 import { directionOf, type MessageType, messageTypeSchema } from './message-type'
 import { overdueAcknowledgementMessageTypes } from './overdue-acknowledgement'
 import { type FailureStage, failureStageSchema } from './run'
@@ -127,24 +126,4 @@ export function taskCountsOf(tasks: ReadonlyArray<Pick<Task, 'whoActs'>>): TaskC
   }
 
   return counts
-}
-
-export const healthStatuses = ['healthy', 'degraded', 'failing'] as const
-
-export type HealthStatus = (typeof healthStatuses)[number]
-
-export const healthThresholds = { degraded: 0.1, failing: 0.25 } as const
-
-export function healthStatusOf({
-  delivered,
-  failed,
-  overdue,
-}: FinishedRunCounts & { overdue: number }): HealthStatus {
-  const rate = errorRate({ delivered, failed }) ?? 0
-
-  if (rate >= healthThresholds.failing) {
-    return 'failing'
-  }
-
-  return rate >= healthThresholds.degraded || overdue > 0 ? 'degraded' : 'healthy'
 }

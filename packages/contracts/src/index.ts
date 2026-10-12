@@ -395,9 +395,6 @@ export {
 } from './order-lifecycle'
 
 export {
-  errorRate,
-  type FinishedRunCounts,
-  finishedRunCountsSchema,
   type Home,
   homeEndpoint,
   type HomeKeyNumbers,
@@ -421,6 +418,16 @@ export {
   overdueAcknowledgementMessageTypes,
   overdueAcknowledgementSchema,
 } from './overdue-acknowledgement'
+
+export {
+  errorRate,
+  type FinishedRunCounts,
+  finishedRunCountsSchema,
+  type HealthStatus,
+  healthStatuses,
+  healthStatusOf,
+  healthThresholds,
+} from './trading-partner-health'
 
 export {
   type ErrorPosition,
@@ -480,10 +487,6 @@ export {
 } from './run'
 
 export {
-  type HealthStatus,
-  healthStatuses,
-  healthStatusOf,
-  healthThresholds,
   type Task,
   type TaskActor,
   taskActors,
