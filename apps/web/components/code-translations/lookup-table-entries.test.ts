@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest'
 
 import { maxLookupCodeLength } from '@edi-bridge/contracts'
 
+import type { FailedRunReference, LookupTableUse, MissingCode } from '@edi-bridge/contracts'
+
 import {
+  fixesOf,
   hasValue,
   matchesFilter,
   problemsOf,
   restoredEntry,
+  runsToReprocess,
+  tableDirection,
   trimmedEntry,
   withEntry,
+  withFixes,
   withoutEntry,
 } from './lookup-table-entries'
 
@@ -86,5 +92,78 @@ describe('entry changes', () => {
     expect(entries.filter((entry) => matchesFilter(entry, 'kg'))).toEqual([entries[1]])
     expect(entries.filter((entry) => matchesFilter(entry, 'ltr'))).toEqual([entries[2]])
     expect(entries.filter((entry) => matchesFilter(entry, ''))).toEqual(entries)
+  })
+})
+
+function failedRun(id: string, receivedAt: string): FailedRunReference {
+  return {
+    id,
+    receivedAt,
+    tradingPartner: { id: 'p-1', name: 'Hansemarkt' },
+    messageType: 'ORDERS',
+    businessReference: null,
+  }
+}
+
+const older = failedRun('r-old', '2026-03-01T08:00:00.000Z')
+
+const newer = failedRun('r-new', '2026-03-02T08:00:00.000Z')
+
+const newest = failedRun('r-newest', '2026-03-03T08:00:00.000Z')
+
+const missingCodes: MissingCode[] = [
+  { urgency: 'blocking', code: 'KRT', meaning: null, suggestions: [], failedRuns: [older, newer] },
+  { urgency: 'blocking', code: 'DOS', meaning: null, suggestions: [], failedRuns: [newest] },
+  { urgency: 'upcoming', code: 'BTL', meaning: null, suggestions: [], itemCount: 3 },
+]
+
+describe('fixes', () => {
+  it('names the blocking codes a save translates', () => {
+    const saved = [
+      ...entries,
+      { sourceCode: 'KRT', targetCode: 'CT' },
+      { sourceCode: 'BTL', targetCode: 'BO' },
+    ]
+
+    expect(fixesOf(missingCodes, saved)).toEqual([
+      { code: 'KRT', targetCode: 'CT', failedRuns: [older, newer] },
+    ])
+    expect(fixesOf(missingCodes, entries)).toEqual([])
+  })
+
+  it('replaces an earlier fix of the same code', () => {
+    const krt = { code: 'KRT', targetCode: 'CT', failedRuns: [older] }
+    const dos = { code: 'DOS', targetCode: 'PCE', failedRuns: [newest] }
+
+    expect(withFixes([krt, dos], [{ ...krt, targetCode: 'PK' }])).toEqual([
+      dos,
+      { ...krt, targetCode: 'PK' },
+    ])
+  })
+
+  it('puts the origin Run first, then the newest, each once', () => {
+    const fixes = [
+      { code: 'KRT', targetCode: 'CT', failedRuns: [older, newer] },
+      { code: 'DOS', targetCode: 'PCE', failedRuns: [newest, newer] },
+    ]
+
+    expect(runsToReprocess(fixes, undefined)).toEqual([newest, newer, older])
+    expect(runsToReprocess(fixes, older.id)).toEqual([older, newest, newer])
+  })
+})
+
+describe('tableDirection', () => {
+  const use = (direction: LookupTableUse['direction']): LookupTableUse => ({
+    mappingId: 'm-1',
+    name: 'Orders',
+    messageType: direction === 'inbound' ? 'ORDERS' : 'INVOIC',
+    direction,
+    tradingPartners: [],
+  })
+
+  it('reads a list as incoming once any Mapping reads it inbound', () => {
+    expect(tableDirection([use('outbound'), use('inbound')])).toBe('inbound')
+    expect(tableDirection([use('outbound')])).toBe('outbound')
+    expect(tableDirection([])).toBe('outbound')
   })
 })

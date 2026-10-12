@@ -61,6 +61,7 @@ const meta = preview.meta({
   component: ImportCsvDialog,
   args: {
     table: unitsOfMeasure,
+    direction: 'inbound' as const,
     open: true,
     onOpenChange: fn(),
     onImported: fn(),
@@ -75,7 +76,7 @@ const meta = preview.meta({
 export const Empty = meta.story({
   async play() {
     await dialog()
-    await expect(screen.getByText(/keeps every entry missing from the CSV/)).toBeVisible()
+    await expect(screen.getByText(/keeps every value missing from the CSV/)).toBeVisible()
     await expect(screen.getByLabelText('CSV file')).toBeVisible()
     await expect(screen.getByLabelText('CSV text')).toHaveValue('')
   },
@@ -100,9 +101,26 @@ export const Preview = meta.story({
     await expect(screen.getByRole('button', { name: 'Unchanged 1' })).toBeVisible()
     await expect(screen.getByRole('button', { name: 'Invalid 3' })).toBeVisible()
     await expect(screen.getByText('changed from KGM to KGS')).toBeInTheDocument()
-    await expect(visibleText('The source code is missing.')).toBeVisible()
+    await expect(
+      screen.getByRole('columnheader', { name: 'What the partner sends' }),
+    ).toBeInTheDocument()
+    await expect(visibleText('The partner’s code is missing.')).toBeVisible()
     await expect(visibleText('Needs exactly two columns.')).toBeVisible()
-    await expect(visibleText('The source code already occurs in an earlier line.')).toBeVisible()
+    await expect(visibleText('The partner’s code already occurs in an earlier line.')).toBeVisible()
+  },
+})
+
+export const OutgoingPreview = meta.story({
+  args: { direction: 'outbound' as const },
+  async play() {
+    await requestPreview(everyStatusCsv)
+
+    await expect(await screen.findByRole('heading', { name: 'Preview' })).toHaveFocus()
+    await expect(screen.getByRole('columnheader', { name: 'Your value' })).toBeInTheDocument()
+    await expect(
+      screen.getByRole('columnheader', { name: 'What the partner gets' }),
+    ).toBeInTheDocument()
+    await expect(visibleText('Your value is missing.')).toBeVisible()
   },
 })
 
@@ -242,7 +260,7 @@ export const German = meta.story({
     })
 
     await expect(await screen.findByRole('button', { name: 'Neu 1' })).toBeVisible()
-    await expect(visibleText('Der Ausgangscode fehlt.')).toBeVisible()
+    await expect(visibleText('Der Code des Partners fehlt.')).toBeVisible()
   },
 })
 

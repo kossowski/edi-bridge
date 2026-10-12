@@ -12,7 +12,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Page({ params, searchParams }: PageProps<'/code-translations/[id]'>) {
-  const [{ id }, { add, code }] = await Promise.all([params, searchParams])
+  const [{ id }, { add, code, run }] = await Promise.all([params, searchParams])
 
-  return <LookupTableScreen id={id} add={firstSearchParam(add)} code={firstSearchParam(code)} />
+  return (
+    <LookupTableScreen
+      id={id}
+      add={firstSearchParam(add)}
+      code={firstSearchParam(code)}
+      run={firstSearchParam(run)}
+    />
+  )
 }

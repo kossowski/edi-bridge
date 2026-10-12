@@ -3335,16 +3335,16 @@
     },
     "values": {
       "title": "Values",
-      "yours": "Your value",
-      "theirs": "What the partner gets",
-      "sentAs": "is sent as",
+      "source": "{direction, select, inbound {What the partner sends} other {Your value}}",
+      "target": "{direction, select, inbound {Your value} other {What the partner gets}}",
+      "arrow": "{direction, select, inbound {becomes} other {is sent as}}",
       "meaning": "{code} means {meaning}.",
       "filter": "Find a value",
       "filteredCount": "{count, number} of {total, number} values",
       "noMatch": "No value matches.",
       "empty": {
         "title": "No values yet",
-        "description": "Add the first value, e.g. your unit ST is sent as PCE.",
+        "description": "{kind, select, units {Add the first value, e.g. the unit ST becomes PCE.} countries {Add the first value, e.g. the country Deutschland becomes DE.} addresses {Add the first value, e.g. a store number becomes an address ID.} other {Add the first value: a code and the code it becomes.}}",
         "viewOnlyDescription": "Values appear here once an Admin adds them."
       },
       "add": "Add a value",
@@ -3356,7 +3356,7 @@
       "cancel": "Cancel",
       "suggestions": "Suggested codes",
       "saved": "{code} saved.",
-      "removed": "{code} removed. It was sent as {target}.",
+      "removed": "{direction, select, inbound {{code} removed. It became {target}.} other {{code} removed. It was sent as {target}.}}",
       "undo": "Undo",
       "restored": "{code} restored.",
       "errors": {
@@ -3370,25 +3370,35 @@
       "title": "Not translated yet",
       "loading": "Loading the values that are not translated yet",
       "unavailable": "The values that are not translated yet could not be loaded.",
-      "add": "Add {code}",
+      "accept": "Accept",
+      "acceptCode": "Accept {code}",
+      "sendAs": "{direction, select, inbound {What {code} becomes} other {Send {code} as}}",
+      "or": "or",
+      "useSuggestion": "Use {code} ({meaning})",
+      "stops": "{more, plural, =0 {Stops {document}} other {Stops {document} and # more}}",
       "showAll": "Show all {count}",
       "blocking": {
         "title": "Stopped documents",
         "description": "Documents failed because these values have no translation.",
-        "stopped": "{count, plural, one {Stopped # document} other {Stopped # documents}}",
-        "seenIn": "Seen in"
+        "seenIn": "Seen in",
+        "seenAll": "Show all {count}"
       },
       "upcoming": {
         "title": "Coming up",
         "description": "Your ERP uses these values, but no document has needed them yet.",
-        "items": "{count, plural, one {# item in your ERP export uses it} other {# items in your ERP export use it}}"
+        "items": "{count, plural, one {# item in your ERP data uses it} other {# items in your ERP data use it}}"
       }
     },
     "fixed": {
-      "title": "{code} is now sent as {target}",
-      "description": "{document} stopped because {code} had no translation.",
-      "reprocess": "Now process the document again",
-      "reprocessEach": "{count, plural, one {Now process the document again:} other {Now process the # documents again:}}"
+      "title": "{direction, select, inbound {{code} now becomes {target}} other {{code} is now sent as {target}}}",
+      "titleMany": "{codes} are translated now",
+      "description": "{count, plural, one {A document stopped because the translation was missing. Process it again so it uses the new translation.} other {# documents stopped because the translation was missing. Process them again so they use the new translation.}}",
+      "reprocess": "Process {document} again",
+      "more": "and {count} more",
+      "showAll": "Show all {count}"
+    },
+    "uses": {
+      "unused": "No document uses it yet. Add it to a mapping with the “Code translation” step."
     }
   },
   "CodeTranslations": {
@@ -3498,7 +3508,7 @@
     "import": {
       "open": "Import CSV",
       "title": "Import CSV",
-      "description": "Add and update entries from a CSV with a source code and a target code per line. The import merges: it adds new source codes and changes target codes, and it keeps every entry missing from the CSV.",
+      "description": "Add and change values from a CSV with {direction, select, inbound {what the partner sends and your value} other {your value and what the partner gets}} on each line. The import merges: it adds new values, changes existing ones and keeps every value missing from the CSV.",
       "close": "Close",
       "cancel": "Cancel",
       "file": {
@@ -3507,7 +3517,7 @@
       },
       "text": {
         "label": "CSV text",
-        "description": "Or paste the CSV here: one entry per line, source code and target code separated by a semicolon, comma or tab. A header line such as source;target is skipped."
+        "description": "Or paste the CSV here: one value per line, {direction, select, inbound {what the partner sends and your value} other {your value and what the partner gets}} separated by a semicolon, comma or tab. A header line such as source;target is skipped."
       },
       "preview": "Preview import",
       "previewing": "Loading preview…",
@@ -3523,9 +3533,9 @@
       },
       "result": {
         "title": "Preview",
-        "description": "Nothing changes until you apply the import. Entries missing from the CSV are kept, and invalid lines are skipped.",
-        "noLines": "The CSV has no entry lines.",
-        "nothingToApply": "The CSV neither adds nor changes an entry, so there is nothing to apply.",
+        "description": "Nothing changes until you apply the import. Values missing from the CSV are kept, and invalid lines are skipped.",
+        "noLines": "The CSV has no value lines.",
+        "nothingToApply": "The CSV neither adds nor changes a value, so there is nothing to apply.",
         "filter": "Show lines",
         "all": "All",
         "lines": "Lines of the CSV",
@@ -3544,19 +3554,19 @@
       "columns": {
         "line": "Line",
         "status": "Status",
-        "sourceCode": "Source code",
-        "targetCode": "Target code",
+        "sourceCode": "{direction, select, inbound {What the partner sends} other {Your value}}",
+        "targetCode": "{direction, select, inbound {Your value} other {What the partner gets}}",
         "details": "Details"
       },
       "reasons": {
         "columnCount": "Needs exactly two columns.",
-        "sourceCodeMissing": "The source code is missing.",
-        "targetCodeMissing": "The target code is missing.",
-        "sourceCodeTooLong": "The source code has more than {max} characters.",
-        "targetCodeTooLong": "The target code has more than {max} characters.",
-        "duplicateSourceCode": "The source code already occurs in an earlier line."
+        "sourceCodeMissing": "{direction, select, inbound {The partner’s code is missing.} other {Your value is missing.}}",
+        "targetCodeMissing": "{direction, select, inbound {Your value is missing.} other {The partner’s code is missing.}}",
+        "sourceCodeTooLong": "{direction, select, inbound {The partner’s code} other {Your value}} has more than {max} characters.",
+        "targetCodeTooLong": "{direction, select, inbound {Your value} other {The partner’s code}} has more than {max} characters.",
+        "duplicateSourceCode": "{direction, select, inbound {The partner’s code} other {Your value}} already occurs in an earlier line."
       },
-      "applied": "CSV imported: {added, plural, one {# entry added} other {# entries added}}, {changed, plural, one {# entry changed} other {# entries changed}}."
+      "applied": "CSV imported: {added, plural, one {# value added} other {# values added}}, {changed, plural, one {# value changed} other {# values changed}}."
     }
   },
   "ManualSubmission": {

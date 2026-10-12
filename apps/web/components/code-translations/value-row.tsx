@@ -11,7 +11,12 @@ import {
   problemsOf,
   trimmedEntry,
 } from '@/components/code-translations/lookup-table-entries'
-import { type CodeMeaning, type LookupTableEntry, maxLookupCodeLength } from '@edi-bridge/contracts'
+import {
+  type CodeMeaning,
+  type Direction,
+  type LookupTableEntry,
+  maxLookupCodeLength,
+} from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Input } from '@edi-bridge/ui/components/input'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -22,7 +27,7 @@ export function focusOnMount(element: HTMLElement | null) {
   element?.focus()
 }
 
-function revealOnMount(row: HTMLLIElement | null) {
+export function revealOnMount(row: HTMLElement | null) {
   row?.scrollIntoView({ block: 'center' })
 }
 
@@ -41,7 +46,7 @@ function useProblemMessage() {
   }
 }
 
-function SentAs() {
+export function SentAs({ direction }: { direction: Direction }) {
   const t = useTranslations('CodeTranslation.values')
 
   return (
@@ -52,7 +57,7 @@ function SentAs() {
         aria-hidden
         className="text-muted-foreground size-4 shrink-0"
       />
-      <span className="sr-only"> {t('sentAs')} </span>
+      <span className="sr-only"> {t('arrow', { direction })} </span>
     </>
   )
 }
@@ -107,7 +112,7 @@ function CodeInput({
   )
 }
 
-function useValidation(entries: ReadonlyArray<LookupTableEntry>, index: number | null) {
+export function useValidation(entries: ReadonlyArray<LookupTableEntry>, index: number | null) {
   const [attempted, setAttempted] = useState(false)
   const problemMessage = useProblemMessage()
 
@@ -136,6 +141,7 @@ function useValidation(entries: ReadonlyArray<LookupTableEntry>, index: number |
 
 export function ValueRow({
   entry,
+  direction,
   index,
   entries,
   meaningOf,
@@ -147,6 +153,7 @@ export function ValueRow({
   onRemove,
 }: {
   entry: LookupTableEntry
+  direction: Direction
   index: number
   entries: ReadonlyArray<LookupTableEntry>
   meaningOf: MeaningOf
@@ -172,6 +179,7 @@ export function ValueRow({
     return (
       <li className="bg-muted/50 rounded-lg p-2">
         <EditValueForm
+          direction={direction}
           entries={entries}
           entry={entry}
           index={index}
@@ -191,7 +199,7 @@ export function ValueRow({
         highlighted && 'ring-primary ring-2',
       )}>
       <span className="truncate font-mono sm:text-base">{entry.sourceCode}</span>
-      <SentAs />
+      <SentAs direction={direction} />
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <span className="truncate font-mono font-medium sm:text-base">{entry.targetCode}</span>
         {meaning && <span className="text-muted-foreground truncate text-xs">{meaning}</span>}
@@ -234,6 +242,7 @@ export function ValueRow({
 
 function EditValueForm({
   entry,
+  direction,
   index,
   entries,
   saving,
@@ -241,6 +250,7 @@ function EditValueForm({
   onCancel,
 }: {
   entry: LookupTableEntry
+  direction: Direction
   index: number
   entries: ReadonlyArray<LookupTableEntry>
   saving: boolean
@@ -260,7 +270,7 @@ function EditValueForm({
       onSubmit={(event) => validation.submit(event, draft, onSave)}>
       <CodeInput
         focusFirst
-        label={t('yours')}
+        label={t('source', { direction })}
         labelVisible={false}
         problem={messages.sourceCode}
         value={draft.sourceCode}
@@ -268,11 +278,11 @@ function EditValueForm({
         onChange={(sourceCode) => setDraft({ ...draft, sourceCode })}
       />
       <span className="flex h-8 items-center">
-        <SentAs />
+        <SentAs direction={direction} />
       </span>
       <CodeInput
         focusFirst={false}
-        label={t('theirs')}
+        label={t('target', { direction })}
         labelVisible={false}
         problem={messages.targetCode}
         value={draft.targetCode}
@@ -295,6 +305,7 @@ export type AddDraft = { key: number; sourceCode: string }
 
 export function AddValueForm({
   initial,
+  direction,
   entries,
   suggestionsOf,
   meaningOf,
@@ -303,6 +314,7 @@ export function AddValueForm({
   onCancel,
 }: {
   initial: AddDraft
+  direction: Direction
   entries: ReadonlyArray<LookupTableEntry>
   suggestionsOf: (sourceCode: string) => ReadonlyArray<CodeMeaning>
   meaningOf: MeaningOf
@@ -330,7 +342,7 @@ export function AddValueForm({
       <div className="flex flex-wrap items-start gap-2">
         <CodeInput
           focusFirst={initial.sourceCode === ''}
-          label={t('yours')}
+          label={t('source', { direction })}
           labelVisible
           problem={messages.sourceCode}
           value={sourceCode}
@@ -338,11 +350,11 @@ export function AddValueForm({
           onChange={setSourceCode}
         />
         <span className="flex h-8 items-center self-end">
-          <SentAs />
+          <SentAs direction={direction} />
         </span>
         <CodeInput
           focusFirst={initial.sourceCode !== ''}
-          label={t('theirs')}
+          label={t('target', { direction })}
           labelVisible
           problem={messages.targetCode}
           value={targetCode}

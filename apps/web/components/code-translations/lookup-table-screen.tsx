@@ -7,7 +7,12 @@ import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
-import { LookupTableValues } from '@/components/code-translations/lookup-table-values'
+import { tableDirection } from '@/components/code-translations/lookup-table-entries'
+import {
+  LookupTableValues,
+  openMissingCodes,
+  useFixedCodes,
+} from '@/components/code-translations/lookup-table-values'
 import { LoadFailure } from '@/components/detail-parts'
 import { ImportCsvDialog } from '@/components/lookup-tables/import-csv-dialog'
 import { useSession } from '@/hooks/use-session'
@@ -41,10 +46,12 @@ export function LookupTableScreen({
   id,
   add,
   code,
+  run,
 }: {
   id: string
   add?: string | undefined
   code?: string | undefined
+  run?: string | undefined
 }) {
   const t = useTranslations('CodeTranslation')
   const tImport = useTranslations('LookupTable.import')
@@ -53,6 +60,7 @@ export function LookupTableScreen({
   const session = useSession()
   const [importOpen, setImportOpen] = useState(false)
   const [imported, setImported] = useState('')
+  const fixedCodes = useFixedCodes()
   const importButton = useRef<HTMLButtonElement>(null)
   const requestedCode = add ?? code
 
@@ -85,16 +93,21 @@ export function LookupTableScreen({
           <LookupTableValues
             key={`${data.id}:${requestedCode ?? ''}`}
             canChange={session.canChange}
+            fixed={fixedCodes.fixed}
             missing={missing}
+            originRunId={run}
             requestedCode={requestedCode}
             table={data}
+            onFixed={fixedCodes.record}
           />
           {session.canChange && (
             <ImportCsvDialog
+              direction={tableDirection(data.uses)}
               finalFocus={importButton}
               open={importOpen}
               table={data}
-              onImported={(_, counts) => {
+              onImported={(saved, counts) => {
+                fixedCodes.record(openMissingCodes(missing.data, data.entries) ?? [], saved, false)
                 setImportOpen(false)
                 setImported(tImport('applied', { added: counts.added, changed: counts.changed }))
               }}

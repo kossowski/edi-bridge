@@ -27,6 +27,7 @@ import {
 import { importLookupTable, previewLookupTableImport } from '@/lib/api/client'
 import { lookupTableKeys, storeSavedLookupTable } from '@/lib/api/queries'
 import {
+  type Direction,
   type LookupTable,
   type LookupTableImportReason,
   type LookupTableImportRow,
@@ -72,6 +73,7 @@ function StatusBadge({ status }: { status: LookupTableImportStatus }) {
 
 function CsvSource({
   csv,
+  direction,
   error,
   focusOnMount,
   previewing,
@@ -81,6 +83,7 @@ function CsvSource({
   onSubmit,
 }: {
   csv: string
+  direction: Direction
   error: SourceError | null
   focusOnMount: boolean
   previewing: boolean
@@ -151,7 +154,7 @@ function CsvSource({
       </FormField>
       <FormField
         id={textId}
-        description={t('text.description')}
+        description={t('text.description', { direction })}
         error={textError}
         label={
           <label htmlFor={textId} className="text-sm font-medium">
@@ -186,9 +189,11 @@ function CsvSource({
 
 function Reasons({
   reasons,
+  direction,
   className,
 }: {
   reasons: ReadonlyArray<LookupTableImportReason>
+  direction: Direction
   className?: string
 }) {
   const t = useTranslations('LookupTable.import.reasons')
@@ -196,13 +201,13 @@ function Reasons({
   return (
     <ul className={cn('flex flex-col gap-0.5', className)}>
       {reasons.map((reason) => (
-        <li key={reason}>{t(reason, { max: maxLookupCodeLength })}</li>
+        <li key={reason}>{t(reason, { direction, max: maxLookupCodeLength })}</li>
       ))}
     </ul>
   )
 }
 
-function Codes({ row }: { row: LookupTableImportRow }) {
+function Codes({ row, direction }: { row: LookupTableImportRow; direction: Direction }) {
   const t = useTranslations('LookupTable.import')
 
   if (row.status === 'invalid') {
@@ -218,7 +223,7 @@ function Codes({ row }: { row: LookupTableImportRow }) {
         </span>
         <div className="mt-1 sm:hidden">
           <span className="sr-only">{t('columns.details')}: </span>
-          <Reasons reasons={row.reasons} />
+          <Reasons direction={direction} reasons={row.reasons} />
         </div>
       </td>
     )
@@ -264,9 +269,11 @@ function EmptyState({ children }: { children: ReactNode }) {
 
 function PreviewTable({
   rows,
+  direction,
   focusIndex,
 }: {
   rows: ReadonlyArray<LookupTableImportRow>
+  direction: Direction
   focusIndex: number | null
 }) {
   const t = useTranslations('LookupTable.import')
@@ -294,8 +301,8 @@ function PreviewTable({
           <tr>
             <HeaderCell className="w-12 sm:w-16">{t('columns.line')}</HeaderCell>
             <HeaderCell className="sm:w-28">{t('columns.status')}</HeaderCell>
-            <HeaderCell>{t('columns.sourceCode')}</HeaderCell>
-            <HeaderCell>{t('columns.targetCode')}</HeaderCell>
+            <HeaderCell>{t('columns.sourceCode', { direction })}</HeaderCell>
+            <HeaderCell>{t('columns.targetCode', { direction })}</HeaderCell>
             <HeaderCell className="hidden sm:table-cell">{t('columns.details')}</HeaderCell>
           </tr>
         </thead>
@@ -310,9 +317,11 @@ function PreviewTable({
               <td className="px-2 py-1.5">
                 <StatusBadge status={row.status} />
               </td>
-              <Codes row={row} />
+              <Codes direction={direction} row={row} />
               <td className="hidden px-2 py-1.5 sm:table-cell">
-                {row.status === 'invalid' && <Reasons reasons={row.reasons} />}
+                {row.status === 'invalid' && (
+                  <Reasons direction={direction} reasons={row.reasons} />
+                )}
               </td>
             </tr>
           ))}
@@ -324,12 +333,14 @@ function PreviewTable({
 
 function ImportPreview({
   rows,
+  direction,
   applying,
   applyFailed,
   onBack,
   onApply,
 }: {
   rows: ReadonlyArray<LookupTableImportRow>
+  direction: Direction
   applying: boolean
   applyFailed: boolean
   onBack: () => void
@@ -393,7 +404,7 @@ function ImportPreview({
           {filtered.length === 0 ? (
             <EmptyState>{t('result.noMatch')}</EmptyState>
           ) : (
-            <PreviewTable focusIndex={focusIndex} rows={shown} />
+            <PreviewTable direction={direction} focusIndex={focusIndex} rows={shown} />
           )}
           {filtered.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -443,9 +454,11 @@ function ImportPreview({
 
 function ImportSteps({
   tableId,
+  direction,
   onImported,
 }: {
   tableId: string
+  direction: Direction
   onImported: (imported: LookupTable, counts: ImportCounts) => void
 }) {
   const queryClient = useQueryClient()
@@ -473,6 +486,7 @@ function ImportSteps({
       <ImportPreview
         applyFailed={applying.isError}
         applying={applying.isPending}
+        direction={direction}
         rows={preview.rows}
         onApply={() => applying.mutate(preview)}
         onBack={() => {
@@ -487,6 +501,7 @@ function ImportSteps({
   return (
     <CsvSource
       csv={csv}
+      direction={direction}
       error={sourceError}
       focusOnMount={backFromPreview}
       previewFailed={previewing.isError}
@@ -510,12 +525,14 @@ function ImportSteps({
 
 export function ImportCsvDialog({
   table,
+  direction,
   open,
   finalFocus,
   onOpenChange,
   onImported,
 }: {
   table: Pick<LookupTable, 'id'>
+  direction: Direction
   open: boolean
   finalFocus?: RefObject<HTMLElement | null>
   onOpenChange: (open: boolean) => void
@@ -544,9 +561,14 @@ export function ImportCsvDialog({
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t('title')}</DialogTitle>
-          <DialogDescription>{t('description')}</DialogDescription>
+          <DialogDescription>{t('description', { direction })}</DialogDescription>
         </DialogHeader>
-        <ImportSteps key={resetKey} tableId={table.id} onImported={onImported} />
+        <ImportSteps
+          key={resetKey}
+          direction={direction}
+          tableId={table.id}
+          onImported={onImported}
+        />
       </DialogContent>
     </Dialog>
   )

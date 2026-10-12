@@ -1,4 +1,12 @@
-import { type LookupTableEntry, lookupTableEntrySchema } from '@edi-bridge/contracts'
+import {
+  type BlockingMissingCode,
+  type Direction,
+  type FailedRunReference,
+  type LookupTableEntry,
+  lookupTableEntrySchema,
+  type LookupTableUse,
+  type MissingCode,
+} from '@edi-bridge/contracts'
 
 export type EntryProblem = 'required' | 'tooLong' | 'duplicate'
 
@@ -72,5 +80,46 @@ export function matchesFilter(entry: LookupTableEntry, term: string) {
     term === '' ||
     entry.sourceCode.toLocaleLowerCase().includes(term) ||
     entry.targetCode.toLocaleLowerCase().includes(term)
+  )
+}
+
+export function tableDirection(uses: ReadonlyArray<LookupTableUse>): Direction {
+  return uses.some(({ direction }) => direction === 'inbound') ? 'inbound' : 'outbound'
+}
+
+export function newestFirst(runs: ReadonlyArray<FailedRunReference>) {
+  return runs.toSorted((left, right) => right.receivedAt.localeCompare(left.receivedAt))
+}
+
+export type Fix = { code: string; targetCode: string; failedRuns: FailedRunReference[] }
+
+function isBlocking(code: MissingCode): code is BlockingMissingCode {
+  return code.urgency === 'blocking'
+}
+
+export function fixesOf(
+  missingBefore: ReadonlyArray<MissingCode>,
+  saved: ReadonlyArray<LookupTableEntry>,
+): Fix[] {
+  const targets = new Map(saved.map(({ sourceCode, targetCode }) => [sourceCode, targetCode]))
+
+  return missingBefore.filter(isBlocking).flatMap(({ code, failedRuns }) => {
+    const targetCode = targets.get(code)
+
+    return targetCode === undefined ? [] : [{ code, targetCode, failedRuns }]
+  })
+}
+
+export function withFixes(current: ReadonlyArray<Fix>, fixes: ReadonlyArray<Fix>): Fix[] {
+  const codes = new Set(fixes.map(({ code }) => code))
+
+  return [...current.filter(({ code }) => !codes.has(code)), ...fixes]
+}
+
+export function runsToReprocess(fixes: ReadonlyArray<Fix>, originRunId: string | undefined) {
+  const runs = new Map(fixes.flatMap(({ failedRuns }) => failedRuns.map((run) => [run.id, run])))
+
+  return newestFirst([...runs.values()]).toSorted(
+    (left, right) => Number(right.id === originRunId) - Number(left.id === originRunId),
   )
 }

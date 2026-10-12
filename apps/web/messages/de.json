@@ -3335,16 +3335,16 @@
     },
     "values": {
       "title": "Werte",
-      "yours": "Ihr Wert",
-      "theirs": "Was der Partner erhält",
-      "sentAs": "wird gesendet als",
+      "source": "{direction, select, inbound {Was der Partner sendet} other {Ihr Wert}}",
+      "target": "{direction, select, inbound {Ihr Wert} other {Was der Partner erhält}}",
+      "arrow": "{direction, select, inbound {wird zu} other {wird gesendet als}}",
       "meaning": "{code} bedeutet {meaning}.",
       "filter": "Wert suchen",
       "filteredCount": "{count, number} von {total, number} Werten",
       "noMatch": "Kein Wert passt.",
       "empty": {
         "title": "Noch keine Werte",
-        "description": "Fügen Sie den ersten Wert hinzu, z. B. wird Ihre Einheit ST als PCE gesendet.",
+        "description": "{kind, select, units {Fügen Sie den ersten Wert hinzu, z. B. wird die Einheit ST zu PCE.} countries {Fügen Sie den ersten Wert hinzu, z. B. wird das Land Deutschland zu DE.} addresses {Fügen Sie den ersten Wert hinzu, z. B. wird eine Filialnummer zu einer Adress-ID.} other {Fügen Sie den ersten Wert hinzu: einen Code und den Code, zu dem er wird.}}",
         "viewOnlyDescription": "Werte erscheinen hier, sobald ein Admin sie hinzufügt."
       },
       "add": "Wert hinzufügen",
@@ -3356,7 +3356,7 @@
       "cancel": "Abbrechen",
       "suggestions": "Vorgeschlagene Codes",
       "saved": "{code} gespeichert.",
-      "removed": "{code} entfernt. Es wurde als {target} gesendet.",
+      "removed": "{direction, select, inbound {{code} entfernt. Es wurde zu {target}.} other {{code} entfernt. Es wurde als {target} gesendet.}}",
       "undo": "Rückgängig",
       "restored": "{code} wiederhergestellt.",
       "errors": {
@@ -3370,25 +3370,35 @@
       "title": "Noch nicht übersetzt",
       "loading": "Noch nicht übersetzte Werte werden geladen",
       "unavailable": "Die noch nicht übersetzten Werte konnten nicht geladen werden.",
-      "add": "{code} hinzufügen",
+      "accept": "Übernehmen",
+      "acceptCode": "Übernehmen: {code}",
+      "sendAs": "{direction, select, inbound {Was aus {code} wird} other {{code} senden als}}",
+      "or": "oder",
+      "useSuggestion": "{code} verwenden ({meaning})",
+      "stops": "{more, plural, =0 {Stoppt {document}} other {Stoppt {document} und # weitere}}",
       "showAll": "Alle {count} anzeigen",
       "blocking": {
         "title": "Gestoppte Belege",
         "description": "Belege sind fehlgeschlagen, weil diese Werte keine Übersetzung haben.",
-        "stopped": "{count, plural, one {# Beleg gestoppt} other {# Belege gestoppt}}",
-        "seenIn": "Gesehen in"
+        "seenIn": "Gesehen in",
+        "seenAll": "Alle {count} anzeigen"
       },
       "upcoming": {
         "title": "Demnächst",
         "description": "Ihr ERP verwendet diese Werte, aber noch kein Beleg hat sie gebraucht.",
-        "items": "{count, plural, one {# Artikel in Ihrem ERP-Export verwendet ihn} other {# Artikel in Ihrem ERP-Export verwenden ihn}}"
+        "items": "{count, plural, one {# Artikel in Ihren ERP-Daten verwendet ihn} other {# Artikel in Ihren ERP-Daten verwenden ihn}}"
       }
     },
     "fixed": {
-      "title": "{code} wird jetzt als {target} gesendet",
-      "description": "{document} wurde gestoppt, weil {code} keine Übersetzung hatte.",
-      "reprocess": "Beleg jetzt erneut verarbeiten",
-      "reprocessEach": "{count, plural, one {Verarbeiten Sie den Beleg jetzt erneut:} other {Verarbeiten Sie die # Belege jetzt erneut:}}"
+      "title": "{direction, select, inbound {{code} wird jetzt zu {target}} other {{code} wird jetzt als {target} gesendet}}",
+      "titleMany": "{codes} sind jetzt übersetzt",
+      "description": "{count, plural, one {Ein Beleg wurde gestoppt, weil die Übersetzung fehlte. Verarbeiten Sie ihn erneut, damit er die neue Übersetzung verwendet.} other {# Belege wurden gestoppt, weil die Übersetzung fehlte. Verarbeiten Sie sie erneut, damit sie die neue Übersetzung verwenden.}}",
+      "reprocess": "{document} erneut verarbeiten",
+      "more": "und {count} weitere",
+      "showAll": "Alle {count} anzeigen"
+    },
+    "uses": {
+      "unused": "Noch kein Beleg verwendet sie. Fügen Sie sie mit dem Schritt „Code-Übersetzung“ zu einem Mapping hinzu."
     }
   },
   "CodeTranslations": {
@@ -3498,7 +3508,7 @@
     "import": {
       "open": "CSV importieren",
       "title": "CSV importieren",
-      "description": "Einträge aus einer CSV mit einem Ausgangscode und einem Zielcode pro Zeile hinzufügen und aktualisieren. Der Import führt zusammen: Er fügt neue Ausgangscodes hinzu und ändert Zielcodes; jeder Eintrag, der in der CSV fehlt, bleibt erhalten.",
+      "description": "Werte aus einer CSV mit {direction, select, inbound {dem, was der Partner sendet, und Ihrem Wert} other {Ihrem Wert und dem, was der Partner erhält}} pro Zeile hinzufügen und ändern. Der Import führt zusammen: Er fügt neue Werte hinzu, ändert vorhandene und behält jeden Wert, der in der CSV fehlt.",
       "close": "Schließen",
       "cancel": "Abbrechen",
       "file": {
@@ -3507,7 +3517,7 @@
       },
       "text": {
         "label": "CSV-Text",
-        "description": "Oder fügen Sie die CSV hier ein: ein Eintrag pro Zeile, Ausgangscode und Zielcode getrennt durch Semikolon, Komma oder Tabulator. Eine Kopfzeile wie source;target wird übersprungen."
+        "description": "Oder fügen Sie die CSV hier ein: ein Wert pro Zeile, {direction, select, inbound {was der Partner sendet und Ihr Wert} other {Ihr Wert und was der Partner erhält}} getrennt durch Semikolon, Komma oder Tabulator. Eine Kopfzeile wie source;target wird übersprungen."
       },
       "preview": "Vorschau anzeigen",
       "previewing": "Vorschau wird geladen…",
@@ -3523,9 +3533,9 @@
       },
       "result": {
         "title": "Vorschau",
-        "description": "Nichts ändert sich, bis Sie den Import anwenden. Einträge, die in der CSV fehlen, bleiben erhalten; ungültige Zeilen werden übersprungen.",
-        "noLines": "Die CSV enthält keine Eintragszeilen.",
-        "nothingToApply": "Die CSV fügt keinen Eintrag hinzu und ändert keinen, daher gibt es nichts anzuwenden.",
+        "description": "Nichts ändert sich, bis Sie den Import anwenden. Werte, die in der CSV fehlen, bleiben erhalten; ungültige Zeilen werden übersprungen.",
+        "noLines": "Die CSV enthält keine Wertzeilen.",
+        "nothingToApply": "Die CSV fügt keinen Wert hinzu und ändert keinen, daher gibt es nichts anzuwenden.",
         "filter": "Zeilen anzeigen",
         "all": "Alle",
         "lines": "Zeilen der CSV",
@@ -3544,19 +3554,19 @@
       "columns": {
         "line": "Zeile",
         "status": "Status",
-        "sourceCode": "Ausgangscode",
-        "targetCode": "Zielcode",
+        "sourceCode": "{direction, select, inbound {Was der Partner sendet} other {Ihr Wert}}",
+        "targetCode": "{direction, select, inbound {Ihr Wert} other {Was der Partner erhält}}",
         "details": "Details"
       },
       "reasons": {
         "columnCount": "Braucht genau zwei Spalten.",
-        "sourceCodeMissing": "Der Ausgangscode fehlt.",
-        "targetCodeMissing": "Der Zielcode fehlt.",
-        "sourceCodeTooLong": "Der Ausgangscode hat mehr als {max} Zeichen.",
-        "targetCodeTooLong": "Der Zielcode hat mehr als {max} Zeichen.",
-        "duplicateSourceCode": "Der Ausgangscode kommt schon in einer früheren Zeile vor."
+        "sourceCodeMissing": "{direction, select, inbound {Der Code des Partners fehlt.} other {Ihr Wert fehlt.}}",
+        "targetCodeMissing": "{direction, select, inbound {Ihr Wert fehlt.} other {Der Code des Partners fehlt.}}",
+        "sourceCodeTooLong": "{direction, select, inbound {Der Code des Partners} other {Ihr Wert}} hat mehr als {max} Zeichen.",
+        "targetCodeTooLong": "{direction, select, inbound {Ihr Wert} other {Der Code des Partners}} hat mehr als {max} Zeichen.",
+        "duplicateSourceCode": "{direction, select, inbound {Der Code des Partners} other {Ihr Wert}} kommt schon in einer früheren Zeile vor."
       },
-      "applied": "CSV importiert: {added, plural, one {# Eintrag hinzugefügt} other {# Einträge hinzugefügt}}, {changed, plural, one {# Eintrag geändert} other {# Einträge geändert}}."
+      "applied": "CSV importiert: {added, plural, one {# Wert hinzugefügt} other {# Werte hinzugefügt}}, {changed, plural, one {# Wert geändert} other {# Werte geändert}}."
     }
   },
   "ManualSubmission": {

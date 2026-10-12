@@ -84,7 +84,7 @@ export function UsesList({
           <li key={use.mappingId}>
             <Link
               href={mappingHref(use.mappingId)}
-              className="decoration-muted-foreground/50 hover:decoration-foreground focus-visible:ring-ring/50 rounded-sm underline underline-offset-4 outline-none focus-visible:ring-3">
+              className="decoration-muted-foreground/50 hover:decoration-foreground focus-visible:ring-ring/50 inline-block rounded-sm py-0.5 underline underline-offset-4 outline-none focus-visible:ring-3">
               {sentence(use)}
             </Link>
           </li>
