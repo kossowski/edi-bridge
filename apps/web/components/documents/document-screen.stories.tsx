@@ -7,6 +7,7 @@ import { apiUrl } from '@/lib/api/config'
 import {
   type FailureStage,
   type MessageType,
+  runDetailSchema,
   runEndpoint,
   type RunStatus,
   toPath,
@@ -20,7 +21,9 @@ import {
   runDetailHandlers,
   seedChannels,
   seedFlows,
+  seedMappingVersions,
   seedTradingPartners,
+  toMappingVersionSummary,
 } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -62,6 +65,42 @@ function storyRun(
 
 const missingField = storyRun(1, 'INVOIC', 'mapping')
 
+const missingFieldMapping = toMappingVersionSummary(
+  seedMappingVersions.find(({ id }) => id === flowFor('INVOIC').mappingVersionId)!,
+)
+
+const missingFieldDetail = runDetailSchema.parse({
+  ...missingField,
+  steps: [
+    { stage: 'receipt', status: 'succeeded' },
+    { stage: 'mapping', status: 'failed' },
+    { stage: 'validation', status: 'skipped' },
+    { stage: 'delivery', status: 'skipped' },
+  ].map((step) => ({ ...step, startedAt: null, finishedAt: null })),
+  interchange: null,
+  message: null,
+  mappingVersion: missingFieldMapping,
+  replaces: null,
+  replacedBy: null,
+  error: {
+    code: 'missingSourceField',
+    message: 'The source field lines[].gtin is empty',
+    position: null,
+  },
+  problem: {
+    reason: 'missingField',
+    whoFixes: 'you',
+    fixTarget: {
+      kind: 'mapping',
+      mappingId: missingFieldMapping.mappingId,
+      name: missingFieldMapping.mappingName,
+      fieldPath: 'lines[].gtin',
+    },
+  },
+  waitingForTradingPartnerSince: null,
+  duplicateOf: null,
+})
+
 const unreadable = storyRun(2, 'ORDERS', 'parse')
 
 const invalidContentInbound = storyRun(3, 'ORDERS', 'validation')
@@ -94,6 +133,8 @@ const duplicate = {
   },
 }
 
+const duplicateFromErp = storyRun(14, 'INVOIC', 'duplicate')
+
 const runs = [
   missingField,
   unreadable,
@@ -108,6 +149,7 @@ const runs = [
   received,
   original,
   duplicate,
+  duplicateFromErp,
 ]
 
 const channel = seedChannels.find(({ id }) => id === flowFor('INVOIC').destinationChannelId)!
@@ -117,7 +159,12 @@ const meta = preview.meta({
   component: DocumentScreen,
   parameters: { layout: 'fullscreen' },
   beforeEach({ msw }) {
-    msw.use(...runDetailHandlers(apiUrl, { runs }))
+    msw.use(
+      http.get(`${apiUrl}${toPath(runEndpoint.path, { id: missingField.id })}`, () =>
+        HttpResponse.json(missingFieldDetail),
+      ),
+      ...runDetailHandlers(apiUrl, { runs }),
+    )
   },
 })
 
@@ -251,18 +298,23 @@ export const Delivered = meta.story({
       await canvas.findByRole('heading', { name: 'All good, nothing to do' }),
     ).toBeVisible()
     await expect(canvas.getByText(/^Received/)).toBeVisible()
+    await expect(
+      canvas.getByText(
+        `This purchase order from ${partner.name} was translated and passed to your ERP.`,
+      ),
+    ).toBeVisible()
     await expectFixLink(
       canvas.getByRole('link', { name: `View the whole order ${delivered.businessReference}` }),
       `/order-lifecycle?businessReference=${delivered.businessReference}`,
     )
-    await expect(canvas.queryByText('Uploaded by hand', { exact: false })).toBeNull()
+    await expect(canvas.queryByText('uploaded by hand', { exact: false })).toBeNull()
   },
 })
 
 export const UploadedByHand = meta.story({
   args: { id: uploaded.id },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Uploaded by hand', { exact: false })).toBeVisible()
+    await expect(await canvas.findByText('· uploaded by hand', { exact: false })).toBeVisible()
   },
 })
 
@@ -288,12 +340,31 @@ export const Duplicate = meta.story({
   args: { id: duplicate.id },
   async play({ canvas }) {
     await expect(
-      await canvas.findByRole('heading', { name: 'Received twice, ignored' }),
+      await canvas.findByRole('heading', {
+        name: 'Received twice, ignored to avoid a double order',
+      }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        `${partner.name} sent this file a second time. EDI Bridge recognised it and did not pass it on again, so your ERP has only one order ${duplicate.businessReference}.`,
+      ),
     ).toBeVisible()
     await expectFixLink(
       canvas.getByRole('link', { name: 'Open the original document' }),
       `/documents/${original.id}`,
     )
+  },
+})
+
+export const DuplicateFromErp = meta.story({
+  args: { id: duplicateFromErp.id },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Created twice, ignored to avoid a double order',
+      }),
+    ).toBeVisible()
+    await expect(canvas.getByText(/^Your ERP created this document a second time\./)).toBeVisible()
   },
 })
 
@@ -330,6 +401,7 @@ export const NotFound = meta.story({
   args: { id: '40000000-0000-4000-8000-999999999999' },
   async play({ canvas }) {
     await expect(await canvas.findByText('Document not found')).toBeVisible()
+    await expectFixLink(canvas.getByRole('link', { name: 'Back to all documents' }), '/documents')
   },
 })
 

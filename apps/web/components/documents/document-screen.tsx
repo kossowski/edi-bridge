@@ -1,44 +1,32 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 import { AppPage } from '@/components/app-page'
-import { linkClass, LoadFailure } from '@/components/detail-parts'
+import { linkClass, LoadFailure, Loading } from '@/components/detail-parts'
 import { DocumentVerdict } from '@/components/documents/document-verdict'
 import { ProblemCard } from '@/components/documents/problem-card'
+import { RelativeTime } from '@/components/documents/relative-time'
 import { RunStatusBadge } from '@/components/runs/run-status'
 import { useRunTitle } from '@/components/runs/run-title'
 import { ApiError } from '@/lib/api/client'
 import { runQuery } from '@/lib/api/queries'
-import { orderHref } from '@/lib/navigation'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
+import { navigationItems, orderHref } from '@/lib/navigation'
+import { buttonVariants } from '@edi-bridge/ui/components/button'
 
 import type { RunDetail } from '@edi-bridge/contracts'
 
 function DocumentHeader({ run }: { run: RunDetail }) {
   const t = useTranslations('Document.header')
-  const format = useFormatter()
-  const now = useNow({ updateInterval: 60_000 })
-  const receivedAt = new Date(run.receivedAt)
   const reference = run.businessReference
 
   return (
     <>
       <RunStatusBadge status={run.status} />
       <span>
-        {t.rich('receivedAt', {
-          direction: run.direction,
-          relativeTime: format.relativeTime(receivedAt, now),
-          time: (chunks) => (
-            <time
-              dateTime={run.receivedAt}
-              title={format.dateTime(receivedAt, { dateStyle: 'medium', timeStyle: 'medium' })}>
-              {chunks}
-            </time>
-          ),
-        })}
+        {t('receivedAt', { direction: run.direction })} <RelativeTime dateTime={run.receivedAt} />
         {run.manualSubmission && ` · ${t('uploaded')}`}
       </span>
       {reference !== null && (
@@ -60,21 +48,8 @@ function DocumentView({ run }: { run: RunDetail }) {
   )
 }
 
-function DocumentLoading() {
-  const t = useTranslations('Document')
-
-  return (
-    <div aria-busy className="flex flex-col gap-6">
-      <p role="status" className="sr-only">
-        {t('loading')}
-      </p>
-      <Skeleton className="h-5 w-72 max-w-full" />
-      <Skeleton className="h-48 w-full" />
-    </div>
-  )
-}
-
 export function DocumentScreen({ id }: { id: string }) {
+  const t = useTranslations('Document')
   const { data, error, isPending, refetch } = useQuery(runQuery(id))
 
   if (data) {
@@ -84,11 +59,16 @@ export function DocumentScreen({ id }: { id: string }) {
   return (
     <AppPage>
       {isPending ? (
-        <DocumentLoading />
+        <Loading label={t('loading')} rowClassName="h-24" rows={2} />
       ) : (
         <LoadFailure
           namespace="Document"
           notFound={error instanceof ApiError && error.status === 404}
+          notFoundAction={
+            <Link href={navigationItems.documents.href} className={buttonVariants()}>
+              {t('notFound.back')}
+            </Link>
+          }
           onRetry={() => void refetch()}
         />
       )}

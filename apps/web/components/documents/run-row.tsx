@@ -2,10 +2,11 @@
 
 import { ArrowDownLeft01Icon, ArrowUpRight01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 import { FixerBadge } from '@/components/documents/fixer-badge'
+import { RelativeTime } from '@/components/documents/relative-time'
 import { usePlainNames } from '@/components/plain-names'
 import { RunStatusBadge } from '@/components/runs/run-status'
 import { useRunTitle } from '@/components/runs/run-title'
@@ -28,12 +29,9 @@ import type { RunSummary } from '@edi-bridge/contracts'
 export function RunRow({ run }: { run: RunSummary }) {
   const t = useTranslations('Documents.row')
   const plainNames = usePlainNames()
-  const format = useFormatter()
-  const now = useNow({ updateInterval: 60_000 })
   const title = useRunTitle(run)
   const fixer = whoFixes(run)
   const href = runHref(run.id)
-  const receivedAt = new Date(run.receivedAt)
   const reference = run.businessReference
 
   return (
@@ -72,11 +70,7 @@ export function RunRow({ run }: { run: RunSummary }) {
             </>
           )}
           {' · '}
-          <time
-            dateTime={run.receivedAt}
-            title={format.dateTime(receivedAt, { dateStyle: 'medium', timeStyle: 'medium' })}>
-            {format.relativeTime(receivedAt, now)}
-          </time>
+          <RelativeTime dateTime={run.receivedAt} />
           {run.manualSubmission && ` · ${t('uploaded')}`}
         </ItemDescription>
         {run.failureStage !== null && (

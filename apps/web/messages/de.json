@@ -557,7 +557,8 @@
     "loading": "Beleg wird geladen",
     "notFound": {
       "title": "Beleg nicht gefunden",
-      "description": "In diesem Arbeitsbereich gibt es keinen Beleg mit dieser ID. Er wurde vielleicht entfernt, oder der Link ist unvollständig."
+      "description": "In diesem Arbeitsbereich gibt es keinen Beleg mit dieser ID. Er wurde vielleicht entfernt, oder der Link ist unvollständig.",
+      "back": "Zurück zu allen Belegen"
     },
     "error": {
       "title": "Beleg nicht verfügbar",
@@ -565,7 +566,7 @@
       "retry": "Erneut versuchen"
     },
     "header": {
-      "receivedAt": "{direction, select, inbound {Empfangen} other {Erstellt}} <time>{relativeTime}</time>",
+      "receivedAt": "{direction, select, inbound {Empfangen} other {Erstellt}}",
       "uploaded": "Von Hand hochgeladen",
       "order": "Ganzen Auftrag {reference} ansehen"
     },
@@ -619,15 +620,16 @@
     "verdict": {
       "delivered": {
         "title": "Alles in Ordnung, nichts zu tun",
-        "description": "{direction, select, inbound {Dieser Beleg von {tradingPartner} wurde übersetzt und an Ihr ERP übergeben.} other {Dieser Beleg wurde übersetzt und an {tradingPartner} gesendet.}}"
+        "description": "{direction, select, inbound {{messageType, select, DESADV {Dieses} other {Diese}} {messageTypeName} von {tradingPartner} wurde übersetzt und an Ihr ERP übergeben.} other {{messageType, select, DESADV {Dieses} other {Diese}} {messageTypeName} wurde übersetzt und an {tradingPartner} gesendet.}}"
       },
       "inProgress": {
         "title": "Wird noch verarbeitet",
         "description": "Das dauert meist nur wenige Sekunden. Sie müssen nichts tun."
       },
       "duplicate": {
-        "title": "Doppelt empfangen, ignoriert",
-        "description": "{tradingPartner} hat diese Datei ein zweites Mal gesendet. EDI Bridge hat sie erkannt und nicht erneut weitergegeben, damit nichts doppelt verarbeitet wird.",
+        "title": "{direction, select, inbound {Doppelt empfangen} other {Doppelt erstellt}}, ignoriert, um einen doppelten Auftrag zu vermeiden",
+        "description": "{direction, select, inbound {{tradingPartner} hat diese Datei ein zweites Mal gesendet. EDI Bridge hat sie erkannt und nicht erneut weitergegeben, damit Ihr ERP den Auftrag {reference} nur einmal hat.} other {Ihr ERP hat diesen Beleg ein zweites Mal erstellt. EDI Bridge hat ihn erkannt und nicht erneut gesendet, damit {tradingPartner} den Auftrag {reference} nur einmal hat.}}",
+        "descriptionWithoutReference": "{direction, select, inbound {{tradingPartner} hat diese Datei ein zweites Mal gesendet. EDI Bridge hat sie erkannt und nicht erneut weitergegeben, damit Ihr ERP den Auftrag nur einmal hat.} other {Ihr ERP hat diesen Beleg ein zweites Mal erstellt. EDI Bridge hat ihn erkannt und nicht erneut gesendet, damit {tradingPartner} den Auftrag nur einmal hat.}}",
         "original": "Ursprünglichen Beleg öffnen"
       }
     }

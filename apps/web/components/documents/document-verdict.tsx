@@ -2,12 +2,13 @@
 
 import { CheckmarkCircle02Icon, Copy01Icon, HourglassIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 import type { ReactNode } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
+import { usePlainNames } from '@/components/plain-names'
 import { documentHref } from '@/lib/navigation'
 import { Card, CardContent } from '@edi-bridge/ui/components/card'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -52,7 +53,17 @@ function Verdict({
 
 export function DocumentVerdict({ run }: { run: SettledRun }) {
   const t = useTranslations('Document.verdict')
-  const values = { direction: run.direction, tradingPartner: run.tradingPartner.name }
+  const locale = useLocale()
+  const plainNames = usePlainNames()
+  const messageTypeName = plainNames.messageTypeName(run.messageType)
+  const reference = run.businessReference
+
+  const values = {
+    direction: run.direction,
+    tradingPartner: run.tradingPartner.name,
+    messageType: run.messageType,
+    messageTypeName: locale === 'de' ? messageTypeName : messageTypeName.toLocaleLowerCase(locale),
+  }
 
   switch (run.status) {
     case 'delivered': {
@@ -82,10 +93,14 @@ export function DocumentVerdict({ run }: { run: SettledRun }) {
     case 'duplicate': {
       return (
         <Verdict
-          description={t('duplicate.description', values)}
+          description={
+            reference === null
+              ? t('duplicate.descriptionWithoutReference', values)
+              : t('duplicate.description', { ...values, reference })
+          }
           icon={Copy01Icon}
           iconClassName="text-muted-foreground"
-          title={t('duplicate.title')}>
+          title={t('duplicate.title', values)}>
           {run.duplicateOf && (
             <Link href={documentHref(run.duplicateOf.id)} className={cn(linkClass, 'text-sm')}>
               {t('duplicate.original')}

@@ -114,29 +114,17 @@ export function useFixSteps({ problem, tradingPartner }: FailedRun): WhatToDoSte
   const target = problem.fixTarget
 
   switch (problem.whoFixes) {
-    case 'you': {
-      return target
-        ? [
-            {
-              key: 'fix',
-              content: (
-                <StepBody text={t('fixCause')}>
-                  <FixLink primary target={target} />
-                </StepBody>
-              ),
-            },
-          ]
-        : []
-    }
-
+    case 'you':
     case 'retry': {
+      const you = problem.whoFixes === 'you'
+
       return target
         ? [
             {
               key: 'fix',
               content: (
-                <StepBody text={t('checkConnection')}>
-                  <FixLink primary={false} target={target} />
+                <StepBody text={t(you ? 'fixCause' : 'checkConnection')}>
+                  <FixLink primary={you} target={target} />
                 </StepBody>
               ),
             },

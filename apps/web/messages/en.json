@@ -557,7 +557,8 @@
     "loading": "Loading document",
     "notFound": {
       "title": "Document not found",
-      "description": "No document with this ID exists in this workspace. It may have been removed, or the link is incomplete."
+      "description": "No document with this ID exists in this workspace. It may have been removed, or the link is incomplete.",
+      "back": "Back to all documents"
     },
     "error": {
       "title": "Document unavailable",
@@ -565,8 +566,8 @@
       "retry": "Try again"
     },
     "header": {
-      "receivedAt": "{direction, select, inbound {Received} other {Created}} <time>{relativeTime}</time>",
-      "uploaded": "Uploaded by hand",
+      "receivedAt": "{direction, select, inbound {Received} other {Created}}",
+      "uploaded": "uploaded by hand",
       "order": "View the whole order {reference}"
     },
     "problem": {
@@ -619,15 +620,16 @@
     "verdict": {
       "delivered": {
         "title": "All good, nothing to do",
-        "description": "{direction, select, inbound {This document from {tradingPartner} was translated and passed to your ERP.} other {This document was translated and sent to {tradingPartner}.}}"
+        "description": "{direction, select, inbound {This {messageTypeName} from {tradingPartner} was translated and passed to your ERP.} other {This {messageTypeName} was translated and sent to {tradingPartner}.}}"
       },
       "inProgress": {
         "title": "Still being processed",
         "description": "This usually takes a few seconds. You do not need to do anything."
       },
       "duplicate": {
-        "title": "Received twice, ignored",
-        "description": "{tradingPartner} sent this file a second time. EDI Bridge recognised it and did not pass it on again, so nothing is processed twice.",
+        "title": "{direction, select, inbound {Received twice} other {Created twice}}, ignored to avoid a double order",
+        "description": "{direction, select, inbound {{tradingPartner} sent this file a second time. EDI Bridge recognised it and did not pass it on again, so your ERP has only one order {reference}.} other {Your ERP created this document a second time. EDI Bridge recognised it and did not send it again, so {tradingPartner} has only one order {reference}.}}",
+        "descriptionWithoutReference": "{direction, select, inbound {{tradingPartner} sent this file a second time. EDI Bridge recognised it and did not pass it on again, so your ERP has only one order.} other {Your ERP created this document a second time. EDI Bridge recognised it and did not send it again, so {tradingPartner} has only one order.}}",
         "original": "Open the original document"
       }
     }
