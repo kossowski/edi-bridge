@@ -193,9 +193,10 @@ export function toTradingPartnerActivityDetail(
 // Generated overview data has no Flow or Channel records, so each partner with Runs gets the
 // Flows its Runs name and one Channel.
 function withSetupFromRuns(overview: OverviewData): TradingPartnerActivityData {
+  const runs = toRunStore(overview.runs)
   const flows = new Map<string, PartnerFlow>()
 
-  for (const { flow, tradingPartner } of toRunStore(overview.runs).all()) {
+  for (const { flow, tradingPartner } of runs.all()) {
     flows.set(flow.id, { ...flow, tradingPartnerId: tradingPartner.id })
   }
 
@@ -205,17 +206,25 @@ function withSetupFromRuns(overview: OverviewData): TradingPartnerActivityData {
 
   return {
     ...overview,
+    runs,
     flows: [...flows.values()],
     channels: [...partnersWithRuns].map((tradingPartnerId) => ({ tradingPartnerId })),
   }
 }
 
+let largeActivityData: TradingPartnerActivityData | undefined
+
 function activityDataOf(
   source: TradingPartnerActivityData | 'empty' | 'large',
 ): TradingPartnerActivityData {
-  return source === 'empty' || source === 'large'
-    ? withSetupFromRuns(overviewDataOf(source))
-    : source
+  switch (source) {
+    case 'empty':
+      return withSetupFromRuns(overviewDataOf(source))
+    case 'large':
+      return (largeActivityData ??= withSetupFromRuns(overviewDataOf(source)))
+    default:
+      return { ...source, runs: toRunStore(source.runs) }
+  }
 }
 
 export function tradingPartnerActivityHandlers(

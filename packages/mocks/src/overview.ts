@@ -300,6 +300,14 @@ export function seedOverviewData(
 
 export type OverviewState = 'empty' | 'large' | 'loading' | 'error'
 
+let largeOverviewData: OverviewData | undefined
+
+function createLargeOverviewData(): OverviewData {
+  const data = createOverviewData({ tradingPartnerCount: 240, overdueCount: 400, runCount: 30_000 })
+
+  return { ...data, runs: toRunStore(data.runs) }
+}
+
 export function overviewDataOf(source: OverviewData | 'empty' | 'large' | undefined): OverviewData {
   switch (source) {
     case undefined:
@@ -307,7 +315,7 @@ export function overviewDataOf(source: OverviewData | 'empty' | 'large' | undefi
     case 'empty':
       return emptyOverviewData
     case 'large':
-      return createOverviewData({ tradingPartnerCount: 240, overdueCount: 400, runCount: 30_000 })
+      return (largeOverviewData ??= createLargeOverviewData())
     default:
       return source
   }

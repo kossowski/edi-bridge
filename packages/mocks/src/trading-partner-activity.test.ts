@@ -11,7 +11,7 @@ import {
 import { seedChannels } from './channel'
 import { seedFlows } from './flow'
 import { createHandlers } from './index'
-import { createOverdueAcknowledgement, createOverviewData } from './overview'
+import { createOverdueAcknowledgement } from './overview'
 import { createRun } from './run'
 import { createTradingPartner, seedTradingPartners } from './trading-partner'
 import { tradingPartnerActivityHandlers } from './trading-partner-activity'
@@ -176,14 +176,7 @@ describe('GET /trading-partners/activity', () => {
   })
 
   it('serves a large volume of partners', async () => {
-    const data = createOverviewData({
-      tradingPartnerCount: 240,
-      overdueCount: 400,
-      runCount: 30_000,
-      now,
-    })
-
-    server.use(...tradingPartnerActivityHandlers(apiUrl, { ...data, flows: [], channels: [] }))
+    server.use(...tradingPartnerActivityHandlers(apiUrl, 'large'))
 
     expect(await listActivities()).toHaveLength(240)
   })

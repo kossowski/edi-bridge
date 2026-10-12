@@ -168,9 +168,10 @@ export function createRunStore(
   return {
     all: () => placed().runs,
     newestFirst: () =>
-      (newestFirst ??= placed().runs.toSorted(
-        (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
-      )),
+      (newestFirst ??= placed()
+        .runs.map((run) => ({ run, receivedAt: Date.parse(run.receivedAt) }))
+        .sort((a, b) => b.receivedAt - a.receivedAt)
+        .map(({ run }) => run)),
     get: (id) => placed().byId.get(id),
     set: (...changed) => {
       for (const run of changed) {
