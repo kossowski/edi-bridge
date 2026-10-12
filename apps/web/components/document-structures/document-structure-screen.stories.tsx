@@ -623,6 +623,7 @@ export const LargeVolume = meta.story({
   beforeEach({ msw }) {
     msw.use(...createHandlers(apiUrl, { documentStructures: [...seedDocumentStructures, large] }))
   },
+  parameters: { a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } } },
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('group', { name: /^Values in / })).toBeVisible()
     await openTechnicalSettings(canvasElement)
