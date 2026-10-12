@@ -29,6 +29,7 @@ describe('pageItems', () => {
       Object.keys(messages.Pages).toSorted(),
     )
     expect(sidebarItems.map((item) => item.href)).not.toContain('/tasks')
+    expect(sidebarItems.map((item) => item.href)).not.toContain('/first-steps')
   })
 })
 

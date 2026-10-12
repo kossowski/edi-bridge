@@ -128,6 +128,7 @@
   "Navigation": {
     "home": "Start",
     "tasks": "Aufgaben",
+    "firstSteps": "Erste Schritte",
     "documents": "Belege",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
@@ -144,6 +145,10 @@
     "tasks": {
       "label": "Aufgaben",
       "hint": "Alles, was jemanden braucht, nach Zuständigkeit gruppiert"
+    },
+    "firstSteps": {
+      "label": "Erste Schritte",
+      "hint": "Ihren Workspace Schritt für Schritt einrichten, von der GLN bis zum Livebetrieb"
     }
   },
   "NotFound": {
@@ -189,6 +194,10 @@
   },
   "Home": {
     "loading": "Start wird geladen",
+    "setup": {
+      "title": "Einrichtung fortsetzen",
+      "progress": "{done} von {total} erledigt"
+    },
     "window": {
       "label": "Zeitraum",
       "24h": "24 Stunden",
@@ -282,6 +291,76 @@
     "error": {
       "title": "Start nicht verfügbar",
       "description": "Die Startseite konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    }
+  },
+  "FirstSteps": {
+    "loading": "Erste Schritte werden geladen",
+    "heading": "Willkommen. {total, plural, other {# Schritte}} bis zu Ihrem ersten Live-Beleg.",
+    "progress": "{done} von {total} Schritten erledigt",
+    "explainer": {
+      "title": "So funktioniert EDI Bridge",
+      "description": "Ihre Handelspartner senden <term>EDI-Dateien</term>. EDI Bridge liest sie, übersetzt sie in das Format Ihres ERP und macht dasselbe umgekehrt für Lieferavise und Rechnungen.",
+      "tradingPartner": {
+        "title": "Ihr Handelspartner",
+        "text": "Sendet Bestellungen, erwartet Rechnungen"
+      },
+      "bridge": {
+        "title": "EDI Bridge",
+        "text": "Übersetzt, liefert aus, sagt Ihnen, was schiefging"
+      },
+      "erp": {
+        "title": "Ihr ERP",
+        "text": "Empfängt Bestellungen, sendet Lieferavise und Rechnungen"
+      }
+    },
+    "steps": {
+      "label": "Schritte",
+      "number": "Schritt {number}",
+      "next": "Als Nächstes",
+      "done": "Erledigt",
+      "open": "Offen",
+      "viewer": "Diesen Schritt erledigt ein Admin Ihres Workspace.",
+      "gln": {
+        "title": "Firmen-ID (GLN) eintragen",
+        "effort": "2 Minuten",
+        "why": "Ihre Partner erkennen Sie an einer 13-stelligen Nummer, der GLN. Ohne sie können sie Ihre Belege nicht Ihrer Firma zuordnen.",
+        "action": "Firmeneinstellungen öffnen"
+      },
+      "erpConnection": {
+        "title": "ERP anbinden",
+        "effort": "15 Minuten, fragen Sie Ihre IT",
+        "why": "EDI Bridge braucht eine <term>Verbindung</term>, um eingehende Bestellungen zu übergeben und Lieferavise und Rechnungen abzuholen. Meist ist das eine Webadresse oder ein freigegebener Ordner.",
+        "action": "ERP anbinden"
+      },
+      "tradingPartner": {
+        "title": "Ersten Handelspartner anlegen",
+        "effort": "10 Minuten",
+        "why": "Ein <term>Handelspartner</term> ist ein Händler, mit dem Sie Belege austauschen. Sie geben an, wer er ist und wie seine Belege ankommen.",
+        "action": "Handelspartner anlegen"
+      },
+      "mapping": {
+        "title": "Ersten Belegtyp übersetzen",
+        "effort": "20 Minuten, die KI hilft",
+        "why": "Ihr ERP und Ihr Partner beschreiben eine Bestellung unterschiedlich. Ein <term>Mapping</term> sagt EDI Bridge, welches Feld wohin gehört. Ein KI-Entwurf erledigt das meiste, Sie prüfen und veröffentlichen ihn.",
+        "action": "Mapping anlegen"
+      },
+      "testInterchange": {
+        "title": "Testbeleg senden",
+        "effort": "5 Minuten",
+        "why": "Probieren Sie alles mit einem Testbeleg aus. Solange der Partner im <term>Testbetrieb</term> ist, erreicht ihn nichts im Ernst.",
+        "action": "Test senden"
+      },
+      "production": {
+        "title": "Live gehen",
+        "effort": "1 Minute",
+        "why": "Wenn der Test stimmt und Ihr Partner ihn bestätigt hat, schalten Sie den Partner live. Ab dann fließen echte Belege.",
+        "action": "Live gehen"
+      }
+    },
+    "error": {
+      "title": "Erste Schritte nicht verfügbar",
+      "description": "Die ersten Schritte konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     }
   },

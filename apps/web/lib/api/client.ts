@@ -28,6 +28,7 @@ import {
   type DocumentStructureProblem,
   documentStructureProblemSchema,
   documentStructuresEndpoint,
+  firstStepsEndpoint,
   type Endpoint,
   flowEndpoint,
   type FlowInput,
@@ -217,6 +218,10 @@ export function isConflict(error: Error | null) {
 
 export function getCurrentWorkspace() {
   return request(currentWorkspaceEndpoint)
+}
+
+export function getFirstSteps() {
+  return request(firstStepsEndpoint)
 }
 
 export function updateCompanyIdentity(body: CompanyIdentityInput) {

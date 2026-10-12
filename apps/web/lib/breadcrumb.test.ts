@@ -25,6 +25,12 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
+  it('names the first steps page', () => {
+    expect(breadcrumbTrail('/first-steps')).toEqual([
+      { href: '/first-steps', label: { kind: 'page', key: 'firstSteps' } },
+    ])
+  })
+
   it('adds a detail crumb and the subpages below it', () => {
     expect(breadcrumbTrail('/flows/fl-1/edit')).toEqual([
       { href: '/flows', label: { kind: 'item', key: 'allDocumentRoutes' } },

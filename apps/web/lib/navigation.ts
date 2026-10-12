@@ -6,6 +6,7 @@ import {
   HelpCircleIcon,
   HierarchySquare02Icon,
   PlugSocketIcon,
+  Rocket01Icon,
   Route01Icon,
   Settings02Icon,
   ShoppingBasket01Icon,
@@ -39,6 +40,7 @@ export const appIcon = ArrowDataTransferHorizontalIcon
 export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = {
   home: { href: '/', icon: DashboardSquare01Icon },
   tasks: { href: '/tasks', icon: Task01Icon },
+  firstSteps: { href: '/first-steps', icon: Rocket01Icon },
   documents: { href: '/documents', icon: File02Icon },
   orderLifecycle: { href: '/order-lifecycle', icon: Route01Icon },
   tradingPartners: { href: '/trading-partners', icon: UserMultiple02Icon },
@@ -154,7 +156,10 @@ export type PageItemKey = keyof Messages['Pages']
 
 export type PageItem = NavigationItem & { key: PageItemKey }
 
-export const pageItems: ReadonlyArray<PageItem> = [{ key: 'tasks', ...navigationItems.tasks }]
+export const pageItems: ReadonlyArray<PageItem> = [
+  { key: 'tasks', ...navigationItems.tasks },
+  { key: 'firstSteps', ...navigationItems.firstSteps },
+]
 
 export function sidebarItem(key: SidebarItemKey) {
   const item = sidebarItems.find((entry) => entry.key === key)
