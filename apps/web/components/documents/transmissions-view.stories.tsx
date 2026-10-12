@@ -11,7 +11,7 @@ import preview from '../../.storybook/preview'
 
 const runs = createRuns({ count: 40 })
 
-const transmissionsAt = (query: Record<string, string> = {}) => ({
+const transmissionsAt = (query: { q?: string; page?: string } = {}) => ({
   nextjs: { navigation: { pathname: '/documents', query: { view: 'transmissions', ...query } } },
 })
 
@@ -184,5 +184,38 @@ export const Tablet = meta.story({
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByText(transmissionCount)).toBeVisible()
     await expectNoOverflow(canvasElement)
+  },
+})
+
+export const GermanTablet = meta.story({
+  ...tablet,
+  decorators: [german, besideSidebar],
+  beforeEach({ msw }) {
+    msw.use(interchangesHandler(apiUrl, runs))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(/^\d+ Übertragungen?$/)).toBeVisible()
+
+    const search = canvas.getByRole('searchbox', {
+      name: 'Datei-, Bestellnummer oder Partner suchen',
+    })
+
+    const style = getComputedStyle(search)
+    const context = document.createElement('canvas').getContext('2d')
+
+    if (!context) {
+      throw new Error('No canvas context')
+    }
+
+    context.font = style.font
+
+    const textWidth =
+      search.clientWidth -
+      Number.parseFloat(style.paddingLeft) -
+      Number.parseFloat(style.paddingRight)
+
+    await expect(
+      context.measureText(search.getAttribute('placeholder') ?? '').width,
+    ).toBeLessThanOrEqual(textWidth)
   },
 })

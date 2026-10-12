@@ -3,8 +3,12 @@
 import { ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
+import { Fragment, type ReactNode, useId } from 'react'
 
-import { type DocumentFilters, listPageSize } from '@/components/documents/document-filters'
+import type { UseQueryResult } from '@tanstack/react-query'
+
+import { listPageSize, type ResultsProps } from '@/components/documents/document-filters'
+import { LoadError } from '@/components/load-error'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -14,13 +18,17 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@edi-bridge/ui/components/empty'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
-export type EmptyAction = 'clear' | 'firstPage'
+export type EmptyAction = { label: string; onClick: () => void }
 
-export type ResultsProps = {
-  filters: DocumentFilters
-  onChange: (change: Partial<DocumentFilters>) => void
-  onClear: () => void
+export function useEmptyActions({ onChange, onClear }: Pick<ResultsProps, 'onChange' | 'onClear'>) {
+  const t = useTranslations('Documents')
+
+  return {
+    nothingMatches: { label: t('filters.clear'), onClick: onClear },
+    pageOutOfRange: { label: t('pagination.first'), onClick: () => onChange({ page: 1 }) },
+  }
 }
 
 export function ListEmpty({
@@ -28,18 +36,12 @@ export function ListEmpty({
   title,
   description,
   action,
-  onClear,
-  onFirstPage,
 }: {
   icon: IconSvgElement
   title: string
   description: string
   action: EmptyAction | undefined
-  onClear: () => void
-  onFirstPage: () => void
 }) {
-  const t = useTranslations('Documents')
-
   return (
     <Empty className="border border-dashed">
       <EmptyHeader>
@@ -49,17 +51,10 @@ export function ListEmpty({
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
-      {action === 'clear' && (
+      {action && (
         <EmptyContent>
-          <Button variant="outline" onClick={onClear}>
-            {t('filters.clear')}
-          </Button>
-        </EmptyContent>
-      )}
-      {action === 'firstPage' && (
-        <EmptyContent>
-          <Button variant="outline" onClick={onFirstPage}>
-            {t('pagination.first')}
+          <Button variant="outline" onClick={action.onClick}>
+            {action.label}
           </Button>
         </EmptyContent>
       )}
@@ -105,5 +100,81 @@ export function Pagination({
         </Button>
       </div>
     </nav>
+  )
+}
+
+export function ListResults<List extends { total: number }, Entry>({
+  query: { data, isError, isPending, isPlaceholderData, refetch },
+  page,
+  onPage,
+  entries,
+  renderEntry,
+  skeleton,
+  skeletonCount,
+  label,
+  className,
+  error,
+  empty,
+}: {
+  query: UseQueryResult<List>
+  page: number
+  onPage: (page: number) => void
+  entries: (list: List) => ReadonlyArray<Entry>
+  renderEntry: (entry: Entry) => ReactNode
+  skeleton: ReactNode
+  skeletonCount: number
+  label: string
+  className?: string
+  error: { title: string; description: string; retry: string }
+  empty: (list: List) => ReactNode
+}) {
+  const listId = useId()
+  const settled = isPlaceholderData ? undefined : data
+
+  if (isError && !data) {
+    return (
+      <LoadError
+        description={error.description}
+        retryLabel={error.retry}
+        title={error.title}
+        onRetry={() => void refetch()}
+      />
+    )
+  }
+
+  if (settled && entries(settled).length === 0) {
+    return empty(settled)
+  }
+
+  const shown = data && !(isPlaceholderData && entries(data).length === 0) ? data : undefined
+
+  return (
+    <>
+      <ul
+        id={listId}
+        aria-busy={isPending || isPlaceholderData}
+        aria-label={label}
+        className={cn(
+          'flex flex-col gap-2',
+          isPlaceholderData && 'opacity-60 transition-opacity',
+          className,
+        )}>
+        {shown
+          ? entries(shown).map(renderEntry)
+          : Array.from({ length: skeletonCount }, (_, index) => (
+              <Fragment key={index}>{skeleton}</Fragment>
+            ))}
+      </ul>
+      {data && (
+        <Pagination
+          page={page}
+          total={data.total}
+          onPage={(next) => {
+            onPage(next)
+            document.getElementById(listId)?.scrollIntoView({ block: 'start' })
+          }}
+        />
+      )}
+    </>
   )
 }

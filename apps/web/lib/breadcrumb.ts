@@ -1,4 +1,12 @@
-import { navigationItems, type SidebarItemKey, sidebarItem, sidebarItems } from './navigation'
+import {
+  activeSidebarItem,
+  navigationItems,
+  type SidebarItemKey,
+  sidebarItem,
+  sidebarItems,
+} from './navigation'
+
+import type { SearchParamsReader } from './search-params'
 
 const subpageKeys = ['new', 'edit', 'versions', 'compare'] as const
 
@@ -54,14 +62,18 @@ function subpageKey(segment: string) {
   return subpageKeys.find((key) => key === segment)
 }
 
-export function breadcrumbTrail(pathname: string): ReadonlyArray<Crumb> {
+export function breadcrumbTrail(
+  pathname: string,
+  searchParams: SearchParamsReader = new URLSearchParams(),
+): ReadonlyArray<Crumb> {
   const [first, ...rest] = pathname.split('/').filter(Boolean)
 
   if (first === undefined) {
     return [itemSection('home')]
   }
 
-  const section = sections.get(first)
+  const active = rest.length === 0 ? activeSidebarItem(pathname, searchParams) : undefined
+  const section = active ? itemSection(active) : sections.get(first)
 
   if (!section) {
     return [{ href: pathname, label: { kind: 'notFound' } }]

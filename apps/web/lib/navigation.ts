@@ -18,6 +18,12 @@ import {
 import type { IconSvgElement } from '@hugeicons/react'
 import type { Messages } from 'next-intl'
 
+import type { SearchParamsReader } from './search-params'
+
+export const documentViews = ['documents', 'transmissions'] as const
+
+export type DocumentView = (typeof documentViews)[number]
+
 export type NavigationKey = keyof Messages['Navigation']
 
 type NavigationItem = {
@@ -65,7 +71,7 @@ type SidebarItemSource = {
   key: SidebarItemKey
   page: NavigationKey
   icon?: IconSvgElement
-  search?: Record<string, string>
+  search?: { view: DocumentView }
 }
 
 export type SidebarItem = NavigationItem & { key: SidebarItemKey }
@@ -149,8 +155,6 @@ export function sidebarItem(key: SidebarItemKey) {
 
   return item
 }
-
-type SearchParamsReader = { get: (name: string) => string | null }
 
 export function activeSidebarItem(pathname: string, searchParams: SearchParamsReader) {
   let active: SidebarItem | undefined

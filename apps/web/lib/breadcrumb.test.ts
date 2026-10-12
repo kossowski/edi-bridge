@@ -37,6 +37,12 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
+  it('names the Transmissions view of the documents', () => {
+    expect(breadcrumbTrail('/documents', new URLSearchParams({ view: 'transmissions' }))).toEqual([
+      { href: '/documents?view=transmissions', label: { kind: 'item', key: 'transmissions' } },
+    ])
+  })
+
   it('puts a Run under the documents', () => {
     expect(breadcrumbTrail('/runs/run-1')).toEqual([
       { href: '/documents', label: { kind: 'item', key: 'documents' } },

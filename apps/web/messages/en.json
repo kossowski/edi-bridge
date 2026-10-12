@@ -271,7 +271,7 @@
       "title": "Overdue Acknowledgements",
       "description": "{count, plural, =0 {Every sent Interchange was acknowledged in time.} one {# sent Interchange without an Acknowledgement within the time limit. Longest Overdue first.} other {# sent Interchanges without an Acknowledgement within the time limit. Longest Overdue first.}}",
       "caption": "Overdue Acknowledgements, longest Overdue first",
-      "interchangeLink": "Interchange {controlReference}",
+      "interchangeLink": "Transmission {controlReference}",
       "hours": "{hours, plural, one {# hour} other {# hours}}",
       "showAll": "Show all {count, number} Overdue Acknowledgements",
       "columns": {
@@ -469,7 +469,7 @@
       "messageType": "Document type",
       "allMessageTypes": "All document types",
       "clear": "Clear filters",
-      "searchTransmissions": "Search file number, order number or partner"
+      "searchInterchanges": "Search file number, order number or partner"
     },
     "statusGroups": "Status",
     "list": "Documents, newest first",
@@ -521,7 +521,7 @@
       "description": "The documents could not be loaded. Try again.",
       "retry": "Try again"
     },
-    "transmissions": {
+    "interchanges": {
       "explanation": "A transmission is one file exchanged with a partner. Most hold a single document, but a file can carry several, for example two purchase orders sent together. This view helps when a partner asks “did you get our file 00123?”.",
       "list": "Transmissions, newest first",
       "loading": "Loading transmissions",
@@ -532,7 +532,7 @@
         "documents": "{count, plural, one {# document} other {# documents}}"
       },
       "empty": {
-        "noTransmissions": {
+        "noInterchanges": {
           "title": "No transmissions yet",
           "description": "Files appear here as soon as a partner sends one or a document goes out to a partner."
         },
@@ -589,7 +589,7 @@
       "flow": "Flow",
       "source": "Source",
       "mappingVersion": "Mapping Version",
-      "interchange": "Interchange",
+      "interchange": "Transmission",
       "replaces": "Replaces",
       "replacedBy": "Replaced by"
     },

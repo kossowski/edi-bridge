@@ -15,15 +15,15 @@ import { useId } from 'react'
 import {
   type DocumentFilters,
   hasSearchFilters,
+  type ResultsProps,
   toInterchangeListQuery,
 } from '@/components/documents/document-filters'
 import {
   type EmptyAction,
   ListEmpty,
-  Pagination,
-  type ResultsProps,
+  ListResults,
+  useEmptyActions,
 } from '@/components/documents/list-parts'
-import { LoadError } from '@/components/load-error'
 import { usePlainNames } from '@/components/plain-names'
 import { RunStatusBadge } from '@/components/runs/run-status'
 import { interchangesQuery } from '@/lib/api/queries'
@@ -37,12 +37,11 @@ import {
   ItemTitle,
 } from '@edi-bridge/ui/components/item'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
-import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { InterchangeList, InterchangeSummary } from '@edi-bridge/contracts'
 
 function InterchangeRow({ interchange }: { interchange: InterchangeSummary }) {
-  const t = useTranslations('Documents.transmissions.row')
+  const t = useTranslations('Documents.interchanges.row')
   const plainNames = usePlainNames()
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
@@ -109,17 +108,12 @@ function InterchangeRowSkeleton() {
   )
 }
 
-type EmptyKind = 'noTransmissions' | 'nothingMatches' | 'pageOutOfRange'
+type EmptyKind = 'noInterchanges' | 'nothingMatches' | 'pageOutOfRange'
 
 const emptyIcons: Record<EmptyKind, IconSvgElement> = {
-  noTransmissions: Route01Icon,
+  noInterchanges: Route01Icon,
   nothingMatches: SearchRemoveIcon,
   pageOutOfRange: Route01Icon,
-}
-
-const emptyActions: Partial<Record<EmptyKind, EmptyAction>> = {
-  nothingMatches: 'clear',
-  pageOutOfRange: 'firstPage',
 }
 
 function emptyKind(filters: DocumentFilters, list: InterchangeList): EmptyKind {
@@ -127,77 +121,19 @@ function emptyKind(filters: DocumentFilters, list: InterchangeList): EmptyKind {
     return 'pageOutOfRange'
   }
 
-  return hasSearchFilters(filters) ? 'nothingMatches' : 'noTransmissions'
+  return hasSearchFilters(filters) ? 'nothingMatches' : 'noInterchanges'
 }
 
-export function TransmissionResults({ filters, onChange, onClear }: ResultsProps) {
-  const t = useTranslations('Documents.transmissions')
-  const listId = useId()
+export function InterchangeResults({ filters, onChange, onClear }: ResultsProps) {
+  const t = useTranslations('Documents.interchanges')
 
-  const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(
-    interchangesQuery(toInterchangeListQuery(filters)),
-  )
+  const emptyActions: Partial<Record<EmptyKind, EmptyAction>> = useEmptyActions({
+    onChange,
+    onClear,
+  })
 
-  const settled = isPlaceholderData ? undefined : data
-
-  function results() {
-    if (isError && !data) {
-      return (
-        <LoadError
-          description={t('error.description')}
-          retryLabel={t('error.retry')}
-          title={t('error.title')}
-          onRetry={() => void refetch()}
-        />
-      )
-    }
-
-    if (settled?.interchanges.length === 0) {
-      const kind = emptyKind(filters, settled)
-
-      return (
-        <ListEmpty
-          action={emptyActions[kind]}
-          description={t(`empty.${kind}.description`)}
-          icon={emptyIcons[kind]}
-          title={t(`empty.${kind}.title`)}
-          onClear={onClear}
-          onFirstPage={() => onChange({ page: 1 })}
-        />
-      )
-    }
-
-    const waiting = isPending || (isPlaceholderData && data.interchanges.length === 0)
-
-    return (
-      <>
-        <ul
-          id={listId}
-          aria-busy={isPending || isPlaceholderData}
-          aria-label={t('list')}
-          className={cn(
-            'flex flex-col gap-2',
-            isPlaceholderData && 'opacity-60 transition-opacity',
-          )}>
-          {waiting
-            ? Array.from({ length: 6 }, (_, index) => <InterchangeRowSkeleton key={index} />)
-            : data.interchanges.map((interchange) => (
-                <InterchangeRow key={interchange.id} interchange={interchange} />
-              ))}
-        </ul>
-        {data && (
-          <Pagination
-            page={filters.page}
-            total={data.total}
-            onPage={(page) => {
-              onChange({ page })
-              document.getElementById(listId)?.scrollIntoView({ block: 'start' })
-            }}
-          />
-        )}
-      </>
-    )
-  }
+  const query = useQuery(interchangesQuery(toInterchangeListQuery(filters)))
+  const { data, isPending } = query
 
   return (
     <>
@@ -207,7 +143,35 @@ export function TransmissionResults({ filters, onChange, onClear }: ResultsProps
           {isPending ? t('loading') : data && t('count', { count: data.total })}
         </p>
       </div>
-      {results()}
+      <ListResults
+        empty={(list) => {
+          const kind = emptyKind(filters, list)
+
+          return (
+            <ListEmpty
+              action={emptyActions[kind]}
+              description={t(`empty.${kind}.description`)}
+              icon={emptyIcons[kind]}
+              title={t(`empty.${kind}.title`)}
+            />
+          )
+        }}
+        entries={(list) => list.interchanges}
+        error={{
+          title: t('error.title'),
+          description: t('error.description'),
+          retry: t('error.retry'),
+        }}
+        label={t('list')}
+        page={filters.page}
+        query={query}
+        renderEntry={(interchange) => (
+          <InterchangeRow key={interchange.id} interchange={interchange} />
+        )}
+        skeleton={<InterchangeRowSkeleton />}
+        skeletonCount={6}
+        onPage={(page) => onChange({ page })}
+      />
     </>
   )
 }

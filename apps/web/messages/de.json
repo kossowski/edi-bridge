@@ -271,7 +271,7 @@
       "title": "Überfällige Acknowledgements",
       "description": "{count, plural, =0 {Für jedes gesendete Interchange kam das Acknowledgement rechtzeitig an.} one {# gesendetes Interchange ohne Acknowledgement innerhalb der Frist. Am längsten überfällige zuerst.} other {# gesendete Interchanges ohne Acknowledgement innerhalb der Frist. Am längsten überfällige zuerst.}}",
       "caption": "Überfällige Acknowledgements, am längsten überfällige zuerst",
-      "interchangeLink": "Interchange {controlReference}",
+      "interchangeLink": "Übertragung {controlReference}",
       "hours": "{hours, plural, one {# Stunde} other {# Stunden}}",
       "showAll": "Alle {count, number} überfälligen Acknowledgements anzeigen",
       "columns": {
@@ -469,7 +469,7 @@
       "messageType": "Belegart",
       "allMessageTypes": "Alle Belegarten",
       "clear": "Filter zurücksetzen",
-      "searchTransmissions": "Dateinummer, Bestellnummer oder Partner suchen"
+      "searchInterchanges": "Datei-, Bestellnummer oder Partner suchen"
     },
     "statusGroups": "Status",
     "list": "Belege, neueste zuerst",
@@ -521,7 +521,7 @@
       "description": "Die Belege konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     },
-    "transmissions": {
+    "interchanges": {
       "explanation": "Eine Übertragung ist eine Datei, die Sie mit einem Partner austauschen. Meist enthält sie einen einzigen Beleg, eine Datei kann aber auch mehrere enthalten, zum Beispiel zwei Bestellungen, die zusammen gesendet wurden. Diese Ansicht hilft, wenn ein Partner fragt: „Haben Sie unsere Datei 00123 erhalten?“",
       "list": "Übertragungen, neueste zuerst",
       "loading": "Übertragungen werden geladen",
@@ -532,7 +532,7 @@
         "documents": "{count, plural, one {# Beleg} other {# Belege}}"
       },
       "empty": {
-        "noTransmissions": {
+        "noInterchanges": {
           "title": "Noch keine Übertragungen",
           "description": "Dateien erscheinen hier, sobald ein Partner eine sendet oder ein Beleg an einen Partner hinausgeht."
         },
@@ -589,7 +589,7 @@
       "flow": "Flow",
       "source": "Quelle",
       "mappingVersion": "Mapping Version",
-      "interchange": "Interchange",
+      "interchange": "Übertragung",
       "replaces": "Ersetzt",
       "replacedBy": "Ersetzt durch"
     },

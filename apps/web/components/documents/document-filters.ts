@@ -6,15 +6,14 @@ import {
   type RunStatus,
 } from '@edi-bridge/contracts'
 
+import { type DocumentView, documentViews } from '../../lib/navigation'
 import { groupStatuses, type StatusGroup, statusGroups } from '../../lib/status-groups'
+
+import type { SearchParamsReader } from '../../lib/search-params'
 
 export const defaultStatusGroup: StatusGroup = 'attention'
 
 export const listPageSize = 50
-
-export const documentViews = ['documents', 'transmissions'] as const
-
-export type DocumentView = (typeof documentViews)[number]
 
 export type DocumentFilters = {
   view: DocumentView
@@ -23,6 +22,12 @@ export type DocumentFilters = {
   tradingPartnerId: string
   messageType: MessageType | ''
   page: number
+}
+
+export type ResultsProps = {
+  filters: DocumentFilters
+  onChange: (change: Partial<DocumentFilters>) => void
+  onClear: () => void
 }
 
 export const clearedSearchFilters = {
@@ -37,8 +42,6 @@ export const emptyDocumentFilters: DocumentFilters = {
   ...clearedSearchFilters,
   page: 1,
 }
-
-type SearchParamsReader = { get: (name: string) => string | null }
 
 const uuidPattern = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 

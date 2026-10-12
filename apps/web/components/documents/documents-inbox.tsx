@@ -11,29 +11,28 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   clearedSearchFilters,
   type DocumentFilters,
-  type DocumentView,
-  documentViews,
   hasSearchFilters,
+  type ResultsProps,
   statusGroupCount,
   toRunListQuery,
 } from '@/components/documents/document-filters'
+import { InterchangeResults } from '@/components/documents/interchange-results'
 import {
   type EmptyAction,
   ListEmpty,
-  Pagination,
-  type ResultsProps,
+  ListResults,
+  useEmptyActions,
 } from '@/components/documents/list-parts'
 import { RunRow, RunRowSkeleton } from '@/components/documents/run-row'
-import { TransmissionResults } from '@/components/documents/transmission-results'
 import { useDocumentFilters } from '@/components/documents/use-document-filters'
-import { LoadError } from '@/components/load-error'
 import { usePlainNames } from '@/components/plain-names'
 import { runsQuery, tradingPartnersQuery } from '@/lib/api/queries'
+import { type DocumentView, documentViews } from '@/lib/navigation'
 import { type StatusGroup, statusGroups } from '@/lib/status-groups'
 import { messageTypes, type RunList } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -41,7 +40,6 @@ import { Button } from '@edi-bridge/ui/components/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@edi-bridge/ui/components/input-group'
 import { NativeSelect, NativeSelectOption } from '@edi-bridge/ui/components/native-select'
 import { ToggleGroup, ToggleGroupItem } from '@edi-bridge/ui/components/toggle-group'
-import { cn } from '@edi-bridge/ui/lib/utils'
 
 const searchDelay = 300
 
@@ -74,7 +72,7 @@ function SearchField({
   useEffect(() => () => clearTimeout(timer.current), [])
 
   return (
-    <InputGroup className="min-w-48 flex-1 sm:max-w-sm">
+    <InputGroup className="min-w-[min(100%,22rem)] flex-1 sm:max-w-sm">
       <InputGroupAddon>
         <HugeiconsIcon icon={Search01Icon} strokeWidth={2} aria-hidden />
       </InputGroupAddon>
@@ -118,7 +116,7 @@ function Filters({
     <search aria-label={t('label')} className="flex flex-wrap items-center gap-2">
       <SearchField
         key={searchKey}
-        label={filters.view === 'transmissions' ? t('searchTransmissions') : t('search')}
+        label={filters.view === 'transmissions' ? t('searchInterchanges') : t('search')}
         value={filters.q}
         onSearch={(q) => onChange({ q })}
       />
@@ -237,77 +235,16 @@ function emptyKind(filters: DocumentFilters, list: RunList): EmptyKind {
   return filters.status === 'attention' ? 'nothingNeedsAttention' : 'emptyGroup'
 }
 
-const emptyActions: Partial<Record<EmptyKind, EmptyAction>> = {
-  nothingMatches: 'clear',
-  pageOutOfRange: 'firstPage',
-}
-
 function RunResults({ filters, onChange, onClear }: ResultsProps) {
   const t = useTranslations('Documents')
-  const listId = useId()
 
-  const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(
-    runsQuery(toRunListQuery(filters)),
-  )
+  const emptyActions: Partial<Record<EmptyKind, EmptyAction>> = useEmptyActions({
+    onChange,
+    onClear,
+  })
 
-  const settled = isPlaceholderData ? undefined : data
-
-  function results() {
-    if (isError && !data) {
-      return (
-        <LoadError
-          description={t('error.description')}
-          retryLabel={t('error.retry')}
-          title={t('error.title')}
-          onRetry={() => void refetch()}
-        />
-      )
-    }
-
-    if (settled?.runs.length === 0) {
-      const kind = emptyKind(filters, settled)
-
-      return (
-        <ListEmpty
-          action={emptyActions[kind]}
-          description={t(`empty.${kind}.description`)}
-          icon={emptyIcons[kind]}
-          title={t(`empty.${kind}.title`)}
-          onClear={onClear}
-          onFirstPage={() => onChange({ page: 1 })}
-        />
-      )
-    }
-
-    const waiting = isPending || (isPlaceholderData && data.runs.length === 0)
-
-    return (
-      <>
-        <ul
-          id={listId}
-          aria-busy={isPending || isPlaceholderData}
-          aria-label={t('list')}
-          className={cn(
-            '@container flex flex-col gap-2',
-            isPlaceholderData && 'opacity-60 transition-opacity',
-          )}>
-          {waiting
-            ? Array.from({ length: 8 }, (_, index) => <RunRowSkeleton key={index} />)
-            : data.runs.map((run) => <RunRow key={run.id} run={run} />)}
-        </ul>
-        {data && (
-          <Pagination
-            page={filters.page}
-            total={data.total}
-            onPage={(page) => {
-              onChange({ page })
-              document.getElementById(listId)?.scrollIntoView({ block: 'start' })
-            }}
-          />
-        )}
-      </>
-    )
-  }
+  const query = useQuery(runsQuery(toRunListQuery(filters)))
+  const { data, isPending } = query
 
   return (
     <>
@@ -321,7 +258,34 @@ function RunResults({ filters, onChange, onClear }: ResultsProps) {
           {isPending ? t('loading') : data && t('count', { count: data.total })}
         </p>
       </div>
-      {results()}
+      <ListResults
+        empty={(list) => {
+          const kind = emptyKind(filters, list)
+
+          return (
+            <ListEmpty
+              action={emptyActions[kind]}
+              description={t(`empty.${kind}.description`)}
+              icon={emptyIcons[kind]}
+              title={t(`empty.${kind}.title`)}
+            />
+          )
+        }}
+        entries={(list) => list.runs}
+        error={{
+          title: t('error.title'),
+          description: t('error.description'),
+          retry: t('error.retry'),
+        }}
+        label={t('list')}
+        page={filters.page}
+        query={query}
+        renderEntry={(run) => <RunRow key={run.id} run={run} />}
+        skeleton={<RunRowSkeleton />}
+        skeletonCount={8}
+        className="@container"
+        onPage={(page) => onChange({ page })}
+      />
     </>
   )
 }
@@ -384,7 +348,7 @@ export function DocumentsInbox() {
         onClear={clearFilters}
       />
       {filters.view === 'transmissions' ? (
-        <TransmissionResults {...resultsProps} />
+        <InterchangeResults {...resultsProps} />
       ) : (
         <RunResults {...resultsProps} />
       )}

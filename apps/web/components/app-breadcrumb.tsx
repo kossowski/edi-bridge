@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { Fragment } from 'react'
 
 import { useBreadcrumbNames } from '@/hooks/use-breadcrumb-name'
@@ -88,7 +88,7 @@ function PathMenu({ crumbs, firstHidden }: { crumbs: ReadonlyArray<Crumb>; first
 export function AppBreadcrumb() {
   const t = useTranslations('Breadcrumb')
   const crumbText = useCrumbText()
-  const trail = breadcrumbTrail(usePathname())
+  const trail = breadcrumbTrail(usePathname(), useSearchParams())
   const ancestors = trail.slice(0, -1)
   const current = trail.at(-1)
 
