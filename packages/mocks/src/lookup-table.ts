@@ -30,7 +30,7 @@ import {
 
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
-import { generateMessage } from './interchange'
+import { generateMessage, type GeneratedMessage } from './interchange'
 import { codeMeaningsOf, firstValuesOf, hintFor } from './lookup-table-codes'
 import { applyImport, classifyImport } from './lookup-table-import'
 import {
@@ -178,6 +178,22 @@ function newestFirst(a: Pick<RunSummary, 'receivedAt'>, b: Pick<RunSummary, 'rec
   return Date.parse(b.receivedAt) - Date.parse(a.receivedAt)
 }
 
+let seedRunStore: RunStore | undefined
+
+const failures = new WeakMap<RunSummary, Pick<GeneratedMessage, 'error' | 'broken'>>()
+
+function failureOf(run: RunSummary) {
+  let failure = failures.get(run)
+
+  if (!failure) {
+    const { error, broken } = generateMessage(run, '1')
+    failure = { error, broken }
+    failures.set(run, failure)
+  }
+
+  return failure
+}
+
 export function createLookupTableUsage(
   lookupTables: LookupTableStore,
   tradingPartners: TradingPartnerStore,
@@ -190,7 +206,10 @@ export function createLookupTableUsage(
   const targets = new Map<string, LookupTableTarget | null>()
 
   function runs() {
-    runStore ??= toRunStore(world.runs ?? seedRuns(), world.reprocessed)
+    runStore ??=
+      world.runs === undefined && world.reprocessed === undefined
+        ? (seedRunStore ??= toRunStore(seedRuns()))
+        : toRunStore(world.runs ?? seedRuns(), world.reprocessed)
 
     return runStore
   }
@@ -201,7 +220,7 @@ export function createLookupTableUsage(
     }
 
     if (!targets.has(run.id)) {
-      const problem = problemOf(run, generateMessage(run, '1'), null, {
+      const problem = problemOf(run, failureOf(run), null, {
         flows,
         channels,
         lookupTables,
