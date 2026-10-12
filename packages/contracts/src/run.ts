@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { controlReferenceSchema, segmentTagSchema } from './edifact'
 import { flowSummarySchema } from './flow'
+import { listPageFields, listQueryFields, many } from './list'
 import { mappingVersionSummarySchema } from './mapping-version'
 import { directionSchema, messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
@@ -52,13 +53,6 @@ export const runSummarySchema = z.discriminatedUnion('status', [
 
 export type RunSummary = z.infer<typeof runSummarySchema>
 
-export function many<Item extends z.ZodType>(item: Item) {
-  return z.preprocess(
-    (value) => (value === undefined ? undefined : [value].flat()),
-    z.array(item).optional(),
-  )
-}
-
 export const runListQuerySchema = z.object({
   status: many(runStatusSchema),
   failureStage: many(failureStageSchema),
@@ -68,19 +62,15 @@ export const runListQuerySchema = z.object({
   receivedFrom: z.iso.datetime().optional(),
   receivedTo: z.iso.datetime().optional(),
   manualSubmission: z.stringbool().optional(),
-  q: z.string().trim().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  ...listQueryFields,
 })
 
 export type RunListQuery = z.output<typeof runListQuerySchema>
 
 export const runListSchema = z.object({
   runs: z.array(runSummarySchema),
-  total: z.number().int().min(0),
   statusCounts: z.record(runStatusSchema, z.number().int().min(0)),
-  page: z.number().int().min(1),
-  pageSize: z.number().int().min(1),
+  ...listPageFields,
 })
 
 export type RunList = z.infer<typeof runListSchema>
