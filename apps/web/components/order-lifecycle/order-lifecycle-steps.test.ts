@@ -19,7 +19,13 @@ function message(
     messageType,
     direction: messageType === 'ORDERS' ? 'inbound' : 'outbound',
     receivedAt,
-    run: { id, status: 'delivered', failureStage: null, replacedBy: null },
+    run: {
+      id,
+      status: 'delivered',
+      failureStage: null,
+      replacedBy: null,
+      waitingForTradingPartnerSince: null,
+    },
     interchange:
       acknowledgement === undefined
         ? null

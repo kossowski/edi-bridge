@@ -94,6 +94,15 @@ The chronological chain of all Messages sharing one Business Reference, e.g. ORD
 _Avoid_: Order history, transaction, thread
 _On screen_: Order (DE: Auftrag)
 
+**Order Lifecycle Status**:
+The overall state of an Order Lifecycle, derived from the current Run and Acknowledgement of each Message Type. It has one of four values.
+On track: nothing needs action, and at least one Message Type is still open or in progress.
+Needs attention: a Run failed and does not wait for the Trading Partner, or an Acknowledgement was rejected or is Overdue.
+Waiting for the Trading Partner: a failed Run waits for a resend from the Trading Partner, or an Acknowledgement is pending within the time limit.
+Done: every Message Type was delivered, and every sent Interchange was accepted.
+_Avoid_: Order status, phase, partner status
+_On screen_: on track → On track (DE: Im Plan), needs attention → Needs attention (DE: Handlungsbedarf), waiting for the Trading Partner → Waiting for partner (DE: Wartet auf Partner), done → Done (DE: Erledigt)
+
 ### Processing
 
 **Channel**:

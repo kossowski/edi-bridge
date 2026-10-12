@@ -63,7 +63,11 @@ import {
   sessionWorkspaceStore,
   type WorkspaceSummaryRecord,
 } from './operator'
-import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
+import {
+  orderLifecycleHandler,
+  orderLifecycleListHandler,
+  seedOrderLifecycles,
+} from './order-lifecycle'
 import { seedOverdueAcknowledgements } from './overdue-acknowledgement'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
@@ -230,7 +234,10 @@ export {
 } from './operator'
 
 export {
+  createLargeVolumeOrderLifecycles,
   orderLifecycleHandler,
+  orderLifecycleListHandler,
+  type OrderLifecycleListState,
   orderLifecycleReferences,
   type OrderLifecycleSeed,
   type OrderLifecycleState,
@@ -456,9 +463,15 @@ export function createHandlers(
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
     homeHandler(apiUrl, seedWorkspaceActivity(runs)),
     tasksHandler(apiUrl, seedWorkspaceActivity(runs)),
+    orderLifecycleListHandler(apiUrl, orderLifecycles.orderLifecycles, {
+      runs,
+      tradingPartners: tradingPartnerStore,
+      waitingForTradingPartnerSince: orderLifecycles.waitingForTradingPartnerSince,
+    }),
     orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles, {
       runs,
       tradingPartners: tradingPartnerStore,
+      waitingForTradingPartnerSince: orderLifecycles.waitingForTradingPartnerSince,
     }),
     ...mappingVersionHandlers(apiUrl, {
       mappings: mappingDraftStore,
@@ -469,6 +482,7 @@ export function createHandlers(
     }),
     ...runDetailHandlers(apiUrl, {
       runs,
+      waitingForTradingPartnerSince: orderLifecycles.waitingForTradingPartnerSince,
       mappingVersions: mappingVersionStore,
       flows,
       channels: channelStore,
