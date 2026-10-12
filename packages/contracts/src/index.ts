@@ -479,6 +479,20 @@ export {
 } from './run'
 
 export {
+  type Task,
+  type TaskActor,
+  taskActors,
+  type TaskCounts,
+  taskCountsOf,
+  type Tasks,
+  taskSchema,
+  tasksEndpoint,
+  tasksSchema,
+  type TaskTarget,
+  whoActsOnFailedRun,
+} from './task'
+
+export {
   type ConditionOperator,
   conditionOperators,
   concatenateInputs,

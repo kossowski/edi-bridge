@@ -127,6 +127,7 @@
   },
   "Navigation": {
     "overview": "Overview",
+    "tasks": "Tasks",
     "documents": "Documents",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
@@ -138,6 +139,12 @@
     "settings": "Settings",
     "operator": "Operator",
     "help": "Help"
+  },
+  "Pages": {
+    "tasks": {
+      "label": "Tasks",
+      "hint": "Everything that needs someone, grouped by who acts"
+    }
   },
   "NotFound": {
     "title": "Page not found",
@@ -295,6 +302,45 @@
       "title": "Overview unavailable",
       "description": "The Overview could not be loaded. Try again.",
       "retry": "Try again"
+    }
+  },
+  "Tasks": {
+    "intro": "Everything that needs someone right now, grouped by who acts. Each entry has one button that takes you to the fix.",
+    "loading": "Loading tasks",
+    "error": {
+      "title": "Tasks unavailable",
+      "description": "The tasks could not be loaded. Try again in a moment.",
+      "retry": "Try again"
+    },
+    "empty": {
+      "title": "Nothing needs you",
+      "description": "Every document went through and no partner is waiting for you.",
+      "home": "Back to home"
+    },
+    "groups": {
+      "you": "For you to fix",
+      "retry": "Try again",
+      "tradingPartner": "Waiting for a partner"
+    },
+    "showAll": "{count, plural, one {Show the # task} other {Show all # tasks}}",
+    "showNewest": "Show the newest {count}",
+    "failedRun": {
+      "detail": "{direction, select, inbound {{messageType} from {partner}} other {{messageType} to {partner}}}",
+      "action": {
+        "you": "Fix it",
+        "retry": "Open and try again",
+        "tradingPartner": "See details"
+      }
+    },
+    "overdueAcknowledgement": {
+      "title": "{partner} has not confirmed receipt",
+      "detail": "{messageType} {controlReference}: the <term>receipt confirmation</term> was due within {hours, plural, one {# hour} other {# hours}}",
+      "action": "Open transmission"
+    },
+    "failingTradingPartner": {
+      "title": "Many documents with {partner} fail",
+      "detail": "{failed} of {total} documents failed in the last 24 hours",
+      "action": "Open partner"
     }
   },
   "PlainNames": {

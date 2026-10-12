@@ -10,6 +10,7 @@ import {
   Settings02Icon,
   ShoppingBasket01Icon,
   Table01Icon,
+  Task01Icon,
   UserMultiple02Icon,
   UserShield01Icon,
   WorkflowSquare03Icon,
@@ -37,6 +38,7 @@ export const appIcon = ArrowDataTransferHorizontalIcon
 
 export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = {
   overview: { href: '/', icon: DashboardSquare01Icon },
+  tasks: { href: '/tasks', icon: Task01Icon },
   documents: { href: '/documents', icon: File02Icon },
   orderLifecycle: { href: '/order-lifecycle', icon: Route01Icon },
   tradingPartners: { href: '/trading-partners', icon: UserMultiple02Icon },
@@ -147,6 +149,12 @@ export const sidebarItems = [
   ...sidebarGroups.flatMap((group) => group.items),
   ...sidebarFooterItems,
 ]
+
+export type PageItemKey = keyof Messages['Pages']
+
+export type PageItem = NavigationItem & { key: PageItemKey }
+
+export const pageItems: ReadonlyArray<PageItem> = [{ key: 'tasks', ...navigationItems.tasks }]
 
 export function sidebarItem(key: SidebarItemKey) {
   const item = sidebarItems.find((entry) => entry.key === key)

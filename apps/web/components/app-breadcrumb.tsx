@@ -33,6 +33,8 @@ function useCrumbText() {
     switch (label.kind) {
       case 'item':
         return t(`Sidebar.items.${label.key}.label`)
+      case 'page':
+        return t(`Pages.${label.key}.label`)
       case 'session':
         return t(`Shell.session.${label.key}`)
       case 'subpage':

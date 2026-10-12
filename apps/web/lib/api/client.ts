@@ -91,6 +91,7 @@ import {
   submitDocumentEndpoint,
   sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
+  tasksEndpoint,
   toPath,
   toSearchParams,
   tradingPartnerActivitiesEndpoint,
@@ -284,6 +285,10 @@ export function updateOperatorWorkspaceSettings(workspaceId: string, body: Works
 
 export function getOverview(query: OverviewQuery) {
   return request(overviewEndpoint, { query })
+}
+
+export function getTasks() {
+  return request(tasksEndpoint)
 }
 
 export function listOrderLifecycles(query: OrderLifecycleQuery) {

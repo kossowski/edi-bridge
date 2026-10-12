@@ -1,6 +1,8 @@
 import {
   activeSidebarItem,
   navigationItems,
+  type PageItemKey,
+  pageItems,
   type SidebarItemKey,
   sidebarItem,
   sidebarItems,
@@ -14,6 +16,7 @@ type SubpageKey = (typeof subpageKeys)[number]
 
 export type CrumbLabel =
   | { kind: 'item'; key: SidebarItemKey }
+  | { kind: 'page'; key: PageItemKey }
   | { kind: 'session'; key: 'settings' | 'operatorArea' }
   | { kind: 'subpage'; key: SubpageKey }
   | { kind: 'detail' }
@@ -43,6 +46,10 @@ function sidebarSections() {
 
 const sections = new Map<string, Section>([
   ...sidebarSections(),
+  ...pageItems.map(({ key, href }): [string, Section] => [
+    href.slice(1),
+    { label: { kind: 'page', key }, href },
+  ]),
   [
     'settings',
     { label: { kind: 'session', key: 'settings' }, href: navigationItems.settings.href },

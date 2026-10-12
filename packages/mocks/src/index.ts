@@ -67,6 +67,7 @@ import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
 import { createSessionStore, seedSession, sessionHandlers } from './session'
+import { seedTasksData, tasksHandler } from './task'
 import {
   createTradingPartnerStore,
   seedTradingPartners,
@@ -281,6 +282,8 @@ export {
   type RunStore,
 } from './run-store'
 
+export { emptyTasksData, type TasksData, tasksHandler } from './task'
+
 export { type SessionStore } from './session-access'
 
 export {
@@ -428,6 +431,7 @@ export function createHandlers(
     interchangesHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
     overviewHandler(apiUrl, seedOverviewData(runs)),
+    tasksHandler(apiUrl, seedTasksData(runs)),
     orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles, {
       runs,
       tradingPartners: tradingPartnerStore,

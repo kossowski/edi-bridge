@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import type { IconSvgElement } from '@hugeicons/react'
 
 import { CommandItemHint } from '@/components/search/command-item-hint'
-import { accountMenuItems, sidebarItems } from '@/lib/navigation'
+import { accountMenuItems, pageItems, sidebarItems } from '@/lib/navigation'
 import { CommandGroup, CommandItem } from '@edi-bridge/ui/components/command'
 
 type Page = { key: string; href: string; icon: IconSvgElement; label: string; hint?: string }
@@ -23,6 +23,11 @@ export function PageResults({
       ...item,
       label: t(`Sidebar.items.${item.key}.label`),
       hint: t(`Sidebar.items.${item.key}.hint`),
+    })),
+    ...pageItems.map((item) => ({
+      ...item,
+      label: t(`Pages.${item.key}.label`),
+      hint: t(`Pages.${item.key}.hint`),
     })),
     ...accountMenuItems(operator).map((item) => ({
       ...item,

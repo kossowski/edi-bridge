@@ -77,7 +77,7 @@ const worstFirst = (status: HealthStatus) => -healthStatuses.indexOf(status)
 const isFinished = (status: RunStatus): status is keyof FinishedRunCounts =>
   status === 'delivered' || status === 'failed'
 
-function tradingPartnerHealthOf(
+export function tradingPartnerHealthOf(
   tradingPartners: ReadonlyArray<TradingPartner>,
   runs: readonly RunSummary[],
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>,

@@ -127,6 +127,7 @@
   },
   "Navigation": {
     "overview": "Übersicht",
+    "tasks": "Aufgaben",
     "documents": "Belege",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
@@ -138,6 +139,12 @@
     "settings": "Einstellungen",
     "operator": "Operator",
     "help": "Hilfe"
+  },
+  "Pages": {
+    "tasks": {
+      "label": "Aufgaben",
+      "hint": "Alles, was jemanden braucht, nach Zuständigkeit gruppiert"
+    }
   },
   "NotFound": {
     "title": "Seite nicht gefunden",
@@ -295,6 +302,45 @@
       "title": "Übersicht nicht verfügbar",
       "description": "Die Übersicht konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
+    }
+  },
+  "Tasks": {
+    "intro": "Alles, was gerade jemanden braucht, gruppiert danach, wer handelt. Jeder Eintrag hat einen Knopf, der Sie zur Lösung führt.",
+    "loading": "Aufgaben werden geladen",
+    "error": {
+      "title": "Aufgaben nicht verfügbar",
+      "description": "Die Aufgaben konnten nicht geladen werden. Versuchen Sie es gleich noch einmal.",
+      "retry": "Erneut versuchen"
+    },
+    "empty": {
+      "title": "Nichts braucht Sie",
+      "description": "Jeder Beleg ist durchgelaufen und kein Handelspartner wartet auf Sie.",
+      "home": "Zurück zum Start"
+    },
+    "groups": {
+      "you": "Von Ihnen zu beheben",
+      "retry": "Erneut versuchen",
+      "tradingPartner": "Wartet auf einen Handelspartner"
+    },
+    "showAll": "{count, plural, one {Die # Aufgabe zeigen} other {Alle # Aufgaben zeigen}}",
+    "showNewest": "Die neuesten {count} zeigen",
+    "failedRun": {
+      "detail": "{direction, select, inbound {{messageType} von {partner}} other {{messageType} an {partner}}}",
+      "action": {
+        "you": "Beheben",
+        "retry": "Öffnen und erneut versuchen",
+        "tradingPartner": "Details ansehen"
+      }
+    },
+    "overdueAcknowledgement": {
+      "title": "{partner} hat den Empfang nicht bestätigt",
+      "detail": "{messageType} {controlReference}: die <term>Empfangsbestätigung</term> war innerhalb von {hours, plural, one {# Stunde} other {# Stunden}} fällig",
+      "action": "Übertragung öffnen"
+    },
+    "failingTradingPartner": {
+      "title": "Viele Belege mit {partner} schlagen fehl",
+      "detail": "{failed} von {total} Belegen sind in den letzten 24 Stunden fehlgeschlagen",
+      "action": "Handelspartner öffnen"
     }
   },
   "PlainNames": {
