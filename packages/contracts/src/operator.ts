@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
 import { workspaceKindSchema, workspaceRoleSchema, workspaceSchema } from './workspace'
-import { type WorkspaceMember, workspaceMemberSchema } from './workspace-member'
 
 import type { Endpoint } from './endpoint'
 
@@ -43,17 +42,6 @@ export const createWorkspaceEndpoint: Endpoint<
   path: '/operator/workspaces',
   body: workspaceInputSchema,
   response: workspaceSummarySchema,
-}
-
-export const operatorWorkspaceMembersEndpoint: Endpoint<
-  WorkspaceMember[],
-  undefined,
-  undefined,
-  '/operator/workspaces/:workspaceId/members'
-> = {
-  method: 'GET',
-  path: '/operator/workspaces/:workspaceId/members',
-  response: z.array(workspaceMemberSchema),
 }
 
 export const inviteSchema = z.object({
