@@ -30,15 +30,15 @@ function card(link: HTMLElement) {
 
 const mappingLink = /^\/mappings\/[\w-]+$/
 
-// SAFETY: the seed has ORDERS mappings, and each of them reads Units of measure.
-const ordersDraft = seedMappingDrafts.find(
-  ({ messageType }) => messageType === 'ORDERS',
+// SAFETY: the seed Hansemarkt DESADV mapping reads Units of measure.
+const dispatchAdviceDraft = seedMappingDrafts.find(
+  ({ name }) => name === 'Hansemarkt: ERP JSON to DESADV',
 ) as MappingDraftRecord
 
-const extraOrderMappings = Array.from({ length: 4 }, (_, index) => ({
-  ...ordersDraft,
+const extraDispatchAdviceMappings = Array.from({ length: 4 }, (_, index) => ({
+  ...dispatchAdviceDraft,
   id: `00000000-0000-4000-8000-00000000000${index + 1}`,
-  name: `Extra orders ${index + 1}`,
+  name: `Extra dispatch advices ${index + 1}`,
 }))
 
 const [extraBlocking] = createLookupTables({ count: 1, blockingCodeCount: 2, seed: 5 })
@@ -63,13 +63,19 @@ export const Default = meta.story({
     const units = card(everyPartner.getByRole('link', { name: 'Units of measure' }))
 
     await expect(units.getByText('KRT missing')).toBeVisible()
-    await expect(units.getByText(/^\d+ values$/).parentElement).toHaveTextContent(
-      /^Units of measure · \d+ values$/,
+    await expect(units.getByText('4 values').parentElement).toHaveTextContent(
+      /^Units of measure · 4 values$/,
     )
     const usedFor = within(units.getByRole('list', { name: 'Used for' }))
-    const [firstUse] = usedFor.getAllByRole('link')
+    const uses = usedFor.getAllByRole('link')
+    const [firstUse] = uses
 
-    await expect(firstUse).toHaveTextContent(/^Purchase orders from \S/)
+    await expect(uses.map(({ textContent }) => textContent)).toEqual([
+      'Dispatch advices to Elbtal Warenhaus KG',
+      'Invoices to Elbtal Warenhaus KG',
+      'Dispatch advices to Hansemarkt GmbH',
+    ])
+    await expect(usedFor.getByText('and 1 more')).toBeVisible()
     await expect(firstUse).toHaveAttribute('href', expect.stringMatching(mappingLink))
     await expect(units.getByRole('link', { name: 'Open' })).toHaveAttribute(
       'href',
@@ -108,7 +114,7 @@ export const ManyUsesAndCodes = meta.story({
     msw.use(
       ...lookupTableHandlers(apiUrl, {
         lookupTables: busyTables,
-        mappings: [...seedMappingDrafts, ...extraOrderMappings],
+        mappings: [...seedMappingDrafts, ...extraDispatchAdviceMappings],
       }),
     )
   },
@@ -204,9 +210,14 @@ export const German = meta.story({
 
     await expect(units.getByText('KRT fehlt')).toBeVisible()
     await expect(units.getByRole('link', { name: 'KRT hinzufügen' })).toBeVisible()
-    await expect(units.getByRole('list', { name: 'Verwendet für' })).toHaveTextContent(
-      /^Bestellungen von /,
-    )
+    const usedFor = within(units.getByRole('list', { name: 'Verwendet für' }))
+
+    await expect(usedFor.getAllByRole('listitem').map(({ textContent }) => textContent)).toEqual([
+      'Lieferavise an Elbtal Warenhaus KG',
+      'Rechnungen an Elbtal Warenhaus KG',
+      'Lieferavise an Hansemarkt GmbH',
+      'und 1 weitere',
+    ])
     await expect(canvas.getByRole('region', { name: 'Nur für Hansemarkt GmbH (2)' })).toBeVisible()
   },
 })
