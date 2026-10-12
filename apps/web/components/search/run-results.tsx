@@ -1,7 +1,6 @@
 import { useFormatter, useTranslations } from 'next-intl'
 
 import { CommandItemHint } from '@/components/search/command-item-hint'
-import { navigationItems } from '@/lib/navigation'
 import { type RunSummary } from '@edi-bridge/contracts'
 import { CommandGroup, CommandItem } from '@edi-bridge/ui/components/command'
 
@@ -26,7 +25,7 @@ export function RunResults({
           key={run.id}
           keywords={[run.messageType, run.tradingPartner.name, run.flow.name]}
           value={`run ${run.id}`}
-          onSelect={() => onOpen(`${navigationItems.runs.href}/${run.id}`)}>
+          onSelect={() => onOpen(`/runs/${run.id}`)}>
           <span className="shrink-0 font-mono text-xs">{run.messageType}</span>
           <span className="min-w-0 truncate">{run.tradingPartner.name}</span>
           <CommandItemHint className="tabular-nums">

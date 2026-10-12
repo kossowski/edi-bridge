@@ -5,7 +5,6 @@ import {
   FlowConnectionIcon,
   HelpCircleIcon,
   HierarchySquare02Icon,
-  PlayListIcon,
   PlugSocketIcon,
   Route01Icon,
   Settings02Icon,
@@ -30,7 +29,7 @@ export const appIcon = ArrowDataTransferHorizontalIcon
 
 export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = {
   overview: { href: '/', icon: DashboardSquare01Icon },
-  runs: { href: '/runs', icon: PlayListIcon },
+  documents: { href: '/documents', icon: File02Icon },
   orderLifecycle: { href: '/order-lifecycle', icon: Route01Icon },
   tradingPartners: { href: '/trading-partners', icon: UserMultiple02Icon },
   channels: { href: '/channels', icon: PlugSocketIcon },
@@ -82,7 +81,7 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
     collapsible: false,
     items: [
       { key: 'home', page: 'overview' },
-      { key: 'documents', page: 'runs', icon: File02Icon },
+      { key: 'documents', page: 'documents' },
       { key: 'orders', page: 'orderLifecycle', icon: ShoppingBasket01Icon },
     ],
   },
@@ -102,7 +101,7 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
     items: [
       { key: 'allConnections', page: 'channels' },
       { key: 'allDocumentRoutes', page: 'flows' },
-      { key: 'transmissions', page: 'runs', icon: Route01Icon },
+      { key: 'transmissions', page: 'documents', icon: Route01Icon },
     ],
   },
 ]

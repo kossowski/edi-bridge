@@ -1,13 +1,13 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import { Suspense } from 'react'
 
 import { AppPage } from '@/components/app-page'
+import { DocumentsInbox } from '@/components/documents/documents-inbox'
 import { ManualSubmissionDialog } from '@/components/manual-submission/manual-submission-dialog'
-import { RunFilters } from '@/components/runs/run-filters'
-import { RunsTable } from '@/components/runs/runs-table'
 
-export function RunsScreen() {
+export function DocumentsScreen() {
   const t = useTranslations('Sidebar.items')
 
   return (
@@ -15,8 +15,9 @@ export function RunsScreen() {
       changeActions={<ManualSubmissionDialog />}
       title={t('documents.label')}
       className="gap-4">
-      <RunFilters />
-      <RunsTable />
+      <Suspense>
+        <DocumentsInbox />
+      </Suspense>
     </AppPage>
   )
 }

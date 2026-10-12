@@ -127,7 +127,7 @@
   },
   "Navigation": {
     "overview": "Übersicht",
-    "runs": "Runs",
+    "documents": "Belege",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
     "channels": "Channels",
@@ -340,6 +340,12 @@
         "title": "Der Beleg konnte nicht zugestellt werden",
         "summary": "Das empfangende System hat den Beleg nicht angenommen, oft weil es nicht erreichbar war. Versuchen Sie es erneut, sobald es wieder erreichbar ist."
       }
+    },
+    "statusGroup": {
+      "attention": "Handlungsbedarf",
+      "progress": "In Bearbeitung",
+      "done": "Erledigt",
+      "all": "Alle"
     }
   },
   "Help": {
@@ -449,62 +455,75 @@
       "CONTRL": "Die automatische Antwort auf eine Übertragung: Sie bestätigt, dass die Übertragung angekommen ist und entweder angenommen oder wegen Syntaxfehlern abgelehnt wurde."
     }
   },
+  "Documents": {
+    "filters": {
+      "label": "Belege filtern",
+      "search": "Bestellnummer oder Partner suchen",
+      "tradingPartner": "Handelspartner",
+      "allTradingPartners": "Alle Handelspartner",
+      "messageType": "Belegart",
+      "allMessageTypes": "Alle Belegarten",
+      "clear": "Filter zurücksetzen"
+    },
+    "statusGroups": "Status",
+    "list": "Belege, neueste zuerst",
+    "loading": "Belege werden geladen",
+    "count": "{count, plural, one {# Beleg} other {# Belege}}",
+    "row": {
+      "title": "{direction, select, inbound {{messageType} {reference} von {tradingPartner}} other {{messageType} {reference} an {tradingPartner}}}",
+      "titleWithoutReference": "{direction, select, inbound {{messageType} von {tradingPartner}} other {{messageType} an {tradingPartner}}}",
+      "order": "Bestellung <link>{reference}</link>",
+      "uploaded": "Von Hand hochgeladen",
+      "whatToDo": "Was ist zu tun?"
+    },
+    "whoFixes": {
+      "partner": "Ihr Partner behebt das",
+      "retry": "Einfach erneut versuchen",
+      "you": "Sie beheben das"
+    },
+    "pagination": {
+      "label": "Seiten",
+      "page": "Seite {page} von {pageCount}",
+      "previous": "Vorherige Seite",
+      "next": "Nächste Seite"
+    },
+    "empty": {
+      "noDocuments": {
+        "title": "Noch keine Belege",
+        "description": "Belege erscheinen hier, sobald ein Partner einen sendet oder Ihr ERP einen exportiert."
+      },
+      "nothingNeedsAttention": {
+        "title": "Kein Handlungsbedarf",
+        "description": "Alle Belege sind durchgelaufen. Neue Probleme erscheinen hier."
+      },
+      "nothingMatches": {
+        "title": "Keine passenden Belege",
+        "description": "Versuchen Sie eine andere Suche oder setzen Sie die Filter zurück."
+      },
+      "emptyGroup": {
+        "title": "Keine Belege mit diesem Status",
+        "description": "Wählen Sie oben einen anderen Status."
+      }
+    },
+    "error": {
+      "title": "Belege nicht verfügbar",
+      "description": "Die Belege konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    }
+  },
   "Runs": {
-    "caption": "Runs, neueste zuerst",
-    "loading": "Runs werden geladen",
-    "count": "{count, plural, one {# Run} other {# Runs}}",
     "openRun": "– Run von {tradingPartner} öffnen, {messageType}",
     "noFailureStage": "Keine Failure Stage",
     "columns": {
       "receivedAt": "Empfangen",
       "status": "Status",
       "failureStage": "Failure Stage",
-      "tradingPartner": "Trading Partner",
       "messageType": "Message Type",
-      "flow": "Flow",
-      "source": "Quelle"
-    },
-    "timeRange": {
-      "any": "Beliebiger Zeitraum",
-      "lastHour": "Letzte Stunde",
-      "last24Hours": "Letzte 24 Stunden",
-      "last7Days": "Letzte 7 Tage",
-      "last30Days": "Letzte 30 Tage",
-      "custom": "Eigener Zeitraum"
+      "flow": "Flow"
     },
     "manualSubmission": {
-      "any": "Beliebige Quelle",
       "manual": "Manual Submission",
       "channel": "Channel"
-    },
-    "filters": {
-      "label": "Runs filtern",
-      "clear": "Filter zurücksetzen",
-      "clearAll": "Alle Filter zurücksetzen",
-      "timeRange": "Zeitraum",
-      "from": "Von",
-      "to": "Bis",
-      "manualSubmission": "Quelle"
-    },
-    "pagination": {
-      "label": "Seiten",
-      "pageSize": "Zeilen pro Seite",
-      "page": "Seite {page} von {pageCount}",
-      "first": "Erste Seite",
-      "previous": "Vorherige Seite",
-      "next": "Nächste Seite",
-      "last": "Letzte Seite"
-    },
-    "empty": {
-      "title": "Noch keine Runs",
-      "description": "Runs erscheinen hier, sobald ein Document auf einem Channel oder per Manual Submission eintrifft.",
-      "filteredTitle": "Keine passenden Runs",
-      "filteredDescription": "Kein Run passt zu diesen Filtern. Ändern Sie die Filter oder setzen Sie sie zurück."
-    },
-    "error": {
-      "title": "Runs nicht verfügbar",
-      "description": "Die Runs konnten nicht geladen werden. Versuchen Sie es erneut.",
-      "retry": "Erneut versuchen"
     }
   },
   "RunDetail": {
