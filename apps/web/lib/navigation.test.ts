@@ -99,6 +99,15 @@ describe('fixTargetHref', () => {
     ).toBe('/code-translations/t-1?code=K%26T')
   })
 
+  it('names the Run that stopped on the missing code', () => {
+    expect(
+      fixTargetHref(
+        { kind: 'lookupTable', lookupTableId: 't-1', name: 'Units', code: 'KRT' },
+        'r-1',
+      ),
+    ).toBe('/code-translations/t-1?code=KRT&run=r-1')
+  })
+
   it('opens the Channel and the Trading Partner', () => {
     expect(fixTargetHref({ kind: 'channel', channelId: 'c-1', name: 'SFTP' })).toBe('/channels/c-1')
     expect(fixTargetHref({ kind: 'tradingPartner', tradingPartnerId: 'p-1', name: 'Acme' })).toBe(

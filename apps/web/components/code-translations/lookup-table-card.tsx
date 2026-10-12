@@ -56,7 +56,13 @@ function useUseSentence() {
   }
 }
 
-function UsesList({ uses }: { uses: ReadonlyArray<LookupTableUse> }) {
+export function UsesList({
+  uses,
+  showAll = false,
+}: {
+  uses: ReadonlyArray<LookupTableUse>
+  showAll?: boolean
+}) {
   const t = useTranslations('CodeTranslations.uses')
   const sentence = useUseSentence()
   const labelId = useId()
@@ -65,7 +71,8 @@ function UsesList({ uses }: { uses: ReadonlyArray<LookupTableUse> }) {
     return <p className="text-muted-foreground text-sm">{t('none')}</p>
   }
 
-  const hidden = uses.length - shownUses
+  const shown = showAll ? uses : uses.slice(0, shownUses)
+  const hidden = uses.length - shown.length
 
   return (
     <div className="flex flex-col gap-1 text-sm">
@@ -73,11 +80,11 @@ function UsesList({ uses }: { uses: ReadonlyArray<LookupTableUse> }) {
         {t('label')}
       </p>
       <ul aria-labelledby={labelId} className="flex flex-col gap-0.5">
-        {uses.slice(0, shownUses).map((use) => (
+        {shown.map((use) => (
           <li key={use.mappingId}>
             <Link
               href={mappingHref(use.mappingId)}
-              className="decoration-muted-foreground/50 hover:decoration-foreground focus-visible:ring-ring/50 rounded-sm underline underline-offset-4 outline-none focus-visible:ring-3">
+              className="decoration-muted-foreground/50 hover:decoration-foreground focus-visible:ring-ring/50 inline-block rounded-sm py-0.5 underline underline-offset-4 outline-none focus-visible:ring-3">
               {sentence(use)}
             </Link>
           </li>

@@ -3321,6 +3321,86 @@
     },
     "csvSettingsUsedByMappingVersion": "Veröffentlichte Mapping Versions lesen CSV-Documents mit diesen Einstellungen, und eine veröffentlichte Mapping Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie ein neues Datenformat mit den neuen."
   },
+  "CodeTranslation": {
+    "title": "Code-Übersetzung",
+    "loading": "Liste wird geladen",
+    "notFound": {
+      "title": "Liste nicht gefunden",
+      "description": "In diesem Workspace gibt es keine Code-Übersetzungsliste mit dieser ID."
+    },
+    "error": {
+      "title": "Liste nicht verfügbar",
+      "description": "Die Liste konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "values": {
+      "title": "Werte",
+      "source": "{direction, select, inbound {Was der Partner sendet} other {Ihr Wert}}",
+      "target": "{direction, select, inbound {Ihr Wert} other {Was der Partner erhält}}",
+      "arrow": "{direction, select, inbound {wird zu} other {wird gesendet als}}",
+      "meaning": "{code} bedeutet {meaning}.",
+      "filter": "Wert suchen",
+      "filteredCount": "{count, number} von {total, number} Werten",
+      "noMatch": "Kein Wert passt.",
+      "empty": {
+        "title": "Noch keine Werte",
+        "description": "{kind, select, units {Fügen Sie den ersten Wert hinzu, z. B. wird die Einheit ST zu PCE.} countries {Fügen Sie den ersten Wert hinzu, z. B. wird das Land Deutschland zu DE.} addresses {Fügen Sie den ersten Wert hinzu, z. B. wird eine Filialnummer zu einer Adress-ID.} other {Fügen Sie den ersten Wert hinzu: einen Code und den Code, zu dem er wird.}}",
+        "viewOnlyDescription": "Werte erscheinen hier, sobald ein Admin sie hinzufügt."
+      },
+      "add": "Wert hinzufügen",
+      "edit": "{code} bearbeiten",
+      "editing": "{code} ändern",
+      "remove": "{code} entfernen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert…",
+      "cancel": "Abbrechen",
+      "suggestions": "Vorgeschlagene Codes",
+      "saved": "{code} gespeichert.",
+      "removed": "{direction, select, inbound {{code} entfernt. Es wurde zu {target}.} other {{code} entfernt. Es wurde als {target} gesendet.}}",
+      "undo": "Rückgängig",
+      "restored": "{code} wiederhergestellt.",
+      "errors": {
+        "required": "Geben Sie einen Code ein.",
+        "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
+        "duplicate": "{code} hat bereits eine Übersetzung.",
+        "saveFailed": "Die Änderung konnte nicht gespeichert werden. Versuchen Sie es erneut."
+      }
+    },
+    "missing": {
+      "title": "Noch nicht übersetzt",
+      "loading": "Noch nicht übersetzte Werte werden geladen",
+      "unavailable": "Die noch nicht übersetzten Werte konnten nicht geladen werden.",
+      "accept": "Übernehmen",
+      "acceptCode": "Übernehmen: {code}",
+      "sendAs": "{direction, select, inbound {Was aus {code} wird} other {{code} senden als}}",
+      "or": "oder",
+      "useSuggestion": "{code} verwenden ({meaning})",
+      "stops": "{more, plural, =0 {Stoppt {document}} other {Stoppt {document} und # weitere}}",
+      "showAll": "Alle {count} anzeigen",
+      "blocking": {
+        "title": "Gestoppte Belege",
+        "description": "Belege sind fehlgeschlagen, weil diese Werte keine Übersetzung haben.",
+        "seenIn": "Gesehen in",
+        "seenAll": "Alle {count} anzeigen"
+      },
+      "upcoming": {
+        "title": "Demnächst",
+        "description": "Ihr ERP verwendet diese Werte, aber noch kein Beleg hat sie gebraucht.",
+        "items": "{count, plural, one {# Artikel in Ihren ERP-Daten verwendet ihn} other {# Artikel in Ihren ERP-Daten verwenden ihn}}"
+      }
+    },
+    "fixed": {
+      "title": "{direction, select, inbound {{code} wird jetzt zu {target}} other {{code} wird jetzt als {target} gesendet}}",
+      "titleMany": "{codes} sind jetzt übersetzt",
+      "description": "{count, plural, one {Ein Beleg wurde gestoppt, weil die Übersetzung fehlte. Verarbeiten Sie ihn erneut, damit er die neue Übersetzung verwendet.} other {# Belege wurden gestoppt, weil die Übersetzung fehlte. Verarbeiten Sie sie erneut, damit sie die neue Übersetzung verwenden.}}",
+      "reprocess": "{document} erneut verarbeiten",
+      "more": "und {count} weitere",
+      "showAll": "Alle {count} anzeigen"
+    },
+    "uses": {
+      "unused": "Noch kein Beleg verwendet sie. Fügen Sie sie mit dem Schritt „Code-Übersetzung“ zu einem Mapping hinzu."
+    }
+  },
   "CodeTranslations": {
     "intro": "Werte, die Ihre Partner anders schreiben als Ihr ERP, gruppiert danach, wer sie erhält.",
     "summary": "{count, plural, one {# Liste} other {# Listen}}",
@@ -3370,12 +3450,6 @@
     }
   },
   "LookupTables": {
-    "columns": {
-      "scope": "Geltungsbereich"
-    },
-    "scope": {
-      "workspace": "Workspace"
-    },
     "form": {
       "createTitle": "Neue Liste",
       "createDescription": "Benennen Sie die Liste und wählen Sie, wer sie erhält. Die Werte fügen Sie danach hinzu.",
@@ -3431,116 +3505,19 @@
     }
   },
   "LookupTable": {
-    "title": "Lookup Table",
-    "loading": "Lookup Table wird geladen",
-    "notFound": {
-      "title": "Lookup Table nicht gefunden",
-      "description": "In diesem Workspace gibt es keine Lookup Table mit dieser ID."
-    },
-    "error": {
-      "title": "Lookup Table nicht verfügbar",
-      "description": "Die Lookup Table konnte nicht geladen werden. Versuchen Sie es erneut.",
-      "retry": "Erneut versuchen"
-    },
-    "entries": {
-      "title": "Einträge",
-      "description": "Jeder Eintrag übersetzt einen Ausgangscode in einen Zielcode. Ausgangscodes müssen eindeutig sein.",
-      "hint": "Mit den Pfeiltasten wechseln Sie zwischen Zellen, mit Enter bearbeiten Sie eine Zelle.",
-      "viewOnlyHint": "Mit den Pfeiltasten wechseln Sie zwischen Zellen.",
-      "columns": {
-        "row": "Zeile",
-        "sourceCode": "Ausgangscode",
-        "targetCode": "Zielcode",
-        "actions": "Aktionen"
-      },
-      "cellLabel": "{column}, Zeile {row}",
-      "activeError": "{column}, Zeile {row}: {error}",
-      "filter": "Nach Ausgangs- oder Zielcode filtern",
-      "count": "{count, plural, one {# Eintrag} other {# Einträge}}",
-      "filteredCount": "{count, number} von {total, number} Einträgen",
-      "noMatch": "Kein Eintrag passt zum Filter.",
-      "empty": {
-        "title": "Noch keine Einträge",
-        "description": "Fügen Sie den ersten Eintrag hinzu, z. B. Ausgangscode ST mit Zielcode PCE.",
-        "viewOnlyDescription": "Einträge erscheinen hier, sobald ein Admin sie hinzufügt."
-      },
-      "add": "Eintrag hinzufügen",
-      "deleteRow": "Eintrag in Zeile {row} löschen",
-      "save": "Änderungen speichern",
-      "saving": "Wird gespeichert…",
-      "discard": "Änderungen verwerfen",
-      "unsaved": "Ungespeicherte Änderungen",
-      "upToDate": "Alle Änderungen gespeichert",
-      "savingReadOnly": "Wird gespeichert… Die Einträge sind schreibgeschützt, bis das Speichern abgeschlossen ist.",
-      "errors": {
-        "required": "Geben Sie einen Code ein.",
-        "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
-        "duplicate": "Bereits in Zeile {row} verwendet.",
-        "summary": "{count, plural, one {# Eintrag muss} other {# Einträge müssen}} vor dem Speichern korrigiert werden.",
-        "saveFailed": "Die Einträge konnten nicht gespeichert werden. Versuchen Sie es erneut."
-      },
-      "announcements": {
-        "saved": "Einträge gespeichert.",
-        "added": "Eintrag in Zeile {row} hinzugefügt.",
-        "deleted": "Eintrag in Zeile {row} gelöscht.",
-        "discarded": "Änderungen verworfen."
-      },
-      "shortcuts": {
-        "title": "Tastenkürzel",
-        "items": {
-          "move": {
-            "keys": "Pfeiltasten, Pos1, Ende, Bild auf, Bild ab",
-            "action": "Zwischen Zellen wechseln"
-          },
-          "tab": {
-            "keys": "Tab, Umschalt+Tab",
-            "action": "Einträge verlassen; beim Bearbeiten Änderung übernehmen und zur nächsten oder vorherigen Zelle wechseln"
-          },
-          "edit": {
-            "keys": "Enter, F2 oder lostippen",
-            "action": "Zelle bearbeiten"
-          },
-          "commit": {
-            "keys": "Enter",
-            "action": "Änderung übernehmen"
-          },
-          "cancel": {
-            "keys": "Esc",
-            "action": "Änderung in der Zelle zurücknehmen"
-          },
-          "add": {
-            "keys": "Strg+Enter (⌘+Enter auf dem Mac)",
-            "action": "Eintrag darunter hinzufügen"
-          },
-          "delete": {
-            "keys": "Strg+Entf (⌘+Rückschritt auf dem Mac)",
-            "action": "Eintrag löschen"
-          },
-          "save": {
-            "keys": "Strg+S (⌘+S auf dem Mac)",
-            "action": "Änderungen speichern"
-          }
-        }
-      }
-    },
     "import": {
       "open": "CSV importieren",
       "title": "CSV importieren",
-      "description": "Einträge aus einer CSV mit einem Ausgangscode und einem Zielcode pro Zeile hinzufügen und aktualisieren. Der Import führt zusammen: Er fügt neue Ausgangscodes hinzu und ändert Zielcodes; jeder Eintrag, der in der CSV fehlt, bleibt erhalten.",
+      "description": "Werte aus einer CSV mit {direction, select, inbound {dem, was der Partner sendet, und Ihrem Wert} other {Ihrem Wert und dem, was der Partner erhält}} pro Zeile hinzufügen und ändern. Der Import führt zusammen: Er fügt neue Werte hinzu, ändert vorhandene und behält jeden Wert, der in der CSV fehlt.",
       "close": "Schließen",
       "cancel": "Abbrechen",
-      "unsaved": {
-        "title": "Ungespeicherte Änderungen",
-        "description": "Die Einträge haben ungespeicherte Änderungen. Speichern oder verwerfen Sie sie, bevor Sie eine CSV importieren, damit der Import von den gespeicherten Einträgen ausgeht.",
-        "discard": "Änderungen verwerfen und fortfahren"
-      },
       "file": {
         "label": "CSV-Datei",
         "description": "Der Inhalt einer gewählten Datei erscheint im CSV-Text darunter."
       },
       "text": {
         "label": "CSV-Text",
-        "description": "Oder fügen Sie die CSV hier ein: ein Eintrag pro Zeile, Ausgangscode und Zielcode getrennt durch Semikolon, Komma oder Tabulator. Eine Kopfzeile wie source;target wird übersprungen."
+        "description": "Oder fügen Sie die CSV hier ein: ein Wert pro Zeile, {direction, select, inbound {was der Partner sendet und Ihr Wert} other {Ihr Wert und was der Partner erhält}} getrennt durch Semikolon, Komma oder Tabulator. Eine Kopfzeile wie source;target wird übersprungen."
       },
       "preview": "Vorschau anzeigen",
       "previewing": "Vorschau wird geladen…",
@@ -3556,9 +3533,9 @@
       },
       "result": {
         "title": "Vorschau",
-        "description": "Nichts ändert sich, bis Sie den Import anwenden. Einträge, die in der CSV fehlen, bleiben erhalten; ungültige Zeilen werden übersprungen.",
-        "noLines": "Die CSV enthält keine Eintragszeilen.",
-        "nothingToApply": "Die CSV fügt keinen Eintrag hinzu und ändert keinen, daher gibt es nichts anzuwenden.",
+        "description": "Nichts ändert sich, bis Sie den Import anwenden. Werte, die in der CSV fehlen, bleiben erhalten; ungültige Zeilen werden übersprungen.",
+        "noLines": "Die CSV enthält keine Wertzeilen.",
+        "nothingToApply": "Die CSV fügt keinen Wert hinzu und ändert keinen, daher gibt es nichts anzuwenden.",
         "filter": "Zeilen anzeigen",
         "all": "Alle",
         "lines": "Zeilen der CSV",
@@ -3577,19 +3554,19 @@
       "columns": {
         "line": "Zeile",
         "status": "Status",
-        "sourceCode": "Ausgangscode",
-        "targetCode": "Zielcode",
+        "sourceCode": "{direction, select, inbound {Was der Partner sendet} other {Ihr Wert}}",
+        "targetCode": "{direction, select, inbound {Ihr Wert} other {Was der Partner erhält}}",
         "details": "Details"
       },
       "reasons": {
         "columnCount": "Braucht genau zwei Spalten.",
-        "sourceCodeMissing": "Der Ausgangscode fehlt.",
-        "targetCodeMissing": "Der Zielcode fehlt.",
-        "sourceCodeTooLong": "Der Ausgangscode hat mehr als {max} Zeichen.",
-        "targetCodeTooLong": "Der Zielcode hat mehr als {max} Zeichen.",
-        "duplicateSourceCode": "Der Ausgangscode kommt schon in einer früheren Zeile vor."
+        "sourceCodeMissing": "{direction, select, inbound {Der Code des Partners fehlt.} other {Ihr Wert fehlt.}}",
+        "targetCodeMissing": "{direction, select, inbound {Ihr Wert fehlt.} other {Der Code des Partners fehlt.}}",
+        "sourceCodeTooLong": "{direction, select, inbound {Der Code des Partners} other {Ihr Wert}} hat mehr als {max} Zeichen.",
+        "targetCodeTooLong": "{direction, select, inbound {Ihr Wert} other {Der Code des Partners}} hat mehr als {max} Zeichen.",
+        "duplicateSourceCode": "{direction, select, inbound {Der Code des Partners} other {Ihr Wert}} kommt schon in einer früheren Zeile vor."
       },
-      "applied": "CSV importiert: {added, plural, one {# Eintrag hinzugefügt} other {# Einträge hinzugefügt}}, {changed, plural, one {# Eintrag geändert} other {# Einträge geändert}}."
+      "applied": "CSV importiert: {added, plural, one {# Wert hinzugefügt} other {# Werte hinzugefügt}}, {changed, plural, one {# Wert geändert} other {# Werte geändert}}."
     }
   },
   "ManualSubmission": {
@@ -3746,13 +3723,6 @@
     "button": "{label} kopieren",
     "copied": "Kopiert",
     "failed": "Kopieren fehlgeschlagen. Markieren Sie den Text und kopieren Sie ihn selbst."
-  },
-  "LeaveGuard": {
-    "title": "Ohne Speichern verlassen?",
-    "description": "Ihre ungespeicherten Änderungen gehen verloren.",
-    "stay": "Auf dieser Seite bleiben",
-    "leave": "Ohne Speichern verlassen",
-    "close": "Schließen"
   },
   "Operator": {
     "kind": {

@@ -441,7 +441,7 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
     expect(krt).toEqual({
       urgency: 'blocking',
       code: 'KRT',
-      meaning: 'carton',
+      meaning: 'Carton',
       suggestions: [
         { code: 'CT', meaning: 'Carton' },
         { code: 'PK', meaning: 'Package' },
@@ -510,7 +510,7 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
       ['BTL', 'upcoming'],
       ['SET', 'upcoming'],
     ])
-    expect(codes[1]).toMatchObject({ meaning: 'bottle', itemCount: 14 })
+    expect(codes[1]).toMatchObject({ meaning: 'Bottle', itemCount: 14 })
   })
 
   it('drops a code once the table translates it and counts the rest on the list', async () => {

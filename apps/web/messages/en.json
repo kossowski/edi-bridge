@@ -3321,6 +3321,86 @@
     },
     "csvSettingsUsedByMappingVersion": "Published Mapping Versions read CSV Documents with these settings, and a published Mapping Version never changes. Keep the saved CSV settings, or create a new data format with the new ones."
   },
+  "CodeTranslation": {
+    "title": "Code translation",
+    "loading": "Loading the list",
+    "notFound": {
+      "title": "List not found",
+      "description": "This workspace has no code translation list with this ID."
+    },
+    "error": {
+      "title": "List unavailable",
+      "description": "The list could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "values": {
+      "title": "Values",
+      "source": "{direction, select, inbound {What the partner sends} other {Your value}}",
+      "target": "{direction, select, inbound {Your value} other {What the partner gets}}",
+      "arrow": "{direction, select, inbound {becomes} other {is sent as}}",
+      "meaning": "{code} means {meaning}.",
+      "filter": "Find a value",
+      "filteredCount": "{count, number} of {total, number} values",
+      "noMatch": "No value matches.",
+      "empty": {
+        "title": "No values yet",
+        "description": "{kind, select, units {Add the first value, e.g. the unit ST becomes PCE.} countries {Add the first value, e.g. the country Deutschland becomes DE.} addresses {Add the first value, e.g. a store number becomes an address ID.} other {Add the first value: a code and the code it becomes.}}",
+        "viewOnlyDescription": "Values appear here once an Admin adds them."
+      },
+      "add": "Add a value",
+      "edit": "Edit {code}",
+      "editing": "Change {code}",
+      "remove": "Remove {code}",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "suggestions": "Suggested codes",
+      "saved": "{code} saved.",
+      "removed": "{direction, select, inbound {{code} removed. It became {target}.} other {{code} removed. It was sent as {target}.}}",
+      "undo": "Undo",
+      "restored": "{code} restored.",
+      "errors": {
+        "required": "Enter a code.",
+        "tooLong": "Use at most {max} characters.",
+        "duplicate": "{code} already has a translation.",
+        "saveFailed": "The change could not be saved. Try again."
+      }
+    },
+    "missing": {
+      "title": "Not translated yet",
+      "loading": "Loading the values that are not translated yet",
+      "unavailable": "The values that are not translated yet could not be loaded.",
+      "accept": "Accept",
+      "acceptCode": "Accept {code}",
+      "sendAs": "{direction, select, inbound {What {code} becomes} other {Send {code} as}}",
+      "or": "or",
+      "useSuggestion": "Use {code} ({meaning})",
+      "stops": "{more, plural, =0 {Stops {document}} other {Stops {document} and # more}}",
+      "showAll": "Show all {count}",
+      "blocking": {
+        "title": "Stopped documents",
+        "description": "Documents failed because these values have no translation.",
+        "seenIn": "Seen in",
+        "seenAll": "Show all {count}"
+      },
+      "upcoming": {
+        "title": "Coming up",
+        "description": "Your ERP uses these values, but no document has needed them yet.",
+        "items": "{count, plural, one {# item in your ERP data uses it} other {# items in your ERP data use it}}"
+      }
+    },
+    "fixed": {
+      "title": "{direction, select, inbound {{code} now becomes {target}} other {{code} is now sent as {target}}}",
+      "titleMany": "{codes} are translated now",
+      "description": "{count, plural, one {A document stopped because the translation was missing. Process it again so it uses the new translation.} other {# documents stopped because the translation was missing. Process them again so they use the new translation.}}",
+      "reprocess": "Process {document} again",
+      "more": "and {count} more",
+      "showAll": "Show all {count}"
+    },
+    "uses": {
+      "unused": "No document uses it yet. Add it to a mapping with the “Code translation” step."
+    }
+  },
   "CodeTranslations": {
     "intro": "Values your partners write differently than your ERP, grouped by who receives them.",
     "summary": "{count, plural, one {# list} other {# lists}}",
@@ -3370,12 +3450,6 @@
     }
   },
   "LookupTables": {
-    "columns": {
-      "scope": "Scope"
-    },
-    "scope": {
-      "workspace": "Workspace"
-    },
     "form": {
       "createTitle": "New list",
       "createDescription": "Name the list and choose who receives it. You add the values afterwards.",
@@ -3431,116 +3505,19 @@
     }
   },
   "LookupTable": {
-    "title": "Lookup Table",
-    "loading": "Loading Lookup Table",
-    "notFound": {
-      "title": "Lookup Table not found",
-      "description": "This Workspace has no Lookup Table with this ID."
-    },
-    "error": {
-      "title": "Lookup Table unavailable",
-      "description": "The Lookup Table could not be loaded. Try again.",
-      "retry": "Try again"
-    },
-    "entries": {
-      "title": "Entries",
-      "description": "Each entry translates a source code into a target code. Source codes must be unique.",
-      "hint": "Use the arrow keys to move between cells and Enter to edit a cell.",
-      "viewOnlyHint": "Use the arrow keys to move between cells.",
-      "columns": {
-        "row": "Row",
-        "sourceCode": "Source code",
-        "targetCode": "Target code",
-        "actions": "Actions"
-      },
-      "cellLabel": "{column}, row {row}",
-      "activeError": "{column}, row {row}: {error}",
-      "filter": "Filter by source or target code",
-      "count": "{count, plural, one {# entry} other {# entries}}",
-      "filteredCount": "{count, number} of {total, number} entries",
-      "noMatch": "No entry matches the filter.",
-      "empty": {
-        "title": "No entries yet",
-        "description": "Add the first entry, e.g. source code ST with target code PCE.",
-        "viewOnlyDescription": "Entries appear here once an Admin adds them."
-      },
-      "add": "Add entry",
-      "deleteRow": "Delete entry in row {row}",
-      "save": "Save changes",
-      "saving": "Saving…",
-      "discard": "Discard changes",
-      "unsaved": "Unsaved changes",
-      "upToDate": "All changes saved",
-      "savingReadOnly": "Saving… The entries are read-only until the save finishes.",
-      "errors": {
-        "required": "Enter a code.",
-        "tooLong": "Use at most {max} characters.",
-        "duplicate": "Already used in row {row}.",
-        "summary": "{count, plural, one {# entry needs} other {# entries need}} correcting before you can save.",
-        "saveFailed": "The entries could not be saved. Try again."
-      },
-      "announcements": {
-        "saved": "Entries saved.",
-        "added": "Entry added in row {row}.",
-        "deleted": "Entry in row {row} deleted.",
-        "discarded": "Changes discarded."
-      },
-      "shortcuts": {
-        "title": "Keyboard shortcuts",
-        "items": {
-          "move": {
-            "keys": "Arrow keys, Home, End, Page Up, Page Down",
-            "action": "Move between cells"
-          },
-          "tab": {
-            "keys": "Tab, Shift+Tab",
-            "action": "Leave the entries; while editing, keep the change and move to the next or previous cell"
-          },
-          "edit": {
-            "keys": "Enter, F2 or start typing",
-            "action": "Edit the cell"
-          },
-          "commit": {
-            "keys": "Enter",
-            "action": "Keep the change"
-          },
-          "cancel": {
-            "keys": "Escape",
-            "action": "Undo the change in the cell"
-          },
-          "add": {
-            "keys": "Ctrl+Enter (⌘+Enter on Mac)",
-            "action": "Add an entry below"
-          },
-          "delete": {
-            "keys": "Ctrl+Delete (⌘+Backspace on Mac)",
-            "action": "Delete the entry"
-          },
-          "save": {
-            "keys": "Ctrl+S (⌘+S on Mac)",
-            "action": "Save changes"
-          }
-        }
-      }
-    },
     "import": {
       "open": "Import CSV",
       "title": "Import CSV",
-      "description": "Add and update entries from a CSV with a source code and a target code per line. The import merges: it adds new source codes and changes target codes, and it keeps every entry missing from the CSV.",
+      "description": "Add and change values from a CSV with {direction, select, inbound {what the partner sends and your value} other {your value and what the partner gets}} on each line. The import merges: it adds new values, changes existing ones and keeps every value missing from the CSV.",
       "close": "Close",
       "cancel": "Cancel",
-      "unsaved": {
-        "title": "Unsaved changes",
-        "description": "The entries have unsaved changes. Save or discard them before you import a CSV, so the import starts from the saved entries.",
-        "discard": "Discard changes and continue"
-      },
       "file": {
         "label": "CSV file",
         "description": "Choosing a file puts its content into the CSV text below."
       },
       "text": {
         "label": "CSV text",
-        "description": "Or paste the CSV here: one entry per line, source code and target code separated by a semicolon, comma or tab. A header line such as source;target is skipped."
+        "description": "Or paste the CSV here: one value per line, {direction, select, inbound {what the partner sends and your value} other {your value and what the partner gets}} separated by a semicolon, comma or tab. A header line such as source;target is skipped."
       },
       "preview": "Preview import",
       "previewing": "Loading preview…",
@@ -3556,9 +3533,9 @@
       },
       "result": {
         "title": "Preview",
-        "description": "Nothing changes until you apply the import. Entries missing from the CSV are kept, and invalid lines are skipped.",
-        "noLines": "The CSV has no entry lines.",
-        "nothingToApply": "The CSV neither adds nor changes an entry, so there is nothing to apply.",
+        "description": "Nothing changes until you apply the import. Values missing from the CSV are kept, and invalid lines are skipped.",
+        "noLines": "The CSV has no value lines.",
+        "nothingToApply": "The CSV neither adds nor changes a value, so there is nothing to apply.",
         "filter": "Show lines",
         "all": "All",
         "lines": "Lines of the CSV",
@@ -3577,19 +3554,19 @@
       "columns": {
         "line": "Line",
         "status": "Status",
-        "sourceCode": "Source code",
-        "targetCode": "Target code",
+        "sourceCode": "{direction, select, inbound {What the partner sends} other {Your value}}",
+        "targetCode": "{direction, select, inbound {Your value} other {What the partner gets}}",
         "details": "Details"
       },
       "reasons": {
         "columnCount": "Needs exactly two columns.",
-        "sourceCodeMissing": "The source code is missing.",
-        "targetCodeMissing": "The target code is missing.",
-        "sourceCodeTooLong": "The source code has more than {max} characters.",
-        "targetCodeTooLong": "The target code has more than {max} characters.",
-        "duplicateSourceCode": "The source code already occurs in an earlier line."
+        "sourceCodeMissing": "{direction, select, inbound {The partner’s code is missing.} other {Your value is missing.}}",
+        "targetCodeMissing": "{direction, select, inbound {Your value is missing.} other {The partner’s code is missing.}}",
+        "sourceCodeTooLong": "{direction, select, inbound {The partner’s code} other {Your value}} has more than {max} characters.",
+        "targetCodeTooLong": "{direction, select, inbound {Your value} other {The partner’s code}} has more than {max} characters.",
+        "duplicateSourceCode": "{direction, select, inbound {The partner’s code} other {Your value}} already occurs in an earlier line."
       },
-      "applied": "CSV imported: {added, plural, one {# entry added} other {# entries added}}, {changed, plural, one {# entry changed} other {# entries changed}}."
+      "applied": "CSV imported: {added, plural, one {# value added} other {# values added}}, {changed, plural, one {# value changed} other {# values changed}}."
     }
   },
   "ManualSubmission": {
@@ -3746,13 +3723,6 @@
     "button": "Copy {label}",
     "copied": "Copied",
     "failed": "Copying failed. Select the text and copy it yourself."
-  },
-  "LeaveGuard": {
-    "title": "Leave without saving?",
-    "description": "Your unsaved changes are lost.",
-    "stay": "Stay on this page",
-    "leave": "Leave without saving",
-    "close": "Close"
   },
   "Operator": {
     "kind": {

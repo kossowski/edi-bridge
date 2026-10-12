@@ -239,7 +239,7 @@ export function orderHref(businessReference: string) {
   return `${navigationItems.orders.href}/${encodeURIComponent(businessReference)}`
 }
 
-export function fixTargetHref(target: FixTarget) {
+export function fixTargetHref(target: FixTarget, runId?: string) {
   switch (target.kind) {
     case 'mapping': {
       const search = new URLSearchParams({ field: target.fieldPath })
@@ -249,6 +249,10 @@ export function fixTargetHref(target: FixTarget) {
 
     case 'lookupTable': {
       const search = new URLSearchParams({ code: target.code })
+
+      if (runId !== undefined) {
+        search.set('run', runId)
+      }
 
       return `${lookupTableHref(target.lookupTableId)}?${search}`
     }
