@@ -24,6 +24,7 @@ import {
   toDocumentStructureStore,
 } from './document-structure'
 import { createFlowStore, flowHandlers } from './flow'
+import { homeHandler } from './home'
 import { interchangesHandler } from './interchange-list'
 import { liveEventsHandler, type LiveEventsOptions } from './live-event'
 import {
@@ -62,12 +63,12 @@ import {
   type WorkspaceSummaryRecord,
 } from './operator'
 import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
-import { overviewHandler, seedOverdueAcknowledgements, seedOverviewData } from './overview'
+import { seedOverdueAcknowledgements } from './overdue-acknowledgement'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
 import { createSessionStore, seedSession, sessionHandlers } from './session'
-import { seedTasksData, tasksHandler } from './task'
+import { tasksHandler } from './task'
 import {
   createTradingPartnerStore,
   seedTradingPartners,
@@ -76,6 +77,7 @@ import {
 } from './trading-partner'
 import { tradingPartnerActivityHandlers } from './trading-partner-activity'
 import { seedWorkspace, workspaceHandlers } from './workspace'
+import { seedWorkspaceActivity } from './workspace-activity'
 import {
   seedWorkspaceMembers,
   workspaceMemberHandlers,
@@ -226,17 +228,12 @@ export {
   seedOrderLifecycles,
 } from './order-lifecycle'
 
+export { homeHandler, toHome } from './home'
+
 export {
   createOverdueAcknowledgement,
-  createOverviewData,
-  emptyOverviewData,
-  type OverviewData,
-  overviewHandler,
-  type OverviewState,
   seedOverdueAcknowledgements,
-  seedOverviewData,
-  toOverview,
-} from './overview'
+} from './overdue-acknowledgement'
 
 export { createRun, createRuns, type RunFields, runsHandler, seedRuns, toRunSummary } from './run'
 
@@ -282,7 +279,15 @@ export {
   type RunStore,
 } from './run-store'
 
-export { emptyTasksData, type TasksData, tasksHandler } from './task'
+export { tasksHandler } from './task'
+
+export {
+  createWorkspaceActivity,
+  emptyWorkspaceActivity,
+  seedWorkspaceActivity,
+  type WorkspaceActivity,
+  type WorkspaceActivityState,
+} from './workspace-activity'
 
 export { type SessionStore } from './session-access'
 
@@ -430,8 +435,8 @@ export function createHandlers(
     runsHandler(apiUrl, runs),
     interchangesHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
-    overviewHandler(apiUrl, seedOverviewData(runs)),
-    tasksHandler(apiUrl, seedTasksData(runs)),
+    homeHandler(apiUrl, seedWorkspaceActivity(runs)),
+    tasksHandler(apiUrl, seedWorkspaceActivity(runs)),
     orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles, {
       runs,
       tradingPartners: tradingPartnerStore,

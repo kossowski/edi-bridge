@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { errorRate, healthStatusOf } from './overview'
+import { errorRate, healthStatusOf } from './trading-partner-health'
 
 describe('errorRate', () => {
   it('is the share of failed Runs among finished Runs', () => {

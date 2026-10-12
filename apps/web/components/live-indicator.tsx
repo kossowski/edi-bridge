@@ -27,7 +27,7 @@ const liveStatusStyles: Record<LiveStatus, string> = {
 const announceInterruptionAfterMs = 3000
 
 function useAnnouncement(status: LiveStatus) {
-  const t = useTranslations('Overview.live.announcement')
+  const t = useTranslations('LiveIndicator.announcement')
   const [previous, setPrevious] = useState(status)
   const [interrupted, setInterrupted] = useState(false)
   const [announcement, setAnnouncement] = useState('')
@@ -61,7 +61,7 @@ function useAnnouncement(status: LiveStatus) {
 }
 
 export function LiveIndicator({ status }: { status: LiveStatus }) {
-  const t = useTranslations('Overview.live')
+  const t = useTranslations('LiveIndicator')
   const announcement = useAnnouncement(status)
   const busy = status === 'connecting' || status === 'reconnecting'
 

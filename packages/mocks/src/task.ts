@@ -1,6 +1,10 @@
-import { delay, http, HttpResponse } from 'msw'
+import { HttpResponse } from 'msw'
 
 import {
+  type FinishedRunCounts,
+  type HealthStatus,
+  healthStatuses,
+  healthStatusOf,
   type OverdueAcknowledgement,
   type RunSummary,
   type Task,
@@ -15,20 +19,71 @@ import {
 } from '@edi-bridge/contracts'
 
 import { hour } from './overdue'
-import { createOverviewData, seedOverdueAcknowledgements, tradingPartnerHealthOf } from './overview'
-import { serverError } from './responses'
-import { seedRuns } from './run'
-import { seedReprocessed } from './run-detail'
-import { createRunStore, type RunStore, toRunStore } from './run-store'
-import { seedTradingPartners } from './trading-partner'
-
-export type TasksData = {
-  runs: ReadonlyArray<RunSummary> | RunStore
-  tradingPartners: ReadonlyArray<TradingPartner>
-  overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>
-}
+import { type RunStore, toRunStore } from './run-store'
+import {
+  isFinished,
+  type WorkspaceActivity,
+  type WorkspaceActivityState,
+  workspaceActivityHandler,
+} from './workspace-activity'
 
 const tasksLookback = 24 * hour
+
+type TradingPartnerHealth = FinishedRunCounts & {
+  tradingPartner: Pick<TradingPartner, 'id' | 'name'>
+  status: HealthStatus
+  overdue: number
+  lastRunAt: string | null
+}
+
+const worstFirst = (status: HealthStatus) => -healthStatuses.indexOf(status)
+
+function tradingPartnerHealthOf(
+  tradingPartners: ReadonlyArray<TradingPartner>,
+  runs: readonly RunSummary[],
+  overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>,
+  from: number,
+): TradingPartnerHealth[] {
+  const counts = new Map<string, Omit<TradingPartnerHealth, 'tradingPartner' | 'status'>>(
+    tradingPartners.map(({ id }) => [id, { delivered: 0, failed: 0, overdue: 0, lastRunAt: null }]),
+  )
+
+  for (const run of runs) {
+    const count = counts.get(run.tradingPartner.id)
+
+    if (!count) {
+      continue
+    }
+
+    if (count.lastRunAt === null || Date.parse(run.receivedAt) > Date.parse(count.lastRunAt)) {
+      count.lastRunAt = run.receivedAt
+    }
+
+    if (Date.parse(run.receivedAt) >= from && isFinished(run.status)) {
+      count[run.status] += 1
+    }
+  }
+
+  for (const { tradingPartner } of overdueAcknowledgements) {
+    const count = counts.get(tradingPartner.id)
+
+    if (count) {
+      count.overdue += 1
+    }
+  }
+
+  return tradingPartners
+    .map(({ id, name }) => {
+      const count = counts.get(id)!
+
+      return { tradingPartner: { id, name }, status: healthStatusOf(count), ...count }
+    })
+    .sort(
+      (a, b) =>
+        worstFirst(a.status) - worstFirst(b.status) ||
+        a.tradingPartner.name.localeCompare(b.tradingPartner.name),
+    )
+}
 
 type FailedRun = Extract<RunSummary, { status: 'failed' }>
 
@@ -110,8 +165,8 @@ function failingTradingPartnerTasks(
   )
 }
 
-function toTasks(
-  { runs, tradingPartners, overdueAcknowledgements }: TasksData,
+export function toTasks(
+  { runs, tradingPartners, overdueAcknowledgements }: WorkspaceActivity,
   now = new Date(),
 ): Tasks {
   const from = now.getTime() - tasksLookback
@@ -127,61 +182,8 @@ function toTasks(
   return tasksSchema.parse({ tasks, counts: taskCountsOf(tasks) })
 }
 
-export const emptyTasksData: TasksData = {
-  runs: [],
-  tradingPartners: [],
-  overdueAcknowledgements: [],
-}
-
-function seedRunStore() {
-  const runs = seedRuns()
-
-  return createRunStore(runs, seedReprocessed(runs))
-}
-
-export function seedTasksData(runs: RunStore = seedRunStore()): TasksData {
-  return {
-    runs,
-    tradingPartners: seedTradingPartners,
-    get overdueAcknowledgements() {
-      return seedOverdueAcknowledgements(runs.all())
-    },
-  }
-}
-
-export type TasksState = 'empty' | 'large' | 'loading' | 'error'
-
-function tasksDataOf(source: TasksData | 'empty' | 'large' | undefined): TasksData {
-  switch (source) {
-    case undefined:
-      return seedTasksData()
-    case 'empty':
-      return emptyTasksData
-    case 'large':
-      return createOverviewData({ tradingPartnerCount: 240, overdueCount: 400, runCount: 30_000 })
-    default:
-      return source
-  }
-}
-
-export function tasksHandler(apiUrl: string, source?: TasksData | TasksState) {
-  const path = `${apiUrl}${tasksEndpoint.path}`
-
-  if (source === 'loading') {
-    return http.get(path, async () => {
-      await delay('infinite')
-    })
-  }
-
-  if (source === 'error') {
-    return http.get(path, () => serverError())
-  }
-
-  let data: TasksData | undefined
-
-  return http.get(path, () => {
-    data ??= tasksDataOf(source)
-
-    return HttpResponse.json(toTasks(data))
-  })
+export function tasksHandler(apiUrl: string, source?: WorkspaceActivity | WorkspaceActivityState) {
+  return workspaceActivityHandler(`${apiUrl}${tasksEndpoint.path}`, source, (activity) =>
+    HttpResponse.json(toTasks(activity)),
+  )
 }

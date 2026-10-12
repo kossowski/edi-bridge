@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { controlReferenceSchema } from './edifact'
 import { directionOf, type MessageType, messageTypeSchema } from './message-type'
-import { overdueAcknowledgementMessageTypes } from './overview'
+import { overdueAcknowledgementMessageTypes } from './overdue-acknowledgement'
 import { type FailureStage, failureStageSchema } from './run'
 import { tradingPartnerSummarySchema } from './trading-partner'
 

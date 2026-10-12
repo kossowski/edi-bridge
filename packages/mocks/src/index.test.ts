@@ -28,7 +28,7 @@ import {
   messageTypeStructureEndpoint,
   operatorWorkspacesEndpoint,
   orderLifecyclesEndpoint,
-  overviewEndpoint,
+  homeEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   type ReprocessRunBody,
@@ -160,7 +160,7 @@ describe('createHandlers', () => {
     })
   })
 
-  it('counts a retried Run as delivered on the Overview', async () => {
+  it('counts a retried Run as delivered on Home', async () => {
     server.use(...createHandlers(apiUrl))
 
     const { runs } = await listRuns({
@@ -172,18 +172,16 @@ describe('createHandlers', () => {
     const failed = runs[0]!
 
     const failedInWindow = async () => {
-      const response = await fetch(`${apiUrl}${overviewEndpoint.path}?window=24h`)
-      const { tradingPartners } = overviewEndpoint.response.parse(await response.json())
+      const response = await fetch(`${apiUrl}${homeEndpoint.path}?window=24h`)
+      const { throughput } = homeEndpoint.response.parse(await response.json())
 
-      return tradingPartners.find(
-        ({ tradingPartner }) => tradingPartner.id === failed.tradingPartner.id,
-      )?.failed
+      return throughput.reduce((sum, bucket) => sum + bucket.failed, 0)
     }
 
     const before = await failedInWindow()
     await post(toPath(retryRunEndpoint.path, { id: failed.id }))
 
-    expect(await failedInWindow()).toBe(before! - 1)
+    expect(await failedInWindow()).toBe(before - 1)
   })
 
   it('drops a retried Run from the Tasks', async () => {

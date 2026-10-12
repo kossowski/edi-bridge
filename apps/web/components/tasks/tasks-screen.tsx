@@ -5,13 +5,14 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadError } from '@/components/load-error'
 import { TaskIcon, useTaskText } from '@/components/tasks/task-text'
+import { useLocationHash } from '@/hooks/use-location-hash'
 import { tasksQuery } from '@/lib/api/queries'
-import { taskHref } from '@/lib/task-href'
+import { taskGroupIds, taskHref } from '@/lib/task-href'
 import { type Task, type TaskActor, taskActors, type TaskCounts } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -89,7 +90,10 @@ function TaskGroup({
   const shown = expanded ? tasks : tasks.slice(0, topCount)
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
+    <section
+      id={taskGroupIds[whoActs]}
+      aria-labelledby={headingId}
+      className="flex scroll-mt-20 flex-col gap-3">
       <h2 id={headingId} className="text-sm font-medium">
         {t(`groups.${whoActs}`)} <span className="text-muted-foreground">({count})</span>
       </h2>
@@ -115,7 +119,15 @@ function TaskGroup({
 
 function TaskGroups({ tasks, counts }: { tasks: ReadonlyArray<Task>; counts: TaskCounts }) {
   const now = useNow({ updateInterval: 60_000 })
+  const hash = useLocationHash()
   const byWho = Map.groupBy(tasks, (task) => task.whoActs)
+
+  useEffect(() => {
+    const target = hash === '' ? null : document.getElementById(hash)
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    target?.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' })
+  }, [hash])
 
   return taskActors.map((whoActs) => {
     const groupTasks = byWho.get(whoActs)

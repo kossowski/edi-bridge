@@ -3,11 +3,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { type TradingPartner, tasksEndpoint, tasksSchema } from '@edi-bridge/contracts'
 
-import { createOverdueAcknowledgement } from './overview'
+import { createOverdueAcknowledgement } from './overdue-acknowledgement'
 import { createRun } from './run'
 import { createRunStore } from './run-store'
-import { emptyTasksData, type TasksData, tasksHandler } from './task'
+import { tasksHandler } from './task'
 import { createTradingPartner } from './trading-partner'
+import { emptyWorkspaceActivity, type WorkspaceActivity } from './workspace-activity'
 
 const apiUrl = 'http://api.test'
 
@@ -58,8 +59,8 @@ function delivered(receivedAt: string, tradingPartner = rheinkauf) {
   })
 }
 
-function data(overrides: Partial<TasksData>): TasksData {
-  return { ...emptyTasksData, ...overrides }
+function data(overrides: Partial<WorkspaceActivity>): WorkspaceActivity {
+  return { ...emptyWorkspaceActivity, ...overrides }
 }
 
 describe('GET /tasks', () => {

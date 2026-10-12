@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { flowSummarySchema } from './flow'
-import { overdueAcknowledgementSchema } from './overview'
+import { overdueAcknowledgementSchema } from './overdue-acknowledgement'
 import { runSummarySchema } from './run'
 
 import type { Endpoint } from './endpoint'

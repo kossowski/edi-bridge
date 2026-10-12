@@ -2,8 +2,8 @@ import {
   createOverdueAcknowledgement,
   createRun,
   createTradingPartner,
-  emptyTasksData,
-  type TasksData,
+  emptyWorkspaceActivity,
+  type WorkspaceActivity,
 } from '@edi-bridge/mocks'
 
 const hour = 60 * 60 * 1000
@@ -46,9 +46,9 @@ function deliveredRun(tradingPartner: typeof hansemarkt, hours: number) {
   })
 }
 
-export function everyKind(): TasksData {
+export function everyKind(): WorkspaceActivity {
   return {
-    ...emptyTasksData,
+    ...emptyWorkspaceActivity,
     tradingPartners: [hansemarkt, rheinkauf],
     runs: [
       failedRun(hansemarkt, 'INVOIC', 'delivery', 1),

@@ -19,10 +19,14 @@ import {
   tradingPartnerActivitySchema,
 } from '@edi-bridge/contracts'
 
-import { type OverviewData, overviewDataOf, type OverviewState } from './overview'
 import { notFound, serverError } from './responses'
 import { type RunStore, toRunStore } from './run-store'
 import { type TradingPartnerStore, toTradingPartnerStore } from './trading-partner'
+import {
+  type WorkspaceActivity,
+  workspaceActivityOf,
+  type WorkspaceActivityState,
+} from './workspace-activity'
 
 type Listing<T> = ReadonlyArray<T> | { all: () => readonly T[] }
 
@@ -190,10 +194,10 @@ export function toTradingPartnerActivityDetail(
   })
 }
 
-// Generated overview data has no Flow or Channel records, so each partner with Runs gets the
+// Generated workspace activity has no Flow or Channel records, so each partner with Runs gets the
 // Flows its Runs name and one Channel.
-function withSetupFromRuns(overview: OverviewData): TradingPartnerActivityData {
-  const runs = toRunStore(overview.runs)
+function withSetupFromRuns(activity: WorkspaceActivity): TradingPartnerActivityData {
+  const runs = toRunStore(activity.runs)
   const flows = new Map<string, PartnerFlow>()
 
   for (const { flow, tradingPartner } of runs.all()) {
@@ -205,7 +209,7 @@ function withSetupFromRuns(overview: OverviewData): TradingPartnerActivityData {
   )
 
   return {
-    ...overview,
+    ...activity,
     runs,
     flows: [...flows.values()],
     channels: [...partnersWithRuns].map((tradingPartnerId) => ({ tradingPartnerId })),
@@ -219,9 +223,9 @@ function activityDataOf(
 ): TradingPartnerActivityData {
   switch (source) {
     case 'empty':
-      return withSetupFromRuns(overviewDataOf(source))
+      return withSetupFromRuns(workspaceActivityOf(source))
     case 'large':
-      return (largeActivityData ??= withSetupFromRuns(overviewDataOf(source)))
+      return (largeActivityData ??= withSetupFromRuns(workspaceActivityOf(source)))
     default:
       return { ...source, runs: toRunStore(source.runs) }
   }
@@ -229,7 +233,7 @@ function activityDataOf(
 
 export function tradingPartnerActivityHandlers(
   apiUrl: string,
-  source: TradingPartnerActivityData | OverviewState,
+  source: TradingPartnerActivityData | WorkspaceActivityState,
 ) {
   const listPath = `${apiUrl}${tradingPartnerActivitiesEndpoint.path}`
   const detailPath = `${apiUrl}${tradingPartnerActivityEndpoint.path}`

@@ -23,6 +23,10 @@ export const EveryKind = meta.story({
     const retry = canvas.getByRole('region', { name: 'Try again (1)' })
     const tradingPartner = canvas.getByRole('region', { name: 'Waiting for a partner (2)' })
 
+    await expect(you).toHaveAttribute('id', 'for-you')
+    await expect(retry).toHaveAttribute('id', 'try-again')
+    await expect(tradingPartner).toHaveAttribute('id', 'waiting-for-partner')
+
     await expect(
       within(you).getByRole('heading', { name: 'Many documents with Hansemarkt GmbH fail' }),
     ).toBeVisible()

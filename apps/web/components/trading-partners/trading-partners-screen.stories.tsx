@@ -117,7 +117,7 @@ export const ActivityUnavailable = meta.story({
 export const LargeVolume = meta.story({
   beforeEach({ msw }) {
     msw.use(
-      // Same count and seed as the large overview data, so the activity matches these partners.
+      // Same count and seed as the large workspace activity, so the activity matches these partners.
       ...tradingPartnerHandlers(apiUrl, {
         tradingPartners: createTradingPartners({ count: 240, seed: 16 }),
       }),

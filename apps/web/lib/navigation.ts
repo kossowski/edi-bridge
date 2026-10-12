@@ -37,7 +37,7 @@ type NavigationItem = {
 export const appIcon = ArrowDataTransferHorizontalIcon
 
 export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = {
-  overview: { href: '/', icon: DashboardSquare01Icon },
+  home: { href: '/', icon: DashboardSquare01Icon },
   tasks: { href: '/tasks', icon: Task01Icon },
   documents: { href: '/documents', icon: File02Icon },
   orderLifecycle: { href: '/order-lifecycle', icon: Route01Icon },
@@ -95,7 +95,7 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
     key: 'dailyWork',
     collapsible: false,
     items: [
-      { key: 'home', page: 'overview' },
+      { key: 'home', page: 'home' },
       { key: 'documents', page: 'documents' },
       { key: 'orders', page: 'orderLifecycle', icon: ShoppingBasket01Icon },
     ],

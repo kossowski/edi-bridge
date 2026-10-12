@@ -2,12 +2,12 @@
 
 import { useFormatter, useTranslations } from 'next-intl'
 
-import { type BucketRow, rangeFormats, tickFormats } from '@/components/overview/overview-data'
+import { type BucketRow, rangeFormats, tickFormats } from '@/components/home/home-data'
 
-import type { OverviewWindow } from '@edi-bridge/contracts'
+import type { HomeWindow } from '@edi-bridge/contracts'
 
-export function useFormats(timeWindow: OverviewWindow) {
-  const t = useTranslations('Overview')
+export function useFormats(timeWindow: HomeWindow) {
+  const t = useTranslations('Home')
   const format = useFormatter()
 
   const percent = (value: number) =>
