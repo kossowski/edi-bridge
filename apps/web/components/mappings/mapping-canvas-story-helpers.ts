@@ -188,3 +188,34 @@ export async function expectSavedLinkCount(id: string, count: number) {
     { timeout: 5000 },
   )
 }
+
+export function findLink(canvasElement: HTMLElement, name: string) {
+  return within(canvasElement).findByRole('group', { name })
+}
+
+// The menu renders in a portal outside the story's root, and fades in.
+export async function findLinkMenu(canvasElement: HTMLElement) {
+  const menu = await page(canvasElement).findByRole('menu')
+
+  await waitFor(() => expect(menu).toBeVisible())
+
+  return within(menu)
+}
+
+export async function openLinkMenuByMouse(canvasElement: HTMLElement, name: string) {
+  const line = (await findLink(canvasElement, name)).querySelector('.react-flow__edge-interaction')!
+
+  await userEvent.pointer({ keys: '[MouseRight]', target: line })
+
+  return findLinkMenu(canvasElement)
+}
+
+export async function openLinkMenuByKeyboard(
+  canvasElement: HTMLElement,
+  name: string,
+  keys = '{Shift>}{F10}{/Shift}',
+) {
+  await pressOn(await findLink(canvasElement, name), keys)
+
+  return findLinkMenu(canvasElement)
+}

@@ -69,3 +69,13 @@
 .mapping-canvas .react-flow__handle.part-handle {
   pointer-events: none;
 }
+
+.mapping-canvas .react-flow__edge:focus-visible .react-flow__edge-interaction {
+  stroke: var(--ring);
+  stroke-opacity: 0.5;
+  stroke-width: 10px;
+}
+
+.mapping-canvas .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke-width: 2.5;
+}

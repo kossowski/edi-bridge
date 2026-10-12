@@ -22,6 +22,9 @@ import type { LinkableRows, RowRef } from '@/components/mappings/mapping-links'
 import type { Side, TreeRow } from '@/components/mappings/mapping-tree'
 import type { AiReview, LinkStart } from '@edi-bridge/contracts'
 
+// Opened on the focused link, the menu takes the focus back to it when it closes without an action.
+export type LinkMenuAt = { edgeId: string; at: XYPosition; focused: boolean }
+
 export type CanvasState = {
   collapsed: Readonly<Record<Side, ReadonlySet<string>>>
   selected: RowRef | null
@@ -29,8 +32,9 @@ export type CanvasState = {
   linkFrom: LinkStart | null
   tooltipRowId: string | null
   hoveredEdge: string | null
-  // Where the pointer met the hovered edge, in flow coordinates; its middle may be out of view.
-  edgeAnchor: XYPosition | null
+  // Kept while the menu closes, so it fades out where it was.
+  linkMenu: LinkMenuAt | null
+  linkMenuOpen: boolean
   announcement: string
   problem: string | null
   // Opened from the toolbar; a selected Transform shows its settings there too. A selected row or
@@ -48,8 +52,10 @@ export type CanvasState = {
   startLink: (start: LinkStart) => void
   cancelLink: () => void
   setTooltipRowId: (id: string | null) => void
-  hoverEdge: (id: string, at?: XYPosition) => void
+  hoverEdge: (id: string) => void
   leaveEdge: (id: string) => void
+  openLinkMenu: (menu: LinkMenuAt) => void
+  closeLinkMenu: () => void
   announce: (text: string) => void
   setProblem: (problem: string | null) => void
 }
@@ -70,20 +76,16 @@ function toRowRef({ side, path }: RowRef): RowRef {
   return { side, path }
 }
 
-// Moving from an edge to its remove button leaves the edge first; the grace keeps the button.
-const edgeLeaveGrace = 300
-
 export function createCanvasStore() {
-  let leaveTimer: ReturnType<typeof setTimeout> | undefined
-
-  return createStore<CanvasState>()((set, get) => ({
+  return createStore<CanvasState>()((set) => ({
     collapsed: { source: new Set(), target: new Set() },
     selected: null,
     selectedTransform: null,
     linkFrom: null,
     tooltipRowId: null,
     hoveredEdge: null,
-    edgeAnchor: null,
+    linkMenu: null,
+    linkMenuOpen: false,
     announcement: '',
     problem: null,
     detailsOpen: false,
@@ -123,21 +125,11 @@ export function createCanvasStore() {
     startLink: (linkFrom) => set({ linkFrom, problem: null }),
     cancelLink: () => set({ linkFrom: null }),
     setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
-    hoverEdge: (id, at) => {
-      clearTimeout(leaveTimer)
-      set(({ hoveredEdge, edgeAnchor }) => ({
-        hoveredEdge: id,
-        edgeAnchor: at ?? (hoveredEdge === id ? edgeAnchor : null),
-      }))
-    },
-    leaveEdge: (id) => {
-      clearTimeout(leaveTimer)
-      leaveTimer = setTimeout(() => {
-        if (get().hoveredEdge === id) {
-          set({ hoveredEdge: null })
-        }
-      }, edgeLeaveGrace)
-    },
+    hoverEdge: (id) => set({ hoveredEdge: id }),
+    leaveEdge: (id) =>
+      set(({ hoveredEdge }) => ({ hoveredEdge: hoveredEdge === id ? null : hoveredEdge })),
+    openLinkMenu: (linkMenu) => set({ linkMenu, linkMenuOpen: true }),
+    closeLinkMenu: () => set({ linkMenuOpen: false }),
     // A live region repeats nothing it already shows, so a repeated text gets a trailing space.
     announce: (text) =>
       set(({ announcement }) => ({

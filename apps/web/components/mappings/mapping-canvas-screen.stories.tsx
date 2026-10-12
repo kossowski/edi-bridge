@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
@@ -20,6 +20,8 @@ import {
   startDrag,
   target,
   expectSavedLinkCount,
+  openLinkMenuByKeyboard,
+  openLinkMenuByMouse,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { nodeId } from '@/components/mappings/mapping-tree'
 import { apiUrl } from '@/lib/api/config'
@@ -100,7 +102,7 @@ export const Outbound = meta.story({
     await expect(await canvas.findByText('despatchNumber')).toBeVisible()
     await expect(canvas.getByText('UNH')).toBeVisible()
     await expect(
-      await canvas.findByRole('img', { name: 'Link from despatchNumber to BGM/1004' }),
+      await canvas.findByRole('group', { name: 'Link from despatchNumber to BGM/1004' }),
     ).toBeInTheDocument()
 
     const details = await openDetails(canvasElement)
@@ -119,7 +121,7 @@ export const Inbound = meta.story({
     ).toBeVisible()
     await expect(await canvas.findByText('orderNumber')).toBeVisible()
     await expect(
-      await canvas.findByRole('img', { name: 'Link from BGM/1004 to orderNumber' }),
+      await canvas.findByRole('group', { name: 'Link from BGM/1004 to orderNumber' }),
     ).toBeInTheDocument()
 
     const details = await openDetails(canvasElement)
@@ -139,7 +141,7 @@ export const CollapseParts = meta.story({
     )
     await expect(await canvas.findByText('DTM+137')).toBeVisible()
     await expect(
-      await canvas.findByRole('img', { name: 'Link from BGM/1004 to orderNumber' }),
+      await canvas.findByRole('group', { name: 'Link from BGM/1004 to orderNumber' }),
     ).toBeInTheDocument()
   },
 })
@@ -442,7 +444,7 @@ export const German = meta.story({
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByText('Nachrichtenkopf')).toBeVisible()
     await expect(
-      await canvas.findByRole('img', { name: 'Verknüpfung von BGM/1004 zu orderNumber' }),
+      await canvas.findByRole('group', { name: 'Verknüpfung von BGM/1004 zu orderNumber' }),
     ).toBeInTheDocument()
 
     const row = await findRow(canvasElement, { side: 'source', path: 'DTM+137' })
@@ -476,10 +478,18 @@ export const German = meta.story({
       ),
     )
 
-    await userEvent.hover(edgeOf(canvasElement, source('BGM/1004'), target('orderNumber'))!)
+    const menu = await openLinkMenuByKeyboard(
+      canvasElement,
+      'Verknüpfung von BGM/1004 zu orderNumber',
+    )
+
+    await expect(menu.getByText('BGM/1004 → orderNumber')).toBeVisible()
     await expect(
-      await canvas.findByRole('button', { name: 'Verknüpfung entfernen: BGM/1004 zu orderNumber' }),
+      menu.getByRole('menuitem', { name: 'BGM/1004 in der Quelle anzeigen' }),
     ).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: 'Verknüpfung entfernen' })).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
 
     // Open, the details cover part of the canvas; closed, every part is in reach again.
     await userEvent.click(panel.getByRole('button', { name: 'Details schließen' }))
@@ -505,12 +515,12 @@ export const Dark = meta.story({
     await userEvent.hover(row)
     await findTooltip(canvasElement)
 
-    // The marks of a pending link and an edge's remove button, checked in dark too.
+    // The marks of a pending link and a link's menu, checked in dark too.
     await pressOn(await findRow(canvasElement, source('despatchDate')), 'l')
-    await userEvent.hover(edgeOf(canvasElement, source('despatchNumber'), target('BGM/1004'))!)
-    await expect(
-      await canvas.findByRole('button', { name: 'Remove link from despatchNumber to BGM/1004' }),
-    ).toBeVisible()
+
+    const menu = await openLinkMenuByMouse(canvasElement, 'Link from despatchNumber to BGM/1004')
+
+    await expect(menu.getByRole('menuitem', { name: 'Remove link' })).toBeVisible()
   },
 })
 
@@ -661,7 +671,7 @@ export const DrawLinkByMouse = meta.story({
     await dragLink(canvasElement, source('invoiceNumber'), target('BGM/1004'))
 
     await expect(
-      await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
+      await canvas.findByRole('group', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeInTheDocument()
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
     await expectSavedLinkCount(withoutLinks.id, 1)
@@ -697,7 +707,7 @@ export const DrawLinkByKeyboard = meta.story({
     await pressOn(panel.getByRole('button', { name: 'Link to here' }), '{Enter}')
 
     await expect(
-      await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
+      await canvas.findByRole('group', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeInTheDocument()
     await waitFor(() => expect(to).toHaveFocus())
     await expect(panel.getByText('invoiceNumber to BGM/1004')).toBeVisible()
@@ -707,7 +717,7 @@ export const DrawLinkByKeyboard = meta.story({
     await pressOn(await findRow(canvasElement, source('invoiceDate')), 'l')
     await pressOn(await findRow(canvasElement, target('DTM+137/C507/2380')), 'l')
     await expect(
-      await canvas.findByRole('img', { name: 'Link from invoiceDate to DTM+137/C507/2380' }),
+      await canvas.findByRole('group', { name: 'Link from invoiceDate to DTM+137/C507/2380' }),
     ).toBeInTheDocument()
     await expectSavedLinkCount(withoutLinks.id, 2)
 
@@ -729,28 +739,27 @@ export const RemoveLinkByMouse = meta.story({
   args: { id: outbound.id },
   parameters: linkStories,
   async play({ canvas, canvasElement }) {
-    await canvas.findByRole('img', { name: 'Link from despatchNumber to BGM/1004' })
+    const menu = await openLinkMenuByMouse(canvasElement, 'Link from despatchNumber to BGM/1004')
 
-    await userEvent.hover(edgeOf(canvasElement, source('despatchNumber'), target('BGM/1004'))!)
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Remove link from despatchNumber to BGM/1004' }),
-    )
+    await userEvent.click(menu.getByRole('menuitem', { name: 'Remove link' }))
 
     await waitFor(() =>
       expect(
-        canvas.queryByRole('img', { name: 'Link from despatchNumber to BGM/1004' }),
+        canvas.queryByRole('group', { name: 'Link from despatchNumber to BGM/1004' }),
       ).toBeNull(),
     )
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
     await expectSavedLinkCount(outbound.id, 29)
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
-    // An edge into collapsed parts carries several links; its button lists them by name first.
+    // A link into collapsed parts stands for several; its menu lists them by name first.
     await userEvent.click(canvas.getByRole('button', { name: 'Collapse packages' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Collapse SG10' }))
-    await userEvent.hover(edgeOf(canvasElement, source('packages[]'), target('SG10'))!)
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Show the 9 links from packages[] to SG10' }),
-    )
+
+    const merged = await openLinkMenuByMouse(canvasElement, '9 links from packages[] to SG10')
+
+    await expect(merged.queryByRole('menuitem', { name: 'Remove link' })).toBeNull()
+    await userEvent.click(merged.getByRole('menuitem', { name: 'Show the 9 links' }))
 
     const panel = await detailsPanel(canvasElement)
 
@@ -787,7 +796,7 @@ export const RemoveLinkByKeyboard = meta.story({
 
     await waitFor(() =>
       expect(
-        canvas.queryByRole('img', { name: 'Link from despatchNumber to BGM/1004' }),
+        canvas.queryByRole('group', { name: 'Link from despatchNumber to BGM/1004' }),
       ).toBeNull(),
     )
     await waitFor(() => expect(row).toHaveFocus())
@@ -798,7 +807,7 @@ export const RemoveLinkByKeyboard = meta.story({
     await pressOn(await findRow(canvasElement, source('documentDate')), '{Delete}')
     await waitFor(() =>
       expect(
-        canvas.queryByRole('img', { name: 'Link from documentDate to DTM+137/C507/2380' }),
+        canvas.queryByRole('group', { name: 'Link from documentDate to DTM+137/C507/2380' }),
       ).toBeNull(),
     )
     await expectSavedLinkCount(outbound.id, 28)
@@ -811,10 +820,27 @@ export const RemoveLinkByKeyboard = meta.story({
       ),
     )
     await expectSavedLinkCount(outbound.id, 28)
+
+    // The menu key on a focused link opens its menu; the focus goes to where the link started.
+    await openLinkMenuByKeyboard(
+      canvasElement,
+      'Link from despatchDate to DTM+11/C507/2380',
+      '{ContextMenu}',
+    )
+    await userEvent.keyboard('{ArrowUp}{Enter}')
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole('group', { name: 'Link from despatchDate to DTM+11/C507/2380' }),
+      ).toBeNull(),
+    )
+    await waitFor(async () =>
+      expect(await findRow(canvasElement, source('despatchDate'))).toHaveFocus(),
+    )
+    await expectSavedLinkCount(outbound.id, 27)
   },
 })
 
-export const RemoveButtonOfLongEdge = meta.story({
+export const LinkMenuOfLongEdge = meta.story({
   args: { id: inbound.id },
   parameters: linkStories,
   // A short canvas, so the long edge runs out of view.
@@ -843,49 +869,74 @@ export const RemoveButtonOfLongEdge = meta.story({
 
     await new Promise((resolve) => requestAnimationFrame(resolve))
 
-    const length = edge.getTotalLength()
-    const middle = screenPoint(edge, length / 2)
+    const middle = screenPoint(edge, edge.getTotalLength() / 2)
 
     await expect(inside(new DOMRect(middle.x, middle.y), pane)).toBe(false)
 
-    // Hovered where the edge is in view, near the end that is on screen.
-    const lengths = Array.from({ length: 41 }, (_, step) => (length * step) / 40)
+    // From the keyboard, the menu opens at the part of the link in view.
+    const menu = await openLinkMenuByKeyboard(canvasElement, '8 links from SG2+BY to buyer')
 
-    // Not where a transform or another link covers it.
-    const shown = lengths
-      .map((at) => screenPoint(edge, at))
-      .find(
-        (point) =>
-          inside(new DOMRect(point.x - 20, point.y - 20, 40, 40), pane) &&
-          canvasElement.ownerDocument
-            .elementFromPoint(point.x, point.y)
-            ?.closest('.react-flow__edge') === edge.closest('.react-flow__edge'),
-      )!
+    await expect(menu.getByRole('menuitem', { name: 'Show the 8 links' })).toBeVisible()
 
-    await fireEvent.mouseOver(edge, { clientX: shown.x, clientY: shown.y })
+    const box = page(canvasElement).getByRole('menu').getBoundingClientRect()
+    const view = new DOMRect(0, 0, window.innerWidth, window.innerHeight)
 
-    const button = await canvas.findByRole('button', {
-      name: 'Show the 8 links from SG2+BY to buyer',
-    })
+    await expect(inside(box, view)).toBe(true)
+    await expect(box.left).toBeLessThanOrEqual(pane.right)
+    await expect(box.top).toBeLessThanOrEqual(pane.bottom)
 
-    const box = button.getBoundingClientRect()
-
-    await expect(inside(box, pane)).toBe(true)
-
-    // The button sits beside the hovered point, so a click there still lands on the edge.
-    await expect(inside(new DOMRect(shown.x, shown.y), box)).toBe(false)
-
-    const hit = canvasElement.ownerDocument.elementFromPoint(shown.x, shown.y)!
-
-    await expect(button.contains(hit)).toBe(false)
-    await expect(hit.closest('.react-flow__edge')).not.toBeNull()
-    await userEvent.click(hit)
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-    await expect(edgeOf(canvasElement, source('SG2+BY'), target('buyer'))).not.toBeNull()
+    // Escape closes it and takes the focus back to the link, with nothing removed.
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
+    await waitFor(() =>
+      expect(canvas.getByRole('group', { name: '8 links from SG2+BY to buyer' })).toHaveFocus(),
+    )
     await expect(canvas.queryByText('Saving…')).toBeNull()
+  },
+})
+
+export const LinkMenuByMouse = meta.story({
+  args: { id: outbound.id },
+  parameters: linkStories,
+  async play({ canvasElement }) {
+    const menu = await openLinkMenuByMouse(canvasElement, 'Link from despatchNumber to BGM/1004')
+
+    await expect(menu.getByText('despatchNumber → BGM/1004')).toBeVisible()
     await expect(
-      canvas.getByRole('button', { name: 'Show the 8 links from SG2+BY to buyer' }),
+      menu.getByRole('menuitem', { name: 'Show despatchNumber in the source' }),
     ).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: 'Show BGM/1004 in the target' })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: 'Remove link' })).toBeVisible()
+  },
+})
+
+export const LinkMenuByKeyboard = meta.story({
+  args: { id: outbound.id },
+  parameters: linkStories,
+  async play({ canvasElement }) {
+    const menu = await openLinkMenuByKeyboard(canvasElement, 'Link from despatchNumber to BGM/1004')
+
+    await userEvent.keyboard('{ArrowDown}')
+    await waitFor(() =>
+      expect(
+        menu.getByRole('menuitem', { name: 'Show despatchNumber in the source' }),
+      ).toHaveFocus(),
+    )
+
+    // Showing a field selects it, opens the details and moves the focus to it.
+    await userEvent.keyboard('{Enter}')
+
+    const panel = await detailsPanel(canvasElement)
+
+    await expect(
+      panel.getByRole('button', { name: 'Remove link from despatchNumber to BGM/1004' }),
+    ).toBeVisible()
+    await waitFor(async () =>
+      expect(await findRow(canvasElement, source('despatchNumber'))).toHaveFocus(),
+    )
+
+    // Enter on a link opens its menu too; it stays open for the accessibility checks.
+    await openLinkMenuByKeyboard(canvasElement, 'Link from despatchNumber to BGM/1004', '{Enter}')
   },
 })
 
@@ -929,7 +980,7 @@ export const DragOntoLinkedTarget = meta.story({
     )
     await expect(canvasElement.querySelector('[data-link-unavailable]')).toBeNull()
     await expect(
-      canvas.queryByRole('img', { name: 'Link from despatchDate to BGM/1004' }),
+      canvas.queryByRole('group', { name: 'Link from despatchDate to BGM/1004' }),
     ).toBeNull()
     await expectSavedLinkCount(outbound.id, 30)
   },
@@ -956,7 +1007,7 @@ export const TargetAlreadyLinked = meta.story({
       ),
     )
     await expect(
-      canvas.queryByRole('img', { name: 'Link from despatchDate to DTM+137/C507/2380' }),
+      canvas.queryByRole('group', { name: 'Link from despatchDate to DTM+137/C507/2380' }),
     ).toBeNull()
     await expectSavedLinkCount(outbound.id, 30)
     await expect(
@@ -982,7 +1033,7 @@ export const SaveErrorRollback = meta.story({
     await pressOn(await findRow(canvasElement, target('BGM/1004')), 'l')
 
     await expect(
-      await canvas.findByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
+      await canvas.findByRole('group', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeInTheDocument()
     await expect(canvas.getByText('Saving…')).toBeVisible()
     await expect(canvas.getByText(/^Unpublished changes since Version/)).toBeVisible()
@@ -993,7 +1044,7 @@ export const SaveErrorRollback = meta.story({
       ),
     )
     await expect(
-      canvas.queryByRole('img', { name: 'Link from invoiceNumber to BGM/1004' }),
+      canvas.queryByRole('group', { name: 'Link from invoiceNumber to BGM/1004' }),
     ).toBeNull()
     await expect(await findSaveStatus(canvasElement, 'Not saved')).toBeVisible()
     await expectSavedLinkCount(withoutLinks.id, 0)

@@ -359,7 +359,7 @@ export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas }) {
       await expect(
-        (await canvas.findAllByRole('img', { name: /^Link from/ })).length,
+        (await canvas.findAllByRole('group', { name: /^Link from/ })).length,
       ).toBeGreaterThan(0)
       await expect(canvas.queryByRole('button', { name: 'What needs attention' })).toBeNull()
       await expect(canvas.getByRole('button', { name: 'Preview' })).toBeVisible()

@@ -19,7 +19,6 @@ import {
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
 import {
-  type MouseEvent,
   type ReactNode,
   type Ref,
   useCallback,
@@ -32,12 +31,13 @@ import {
 
 import { proposedLinkCount, useAiMarks } from '@/components/mappings/ai-marks'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
+import { LinkEdge, type LinkFlowEdge } from '@/components/mappings/link-edge'
 import {
-  LinkActionsContext,
-  type LinkActions,
-  LinkEdge,
-  type LinkFlowEdge,
-} from '@/components/mappings/link-edge'
+  LinkMenu,
+  type LinkMenuActions,
+  type LinkMenuEnd,
+  type LinkMenuTarget,
+} from '@/components/mappings/link-menu'
 import {
   detailsShown,
   LinkableRowsContext,
@@ -360,6 +360,49 @@ function DetailsPanel({
   )
 }
 
+// A link takes the focus, so the keyboard opens its menu; above the trees, so it crosses the parts.
+// It stays a group: as a button, axe counts its whole box as a target crowding the rows' buttons.
+const menuEdge = {
+  focusable: true,
+  zIndex: 100,
+  domAttributes: { 'aria-roledescription': undefined },
+} satisfies Partial<LinkFlowEdge>
+
+function opensMenu(event: globalThis.KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey) {
+    return false
+  }
+
+  return (
+    event.key === 'Enter' ||
+    event.key === ' ' ||
+    event.key === 'ContextMenu' ||
+    (event.key === 'F10' && event.shiftKey)
+  )
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function middleInView(edge: Element, pane: DOMRect) {
+  const path = edge.querySelector<SVGPathElement>('.react-flow__edge-path')
+  const matrix = path?.getScreenCTM()
+  const box = edge.getBoundingClientRect()
+
+  const point = path?.getPointAtLength(path.getTotalLength() / 2)
+
+  const middle =
+    point && matrix
+      ? new DOMPoint(point.x, point.y).matrixTransform(matrix)
+      : { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+
+  return {
+    x: clamp(middle.x, pane.left, pane.right),
+    y: clamp(middle.y, pane.top, pane.bottom),
+  }
+}
+
 // Focus moves once the change has rendered, when the button it goes to exists.
 function afterRender(focus: () => void) {
   requestAnimationFrame(focus)
@@ -464,6 +507,7 @@ export function MappingCanvas({
   const clearSelection = useCanvasStore((state) => state.clearSelection)
   const hoverEdge = useCanvasStore((state) => state.hoverEdge)
   const leaveEdge = useCanvasStore((state) => state.leaveEdge)
+  const linkMenu = useCanvasStore((state) => state.linkMenu)
   const usesLookupTables = graph.transforms.some(({ kind }) => kind === 'lookupTable')
   const lookupTables = useQuery({ ...lookupTablesQuery, enabled: usesLookupTables })
   const text = useGraphText(graph.transforms, lookupTables.data)
@@ -592,8 +636,7 @@ export function MappingCanvas({
           targetHandle: to.handle,
           data: { kind: 'transformLink', link, ...names, aiProposed },
           selectable: false,
-          focusable: false,
-          zIndex: 100,
+          ...menuEdge,
           ariaLabel: edgeLabel(t('link', names), aiProposed ? 1 : 0, 1),
         },
       ]
@@ -737,8 +780,7 @@ export function MappingCanvas({
           aiProposed: proposed === merged.length,
         },
         selectable: false,
-        focusable: false,
-        zIndex: 100,
+        ...menuEdge,
         ariaLabel: edgeLabel(label, proposed, merged.length),
       }
     })
@@ -773,16 +815,40 @@ export function MappingCanvas({
     text,
   ])
 
-  // A point outside the pane, like the 0,0 of a synthetic event, is on no visible part of the
-  // edge; the button then falls back to the edge's middle.
-  const pointOf = (event: MouseEvent) => {
-    const pane = container.current?.getBoundingClientRect()
-    const { clientX: x, clientY: y } = event
+  const edgeElement = useCallback(
+    (edgeId: string) =>
+      container.current?.querySelector<HTMLElement>(
+        `.react-flow__edge[data-id="${CSS.escape(edgeId)}"]`,
+      ) ?? null,
+    [],
+  )
 
-    return pane && x >= pane.left && x <= pane.right && y >= pane.top && y <= pane.bottom
-      ? flow.current?.screenToFlowPosition({ x, y })
-      : undefined
-  }
+  // A pointer opens the menu where it is; a key, or a point outside the pane like the 0,0 of a
+  // synthetic event, at the middle of the link's part in view.
+  const openLinkMenu = useCallback(
+    (edgeId: string, pointer?: { x: number; y: number }) => {
+      const element = edgeElement(edgeId)
+      const pane = container.current?.getBoundingClientRect()
+
+      if (!element || !pane) {
+        return
+      }
+
+      const inPane =
+        pointer !== undefined &&
+        pointer.x >= pane.left &&
+        pointer.x <= pane.right &&
+        pointer.y >= pane.top &&
+        pointer.y <= pane.bottom
+
+      store.getState().openLinkMenu({
+        edgeId,
+        at: inPane ? pointer : middleInView(element, pane),
+        focused: element === element.ownerDocument.activeElement,
+      })
+    },
+    [edgeElement, store],
+  )
 
   const onInit = useCallback((instance: ReactFlowInstance<CanvasNode, LinkFlowEdge>) => {
     flow.current = instance
@@ -1111,25 +1177,88 @@ export function MappingCanvas({
     [focusAfterRemoval, graph, removeButtons, removeTransformById, save, store, transformButton],
   )
 
-  const edgeActions = useMemo(
-    (): LinkActions => ({
-      remove: (removed) => removeRowLink({ kind: 'link', link: removed }),
-      removeTransformLink: (removed) => removeRowLink({ kind: 'transformLink', link: removed }),
-      show: (edge) => {
-        store.getState().select(rowListingLinks(edge))
+  const linkMenuActions = useMemo((): LinkMenuActions => {
+    const removeButton = () => detailsBody.current?.querySelector<HTMLElement>('[data-remove-link]')
+
+    const showRow = (row: RowRef) => {
+      store.getState().select(row)
+      store.getState().openDetails()
+      focusRow(row)
+    }
+
+    return {
+      showLinks: (edge) => {
+        const row = rowListingLinks(edge)
+
+        if (viewOnly) {
+          showRow(row)
+
+          return
+        }
+
+        store.getState().select(row)
         store.getState().openDetails()
-
-        const removeButton = () =>
-          detailsBody.current?.querySelector<HTMLElement>('[data-remove-link]')
-
         whenRendered(
           () => Boolean(removeButton()),
           () => removeButton()?.focus(),
         )
       },
-    }),
-    [detailsBody, removeRowLink, store],
-  )
+      showRow,
+      showTransform: (transformId) => {
+        store.getState().selectTransform(transformId)
+        afterRender(() => transformButton({ kind: 'header', transformId })?.focus())
+      },
+      remove: (data, focused) => {
+        const [only] = data.kind === 'link' ? data.links : []
+
+        if (data.kind === 'transformLink') {
+          removeRowLink({ kind: 'transformLink', link: data.link })
+        } else if (only) {
+          removeRowLink({ kind: 'link', link: only })
+        }
+
+        if (!focused) {
+          return
+        }
+
+        // The link takes its focus with it, so it moves to where the link started.
+        if (data.kind === 'link') {
+          focusRow({ side: 'source', path: data.sourcePath })
+        } else if (data.link.from.kind === 'source') {
+          focusRow({ side: 'source', path: data.link.from.path })
+        } else {
+          const { transformId, output } = data.link.from
+
+          afterRender(() => transformButton({ kind: 'output', transformId, port: output })?.focus())
+        }
+      },
+    }
+  }, [detailsBody, focusRow, removeRowLink, store, transformButton, viewOnly])
+
+  const linkMenuTarget = useMemo((): LinkMenuTarget | null => {
+    const edge = linkMenu && edges.find(({ id }) => id === linkMenu.edgeId)
+
+    if (!edge?.data) {
+      return null
+    }
+
+    const endOf = (id: string): LinkMenuEnd[] => {
+      const row = rowOfNodeId(id)
+      const transformId = transformOfNodeId(id)
+
+      if (row) {
+        return [{ kind: 'row', row }]
+      }
+
+      return transformId ? [{ kind: 'transform', transformId, name: text.name(transformId) }] : []
+    }
+
+    return {
+      data: edge.data,
+      ends: [...endOf(edge.source), ...endOf(edge.target)],
+      element: () => edgeElement(edge.id),
+    }
+  }, [edgeElement, edges, linkMenu, text])
 
   // A taken target or input is no valid drop, so the drag does not mark it as one.
   const isValidConnection = useCallback<IsValidConnection<LinkFlowEdge>>(
@@ -1367,6 +1496,20 @@ export function MappingCanvas({
         return
       }
 
+      const edgeId =
+        event.target instanceof Element && event.target.matches('.react-flow__edge')
+          ? event.target.getAttribute('data-id')
+          : null
+
+      if (edgeId !== null) {
+        if (opensMenu(event)) {
+          event.preventDefault()
+          openLinkMenu(edgeId)
+        }
+
+        return
+      }
+
       const linkKey = event.key === 'l' || event.key === 'L'
       const deleteKey = event.key === 'Delete' || event.key === 'Backspace'
 
@@ -1401,6 +1544,7 @@ export function MappingCanvas({
     itemOf,
     labelOf,
     link,
+    openLinkMenu,
     outputAction,
     viewOnly,
     removeRowLink,
@@ -1441,51 +1585,54 @@ export function MappingCanvas({
               })
             }}>
             <div className="absolute inset-0">
-              <LinkActionsContext value={edgeActions}>
-                <TransformActionsContext value={transformActions}>
-                  <LinkableRowsContext value={rows}>
-                    <ReactFlow<CanvasNode, LinkFlowEdge>
-                      ariaLabelConfig={{
-                        'controls.ariaLabel': t('controls.panel'),
-                        'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
-                        'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
-                        'controls.fitView.ariaLabel': t('controls.fitView'),
-                      }}
-                      attributionPosition="bottom-left"
-                      deleteKeyCode={null}
-                      edges={edges}
-                      edgesFocusable={false}
-                      edgesReconnectable={false}
-                      edgeTypes={edgeTypes}
-                      elementsSelectable={false}
-                      isValidConnection={isValidConnection}
-                      maxZoom={1.5}
-                      minZoom={0.2}
-                      nodes={nodes}
-                      nodesConnectable={!viewOnly}
-                      nodesDraggable={false}
-                      nodesFocusable={false}
-                      nodeTypes={nodeTypes}
-                      panOnScroll
-                      zoomOnDoubleClick={false}
-                      aria-label={label}
-                      onConnect={onConnect}
-                      onConnectEnd={onConnectEnd}
-                      onConnectStart={onConnectStart}
-                      // A click shows the remove button too, for pointers that cannot hover.
-                      onEdgeClick={(event, edge) => hoverEdge(edge.id, pointOf(event))}
-                      onEdgeMouseEnter={(event, edge) => hoverEdge(edge.id, pointOf(event))}
-                      onEdgeMouseLeave={(_, edge) => leaveEdge(edge.id)}
-                      onInit={onInit}
-                      onNodeDrag={onNodeDrag}
-                      onNodeDragStop={onNodeDragStop}
-                      onPaneClick={clearSelection}>
-                      <Background gap={16} variant={BackgroundVariant.Dots} />
-                      <Controls position="top-left" showInteractive={false} />
-                    </ReactFlow>
-                  </LinkableRowsContext>
-                </TransformActionsContext>
-              </LinkActionsContext>
+              <TransformActionsContext value={transformActions}>
+                <LinkableRowsContext value={rows}>
+                  <ReactFlow<CanvasNode, LinkFlowEdge>
+                    ariaLabelConfig={{
+                      'controls.ariaLabel': t('controls.panel'),
+                      'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
+                      'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
+                      'controls.fitView.ariaLabel': t('controls.fitView'),
+                      'edge.a11yDescription.default': tLinks('menu.hint'),
+                    }}
+                    attributionPosition="bottom-left"
+                    deleteKeyCode={null}
+                    edges={edges}
+                    edgesReconnectable={false}
+                    edgeTypes={edgeTypes}
+                    elementsSelectable={false}
+                    isValidConnection={isValidConnection}
+                    maxZoom={1.5}
+                    minZoom={0.2}
+                    nodes={nodes}
+                    nodesConnectable={!viewOnly}
+                    nodesDraggable={false}
+                    nodesFocusable={false}
+                    nodeTypes={nodeTypes}
+                    panOnScroll
+                    zoomOnDoubleClick={false}
+                    aria-label={label}
+                    onConnect={onConnect}
+                    onConnectEnd={onConnectEnd}
+                    onConnectStart={onConnectStart}
+                    onEdgeClick={(event, edge) =>
+                      openLinkMenu(edge.id, { x: event.clientX, y: event.clientY })
+                    }
+                    onEdgeContextMenu={(event, edge) => {
+                      event.preventDefault()
+                      openLinkMenu(edge.id, { x: event.clientX, y: event.clientY })
+                    }}
+                    onEdgeMouseEnter={(_, edge) => hoverEdge(edge.id)}
+                    onEdgeMouseLeave={(_, edge) => leaveEdge(edge.id)}
+                    onInit={onInit}
+                    onNodeDrag={onNodeDrag}
+                    onNodeDragStop={onNodeDragStop}
+                    onPaneClick={clearSelection}>
+                    <Background gap={16} variant={BackgroundVariant.Dots} />
+                    <Controls position="top-left" showInteractive={false} />
+                  </ReactFlow>
+                </LinkableRowsContext>
+              </TransformActionsContext>
             </div>
           </div>
           <DetailsPanel
@@ -1505,6 +1652,7 @@ export function MappingCanvas({
       </div>
       <MeaningTooltip />
       <LinkHints text={text} />
+      <LinkMenu actions={linkMenuActions} target={linkMenuTarget} />
     </div>
   )
 }
