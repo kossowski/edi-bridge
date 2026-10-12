@@ -162,15 +162,27 @@ function pressedValues(canvasElement: HTMLElement) {
   return [...canvasElement.querySelectorAll('[data-sample-value][aria-pressed=true]')]
 }
 
+// The first story of the file renders cold. Its Mapping links wait for the list of Document
+// Structures, which answers after a delay, and a busy CI runner takes longer than a second for both.
+const firstRender = { timeout: 5000 }
+
 export const Default = meta.story({
   async play({ canvas, canvasElement }) {
-    const values = await canvas.findByRole('group', { name: 'Values in order-4711.json' })
+    const values = await canvas.findByRole(
+      'group',
+      { name: 'Values in order-4711.json' },
+      firstRender,
+    )
 
     await expect(canvasElement.querySelector('li [aria-expanded=true]')).toBe(
       canvasElement.querySelector('li [data-path]'),
     )
 
-    const [mapping] = await canvas.findAllByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON' })
+    const [mapping] = await canvas.findAllByRole(
+      'link',
+      { name: 'Hansemarkt: ORDERS to ERP JSON' },
+      firstRender,
+    )
 
     await expect(mapping).toBeVisible()
     await selectField(canvasElement, 'Order number')

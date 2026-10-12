@@ -186,7 +186,14 @@ export function detailsPanel(canvasElement: HTMLElement, name = 'Details') {
 export async function openDetails(canvasElement: HTMLElement, name = 'Details') {
   await userEvent.click(await within(canvasElement).findByRole('button', { name }))
 
-  return findSheet(canvasElement, name)
+  const sheet = await findSheetElement(canvasElement, name)
+
+  // The sheet takes the focus a frame or more after it shows; a key pressed before then misses it.
+  await waitFor(() => expect(sheet.contains(sheet.ownerDocument.activeElement)).toBe(true), {
+    timeout: 5000,
+  })
+
+  return within(sheet)
 }
 
 // The counts live in the Details sheet now; the stories check what the canvas shows or saved.
