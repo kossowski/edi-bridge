@@ -6,6 +6,7 @@ import { AppBreadcrumb } from '@/components/app-breadcrumb'
 import { AppSearch } from '@/components/app-search'
 import { headerTabsId } from '@/components/header-tabs'
 import { ViewOnlyBadge } from '@/components/session/view-only-badge'
+import { TaskBell } from '@/components/tasks/task-bell'
 import { SidebarTrigger } from '@edi-bridge/ui/components/sidebar'
 
 export function AppHeader() {
@@ -19,6 +20,7 @@ export function AppHeader() {
         <ViewOnlyBadge />
         <div className="flex shrink-0 items-center gap-2 empty:hidden" data-slot="header-actions">
           <AppSearch />
+          <TaskBell />
         </div>
       </div>
       <div

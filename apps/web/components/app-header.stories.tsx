@@ -4,8 +4,15 @@ import { AppHeader } from '@/components/app-header'
 import { HeaderTabs, headerTabsId } from '@/components/header-tabs'
 import { sessionHandlers } from '@/components/session/session-story-helpers'
 import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
+import { everyKind } from '@/components/tasks/task-story-helpers'
 import { useBreadcrumbName } from '@/hooks/use-breadcrumb-name'
-import { sandboxAdminSession, seedSession, showcaseViewerSession } from '@edi-bridge/mocks'
+import { apiUrl } from '@/lib/api/config'
+import {
+  sandboxAdminSession,
+  seedSession,
+  showcaseViewerSession,
+  tasksHandler,
+} from '@edi-bridge/mocks'
 import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
@@ -59,7 +66,7 @@ const meta = preview.meta({
 
 export const Admin = meta.story({
   beforeEach({ msw }) {
-    msw.use(...sessionHandlers(sandboxAdminSession))
+    msw.use(...sessionHandlers(sandboxAdminSession), tasksHandler(apiUrl, everyKind()))
   },
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('button', { name: 'Toggle sidebar' })).toBeVisible()
@@ -72,6 +79,9 @@ export const Admin = meta.story({
     await expect(tabRow(canvasElement)).not.toBeVisible()
     await expect(headerActions(canvasElement)).toContainElement(
       canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
+    )
+    await expect(headerActions(canvasElement)).toContainElement(
+      await canvas.findByRole('button', { name: 'Tasks, 5 open' }),
     )
   },
 })
@@ -234,10 +244,13 @@ export const German = meta.story({
   decorators: [german],
   parameters: { nextjs: { navigation: { pathname: '/mappings/m-1/versions' } } },
   beforeEach({ msw }) {
-    msw.use(...sessionHandlers(showcaseViewerSession))
+    msw.use(...sessionHandlers(showcaseViewerSession), tasksHandler(apiUrl, 'empty'))
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('Nur ansehen')).toBeVisible()
+    await expect(
+      await canvas.findByRole('button', { name: 'Aufgaben, nichts offen' }),
+    ).toBeVisible()
     await expect(
       canvas.getByRole('button', { name: 'Aufträge, Handelspartner, Belege, Seiten suchen …' }),
     ).toBeVisible()
