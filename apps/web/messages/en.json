@@ -2458,7 +2458,7 @@
       "applied": "CSV imported: {added, plural, one {# entry added} other {# entries added}}, {changed, plural, one {# entry changed} other {# entries changed}}."
     }
   },
-  "Upload": {
+  "ManualSubmission": {
     "open": "Upload a document",
     "title": "Upload a document",
     "description": "Hand in a document yourself, for example one a partner sent by email. EDI Bridge processes it as if it had arrived on the connection you choose and marks it as uploaded by hand.",
@@ -2466,6 +2466,8 @@
     "cancel": "Cancel",
     "submit": "Upload",
     "submitting": "Uploading…",
+    "retry": "Try again",
+    "newFlow": "Set up a document route",
     "channel": {
       "label": "Where does the document come from?",
       "description": "Choose the incoming connection the document would normally arrive on.",
@@ -2473,7 +2475,6 @@
       "loading": "Loading connections…",
       "detail": "{kind} · {tradingPartner}",
       "error": "The connections could not be loaded.",
-      "retry": "Try again",
       "empty": {
         "title": "No incoming connection yet",
         "description": "An upload needs a connection that documents arrive on. Set one up first.",
@@ -2494,9 +2495,7 @@
         "tooLarge": "The file is too large. A file can have at most 5 million characters."
       },
       "unroutable": "No document route on this connection handles the documents in this file. Set up a document route for them first.",
-      "newFlow": "Set up a document route",
-      "failed": "The file could not be uploaded. Try again.",
-      "retry": "Try again"
+      "failed": "The file could not be uploaded. Try again."
     },
     "result": {
       "title": "{count, plural, one {# document created} other {# documents created}}",
@@ -2507,8 +2506,7 @@
       "done": "Done",
       "notRouted": {
         "title": "{count, plural, one {# part of the file was not processed} other {# parts of the file were not processed}}",
-        "description": "No document route on {channel} handles these document types, so EDI Bridge created no document for them.",
-        "action": "Set up a document route"
+        "description": "No document route on {channel} handles these document types, so EDI Bridge created no document for them."
       }
     }
   },

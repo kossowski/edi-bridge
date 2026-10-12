@@ -5,21 +5,27 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { type DragEvent, useEffect, useId, useRef, useState } from 'react'
+import { type DragEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 
 import { useChannelKindLabel, useChannelTradingPartners } from '@/components/channels/channel-parts'
-import { useRunTitle } from '@/components/documents/run-row'
 import {
   documentProblem,
   type DocumentProblem,
-  knownMessageType,
-} from '@/components/documents/upload-document'
+  parseMessageType,
+} from '@/components/documents/manual-submission'
 import { describedBy, FormField, SelectField } from '@/components/form-field'
 import { MessageTypeName, usePlainNames } from '@/components/plain-names'
 import { RunStatusBadge } from '@/components/runs/run-status'
+import { useRunTitle } from '@/components/runs/run-title'
 import { useLookup } from '@/hooks/use-lookup'
 import { ApiError, submitDocument } from '@/lib/api/client'
-import { channelsQuery, interchangeKeys, runKeys } from '@/lib/api/queries'
+import {
+  channelsQuery,
+  interchangeKeys,
+  orderLifecycleKeys,
+  overviewKeys,
+  runKeys,
+} from '@/lib/api/queries'
 import { runHref } from '@/lib/navigation'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
@@ -49,16 +55,19 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 import type {
   Channel,
   ManualSubmission,
-  ManualSubmissionInput,
   RunSummary,
+  SubmittedDocument,
 } from '@edi-bridge/contracts'
 
-type Upload = {
+type Submitted = {
   submission: ManualSubmission
   fileName: string
-  channelId: string
-  channelName: string
+  channel: Channel
 }
+
+type Step = { name: 'form'; focusFile: boolean } | { name: 'result'; submitted: Submitted }
+
+const firstStep: Step = { name: 'form', focusFile: false }
 
 function useInboundChannels() {
   const channels = useLookup(channelsQuery)
@@ -84,7 +93,7 @@ function ChannelChoice({
   error: string | null
   onChange: (channelId: string) => void
 }) {
-  const t = useTranslations('Upload.channel')
+  const t = useTranslations('ManualSubmission.channel')
   const kindLabel = useChannelKindLabel()
   const tradingPartners = useChannelTradingPartners()
 
@@ -111,23 +120,41 @@ function ChannelChoice({
   )
 }
 
-function ChannelsUnavailable({ onRetry }: { onRetry: () => void }) {
-  const t = useTranslations('Upload.channel')
-
+function FailureAlert({ message, children }: { message: string; children: ReactNode }) {
   return (
     <Alert variant="destructive">
       <AlertDescription className="flex flex-col items-start gap-2">
-        <p>{t('error')}</p>
-        <Button size="sm" variant="outline" onClick={onRetry}>
-          {t('retry')}
-        </Button>
+        <p>{message}</p>
+        {children}
       </AlertDescription>
     </Alert>
   )
 }
 
+function RetryButton({ onRetry }: { onRetry: () => void }) {
+  const t = useTranslations('ManualSubmission')
+
+  return (
+    <Button size="sm" variant="outline" onClick={onRetry}>
+      {t('retry')}
+    </Button>
+  )
+}
+
+function NewFlowLink() {
+  const t = useTranslations('ManualSubmission')
+
+  return (
+    <Link
+      href="/flows/new"
+      className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-start')}>
+      {t('newFlow')}
+    </Link>
+  )
+}
+
 function NoInboundChannels() {
-  const t = useTranslations('Upload.channel.empty')
+  const t = useTranslations('ManualSubmission.channel.empty')
 
   return (
     <Empty className="border">
@@ -158,7 +185,7 @@ function FileField({
   error: string | null
   onChange: (file: File | null) => void
 }) {
-  const t = useTranslations('Upload.file')
+  const t = useTranslations('ManualSubmission.file')
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -222,25 +249,25 @@ function FileField({
   )
 }
 
-function UploadFailure({ error, onRetry }: { error: Error; onRetry: () => void }) {
-  const t = useTranslations('Upload.errors')
+function ManualSubmissionFailure({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  const t = useTranslations('ManualSubmission.errors')
   const unroutable = error instanceof ApiError && error.status === 422
 
   return (
-    <Alert variant="destructive">
-      <AlertDescription className="flex flex-col items-start gap-2">
-        <p>{unroutable ? t('unroutable') : t('failed')}</p>
-        {unroutable ? (
-          <Link href="/flows/new" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            {t('newFlow')}
-          </Link>
-        ) : (
-          <Button size="sm" variant="outline" onClick={onRetry}>
-            {t('retry')}
-          </Button>
-        )}
-      </AlertDescription>
-    </Alert>
+    <FailureAlert message={unroutable ? t('unroutable') : t('failed')}>
+      {unroutable ? <NewFlowLink /> : <RetryButton onRetry={onRetry} />}
+    </FailureAlert>
+  )
+}
+
+function FormFooter({ children }: { children?: ReactNode }) {
+  const t = useTranslations('ManualSubmission')
+
+  return (
+    <SheetFooter className="flex-row justify-end border-t">
+      <SheetClose render={<Button variant="outline" />}>{t('cancel')}</SheetClose>
+      {children}
+    </SheetFooter>
   )
 }
 
@@ -250,50 +277,53 @@ async function readFile(file: File | null) {
   return { content, problem: documentProblem(content) }
 }
 
-function UploadForm({
-  defaultChannelId,
+function ManualSubmissionForm({
+  channelId,
   focusFile,
-  onUploaded,
+  onChannelChange,
+  onSubmitted,
 }: {
-  defaultChannelId: string | null
+  channelId: string | null
   focusFile: boolean
-  onUploaded: (upload: Upload) => void
+  onChannelChange: (channelId: string) => void
+  onSubmitted: (submitted: Submitted) => void
 }) {
-  const t = useTranslations('Upload')
+  const t = useTranslations('ManualSubmission')
   const id = useId()
   const queryClient = useQueryClient()
   const channels = useInboundChannels()
-  const [channelId, setChannelId] = useState(defaultChannelId)
   const [file, setFile] = useState<File | null>(null)
   const [channelError, setChannelError] = useState(false)
   const [fileProblem, setFileProblem] = useState<DocumentProblem | null>(null)
 
-  const upload = useMutation({
-    mutationFn: (input: ManualSubmissionInput) => submitDocument(input),
-    onSuccess: (submission, input) => {
-      void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
-      void queryClient.invalidateQueries({ queryKey: interchangeKeys.all() })
+  const submission = useMutation({
+    mutationFn: (input: { channel: Channel; document: SubmittedDocument }) =>
+      submitDocument({ channelId: input.channel.id, document: input.document }),
+    onSuccess: (result, input) => {
+      for (const queryKey of [
+        runKeys.lists(),
+        interchangeKeys.all(),
+        overviewKeys.all(),
+        orderLifecycleKeys.all(),
+      ]) {
+        void queryClient.invalidateQueries({ queryKey })
+      }
 
-      onUploaded({
-        submission,
-        fileName: input.document.fileName,
-        channelId: input.channelId,
-        channelName: channels.find(input.channelId)?.name ?? '',
-      })
+      onSubmitted({ submission: result, fileName: input.document.fileName, channel: input.channel })
     },
   })
 
   async function submit() {
     const { content, problem } = await readFile(file)
-    const missingChannel = channelId === null
+    const channel = channels.find(channelId)
 
-    setChannelError(missingChannel)
+    setChannelError(channel === undefined)
     setFileProblem(problem)
 
-    if (!missingChannel && file !== null && content !== null && problem === null) {
-      upload.mutate({ channelId, document: { fileName: file.name, content } })
+    if (channel !== undefined && file !== null && content !== null && problem === null) {
+      submission.mutate({ channel, document: { fileName: file.name, content } })
     } else {
-      document.getElementById(missingChannel ? `${id}-channel` : `${id}-file`)?.focus()
+      document.getElementById(channel === undefined ? `${id}-channel` : `${id}-file`)?.focus()
     }
   }
 
@@ -309,9 +339,7 @@ function UploadForm({
         <div className="flex-1 overflow-y-auto px-4">
           <NoInboundChannels />
         </div>
-        <SheetFooter className="flex-row justify-end border-t">
-          <SheetClose render={<Button variant="outline" />}>{t('cancel')}</SheetClose>
-        </SheetFooter>
+        <FormFooter />
       </>
     )
   }
@@ -319,7 +347,7 @@ function UploadForm({
   return (
     <form
       noValidate
-      aria-busy={upload.isPending}
+      aria-busy={submission.isPending}
       className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault()
@@ -327,7 +355,9 @@ function UploadForm({
       }}>
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
         {channels.isError ? (
-          <ChannelsUnavailable onRetry={() => void channels.refetch()} />
+          <FailureAlert message={t('channel.error')}>
+            <RetryButton onRetry={() => void channels.refetch()} />
+          </FailureAlert>
         ) : (
           <ChannelChoice
             id={`${id}-channel`}
@@ -336,8 +366,9 @@ function UploadForm({
             loading={channels.isPending}
             value={channelId}
             onChange={(next) => {
-              setChannelId(next)
+              onChannelChange(next)
               setChannelError(false)
+              submission.reset()
             }}
           />
         )}
@@ -348,24 +379,25 @@ function UploadForm({
           onChange={(next) => {
             setFile(next)
             setFileProblem(null)
-            upload.reset()
+            submission.reset()
           }}
         />
-        {upload.isError && <UploadFailure error={upload.error} onRetry={() => void submit()} />}
+        {submission.isError && (
+          <ManualSubmissionFailure error={submission.error} onRetry={() => void submit()} />
+        )}
       </div>
-      <SheetFooter className="flex-row justify-end border-t">
-        <SheetClose render={<Button variant="outline" />}>{t('cancel')}</SheetClose>
-        <Button disabled={upload.isPending} type="submit">
-          {upload.isPending && <Spinner aria-hidden data-icon="inline-start" />}
-          {upload.isPending ? t('submitting') : t('submit')}
+      <FormFooter>
+        <Button disabled={submission.isPending || channels.isError} type="submit">
+          {submission.isPending && <Spinner aria-hidden data-icon="inline-start" />}
+          {submission.isPending ? t('submitting') : t('submit')}
         </Button>
-      </SheetFooter>
+      </FormFooter>
     </form>
   )
 }
 
 function CreatedRun({ run }: { run: RunSummary }) {
-  const t = useTranslations('Upload.result')
+  const t = useTranslations('ManualSubmission.result')
   const plainNames = usePlainNames()
   const title = useRunTitle(run)
 
@@ -394,26 +426,26 @@ function CreatedRun({ run }: { run: RunSummary }) {
 
 function NotRouted({
   notRouted,
-  channelName,
+  channel,
 }: {
   notRouted: ManualSubmission['notRouted']
-  channelName: string
+  channel: Channel
 }) {
-  const t = useTranslations('Upload.result.notRouted')
+  const t = useTranslations('ManualSubmission.result.notRouted')
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
       <p className="font-medium">{t('title', { count: notRouted.length })}</p>
-      <p className="text-muted-foreground">{t('description', { channel: channelName })}</p>
+      <p className="text-muted-foreground">{t('description', { channel: channel.name })}</p>
       <ul className="flex flex-col gap-1">
         {notRouted.map(({ messageType }, index) => {
-          const known = knownMessageType(messageType)
+          const parsed = parseMessageType(messageType)
 
           return (
             // The same Message Type can occur several times in one Interchange.
             <li key={index}>
-              {known ? (
-                <MessageTypeName messageType={known} />
+              {parsed ? (
+                <MessageTypeName messageType={parsed} />
               ) : (
                 <span className="font-mono text-xs">{messageType}</span>
               )}
@@ -421,20 +453,23 @@ function NotRouted({
           )
         })}
       </ul>
-      <Link
-        href="/flows/new"
-        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'self-start')}>
-        {t('action')}
-      </Link>
+      <NewFlowLink />
     </div>
   )
 }
 
-function UploadResult({ upload, onAnother }: { upload: Upload; onAnother: () => void }) {
-  const t = useTranslations('Upload.result')
+function ManualSubmissionResult({
+  submitted,
+  onAnother,
+}: {
+  submitted: Submitted
+  onAnother: () => void
+}) {
+  const t = useTranslations('ManualSubmission.result')
   const id = useId()
   const heading = useRef<HTMLHeadingElement>(null)
-  const { runs, notRouted } = upload.submission
+  const { submission, fileName, channel } = submitted
+  const { runs, notRouted } = submission
 
   useEffect(() => {
     heading.current?.focus()
@@ -448,7 +483,7 @@ function UploadResult({ upload, onAnother }: { upload: Upload; onAnother: () => 
             {t('title', { count: runs.length })}
           </h3>
           <p className="text-muted-foreground break-words">
-            {t('description', { fileName: upload.fileName, channel: upload.channelName })}
+            {t('description', { fileName, channel: channel.name })}
           </p>
         </div>
         <ul aria-label={t('list')} className="flex flex-col gap-2">
@@ -456,9 +491,7 @@ function UploadResult({ upload, onAnother }: { upload: Upload; onAnother: () => 
             <CreatedRun key={run.id} run={run} />
           ))}
         </ul>
-        {notRouted.length > 0 && (
-          <NotRouted channelName={upload.channelName} notRouted={notRouted} />
-        )}
+        {notRouted.length > 0 && <NotRouted channel={channel} notRouted={notRouted} />}
       </div>
       <SheetFooter className="flex-row flex-wrap justify-end border-t">
         <Button variant="outline" onClick={onAnother}>
@@ -470,26 +503,24 @@ function UploadResult({ upload, onAnother }: { upload: Upload; onAnother: () => 
   )
 }
 
-export function UploadSheet({
+export function ManualSubmissionSheet({
   defaultChannelId = null,
   defaultOpen = false,
 }: {
   defaultChannelId?: string | null
   defaultOpen?: boolean
 }) {
-  const t = useTranslations('Upload')
-  const [upload, setUpload] = useState<Upload | null>(null)
-  const [attempt, setAttempt] = useState(0)
+  const t = useTranslations('ManualSubmission')
   const [channelId, setChannelId] = useState(defaultChannelId)
+  const [step, setStep] = useState<Step>(firstStep)
 
   return (
     <Sheet
       defaultOpen={defaultOpen}
       onOpenChangeComplete={(open) => {
         if (!open) {
-          setUpload(null)
           setChannelId(defaultChannelId)
-          setAttempt(0)
+          setStep(firstStep)
         }
       }}>
       <SheetTrigger render={<Button variant="outline" />}>
@@ -503,21 +534,17 @@ export function UploadSheet({
           <SheetTitle>{t('title')}</SheetTitle>
           <SheetDescription>{t('description')}</SheetDescription>
         </SheetHeader>
-        {upload ? (
-          <UploadResult
-            upload={upload}
-            onAnother={() => {
-              setChannelId(upload.channelId)
-              setUpload(null)
-              setAttempt((count) => count + 1)
-            }}
+        {step.name === 'result' ? (
+          <ManualSubmissionResult
+            submitted={step.submitted}
+            onAnother={() => setStep({ name: 'form', focusFile: true })}
           />
         ) : (
-          <UploadForm
-            key={attempt}
-            defaultChannelId={channelId}
-            focusFile={attempt > 0}
-            onUploaded={setUpload}
+          <ManualSubmissionForm
+            channelId={channelId}
+            focusFile={step.focusFile}
+            onChannelChange={setChannelId}
+            onSubmitted={(submitted) => setStep({ name: 'result', submitted })}
           />
         )}
       </SheetContent>

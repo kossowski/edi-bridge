@@ -1,7 +1,7 @@
 import { delay, http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
-import { UploadSheet } from '@/components/documents/upload-sheet'
+import { ManualSubmissionSheet } from '@/components/documents/manual-submission-sheet'
 import { darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { channelsEndpoint, submitDocumentEndpoint } from '@edi-bridge/contracts'
@@ -54,13 +54,17 @@ async function loaded(content: Awaited<ReturnType<typeof sheet>>) {
   return trigger
 }
 
-async function upload(file: File, channel?: string) {
+async function chooseChannel(content: Awaited<ReturnType<typeof sheet>>, channel: string) {
+  await userEvent.click(await loaded(content))
+  await userEvent.click(await screen.findByRole('option', { name: new RegExp(`^${channel}`) }))
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+}
+
+async function submitFile(file: File, channel?: string) {
   const content = await sheet()
 
   if (channel) {
-    await userEvent.click(await loaded(content))
-    await userEvent.click(await screen.findByRole('option', { name: new RegExp(`^${channel}`) }))
-    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+    await chooseChannel(content, channel)
   }
 
   await userEvent.upload(content.getByLabelText('File'), file)
@@ -70,8 +74,8 @@ async function upload(file: File, channel?: string) {
 }
 
 const meta = preview.meta({
-  title: 'Documents/UploadSheet',
-  component: UploadSheet,
+  title: 'Documents/ManualSubmissionSheet',
+  component: ManualSubmissionSheet,
   args: { defaultOpen: true },
   parameters: { a11y: { context: 'body' } },
   beforeEach({ msw }) {
@@ -139,7 +143,7 @@ export const Submitting = meta.story({
     )
   },
   async play() {
-    const content = await upload(orders)
+    const content = await submitFile(orders)
 
     await expect(await content.findByRole('button', { name: 'Uploading…' })).toBeDisabled()
   },
@@ -147,7 +151,7 @@ export const Submitting = meta.story({
 
 export const OneDocument = meta.story({
   async play() {
-    const content = await upload(order, 'Hansemarkt SFTP inbox')
+    const content = await submitFile(order, 'Hansemarkt SFTP inbox')
 
     await waitFor(() =>
       expect(content.getByRole('heading', { name: '1 document created' })).toHaveFocus(),
@@ -168,7 +172,7 @@ export const OneDocument = meta.story({
 export const SeveralDocuments = meta.story({
   args: { defaultChannelId: inbox.id },
   async play() {
-    const content = await upload(orders)
+    const content = await submitFile(orders)
 
     await expect(await content.findByRole('heading', { name: '2 documents created' })).toBeVisible()
     await expect(
@@ -183,7 +187,7 @@ export const SeveralDocuments = meta.story({
 export const PartlyNotRouted = meta.story({
   args: { defaultChannelId: inbox.id },
   async play() {
-    const content = await upload(mixed)
+    const content = await submitFile(mixed)
 
     await expect(await content.findByRole('heading', { name: '1 document created' })).toBeVisible()
     await expect(content.getByText('2 parts of the file were not processed')).toBeVisible()
@@ -196,10 +200,10 @@ export const PartlyNotRouted = meta.story({
   },
 })
 
-export const UploadAnother = meta.story({
+export const AnotherFile = meta.story({
   args: { defaultChannelId: inbox.id },
   async play() {
-    const content = await upload(orders)
+    const content = await submitFile(orders)
 
     await userEvent.click(await content.findByRole('button', { name: 'Upload another file' }))
     await expect(content.getByLabelText('File')).toHaveFocus()
@@ -225,7 +229,7 @@ export const ValidationError = meta.story({
 export const EmptyFile = meta.story({
   args: { defaultChannelId: inbox.id },
   async play() {
-    const content = await upload(new File([], 'empty.edi'))
+    const content = await submitFile(new File([], 'empty.edi'))
 
     await expect(await content.findByText('The file is empty.')).toBeVisible()
     await expect(content.getByLabelText('File')).toHaveFocus()
@@ -242,7 +246,7 @@ export const ServerError = meta.story({
     )
   },
   async play() {
-    const content = await upload(orders)
+    const content = await submitFile(orders)
 
     await expect(await content.findByRole('alert')).toHaveTextContent(
       'The file could not be uploaded. Try again.',
@@ -251,25 +255,39 @@ export const ServerError = meta.story({
   },
 })
 
+const unroutable = http.post(`${apiUrl}${submitDocumentEndpoint.path}`, () =>
+  HttpResponse.json(
+    { message: 'No Flow on this Channel routes a Message of this Document' },
+    { status: 422 },
+  ),
+)
+
 export const NothingRoutable = meta.story({
   args: { defaultChannelId: inbox.id },
   beforeEach({ msw }) {
-    msw.use(
-      http.post(`${apiUrl}${submitDocumentEndpoint.path}`, () =>
-        HttpResponse.json(
-          { message: 'No Flow on this Channel routes a Message of this Document' },
-          { status: 422 },
-        ),
-      ),
-    )
+    msw.use(unroutable)
   },
   async play() {
-    const content = await upload(orders)
+    const content = await submitFile(orders)
 
     await expect(await content.findByRole('alert')).toHaveTextContent(
       'No document route on this connection handles the documents in this file.',
     )
     await expect(content.getByRole('link', { name: 'Set up a document route' })).toBeVisible()
+  },
+})
+
+export const ChannelChangeClearsFailure = meta.story({
+  args: { defaultChannelId: inbox.id },
+  beforeEach({ msw }) {
+    msw.use(unroutable)
+  },
+  async play() {
+    const content = await submitFile(orders)
+
+    await content.findByRole('alert')
+    await chooseChannel(content, 'ERP webhook')
+    await expect(content.queryByRole('alert')).toBeNull()
   },
 })
 
@@ -304,6 +322,7 @@ export const ConnectionsUnavailable = meta.story({
       'The connections could not be loaded.',
     )
     await expect(content.getByRole('button', { name: 'Try again' })).toBeVisible()
+    await expect(content.getByRole('button', { name: 'Upload' })).toBeDisabled()
   },
 })
 
@@ -347,7 +366,7 @@ export const Dark = meta.story({
   args: { defaultChannelId: inbox.id },
   beforeEach: darkMode,
   async play() {
-    const content = await upload(mixed)
+    const content = await submitFile(mixed)
 
     await expect(await content.findByText('2 parts of the file were not processed')).toBeVisible()
   },
@@ -357,7 +376,7 @@ export const Mobile = meta.story({
   ...mobile,
   args: { defaultChannelId: inbox.id },
   async play() {
-    const content = await upload(orders)
+    const content = await submitFile(orders)
 
     await expect(await content.findByRole('heading', { name: '2 documents created' })).toBeVisible()
     const popup = await screen.findByRole('dialog', { name: 'Upload a document' })

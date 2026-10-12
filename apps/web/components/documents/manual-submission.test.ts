@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { maxDocumentLength } from '@edi-bridge/contracts'
 
-import { documentProblem, knownMessageType } from './upload-document'
+import { documentProblem, parseMessageType } from './manual-submission'
 
 describe('documentProblem', () => {
   it('asks for a file when none is chosen', () => {
@@ -19,12 +19,12 @@ describe('documentProblem', () => {
   })
 })
 
-describe('knownMessageType', () => {
+describe('parseMessageType', () => {
   it('recognises a Message Type of the contract', () => {
-    expect(knownMessageType('DESADV')).toBe('DESADV')
+    expect(parseMessageType('DESADV')).toBe('DESADV')
   })
 
   it('leaves a raw type outside the contract unnamed', () => {
-    expect(knownMessageType('PRICAT')).toBeNull()
+    expect(parseMessageType('PRICAT')).toBeNull()
   })
 })

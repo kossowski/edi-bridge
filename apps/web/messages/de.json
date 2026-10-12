@@ -2458,7 +2458,7 @@
       "applied": "CSV importiert: {added, plural, one {# Eintrag hinzugefügt} other {# Einträge hinzugefügt}}, {changed, plural, one {# Eintrag geändert} other {# Einträge geändert}}."
     }
   },
-  "Upload": {
+  "ManualSubmission": {
     "open": "Beleg hochladen",
     "title": "Beleg hochladen",
     "description": "Reichen Sie einen Beleg selbst ein, zum Beispiel einen, den ein Partner per E-Mail geschickt hat. EDI Bridge verarbeitet ihn, als wäre er über die gewählte Verbindung eingetroffen, und markiert ihn als von Hand hochgeladen.",
@@ -2466,6 +2466,8 @@
     "cancel": "Abbrechen",
     "submit": "Hochladen",
     "submitting": "Wird hochgeladen…",
+    "retry": "Erneut versuchen",
+    "newFlow": "Belegweg einrichten",
     "channel": {
       "label": "Woher kommt der Beleg?",
       "description": "Wählen Sie die eingehende Verbindung, über die der Beleg sonst eintreffen würde.",
@@ -2473,7 +2475,6 @@
       "loading": "Verbindungen werden geladen…",
       "detail": "{kind} · {tradingPartner}",
       "error": "Die Verbindungen konnten nicht geladen werden.",
-      "retry": "Erneut versuchen",
       "empty": {
         "title": "Noch keine eingehende Verbindung",
         "description": "Für einen Upload brauchen Sie eine Verbindung, über die Belege eintreffen. Richten Sie zuerst eine ein.",
@@ -2494,9 +2495,7 @@
         "tooLarge": "Die Datei ist zu groß. Eine Datei darf höchstens 5 Millionen Zeichen haben."
       },
       "unroutable": "Kein Belegweg auf dieser Verbindung verarbeitet die Belege in dieser Datei. Richten Sie zuerst einen Belegweg für sie ein.",
-      "newFlow": "Belegweg einrichten",
-      "failed": "Die Datei konnte nicht hochgeladen werden. Versuchen Sie es erneut.",
-      "retry": "Erneut versuchen"
+      "failed": "Die Datei konnte nicht hochgeladen werden. Versuchen Sie es erneut."
     },
     "result": {
       "title": "{count, plural, one {# Beleg angelegt} other {# Belege angelegt}}",
@@ -2507,8 +2506,7 @@
       "done": "Fertig",
       "notRouted": {
         "title": "{count, plural, one {# Teil der Datei wurde nicht verarbeitet} other {# Teile der Datei wurden nicht verarbeitet}}",
-        "description": "Kein Belegweg auf {channel} verarbeitet diese Belegarten, deshalb hat EDI Bridge für sie keinen Beleg angelegt.",
-        "action": "Belegweg einrichten"
+        "description": "Kein Belegweg auf {channel} verarbeitet diese Belegarten, deshalb hat EDI Bridge für sie keinen Beleg angelegt."
       }
     }
   },

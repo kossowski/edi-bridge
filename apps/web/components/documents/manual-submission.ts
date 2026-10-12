@@ -14,8 +14,8 @@ export function documentProblem(content: string | null): DocumentProblem | null 
   return content.length > maxDocumentLength ? 'tooLarge' : null
 }
 
-export function knownMessageType(messageType: string): MessageType | null {
-  const known = messageTypeSchema.safeParse(messageType)
+export function parseMessageType(messageType: string): MessageType | null {
+  const parsed = messageTypeSchema.safeParse(messageType)
 
-  return known.success ? known.data : null
+  return parsed.success ? parsed.data : null
 }

@@ -12,7 +12,7 @@ import {
 } from '@/components/channels/channel-parts'
 import { WebhookAccess } from '@/components/channels/webhook-token'
 import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
-import { UploadSheet } from '@/components/documents/upload-sheet'
+import { ManualSubmissionSheet } from '@/components/documents/manual-submission-sheet'
 import { EditLink } from '@/components/edit-link'
 import { ApiError } from '@/lib/api/client'
 import { channelQuery } from '@/lib/api/queries'
@@ -94,7 +94,7 @@ function ConnectionFacts({ channel }: { channel: Channel }) {
 function ChannelActions({ channel }: { channel: Channel }) {
   return (
     <>
-      {channel.direction === 'inbound' && <UploadSheet defaultChannelId={channel.id} />}
+      {channel.direction === 'inbound' && <ManualSubmissionSheet defaultChannelId={channel.id} />}
       <EditLink href={`/channels/${channel.id}/edit`} />
     </>
   )
