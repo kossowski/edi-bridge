@@ -3,7 +3,6 @@ import { http, HttpResponse } from 'msw'
 import {
   directionOf,
   type RunSummary,
-  runSummarySchema,
   submitDocumentEndpoint,
   type TradingPartner,
 } from '@edi-bridge/contracts'
@@ -11,6 +10,7 @@ import {
 import { type ChannelRecord, type ChannelStore, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, toFlowStore } from './flow'
 import { badRequest, unprocessable } from './responses'
+import { toRunSummary } from './run'
 import { createRunStore, type RunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
@@ -122,24 +122,30 @@ export function manualSubmissionHandler(
 
     const receivedAt = new Date().toISOString()
 
-    const created: RunSummary[] = outcomes.map(({ flow, failed, tradingPartner }) =>
-      runSummarySchema.parse({
-        id: crypto.randomUUID(),
-        receivedAt,
-        tradingPartner,
-        messageType: flow.messageType,
-        flow: { id: flow.id, name: flow.name },
-        manualSubmission: true,
-        status: failed ? 'failed' : 'delivered',
-        failureStage: failed ? 'parse' : null,
-      }),
+    const created: RunSummary[] = outcomes.flatMap(({ flow, failed, tradingPartner }) =>
+      tradingPartner
+        ? [
+            toRunSummary({
+              id: crypto.randomUUID(),
+              receivedAt,
+              tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
+              messageType: flow.messageType,
+              flow: { id: flow.id, name: flow.name },
+              manualSubmission: true,
+              status: failed ? 'failed' : 'delivered',
+              failureStage: failed ? 'parse' : null,
+            }),
+          ]
+        : [],
     )
 
     for (const run of created) {
       runs.set(run)
     }
 
-    return HttpResponse.json(submitDocumentEndpoint.response.parse({ runs: created, notRouted }), {
+    const placed = created.map((run) => runs.get(run.id) ?? run)
+
+    return HttpResponse.json(submitDocumentEndpoint.response.parse({ runs: placed, notRouted }), {
       status: 201,
     })
   })

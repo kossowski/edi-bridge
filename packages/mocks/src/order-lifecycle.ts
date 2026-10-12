@@ -12,14 +12,14 @@ import {
   orderLifecycleSchema,
   orderLifecyclesEndpoint,
   type RunSummary,
-  runSummarySchema,
   type TradingPartner,
 } from '@edi-bridge/contracts'
 
 import { seedFlows } from './flow'
 import { hour, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
-import { controlReferenceOf, interchangeIdOf, type Reprocessed } from './run-detail'
+import { toRunSummary } from './run'
+import { controlReferenceOf, interchangeIdOf, type Reprocessed } from './run-store'
 import { stableUuid } from './seed-id'
 import { seedTradingPartners } from './trading-partner'
 
@@ -164,7 +164,6 @@ const lifecycleSeeds: LifecycleSeed[] = [
 export type OrderLifecycleSeed = {
   runs: RunSummary[]
   reprocessed: Reprocessed[]
-  businessReferences: ReadonlyMap<string, string>
   orderLifecycles: OrderLifecycle[]
 }
 
@@ -197,7 +196,6 @@ function interchangeOf(
 export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
   const runs: RunSummary[] = []
   const reprocessed: Reprocessed[] = []
-  const businessReferences = new Map<string, string>()
 
   const orderLifecycles = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
     const tradingPartner = seedTradingPartners.find(({ name }) => name === seed.tradingPartner)!
@@ -222,14 +220,13 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
         manualSubmission: false,
       }
 
-      const run = runSummarySchema.parse(
+      const run = toRunSummary(
         outcome === 'delivered'
-          ? { ...base, status: 'delivered', failureStage: null }
-          : { ...base, status: 'failed', failureStage: outcome },
+          ? { ...base, businessReference, status: 'delivered', failureStage: null }
+          : { ...base, businessReference, status: 'failed', failureStage: outcome },
       )
 
       runs.push(run)
-      businessReferences.set(run.id, businessReference)
 
       return run
     }
@@ -280,7 +277,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
     })
   })
 
-  return { runs, reprocessed, businessReferences, orderLifecycles }
+  return { runs, reprocessed, orderLifecycles }
 }
 
 export type OrderLifecycleState = 'loading' | 'error'

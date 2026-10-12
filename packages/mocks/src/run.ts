@@ -14,8 +14,53 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedFlows } from './flow'
-import { type RunStore, toRunStore } from './run-store'
+import { hash } from './hash'
+import {
+  controlReferenceOf,
+  createRunStore,
+  hasInterchange,
+  interchangeIdOf,
+  type RunStore,
+  toRunStore,
+} from './run-store'
 import { seedTradingPartners } from './trading-partner'
+
+export type RunFields = Pick<
+  RunSummary,
+  | 'id'
+  | 'receivedAt'
+  | 'tradingPartner'
+  | 'messageType'
+  | 'flow'
+  | 'manualSubmission'
+  | 'status'
+  | 'failureStage'
+> & { businessReference?: string | null }
+
+// A CONTRL acknowledges a whole Interchange, so it carries no order number.
+function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messageType'>) {
+  return messageType === 'CONTRL'
+    ? null
+    : `PO${String(hash(`business-reference:${id}`) % 1_000_000).padStart(6, '0')}`
+}
+
+export function toRunSummary(run: RunFields): RunSummary {
+  const summary = runSummarySchema.parse({
+    ...run,
+    direction: directionOf(run),
+    businessReference:
+      run.businessReference === undefined ? businessReferenceOf(run) : run.businessReference,
+    interchange: null,
+  })
+
+  if (!hasInterchange(summary)) {
+    return summary
+  }
+
+  const id = interchangeIdOf(summary)
+
+  return { ...summary, interchange: { id, controlReference: controlReferenceOf(id) } }
+}
 
 export function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
   // Outbound Documents come from the ERP as JSON or CSV, so they never fail at EDIFACT parsing.
@@ -42,7 +87,7 @@ const weightedFlows = seedFlows.flatMap((flow) => {
   return [{ value: { flow, tradingPartner }, weight: tradingPartner.testMode ? 0.003 : 1 }]
 })
 
-export function generateRun(faker: Faker, receivedAt: Date) {
+export function generateRun(faker: Faker, receivedAt: Date): RunFields {
   const { flow, tradingPartner } = faker.helpers.weightedArrayElement(weightedFlows)
 
   const status = faker.helpers.weightedArrayElement<RunStatus>([
@@ -66,7 +111,7 @@ export function generateRun(faker: Faker, receivedAt: Date) {
 }
 
 export function createRun(overrides: Partial<RunSummary> = {}): RunSummary {
-  return runSummarySchema.parse({
+  return toRunSummary({
     ...generateRun(defaultFaker, defaultFaker.date.recent({ days: 30 })),
     ...overrides,
   })
@@ -86,7 +131,7 @@ export function createRuns({
   const faker = new Faker({ locale: [en], seed })
   const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 
-  const runs: RunSummary[] = []
+  const runs: RunFields[] = []
 
   while (runs.length < count) {
     const run = generateRun(faker, faker.date.between({ from, to: now }))
@@ -104,10 +149,10 @@ export function createRuns({
       flow: run.flow,
     }))
 
-    runs.push(...[run, ...siblings].map((item) => runSummarySchema.parse(item)))
+    runs.push(run, ...siblings)
   }
 
-  return runs.slice(0, count)
+  return createRunStore(runs.slice(0, count).map(toRunSummary)).all().slice()
 }
 
 let seedRunsCache: RunSummary[] | undefined
@@ -118,11 +163,17 @@ export function seedRuns() {
   return seedRunsCache
 }
 
-function matches(run: RunSummary, query: RunListQuery) {
+export function includesText(value: string | null, text: string) {
+  return value !== null && value.toLowerCase().includes(text)
+}
+
+function matchesExceptStatus(run: RunSummary, query: RunListQuery, text: string) {
   const receivedAt = Date.parse(run.receivedAt)
 
   return (
-    (!query.status?.length || query.status.includes(run.status)) &&
+    (text === '' ||
+      includesText(run.businessReference, text) ||
+      includesText(run.tradingPartner.name, text)) &&
     (!query.failureStage?.length ||
       (run.failureStage !== null && query.failureStage.includes(run.failureStage))) &&
     (!query.tradingPartnerId?.length || query.tradingPartnerId.includes(run.tradingPartner.id)) &&
@@ -145,12 +196,35 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | R
     }
 
     store ??= toRunStore(runs ?? seedRuns())
-    const { page, pageSize } = query.data
-    const filtered = store.newestFirst().filter((run) => matches(run, query.data))
+    const { page, pageSize, status } = query.data
+    const text = query.data.q?.toLowerCase() ?? ''
+
+    const statusCounts: Record<RunStatus, number> = {
+      received: 0,
+      processing: 0,
+      delivered: 0,
+      failed: 0,
+      duplicate: 0,
+    }
+
+    const filtered: RunSummary[] = []
+
+    for (const run of store.newestFirst()) {
+      if (!matchesExceptStatus(run, query.data, text)) {
+        continue
+      }
+
+      statusCounts[run.status] += 1
+
+      if (!status?.length || status.includes(run.status)) {
+        filtered.push(run)
+      }
+    }
 
     return HttpResponse.json({
       runs: filtered.slice((page - 1) * pageSize, page * pageSize),
       total: filtered.length,
+      statusCounts,
       page,
       pageSize,
     })

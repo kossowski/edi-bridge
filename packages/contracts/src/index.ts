@@ -201,11 +201,18 @@ export { type GlnIssue, glnIssue, glnSchema, withCheckDigit } from './gln'
 export {
   type Interchange,
   interchangeEndpoint,
+  type InterchangeList,
+  type InterchangeListQuery,
+  interchangeListQuerySchema,
+  interchangeListSchema,
   type InterchangeParty,
   interchangePartySchema,
   type InterchangeRun,
   interchangeRunSchema,
   interchangeSchema,
+  interchangesEndpoint,
+  type InterchangeSummary,
+  interchangeSummarySchema,
 } from './interchange'
 
 export {
@@ -408,6 +415,8 @@ export {
   type FailureStage,
   failureStageSchema,
   failureStages,
+  type InterchangeReference,
+  interchangeReferenceSchema,
   type ParsedMessage,
   parsedMessageSchema,
   type ParsedSegment,

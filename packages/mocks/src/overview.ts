@@ -20,7 +20,6 @@ import {
   overviewWindowSizes,
   type RunStatus,
   type RunSummary,
-  runSummarySchema,
   type TradingPartner,
   type TradingPartnerHealth,
 } from '@edi-bridge/contracts'
@@ -28,9 +27,8 @@ import {
 import { hash } from './hash'
 import { hour, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
-import { seedRuns } from './run'
-import { controlReferenceOf, interchangeIdOf } from './run-detail'
-import { type RunStore, toRunStore } from './run-store'
+import { seedRuns, toRunSummary } from './run'
+import { controlReferenceOf, interchangeIdOf, type RunStore, toRunStore } from './run-store'
 import { createTradingPartners, seedTradingPartners } from './trading-partner'
 
 export type OverviewData = {
@@ -215,7 +213,7 @@ export function createOverviewData({
       manualSubmission: false,
     }
 
-    return runSummarySchema.parse(
+    return toRunSummary(
       faker.datatype.boolean({ probability: errorShare })
         ? { ...base, status: 'failed', failureStage: faker.helpers.arrayElement(failureStages) }
         : { ...base, status: 'delivered', failureStage: null },

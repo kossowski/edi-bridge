@@ -19,8 +19,11 @@ const run: RunSummary = {
   receivedAt: '2026-10-09T08:15:00.000Z',
   tradingPartner: { id: '00000001-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' },
   messageType: 'ORDERS',
+  direction: 'inbound',
   flow: { id: '00000002-0000-4000-8000-000000000001', name: 'Hansemarkt ORDERS inbound' },
   manualSubmission: true,
+  businessReference: 'PO000001',
+  interchange: null,
   status: 'delivered',
   failureStage: null,
 }

@@ -87,16 +87,11 @@ function compactDate(iso: string) {
   return iso.slice(0, 10).replaceAll('-', '')
 }
 
-function businessSegments(
-  faker: Faker,
-  run: RunSummary,
-  parties: Parties,
-  businessReference: string | undefined,
-): Segment[] {
+function businessSegments(faker: Faker, run: RunSummary, parties: Parties): Segment[] {
   const date = compactDate(run.receivedAt)
   // Drawn even when replaced, so the rest of the Message keeps its seeded values.
   const generatedOrderNumber = `PO${faker.string.numeric(6)}`
-  const orderNumber = businessReference ?? generatedOrderNumber
+  const orderNumber = run.businessReference ?? generatedOrderNumber
 
   const lines = Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () => ({
     gtin: gtin(faker),
@@ -340,13 +335,9 @@ export function partiesOf(run: RunSummary): Parties {
     : { sender: tradingPartner, receiver: ownCompany }
 }
 
-export function generateMessage(
-  run: RunSummary,
-  reference: string,
-  businessReference?: string,
-): GeneratedMessage {
+export function generateMessage(run: RunSummary, reference: string): GeneratedMessage {
   const faker = seededFaker(`message:${run.id}`)
-  const body = businessSegments(faker, run, partiesOf(run), businessReference)
+  const body = businessSegments(faker, run, partiesOf(run))
 
   const segments = [
     seg('UNH', reference, [run.messageType, 'D', '96A', 'UN', messageVersions[run.messageType]]),
