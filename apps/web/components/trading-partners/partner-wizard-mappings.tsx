@@ -1,14 +1,19 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 
 import { SelectField } from '@/components/form-field'
 import { ChoiceCards } from '@/components/trading-partners/choice-cards'
 import { latestMappingVersions } from '@/components/trading-partners/partner-documents'
 import {
+  WizardLoadFailed,
+  WizardLoading,
+} from '@/components/trading-partners/partner-wizard-load-state'
+import {
   chooseMapping,
   type MappingWay,
+  type OfferedMappings,
   type WizardDocument,
   type WizardErrors,
   type WizardMapping,
@@ -16,13 +21,35 @@ import {
 } from '@/components/trading-partners/partner-wizard-state'
 import { publishedMappingVersionsQuery } from '@/lib/api/queries'
 import { type MappingVersionSummary } from '@edi-bridge/contracts'
-import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 type UpdateMapping = (
   document: WizardDocument,
   update: (current: WizardMapping | undefined) => WizardMapping,
 ) => void
+
+export function useOfferedMappings(
+  documents: ReadonlyArray<WizardDocument>,
+  enabled: boolean,
+): OfferedMappings {
+  const results = useQueries({
+    queries: documents.map((document) => ({
+      ...publishedMappingVersionsQuery(document),
+      enabled,
+    })),
+  })
+
+  const offered: OfferedMappings = {}
+
+  documents.forEach((document, index) => {
+    const data = results[index]?.data
+
+    if (data !== undefined) {
+      offered[document] = latestMappingVersions(data).map(({ id }) => id)
+    }
+  })
+
+  return offered
+}
 
 function useVersionLabel() {
   const t = useTranslations('Flow')
@@ -58,19 +85,19 @@ function DocumentMapping({
   const label = t('mappings.label', { documents })
   const fieldId = wizardFieldId(idPrefix, `${document}.mapping`)
 
-  const existing =
-    only === undefined
+  const existing = {
+    value: 'existing' as const,
+    ...(only === undefined
       ? {
-          value: 'existing' as const,
           title: t('mappings.existing.title'),
           description: t('mappings.existing.description', { count: mappings.length, documents }),
         }
       : {
-          value: 'existing' as const,
           title: t('mappings.use', { mapping: only.mappingName }),
           description: versionLabel(only),
           badge: t('mappings.suggested'),
-        }
+        }),
+  }
 
   const items = [
     ...(mappings.length > 0 ? [existing] : []),
@@ -98,13 +125,9 @@ function DocumentMapping({
     return (
       <div id={fieldId} className="flex flex-col gap-2">
         <span className="text-sm font-medium">{label}</span>
-        <p role="status" className="text-muted-foreground text-sm">
-          {t('mappings.loading', { documents })}
-        </p>
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-lg" />
+        <WizardLoading message={t('mappings.loading', { documents })} />
         {wayError !== undefined && (
-          <p className="text-sm text-red-800 dark:text-red-300">{t('errors.mapping.required')}</p>
+          <p className="text-destructive-text text-sm">{t('errors.mapping.required')}</p>
         )}
       </div>
     )
@@ -113,14 +136,10 @@ function DocumentMapping({
   return (
     <div className="flex flex-col gap-3">
       {versions.isError && (
-        <div
-          role="alert"
-          className="bg-muted/50 flex flex-wrap items-center justify-between gap-3 rounded-lg p-3 text-sm">
-          <p>{t('mappings.failed', { documents })}</p>
-          <Button size="sm" type="button" variant="outline" onClick={() => void versions.refetch()}>
-            {t('mappings.retry')}
-          </Button>
-        </div>
+        <WizardLoadFailed
+          message={t('mappings.failed', { documents })}
+          onRetry={() => void versions.refetch()}
+        />
       )}
       <ChoiceCards
         id={fieldId}

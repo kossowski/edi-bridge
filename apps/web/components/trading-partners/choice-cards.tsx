@@ -87,7 +87,7 @@ export function ChoiceCards<Value extends string>({
         ))}
       </RadioGroup>
       {error && (
-        <p id={`${id}-error`} className="text-sm text-red-800 dark:text-red-300">
+        <p id={`${id}-error`} className="text-destructive-text text-sm">
           {error}
         </p>
       )}
@@ -134,7 +134,7 @@ export function CheckboxCards<Value extends string>({
         />
       ))}
       {error && (
-        <p id={`${id}-error`} className="text-sm text-red-800 dark:text-red-300">
+        <p id={`${id}-error`} className="text-destructive-text text-sm">
           {error}
         </p>
       )}

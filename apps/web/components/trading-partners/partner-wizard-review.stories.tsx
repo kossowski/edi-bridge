@@ -95,7 +95,7 @@ export const Postponed = meta.story({
 
     const routes = section(canvas, 'Document routes')
     await expect(
-      routes.getByText('Purchase orders: set up later on the partner page'),
+      routes.getByText('Document route for purchase orders: set up later on the partner page'),
     ).toBeVisible()
     await expect(
       routes.getByText(`${wizardPartner} still sends you the connection details.`),
@@ -148,7 +148,9 @@ export const MappingLater = meta.story({
     await continueTo(canvas, 'Review and create')
 
     const routes = await findSection(canvas, 'Document routes')
-    await expect(routes.getByText('Invoices: set up later on the partner page')).toBeVisible()
+    await expect(
+      routes.getByText('Document route for invoices: set up later on the partner page'),
+    ).toBeVisible()
     await expect(routes.getByText('You choose the mapping there.')).toBeVisible()
   },
 })
@@ -256,7 +258,7 @@ export const German = meta.story({
 
     const routes = await findSection(canvas, 'Belegwege')
     await expect(
-      routes.getByText('Rechnungen: später auf der Partnerseite einrichten'),
+      routes.getByText('Belegweg für Rechnungen: später auf der Partnerseite einrichten'),
     ).toBeVisible()
     await expect(
       section(canvas, 'Mappings').getByText('Neues Mapping für Rechnungen'),

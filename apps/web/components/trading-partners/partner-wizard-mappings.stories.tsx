@@ -120,13 +120,13 @@ export const Loading = meta.story({
   },
 })
 
+const failingMappings = http.get(`${apiUrl}${publishedMappingVersionsEndpoint.path}`, () =>
+  HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+)
+
 export const LoadFailed = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      http.get(`${apiUrl}${publishedMappingVersionsEndpoint.path}`, () =>
-        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
-      ),
-    )
+    msw.use(failingMappings)
   },
   async play({ canvas }) {
     await toMappings(canvas, ['ORDERS'])
@@ -136,6 +136,16 @@ export const LoadFailed = meta.story({
 
     const orders = await findMappingGroup(canvas, 'ORDERS')
     await expect(orders.getAllByRole('radio')).toHaveLength(2)
+  },
+})
+
+export const LoadFailedAiDraft = meta.story({
+  beforeEach({ msw }) {
+    msw.use(failingMappings)
+  },
+  async play({ canvas }) {
+    await toMappings(canvas, ['ORDERS'])
+    const orders = await findMappingGroup(canvas, 'ORDERS')
     await userEvent.click(orders.getByRole('radio', { name: /Let AI draft one/ }))
     await continueTo(canvas, 'Review and create')
   },

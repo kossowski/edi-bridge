@@ -8,16 +8,17 @@ import { usePlainNames } from '@/components/plain-names'
 import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import {
   type PlanChannel,
-  type PlannedConnection,
   type PlannedRoute,
   setupPlan,
 } from '@/components/trading-partners/partner-setup-plan'
+import {
+  WizardLoadFailed,
+  WizardLoading,
+} from '@/components/trading-partners/partner-wizard-load-state'
 import { type WizardResult } from '@/components/trading-partners/partner-wizard-state'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
 import { channelsQuery, publishedMappingVersionsQuery } from '@/lib/api/queries'
 import { directionOf } from '@edi-bridge/contracts'
-import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 function PlanSection({ title, children }: { title: string; children: ReactNode }) {
   const id = useId()
@@ -41,12 +42,8 @@ function PlanItem({ title, detail }: { title: ReactNode; detail?: ReactNode }) {
   )
 }
 
-function routeEnds(
-  route: PlannedRoute<PlanChannel>,
-  connections: ReadonlyArray<PlannedConnection>,
-) {
-  const partner =
-    connections.find((connection) => connection.direction === route.direction)?.values.name ?? ''
+function routeEnds(route: PlannedRoute<PlanChannel>) {
+  const partner = route.partnerConnection.values.name
 
   return route.direction === 'inbound'
     ? { from: partner, to: route.ownChannel.name }
@@ -75,37 +72,21 @@ export function ReviewStep({ result }: { result: WizardResult }) {
 
   if (queries.some((query) => query.isError)) {
     return (
-      <div
-        role="alert"
-        className="bg-muted/50 flex flex-wrap items-center justify-between gap-3 rounded-lg p-3 text-sm">
-        <p>{t('failed')}</p>
-        <Button
-          size="sm"
-          type="button"
-          variant="outline"
-          onClick={() => {
-            for (const query of queries) {
-              if (query.isError) {
-                void query.refetch()
-              }
+      <WizardLoadFailed
+        message={t('failed')}
+        onRetry={() => {
+          for (const query of queries) {
+            if (query.isError) {
+              void query.refetch()
             }
-          }}>
-          {t('retry')}
-        </Button>
-      </div>
+          }
+        }}
+      />
     )
   }
 
   if (channels.data === undefined || versions.some((query) => query.data === undefined)) {
-    return (
-      <div className="flex flex-col gap-3">
-        <p role="status" className="text-muted-foreground text-sm">
-          {t('loading')}
-        </p>
-        <Skeleton className="h-16 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-lg" />
-      </div>
-    )
+    return <WizardLoading message={t('loading')} />
   }
 
   const plan = setupPlan(result, {
@@ -172,14 +153,14 @@ export function ReviewStep({ result }: { result: WizardResult }) {
       <PlanSection title={t('routes.title')}>
         <ul className="flex flex-col gap-2">
           {plan.documents.map((document) => {
-            const documents = plainNames.messageTypeName(document.messageType, true)
+            const documents = tWizard(`documentNames.${document.messageType}`)
 
             if ('route' in document) {
               return (
                 <PlanItem
                   key={document.messageType}
                   detail={t('routes.detail', {
-                    ...routeEnds(document.route, plan.connections),
+                    ...routeEnds(document.route),
                     mapping: document.route.mappingVersion.mappingName,
                     version: document.route.mappingVersion.version,
                   })}
@@ -192,12 +173,7 @@ export function ReviewStep({ result }: { result: WizardResult }) {
               <PlanItem
                 key={document.messageType}
                 detail={document.reasons
-                  .map((reason) =>
-                    t(`routes.reasons.${reason}`, {
-                      name,
-                      documents: tWizard(`documentNames.${document.messageType}`),
-                    }),
-                  )
+                  .map((reason) => t(`routes.reasons.${reason}`, { name, documents }))
                   .join(' ')}
                 title={t('routes.left', { documents })}
               />

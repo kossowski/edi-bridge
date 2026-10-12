@@ -1589,13 +1589,11 @@
       },
       "loading": "Die Mappings für {documents} werden geladen…",
       "empty": "Für {documents} ist noch kein Mapping veröffentlicht. Lassen Sie die KI eines entwerfen, oder wählen Sie später.",
-      "failed": "Die Mappings für {documents} konnten nicht geladen werden. Sie können trotzdem die KI eines entwerfen lassen oder später wählen.",
-      "retry": "Erneut versuchen"
+      "failed": "Die Mappings für {documents} konnten nicht geladen werden. Sie können trotzdem die KI eines entwerfen lassen oder später wählen."
     },
     "review": {
       "loading": "Ihre Verbindungen und Mappings werden geladen…",
       "failed": "Ihre Verbindungen und Mappings konnten nicht geladen werden. Daher lässt sich die Einrichtung noch nicht auflisten.",
-      "retry": "Erneut versuchen",
       "partner": {
         "title": "Partner"
       },
@@ -1611,7 +1609,7 @@
       "routes": {
         "title": "Belegwege",
         "detail": "Von {from} an {to}, mit dem Mapping {mapping}, Version {version}.",
-        "left": "{documents}: später auf der Partnerseite einrichten",
+        "left": "Belegweg für {documents}: später auf der Partnerseite einrichten",
         "reasons": {
           "connectionPostponed": "{name} schickt Ihnen noch die Verbindungsangaben.",
           "noOwnConnection": "Noch keine Ihrer eigenen Verbindungen passt zu {documents}.",
@@ -1657,7 +1655,8 @@
     "cancel": "Abbrechen",
     "back": "Zurück",
     "continue": "Weiter",
-    "finish": "Partner im Testbetrieb anlegen"
+    "finish": "Partner im Testbetrieb anlegen",
+    "retry": "Erneut versuchen"
   },
   "Channels": {
     "new": "Neuer Channel",

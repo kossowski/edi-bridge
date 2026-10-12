@@ -148,23 +148,51 @@ function connectionsErrors({ documents, connections }: PartnerWizardState): Wiza
   return errors
 }
 
-function mappingsErrors({ documents, mappings }: PartnerWizardState): WizardErrors {
+export type OfferedMappings = Partial<Record<WizardDocument, ReadonlyArray<string>>>
+
+function mappingError(
+  mapping: WizardMapping | undefined,
+  offered: ReadonlyArray<string>,
+): 'mapping' | 'mappingVersion' | null {
+  if (mapping === undefined) {
+    return 'mapping'
+  }
+
+  if (mapping.way !== 'existing') {
+    return null
+  }
+
+  const { mappingVersionId } = mapping
+
+  if (mappingVersionId !== null && offered.includes(mappingVersionId)) {
+    return null
+  }
+
+  return offered.length > 1 ? 'mappingVersion' : 'mapping'
+}
+
+function mappingsErrors(
+  { documents, mappings }: PartnerWizardState,
+  offeredMappings: OfferedMappings,
+): WizardErrors {
   const errors: WizardErrors = {}
 
   for (const document of documents) {
-    const mapping = mappings[document]
+    const field = mappingError(mappings[document], offeredMappings[document] ?? [])
 
-    if (mapping === undefined) {
-      errors[`${document}.mapping`] = 'required'
-    } else if (mapping.way === 'existing' && mapping.mappingVersionId === null) {
-      errors[`${document}.mappingVersion`] = 'required'
+    if (field !== null) {
+      errors[`${document}.${field}`] = 'required'
     }
   }
 
   return errors
 }
 
-export function stepErrors(step: WizardStep, state: PartnerWizardState): WizardErrors {
+export function stepErrors(
+  step: WizardStep,
+  state: PartnerWizardState,
+  offeredMappings: OfferedMappings = {},
+): WizardErrors {
   switch (step) {
     case 'partner':
       return partnerErrors(state)
@@ -173,7 +201,7 @@ export function stepErrors(step: WizardStep, state: PartnerWizardState): WizardE
     case 'connections':
       return connectionsErrors(state)
     case 'mappings':
-      return mappingsErrors(state)
+      return mappingsErrors(state, offeredMappings)
     case 'review':
       return {}
   }

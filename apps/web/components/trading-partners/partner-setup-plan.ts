@@ -8,7 +8,7 @@ import {
 
 import { type ChannelFormValues, type ChannelKindKey } from '../channels/channel-form-values'
 import { suggestedName, wayKind } from './partner-connections'
-import { ownConnections } from './partner-documents'
+import { flowName, ownConnections } from './partner-documents'
 import { type WizardDocument, type WizardResult } from './partner-wizard-state'
 
 export type PlanChannel = Pick<ChannelSummary, 'id' | 'name' | 'direction' | 'tradingPartnerId'>
@@ -29,6 +29,7 @@ export type LeftReason =
 export type PlannedRoute<Channel extends PlanChannel> = {
   name: string
   direction: Direction
+  partnerConnection: PlannedConnection
   ownChannel: Channel
   mappingVersion: MappingVersionSummary
 }
@@ -91,9 +92,11 @@ function plannedDocument<Channel extends PlanChannel>(
       ? mappingVersions.find(({ id }) => id === mapping.mappingVersionId)
       : undefined
 
+  const partnerConnection = connections.find((connection) => connection.direction === direction)
+
   const reasons: LeftReason[] = []
 
-  if (!connections.some((connection) => connection.direction === direction)) {
+  if (partnerConnection === undefined) {
     reasons.push('connectionPostponed')
   }
 
@@ -111,13 +114,24 @@ function plannedDocument<Channel extends PlanChannel>(
 
   const [ownChannel] = own
 
-  if (reasons.length > 0 || ownChannel === undefined || mappingVersion === undefined) {
+  if (
+    reasons.length > 0 ||
+    partnerConnection === undefined ||
+    ownChannel === undefined ||
+    mappingVersion === undefined
+  ) {
     return { messageType, reasons }
   }
 
   return {
     messageType,
-    route: { name: names.route(messageType), direction, ownChannel, mappingVersion },
+    route: {
+      name: flowName(names.route(messageType)),
+      direction,
+      partnerConnection,
+      ownChannel,
+      mappingVersion,
+    },
   }
 }
 

@@ -1589,13 +1589,11 @@
       },
       "loading": "Loading the mappings for {documents}…",
       "empty": "No mapping for {documents} is published yet. Let the AI draft one, or choose one later.",
-      "failed": "The mappings for {documents} could not be loaded. You can still let the AI draft one or choose later.",
-      "retry": "Try again"
+      "failed": "The mappings for {documents} could not be loaded. You can still let the AI draft one or choose later."
     },
     "review": {
       "loading": "Loading your connections and mappings…",
       "failed": "Your connections and mappings could not be loaded, so the setup cannot be listed yet.",
-      "retry": "Try again",
       "partner": {
         "title": "Partner"
       },
@@ -1611,7 +1609,7 @@
       "routes": {
         "title": "Document routes",
         "detail": "From {from} to {to}, with the mapping {mapping}, version {version}.",
-        "left": "{documents}: set up later on the partner page",
+        "left": "Document route for {documents}: set up later on the partner page",
         "reasons": {
           "connectionPostponed": "{name} still sends you the connection details.",
           "noOwnConnection": "None of your own connections fits {documents} yet.",
@@ -1657,7 +1655,8 @@
     "cancel": "Cancel",
     "back": "Back",
     "continue": "Continue",
-    "finish": "Create partner for testing"
+    "finish": "Create partner for testing",
+    "retry": "Try again"
   },
   "Channels": {
     "new": "New Channel",

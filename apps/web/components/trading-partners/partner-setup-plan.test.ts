@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { maxChannelNameLength } from '@edi-bridge/contracts'
+import { maxChannelNameLength, maxFlowNameLength } from '@edi-bridge/contracts'
 
 import { toFormValues } from '../channels/channel-form-values'
 import { type PlanChannel, setupPlan, type SetupContext } from './partner-setup-plan'
@@ -61,13 +61,16 @@ const result: WizardResult = {
 describe('setupPlan', () => {
   it('plans a document route for each document when everything is in place', () => {
     const plan = setupPlan(result, context)
+    const [inbound, outbound] = plan.connections
 
+    expect([inbound?.direction, outbound?.direction]).toEqual(['inbound', 'outbound'])
     expect(plan.documents).toEqual([
       {
         messageType: 'ORDERS',
         route: {
           name: 'ORDERS route',
           direction: 'inbound',
+          partnerConnection: inbound,
           ownChannel: erpDelivery,
           mappingVersion: ordersVersion,
         },
@@ -77,6 +80,7 @@ describe('setupPlan', () => {
         route: {
           name: 'INVOIC route',
           direction: 'outbound',
+          partnerConnection: outbound,
           ownChannel: erpWebhook,
           mappingVersion: invoicVersion,
         },
@@ -111,6 +115,20 @@ describe('setupPlan', () => {
     })
 
     expect(plan.connections[0]?.values.name).toHaveLength(maxChannelNameLength)
+  })
+
+  it('cuts a long document route name to the allowed length, as it is created', () => {
+    const name = 'K'.repeat(70)
+
+    const plan = setupPlan(
+      { ...result, partner: { ...result.partner, name } },
+      { ...context, names: { ...context.names, route: () => `Purchase orders from ${name}` } },
+    )
+
+    const expected = `Purchase orders from ${name}`.slice(0, maxFlowNameLength)
+
+    expect(expected).toHaveLength(maxFlowNameLength)
+    expect(plan.documents[0]).toMatchObject({ route: { name: expected } })
   })
 
   it('creates no connection for a postponed direction and leaves its documents', () => {

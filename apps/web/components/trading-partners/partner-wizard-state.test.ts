@@ -333,11 +333,12 @@ describe('mappings step', () => {
           ORDERS: { way: 'existing', mappingVersionId: null },
           INVOIC: { way: 'ai' },
         }),
+        { ORDERS: ['v1', 'v2'] },
       ),
     ).toEqual({ 'ORDERS.mappingVersion': 'required' })
   })
 
-  it('accepts an existing mapping, an AI draft or later', () => {
+  it('accepts an offered existing mapping, an AI draft or later', () => {
     expect(
       stepErrors(
         'mappings',
@@ -345,8 +346,42 @@ describe('mappings step', () => {
           ORDERS: { way: 'existing', mappingVersionId: 'v1' },
           INVOIC: { way: 'ai' },
         }),
+        { ORDERS: ['v1', 'v2'] },
       ),
     ).toEqual({})
+    expect(
+      stepErrors('mappings', withMappings({ ORDERS: { way: 'later' }, INVOIC: { way: 'ai' } })),
+    ).toEqual({})
+  })
+
+  it.each([
+    ['no mapping is published', { ORDERS: [] }],
+    ['the mappings are still loading or could not be loaded', {}],
+  ])('asks for a choice again when an existing mapping was chosen but %s', (_, offered) => {
+    expect(
+      stepErrors(
+        'mappings',
+        withMappings({
+          ORDERS: { way: 'existing', mappingVersionId: 'v1' },
+          INVOIC: { way: 'later' },
+        }),
+        offered,
+      ),
+    ).toEqual({ 'ORDERS.mapping': 'required' })
+  })
+
+  it('asks again for a picked mapping that is no longer offered', () => {
+    const state = withMappings({
+      ORDERS: { way: 'existing', mappingVersionId: 'gone' },
+      INVOIC: { way: 'later' },
+    })
+
+    expect(stepErrors('mappings', state, { ORDERS: ['v1', 'v2'] })).toEqual({
+      'ORDERS.mappingVersion': 'required',
+    })
+    expect(stepErrors('mappings', state, { ORDERS: ['v1'] })).toEqual({
+      'ORDERS.mapping': 'required',
+    })
   })
 })
 
