@@ -555,6 +555,7 @@ export {
   characterSetSchema,
   characterSets,
   createTradingPartnerEndpoint,
+  glnRequired,
   type OnboardingChecklistItem,
   onboardingChecklist,
   type OnboardingStep,

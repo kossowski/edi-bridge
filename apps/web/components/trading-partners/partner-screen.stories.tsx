@@ -12,6 +12,7 @@ import {
   live,
   sheetOf,
   untouched,
+  withoutGln,
   withPartnerFrame,
 } from '@/components/trading-partners/partner-story-helpers'
 import { apiUrl } from '@/lib/api/config'
@@ -222,7 +223,7 @@ export const ConfirmedOnLoad = meta.story({
     ).toBeVisible()
     await expect(canvas.getByRole('progressbar', { name: 'Setup' })).toHaveAttribute(
       'aria-valuetext',
-      '5 of 6 steps done',
+      '6 of 7 steps done',
     )
   },
 })
@@ -262,6 +263,37 @@ export const WorkspaceWithoutGln = meta.story({
     await expect(
       await canvas.findByRole('link', { name: "Record your company's GLN" }),
     ).toHaveAttribute('href', '/settings')
+  },
+})
+
+export const PartnerWithoutGln = meta.story({
+  ...at(withoutGln),
+  async play({ canvas }) {
+    await expect(await canvas.findByText('GLN not added yet')).toBeVisible()
+    const current = await canvas.findByRole('listitem', { current: 'step' })
+    await expect(current).toHaveTextContent("The partner's GLN")
+    await expect(
+      within(current).getByRole('link', { name: "Add the partner's GLN" }),
+    ).toHaveAttribute('href', `/trading-partners/${withoutGln.id}?tab=settings`)
+  },
+})
+
+export const PartnerWithoutGlnGerman = meta.story({
+  ...at(withoutGln),
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(await canvas.findByText('GLN noch nicht erfasst')).toBeVisible()
+    await expect(
+      await canvas.findByRole('link', { name: 'GLN des Partners erfassen' }),
+    ).toBeVisible()
+  },
+})
+
+export const PartnerWithoutGlnDark = meta.story({
+  ...at(withoutGln),
+  beforeEach: darkMode,
+  async play({ canvas }) {
+    await expect(await canvas.findByText('GLN not added yet')).toBeVisible()
   },
 })
 
@@ -345,10 +377,55 @@ export const SettingsInvalid = meta.story({
 export const SettingsAsViewer = meta.story({
   ...at(awaiting, 'settings'),
   ...asViewer(async ({ canvas }) => {
-    await expect(await canvas.findByText(awaiting.gln)).toBeVisible()
+    await expect(await canvas.findByText(awaiting.gln!)).toBeVisible()
     await expect(canvas.getByText('12 hours')).toBeVisible()
     await expect(canvas.queryByRole('textbox')).toBeNull()
     await expect(canvas.queryByRole('button', { name: 'Save changes' })).toBeNull()
+  }),
+})
+
+export const SettingsWithoutGln = meta.story({
+  ...at(withoutGln, 'settings'),
+  async play({ canvas }) {
+    await expect(await canvas.findByLabelText('GLN')).toHaveValue('')
+    await userEvent.click(canvas.getByRole('button', { name: 'Save changes' }))
+    await expect(await canvas.findByText('Changes saved.')).toBeVisible()
+    await expect(canvas.getByText('GLN not added yet')).toBeVisible()
+  },
+})
+
+export const SettingsClearGln = meta.story({
+  ...at(untouched, 'settings'),
+  async play({ canvas }) {
+    const gln = await canvas.findByLabelText('GLN')
+    await userEvent.clear(gln)
+    await userEvent.click(canvas.getByRole('button', { name: 'Save changes' }))
+    await expect(await canvas.findByText('Changes saved.')).toBeVisible()
+    await expect(gln).not.toHaveAttribute('aria-invalid', 'true')
+    await expect(await canvas.findByText('GLN not added yet')).toBeVisible()
+  },
+})
+
+export const SettingsKeepGlnAfterTest = meta.story({
+  ...at(awaiting, 'settings'),
+  async play({ canvas }) {
+    const gln = await canvas.findByLabelText('GLN')
+    await userEvent.clear(gln)
+    await userEvent.click(canvas.getByRole('button', { name: 'Save changes' }))
+    await expect(gln).toHaveAttribute('aria-invalid', 'true')
+    await expect(gln).toHaveFocus()
+    await expect(
+      canvas.getByText(
+        'Enter the GLN. Documents exchanged with this partner are addressed with it, so it cannot be removed.',
+      ),
+    ).toBeVisible()
+  },
+})
+
+export const SettingsWithoutGlnAsViewer = meta.story({
+  ...at(withoutGln, 'settings'),
+  ...asViewer(async ({ canvas }) => {
+    await expect(await canvas.findByText('Not added yet')).toBeVisible()
   }),
 })
 

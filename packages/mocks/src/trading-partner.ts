@@ -7,6 +7,7 @@ import {
   type CharacterSet,
   characterSets,
   createTradingPartnerEndpoint,
+  glnRequired,
   switchToProductionEndpoint,
   type TradingPartner,
   tradingPartnerEndpoint,
@@ -20,7 +21,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { randomGln } from './gln'
-import { conflict } from './responses'
+import { conflict, unprocessable } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { seedWorkspace, toWorkspaceStore, type WorkspaceStore } from './workspace'
@@ -42,6 +43,7 @@ function onboarded(day: string): TradingPartnerOnboarding {
 const seeds: ReadonlyArray<
   Pick<TradingPartner, 'name' | 'characterSet' | 'acknowledgementTimeLimitHours' | 'testMode'> & {
     onboarding: TradingPartnerOnboarding
+    gln?: null
   }
 > = [
   {
@@ -93,12 +95,20 @@ const seeds: ReadonlyArray<
     testMode: true,
     onboarding: notStarted,
   },
+  {
+    name: 'Ostsee Feinkost GmbH',
+    characterSet: 'UNOC',
+    acknowledgementTimeLimitHours: 24,
+    testMode: true,
+    onboarding: notStarted,
+    gln: null,
+  },
 ]
 
 export const seedTradingPartners: ReadonlyArray<TradingPartner> = seeds.map((seed, index) => {
   const id = seedId(1, index + 1)
 
-  return tradingPartnerSchema.parse({ ...seed, id, gln: seedGln(id) })
+  return tradingPartnerSchema.parse({ id, gln: seedGln(id), ...seed })
 })
 
 function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
@@ -112,10 +122,12 @@ function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
   const sentAt = faker.date.past({ years: 2, refDate: now })
   const receivedAt = new Date(sentAt.getTime() + faker.number.int({ min: 1, max: 600 }) * 1000)
 
+  const gln = randomGln(faker)
+
   return {
     id: faker.string.uuid(),
     name: faker.company.name(),
-    gln: randomGln(faker),
+    gln: stage === 'awaitingTestInterchange' && faker.datatype.boolean(0.3) ? null : gln,
     characterSet: faker.helpers.weightedArrayElement<CharacterSet>([
       { value: 'UNOC', weight: 70 },
       ...characterSets
@@ -157,10 +169,17 @@ export function createTradingPartners({
   while (tradingPartners.length < count) {
     const tradingPartner = generateTradingPartner(faker, now)
 
-    if (!glns.has(tradingPartner.gln)) {
-      glns.add(tradingPartner.gln)
-      tradingPartners.push(tradingPartnerSchema.parse(tradingPartner))
+    const { gln } = tradingPartner
+
+    if (gln !== null) {
+      if (glns.has(gln)) {
+        continue
+      }
+
+      glns.add(gln)
     }
+
+    tradingPartners.push(tradingPartnerSchema.parse(tradingPartner))
   }
 
   return tradingPartners
@@ -239,10 +258,13 @@ export function tradingPartnerHandlers(
     }
   }
 
-  function glnTaken(gln: string, ownId?: string) {
-    return store
-      .all()
-      .some((tradingPartner) => tradingPartner.gln === gln && tradingPartner.id !== ownId)
+  function glnTaken(gln: string | null, ownId?: string) {
+    return (
+      gln !== null &&
+      store
+        .all()
+        .some((tradingPartner) => tradingPartner.gln === gln && tradingPartner.id !== ownId)
+    )
   }
 
   async function parseInput(
@@ -315,6 +337,10 @@ export function tradingPartnerHandlers(
 
         if (glnTaken(parsed.input.gln, existing.id)) {
           return glnConflict()
+        }
+
+        if (parsed.input.gln === null && glnRequired(existing)) {
+          return unprocessable('The Trading Partner needs its GLN once Interchanges were exchanged')
         }
 
         const updated = { ...existing, ...parsed.input }

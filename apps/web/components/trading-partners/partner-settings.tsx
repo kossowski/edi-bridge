@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 
 import { Fact } from '@/components/detail-parts'
 import { SettingsCard } from '@/components/settings/settings-card'
+import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import { type PartnerPanelProps } from '@/components/trading-partners/partner-page-helpers'
 import { TradingPartnerForm } from '@/components/trading-partners/trading-partner-form'
 import { useSession } from '@/hooks/use-session'
@@ -19,7 +20,7 @@ function PartnerDetails({ tradingPartner }: { tradingPartner: TradingPartner }) 
     <dl className="flex flex-col gap-4">
       <Fact label={t('fields.name.label')}>{tradingPartner.name}</Fact>
       <Fact label={t('fields.gln.label')}>
-        <span className="font-mono tabular-nums">{tradingPartner.gln}</span>
+        <PartnerGln gln={tradingPartner.gln} label="outside" />
       </Fact>
       <Fact label={t('fields.characterSet.label')}>
         {t(`characterSets.${tradingPartner.characterSet}`)}

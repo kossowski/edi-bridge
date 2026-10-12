@@ -11,6 +11,7 @@ import type { ReactNode } from 'react'
 import { AppPage } from '@/components/app-page'
 import { ListEmpty, NewLink } from '@/components/list-table'
 import { LoadError } from '@/components/load-error'
+import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import { partnerSetup } from '@/components/trading-partners/partner-setup'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
 import {
@@ -112,8 +113,8 @@ function PartnerCard({
           <h2 className="min-w-0 break-words">{tradingPartner.name}</h2>
           <TestModeBadge testMode={tradingPartner.testMode} />
         </CardTitle>
-        <CardDescription className="font-mono text-xs tabular-nums">
-          {tradingPartner.gln}
+        <CardDescription className="text-xs">
+          <PartnerGln gln={tradingPartner.gln} />
         </CardDescription>
         <CardAction>
           <Link

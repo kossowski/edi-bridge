@@ -92,6 +92,16 @@ export const Results = meta.story({
   },
 })
 
+export const PartnerWithoutGln = meta.story({
+  async play({ canvas }) {
+    const dialog = await openPalette(canvas)
+
+    await userEvent.type(dialog.getByRole('combobox'), 'ostsee')
+    const partner = await dialog.findByRole('option', { name: /^Ostsee Feinkost GmbH/ })
+    await expect(within(partner).getByText('GLN not added yet')).toBeVisible()
+  },
+})
+
 export const KeyboardShortcut = meta.story({
   async play({ canvas }) {
     await canvas.findByRole('button', { name: searchButton })
