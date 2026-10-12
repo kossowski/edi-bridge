@@ -3401,6 +3401,67 @@
       "unused": "Noch kein Beleg verwendet sie. Fügen Sie sie mit dem Schritt „Code-Übersetzung“ zu einem Mapping hinzu."
     }
   },
+  "CodeTranslationNew": {
+    "title": "Neue Liste",
+    "intro": "Wählen Sie, was Ihre Partner anders schreiben und wer die Liste erhält. Die Liste beginnt mit vorgeschlagenen Werten, die Sie übernehmen oder ändern.",
+    "kind": {
+      "question": "Was wird anders geschrieben?",
+      "examples": {
+        "units": "Ihr ST wird als PCE gesendet",
+        "countries": "Ihr „Deutschland“ wird als DE gesendet",
+        "addresses": "Die Filialnummer des Partners wird zu Ihrer Adress-ID",
+        "other": "Jeder Wert mit einem festen Gegenstück"
+      }
+    },
+    "receiver": {
+      "question": "Wer erhält sie?",
+      "workspace": {
+        "title": "Jeder Partner",
+        "description": "Jeder Partner erhält die übersetzten Codes."
+      },
+      "tradingPartner": {
+        "title": "Ein Handelspartner",
+        "description": "Nur der gewählte Handelspartner erhält die übersetzten Codes."
+      }
+    },
+    "name": {
+      "tradingPartner": "{kind} für {partner}"
+    },
+    "suggestions": {
+      "title": "Vorgeschlagene Werte",
+      "description": "Übernehmen Sie die passenden Werte, ändern Sie, was der Partner erhält, oder überspringen Sie sie.",
+      "loading": "Vorgeschlagene Werte werden geladen",
+      "none": "Für diese Art gibt es keine Vorschläge. Fügen Sie unten eigene Werte hinzu.",
+      "done": "Sie haben alle Vorschläge durchgesehen.",
+      "row": "Vorschlag {code}",
+      "sendAs": "{code} senden als",
+      "accept": "Übernehmen: {code}",
+      "acceptShort": "Übernehmen",
+      "skip": "Überspringen: {code}",
+      "skipShort": "Überspringen",
+      "skipped": "{code} übersprungen.",
+      "skippedCount": "{count, plural, one {# Vorschlag übersprungen} other {# Vorschläge übersprungen}}",
+      "showSkipped": "Wieder anzeigen",
+      "error": {
+        "title": "Vorschläge nicht verfügbar",
+        "description": "Die vorgeschlagenen Werte konnten nicht geladen werden. Versuchen Sie es erneut oder fügen Sie eigene Werte hinzu.",
+        "retry": "Erneut versuchen"
+      }
+    },
+    "values": {
+      "title": "Werte in der neuen Liste",
+      "empty": "Noch keine Werte. Übernehmen Sie einen Vorschlag oder fügen Sie eigene hinzu.",
+      "added": "{code} hinzugefügt.",
+      "removed": "{code} entfernt."
+    },
+    "create": {
+      "summary": "Legt <strong>{name}</strong> mit {count, plural, =0 {keinen Werten} one {# Wert} other {# Werten}} an.",
+      "pendingLeftOut": "{count, plural, one {# Vorschlag, den Sie nicht übernommen haben, bleibt außen vor.} other {# Vorschläge, die Sie nicht übernommen haben, bleiben außen vor.}}",
+      "submit": "Liste anlegen",
+      "creating": "Wird angelegt…",
+      "failed": "Die Liste konnte nicht angelegt werden. Versuchen Sie es erneut."
+    }
+  },
   "CodeTranslations": {
     "intro": "Werte, die Ihre Partner anders schreiben als Ihr ERP, gruppiert danach, wer sie erhält.",
     "summary": "{count, plural, one {# Liste} other {# Listen}}",
@@ -3451,13 +3512,10 @@
   },
   "LookupTables": {
     "form": {
-      "createTitle": "Neue Liste",
-      "createDescription": "Benennen Sie die Liste und wählen Sie, wer sie erhält. Die Werte fügen Sie danach hinzu.",
       "editTitle": "{name} bearbeiten",
       "editDescription": "Benennen Sie die Liste um oder ändern Sie, wer sie erhält. Die Werte bleiben unverändert.",
       "close": "Schließen",
       "cancel": "Abbrechen",
-      "create": "Liste anlegen",
       "save": "Speichern",
       "saving": "Wird gespeichert…",
       "fields": {

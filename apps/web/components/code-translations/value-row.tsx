@@ -62,7 +62,7 @@ export function SentAs({ direction }: { direction: Direction }) {
   )
 }
 
-function CodeInput({
+export function CodeInput({
   label,
   labelVisible,
   value,
@@ -305,6 +305,7 @@ export type AddDraft = { key: number; sourceCode: string }
 
 export function AddValueForm({
   initial,
+  focusOnOpen = true,
   direction,
   entries,
   suggestionsOf,
@@ -314,6 +315,7 @@ export function AddValueForm({
   onCancel,
 }: {
   initial: AddDraft
+  focusOnOpen?: boolean
   direction: Direction
   entries: ReadonlyArray<LookupTableEntry>
   suggestionsOf: (sourceCode: string) => ReadonlyArray<CodeMeaning>
@@ -341,7 +343,7 @@ export function AddValueForm({
       onSubmit={(event) => validation.submit(event, { sourceCode, targetCode }, onAdd)}>
       <div className="flex flex-wrap items-start gap-2">
         <CodeInput
-          focusFirst={initial.sourceCode === ''}
+          focusFirst={focusOnOpen && initial.sourceCode === ''}
           label={t('source', { direction })}
           labelVisible
           problem={messages.sourceCode}
@@ -353,7 +355,7 @@ export function AddValueForm({
           <SentAs direction={direction} />
         </span>
         <CodeInput
-          focusFirst={initial.sourceCode !== ''}
+          focusFirst={focusOnOpen && initial.sourceCode !== ''}
           label={t('target', { direction })}
           labelVisible
           problem={messages.targetCode}

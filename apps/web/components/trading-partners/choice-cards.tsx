@@ -40,13 +40,13 @@ function ChoiceCard({
 export function ChoiceCards<Value extends string>({
   id: groupId,
   label,
+  labelledBy,
   value,
   items,
   error = null,
   onChange,
-}: {
+}: ({ label: string; labelledBy?: never } | { label?: never; labelledBy: string }) & {
   id?: string
-  label: string
   value: Value | null
   items: ReadonlyArray<Choice<Value>>
   error?: string | null
@@ -56,13 +56,15 @@ export function ChoiceCards<Value extends string>({
 
   return (
     <div id={groupId} className="flex flex-col gap-2">
-      <span id={`${id}-label`} className="text-sm font-medium">
-        {label}
-      </span>
+      {label && (
+        <span id={`${id}-label`} className="text-sm font-medium">
+          {label}
+        </span>
+      )}
       <RadioGroup
         value={value}
         aria-describedby={error ? `${id}-error` : undefined}
-        aria-labelledby={`${id}-label`}
+        aria-labelledby={labelledBy ?? `${id}-label`}
         className="flex flex-col gap-2"
         onValueChange={(next) => {
           const item = items.find((candidate) => candidate.value === next)

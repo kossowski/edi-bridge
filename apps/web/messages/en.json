@@ -3401,6 +3401,67 @@
       "unused": "No document uses it yet. Add it to a mapping with the “Code translation” step."
     }
   },
+  "CodeTranslationNew": {
+    "title": "New list",
+    "intro": "Choose what your partners write differently and who receives it. The list starts with suggested values that you accept or change.",
+    "kind": {
+      "question": "What is written differently?",
+      "examples": {
+        "units": "Your ST is sent as PCE",
+        "countries": "Your “Deutschland” is sent as DE",
+        "addresses": "Their store number becomes your address ID",
+        "other": "Any value with a fixed counterpart"
+      }
+    },
+    "receiver": {
+      "question": "Who receives it?",
+      "workspace": {
+        "title": "Every partner",
+        "description": "Every partner gets the translated codes."
+      },
+      "tradingPartner": {
+        "title": "One trading partner",
+        "description": "Only the chosen trading partner gets the translated codes."
+      }
+    },
+    "name": {
+      "tradingPartner": "{kind} for {partner}"
+    },
+    "suggestions": {
+      "title": "Suggested values",
+      "description": "Accept the values that fit, change what the partner gets, or skip them.",
+      "loading": "Loading suggested values",
+      "none": "There are no suggestions for this kind. Add your own values below.",
+      "done": "You have gone through every suggestion.",
+      "row": "Suggestion {code}",
+      "sendAs": "Send {code} as",
+      "accept": "Accept {code}",
+      "acceptShort": "Accept",
+      "skip": "Skip {code}",
+      "skipShort": "Skip",
+      "skipped": "{code} skipped.",
+      "skippedCount": "{count, plural, one {# suggestion skipped} other {# suggestions skipped}}",
+      "showSkipped": "Show again",
+      "error": {
+        "title": "Suggestions unavailable",
+        "description": "The suggested values could not be loaded. Try again, or add your own values.",
+        "retry": "Try again"
+      }
+    },
+    "values": {
+      "title": "Values in the new list",
+      "empty": "No values yet. Accept a suggestion or add your own.",
+      "added": "{code} added.",
+      "removed": "{code} removed."
+    },
+    "create": {
+      "summary": "Creates <strong>{name}</strong> with {count, plural, =0 {no values} one {# value} other {# values}}.",
+      "pendingLeftOut": "{count, plural, one {# suggestion you have not accepted is left out.} other {# suggestions you have not accepted are left out.}}",
+      "submit": "Create list",
+      "creating": "Creating…",
+      "failed": "The list could not be created. Try again."
+    }
+  },
   "CodeTranslations": {
     "intro": "Values your partners write differently than your ERP, grouped by who receives them.",
     "summary": "{count, plural, one {# list} other {# lists}}",
@@ -3451,13 +3512,10 @@
   },
   "LookupTables": {
     "form": {
-      "createTitle": "New list",
-      "createDescription": "Name the list and choose who receives it. You add the values afterwards.",
       "editTitle": "Edit {name}",
       "editDescription": "Rename the list or change who receives it. The values stay as they are.",
       "close": "Close",
       "cancel": "Cancel",
-      "create": "Create list",
       "save": "Save",
       "saving": "Saving…",
       "fields": {

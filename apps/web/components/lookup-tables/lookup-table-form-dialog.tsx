@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { type FormEvent, type RefObject, useId, useRef, useState } from 'react'
 
-import { RadioField, SelectField, TextField } from '@/components/form-field'
+import { RadioField, TextField } from '@/components/form-field'
 import {
   type LookupTableField,
   type LookupTableFieldError,
@@ -15,9 +15,9 @@ import {
   validateLookupTableForm,
 } from '@/components/lookup-tables/lookup-table-form-values'
 import { scopeKey } from '@/components/lookup-tables/lookup-table-scope'
-import { useLookup } from '@/hooks/use-lookup'
-import { createLookupTable, isConflict, updateLookupTable } from '@/lib/api/client'
-import { lookupTableQuery, storeSavedLookupTable, tradingPartnersQuery } from '@/lib/api/queries'
+import { TradingPartnerChoice } from '@/components/lookup-tables/trading-partner-choice'
+import { isConflict, updateLookupTable } from '@/lib/api/client'
+import { lookupTableQuery, storeSavedLookupTable } from '@/lib/api/queries'
 import { lookupTableInputSchema } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
@@ -43,61 +43,11 @@ function useFieldErrorMessage() {
       : t(`required.${field}`)
 }
 
-function TradingPartnerChoice({
-  id,
-  value,
-  error,
-  onChange,
-}: {
-  id: string
-  value: string | null
-  error: string | null
-  onChange: (tradingPartnerId: string) => void
-}) {
-  const t = useTranslations('LookupTables.form.fields.tradingPartner')
-  const tradingPartners = useLookup(tradingPartnersQuery)
-
-  if (tradingPartners.isError) {
-    return (
-      <div className="flex flex-col items-start gap-2">
-        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
-          {t('error')}
-        </p>
-        <Button size="sm" variant="outline" onClick={() => void tradingPartners.refetch()}>
-          {t('retry')}
-        </Button>
-      </div>
-    )
-  }
-
-  if (tradingPartners.data?.length === 0) {
-    return <p className="text-muted-foreground rounded-lg border p-3 text-sm">{t('empty')}</p>
-  }
-
-  return (
-    <SelectField
-      id={id}
-      description={t('description')}
-      error={error}
-      items={(tradingPartners.data ?? []).map((tradingPartner) => ({
-        value: tradingPartner.id,
-        label: tradingPartner.name,
-      }))}
-      label={t('label')}
-      loading={tradingPartners.isPending}
-      placeholder={tradingPartners.isPending ? t('loading') : t('placeholder')}
-      value={value}
-      className="w-full"
-      onChange={onChange}
-    />
-  )
-}
-
 function LookupTableForm({
   table,
   onSaved,
 }: {
-  table: LookupTableSummary | null
+  table: LookupTableSummary
   onSaved: (saved: LookupTable) => void
 }) {
   const t = useTranslations('LookupTables.form')
@@ -106,19 +56,13 @@ function LookupTableForm({
   const baseId = useId()
   const formRef = useRef<HTMLFormElement>(null)
 
-  const [values, setValues] = useState<LookupTableFormValues>(() =>
-    toFormValues(table ?? undefined),
-  )
+  const [values, setValues] = useState<LookupTableFormValues>(() => toFormValues(table))
 
   const [submitted, setSubmitted] = useState(false)
   const [taken, setTaken] = useState<{ name: string; scope: string } | null>(null)
 
   const save = useMutation({
     mutationFn: async (settings: LookupTableSettings) => {
-      if (!table) {
-        return createLookupTable({ ...settings, kind: 'other', entries: [] })
-      }
-
       const { entries } = await queryClient.fetchQuery({
         ...lookupTableQuery(table.id),
         staleTime: 0,
@@ -227,7 +171,7 @@ function LookupTableForm({
       <DialogFooter>
         <DialogClose render={<Button variant="outline" />}>{t('cancel')}</DialogClose>
         <Button disabled={save.isPending} type="submit">
-          {save.isPending ? t('saving') : table ? t('save') : t('create')}
+          {save.isPending ? t('saving') : t('save')}
         </Button>
       </DialogFooter>
     </form>
@@ -253,14 +197,10 @@ export function LookupTableFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent closeLabel={t('close')} finalFocus={finalFocus} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {table ? t('editTitle', { name: table.name }) : t('createTitle')}
-          </DialogTitle>
-          <DialogDescription>
-            {table ? t('editDescription') : t('createDescription')}
-          </DialogDescription>
+          <DialogTitle>{table && t('editTitle', { name: table.name })}</DialogTitle>
+          <DialogDescription>{t('editDescription')}</DialogDescription>
         </DialogHeader>
-        <LookupTableForm key={table?.id ?? 'new'} table={table} onSaved={onSaved} />
+        {table && <LookupTableForm key={table.id} table={table} onSaved={onSaved} />}
       </DialogContent>
     </Dialog>
   )

@@ -47,10 +47,6 @@ describe('validateLookupTableForm', () => {
 })
 
 describe('toFormValues', () => {
-  it('starts a new table in the Workspace', () => {
-    expect(toFormValues()).toEqual({ name: '', scopeKind: 'workspace', tradingPartnerId: null })
-  })
-
   it('takes the Trading Partner of a scoped table', () => {
     expect(
       toFormValues({

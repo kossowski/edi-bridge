@@ -55,10 +55,10 @@ export function validateLookupTableForm(values: LookupTableFormValues): LookupTa
   }
 }
 
-export function toFormValues(table?: LookupTableSummary): LookupTableFormValues {
+export function toFormValues(table: LookupTableSummary): LookupTableFormValues {
   return {
-    name: table?.name ?? '',
-    scopeKind: table?.scope.kind ?? 'workspace',
-    tradingPartnerId: table?.scope.kind === 'tradingPartner' ? table.scope.tradingPartner.id : null,
+    name: table.name,
+    scopeKind: table.scope.kind,
+    tradingPartnerId: table.scope.kind === 'tradingPartner' ? table.scope.tradingPartner.id : null,
   }
 }
