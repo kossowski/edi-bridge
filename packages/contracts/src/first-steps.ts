@@ -1,8 +1,9 @@
 import { z } from 'zod'
 
+import { onboardingChecklist, type TradingPartner } from './trading-partner'
+
 import type { Channel } from './channel'
 import type { Endpoint } from './endpoint'
-import type { TradingPartner } from './trading-partner'
 
 export const firstStepIds = [
   'gln',
@@ -68,9 +69,6 @@ function onboardingTarget(tradingPartner: OnboardingPartner | undefined) {
     : ({ kind: 'newTradingPartner' } as const)
 }
 
-const testSent = ({ testMode, onboarding }: OnboardingPartner) =>
-  !testMode || onboarding.testInterchangeSentAt !== null
-
 export function firstStepsOf({
   gln,
   channels,
@@ -82,6 +80,11 @@ export function firstStepsOf({
   tradingPartners: ReadonlyArray<OnboardingPartner>
   publishedMappingVersions: number
 }): FirstSteps {
+  const testSent = (tradingPartner: OnboardingPartner) =>
+    onboardingChecklist(tradingPartner, gln).some(
+      ({ step, state }) => step === 'testInterchange' && state === 'done',
+    )
+
   const inTestMode = tradingPartners.filter(({ testMode }) => testMode)
   const awaitingTest = inTestMode.find((tradingPartner) => !testSent(tradingPartner))
   const tested = inTestMode.find(testSent)
@@ -119,6 +122,6 @@ export function firstStepsProgress({ steps }: FirstSteps) {
     done: steps.filter(({ done }) => done).length,
     total: steps.length,
     next: steps.find(({ done }) => !done)?.id,
-    setUp: steps.some(({ id, done }) => id === 'tradingPartner' && done),
+    hasTradingPartner: steps.some(({ id, done }) => id === 'tradingPartner' && done),
   }
 }

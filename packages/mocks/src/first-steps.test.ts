@@ -60,13 +60,18 @@ describe('GET /workspaces/current/first-steps', () => {
   it('finds every step done in the seeded Workspace', async () => {
     server.use(firstStepsHandler(apiUrl))
 
-    expect(await progress()).toEqual({ done: 6, total: 6, next: undefined, setUp: true })
+    expect(await progress()).toEqual({
+      done: 6,
+      total: 6,
+      next: undefined,
+      hasTradingPartner: true,
+    })
   })
 
   it('leaves every step open in a fresh Workspace', async () => {
     server.use(firstStepsHandler(apiUrl, 'fresh'))
 
-    expect(await progress()).toEqual({ done: 0, total: 6, next: 'gln', setUp: false })
+    expect(await progress()).toEqual({ done: 0, total: 6, next: 'gln', hasTradingPartner: false })
   })
 
   it('stops at the first Mapping in a partly set-up Workspace', async () => {
@@ -74,7 +79,12 @@ describe('GET /workspaces/current/first-steps', () => {
 
     const steps = await getFirstSteps()
 
-    expect(firstStepsProgress(steps)).toEqual({ done: 3, total: 6, next: 'mapping', setUp: true })
+    expect(firstStepsProgress(steps)).toEqual({
+      done: 3,
+      total: 6,
+      next: 'mapping',
+      hasTradingPartner: true,
+    })
     expect(steps.steps[4].target.kind).toBe('tradingPartner')
   })
 
@@ -126,7 +136,7 @@ describe('GET /workspaces/current/first-steps', () => {
       ).json(),
     )
 
-    expect(await progress()).toMatchObject({ done: 3, next: 'mapping', setUp: true })
+    expect(await progress()).toMatchObject({ done: 3, next: 'mapping', hasTradingPartner: true })
 
     const mappingId = seedMappingDrafts[0]!.id
 
@@ -144,6 +154,11 @@ describe('GET /workspaces/current/first-steps', () => {
     expect(await progress()).toMatchObject({ done: 5, next: 'production' })
 
     await send('POST', toPath(switchToProductionEndpoint.path, { id }))
-    expect(await progress()).toEqual({ done: 6, total: 6, next: undefined, setUp: true })
+    expect(await progress()).toEqual({
+      done: 6,
+      total: 6,
+      next: undefined,
+      hasTradingPartner: true,
+    })
   })
 })

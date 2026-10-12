@@ -25,7 +25,10 @@ const tested = {
 const live = {
   id: '10000000-0000-4000-8000-000000000003',
   testMode: false,
-  onboarding: notStarted,
+  onboarding: {
+    testInterchangeSentAt: '2026-10-01T09:12:00.000Z',
+    contrlReceivedAt: '2026-10-01T09:14:30.000Z',
+  },
 }
 
 const fresh = { gln: null, channels: [], tradingPartners: [], publishedMappingVersions: 0 }
@@ -70,6 +73,17 @@ describe('firstStepsOf', () => {
     expect(steps.steps[5].target).toEqual({ kind: 'tradingPartner', tradingPartnerId: tested.id })
   })
 
+  it('counts the test as sent by the same rule as the onboarding checklist', () => {
+    const steps = firstStepsOf({
+      gln,
+      channels: [erpChannel],
+      tradingPartners: [{ ...live, onboarding: notStarted }],
+      publishedMappingVersions: 1,
+    })
+
+    expect(doneOf(steps)).toMatchObject({ testInterchange: false, production: true })
+  })
+
   it('treats a live Trading Partner as tested and live', () => {
     const steps = firstStepsOf({
       gln,
@@ -88,12 +102,12 @@ describe('firstStepsProgress', () => {
       firstStepsProgress(
         firstStepsOf({ ...fresh, gln, channels: [erpChannel], tradingPartners: [awaitingTest] }),
       ),
-    ).toEqual({ done: 3, total: 6, next: 'mapping', setUp: true })
+    ).toEqual({ done: 3, total: 6, next: 'mapping', hasTradingPartner: true })
     expect(firstStepsProgress(firstStepsOf(fresh))).toEqual({
       done: 0,
       total: 6,
       next: 'gln',
-      setUp: false,
+      hasTradingPartner: false,
     })
   })
 })

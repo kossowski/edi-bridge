@@ -90,7 +90,7 @@ export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWind
   const home = useQuery(homeQuery(timeWindow))
   const firstSteps = useQuery(firstStepsQuery)
   const setup = firstSteps.data && firstStepsProgress(firstSteps.data)
-  const leaving = setup?.setUp === false
+  const leaving = setup?.hasTradingPartner === false
   const deciding = firstSteps.isPending || leaving
 
   useEffect(() => {
@@ -164,7 +164,7 @@ export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWind
             'flex flex-col gap-6',
             isPlaceholderData && 'opacity-60 transition-opacity',
           )}>
-          {setup?.setUp && setup.done < setup.total && (
+          {setup?.hasTradingPartner && setup.done < setup.total && (
             <HomeSetupLink done={setup.done} total={setup.total} />
           )}
           <HomeKeyNumbers
