@@ -117,7 +117,7 @@ export const NoDataFormat = meta.story({
     )
     await expect(canvas.getByRole('link', { name: 'Add a data format' })).toHaveAttribute(
       'href',
-      '/document-structures/new',
+      '/data-formats/new',
     )
     await expect(canvas.getByRole('button', { name: button })).not.toHaveAttribute('aria-disabled')
   },
