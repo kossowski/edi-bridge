@@ -1,5 +1,6 @@
+import { http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, userEvent, waitFor } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
@@ -19,7 +20,8 @@ import { viewerStory } from '@/components/session/session-story-helpers'
 import { laptop } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { createHandlers } from '@edi-bridge/mocks'
+import { mappingVersionsEndpoint, type MappingVersionEntry } from '@edi-bridge/contracts'
+import { createHandlers, createMappingVersions } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -227,6 +229,73 @@ export const DropTransform = meta.story({
     await expect(Math.abs(header.left + header.width / 2 - at.clientX)).toBeLessThan(header.width)
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
     await expectTransformCount(canvasElement, 1)
+  },
+})
+
+const changedOutbound = { ...outbound, unpublishedChanges: true }
+
+const partners = [
+  'Nordwind',
+  'Alpenfrisch',
+  'Elbtal',
+  'Rheinkauf',
+  'Hansemarkt',
+  'Ostsee',
+  'Moselland',
+  'Isartal',
+]
+
+const manyFlows: MappingVersionEntry[] = createMappingVersions([changedOutbound]).map(
+  ({ id, mappingId, mappingName, version, publishedAt, changeNote, publishedBy }) => ({
+    id,
+    mappingId,
+    mappingName,
+    version,
+    publishedAt,
+    changeNote,
+    publishedBy,
+    flows:
+      version === changedOutbound.latestVersion
+        ? partners.map((partner) => ({
+            id: crypto.randomUUID(),
+            name: 'Despatch advice by AS2',
+            tradingPartner: {
+              id: crypto.randomUUID(),
+              name: `${partner} Großhandel GmbH & Co. KG`,
+            },
+          }))
+        : [],
+  }),
+)
+
+export const PublishManyRoutes = meta.story({
+  ...laptop,
+  args: { id: changedOutbound.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${mappingVersionsEndpoint.path}`, () => HttpResponse.json(manyFlows)),
+      ...createHandlers(apiUrl, { mappingDrafts: [changedOutbound] }),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: /^Publish/ }))
+
+    const dialog = await page(canvasElement).findByRole('dialog', { name: /^Publish Version/ })
+
+    await expect(
+      await within(dialog).findByText('8 document routes keep their versions until you move them.'),
+    ).toBeInTheDocument()
+    await expect(dialog.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight)
+
+    const last = within(dialog).getAllByRole('checkbox').at(-1)!
+
+    last.focus()
+    await userEvent.keyboard(' ')
+    await expect(last).toBeChecked()
+    await expect(last).toBeVisible()
+    await expect(
+      within(dialog).getByText('7 document routes keep their versions until you move them.'),
+    ).toBeInTheDocument()
   },
 })
 
