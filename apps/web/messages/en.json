@@ -783,6 +783,7 @@
     "tabs": {
       "label": "Partner sections",
       "overview": "Overview",
+      "documents": "Documents",
       "connections": "Connections",
       "settings": "Settings"
     },
@@ -827,7 +828,7 @@
       "actions": {
         "identity": "Record your company's GLN",
         "connections": "Add a connection",
-        "documents": "Add a document route",
+        "documents": "Add a document type",
         "testInterchange": "Send a test document",
         "sending": "Sending…",
         "resend": "Send the test again",
@@ -880,6 +881,48 @@
       "openInterchange": "Open transmission {controlReference}",
       "more": "Showing {shown} of {total}.",
       "showAll": "Show all documents that need attention"
+    },
+    "documents": {
+      "loading": "Loading the document types",
+      "error": {
+        "title": "Document types unavailable",
+        "description": "The document types could not be loaded. Try again.",
+        "retry": "Try again"
+      },
+      "title": "Documents you exchange with {name}",
+      "description": "Each document type travels on its own <term>document route</term>: the connections it arrives and leaves on, and the mapping that translates it.",
+      "list": "Document types with {name}",
+      "add": "Add a document type",
+      "empty": {
+        "title": "No document types yet",
+        "description": "Add the first one, for example the purchase orders {name} sends you.",
+        "viewOnlyDescription": "Document types appear here once an Admin adds one."
+      },
+      "way": {
+        "inbound": "{name} sends these to you",
+        "outbound": "You send these to {name}"
+      },
+      "route": "Document route",
+      "connections": "Connections",
+      "connectionPath": "From <from></from> to <to></to>",
+      "unknownChannel": "an unknown connection",
+      "mapping": "Mapping",
+      "mappingVersion": "<link>{mapping}</link>, version {version}",
+      "newer": {
+        "available": "{count, plural, one {A newer version of the mapping is available: version {latest}.} other {# newer versions of the mapping are available, up to version {latest}.}}",
+        "kept": "Documents keep using version {version} until you move them."
+      },
+      "move": {
+        "button": "Move to version {version}",
+        "for": "for {route}",
+        "title": "Move to version {version} of {mapping}?",
+        "description": "{route} uses version {current} today. Documents that arrive after the move use version {version}. Documents already processed keep the version they used.",
+        "confirm": "Move to version {version}",
+        "cancel": "Cancel",
+        "pending": "Moving…",
+        "failed": "The document route could not be moved. Try again.",
+        "done": "{route} now uses version {version}."
+      }
     },
     "settings": {
       "title": "Partner details",
@@ -959,6 +1002,70 @@
             "hint": "Check the address. If it is right, ask the other side's IT team to look at their server's log."
           }
         }
+      }
+    },
+    "addDocument": {
+      "title": "Add a document type",
+      "description": "Answer three questions: which document, which connection, and which mapping translates it.",
+      "close": "Close",
+      "document": {
+        "label": "Which document?",
+        "inbound": "{name} sends these to you.",
+        "outbound": "You send these to {name}.",
+        "existing": "Already set up"
+      },
+      "connection": {
+        "label": {
+          "inbound": "Where do they arrive from {name}?",
+          "outbound": "Where do they leave to {name}?"
+        },
+        "none": {
+          "inbound": "No connection receives documents from {name} yet. Add one first, then add the document type.",
+          "outbound": "No connection sends documents to {name} yet. Add one first, then add the document type."
+        },
+        "add": "Add a connection",
+        "own": {
+          "label": {
+            "inbound": "Which of your systems receives them?",
+            "outbound": "Which of your systems do they come from?"
+          },
+          "only": {
+            "inbound": "They go on to your systems through {channel}.",
+            "outbound": "They come from your systems through {channel}."
+          },
+          "none": {
+            "inbound": "None of your systems can receive these documents yet. Add a connection under <link>All connections</link>.",
+            "outbound": "None of your systems can send these documents yet. Add a connection under <link>All connections</link>."
+          }
+        }
+      },
+      "mapping": {
+        "label": "Which mapping translates them?",
+        "loading": "Loading the mappings…",
+        "failed": "The mappings could not be loaded. You can still create a new one with AI.",
+        "ai": {
+          "title": "Create a new one with AI",
+          "description": "The AI drafts the mapping from an example document. You review and publish it before any document uses it."
+        }
+      },
+      "routeName": {
+        "inbound": "{document} from {name}",
+        "outbound": "{document} to {name}"
+      },
+      "create": "Add document type",
+      "creating": "Adding…",
+      "createMapping": "Create the mapping",
+      "creatingMapping": "Creating…",
+      "cancel": "Cancel",
+      "added": "{document} are now set up with {name}.",
+      "failed": "The document type could not be added. Try again.",
+      "mappingFailed": "The mapping could not be created. Try again.",
+      "noDataFormat": "Your Workspace has no data format to translate to yet. Add one first, then create the mapping.",
+      "drafting": {
+        "created": "The mapping {mapping} is created.",
+        "next": "The AI drafts it in the mapping editor from an example document. Once you have reviewed and published it, add “{document}” here again and choose the mapping.",
+        "open": "Open the mapping and draft with AI",
+        "done": "Done"
       }
     },
     "addConnection": {

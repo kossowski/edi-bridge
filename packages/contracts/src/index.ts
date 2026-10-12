@@ -197,6 +197,7 @@ export {
   flowsEndpoint,
   type FlowUpdate,
   flowUpdateSchema,
+  maxFlowNameLength,
   type MoveFlowMappingVersionBody,
   moveFlowMappingVersionBodySchema,
   moveFlowMappingVersionEndpoint,

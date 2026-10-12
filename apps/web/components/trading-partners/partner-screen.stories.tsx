@@ -2,12 +2,18 @@ import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
-import type { StoryContext } from '@storybook/nextjs-vite'
-
-import { AppHeader } from '@/components/app-header'
-import { sessionHandlers } from '@/components/session/session-story-helpers'
 import { darkMode, german } from '@/components/story-helpers'
 import { PartnerScreen } from '@/components/trading-partners/partner-screen'
+import {
+  asViewer,
+  at,
+  awaiting,
+  confirmed,
+  live,
+  sheetOf,
+  untouched,
+  withPartnerFrame,
+} from '@/components/trading-partners/partner-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   channelsEndpoint,
@@ -24,25 +30,11 @@ import {
   createOverviewData,
   createWorkspace,
   seedTradingPartners,
-  showcaseViewerSession,
   tradingPartnerActivityHandlers,
   tradingPartnerHandlers,
 } from '@edi-bridge/mocks'
-import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
 
 import preview from '../../.storybook/preview'
-
-function seeded(name: string) {
-  return seedTradingPartners.find((tradingPartner) => tradingPartner.name === name)!
-}
-
-const live = seeded('Hansemarkt GmbH')
-
-const confirmed = seeded('Spreewald Frische GmbH')
-
-const awaiting = seeded('Bodensee Handelshaus AG')
-
-const untouched = seeded('Mainfranken Getränke GmbH')
 
 const readyForTest: TradingPartner = {
   ...confirmed,
@@ -68,32 +60,6 @@ const largeFlows = [
   ).values(),
 ]
 
-function at(tradingPartner: TradingPartner, tab?: string) {
-  return {
-    args: { id: tradingPartner.id },
-    parameters: {
-      nextjs: {
-        navigation: {
-          pathname: `/trading-partners/${tradingPartner.id}`,
-          query: tab ? { tab } : {},
-        },
-      },
-    },
-  }
-}
-
-function asViewer(play: (context: StoryContext) => Promise<void>) {
-  return {
-    beforeEach({ msw }: StoryContext) {
-      msw.use(...sessionHandlers(showcaseViewerSession))
-    },
-    async play(context: StoryContext) {
-      await expect(await context.canvas.findByText('View only')).toBeVisible()
-      await play(context)
-    },
-  }
-}
-
 function region(canvasElement: HTMLElement, name: string | RegExp) {
   return within(within(canvasElement).getByRole('region', { name }))
 }
@@ -104,28 +70,11 @@ async function connectionItem(canvasElement: HTMLElement, list: string, way: str
   return within(items.getByText(way).closest('li')!)
 }
 
-// Waits out the opening fade, so visibility checks see the settled sheet.
-async function sheetOf(canvasElement: HTMLElement, name = 'Add a connection') {
-  const element = await within(canvasElement.ownerDocument.body).findByRole('dialog', { name })
-  await waitFor(() => expect(element).toBeVisible())
-
-  return element
-}
-
 const meta = preview.meta({
   title: 'Trading Partners/PartnerScreen',
   component: PartnerScreen,
   parameters: { layout: 'fullscreen' },
-  decorators: [
-    (Story) => (
-      <SidebarProvider>
-        <div className="w-full">
-          <AppHeader />
-          <Story />
-        </div>
-      </SidebarProvider>
-    ),
-  ],
+  decorators: [withPartnerFrame],
   beforeEach({ msw }) {
     msw.use(...createHandlers(apiUrl))
   },
@@ -350,7 +299,7 @@ export const ChooseSettingsTab = meta.story({
 })
 
 export const UnknownTabShowsOverview = meta.story({
-  ...at(live, 'documents'),
+  ...at(live, 'archive'),
   async play({ canvas }) {
     await expect(await canvas.findByRole('tab', { name: 'Overview' })).toHaveAttribute(
       'aria-selected',
@@ -549,6 +498,7 @@ export const Connections = meta.story({
     )
     await expect(canvas.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Overview',
+      'Documents',
       'Connections',
       'Settings',
     ])

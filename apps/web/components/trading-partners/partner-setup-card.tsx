@@ -55,6 +55,7 @@ type SetupContext = {
   canChange: boolean
   onLive: () => void
   onAddConnection: () => void
+  onAddDocument: () => void
 }
 
 const stepBadges = {
@@ -228,8 +229,10 @@ function Confirmed({ tradingPartner }: { tradingPartner: TradingPartner }) {
 
 function StepAction({ item, context }: { item: PartnerSetupItem; context: SetupContext }) {
   const t = useTranslations('TradingPartner.setup')
-  const { tradingPartner, workspaceGln, canChange, onLive, onAddConnection } = context
   const { step, action } = item
+
+  const { tradingPartner, workspaceGln, canChange, onLive, onAddConnection, onAddDocument } =
+    context
 
   const viewOnly = (
     <p className="text-sm">{step === 'identity' ? t('viewOnly.identity') : t('viewOnly.other')}</p>
@@ -248,6 +251,14 @@ function StepAction({ item, context }: { item: PartnerSetupItem; context: SetupC
       return canChange ? (
         <Button size="sm" className="w-fit" onClick={onAddConnection}>
           {t('actions.connections')}
+        </Button>
+      ) : (
+        viewOnly
+      )
+    case 'addDocument':
+      return canChange ? (
+        <Button size="sm" className="w-fit" onClick={onAddDocument}>
+          {t('actions.documents')}
         </Button>
       ) : (
         viewOnly
@@ -363,7 +374,8 @@ export function PartnerSetupCard({
   tradingPartner,
   activity,
   onAddConnection,
-}: PartnerActivityProps & { onAddConnection: () => void }) {
+  onAddDocument,
+}: PartnerActivityProps & { onAddConnection: () => void; onAddDocument: () => void }) {
   const t = useTranslations('TradingPartner.setup')
   const workspace = useQuery(currentWorkspaceQuery)
   const session = useSession()
@@ -423,6 +435,7 @@ export function PartnerSetupCard({
               canChange: session.canChange,
               onLive: () => setWentLive(true),
               onAddConnection,
+              onAddDocument,
             }}
             setup={partnerSetup(tradingPartner, activity, workspaceGln)}
             titleId={titleId}

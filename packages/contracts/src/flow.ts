@@ -15,8 +15,10 @@ export const flowSummarySchema = z.object({
 
 export type FlowSummary = z.infer<typeof flowSummarySchema>
 
+export const maxFlowNameLength = 70
+
 const editableFields = {
-  name: z.string().trim().min(1).max(70),
+  name: z.string().trim().min(1).max(maxFlowNameLength),
   inboundChannelId: z.uuid(),
   destinationChannelId: z.uuid(),
 }

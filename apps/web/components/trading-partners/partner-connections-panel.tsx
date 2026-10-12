@@ -21,12 +21,12 @@ import { Term } from '@/components/term'
 import { AddConnectionSheet } from '@/components/trading-partners/add-connection-sheet'
 import { partnerConnections } from '@/components/trading-partners/partner-connections'
 import { type PartnerPanelProps } from '@/components/trading-partners/partner-page-helpers'
+import { PanelLoading, StatusLine } from '@/components/trading-partners/partner-panel-parts'
 import { useSession } from '@/hooks/use-session'
 import { testChannel } from '@/lib/api/client'
 import { channelsQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { Channel, ChannelTestResult } from '@edi-bridge/contracts'
@@ -189,19 +189,6 @@ function ConnectionSection({
   )
 }
 
-function ConnectionsLoading({ label }: { label: string }) {
-  return (
-    <div aria-busy className="flex flex-col gap-3">
-      <p role="status" className="sr-only">
-        {label}
-      </p>
-      <Skeleton className="h-6 w-48" />
-      <Skeleton className="h-24 w-full rounded-lg" />
-      <Skeleton className="h-24 w-full rounded-lg" />
-    </div>
-  )
-}
-
 export function PartnerConnections({
   tradingPartner,
   addingConnection,
@@ -219,7 +206,7 @@ export function PartnerConnections({
   const canChange = session.canChange
 
   if (channels.isPending) {
-    return <ConnectionsLoading label={t('loading')} />
+    return <PanelLoading label={t('loading')} />
   }
 
   if (channels.isError) {
@@ -256,19 +243,7 @@ export function PartnerConnections({
           term: (chunks) => <Term glossaryKey="channel">{chunks}</Term>,
         })}
         title={t('own.title', { name })}>
-        <p role="status" className="flex items-center gap-2 text-sm empty:hidden">
-          {added && (
-            <>
-              <HugeiconsIcon
-                icon={CheckmarkCircle02Icon}
-                strokeWidth={2}
-                aria-hidden
-                className="text-success-text size-4 shrink-0"
-              />
-              {t('added', { name: added })}
-            </>
-          )}
-        </p>
+        <StatusLine>{added && t('added', { name: added })}</StatusLine>
         {own.length === 0 ? (
           <ListEmpty
             description={t('empty.description', { name })}

@@ -4,16 +4,20 @@
 
 **Blocked by:** 57 (Help & glossary page and plain names)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Cards show the listed facts and only "Open partner" as an action; an empty Workspace gets "Add your first trading partner"
-- [ ] The partner page tabs are kept in the URL (`?tab=`) and render in the header's tab row
-- [ ] Adding a connection creates a Channel for this partner; "Test connection" shows success or a plain error ("Login was rejected …")
-- [ ] Adding a document type creates a Flow; choosing "Create a new one with AI" creates the Mapping and starts its AI draft
-- [ ] A document type with a newer Mapping Version offers to move to it explicitly
-- [ ] Testing partners can send a test document and switch to live only explicitly, after the receipt confirmation arrived
-- [ ] The contracts gain the connection test and the test document; the live API follows in tickets 30 and 42
-- [ ] The current partner list, detail and edit screens and their stories are replaced; the global Channels and Flows screens stay; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Cards show the listed facts and only "Open partner" as an action; an empty Workspace gets "Add your first trading partner"
+- [x] The partner page tabs are kept in the URL (`?tab=`) and render in the header's tab row
+- [x] Adding a connection creates a Channel for this partner; "Test connection" shows success or a plain error ("Login was rejected …")
+- [x] Adding a document type creates a Flow; choosing "Create a new one with AI" creates the Mapping and starts its AI draft
+- [x] A document type with a newer Mapping Version offers to move to it explicitly
+- [x] Testing partners can send a test document and switch to live only explicitly, after the receipt confirmation arrived
+- [x] The contracts gain the connection test and the test document; the live API follows in tickets 30 and 42
+- [x] The current partner list, detail and edit screens and their stories are replaced; the global Channels and Flows screens stay; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #90, #92, #102, #105, #113.
