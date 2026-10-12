@@ -268,7 +268,9 @@ describe('GET /trading-partners/:id/activity', () => {
 
     expect(openProblems).toBe(25)
     expect(problems).toHaveLength(20)
-    expect(problems[0]).toMatchObject({ kind: 'failedRun', run: many[0] })
+    expect(problems.map((problem) => problem.kind === 'failedRun' && problem.run.id)).toEqual(
+      many.slice(0, 20).map(({ id }) => id),
+    )
   })
 
   it('answers 404 for an unknown Trading Partner', async () => {
