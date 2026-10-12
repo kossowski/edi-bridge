@@ -2380,7 +2380,7 @@
       "askOperator": {
         "title": "Ask the Operator to add someone",
         "admin": "The Operator creates the invites and changes roles. Tell the Operator who should join and whether they should be an Admin or a Viewer.",
-        "viewer": "The Operator adds members and changes roles. Ask an admin of your company to contact the Operator."
+        "viewer": "The Operator adds members and changes roles. Ask an Admin of your company to contact the Operator."
       },
       "you": "You",
       "roles": {

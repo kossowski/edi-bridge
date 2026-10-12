@@ -80,41 +80,20 @@ const sandboxAdmin = createWorkspaceMember({
   lastActivityAt: '2026-10-11T09:30:00.000Z',
 })
 
-const team = [
-  createWorkspaceMember({
-    id: 'member-viewer',
-    name: 'Anna Berg',
-    email: 'anna.berg@example.com',
-    role: 'viewer',
-    lastActivityAt: '2026-10-02T14:00:00.000Z',
-  }),
-  sandboxAdmin,
-  createWorkspaceMember({
-    id: 'member-admin',
-    name: 'Zoe Winter',
-    email: 'zoe.winter@example.com',
-    role: 'admin',
-    lastActivityAt: '2026-09-20T08:15:00.000Z',
-  }),
-  createWorkspaceMember({
-    id: 'member-new',
-    name: 'Ben Krause',
-    email: 'ben.krause@example.com',
-    role: 'viewer',
-    lastActivityAt: null,
-  }),
-]
+const [first, second, third] = createWorkspaceMembers({ count: 3 })
+
+const newViewer = createWorkspaceMember({ ...first, role: 'viewer', lastActivityAt: null })
+
+const viewer = createWorkspaceMember({ ...second, role: 'viewer' })
+
+const admin = createWorkspaceMember({ ...third, role: 'admin' })
+
+const team = [viewer, sandboxAdmin, admin, newViewer]
 
 const neverSignedIn = [
   sandboxAdmin,
-  ...['Jonas Petersen', 'Mila Schröder', 'Paul Neumann'].map((name, index) =>
-    createWorkspaceMember({
-      id: `member-invited-${index}`,
-      name,
-      email: `${name.toLowerCase().replace(' ', '.').replace('ö', 'oe')}@example.com`,
-      role: 'viewer',
-      lastActivityAt: null,
-    }),
+  ...createWorkspaceMembers({ count: 3, seed: 7 }).map((member) =>
+    createWorkspaceMember({ ...member, role: 'viewer', lastActivityAt: null }),
   ),
 ]
 
@@ -497,13 +476,13 @@ export const MembersAsAdmin = meta.story({
     await expect(canvas.getByText(/Tell the Operator who should join/)).toBeVisible()
     const rows = await memberRows(canvasElement)
     await expect(rows.map((row) => within(row).getByText(/@/).textContent)).toEqual([
+      admin.email,
       sandboxAdmin.email,
-      'zoe.winter@example.com',
-      'anna.berg@example.com',
-      'ben.krause@example.com',
+      viewer.email,
+      newViewer.email,
     ])
-    await expect(rows[0]).toHaveTextContent(/You.*Admin/)
-    await expect(rows[1]).not.toHaveTextContent('You')
+    await expect(rows[0]).not.toHaveTextContent('You')
+    await expect(rows[1]).toHaveTextContent(/You.*Admin/)
     await expect(rows[2]).toHaveTextContent(/Viewer\s*Active /)
     await expect(rows[3]).toHaveTextContent(/Viewer\s*Never signed in/)
     await expect(canvas.getByText('4 members')).toBeVisible()
@@ -521,7 +500,7 @@ export const MembersAsViewer = meta.story({
     msw.use(...signedInAs(showcaseViewerSession))
   },
   async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByText(/Ask an admin of your company/)).toBeVisible()
+    await expect(await canvas.findByText(/Ask an Admin of your company/)).toBeVisible()
     const rows = await memberRows(canvasElement)
     await expect(rows).toHaveLength(4)
     await expect(rows[0]).toHaveTextContent('Admin')
@@ -643,6 +622,6 @@ export const MembersAsViewerDark = meta.story({
     return darkMode()
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText(/Ask an admin of your company/)).toBeVisible()
+    await expect(await canvas.findByText(/Ask an Admin of your company/)).toBeVisible()
   },
 })
