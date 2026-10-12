@@ -1,14 +1,16 @@
 'use client'
 
-import { ArrowDown01Icon, ArrowUp01Icon, Loading03Icon } from '@hugeicons/core-free-icons'
+import { Loading03Icon, ViewIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useId, useState } from 'react'
 
 import { Loading } from '@/components/detail-parts'
+import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { useGraphText } from '@/components/mappings/graph-text'
 import { documentSize, documentText } from '@/components/mappings/mapping-preview'
+import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useDraftPreview } from '@/components/mappings/use-draft-preview'
 import { mappingSamplesQuery } from '@/lib/api/queries'
 import {
@@ -28,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@edi-bridge/ui/components/select'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@edi-bridge/ui/components/tooltip'
+import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 const views = ['target', 'source'] as const
@@ -198,7 +200,6 @@ function SamplePreview({
           {preview.isSuccess && (updating ? t('updating') : t('upToDate'))}
         </p>
       </div>
-      {/* One Document at a time: the band's column is too narrow for both side by side. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div role="group" aria-label={t('shown')} className="flex flex-wrap gap-1">
           {views.map((view) => (
@@ -276,24 +277,17 @@ function PreviewContent({
   return <SamplePreview draft={draft} sample={sample} samples={samples.data} onChoose={onChoose} />
 }
 
-// Shown beside the Details panel in the band under the canvas, whose toggle it carries: hidden,
-// the band gives its height to the canvas.
-export function MappingPreviewPanel({
+// A modal sheet: the canvas keeps its full width, and the preview opens on the links as they are.
+export function MappingPreviewSheet({
   draft,
-  open,
-  onToggle,
-  controls,
   reviewSampleId = null,
 }: {
   draft: MappingDraft
-  open: boolean
-  onToggle: () => void
-  controls?: string
   reviewSampleId?: string | null
 }) {
   const t = useTranslations('Mapping.preview')
-  // Held here, not in the content, which unmounts while the band is collapsed. An AI review that
-  // opens shows its Sample Document, which the Admin may then change.
+  // Held here, not in the content, which unmounts while the sheet is closed. An AI review that
+  // opens shows its example document, which the Admin may then change.
   const [chosen, setChosen] = useState<string | null>(reviewSampleId)
   const [review, setReview] = useState(reviewSampleId)
 
@@ -305,46 +299,21 @@ export function MappingPreviewPanel({
     }
   }
 
-  const headingId = useId()
-  const contentId = useId()
-  const toggleLabel = open ? t('hide') : t('show')
-
   return (
-    <section
-      aria-labelledby={headingId}
-      className="bg-card @container flex min-h-0 min-w-0 flex-col rounded-lg border">
-      <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 px-4 py-1.5">
-        <h2 id={headingId} className="text-sm font-semibold">
-          {t('title')}
-        </h2>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-controls={controls ? `${controls} ${contentId}` : contentId}
-                aria-expanded={open}
-                className="px-1.5 @sm:px-2.5"
-                onClick={onToggle}
-              />
-            }>
-            <HugeiconsIcon
-              icon={open ? ArrowDown01Icon : ArrowUp01Icon}
-              strokeWidth={2}
-              aria-hidden
-            />
-            <span className="sr-only @sm:not-sr-only">{toggleLabel}</span>
-          </TooltipTrigger>
-          <TooltipContent>{toggleLabel}</TooltipContent>
-        </Tooltip>
-      </div>
-      <div
-        id={contentId}
-        hidden={!open}
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t px-4 py-3">
-        {open && <PreviewContent chosen={chosen} draft={draft} onChoose={setChosen} />}
-      </div>
-    </section>
+    <Sheet>
+      <ToolbarAction
+        icon={<HugeiconsIcon icon={ViewIcon} strokeWidth={2} aria-hidden />}
+        label={t('title')}
+        render={<SheetTrigger render={<Button variant="outline" />} />}
+      />
+      <EditorSheetContent
+        bodyClassName="@container"
+        closeLabel={t('close')}
+        description={t('description')}
+        title={t('title')}
+        className="data-[side=right]:sm:max-w-2xl">
+        <PreviewContent chosen={chosen} draft={draft} onChoose={setChosen} />
+      </EditorSheetContent>
+    </Sheet>
   )
 }

@@ -5,6 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
   detailsPanel,
+  openDetails,
   dragLink,
   findRow,
   findSaveStatus,
@@ -15,6 +16,9 @@ import {
   source,
   target,
   transformNodeOf,
+  expectSavedLinkCount,
+  expectTransformCount,
+  page,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
@@ -80,7 +84,7 @@ async function place(canvasElement: HTMLElement, kind: string, name: string) {
 export const TransformNodes = meta.story({
   args: { id: invoic.id },
   async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByText('9 Transforms')).toBeVisible()
+    await expectTransformCount(canvasElement, 9)
 
     const dateFormat = await findNode(canvasElement, 'Date format 1')
 
@@ -117,7 +121,7 @@ export const TransformNodes = meta.story({
     await userEvent.keyboard('{Escape}')
     await pressOn(filled, '{Enter}')
     await expect(
-      detailsPanel(canvasElement).getByText('Date format 1 (Result) to DTM+137/C507/2380'),
+      (await openDetails(canvasElement)).getByText('Date format 1 (Result) to DTM+137/C507/2380'),
     ).toBeVisible()
   },
 })
@@ -169,7 +173,8 @@ export const PanToWholeNode = meta.story({
 export const PlaceTransform = meta.story({
   args: { id: withoutLinks.id },
   async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByText('No Transforms yet')).toBeVisible()
+    await canvas.findByRole('button', { name: 'Add Date format' })
+    await expectTransformCount(canvasElement, 0)
 
     const header = await place(canvasElement, 'Date format', 'Date format 1')
 
@@ -182,13 +187,13 @@ export const PlaceTransform = meta.story({
       dateFormat.getByRole('button', { name: 'Value input of Date format 1' }),
     ).toHaveAccessibleDescription('Not linked yet.')
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
 
     await expect(panel.getByRole('heading', { name: 'Date format 1' })).toBeVisible()
     await expect(panel.getByRole('textbox', { name: 'From pattern' })).toHaveValue('yyyy-MM-dd')
     await expect(panel.getByRole('textbox', { name: 'To pattern' })).toHaveValue('yyyyMMdd')
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
-    await expect(canvas.getByText('1 Transform')).toBeVisible()
+    await expectTransformCount(canvasElement, 1)
     await waitFor(() => expect(liveStatus(canvasElement)).toHaveTextContent('Date format 1 added.'))
 
     // A second one goes beside or below the first, not on top of it.
@@ -200,7 +205,7 @@ export const PlaceTransform = meta.story({
     await expect(
       first.right <= second.left || second.bottom <= first.top || first.bottom <= second.top,
     ).toBe(true)
-    await expect(await canvas.findByText('2 Transforms')).toBeVisible()
+    await expectTransformCount(canvasElement, 2)
   },
 })
 
@@ -228,7 +233,7 @@ export const ConnectByKeyboard = meta.story({
     await pressOn(output, 'l')
     await expect(output).toHaveAttribute('aria-pressed', 'true')
     await expect(
-      detailsPanel(canvasElement).getByText('Linking from Date format 1 (Result).', {
+      (await openDetails(canvasElement)).getByText('Linking from Date format 1 (Result).', {
         exact: false,
       }),
     ).toBeVisible()
@@ -300,7 +305,7 @@ export const ConnectByMouse = meta.story({
       expect(node(canvasElement, 'Concatenate 1').queryByText(/not linked/)).toBeNull(),
     )
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
-    await expect(canvas.getByText('3 links')).toBeVisible()
+    await expectSavedLinkCount(withoutLinks.id, 3)
   },
 })
 
@@ -311,7 +316,7 @@ export const ConfigureTransform = meta.story({
 
     await userEvent.click(split.getByRole('button', { name: 'Split 1' }))
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
     const separator = panel.getByRole('textbox', { name: 'Separator' })
 
     await expect(separator).toHaveAttribute('aria-invalid', 'true')
@@ -360,7 +365,7 @@ export const EscapeInSettings = meta.story({
 
     await userEvent.click(header)
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
     const separator = panel.getByRole('textbox', { name: 'Separator' })
 
     // The first Escape takes back what was typed and keeps the form and the focus.
@@ -370,23 +375,28 @@ export const EscapeInSettings = meta.story({
     await expect(separator).toHaveFocus()
     await expect(header).toHaveAttribute('aria-pressed', 'true')
 
-    // The next clears the selection and takes the focus back to the Transform.
+    // The next clears the selection, and with it the Transform's details, and takes the focus back
+    // to the Transform.
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(header).toHaveFocus())
     await expect(header).toHaveAttribute('aria-pressed', 'false')
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
 
     // From a link's remove button, the focus goes back to the selected part.
     const filled = target('DTM+137/C507/2380')
 
     await pressOn(await findRow(canvasElement, filled), '{Enter}')
-    panel
+
+    const rowDetails = await openDetails(canvasElement)
+
+    rowDetails
       .getByRole('button', {
         name: 'Remove link from Date format 1 (Result) to DTM+137/C507/2380',
       })
       .focus()
     await userEvent.keyboard('{Escape}')
     await waitFor(async () => expect(await findRow(canvasElement, filled)).toHaveFocus())
-    await expect(panel.getByText(/Select a part/)).toBeVisible()
+    await expect(rowDetails.getByText(/Select a part/)).toBeVisible()
   },
 })
 
@@ -401,12 +411,14 @@ export const LowerConcatenateParts = meta.story({
 
     await userEvent.click(concatenate.getByRole('button', { name: 'Concatenate 1' }))
 
-    const parts = detailsPanel(canvasElement).getByRole('textbox', { name: 'Number of parts' })
+    const parts = (await detailsPanel(canvasElement)).getByRole('textbox', {
+      name: 'Number of parts',
+    })
 
     await userEvent.clear(parts)
     await userEvent.type(parts, '1')
     await expect(
-      detailsPanel(canvasElement).getByText('Number of parts must be between 2 and 10.'),
+      (await detailsPanel(canvasElement)).getByText('Number of parts must be between 2 and 10.'),
     ).toBeVisible()
     await userEvent.tab()
 
@@ -427,7 +439,7 @@ export const LowerConcatenateParts = meta.story({
 export const RemoveTransforms = meta.story({
   args: { id: desadv.id },
   async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByText('7 Transforms')).toBeVisible()
+    await expectTransformCount(canvasElement, 7)
     await expect(
       await canvas.findByRole('img', { name: 'Link from Constant 1 (Result) to BGM/C002/1001' }),
     ).toBeInTheDocument()
@@ -440,12 +452,12 @@ export const RemoveTransforms = meta.story({
       ).toBeNull(),
     )
     await waitFor(() => expect(canvas.getByRole('button', { name: 'Substring 1' })).toHaveFocus())
-    await expect(await canvas.findByText('6 Transforms')).toBeVisible()
+    await expectTransformCount(canvasElement, 6)
 
     // By keyboard: Delete on a transform removes it.
     await userEvent.keyboard('{Delete}')
     await waitFor(() => expect(liveStatus(canvasElement)).toHaveTextContent('Substring 1 removed.'))
-    await expect(await canvas.findByText('5 Transforms')).toBeVisible()
+    await expectTransformCount(canvasElement, 5)
 
     // Delete on an input removes the link into it.
     await pressOn(canvas.getByRole('button', { name: 'Part 2 input of Concatenate 1' }), '{Delete}')
@@ -472,7 +484,7 @@ export const RemoveTransforms = meta.story({
     // The panel lists a selected transform's links and removes them, or the transform.
     await userEvent.click(canvas.getByRole('button', { name: 'Concatenate 1' }))
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
 
     await userEvent.click(
       panel.getByRole('button', {
@@ -481,8 +493,8 @@ export const RemoveTransforms = meta.story({
     )
     await waitFor(() => expect(panel.getAllByText('Not linked yet')).toHaveLength(3))
     await userEvent.click(panel.getByRole('button', { name: 'Remove Concatenate 1' }))
-    await expect(await canvas.findByText('4 Transforms')).toBeVisible()
-    await expect(panel.getByText(/Select a part to keep its meaning/)).toBeVisible()
+    await expectTransformCount(canvasElement, 4)
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
   },
 })
 
@@ -499,7 +511,7 @@ export const MoveTransform = meta.story({
     const before = flowTop(canvasElement, 'Date format 1')
 
     await userEvent.click(
-      detailsPanel(canvasElement).getByRole('button', { name: 'Move Date format 1 down' }),
+      (await detailsPanel(canvasElement)).getByRole('button', { name: 'Move Date format 1 down' }),
     )
     await waitFor(() => expect(flowTop(canvasElement, 'Date format 1')).toBe(before + 40))
     await waitFor(() => expect(liveStatus(canvasElement)).toHaveTextContent('Date format 1 moved.'))
@@ -530,7 +542,7 @@ export const SaveErrorRollback = meta.story({
     )
     await expect(canvas.queryByRole('group', { name: 'Transform Constant 1' })).toBeNull()
     await expect(await findSaveStatus(canvasElement, 'Not saved')).toBeVisible()
-    await expect(canvas.getByText('No Transforms yet')).toBeVisible()
+    await expectTransformCount(canvasElement, 0)
   },
 })
 
@@ -574,11 +586,11 @@ export const OverlappingSaveRollback = meta.story({
 
     await expect(saved.transforms.map(({ kind }) => kind)).toEqual(['split'])
     await expect(canvas.queryByRole('group', { name: 'Transform Constant 1' })).toBeNull()
-    await expect(canvas.getByText('1 Transform')).toBeVisible()
+    await expectTransformCount(canvasElement, 1)
   },
 })
 
-// The band's Details column is narrowest on a laptop, where its fields have to fit.
+// The Details sheet is narrowest on a laptop, where its fields have to fit.
 const onLaptop = {
   parameters: {
     viewport: {
@@ -599,7 +611,7 @@ export const German = meta.story({
     ),
   ],
   async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByText('9 Transforms')).toBeVisible()
+    await expectTransformCount(canvasElement, 9)
     await expect(
       await canvas.findByRole('button', { name: 'Datumsformat hinzufügen' }),
     ).toBeVisible()
@@ -621,7 +633,7 @@ export const German = meta.story({
 
     await userEvent.click(canvas.getByRole('button', { name: 'Teilen 1' }))
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
 
     await expect(panel.getByRole('heading', { name: 'Teilen 1' })).toBeVisible()
     await expect(panel.getByText('Trennzeichen: Angabe erforderlich.')).toBeVisible()
@@ -642,7 +654,7 @@ export const Dark = meta.story({
     // An invalid node with its form open, and the marks of a link pending from a transform.
     await userEvent.click(numberFormat.getByRole('button', { name: 'Number format 1' }))
     await expect(
-      detailsPanel(canvasElement).getByRole('textbox', { name: 'Decimal places' }),
+      (await detailsPanel(canvasElement)).getByRole('textbox', { name: 'Decimal places' }),
     ).toHaveAttribute('aria-invalid', 'true')
     await pressOn(canvas.getByRole('button', { name: 'Result output of Date format 1' }), 'l')
     await expect(
@@ -652,7 +664,7 @@ export const Dark = meta.story({
 })
 
 async function expectNoSettingsInputs(canvasElement: HTMLElement) {
-  const panel = detailsPanel(canvasElement)
+  const panel = await detailsPanel(canvasElement)
 
   for (const role of ['textbox', 'radio', 'combobox'] as const) {
     await expect(panel.queryAllByRole(role)).toHaveLength(0)
@@ -684,7 +696,7 @@ export const Viewer = meta.story({
       await pressOn(row, '{Delete}')
       await pressOn(row, 'l')
       await pressOn(header, '{Delete}')
-      await expect(canvas.getByText('9 Transforms')).toBeVisible()
+      await expectTransformCount(canvasElement, 9)
       await expect(canvas.getByRole('img', { name: linked })).toBeInTheDocument()
       await expect(canvas.queryByText(/^Linking from/)).toBeNull()
 
@@ -697,7 +709,7 @@ export const Viewer = meta.story({
 
       await pressOn(header, '{Enter}')
 
-      const panel = detailsPanel(canvasElement)
+      const panel = await detailsPanel(canvasElement)
 
       await expect(panel.getByRole('heading', { name: 'Date format 1' })).toBeVisible()
       await expect(panel.getByText('From pattern')).toBeVisible()
@@ -719,10 +731,13 @@ export const Viewer = meta.story({
       await expect(panel.getByText('The syntax is valid.')).toBeVisible()
 
       await pressOn(await findRow(canvasElement, source('invoiceNumber')), '{Enter}')
-      await expect(panel.getByRole('heading', { name: 'Links' })).toBeVisible()
-      await expect(panel.queryByRole('button', { name: 'Link from here' })).toBeNull()
-      await userEvent.keyboard('{Escape}')
-      await expect(panel.getByText(/Select a part to keep its meaning/)).toBeVisible()
+
+      const rowDetails = await openDetails(canvasElement)
+
+      await expect(rowDetails.getByRole('heading', { name: 'Links' })).toBeVisible()
+      await expect(rowDetails.queryByRole('button', { name: 'Link from here' })).toBeNull()
+      await userEvent.click(rowDetails.getByRole('button', { name: 'Close details' }))
+      await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
     },
   }),
 })
@@ -745,7 +760,7 @@ export const ViewerGerman = meta.story({
       await expect(canvas.queryByRole('button', { name: /hinzufügen$/ })).toBeNull()
       await userEvent.click(split.getByRole('button', { name: 'Teilen 1' }))
 
-      const panel = detailsPanel(canvasElement)
+      const panel = await detailsPanel(canvasElement)
 
       await expect(panel.getByText('Nicht festgelegt')).toBeVisible()
       await expect(panel.getByText('Trennzeichen: Angabe erforderlich.')).toBeVisible()
@@ -767,7 +782,7 @@ export const ViewerDark = meta.story({
       const numberFormat = await findNode(canvasElement, 'Number format 1')
 
       await userEvent.click(numberFormat.getByRole('button', { name: 'Number format 1' }))
-      await expect(detailsPanel(canvasElement).getByText('Decimal places')).toBeVisible()
+      await expect((await detailsPanel(canvasElement)).getByText('Decimal places')).toBeVisible()
       await expectNoSettingsInputs(canvasElement)
     },
   }),

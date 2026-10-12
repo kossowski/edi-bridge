@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { AiBadge } from '@/components/mappings/ai-badge'
 import { aiProposedCount } from '@/components/mappings/ai-marks'
-import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
+import { AiReviewSheet } from '@/components/mappings/ai-review-panel'
 import { useGraphSaveState } from '@/components/mappings/use-save-graph'
 import { acceptAiDraft } from '@/lib/api/client'
 import { mappingDraftQuery, storeAcceptedAiDraft } from '@/lib/api/queries'
@@ -16,37 +16,16 @@ import { Button } from '@edi-bridge/ui/components/button'
 
 import type { MappingDraft } from '@edi-bridge/contracts'
 
-function ShowReviewPanel({ panelId }: { panelId: string }) {
-  const t = useTranslations('Mapping.aiReview')
-  const store = useCanvasStoreApi()
-
-  const show = () => {
-    const { bandOpen, toggleBand } = store.getState()
-
-    if (!bandOpen) {
-      toggleBand()
-    }
-
-    requestAnimationFrame(() => document.getElementById(panelId)?.focus())
-  }
-
-  return (
-    <Button size="sm" variant="outline" onClick={show}>
-      {t('showPanel')}
-    </Button>
-  )
-}
-
 export function AiReviewState({
   draft,
   summaryId,
   publishHintId,
-  reviewPanelId = null,
+  showReview = false,
 }: {
   draft: MappingDraft
   summaryId: string
   publishHintId: string
-  reviewPanelId?: string | null
+  showReview?: boolean
 }) {
   const t = useTranslations('Mapping.aiReview')
   const queryClient = useQueryClient()
@@ -66,7 +45,8 @@ export function AiReviewState({
       }),
   })
 
-  const open = draft.aiReview !== null
+  const review = draft.aiReview
+  const open = review !== null
   const done = accepted && !open
 
   useEffect(() => {
@@ -89,13 +69,13 @@ export function AiReviewState({
           </>
         )}
       </p>
-      {open && (
+      {review && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <span id={summaryId} className="inline-flex flex-wrap items-center gap-2">
             <AiBadge label={t('open')} />
-            {t('openSummary', { count: aiProposedCount(draft.aiReview) })}
+            {t('openSummary', { count: aiProposedCount(review) })}
           </span>
-          {reviewPanelId && <ShowReviewPanel panelId={reviewPanelId} />}
+          {showReview && <AiReviewSheet draft={draft} review={review} />}
           <Button
             disabled={accept.isPending || saving}
             focusableWhenDisabled

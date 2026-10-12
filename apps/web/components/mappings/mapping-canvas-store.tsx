@@ -1,6 +1,15 @@
 'use client'
 
-import { createContext, type ReactNode, useContext, useId, useMemo, useState } from 'react'
+import {
+  createContext,
+  createRef,
+  type ReactNode,
+  type RefObject,
+  useContext,
+  useId,
+  useMemo,
+  useState,
+} from 'react'
 import { createStore, type StoreApi, useStore } from 'zustand'
 
 import type { XYPosition } from '@xyflow/react'
@@ -24,8 +33,11 @@ export type CanvasState = {
   edgeAnchor: XYPosition | null
   announcement: string
   problem: string | null
-  bandOpen: boolean
-  toggleBand: () => void
+  // Opened from the toolbar; a selected Transform shows its settings there too. A selected row or
+  // a pending link does not, so the panel never covers the targets a link is being drawn to.
+  detailsOpen: boolean
+  openDetails: () => void
+  closeDetails: () => void
   toggleCollapsed: (row: RowRef) => void
   expand: (side: Side, paths: ReadonlyArray<string>) => void
   toggleSelected: (row: RowRef) => void
@@ -40,6 +52,10 @@ export type CanvasState = {
   leaveEdge: (id: string) => void
   announce: (text: string) => void
   setProblem: (problem: string | null) => void
+}
+
+export function detailsShown(state: CanvasState) {
+  return state.detailsOpen || state.selectedTransform !== null
 }
 
 export function isSameRow(a: RowRef | null, b: RowRef) {
@@ -70,8 +86,9 @@ export function createCanvasStore() {
     edgeAnchor: null,
     announcement: '',
     problem: null,
-    bandOpen: true,
-    toggleBand: () => set(({ bandOpen }) => ({ bandOpen: !bandOpen })),
+    detailsOpen: false,
+    openDetails: () => set({ detailsOpen: true }),
+    closeDetails: () => set({ detailsOpen: false, selectedTransform: null }),
     toggleCollapsed: ({ side, path }) =>
       set(({ collapsed }) => {
         const next = new Set(collapsed[side])
@@ -91,22 +108,19 @@ export function createCanvasStore() {
         return { collapsed: { ...collapsed, [side]: next } }
       }),
     toggleSelected: (row) =>
-      set(({ selected, bandOpen }) => ({
+      set(({ selected }) => ({
         selected: isSameRow(selected, row) ? null : toRowRef(row),
         selectedTransform: null,
-        bandOpen: bandOpen || !isSameRow(selected, row),
       })),
-    select: (row) => set({ selected: toRowRef(row), selectedTransform: null, bandOpen: true }),
+    select: (row) => set({ selected: toRowRef(row), selectedTransform: null }),
     toggleTransform: (id) =>
-      set(({ selectedTransform, bandOpen }) => ({
+      set(({ selectedTransform }) => ({
         selectedTransform: selectedTransform === id ? null : id,
         selected: null,
-        bandOpen: bandOpen || selectedTransform !== id,
       })),
-    selectTransform: (id) => set({ selectedTransform: id, selected: null, bandOpen: true }),
+    selectTransform: (id) => set({ selectedTransform: id, selected: null }),
     clearSelection: () => set({ selected: null, selectedTransform: null }),
-    // A selection or a pending link shows its details, and focus may move there, so the band opens.
-    startLink: (linkFrom) => set({ linkFrom, problem: null, bandOpen: true }),
+    startLink: (linkFrom) => set({ linkFrom, problem: null }),
     cancelLink: () => set({ linkFrom: null }),
     setTooltipRowId: (tooltipRowId) => set({ tooltipRowId }),
     hoverEdge: (id, at) => {
@@ -133,8 +147,15 @@ export function createCanvasStore() {
   }))
 }
 
+export type CanvasRefs = {
+  canvas: RefObject<HTMLDivElement | null>
+  detailsBody: RefObject<HTMLDivElement | null>
+  detailsTrigger: RefObject<HTMLButtonElement | null>
+}
+
 type CanvasContext = {
   store: StoreApi<CanvasState>
+  refs: CanvasRefs
   tooltip: { handle: ReturnType<typeof createTooltipHandle<TreeRow>>; id: string }
   hints: { linkTarget: string; linkStart: string }
   viewOnly: boolean
@@ -156,6 +177,11 @@ export function MappingCanvasProvider({
 
   const [shared] = useState(() => ({
     store: createCanvasStore(),
+    refs: {
+      canvas: createRef<HTMLDivElement>(),
+      detailsBody: createRef<HTMLDivElement>(),
+      detailsTrigger: createRef<HTMLButtonElement>(),
+    },
     tooltip: { handle: createTooltipHandle<TreeRow>(), id: `${id}meaning` },
     hints: { linkTarget: `${id}link-target`, linkStart: `${id}link-start` },
   }))
@@ -186,6 +212,10 @@ export function useCanvasStore<Selected>(selector: (state: CanvasState) => Selec
 
 export function useCanvasStoreApi() {
   return useCanvasContext().store
+}
+
+export function useCanvasRefs() {
+  return useCanvasContext().refs
 }
 
 export function useCanvasViewOnly() {

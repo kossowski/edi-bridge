@@ -13,6 +13,8 @@ import {
   publishProblem,
   type VersionFacts,
 } from '@/components/mappings/draft-state'
+import { StateBadge } from '@/components/mappings/state-badge'
+import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useGraphSaveState } from '@/components/mappings/use-save-graph'
 import { ApiError, publishMappingDraft } from '@/lib/api/client'
 import { mappingDraftQuery, storePublishedMappingVersion } from '@/lib/api/queries'
@@ -31,25 +33,21 @@ import {
 
 import type { MappingDraft } from '@edi-bridge/contracts'
 
-const dotTones = {
-  neverPublished: 'bg-amber-500',
-  unpublishedChanges: 'bg-amber-500',
-  published: 'bg-emerald-500',
-} as const
-
 export function DraftStateLabel({ draft, id }: { draft: VersionFacts; id?: string }) {
   const t = useTranslations('Mapping')
   const state = draftState(draft)
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2 text-sm">
-      <Badge variant="outline">{t('draft')}</Badge>
-      <span id={id} className="inline-flex items-center gap-1.5">
-        <span aria-hidden className={`size-2 rounded-full ${dotTones[state.kind]}`} />
+      <Badge className="h-7 px-3 text-sm">{t('draft')}</Badge>
+      <StateBadge
+        id={id}
+        state={state.kind === 'published' ? 'live' : 'draft'}
+        className="h-7 gap-2 px-3 text-sm [&>svg]:size-4!">
         {state.kind === 'neverPublished'
           ? t('state.neverPublished')
           : t(`state.${state.kind}`, { version: state.version })}
-      </span>
+      </StateBadge>
     </span>
   )
 }
@@ -58,12 +56,16 @@ export function MappingVersionsLink({ mappingId }: { mappingId: string }) {
   const t = useTranslations('Mapping')
 
   return (
-    <Link
-      href={`/mappings/${mappingId}/versions`}
-      className={buttonVariants({ variant: 'outline' })}>
-      <HugeiconsIcon icon={WorkHistoryIcon} strokeWidth={2} aria-hidden />
-      {t('versionsLink')}
-    </Link>
+    <ToolbarAction
+      icon={<HugeiconsIcon icon={WorkHistoryIcon} strokeWidth={2} aria-hidden />}
+      label={t('versionsLink')}
+      render={
+        <Link
+          href={`/mappings/${mappingId}/versions`}
+          className={buttonVariants({ variant: 'outline' })}
+        />
+      }
+    />
   )
 }
 
@@ -110,7 +112,7 @@ export function PublishDraft({
     !draft.unpublishedChanges
 
   return (
-    <div className="relative flex flex-wrap items-center gap-2">
+    <div className="relative flex items-center gap-2">
       <p
         ref={doneRef}
         role="status"
@@ -132,15 +134,19 @@ export function PublishDraft({
 
           setOpen(next)
         }}>
-        <DialogTrigger
-          disabled={!draft.unpublishedChanges || saving || reviewOpen}
-          render={<Button />}
-          aria-describedby={
-            [stateId, reviewOpen && reviewHintId].filter(Boolean).join(' ') || undefined
-          }>
-          <HugeiconsIcon icon={CloudUploadIcon} strokeWidth={2} aria-hidden />
-          {t('button')}
-        </DialogTrigger>
+        <ToolbarAction
+          icon={<HugeiconsIcon icon={CloudUploadIcon} strokeWidth={2} aria-hidden />}
+          label={t('button')}
+          render={
+            <DialogTrigger
+              disabled={!draft.unpublishedChanges || saving || reviewOpen}
+              render={<Button />}
+              aria-describedby={
+                [stateId, reviewOpen && reviewHintId].filter(Boolean).join(' ') || undefined
+              }
+            />
+          }
+        />
         <DialogContent
           closeLabel={t('close')}
           finalFocus={publish.isSuccess ? doneRef : true}

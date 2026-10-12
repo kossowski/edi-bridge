@@ -6,7 +6,12 @@ import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
 import type { BeforeEach } from 'storybook/internal/csf'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
-import { page, seeded } from '@/components/mappings/mapping-canvas-story-helpers'
+import {
+  expectSavedLinkCount,
+  findSheet,
+  page,
+  seeded,
+} from '@/components/mappings/mapping-canvas-story-helpers'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
@@ -66,11 +71,7 @@ function aiDraft(
 async function openAiDraft(canvasElement: HTMLElement, action: string | RegExp = 'Draft with AI') {
   await userEvent.click(await within(canvasElement).findByRole('button', { name: action }))
 
-  const dialog = await page(canvasElement).findByRole('dialog', { name: 'Draft with AI' })
-
-  await waitFor(() => expect(dialog).toBeVisible())
-
-  return within(dialog)
+  return findSheet(canvasElement, 'Draft with AI')
 }
 
 async function startAiDraft(canvasElement: HTMLElement, budgetText = /tokens left today/) {
@@ -131,7 +132,7 @@ export const Idle = meta.story({
 
 export const InProgress = meta.story({
   beforeEach: aiDraft('loading'),
-  async play({ canvas, canvasElement }) {
+  async play({ canvasElement }) {
     const dialog = await startAiDraft(canvasElement)
 
     await expect(dialog.getByRole('button', { name: 'Close' })).toHaveFocus()
@@ -148,7 +149,7 @@ export const InProgress = meta.story({
     await expect(
       dialog.getByText('The AI draft keeps going when you close this dialog. Stop ends it.'),
     ).toBeVisible()
-    await expect(canvas.getByText('No links yet')).toBeVisible()
+    await expectSavedLinkCount(withoutLinks.id, 0)
   },
 })
 
@@ -207,7 +208,7 @@ export const StopEndsDraft = meta.story({
       'stopped',
     )
     await expect(dialog.getByRole('button', { name: 'Try again' })).toBeVisible()
-    await expect(canvas.getByText('No links yet')).toBeVisible()
+    await expectSavedLinkCount(withoutLinks.id, 0)
 
     await userEvent.click(dialog.getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
@@ -230,7 +231,6 @@ export const Drafted = meta.story({
     await expect(
       within(outcome.parentElement!).getByText(/passed the check against the Sample Document/),
     ).toBeVisible()
-    await expect(canvas.queryByText('No links yet')).toBeNull()
     await waitFor(() =>
       expect(canvasElement.querySelectorAll('.react-flow__edge').length).toBeGreaterThan(0),
     )
@@ -251,7 +251,7 @@ export const EmptyProposal = meta.story({
 
     await findOutcome(dialog, 'The AI found no links')
     await expect(dialog.getByRole('button', { name: 'Try again' })).toBeVisible()
-    await expect(canvas.getByText('No links yet')).toBeVisible()
+    await expectSavedLinkCount(withoutLinks.id, 0)
     await userEvent.click(dialog.getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
     await expect(canvas.getByRole('button', { name: 'Draft with AI' })).not.toHaveAttribute(
@@ -263,7 +263,7 @@ export const EmptyProposal = meta.story({
 
 export const CheckFailed = meta.story({
   beforeEach: aiDraft('error'),
-  async play({ canvas, canvasElement }) {
+  async play({ canvasElement }) {
     const dialog = await startAiDraft(canvasElement)
 
     const outcome = await findOutcome(dialog, 'The links did not pass the check')
@@ -274,7 +274,7 @@ export const CheckFailed = meta.story({
       'data-state',
       'stopped',
     )
-    await expect(canvas.getByText('No links yet')).toBeVisible()
+    await expectSavedLinkCount(withoutLinks.id, 0)
 
     await userEvent.click(dialog.getByRole('button', { name: 'Try again' }))
     await waitFor(() =>
@@ -426,9 +426,7 @@ export const German = meta.story({
       await within(canvasElement).findByRole('button', { name: 'Mit KI entwerfen' }),
     )
 
-    const dialog = within(
-      await page(canvasElement).findByRole('dialog', { name: 'Mit KI entwerfen' }),
-    )
+    const dialog = await findSheet(canvasElement, 'Mit KI entwerfen')
 
     const budget = await dialog.findByText('Heute noch 151.650 von 200.000 Tokens übrig.')
 

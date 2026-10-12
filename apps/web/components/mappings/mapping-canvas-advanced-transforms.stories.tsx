@@ -15,6 +15,7 @@ import {
   source,
   target,
   transformNodeOf,
+  expectTransformCount,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
@@ -32,6 +33,17 @@ const invoic = seeded('Hansemarkt: ERP JSON to INVOIC')
 const withoutLinks = seeded('Rheinkauf: ERP JSON to INVOIC')
 
 const lookupTablesUrl = `${apiUrl}${lookupTablesEndpoint.path}`
+
+// Wide enough for both trees beside the Transform list, so linking down the line items needs no
+// pan that moves fields of the source behind the list.
+const onWideScreen = {
+  parameters: {
+    viewport: {
+      options: { wide: { name: 'Wide desktop', styles: { width: '1600px', height: '900px' } } },
+    },
+  },
+  globals: { viewport: { value: 'wide', isRotated: false } },
+}
 
 const meta = preview.meta({
   title: 'Mappings/MappingCanvasScreen/Advanced transforms',
@@ -90,11 +102,11 @@ export const PlaceLookupTableAndConditional = meta.story({
   async play({ canvas, canvasElement }) {
     const palette = within(await canvas.findByRole('region', { name: 'Add a Transform' }))
 
-    await expect(palette.getAllByRole('button')).toHaveLength(10)
+    await expect(palette.getAllByRole('button', { name: /^Add / })).toHaveLength(10)
 
     await place(canvasElement, 'Lookup Table', 'Lookup Table 1')
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
 
     await expect(await panel.findByRole('combobox', { name: 'Lookup Table' })).toBeVisible()
     await expect(panel.getByRole('radio', { name: 'Keep the incoming value' })).toBeChecked()
@@ -106,16 +118,16 @@ export const PlaceLookupTableAndConditional = meta.story({
     await expect(panel.getByRole('radio', { name: 'Equals' })).toBeChecked()
     await expect(panel.getByRole('textbox', { name: 'Compare with' })).toBeVisible()
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
-    await expect(await canvas.findByText('2 Transforms')).toBeVisible()
+    await expectTransformCount(canvasElement, 2)
   },
 })
 
 export const PlaceLoopAndJsonata = meta.story({
   args: { id: withoutLinks.id },
-  async play({ canvas, canvasElement }) {
+  async play({ canvasElement }) {
     await place(canvasElement, 'Loop over line items', 'Loop over line items 1')
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
 
     await expect(panel.getByRole('textbox', { name: 'Counter start' })).toHaveValue('1')
 
@@ -125,7 +137,7 @@ export const PlaceLoopAndJsonata = meta.story({
       (await findNode(canvasElement, 'JSONata expression 1')).getByText('No inputs'),
     ).toBeVisible()
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
-    await expect(await canvas.findByText('2 Transforms')).toBeVisible()
+    await expectTransformCount(canvasElement, 2)
   },
 })
 
@@ -371,6 +383,7 @@ export const InsertSourcePath = meta.story({
 
 export const LoopByKeyboard = meta.story({
   args: { id: withoutLinks.id },
+  ...onWideScreen,
   async play({ canvas, canvasElement }) {
     await place(canvasElement, 'Loop over line items', 'Loop over line items 1')
 
@@ -468,6 +481,7 @@ export const LoopByMouse = meta.story({
 // once per item.
 export const LinkOutsideLoop = meta.story({
   args: { id: invoic.id },
+  ...onWideScreen,
   async play({ canvasElement }) {
     const loop = await findNode(canvasElement, 'Loop over line items 1')
 
@@ -530,7 +544,7 @@ export const German = meta.story({
 
     await userEvent.click(await canvas.findByRole('button', { name }))
 
-    const panel = detailsPanel(canvasElement)
+    const panel = await detailsPanel(canvasElement)
 
     await expect(panel.getByRole('textbox', { name: 'Ausdruck' })).toHaveAttribute(
       'aria-invalid',

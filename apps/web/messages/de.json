@@ -2333,6 +2333,7 @@
       "panel": {
         "title": "Durchsicht des KI-Entwurfs",
         "description": "Was vor dem Übernehmen des KI-Entwurfs Aufmerksamkeit braucht. Wählen Sie einen Eintrag, um ihn auf der Zeichenfläche zu zeigen.",
+        "close": "Durchsicht schließen",
         "unmapped": {
           "title": "Pflicht-Zielelemente ohne Verknüpfung",
           "detail": "Pflichtfeld, noch nichts verknüpft.",
@@ -2466,7 +2467,9 @@
     "details": {
       "title": "Details",
       "empty": "Wählen Sie einen Teil aus, um seine Bedeutung und Verknüpfungen hier zu behalten. Für einen schnellen Blick zeigen Sie auf einen Teil oder setzen Sie den Fokus darauf.",
-      "clear": "Auswahl aufheben"
+      "clear": "Auswahl aufheben",
+      "description": "Was auf der Zeichenfläche ausgewählt ist, mit Bedeutung und Verknüpfungen. Ohne Auswahl die Eckdaten dieses Mappings.",
+      "close": "Details schließen"
     },
     "transforms": {
       "kinds": {
@@ -2511,7 +2514,10 @@
       "palette": {
         "heading": "Transform hinzufügen",
         "add": "{kind} hinzufügen",
-        "note": "Wählen Sie einen platzierten Transform aus, um seine Einstellungen unter Details zu ändern. Seine Ein- und Ausgänge verknüpfen Sie wie Felder und Elemente."
+        "note": "Wählen Sie einen platzierten Transform aus, um seine Einstellungen unter Details zu ändern. Seine Ein- und Ausgänge verknüpfen Sie wie Felder und Elemente.",
+        "hint": "Klicken Sie zum Hinzufügen, oder ziehen Sie einen Transform auf die Zeichenfläche.",
+        "show": "Transforms einblenden",
+        "hide": "Transforms ausblenden"
       },
       "node": {
         "label": "Transform {name}",
@@ -2734,26 +2740,24 @@
     },
     "preview": {
       "title": "Vorschau",
-      "show": "Details und Vorschau einblenden",
-      "hide": "Details und Vorschau ausblenden",
-      "sample": "Beispiel-Document",
-      "source": "Beispiel-Document",
+      "sample": "Beispielbeleg",
+      "source": "Beispielbeleg",
       "target": "Ziel-Document",
       "shown": "Angezeigtes Document",
-      "sourceLabel": "Beispiel-Document {name}",
+      "sourceLabel": "Beispielbeleg {name}",
       "targetLabel": "Ziel-Document für {name}",
       "size": "{format}, {count, plural, one {# Zeile} other {# Zeilen}}",
-      "loading": "Beispiel-Documents werden geladen",
+      "loading": "Beispielbelege werden geladen",
       "building": "Vorschau wird erstellt",
       "updating": "Wird aktualisiert …",
       "upToDate": "Aktuell",
       "updated": "Vorschau für {name} aktualisiert",
       "empty": {
-        "title": "Noch keine Beispiel-Documents",
-        "description": "Die Vorschau zeigt das Ziel-Document für ein Beispiel-Document der Quelle. Dieses Mapping hat noch keine Beispiel-Documents."
+        "title": "Noch keine Beispielbelege",
+        "description": "Die Vorschau zeigt das Ziel-Document für einen Beispielbeleg der Quelle. Dieses Mapping hat noch keine Beispielbelege."
       },
       "error": {
-        "samples": "Die Beispiel-Documents konnten nicht geladen werden.",
+        "samples": "Die Beispielbelege konnten nicht geladen werden.",
         "preview": "Die Vorschau konnte nicht erstellt werden.",
         "retry": "Erneut versuchen"
       },
@@ -2761,10 +2765,12 @@
         "title": "{count, plural, one {# Ziel bleibt leer} other {# Ziele bleiben leer}}",
         "invalidTransform": "{transform} ist ungültig konfiguriert.",
         "noLookupMatch": "{transform} hat in seiner Lookup Table keinen Treffer gefunden.",
-        "expressionFailed": "{transform} ist bei diesem Beispiel-Document fehlgeschlagen.",
-        "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispiel-Documents noch nicht in der Vorschau berechnet.",
+        "expressionFailed": "{transform} ist bei diesem Beispielbeleg fehlgeschlagen.",
+        "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispielbelegen noch nicht in der Vorschau berechnet.",
         "brokenLink": "Eine Verknüpfung hier führt zu einem Feld oder Element, das ihre Seite nicht hat; die Vorschau überspringt sie."
-      }
+      },
+      "description": "Das Ziel-Document, das dieses Mapping aus einem Beispielbeleg macht, mit den Verknüpfungen in ihrem aktuellen Stand.",
+      "close": "Vorschau schließen"
     }
   },
   "MappingVersions": {

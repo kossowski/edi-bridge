@@ -6,6 +6,7 @@ import type { BeforeEach } from 'storybook/internal/csf'
 import { nodeId } from '@/components/mappings/mapping-tree'
 import { findRowButton } from '@/components/mappings/tree-node'
 import { apiUrl } from '@/lib/api/config'
+import { mappingDraftEndpoint, toPath } from '@edi-bridge/contracts'
 import {
   type AiProposalSize,
   aiProposalFor,
@@ -144,6 +145,46 @@ export const source = (path: string): RowRef => ({ side: 'source', path })
 
 export const target = (path: string): RowRef => ({ side: 'target', path })
 
+// A sheet renders in a portal outside the story's root, and fades in. A busy CI runner can take
+// longer than the default second to finish the open transition.
+export async function findSheetElement(canvasElement: HTMLElement, name: string) {
+  const wait = { timeout: 5000 }
+  const sheet = await page(canvasElement).findByRole('dialog', { name }, wait)
+
+  await waitFor(() => expect(sheet).toBeVisible(), wait)
+
+  return sheet
+}
+
+export async function findSheet(canvasElement: HTMLElement, name: string) {
+  return within(await findSheetElement(canvasElement, name))
+}
+
 export function detailsPanel(canvasElement: HTMLElement, name = 'Details') {
-  return within(page(canvasElement).getByRole('region', { name }))
+  return findSheet(canvasElement, name)
+}
+
+export async function openDetails(canvasElement: HTMLElement, name = 'Details') {
+  await userEvent.click(await within(canvasElement).findByRole('button', { name }))
+
+  return findSheet(canvasElement, name)
+}
+
+// The counts live in the Details sheet now; the stories check what the canvas shows or saved.
+export async function expectTransformCount(canvasElement: HTMLElement, count: number) {
+  await waitFor(() =>
+    expect(canvasElement.querySelectorAll('.react-flow__node-transform')).toHaveLength(count),
+  )
+}
+
+export async function expectSavedLinkCount(id: string, count: number) {
+  await waitFor(
+    async () => {
+      const response = await fetch(`${apiUrl}${toPath(mappingDraftEndpoint.path, { id })}`)
+      const saved = mappingDraftEndpoint.response.parse(await response.json())
+
+      await expect(saved.links.length + saved.transformLinks.length).toBe(count)
+    },
+    { timeout: 5000 },
+  )
 }

@@ -2333,6 +2333,7 @@
       "panel": {
         "title": "AI review",
         "description": "What needs attention before you accept the draft. Choose an entry to show it on the canvas.",
+        "close": "Close AI review",
         "unmapped": {
           "title": "Required target elements left unmapped",
           "detail": "Required, nothing is mapped to it yet.",
@@ -2466,7 +2467,9 @@
     "details": {
       "title": "Details",
       "empty": "Select a part to keep its meaning and links here. To take a quick look, point at a part or move the focus to it.",
-      "clear": "Clear selection"
+      "clear": "Clear selection",
+      "description": "What is selected on the canvas, with its meaning and links. With nothing selected, the facts of this Mapping.",
+      "close": "Close details"
     },
     "transforms": {
       "kinds": {
@@ -2511,7 +2514,10 @@
       "palette": {
         "heading": "Add a Transform",
         "add": "Add {kind}",
-        "note": "Select a placed Transform to change its settings under Details. Its inputs and outputs are linked like fields and elements."
+        "note": "Select a placed Transform to change its settings under Details. Its inputs and outputs are linked like fields and elements.",
+        "hint": "Click to add, or drag onto the canvas.",
+        "show": "Show the Transforms",
+        "hide": "Hide the Transforms"
       },
       "node": {
         "label": "Transform {name}",
@@ -2734,26 +2740,24 @@
     },
     "preview": {
       "title": "Preview",
-      "show": "Show details and preview",
-      "hide": "Hide details and preview",
-      "sample": "Sample Document",
-      "source": "Sample Document",
+      "sample": "Example document",
+      "source": "Example document",
       "target": "Target Document",
       "shown": "Document shown",
-      "sourceLabel": "Sample Document {name}",
+      "sourceLabel": "Example document {name}",
       "targetLabel": "Target Document for {name}",
       "size": "{format}, {count, plural, one {# line} other {# lines}}",
-      "loading": "Loading the Sample Documents",
+      "loading": "Loading the example documents",
       "building": "Building the preview",
       "updating": "Updating…",
       "upToDate": "Up to date",
       "updated": "Preview updated for {name}",
       "empty": {
-        "title": "No Sample Documents yet",
-        "description": "The preview shows the target Document for a Sample Document of the source. This Mapping has no Sample Documents yet."
+        "title": "No example documents yet",
+        "description": "The preview shows the target Document for an example document of the source. This Mapping has no example documents yet."
       },
       "error": {
-        "samples": "The Sample Documents could not be loaded.",
+        "samples": "The example documents could not be loaded.",
         "preview": "The preview could not be built.",
         "retry": "Try again"
       },
@@ -2761,10 +2765,12 @@
         "title": "{count, plural, one {# target left empty} other {# targets left empty}}",
         "invalidTransform": "{transform} has an invalid configuration.",
         "noLookupMatch": "{transform} found no match in its Lookup Table.",
-        "expressionFailed": "{transform} failed on this Sample Document.",
-        "expressionNotPreviewed": "{transform} is not previewed on EDIFACT Sample Documents yet.",
+        "expressionFailed": "{transform} failed on this example document.",
+        "expressionNotPreviewed": "{transform} is not previewed on EDIFACT example documents yet.",
         "brokenLink": "A link here reaches a field or element its side does not have, so the preview skips it."
-      }
+      },
+      "description": "The target Document this Mapping makes of an example document, with the links as they are now.",
+      "close": "Close preview"
     }
   },
   "MappingVersions": {

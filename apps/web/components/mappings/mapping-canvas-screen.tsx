@@ -1,6 +1,6 @@
 'use client'
 
-import { ComputerIcon } from '@hugeicons/core-free-icons'
+import { ComputerIcon, InformationCircleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
@@ -9,24 +9,33 @@ import { useId } from 'react'
 import { AppPage } from '@/components/app-page'
 import { Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
-import { AiReviewPanel } from '@/components/mappings/ai-review-panel'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
+import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
-import { MappingCanvasProvider } from '@/components/mappings/mapping-canvas-store'
-import { MappingPreviewPanel } from '@/components/mappings/mapping-preview-panel'
+import {
+  detailsShown,
+  MappingCanvasProvider,
+  useCanvasRefs,
+  useCanvasStore,
+  useCanvasStoreApi,
+} from '@/components/mappings/mapping-canvas-store'
+import { MappingPreviewSheet } from '@/components/mappings/mapping-preview-panel'
 import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
 import {
   DraftStateLabel,
   MappingVersionsLink,
   PublishDraft,
 } from '@/components/mappings/publish-draft'
+import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
+import { whenRendered } from '@/components/mappings/when-rendered'
 import { useDesktop } from '@/hooks/use-desktop'
 import { useSession } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { mappingDraftQuery } from '@/lib/api/queries'
+import { Button } from '@edi-bridge/ui/components/button'
 import {
   Empty,
   EmptyDescription,
@@ -34,9 +43,10 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@edi-bridge/ui/components/empty'
+import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { AiReview, MappingDraft } from '@edi-bridge/contracts'
+import type { MappingDraft } from '@edi-bridge/contracts'
 
 function CanvasLoading() {
   const t = useTranslations('Mapping.canvas')
@@ -58,17 +68,8 @@ function CanvasLoading() {
   )
 }
 
-function Canvas({
-  draft,
-  aiReview,
-  reviewPanelId,
-}: {
-  draft: MappingDraft
-  aiReview: AiReview | null
-  reviewPanelId: string
-}) {
+function Canvas({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping.canvas')
-  const reviewBodyId = useId()
   const source = useSide(draft.source)
   const target = useSide(draft.target)
   const save = useSaveGraph(draft.mappingId)
@@ -90,34 +91,13 @@ function Canvas({
     return <CanvasLoading />
   }
 
-  const targetSide = { title: target.title, items: target.items }
-
   return (
     <MappingCanvas
-      beside={(band) => (
-        <>
-          {aiReview && (
-            <AiReviewPanel
-              id={reviewPanelId}
-              bodyId={reviewBodyId}
-              draft={draft}
-              open={band.open}
-              review={aiReview}
-              targetItems={targetSide.items}
-            />
-          )}
-          <MappingPreviewPanel
-            draft={draft}
-            {...band}
-            controls={aiReview ? `${band.controls} ${reviewBodyId}` : band.controls}
-            reviewSampleId={aiReview?.sampleId ?? null}
-          />
-        </>
-      )}
+      detailsFacts={<MappingFacts draft={draft} />}
       graph={draft}
       label={t('label', { source: source.title, target: target.title })}
       source={{ title: source.title, items: source.items }}
-      target={targetSide}
+      target={{ title: target.title, items: target.items }}
       onChange={save}
     />
   )
@@ -144,9 +124,7 @@ function MappingFacts({ draft }: { draft: MappingDraft }) {
   const sideTitle = useSideTitle()
 
   return (
-    <dl
-      aria-label={t('facts.label')}
-      className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
+    <dl aria-label={t('facts.label')} className="grid grid-cols-2 gap-x-6 gap-y-4">
       <Fact label={t('facts.direction')}>{t(`direction.${draft.direction}`)}</Fact>
       <Fact label={t('facts.source')}>{sideTitle(draft.source)}</Fact>
       <Fact label={t('facts.target')}>{sideTitle(draft.target)}</Fact>
@@ -160,6 +138,63 @@ function MappingFacts({ draft }: { draft: MappingDraft }) {
   )
 }
 
+// On a computer the details belong to the canvas, which also shows a selection in them; on a
+// small screen, without the canvas, a sheet shows the facts alone.
+function DetailsAction({ draft }: { draft: MappingDraft }) {
+  const t = useTranslations('Mapping.details')
+  const desktop = useDesktop()
+  const store = useCanvasStoreApi()
+  const { detailsBody, detailsTrigger } = useCanvasRefs()
+  const open = useCanvasStore(detailsShown)
+  const icon = <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} aria-hidden />
+
+  if (!desktop) {
+    return (
+      <Sheet>
+        <ToolbarAction
+          icon={icon}
+          label={t('title')}
+          render={<SheetTrigger render={<Button variant="outline" />} />}
+        />
+        <EditorSheetContent
+          closeLabel={t('close')}
+          description={t('description')}
+          title={t('title')}>
+          <MappingFacts draft={draft} />
+        </EditorSheetContent>
+      </Sheet>
+    )
+  }
+
+  const toggle = () => {
+    if (open) {
+      store.getState().closeDetails()
+    } else {
+      store.getState().openDetails()
+      whenRendered(
+        () => Boolean(detailsBody.current),
+        () => detailsBody.current?.focus(),
+      )
+    }
+  }
+
+  return (
+    <ToolbarAction
+      icon={icon}
+      label={t('title')}
+      render={
+        <Button
+          ref={detailsTrigger}
+          variant="outline"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          onClick={toggle}
+        />
+      }
+    />
+  )
+}
+
 function MappingLoading() {
   const t = useTranslations('Mapping')
 
@@ -168,7 +203,6 @@ function MappingLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-20 w-full" />
       <Skeleton className="h-96 w-full" />
     </div>
   )
@@ -181,7 +215,6 @@ export function MappingCanvasScreen({ id }: { id: string }) {
   const stateId = useId()
   const reviewSummaryId = useId()
   const publishHintId = useId()
-  const reviewPanelId = useId()
   const aiDraft = useAiDraftRun(id)
   const draft = session.isPending ? undefined : data
   const canChange = session.canChange
@@ -189,21 +222,24 @@ export function MappingCanvasScreen({ id }: { id: string }) {
 
   return (
     <MappingCanvasProvider aiReview={aiReview} viewOnly={!canChange}>
-      {/* On desktop the screen fills the viewport below the header, so the canvas and the band
-          under it share the height without page scrolling. */}
+      {/* On desktop the editor fills the viewport below the header: a thin toolbar, then the canvas
+          at full height without page scrolling. */}
       <AppPage
         actions={
-          draft &&
-          (canChange ? (
+          draft && (
             <>
-              {desktop && (
+              {canChange && desktop && (
                 <AiDraftAction aiDraft={aiDraft} draft={draft} reviewSummaryId={reviewSummaryId} />
               )}
-              <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
+              <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
+              <DetailsAction draft={draft} />
+              {canChange ? (
+                <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
+              ) : (
+                <MappingVersionsLink mappingId={id} />
+              )}
             </>
-          ) : (
-            <MappingVersionsLink mappingId={id} />
-          ))
+          )
         }
         meta={
           draft && (
@@ -214,24 +250,21 @@ export function MappingCanvasScreen({ id }: { id: string }) {
           )
         }
         name={draft?.name}
-        className="lg:gap-3 lg:py-4 lg:contain-size">
+        className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
         {draft ? (
           <>
             {canChange && (
               <AiReviewState
                 draft={draft}
                 publishHintId={publishHintId}
-                reviewPanelId={desktop ? reviewPanelId : null}
+                showReview={desktop}
                 summaryId={reviewSummaryId}
               />
             )}
-            <MappingFacts draft={draft} />
             <DesktopOnlyNotice />
             {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
             <div className="hidden min-h-0 flex-1 flex-col lg:flex">
-              {desktop && (
-                <Canvas aiReview={aiReview} draft={draft} reviewPanelId={reviewPanelId} />
-              )}
+              {desktop && <Canvas draft={draft} />}
             </div>
           </>
         ) : isPending || session.isPending ? (
