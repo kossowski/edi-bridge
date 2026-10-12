@@ -47,7 +47,13 @@ function useFieldErrorMessage() {
   }
 }
 
-export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: TradingPartner }) {
+export function TradingPartnerForm({
+  tradingPartner,
+  savedLabel,
+}: {
+  tradingPartner?: TradingPartner
+  savedLabel?: string
+}) {
   const t = useTranslations('TradingPartnerForm')
   const errorMessage = useFieldErrorMessage()
   const queryClient = useQueryClient()
@@ -63,7 +69,10 @@ export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: Tradin
       tradingPartner ? updateTradingPartner(tradingPartner.id, input) : createTradingPartner(input),
     onSuccess: (saved) => {
       storeSavedTradingPartner(queryClient, saved)
-      router.push(`/trading-partners/${saved.id}`)
+
+      if (!tradingPartner) {
+        router.push(`/trading-partners/${saved.id}`)
+      }
     },
     onError: (error, input) => {
       if (isConflict(error)) {
@@ -91,10 +100,16 @@ export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: Tradin
     value: TradingPartnerFormValues[Field],
   ) {
     setValues((current) => ({ ...current, [field]: value }))
+    save.reset()
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    if (save.isPending) {
+      return
+    }
+
     setSubmitted(true)
 
     if ('errors' in result) {
@@ -181,15 +196,22 @@ export function TradingPartnerForm({ tradingPartner }: { tradingPartner?: Tradin
           {conflict}
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={save.isPending} type="submit">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="submit"
+          aria-disabled={save.isPending || undefined}
+          className="aria-disabled:cursor-progress aria-disabled:opacity-50">
           {save.isPending ? t('saving') : tradingPartner ? t('save') : t('create')}
         </Button>
-        <Link
-          href={tradingPartner ? `/trading-partners/${tradingPartner.id}` : '/trading-partners'}
-          className={buttonVariants({ variant: 'outline' })}>
-          {t('cancel')}
-        </Link>
+        {tradingPartner ? (
+          <p role="status" className="text-sm">
+            {save.isSuccess && savedLabel}
+          </p>
+        ) : (
+          <Link href="/trading-partners" className={buttonVariants({ variant: 'outline' })}>
+            {t('cancel')}
+          </Link>
+        )}
       </div>
     </form>
   )

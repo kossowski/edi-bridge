@@ -769,103 +769,142 @@
     }
   },
   "TradingPartner": {
-    "title": "Trading Partner",
-    "loading": "Loading Trading Partner",
+    "title": "Trading partner",
+    "loading": "Loading trading partner",
     "notFound": {
-      "title": "Trading Partner not found",
-      "description": "No Trading Partner with this ID exists in this Workspace."
+      "title": "Trading partner not found",
+      "description": "No trading partner with this ID exists in this Workspace."
     },
     "error": {
-      "title": "Trading Partner unavailable",
-      "description": "The Trading Partner could not be loaded. Try again.",
+      "title": "Trading partner unavailable",
+      "description": "The trading partner could not be loaded. Try again.",
       "retry": "Try again"
     },
-    "facts": {
-      "label": "Trading Partner details",
-      "gln": "GLN",
-      "characterSet": "Character set",
-      "acknowledgementTimeLimit": "Acknowledgement time limit",
-      "mode": "Mode"
+    "tabs": {
+      "label": "Partner sections",
+      "overview": "Overview",
+      "settings": "Settings"
     },
-    "onboarding": {
-      "title": "Onboarding",
+    "gln": "GLN {gln}",
+    "setup": {
+      "title": "Setup",
+      "description": "While {name} is testing, every document is marked as a test. Work through the steps in order.",
+      "complete": "{name} is set up and exchanging real documents.",
+      "progress": "{done} of {total} steps done",
       "state": {
         "done": "Done",
-        "current": "Next step",
-        "pending": "Open"
+        "next": "Next step",
+        "open": "Later"
       },
       "steps": {
         "identity": {
-          "title": "Identity set",
-          "description": "Your company's GLN and the Trading Partner's GLN are recorded, so Interchanges carry the correct sender and receiver."
+          "title": "Your company's GLN",
+          "description": "Your partners know you by your company's location number (GLN). It goes into every document you send."
+        },
+        "connections": {
+          "title": "Connections",
+          "description": "How documents arrive from this partner and leave to it, for example through an SFTP folder."
+        },
+        "documents": {
+          "title": "Documents you exchange",
+          "description": "Which documents travel, such as purchase orders or invoices, and the mapping between the partner's format and yours."
         },
         "testInterchange": {
-          "title": "Test Interchange sent",
-          "description": "A first Interchange flagged as a test went to the Trading Partner."
+          "title": "Send a test document",
+          "description": "One document marked as a test goes to the partner. Nothing reaches their real order processing."
         },
         "contrl": {
-          "title": "CONTRL received",
-          "description": "The Trading Partner confirmed the test Interchange with a CONTRL."
+          "title": "Receipt confirmation",
+          "description": "The partner's system answers with a receipt confirmation once it could read your test. This can take a few hours."
         },
         "production": {
-          "title": "Production on",
-          "description": "Interchanges with the Trading Partner are no longer flagged as a test."
+          "title": "Go live",
+          "description": "Documents with this partner are no longer marked as tests and reach your daily work."
         }
       },
-      "setIdentity": "Record your company's GLN in Settings",
-      "identityViewOnly": "An Admin records your company's GLN in Settings.",
-      "productionLocked": {
-        "identity": "You can switch to production once your company's GLN is recorded.",
-        "testInterchange": "You can switch to production once the test Interchange is sent.",
-        "contrl": "You can switch to production once the CONTRL is received."
+      "doneAt": "Done on <when>{at}</when>",
+      "actions": {
+        "identity": "Record your company's GLN",
+        "connections": "Add a connection",
+        "documents": "Add a document route",
+        "testInterchange": "Send a test document",
+        "sending": "Sending…",
+        "resend": "Send the test again",
+        "production": "Go live"
       },
-      "switch": {
-        "button": "Switch to production",
-        "confirmation": "From now on, Interchanges with {tradingPartner} are production traffic and are no longer flagged as a test.",
-        "confirm": "Switch to production now",
+      "viewOnly": {
+        "identity": "An Admin records your company's GLN in Settings.",
+        "other": "An Admin continues the setup."
+      },
+      "sendFailed": "The test document could not be sent. Try again.",
+      "waiting": "Waiting for the receipt confirmation from {name}. This page updates by itself.",
+      "sentAt": "Test document sent <when>{time}</when>.",
+      "arrived": "The receipt confirmation from {name} arrived. You can go live now.",
+      "goLive": {
+        "title": "Take {name} live?",
+        "description": "From now on, documents with {name} are real and no longer marked as tests. They reach your daily work and the partner's real order processing.",
+        "confirm": "Go live now",
         "cancel": "Cancel",
-        "pending": "Switching…",
-        "failed": "The switch to production failed. Try again."
+        "pending": "Going live…",
+        "failed": "{name} could not go live. Try again.",
+        "done": "{name} is live."
       }
     },
-    "channels": {
-      "title": "Channels",
-      "none": "No Channels belong to this Trading Partner yet.",
-      "failed": "The Channels could not be loaded."
+    "activity": {
+      "title": "Activity unavailable",
+      "loading": "Loading the activity",
+      "failed": "The activity could not be loaded.",
+      "retry": "Try again"
+    },
+    "days": {
+      "title": "Documents, last 7 days",
+      "total": "{count, plural, one {# document} other {# documents}}",
+      "failedTotal": "{count, plural, one {# needs attention} other {# need attention}}",
+      "empty": "No documents in the last 7 days.",
+      "documents": "{count, plural, one {# document} other {# documents}}",
+      "caption": "Documents with {name} per day, last 7 days"
     },
     "flows": {
-      "title": "Flows",
-      "none": "No Flows for this Trading Partner yet.",
-      "failed": "The Flows could not be loaded."
+      "title": "What flows with {name}",
+      "description": "Every document route with this partner and its documents of the last 7 days.",
+      "empty": "No document routes yet. Once you choose the documents you exchange, they appear here.",
+      "documents": "{count, plural, =0 {No documents} one {# document} other {# documents}}"
     },
-    "runs": {
-      "title": "Recent documents",
-      "none": "No documents for this trading partner yet.",
-      "failed": "The recent documents could not be loaded.",
-      "viewAll": "View all {count, plural, one {# document} other {# documents}} of this trading partner"
+    "problems": {
+      "title": "{count, plural, =0 {Open problems} other {Open problems (#)}}",
+      "none": "Nothing needs attention.",
+      "overdue": "No receipt confirmation",
+      "overdueSince": "Overdue since <when>{time}</when>",
+      "openRun": "Open document",
+      "openInterchange": "Open transmission {controlReference}",
+      "more": "Showing {shown} of {total}.",
+      "showAll": "Show all documents that need attention"
+    },
+    "settings": {
+      "title": "Partner details",
+      "description": "How EDI Bridge addresses the documents it exchanges with {name}.",
+      "saved": "Changes saved."
     }
   },
   "TradingPartnerForm": {
     "createTitle": "New trading partner",
-    "editTitle": "Edit {name}",
-    "editPageTitle": "Edit Trading Partner",
     "testModeNotice": "A new Trading Partner starts in Test Mode. Every Interchange with it is flagged as a test until you switch it to production.",
     "fields": {
       "name": {
         "label": "Name",
-        "description": "The company name of the Trading Partner."
+        "description": "The partner's company name."
       },
       "gln": {
         "label": "GLN",
-        "description": "The Trading Partner's 13-digit Global Location Number, including the check digit."
+        "description": "The partner's 13-digit location number (GLN), including the check digit. It is on the partner's EDI info sheet."
       },
       "characterSet": {
         "label": "Character set",
-        "description": "The syntax level in the UNB envelope of Interchanges to this Trading Partner."
+        "description": "Which letters documents to this partner may contain. Only change it if the partner asks."
       },
       "acknowledgementTimeLimitHours": {
-        "label": "Acknowledgement time limit (hours)",
-        "description": "A sent Interchange becomes Overdue when no CONTRL arrives within this time."
+        "label": "Wait time for a receipt confirmation (hours)",
+        "description": "A sent document becomes overdue when no receipt confirmation arrives within this time."
       }
     },
     "characterSets": {

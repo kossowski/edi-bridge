@@ -769,103 +769,142 @@
     }
   },
   "TradingPartner": {
-    "title": "Trading Partner",
-    "loading": "Trading Partner wird geladen",
+    "title": "Handelspartner",
+    "loading": "Handelspartner wird geladen",
     "notFound": {
-      "title": "Trading Partner nicht gefunden",
-      "description": "In diesem Workspace gibt es keinen Trading Partner mit dieser ID."
+      "title": "Handelspartner nicht gefunden",
+      "description": "In diesem Arbeitsbereich gibt es keinen Handelspartner mit dieser ID."
     },
     "error": {
-      "title": "Trading Partner nicht verfügbar",
-      "description": "Der Trading Partner konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Handelspartner nicht verfügbar",
+      "description": "Der Handelspartner konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     },
-    "facts": {
-      "label": "Details zum Trading Partner",
-      "gln": "GLN",
-      "characterSet": "Zeichensatz",
-      "acknowledgementTimeLimit": "Frist für Acknowledgements",
-      "mode": "Modus"
+    "tabs": {
+      "label": "Bereiche des Partners",
+      "overview": "Übersicht",
+      "settings": "Einstellungen"
     },
-    "onboarding": {
-      "title": "Onboarding",
+    "gln": "GLN {gln}",
+    "setup": {
+      "title": "Einrichtung",
+      "description": "Solange {name} im Testbetrieb ist, wird jeder Beleg als Test markiert. Gehen Sie die Schritte der Reihe nach durch.",
+      "complete": "{name} ist eingerichtet, echte Belege werden ausgetauscht.",
+      "progress": "{done} von {total} Schritten erledigt",
       "state": {
         "done": "Erledigt",
-        "current": "Nächster Schritt",
-        "pending": "Offen"
+        "next": "Nächster Schritt",
+        "open": "Später"
       },
       "steps": {
         "identity": {
-          "title": "Identität erfasst",
-          "description": "Die GLN Ihres Unternehmens und die GLN des Trading Partners sind erfasst, damit Interchanges den richtigen Absender und Empfänger tragen."
+          "title": "GLN Ihres Unternehmens",
+          "description": "Ihre Partner erkennen Sie an der Standortnummer (GLN) Ihres Unternehmens. Sie steht in jedem Beleg, den Sie senden."
+        },
+        "connections": {
+          "title": "Verbindungen",
+          "description": "Wie Belege von diesem Partner ankommen und an ihn gehen, zum Beispiel über einen SFTP-Ordner."
+        },
+        "documents": {
+          "title": "Belege, die Sie austauschen",
+          "description": "Welche Belege ausgetauscht werden, etwa Bestellungen oder Rechnungen, und das Mapping zwischen dem Format des Partners und Ihrem."
         },
         "testInterchange": {
-          "title": "Test-Interchange gesendet",
-          "description": "Ein erstes, als Test markiertes Interchange ging an den Trading Partner."
+          "title": "Testbeleg senden",
+          "description": "Ein als Test markierter Beleg geht an den Partner. Seine echte Auftragsbearbeitung erreicht nichts."
         },
         "contrl": {
-          "title": "CONTRL empfangen",
-          "description": "Der Trading Partner hat das Test-Interchange mit einem CONTRL bestätigt."
+          "title": "Empfangsbestätigung",
+          "description": "Das System des Partners antwortet mit einer Empfangsbestätigung, sobald es Ihren Test lesen konnte. Das kann einige Stunden dauern."
         },
         "production": {
-          "title": "Produktion aktiv",
-          "description": "Interchanges mit dem Trading Partner sind nicht mehr als Test markiert."
+          "title": "Live schalten",
+          "description": "Belege mit diesem Partner sind nicht mehr als Test markiert und landen in Ihrer täglichen Arbeit."
         }
       },
-      "setIdentity": "GLN Ihres Unternehmens in den Einstellungen erfassen",
-      "identityViewOnly": "Ein Admin erfasst die GLN Ihres Unternehmens in den Einstellungen.",
-      "productionLocked": {
-        "identity": "Sie können auf Produktion umstellen, sobald die GLN Ihres Unternehmens erfasst ist.",
-        "testInterchange": "Sie können auf Produktion umstellen, sobald das Test-Interchange gesendet ist.",
-        "contrl": "Sie können auf Produktion umstellen, sobald das CONTRL empfangen ist."
+      "doneAt": "Erledigt am <when>{at}</when>",
+      "actions": {
+        "identity": "GLN Ihres Unternehmens erfassen",
+        "connections": "Verbindung hinzufügen",
+        "documents": "Belegweg hinzufügen",
+        "testInterchange": "Testbeleg senden",
+        "sending": "Wird gesendet…",
+        "resend": "Test erneut senden",
+        "production": "Live schalten"
       },
-      "switch": {
-        "button": "Auf Produktion umstellen",
-        "confirmation": "Ab sofort sind Interchanges mit {tradingPartner} Produktionsverkehr und nicht mehr als Test markiert.",
-        "confirm": "Jetzt auf Produktion umstellen",
+      "viewOnly": {
+        "identity": "Ein Admin erfasst die GLN Ihres Unternehmens in den Einstellungen.",
+        "other": "Ein Admin setzt die Einrichtung fort."
+      },
+      "sendFailed": "Der Testbeleg konnte nicht gesendet werden. Versuchen Sie es erneut.",
+      "waiting": "Warten auf die Empfangsbestätigung von {name}. Diese Seite aktualisiert sich von selbst.",
+      "sentAt": "Testbeleg gesendet <when>{time}</when>.",
+      "arrived": "Die Empfangsbestätigung von {name} ist eingetroffen. Sie können jetzt live schalten.",
+      "goLive": {
+        "title": "{name} live schalten?",
+        "description": "Ab jetzt sind Belege mit {name} echt und nicht mehr als Test markiert. Sie landen in Ihrer täglichen Arbeit und in der echten Auftragsbearbeitung des Partners.",
+        "confirm": "Jetzt live schalten",
         "cancel": "Abbrechen",
-        "pending": "Wird umgestellt…",
-        "failed": "Die Umstellung auf Produktion ist fehlgeschlagen. Versuchen Sie es erneut."
+        "pending": "Wird live geschaltet…",
+        "failed": "{name} konnte nicht live geschaltet werden. Versuchen Sie es erneut.",
+        "done": "{name} ist live."
       }
     },
-    "channels": {
-      "title": "Channels",
-      "none": "Zu diesem Trading Partner gehören noch keine Channels.",
-      "failed": "Die Channels konnten nicht geladen werden."
+    "activity": {
+      "title": "Aktivität nicht verfügbar",
+      "loading": "Aktivität wird geladen",
+      "failed": "Die Aktivität konnte nicht geladen werden.",
+      "retry": "Erneut versuchen"
+    },
+    "days": {
+      "title": "Belege der letzten 7 Tage",
+      "total": "{count, plural, one {# Beleg} other {# Belege}}",
+      "failedTotal": "{count, plural, one {# braucht Aufmerksamkeit} other {# brauchen Aufmerksamkeit}}",
+      "empty": "Keine Belege in den letzten 7 Tagen.",
+      "documents": "{count, plural, one {# Beleg} other {# Belege}}",
+      "caption": "Belege mit {name} pro Tag, letzte 7 Tage"
     },
     "flows": {
-      "title": "Flows",
-      "none": "Für diesen Trading Partner gibt es noch keine Flows.",
-      "failed": "Die Flows konnten nicht geladen werden."
+      "title": "Was mit {name} ausgetauscht wird",
+      "description": "Jeder Belegweg mit diesem Partner und seine Belege der letzten 7 Tage.",
+      "empty": "Noch keine Belegwege. Sobald Sie die Belege auswählen, die Sie austauschen, erscheinen sie hier.",
+      "documents": "{count, plural, =0 {Keine Belege} one {# Beleg} other {# Belege}}"
     },
-    "runs": {
-      "title": "Letzte Belege",
-      "none": "Für diesen Handelspartner gibt es noch keine Belege.",
-      "failed": "Die letzten Belege konnten nicht geladen werden.",
-      "viewAll": "Alle {count, plural, one {# Beleg} other {# Belege}} dieses Handelspartners anzeigen"
+    "problems": {
+      "title": "{count, plural, =0 {Offene Probleme} other {Offene Probleme (#)}}",
+      "none": "Nichts braucht Aufmerksamkeit.",
+      "overdue": "Keine Empfangsbestätigung",
+      "overdueSince": "Überfällig seit <when>{time}</when>",
+      "openRun": "Beleg öffnen",
+      "openInterchange": "Übertragung {controlReference} öffnen",
+      "more": "{shown} von {total} werden angezeigt.",
+      "showAll": "Alle Belege anzeigen, die Aufmerksamkeit brauchen"
+    },
+    "settings": {
+      "title": "Partnerdaten",
+      "description": "Wie EDI Bridge die Belege adressiert, die es mit {name} austauscht.",
+      "saved": "Änderungen gespeichert."
     }
   },
   "TradingPartnerForm": {
     "createTitle": "Neuer Handelspartner",
-    "editTitle": "{name} bearbeiten",
-    "editPageTitle": "Trading Partner bearbeiten",
     "testModeNotice": "Ein neuer Trading Partner startet im Test Mode. Jedes Interchange mit ihm ist als Test markiert, bis Sie ihn auf Produktion umstellen.",
     "fields": {
       "name": {
         "label": "Name",
-        "description": "Der Firmenname des Trading Partners."
+        "description": "Der Firmenname des Partners."
       },
       "gln": {
         "label": "GLN",
-        "description": "Die 13-stellige Global Location Number des Trading Partners, einschließlich Prüfziffer."
+        "description": "Die 13-stellige Standortnummer (GLN) des Partners, einschließlich Prüfziffer. Sie steht im EDI-Infoblatt des Partners."
       },
       "characterSet": {
         "label": "Zeichensatz",
-        "description": "Die Syntaxebene im UNB-Rahmen der Interchanges an diesen Trading Partner."
+        "description": "Welche Zeichen Belege an diesen Partner enthalten dürfen. Ändern Sie ihn nur, wenn der Partner darum bittet."
       },
       "acknowledgementTimeLimitHours": {
-        "label": "Frist für Acknowledgements (Stunden)",
-        "description": "Ein gesendetes Interchange wird überfällig, wenn innerhalb dieser Zeit kein CONTRL eintrifft."
+        "label": "Wartezeit auf eine Empfangsbestätigung (Stunden)",
+        "description": "Ein gesendeter Beleg wird überfällig, wenn innerhalb dieser Zeit keine Empfangsbestätigung eintrifft."
       }
     },
     "characterSets": {

@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import type { Metadata } from 'next'
 
-import { TradingPartnerDetailScreen } from '@/components/trading-partners/trading-partner-detail-screen'
+import { PartnerScreen } from '@/components/trading-partners/partner-screen'
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations()
@@ -13,5 +13,5 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Page({ params }: PageProps<'/trading-partners/[id]'>) {
   const { id } = await params
 
-  return <TradingPartnerDetailScreen id={id} />
+  return <PartnerScreen id={id} />
 }

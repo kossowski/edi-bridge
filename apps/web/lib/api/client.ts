@@ -89,10 +89,12 @@ import {
   type RunListQuery,
   runsEndpoint,
   submitDocumentEndpoint,
+  sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
   toPath,
   toSearchParams,
   tradingPartnerActivitiesEndpoint,
+  tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
   type TradingPartnerInput,
   tradingPartnersEndpoint,
@@ -510,6 +512,12 @@ export function listTradingPartnerActivities() {
   return request(tradingPartnerActivitiesEndpoint)
 }
 
+export function getTradingPartnerActivity(id: string) {
+  return request(tradingPartnerActivityEndpoint, {
+    path: toPath(tradingPartnerActivityEndpoint.path, { id }),
+  })
+}
+
 export function getTradingPartner(id: string) {
   return request(tradingPartnerEndpoint, { path: toPath(tradingPartnerEndpoint.path, { id }) })
 }
@@ -528,6 +536,12 @@ export function updateTradingPartner(id: string, body: TradingPartnerInput) {
 export function switchToProduction(id: string) {
   return request(switchToProductionEndpoint, {
     path: toPath(switchToProductionEndpoint.path, { id }),
+  })
+}
+
+export function sendTestInterchange(id: string) {
+  return request(sendTestInterchangeEndpoint, {
+    path: toPath(sendTestInterchangeEndpoint.path, { id }),
   })
 }
 

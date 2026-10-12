@@ -20,10 +20,10 @@ describe('breadcrumbTrail', () => {
   })
 
   it('adds a detail crumb and the subpages below it', () => {
-    expect(breadcrumbTrail('/trading-partners/tp-1/edit')).toEqual([
-      { href: '/trading-partners', label: { kind: 'item', key: 'tradingPartners' } },
-      { href: '/trading-partners/tp-1', label: { kind: 'detail' } },
-      { href: '/trading-partners/tp-1/edit', label: { kind: 'subpage', key: 'edit' } },
+    expect(breadcrumbTrail('/flows/fl-1/edit')).toEqual([
+      { href: '/flows', label: { kind: 'item', key: 'allDocumentRoutes' } },
+      { href: '/flows/fl-1', label: { kind: 'detail' } },
+      { href: '/flows/fl-1/edit', label: { kind: 'subpage', key: 'edit' } },
     ])
     expect(breadcrumbTrail('/channels/new')).toEqual([
       { href: '/channels', label: { kind: 'item', key: 'allConnections' } },
