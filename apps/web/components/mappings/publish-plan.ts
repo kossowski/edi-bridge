@@ -1,24 +1,6 @@
-import { type MappingVersionEntry, maxChangeNoteLength } from '@edi-bridge/contracts'
+import { maxChangeNoteLength } from '@edi-bridge/contracts'
 
-export type RouteInUse = { id: string; name: string; partner: string; version: number }
-
-export function routesInUse(entries: ReadonlyArray<MappingVersionEntry>): RouteInUse[] {
-  return entries
-    .flatMap(({ version, flows }) =>
-      flows.map(({ id, name, tradingPartner }) => ({
-        id,
-        name,
-        partner: tradingPartner.name,
-        version,
-      })),
-    )
-    .sort(
-      (a, b) =>
-        a.partner.localeCompare(b.partner, 'de') ||
-        a.name.localeCompare(b.name, 'de') ||
-        b.version - a.version,
-    )
-}
+import type { FlowInUse } from './version-history'
 
 export type ChangeNoteProblem = 'missing' | 'tooLong'
 
@@ -32,10 +14,9 @@ export function changeNoteProblem(note: string): ChangeNoteProblem | null {
   return trimmed.length > maxChangeNoteLength ? 'tooLong' : null
 }
 
-// Keeps the routes' order, so the request lists them as the dialog does.
-export function chosenRouteIds(
-  routes: ReadonlyArray<RouteInUse>,
+export function chosenFlowIds(
+  flows: ReadonlyArray<FlowInUse>,
   chosen: ReadonlySet<string>,
 ): string[] {
-  return routes.flatMap(({ id }) => (chosen.has(id) ? [id] : []))
+  return flows.flatMap(({ id }) => (chosen.has(id) ? [id] : []))
 }

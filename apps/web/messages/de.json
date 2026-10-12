@@ -2214,7 +2214,7 @@
       },
       "routes": {
         "legend": "Belegwege",
-        "loading": "Belegwege werden geladen",
+        "loading": "Die Belegwege werden geladen. Sie können veröffentlichen, sobald sie angezeigt werden.",
         "none": "Noch nutzt kein Partner dieses Mapping. Für Ihre Partner ändert das Veröffentlichen nichts.",
         "error": "Die Belegwege konnten nicht geladen werden. Beim Veröffentlichen wird jetzt keiner umgestellt.",
         "retry": "Belegwege erneut laden",
@@ -2231,10 +2231,10 @@
       "done": "Als Version {version} veröffentlicht.",
       "doneMoved": "Als Version {version} veröffentlicht. {count, plural, one {# Belegweg wurde} other {# Belegwege wurden}} darauf umgestellt.",
       "problem": {
-        "noChanges": "Der Draft hat seit der neuesten Version keine Änderungen, es gibt also nichts zu veröffentlichen.",
-        "incomplete": "Der Draft lässt sich noch nicht veröffentlichen: Jede Verknüpfung und jeder Transform muss vollständig sein. Vervollständigen Sie sie und veröffentlichen Sie dann erneut.",
-        "reviewOpen": "Der Draft lässt sich nicht veröffentlichen, solange die Durchsicht des KI-Entwurfs offen ist. Übernehmen Sie zuerst den KI-Entwurf und veröffentlichen Sie dann.",
-        "failed": "Der Draft konnte nicht veröffentlicht werden. Versuchen Sie es erneut."
+        "noChanges": "Der Entwurf hat seit der neuesten Version keine Änderungen, es gibt also nichts zu veröffentlichen.",
+        "incomplete": "Der Entwurf lässt sich noch nicht veröffentlichen: Jede Verknüpfung und jeder Transform muss vollständig sein. Vervollständigen Sie sie und veröffentlichen Sie dann erneut.",
+        "reviewOpen": "Der Entwurf lässt sich nicht veröffentlichen, solange die Durchsicht des KI-Entwurfs offen ist. Übernehmen Sie zuerst den KI-Entwurf und veröffentlichen Sie dann.",
+        "failed": "Der Entwurf konnte nicht veröffentlicht werden. Versuchen Sie es erneut."
       }
     },
     "versions": {

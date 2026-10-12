@@ -60,7 +60,7 @@ const versionsPath = `${apiUrl}${mappingVersionsEndpoint.path}`
 
 const note = 'Delivery date added'
 
-function route(name: string, partner: string): PinnedFlow {
+function flow(name: string, partner: string): PinnedFlow {
   return {
     id: crypto.randomUUID(),
     name,
@@ -86,13 +86,13 @@ function versionEntries(
   )
 }
 
-const hansemarkt = route('Orders by AS2', 'Hansemarkt GmbH')
+const hansemarkt = flow('Orders by AS2', 'Hansemarkt GmbH')
 
-const elbtal = route('Orders by SFTP', 'Elbtal Warenhaus KG')
+const elbtal = flow('Orders by SFTP', 'Elbtal Warenhaus KG')
 
-const alpenfrisch = route('Orders by mail', 'Alpenfrisch AG')
+const alpenfrisch = flow('Orders by mail', 'Alpenfrisch AG')
 
-const severalRoutes = versionEntries(
+const severalFlows = versionEntries(
   changed,
   new Map([
     [3, [hansemarkt]],
@@ -101,13 +101,13 @@ const severalRoutes = versionEntries(
   ]),
 )
 
-const manyRoutes = versionEntries(
+const manyFlows = versionEntries(
   changed,
   new Map(
     [3, 2, 1].map((version) => [
       version,
       Array.from({ length: 20 }, (_, index) =>
-        route(
+        flow(
           `Orders by AS2, route ${version * 100 + index}`,
           `Großhandel ${String.fromCodePoint(65 + index)} Nord GmbH & Co. KG`,
         ),
@@ -121,29 +121,30 @@ const unusedVersions = versionEntries(changed, new Map())
 const publishRequests: PublishMappingDraftBody[] = []
 
 // Answers as the API would and keeps each request body, so a story sees what moves.
-function recordPublish(versions: ReadonlyArray<MappingVersionEntry>) {
+function publishHandler(versions: ReadonlyArray<MappingVersionEntry>) {
   const [latest] = [...versions].sort((a, b) => b.version - a.version)
 
-  return [
-    http.get(versionsPath, () => HttpResponse.json(versions)),
-    http.post(publishPath, async ({ request }) => {
-      const body = publishMappingDraftBodySchema.parse(await request.json())
+  return http.post(publishPath, async ({ request }) => {
+    const body = publishMappingDraftBodySchema.parse(await request.json())
 
-      publishRequests.push(body)
+    publishRequests.push(body)
 
-      return HttpResponse.json(
-        {
-          ...latest!,
-          id: crypto.randomUUID(),
-          version: latest!.version + 1,
-          publishedAt: new Date().toISOString(),
-          changeNote: body.changeNote,
-          flows: [],
-        },
-        { status: 201 },
-      )
-    }),
-  ]
+    return HttpResponse.json(
+      {
+        ...latest!,
+        id: crypto.randomUUID(),
+        version: latest!.version + 1,
+        publishedAt: new Date().toISOString(),
+        changeNote: body.changeNote,
+        flows: [],
+      },
+      { status: 201 },
+    )
+  })
+}
+
+function recordPublish(versions: ReadonlyArray<MappingVersionEntry>) {
+  return [http.get(versionsPath, () => HttpResponse.json(versions)), publishHandler(versions)]
 }
 
 function DraftHeader({ id }: { id: string }) {
@@ -183,8 +184,9 @@ async function confirmPublish(canvasElement: HTMLElement) {
 
   await userEvent.type(dialog.getByRole('textbox', { name: 'What changed?' }), note)
 
-  const confirm = dialog.getByRole('button', { name: /^Publish version/ })
+  const confirm = dialog.getByRole('button', { name: /^Publish Version/ })
 
+  await waitFor(() => expect(confirm).toHaveAttribute('aria-disabled', 'false'))
   await userEvent.click(confirm)
 
   return confirm
@@ -245,21 +247,21 @@ export const NeverPublished = meta.story({
 
     const dialog = await openDialog(canvasElement)
 
-    await expect(page(canvasElement).getByRole('dialog')).toHaveAccessibleName('Publish version 1?')
+    await expect(page(canvasElement).getByRole('dialog')).toHaveAccessibleName('Publish Version 1?')
     await expect(dialog.getByText(/^No partner uses this Mapping yet\./)).toBeVisible()
   },
 })
 
 export const Confirm = meta.story({
   beforeEach({ msw }) {
-    msw.use(...recordPublish(severalRoutes))
+    msw.use(...recordPublish(severalFlows))
   },
   async play({ canvasElement }) {
     const dialog = await openDialog(canvasElement)
     const popup = page(canvasElement).getByRole('dialog')
 
-    await expect(popup).toHaveAccessibleName('Publish version 4?')
-    await expect(popup).toHaveAccessibleDescription(/^Your unpublished changes become version 4\./)
+    await expect(popup).toHaveAccessibleName('Publish Version 4?')
+    await expect(popup).toHaveAccessibleDescription(/^Your unpublished changes become Version 4\./)
 
     const field = dialog.getByRole('textbox', { name: 'What changed?' })
 
@@ -268,11 +270,11 @@ export const Confirm = meta.story({
       `Shown in the version history. Up to ${maxChangeNoteLength} characters.`,
     )
 
-    const routes = await dialog.findByRole('group', { name: 'Document routes' })
+    const flowGroup = await dialog.findByRole('group', { name: 'Document routes' })
 
-    await expect(routes).toBeVisible()
+    await expect(flowGroup).toBeVisible()
 
-    for (const checkbox of within(routes).getAllByRole('checkbox')) {
+    for (const checkbox of within(flowGroup).getAllByRole('checkbox')) {
       await expect(checkbox).not.toBeChecked()
     }
   },
@@ -296,27 +298,27 @@ export const NoRoutes = meta.story({
 
 export const SeveralRoutes = meta.story({
   beforeEach({ msw }) {
-    msw.use(...recordPublish(severalRoutes))
+    msw.use(...recordPublish(severalFlows))
   },
   async play({ canvasElement }) {
     const dialog = await openDialog(canvasElement)
 
-    const elbtalRoute = await dialog.findByRole('checkbox', {
-      name: 'Move Orders by SFTP (Elbtal Warenhaus KG) to version 4',
+    const elbtalFlow = await dialog.findByRole('checkbox', {
+      name: 'Move Orders by SFTP (Elbtal Warenhaus KG) to Version 4',
     })
 
-    await expect(elbtalRoute).toHaveAccessibleDescription('Uses version 2 now.')
+    await expect(elbtalFlow).toHaveAccessibleDescription('Uses Version 2 now.')
     await expect(
-      dialog.getByRole('checkbox', { name: 'Move Orders by AS2 (Hansemarkt GmbH) to version 4' }),
-    ).toHaveAccessibleDescription('Uses version 3 now.')
+      dialog.getByRole('checkbox', { name: 'Move Orders by AS2 (Hansemarkt GmbH) to Version 4' }),
+    ).toHaveAccessibleDescription('Uses Version 3 now.')
     await expect(
       dialog.getByText(
         'Orders by mail (Alpenfrisch AG), Orders by SFTP (Elbtal Warenhaus KG), and Orders by AS2 (Hansemarkt GmbH) keep their versions until you move them.',
       ),
     ).toBeVisible()
 
-    await userEvent.click(elbtalRoute)
-    await expect(elbtalRoute).toBeChecked()
+    await userEvent.click(elbtalFlow)
+    await expect(elbtalFlow).toBeChecked()
     await expect(
       dialog.getByText(
         'Orders by mail (Alpenfrisch AG) and Orders by AS2 (Hansemarkt GmbH) keep their versions until you move them.',
@@ -324,28 +326,28 @@ export const SeveralRoutes = meta.story({
     ).toBeVisible()
 
     await userEvent.type(dialog.getByRole('textbox', { name: 'What changed?' }), `  ${note}  `)
-    await userEvent.click(dialog.getByRole('button', { name: 'Publish version 4' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Publish Version 4' }))
 
-    await expectToast(canvasElement, 'Published as version 4. 1 document route moved to it.')
+    await expectToast(canvasElement, 'Published as Version 4. 1 document route moved to it.')
     await expect(publishRequests).toEqual([{ changeNote: note, moveFlowIds: [elbtal.id] }])
   },
 })
 
 export const NothingMovesUnlessChosen = meta.story({
   beforeEach({ msw }) {
-    msw.use(...recordPublish(severalRoutes))
+    msw.use(...recordPublish(severalFlows))
   },
   async play({ canvasElement }) {
     await confirmPublish(canvasElement)
 
-    await expectToast(canvasElement, 'Published as version 4.')
+    await expectToast(canvasElement, 'Published as Version 4.')
     await expect(publishRequests).toEqual([{ changeNote: note, moveFlowIds: [] }])
   },
 })
 
 export const ManyRoutes = meta.story({
   beforeEach({ msw }) {
-    msw.use(...recordPublish(manyRoutes))
+    msw.use(...recordPublish(manyFlows))
   },
   async play({ canvasElement }) {
     const dialog = await openDialog(canvasElement)
@@ -358,7 +360,7 @@ export const ManyRoutes = meta.story({
     await expect(
       page(canvasElement).getByRole('dialog').getBoundingClientRect().bottom,
     ).toBeLessThanOrEqual(window.innerHeight)
-    await expect(dialog.getByRole('button', { name: 'Publish version 4' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Publish Version 4' })).toBeVisible()
 
     const last = checkboxes.at(-1)!
 
@@ -370,7 +372,7 @@ export const ManyRoutes = meta.story({
     ).toBeInTheDocument()
 
     await userEvent.type(dialog.getByRole('textbox', { name: 'What changed?' }), note)
-    await userEvent.click(dialog.getByRole('button', { name: 'Publish version 4' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Publish Version 4' }))
 
     await waitFor(() => expect(publishRequests).toHaveLength(1))
     await expect(publishRequests[0]!.moveFlowIds).toHaveLength(1)
@@ -381,7 +383,7 @@ export const RoutesUnavailable = meta.story({
   beforeEach({ msw }) {
     msw.use(
       http.get(versionsPath, () => new HttpResponse(null, { status: 500 })),
-      ...recordPublish(severalRoutes),
+      ...recordPublish(severalFlows),
     )
   },
   async play({ canvasElement }) {
@@ -392,25 +394,146 @@ export const RoutesUnavailable = meta.story({
         'The document routes could not be loaded. Publishing now moves none of them.',
       ),
     ).toBeVisible()
-    await expect(dialog.getByRole('button', { name: 'Load the routes again' })).toBeVisible()
+    await expect(
+      dialog.getByRole('button', { name: 'Load the document routes again' }),
+    ).toBeVisible()
 
     await userEvent.type(dialog.getByRole('textbox', { name: 'What changed?' }), note)
-    await userEvent.click(dialog.getByRole('button', { name: 'Publish version 4' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Publish Version 4' }))
 
     await waitFor(() => expect(publishRequests).toEqual([{ changeNote: note, moveFlowIds: [] }]))
   },
 })
 
+export const RoutesLoading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(versionsPath, async () => {
+        await delay('infinite')
+      }),
+      publishHandler(severalFlows),
+    )
+  },
+  async play({ canvasElement }) {
+    const dialog = await openDialog(canvasElement)
+    const loading = 'Loading the document routes. You can publish once they are shown.'
+
+    await expect(dialog.getByRole('status')).toHaveTextContent(loading)
+    await expect(dialog.queryByRole('checkbox')).toBeNull()
+
+    const confirm = dialog.getByRole('button', { name: 'Publish Version 4' })
+
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    await expect(confirm).toHaveAccessibleDescription(loading)
+
+    await userEvent.type(dialog.getByRole('textbox', { name: 'What changed?' }), note)
+    await userEvent.click(confirm)
+    await expect(publishRequests).toEqual([])
+  },
+})
+
+const elbtalMoved = versionEntries(
+  changed,
+  new Map([
+    [3, [hansemarkt, elbtal]],
+    [1, [alpenfrisch]],
+  ]),
+)
+
+let releaseVersions = () => {}
+
+export const RoutesRefreshedOnOpen = meta.story({
+  beforeEach({ msw }) {
+    let calls = 0
+
+    msw.use(
+      http.get(versionsPath, async () => {
+        calls += 1
+
+        if (calls === 1) {
+          return HttpResponse.json(severalFlows)
+        }
+
+        await new Promise<void>((resolve) => {
+          releaseVersions = resolve
+        })
+
+        return HttpResponse.json(elbtalMoved)
+      }),
+      publishHandler(severalFlows),
+    )
+  },
+  async play({ canvasElement }) {
+    const first = await openDialog(canvasElement)
+    const elbtalName = 'Move Orders by SFTP (Elbtal Warenhaus KG) to Version 4'
+
+    await expect(
+      await first.findByRole('checkbox', { name: elbtalName }),
+    ).toHaveAccessibleDescription('Uses Version 2 now.')
+    await userEvent.click(first.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
+
+    const second = await openDialog(canvasElement)
+
+    await expect(second.queryByRole('checkbox')).toBeNull()
+    await expect(second.getByRole('button', { name: 'Publish Version 4' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+
+    releaseVersions()
+
+    await expect(
+      await second.findByRole('checkbox', { name: elbtalName }),
+    ).toHaveAccessibleDescription('Uses Version 3 now.')
+  },
+})
+
+export const FourRoutes = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      ...recordPublish(
+        versionEntries(
+          changed,
+          new Map([
+            [3, [hansemarkt, flow('Orders by AS2', 'Nordwind Handel')]],
+            [2, [elbtal]],
+            [1, [alpenfrisch]],
+          ]),
+        ),
+      ),
+    )
+  },
+  async play({ canvasElement }) {
+    const dialog = await openDialog(canvasElement)
+
+    await expect(
+      await dialog.findByText('4 document routes keep their versions until you move them.'),
+    ).toBeVisible()
+
+    await userEvent.click(
+      dialog.getByRole('checkbox', {
+        name: 'Move Orders by AS2 (Nordwind Handel) to Version 4',
+      }),
+    )
+    await expect(
+      dialog.getByText(
+        'Orders by mail (Alpenfrisch AG), Orders by SFTP (Elbtal Warenhaus KG), and Orders by AS2 (Hansemarkt GmbH) keep their versions until you move them.',
+      ),
+    ).toBeVisible()
+  },
+})
+
 export const NoteMissing = meta.story({
   beforeEach({ msw }) {
-    msw.use(...recordPublish(severalRoutes))
+    msw.use(...recordPublish(severalFlows))
   },
   async play({ canvasElement }) {
     const dialog = await openDialog(canvasElement)
     const field = dialog.getByRole('textbox', { name: 'What changed?' })
 
     await userEvent.type(field, '   ')
-    await userEvent.click(dialog.getByRole('button', { name: 'Publish version 4' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Publish Version 4' }))
 
     await expect(field).toHaveFocus()
     await expect(field).toHaveAttribute('aria-invalid', 'true')
@@ -426,7 +549,7 @@ export const NoteMissing = meta.story({
 
 export const NoteTooLong = meta.story({
   beforeEach({ msw }) {
-    msw.use(...recordPublish(severalRoutes))
+    msw.use(...recordPublish(severalFlows))
   },
   async play({ canvasElement }) {
     const dialog = await openDialog(canvasElement)
@@ -439,7 +562,7 @@ export const NoteTooLong = meta.story({
       dialog.getByText(`Shorten the note to ${maxChangeNoteLength} characters. It has 512 now.`),
     ).toBeVisible()
 
-    await userEvent.click(dialog.getByRole('button', { name: 'Publish version 4' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Publish Version 4' }))
     await expect(field).toHaveFocus()
     await expect(publishRequests).toEqual([])
   },
@@ -473,7 +596,7 @@ export const Published = meta.story({
     const top = title.getBoundingClientRect().top
 
     await confirmPublish(canvasElement)
-    await expectToast(canvasElement, 'Published as version 5.')
+    await expectToast(canvasElement, 'Published as Version 5.')
     await expect(title.getBoundingClientRect().top).toBe(top)
 
     const state = canvas.getByText('No changes since Version 5')
@@ -581,7 +704,7 @@ export const ReviewOpenMeanwhile = meta.story({
 export const German = meta.story({
   decorators: [german],
   beforeEach({ msw }) {
-    msw.use(...recordPublish(severalRoutes))
+    msw.use(...recordPublish(severalFlows))
   },
   async play({ canvas, canvasElement }) {
     await expect(
@@ -612,7 +735,7 @@ export const German = meta.story({
 
 export const Dark = meta.story({
   beforeEach({ msw }) {
-    msw.use(...recordPublish(severalRoutes))
+    msw.use(...recordPublish(severalFlows))
 
     return darkMode()
   },
@@ -621,10 +744,10 @@ export const Dark = meta.story({
 
     await userEvent.click(
       await dialog.findByRole('checkbox', {
-        name: 'Move Orders by AS2 (Hansemarkt GmbH) to version 4',
+        name: 'Move Orders by AS2 (Hansemarkt GmbH) to Version 4',
       }),
     )
-    await userEvent.click(dialog.getByRole('button', { name: 'Publish version 4' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Publish Version 4' }))
     await expect(
       dialog.getByText('Describe what changed, so the version history shows it.'),
     ).toBeVisible()

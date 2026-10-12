@@ -6,7 +6,8 @@ import {
   type PinnedFlow,
 } from '@edi-bridge/contracts'
 
-import { changeNoteProblem, chosenRouteIds, routesInUse } from './publish-plan'
+import { changeNoteProblem, chosenFlowIds } from './publish-plan'
+import { flowsInUse } from './version-history'
 
 const mappingId = '6f0e1c1a-2b3c-4d5e-8f90-a1b2c3d4e5f6'
 
@@ -31,27 +32,6 @@ function entry(version: number, flows: PinnedFlow[] = []): MappingVersionEntry {
   }
 }
 
-describe('routesInUse', () => {
-  it('lists every document route with the version it uses, by partner and name', () => {
-    const rheinkauf = pinned('Orders by AS2', 'Rheinkauf')
-    const alpenfrischMail = pinned('Orders by mail', 'Alpenfrisch')
-    const alpenfrischSftp = pinned('Orders by SFTP', 'Alpenfrisch')
-
-    expect(
-      routesInUse([entry(1, [rheinkauf]), entry(2), entry(3, [alpenfrischSftp, alpenfrischMail])]),
-    ).toEqual([
-      { id: alpenfrischMail.id, name: 'Orders by mail', partner: 'Alpenfrisch', version: 3 },
-      { id: alpenfrischSftp.id, name: 'Orders by SFTP', partner: 'Alpenfrisch', version: 3 },
-      { id: rheinkauf.id, name: 'Orders by AS2', partner: 'Rheinkauf', version: 1 },
-    ])
-  })
-
-  it('lists nothing when no document route uses the Mapping', () => {
-    expect(routesInUse([entry(1), entry(2)])).toEqual([])
-    expect(routesInUse([])).toEqual([])
-  })
-})
-
 describe('changeNoteProblem', () => {
   it('asks for a note when it is empty or only spaces', () => {
     expect(changeNoteProblem('')).toBe('missing')
@@ -68,23 +48,23 @@ describe('changeNoteProblem', () => {
   })
 })
 
-describe('chosenRouteIds', () => {
-  const routes = routesInUse([
+describe('chosenFlowIds', () => {
+  const flows = flowsInUse([
     entry(1, [pinned('Orders by AS2', 'Rheinkauf')]),
     entry(2, [pinned('Orders by SFTP', 'Alpenfrisch'), pinned('Orders by mail', 'Nordwind')]),
   ])
 
   it('moves nothing unless chosen', () => {
-    expect(chosenRouteIds(routes, new Set())).toEqual([])
+    expect(chosenFlowIds(flows, new Set())).toEqual([])
   })
 
-  it('moves only the chosen routes, in the listed order', () => {
-    const [first, , third] = routes
+  it('moves only the chosen Flows, in the listed order', () => {
+    const [first, , third] = flows
 
-    expect(chosenRouteIds(routes, new Set([third!.id, first!.id]))).toEqual([first!.id, third!.id])
+    expect(chosenFlowIds(flows, new Set([third!.id, first!.id]))).toEqual([first!.id, third!.id])
   })
 
-  it('ignores a choice for a route that no longer uses the Mapping', () => {
-    expect(chosenRouteIds(routes, new Set([crypto.randomUUID()]))).toEqual([])
+  it('ignores a choice for a Flow that no longer uses the Mapping', () => {
+    expect(chosenFlowIds(flows, new Set([crypto.randomUUID()]))).toEqual([])
   })
 })

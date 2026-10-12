@@ -25,20 +25,20 @@ const stateIcons: Record<MappingState, IconSvgElement> = {
 export function StateBadge({
   state,
   id,
-  tabIndex,
+  focusable = false,
   className,
   children,
 }: {
   state: MappingState
   id?: string | undefined
-  tabIndex?: number | undefined
+  focusable?: boolean
   className?: string
   children: ReactNode
 }) {
   return (
     <Badge
       id={id}
-      tabIndex={tabIndex}
+      tabIndex={focusable ? -1 : undefined}
       variant="outline"
       className={cn(
         {

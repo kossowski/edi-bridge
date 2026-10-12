@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import type { MappingVersionEntry, PinnedFlow } from '@edi-bridge/contracts'
 
-import { failedDocumentsQuery, failedDocumentsShown, liveVersions } from './version-history'
+import {
+  failedDocumentsQuery,
+  failedDocumentsShown,
+  flowsInUse,
+  liveVersions,
+} from './version-history'
 
 const mappingId = '6f0e1c1a-2b3c-4d5e-8f90-a1b2c3d4e5f6'
 
@@ -76,6 +81,27 @@ describe('liveVersions', () => {
   it('finds nothing live when no document route uses the mapping', () => {
     expect(liveVersions([entry(1), entry(2)])).toEqual({ live: undefined, stillInUse: [] })
     expect(liveVersions([])).toEqual({ live: undefined, stillInUse: [] })
+  })
+})
+
+describe('flowsInUse', () => {
+  it('lists every Flow with the version it uses, by partner and name', () => {
+    const rheinkauf = pinned('Orders by AS2', 'Rheinkauf')
+    const alpenfrischMail = pinned('Orders by mail', 'Alpenfrisch')
+    const alpenfrischSftp = pinned('Orders by SFTP', 'Alpenfrisch')
+
+    expect(
+      flowsInUse([entry(1, [rheinkauf]), entry(2), entry(3, [alpenfrischSftp, alpenfrischMail])]),
+    ).toEqual([
+      { id: alpenfrischMail.id, name: 'Orders by mail', partner: 'Alpenfrisch', version: 3 },
+      { id: alpenfrischSftp.id, name: 'Orders by SFTP', partner: 'Alpenfrisch', version: 3 },
+      { id: rheinkauf.id, name: 'Orders by AS2', partner: 'Rheinkauf', version: 1 },
+    ])
+  })
+
+  it('lists nothing when no Flow uses the Mapping', () => {
+    expect(flowsInUse([entry(1), entry(2)])).toEqual([])
+    expect(flowsInUse([])).toEqual([])
   })
 })
 

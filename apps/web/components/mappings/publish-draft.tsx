@@ -2,7 +2,7 @@
 
 import { CloudUploadIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import { useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
@@ -15,26 +15,18 @@ import {
   publishProblem,
   type VersionFacts,
 } from '@/components/mappings/draft-state'
-import {
-  changeNoteProblem,
-  chosenRouteIds,
-  type RouteInUse,
-  routesInUse,
-} from '@/components/mappings/publish-plan'
+import { changeNoteProblem, chosenFlowIds } from '@/components/mappings/publish-plan'
 import { StateBadge } from '@/components/mappings/state-badge'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useGraphSaveState } from '@/components/mappings/use-save-graph'
+import { type FlowInUse, flowsInUse } from '@/components/mappings/version-history'
 import { ApiError, publishMappingDraft } from '@/lib/api/client'
 import {
   mappingDraftQuery,
   mappingVersionsQuery,
   storePublishedMappingVersion,
 } from '@/lib/api/queries'
-import {
-  maxChangeNoteLength,
-  type MappingDraft,
-  type MappingVersionEntry,
-} from '@edi-bridge/contracts'
+import { maxChangeNoteLength, type MappingDraft } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Checkbox } from '@edi-bridge/ui/components/checkbox'
@@ -60,8 +52,8 @@ export function DraftStateLabel({ draft, id }: { draft: VersionFacts; id?: strin
       <Badge className="h-7 px-3 text-sm">{t('draft')}</Badge>
       <StateBadge
         id={id}
+        focusable
         state={state.kind === 'published' ? 'live' : 'draft'}
-        tabIndex={id === undefined ? undefined : -1}
         className="h-7 gap-2 px-3 text-sm [&>svg]:size-4!">
         {state.kind === 'neverPublished'
           ? t('state.neverPublished')
@@ -71,15 +63,20 @@ export function DraftStateLabel({ draft, id }: { draft: VersionFacts; id?: strin
   )
 }
 
-const routeNamesShown = 3
+const flowNamesShown = 3
 
-function KeptRoutes({ kept, version }: { kept: ReadonlyArray<RouteInUse>; version: number }) {
+type FlowList =
+  | { status: 'loading' }
+  | { status: 'error'; retry: () => void }
+  | { status: 'ready'; flows: ReadonlyArray<FlowInUse> }
+
+function KeptFlows({ kept, version }: { kept: ReadonlyArray<FlowInUse>; version: number }) {
   const t = useTranslations('Mapping.publish.routes')
   const format = useFormatter()
 
   return (
     <p className="text-muted-foreground text-sm">
-      {kept.length > routeNamesShown
+      {kept.length > flowNamesShown
         ? t('keepMany', { count: kept.length })
         : t('keep', {
             count: kept.length,
@@ -92,111 +89,77 @@ function KeptRoutes({ kept, version }: { kept: ReadonlyArray<RouteInUse>; versio
   )
 }
 
-function RouteChoices({
-  routes,
+function FlowsToMove({
+  list,
   version,
   chosen,
   disabled,
+  loadingId,
   onChange,
 }: {
-  routes: ReadonlyArray<RouteInUse>
+  list: FlowList
   version: number
   chosen: ReadonlySet<string>
   disabled: boolean
+  loadingId: string
   onChange: (id: string, checked: boolean) => void
 }) {
   const t = useTranslations('Mapping.publish.routes')
   const descriptionId = useId()
 
-  return (
-    <fieldset className="flex min-w-0 flex-col gap-2">
-      <legend className="mb-2 text-sm font-medium">{t('legend')}</legend>
-      <ul className="flex flex-col gap-1">
-        {routes.map((route) => (
-          <li
-            key={route.id}
-            className="has-data-checked:border-primary/30 has-data-checked:bg-primary/5 hover:bg-muted/50 dark:has-data-checked:border-primary/20 dark:has-data-checked:bg-primary/10 relative flex flex-col gap-0.5 rounded-lg border px-3 py-2">
-            <label className="flex cursor-pointer items-start gap-3 text-sm font-medium break-words after:absolute after:inset-0">
-              <Checkbox
-                checked={chosen.has(route.id)}
-                disabled={disabled}
-                aria-describedby={`${descriptionId}-${route.id}`}
-                className="mt-0.5"
-                onCheckedChange={(checked) => onChange(route.id, checked)}
-              />
-              <span className="min-w-0">
-                {t('move', { route: route.name, partner: route.partner, version })}
-              </span>
-            </label>
-            <span
-              id={`${descriptionId}-${route.id}`}
-              className="text-muted-foreground ps-7 text-xs">
-              {t('current', { version: route.version })}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <KeptRoutes kept={routes.filter(({ id }) => !chosen.has(id))} version={version} />
-    </fieldset>
-  )
-}
-
-function RoutesToMove({
-  history,
-  published,
-  version,
-  chosen,
-  disabled,
-  onChange,
-}: {
-  history: UseQueryResult<MappingVersionEntry[]>
-  published: boolean
-  version: number
-  chosen: ReadonlySet<string>
-  disabled: boolean
-  onChange: (id: string, checked: boolean) => void
-}) {
-  const t = useTranslations('Mapping.publish.routes')
-
-  if (!published) {
-    return <p className="text-muted-foreground text-sm">{t('none')}</p>
+  if (list.status === 'loading') {
+    return (
+      <div aria-busy className="flex flex-col gap-2">
+        <p id={loadingId} role="status" className="text-muted-foreground text-sm">
+          {t('loading')}
+        </p>
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    )
   }
 
-  if (history.isError) {
+  if (list.status === 'error') {
     return (
       <div className="flex flex-col items-start gap-2">
         <p className="text-sm text-red-800 dark:text-red-300">{t('error')}</p>
-        <Button size="sm" variant="outline" onClick={() => void history.refetch()}>
+        <Button size="sm" variant="outline" onClick={list.retry}>
           {t('retry')}
         </Button>
       </div>
     )
   }
 
-  if (!history.data) {
-    return (
-      <div aria-busy className="flex flex-col gap-2">
-        <p role="status" className="sr-only">
-          {t('loading')}
-        </p>
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-12 w-full" />
-      </div>
-    )
+  if (list.flows.length === 0) {
+    return <p className="text-muted-foreground text-sm">{t('none')}</p>
   }
 
-  const routes = routesInUse(history.data)
-
-  return routes.length === 0 ? (
-    <p className="text-muted-foreground text-sm">{t('none')}</p>
-  ) : (
-    <RouteChoices
-      chosen={chosen}
-      disabled={disabled}
-      routes={routes}
-      version={version}
-      onChange={onChange}
-    />
+  return (
+    <fieldset className="flex min-w-0 flex-col gap-2">
+      <legend className="mb-2 text-sm font-medium">{t('legend')}</legend>
+      {list.flows.map((flow) => (
+        <div
+          key={flow.id}
+          className="has-data-checked:border-primary has-data-checked:bg-muted/50 relative flex flex-col gap-0.5 rounded-lg border p-3">
+          <label className="flex cursor-pointer items-start gap-3 text-sm font-medium break-words after:absolute after:inset-0">
+            <Checkbox
+              checked={chosen.has(flow.id)}
+              disabled={disabled}
+              aria-describedby={`${descriptionId}-${flow.id}`}
+              className="mt-0.5"
+              onCheckedChange={(checked) => onChange(flow.id, checked)}
+            />
+            <span className="min-w-0">
+              {t('move', { route: flow.name, partner: flow.partner, version })}
+            </span>
+          </label>
+          <span id={`${descriptionId}-${flow.id}`} className="text-muted-foreground ps-7 text-sm">
+            {t('current', { version: flow.version })}
+          </span>
+        </div>
+      ))}
+      <KeptFlows kept={list.flows.filter(({ id }) => !chosen.has(id))} version={version} />
+    </fieldset>
   )
 }
 
@@ -222,12 +185,20 @@ export function PublishDraft({
   const version = nextVersion(draft)
   const published = draft.latestVersion !== null
 
-  const history = useQuery({
-    ...mappingVersionsQuery(draft.mappingId),
-    enabled: open && published,
-  })
+  const loadingId = useId()
+  const versionsQuery = mappingVersionsQuery(draft.mappingId)
 
-  const routes = history.data ? routesInUse(history.data) : []
+  const history = useQuery({ ...versionsQuery, enabled: open && published })
+
+  const flowList: FlowList = !published
+    ? { status: 'ready', flows: [] }
+    : history.isPending || (history.isError && history.isFetching)
+      ? { status: 'loading' }
+      : history.isError
+        ? { status: 'error', retry: () => void history.refetch() }
+        : { status: 'ready', flows: flowsInUse(history.data) }
+
+  const flowsLoading = flowList.status === 'loading'
 
   const problemOf = (error: Error) =>
     publishProblem(error instanceof ApiError ? error.status : null)
@@ -261,6 +232,10 @@ export function PublishDraft({
     t(`note.${shownNoteProblem}`, { max: maxChangeNoteLength, length: note.trim().length })
 
   function confirm() {
+    if (flowsLoading) {
+      return
+    }
+
     if (noteProblem) {
       flushSync(() => setNoteChecked(true))
       noteRef.current?.focus()
@@ -268,7 +243,7 @@ export function PublishDraft({
       return
     }
 
-    publish.mutate(chosenRouteIds(routes, chosen))
+    publish.mutate(flowList.status === 'ready' ? chosenFlowIds(flowList.flows, chosen) : [])
   }
 
   return (
@@ -280,6 +255,7 @@ export function PublishDraft({
         }
 
         if (next) {
+          void queryClient.resetQueries({ queryKey: versionsQuery.queryKey })
           publish.reset()
           setNote('')
           setNoteChecked(false)
@@ -344,11 +320,11 @@ export function PublishDraft({
               onChange={(event) => setNote(event.target.value)}
             />
           </FormField>
-          <RoutesToMove
+          <FlowsToMove
             chosen={chosen}
             disabled={publish.isPending}
-            history={history}
-            published={published}
+            list={flowList}
+            loadingId={loadingId}
             version={version}
             onChange={(id, checked) =>
               setChosen((current) => {
@@ -375,10 +351,11 @@ export function PublishDraft({
             {t('cancel')}
           </DialogClose>
           <Button
-            disabled={publish.isPending}
+            disabled={publish.isPending || flowsLoading}
             focusableWhenDisabled
             form={`${noteId}-form`}
-            type="submit">
+            type="submit"
+            aria-describedby={flowsLoading ? loadingId : undefined}>
             {publish.isPending ? t('pending') : t('confirm', { version })}
           </Button>
         </DialogFooter>
