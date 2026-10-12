@@ -2996,33 +2996,40 @@
     }
   },
   "DocumentStructures": {
-    "caption": "Document Structures, nach Name",
-    "loading": "Document Structures werden geladen",
-    "count": "{count, plural, one {# Document Structure} other {# Document Structures}}",
-    "filteredCount": "{count} von {total} Document Structures",
+    "loading": "Ihre Datenformate werden geladen",
+    "count": "{count, plural, one {# Datenformat} other {# Datenformate}}",
+    "filteredCount": "{count} von {total} Datenformaten",
     "search": "Nach Name oder Mapping suchen",
-    "noMatch": "Keine Document Structure passt zur Suche.",
-    "new": "Neue Document Structure",
+    "noMatch": "Kein Datenformat passt zur Suche.",
     "notUsed": "Noch nicht verwendet",
     "fieldCount": "{count, plural, one {# Feld} other {# Felder}}",
-    "columns": {
-      "name": "Name",
-      "format": "Format",
-      "fields": "Felder",
-      "mappings": "Verwendet von Mappings"
-    },
+    "moreFields": "{count} weitere",
+    "moreMappings": "und {count} weitere",
+    "readBy": "Gelesen von",
+    "notRead": "Noch kein Mapping liest es",
+    "open": "Öffnen",
     "format": {
       "json": "JSON",
       "csv": "CSV"
     },
+    "add": {
+      "title": "Datenformat aus einem ERP-Export anlegen",
+      "description": "EDI Bridge liest die Datei und benennt jedes Feld in einfachen Worten."
+    },
+    "sample": {
+      "label": "Beispieldatei",
+      "none": "Aus einem JSON Schema erstellt",
+      "noneDescription": "Es gibt keine Beispieldatei zum Anzeigen."
+    },
     "empty": {
-      "title": "Noch keine Document Structures",
-      "description": "Eine Document Structure beschreibt die JSON- oder CSV-Documents Ihrer eigenen Systeme, damit ein Mapping deren Felder kennt. Erstellen Sie eine aus einem Beispiel-Document oder einem JSON Schema.",
-      "viewOnlyDescription": "Eine Document Structure beschreibt die JSON- oder CSV-Documents Ihrer eigenen Systeme, damit ein Mapping deren Felder kennt. Document Structures erscheinen hier, sobald ein Admin eine anlegt."
+      "title": "Noch keine Datenformate",
+      "description": "Ein Datenformat beschreibt die Dateien aus Ihren eigenen Systemen, damit ein Mapping deren Felder kennt. Legen Sie eines aus einem Export Ihres ERP an.",
+      "viewOnlyDescription": "Ein Datenformat beschreibt die Dateien aus Ihren eigenen Systemen, damit ein Mapping deren Felder kennt. Datenformate erscheinen hier, sobald ein Admin eines anlegt.",
+      "action": "Datenformat hinzufügen"
     },
     "error": {
-      "title": "Document Structures nicht verfügbar",
-      "description": "Die Document Structures konnten nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Datenformate nicht verfügbar",
+      "description": "Ihre Datenformate konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     }
   },

@@ -1,13 +1,17 @@
-import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, within } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 
 import { DocumentStructuresScreen } from '@/components/document-structures/document-structures-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
+import { desktop, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { documentStructuresEndpoint } from '@edi-bridge/contracts'
-import { createDocumentStructures, createHandlers } from '@edi-bridge/mocks'
+import {
+  createDocumentStructures,
+  createHandlers,
+  seedDocumentStructures,
+  seedMappingDrafts,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -20,24 +24,98 @@ const meta = preview.meta({
   },
 })
 
+function cardOf(heading: HTMLElement) {
+  return within(heading.closest('[data-slot="card"]')!)
+}
+
 export const Default = meta.story({
   async play({ canvas }) {
-    const order = within(
-      (await canvas.findByRole('link', { name: 'ERP purchase order' })).closest('tr')!,
-    )
+    const order = cardOf(await canvas.findByRole('heading', { name: 'ERP purchase order' }))
 
     await expect(order.getByText('JSON')).toBeVisible()
-    await expect(order.getByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON' })).toBeVisible()
+    await expect(order.getByText('order-4711.json')).toBeVisible()
+    await expect(order.getAllByRole('link', { name: /ORDERS/ })).toHaveLength(2)
+    await expect(order.getByText(/^and \d+ more$/)).toBeVisible()
 
-    const csv = within(
-      canvas.getByRole('link', { name: 'ERP dispatch export (CSV)' }).closest('tr')!,
-    )
+    const dispatch = cardOf(canvas.getByRole('heading', { name: 'ERP dispatch export (CSV)' }))
 
-    await expect(csv.getByText('CSV')).toBeVisible()
-    await expect(csv.getByText('Not used yet')).toBeVisible()
+    await expect(dispatch.getByText('CSV')).toBeVisible()
+    await expect(dispatch.getByText('No Mapping reads it yet')).toBeVisible()
+
+    const schema = cardOf(canvas.getByRole('heading', { name: 'ERP article master' }))
+
+    await expect(schema.getByText('Created from a JSON Schema')).toBeVisible()
     await expect(
-      await canvas.findByRole('link', { name: 'New Document Structure' }),
-    ).toHaveAttribute('href', '/document-structures/new')
+      canvas.getByRole('link', { name: /Add a data format from an ERP export/ }),
+    ).toHaveAttribute('href', '/data-formats/new')
+  },
+})
+
+const [manyReaders, noReader, oneReader] = seedDocumentStructures
+
+const mappingCountStructures = [
+  { ...manyReaders!, name: 'A export read by six Mappings' },
+  { ...noReader!, name: 'B export read by no Mapping' },
+  { ...oneReader!, name: 'C export read by one Mapping' },
+]
+
+const mappingCountDrafts = seedMappingDrafts.slice(0, 7).map((draft, index) => ({
+  ...draft,
+  documentStructureId: (index < 6 ? manyReaders! : oneReader!).id,
+}))
+
+export const MappingCountsInARow = meta.story({
+  ...desktop,
+  parameters: {
+    ...desktop.parameters,
+    a11y: { config: { rules: [{ id: 'target-size', enabled: true }] } },
+  },
+  beforeEach({ msw }) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        documentStructures: mappingCountStructures,
+        mappingDrafts: mappingCountDrafts,
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const many = cardOf(await canvas.findByRole('heading', { name: /read by six/ }))
+    const none = cardOf(canvas.getByRole('heading', { name: /read by no/ }))
+
+    await expect(many.getAllByRole('listitem')).toHaveLength(3)
+    await expect(many.getByText('and 4 more')).toBeVisible()
+    await expect(none.getByText('No Mapping reads it yet')).toBeVisible()
+
+    const manyBar = many.getByRole('link', { name: 'Open' }).getBoundingClientRect()
+    const noneBar = none.getByRole('link', { name: 'Open' }).getBoundingClientRect()
+
+    await expect(noneBar.top).toBe(manyBar.top)
+    await expect(noneBar.left).toBeGreaterThan(manyBar.right)
+  },
+})
+
+export const Mobile = meta.story({
+  ...mobile,
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { name: 'ERP purchase order' })
+
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+      canvasElement.ownerDocument.documentElement.clientWidth,
+    )
+  },
+})
+
+export const Search = meta.story({
+  async play({ canvas }) {
+    await canvas.findByRole('heading', { name: 'ERP purchase order' })
+    await userEvent.type(canvas.getByLabelText('Search by name or Mapping'), 'dispatch')
+
+    await expect(canvas.getByRole('heading', { name: 'ERP dispatch export (CSV)' })).toBeVisible()
+    await expect(canvas.queryByRole('heading', { name: 'ERP purchase order' })).toBeNull()
+
+    await userEvent.type(canvas.getByLabelText('Search by name or Mapping'), ' nothing')
+
+    await expect(canvas.getByText('No data format matches the search.')).toBeVisible()
   },
 })
 
@@ -46,33 +124,29 @@ export const Empty = meta.story({
     msw.use(...createHandlers(apiUrl, { documentStructures: [] }))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('No Document Structures yet')).toBeVisible()
+    await expect(await canvas.findByText('No data formats yet')).toBeVisible()
+    await expect(canvas.getByRole('link', { name: 'Add a data format' })).toHaveAttribute(
+      'href',
+      '/data-formats/new',
+    )
   },
 })
 
 export const Loading = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      http.get(`${apiUrl}${documentStructuresEndpoint.path}`, async () => {
-        await delay('infinite')
-      }),
-    )
+    msw.use(...createHandlers(apiUrl, { documentStructuresState: 'loading' }))
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Document Structures')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading your data formats')).toBeInTheDocument()
   },
 })
 
 export const Unavailable = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      http.get(`${apiUrl}${documentStructuresEndpoint.path}`, () =>
-        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
-      ),
-    )
+    msw.use(...createHandlers(apiUrl, { documentStructuresState: 'error' }))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Document Structures unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Data formats unavailable')).toBeVisible()
   },
 })
 
@@ -82,11 +156,11 @@ export const LargeVolume = meta.story({
       ...createHandlers(apiUrl, { documentStructures: createDocumentStructures({ count: 300 }) }),
     )
   },
-  // Contrast is checked on the same rows in the small stories. Over a large DOM it makes axe
+  // Contrast is checked on the same cards in the small stories. Over a large DOM it makes axe
   // outrun the test timeout on CI, so only the structural rules run here.
   parameters: { a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } } },
   async play({ canvas }) {
-    await expect(await canvas.findByText('300 Document Structures')).toBeVisible()
+    await expect(await canvas.findByText('300 data formats')).toBeVisible()
   },
 })
 
@@ -99,8 +173,9 @@ export const German = meta.story({
     ),
   ],
   async play({ canvas }) {
-    await expect(await canvas.findByRole('link', { name: 'ERP purchase order' })).toBeVisible()
-    await expect(canvas.getAllByText('Noch nicht verwendet')[0]).toBeVisible()
+    await expect(await canvas.findByRole('heading', { name: 'ERP purchase order' })).toBeVisible()
+    await expect(canvas.getAllByText('Noch kein Mapping liest es')[0]).toBeVisible()
+    await expect(canvas.getByText('Aus einem JSON Schema erstellt')).toBeVisible()
   },
 })
 
@@ -111,15 +186,17 @@ export const Dark = meta.story({
     return () => document.documentElement.classList.remove('dark')
   },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('link', { name: 'ERP purchase order' })).toBeVisible()
+    await expect(await canvas.findByRole('heading', { name: 'ERP purchase order' })).toBeVisible()
   },
 })
 
 export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas }) {
-      await expect(await canvas.findByRole('link', { name: 'ERP purchase order' })).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'New Document Structure' })).toBeNull()
+      await expect(await canvas.findByRole('heading', { name: 'ERP purchase order' })).toBeVisible()
+      await expect(
+        canvas.queryByRole('link', { name: /Add a data format from an ERP export/ }),
+      ).toBeNull()
     },
   }),
 })
@@ -129,9 +206,9 @@ export const ViewerEmpty = meta.story({
     handlers: [...createHandlers(apiUrl, { documentStructures: [] })],
     async play({ canvas }) {
       await expect(
-        await canvas.findByText(/Document Structures appear here once an Admin creates one\./),
+        await canvas.findByText(/Data formats appear here once an Admin adds one\./),
       ).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'New Document Structure' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'Add a data format' })).toBeNull()
     },
   }),
 })

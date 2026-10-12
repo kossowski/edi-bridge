@@ -277,7 +277,7 @@ export const CreateMappingFailed = meta.story({
     )
     await expect(sheet.getByRole('link', { name: 'Add a data format' })).toHaveAttribute(
       'href',
-      '/document-structures/new',
+      '/data-formats/new',
     )
     await expect(sheet.getByRole('button', { name: 'Purchase orders you receive' })).toBeEnabled()
   },

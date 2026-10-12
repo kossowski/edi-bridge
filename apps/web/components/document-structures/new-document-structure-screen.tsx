@@ -27,6 +27,7 @@ import {
   storeSavedDocumentStructure,
   useDocumentStructureInference,
 } from '@/lib/api/queries'
+import { documentStructureHref } from '@/lib/navigation'
 import {
   type CreateDocumentStructureBody,
   type CsvSettings,
@@ -131,7 +132,7 @@ export function NewDocumentStructureScreen() {
     mutationFn: (body: CreateDocumentStructureBody) => createDocumentStructure(body),
     onSuccess: (created) => {
       storeSavedDocumentStructure(queryClient, created)
-      router.push(`/document-structures/${created.id}`)
+      router.push(documentStructureHref(created.id))
     },
   })
 

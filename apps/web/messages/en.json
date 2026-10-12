@@ -2996,33 +2996,40 @@
     }
   },
   "DocumentStructures": {
-    "caption": "Document Structures, by name",
-    "loading": "Loading Document Structures",
-    "count": "{count, plural, one {# Document Structure} other {# Document Structures}}",
-    "filteredCount": "{count} of {total} Document Structures",
+    "loading": "Loading your data formats",
+    "count": "{count, plural, one {# data format} other {# data formats}}",
+    "filteredCount": "{count} of {total} data formats",
     "search": "Search by name or Mapping",
-    "noMatch": "No Document Structure matches the search.",
-    "new": "New Document Structure",
+    "noMatch": "No data format matches the search.",
     "notUsed": "Not used yet",
     "fieldCount": "{count, plural, one {# field} other {# fields}}",
-    "columns": {
-      "name": "Name",
-      "format": "Format",
-      "fields": "Fields",
-      "mappings": "Used by Mappings"
-    },
+    "moreFields": "{count} more",
+    "moreMappings": "and {count} more",
+    "readBy": "Read by",
+    "notRead": "No Mapping reads it yet",
+    "open": "Open",
     "format": {
       "json": "JSON",
       "csv": "CSV"
     },
+    "add": {
+      "title": "Add a data format from an ERP export",
+      "description": "EDI Bridge reads the file and names every field in plain words."
+    },
+    "sample": {
+      "label": "Sample file",
+      "none": "Created from a JSON Schema",
+      "noneDescription": "There is no sample file to show."
+    },
     "empty": {
-      "title": "No Document Structures yet",
-      "description": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Create one from a sample Document or a JSON Schema.",
-      "viewOnlyDescription": "A Document Structure describes the JSON or CSV Documents of your own systems, so a Mapping knows their fields. Document Structures appear here once an Admin creates one."
+      "title": "No data formats yet",
+      "description": "A data format describes the files from your own systems, so a Mapping knows their fields. Add one from an export of your ERP.",
+      "viewOnlyDescription": "A data format describes the files from your own systems, so a Mapping knows their fields. Data formats appear here once an Admin adds one.",
+      "action": "Add a data format"
     },
     "error": {
-      "title": "Document Structures unavailable",
-      "description": "The Document Structures could not be loaded. Try again.",
+      "title": "Data formats unavailable",
+      "description": "Your data formats could not be loaded. Try again.",
       "retry": "Try again"
     }
   },

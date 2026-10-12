@@ -47,7 +47,7 @@ export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = 
   channels: { href: '/channels', icon: PlugSocketIcon },
   flows: { href: '/flows', icon: WorkflowSquare03Icon },
   mappings: { href: '/mappings', icon: FlowConnectionIcon },
-  documentStructures: { href: '/document-structures', icon: HierarchySquare02Icon },
+  documentStructures: { href: '/data-formats', icon: HierarchySquare02Icon },
   lookupTables: { href: '/lookup-tables', icon: Table01Icon },
   settings: { href: '/settings', icon: Settings02Icon },
   operator: { href: '/operator', icon: UserShield01Icon },
@@ -223,6 +223,12 @@ export function flowHref(id: string) {
 
 export function mappingHref(id: string) {
   return `${navigationItems.mappings.href}/${id}`
+}
+
+export const newDocumentStructureHref = `${navigationItems.documentStructures.href}/new`
+
+export function documentStructureHref(id: string) {
+  return `${navigationItems.documentStructures.href}/${id}`
 }
 
 export function orderHref(businessReference: string) {

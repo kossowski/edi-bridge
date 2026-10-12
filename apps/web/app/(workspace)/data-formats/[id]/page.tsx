@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: { absolute: `${t('DocumentStructure.title')} · ${t('Shell.appName')}` } }
 }
 
-export default async function Page({ params }: PageProps<'/document-structures/[id]'>) {
+export default async function Page({ params }: PageProps<'/data-formats/[id]'>) {
   const { id } = await params
 
   return <DocumentStructureScreen id={id} />

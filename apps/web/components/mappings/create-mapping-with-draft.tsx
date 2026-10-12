@@ -9,6 +9,7 @@ import { useRef } from 'react'
 import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
 import { ApiError, createMapping } from '@/lib/api/client'
 import { storeCreatedMapping } from '@/lib/api/queries'
+import { newDocumentStructureHref } from '@/lib/navigation'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -73,7 +74,7 @@ export function CreateMappingError({
         {missingDocumentStructure ? t('noDocumentStructure') : t('failed')}
         {missingDocumentStructure && (
           <Link
-            href="/document-structures/new"
+            href={newDocumentStructureHref}
             className={buttonVariants({ variant: 'outline', size: 'sm' })}>
             {t('addDataFormat')}
           </Link>
