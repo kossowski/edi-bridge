@@ -11,19 +11,21 @@
 | `mapping-comparison-screen.stories.tsx` > Chosen Versions And Sample                                   | 38274951367                           | The status message is not in the document yet                                       |
 | `mapping-canvas-ai-review-panel.stories.tsx` > Preview Loading                                         | 38257172660                           | `toBeVisible` sees the sheet during its fade-in; passes on main since #119          |
 | `home-screen.stories.tsx` > Large Volume                                                               | 38247617012, 38247806609              | Unable to find the link "open problem"; passes on main since #114                   |
-| `document-structure-screen.stories.tsx` > Large Volume                                                 | 38294798999                           | Times out after 15 s; only on ticket 68's branch, handed to ticket 68               |
+| `document-structure-screen.stories.tsx` > Large Volume                                                 | 38294798999                           | Times out after 15 s; passes on main since #142                                     |
 | `packages/mocks` `home.test.ts` > serves a large volume with traffic in every bucket                   | 38305232663, 38305229299              | Exceeds the 5 s test timeout on CI; about 1 s locally                               |
 | `packages/mocks` `run.test.ts` > lists each Run with the direction, Business Reference and Interchange | 38291078884                           | Exceeds the 5 s test timeout on CI                                                  |
 
-Preview Loading waits five seconds for the sheet since #119, and Home Large Volume waits ten seconds since #114, so both need no change. Document Structure Large Volume failed only on the branch of ticket 68, which drops the `color-contrast` exclusion of axe, so ticket 68 fixes it.
+Preview Loading waits five seconds for the sheet since #119, and Home Large Volume waits ten seconds since #114, so both need no change. Document Structure Large Volume failed only on an earlier commit of #142, which dropped the `color-contrast` exclusion of axe; #142 kept it when it merged.
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Each story in the table that still fails on main waits for the state it checks instead of racing the clock
-- [ ] The axe check of Many Mappings passes without turning off `aria-hidden-focus` for the whole story
-- [ ] The two `packages/mocks` tests run within their timeout on a CI runner
-- [ ] Each fixed test passes five times in a row locally
+- [x] Each story in the table that still fails on main waits for the state it checks instead of racing the clock
+- [x] The axe check of Many Mappings passes without turning off `aria-hidden-focus` for the whole story
+- [x] The two `packages/mocks` tests run within their timeout on a CI runner
+- [x] Each fixed test passes five times in a row locally
 
 ## Comments
+
+Resolved in #147.
