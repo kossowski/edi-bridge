@@ -5,8 +5,9 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import { useRef } from 'react'
 
+import { singleLink } from '@/components/mappings/link-edge'
 import {
-  type LinkMenuAt,
+  type LinkMenuAnchor,
   useCanvasStore,
   useCanvasViewOnly,
 } from '@/components/mappings/mapping-canvas-store'
@@ -29,14 +30,14 @@ export type LinkMenuEnd =
 export type LinkMenuTarget = {
   data: LinkEdgeData
   ends: ReadonlyArray<LinkMenuEnd>
-  element: () => HTMLElement | null
+  element: () => SVGElement | null
 }
 
 export type LinkMenuActions = {
   showLinks: (edge: PlainEdgeData) => void
   showRow: (row: RowRef) => void
   showTransform: (transformId: string) => void
-  remove: (data: LinkEdgeData, focused: boolean) => void
+  remove: (data: LinkEdgeData, linkFocused: boolean) => void
 }
 
 function names(data: LinkEdgeData) {
@@ -44,11 +45,10 @@ function names(data: LinkEdgeData) {
     return { source: data.source, target: data.target }
   }
 
-  const [only] = data.links
+  const single = singleLink(data)
+  const shown = single?.kind === 'link' ? single.link : data
 
-  return data.links.length === 1 && only
-    ? { source: only.sourcePath, target: only.targetPath }
-    : { source: data.sourcePath, target: data.targetPath }
+  return { source: shown.sourcePath, target: shown.targetPath }
 }
 
 export function LinkMenu({
@@ -59,23 +59,23 @@ export function LinkMenu({
   actions: LinkMenuActions
 }) {
   const t = useTranslations('Mapping.links.menu')
+  const tAi = useTranslations('Mapping.aiReview')
   const removeText = useRemoveText()
   const viewOnly = useCanvasViewOnly()
-  const at = useCanvasStore((state) => state.linkMenu)
+  const anchor = useCanvasStore((state) => state.linkMenu)
   const open = useCanvasStore((state) => state.linkMenuOpen)
   const closeLinkMenu = useCanvasStore((state) => state.closeLinkMenu)
-  const actedOn = useRef<LinkMenuAt | null>(null)
+  const actedOn = useRef<LinkMenuAnchor | null>(null)
 
-  if (!target || !at) {
+  if (!target || !anchor) {
     return null
   }
 
   const { data, ends } = target
-  const merged = data.kind === 'link' && data.links.length > 1 ? data : null
-  const { source, target: end } = names(data)
+  const merged = data.kind === 'link' && !singleLink(data) ? data : null
 
   const act = (action: () => void) => {
-    actedOn.current = at
+    actedOn.current = anchor
     action()
   }
 
@@ -84,7 +84,7 @@ export function LinkMenu({
       return t('links', { count: merged.links.length })
     }
 
-    return data.aiProposed ? t('proposedLink') : t('link')
+    return data.aiProposed ? tAi('proposedLink') : t('link')
   }
 
   const showEnd = (menuEnd: LinkMenuEnd) => {
@@ -107,11 +107,11 @@ export function LinkMenu({
       }}>
       <DropdownMenuContent
         anchor={{
-          getBoundingClientRect: () => DOMRect.fromRect({ x: at.at.x, y: at.at.y }),
+          getBoundingClientRect: () => DOMRect.fromRect(anchor.point),
         }}
         // A link is an SVG element, which the menu does not take the focus back to by itself.
         finalFocus={() => {
-          if (at.focused && actedOn.current !== at) {
+          if (anchor.linkFocused && actedOn.current !== anchor) {
             target.element()?.focus()
           }
 
@@ -122,7 +122,7 @@ export function LinkMenu({
           <DropdownMenuLabel className="flex flex-col gap-0.5">
             <span>{title()}</span>
             <span className="text-foreground font-mono font-normal [overflow-wrap:anywhere]">
-              {t('names', { source, target: end })}
+              {t('names', names(data))}
             </span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
@@ -156,7 +156,7 @@ export function LinkMenu({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
-              onClick={() => act(() => actions.remove(data, at.focused))}>
+              onClick={() => act(() => actions.remove(data, anchor.linkFocused))}>
               <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
               {removeText.link(data.aiProposed)}
             </DropdownMenuItem>

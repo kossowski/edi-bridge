@@ -18,6 +18,7 @@ import {
   transformNodeOf,
   expectSavedLinkCount,
   expectTransformCount,
+  findLinkLine,
   openLinkMenuByMouse,
   page,
 } from '@/components/mappings/mapping-canvas-story-helpers'
@@ -62,12 +63,6 @@ async function findNode(canvasElement: HTMLElement, name: string) {
   await within(canvasElement).findByRole('group', { name: `Transform ${name}` })
 
   return node(canvasElement, name)
-}
-
-function edgeNamed(canvasElement: HTMLElement, name: string) {
-  return within(canvasElement)
-    .getByRole('group', { name })
-    .querySelector<SVGElement>('.react-flow__edge-interaction')!
 }
 
 async function place(canvasElement: HTMLElement, kind: string, name: string) {
@@ -706,7 +701,7 @@ export const Viewer = meta.story({
       await expect(canvas.getByRole('group', { name: linked })).toBeInTheDocument()
       await expect(canvas.queryByText(/^Linking from/)).toBeNull()
 
-      const edge = edgeNamed(canvasElement, linked)
+      const edge = await findLinkLine(canvasElement, linked)
       const path = edge.parentElement!.querySelector<SVGPathElement>('.react-flow__edge-path')!
 
       await userEvent.hover(edge)

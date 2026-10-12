@@ -20,6 +20,7 @@ import {
   startDrag,
   target,
   expectSavedLinkCount,
+  findLinkMenu,
   openLinkMenuByKeyboard,
   openLinkMenuByMouse,
 } from '@/components/mappings/mapping-canvas-story-helpers'
@@ -75,6 +76,38 @@ function screenPoint(path: SVGGeometryElement, length: number) {
     path.getPointAtLength(length).x,
     path.getPointAtLength(length).y,
   ).matrixTransform(path.getScreenCTM()!)
+}
+
+function links(canvasElement: HTMLElement) {
+  return [...canvasElement.querySelectorAll<SVGGElement>('.react-flow__edge')]
+}
+
+function linkTabStops(canvasElement: HTMLElement) {
+  return links(canvasElement).filter((link) => link.tabIndex === 0)
+}
+
+// The ring around a focused link is in the text colour, which stands out from the canvas.
+async function expectFocusRing(link: SVGGElement) {
+  const ring = getComputedStyle(link.querySelector('.link-focus-ring')!)
+
+  await expect(link).toHaveFocus()
+  await expect(link).toHaveAttribute('tabindex', '0')
+  await expect(ring.stroke).toBe(getComputedStyle(link.ownerDocument.body).color)
+  await expect(ring.strokeWidth).toBe('10px')
+}
+
+// A link is a single Tab stop: the arrow keys move between the links, Tab on to the trees.
+async function moveToNextLink(canvasElement: HTMLElement) {
+  await waitFor(() => expect(linkTabStops(canvasElement)).toHaveLength(1))
+
+  const [first] = linkTabStops(canvasElement)
+  const next = links(canvasElement)[links(canvasElement).indexOf(first!) + 1]!
+
+  first!.focus()
+  await userEvent.keyboard('{ArrowDown}')
+  await waitFor(() => expect(linkTabStops(canvasElement)).toEqual([next]))
+
+  return next
 }
 
 const meta = preview.meta({
@@ -521,6 +554,9 @@ export const Dark = meta.story({
     const menu = await openLinkMenuByMouse(canvasElement, 'Link from despatchNumber to BGM/1004')
 
     await expect(menu.getByRole('menuitem', { name: 'Remove link' })).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
+    await expectFocusRing(await moveToNextLink(canvasElement))
   },
 })
 
@@ -880,10 +916,22 @@ export const LinkMenuOfLongEdge = meta.story({
 
     const box = page(canvasElement).getByRole('menu').getBoundingClientRect()
     const view = new DOMRect(0, 0, window.innerWidth, window.innerHeight)
+    const near = (a: number, b: number) => Math.abs(a - b) <= 8
+
+    const shown = Array.from({ length: 101 }, (_, step) =>
+      screenPoint(edge, (edge.getTotalLength() * step) / 100),
+    ).filter((point) => inside(new DOMRect(point.x, point.y), pane))
 
     await expect(inside(box, view)).toBe(true)
-    await expect(box.left).toBeLessThanOrEqual(pane.right)
-    await expect(box.top).toBeLessThanOrEqual(pane.bottom)
+    // A corner of the menu sits on the link where the link shows.
+    await expect(
+      shown.some(
+        (point) =>
+          (near(point.y, box.top) || near(point.y, box.bottom)) &&
+          point.x >= box.left - 8 &&
+          point.x <= box.right + 8,
+      ),
+    ).toBe(true)
 
     // Escape closes it and takes the focus back to the link, with nothing removed.
     await userEvent.keyboard('{Escape}')
@@ -892,6 +940,35 @@ export const LinkMenuOfLongEdge = meta.story({
       expect(canvas.getByRole('group', { name: '8 links from SG2+BY to buyer' })).toHaveFocus(),
     )
     await expect(canvas.queryByText('Saving…')).toBeNull()
+  },
+})
+
+export const LinkFocusByKeyboard = meta.story({
+  args: { id: outbound.id },
+  parameters: linkStories,
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('group', { name: 'Link from despatchNumber to BGM/1004' })
+
+    const link = await moveToNextLink(canvasElement)
+
+    await expectFocusRing(link)
+
+    await userEvent.tab()
+    await waitFor(() =>
+      expect(canvasElement.ownerDocument.activeElement?.closest('.react-flow__edge')).toBeNull(),
+    )
+    await expect(
+      canvasElement.ownerDocument.activeElement?.closest('.react-flow__node'),
+    ).not.toBeNull()
+
+    await userEvent.tab({ shift: true })
+    await waitFor(() => expect(link).toHaveFocus())
+
+    await userEvent.keyboard(' ')
+
+    const menu = await findLinkMenu(canvasElement)
+
+    await expect(menu.getAllByRole('menuitem').length).toBeGreaterThan(0)
   },
 })
 

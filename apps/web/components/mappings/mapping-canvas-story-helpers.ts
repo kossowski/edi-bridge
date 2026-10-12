@@ -189,8 +189,11 @@ export async function expectSavedLinkCount(id: string, count: number) {
   )
 }
 
-export function findLink(canvasElement: HTMLElement, name: string) {
-  return within(canvasElement).findByRole('group', { name })
+// The wide, unseen line along a link that takes the pointer.
+export async function findLinkLine(canvasElement: HTMLElement, name: string) {
+  const link = await within(canvasElement).findByRole('group', { name })
+
+  return link.querySelector<SVGPathElement>('.react-flow__edge-interaction')!
 }
 
 // The menu renders in a portal outside the story's root, and fades in.
@@ -203,9 +206,7 @@ export async function findLinkMenu(canvasElement: HTMLElement) {
 }
 
 export async function openLinkMenuByMouse(canvasElement: HTMLElement, name: string) {
-  const line = (await findLink(canvasElement, name)).querySelector('.react-flow__edge-interaction')!
-
-  await userEvent.pointer({ keys: '[MouseRight]', target: line })
+  await userEvent.pointer({ keys: '[MouseRight]', target: await findLinkLine(canvasElement, name) })
 
   return findLinkMenu(canvasElement)
 }
@@ -215,7 +216,7 @@ export async function openLinkMenuByKeyboard(
   name: string,
   keys = '{Shift>}{F10}{/Shift}',
 ) {
-  await pressOn(await findLink(canvasElement, name), keys)
+  await pressOn(await within(canvasElement).findByRole('group', { name }), keys)
 
   return findLinkMenu(canvasElement)
 }

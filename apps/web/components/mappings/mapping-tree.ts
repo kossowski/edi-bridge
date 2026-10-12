@@ -219,6 +219,13 @@ export function rowOfNodeId(id: string): RowRef | null {
     : null
 }
 
+const transformPrefix = 'transform:'
+
+export const transformNodeId = (id: string) => `${transformPrefix}${id}`
+
+export const transformOfNodeId = (id: string) =>
+  id.startsWith(transformPrefix) ? id.slice(transformPrefix.length) : null
+
 export function layoutTree(
   items: ReadonlyArray<TreeItem>,
   { side, x, y, collapsed }: { side: Side; x: number; y: number; collapsed: ReadonlySet<string> },

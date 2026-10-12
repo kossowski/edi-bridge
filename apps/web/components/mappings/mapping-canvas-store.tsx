@@ -23,7 +23,7 @@ import type { Side, TreeRow } from '@/components/mappings/mapping-tree'
 import type { AiReview, LinkStart } from '@edi-bridge/contracts'
 
 // Opened on the focused link, the menu takes the focus back to it when it closes without an action.
-export type LinkMenuAt = { edgeId: string; at: XYPosition; focused: boolean }
+export type LinkMenuAnchor = { edgeId: string; point: XYPosition; linkFocused: boolean }
 
 export type CanvasState = {
   collapsed: Readonly<Record<Side, ReadonlySet<string>>>
@@ -33,7 +33,7 @@ export type CanvasState = {
   tooltipRowId: string | null
   hoveredEdge: string | null
   // Kept while the menu closes, so it fades out where it was.
-  linkMenu: LinkMenuAt | null
+  linkMenu: LinkMenuAnchor | null
   linkMenuOpen: boolean
   announcement: string
   problem: string | null
@@ -54,7 +54,7 @@ export type CanvasState = {
   setTooltipRowId: (id: string | null) => void
   hoverEdge: (id: string) => void
   leaveEdge: (id: string) => void
-  openLinkMenu: (menu: LinkMenuAt) => void
+  openLinkMenu: (menu: LinkMenuAnchor) => void
   closeLinkMenu: () => void
   announce: (text: string) => void
   setProblem: (problem: string | null) => void
