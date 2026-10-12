@@ -131,9 +131,7 @@ export const Order = meta.story({
     await waitFor(() => expect(order).toHaveAttribute('aria-selected', 'true'))
     await expect(dialog.queryByText('Nothing found.')).toBeNull()
     await userEvent.keyboard('{Enter}')
-    await expect(getRouter().push).toHaveBeenCalledWith(
-      `/order-lifecycle?businessReference=${orderLifecycleReferences.full}`,
-    )
+    await expect(getRouter().push).toHaveBeenCalledWith(`/orders/${orderLifecycleReferences.full}`)
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   },
 })
@@ -150,7 +148,7 @@ export const OrderBesideOtherResults = meta.story({
     await expect(dialog.queryByText('Nothing found.')).toBeNull()
     await userEvent.click(within(orders).getAllByRole('option')[0]!)
     await expect(getRouter().push).toHaveBeenCalledWith(
-      `/order-lifecycle?businessReference=${orderLifecycleReferences.failures}`,
+      `/orders/${orderLifecycleReferences.failures}`,
     )
   },
 })

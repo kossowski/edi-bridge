@@ -62,6 +62,13 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
+  it('puts an order under the orders', () => {
+    expect(breadcrumbTrail('/orders/4711')).toEqual([
+      { href: '/order-lifecycle', label: { kind: 'item', key: 'orders' } },
+      { href: '/orders/4711', label: { kind: 'detail' } },
+    ])
+  })
+
   it('leaves out segments without a page of their own', () => {
     expect(breadcrumbTrail('/operator/workspaces/ws-1')).toEqual([
       { href: '/operator', label: { kind: 'session', key: 'operatorArea' } },

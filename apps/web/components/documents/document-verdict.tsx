@@ -2,7 +2,7 @@
 
 import { CheckmarkCircle02Icon, Copy01Icon, HourglassIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 import type { ReactNode } from 'react'
@@ -53,16 +53,14 @@ function Verdict({
 
 export function DocumentVerdict({ run }: { run: SettledRun }) {
   const t = useTranslations('Document.verdict')
-  const locale = useLocale()
   const plainNames = usePlainNames()
-  const messageTypeName = plainNames.messageTypeName(run.messageType)
   const reference = run.businessReference
 
   const values = {
     direction: run.direction,
     tradingPartner: run.tradingPartner.name,
     messageType: run.messageType,
-    messageTypeName: locale === 'de' ? messageTypeName : messageTypeName.toLocaleLowerCase(locale),
+    messageTypeName: plainNames.messageTypeNameInText(run.messageType),
   }
 
   switch (run.status) {

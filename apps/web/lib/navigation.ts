@@ -225,8 +225,10 @@ export function mappingHref(id: string) {
   return `${navigationItems.mappings.href}/${id}`
 }
 
+export const ordersPath = '/orders'
+
 export function orderHref(businessReference: string) {
-  return `${navigationItems.orderLifecycle.href}?${new URLSearchParams({ businessReference })}`
+  return `${ordersPath}/${encodeURIComponent(businessReference)}`
 }
 
 export function fixTargetHref(target: FixTarget) {

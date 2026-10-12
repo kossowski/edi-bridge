@@ -71,7 +71,7 @@ describe('documentHref', () => {
 
 describe('orderHref', () => {
   it('opens the order for the order number', () => {
-    expect(orderHref('PO 4711')).toBe('/order-lifecycle?businessReference=PO+4711')
+    expect(orderHref('PO 4711/A')).toBe('/orders/PO%204711%2FA')
   })
 })
 

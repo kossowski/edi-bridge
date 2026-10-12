@@ -222,6 +222,22 @@ export const InvalidContentFromPartner = meta.story({
   },
 })
 
+export const OpenedAtWhatToDo = meta.story({
+  args: { id: unreadable.id },
+  beforeEach() {
+    const { href } = window.location
+
+    window.history.replaceState(window.history.state, '', '#what-to-do')
+
+    return () => window.history.replaceState(window.history.state, '', href)
+  },
+  async play({ canvas }) {
+    await waitFor(() =>
+      expect(canvas.getByRole('heading', { level: 3, name: 'What to do' })).toHaveFocus(),
+    )
+  },
+})
+
 export const WaitingForPartner = meta.story({
   args: { id: unreadable.id },
   async beforeEach() {
@@ -328,7 +344,7 @@ export const Delivered = meta.story({
     ).toBeVisible()
     await expectFixLink(
       canvas.getByRole('link', { name: `View the whole order ${delivered.businessReference}` }),
-      `/order-lifecycle?businessReference=${delivered.businessReference}`,
+      `/orders/${delivered.businessReference}`,
     )
     await expect(canvas.queryByText('uploaded by hand', { exact: false })).toBeNull()
   },

@@ -1032,6 +1032,82 @@
     "replacedBy": "Replaced by",
     "documentLink": "Document {id}"
   },
+  "Orders": {
+    "title": "Order {businessReference}",
+    "loading": "Loading order {businessReference}",
+    "error": {
+      "title": "Order unavailable",
+      "description": "Order {businessReference} could not be loaded. Try again.",
+      "retry": "Try again"
+    },
+    "notFound": {
+      "title": "Order not found",
+      "description": "No document carries the order number {businessReference}. Check the number and search again.",
+      "back": "Search for an order"
+    },
+    "tradingPartnerCount": "This order number is used with {count, number} trading partners. Each one has its own timeline.",
+    "status": {
+      "on-track": "On track",
+      "needs-attention": "Needs attention",
+      "waiting-for-trading-partner": "Waiting for partner",
+      "done": "Done"
+    },
+    "verdict": {
+      "failed": "{direction, select, inbound {The {document} from {tradingPartner} could not be processed} other {The {document} to {tradingPartner} could not be processed}}",
+      "rejected": "{tradingPartner} rejected the {document}",
+      "overdue": "{tradingPartner} has not confirmed the {document}",
+      "resendAwaited": "Waiting for {tradingPartner} to send the {document} again",
+      "confirmationPending": "Waiting for {tradingPartner} to confirm the {document}",
+      "inProgress": "The {document} is being processed",
+      "sentUnconfirmed": "The {document} was sent to {tradingPartner}, with no receipt confirmation yet",
+      "nextDocument": "Waiting for the {document}",
+      "done": "Everything for this order is done",
+      "progress": "{done, number} of {total, number} documents done"
+    },
+    "facts": {
+      "label": "Order facts",
+      "orderNumber": "Order number",
+      "tradingPartner": "Trading partner",
+      "startedAt": "Started",
+      "lastActivityAt": "Last activity"
+    },
+    "timeline": {
+      "label": "Documents with {tradingPartner}, from purchase order to invoice",
+      "state": {
+        "open": "Not yet",
+        "missing": "Missing",
+        "in-progress": "In progress",
+        "needs-attention": "Needs attention",
+        "waiting-for-trading-partner": "Waiting for partner",
+        "done": "Done"
+      },
+      "open": "No {document} yet.",
+      "missing": "No {document} found for this order.",
+      "messageCount": "{count, plural, one {# document} other {# documents}}",
+      "latestShown": "Latest {shown, number} of {count, number}{attention, plural, =0 {} one {, plus # that needs attention} other {, plus # that need attention}}",
+      "showAll": "Show all {count, number}",
+      "showLatest": "Show the latest {count, number}"
+    },
+    "message": {
+      "at": "{kind, select, received {Received} sent {Sent} other {Created}} <time>{date}</time>",
+      "receiptConfirmation": "Receipt confirmation",
+      "waiting": "{unit, select, days {Waiting {value, plural, one {# day} other {# days}}} other {Waiting {value, number} h}} — limit {limit, number} h",
+      "replaced": "Replaced",
+      "replacedBy": "Processed again:",
+      "replacement": "see the new document",
+      "seeWhatToDo": "See what to do",
+      "waitingForResend": "Waiting for {tradingPartner} to send it again since {since}"
+    },
+    "overdue": {
+      "question": "What does this mean?",
+      "explanation": "{tradingPartner} should confirm every document within {limit, plural, one {# hour} other {# hours}} with a <term>receipt confirmation</term>. Without it, you cannot be sure the document arrived.",
+      "ask": "Ask partner",
+      "askHint": "Prepares a message you can send by e-mail.",
+      "messageLabel": "Message to {tradingPartner}",
+      "copyLabel": "message",
+      "text": "Hello {tradingPartner} team,\n\nWe sent you the {document} for order {businessReference} on {sentAt} (transmission {controlReference}), but we have not received a receipt confirmation yet. Could you check whether it arrived in your system?\n\nThank you and kind regards"
+    }
+  },
   "TradingPartners": {
     "add": "Add trading partner",
     "list": "Trading partners",
