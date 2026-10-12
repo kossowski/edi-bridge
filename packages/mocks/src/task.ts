@@ -65,7 +65,10 @@ function overdueAcknowledgementTasks(
     messageType: acknowledgement.messageType,
     sentAt: acknowledgement.sentAt,
     acknowledgementTimeLimitHours: acknowledgement.acknowledgementTimeLimitHours,
-    target: { kind: 'interchange', interchangeId: acknowledgement.interchange.id },
+    target: {
+      kind: 'interchange',
+      controlReference: acknowledgement.interchange.controlReference,
+    },
   }))
 }
 

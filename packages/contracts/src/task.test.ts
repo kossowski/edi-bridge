@@ -60,7 +60,7 @@ describe('taskSchema', () => {
         messageType: 'DESADV',
         sentAt: '2026-10-09T09:00:00.000Z',
         acknowledgementTimeLimitHours: 24,
-        target: { kind: 'interchange', interchangeId: runId },
+        target: { kind: 'interchange', controlReference: '4711' },
       }).success,
     ).toBe(false)
   })

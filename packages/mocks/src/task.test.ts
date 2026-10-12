@@ -167,7 +167,10 @@ describe('GET /tasks', () => {
         messageType: acknowledgement.messageType,
         sentAt: acknowledgement.sentAt,
         acknowledgementTimeLimitHours: acknowledgement.acknowledgementTimeLimitHours,
-        target: { kind: 'interchange', interchangeId: acknowledgement.interchange.id },
+        target: {
+          kind: 'interchange',
+          controlReference: acknowledgement.interchange.controlReference,
+        },
       },
     ])
     expect(counts).toEqual({ you: 0, retry: 0, tradingPartner: 1 })

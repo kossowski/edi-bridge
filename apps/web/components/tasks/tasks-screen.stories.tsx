@@ -112,7 +112,7 @@ export const EveryKind = meta.story({
     ).toBeVisible()
     await expect(
       within(tradingPartner).getByRole('link', { name: 'Open transmission' }),
-    ).toHaveAttribute('href', expect.stringMatching(/^\/interchanges\//))
+    ).toHaveAttribute('href', expect.stringMatching(/^\/documents\?view=transmissions&q=\d+$/))
   },
 })
 

@@ -1,6 +1,6 @@
 import type { TaskTarget } from '@edi-bridge/contracts'
 
-import { documentHref } from './navigation'
+import { documentHref, interchangeHref } from './navigation'
 
 export function taskHref(target: TaskTarget) {
   switch (target.kind) {
@@ -9,7 +9,7 @@ export function taskHref(target: TaskTarget) {
     }
 
     case 'interchange': {
-      return `/interchanges/${encodeURIComponent(target.interchangeId)}`
+      return interchangeHref(target.controlReference)
     }
 
     case 'tradingPartner': {

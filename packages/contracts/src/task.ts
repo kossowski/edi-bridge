@@ -18,7 +18,7 @@ const runTaskTargetSchema = z.object({ kind: z.literal('run'), runId: z.uuid() }
 
 const interchangeTaskTargetSchema = z.object({
   kind: z.literal('interchange'),
-  interchangeId: z.uuid(),
+  controlReference: controlReferenceSchema,
 })
 
 const tradingPartnerTaskTargetSchema = z.object({
