@@ -135,7 +135,7 @@
     "channels": "Channels",
     "flows": "Flows",
     "mappings": "Mappings",
-    "documentStructures": "Document Structures",
+    "documentStructures": "Data formats",
     "lookupTables": "Lookup Tables",
     "settings": "Settings",
     "operator": "Operator",
@@ -2440,8 +2440,8 @@
       "transforms": "Transforms"
     },
     "direction": {
-      "inbound": "Inbound: Message Type to Document Structure",
-      "outbound": "Outbound: Document Structure to Message Type"
+      "inbound": "Inbound: Message Type to data format",
+      "outbound": "Outbound: data format to Message Type"
     },
     "linkCount": "{count, plural, =0 {No links yet} one {# link} other {# links}}",
     "side": {
