@@ -2,50 +2,29 @@
 
 import { MailReceive01Icon, RefreshIcon, RepeatIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useId, useState } from 'react'
+import { useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
+import { ActionError } from '@/components/documents/action-error'
+import {
+  MappingVersionSelect,
+  useMappingVersionChoices,
+} from '@/components/documents/mapping-version-select'
+import { useReprocessRun, useRetryRun } from '@/components/documents/run-actions'
 import { usePlainNames } from '@/components/plain-names'
 import { type RunRemedy, runRemedy } from '@/components/runs/run-remedy'
 import { useCanChange } from '@/hooks/use-session'
-import { reprocessRun, retryRun } from '@/lib/api/client'
-import { interchangeKeys, mappingVersionsQuery, runKeys, runQuery } from '@/lib/api/queries'
 import { runHref } from '@/lib/navigation'
 import { Button } from '@edi-bridge/ui/components/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@edi-bridge/ui/components/select'
 
-import type { MappingVersionSummary, RunDetail } from '@edi-bridge/contracts'
-
-function ActionError({ message }: { message: string }) {
-  return (
-    <p role="alert" className="text-sm text-red-800 dark:text-red-300">
-      {message}
-    </p>
-  )
-}
+import type { RunDetail } from '@edi-bridge/contracts'
 
 function RetryAction({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail.remedy.retry')
-  const queryClient = useQueryClient()
-
-  const retry = useMutation({
-    mutationFn: () => retryRun(run.id),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(runQuery(run.id).queryKey, updated)
-      void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
-      void queryClient.invalidateQueries({ queryKey: interchangeKeys.all() })
-    },
-  })
+  const retry = useRetryRun(run.id)
 
   return (
     <div className="flex flex-col items-start gap-3">
@@ -59,50 +38,18 @@ function RetryAction({ run }: { run: RunDetail }) {
   )
 }
 
-function useVersionLabel(used: MappingVersionSummary | null) {
-  const t = useTranslations('RunDetail.remedy.reprocess')
-  const format = useFormatter()
-
-  return (version: MappingVersionSummary) => {
-    const option = t('option', {
-      version: version.version,
-      publishedAt: format.dateTime(new Date(version.publishedAt), { dateStyle: 'medium' }),
-    })
-
-    return version.id === used?.id ? t('used', { option }) : option
-  }
-}
-
 function ReprocessAction({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail.remedy.reprocess')
-  const queryClient = useQueryClient()
   const router = useRouter()
-  const labelId = useId()
-  const versionLabel = useVersionLabel(run.mappingVersion)
+  const mappingId = run.mappingVersion?.mappingId ?? null
+  const versions = useMappingVersionChoices(mappingId, run.mappingVersion?.id ?? null)
 
-  const versions = useQuery({
-    ...mappingVersionsQuery(run.mappingVersion?.mappingId ?? ''),
-    enabled: run.mappingVersion !== null,
+  const reprocess = useReprocessRun(run.id, {
+    onReprocessed: (replacing) => router.push(runHref(replacing.id)),
   })
 
   const [chosen, setChosen] = useState<string | null>(null)
-  const selected = chosen ?? versions.data?.[0]?.id ?? null
-
-  const items = (versions.data ?? []).map((version) => ({
-    value: version.id,
-    label: versionLabel(version),
-  }))
-
-  const reprocess = useMutation({
-    mutationFn: (mappingVersionId: string) => reprocessRun(run.id, { mappingVersionId }),
-    onSuccess: (replacing) => {
-      queryClient.setQueryData(runQuery(replacing.id).queryKey, replacing)
-      void queryClient.invalidateQueries({ queryKey: runKeys.detail(run.id) })
-      void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
-      void queryClient.invalidateQueries({ queryKey: interchangeKeys.all() })
-      router.push(runHref(replacing.id))
-    },
-  })
+  const selected = chosen ?? versions.choices[0]?.version.id ?? null
 
   return (
     <div className="flex flex-col items-start gap-3">
@@ -111,33 +58,13 @@ function ReprocessAction({ run }: { run: RunDetail }) {
         <ActionError message={t('versionsUnavailable')} />
       ) : (
         <div className="flex w-full flex-wrap items-end gap-2">
-          <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
-            <span id={labelId} className="text-sm font-medium">
-              {t('version')}
-            </span>
-            <Select
-              disabled={versions.isPending}
-              items={items}
-              value={selected}
-              onValueChange={(value) => setChosen(value)}>
-              <SelectTrigger aria-labelledby={labelId} className="w-full sm:w-80">
-                <SelectValue className="min-w-0">
-                  {(value: string | null) => (
-                    <span className="truncate">
-                      {items.find((item) => item.value === value)?.label}
-                    </span>
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {items.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <MappingVersionSelect
+            choices={versions.choices}
+            disabled={versions.isPending}
+            label={t('version')}
+            value={selected}
+            onValueChange={setChosen}
+          />
           <Button
             disabled={selected === null || reprocess.isPending}
             onClick={() => selected && reprocess.mutate(selected)}>

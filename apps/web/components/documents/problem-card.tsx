@@ -8,14 +8,22 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { FixerBadge, fixerIcons } from '@/components/documents/fixer-badge'
+import {
+  CopyPartnerMessage,
+  MarkWaitingStep,
+  ProcessAgainStep,
+  ProcessedAgain,
+  reprocessMapping,
+  TryAgainStep,
+  useFreshlyReprocessed,
+} from '@/components/documents/problem-actions'
 import { fixTargetHref } from '@/lib/navigation'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@edi-bridge/ui/components/card'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-import type { FixTarget, RunDetail } from '@edi-bridge/contracts'
-
-export type FailedRun = Extract<RunDetail, { status: 'failed' }>
+import type { FailedRun } from '@/components/documents/failed-run'
+import type { FixTarget } from '@edi-bridge/contracts'
 
 export type WhatToDoStep = { key: string; content: ReactNode }
 
@@ -109,45 +117,88 @@ function StepBody({ text, children }: { text: string; children?: ReactNode }) {
   )
 }
 
-export function useFixSteps({ problem, tradingPartner }: FailedRun): WhatToDoStep[] {
+export function useFixSteps(run: FailedRun): WhatToDoStep[] {
   const t = useTranslations('Document.problem.steps')
+  const { problem, tradingPartner } = run
   const target = problem.fixTarget
 
   switch (problem.whoFixes) {
-    case 'you':
-    case 'retry': {
-      const you = problem.whoFixes === 'you'
+    case 'you': {
+      const mapping = reprocessMapping(run)
 
-      return target
-        ? [
-            {
-              key: 'fix',
-              content: (
-                <StepBody text={t(you ? 'fixCause' : 'checkConnection')}>
-                  <FixLink primary={you} target={target} />
-                </StepBody>
-              ),
-            },
-          ]
-        : []
+      if (target === null && mapping === null) {
+        return [
+          {
+            key: 'fix',
+            content: (
+              <StepBody
+                text={t('fixCauseWithoutTarget', {
+                  direction: run.direction,
+                  tradingPartner: tradingPartner.name,
+                })}
+              />
+            ),
+          },
+        ]
+      }
+
+      return [
+        ...(target
+          ? [
+              {
+                key: 'fix',
+                content: (
+                  <StepBody text={t('fixCause')}>
+                    <FixLink primary target={target} />
+                  </StepBody>
+                ),
+              },
+            ]
+          : []),
+        ...(mapping
+          ? [{ key: 'processAgain', content: <ProcessAgainStep mapping={mapping} run={run} /> }]
+          : []),
+      ]
+    }
+
+    case 'retry': {
+      return [
+        { key: 'tryAgain', content: <TryAgainStep run={run} /> },
+        ...(target
+          ? [
+              {
+                key: 'fix',
+                content: (
+                  <StepBody text={t('checkConnection')}>
+                    <FixLink primary={false} target={target} />
+                  </StepBody>
+                ),
+              },
+            ]
+          : []),
+      ]
     }
 
     case 'tradingPartner': {
       return [
         {
-          key: 'fix',
+          key: 'tell',
           content: (
-            <StepBody text={t('contactTradingPartner', { tradingPartner: tradingPartner.name })}>
-              {target && <FixLink primary={false} target={target} />}
+            <StepBody text={t('tellTradingPartner', { tradingPartner: tradingPartner.name })}>
+              <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">
+                <CopyPartnerMessage run={run} />
+                {target && <FixLink primary={false} target={target} />}
+              </div>
             </StepBody>
           ),
         },
+        { key: 'markWaiting', content: <MarkWaitingStep run={run} /> },
       ]
     }
   }
 }
 
-function WhatToDo({ steps }: { steps: ReadonlyArray<WhatToDoStep> }) {
+function WhatToDo({ children }: { children: ReactNode }) {
   const t = useTranslations('Document.problem')
 
   return (
@@ -155,19 +206,25 @@ function WhatToDo({ steps }: { steps: ReadonlyArray<WhatToDoStep> }) {
       <h3 id="what-to-do" className="text-sm font-semibold">
         {t('whatToDo')}
       </h3>
-      <ol className="flex flex-col gap-4 text-sm">
-        {steps.map((step, index) => (
-          <li key={step.key} className="flex gap-3">
-            <span
-              aria-hidden
-              className="bg-muted flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium">
-              {index + 1}
-            </span>
-            {step.content}
-          </li>
-        ))}
-      </ol>
+      {children}
     </section>
+  )
+}
+
+function Steps({ steps }: { steps: ReadonlyArray<WhatToDoStep> }) {
+  return (
+    <ol className="flex flex-col gap-4 text-sm">
+      {steps.map((step, index) => (
+        <li key={step.key} className="flex gap-3">
+          <span
+            aria-hidden
+            className="bg-muted flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+            {index + 1}
+          </span>
+          {step.content}
+        </li>
+      ))}
+    </ol>
   )
 }
 
@@ -193,6 +250,7 @@ export function ProblemCard({ run }: { run: FailedRun }) {
   const t = useTranslations('Document.problem')
   const { title, description } = useProblemText(run)
   const steps = useFixSteps(run)
+  const freshlyReprocessed = useFreshlyReprocessed(run.id)
   const fixer = run.problem.whoFixes
 
   return (
@@ -230,7 +288,13 @@ export function ProblemCard({ run }: { run: FailedRun }) {
             <WaitingNote run={run} since={run.waitingForTradingPartnerSince} />
           )}
         </section>
-        {steps.length > 0 && <WhatToDo steps={steps} />}
+        <WhatToDo>
+          {run.replacedBy || freshlyReprocessed ? (
+            <ProcessedAgain replacedBy={freshlyReprocessed ? null : run.replacedBy} />
+          ) : (
+            <Steps steps={steps} />
+          )}
+        </WhatToDo>
       </CardContent>
     </Card>
   )

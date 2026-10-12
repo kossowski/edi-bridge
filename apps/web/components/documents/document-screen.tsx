@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { AppPage } from '@/components/app-page'
 import { linkClass, LoadFailure, Loading } from '@/components/detail-parts'
 import { DocumentVerdict } from '@/components/documents/document-verdict'
+import { RunActionResultAlert } from '@/components/documents/problem-actions'
 import { ProblemCard } from '@/components/documents/problem-card'
 import { RelativeTime } from '@/components/documents/relative-time'
 import { RunStatusBadge } from '@/components/runs/run-status'
@@ -43,6 +44,7 @@ function DocumentView({ run }: { run: RunDetail }) {
 
   return (
     <AppPage meta={<DocumentHeader run={run} />} name={title}>
+      <RunActionResultAlert run={run} />
       {run.status === 'failed' ? <ProblemCard run={run} /> : <DocumentVerdict run={run} />}
     </AppPage>
   )

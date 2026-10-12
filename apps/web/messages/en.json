@@ -607,8 +607,12 @@
       "waiting": "Marked as waiting for {tradingPartner} since <time>{since}</time>.",
       "steps": {
         "fixCause": "Fix the cause.",
+        "fixCauseWithoutTarget": "Fix the cause described here. EDI Bridge cannot process this document again, so {direction, select, inbound {ask {tradingPartner} to send it again} other {send it again from your ERP}}.",
         "checkConnection": "If it keeps failing, check the connection details.",
-        "contactTradingPartner": "Ask {tradingPartner} to send a corrected file. Their contact details are on the partner page."
+        "processAgain": "Process it again. EDI Bridge uses the original file, so {direction, select, inbound {{tradingPartner} does} other {your ERP does}} not have to send anything again.",
+        "tryAgain": "Try again. The finished document is sent once more, nothing is translated again.",
+        "tellTradingPartner": "Tell {tradingPartner} and ask for a corrected file. The message includes the technical detail their IT team needs. Their contact details are on the partner page.",
+        "markWaiting": "Mark it so your team knows you are waiting for {tradingPartner}."
       },
       "fixLink": {
         "mapping": "Open “{name}” at this field",
@@ -616,6 +620,82 @@
         "channel": "Check the connection “{name}”",
         "tradingPartner": "Open {name}"
       }
+    },
+    "actions": {
+      "version": "Version",
+      "versionOption": {
+        "option": "Version {version}, published {publishedAt}",
+        "newest": "Version {version}, published {publishedAt} (newest)",
+        "usedBefore": "Version {version}, published {publishedAt} (used before)",
+        "newestUsedBefore": "Version {version}, published {publishedAt} (newest, used before)"
+      },
+      "versionsUnavailable": "The versions could not be loaded.",
+      "versionsLoading": "Loading versions…",
+      "noVersions": "“{mapping}” has no published version yet. Publish it first, then process this document again.",
+      "unpublished": {
+        "description": "“{mapping}” has unpublished changes. Publish your fix first, otherwise this attempt does not use it.",
+        "link": "Open “{mapping}”"
+      },
+      "processAgain": {
+        "button": "Process again",
+        "pending": "Processing again",
+        "failed": "Processing again did not start. Try again.",
+        "viewOnly": "An Admin can process it again."
+      },
+      "tryAgain": {
+        "button": "Try again",
+        "pending": "Trying again",
+        "failed": "The delivery did not start again. Try once more.",
+        "viewOnly": "An Admin can try again."
+      },
+      "copyMessage": {
+        "button": "Copy a message for {tradingPartner}",
+        "copied": "Message copied",
+        "failed": "The message could not be copied. Allow access to the clipboard and try again."
+      },
+      "markWaiting": {
+        "button": "Mark as waiting for partner",
+        "pending": "Marking",
+        "marked": "Marked as waiting",
+        "failed": "The mark was not set. Try again.",
+        "viewOnly": "An Admin can mark it."
+      }
+    },
+    "result": {
+      "reprocessed": {
+        "title": "Processing again",
+        "description": "EDI Bridge started a new attempt from the original file with version {version}.",
+        "descriptionWithoutVersion": "EDI Bridge started a new attempt from the original file.",
+        "link": "Open the new attempt"
+      },
+      "retried": {
+        "pending": {
+          "title": "Delivering again",
+          "description": "EDI Bridge is sending the finished document once more. The result appears here."
+        },
+        "failedAgain": {
+          "title": "Still not delivered",
+          "description": "Trying again did not help, the delivery failed again. See below what to do."
+        }
+      },
+      "replaced": {
+        "description": "This document was processed again. The new attempt replaces it.",
+        "link": "Open the new attempt"
+      }
+    },
+    "partnerMessage": {
+      "greeting": "Hello {tradingPartner},",
+      "intro": "we could not process your {messageTypeName} {reference} ({messageType}).",
+      "introWithoutReference": "we could not process your {messageTypeName} ({messageType}).",
+      "transmission": "It came in the transmission with the control reference {controlReference}.",
+      "reason": "{reason, select, unreadable {The file is damaged or incomplete, so it could not be read.} invalidContent {A value in it breaks the EDIFACT rules for this kind of document.} other {It could not be processed.}}",
+      "technical": "Technical detail: {message} (error code {code}).",
+      "technicalAt": "Technical detail: {message} (error code {code}, {position}).",
+      "segment": "segment {segment} ({tag})",
+      "element": "element {element}",
+      "component": "component {component}",
+      "request": "Could you check the file and send a corrected version?",
+      "closing": "Thank you"
     },
     "verdict": {
       "delivered": {
@@ -721,8 +801,6 @@
       "reprocess": {
         "description": "The mapping failed. Reprocess starts a new Run from the original, unmodified Document with the Mapping Version you choose.",
         "version": "Mapping Version",
-        "option": "Version {version}, published {publishedAt}",
-        "used": "{option} (used by this Run)",
         "button": "Reprocess",
         "pending": "Reprocessing",
         "viewOnly": "An Admin can reprocess this Run with a chosen Mapping Version.",
