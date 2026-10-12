@@ -30,6 +30,17 @@ describe('partnerSetup', () => {
     })
   })
 
+  it('adds connections and document types to the onboarding steps after the identity', () => {
+    expect(partnerSetup(newPartner, nothingSetUp, null).steps.map(({ step }) => step)).toEqual([
+      'identity',
+      'connections',
+      'documents',
+      'testInterchange',
+      'contrl',
+      'production',
+    ])
+  })
+
   it('asks for a connection once the company GLN is recorded', () => {
     expect(partnerSetup(newPartner, nothingSetUp, gln)).toMatchObject({
       done: 1,
