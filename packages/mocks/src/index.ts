@@ -5,7 +5,6 @@ import type {
   TradingPartner,
   Workspace,
   WorkspaceSettings,
-  WorkspaceSummary,
 } from '@edi-bridge/contracts'
 
 import { aiDraftHandlers, type AiDraftOptions } from './ai-draft'
@@ -47,10 +46,12 @@ import {
 import { messageTypeStructureHandler } from './message-type-structure'
 import {
   createOperatorStore,
+  newWorkspaceSummary,
   operatorHandlers,
   seedInvites,
   seedWorkspaceSummaries,
   sessionWorkspaceStore,
+  type WorkspaceSummaryRecord,
 } from './operator'
 import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
 import { overviewHandler, seedOverviewData } from './overview'
@@ -197,6 +198,7 @@ export {
   seedWorkspaceSummaries,
   sessionWorkspaceStore,
   toOperatorStore,
+  type WorkspaceSummaryRecord,
 } from './operator'
 
 export {
@@ -304,7 +306,7 @@ export function createHandlers(
     workspace?: Workspace
     workspaceSettings?: WorkspaceSettings
     workspaceMembers?: WorkspaceMembers
-    operatorWorkspaces?: ReadonlyArray<WorkspaceSummary>
+    operatorWorkspaces?: ReadonlyArray<WorkspaceSummaryRecord>
     invites?: ReadonlyArray<Invite>
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
@@ -323,17 +325,7 @@ export function createHandlers(
   const operatorStore = createOperatorStore({ workspaces: operatorWorkspaces, invites })
 
   if (workspace && !operatorStore.workspace(workspace.id)) {
-    operatorStore.setWorkspace({
-      ...workspace,
-      kind: 'standard',
-      memberCount: 1,
-      pendingInviteCount: 0,
-      documentsToday: 0,
-      lastActivityAt: null,
-      seeded: false,
-      createdAt: new Date().toISOString(),
-      lastResetAt: null,
-    })
+    operatorStore.setWorkspace(newWorkspaceSummary(workspace, { memberCount: 1, seeded: false }))
   }
 
   const sessionStore = createSessionStore(

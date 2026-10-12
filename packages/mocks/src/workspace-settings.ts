@@ -9,10 +9,14 @@ import {
   workspaceSettingsEndpoint,
   type WorkspaceSettings,
   workspaceSettingsSchema,
-  type WorkspaceSummary,
 } from '@edi-bridge/contracts'
 
-import { type OperatorStore, seedWorkspaceSummaries, toOperatorStore } from './operator'
+import {
+  type OperatorStore,
+  seedWorkspaceSummaries,
+  toOperatorStore,
+  type WorkspaceSummaryRecord,
+} from './operator'
 import { badRequest, notFound } from './responses'
 import { seedSession, toSessionStore } from './session'
 import { operatorOnly, type SessionStore, signedInOnly } from './session-access'
@@ -62,7 +66,7 @@ export function workspaceSettingsHandlers(
   }: {
     settings?: WorkspaceSettings | WorkspaceSettingsStore
     session?: Session | null | SessionStore
-    workspaces?: ReadonlyArray<WorkspaceSummary> | OperatorStore
+    workspaces?: ReadonlyArray<WorkspaceSummaryRecord> | OperatorStore
   } = {},
 ) {
   const store = toWorkspaceSettingsStore(settings)

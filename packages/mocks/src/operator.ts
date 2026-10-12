@@ -39,12 +39,15 @@ import {
   type WorkspaceMembers,
 } from './workspace-member'
 
-export const seedWorkspaceSummaries: ReadonlyArray<WorkspaceSummary> = [
+export type WorkspaceSummaryRecord = Omit<WorkspaceSummary, 'pendingInviteCount'>
+
+const workspaceSummaryRecordSchema = workspaceSummarySchema.omit({ pendingInviteCount: true })
+
+export const seedWorkspaceSummaries: ReadonlyArray<WorkspaceSummaryRecord> = [
   {
     ...seedWorkspace,
     kind: 'standard',
     memberCount: 4,
-    pendingInviteCount: 1,
     documentsToday: 184,
     lastActivityAt: '2026-10-11T16:42:00.000Z',
     seeded: true,
@@ -55,7 +58,6 @@ export const seedWorkspaceSummaries: ReadonlyArray<WorkspaceSummary> = [
     ...seedShowcaseWorkspace,
     kind: 'showcase',
     memberCount: 4,
-    pendingInviteCount: 0,
     documentsToday: 37,
     lastActivityAt: '2026-10-11T19:03:00.000Z',
     seeded: true,
@@ -66,16 +68,15 @@ export const seedWorkspaceSummaries: ReadonlyArray<WorkspaceSummary> = [
     ...seedSandboxWorkspace,
     kind: 'sandbox',
     memberCount: 1,
-    pendingInviteCount: 0,
     documentsToday: 12,
     lastActivityAt: '2026-10-10T11:26:00.000Z',
     seeded: true,
     createdAt: '2026-02-02T08:05:00.000Z',
     lastResetAt: '2026-10-09T17:45:00.000Z',
   },
-].map((workspace) => workspaceSummarySchema.parse(workspace))
+].map((workspace) => workspaceSummaryRecordSchema.parse(workspace))
 
-function generateWorkspaceSummary(faker: Faker, now: Date): WorkspaceSummary {
+function generateWorkspaceSummary(faker: Faker, now: Date): WorkspaceSummaryRecord {
   const createdAt = faker.date.past({ years: 3, refDate: now })
   const quiet = faker.datatype.boolean(0.15)
 
@@ -85,7 +86,6 @@ function generateWorkspaceSummary(faker: Faker, now: Date): WorkspaceSummary {
     gln: faker.datatype.boolean(0.85) ? randomGln(faker) : null,
     kind: 'standard',
     memberCount: faker.number.int({ min: 0, max: 40 }),
-    pendingInviteCount: faker.datatype.boolean(0.3) ? faker.number.int({ min: 1, max: 12 }) : 0,
     documentsToday: quiet ? 0 : faker.number.int({ min: 0, max: 25_000 }),
     lastActivityAt: quiet ? null : faker.date.between({ from: createdAt, to: now }).toISOString(),
     seeded: faker.datatype.boolean(0.3),
@@ -102,19 +102,35 @@ export function createWorkspaceSummaries({
   count: number
   now?: Date
   seed?: number
-}): WorkspaceSummary[] {
+}): WorkspaceSummaryRecord[] {
   const faker = new Faker({ locale: [en], seed })
-  const byName = new Map<string, WorkspaceSummary>()
+  const byName = new Map<string, WorkspaceSummaryRecord>()
 
   while (byName.size < count) {
     const workspace = generateWorkspaceSummary(faker, now)
 
     if (!byName.has(workspace.name)) {
-      byName.set(workspace.name, workspaceSummarySchema.parse(workspace))
+      byName.set(workspace.name, workspaceSummaryRecordSchema.parse(workspace))
     }
   }
 
   return [...byName.values()]
+}
+
+export function newWorkspaceSummary(
+  workspace: Workspace,
+  { memberCount, seeded }: Pick<WorkspaceSummary, 'memberCount' | 'seeded'>,
+): WorkspaceSummaryRecord {
+  return {
+    ...workspace,
+    kind: 'standard',
+    memberCount,
+    documentsToday: 0,
+    lastActivityAt: null,
+    seeded,
+    createdAt: new Date().toISOString(),
+    lastResetAt: null,
+  }
 }
 
 const defaultAppUrl = 'http://localhost:3000'
@@ -248,7 +264,7 @@ function sameName(a: string, b: string) {
 export type OperatorStore = {
   workspaces: () => readonly WorkspaceSummary[]
   workspace: (id: string) => WorkspaceSummary | undefined
-  setWorkspace: (workspace: WorkspaceSummary) => void
+  setWorkspace: (workspace: WorkspaceSummaryRecord) => void
   invites: (workspaceId: string) => readonly Invite[]
   invite: (workspaceId: string, inviteId: string) => Invite | undefined
   setInvite: (invite: Invite) => void
@@ -257,27 +273,53 @@ export type OperatorStore = {
 export function createOperatorStore({
   workspaces = seedWorkspaceSummaries,
   invites = seedInvites,
+  now = () => new Date(),
 }: {
-  workspaces?: ReadonlyArray<WorkspaceSummary>
+  workspaces?: ReadonlyArray<WorkspaceSummaryRecord>
   invites?: ReadonlyArray<Invite>
+  now?: () => Date
 } = {}): OperatorStore {
-  const byId = new Map(workspaces.map((workspace) => [workspace.id, workspace]))
+  const byId = new Map(
+    workspaces.map((workspace) => [workspace.id, workspaceSummaryRecordSchema.parse(workspace)]),
+  )
+
   const invitesById = new Map(invites.map((invite) => [invite.id, invite]))
 
-  const listed = (workspaceId: string) =>
+  const activeInvites = (workspaceId: string) =>
     [...invitesById.values()].filter(
       (invite) => invite.workspaceId === workspaceId && invite.revokedAt === null,
     )
 
+  const pendingInviteCount = (workspaceId: string) => {
+    const at = now().getTime()
+
+    return activeInvites(workspaceId).filter(
+      ({ acceptedAt, expiresAt }) => acceptedAt === null && Date.parse(expiresAt) > at,
+    ).length
+  }
+
+  const summary = (workspace: WorkspaceSummaryRecord): WorkspaceSummary => ({
+    ...workspace,
+    pendingInviteCount: pendingInviteCount(workspace.id),
+  })
+
   return {
-    workspaces: () => [...byId.values()],
-    workspace: (id) => byId.get(id),
+    workspaces: () => [...byId.values()].map(summary),
+    workspace: (id) => {
+      const workspace = byId.get(id)
+
+      return workspace && summary(workspace)
+    },
     setWorkspace: (workspace) => {
-      byId.set(workspace.id, workspace)
+      byId.set(workspace.id, workspaceSummaryRecordSchema.parse(workspace))
     },
     invites: (workspaceId) =>
-      listed(workspaceId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    invite: (workspaceId, inviteId) => listed(workspaceId).find(({ id }) => id === inviteId),
+      activeInvites(workspaceId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    invite: (workspaceId, inviteId) => {
+      const invite = invitesById.get(inviteId)
+
+      return invite?.workspaceId === workspaceId && invite.revokedAt === null ? invite : undefined
+    },
     setInvite: (invite) => {
       invitesById.set(invite.id, invite)
     },
@@ -285,10 +327,11 @@ export function createOperatorStore({
 }
 
 export function toOperatorStore(
-  workspaces: ReadonlyArray<WorkspaceSummary> | OperatorStore = seedWorkspaceSummaries,
+  workspaces: ReadonlyArray<WorkspaceSummaryRecord> | OperatorStore = seedWorkspaceSummaries,
   invites: ReadonlyArray<Invite> = seedInvites,
+  now: () => Date = () => new Date(),
 ) {
-  return 'workspace' in workspaces ? workspaces : createOperatorStore({ workspaces, invites })
+  return 'workspace' in workspaces ? workspaces : createOperatorStore({ workspaces, invites, now })
 }
 
 export function sessionWorkspaceStore({
@@ -329,15 +372,17 @@ export function operatorHandlers(
     members = seedWorkspaceMembers,
     session = seedSession,
     appUrl = globalThis.location?.origin ?? defaultAppUrl,
+    now,
   }: {
-    workspaces?: ReadonlyArray<WorkspaceSummary> | OperatorStore
+    workspaces?: ReadonlyArray<WorkspaceSummaryRecord> | OperatorStore
     invites?: ReadonlyArray<Invite>
     members?: WorkspaceMembers
     session?: Session | null | SessionStore
     appUrl?: string
+    now?: () => Date
   } = {},
 ) {
-  const store = toOperatorStore(workspaces, invites)
+  const store = toOperatorStore(workspaces, invites, now)
   const memberStore = toWorkspaceMemberStore(members)
   const sessionStore = toSessionStore(session)
 
@@ -367,23 +412,14 @@ export function operatorHandlers(
 
         const id = crypto.randomUUID()
 
-        const created: WorkspaceSummary = {
-          id,
-          name,
-          gln: seed ? randomGln(seededFaker(`workspace:${id}`)) : null,
-          kind: 'standard',
-          memberCount: 0,
-          pendingInviteCount: 0,
-          documentsToday: 0,
-          lastActivityAt: null,
-          seeded: seed,
-          createdAt: new Date().toISOString(),
-          lastResetAt: null,
-        }
+        store.setWorkspace(
+          newWorkspaceSummary(
+            { id, name, gln: seed ? randomGln(seededFaker(`workspace:${id}`)) : null },
+            { memberCount: 0, seeded: seed },
+          ),
+        )
 
-        store.setWorkspace(created)
-
-        return HttpResponse.json(created, { status: 201 })
+        return HttpResponse.json(store.workspace(id), { status: 201 })
       }),
     ),
     http.get<{ workspaceId: string }>(
@@ -405,9 +441,7 @@ export function operatorHandlers(
     http.post<{ workspaceId: string }>(
       `${apiUrl}${createInviteEndpoint.path}`,
       operatorOnly(sessionStore, async ({ params, request }) => {
-        const workspace = store.workspace(params.workspaceId)
-
-        if (!workspace) {
+        if (!store.workspace(params.workspaceId)) {
           return notFound()
         }
 
@@ -430,7 +464,6 @@ export function operatorHandlers(
         )
 
         store.setInvite(invite)
-        store.setWorkspace({ ...workspace, pendingInviteCount: workspace.pendingInviteCount + 1 })
 
         return HttpResponse.json(invite, { status: 201 })
       }),
@@ -438,10 +471,9 @@ export function operatorHandlers(
     http.delete<{ workspaceId: string; inviteId: string }>(
       `${apiUrl}${revokeInviteEndpoint.path}`,
       operatorOnly(sessionStore, ({ params }) => {
-        const workspace = store.workspace(params.workspaceId)
         const invite = store.invite(params.workspaceId, params.inviteId)
 
-        if (!workspace || !invite) {
+        if (!invite) {
           return notFound()
         }
 
@@ -451,10 +483,6 @@ export function operatorHandlers(
 
         const revoked = { ...invite, revokedAt: new Date().toISOString() }
         store.setInvite(revoked)
-        store.setWorkspace({
-          ...workspace,
-          pendingInviteCount: Math.max(0, workspace.pendingInviteCount - 1),
-        })
 
         return HttpResponse.json(revoked)
       }),

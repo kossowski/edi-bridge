@@ -13,7 +13,6 @@ import {
   maxWorkspaceNameLength,
   operatorWorkspacesEndpoint,
   type Session,
-  type WorkspaceSummary,
 } from '@edi-bridge/contracts'
 import {
   createOperatorStore,
@@ -25,6 +24,7 @@ import {
   seedWorkspace,
   seedWorkspaceSummaries,
   sessionHandlers,
+  type WorkspaceSummaryRecord,
 } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -32,7 +32,7 @@ import preview from '../../.storybook/preview'
 function operatorMocks({
   workspaces = seedWorkspaceSummaries,
   session = seedSession,
-}: { workspaces?: ReadonlyArray<WorkspaceSummary>; session?: Session } = {}) {
+}: { workspaces?: ReadonlyArray<WorkspaceSummaryRecord>; session?: Session } = {}) {
   const sessionStore = createSessionStore(session)
 
   return [

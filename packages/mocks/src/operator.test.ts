@@ -15,6 +15,7 @@ import {
   glnIssue,
   type WorkspaceInput,
   operatorWorkspacesEndpoint,
+  type WorkspaceSummary,
   workspaceSummarySchema,
 } from '@edi-bridge/contracts'
 
@@ -74,18 +75,6 @@ describe('seedWorkspaceSummaries', () => {
     }
   })
 
-  it('counts the pending invites of each seed Workspace', () => {
-    expect(
-      Object.fromEntries(
-        seedWorkspaceSummaries.map(({ id, pendingInviteCount }) => [id, pendingInviteCount]),
-      ),
-    ).toEqual({
-      [seedWorkspace.id]: 1,
-      [seedShowcaseWorkspace.id]: 0,
-      [seedSandboxWorkspace.id]: 0,
-    })
-  })
-
   it('marks every seed Workspace as seeded', () => {
     expect(seedWorkspaceSummaries.every(({ seeded }) => seeded)).toBe(true)
   })
@@ -107,7 +96,9 @@ describe('createWorkspaceSummaries', () => {
     expect(new Set(workspaces.map(({ name }) => name)).size).toBe(300)
 
     for (const workspace of workspaces) {
-      expect(workspaceSummarySchema.parse(workspace)).toEqual(workspace)
+      expect(workspaceSummarySchema.omit({ pendingInviteCount: true }).parse(workspace)).toEqual(
+        workspace,
+      )
       expect(workspace.gln === null || /^02\d{11}$/.test(workspace.gln)).toBe(true)
     }
   })
@@ -117,7 +108,6 @@ describe('createWorkspaceSummaries', () => {
 
     expect(workspaces.some(({ lastActivityAt }) => lastActivityAt === null)).toBe(true)
     expect(workspaces.some(({ documentsToday }) => documentsToday > 1000)).toBe(true)
-    expect(workspaces.some(({ pendingInviteCount }) => pendingInviteCount > 0)).toBe(true)
   })
 
   it('generates the same Workspaces for the same seed and date', () => {
@@ -425,10 +415,7 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
   })
 })
 
-function pendingInviteCountOf(
-  workspaces: ReadonlyArray<{ id: string; pendingInviteCount: number }>,
-  id: string,
-) {
+function pendingInviteCountOf(workspaces: ReadonlyArray<WorkspaceSummary>, id: string) {
   return workspaces.find((workspace) => workspace.id === id)?.pendingInviteCount
 }
 
@@ -447,7 +434,7 @@ describe('DELETE /operator/workspaces/:workspaceId/invites/:inviteId', () => {
     })
 
   it('revokes a pending invite, drops it from the list and the pending count', async () => {
-    server.use(...operatorHandlers(apiUrl))
+    server.use(...operatorHandlers(apiUrl, { now: () => new Date('2026-10-12T08:00:00.000Z') }))
     const before = Date.now()
 
     const response = await revoke(seedWorkspace.id, pending.id)
@@ -503,6 +490,67 @@ describe('DELETE /operator/workspaces/:workspaceId/invites/:inviteId', () => {
     })
 
     expect(pendingInviteCountOf(await listWorkspaces(), seedSandboxWorkspace.id)).toBe(1)
+  })
+})
+
+describe('pending invite count', () => {
+  const beforeSeedExpiry = new Date('2026-10-12T08:00:00.000Z')
+  const afterSeedExpiry = new Date('2026-10-16T08:00:00.000Z')
+
+  const pending = seedInvites.find(
+    ({ workspaceId, acceptedAt }) => workspaceId === seedWorkspace.id && acceptedAt === null,
+  )!
+
+  it('counts the pending invites of each seed Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl, { now: () => beforeSeedExpiry }))
+
+    const workspaces = await listWorkspaces()
+
+    expect(
+      Object.fromEntries(workspaces.map(({ id, pendingInviteCount }) => [id, pendingInviteCount])),
+    ).toEqual({
+      [seedWorkspace.id]: 1,
+      [seedShowcaseWorkspace.id]: 0,
+      [seedSandboxWorkspace.id]: 0,
+    })
+  })
+
+  it('does not count an expired invite as pending', async () => {
+    server.use(...operatorHandlers(apiUrl, { now: () => afterSeedExpiry }))
+
+    expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(0)
+  })
+
+  it('revokes an expired invite without counting it as pending', async () => {
+    server.use(...operatorHandlers(apiUrl, { now: () => afterSeedExpiry }))
+
+    const response = await fetch(
+      `${apiUrl}${toPath(revokeInviteEndpoint.path, { workspaceId: seedWorkspace.id, inviteId: pending.id })}`,
+      { method: 'DELETE' },
+    )
+
+    expect(response.status).toBe(200)
+    expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(0)
+  })
+
+  it('derives the count from hundreds of generated invites', async () => {
+    const now = new Date('2026-10-12T08:00:00.000Z')
+    const invites = createInvites({ count: 200, workspaceId: seedWorkspace.id, now })
+    server.use(...operatorHandlers(apiUrl, { invites, now: () => now }))
+
+    const listed = workspaceInvitesEndpoint.response.parse(
+      await (await listInvites(seedWorkspace.id)).json(),
+    )
+
+    const unansweredInLastWeek = invites.filter(
+      ({ acceptedAt, createdAt }) =>
+        acceptedAt === null && now.getTime() - Date.parse(createdAt) < inviteValidityDays * dayMs,
+    )
+
+    expect(listed).toHaveLength(200)
+    expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(
+      unansweredInLastWeek.length,
+    )
   })
 })
 
