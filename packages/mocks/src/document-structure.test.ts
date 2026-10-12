@@ -33,6 +33,7 @@ import {
   type MappingVersionRecord,
   seedMappingVersions,
 } from './mapping-version'
+import { seedSession } from './session'
 
 const apiUrl = 'http://api.test'
 
@@ -471,6 +472,8 @@ describe('PUT /document-structures/:id with CSV settings', () => {
     publishedAt: '2026-10-01T08:00:00.000Z',
     messageType: 'DESADV',
     documentStructureId: dispatch.id,
+    changeNote: null,
+    publishedBy: { id: seedSession.user.id, name: seedSession.user.name },
     links: [],
     transforms: [],
     transformLinks: [],

@@ -449,7 +449,11 @@ describe('POST /mappings/:id/ai-draft/accept', () => {
       (
         await fetch(
           `${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId: draft.mappingId })}`,
-          { method: 'POST' },
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ changeNote: '' }),
+          },
         )
       ).status,
     ).toBe(423)
@@ -464,7 +468,11 @@ describe('POST /mappings/:id/ai-draft/accept', () => {
       (
         await fetch(
           `${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId: draft.mappingId })}`,
-          { method: 'POST' },
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ changeNote: '' }),
+          },
         )
       ).status,
     ).toBe(201)

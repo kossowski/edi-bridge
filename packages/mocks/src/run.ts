@@ -13,7 +13,16 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
-import { seedFlows } from './flow'
+import {
+  type FlowRecord,
+  type FlowStore,
+  type MappingCatalogue,
+  type MappingRecord,
+  seedFlows,
+  seedMappings,
+  toFlowStore,
+  toMappingCatalogue,
+} from './flow'
 import { hash } from './hash'
 import { includesText, pageOf } from './list'
 import { badRequest } from './responses'
@@ -255,8 +264,14 @@ export function seedRuns() {
   return seedRunsCache
 }
 
-function matchesExceptStatus(run: RunSummary, query: RunListQuery, text: string) {
+function matchesExceptStatus(
+  run: RunSummary,
+  query: RunListQuery,
+  text: string,
+  mappingOfFlow: (flowId: string) => string | undefined,
+) {
   const receivedAt = Date.parse(run.receivedAt)
+  const mappingId = query.mappingId?.length ? mappingOfFlow(run.flow.id) : undefined
 
   return (
     (text === '' ||
@@ -267,14 +282,28 @@ function matchesExceptStatus(run: RunSummary, query: RunListQuery, text: string)
     (!query.tradingPartnerId?.length || query.tradingPartnerId.includes(run.tradingPartner.id)) &&
     (!query.messageType?.length || query.messageType.includes(run.messageType)) &&
     (!query.flowId?.length || query.flowId.includes(run.flow.id)) &&
+    (!query.mappingId?.length ||
+      (mappingId !== undefined && query.mappingId.includes(mappingId))) &&
     (query.receivedFrom === undefined || receivedAt >= Date.parse(query.receivedFrom)) &&
     (query.receivedTo === undefined || receivedAt <= Date.parse(query.receivedTo)) &&
     (query.manualSubmission === undefined || run.manualSubmission === query.manualSubmission)
   )
 }
 
-export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | RunStore) {
+export function runsHandler(
+  apiUrl: string,
+  runs?: ReadonlyArray<RunSummary> | RunStore,
+  {
+    flows = seedFlows,
+    mappings = seedMappings,
+  }: {
+    flows?: ReadonlyArray<FlowRecord> | FlowStore
+    mappings?: ReadonlyArray<MappingRecord> | MappingCatalogue
+  } = {},
+) {
   let store: RunStore | undefined
+  const flowStore = toFlowStore(flows)
+  const catalogue = toMappingCatalogue(mappings)
 
   return http.get(`${apiUrl}${runsEndpoint.path}`, ({ request }) => {
     const query = runsEndpoint.query.safeParse(fromSearchParams(new URL(request.url).searchParams))
@@ -287,6 +316,12 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | R
     const { status } = query.data
     const text = query.data.q?.toLowerCase() ?? ''
 
+    const mappingOfFlow = (flowId: string) => {
+      const flow = flowStore.get(flowId)
+
+      return flow && catalogue.find(flow.mappingVersionId)?.mapping.mappingId
+    }
+
     const statusCounts: Record<RunStatus, number> = {
       received: 0,
       processing: 0,
@@ -298,7 +333,7 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | R
     const filtered: RunSummary[] = []
 
     for (const run of store.newestFirst()) {
-      if (!matchesExceptStatus(run, query.data, text)) {
+      if (!matchesExceptStatus(run, query.data, text, mappingOfFlow)) {
         continue
       }
 

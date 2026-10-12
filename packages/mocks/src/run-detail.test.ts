@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import {
   interchangeEndpoint,
   mappingVersionsEndpoint,
+  mappingVersionSummarySchema,
   type FailureStage,
   type ReprocessRunBody,
   reprocessRunEndpoint,
@@ -480,7 +481,9 @@ async function post(path: string, body?: ReprocessRunBody) {
 async function versionsOf(mappingId: string) {
   const response = await fetch(`${apiUrl}${toPath(mappingVersionsEndpoint.path, { mappingId })}`)
 
-  return mappingVersionsEndpoint.response.parse(await response.json())
+  return mappingVersionsEndpoint.response
+    .parse(await response.json())
+    .map((entry) => mappingVersionSummarySchema.parse(entry))
 }
 
 describe('POST /runs/:id/retry', () => {

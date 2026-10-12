@@ -70,6 +70,7 @@ import {
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   type PreviewMappingBody,
+  type PublishMappingDraftBody,
   type PublishedMappingVersionsQuery,
   type QueryParams,
   regenerateWebhookTokenEndpoint,
@@ -352,9 +353,10 @@ export function compareMappingVersions(mappingId: string, query: MappingComparis
   })
 }
 
-export function publishMappingDraft(mappingId: string) {
+export function publishMappingDraft(mappingId: string, body: PublishMappingDraftBody) {
   return request(publishMappingDraftEndpoint, {
     path: toPath(publishMappingDraftEndpoint.path, { mappingId }),
+    body,
   })
 }
 

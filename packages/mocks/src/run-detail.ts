@@ -30,7 +30,12 @@ import {
   serializeInterchange,
 } from './interchange'
 import { type LookupTableStore, toLookupTableStore } from './lookup-table'
-import { type MappingVersionStore, toMappingVersionSummary } from './mapping-version'
+import {
+  type MappingVersionStore,
+  pinnedFlows,
+  seedMappingVersionEntry,
+  toMappingVersionSummary,
+} from './mapping-version'
 import { seedRuns } from './run'
 import { problemOf } from './run-problem'
 import { stagesOf, statusOf, stepStatuses } from './run-steps'
@@ -370,8 +375,13 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     `${apiUrl}${mappingVersionsEndpoint.path}`,
     ({ params }) => {
       const versions = versionsOf(params.mappingId)
+      const flowsOf = pinnedFlows()
 
-      return versions ? HttpResponse.json(versions) : problem(404, 'Not Found')
+      return versions
+        ? HttpResponse.json(
+            versions.map((version) => seedMappingVersionEntry(version, flowsOf(version.id))),
+          )
+        : problem(404, 'Not Found')
     },
   )
 

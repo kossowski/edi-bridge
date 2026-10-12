@@ -25,6 +25,7 @@ import {
   mappingSamplesEndpoint,
   mappingsEndpoint,
   mappingVersionsEndpoint,
+  mappingVersionSummarySchema,
   messageTypeStructureEndpoint,
   operatorWorkspacesEndpoint,
   orderLifecycleEndpoint,
@@ -258,6 +259,8 @@ describe('createHandlers', () => {
       await (
         await fetch(`${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId })}`, {
           method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ changeNote: '' }),
         })
       ).json(),
     )
@@ -278,9 +281,11 @@ describe('createHandlers', () => {
       mappingVersionId: published.id,
     })
 
-    expect(offered).toContainEqual(published)
-    expect(flow.newerMappingVersions).toContainEqual(published)
-    expect(replacing.mappingVersion).toEqual(published)
+    const summary = mappingVersionSummarySchema.parse(published)
+
+    expect(offered).toContainEqual(summary)
+    expect(flow.newerMappingVersions).toContainEqual(summary)
+    expect(replacing.mappingVersion).toEqual(summary)
   })
 
   it('opens a Mapping created within the same createHandlers call and shows its publication', async () => {
@@ -310,6 +315,8 @@ describe('createHandlers', () => {
           `${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId: created.id })}`,
           {
             method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ changeNote: '' }),
           },
         )
       ).json(),

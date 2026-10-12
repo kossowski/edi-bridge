@@ -89,7 +89,7 @@ export function PublishDraft({
     publishProblem(error instanceof ApiError ? error.status : null)
 
   const publish = useMutation({
-    mutationFn: () => publishMappingDraft(draft.mappingId),
+    mutationFn: () => publishMappingDraft(draft.mappingId, { changeNote: '', moveFlowIds: [] }),
     onSuccess: (summary) => {
       storePublishedMappingVersion(queryClient, summary)
       setPublishedVersion(summary.version)
