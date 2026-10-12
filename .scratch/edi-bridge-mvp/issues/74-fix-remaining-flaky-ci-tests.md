@@ -7,6 +7,7 @@
 | `document-structure-screen.stories.tsx` > Default                    | 38313212673 (main), 38313704995 | Unable to find the link "Hansemarkt: ORDERS to ERP JSON" after about 4.9 s       |
 | `mapping-comparison-screen.stories.tsx` > Unavailable                | 38313120863                     | Unable to find the text "Mapping differences unavailable" within the 1 s default |
 | `packages/mocks` tests                                               | none yet                        | Take about 4 s of their 5 s timeout on CI                                        |
+| `task.test.ts` > serves a large volume of tasks for every kind       | #141                            | Hit its 5 s timeout                                                              |
 | `mapping-canvas-story-helpers.ts` `openDetails`, used by ~30 stories | none yet                        | Returns the sheet before focus has moved into it                                 |
 
 The canvas stories that failed on the `feat/67-*` branches ("30 links", the transform stories) fail the same way on every branch of that stack, so they come from ticket 67's changes, not from flaky tests.
