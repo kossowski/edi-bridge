@@ -3,10 +3,11 @@
 import { Search01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useLocale, useTranslations } from 'next-intl'
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { useGlossary } from '@/hooks/use-glossary'
+import { useLocationHash } from '@/hooks/use-location-hash'
 import { glossaryEntries } from '@/lib/glossary'
 import {
   Empty,
@@ -22,7 +23,16 @@ export function HelpScreen() {
   const locale = useLocale()
   const glossary = useGlossary()
   const searchId = useId()
-  const [search, setSearch] = useState('')
+  const hash = useLocationHash()
+  const [typed, setTyped] = useState({ text: '', hash })
+  const search = typed.hash === hash ? typed.text : ''
+
+  useEffect(() => {
+    const target = hash === '' ? null : document.getElementById(hash)
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    target?.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' })
+  }, [hash])
 
   const collator = new Intl.Collator(locale)
 
@@ -54,7 +64,7 @@ export function HelpScreen() {
               id={searchId}
               type="search"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => setTyped({ text: event.target.value, hash })}
             />
           </div>
           <p aria-live="polite" className="text-muted-foreground text-sm">
@@ -79,7 +89,8 @@ export function HelpScreen() {
               <div
                 key={entry.id}
                 id={entry.id}
-                className="bg-card target:border-primary target:ring-ring/50 flex scroll-mt-24 flex-col gap-1.5 rounded-xl border p-4 text-sm target:ring-[3px]">
+                className="bg-card data-targeted:border-primary data-targeted:ring-ring/50 flex scroll-mt-24 flex-col gap-1.5 rounded-xl border p-4 text-sm data-targeted:ring-[3px]"
+                data-targeted={entry.id === hash || undefined}>
                 <dt className="font-medium">{entry.label}</dt>
                 <dd className="text-muted-foreground text-xs">
                   {t('Help.technicalTerm')}: <span lang="en">{entry.term}</span>

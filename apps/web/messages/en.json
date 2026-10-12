@@ -395,7 +395,7 @@
       },
       "documentStructure": {
         "label": "Data format",
-        "explanation": "The fields of a JSON or CSV file that your own systems export or import, learned from an example file."
+        "explanation": "A file format from your own systems: its fields, nesting and repeated parts, learned from an example file or a schema."
       },
       "mapping": {
         "label": "Mapping",
@@ -446,7 +446,7 @@
       "ORDERS": "Your trading partner orders goods from you.",
       "DESADV": "You tell your trading partner what you ship and when it arrives.",
       "INVOIC": "You bill your trading partner for the goods you delivered.",
-      "CONTRL": "An automatic reply confirming that a transmission arrived and could be read."
+      "CONTRL": "The automatic reply to a transmission: it confirms that the transmission arrived and was either accepted or rejected because of syntax errors."
     }
   },
   "Runs": {

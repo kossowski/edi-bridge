@@ -1,4 +1,4 @@
-import { expect, userEvent } from 'storybook/test'
+import { expect, userEvent, waitFor } from 'storybook/test'
 
 import { HelpScreen } from '@/components/help/help-screen'
 import { darkMode, german, mobile } from '@/components/story-helpers'
@@ -65,6 +65,45 @@ export const German = meta.story({
     )
     await expect(canvas.getByText('Lieferavis', { selector: 'dt' })).toBeVisible()
     await expect(canvas.queryByText('Code-Übersetzung')).toBeNull()
+  },
+})
+
+function withHash(hash: string) {
+  return () => {
+    const original = window.location.href
+
+    window.history.replaceState(window.history.state, '', `#${hash}`)
+
+    return () => window.history.replaceState(window.history.state, '', original)
+  }
+}
+
+export const LinkedEntry = meta.story({
+  beforeEach: withHash('lookup-table'),
+  async play({ canvasElement }) {
+    const entry = canvasElement.querySelector('#lookup-table')
+
+    await expect(entry).toHaveAttribute('data-targeted')
+    await expect(canvasElement.querySelectorAll('[data-targeted]')).toHaveLength(1)
+    await waitFor(() => expect(entry?.getBoundingClientRect().top).toBeLessThan(window.innerHeight))
+  },
+})
+
+export const NavigateToEntry = meta.story({
+  beforeEach: withHash('workspace'),
+  async play({ canvas, canvasElement }) {
+    const search = canvas.getByRole('searchbox', { name: 'Search the glossary' })
+
+    await userEvent.type(search, 'workspace')
+    await expect(canvasElement.querySelector('#reprocess')).toBeNull()
+
+    window.history.pushState(window.history.state, '', '#reprocess')
+
+    await waitFor(() =>
+      expect(canvasElement.querySelector('#reprocess')).toHaveAttribute('data-targeted'),
+    )
+    await expect(search).toHaveValue('')
+    await expect(canvasElement.querySelector('#workspace')).not.toHaveAttribute('data-targeted')
   },
 })
 

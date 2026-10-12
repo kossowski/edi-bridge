@@ -360,3 +360,14 @@ export const Desktop = meta.story({
     await expect(canvas.getByText('Ctrl K')).toBeVisible()
   },
 })
+
+export const GermanDesktopPageLabels = meta.story({
+  ...desktop,
+  decorators: [german],
+  async play({ canvas }) {
+    const dialog = await openPalette(canvas, 'Aufträge, Handelspartner, Belege, Seiten suchen …')
+    const label = dialog.getByText('Hilfe & Glossar', { selector: 'span' })
+
+    await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth)
+  },
+})

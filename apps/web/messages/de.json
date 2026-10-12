@@ -395,7 +395,7 @@
       },
       "documentStructure": {
         "label": "Datenformat",
-        "explanation": "Die Felder einer JSON- oder CSV-Datei, die Ihre eigenen Systeme exportieren oder importieren, erkannt aus einer Beispieldatei."
+        "explanation": "Ein Dateiformat Ihrer eigenen Systeme: seine Felder, Verschachtelungen und Wiederholungen, erkannt aus einer Beispieldatei oder einem Schema."
       },
       "mapping": {
         "label": "Mapping",
@@ -446,7 +446,7 @@
       "ORDERS": "Ihr Handelspartner bestellt Waren bei Ihnen.",
       "DESADV": "Sie teilen Ihrem Handelspartner mit, was Sie liefern und wann es ankommt.",
       "INVOIC": "Sie stellen Ihrem Handelspartner die gelieferte Ware in Rechnung.",
-      "CONTRL": "Eine automatische Antwort, die bestätigt, dass eine Übertragung angekommen ist und gelesen werden konnte."
+      "CONTRL": "Die automatische Antwort auf eine Übertragung: Sie bestätigt, dass die Übertragung angekommen ist und entweder angenommen oder wegen Syntaxfehlern abgelehnt wurde."
     }
   },
   "Runs": {
