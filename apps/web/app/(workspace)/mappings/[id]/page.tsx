@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server'
 import type { Metadata } from 'next'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
+import { firstSearchParam } from '@/lib/search-params'
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations()
@@ -10,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: { absolute: `${t('Mapping.title')} · ${t('Shell.appName')}` } }
 }
 
-export default async function Page({ params }: PageProps<'/mappings/[id]'>) {
-  const { id } = await params
+export default async function Page({ params, searchParams }: PageProps<'/mappings/[id]'>) {
+  const [{ id }, { field }] = await Promise.all([params, searchParams])
 
-  return <MappingCanvasScreen id={id} />
+  return <MappingCanvasScreen id={id} field={firstSearchParam(field)} />
 }

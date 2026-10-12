@@ -24,12 +24,14 @@ import {
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
 } from 'react'
 
 import { proposedLinkCount, useAiMarks } from '@/components/mappings/ai-marks'
+import { type FailingField } from '@/components/mappings/failing-field'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
 import {
   LinkEdge,
@@ -91,6 +93,7 @@ import {
   layoutTree,
   nodeId,
   panelGutter,
+  rowHeight,
   rowOfNodeId,
   type Side,
   transformNodeId,
@@ -172,6 +175,8 @@ const dropOffset = 20
 // Below this a row's toggle falls under the 24px target size; the user pans to the rest instead.
 const minInitialZoom = 0.82
 
+const minZoom = 0.2
+
 // React Flow announces every node as one to select, move or delete; these nodes are none of that.
 const plainNode = { 'aria-roledescription': undefined, 'aria-describedby': undefined }
 
@@ -186,6 +191,8 @@ const transformExtent: [[number, number], [number, number]] = [
 
 export type CanvasSide = { title: string; items: ReadonlyArray<TreeItem> }
 
+export type MappingCanvasHandle = { showFailingField: () => void }
+
 type MappingCanvasProps = {
   label: string
   graph: Graph
@@ -193,6 +200,8 @@ type MappingCanvasProps = {
   target: CanvasSide
   onChange: (save: GraphSave) => void
   detailsFacts?: ReactNode
+  failingField?: FailingField | null
+  ref?: Ref<MappingCanvasHandle>
 }
 
 // Mounted only while the tooltip shows a row, so that row's button can point at the tooltip.
@@ -455,6 +464,8 @@ export function MappingCanvas({
   target,
   onChange,
   detailsFacts,
+  failingField = null,
+  ref,
 }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
   const tAi = useTranslations('Mapping.aiReview')
@@ -603,6 +614,17 @@ export function MappingCanvas({
       ]
     })
 
+    const failingRow = failingField?.row
+    const failingShownAt = failingRow && layouts[failingRow.side].visible.get(failingRow.path)
+
+    const failing = (row: TreeRow) => {
+      if (row.side !== failingRow?.side || row.path !== failingShownAt) {
+        return null
+      }
+
+      return row.path === failingRow.path ? 'field' : 'inside'
+    }
+
     const linked = new Set([
       ...shown.flatMap((link) => [
         nodeId('source', link.sourcePath),
@@ -639,6 +661,7 @@ export function MappingCanvas({
         filled: row.side === 'target' && linkIntoTarget(graph, row.path) !== null,
         wholePart: isWholePart(rows, row),
         aiProposed: row.side === 'target' && marks.end({ kind: 'target', path: row.path }),
+        failing: failing(row),
       },
       draggable: false,
       selectable: false,
@@ -760,6 +783,7 @@ export function MappingCanvas({
   }, [
     collapsed,
     draggedTo,
+    failingField,
     graph,
     heights,
     issues,
@@ -776,22 +800,86 @@ export function MappingCanvas({
     text,
   ])
 
-  const onInit = useCallback((instance: ReactFlowInstance<CanvasNode, LinkFlowEdge>) => {
-    flow.current = instance
+  // The field comes to the middle height. Sideways both trees stay in view, the source fields
+  // too; where they do not fit beside each other at the current zoom, a target field zooms out
+  // and a source field keeps the zoom with its tree at the left. The free width leaves out the
+  // controls' strip and the open details.
+  const centreOn = useCallback((row: RowRef) => {
+    const instance = flow.current
+    const pane = container.current
+    const node = instance?.getNode(nodeId(row.side, row.path))
 
-    const width = container.current?.clientWidth ?? canvasWidth
+    if (!instance || !pane || !node) {
+      return
+    }
 
-    const zoom = Math.min(
-      1,
-      Math.max(minInitialZoom, (width - panelGutter - viewportPadding) / canvasWidth),
-    )
+    const details = detailsPanel.current?.getBoundingClientRect()
+    const covered = details ? Math.max(0, pane.getBoundingClientRect().right - details.left) : 0
+    const free = pane.clientWidth - covered - panelGutter
+    const current = instance.getViewport().zoom
+    const fitZoom = (free - viewportPadding) / canvasWidth
+    const fits = fitZoom >= current
+    const zoom = fits || row.side === 'source' ? current : Math.max(minZoom, fitZoom)
 
     void instance.setViewport({
-      x: Math.max(panelGutter, (width - canvasWidth * zoom) / 2),
-      y: viewportPadding,
+      x: panelGutter + (fits ? (free - canvasWidth * zoom) / 2 : viewportPadding / 2),
+      y: pane.clientHeight / 2 - (node.position.y + rowHeight / 2) * zoom,
       zoom,
     })
   }, [])
+
+  const onInit = useCallback(
+    (instance: ReactFlowInstance<CanvasNode, LinkFlowEdge>) => {
+      flow.current = instance
+
+      const width = container.current?.clientWidth ?? canvasWidth
+
+      const zoom = Math.min(
+        1,
+        Math.max(minInitialZoom, (width - panelGutter - viewportPadding) / canvasWidth),
+      )
+
+      void instance.setViewport({
+        x: Math.max(panelGutter, (width - canvasWidth * zoom) / 2),
+        y: viewportPadding,
+        zoom,
+      })
+
+      if (failingField) {
+        centreOn(failingField.row)
+      }
+    },
+    [centreOn, failingField],
+  )
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      showFailingField: () => {
+        if (!failingField) {
+          return
+        }
+
+        const { row, ancestors } = failingField
+        const { expand, select } = store.getState()
+        const button = () => (container.current ? findRowButton(container.current, row) : null)
+
+        expand(
+          row.side,
+          ancestors.map(({ path }) => path),
+        )
+        select(row)
+        whenRendered(
+          () => Boolean(button()),
+          () => {
+            button()?.focus({ preventScroll: true })
+            centreOn(row)
+          },
+        )
+      },
+    }),
+    [centreOn, failingField, store],
+  )
 
   const focusRow = useCallback((row: RowRef | null) => {
     afterRender(() => {
@@ -1495,7 +1583,7 @@ export function MappingCanvas({
                     elementsSelectable={false}
                     isValidConnection={isValidConnection}
                     maxZoom={1.5}
-                    minZoom={0.2}
+                    minZoom={minZoom}
                     nodes={nodes}
                     nodesConnectable={!viewOnly}
                     nodesDraggable={false}

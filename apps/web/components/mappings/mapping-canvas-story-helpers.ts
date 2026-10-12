@@ -220,3 +220,8 @@ export async function openLinkMenuByKeyboard(
 
   return findLinkMenu(canvasElement)
 }
+
+// An empty Mapping opens on "Start here"; this takes the path that opens the empty editor.
+export async function openEmptyEditor(canvasElement: HTMLElement, name = 'Open the empty editor') {
+  await userEvent.click(await within(canvasElement).findByRole('button', { name }))
+}
