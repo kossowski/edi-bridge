@@ -61,7 +61,7 @@ export const firstStepsEndpoint: Endpoint<FirstSteps> = {
   response: firstStepsSchema,
 }
 
-type OnboardingPartner = Pick<TradingPartner, 'id' | 'testMode' | 'onboarding'>
+type OnboardingPartner = Pick<TradingPartner, 'id' | 'gln' | 'testMode' | 'onboarding'>
 
 function onboardingTarget(tradingPartner: OnboardingPartner | undefined) {
   return tradingPartner

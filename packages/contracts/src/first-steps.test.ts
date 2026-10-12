@@ -12,18 +12,21 @@ const notStarted = { testInterchangeSentAt: null, contrlReceivedAt: null }
 
 const awaitingTest = {
   id: '10000000-0000-4000-8000-000000000001',
+  gln: null,
   testMode: true,
   onboarding: notStarted,
 }
 
 const tested = {
   id: '10000000-0000-4000-8000-000000000002',
+  gln: '4000000000002',
   testMode: true,
   onboarding: { testInterchangeSentAt: '2026-10-06T14:03:00.000Z', contrlReceivedAt: null },
 }
 
 const live = {
   id: '10000000-0000-4000-8000-000000000003',
+  gln: '4000000000003',
   testMode: false,
   onboarding: {
     testInterchangeSentAt: '2026-10-01T09:12:00.000Z',
