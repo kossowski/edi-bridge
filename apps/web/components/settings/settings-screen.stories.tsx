@@ -1,18 +1,16 @@
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
-import { NextIntlClientProvider } from 'next-intl'
-import { expect, userEvent, waitFor } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
-import type { ReactNode } from 'react'
-
+import { AppHeader } from '@/components/app-header'
 import { sessionHandlers } from '@/components/session/session-story-helpers'
 import { SettingsScreen } from '@/components/settings/settings-screen'
+import { darkMode, german } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import messagesDe from '@/messages/de.json'
 import {
   currentWorkspaceEndpoint,
   type Session,
-  sessionEndpoint,
-  updateWorkspaceSettingsEndpoint,
+  updateCompanyIdentityEndpoint,
   workspaceSettingsEndpoint,
   type WorkspaceSettings,
 } from '@edi-bridge/contracts'
@@ -27,34 +25,48 @@ import {
   workspaceHandlers,
   workspaceSettingsHandlers,
 } from '@edi-bridge/mocks'
+import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
 
 import preview from '../../.storybook/preview'
 
-function signedInAs(session: Session, settings?: WorkspaceSettings) {
+const withoutGln = createWorkspace({ name: seedWorkspace.name, gln: null })
+
+function signedInAs(
+  session: Session,
+  { settings, missingGln = false }: { settings?: WorkspaceSettings; missingGln?: boolean } = {},
+) {
   const store = createSessionStore(session)
 
   return [
     ...sessionHandlers(store),
-    ...workspaceHandlers(apiUrl, seedWorkspace, store),
+    ...workspaceHandlers(apiUrl, missingGln ? withoutGln : seedWorkspace, store),
     ...workspaceSettingsHandlers(apiUrl, { session: store, ...(settings && { settings }) }),
   ]
 }
 
-function darkMode() {
-  document.documentElement.classList.add('dark')
-
-  return () => document.documentElement.classList.remove('dark')
+function failing(path: string, method: 'get' | 'put' = 'get') {
+  return http[method](`${apiUrl}${path}`, () =>
+    HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+  )
 }
 
-const german = (Story: () => ReactNode) => (
-  <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-    <Story />
-  </NextIntlClientProvider>
-)
+function pending(path: string) {
+  return http.get(`${apiUrl}${path}`, async () => {
+    await delay('infinite')
+  })
+}
+
+function panel(canvasElement: HTMLElement) {
+  return within(within(canvasElement).getByRole('tabpanel'))
+}
+
+const dataTab = { parameters: { nextjs: { navigation: { query: { tab: 'data' } } } } }
 
 const exhausted = createWorkspaceSettings({
   aiTokenBudget: { dailyLimit: 200_000, usedToday: 200_000 },
 })
+
+const turnedOff = createWorkspaceSettings({ aiTokenBudget: { dailyLimit: 0, usedToday: 0 } })
 
 const largeNumbers = createWorkspaceSettings({
   documentRetentionDays: 730,
@@ -64,326 +76,332 @@ const largeNumbers = createWorkspaceSettings({
 const meta = preview.meta({
   title: 'Settings/SettingsScreen',
   component: SettingsScreen,
-  parameters: { layout: 'fullscreen' },
-  beforeEach({ msw }) {
-    msw.use(...signedInAs(seedSession))
+  parameters: {
+    layout: 'fullscreen',
+    nextjs: { navigation: { pathname: '/settings', query: {} } },
   },
-})
-
-export const Default = meta.story({
-  async play({ canvas }) {
-    await expect(await canvas.findByLabelText('GLN')).toHaveValue(seedWorkspace.gln)
-    await expect(await canvas.findByLabelText('Retention period in days')).toHaveValue('90')
-    await expect(canvas.getByLabelText('Daily limit in tokens')).toHaveValue('200,000')
-    await expect(canvas.getByRole('progressbar', { name: 'Used today' })).toHaveAttribute(
-      'aria-valuetext',
-      '48,350 of 200,000 tokens (24%)',
-    )
-  },
-})
-
-export const OperatorSaves = meta.story({
-  async play({ canvas }) {
-    const retention = await canvas.findByLabelText('Retention period in days')
-    await userEvent.clear(retention)
-    await userEvent.type(retention, '30')
-    const limit = canvas.getByLabelText('Daily limit in tokens')
-    await userEvent.clear(limit)
-    await userEvent.type(limit, '40000')
-    await userEvent.click(canvas.getByRole('button', { name: 'Save retention and AI budget' }))
-    await expect(await canvas.findByText('Retention and AI budget saved.')).toBeVisible()
-    await expect(limit).toHaveValue('40,000')
-  },
-})
-
-export const SaveKeepsFocus = meta.story({
-  beforeEach({ msw }) {
-    msw.use(
-      http.put(`${apiUrl}${updateWorkspaceSettingsEndpoint.path}`, async () => {
-        await delay('infinite')
-      }),
-    )
-  },
-  async play({ canvas }) {
-    const save = await canvas.findByRole('button', { name: 'Save retention and AI budget' })
-    save.focus()
-    await userEvent.keyboard('{Enter}')
-    await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'))
-    await expect(save).toHaveTextContent('Saving…')
-    await expect(save).toHaveFocus()
-  },
-})
-
-export const SessionUnavailable = meta.story({
-  beforeEach({ msw }) {
-    msw.use(
-      http.get(`${apiUrl}${sessionEndpoint.path}`, () =>
-        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
-      ),
-    )
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText(/The Operator sets the retention period/)).toBeVisible()
-    await expect(canvas.queryByRole('textbox')).toBeNull()
-    await expect(canvas.queryByRole('button')).toBeNull()
-  },
-})
-
-export const AdminReadOnly = meta.story({
+  decorators: [
+    (Story) => (
+      <SidebarProvider>
+        <div className="w-full">
+          <AppHeader />
+          <Story />
+        </div>
+      </SidebarProvider>
+    ),
+  ],
   beforeEach({ msw }) {
     msw.use(...signedInAs(sandboxAdminSession))
   },
-  async play({ canvas }) {
-    await expect(await canvas.findByText(/The Operator sets the retention period/)).toBeVisible()
-    await expect(canvas.getByText('90 days')).toBeVisible()
-    await expect(canvas.getByText('200,000 tokens per day')).toBeVisible()
-    await expect(canvas.queryByLabelText('Retention period in days')).toBeNull()
-    await expect(canvas.getByLabelText('GLN')).toHaveValue(seedWorkspace.gln)
-  },
 })
 
-export const ViewerReadOnly = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...signedInAs(showcaseViewerSession))
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText(/The Operator sets the retention period/)).toBeVisible()
-    await expect(canvas.getByText(seedWorkspace.gln ?? '')).toBeVisible()
-    await expect(canvas.queryByRole('textbox')).toBeNull()
-    await expect(canvas.queryByRole('button')).toBeNull()
-  },
-})
-
-export const ViewerReadOnlyGerman = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...signedInAs(showcaseViewerSession))
-  },
-  decorators: [german],
-  async play({ canvas }) {
-    await expect(await canvas.findByText(/Der Operator legt die Aufbewahrungsdauer/)).toBeVisible()
-    await expect(canvas.getByText('90 Tage')).toBeVisible()
-    await expect(canvas.getByText('200.000 Tokens pro Tag')).toBeVisible()
-    await expect(canvas.queryByRole('textbox')).toBeNull()
-  },
-})
-
-export const ViewerReadOnlyDark = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...signedInAs(showcaseViewerSession))
-
-    return darkMode()
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText(/The Operator sets the retention period/)).toBeVisible()
-    await expect(canvas.getByRole('progressbar', { name: 'Used today' })).toBeVisible()
-  },
-})
-
-export const BudgetExhausted = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...signedInAs(seedSession, exhausted))
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText(/AI token budget is used up/)).toBeVisible()
-    await expect(canvas.getByText('200,000 of 200,000 tokens (100%)')).toBeVisible()
-  },
-})
-
-export const BudgetExhaustedGerman = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...signedInAs(seedSession, exhausted))
-  },
-  decorators: [german],
-  async play({ canvas }) {
+export const CompanyAsAdmin = meta.story({
+  async play({ canvas, canvasElement }) {
     await expect(
-      await canvas.findByText(/KI-Token-Budget für heute ist aufgebraucht/),
-    ).toBeVisible()
-    await expect(canvas.getByText('200.000 von 200.000 Tokens (100 %)')).toBeVisible()
-  },
-})
-
-export const BudgetExhaustedDark = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...signedInAs(seedSession, exhausted))
-
-    return darkMode()
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText(/AI token budget is used up/)).toBeVisible()
-  },
-})
-
-export const AiTurnedOff = meta.story({
-  beforeEach({ msw }) {
-    msw.use(
-      ...signedInAs(
-        sandboxAdminSession,
-        createWorkspaceSettings({ aiTokenBudget: { dailyLimit: 0, usedToday: 0 } }),
-      ),
+      await canvas.findByRole('heading', { level: 1, name: 'Settings' }),
+    ).toBeInTheDocument()
+    await expect(await canvas.findByRole('tab', { name: 'Company' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     )
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText('AI is turned off for this Workspace.')).toBeVisible()
+    await expect(canvas.getByRole('tab', { name: 'Data & AI' })).toBeVisible()
+    await expect(canvas.queryByRole('tab', { name: /Notifications/ })).toBeNull()
+    await expect(await canvas.findByLabelText('Company ID (GLN)')).toHaveValue(seedWorkspace.gln)
+    const company = panel(canvasElement)
+    await expect(company.getByText('This is how your partners see you.')).toBeVisible()
+    await expect(company.getByText(seedWorkspace.name)).toBeVisible()
+    await expect(company.queryByText('Your company ID is missing')).toBeNull()
   },
 })
 
-export const LargeNumbers = meta.story({
+export const CompanySaved = meta.story({
+  async play({ canvas }) {
+    const gln = await canvas.findByLabelText('Company ID (GLN)')
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
+    await expect(await canvas.findByText('Company ID saved.')).toBeVisible()
+
+    await userEvent.type(gln, '1')
+    await expect(canvas.queryByText('Company ID saved.')).toBeNull()
+  },
+})
+
+export const CompanyInvalidGln = meta.story({
+  async play({ canvas }) {
+    const gln = await canvas.findByLabelText('Company ID (GLN)')
+    await userEvent.clear(gln)
+    await userEvent.type(gln, '123')
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(gln).toHaveAttribute('aria-invalid', 'true'))
+  },
+})
+
+export const CompanySaveFailed = meta.story({
   beforeEach({ msw }) {
-    msw.use(...signedInAs(sandboxAdminSession, largeNumbers))
+    msw.use(failing(updateCompanyIdentityEndpoint.path, 'put'))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('730 days')).toBeVisible()
-    await expect(canvas.getByText('10,000,000 tokens per day')).toBeVisible()
-    await expect(canvas.getByText('9,876,543 of 10,000,000 tokens (99%)')).toBeVisible()
-  },
-})
-
-export const ValidationError = meta.story({
-  async play({ canvas }) {
-    const retention = await canvas.findByLabelText('Retention period in days')
-    const limit = canvas.getByLabelText('Daily limit in tokens')
-    await userEvent.clear(retention)
-    await userEvent.type(retention, '3')
-    await userEvent.clear(limit)
-    await userEvent.type(limit, '1.5')
-    await userEvent.click(canvas.getByRole('button', { name: 'Save retention and AI budget' }))
-    await expect(await canvas.findByText('Enter between 7 and 730 days.')).toBeVisible()
-    await expect(canvas.getByText('Enter a whole number of tokens.')).toBeVisible()
-    await expect(retention).toHaveAttribute('aria-invalid', 'true')
-  },
-})
-
-export const ValidationErrorGerman = meta.story({
-  decorators: [german],
-  async play({ canvas }) {
-    const retention = await canvas.findByLabelText('Aufbewahrungsdauer in Tagen')
-    const limit = canvas.getByLabelText('Tageslimit in Tokens')
-    await userEvent.clear(retention)
-    await userEvent.type(retention, '3')
-    await userEvent.clear(limit)
-    await userEvent.type(limit, '1,500')
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Aufbewahrung und KI-Budget speichern' }),
-    )
-    await expect(
-      await canvas.findByText('Geben Sie einen Wert zwischen 7 und 730 Tagen ein.'),
-    ).toBeVisible()
-    await expect(canvas.getByText('Geben Sie eine ganze Zahl von Tokens ein.')).toBeVisible()
-    await expect(limit).toHaveAttribute('aria-invalid', 'true')
-  },
-})
-
-export const SaveFailed = meta.story({
-  beforeEach({ msw }) {
-    msw.use(
-      http.put(`${apiUrl}${updateWorkspaceSettingsEndpoint.path}`, () =>
-        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
-      ),
-    )
-  },
-  async play({ canvas }) {
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Save retention and AI budget' }),
-    )
+    await userEvent.click(await canvas.findByRole('button', { name: 'Save' }))
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The retention period and AI budget could not be saved. Try again.',
+      'The company ID could not be saved. Try again.',
     )
   },
 })
 
-export const SettingsUnavailable = meta.story({
+export const CompanyAsViewer = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      http.get(`${apiUrl}${workspaceSettingsEndpoint.path}`, () =>
-        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
-      ),
-    )
+    msw.use(...signedInAs(showcaseViewerSession))
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText(seedWorkspace.gln ?? '')).toBeVisible()
+    const company = panel(canvasElement)
+    await expect(company.getByText(seedWorkspace.name)).toBeVisible()
+    await expect(company.queryByRole('textbox')).toBeNull()
+    await expect(company.queryByRole('button')).toBeNull()
+  },
+})
+
+export const CompanyWithoutGln = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { missingGln: true }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Your company ID is missing')).toBeVisible()
+    await expect(canvas.getByText(/Add your GLN below/)).toBeVisible()
+    await expect(canvas.getByLabelText('Company ID (GLN)')).toHaveValue('')
+  },
+})
+
+export const CompanyWithoutGlnAsViewer = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(showcaseViewerSession, { missingGln: true }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Your company ID is missing')).toBeVisible()
+    await expect(canvas.getByText(/Ask an admin of your company/)).toBeVisible()
+    await expect(canvas.getByText('Not set')).toBeVisible()
+  },
+})
+
+export const CompanyLoading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(pending(currentWorkspaceEndpoint.path))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Loading settings')).toBeInTheDocument()
+  },
+})
+
+export const CompanyUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(failing(currentWorkspaceEndpoint.path))
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('Settings unavailable')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
-    await expect(await canvas.findByLabelText('GLN')).toBeVisible()
   },
 })
 
-export const SavedThenEdited = meta.story({
+export const CompanyGerman = meta.story({
+  decorators: [german],
   async play({ canvas }) {
-    const gln = await canvas.findByLabelText('GLN')
-    await userEvent.click(canvas.getByRole('button', { name: 'Save company identity' }))
-    await expect(await canvas.findByText('Company identity saved.')).toBeVisible()
-
-    await userEvent.type(gln, '1')
-    await expect(canvas.queryByText('Company identity saved.')).toBeNull()
-  },
-})
-
-export const WithoutGln = meta.story({
-  beforeEach({ msw }) {
-    msw.use(
-      ...workspaceHandlers(apiUrl, createWorkspace({ name: 'Ostsee Feinkost AG', gln: null })),
+    await expect(await canvas.findByRole('tab', { name: 'Unternehmen' })).toBeVisible()
+    await expect(canvas.getByRole('tab', { name: 'Daten & KI' })).toBeVisible()
+    await expect(await canvas.findByLabelText('Unternehmens-ID (GLN)')).toHaveValue(
+      seedWorkspace.gln,
     )
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText(/Your company has no GLN yet/)).toBeVisible()
+    await expect(canvas.getByText('So sehen Ihre Partner Sie.')).toBeVisible()
   },
 })
 
-export const Loading = meta.story({
+export const CompanyWithoutGlnGerman = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      http.get(`${apiUrl}${currentWorkspaceEndpoint.path}`, async () => {
-        await delay('infinite')
-      }),
-      http.get(`${apiUrl}${workspaceSettingsEndpoint.path}`, async () => {
-        await delay('infinite')
-      }),
-    )
-  },
-  async play({ canvas }) {
-    await expect(canvas.getAllByText('Loading settings')).toHaveLength(2)
-  },
-})
-
-export const Unavailable = meta.story({
-  beforeEach({ msw }) {
-    msw.use(
-      http.get(`${apiUrl}${currentWorkspaceEndpoint.path}`, () =>
-        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
-      ),
-    )
-  },
-  async play({ canvas }) {
-    await expect(await canvas.findByText('Settings unavailable')).toBeVisible()
-  },
-})
-
-export const German = meta.story({
-  beforeEach({ msw }) {
-    msw.use(...signedInAs(seedSession, largeNumbers))
+    msw.use(...signedInAs(showcaseViewerSession, { missingGln: true }))
   },
   decorators: [german],
   async play({ canvas }) {
-    await expect(
-      await canvas.findByRole('heading', { name: 'Unternehmensidentität' }),
-    ).toBeVisible()
-    await expect(await canvas.findByLabelText('Tageslimit in Tokens')).toHaveValue('10.000.000')
-    await expect(canvas.getByText('9.876.543 von 10.000.000 Tokens (99 %)')).toBeVisible()
+    await expect(await canvas.findByText('Ihre Unternehmens-ID fehlt')).toBeVisible()
   },
 })
 
-export const Dark = meta.story({
+export const CompanyDark = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      ...signedInAs(
-        seedSession,
-        createWorkspaceSettings({ aiTokenBudget: { dailyLimit: 200_000, usedToday: 210_000 } }),
-      ),
-    )
+    msw.use(...signedInAs(sandboxAdminSession, { missingGln: true }))
 
     return darkMode()
   },
   async play({ canvas }) {
-    await expect(await canvas.findByLabelText('GLN')).toBeVisible()
-    await expect(await canvas.findByRole('progressbar', { name: 'Used today' })).toBeVisible()
+    await expect(await canvas.findByText('Your company ID is missing')).toBeVisible()
+    await expect(canvas.getByLabelText('Company ID (GLN)')).toBeVisible()
+  },
+})
+
+export const ChooseDataTab = meta.story({
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('tab', { name: 'Data & AI' }))
+    await expect(getRouter().replace).toHaveBeenCalledWith('/settings?tab=data', {
+      scroll: false,
+    })
+  },
+})
+
+export const UnknownTabShowsCompany = meta.story({
+  parameters: { nextjs: { navigation: { query: { tab: 'notifications' } } } },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('tab', { name: 'Company' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(await canvas.findByLabelText('Company ID (GLN)')).toBeVisible()
+  },
+})
+
+export const DataAndAi = meta.story({
+  ...dataTab,
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByRole('tab', { name: 'Data & AI' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(await canvas.findByText('Set by the Operator')).toBeVisible()
+    const data = panel(canvasElement)
+    await expect(data.getByText('90 days')).toBeVisible()
+    await expect(data.getByText(/process a document again only while it is kept/)).toBeVisible()
+    await expect(data.getByText('200,000 tokens')).toBeVisible()
+    await expect(data.getByRole('progressbar', { name: 'Used today' })).toHaveAttribute(
+      'aria-valuetext',
+      '48,350 of 200,000 tokens (24%)',
+    )
+    await expect(data.queryByRole('textbox')).toBeNull()
+    await expect(data.queryByRole('button')).toBeNull()
+    await expect(data.queryByRole('link')).toBeNull()
+  },
+})
+
+export const DataAndAiAsOperator = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(seedSession))
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText('Set by the Operator')).toBeVisible()
+    await expect(panel(canvasElement).queryByRole('textbox')).toBeNull()
+  },
+})
+
+export const DataAndAiAsViewer = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(showcaseViewerSession))
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText('90 days')).toBeVisible()
+    await expect(panel(canvasElement).queryByRole('textbox')).toBeNull()
+  },
+})
+
+export const BudgetExhausted = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { settings: exhausted }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Today’s AI budget is used up')).toBeVisible()
+    await expect(canvas.getByText(/cannot draft mappings until tomorrow/)).toBeVisible()
+    await expect(canvas.getByText('200,000 of 200,000 tokens (100%)')).toBeVisible()
+  },
+})
+
+export const AiTurnedOff = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { settings: turnedOff }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('AI is turned off')).toBeVisible()
+    await expect(canvas.queryByRole('progressbar')).toBeNull()
+    await expect(canvas.queryByText(/per day/)).toBeNull()
+  },
+})
+
+export const LargeNumbers = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { settings: largeNumbers }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('730 days')).toBeVisible()
+    await expect(canvas.getByText('10,000,000 tokens')).toBeVisible()
+    await expect(canvas.getByText('9,876,543 of 10,000,000 tokens (99%)')).toBeVisible()
+  },
+})
+
+export const DataAndAiLoading = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(pending(workspaceSettingsEndpoint.path))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Loading settings')).toBeInTheDocument()
+  },
+})
+
+export const DataAndAiUnavailable = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(failing(workspaceSettingsEndpoint.path))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Settings unavailable')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
+  },
+})
+
+export const DataAndAiGerman = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { settings: largeNumbers }))
+  },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Vom Operator festgelegt')).toBeVisible()
+    await expect(canvas.getByText('730 Tage')).toBeVisible()
+    await expect(canvas.getByText('10.000.000 Tokens')).toBeVisible()
+    await expect(canvas.getByText('9.876.543 von 10.000.000 Tokens (99 %)')).toBeVisible()
+  },
+})
+
+export const BudgetExhaustedGerman = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { settings: exhausted }))
+  },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Das KI-Budget für heute ist aufgebraucht')).toBeVisible()
+  },
+})
+
+export const DataAndAiDark = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { settings: exhausted }))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Today’s AI budget is used up')).toBeVisible()
+    await expect(canvas.getByRole('progressbar', { name: 'Used today' })).toBeVisible()
+  },
+})
+
+export const AiTurnedOffDark = meta.story({
+  ...dataTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { settings: turnedOff }))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('AI is turned off')).toBeVisible()
   },
 })

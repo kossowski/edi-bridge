@@ -2345,57 +2345,56 @@
       "description": "Die Einstellungen konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     },
-    "companyIdentity": {
-      "title": "Unternehmensidentität",
-      "description": "Jedes Interchange, das Ihr Unternehmen sendet, trägt diese Identität als Absender.",
-      "missing": "Ihr Unternehmen hat noch keine GLN. Ohne sie können Trading Partners das Onboarding nicht abschließen.",
-      "companyName": "Unternehmen",
+    "tabs": {
+      "company": "Unternehmen",
+      "data": "Daten & KI"
+    },
+    "company": {
+      "title": "Unternehmen",
+      "description": "So sehen Ihre Partner Sie.",
+      "name": "Name des Unternehmens",
       "gln": {
-        "label": "GLN",
+        "label": "Unternehmens-ID (GLN)",
         "description": "Die 13-stellige Global Location Number Ihres Unternehmens, einschließlich Prüfziffer."
       },
       "notSet": "Nicht festgelegt",
-      "save": "Unternehmensidentität speichern",
+      "missing": {
+        "title": "Ihre Unternehmens-ID fehlt",
+        "admin": "Ohne sie können Handelspartner die Einrichtung nicht abschließen. Tragen Sie Ihre GLN unten ein.",
+        "viewer": "Ohne sie können Handelspartner die Einrichtung nicht abschließen. Bitten Sie einen Admin Ihres Unternehmens, sie einzutragen."
+      },
+      "save": "Speichern",
       "saving": "Wird gespeichert…",
-      "saved": "Unternehmensidentität gespeichert.",
-      "failed": "Die Unternehmensidentität konnte nicht gespeichert werden. Versuchen Sie es erneut."
+      "saved": "Unternehmens-ID gespeichert.",
+      "failed": "Die Unternehmens-ID konnte nicht gespeichert werden. Versuchen Sie es erneut."
     },
-    "retentionAndBudget": {
-      "title": "Aufbewahrung und KI-Budget",
-      "description": "Wie lange dieser Workspace Roh-Documents aufbewahrt und wie viele KI-Tokens er pro Tag verbrauchen darf.",
-      "setByOperator": "Der Operator legt die Aufbewahrungsdauer und das KI-Token-Budget für jeden Workspace fest.",
+    "data": {
+      "setByOperator": {
+        "title": "Vom Operator festgelegt",
+        "description": "Sie können diese Grenzen hier nicht ändern. Der Operator legt sie für diesen Arbeitsbereich fest. Wenden Sie sich an den Operator, wenn Sie mehr brauchen."
+      },
       "retention": {
-        "title": "Aufbewahrungsdauer für Documents",
-        "description": "Ältere Roh-Documents werden gelöscht. Ein Run lässt sich nur per Reprocess erneut verarbeiten, solange sein Roh-Document aufbewahrt wird.",
-        "label": "Aufbewahrungsdauer in Tagen",
-        "hint": "Zwischen {min} und {max} Tagen.",
-        "value": "{value, plural, one {# Tag} other {# Tage}}",
-        "errors": {
-          "required": "Geben Sie eine Aufbewahrungsdauer ein.",
-          "notWhole": "Geben Sie eine ganze Zahl von Tagen ein.",
-          "outOfRange": "Geben Sie einen Wert zwischen {min} und {max} Tagen ein."
-        }
+        "title": "Wie lange Belege aufbewahrt werden",
+        "deleted": "Belege, die älter als <strong>{days, plural, one {# Tag} other {# Tage}}</strong> sind, werden gelöscht.",
+        "reprocess": "Sie können einen Beleg nur erneut verarbeiten, solange er aufbewahrt wird."
       },
       "budget": {
-        "title": "KI-Token-Budget",
-        "description": "Das tägliche Limit an KI-Tokens, zum Beispiel, wenn die KI ein Mapping entwirft. Der Verbrauch beginnt jeden Tag wieder bei null.",
-        "label": "Tageslimit in Tokens",
-        "hint": "Zwischen {min} und {max} Tokens. 0 schaltet KI für diesen Workspace aus.",
-        "value": "{value, plural, one {# Token pro Tag} other {# Tokens pro Tag}}",
-        "usedLabel": "Heute verbraucht",
-        "used": "{used} von {limit} Tokens ({share})",
-        "exhausted": "Das KI-Token-Budget für heute ist aufgebraucht. KI-Funktionen sind morgen wieder verfügbar.",
-        "turnedOff": "KI ist für diesen Workspace ausgeschaltet.",
-        "errors": {
-          "required": "Geben Sie ein Tageslimit ein.",
-          "notWhole": "Geben Sie eine ganze Zahl von Tokens ein.",
-          "outOfRange": "Geben Sie einen Wert zwischen {min} und {max} Tokens ein."
-        }
+        "title": "KI-Budget",
+        "description": "Die KI verbraucht Tokens, wenn sie ein Mapping für Sie entwirft. Das Budget beginnt jeden Tag wieder bei null.",
+        "limit": "<strong>{limit, plural, one {# Token} other {# Tokens}}</strong> pro Tag"
+      }
+    },
+    "budgetUsage": {
+      "usedLabel": "Heute verbraucht",
+      "used": "{used} von {limit} Tokens ({share})",
+      "exhausted": {
+        "title": "Das KI-Budget für heute ist aufgebraucht",
+        "description": "Die KI kann bis morgen keine Mappings entwerfen. Alles andere funktioniert weiter."
       },
-      "save": "Aufbewahrung und KI-Budget speichern",
-      "saving": "Wird gespeichert…",
-      "saved": "Aufbewahrung und KI-Budget gespeichert.",
-      "failed": "Die Aufbewahrungsdauer und das KI-Budget konnten nicht gespeichert werden. Versuchen Sie es erneut."
+      "turnedOff": {
+        "title": "KI ist ausgeschaltet",
+        "description": "Die KI kann für diesen Arbeitsbereich keine Mappings entwerfen. Alles andere funktioniert weiter."
+      }
     }
   },
   "GlnField": {
@@ -2567,7 +2566,33 @@
     },
     "settings": {
       "title": "Aufbewahrung und KI-Budget",
-      "description": "Wie lange dieser Workspace Roh-Documents aufbewahrt und wie viele KI-Tokens er pro Tag verbrauchen darf."
+      "description": "Wie lange dieser Workspace Roh-Documents aufbewahrt und wie viele KI-Tokens er pro Tag verbrauchen darf.",
+      "retention": {
+        "title": "Aufbewahrungsdauer für Documents",
+        "description": "Ältere Roh-Documents werden gelöscht. Ein Run lässt sich nur per Reprocess erneut verarbeiten, solange sein Roh-Document aufbewahrt wird.",
+        "label": "Aufbewahrungsdauer in Tagen",
+        "hint": "Zwischen {min} und {max} Tagen.",
+        "errors": {
+          "required": "Geben Sie eine Aufbewahrungsdauer ein.",
+          "notWhole": "Geben Sie eine ganze Zahl von Tagen ein.",
+          "outOfRange": "Geben Sie einen Wert zwischen {min} und {max} Tagen ein."
+        }
+      },
+      "budget": {
+        "title": "KI-Token-Budget",
+        "description": "Das tägliche Limit an KI-Tokens, zum Beispiel, wenn die KI ein Mapping entwirft. Der Verbrauch beginnt jeden Tag wieder bei null.",
+        "label": "Tageslimit in Tokens",
+        "hint": "Zwischen {min} und {max} Tokens. 0 schaltet KI für diesen Workspace aus.",
+        "errors": {
+          "required": "Geben Sie ein Tageslimit ein.",
+          "notWhole": "Geben Sie eine ganze Zahl von Tokens ein.",
+          "outOfRange": "Geben Sie einen Wert zwischen {min} und {max} Tokens ein."
+        }
+      },
+      "save": "Aufbewahrung und KI-Budget speichern",
+      "saving": "Wird gespeichert…",
+      "saved": "Aufbewahrung und KI-Budget gespeichert.",
+      "failed": "Die Aufbewahrungsdauer und das KI-Budget konnten nicht gespeichert werden. Versuchen Sie es erneut."
     },
     "reset": {
       "trigger": "Sandbox zurücksetzen",

@@ -1,20 +1,19 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import { Suspense } from 'react'
 
 import { AppPage } from '@/components/app-page'
-import { CompanyIdentitySection } from '@/components/settings/company-identity-form'
-import { RetentionAndBudgetSection } from '@/components/settings/retention-and-budget-form'
-import { Separator } from '@edi-bridge/ui/components/separator'
+import { SettingsTabs } from '@/components/settings/settings-tabs'
 
 export function SettingsScreen() {
   const t = useTranslations('Shell.session')
 
   return (
     <AppPage title={t('settings')}>
-      <CompanyIdentitySection />
-      <Separator />
-      <RetentionAndBudgetSection />
+      <Suspense>
+        <SettingsTabs />
+      </Suspense>
     </AppPage>
   )
 }

@@ -2345,57 +2345,56 @@
       "description": "The settings could not be loaded. Try again.",
       "retry": "Try again"
     },
-    "companyIdentity": {
-      "title": "Company identity",
-      "description": "Every Interchange your company sends carries this identity as the sender.",
-      "missing": "Your company has no GLN yet. Trading Partners cannot finish onboarding without it.",
-      "companyName": "Company",
+    "tabs": {
+      "company": "Company",
+      "data": "Data & AI"
+    },
+    "company": {
+      "title": "Company",
+      "description": "This is how your partners see you.",
+      "name": "Company name",
       "gln": {
-        "label": "GLN",
+        "label": "Company ID (GLN)",
         "description": "Your company's 13-digit Global Location Number, including the check digit."
       },
       "notSet": "Not set",
-      "save": "Save company identity",
+      "missing": {
+        "title": "Your company ID is missing",
+        "admin": "Trading partners cannot finish setup without it. Add your GLN below.",
+        "viewer": "Trading partners cannot finish setup without it. Ask an admin of your company to add it."
+      },
+      "save": "Save",
       "saving": "Saving…",
-      "saved": "Company identity saved.",
-      "failed": "The company identity could not be saved. Try again."
+      "saved": "Company ID saved.",
+      "failed": "The company ID could not be saved. Try again."
     },
-    "retentionAndBudget": {
-      "title": "Retention and AI budget",
-      "description": "How long this Workspace keeps raw Documents and how many AI tokens it may use per day.",
-      "setByOperator": "The Operator sets the retention period and the AI token budget for each Workspace.",
+    "data": {
+      "setByOperator": {
+        "title": "Set by the Operator",
+        "description": "You cannot change these limits here. The Operator sets them for this Workspace. Ask the Operator if you need more."
+      },
       "retention": {
-        "title": "Document retention period",
-        "description": "Raw Documents older than this are deleted. A Run can only be reprocessed while its raw Document is kept.",
-        "label": "Retention period in days",
-        "hint": "Between {min} and {max} days.",
-        "value": "{value, plural, one {# day} other {# days}}",
-        "errors": {
-          "required": "Enter a retention period.",
-          "notWhole": "Enter a whole number of days.",
-          "outOfRange": "Enter between {min} and {max} days."
-        }
+        "title": "How long documents are kept",
+        "deleted": "Documents older than <strong>{days, plural, one {# day} other {# days}}</strong> are deleted.",
+        "reprocess": "You can process a document again only while it is kept."
       },
       "budget": {
-        "title": "AI token budget",
-        "description": "The daily limit of AI tokens, for example when the AI drafts a Mapping. Usage starts again at zero every day.",
-        "label": "Daily limit in tokens",
-        "hint": "Between {min} and {max} tokens. 0 turns AI off for this Workspace.",
-        "value": "{value, plural, one {# token per day} other {# tokens per day}}",
-        "usedLabel": "Used today",
-        "used": "{used} of {limit} tokens ({share})",
-        "exhausted": "Today's AI token budget is used up. AI features are available again tomorrow.",
-        "turnedOff": "AI is turned off for this Workspace.",
-        "errors": {
-          "required": "Enter a daily limit.",
-          "notWhole": "Enter a whole number of tokens.",
-          "outOfRange": "Enter between {min} and {max} tokens."
-        }
+        "title": "AI budget",
+        "description": "The AI uses tokens when it drafts a mapping for you. The budget starts again at zero every day.",
+        "limit": "<strong>{limit, plural, one {# token} other {# tokens}}</strong> per day"
+      }
+    },
+    "budgetUsage": {
+      "usedLabel": "Used today",
+      "used": "{used} of {limit} tokens ({share})",
+      "exhausted": {
+        "title": "Today’s AI budget is used up",
+        "description": "The AI cannot draft mappings until tomorrow. Everything else keeps working."
       },
-      "save": "Save retention and AI budget",
-      "saving": "Saving…",
-      "saved": "Retention and AI budget saved.",
-      "failed": "The retention period and AI budget could not be saved. Try again."
+      "turnedOff": {
+        "title": "AI is turned off",
+        "description": "The AI cannot draft mappings for this Workspace. Everything else keeps working."
+      }
     }
   },
   "GlnField": {
@@ -2567,7 +2566,33 @@
     },
     "settings": {
       "title": "Retention and AI budget",
-      "description": "How long this Workspace keeps raw Documents and how many AI tokens it may use per day."
+      "description": "How long this Workspace keeps raw Documents and how many AI tokens it may use per day.",
+      "retention": {
+        "title": "Document retention period",
+        "description": "Raw Documents older than this are deleted. A Run can only be reprocessed while its raw Document is kept.",
+        "label": "Retention period in days",
+        "hint": "Between {min} and {max} days.",
+        "errors": {
+          "required": "Enter a retention period.",
+          "notWhole": "Enter a whole number of days.",
+          "outOfRange": "Enter between {min} and {max} days."
+        }
+      },
+      "budget": {
+        "title": "AI token budget",
+        "description": "The daily limit of AI tokens, for example when the AI drafts a Mapping. Usage starts again at zero every day.",
+        "label": "Daily limit in tokens",
+        "hint": "Between {min} and {max} tokens. 0 turns AI off for this Workspace.",
+        "errors": {
+          "required": "Enter a daily limit.",
+          "notWhole": "Enter a whole number of tokens.",
+          "outOfRange": "Enter between {min} and {max} tokens."
+        }
+      },
+      "save": "Save retention and AI budget",
+      "saving": "Saving…",
+      "saved": "Retention and AI budget saved.",
+      "failed": "The retention period and AI budget could not be saved. Try again."
     },
     "reset": {
       "trigger": "Reset Sandbox",
