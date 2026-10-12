@@ -1233,29 +1233,51 @@
     "cancel": "Abbrechen"
   },
   "Mappings": {
-    "caption": "Mappings, nach Name",
     "loading": "Mappings werden geladen",
-    "count": "{count, plural, one {# Mapping} other {# Mappings}}",
-    "filteredCount": "{count} von {total} Mappings",
-    "search": "Nach Name, Message Type oder Document Structure suchen",
-    "noMatch": "Kein Mapping passt zur Suche.",
-    "version": "Version {version}",
-    "neverPublished": "Nie veröffentlicht",
-    "direction": {
+    "filter": {
+      "label": "Anzeigen",
+      "all": "Alle",
+      "attention": "Braucht Sie",
+      "live": "Läuft einwandfrei",
+      "new": "Nicht eingerichtet"
+    },
+    "lane": {
       "inbound": "Eingehend",
-      "outbound": "Ausgehend"
+      "outbound": "Ausgehend",
+      "empty": "Gerade nichts hier",
+      "showAll": "Alle {count} anzeigen",
+      "partner": "Handelspartner",
+      "erp": "Ihr ERP"
     },
-    "columns": {
-      "name": "Name",
-      "direction": "Richtung",
-      "messageType": "Message Type",
-      "documentStructure": "Document Structure",
-      "latestVersion": "Neueste Mapping Version"
+    "path": {
+      "inbound": "geht in",
+      "outbound": "geht an",
+      "erp": "Ihr ERP: {name}",
+      "noPartner": "Noch kein Handelspartner"
     },
-    "empty": {
-      "title": "Noch keine Mappings",
-      "description": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sobald es ein Mapping gibt, steht es hier.",
-      "viewOnlyDescription": "Mappings beschreiben, wie ein Document in EDIFACT umgewandelt wird und zurück. Sie erscheinen hier, sobald ein Admin eines anlegt."
+    "title": {
+      "onePartner": "{documents} {direction, select, inbound {von} other {an}} {partner}",
+      "partners": "{documents} {direction, select, inbound {von {count} Partnern} other {an {count} Partner}}"
+    },
+    "state": {
+      "failing": "Dokumente fehlgeschlagen",
+      "draft": "Entwurf nicht veröffentlicht",
+      "new": "Nie veröffentlicht",
+      "live": "Läuft einwandfrei"
+    },
+    "status": {
+      "failed": "Diese Woche {count} fehlgeschlagen",
+      "unpublished": "Änderungen nicht veröffentlicht",
+      "nothingYet": "Noch nichts übersetzt",
+      "translated": "{count, plural, =0 {Diese Woche keine Dokumente} one {Diese Woche # Dokument übersetzt} other {Diese Woche # Dokumente übersetzt}}"
+    },
+    "liveSince": "Version {version} live seit {date}",
+    "neverPublished": "Nie veröffentlicht",
+    "action": {
+      "failing": "Fehler ansehen",
+      "draft": "Prüfen und veröffentlichen",
+      "new": "Mit KI entwerfen",
+      "live": "Öffnen"
     },
     "error": {
       "title": "Mappings nicht verfügbar",
