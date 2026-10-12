@@ -3,10 +3,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { type TradingPartner, tasksEndpoint, tasksSchema } from '@edi-bridge/contracts'
 
-import { createOverdueAcknowledgement } from './overview'
+import { createOverdueAcknowledgement } from './overdue-acknowledgement'
 import { createRun } from './run'
 import { createRunStore } from './run-store'
-import { emptyTasksData, type TasksData, tasksHandler } from './task'
+import { createTasksData, emptyTasksData, type TasksData, tasksHandler } from './task'
 import { createTradingPartner } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -278,5 +278,33 @@ describe('GET /tasks', () => {
     const response = await fetch(`${apiUrl}${tasksEndpoint.path}`)
 
     expect(response.status).toBe(500)
+  })
+})
+
+describe('createTasksData', () => {
+  it('falls back to any Trading Partner in production when none drew an overdue profile', () => {
+    const { tradingPartners, overdueAcknowledgements } = createTasksData({
+      tradingPartnerCount: 1,
+      overdueCount: 3,
+      runCount: 0,
+      seed: 1,
+    })
+
+    expect(tradingPartners[0]?.testMode).toBe(false)
+    expect(overdueAcknowledgements.map(({ tradingPartner }) => tradingPartner.id)).toEqual(
+      Array(3).fill(tradingPartners[0]?.id),
+    )
+  })
+
+  it('leaves Test Mode Trading Partners without Overdue Acknowledgements', () => {
+    const { tradingPartners, overdueAcknowledgements } = createTasksData({
+      tradingPartnerCount: 1,
+      overdueCount: 3,
+      runCount: 0,
+      seed: 4,
+    })
+
+    expect(tradingPartners[0]?.testMode).toBe(true)
+    expect(overdueAcknowledgements).toEqual([])
   })
 })

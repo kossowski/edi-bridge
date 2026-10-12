@@ -126,7 +126,7 @@
     "compare": "Vergleichen"
   },
   "Navigation": {
-    "overview": "Übersicht",
+    "home": "Start",
     "tasks": "Aufgaben",
     "documents": "Belege",
     "orderLifecycle": "Order Lifecycle",
@@ -187,121 +187,103 @@
       }
     }
   },
-  "Overview": {
-    "loading": "Übersicht wird geladen",
-    "live": {
-      "label": "Live-Aktualisierung",
-      "status": {
-        "connecting": "Verbinde",
-        "connected": "Live",
-        "reconnecting": "Verbinde neu",
-        "offline": "Offline"
-      },
-      "announcement": {
-        "connected": "Live-Aktualisierung läuft wieder.",
-        "reconnecting": "Live-Aktualisierung unterbrochen. Verbinde neu.",
-        "offline": "Live-Aktualisierung ist offline. Die Werte sind womöglich veraltet, bis die Verbindung zurück ist."
-      }
-    },
+  "Home": {
+    "loading": "Start wird geladen",
     "window": {
       "label": "Zeitraum",
-      "1h": "1 Stunde",
       "24h": "24 Stunden",
-      "7d": "7 Tage"
+      "7d": "7 Tage",
+      "30d": "30 Tage"
     },
     "period": {
-      "1h": "der letzten Stunde",
       "24h": "den letzten 24 Stunden",
-      "7d": "den letzten 7 Tagen"
+      "7d": "den letzten 7 Tagen",
+      "30d": "den letzten 30 Tagen"
     },
     "bucket": {
-      "1h": "5 Minuten",
       "24h": "Stunde",
-      "7d": "6 Stunden"
+      "7d": "Tag",
+      "30d": "Tag"
+    },
+    "keyNumbers": {
+      "label": "Kennzahlen",
+      "needsAttention": {
+        "label": "Handlungsbedarf",
+        "hint": "{count, plural, =0 {Nichts zu beheben} one {Offene Aufgabe für Sie} other {Offene Aufgaben für Sie}}"
+      },
+      "delivered": {
+        "label": "{window, select, 24h {Zugestellt in 24 Stunden} 7d {Zugestellt in 7 Tagen} other {Zugestellt in 30 Tagen}}",
+        "hint": "{failed, plural, =0 {Keiner fehlgeschlagen} one {# fehlgeschlagen} other {# fehlgeschlagen}}"
+      },
+      "inProgress": {
+        "label": "In Bearbeitung",
+        "hint": "Belege anzeigen"
+      },
+      "waitingForTradingPartner": {
+        "label": "Warten auf Partner",
+        "hint": "{count, plural, =0 {Nichts offen} other {Partner anzeigen}}"
+      },
+      "alert": "Braucht Sie"
     },
     "series": {
       "delivered": "Zugestellt",
       "failed": "Fehlgeschlagen",
-      "errorRate": "Fehlerquote"
+      "errorRate": "Anteil fehlgeschlagen"
     },
-    "noErrorRate": "Keine",
+    "noErrorRate": "Keiner",
     "inProgress": "Läuft noch",
-    "kpis": {
-      "label": "Summen aus {period}",
-      "finished": "Abgeschlossene Runs"
-    },
     "throughput": {
-      "title": "Durchsatz",
-      "description": "Zugestellte und fehlgeschlagene Runs pro {bucket}",
-      "summary": "In {period} wurden {delivered, plural, one {# Run} other {# Runs}} zugestellt und {failed, plural, one {# Run} other {# Runs}} sind fehlgeschlagen. Die meisten Runs wurden um {peakTime} abgeschlossen: {peak, number}."
+      "title": "Belege",
+      "description": "Zugestellte und fehlgeschlagene Belege pro {bucket}",
+      "summary": "In {period} wurden {delivered, plural, one {# Beleg} other {# Belege}} zugestellt und {failed, plural, one {# Beleg ist} other {# Belege sind}} fehlgeschlagen. Die meisten Belege wurden um {peakTime} abgeschlossen: {peak, number}."
     },
     "errorRate": {
-      "title": "Fehlerquote",
-      "description": "Anteil der abgeschlossenen Runs, die fehlgeschlagen sind, pro {bucket}",
-      "summary": "Die Fehlerquote in {period} beträgt {rate}. Am höchsten war sie um {peakTime}: {peakRate}. Zeiträume ohne abgeschlossene Runs haben keine Fehlerquote."
+      "title": "Anteil fehlgeschlagen",
+      "description": "Anteil der abgeschlossenen Belege, die fehlgeschlagen sind, pro {bucket}",
+      "summary": "Der Anteil fehlgeschlagener Belege in {period} beträgt {rate}. Am höchsten war er um {peakTime}: {peakRate}. Zeiträume ohne abgeschlossene Belege haben keinen Anteil."
     },
     "table": {
       "toggle": "Werte als Tabelle anzeigen",
-      "caption": "Zugestellte und fehlgeschlagene Runs und die Fehlerquote pro {bucket}",
+      "caption": "Zugestellte und fehlgeschlagene Belege und der Anteil fehlgeschlagen pro {bucket}",
       "columns": {
         "period": "Zeitraum"
       }
     },
-    "showTop": "Top {count} anzeigen",
-    "health": {
-      "title": "Zustand der Trading Partners",
-      "summary": "{failing, number} fehlerhaft, {degraded, number} beeinträchtigt, {healthy, number} in Ordnung. Schlechteste zuerst.",
-      "allHealthy": "{count, plural, =0 {Noch kein Trading Partner.} one {Der Trading Partner ist in Ordnung.} other {Alle # Trading Partners sind in Ordnung.}}",
-      "caption": "Zustand pro Trading Partner, gezählt werden Runs in {period}, schlechteste zuerst",
-      "noRun": "Noch kein Run",
-      "showAll": "Alle {count, number} Trading Partners anzeigen",
-      "status": {
-        "healthy": "In Ordnung",
-        "degraded": "Beeinträchtigt",
-        "failing": "Fehlerhaft"
-      },
-      "columns": {
-        "tradingPartner": "Trading Partner",
-        "status": "Status",
-        "delivered": "Zugestellt",
-        "failed": "Fehlgeschlagen",
-        "errorRate": "Fehlerquote",
-        "overdue": "Überfällig",
-        "lastRun": "Letzter Run"
-      },
-      "empty": {
-        "title": "Keine Trading Partners",
-        "description": "Der Zustand jedes Trading Partners erscheint hier, sobald ein Trading Partner angelegt ist."
-      }
-    },
-    "overdue": {
-      "title": "Überfällige Acknowledgements",
-      "description": "{count, plural, =0 {Für jedes gesendete Interchange kam das Acknowledgement rechtzeitig an.} one {# gesendetes Interchange ohne Acknowledgement innerhalb der Frist. Am längsten überfällige zuerst.} other {# gesendete Interchanges ohne Acknowledgement innerhalb der Frist. Am längsten überfällige zuerst.}}",
-      "caption": "Überfällige Acknowledgements, am längsten überfällige zuerst",
-      "interchangeLink": "Übertragung {controlReference}",
-      "hours": "{hours, plural, one {# Stunde} other {# Stunden}}",
-      "showAll": "Alle {count, number} überfälligen Acknowledgements anzeigen",
-      "columns": {
-        "interchange": "Interchange",
-        "tradingPartner": "Trading Partner",
-        "messageType": "Message Type",
-        "sentAt": "Gesendet",
-        "timeLimit": "Frist",
-        "overdueSince": "Überfällig seit"
-      },
-      "empty": {
-        "title": "Keine überfälligen Acknowledgements",
-        "description": "Gesendete Interchanges, deren Acknowledgement die Frist überschreitet, erscheinen hier, am längsten überfällige zuerst."
-      }
-    },
     "empty": {
-      "title": "Keine abgeschlossenen Runs",
-      "description": "In {period} wurde kein Run zugestellt und keiner ist fehlgeschlagen. Die Diagramme erscheinen, sobald Runs abgeschlossen werden."
+      "title": "Keine abgeschlossenen Belege",
+      "description": "In {period} wurde kein Beleg zugestellt und keiner ist fehlgeschlagen. Die Diagramme erscheinen, sobald Belege abgeschlossen werden."
+    },
+    "tradingPartners": {
+      "title": "Ihre Handelspartner",
+      "live": "Live",
+      "testing": "Testbetrieb",
+      "documentsToday": "{count, plural, =0 {Heute keine Belege} one {Heute # Beleg} other {Heute # Belege}}",
+      "openProblems": "{count, plural, =0 {Keine offenen Probleme} one {# offenes Problem} other {# offene Probleme}}",
+      "showAll": "Alle {count, number} Handelspartner anzeigen",
+      "empty": {
+        "title": "Noch keine Handelspartner",
+        "description": "Jeder Handelspartner erscheint hier mit seinen Belegen von heute und offenen Problemen.",
+        "action": "Handelspartner anlegen"
+      }
     },
     "error": {
-      "title": "Übersicht nicht verfügbar",
-      "description": "Die Übersicht konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Start nicht verfügbar",
+      "description": "Die Startseite konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
+    }
+  },
+  "LiveIndicator": {
+    "label": "Live-Aktualisierung",
+    "status": {
+      "connecting": "Verbinde",
+      "connected": "Live",
+      "reconnecting": "Verbinde neu",
+      "offline": "Offline"
+    },
+    "announcement": {
+      "connected": "Live-Aktualisierung läuft wieder.",
+      "reconnecting": "Live-Aktualisierung unterbrochen. Verbinde neu.",
+      "offline": "Live-Aktualisierung ist offline. Die Werte sind womöglich veraltet, bis die Verbindung zurück ist."
     }
   },
   "Tasks": {

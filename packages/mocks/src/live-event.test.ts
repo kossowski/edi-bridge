@@ -3,8 +3,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import {
   liveEventsEndpoint,
-  overviewEndpoint,
-  overviewSchema,
+  homeEndpoint,
+  homeSchema,
   parseLiveEvent,
   runDetailSchema,
   runEndpoint,
@@ -14,9 +14,9 @@ import {
   toSearchParams,
 } from '@edi-bridge/contracts'
 
+import { homeHandler } from './home'
 import { createHandlers } from './index'
 import { liveEventsHandler, type LiveEventsOptions } from './live-event'
-import { overviewHandler } from './overview'
 import { createRuns, runsHandler } from './run'
 import { createRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
@@ -131,11 +131,11 @@ describe('GET /events', () => {
     }
   })
 
-  it('finishes each received Run on a later tick, so the Overview counts it', async () => {
+  it('finishes each received Run on a later tick, so Home counts it', async () => {
     const runs = createRunStore([])
     server.use(
       live({ runs }),
-      overviewHandler(apiUrl, {
+      homeHandler(apiUrl, {
         runs,
         tradingPartners: seedTradingPartners,
         overdueAcknowledgements: [],
@@ -151,8 +151,8 @@ describe('GET /events', () => {
     expect(finished.map(({ run }) => run.id)).toContain(first?.run.id)
     expect(finished.every(({ run }) => ['delivered', 'failed'].includes(run.status))).toBe(true)
 
-    const response = await fetch(`${apiUrl}${overviewEndpoint.path}?window=1h`)
-    const { throughput } = overviewSchema.parse(await response.json())
+    const response = await fetch(`${apiUrl}${homeEndpoint.path}?window=24h`)
+    const { throughput } = homeSchema.parse(await response.json())
     const counted = throughput.reduce((sum, { delivered, failed }) => sum + delivered + failed, 0)
 
     expect(counted).toBe(runs.all().filter(({ status }) => status !== 'processing').length)

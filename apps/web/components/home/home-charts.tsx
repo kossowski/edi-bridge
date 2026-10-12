@@ -14,13 +14,8 @@ import {
   YAxis,
 } from 'recharts'
 
-import {
-  type BucketRow,
-  type OverviewSeries,
-  peakOf,
-  rateTicks,
-} from '@/components/overview/overview-data'
-import { useFormats } from '@/components/overview/overview-formats'
+import { type BucketRow, type HomeSeries, peakOf, rateTicks } from '@/components/home/home-data'
+import { useFormats } from '@/components/home/home-formats'
 import {
   Card,
   CardContent,
@@ -67,8 +62,8 @@ function BucketTooltip({
   activeIndex,
   rows,
   timeWindow,
-}: Partial<TooltipContentProps> & Pick<OverviewSeries, 'rows' | 'timeWindow'>) {
-  const t = useTranslations('Overview')
+}: Partial<TooltipContentProps> & Pick<HomeSeries, 'rows' | 'timeWindow'>) {
+  const t = useTranslations('Home')
   const formats = useFormats(timeWindow)
   const row = activeIndex === undefined ? undefined : rows[Number(activeIndex)]
 
@@ -161,8 +156,8 @@ const barProps = {
   strokeWidth: 1,
 } as const
 
-export function ThroughputChart({ rows, totals, timeWindow }: OverviewSeries) {
-  const t = useTranslations('Overview')
+export function ThroughputChart({ rows, totals, timeWindow }: HomeSeries) {
+  const t = useTranslations('Home')
   const formats = useFormats(timeWindow)
   const hatchId = `failed-hatch-${useId().replaceAll(/[^\w-]/g, '')}`
   const peak = peakOf(rows, (row) => row.delivered + row.failed)
@@ -265,8 +260,8 @@ function rateDot(
   )
 }
 
-export function ErrorRateChart({ rows, totals, timeWindow }: OverviewSeries) {
-  const t = useTranslations('Overview')
+export function ErrorRateChart({ rows, totals, timeWindow }: HomeSeries) {
+  const t = useTranslations('Home')
   const formats = useFormats(timeWindow)
   const peak = peakOf(rows, (row) => row.errorRate)
   const lastIndex = rows.findLastIndex((row) => row.errorRate !== null)
@@ -318,12 +313,8 @@ export function ErrorRateChart({ rows, totals, timeWindow }: OverviewSeries) {
   )
 }
 
-const cellClassName = 'px-1.5 whitespace-normal sm:px-2'
-
-const numberCellClassName = `${cellClassName} text-right tabular-nums`
-
-export function BucketTable({ rows, timeWindow }: Pick<OverviewSeries, 'rows' | 'timeWindow'>) {
-  const t = useTranslations('Overview')
+export function BucketTable({ rows, timeWindow }: Pick<HomeSeries, 'rows' | 'timeWindow'>) {
+  const t = useTranslations('Home')
   const formats = useFormats(timeWindow)
 
   return (
@@ -337,11 +328,14 @@ export function BucketTable({ rows, timeWindow }: Pick<OverviewSeries, 'rows' | 
         </TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead scope="col" className={cellClassName}>
+            <TableHead scope="col" className="px-1.5 whitespace-normal sm:px-2">
               {t('table.columns.period')}
             </TableHead>
             {(['delivered', 'failed', 'errorRate'] as const).map((key) => (
-              <TableHead key={key} scope="col" className={`${cellClassName} text-right`}>
+              <TableHead
+                key={key}
+                scope="col"
+                className="px-1.5 text-right whitespace-normal sm:px-2">
                 {t(`series.${key}`)}
               </TableHead>
             ))}
@@ -350,15 +344,19 @@ export function BucketTable({ rows, timeWindow }: Pick<OverviewSeries, 'rows' | 
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.start}>
-              <TableCell className={cellClassName}>
+              <TableCell className="px-1.5 whitespace-normal sm:px-2">
                 {formats.range(row)}
                 {row.inProgress && (
                   <span className="text-muted-foreground block">{t('inProgress')}</span>
                 )}
               </TableCell>
-              <TableCell className={numberCellClassName}>{formats.count(row.delivered)}</TableCell>
-              <TableCell className={numberCellClassName}>{formats.count(row.failed)}</TableCell>
-              <TableCell className={numberCellClassName}>
+              <TableCell className="px-1.5 text-right whitespace-normal tabular-nums sm:px-2">
+                {formats.count(row.delivered)}
+              </TableCell>
+              <TableCell className="px-1.5 text-right whitespace-normal tabular-nums sm:px-2">
+                {formats.count(row.failed)}
+              </TableCell>
+              <TableCell className="px-1.5 text-right whitespace-normal tabular-nums sm:px-2">
                 {formats.errorRate(row.errorRate)}
               </TableCell>
             </TableRow>

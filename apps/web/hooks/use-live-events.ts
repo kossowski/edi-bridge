@@ -4,7 +4,7 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { openLiveEvents } from '@/lib/api/client'
-import { overviewKeys, runKeys, taskKeys } from '@/lib/api/queries'
+import { homeKeys, runKeys, taskKeys } from '@/lib/api/queries'
 import { type LiveEvent, parseLiveEvent } from '@edi-bridge/contracts'
 
 export type LiveStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline'
@@ -22,7 +22,7 @@ function backoffMs(failures: number) {
 }
 
 function invalidateLiveQueries(queryClient: QueryClient) {
-  void queryClient.invalidateQueries({ queryKey: overviewKeys.all() })
+  void queryClient.invalidateQueries({ queryKey: homeKeys.all() })
   void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
   void queryClient.invalidateQueries({ queryKey: taskKeys.all() })
 }

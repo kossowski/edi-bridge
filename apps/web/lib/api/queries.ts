@@ -11,6 +11,7 @@ import type {
   DocumentStructure,
   DocumentStructureOrigin,
   Flow,
+  HomeWindow,
   InterchangeListQuery,
   Invite,
   LookupTable,
@@ -20,7 +21,6 @@ import type {
   MappingSummary,
   MappingVersionSummary,
   MessageType,
-  OverviewWindow,
   RunListQuery,
   Tasks,
   TradingPartner,
@@ -36,11 +36,11 @@ import {
   getCurrentWorkspace,
   getDocumentStructure,
   getFlow,
+  getHome,
   getLookupTable,
   getMappingDraft,
   getMappingVersion,
   getOperatorWorkspaceSettings,
-  getOverview,
   getRun,
   getSession,
   getTasks,
@@ -179,15 +179,15 @@ export function storeResetSandboxWorkspace(
   }
 }
 
-export const overviewKeys = {
-  all: () => ['overview'] as const,
-  window: (window: OverviewWindow) => [...overviewKeys.all(), window] as const,
+export const homeKeys = {
+  all: () => ['home'] as const,
+  window: (window: HomeWindow) => [...homeKeys.all(), window] as const,
 }
 
-export function overviewQuery(window: OverviewWindow) {
+export function homeQuery(window: HomeWindow) {
   return queryOptions({
-    queryKey: overviewKeys.window(window),
-    queryFn: () => getOverview({ window }),
+    queryKey: homeKeys.window(window),
+    queryFn: () => getHome({ window }),
     placeholderData: keepPreviousData,
   })
 }

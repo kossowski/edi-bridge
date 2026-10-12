@@ -35,6 +35,8 @@ import {
   inferDocumentStructureEndpoint,
   type InviteInput,
   type FlowUpdate,
+  homeEndpoint,
+  type HomeQuery,
   importLookupTableEndpoint,
   type InterchangeListQuery,
   interchangesEndpoint,
@@ -63,8 +65,6 @@ import {
   moveFlowMappingVersionEndpoint,
   type OrderLifecycleQuery,
   orderLifecyclesEndpoint,
-  overviewEndpoint,
-  type OverviewQuery,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   type PreviewMappingBody,
@@ -283,8 +283,8 @@ export function updateOperatorWorkspaceSettings(workspaceId: string, body: Works
   })
 }
 
-export function getOverview(query: OverviewQuery) {
-  return request(overviewEndpoint, { query })
+export function getHome(query: HomeQuery) {
+  return request(homeEndpoint, { query })
 }
 
 export function getTasks() {

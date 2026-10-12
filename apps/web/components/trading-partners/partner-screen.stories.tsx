@@ -16,6 +16,7 @@ import {
 } from '@/components/trading-partners/partner-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
+  activityDays,
   channelsEndpoint,
   type RunSummary,
   testChannelEndpoint,
@@ -27,7 +28,7 @@ import {
   channelHandlers,
   createChannels,
   createHandlers,
-  createOverviewData,
+  createTasksData,
   createWorkspace,
   seedTradingPartners,
   tradingPartnerActivityHandlers,
@@ -45,7 +46,12 @@ const withReadyForTest = seedTradingPartners.map((tradingPartner) =>
   tradingPartner.id === confirmed.id ? readyForTest : tradingPartner,
 )
 
-const large = createOverviewData({ tradingPartnerCount: 1, overdueCount: 60, runCount: 4000 })
+const large = createTasksData({
+  tradingPartnerCount: 1,
+  overdueCount: 60,
+  runCount: 4000,
+  days: activityDays,
+})
 
 const largePartner = large.tradingPartners[0]!
 

@@ -6,7 +6,7 @@ import messagesDe from '@/messages/de.json'
 import preview from '../.storybook/preview'
 
 const meta = preview.meta({
-  title: 'Overview/LiveIndicator',
+  title: 'Home/LiveIndicator',
   component: LiveIndicator,
 })
 

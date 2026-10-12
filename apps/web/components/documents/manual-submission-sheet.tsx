@@ -23,7 +23,7 @@ import {
   channelsQuery,
   interchangeKeys,
   orderLifecycleKeys,
-  overviewKeys,
+  homeKeys,
   runKeys,
 } from '@/lib/api/queries'
 import { documentHref } from '@/lib/navigation'
@@ -303,7 +303,7 @@ function ManualSubmissionForm({
       for (const queryKey of [
         runKeys.lists(),
         interchangeKeys.all(),
-        overviewKeys.all(),
+        homeKeys.all(),
         orderLifecycleKeys.all(),
       ]) {
         void queryClient.invalidateQueries({ queryKey })

@@ -1,7 +1,16 @@
+import { en, Faker } from '@faker-js/faker'
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  failureStages,
+  type FinishedRunCounts,
+  type HealthStatus,
+  healthStatuses,
+  healthStatusOf,
+  messageTypes,
   type OverdueAcknowledgement,
+  overdueAcknowledgementSchema,
+  type RunStatus,
   type RunSummary,
   type Task,
   type TaskActor,
@@ -15,12 +24,15 @@ import {
 } from '@edi-bridge/contracts'
 
 import { hour } from './overdue'
-import { createOverviewData, seedOverdueAcknowledgements, tradingPartnerHealthOf } from './overview'
+import {
+  generateOverdueAcknowledgement,
+  seedOverdueAcknowledgements,
+} from './overdue-acknowledgement'
 import { serverError } from './responses'
-import { seedRuns } from './run'
+import { seedRuns, toRunSummary } from './run'
 import { seedReprocessed } from './run-detail'
 import { createRunStore, type RunStore, toRunStore } from './run-store'
-import { seedTradingPartners } from './trading-partner'
+import { createTradingPartners, seedTradingPartners } from './trading-partner'
 
 export type TasksData = {
   runs: ReadonlyArray<RunSummary> | RunStore
@@ -29,6 +41,65 @@ export type TasksData = {
 }
 
 const tasksLookback = 24 * hour
+
+type TradingPartnerHealth = FinishedRunCounts & {
+  tradingPartner: Pick<TradingPartner, 'id' | 'name'>
+  status: HealthStatus
+  overdue: number
+  lastRunAt: string | null
+}
+
+const worstFirst = (status: HealthStatus) => -healthStatuses.indexOf(status)
+
+const isFinished = (status: RunStatus): status is keyof FinishedRunCounts =>
+  status === 'delivered' || status === 'failed'
+
+function tradingPartnerHealthOf(
+  tradingPartners: ReadonlyArray<TradingPartner>,
+  runs: readonly RunSummary[],
+  overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>,
+  from: number,
+): TradingPartnerHealth[] {
+  const counts = new Map<string, Omit<TradingPartnerHealth, 'tradingPartner' | 'status'>>(
+    tradingPartners.map(({ id }) => [id, { delivered: 0, failed: 0, overdue: 0, lastRunAt: null }]),
+  )
+
+  for (const run of runs) {
+    const count = counts.get(run.tradingPartner.id)
+
+    if (!count) {
+      continue
+    }
+
+    if (count.lastRunAt === null || Date.parse(run.receivedAt) > Date.parse(count.lastRunAt)) {
+      count.lastRunAt = run.receivedAt
+    }
+
+    if (Date.parse(run.receivedAt) >= from && isFinished(run.status)) {
+      count[run.status] += 1
+    }
+  }
+
+  for (const { tradingPartner } of overdueAcknowledgements) {
+    const count = counts.get(tradingPartner.id)
+
+    if (count) {
+      count.overdue += 1
+    }
+  }
+
+  return tradingPartners
+    .map(({ id, name }) => {
+      const count = counts.get(id)!
+
+      return { tradingPartner: { id, name }, status: healthStatusOf(count), ...count }
+    })
+    .sort(
+      (a, b) =>
+        worstFirst(a.status) - worstFirst(b.status) ||
+        a.tradingPartner.name.localeCompare(b.tradingPartner.name),
+    )
+}
 
 type FailedRun = Extract<RunSummary, { status: 'failed' }>
 
@@ -110,7 +181,7 @@ function failingTradingPartnerTasks(
   )
 }
 
-function toTasks(
+export function toTasks(
   { runs, tradingPartners, overdueAcknowledgements }: TasksData,
   now = new Date(),
 ): Tasks {
@@ -133,6 +204,91 @@ export const emptyTasksData: TasksData = {
   overdueAcknowledgements: [],
 }
 
+const healthProfiles = [
+  { value: { errorShare: 0.01, overdue: false }, weight: 60 },
+  { value: { errorShare: 0.1, overdue: true }, weight: 25 },
+  { value: { errorShare: 0.4, overdue: true }, weight: 15 },
+]
+
+const inProgressLookback = 2 * hour
+
+function generatedRunStatus(faker: Faker, errorShare: number, receivedAt: Date, now: Date) {
+  if (
+    now.getTime() - receivedAt.getTime() < inProgressLookback &&
+    faker.datatype.boolean({ probability: 0.2 })
+  ) {
+    return { status: 'processing', failureStage: null } as const
+  }
+
+  return faker.datatype.boolean({ probability: errorShare })
+    ? ({ status: 'failed', failureStage: faker.helpers.arrayElement(failureStages) } as const)
+    : ({ status: 'delivered', failureStage: null } as const)
+}
+
+export function createTasksData({
+  tradingPartnerCount,
+  overdueCount,
+  runCount,
+  days = 30,
+  now = new Date(),
+  seed = 16,
+}: {
+  tradingPartnerCount: number
+  overdueCount: number
+  runCount: number
+  days?: number
+  now?: Date
+  seed?: number
+}): TasksData {
+  const faker = new Faker({ locale: [en], seed })
+  const tradingPartners = createTradingPartners({ count: tradingPartnerCount, now, seed })
+
+  const profiled = tradingPartners.map((tradingPartner) => ({
+    tradingPartner,
+    ...faker.helpers.weightedArrayElement(healthProfiles),
+  }))
+
+  const from = new Date(now.getTime() - days * 24 * hour)
+
+  const runs = Array.from({ length: runCount }, () => {
+    const { tradingPartner, errorShare } = faker.helpers.arrayElement(profiled)
+    const messageType = faker.helpers.arrayElement(messageTypes)
+    const receivedAt = faker.date.between({ from, to: now })
+
+    return toRunSummary({
+      id: faker.string.uuid(),
+      receivedAt: receivedAt.toISOString(),
+      tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
+      messageType,
+      flow: { id: faker.string.uuid(), name: `${tradingPartner.name} ${messageType}` },
+      manualSubmission: false,
+      ...generatedRunStatus(faker, errorShare, receivedAt, now),
+    })
+  })
+
+  const inProduction = profiled.filter(({ tradingPartner }) => !tradingPartner.testMode)
+  const overdueProfiled = inProduction.filter(({ overdue }) => overdue)
+  const overdueCandidates = overdueProfiled.length > 0 ? overdueProfiled : inProduction
+
+  const overdueAcknowledgements =
+    overdueCandidates.length === 0
+      ? []
+      : Array.from({ length: overdueCount }, () =>
+          overdueAcknowledgementSchema.parse(
+            generateOverdueAcknowledgement(
+              faker,
+              faker.helpers.arrayElement(overdueCandidates).tradingPartner,
+              now,
+            ),
+          ),
+        )
+
+  return { runs, tradingPartners, overdueAcknowledgements }
+}
+
+export const largeTasksData = () =>
+  createTasksData({ tradingPartnerCount: 240, overdueCount: 500, runCount: 30_000 })
+
 function seedRunStore() {
   const runs = seedRuns()
 
@@ -151,14 +307,14 @@ export function seedTasksData(runs: RunStore = seedRunStore()): TasksData {
 
 export type TasksState = 'empty' | 'large' | 'loading' | 'error'
 
-function tasksDataOf(source: TasksData | 'empty' | 'large' | undefined): TasksData {
+export function tasksDataOf(source: TasksData | 'empty' | 'large' | undefined): TasksData {
   switch (source) {
     case undefined:
       return seedTasksData()
     case 'empty':
       return emptyTasksData
     case 'large':
-      return createOverviewData({ tradingPartnerCount: 240, overdueCount: 400, runCount: 30_000 })
+      return largeTasksData()
     default:
       return source
   }

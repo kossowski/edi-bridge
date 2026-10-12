@@ -1,4 +1,4 @@
-import { errorRate, type OverviewWindow, type ThroughputBucket } from '@edi-bridge/contracts'
+import { errorRate, type HomeWindow, type ThroughputBucket } from '@edi-bridge/contracts'
 
 export type BucketRow = {
   start: string
@@ -34,10 +34,10 @@ export function totalsOf(rows: ReadonlyArray<BucketRow>) {
 
 export type Totals = ReturnType<typeof totalsOf>
 
-export type OverviewSeries = {
+export type HomeSeries = {
   rows: BucketRow[]
   totals: Totals
-  timeWindow: OverviewWindow
+  timeWindow: HomeWindow
 }
 
 export function peakOf<Row>(rows: ReadonlyArray<Row>, value: (row: Row) => number | null) {
@@ -63,13 +63,13 @@ export function rateTicks(rows: ReadonlyArray<BucketRow>) {
 const timeOfDay = { hour: 'numeric', minute: '2-digit' } as const
 
 export const tickFormats = {
-  '1h': timeOfDay,
   '24h': timeOfDay,
-  '7d': { weekday: 'short', ...timeOfDay },
-} as const satisfies Record<OverviewWindow, Intl.DateTimeFormatOptions>
+  '7d': { weekday: 'short', day: 'numeric' },
+  '30d': { day: 'numeric', month: 'short' },
+} as const satisfies Record<HomeWindow, Intl.DateTimeFormatOptions>
 
 export const rangeFormats = {
-  '1h': timeOfDay,
   '24h': timeOfDay,
-  '7d': { weekday: 'short', day: 'numeric', month: 'short', ...timeOfDay },
-} as const satisfies Record<OverviewWindow, Intl.DateTimeFormatOptions>
+  '7d': { weekday: 'short', day: 'numeric', month: 'short' },
+  '30d': { weekday: 'short', day: 'numeric', month: 'short' },
+} as const satisfies Record<HomeWindow, Intl.DateTimeFormatOptions>

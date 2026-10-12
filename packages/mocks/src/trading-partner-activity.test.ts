@@ -11,7 +11,7 @@ import {
 import { seedChannels } from './channel'
 import { seedFlows } from './flow'
 import { createHandlers } from './index'
-import { createOverdueAcknowledgement } from './overview'
+import { createOverdueAcknowledgement } from './overdue-acknowledgement'
 import { createRun } from './run'
 import { createTradingPartner, seedTradingPartners } from './trading-partner'
 import { tradingPartnerActivityHandlers } from './trading-partner-activity'

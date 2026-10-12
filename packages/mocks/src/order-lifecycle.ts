@@ -296,7 +296,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
 const defaultTimeLimit = { acknowledgementTimeLimitHours: 24 }
 
 // Without a curated seed, the Runs of the Business Reference form one Order Lifecycle per Trading
-// Partner, with the same Acknowledgements the Overview counts as overdue.
+// Partner, with the same Acknowledgements that GET /tasks lists as overdue.
 function orderLifecyclesOfRuns(
   businessReference: string,
   runs: RunStore,

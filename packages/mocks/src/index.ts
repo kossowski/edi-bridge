@@ -24,6 +24,7 @@ import {
   toDocumentStructureStore,
 } from './document-structure'
 import { createFlowStore, flowHandlers } from './flow'
+import { homeHandler } from './home'
 import { interchangesHandler } from './interchange-list'
 import { liveEventsHandler, type LiveEventsOptions } from './live-event'
 import {
@@ -62,7 +63,7 @@ import {
   type WorkspaceSummaryRecord,
 } from './operator'
 import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
-import { overviewHandler, seedOverdueAcknowledgements, seedOverviewData } from './overview'
+import { seedOverdueAcknowledgements } from './overdue-acknowledgement'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
@@ -226,17 +227,12 @@ export {
   seedOrderLifecycles,
 } from './order-lifecycle'
 
+export { homeHandler, type HomeState, toHome } from './home'
+
 export {
   createOverdueAcknowledgement,
-  createOverviewData,
-  emptyOverviewData,
-  type OverviewData,
-  overviewHandler,
-  type OverviewState,
   seedOverdueAcknowledgements,
-  seedOverviewData,
-  toOverview,
-} from './overview'
+} from './overdue-acknowledgement'
 
 export { createRun, createRuns, type RunFields, runsHandler, seedRuns, toRunSummary } from './run'
 
@@ -282,7 +278,13 @@ export {
   type RunStore,
 } from './run-store'
 
-export { emptyTasksData, type TasksData, tasksHandler } from './task'
+export {
+  createTasksData,
+  emptyTasksData,
+  seedTasksData,
+  type TasksData,
+  tasksHandler,
+} from './task'
 
 export { type SessionStore } from './session-access'
 
@@ -430,7 +432,7 @@ export function createHandlers(
     runsHandler(apiUrl, runs),
     interchangesHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
-    overviewHandler(apiUrl, seedOverviewData(runs)),
+    homeHandler(apiUrl, seedTasksData(runs)),
     tasksHandler(apiUrl, seedTasksData(runs)),
     orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles, {
       runs,
