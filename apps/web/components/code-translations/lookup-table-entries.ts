@@ -4,7 +4,8 @@ import {
   type FailedRunReference,
   type LookupTableEntry,
   lookupTableEntrySchema,
-  type LookupTableUse,
+  type LookupTableKind,
+  type LookupTableSummary,
   type MissingCode,
 } from '@edi-bridge/contracts'
 
@@ -83,7 +84,21 @@ export function matchesFilter(entry: LookupTableEntry, term: string) {
   )
 }
 
-export function tableDirection(uses: ReadonlyArray<LookupTableUse>): Direction {
+export const kindDirections = {
+  units: 'outbound',
+  countries: 'outbound',
+  addresses: 'inbound',
+  other: 'outbound',
+} as const satisfies Record<LookupTableKind, Direction>
+
+export function tableDirection({
+  kind,
+  uses,
+}: Pick<LookupTableSummary, 'kind' | 'uses'>): Direction {
+  if (uses.length === 0) {
+    return kindDirections[kind]
+  }
+
   return uses.some(({ direction }) => direction === 'inbound') ? 'inbound' : 'outbound'
 }
 

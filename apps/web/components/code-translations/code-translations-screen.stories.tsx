@@ -1,4 +1,4 @@
-import { expect, screen, userEvent, within } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 
 import { CodeTranslationsScreen } from '@/components/code-translations/code-translations-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
@@ -100,12 +100,10 @@ export const Default = meta.story({
 
 export const NewList = meta.story({
   async play({ canvas }) {
-    await userEvent.click(await canvas.findByRole('button', { name: 'New list' }))
-    const dialog = within(await screen.findByRole('dialog', { name: 'New list' }))
-
-    await expect(await dialog.findByRole('textbox', { name: 'Name' })).toBeVisible()
-    await expect(dialog.getByRole('radio', { name: 'Sent to every partner' })).toBeChecked()
-    await expect(dialog.getByRole('button', { name: 'Create list' })).toBeVisible()
+    await expect(await canvas.findByRole('link', { name: 'New list' })).toHaveAttribute(
+      'href',
+      '/code-translations/new',
+    )
   },
 })
 
@@ -154,7 +152,13 @@ export const Empty = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'No code translations yet' }),
     ).toBeVisible()
-    await expect(canvas.getAllByRole('button', { name: 'New list' })).toHaveLength(2)
+    const newLinks = canvas.getAllByRole('link', { name: 'New list' })
+
+    await expect(newLinks).toHaveLength(2)
+
+    for (const link of newLinks) {
+      await expect(link).toHaveAttribute('href', '/code-translations/new')
+    }
   },
 })
 
@@ -270,7 +274,7 @@ export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas }) {
       await expect(await canvas.findByRole('link', { name: 'Units of measure' })).toBeVisible()
-      await expect(canvas.queryByRole('button', { name: 'New list' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'New list' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Actions for / })).toBeNull()
     },
   }),
@@ -283,7 +287,7 @@ export const ViewerEmpty = meta.story({
       await expect(
         await canvas.findByText(/They appear here once an Admin creates one\./),
       ).toBeVisible()
-      await expect(canvas.queryByRole('button', { name: 'New list' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'New list' })).toBeNull()
     },
   }),
 })

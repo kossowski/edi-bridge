@@ -24,7 +24,7 @@ function ChoiceCard({
   control: ReactNode
 }) {
   return (
-    <label className="has-data-checked:border-primary has-data-checked:bg-muted/50 grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 gap-y-0.5 rounded-lg border p-3">
+    <label className="has-data-checked:border-primary has-data-checked:bg-muted/50 has-focus-visible:ring-primary has-focus-visible:ring-offset-background grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 gap-y-0.5 rounded-lg border p-3 has-focus-visible:ring-2 has-focus-visible:ring-offset-2">
       {control}
       <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
         {item.title}
@@ -40,29 +40,32 @@ function ChoiceCard({
 export function ChoiceCards<Value extends string>({
   id: groupId,
   label,
+  labelledBy,
   value,
   items,
   error = null,
   onChange,
-}: {
+}: ({ label: string; labelledBy?: never } | { label?: never; labelledBy: string }) & {
   id?: string
-  label: string
   value: Value | null
   items: ReadonlyArray<Choice<Value>>
   error?: string | null
   onChange: (value: Value) => void
 }) {
   const id = useId()
+  const labelId = labelledBy ?? `${id}-label`
 
   return (
     <div id={groupId} className="flex flex-col gap-2">
-      <span id={`${id}-label`} className="text-sm font-medium">
-        {label}
-      </span>
+      {labelledBy === undefined && (
+        <span id={labelId} className="text-sm font-medium">
+          {label}
+        </span>
+      )}
       <RadioGroup
         value={value}
         aria-describedby={error ? `${id}-error` : undefined}
-        aria-labelledby={`${id}-label`}
+        aria-labelledby={labelId}
         className="flex flex-col gap-2"
         onValueChange={(next) => {
           const item = items.find((candidate) => candidate.value === next)

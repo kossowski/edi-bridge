@@ -23,6 +23,14 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 
 export type MeaningOf = (code: string) => string | null
 
+export type Sides = { source: string; target: string }
+
+export function useDirectionSides(direction: Direction): Sides {
+  const t = useTranslations('CodeTranslation.values')
+
+  return { source: t('source', { direction }), target: t('target', { direction }) }
+}
+
 export function focusOnMount(element: HTMLElement | null) {
   element?.focus()
 }
@@ -62,7 +70,7 @@ export function SentAs({ direction }: { direction: Direction }) {
   )
 }
 
-function CodeInput({
+export function CodeInput({
   label,
   labelVisible,
   value,
@@ -142,6 +150,7 @@ export function useValidation(entries: ReadonlyArray<LookupTableEntry>, index: n
 export function ValueRow({
   entry,
   direction,
+  sides,
   index,
   entries,
   meaningOf,
@@ -154,6 +163,7 @@ export function ValueRow({
 }: {
   entry: LookupTableEntry
   direction: Direction
+  sides: Sides
   index: number
   entries: ReadonlyArray<LookupTableEntry>
   meaningOf: MeaningOf
@@ -184,6 +194,7 @@ export function ValueRow({
           entry={entry}
           index={index}
           saving={saving}
+          sides={sides}
           onCancel={stopEditing}
           onSave={(edited) => onSave(edited, stopEditing)}
         />
@@ -243,6 +254,7 @@ export function ValueRow({
 function EditValueForm({
   entry,
   direction,
+  sides,
   index,
   entries,
   saving,
@@ -251,6 +263,7 @@ function EditValueForm({
 }: {
   entry: LookupTableEntry
   direction: Direction
+  sides: Sides
   index: number
   entries: ReadonlyArray<LookupTableEntry>
   saving: boolean
@@ -270,7 +283,7 @@ function EditValueForm({
       onSubmit={(event) => validation.submit(event, draft, onSave)}>
       <CodeInput
         focusFirst
-        label={t('source', { direction })}
+        label={sides.source}
         labelVisible={false}
         problem={messages.sourceCode}
         value={draft.sourceCode}
@@ -282,7 +295,7 @@ function EditValueForm({
       </span>
       <CodeInput
         focusFirst={false}
-        label={t('target', { direction })}
+        label={sides.target}
         labelVisible={false}
         problem={messages.targetCode}
         value={draft.targetCode}
@@ -305,7 +318,9 @@ export type AddDraft = { key: number; sourceCode: string }
 
 export function AddValueForm({
   initial,
+  focusOnOpen = true,
   direction,
+  sides,
   entries,
   suggestionsOf,
   meaningOf,
@@ -314,7 +329,9 @@ export function AddValueForm({
   onCancel,
 }: {
   initial: AddDraft
+  focusOnOpen?: boolean
   direction: Direction
+  sides: Sides
   entries: ReadonlyArray<LookupTableEntry>
   suggestionsOf: (sourceCode: string) => ReadonlyArray<CodeMeaning>
   meaningOf: MeaningOf
@@ -339,22 +356,22 @@ export function AddValueForm({
       aria-label={t('add')}
       className="flex flex-col gap-3 rounded-xl border border-dashed p-3"
       onSubmit={(event) => validation.submit(event, { sourceCode, targetCode }, onAdd)}>
-      <div className="flex flex-wrap items-start gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
         <CodeInput
-          focusFirst={initial.sourceCode === ''}
-          label={t('source', { direction })}
+          focusFirst={focusOnOpen && initial.sourceCode === ''}
+          label={sides.source}
           labelVisible
           problem={messages.sourceCode}
           value={sourceCode}
           onCancel={onCancel}
           onChange={setSourceCode}
         />
-        <span className="flex h-8 items-center self-end">
+        <span className="flex items-center self-start sm:h-8 sm:self-end [&_svg]:rotate-90 sm:[&_svg]:rotate-0">
           <SentAs direction={direction} />
         </span>
         <CodeInput
-          focusFirst={initial.sourceCode !== ''}
-          label={t('target', { direction })}
+          focusFirst={focusOnOpen && initial.sourceCode !== ''}
+          label={sides.target}
           labelVisible
           problem={messages.targetCode}
           value={targetCode}

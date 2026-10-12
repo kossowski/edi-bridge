@@ -4,15 +4,19 @@
 
 **Blocked by:** 60 (Document page with "what to do")
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Lists are grouped by who receives them and show the Mappings that use them
-- [ ] Values can be added, edited and removed inline, with the code's meaning and an undo after removing
-- [ ] Blocking codes from failed documents appear with a prefilled add action and lead back to the document after saving
-- [ ] A new list asks only the kind and who receives it; suggested values can be accepted or edited one by one
-- [ ] CSV import keeps reporting validation errors per row
-- [ ] The Lookup Table contract gains missing codes per table and suggested values; the live API follows in tickets 37 and 72
-- [ ] `/lookup-tables` and its screens and stories are replaced; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Lists are grouped by who receives them and show the Mappings that use them
+- [x] Values can be added, edited and removed inline, with the code's meaning and an undo after removing
+- [x] Blocking codes from failed documents appear with a prefilled add action and lead back to the document after saving
+- [x] A new list asks only the kind and who receives it; suggested values can be accepted or edited one by one
+- [x] CSV import keeps reporting validation errors per row
+- [x] The Lookup Table contract gains missing codes per table and suggested values; the live API follows in tickets 37 and 72
+- [x] `/lookup-tables` and its screens and stories are replaced; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #129, #132, #141, #145.

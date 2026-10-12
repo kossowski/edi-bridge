@@ -4,7 +4,7 @@ import { Add01Icon, Table01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { type Ref, type RefObject, useId, useRef, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
@@ -24,8 +24,8 @@ import {
 } from '@/components/lookup-tables/lookup-table-scope'
 import { useCanChange } from '@/hooks/use-session'
 import { lookupTablesQuery } from '@/lib/api/queries'
-import { lookupTableHref } from '@/lib/navigation'
-import { Button } from '@edi-bridge/ui/components/button'
+import { newLookupTableHref } from '@/lib/navigation'
+import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Empty,
   EmptyContent,
@@ -121,18 +121,18 @@ function Group({ group, actions }: { group: ScopeGroup; actions: CardActions | n
   )
 }
 
-function NewListButton({ ref, onClick }: { ref?: Ref<HTMLButtonElement>; onClick: () => void }) {
+function NewListLink({ ref }: { ref?: Ref<HTMLAnchorElement> }) {
   const t = useTranslations('CodeTranslations')
 
   return (
-    <Button ref={ref} onClick={onClick}>
+    <Link href={newLookupTableHref()} ref={ref} className={buttonVariants()}>
       <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden data-icon="inline-start" />
       {t('new')}
-    </Button>
+    </Link>
   )
 }
 
-function NoLists({ onCreate }: { onCreate: (() => void) | null }) {
+function NoLists({ canCreate }: { canCreate: boolean }) {
   const t = useTranslations('CodeTranslations.empty')
 
   return (
@@ -145,12 +145,12 @@ function NoLists({ onCreate }: { onCreate: (() => void) | null }) {
           <h2>{t('title')}</h2>
         </EmptyTitle>
         <EmptyDescription>
-          {onCreate ? t('description') : t('viewOnlyDescription')}
+          {canCreate ? t('description') : t('viewOnlyDescription')}
         </EmptyDescription>
       </EmptyHeader>
-      {onCreate && (
+      {canCreate && (
         <EmptyContent className="flex-row justify-center">
-          <NewListButton onClick={onCreate} />
+          <NewListLink />
         </EmptyContent>
       )}
     </Empty>
@@ -175,7 +175,7 @@ type Dialogs = {
   delete: { open: boolean; table: LookupTableSummary | null }
 }
 
-function useListDialogs(newButton: RefObject<HTMLButtonElement | null>) {
+function useListDialogs(newLink: RefObject<HTMLAnchorElement | null>) {
   const returnFocus = useRef<HTMLElement | null>(null)
 
   const [state, setState] = useState<Dialogs>({
@@ -183,12 +183,8 @@ function useListDialogs(newButton: RefObject<HTMLButtonElement | null>) {
     delete: { open: false, table: null },
   })
 
-  function open(
-    kind: keyof Dialogs,
-    table: LookupTableSummary | null,
-    trigger: HTMLElement | null,
-  ) {
-    returnFocus.current = trigger ?? newButton.current
+  function open(kind: keyof Dialogs, table: LookupTableSummary, trigger: HTMLElement | null) {
+    returnFocus.current = trigger ?? newLink.current
     setState((current) => ({ ...current, [kind]: { open: true, table } }))
   }
 
@@ -199,12 +195,11 @@ function useListDialogs(newButton: RefObject<HTMLButtonElement | null>) {
   return {
     state,
     returnFocus,
-    create: () => open('form', null, null),
     edit: ((table, trigger) => open('form', table, trigger)) satisfies CardAction,
     remove: ((table, trigger) => open('delete', table, trigger)) satisfies CardAction,
     close,
     afterDelete: () => {
-      returnFocus.current = newButton.current
+      returnFocus.current = newLink.current
       close('delete')
     },
   }
@@ -214,20 +209,13 @@ export function CodeTranslationsScreen() {
   const t = useTranslations('CodeTranslations')
   const tSidebar = useTranslations('Sidebar.items')
   const { data, isError, isPending, refetch } = useQuery(lookupTablesQuery)
-  const router = useRouter()
   const canChange = useCanChange()
-  const newButton = useRef<HTMLButtonElement>(null)
+  const newLink = useRef<HTMLAnchorElement>(null)
   const [announcement, setAnnouncement] = useState('')
-  const dialogs = useListDialogs(newButton)
+  const dialogs = useListDialogs(newLink)
   const actions = canChange ? { onEdit: dialogs.edit, onDelete: dialogs.remove } : null
 
   function saved(table: LookupTable) {
-    if (!dialogs.state.form.table) {
-      router.push(lookupTableHref(table.id))
-
-      return
-    }
-
     setAnnouncement(t('announcements.saved', { name: table.name }))
     dialogs.close('form')
   }
@@ -254,7 +242,7 @@ export function CodeTranslationsScreen() {
     }
 
     if (data.length === 0) {
-      return <NoLists onCreate={canChange ? dialogs.create : null} />
+      return <NoLists canCreate={canChange} />
     }
 
     return byScope(data).map((group) => <Group key={group.key} actions={actions} group={group} />)
@@ -265,7 +253,7 @@ export function CodeTranslationsScreen() {
   return (
     <AppPage
       busy={isPending && !isError}
-      changeActions={<NewListButton ref={newButton} onClick={dialogs.create} />}
+      changeActions={<NewListLink ref={newLink} />}
       meta={
         data &&
         data.length > 0 && (

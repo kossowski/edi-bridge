@@ -162,8 +162,16 @@ describe('tableDirection', () => {
   })
 
   it('reads a list as incoming once any Mapping reads it inbound', () => {
-    expect(tableDirection([use('outbound'), use('inbound')])).toBe('inbound')
-    expect(tableDirection([use('outbound')])).toBe('outbound')
-    expect(tableDirection([])).toBe('outbound')
+    expect(tableDirection({ kind: 'units', uses: [use('outbound'), use('inbound')] })).toBe(
+      'inbound',
+    )
+    expect(tableDirection({ kind: 'addresses', uses: [use('outbound')] })).toBe('outbound')
+  })
+
+  it('reads an unused list by its kind', () => {
+    expect(tableDirection({ kind: 'addresses', uses: [] })).toBe('inbound')
+    expect(tableDirection({ kind: 'units', uses: [] })).toBe('outbound')
+    expect(tableDirection({ kind: 'countries', uses: [] })).toBe('outbound')
+    expect(tableDirection({ kind: 'other', uses: [] })).toBe('outbound')
   })
 })

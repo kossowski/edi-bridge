@@ -5,6 +5,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { fieldErrors, type FormIssue, tooLongOr } from '../../lib/forms/field-errors'
+import { scopeInputOf } from './lookup-table-scope'
 
 export type ScopeKind = LookupTableScopeInput['kind']
 
@@ -35,10 +36,7 @@ function toField(issue: FormIssue): FormIssue {
 export function validateLookupTableForm(values: LookupTableFormValues): LookupTableFormResult {
   const parsed = settingsSchema.safeParse({
     name: values.name,
-    scope:
-      values.scopeKind === 'workspace'
-        ? { kind: 'workspace' }
-        : { kind: 'tradingPartner', tradingPartnerId: values.tradingPartnerId ?? undefined },
+    scope: scopeInputOf(values.scopeKind, values.tradingPartnerId) ?? { kind: values.scopeKind },
   })
 
   if (parsed.success) {
@@ -55,10 +53,10 @@ export function validateLookupTableForm(values: LookupTableFormValues): LookupTa
   }
 }
 
-export function toFormValues(table?: LookupTableSummary): LookupTableFormValues {
+export function toFormValues(table: LookupTableSummary): LookupTableFormValues {
   return {
-    name: table?.name ?? '',
-    scopeKind: table?.scope.kind ?? 'workspace',
-    tradingPartnerId: table?.scope.kind === 'tradingPartner' ? table.scope.tradingPartner.id : null,
+    name: table.name,
+    scopeKind: table.scope.kind,
+    tradingPartnerId: table.scope.kind === 'tradingPartner' ? table.scope.tradingPartner.id : null,
   }
 }
