@@ -14,11 +14,11 @@ import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import { PartnerLoading, PartnerOverview } from '@/components/trading-partners/partner-overview'
 import { awaitsReceiptConfirmation } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSettings } from '@/components/trading-partners/partner-settings'
-import { SetupNotice, useSetupSummary } from '@/components/trading-partners/partner-setup-notice'
+import { SetupNotice } from '@/components/trading-partners/partner-setup-notice'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
 import { useUrlTab } from '@/hooks/use-url-tab'
 import { ApiError } from '@/lib/api/client'
-import { tradingPartnerQuery } from '@/lib/api/queries'
+import { tradingPartnerQuery, useTakenSetupSummary } from '@/lib/api/queries'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
 import type { TradingPartner } from '@edi-bridge/contracts'
@@ -105,7 +105,7 @@ function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
 
 export function PartnerScreen({ id }: { id: string }) {
   const t = useTranslations('TradingPartner')
-  const [setupSummary, dismissSetupSummary] = useSetupSummary(id)
+  const [setupSummary, dismissSetupSummary] = useTakenSetupSummary(id)
   const titleRef = useRef<HTMLHeadingElement>(null)
 
   function dismissSetupNotice() {

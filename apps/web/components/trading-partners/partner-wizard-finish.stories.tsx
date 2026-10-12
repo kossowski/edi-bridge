@@ -103,11 +103,59 @@ export const Success = meta.story({
     await expect(notice.queryByRole('heading', { name: 'Not created' })).not.toBeInTheDocument()
     await expect(notice.queryByRole('heading', { name: 'AI drafts' })).not.toBeInTheDocument()
 
+    await expect(notice.queryByRole('heading', { name: 'Set up later' })).not.toBeInTheDocument()
+
     await userEvent.click(notice.getByRole('button', { name: 'Done' }))
     await expect(
       canvas.queryByRole('heading', { name: `${wizardPartner} is created for testing` }),
     ).not.toBeInTheDocument()
     await expect(canvas.getByRole('heading', { level: 1, name: wizardPartner })).toHaveFocus()
+    await expect(canvas.getByText('Testing', { exact: true })).toBeVisible()
+
+    await userEvent.click(canvas.getByRole('tab', { name: 'Connections' }))
+
+    const connections = within(
+      await canvas.findByRole('list', { name: `Connections with ${wizardPartner}` }),
+    )
+
+    for (const connection of [`${wizardPartner} webhook`, `${wizardPartner} HTTP delivery`]) {
+      await expect(connections.getByRole('link', { name: connection })).toBeVisible()
+    }
+
+    await userEvent.click(canvas.getByRole('tab', { name: 'Documents' }))
+
+    const documents = within(
+      await canvas.findByRole('list', { name: `Document types with ${wizardPartner}` }),
+    )
+
+    for (const route of [`Purchase orders from ${wizardPartner}`, `Invoices to ${wizardPartner}`]) {
+      await expect(documents.getByRole('link', { name: route })).toBeVisible()
+    }
+  },
+})
+
+export const LeftForLater = meta.story({
+  async play({ canvas }) {
+    await toMappings(canvas, ['ORDERS', 'INVOIC'], { ways: { inbound: 'ask' } })
+    await chooseMapping(canvas, 'ORDERS', 'Hansemarkt: ORDERS to ERP JSON')
+    const invoices = await findMappingGroup(canvas, 'INVOIC')
+    await userEvent.click(invoices.getByRole('radio', { name: /^Later/ }))
+    await continueTo(canvas, 'Review and create')
+    await canvas.findByRole('region', { name: 'Document routes' })
+    await userEvent.click(canvas.getByRole('button', { name: finishLabel }))
+
+    const notice = await findNotice(canvas)
+    const later = within(notice.getByRole('region', { name: 'Set up later' }))
+
+    await expect(later.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      `Connection for documents from ${wizardPartner} Add it once ${wizardPartner} sends you the connection details.`,
+      `Document route for purchase orders It follows once the connection to ${wizardPartner} is added.`,
+      'Document route for invoices Choose the mapping in the setup steps.',
+    ])
+    await expect(notice.queryByRole('heading', { name: 'Not created' })).not.toBeInTheDocument()
+    await expect(
+      notice.queryByRole('heading', { name: `Web address for ${wizardPartner}` }),
+    ).not.toBeInTheDocument()
   },
 })
 
@@ -283,6 +331,12 @@ export const German = meta.story({
     await expect(
       canvas.getByRole('link', { name: 'Mapping für Rechnungen mit KI entwerfen' }),
     ).toBeVisible()
+
+    const later = within(canvas.getByRole('region', { name: 'Später einrichten' }))
+    await expect(later.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      `Verbindung für Belege an ${wizardPartner} Fügen Sie sie hinzu, sobald ${wizardPartner} Ihnen die Verbindungsangaben schickt.`,
+      'Belegweg für Rechnungen Er folgt, sobald die Verbindung zu Kieler Kontor GmbH hinzugefügt ist. Er braucht den veröffentlichten KI-Entwurf.',
+    ])
   },
 })
 
@@ -312,7 +366,15 @@ export const Mobile = meta.story({
     await userEvent.click(canvas.getByRole('button', { name: finishLabel }))
 
     const notice = await findNotice(canvas)
-    await expect(notice.getByRole('region', { name: 'AI drafts' })).toBeVisible()
+    const drafts = notice.getByRole('region', { name: 'AI drafts' })
+    await expect(drafts).toBeVisible()
+
+    const { right } = drafts.getBoundingClientRect()
+
+    for (const link of within(drafts).getAllByRole('link')) {
+      await expect(link.getBoundingClientRect().right).toBeLessThanOrEqual(right)
+    }
+
     await expectNoPageScroll(canvasElement)
   },
 })

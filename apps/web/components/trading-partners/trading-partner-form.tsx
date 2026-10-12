@@ -12,7 +12,8 @@ import {
   type TradingPartnerFormValues,
   validateTradingPartnerForm,
 } from '@/components/trading-partners/trading-partner-form-values'
-import { isConflict, updateTradingPartner } from '@/lib/api/client'
+import { useTakenGln } from '@/hooks/use-taken-gln'
+import { updateTradingPartner } from '@/lib/api/client'
 import { storeSavedTradingPartner } from '@/lib/api/queries'
 import {
   acknowledgementTimeLimitHours,
@@ -61,25 +62,19 @@ export function TradingPartnerForm({
   const formRef = useRef<HTMLFormElement>(null)
   const [values, setValues] = useState<TradingPartnerFormValues>(() => toFormValues(tradingPartner))
   const [submitted, setSubmitted] = useState(false)
-  const [glnTaken, setGlnTaken] = useState<string | null>(null)
+  const takenGln = useTakenGln()
 
   const save = useMutation({
     mutationFn: (input: TradingPartnerInput) => updateTradingPartner(tradingPartner.id, input),
     onSuccess: (saved) => storeSavedTradingPartner(queryClient, saved),
-    onError: (error, input) => {
-      if (isConflict(error)) {
-        setGlnTaken(input.gln)
-      }
-    },
+    onError: (error, input) => takenGln.remember(error, input.gln),
   })
 
   const result = validateTradingPartnerForm(values, tradingPartner)
   const errors = submitted && 'errors' in result ? result.errors : {}
 
   const conflict =
-    'input' in result && glnTaken !== null && result.input.gln === glnTaken
-      ? t('errors.gln.taken')
-      : null
+    'input' in result && takenGln.isTaken(result.input.gln) ? t('errors.gln.taken') : null
 
   function messageFor(field: TradingPartnerField) {
     const error = errors[field]

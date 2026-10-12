@@ -11,3 +11,7 @@ export function glnError(value: string): GlnError | null {
 
   return gln === '' ? 'required' : glnIssue(gln)
 }
+
+export function isTakenGln(gln: string | null, takenGln: string | null) {
+  return gln !== null && takenGln !== null && normalizeGln(gln) === takenGln
+}

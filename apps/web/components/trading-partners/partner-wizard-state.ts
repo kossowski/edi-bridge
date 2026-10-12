@@ -9,7 +9,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { tooLongOr } from '../../lib/forms/field-errors'
-import { type GlnError, glnError, normalizeGln } from '../../lib/forms/gln'
+import { type GlnError, glnError, isTakenGln, normalizeGln } from '../../lib/forms/gln'
 import {
   type ChannelField,
   channelFields,
@@ -193,11 +193,11 @@ export function withTakenGln(
   { partner }: PartnerWizardState,
   takenGln: string | null,
 ): WizardErrors {
-  if (errors.gln !== undefined || partner.glnLater || takenGln === null) {
+  if (errors.gln !== undefined || partner.glnLater) {
     return errors
   }
 
-  return normalizeGln(partner.gln) === takenGln ? { ...errors, gln: 'taken' } : errors
+  return isTakenGln(partner.gln, takenGln) ? { ...errors, gln: 'taken' } : errors
 }
 
 export function stepErrors(

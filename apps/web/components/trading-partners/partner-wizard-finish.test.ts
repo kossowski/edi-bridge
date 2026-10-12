@@ -17,8 +17,11 @@ import { type PlanChannel, setupPlan, type SetupContext } from './partner-setup-
 import {
   type FinishApi,
   finishSetup,
+  forLater,
   leftOver,
+  nothingForLater,
   nothingLeft,
+  routeInput,
   setupSummary,
 } from './partner-wizard-finish'
 import { type WizardResult } from './partner-wizard-state'
@@ -229,14 +232,19 @@ describe('finishSetup', () => {
     expect(api.createFlow.mock.calls.map(([input]) => input.messageType)).toEqual(['INVOIC'])
     expect(leftOver(plan, finished)).toEqual({
       connections: [
-        { direction: 'inbound', kind: 'webhook-inbound', name: 'Kieler Kontor webhook-inbound' },
+        {
+          direction: 'inbound',
+          kind: 'webhook-inbound',
+          name: 'Kieler Kontor webhook-inbound',
+          reason: 'failed',
+        },
       ],
       mappingDrafts: [],
       routes: [{ messageType: 'ORDERS', name: 'ORDERS route' }],
     })
   })
 
-  it('leaves out a connection whose details no longer fit the channel input', async () => {
+  it('leaves out a connection whose details no longer fit the channel input, as invalid', async () => {
     const api = fakeApi()
 
     const broken = setupPlan(
@@ -251,9 +259,17 @@ describe('finishSetup', () => {
     const finished = await finishSetup(broken, api)
 
     expect(api.createChannel).not.toHaveBeenCalled()
-    expect(leftOver(broken, finished)).toMatchObject({
-      connections: [{ direction: 'outbound', kind: 'http-outbound' }],
-      routes: [{ messageType: 'INVOIC' }],
+    expect(leftOver(broken, finished)).toEqual({
+      connections: [
+        {
+          direction: 'outbound',
+          kind: 'http-outbound',
+          name: 'Kieler Kontor http-outbound',
+          reason: 'invalid',
+        },
+      ],
+      mappingDrafts: [],
+      routes: [{ messageType: 'INVOIC', name: 'INVOIC route' }],
     })
   })
 })
@@ -271,6 +287,66 @@ describe('leftOver', () => {
   })
 })
 
+describe('routeInput', () => {
+  it('links the created partner connection with the own connection and the mapping', () => {
+    const [orders] = plan.documents
+
+    if (orders === undefined || !('route' in orders)) {
+      throw new Error('ORDERS has no route')
+    }
+
+    expect(
+      routeInput({
+        messageType: 'ORDERS',
+        route: orders.route,
+        tradingPartnerId: tradingPartner.id,
+        partnerChannelId: '50000000-0000-4000-8000-000000000001',
+      }),
+    ).toEqual({
+      name: 'ORDERS route',
+      tradingPartnerId: tradingPartner.id,
+      messageType: 'ORDERS',
+      inboundChannelId: '50000000-0000-4000-8000-000000000001',
+      destinationChannelId: erpDelivery.id,
+      mappingVersionId: ordersVersion.id,
+    })
+  })
+})
+
+describe('forLater', () => {
+  it('lists nothing when the plan creates every document route', () => {
+    expect(
+      nothingForLater(forLater(setupPlan({ ...result, documents: ['ORDERS'] }, context))),
+    ).toBe(true)
+  })
+
+  it('lists the postponed connections and the documents left with their reasons', () => {
+    const later = setupPlan(
+      {
+        ...result,
+        connections: { outbound: { way: 'web', values: httpValues } },
+        mappings: { ...result.mappings, INVOIC: { way: 'later' } },
+      },
+      context,
+    )
+
+    expect(forLater(later)).toEqual({
+      connections: ['inbound'],
+      documents: [
+        { messageType: 'ORDERS', reasons: ['connectionPostponed'] },
+        { messageType: 'DESADV', reasons: ['mappingDraft'] },
+        { messageType: 'INVOIC', reasons: ['mappingLater'] },
+      ],
+    })
+  })
+
+  it('names each postponed direction once', () => {
+    const later = setupPlan({ ...result, connections: {} }, context)
+
+    expect(forLater(later).connections).toEqual(['inbound', 'outbound'])
+  })
+})
+
 describe('setupSummary', () => {
   it('names the webhook with its token, the AI drafts and what is left', async () => {
     const finished = await finishSetup(plan, fakeApi(['createFlow']))
@@ -285,6 +361,10 @@ describe('setupSummary', () => {
       { messageType: 'DESADV', mapping: finished.mappings.DESADV },
     ])
     expect(summary.left.routes.map(({ messageType }) => messageType)).toEqual(['ORDERS', 'INVOIC'])
+    expect(summary.later).toEqual({
+      connections: [],
+      documents: [{ messageType: 'DESADV', reasons: ['mappingDraft'] }],
+    })
   })
 
   it('has no webhook when only the partner was created', async () => {

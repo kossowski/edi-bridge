@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { glnError, normalizeGln } from './gln'
+import { glnError, isTakenGln, normalizeGln } from './gln'
 
 describe('glnError', () => {
   it.each([
@@ -20,5 +20,19 @@ describe('glnError', () => {
 describe('normalizeGln', () => {
   it('removes the spaces between digit groups', () => {
     expect(normalizeGln(' 0234 5678 90129 ')).toBe('0234567890129')
+  })
+})
+
+describe('isTakenGln', () => {
+  const taken = '0234567890129'
+
+  it('matches the taken GLN however it is spaced', () => {
+    expect(isTakenGln('0234 5678 90129', taken)).toBe(true)
+  })
+
+  it('clears once the GLN changes or none is taken', () => {
+    expect(isTakenGln('4012345000009', taken)).toBe(false)
+    expect(isTakenGln(null, taken)).toBe(false)
+    expect(isTakenGln(taken, null)).toBe(false)
   })
 })

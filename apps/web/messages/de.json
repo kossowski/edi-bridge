@@ -1094,8 +1094,26 @@
         "title": "Nicht angelegt",
         "description": "Diese Punkte konnten nicht angelegt werden. Fügen Sie sie über die Einrichtungsschritte unten hinzu.",
         "connection": "Verbindung {name}",
+        "connectionInvalid": "Verbindung {name}: Einige Angaben sind ungültig",
         "mappingDraft": "Neues Mapping für {documents}",
         "route": "Belegweg {name}"
+      },
+      "later": {
+        "title": "Später einrichten",
+        "description": "Diese Punkte haben Sie für später gelassen. Fügen Sie sie über die Einrichtungsschritte unten hinzu, sobald Sie so weit sind.",
+        "connection": {
+          "inbound": "Verbindung für Belege von {name}",
+          "outbound": "Verbindung für Belege an {name}"
+        },
+        "connectionNext": "Fügen Sie sie hinzu, sobald {name} Ihnen die Verbindungsangaben schickt.",
+        "route": "Belegweg für {documents}",
+        "reasons": {
+          "connectionPostponed": "Er folgt, sobald die Verbindung zu {name} hinzugefügt ist.",
+          "noOwnConnection": "Noch keine Ihrer eigenen Verbindungen passt zu {documents}. Fügen Sie zuerst eine hinzu.",
+          "severalOwnConnections": "Mehrere Ihrer eigenen Verbindungen passen zu {documents}. Wählen Sie eine in den Einrichtungsschritten aus.",
+          "mappingDraft": "Er braucht den veröffentlichten KI-Entwurf.",
+          "mappingLater": "Wählen Sie das Mapping in den Einrichtungsschritten."
+        }
       },
       "dismiss": "Fertig"
     },

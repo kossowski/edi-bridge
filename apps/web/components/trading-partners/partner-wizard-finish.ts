@@ -5,6 +5,7 @@ import {
   type CreatedChannel,
   type CreateMappingBody,
   type Direction,
+  directionOf,
   type Flow,
   type FlowInput,
   type MappingSummary,
@@ -15,6 +16,7 @@ import {
 import { validateNewChannel } from '../channels/channel-form-values'
 import { newDocumentFlow } from './partner-documents'
 import {
+  type LeftReason,
   type PlanChannel,
   type PlannedConnection,
   type PlannedRoute,
@@ -39,8 +41,13 @@ export type FinishedSetup = {
 
 export type LeftRoute = Pick<PlannedRoute<PlanChannel>, 'name'> & { messageType: WizardDocument }
 
+export type LeftConnection = Pick<PlannedConnection, 'direction' | 'kind'> & {
+  name: string
+  reason: 'invalid' | 'failed'
+}
+
 export type LeftOver = {
-  connections: Array<Pick<PlannedConnection, 'direction' | 'kind'> & { name: string }>
+  connections: LeftConnection[]
   mappingDrafts: WizardDocument[]
   routes: LeftRoute[]
 }
@@ -62,12 +69,17 @@ export function connectionInput(
   return 'input' in result ? result.input : null
 }
 
-export function routeInput(
-  messageType: WizardDocument,
-  route: PlannedRoute<PlanChannel>,
-  tradingPartnerId: string,
-  partnerChannelId: string,
-): FlowInput {
+export function routeInput({
+  messageType,
+  route,
+  tradingPartnerId,
+  partnerChannelId,
+}: {
+  messageType: WizardDocument
+  route: PlannedRoute<PlanChannel>
+  tradingPartnerId: string
+  partnerChannelId: string
+}): FlowInput {
   return newDocumentFlow({
     name: route.name,
     tradingPartnerId,
@@ -78,7 +90,7 @@ export function routeInput(
   })
 }
 
-async function attempt<Result>(request: () => Promise<Result>): Promise<Result | undefined> {
+async function tryCreate<Result>(request: () => Promise<Result>): Promise<Result | undefined> {
   try {
     return await request()
   } catch {
@@ -95,7 +107,7 @@ export async function finishSetup(
 
   for (const connection of plan.connections) {
     const input = connectionInput(connection, tradingPartner.id)
-    const created = input && (await attempt(() => api.createChannel(input)))
+    const created = input && (await tryCreate(() => api.createChannel(input)))
 
     if (created) {
       finished.channels[connection.direction] = created
@@ -103,7 +115,7 @@ export async function finishSetup(
   }
 
   for (const messageType of plan.mappingDrafts) {
-    const created = await attempt(() => api.createMapping({ messageType }))
+    const created = await tryCreate(() => api.createMapping({ messageType }))
 
     if (created) {
       finished.mappings[messageType] = created
@@ -120,9 +132,14 @@ export async function finishSetup(
 
     const created =
       partnerChannel &&
-      (await attempt(() =>
+      (await tryCreate(() =>
         api.createFlow(
-          routeInput(messageType, route, tradingPartner.id, partnerChannel.channel.id),
+          routeInput({
+            messageType,
+            route,
+            tradingPartnerId: tradingPartner.id,
+            partnerChannelId: partnerChannel.channel.id,
+          }),
         ),
       ))
 
@@ -136,9 +153,17 @@ export async function finishSetup(
 
 export function leftOver(plan: SetupPlan<PlanChannel>, finished: FinishedSetup): LeftOver {
   return {
-    connections: plan.connections.flatMap(({ direction, kind, values }) =>
-      finished.channels[direction] ? [] : [{ direction, kind, name: values.name }],
-    ),
+    connections: plan.connections.flatMap((connection) => {
+      const { direction, kind, values } = connection
+
+      if (finished.channels[direction]) {
+        return []
+      }
+
+      const valid = connectionInput(connection, finished.tradingPartner.id) !== null
+
+      return [{ direction, kind, name: values.name, reason: valid ? 'failed' : 'invalid' }]
+    }),
     mappingDrafts: plan.mappingDrafts.filter((messageType) => !finished.mappings[messageType]),
     routes: plan.documents.flatMap((document) =>
       'route' in document && !finished.flows[document.messageType]
@@ -152,6 +177,32 @@ export function nothingLeft({ connections, mappingDrafts, routes }: LeftOver) {
   return connections.length + mappingDrafts.length + routes.length === 0
 }
 
+export type LaterDocument = { messageType: WizardDocument; reasons: LeftReason[] }
+
+export type ForLater = {
+  connections: Direction[]
+  documents: LaterDocument[]
+}
+
+export function forLater({ documents }: Pick<SetupPlan<PlanChannel>, 'documents'>): ForLater {
+  const later = documents.flatMap((document) => ('reasons' in document ? [document] : []))
+
+  return {
+    connections: [
+      ...new Set(
+        later.flatMap(({ messageType, reasons }) =>
+          reasons.includes('connectionPostponed') ? [directionOf({ messageType })] : [],
+        ),
+      ),
+    ],
+    documents: later.map(({ messageType, reasons }) => ({ messageType, reasons })),
+  }
+}
+
+export function nothingForLater({ connections, documents }: ForLater) {
+  return connections.length + documents.length === 0
+}
+
 export type CreatedWebhook = { channel: Extract<Channel, { type: 'webhook' }>; token: string }
 
 export type SetupSummary = {
@@ -159,6 +210,7 @@ export type SetupSummary = {
   webhook: CreatedWebhook | null
   mappingDrafts: Array<{ messageType: WizardDocument; mapping: MappingSummary }>
   left: LeftOver
+  later: ForLater
 }
 
 function createdWebhook({ channels }: FinishedSetup): CreatedWebhook | null {
@@ -181,5 +233,6 @@ export function setupSummary(plan: SetupPlan<PlanChannel>, finished: FinishedSet
       return mapping ? [{ messageType, mapping }] : []
     }),
     left: leftOver(plan, finished),
+    later: forLater(plan),
   }
 }

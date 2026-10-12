@@ -2,7 +2,7 @@
 
 import { Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -12,14 +12,9 @@ import { flushSync } from 'react-dom'
 import { AppPage } from '@/components/app-page'
 import { GlnField, TextField, useGlnErrorMessage } from '@/components/form-field'
 import { CheckboxCards } from '@/components/trading-partners/choice-cards'
-import { storeSetupSummary } from '@/components/trading-partners/partner-setup-notice'
 import { type PlanChannel, type SetupPlan } from '@/components/trading-partners/partner-setup-plan'
 import { ConnectionsStep } from '@/components/trading-partners/partner-wizard-connections'
-import {
-  type FinishedSetup,
-  finishSetup,
-  setupSummary,
-} from '@/components/trading-partners/partner-wizard-finish'
+import { finishSetup, setupSummary } from '@/components/trading-partners/partner-wizard-finish'
 import {
   MappingsStep,
   useOfferedMappings,
@@ -41,6 +36,7 @@ import {
   wizardSteps,
   withTakenGln,
 } from '@/components/trading-partners/partner-wizard-state'
+import { useTakenGln } from '@/hooks/use-taken-gln'
 import {
   createChannel,
   createFlow,
@@ -48,12 +44,7 @@ import {
   createTradingPartner,
   isConflict,
 } from '@/lib/api/client'
-import {
-  storeCreatedMapping,
-  storeSavedChannel,
-  storeSavedFlow,
-  storeSavedTradingPartner,
-} from '@/lib/api/queries'
+import { storeFinishedSetup, storeSetupSummary } from '@/lib/api/queries'
 import { tradingPartnerInputSchema } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Checkbox } from '@edi-bridge/ui/components/checkbox'
@@ -93,25 +84,6 @@ function useErrorMessage() {
 
 const finishApi = { createTradingPartner, createChannel, createMapping, createFlow }
 
-function storeFinishedSetup(
-  queryClient: QueryClient,
-  { tradingPartner, channels, mappings, flows }: FinishedSetup,
-) {
-  storeSavedTradingPartner(queryClient, tradingPartner)
-
-  for (const created of Object.values(channels)) {
-    storeSavedChannel(queryClient, created.channel)
-  }
-
-  for (const mapping of Object.values(mappings)) {
-    storeCreatedMapping(queryClient, mapping)
-  }
-
-  for (const flow of Object.values(flows)) {
-    storeSavedFlow(queryClient, flow)
-  }
-}
-
 export function PartnerWizard() {
   const t = useTranslations('PartnerWizard')
   const errorMessage = useErrorMessage()
@@ -120,24 +92,23 @@ export function PartnerWizard() {
   const [state, setState] = useState(initialWizardState)
   const [step, setStep] = useState<WizardStep>('partner')
   const [attempted, setAttempted] = useState(false)
-  const [takenGln, setTakenGln] = useState<string | null>(null)
+  const takenGln = useTakenGln()
   const queryClient = useQueryClient()
   const router = useRouter()
 
   const offeredMappings = useOfferedMappings(state.documents, step === 'mappings')
   const result = wizardResult(state)
-  const plan = useSetupPlan(result, step === 'review')
+  const planState = useSetupPlan(result, step === 'review')
 
   const finish = useMutation({
-    mutationFn: (setup: SetupPlan<PlanChannel>) => finishSetup(setup, finishApi),
-    onSuccess: (finished, setup) => {
+    mutationFn: (plan: SetupPlan<PlanChannel>) => finishSetup(plan, finishApi),
+    onSuccess: (finished, plan) => {
       storeFinishedSetup(queryClient, finished)
-      storeSetupSummary(queryClient, finished.tradingPartner.id, setupSummary(setup, finished))
+      storeSetupSummary(queryClient, finished.tradingPartner.id, setupSummary(plan, finished))
       router.push(`/trading-partners/${finished.tradingPartner.id}`)
     },
-    onError: (error, setup) => {
-      if (isConflict(error)) {
-        setTakenGln(setup.partner.gln)
+    onError: (error, plan) => {
+      if (takenGln.remember(error, plan.partner.gln)) {
         flushSync(() => {
           setStep('partner')
           setAttempted(true)
@@ -151,7 +122,7 @@ export function PartnerWizard() {
   const index = wizardSteps.indexOf(step)
 
   function currentErrors() {
-    return withTakenGln(stepErrors(step, state, offeredMappings), state, takenGln)
+    return withTakenGln(stepErrors(step, state, offeredMappings), state, takenGln.takenGln)
   }
 
   const errors = attempted ? currentErrors() : {}
@@ -206,8 +177,8 @@ export function PartnerWizard() {
 
     if (next) {
       goTo(next)
-    } else if (plan.status === 'ready') {
-      finish.mutate(plan.plan)
+    } else if (planState.status === 'ready') {
+      finish.mutate(planState.plan)
     }
   }
 
@@ -367,7 +338,7 @@ export function PartnerWizard() {
             />
           )}
 
-          {step === 'review' && <ReviewStep state={plan} />}
+          {step === 'review' && <ReviewStep state={planState} />}
 
           {finish.isError && !isConflict(finish.error) && (
             <p role="alert" className="text-destructive-text text-sm">
@@ -392,7 +363,7 @@ export function PartnerWizard() {
             <Button
               type="submit"
               aria-disabled={
-                finishing || (step === 'review' && plan.status !== 'ready') || undefined
+                finishing || (step === 'review' && planState.status !== 'ready') || undefined
               }
               className="aria-disabled:cursor-progress aria-disabled:opacity-50">
               {submitLabel()}

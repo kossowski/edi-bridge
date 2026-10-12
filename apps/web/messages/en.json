@@ -1094,8 +1094,26 @@
         "title": "Not created",
         "description": "These could not be created. Add them with the setup steps below.",
         "connection": "Connection {name}",
+        "connectionInvalid": "Connection {name}: some of its details are not valid",
         "mappingDraft": "New mapping for {documents}",
         "route": "Document route {name}"
+      },
+      "later": {
+        "title": "Set up later",
+        "description": "You left these for later. Add them with the setup steps below when you are ready.",
+        "connection": {
+          "inbound": "Connection for documents from {name}",
+          "outbound": "Connection for documents to {name}"
+        },
+        "connectionNext": "Add it once {name} sends you the connection details.",
+        "route": "Document route for {documents}",
+        "reasons": {
+          "connectionPostponed": "It follows once the connection to {name} is added.",
+          "noOwnConnection": "None of your own connections fits {documents} yet. Add one first.",
+          "severalOwnConnections": "Several of your own connections fit {documents}. Choose one in the setup steps.",
+          "mappingDraft": "It needs the published AI draft.",
+          "mappingLater": "Choose the mapping in the setup steps."
+        }
       },
       "dismiss": "Done"
     },
