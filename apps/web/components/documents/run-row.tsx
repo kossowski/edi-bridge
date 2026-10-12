@@ -1,22 +1,16 @@
 'use client'
 
-import {
-  ArrowDownLeft01Icon,
-  ArrowUpRight01Icon,
-  Refresh01Icon,
-  UserIcon,
-  UserMultiple02Icon,
-} from '@hugeicons/core-free-icons'
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
+import { ArrowDownLeft01Icon, ArrowUpRight01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { FixerBadge } from '@/components/documents/fixer-badge'
 import { usePlainNames } from '@/components/plain-names'
 import { RunStatusBadge } from '@/components/runs/run-status'
 import { useRunTitle } from '@/components/runs/run-title'
-import { navigationItems, runHref } from '@/lib/navigation'
-import { type Fixer, whoFixes } from '@edi-bridge/contracts'
-import { Badge } from '@edi-bridge/ui/components/badge'
+import { orderHref, runHref } from '@/lib/navigation'
+import { whoFixes } from '@edi-bridge/contracts'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Item,
@@ -30,27 +24,6 @@ import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { RunSummary } from '@edi-bridge/contracts'
-
-const fixerIcons: Record<Fixer, IconSvgElement> = {
-  retry: Refresh01Icon,
-  tradingPartner: UserMultiple02Icon,
-  you: UserIcon,
-}
-
-function orderHref(businessReference: string) {
-  return `${navigationItems.orderLifecycle.href}?${new URLSearchParams({ businessReference })}`
-}
-
-function FixerBadge({ fixer }: { fixer: Fixer }) {
-  const t = useTranslations('Documents.whoFixes')
-
-  return (
-    <Badge variant="outline" className="border-destructive/30">
-      <HugeiconsIcon icon={fixerIcons[fixer]} strokeWidth={2} aria-hidden />
-      {t(fixer)}
-    </Badge>
-  )
-}
 
 export function RunRow({ run }: { run: RunSummary }) {
   const t = useTranslations('Documents.row')

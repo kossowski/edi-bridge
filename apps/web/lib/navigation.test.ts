@@ -4,7 +4,10 @@ import messages from '../messages/en.json'
 import {
   accountMenuItems,
   activeSidebarItem,
+  documentHref,
+  fixTargetHref,
   interchangeHref,
+  orderHref,
   sidebarItem,
   sidebarItems,
 } from './navigation'
@@ -45,5 +48,43 @@ describe('interchangeHref', () => {
   it('searches the transmissions for the control reference', () => {
     expect(interchangeHref('00123')).toBe('/documents?view=transmissions&q=00123')
     expect(sidebarItem('transmissions').href).toBe('/documents?view=transmissions')
+  })
+})
+
+describe('documentHref', () => {
+  it('opens the document page', () => {
+    expect(documentHref('run-1')).toBe('/documents/run-1')
+  })
+})
+
+describe('orderHref', () => {
+  it('opens the order for the order number', () => {
+    expect(orderHref('PO 4711')).toBe('/order-lifecycle?businessReference=PO+4711')
+  })
+})
+
+describe('fixTargetHref', () => {
+  it('opens the Mapping at the failing field', () => {
+    expect(
+      fixTargetHref({
+        kind: 'mapping',
+        mappingId: 'm-1',
+        name: 'Invoices',
+        fieldPath: 'lines[].gtin',
+      }),
+    ).toBe('/mappings/m-1?field=lines%5B%5D.gtin')
+  })
+
+  it('opens the Lookup Table with the missing code', () => {
+    expect(
+      fixTargetHref({ kind: 'lookupTable', lookupTableId: 't-1', name: 'Units', code: 'K&T' }),
+    ).toBe('/lookup-tables/t-1?code=K%26T')
+  })
+
+  it('opens the Channel and the Trading Partner', () => {
+    expect(fixTargetHref({ kind: 'channel', channelId: 'c-1', name: 'SFTP' })).toBe('/channels/c-1')
+    expect(fixTargetHref({ kind: 'tradingPartner', tradingPartnerId: 'p-1', name: 'Acme' })).toBe(
+      '/trading-partners/p-1',
+    )
   })
 })

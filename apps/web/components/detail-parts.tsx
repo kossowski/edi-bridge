@@ -129,6 +129,7 @@ export function LoadFailure({
 }: {
   notFound: boolean
   namespace:
+    | 'Document'
     | 'RunDetail'
     | 'TradingPartner'
     | 'Channel'

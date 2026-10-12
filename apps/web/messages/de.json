@@ -552,6 +552,86 @@
       }
     }
   },
+  "Document": {
+    "title": "Beleg",
+    "loading": "Beleg wird geladen",
+    "notFound": {
+      "title": "Beleg nicht gefunden",
+      "description": "In diesem Arbeitsbereich gibt es keinen Beleg mit dieser ID. Er wurde vielleicht entfernt, oder der Link ist unvollständig."
+    },
+    "error": {
+      "title": "Beleg nicht verfügbar",
+      "description": "Der Beleg konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "header": {
+      "receivedAt": "{direction, select, inbound {Empfangen} other {Erstellt}} <time>{relativeTime}</time>",
+      "uploaded": "Von Hand hochgeladen",
+      "order": "Ganzen Auftrag {reference} ansehen"
+    },
+    "problem": {
+      "whatHappened": "Was passiert ist",
+      "whatToDo": "Was zu tun ist",
+      "reason": {
+        "unreadable": {
+          "title": "{tradingPartner} hat eine beschädigte Datei gesendet",
+          "description": "Die Datei ist beschädigt oder unvollständig, daher konnte EDI Bridge sie nicht lesen. {tradingPartner} wurde automatisch mit einer Empfangsbestätigung informiert."
+        },
+        "invalidContent": {
+          "title": "{direction, select, inbound {Der Inhalt verletzt die EDI-Regeln} other {Ein Pflichtwert ist leer}}",
+          "description": "{direction, select, inbound {EDI Bridge konnte die Datei lesen, aber ein Wert darin verletzt die Regeln für diese Belegart, zum Beispiel ein falsches Datum oder ein unbekannter Code.} other {Der übersetzte Beleg verletzt die EDI-Regeln für {tradingPartner}: Ein Pflichtwert ist leer. Das Mapping füllt ihn aus Ihrem Feld „{field}“.}}",
+          "descriptionWithoutTarget": "EDI Bridge konnte einen Pflichtwert für {tradingPartner} nicht füllen. Das Mapping nimmt ihn aus einem Ihrer Felder."
+        },
+        "missingCode": {
+          "title": "Für den Code „{code}“ fehlt eine Übersetzung",
+          "description": "Der Beleg verwendet den Code „{code}“, aber die Code-Übersetzung „{lookupTable}“ hat keinen Eintrag dafür. EDI Bridge weiß nicht, welchen Code {tradingPartner} stattdessen erwartet.",
+          "titleWithoutTarget": "Für einen Code fehlt eine Übersetzung",
+          "descriptionWithoutTarget": "Der Beleg verwendet einen Code, für den die Code-Übersetzung keinen Eintrag hat. EDI Bridge weiß nicht, welchen Code {tradingPartner} erwartet."
+        },
+        "missingField": {
+          "title": "Ein Pflichtfeld ist leer",
+          "description": "Das Mapping liest das Feld „{field}“, aber der Beleg aus Ihrem ERP lässt es leer. Füllen Sie es in Ihrem ERP und senden Sie den Beleg erneut, oder ändern Sie das Mapping, damit es den Wert aus einem anderen Feld nimmt.",
+          "descriptionWithoutTarget": "Das Mapping liest ein Feld, das der Beleg aus Ihrem ERP leer lässt. Füllen Sie es in Ihrem ERP und senden Sie den Beleg erneut, oder ändern Sie das Mapping, damit es den Wert aus einem anderen Feld nimmt."
+        },
+        "unreachable": {
+          "title": "{direction, select, inbound {Ihr ERP hat nicht geantwortet} other {Der Server von {tradingPartner} hat nicht geantwortet}}",
+          "description": "{direction, select, inbound {Der Beleg wurde übersetzt, aber Ihr ERP hat ihn bei der Zustellung nicht angenommen.} other {Der Beleg ist fertig, aber die Übertragung an {tradingPartner} ist fehlgeschlagen.}} Das ist meist nur vorübergehend."
+        }
+      },
+      "whoFixes": {
+        "you": "Das liegt auf Ihrer Seite. Sie können es selbst beheben.",
+        "tradingPartner": "Auf Ihrer Seite ist nichts zu beheben. {tradingPartner} muss eine korrigierte Datei senden.",
+        "retry": "Am Beleg selbst ist nichts falsch. Ein erneuter Versuch klappt meistens."
+      },
+      "waiting": "Als wartend auf {tradingPartner} markiert seit <time>{since}</time>.",
+      "steps": {
+        "fixCause": "Beheben Sie die Ursache.",
+        "checkConnection": "Wenn es weiter fehlschlägt, prüfen Sie die Verbindungsdaten.",
+        "contactTradingPartner": "Bitten Sie {tradingPartner}, eine korrigierte Datei zu senden. Die Kontaktdaten stehen auf der Partnerseite."
+      },
+      "fixLink": {
+        "mapping": "„{name}“ an diesem Feld öffnen",
+        "lookupTable": "{code} zu „{name}“ hinzufügen",
+        "channel": "Verbindung „{name}“ prüfen",
+        "tradingPartner": "{name} öffnen"
+      }
+    },
+    "verdict": {
+      "delivered": {
+        "title": "Alles in Ordnung, nichts zu tun",
+        "description": "{direction, select, inbound {Dieser Beleg von {tradingPartner} wurde übersetzt und an Ihr ERP übergeben.} other {Dieser Beleg wurde übersetzt und an {tradingPartner} gesendet.}}"
+      },
+      "inProgress": {
+        "title": "Wird noch verarbeitet",
+        "description": "Das dauert meist nur wenige Sekunden. Sie müssen nichts tun."
+      },
+      "duplicate": {
+        "title": "Doppelt empfangen, ignoriert",
+        "description": "{tradingPartner} hat diese Datei ein zweites Mal gesendet. EDI Bridge hat sie erkannt und nicht erneut weitergegeben, damit nichts doppelt verarbeitet wird.",
+        "original": "Ursprünglichen Beleg öffnen"
+      }
+    }
+  },
   "Runs": {
     "openRun": "– Run von {tradingPartner} öffnen, {messageType}",
     "noFailureStage": "Keine Failure Stage",
