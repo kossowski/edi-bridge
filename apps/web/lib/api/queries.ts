@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  mutationOptions,
   type QueryClient,
   queryOptions,
   useMutation,
@@ -8,6 +9,7 @@ import {
 import { useEffect, useState } from 'react'
 
 import type {
+  AcceptAiProposedPartsBody,
   AiBudget,
   Channel,
   DocumentStructure,
@@ -34,6 +36,7 @@ import type {
 
 import { compareWorkspaceNames } from '../forms/operator'
 import {
+  acceptAiProposedParts,
   compareMappingVersions,
   getAiBudget,
   getChannel,
@@ -416,6 +419,19 @@ export function storeAiBudget(queryClient: QueryClient, budget: AiBudget) {
 
 export function storeAcceptedAiDraft(queryClient: QueryClient, draft: MappingDraft) {
   queryClient.setQueryData(mappingDraftQuery(draft.mappingId).queryKey, draft)
+}
+
+export function acceptAiProposedPartsMutation(queryClient: QueryClient, mappingId: string) {
+  return mutationOptions({
+    mutationFn: (parts: AcceptAiProposedPartsBody) => acceptAiProposedParts(mappingId, parts),
+    onSuccess: (draft: MappingDraft) => storeAcceptedAiDraft(queryClient, draft),
+  })
+}
+
+export function useAcceptAiProposedParts(mappingId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation(acceptAiProposedPartsMutation(queryClient, mappingId))
 }
 
 export function storeReplacedDraft(queryClient: QueryClient, draft: MappingDraft) {
