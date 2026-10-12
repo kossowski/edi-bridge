@@ -138,6 +138,13 @@ export const Live = meta.story({
       'href',
       expect.stringMatching(/^\/flows\/[\da-f-]+$/),
     )
+
+    const problems = region(canvasElement, /^Open problems \(/)
+    const [transmission] = problems.getAllByRole('link', { name: /^Open transmission / })
+    await expect(transmission).toHaveAttribute(
+      'href',
+      `/documents?view=transmissions&q=${transmission!.textContent}`,
+    )
   },
 })
 

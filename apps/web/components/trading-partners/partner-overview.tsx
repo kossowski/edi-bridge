@@ -19,6 +19,7 @@ import {
 } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSetupCard } from '@/components/trading-partners/partner-setup-card'
 import { tradingPartnerActivityQuery } from '@/lib/api/queries'
+import { interchangeHref } from '@/lib/navigation'
 import { type OpenProblem, type TradingPartner } from '@edi-bridge/contracts'
 import {
   Card,
@@ -197,7 +198,7 @@ function ProblemItem({ problem, now }: { problem: OpenProblem; now: Date }) {
       </span>
       <span className="text-muted-foreground flex flex-wrap items-baseline gap-x-2">
         <Link
-          href={`/interchanges/${interchange.id}`}
+          href={interchangeHref(interchange.controlReference)}
           aria-label={t('openInterchange', { controlReference: interchange.controlReference })}
           className={cn(linkClass, 'font-mono text-xs tabular-nums')}>
           {interchange.controlReference}
