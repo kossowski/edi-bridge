@@ -1483,6 +1483,79 @@
     "saving": "Saving…",
     "cancel": "Cancel"
   },
+  "PartnerWizard": {
+    "title": "Add a trading partner",
+    "progress": "Progress",
+    "stepOf": "Step {current} of {total}",
+    "stepDone": "done",
+    "steps": {
+      "partner": {
+        "label": "Partner",
+        "title": "Who is the partner?",
+        "description": "Just the basics. You can change them later."
+      },
+      "documents": {
+        "label": "Documents",
+        "title": "Which documents do you exchange?",
+        "description": "Choose everything you plan to exchange with this partner. You can add more later."
+      },
+      "connections": {
+        "label": "Connections",
+        "title": "How do documents travel?",
+        "description": "Pick the way that suits your partner. If you don't know it yet, we help you ask."
+      },
+      "mappings": {
+        "label": "Mappings",
+        "title": "Which mapping does each document use?",
+        "description": "The partner's documents and your systems use different formats. A mapping converts between them."
+      },
+      "review": {
+        "label": "Review",
+        "title": "Review and create",
+        "description": "This is what we will set up."
+      }
+    },
+    "fields": {
+      "name": {
+        "label": "Company name",
+        "description": "The partner's company name, as your team knows it."
+      },
+      "gln": {
+        "label": "Location number (GLN)",
+        "description": "13 digits, on the partner's EDI info sheet. Ask the partner if you don't know it."
+      },
+      "glnLater": {
+        "label": "I'll add it later",
+        "description": "You can set up everything else now. The first test document needs the GLN."
+      }
+    },
+    "documents": {
+      "ORDERS": {
+        "title": "Receive purchase orders",
+        "benefit": "The partner orders goods from you, and the order lands in your ERP system."
+      },
+      "DESADV": {
+        "title": "Send dispatch advices",
+        "benefit": "You tell the partner what ships when, before the truck arrives."
+      },
+      "INVOIC": {
+        "title": "Send invoices",
+        "benefit": "Your invoices reach the partner's accounting without email or paper."
+      }
+    },
+    "errors": {
+      "name": {
+        "required": "Enter the company name.",
+        "tooLong": "Use at most {max} characters."
+      },
+      "glnRequired": "Enter the GLN, or choose “I'll add it later”.",
+      "documents": "Choose at least one document."
+    },
+    "cancel": "Cancel",
+    "back": "Back",
+    "continue": "Continue",
+    "finish": "Create partner in Test Mode"
+  },
   "Channels": {
     "new": "New Channel",
     "caption": "Channels, by name",
