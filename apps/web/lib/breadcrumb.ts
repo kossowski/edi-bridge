@@ -10,7 +10,7 @@ import {
 
 import type { SearchParamsReader } from './search-params'
 
-const subpageKeys = ['new', 'edit', 'versions', 'compare'] as const
+const subpageKeys = ['new', 'edit', 'compare'] as const
 
 type SubpageKey = (typeof subpageKeys)[number]
 
@@ -24,10 +24,14 @@ export type CrumbLabel =
 
 export type Crumb = { href: string; label: CrumbLabel }
 
-type Section = { label: CrumbLabel; href: string; skip?: ReadonlyArray<string> }
+type Section = { label: CrumbLabel; href: string; skip?: ReadonlyArray<string> | undefined }
+
+const skippedSegments: Partial<Record<SidebarItemKey, ReadonlyArray<string>>> = {
+  mappings: ['versions'],
+}
 
 function itemSection(key: SidebarItemKey): Section {
-  return { label: { kind: 'item', key }, href: sidebarItem(key).href }
+  return { label: { kind: 'item', key }, href: sidebarItem(key).href, skip: skippedSegments[key] }
 }
 
 function sidebarSections() {

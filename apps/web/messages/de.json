@@ -39,7 +39,8 @@
       "unavailableDescription": "Ihre Sitzungsdaten konnten nicht geladen werden. Abmelden ist trotzdem möglich.",
       "loading": "Sitzung wird geladen …",
       "redirecting": "Ihre Sitzung ist beendet. Die Anmeldeseite wird geöffnet …"
-    }
+    },
+    "toasts": "Meldungen"
   },
   "Sidebar": {
     "groups": {
@@ -122,7 +123,6 @@
     "details": "Details",
     "new": "Neu",
     "edit": "Bearbeiten",
-    "versions": "Versionen",
     "compare": "Vergleichen"
   },
   "Navigation": {
@@ -2201,7 +2201,6 @@
       "unpublishedChanges": "Unveröffentlichte Änderungen seit Version {version}",
       "published": "Keine Änderungen seit Version {version}"
     },
-    "versionsLink": "Mapping Versions",
     "publish": {
       "button": "Veröffentlichen",
       "title": "Draft als Version {version} veröffentlichen?",
@@ -2216,6 +2215,58 @@
         "incomplete": "Der Draft lässt sich noch nicht veröffentlichen: Jede Verknüpfung und jeder Transform muss vollständig sein. Vervollständigen Sie sie und veröffentlichen Sie dann erneut.",
         "reviewOpen": "Der Draft lässt sich nicht veröffentlichen, solange die Durchsicht des KI-Entwurfs offen ist. Übernehmen Sie zuerst den KI-Entwurf und veröffentlichen Sie dann.",
         "failed": "Der Draft konnte nicht veröffentlicht werden. Versuchen Sie es erneut."
+      }
+    },
+    "versions": {
+      "title": "Versionen & Probleme",
+      "close": "Versionen und Probleme schließen",
+      "description": "Die veröffentlichten Versionen dieses Mappings und die Belege, die damit fehlgeschlagen sind.",
+      "neverPublished": "Noch nicht veröffentlicht, daher nutzt kein Belegweg dieses Mapping.",
+      "notLive": "Version {version} ist die neueste. Noch nutzt kein Belegweg dieses Mapping.",
+      "live": "Version {version} ist live für {partners}.",
+      "stillInUse": "Version {version} wird noch von {partners} genutzt.",
+      "heading": "Versionen",
+      "loading": "Versionen werden geladen",
+      "empty": "Noch nichts veröffentlicht. Sobald der Draft veröffentlicht ist, erscheint hier jede Version mit ihrem Änderungshinweis und wer sie veröffentlicht hat.",
+      "error": {
+        "title": "Versionen nicht verfügbar",
+        "description": "Die Versionen konnten nicht geladen werden. Versuchen Sie es erneut.",
+        "retry": "Erneut versuchen"
+      },
+      "version": "Version {version}",
+      "liveMark": "Live",
+      "stillInUseMark": "Noch in Nutzung",
+      "published": "Veröffentlicht am <time></time> von {name}",
+      "noNote": "Kein Änderungshinweis",
+      "usedBy": "{count, plural, one {Genutzt von # Belegweg:} other {Genutzt von # Belegwegen:}}",
+      "route": "{route} · {partner}",
+      "unused": "Kein Belegweg nutzt diese Version.",
+      "compare": "Mit vorheriger vergleichen<hidden> (Version {previous} zu {version})</hidden>",
+      "restore": {
+        "button": "In Draft wiederherstellen<hidden> (Version {version})</hidden>",
+        "reviewOpen": "Eine Version lässt sich wiederherstellen, sobald die Durchsicht des KI-Entwurfs abgeschlossen ist.",
+        "title": "Version {version} im Draft wiederherstellen?",
+        "description": "Die Verknüpfungen und Transforms des Drafts werden durch die von Version {version} überschrieben. Live geht nichts, bis Sie veröffentlichen.",
+        "confirm": "Version {version} wiederherstellen",
+        "pending": "Wird wiederhergestellt…",
+        "cancel": "Abbrechen",
+        "done": "Version {version} im Draft wiederhergestellt. Live geht sie, sobald Sie veröffentlichen.",
+        "problem": {
+          "reviewOpen": "Solange die Durchsicht des KI-Entwurfs offen ist, lässt sich keine Version wiederherstellen. Übernehmen Sie zuerst den KI-Entwurf und stellen Sie dann wieder her.",
+          "failed": "Die Version konnte nicht wiederhergestellt werden. Versuchen Sie es erneut."
+        }
+      },
+      "failed": {
+        "title": "Fehlgeschlagene Belege, letzte 7 Tage",
+        "loading": "Fehlgeschlagene Belege werden geladen",
+        "none": "Keine.",
+        "error": {
+          "title": "Fehlgeschlagene Belege nicht verfügbar",
+          "description": "Die fehlgeschlagenen Belege konnten nicht geladen werden. Versuchen Sie es erneut.",
+          "retry": "Erneut versuchen"
+        },
+        "detail": "{stage} · <time></time>",
+        "more": "Die neuesten {shown} von {total} werden angezeigt."
       }
     },
     "aiDraft": {
@@ -2780,35 +2831,6 @@
       "description": "Das Ziel-Document, das dieses Mapping aus einem Beispielbeleg macht, mit den Verknüpfungen in ihrem aktuellen Stand.",
       "close": "Vorschau schließen"
     }
-  },
-  "MappingVersions": {
-    "title": "Mapping Versions",
-    "heading": "Versionen von {name}",
-    "openDraft": "Draft öffnen",
-    "caption": "Mapping Versions, neueste zuerst",
-    "loading": "Mapping Versions werden geladen",
-    "count": "{count, plural, one {# Mapping Version} other {# Mapping Versions}}",
-    "filteredCount": "{count} von {total} Mapping Versions",
-    "search": "Nach Versionsnummer suchen",
-    "noMatch": "Keine Mapping Version passt zur Suche.",
-    "version": "Version {version}",
-    "latest": "Neueste",
-    "columns": {
-      "version": "Version",
-      "publishedAt": "Veröffentlicht"
-    },
-    "empty": {
-      "title": "Noch keine Mapping Versions",
-      "description": "Der Draft dieses Mappings wurde nie veröffentlicht. Veröffentlichen Sie ihn im Canvas, um Version 1 zu erstellen, auf die Flows dann festgelegt werden können.",
-      "viewOnlyDescription": "Der Draft dieses Mappings wurde nie veröffentlicht. Version 1 erscheint hier, sobald ein Admin ihn veröffentlicht."
-    },
-    "error": {
-      "title": "Mapping Versions nicht verfügbar",
-      "description": "Die Mapping Versions konnten nicht geladen werden. Versuchen Sie es erneut.",
-      "retry": "Erneut versuchen"
-    },
-    "compare": "Versionen vergleichen",
-    "compareWith": "Mit Version {version} vergleichen"
   },
   "MappingComparison": {
     "title": "Mapping Versions vergleichen",

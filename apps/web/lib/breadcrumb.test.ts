@@ -76,6 +76,14 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
+  it('leads from a version comparison back to the mapping editor', () => {
+    expect(breadcrumbTrail('/mappings/m-1/versions/compare')).toEqual([
+      { href: '/mappings', label: { kind: 'item', key: 'mappings' } },
+      { href: '/mappings/m-1', label: { kind: 'detail' } },
+      { href: '/mappings/m-1/versions/compare', label: { kind: 'subpage', key: 'compare' } },
+    ])
+  })
+
   it('names an unknown route as not found', () => {
     expect(breadcrumbTrail('/nowhere/at-all')).toEqual([
       { href: '/nowhere/at-all', label: { kind: 'notFound' } },

@@ -9,6 +9,7 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import { linkClass } from '@/components/detail-parts'
 import { MappingList } from '@/components/document-structures/mapping-list'
 import { documentStructureProblemOf } from '@/lib/api/client'
+import { mappingHref } from '@/lib/navigation'
 import { Button } from '@edi-bridge/ui/components/button'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -78,7 +79,7 @@ function ProblemAlert({
             <ul className="flex flex-col gap-1">
               {mappingVersions.map((version) => (
                 <li key={version.id}>
-                  <Link href={`/mappings/${version.mappingId}/versions`} className={linkClass}>
+                  <Link href={mappingHref(version.mappingId)} className={linkClass}>
                     {t('version', { mappingName: version.mappingName, version: version.version })}
                   </Link>
                 </li>

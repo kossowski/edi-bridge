@@ -62,7 +62,7 @@ export const Toolbar = meta.story({
       'aria-expanded',
       'false',
     )
-    await expect(canvas.getByRole('link', { name: 'Mapping Versions' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Versions & problems' })).toBeVisible()
     await expect(canvas.getByRole('button', { name: /^Publish/ })).toBeVisible()
     await expect(await canvas.findByRole('heading', { name: 'Add a Transform' })).toBeVisible()
   },
@@ -84,7 +84,7 @@ export const ToolbarTooltipsOneAtATime = meta.story({
     draft.focus()
     await userEvent.keyboard('{Shift>}{Tab}{/Shift}')
 
-    for (const name of ['Draft with AI', 'Preview', 'Details', 'Mapping Versions']) {
+    for (const name of ['Draft with AI', 'Preview', 'Details', 'Versions & problems']) {
       await userEvent.tab()
       await expect(shownTooltips(canvasElement).length).toBeLessThanOrEqual(1)
       await waitFor(() =>
@@ -235,7 +235,7 @@ export const Viewer = meta.story({
     async play({ canvas }) {
       await expect(await canvas.findByRole('button', { name: 'Preview' })).toBeVisible()
       await expect(canvas.getByRole('button', { name: 'Details' })).toBeVisible()
-      await expect(canvas.getByRole('link', { name: 'Mapping Versions' })).toBeVisible()
+      await expect(canvas.getByRole('button', { name: 'Versions & problems' })).toBeVisible()
       await expect(canvas.queryByRole('heading', { name: 'Add a Transform' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Publish/ })).toBeNull()
     },
