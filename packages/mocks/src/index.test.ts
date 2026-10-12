@@ -54,6 +54,7 @@ import {
   updateTradingPartnerEndpoint,
   updateWorkspaceSettingsEndpoint,
   withCheckDigit,
+  workspaceMembersEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
@@ -62,6 +63,7 @@ import {
   createMappingDrafts,
   createMappingSample,
   createWorkspace,
+  createWorkspaceMembers,
   documentStructureOrigins,
   mockCredentials,
   orderLifecycleReferences,
@@ -117,6 +119,24 @@ async function post(path: string, body?: ReprocessRunBody) {
 }
 
 describe('createHandlers', () => {
+  it('lists the members of the session Workspace', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const response = await fetch(`${apiUrl}${workspaceMembersEndpoint.path}`)
+    const members = workspaceMembersEndpoint.response.parse(await response.json())
+
+    expect(members.map(({ email }) => email)).toContain(mockCredentials.operator.email)
+  })
+
+  it('serves the given Workspace members', async () => {
+    const workspaceMembers = createWorkspaceMembers({ count: 120 })
+    server.use(...createHandlers(apiUrl, { workspaceMembers }))
+
+    const response = await fetch(`${apiUrl}${workspaceMembersEndpoint.path}`)
+
+    expect(await response.json()).toEqual(workspaceMembers)
+  })
+
   it('lists a retried Run as delivered', async () => {
     server.use(...createHandlers(apiUrl))
     const { runs } = await listRuns({ status: ['failed'], failureStage: ['delivery'] })

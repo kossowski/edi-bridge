@@ -559,6 +559,12 @@ export {
 } from './workspace'
 
 export {
+  type WorkspaceMember,
+  workspaceMemberSchema,
+  workspaceMembersEndpoint,
+} from './workspace-member'
+
+export {
   aiDailyTokenLimit,
   aiDailyTokenLimitSchema,
   type AiTokenBudget,

@@ -44,7 +44,7 @@ export const seedWorkspaceSummaries: ReadonlyArray<WorkspaceSummary> = [
   {
     ...seedShowcaseWorkspace,
     kind: 'showcase',
-    memberCount: 1,
+    memberCount: 4,
     seeded: true,
     createdAt: '2026-02-02T08:00:00.000Z',
     lastResetAt: null,

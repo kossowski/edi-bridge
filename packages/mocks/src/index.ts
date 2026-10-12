@@ -65,6 +65,11 @@ import {
 } from './trading-partner'
 import { seedWorkspace, workspaceHandlers } from './workspace'
 import {
+  seedWorkspaceMembers,
+  workspaceMemberHandlers,
+  type WorkspaceMembers,
+} from './workspace-member'
+import {
   createWorkspaceSettingsStore,
   seedWorkspaceSettings,
   workspaceSettingsHandlers,
@@ -258,6 +263,16 @@ export {
 } from './session'
 
 export {
+  createWorkspaceMember,
+  createWorkspaceMembers,
+  seedWorkspaceMembers,
+  toWorkspaceMemberStore,
+  workspaceMemberHandlers,
+  type WorkspaceMembers,
+  type WorkspaceMemberStore,
+} from './workspace-member'
+
+export {
   createWorkspaceSettings,
   createWorkspaceSettingsStore,
   seedWorkspaceSettings,
@@ -272,6 +287,7 @@ export function createHandlers(
     session,
     workspace,
     workspaceSettings = seedWorkspaceSettings,
+    workspaceMembers = seedWorkspaceMembers,
     operatorWorkspaces = seedWorkspaceSummaries,
     invites = seedInvites,
     tradingPartners = seedTradingPartners,
@@ -287,6 +303,7 @@ export function createHandlers(
     session?: Session | null
     workspace?: Workspace
     workspaceSettings?: WorkspaceSettings
+    workspaceMembers?: WorkspaceMembers
     operatorWorkspaces?: ReadonlyArray<WorkspaceSummary>
     invites?: ReadonlyArray<Invite>
     tradingPartners?: ReadonlyArray<TradingPartner>
@@ -351,6 +368,7 @@ export function createHandlers(
       session: sessionStore,
       workspaces: operatorStore,
     }),
+    ...workspaceMemberHandlers(apiUrl, { members: workspaceMembers, session: sessionStore }),
     ...operatorHandlers(apiUrl, { workspaces: operatorStore, session: sessionStore }),
     ...tradingPartnerHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,
