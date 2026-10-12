@@ -4,7 +4,6 @@ import type {
   Session,
   TradingPartner,
   Workspace,
-  WorkspaceMember,
   WorkspaceSettings,
   WorkspaceSummary,
 } from '@edi-bridge/contracts'
@@ -65,7 +64,11 @@ import {
   tradingPartnerHandlers,
 } from './trading-partner'
 import { seedWorkspace, workspaceHandlers } from './workspace'
-import { seedWorkspaceMembers, workspaceMemberHandlers } from './workspace-member'
+import {
+  seedWorkspaceMembers,
+  workspaceMemberHandlers,
+  type WorkspaceMembers,
+} from './workspace-member'
 import {
   createWorkspaceSettingsStore,
   seedWorkspaceSettings,
@@ -263,7 +266,10 @@ export {
   createWorkspaceMember,
   createWorkspaceMembers,
   seedWorkspaceMembers,
+  toWorkspaceMemberStore,
   workspaceMemberHandlers,
+  type WorkspaceMembers,
+  type WorkspaceMemberStore,
 } from './workspace-member'
 
 export {
@@ -297,8 +303,7 @@ export function createHandlers(
     session?: Session | null
     workspace?: Workspace
     workspaceSettings?: WorkspaceSettings
-    workspaceMembers?:
-      ReadonlyArray<WorkspaceMember> | ReadonlyMap<string, ReadonlyArray<WorkspaceMember>>
+    workspaceMembers?: WorkspaceMembers
     operatorWorkspaces?: ReadonlyArray<WorkspaceSummary>
     invites?: ReadonlyArray<Invite>
     tradingPartners?: ReadonlyArray<TradingPartner>

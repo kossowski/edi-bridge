@@ -1,10 +1,16 @@
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { workspaceMembersEndpoint } from '@edi-bridge/contracts'
 
+import { seedWorkspaceSummaries } from './operator'
 import { seedSession, showcaseViewerSession } from './session'
-import { createWorkspaceMembers, workspaceMemberHandlers } from './workspace-member'
+import {
+  createWorkspaceMembers,
+  seedWorkspaceMembers,
+  toWorkspaceMemberStore,
+  workspaceMemberHandlers,
+} from './workspace-member'
 
 const apiUrl = 'http://api.test'
 
@@ -40,8 +46,19 @@ describe('GET /workspaces/current/members', () => {
     const response = await getMembers()
 
     expect(response.status).toBe(200)
-    expect(workspaceMembersEndpoint.response.parse(await response.json())).toEqual([
-      expect.objectContaining({ email: showcaseViewerSession.user.email, role: 'viewer' }),
+    expect(
+      workspaceMembersEndpoint.response
+        .parse(await response.json())
+        .map(({ email, role, lastActivityAt }) => ({
+          email,
+          role,
+          signedIn: lastActivityAt !== null,
+        })),
+    ).toEqual([
+      { email: showcaseViewerSession.user.email, role: 'viewer', signedIn: true },
+      { email: 'clara.weidner@lindenhof-feinkost.example', role: 'admin', signedIn: true },
+      { email: 'felix.brandt@lindenhof-feinkost.example', role: 'viewer', signedIn: true },
+      { email: 'nele.albers@lindenhof-feinkost.example', role: 'viewer', signedIn: false },
     ])
   })
 
@@ -55,6 +72,30 @@ describe('GET /workspaces/current/members', () => {
     server.use(...workspaceMemberHandlers(apiUrl, { session: null }))
 
     expect((await getMembers()).status).toBe(401)
+  })
+})
+
+describe('seedWorkspaceMembers', () => {
+  it('matches the member count of every seeded Workspace', () => {
+    const store = toWorkspaceMemberStore(seedWorkspaceMembers)
+
+    for (const { id, memberCount } of seedWorkspaceSummaries) {
+      expect(store.get(id)).toHaveLength(memberCount)
+    }
+  })
+})
+
+describe('toWorkspaceMemberStore', () => {
+  it('serves a plain member list for every Workspace', () => {
+    const members = createWorkspaceMembers({ count: 2 })
+    const store = toWorkspaceMemberStore(members)
+
+    expect(store.get(seedSession.workspace.id)).toBe(members)
+    expect(store.get(showcaseViewerSession.workspace.id)).toBe(members)
+  })
+
+  it('serves no members for a Workspace missing from the map', () => {
+    expect(toWorkspaceMemberStore(new Map()).get(seedSession.workspace.id)).toEqual([])
   })
 })
 
@@ -75,5 +116,13 @@ describe('createWorkspaceMembers', () => {
     expect(createWorkspaceMembers({ count: 5, seed: 3, now })).toEqual(
       createWorkspaceMembers({ count: 5, seed: 3, now }),
     )
+  })
+
+  it('generates the same members on every run without a given time', () => {
+    vi.useFakeTimers({ now: new Date('2027-03-01T00:00:00.000Z') })
+    const later = createWorkspaceMembers({ count: 20 })
+    vi.useRealTimers()
+
+    expect(later).toEqual(createWorkspaceMembers({ count: 20 }))
   })
 })

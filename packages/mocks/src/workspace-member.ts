@@ -14,9 +14,9 @@ import { type SessionStore, signedInOnly } from './session-access'
 
 export function createWorkspaceMember(overrides: Partial<WorkspaceMember> = {}): WorkspaceMember {
   return workspaceMemberSchema.parse({
-    id: seedId(11, 1),
-    name: 'Mara Olsen',
-    email: 'mara.olsen@nordwind-handel.example',
+    id: seedId(11, 0),
+    name: 'Erik Lund',
+    email: 'erik.lund@nordwind-handel.example',
     role: 'viewer',
     lastActivityAt: null,
     ...overrides,
@@ -27,12 +27,25 @@ function sessionMember(session: Session, lastActivityAt: string) {
   return createWorkspaceMember({ ...session.user, role: session.role, lastActivityAt })
 }
 
-export const seedWorkspaceMembers: ReadonlyMap<string, ReadonlyArray<WorkspaceMember>> = new Map([
+export type WorkspaceMembers =
+  ReadonlyArray<WorkspaceMember> | ReadonlyMap<string, ReadonlyArray<WorkspaceMember>>
+
+export type WorkspaceMemberStore = {
+  get: (workspaceId: string) => ReadonlyArray<WorkspaceMember>
+}
+
+export const seedWorkspaceMembers: WorkspaceMembers = new Map([
   [
     seedSession.workspace.id,
     [
       sessionMember(seedSession, '2026-10-11T16:42:00.000Z'),
-      createWorkspaceMember({ role: 'admin', lastActivityAt: '2026-10-11T08:05:00.000Z' }),
+      createWorkspaceMember({
+        id: seedId(11, 1),
+        name: 'Mara Olsen',
+        email: 'mara.olsen@nordwind-handel.example',
+        role: 'admin',
+        lastActivityAt: '2026-10-11T08:05:00.000Z',
+      }),
       createWorkspaceMember({
         id: seedId(11, 2),
         name: 'Tobias Reuter',
@@ -51,7 +64,30 @@ export const seedWorkspaceMembers: ReadonlyMap<string, ReadonlyArray<WorkspaceMe
   ],
   [
     showcaseViewerSession.workspace.id,
-    [sessionMember(showcaseViewerSession, '2026-10-11T19:03:00.000Z')],
+    [
+      sessionMember(showcaseViewerSession, '2026-10-11T19:03:00.000Z'),
+      createWorkspaceMember({
+        id: seedId(11, 4),
+        name: 'Clara Weidner',
+        email: 'clara.weidner@lindenhof-feinkost.example',
+        role: 'admin',
+        lastActivityAt: '2026-10-10T07:52:00.000Z',
+      }),
+      createWorkspaceMember({
+        id: seedId(11, 5),
+        name: 'Felix Brandt',
+        email: 'felix.brandt@lindenhof-feinkost.example',
+        role: 'viewer',
+        lastActivityAt: '2026-09-24T14:31:00.000Z',
+      }),
+      createWorkspaceMember({
+        id: seedId(11, 6),
+        name: 'Nele Albers',
+        email: 'nele.albers@lindenhof-feinkost.example',
+        role: 'viewer',
+        lastActivityAt: null,
+      }),
+    ],
   ],
   [
     sandboxAdminSession.workspace.id,
@@ -63,7 +99,7 @@ function generateWorkspaceMember(faker: Faker, now: Date): WorkspaceMember {
   const firstName = faker.person.firstName()
   const lastName = faker.person.lastName()
 
-  return {
+  return createWorkspaceMember({
     id: faker.string.uuid(),
     name: `${firstName} ${lastName}`,
     email: faker.internet.email({ firstName, lastName, provider: 'example.com' }).toLowerCase(),
@@ -71,12 +107,14 @@ function generateWorkspaceMember(faker: Faker, now: Date): WorkspaceMember {
     lastActivityAt: faker.datatype.boolean(0.15)
       ? null
       : faker.date.recent({ days: 120, refDate: now }).toISOString(),
-  }
+  })
 }
+
+const generatedMembersReferenceDate = new Date('2026-10-11T12:00:00.000Z')
 
 export function createWorkspaceMembers({
   count,
-  now = new Date(),
+  now = generatedMembersReferenceDate,
   seed = 69,
 }: {
   count: number
@@ -90,11 +128,19 @@ export function createWorkspaceMembers({
     const member = generateWorkspaceMember(faker, now)
 
     if (!byEmail.has(member.email)) {
-      byEmail.set(member.email, workspaceMemberSchema.parse(member))
+      byEmail.set(member.email, member)
     }
   }
 
   return [...byEmail.values()]
+}
+
+export function toWorkspaceMemberStore(
+  members: WorkspaceMembers = seedWorkspaceMembers,
+): WorkspaceMemberStore {
+  return {
+    get: (workspaceId) => ('get' in members ? (members.get(workspaceId) ?? []) : members),
+  }
 }
 
 export function workspaceMemberHandlers(
@@ -103,19 +149,17 @@ export function workspaceMemberHandlers(
     members = seedWorkspaceMembers,
     session = seedSession,
   }: {
-    members?: ReadonlyArray<WorkspaceMember> | ReadonlyMap<string, ReadonlyArray<WorkspaceMember>>
+    members?: WorkspaceMembers
     session?: Session | null | SessionStore
   } = {},
 ) {
+  const store = toWorkspaceMemberStore(members)
   const sessionStore = toSessionStore(session)
-
-  const membersOf = (workspaceId: string) =>
-    'get' in members ? (members.get(workspaceId) ?? []) : members
 
   return [
     http.get(
       `${apiUrl}${workspaceMembersEndpoint.path}`,
-      signedInOnly(sessionStore, (_, { workspace }) => HttpResponse.json(membersOf(workspace.id))),
+      signedInOnly(sessionStore, (_, { workspace }) => HttpResponse.json(store.get(workspace.id))),
     ),
   ]
 }
