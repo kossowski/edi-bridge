@@ -1543,6 +1543,37 @@
         "benefit": "Ihre Rechnungen erreichen die Buchhaltung des Partners ohne E-Mail oder Papier."
       }
     },
+    "documentNames": {
+      "ORDERS": "Bestellungen",
+      "DESADV": "Lieferavise",
+      "INVOIC": "Rechnungen"
+    },
+    "connections": {
+      "inbound": {
+        "label": "{name} sendet Ihnen {documents}"
+      },
+      "outbound": {
+        "label": "Sie senden {documents} an {name}"
+      },
+      "ask": {
+        "title": "Wir fragen den Partner nach den Angaben",
+        "description": "Machen Sie jetzt weiter und senden Sie dem Partner die fertige Anfrage unten."
+      },
+      "webhookNotice": "EDI Bridge erstellt die Webadresse und einen Schlüssel, wenn Sie fertig sind. Beides geben Sie dann an {name} weiter.",
+      "request": {
+        "title": "Anfrage an {name}",
+        "description": "Senden Sie diese Nachricht an den Partner, zum Beispiel per E-Mail. Seine Antwort enthält alles, was noch fehlt. Sie tragen es später auf der Partnerseite ein.",
+        "copy": "Anfrage"
+      }
+    },
+    "request": {
+      "greeting": "Guten Tag,",
+      "intro": "wir möchten EDI-Belege mit Ihnen austauschen. Damit wir das einrichten können, senden Sie uns bitte:",
+      "inbound": "Für die {documents}, die Sie uns senden: Adresse und Port Ihres SFTP-Servers, den Ordner, den Benutzernamen und das Passwort oder den privaten Schlüssel. Wenn Sie sie lieber an eine Webadresse senden, sagen Sie uns Bescheid, dann senden wir Ihnen unsere Adresse und einen Schlüssel.",
+      "outbound": "Für die {documents}, die wir Ihnen senden: Adresse und Port Ihres SFTP-Servers, den Ordner, den Benutzernamen und das Passwort oder den privaten Schlüssel. Oder eine Webadresse (URL) und, falls nötig, den Wert des Authorization-Headers.",
+      "gln": "Ihre Standortnummer (GLN).",
+      "closing": "Vielen Dank!"
+    },
     "errors": {
       "name": {
         "required": "Geben Sie den Firmennamen ein.",
@@ -1553,6 +1584,9 @@
       },
       "documents": {
         "required": "Wählen Sie mindestens einen Beleg."
+      },
+      "way": {
+        "required": "Wählen Sie, wie die Belege ans Ziel kommen."
       }
     },
     "cancel": "Abbrechen",
@@ -1689,8 +1723,8 @@
       },
       "remotePath": {
         "label": "Ordner",
-        "inbound": "Der Ordner, den EDI Bridge nach neuen Documents abfragt.",
-        "outbound": "Der Ordner, in den EDI Bridge Documents hochlädt."
+        "inbound": "Der Ordner, den EDI Bridge nach neuen Belegen abfragt.",
+        "outbound": "Der Ordner, in den EDI Bridge Belege hochlädt."
       },
       "authentication": {
         "label": "Anmeldung",
@@ -1702,7 +1736,7 @@
       },
       "pollingIntervalMinutes": {
         "label": "Abfrageintervall (Minuten)",
-        "description": "Wie oft EDI Bridge den Ordner nach neuen Documents abfragt."
+        "description": "Wie oft EDI Bridge den Ordner nach neuen Belegen abfragt."
       },
       "rateLimitPerMinute": {
         "label": "Rate Limit (Anfragen pro Minute)",
@@ -1710,7 +1744,7 @@
       },
       "url": {
         "label": "URL",
-        "description": "EDI Bridge schickt jedes Document per POST an diese Adresse."
+        "description": "EDI Bridge schickt jeden Beleg per POST an diese Adresse."
       },
       "sendAuthorization": {
         "label": "Authorization-Header mitsenden"

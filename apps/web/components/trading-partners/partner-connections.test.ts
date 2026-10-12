@@ -5,6 +5,7 @@ import {
   kindKeysTravelling,
   partnerConnections,
   suggestedName,
+  wayKind,
 } from './partner-connections'
 
 describe('partnerConnections', () => {
@@ -46,6 +47,17 @@ describe('defaultKindKey', () => {
     ['outbound', 'sftp-outbound'],
   ] as const)('recommends SFTP for %s documents', (direction, key) => {
     expect(defaultKindKey(direction)).toBe(key)
+  })
+})
+
+describe('wayKind', () => {
+  it.each([
+    ['inbound', 'sftp', 'sftp-inbound'],
+    ['inbound', 'web', 'webhook-inbound'],
+    ['outbound', 'sftp', 'sftp-outbound'],
+    ['outbound', 'web', 'http-outbound'],
+  ] as const)('connects %s documents the %s way with %s', (direction, way, key) => {
+    expect(wayKind(direction, way)).toBe(key)
   })
 })
 

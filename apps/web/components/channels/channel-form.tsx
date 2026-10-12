@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type Dispatch, type FormEvent, type SetStateAction, useId, useRef, useState } from 'react'
+import { type FormEvent, useId, useRef, useState } from 'react'
 
 import {
   type ChannelField,
@@ -143,11 +143,13 @@ function toSubmission(
 
 export function useChannelFields(
   values: ChannelFormValues,
-  setValues: Dispatch<SetStateAction<ChannelFormValues>>,
+  setValues: (update: (current: ChannelFormValues) => ChannelFormValues) => void,
   errors: ChannelFieldErrors,
+  idPrefix?: string,
 ) {
   const errorMessage = useFieldErrorMessage()
-  const baseId = useId()
+  const generatedId = useId()
+  const baseId = idPrefix ?? generatedId
 
   function update<Field extends keyof ChannelFormValues>(
     name: Field,

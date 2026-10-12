@@ -31,13 +31,21 @@ export function kindKeysTravelling(direction: Direction): ReadonlyArray<ChannelK
   )
 }
 
-const defaultKindKeys = {
-  inbound: 'sftp-inbound',
-  outbound: 'sftp-outbound',
-} as const satisfies { [Way in Direction]: Extract<ChannelKindKey, `${string}-${Way}`> }
+export type DetailedWay = 'sftp' | 'web'
+
+const wayKindKeys = {
+  inbound: { sftp: 'sftp-inbound', web: 'webhook-inbound' },
+  outbound: { sftp: 'sftp-outbound', web: 'http-outbound' },
+} as const satisfies {
+  [D in Direction]: Record<DetailedWay, Extract<ChannelKindKey, `${string}-${D}`>>
+}
+
+export function wayKind(direction: Direction, way: DetailedWay): ChannelKindKey {
+  return wayKindKeys[direction][way]
+}
 
 export function defaultKindKey(direction: Direction): ChannelKindKey {
-  return defaultKindKeys[direction]
+  return wayKind(direction, 'sftp')
 }
 
 export function suggestedName(name: string) {

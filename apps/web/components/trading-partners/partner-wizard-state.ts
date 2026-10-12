@@ -10,6 +10,16 @@ import {
 
 import { tooLongOr } from '../../lib/forms/field-errors'
 import { type GlnError, glnError, normalizeGln } from '../../lib/forms/gln'
+import {
+  type ChannelField,
+  channelFields,
+  type ChannelFieldErrors,
+  type ChannelFormValues,
+  type FieldError,
+  toFormValues,
+  validateNewChannel,
+} from '../channels/channel-form-values'
+import { defaultKindKey, type DetailedWay, wayKind } from './partner-connections'
 
 export const wizardSteps = ['partner', 'documents', 'connections', 'mappings', 'review'] as const
 
@@ -19,11 +29,23 @@ export const wizardDocuments = newMappingMessageTypes
 
 export type WizardDocument = (typeof wizardDocuments)[number]
 
-export const connectionWays = ['sftp', 'web', 'ask'] as const
+export const connectionWays = ['sftp', 'web', 'ask'] as const satisfies ReadonlyArray<
+  DetailedWay | 'ask'
+>
 
 export type ConnectionWay = (typeof connectionWays)[number]
 
-export type WizardConnection = { way: ConnectionWay }
+export type WizardConnection = { way: ConnectionWay; values: ChannelFormValues }
+
+const partnerFields = ['name', 'tradingPartnerId'] as const satisfies ReadonlyArray<ChannelField>
+
+export type ConnectionField = Exclude<ChannelField, (typeof partnerFields)[number]>
+
+function isConnectionField(field: ChannelField): field is ConnectionField {
+  return !partnerFields.some((partnerField) => partnerField === field)
+}
+
+export const connectionFields = channelFields.filter(isConnectionField)
 
 export type WizardMapping =
   { kind: 'existing'; mappingVersionId: string } | { kind: 'ai' } | { kind: 'later' }
@@ -35,18 +57,29 @@ export type PartnerWizardState = {
   mappings: Partial<Record<WizardDocument, WizardMapping>>
 }
 
+export type PartnerField = 'name' | 'gln' | 'documents'
+
 export type WizardFieldErrors = {
   name: 'required' | 'tooLong'
   gln: GlnError
   documents: 'required'
+} & { [Key in `${Direction}.way`]: 'required' } & {
+  [Key in `${Direction}.${ConnectionField}`]: FieldError
 }
 
 export type WizardField = keyof WizardFieldErrors
 
 export type WizardErrors = { [Field in WizardField]?: WizardFieldErrors[Field] }
 
-export type WizardResult = Omit<PartnerWizardState, 'partner'> & {
+export function wizardFieldId(baseId: string, field: WizardField | Direction) {
+  return `${baseId}-${field.replace('.', '-')}`
+}
+
+export type ConnectionResult = { way: 'ask' } | { way: DetailedWay; values: ChannelFormValues }
+
+export type WizardResult = Omit<PartnerWizardState, 'partner' | 'connections'> & {
   partner: Pick<TradingPartnerInput, 'name' | 'gln'>
+  connections: Partial<Record<Direction, ConnectionResult>>
 }
 
 export const initialWizardState: PartnerWizardState = {
@@ -67,6 +100,47 @@ function partnerErrors({ partner }: PartnerWizardState): WizardErrors {
   }
 }
 
+function connectionErrors(
+  direction: Direction,
+  connection: WizardConnection | undefined,
+): WizardErrors {
+  const errors: WizardErrors = {}
+
+  if (connection === undefined) {
+    errors[`${direction}.way`] = 'required'
+
+    return errors
+  }
+
+  if (connection.way === 'ask') {
+    return errors
+  }
+
+  const result = validateNewChannel(connection.values)
+
+  if ('errors' in result) {
+    for (const field of connectionFields) {
+      const error = result.errors[field]
+
+      if (error !== undefined) {
+        errors[`${direction}.${field}`] = error
+      }
+    }
+  }
+
+  return errors
+}
+
+function connectionsErrors({ documents, connections }: PartnerWizardState): WizardErrors {
+  const errors: WizardErrors = {}
+
+  for (const direction of neededDirections(documents)) {
+    Object.assign(errors, connectionErrors(direction, connections[direction]))
+  }
+
+  return errors
+}
+
 export function stepErrors(step: WizardStep, state: PartnerWizardState): WizardErrors {
   switch (step) {
     case 'partner':
@@ -74,6 +148,7 @@ export function stepErrors(step: WizardStep, state: PartnerWizardState): WizardE
     case 'documents':
       return state.documents.length === 0 ? { documents: 'required' } : {}
     case 'connections':
+      return connectionsErrors(state)
     case 'mappings':
     case 'review':
       return {}
@@ -88,12 +163,45 @@ export function firstInvalidField(errors: WizardErrors): WizardField | undefined
   return Object.keys(errors).find((key): key is WizardField => isInvalidField(errors, key))
 }
 
+export function channelFieldErrors(errors: WizardErrors, direction: Direction) {
+  const channelErrors: ChannelFieldErrors = {}
+
+  for (const field of connectionFields) {
+    const error = errors[`${direction}.${field}`]
+
+    if (error !== undefined) {
+      channelErrors[field] = error
+    }
+  }
+
+  return channelErrors
+}
+
+function connectionResult({ way, values }: WizardConnection): ConnectionResult {
+  return way === 'ask' ? { way } : { way, values }
+}
+
+function neededConnections({ documents, connections }: PartnerWizardState) {
+  const needed: WizardResult['connections'] = {}
+
+  for (const direction of neededDirections(documents)) {
+    const connection = connections[direction]
+
+    if (connection) {
+      needed[direction] = connectionResult(connection)
+    }
+  }
+
+  return needed
+}
+
 export function wizardResult(state: PartnerWizardState): WizardResult {
   const { name, gln, glnLater } = state.partner
 
   return {
     ...state,
     partner: { name: name.trim(), gln: glnLater ? null : normalizeGln(gln) },
+    connections: neededConnections(state),
   }
 }
 
@@ -111,4 +219,32 @@ export function neededDirections(documents: ReadonlyArray<MessageType>): Directi
   return directions.filter((direction) =>
     documents.some((messageType) => directionOf({ messageType }) === direction),
   )
+}
+
+export function documentsTravelling(
+  documents: ReadonlyArray<WizardDocument>,
+  direction: Direction,
+): WizardDocument[] {
+  return documents.filter((messageType) => directionOf({ messageType }) === direction)
+}
+
+export function postponedDirections({ documents, connections }: PartnerWizardState): Direction[] {
+  return neededDirections(documents).filter((direction) => connections[direction]?.way === 'ask')
+}
+
+export function initialConnectionValues(direction: Direction): ChannelFormValues {
+  return { ...toFormValues(), kind: defaultKindKey(direction), sendAuthorization: false }
+}
+
+export function chooseWay(
+  connection: WizardConnection | undefined,
+  direction: Direction,
+  way: ConnectionWay,
+): WizardConnection {
+  const values = connection?.values ?? initialConnectionValues(direction)
+
+  return {
+    way,
+    values: way === 'ask' ? values : { ...values, kind: wayKind(direction, way) },
+  }
 }

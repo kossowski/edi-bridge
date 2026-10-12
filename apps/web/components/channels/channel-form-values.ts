@@ -66,9 +66,9 @@ const fieldKinds = {
   port: 'number',
   username: 'text',
   remotePath: 'format',
+  pollingIntervalMinutes: 'number',
   authentication: 'choice',
   credential: 'text',
-  pollingIntervalMinutes: 'number',
   rateLimitPerMinute: 'number',
   url: 'format',
   authorization: 'text',
@@ -87,7 +87,9 @@ export function isFieldOfKind<Kind extends FieldKind>(
   return fieldKinds[field] === kind
 }
 
-const fields = Object.keys(fieldKinds).filter((key): key is ChannelField => key in fieldKinds)
+export const channelFields = Object.keys(fieldKinds).filter(
+  (key): key is ChannelField => key in fieldKinds,
+)
 
 function fieldError(field: ChannelField, issue: FormIssue, value: string): FieldError {
   if (isFieldOfKind(field, 'number')) {
@@ -147,7 +149,9 @@ function toBody(values: ChannelFormValues, secrets: { keep: boolean }) {
 }
 
 function collectErrors(issues: ReadonlyArray<FormIssue>, values: ChannelFormValues) {
-  return fieldErrors(issues, fields, (field, issue) => fieldError(field, issue, values[field]))
+  return fieldErrors(issues, channelFields, (field, issue) =>
+    fieldError(field, issue, values[field]),
+  )
 }
 
 export function validateNewChannel(values: ChannelFormValues): ChannelFormResult<ChannelInput> {

@@ -11,6 +11,7 @@ import {
   tablet,
 } from '@/components/story-helpers'
 import { PartnerWizard } from '@/components/trading-partners/partner-wizard'
+import { type WizardResult } from '@/components/trading-partners/partner-wizard-state'
 
 import preview from '../../.storybook/preview'
 
@@ -146,11 +147,18 @@ export const BackKeepsValues = meta.story({
   },
 })
 
+const finished = fn<(result: WizardResult) => void>()
+
 export const Review = meta.story({
+  args: { onFinish: finished },
+  beforeEach() {
+    finished.mockClear()
+  },
   async play({ args, canvas }) {
     await toDocuments(canvas)
     await userEvent.click(canvas.getByRole('checkbox', { name: /Receive purchase orders/ }))
     await continueTo(canvas, 'How do documents travel?')
+    await userEvent.click(canvas.getByRole('radio', { name: /ask the partner/ }))
     await continueTo(canvas, 'Which mapping does each document use?')
     await continueTo(canvas, 'Review and create')
     await userEvent.click(canvas.getByRole('button', { name: 'Create partner for testing' }))
@@ -160,6 +168,7 @@ export const Review = meta.story({
         documents: ['ORDERS'],
       }),
     )
+    await expect(finished.mock.calls[0]?.[0].connections.inbound?.way).toBe('ask')
   },
 })
 
