@@ -3,9 +3,9 @@
 import { Alert02Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useFormatter, useTranslations } from 'next-intl'
-import Link from 'next/link'
 import { useId } from 'react'
 
+import { LinkCard } from '@/components/home/link-card'
 import { navigationItems } from '@/lib/navigation'
 import { taskGroupHref } from '@/lib/task-href'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
@@ -35,9 +35,7 @@ function KeyNumberCard({
 
   return (
     <li className="min-w-0">
-      <Link
-        href={href}
-        className="bg-card hover:bg-muted/50 focus-visible:ring-ring/50 flex h-full flex-col gap-1 rounded-xl border p-4 outline-none focus-visible:ring-3">
+      <LinkCard href={href} className="gap-1 p-4">
         <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="text-muted-foreground text-sm">{label}</span>
           {alert && (
@@ -71,7 +69,7 @@ function KeyNumberCard({
             />
           </span>
         )}
-      </Link>
+      </LinkCard>
     </li>
   )
 }

@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useId } from 'react'
 
+import { LinkCard } from '@/components/home/link-card'
 import { useCanChange } from '@/hooks/use-session'
 import { navigationItems } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -61,9 +62,9 @@ function TradingPartnerCard({
 
   return (
     <li className="min-w-0">
-      <Link
+      <LinkCard
         href={`${navigationItems.tradingPartners.href}/${tradingPartner.id}`}
-        className="bg-card hover:bg-muted/50 focus-visible:ring-ring/50 flex h-full flex-col gap-2 rounded-xl border p-3 outline-none focus-visible:ring-3">
+        className="gap-2 p-3">
         <span className="flex items-start justify-between gap-2">
           <span className="min-w-0 text-sm font-medium break-words">{tradingPartner.name}</span>
           <ModeBadge testMode={testMode} />
@@ -81,7 +82,7 @@ function TradingPartnerCard({
           )}
           {t('openProblems', { count: openProblems })}
         </span>
-      </Link>
+      </LinkCard>
     </li>
   )
 }
