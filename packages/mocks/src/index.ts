@@ -356,6 +356,7 @@ export function createHandlers(
     mappingDrafts = seedMappingDrafts,
     documentStructures = [...seedDocumentStructures, ...seedUnusedDocumentStructures],
     documentStructuresState,
+    documentStructureInferenceState,
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
     mappingVersions,
@@ -375,6 +376,7 @@ export function createHandlers(
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     documentStructuresState?: DocumentStructuresState
+    documentStructureInferenceState?: DocumentStructuresState
     lookupTables?: ReadonlyArray<LookupTableRecord>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
@@ -525,6 +527,7 @@ export function createHandlers(
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
       state: documentStructuresState,
+      inferenceState: documentStructureInferenceState,
     }),
     messageTypeStructureHandler(apiUrl),
     ...lookupTableHandlers(apiUrl, {

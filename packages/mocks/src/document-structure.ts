@@ -717,6 +717,14 @@ function attempt<Result>(run: () => Result): { result: Result } | { response: Re
 
 export type DocumentStructuresState = 'loading' | 'error'
 
+async function respondIn(state: DocumentStructuresState) {
+  if (state === 'loading') {
+    await delay('infinite')
+  }
+
+  return serverError()
+}
+
 export function documentStructureHandlers(
   apiUrl: string,
   {
@@ -724,19 +732,15 @@ export function documentStructureHandlers(
     mappings,
     versions,
     state,
+    inferenceState,
   }: {
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     state?: DocumentStructuresState | undefined
+    inferenceState?: DocumentStructuresState | undefined
   } & MappingUse = {},
 ) {
   if (state) {
-    const respond = async () => {
-      if (state === 'loading') {
-        await delay('infinite')
-      }
-
-      return serverError()
-    }
+    const respond = () => respondIn(state)
 
     return [
       http.get(`${apiUrl}${documentStructuresEndpoint.path}`, respond),
@@ -762,6 +766,10 @@ export function documentStructureHandlers(
       )
     }),
     http.post(`${apiUrl}${inferDocumentStructureEndpoint.path}`, async ({ request }) => {
+      if (inferenceState) {
+        return respondIn(inferenceState)
+      }
+
       const body = inferDocumentStructureEndpoint.body.safeParse(await request.json())
 
       if (!body.success) {
