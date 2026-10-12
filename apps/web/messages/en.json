@@ -90,6 +90,15 @@
       }
     }
   },
+  "Breadcrumb": {
+    "label": "Breadcrumb",
+    "showPath": "Show the whole path",
+    "details": "Details",
+    "new": "New",
+    "edit": "Edit",
+    "versions": "Versions",
+    "compare": "Compare"
+  },
   "Navigation": {
     "overview": "Overview",
     "runs": "Runs",

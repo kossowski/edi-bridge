@@ -90,6 +90,15 @@
       }
     }
   },
+  "Breadcrumb": {
+    "label": "Navigationspfad",
+    "showPath": "Ganzen Pfad anzeigen",
+    "details": "Details",
+    "new": "Neu",
+    "edit": "Bearbeiten",
+    "versions": "Versionen",
+    "compare": "Vergleichen"
+  },
   "Navigation": {
     "overview": "Übersicht",
     "runs": "Runs",
