@@ -416,6 +416,8 @@ export function createHandlers(
       get overdueAcknowledgements() {
         return seedOverdueAcknowledgements(runs.all(), tradingPartnerStore.all())
       },
+      flows,
+      channels: channelStore,
     }),
     ...channelHandlers(apiUrl, { channels: channelStore, connectionFailures }),
     ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings: mappingVersionStore }),

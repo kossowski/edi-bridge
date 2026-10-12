@@ -20,6 +20,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { randomGln } from './gln'
+import { conflict } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { seedWorkspace, toWorkspaceStore, type WorkspaceStore } from './workspace'
@@ -197,6 +198,11 @@ export type TestInterchangeOptions = {
 
 const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 
+// Lets /trading-partners/activity fall through to its own handler.
+function isTradingPartnerId(id: string) {
+  return uuid.test(id)
+}
+
 export function tradingPartnerHandlers(
   apiUrl: string,
   {
@@ -261,7 +267,7 @@ export function tradingPartnerHandlers(
       return HttpResponse.json([...store.all()].sort((a, b) => a.name.localeCompare(b.name, 'de')))
     }),
     http.get<{ id: string }>(`${apiUrl}${tradingPartnerEndpoint.path}`, ({ params }) => {
-      if (!uuid.test(params.id)) {
+      if (!isTradingPartnerId(params.id)) {
         return undefined
       }
 
@@ -343,10 +349,7 @@ export function tradingPartnerHandlers(
       }
 
       if (!canSendTestInterchange(existing, workspaceStore.get().gln)) {
-        return HttpResponse.json(
-          { message: 'The Trading Partner does not await a test Interchange' },
-          { status: 409 },
-        )
+        return conflict('The Trading Partner does not await a test Interchange')
       }
 
       const sentAt = Date.now()

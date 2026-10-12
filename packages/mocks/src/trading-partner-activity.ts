@@ -3,7 +3,9 @@ import { delay, http, HttpResponse } from 'msw'
 import {
   type ActivityDay,
   activityDays,
+  type ChannelSummary,
   type FlowActivity,
+  type FlowSummary,
   type OpenProblem,
   openProblemListLimit,
   type OverdueAcknowledgement,
@@ -17,15 +19,27 @@ import {
   tradingPartnerActivitySchema,
 } from '@edi-bridge/contracts'
 
-import { createOverviewData, emptyOverviewData, type OverviewState } from './overview'
+import { type OverviewData, overviewDataOf, type OverviewState } from './overview'
 import { notFound, serverError } from './responses'
 import { type RunStore, toRunStore } from './run-store'
 import { type TradingPartnerStore, toTradingPartnerStore } from './trading-partner'
+
+type Listing<T> = ReadonlyArray<T> | { all: () => readonly T[] }
+
+type PartnerFlow = Pick<FlowSummary, 'id' | 'name' | 'tradingPartnerId'>
+
+type PartnerChannel = Pick<ChannelSummary, 'tradingPartnerId'>
 
 export type TradingPartnerActivityData = {
   tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore
   runs: ReadonlyArray<RunSummary> | RunStore
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>
+  flows: Listing<PartnerFlow>
+  channels: Listing<PartnerChannel>
+}
+
+function allOf<T>(listing: Listing<T>): readonly T[] {
+  return 'all' in listing ? listing.all() : listing
 }
 
 const day = 24 * 60 * 60 * 1000
@@ -34,21 +48,23 @@ function startOfDay(time: number) {
   return Math.floor(time / day) * day
 }
 
-type Traffic = {
+type PartnerTraffic = {
   runs: RunSummary[]
   overdueAcknowledgements: OverdueAcknowledgement[]
+  flows: PartnerFlow[]
+  channelCount: number
 }
 
-function trafficOf(data: TradingPartnerActivityData, from: number) {
-  const byPartner = new Map<string, Traffic>()
+function noTraffic(): PartnerTraffic {
+  return { runs: [], overdueAcknowledgements: [], flows: [], channelCount: 0 }
+}
+
+function trafficOf(data: TradingPartnerActivityData) {
+  const byPartner = new Map<string, PartnerTraffic>()
 
   function of(id: string) {
-    let traffic = byPartner.get(id)
-
-    if (!traffic) {
-      traffic = { runs: [], overdueAcknowledgements: [] }
-      byPartner.set(id, traffic)
-    }
+    const traffic = byPartner.get(id) ?? noTraffic()
+    byPartner.set(id, traffic)
 
     return traffic
   }
@@ -63,18 +79,17 @@ function trafficOf(data: TradingPartnerActivityData, from: number) {
     )
   }
 
-  return (id: string) => {
-    const { runs, overdueAcknowledgements } = byPartner.get(id) ?? {
-      runs: [],
-      overdueAcknowledgements: [],
-    }
+  for (const flow of allOf(data.flows)) {
+    of(flow.tradingPartnerId).flows.push(flow)
+  }
 
-    return {
-      runs,
-      recent: runs.filter(({ receivedAt }) => Date.parse(receivedAt) >= from),
-      overdueAcknowledgements,
+  for (const { tradingPartnerId } of allOf(data.channels)) {
+    if (tradingPartnerId !== null) {
+      of(tradingPartnerId).channelCount += 1
     }
   }
+
+  return (id: string) => byPartner.get(id) ?? noTraffic()
 }
 
 function problemTime(problem: OpenProblem) {
@@ -85,12 +100,9 @@ function problemTime(problem: OpenProblem) {
   )
 }
 
-function openProblemsOf(
-  recent: readonly RunSummary[],
-  overdueAcknowledgements: readonly OverdueAcknowledgement[],
-): OpenProblem[] {
+function openProblemsOf({ runs, overdueAcknowledgements }: PartnerTraffic): OpenProblem[] {
   return [
-    ...recent.flatMap((run): OpenProblem[] =>
+    ...runs.flatMap((run): OpenProblem[] =>
       run.status === 'failed' ? [{ kind: 'failedRun', run }] : [],
     ),
     ...overdueAcknowledgements.map((overdueAcknowledgement): OpenProblem => ({
@@ -100,96 +112,110 @@ function openProblemsOf(
   ].sort((a, b) => problemTime(b) - problemTime(a))
 }
 
-function activityOf(
-  tradingPartnerId: string,
-  { runs, recent, overdueAcknowledgements }: ReturnType<ReturnType<typeof trafficOf>>,
-  today: number,
-) {
-  const problems = openProblemsOf(recent, overdueAcknowledgements)
+function windowOf() {
+  const today = startOfDay(Date.now())
+
+  return { today, from: today - (activityDays - 1) * day }
+}
+
+function receivedSince(runs: readonly RunSummary[], since: number) {
+  return runs.filter(({ receivedAt }) => Date.parse(receivedAt) >= since)
+}
+
+function activityOf(tradingPartnerId: string, traffic: PartnerTraffic) {
+  const problems = openProblemsOf(traffic)
 
   const activity: TradingPartnerActivity = {
     tradingPartnerId,
-    documentsToday: recent.filter(({ receivedAt }) => Date.parse(receivedAt) >= today).length,
+    runsToday: receivedSince(traffic.runs, windowOf().today).length,
     openProblems: problems.length,
-    lastActivityAt: runs[0]?.receivedAt ?? null,
+    lastActivityAt: traffic.runs[0]?.receivedAt ?? null,
+    channelCount: traffic.channelCount,
+    flowCount: traffic.flows.length,
   }
 
   return { activity, problems }
 }
 
-function windowOf(now: number) {
-  const today = startOfDay(now)
-
-  return { today, from: today - (activityDays - 1) * day }
-}
-
 export function toTradingPartnerActivities(
   data: TradingPartnerActivityData,
-  now = Date.now(),
 ): TradingPartnerActivity[] {
-  const { today, from } = windowOf(now)
-  const traffic = trafficOf(data, from)
+  const traffic = trafficOf(data)
 
   return toTradingPartnerStore(data.tradingPartners)
     .all()
-    .map(({ id }) =>
-      tradingPartnerActivitySchema.parse(activityOf(id, traffic(id), today).activity),
-    )
+    .map(({ id }) => tradingPartnerActivitySchema.parse(activityOf(id, traffic(id)).activity))
 }
 
 export function toTradingPartnerActivityDetail(
   data: TradingPartnerActivityData,
   tradingPartnerId: string,
-  now = Date.now(),
 ): TradingPartnerActivityDetail {
-  const { today, from } = windowOf(now)
-  const traffic = trafficOf(data, from)(tradingPartnerId)
-  const { activity, problems } = activityOf(tradingPartnerId, traffic, today)
+  const { from } = windowOf()
+  const traffic = trafficOf(data)(tradingPartnerId)
+  const { activity, problems } = activityOf(tradingPartnerId, traffic)
 
   const days: ActivityDay[] = Array.from({ length: activityDays }, (_, index) => ({
     date: new Date(from + index * day).toISOString().slice(0, 10),
-    documents: 0,
+    runs: 0,
     failed: 0,
   }))
 
-  const flows = new Map<string, FlowActivity>()
+  const flows = new Map<string, FlowActivity>(
+    traffic.flows.map(({ id, name }) => [id, { flow: { id, name }, runs: 0 }]),
+  )
 
-  for (const run of traffic.recent) {
+  for (const run of receivedSince(traffic.runs, from)) {
     const bucket = days[Math.floor((Date.parse(run.receivedAt) - from) / day)]
 
     if (bucket) {
-      bucket.documents += 1
+      bucket.runs += 1
       bucket.failed += run.status === 'failed' ? 1 : 0
     }
 
-    const flow = flows.get(run.flow.id) ?? { flow: run.flow, documents: 0 }
-    flow.documents += 1
-    flows.set(run.flow.id, flow)
+    const flow = flows.get(run.flow.id)
+
+    if (flow) {
+      flow.runs += 1
+    }
   }
 
   return tradingPartnerActivityDetailSchema.parse({
     ...activity,
-    lastAcknowledgementAt:
-      traffic.runs.find(({ messageType }) => messageType === 'CONTRL')?.receivedAt ?? null,
     days,
     flows: [...flows.values()].sort(
-      (a, b) => b.documents - a.documents || a.flow.name.localeCompare(b.flow.name),
+      (a, b) => b.runs - a.runs || a.flow.name.localeCompare(b.flow.name),
     ),
     problems: problems.slice(0, openProblemListLimit),
   })
 }
 
+// Generated overview data has no Flow or Channel records, so each partner with Runs gets the
+// Flows its Runs name and one Channel.
+function withSetupFromRuns(overview: OverviewData): TradingPartnerActivityData {
+  const flows = new Map<string, PartnerFlow>()
+
+  for (const { flow, tradingPartner } of toRunStore(overview.runs).all()) {
+    flows.set(flow.id, { ...flow, tradingPartnerId: tradingPartner.id })
+  }
+
+  const partnersWithRuns = new Set(
+    [...flows.values()].map(({ tradingPartnerId }) => tradingPartnerId),
+  )
+
+  return {
+    ...overview,
+    flows: [...flows.values()],
+    channels: [...partnersWithRuns].map((tradingPartnerId) => ({ tradingPartnerId })),
+  }
+}
+
 function activityDataOf(
   source: TradingPartnerActivityData | 'empty' | 'large',
 ): TradingPartnerActivityData {
-  switch (source) {
-    case 'empty':
-      return emptyOverviewData
-    case 'large':
-      return createOverviewData({ tradingPartnerCount: 240, overdueCount: 400, runCount: 30_000 })
-    default:
-      return source
-  }
+  return source === 'empty' || source === 'large'
+    ? withSetupFromRuns(overviewDataOf(source))
+    : source
 }
 
 export function tradingPartnerActivityHandlers(

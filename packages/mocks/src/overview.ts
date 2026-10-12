@@ -300,7 +300,7 @@ export function seedOverviewData(
 
 export type OverviewState = 'empty' | 'large' | 'loading' | 'error'
 
-function overviewDataOf(source: OverviewData | 'empty' | 'large' | undefined): OverviewData {
+export function overviewDataOf(source: OverviewData | 'empty' | 'large' | undefined): OverviewData {
   switch (source) {
     case undefined:
       return seedOverviewData()
