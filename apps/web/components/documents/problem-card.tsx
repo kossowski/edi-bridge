@@ -87,7 +87,15 @@ function useProblemText({ problem, direction, tradingPartner }: FailedRun) {
   }
 }
 
-function FixLink({ target, primary }: { target: FixTarget; primary: boolean }) {
+function FixLink({
+  target,
+  runId,
+  primary,
+}: {
+  target: FixTarget
+  runId: string
+  primary: boolean
+}) {
   const t = useTranslations('Document.problem.fixLink')
 
   const label =
@@ -97,7 +105,7 @@ function FixLink({ target, primary }: { target: FixTarget; primary: boolean }) {
 
   return (
     <Link
-      href={fixTargetHref(target)}
+      href={fixTargetHref(target, runId)}
       className={cn(
         buttonVariants({ variant: primary ? 'default' : 'outline' }),
         'h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal',
@@ -149,7 +157,7 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
                 key: 'fix',
                 content: (
                   <StepBody text={t('fixCause')}>
-                    <FixLink primary target={target} />
+                    <FixLink primary runId={run.id} target={target} />
                   </StepBody>
                 ),
               },
@@ -170,7 +178,7 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
                 key: 'fix',
                 content: (
                   <StepBody text={t('checkConnection')}>
-                    <FixLink primary={false} target={target} />
+                    <FixLink primary={false} runId={run.id} target={target} />
                   </StepBody>
                 ),
               },
@@ -187,7 +195,7 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
             <StepBody text={t('tellTradingPartner', { tradingPartner: tradingPartner.name })}>
               <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">
                 <CopyPartnerMessage run={run} />
-                {target && <FixLink primary={false} target={target} />}
+                {target && <FixLink primary={false} runId={run.id} target={target} />}
               </div>
             </StepBody>
           ),
