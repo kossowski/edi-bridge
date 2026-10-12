@@ -68,7 +68,7 @@ import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
 import { createSessionStore, seedSession, sessionHandlers } from './session'
-import { seedTasksData, tasksHandler } from './task'
+import { tasksHandler } from './task'
 import {
   createTradingPartnerStore,
   seedTradingPartners,
@@ -77,6 +77,7 @@ import {
 } from './trading-partner'
 import { tradingPartnerActivityHandlers } from './trading-partner-activity'
 import { seedWorkspace, workspaceHandlers } from './workspace'
+import { seedWorkspaceActivity } from './workspace-activity'
 import {
   seedWorkspaceMembers,
   workspaceMemberHandlers,
@@ -227,7 +228,7 @@ export {
   seedOrderLifecycles,
 } from './order-lifecycle'
 
-export { homeHandler, type HomeState, toHome } from './home'
+export { homeHandler, toHome } from './home'
 
 export {
   createOverdueAcknowledgement,
@@ -278,13 +279,15 @@ export {
   type RunStore,
 } from './run-store'
 
+export { tasksHandler } from './task'
+
 export {
-  createTasksData,
-  emptyTasksData,
-  seedTasksData,
-  type TasksData,
-  tasksHandler,
-} from './task'
+  createWorkspaceActivity,
+  emptyWorkspaceActivity,
+  seedWorkspaceActivity,
+  type WorkspaceActivity,
+  type WorkspaceActivityState,
+} from './workspace-activity'
 
 export { type SessionStore } from './session-access'
 
@@ -432,8 +435,8 @@ export function createHandlers(
     runsHandler(apiUrl, runs),
     interchangesHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
-    homeHandler(apiUrl, seedTasksData(runs)),
-    tasksHandler(apiUrl, seedTasksData(runs)),
+    homeHandler(apiUrl, seedWorkspaceActivity(runs)),
+    tasksHandler(apiUrl, seedWorkspaceActivity(runs)),
     orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles, {
       runs,
       tradingPartners: tradingPartnerStore,

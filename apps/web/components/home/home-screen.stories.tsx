@@ -11,7 +11,7 @@ import {
   liveEventsHandler,
   type LiveEventsOptions,
   seedRuns,
-  seedTasksData,
+  seedWorkspaceActivity,
 } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -192,7 +192,7 @@ function liveStream(options: Omit<LiveEventsOptions, 'runs' | 'signal'>) {
     const streams = new AbortController()
 
     msw.use(
-      homeHandler(apiUrl, seedTasksData(runs)),
+      homeHandler(apiUrl, seedWorkspaceActivity(runs)),
       liveEventsHandler(apiUrl, { intervalMs: 1500, ...options, runs, signal: streams.signal }),
     )
 

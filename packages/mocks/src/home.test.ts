@@ -14,8 +14,9 @@ import {
 import { homeHandler } from './home'
 import { createOverdueAcknowledgement } from './overdue-acknowledgement'
 import { createRun } from './run'
-import { emptyTasksData, type TasksData, tasksHandler } from './task'
+import { tasksHandler } from './task'
 import { createTradingPartner, seedTradingPartners } from './trading-partner'
+import { emptyWorkspaceActivity, type WorkspaceActivity } from './workspace-activity'
 
 const apiUrl = 'http://api.test'
 
@@ -72,8 +73,8 @@ function delivered(receivedAt: string, tradingPartner = rheinkauf) {
   })
 }
 
-function data(overrides: Partial<TasksData>): TasksData {
-  return { ...emptyTasksData, ...overrides }
+function data(overrides: Partial<WorkspaceActivity>): WorkspaceActivity {
+  return { ...emptyWorkspaceActivity, ...overrides }
 }
 
 describe('GET /home', () => {

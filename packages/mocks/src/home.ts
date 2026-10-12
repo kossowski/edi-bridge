@@ -1,4 +1,4 @@
-import { delay, http, HttpResponse } from 'msw'
+import { HttpResponse } from 'msw'
 
 import {
   fromSearchParams,
@@ -13,19 +13,24 @@ import {
   type TradingPartner,
 } from '@edi-bridge/contracts'
 
-import { badRequest, serverError } from './responses'
+import { dayMs } from './duration'
+import { badRequest } from './responses'
 import { type RunStore, toRunStore } from './run-store'
-import { type TasksData, tasksDataOf, toTasks } from './task'
+import { toTasks } from './task'
+import {
+  isFinished,
+  type WorkspaceActivity,
+  type WorkspaceActivityState,
+  workspaceActivityHandler,
+} from './workspace-activity'
 
-const minute = 60 * 1000
-
-const day = 24 * 60 * minute
+const minuteMs = 60 * 1000
 
 function throughputOf(runs: RunStore, { window }: HomeQuery, now: Date) {
   const { durationMinutes, bucketMinutes } = homeWindowSizes[window]
-  const bucketMs = bucketMinutes * minute
+  const bucketMs = bucketMinutes * minuteMs
   const to = Math.floor(now.getTime() / bucketMs) * bucketMs + bucketMs
-  const from = to - durationMinutes * minute
+  const from = to - durationMinutes * minuteMs
 
   const throughput = Array.from({ length: durationMinutes / bucketMinutes }, (_, index) => ({
     start: new Date(from + index * bucketMs).toISOString(),
@@ -37,7 +42,7 @@ function throughputOf(runs: RunStore, { window }: HomeQuery, now: Date) {
   for (const run of runs.all()) {
     const bucket = throughput[Math.floor((Date.parse(run.receivedAt) - from) / bucketMs)]
 
-    if (bucket && (run.status === 'delivered' || run.status === 'failed')) {
+    if (bucket && isFinished(run.status)) {
       bucket[run.status] += 1
     }
   }
@@ -51,7 +56,7 @@ function tradingPartnerCardsOf(
   tasks: ReadonlyArray<Task>,
   now: Date,
 ): HomeTradingPartner[] {
-  const startOfToday = Math.floor(now.getTime() / day) * day
+  const startOfToday = Math.floor(now.getTime() / dayMs) * dayMs
 
   const cards = new Map(
     tradingPartners.map(({ id, name, testMode }) => [
@@ -84,7 +89,7 @@ function tradingPartnerCardsOf(
   )
 }
 
-export function toHome(data: TasksData, query: HomeQuery, now = new Date()): Home {
+export function toHome(data: WorkspaceActivity, query: HomeQuery, now = new Date()): Home {
   const { tradingPartners, overdueAcknowledgements } = data
   const runs = toRunStore(data.runs)
   const { tasks, counts } = toTasks({ runs, tradingPartners, overdueAcknowledgements }, now)
@@ -110,32 +115,14 @@ export function toHome(data: TasksData, query: HomeQuery, now = new Date()): Hom
   })
 }
 
-export type HomeState = 'empty' | 'large' | 'loading' | 'error'
-
-export function homeHandler(apiUrl: string, source?: TasksData | HomeState) {
-  const path = `${apiUrl}${homeEndpoint.path}`
-
-  if (source === 'loading') {
-    return http.get(path, async () => {
-      await delay('infinite')
-    })
-  }
-
-  if (source === 'error') {
-    return http.get(path, () => serverError())
-  }
-
-  let data: TasksData | undefined
-
-  return http.get(path, ({ request }) => {
-    data ??= tasksDataOf(source)
-
+export function homeHandler(apiUrl: string, source?: WorkspaceActivity | WorkspaceActivityState) {
+  return workspaceActivityHandler(`${apiUrl}${homeEndpoint.path}`, source, (activity, request) => {
     const query = homeEndpoint.query.safeParse(fromSearchParams(new URL(request.url).searchParams))
 
     if (!query.success) {
       return badRequest(query.error.message)
     }
 
-    return HttpResponse.json(toHome(data, query.data))
+    return HttpResponse.json(toHome(activity, query.data))
   })
 }

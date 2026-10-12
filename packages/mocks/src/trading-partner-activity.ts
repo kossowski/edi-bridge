@@ -21,8 +21,12 @@ import {
 
 import { notFound, serverError } from './responses'
 import { type RunStore, toRunStore } from './run-store'
-import { type TasksData, tasksDataOf, type TasksState } from './task'
 import { type TradingPartnerStore, toTradingPartnerStore } from './trading-partner'
+import {
+  type WorkspaceActivity,
+  workspaceActivityOf,
+  type WorkspaceActivityState,
+} from './workspace-activity'
 
 type Listing<T> = ReadonlyArray<T> | { all: () => readonly T[] }
 
@@ -190,9 +194,9 @@ export function toTradingPartnerActivityDetail(
   })
 }
 
-// Generated tasks data has no Flow or Channel records, so each partner with Runs gets the
+// Generated workspace activity has no Flow or Channel records, so each partner with Runs gets the
 // Flows its Runs name and one Channel.
-function withSetupFromRuns(activity: TasksData): TradingPartnerActivityData {
+function withSetupFromRuns(activity: WorkspaceActivity): TradingPartnerActivityData {
   const runs = toRunStore(activity.runs)
   const flows = new Map<string, PartnerFlow>()
 
@@ -219,9 +223,9 @@ function activityDataOf(
 ): TradingPartnerActivityData {
   switch (source) {
     case 'empty':
-      return withSetupFromRuns(tasksDataOf(source))
+      return withSetupFromRuns(workspaceActivityOf(source))
     case 'large':
-      return (largeActivityData ??= withSetupFromRuns(tasksDataOf(source)))
+      return (largeActivityData ??= withSetupFromRuns(workspaceActivityOf(source)))
     default:
       return { ...source, runs: toRunStore(source.runs) }
   }
@@ -229,7 +233,7 @@ function activityDataOf(
 
 export function tradingPartnerActivityHandlers(
   apiUrl: string,
-  source: TradingPartnerActivityData | TasksState,
+  source: TradingPartnerActivityData | WorkspaceActivityState,
 ) {
   const listPath = `${apiUrl}${tradingPartnerActivitiesEndpoint.path}`
   const detailPath = `${apiUrl}${tradingPartnerActivityEndpoint.path}`

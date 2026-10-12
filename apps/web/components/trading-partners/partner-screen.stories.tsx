@@ -28,7 +28,7 @@ import {
   channelHandlers,
   createChannels,
   createHandlers,
-  createTasksData,
+  createWorkspaceActivity,
   createWorkspace,
   seedTradingPartners,
   tradingPartnerActivityHandlers,
@@ -46,7 +46,7 @@ const withReadyForTest = seedTradingPartners.map((tradingPartner) =>
   tradingPartner.id === confirmed.id ? readyForTest : tradingPartner,
 )
 
-const large = createTasksData({
+const large = createWorkspaceActivity({
   tradingPartnerCount: 1,
   overdueCount: 60,
   runCount: 4000,
