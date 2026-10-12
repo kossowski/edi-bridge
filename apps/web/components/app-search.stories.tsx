@@ -277,6 +277,16 @@ export const Operator = meta.story({
   },
 })
 
+export const HelpPage = meta.story({
+  async play({ canvas }) {
+    const dialog = await openPalette(canvas)
+
+    await userEvent.type(dialog.getByRole('combobox'), 'glossary')
+    await userEvent.click(await dialog.findByRole('option', { name: /^Help & glossary/ }))
+    await expect(getRouter().push).toHaveBeenCalledWith('/help')
+  },
+})
+
 export const German = meta.story({
   decorators: [german],
   async play({ canvas }) {

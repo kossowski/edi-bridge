@@ -87,6 +87,10 @@
       "transmissions": {
         "label": "Transmissions",
         "hint": "The EDI envelopes sent and received"
+      },
+      "help": {
+        "label": "Help & glossary",
+        "hint": "What the words on screen mean"
       }
     }
   },
@@ -132,7 +136,8 @@
     "documentStructures": "Document Structures",
     "lookupTables": "Lookup Tables",
     "settings": "Settings",
-    "operator": "Operator"
+    "operator": "Operator",
+    "help": "Help"
   },
   "NotFound": {
     "title": "Page not found",
@@ -335,6 +340,113 @@
         "title": "The document could not be delivered",
         "summary": "The receiving system did not accept the document, often because it was unreachable. Try again once it is back."
       }
+    }
+  },
+  "Help": {
+    "intro": "The words you see on screen, what they mean and the technical term behind each one.",
+    "search": "Search the glossary",
+    "technicalTerm": "Technical term",
+    "count": "{count, plural, one {# entry} other {# entries}}",
+    "filteredCount": "{count} of {total} entries",
+    "empty": {
+      "title": "No matching entry",
+      "description": "Try another word, or clear the search to see every entry."
+    },
+    "terms": {
+      "workspace": {
+        "label": "Workspace",
+        "explanation": "Your own area in EDI Bridge. It holds your trading partners, mappings and every document exchanged with them."
+      },
+      "showcaseWorkspace": {
+        "label": "Demo",
+        "explanation": "A ready-made example area to look around in. Nothing in it can be changed."
+      },
+      "tradingPartner": {
+        "label": "Trading partner",
+        "explanation": "A company you exchange business documents with, for example a retailer that orders goods from you."
+      },
+      "testMode": {
+        "label": "Testing",
+        "explanation": "While you set up a new trading partner, every transmission with them is marked as a test."
+      },
+      "interchange": {
+        "label": "Transmission",
+        "explanation": "One EDI file sent to or received from a trading partner. It can hold several documents."
+      },
+      "acknowledgement": {
+        "label": "Receipt confirmation",
+        "explanation": "The receiver’s automatic reply. It confirms that a transmission arrived and could be read, or says whether its content was accepted."
+      },
+      "overdue": {
+        "label": "Overdue",
+        "explanation": "A sent transmission whose receipt confirmation has not arrived within the time agreed with the trading partner."
+      },
+      "businessReference": {
+        "label": "Order number",
+        "explanation": "The number that ties a purchase order, its dispatch advice and its invoice together."
+      },
+      "orderLifecycle": {
+        "label": "Order",
+        "explanation": "All documents with the same order number, in the order they happened: purchase order, dispatch advice, invoice and their receipt confirmations."
+      },
+      "channel": {
+        "label": "Connection",
+        "explanation": "The way documents arrive or leave, for example an SFTP folder or a web address."
+      },
+      "documentStructure": {
+        "label": "Data format",
+        "explanation": "The fields of a JSON or CSV file that your own systems export or import, learned from an example file."
+      },
+      "mapping": {
+        "label": "Mapping",
+        "explanation": "Describes which field of your data fills which field of the EDI document, and back."
+      },
+      "lookupTable": {
+        "label": "Code translation",
+        "explanation": "A list that translates codes, for example your unit ST becomes your partner’s PCE."
+      },
+      "mappingVersion": {
+        "label": "Version",
+        "explanation": "A published state of a mapping that never changes. Each document route uses one version, and every document shows the version that processed it."
+      },
+      "draft": {
+        "label": "Draft",
+        "explanation": "The working copy of a mapping that you edit. Publishing it creates a new version."
+      },
+      "sampleDocument": {
+        "label": "Example document",
+        "explanation": "A typical file stored with a mapping. The preview shows what the draft makes of it."
+      },
+      "manualSubmission": {
+        "label": "Upload",
+        "explanation": "A file you hand in yourself instead of it arriving on a connection. It is processed like any other document and marked as uploaded."
+      },
+      "flow": {
+        "label": "Document route",
+        "explanation": "A rule such as “purchase orders from this partner go through this mapping to your ERP”."
+      },
+      "run": {
+        "label": "Document",
+        "explanation": "One document that went through EDI Bridge, with every step, its outcome, any errors and the result."
+      },
+      "duplicate": {
+        "label": "Duplicate",
+        "explanation": "A transmission that arrived a second time. It is recorded but not processed again."
+      },
+      "retry": {
+        "label": "Try again",
+        "explanation": "Repeats only the failed delivery, unchanged. Use it when the receiving system was briefly unreachable."
+      },
+      "reprocess": {
+        "label": "Process again",
+        "explanation": "Processes the original document once more with a mapping version you choose, for example after fixing the mapping."
+      }
+    },
+    "messageTypes": {
+      "ORDERS": "Your trading partner orders goods from you.",
+      "DESADV": "You tell your trading partner what you ship and when it arrives.",
+      "INVOIC": "You bill your trading partner for the goods you delivered.",
+      "CONTRL": "An automatic reply confirming that a transmission arrived and could be read."
     }
   },
   "Runs": {

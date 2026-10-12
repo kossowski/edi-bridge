@@ -13,6 +13,12 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
+  it('names the help page', () => {
+    expect(breadcrumbTrail('/help')).toEqual([
+      { href: '/help', label: { kind: 'item', key: 'help' } },
+    ])
+  })
+
   it('adds a detail crumb and the subpages below it', () => {
     expect(breadcrumbTrail('/trading-partners/tp-1/edit')).toEqual([
       { href: '/trading-partners', label: { kind: 'item', key: 'tradingPartners' } },

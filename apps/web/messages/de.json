@@ -87,6 +87,10 @@
       "transmissions": {
         "label": "Übertragungen",
         "hint": "Die gesendeten und empfangenen EDI-Umschläge"
+      },
+      "help": {
+        "label": "Hilfe & Glossar",
+        "hint": "Was die Begriffe auf dem Bildschirm bedeuten"
       }
     }
   },
@@ -132,7 +136,8 @@
     "documentStructures": "Document Structures",
     "lookupTables": "Lookup Tables",
     "settings": "Einstellungen",
-    "operator": "Operator"
+    "operator": "Operator",
+    "help": "Hilfe"
   },
   "NotFound": {
     "title": "Seite nicht gefunden",
@@ -335,6 +340,113 @@
         "title": "Der Beleg konnte nicht zugestellt werden",
         "summary": "Das empfangende System hat den Beleg nicht angenommen, oft weil es nicht erreichbar war. Versuchen Sie es erneut, sobald es wieder erreichbar ist."
       }
+    }
+  },
+  "Help": {
+    "intro": "Die Begriffe auf dem Bildschirm, was sie bedeuten und welcher Fachbegriff dahintersteht.",
+    "search": "Glossar durchsuchen",
+    "technicalTerm": "Fachbegriff",
+    "count": "{count, plural, one {# Eintrag} other {# Einträge}}",
+    "filteredCount": "{count} von {total} Einträgen",
+    "empty": {
+      "title": "Kein passender Eintrag",
+      "description": "Versuchen Sie ein anderes Wort oder leeren Sie die Suche, um alle Einträge zu sehen."
+    },
+    "terms": {
+      "workspace": {
+        "label": "Arbeitsbereich",
+        "explanation": "Ihr eigener Bereich in EDI Bridge. Er enthält Ihre Handelspartner, Mappings und alle mit ihnen ausgetauschten Belege."
+      },
+      "showcaseWorkspace": {
+        "label": "Demo",
+        "explanation": "Ein fertig eingerichteter Beispielbereich zum Umsehen. Darin lässt sich nichts ändern."
+      },
+      "tradingPartner": {
+        "label": "Handelspartner",
+        "explanation": "Ein Unternehmen, mit dem Sie Geschäftsbelege austauschen, zum Beispiel ein Händler, der Waren bei Ihnen bestellt."
+      },
+      "testMode": {
+        "label": "Testbetrieb",
+        "explanation": "Solange Sie einen neuen Handelspartner einrichten, wird jede Übertragung mit ihm als Test gekennzeichnet."
+      },
+      "interchange": {
+        "label": "Übertragung",
+        "explanation": "Eine EDI-Datei, die an einen Handelspartner gesendet oder von ihm empfangen wurde. Sie kann mehrere Belege enthalten."
+      },
+      "acknowledgement": {
+        "label": "Empfangsbestätigung",
+        "explanation": "Die automatische Antwort des Empfängers. Sie bestätigt, dass eine Übertragung angekommen ist und gelesen werden konnte, oder sagt, ob ihr Inhalt angenommen wurde."
+      },
+      "overdue": {
+        "label": "Überfällig",
+        "explanation": "Eine gesendete Übertragung, deren Empfangsbestätigung nicht in der mit dem Handelspartner vereinbarten Zeit eingegangen ist."
+      },
+      "businessReference": {
+        "label": "Bestellnummer",
+        "explanation": "Die Nummer, die eine Bestellung, ihr Lieferavis und ihre Rechnung miteinander verbindet."
+      },
+      "orderLifecycle": {
+        "label": "Auftrag",
+        "explanation": "Alle Belege mit derselben Bestellnummer in zeitlicher Reihenfolge: Bestellung, Lieferavis, Rechnung und ihre Empfangsbestätigungen."
+      },
+      "channel": {
+        "label": "Verbindung",
+        "explanation": "Der Weg, auf dem Belege ankommen oder hinausgehen, zum Beispiel ein SFTP-Ordner oder eine Webadresse."
+      },
+      "documentStructure": {
+        "label": "Datenformat",
+        "explanation": "Die Felder einer JSON- oder CSV-Datei, die Ihre eigenen Systeme exportieren oder importieren, erkannt aus einer Beispieldatei."
+      },
+      "mapping": {
+        "label": "Mapping",
+        "explanation": "Beschreibt, welches Feld Ihrer Daten welches Feld im EDI-Beleg füllt, und umgekehrt."
+      },
+      "lookupTable": {
+        "label": "Code-Übersetzung",
+        "explanation": "Eine Liste, die Codes übersetzt, zum Beispiel wird Ihre Einheit ST zur Einheit PCE Ihres Partners."
+      },
+      "mappingVersion": {
+        "label": "Version",
+        "explanation": "Ein veröffentlichter Stand eines Mappings, der sich nicht mehr ändert. Jeder Belegweg nutzt eine Version, und jeder Beleg zeigt die Version, die ihn verarbeitet hat."
+      },
+      "draft": {
+        "label": "Entwurf",
+        "explanation": "Die Arbeitskopie eines Mappings, die Sie bearbeiten. Beim Veröffentlichen entsteht daraus eine neue Version."
+      },
+      "sampleDocument": {
+        "label": "Beispielbeleg",
+        "explanation": "Eine typische Datei, die mit einem Mapping gespeichert ist. Die Vorschau zeigt, was der Entwurf daraus macht."
+      },
+      "manualSubmission": {
+        "label": "Upload",
+        "explanation": "Eine Datei, die Sie selbst einreichen, statt dass sie über eine Verbindung ankommt. Sie wird wie jeder andere Beleg verarbeitet und als Upload gekennzeichnet."
+      },
+      "flow": {
+        "label": "Belegweg",
+        "explanation": "Eine Regel wie „Bestellungen dieses Partners gehen über dieses Mapping in Ihr ERP“."
+      },
+      "run": {
+        "label": "Beleg",
+        "explanation": "Ein Beleg, der EDI Bridge durchlaufen hat, mit jedem Schritt, dem Ergebnis, etwaigen Fehlern und der Ausgabe."
+      },
+      "duplicate": {
+        "label": "Duplikat",
+        "explanation": "Eine Übertragung, die ein zweites Mal angekommen ist. Sie wird festgehalten, aber nicht erneut verarbeitet."
+      },
+      "retry": {
+        "label": "Erneut versuchen",
+        "explanation": "Wiederholt nur die fehlgeschlagene Zustellung, unverändert. Nutzen Sie es, wenn das empfangende System kurz nicht erreichbar war."
+      },
+      "reprocess": {
+        "label": "Erneut verarbeiten",
+        "explanation": "Verarbeitet den ursprünglichen Beleg noch einmal mit einer Mapping-Version Ihrer Wahl, zum Beispiel nachdem Sie das Mapping korrigiert haben."
+      }
+    },
+    "messageTypes": {
+      "ORDERS": "Ihr Handelspartner bestellt Waren bei Ihnen.",
+      "DESADV": "Sie teilen Ihrem Handelspartner mit, was Sie liefern und wann es ankommt.",
+      "INVOIC": "Sie stellen Ihrem Handelspartner die gelieferte Ware in Rechnung.",
+      "CONTRL": "Eine automatische Antwort, die bestätigt, dass eine Übertragung angekommen ist und gelesen werden konnte."
     }
   },
   "Runs": {

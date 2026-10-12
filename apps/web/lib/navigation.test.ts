@@ -9,6 +9,7 @@ describe('sidebarItem', () => {
       Object.keys(messages.Sidebar.items).toSorted(),
     )
     expect(sidebarItem('codeTranslations').href).toBe('/lookup-tables')
+    expect(sidebarItem('help').href).toBe('/help')
   })
 })
 
