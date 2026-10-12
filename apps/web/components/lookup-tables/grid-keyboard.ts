@@ -1,4 +1,4 @@
-import { clamp } from '@/lib/clamp'
+import { clamp } from '../../lib/clamp'
 
 export type CellPosition = { row: number; column: number }
 
