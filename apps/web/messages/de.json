@@ -550,7 +550,8 @@
         "description": "Die Übertragungen konnten nicht geladen werden. Versuchen Sie es erneut.",
         "retry": "Erneut versuchen"
       }
-    }
+    },
+    "noFailureStage": "Keine Failure Stage"
   },
   "Document": {
     "title": "Beleg",
@@ -841,13 +842,6 @@
       }
     }
   },
-  "Runs": {
-    "openRun": "– Run von {tradingPartner} öffnen, {messageType}",
-    "noFailureStage": "Keine Failure Stage",
-    "columns": {
-      "receivedAt": "Empfangen"
-    }
-  },
   "OrderLifecycle": {
     "loading": "Order Lifecycle für {businessReference} wird geladen",
     "search": {
@@ -899,9 +893,11 @@
       "inbound": "Eingehend",
       "outbound": "Ausgehend"
     },
+    "receivedAt": "Empfangen",
+    "openDocument": "– Beleg von {tradingPartner} öffnen, {messageType}",
     "interchangeLink": "Kontrollreferenz {controlReference}",
     "replacedBy": "Ersetzt durch",
-    "runLink": "Run {id}"
+    "documentLink": "Beleg {id}"
   },
   "TradingPartners": {
     "add": "Handelspartner hinzufügen",

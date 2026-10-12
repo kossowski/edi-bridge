@@ -550,7 +550,8 @@
         "description": "The transmissions could not be loaded. Try again.",
         "retry": "Try again"
       }
-    }
+    },
+    "noFailureStage": "No Failure Stage"
   },
   "Document": {
     "title": "Document",
@@ -841,13 +842,6 @@
       }
     }
   },
-  "Runs": {
-    "openRun": "– open Run from {tradingPartner}, {messageType}",
-    "noFailureStage": "No Failure Stage",
-    "columns": {
-      "receivedAt": "Received"
-    }
-  },
   "OrderLifecycle": {
     "loading": "Loading the Order Lifecycle for {businessReference}",
     "search": {
@@ -899,9 +893,11 @@
       "inbound": "Inbound",
       "outbound": "Outbound"
     },
+    "receivedAt": "Received",
+    "openDocument": "– open document from {tradingPartner}, {messageType}",
     "interchangeLink": "Control reference {controlReference}",
     "replacedBy": "Replaced by",
-    "runLink": "Run {id}"
+    "documentLink": "Document {id}"
   },
   "TradingPartners": {
     "add": "Add trading partner",

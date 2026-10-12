@@ -33,7 +33,6 @@ function MessageEntry({
   tradingPartner: string
 }) {
   const t = useTranslations('OrderLifecycle')
-  const tRuns = useTranslations('Runs')
   const { run, interchange } = message
 
   return (
@@ -41,9 +40,9 @@ function MessageEntry({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <span className="font-medium">{t(`direction.${message.direction}`)}</span>
         <span className="flex flex-wrap items-baseline gap-x-1.5">
-          <span className="text-muted-foreground">{tRuns('columns.receivedAt')}</span>
+          <span className="text-muted-foreground">{t('receivedAt')}</span>
           <RunLink
-            description={tRuns('openRun', { tradingPartner, messageType: message.messageType })}
+            description={t('openDocument', { tradingPartner, messageType: message.messageType })}
             run={{ id: run.id, receivedAt: message.receivedAt }}
           />
         </span>
@@ -79,7 +78,7 @@ function MessageEntry({
           <span>
             {t('replacedBy')}{' '}
             <Link href={documentHref(run.replacedBy.id)} className={cn(linkClass, 'relative')}>
-              {t('runLink', { id: shortId(run.replacedBy.id) })}
+              {t('documentLink', { id: shortId(run.replacedBy.id) })}
             </Link>
           </span>
         )}

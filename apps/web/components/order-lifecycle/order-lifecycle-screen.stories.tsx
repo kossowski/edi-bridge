@@ -20,8 +20,8 @@ function stepOf(timeline: HTMLElement, messageType: string) {
   return within(timeline).getByRole('heading', { level: 3, name: messageType }).closest('li')!
 }
 
-function runLinks(step: HTMLElement) {
-  return within(step).getAllByRole('link', { name: /open Run from / })
+function documentLinks(step: HTMLElement) {
+  return within(step).getAllByRole('link', { name: /open document from / })
 }
 
 export const Initial = meta.story({
@@ -122,7 +122,7 @@ export const Full = meta.story({
       within(stepOf(timeline, 'ORDERS')).getByRole('link', { name: /^Control reference / }),
     ).toHaveAttribute('href', expect.stringMatching(/^\/documents\?view=transmissions&q=/))
     await expect(
-      within(timeline).getAllByRole('link', { name: /open Run from Hansemarkt GmbH/ }),
+      within(timeline).getAllByRole('link', { name: /open document from Hansemarkt GmbH/ }),
     ).toHaveLength(3)
   },
 })
@@ -170,7 +170,7 @@ export const Failures = meta.story({
     await expect(desadv.getByText('The document could not be translated')).toBeVisible()
     await expect(desadv.getAllByText('Acknowledgement')).toHaveLength(1)
     await expect(desadv.getByText('Rejected')).toBeVisible()
-    await expect(desadv.getByRole('link', { name: /^Run [0-9a-f]{8}$/ })).toBeVisible()
+    await expect(desadv.getByRole('link', { name: /^Document [0-9a-f]{8}$/ })).toBeVisible()
     await expect(
       within(stepOf(timeline, 'INVOIC')).getByText('The document could not be delivered'),
     ).toBeVisible()
@@ -209,8 +209,8 @@ export const LargeVolume = meta.story({
 
     await expect(within(desadv).getByText('34 Messages')).toBeVisible()
     await expect(within(desadv).getByText('Latest 5 of 34')).toBeVisible()
-    await expect(runLinks(desadv)).toHaveLength(5)
-    await expect(runLinks(invoic)).toHaveLength(5)
+    await expect(documentLinks(desadv)).toHaveLength(5)
+    await expect(documentLinks(invoic)).toHaveLength(5)
 
     const desadvSummary = within(
       within(desadv).getByRole('list', { name: 'Acknowledgements of the DESADV Messages' }),
@@ -227,10 +227,10 @@ export const LargeVolume = meta.story({
 
     await expect(showAll).toHaveAttribute('aria-expanded', 'false')
     await userEvent.click(showAll)
-    await expect(runLinks(desadv)).toHaveLength(34)
+    await expect(documentLinks(desadv)).toHaveLength(34)
     await expect(showAll).toHaveAttribute('aria-expanded', 'true')
     await expect(showAll).toHaveAccessibleName('Show the latest 5')
-    await expect(runLinks(invoic)).toHaveLength(5)
+    await expect(documentLinks(invoic)).toHaveLength(5)
   },
 })
 
@@ -274,7 +274,7 @@ export const LargeVolumeDark = meta.story({
       )
     }
 
-    await expect(runLinks(stepOf(timeline, 'INVOIC'))).toHaveLength(30)
+    await expect(documentLinks(stepOf(timeline, 'INVOIC'))).toHaveLength(30)
   },
 })
 

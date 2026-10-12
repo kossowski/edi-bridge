@@ -23,13 +23,13 @@ The branch under review needs its dependencies installed (`pnpm install` in its 
 
 List the pages the diff changes. If the diff touches the shell (`apps/web/app/layout.tsx`, `apps/web/components/app-*`) or `packages/ui`, take every route from `apps/web/lib/navigation.ts`.
 
-For a dynamic route such as `/runs/[id]`, pass concrete URLs. Take the ids from the links on the list page, and pick one per state the ticket changes.
+For a dynamic route such as `/documents/[id]`, pass concrete URLs. Take the ids from the links on the list page, and pick one per state the ticket changes.
 
 ## 2. Run the fixed checks
 
 ```sh
 node .agents/skills/browser-check/scripts/browser-check.mjs \
-	--repo <worktree of the branch> --out <dir outside the repo> --routes /,/runs
+	--repo <worktree of the branch> --out <dir outside the repo> --routes /,/documents
 ```
 
 The script starts `next dev` on a free port with `NEXT_PUBLIC_API_MOCKING=enabled`, so the pages get their data from the mocks package. It stops the server afterwards. Next refuses a second dev server for the same checkout. If one already runs, the script names its URL. Pass that URL with `--base-url` only if the server runs in mock mode (`pnpm --filter @edi-bridge/web dev:mock`). Otherwise run the check against a worktree.
