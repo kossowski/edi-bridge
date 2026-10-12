@@ -4,16 +4,20 @@
 
 **Blocked by:** 59 (Documents inbox)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Each Failure Stage shows its plain explanation and who fixes it; the fix link opens the exact place (Mapping field, code translation with the code, connection, partner)
-- [ ] "Process again" lets the user pick a Mapping Version (newest first, the one used before marked) and warns with a link when the Mapping has unpublished changes
-- [ ] "Try again" appears only for delivery failures; partner failures offer the copyable message and "Mark as waiting for partner"
-- [ ] After "Process again" or "Try again" the page shows that a new attempt started and links to it
-- [ ] The path stepper marks the failed step and explains each step on hover and focus
-- [ ] Technical details keep everything the Run detail showed: raw Interchange with the error position, parsed tree, Mapping Version, replaced and replacing Runs
-- [ ] The Run contract gains the problem explanation (who fixes it, deep-link target, missing code or field) and the waiting-for-partner mark; the live API follows in ticket 37
-- [ ] `/runs/[id]` and its components and stories are removed or moved; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Each Failure Stage shows its plain explanation and who fixes it; the fix link opens the exact place (Mapping field, code translation with the code, connection, partner)
+- [x] "Process again" lets the user pick a Mapping Version (newest first, the one used before marked) and warns with a link when the Mapping has unpublished changes
+- [x] "Try again" appears only for delivery failures; partner failures offer the copyable message and "Mark as waiting for partner"
+- [x] After "Process again" or "Try again" the page shows that a new attempt started and links to it
+- [x] The path stepper marks the failed step and explains each step on hover and focus
+- [x] Technical details keep everything the Run detail showed: raw Interchange with the error position, parsed tree, Mapping Version, replaced and replacing Runs
+- [x] The Run contract gains the problem explanation (who fixes it, deep-link target, missing code or field) and the waiting-for-partner mark; the live API follows in ticket 37
+- [x] `/runs/[id]` and its components and stories are removed or moved; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #107, #110, #115, #116, #121.

@@ -144,7 +144,6 @@ export function LoadFailure({
   notFoundAction?: ReactNode
   namespace:
     | 'Document'
-    | 'RunDetail'
     | 'TradingPartner'
     | 'Channel'
     | 'Flow'

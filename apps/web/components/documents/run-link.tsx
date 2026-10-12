@@ -6,7 +6,7 @@ import Link from 'next/link'
 import type { ComponentProps } from 'react'
 
 import { rowLinkClass } from '@/components/detail-parts'
-import { runHref } from '@/lib/navigation'
+import { documentHref } from '@/lib/navigation'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { RunSummary } from '@edi-bridge/contracts'
@@ -26,7 +26,7 @@ export function RunLink({
   const format = useFormatter()
 
   return (
-    <Link href={runHref(run.id)} className={cn(rowLinkClass, 'tabular-nums')} {...props}>
+    <Link href={documentHref(run.id)} className={cn(rowLinkClass, 'tabular-nums')} {...props}>
       <time dateTime={run.receivedAt}>
         {format.dateTime(new Date(run.receivedAt), {
           dateStyle: 'medium',

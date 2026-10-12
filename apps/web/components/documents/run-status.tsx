@@ -55,7 +55,7 @@ export function RunStatusBadge({ status }: { status: RunStatus }) {
 }
 
 export function FailureStageLabel({ failureStage }: { failureStage: FailureStage | null }) {
-  const t = useTranslations('Runs')
+  const t = useTranslations('Documents')
   const plainNames = usePlainNames()
 
   if (failureStage === null) {

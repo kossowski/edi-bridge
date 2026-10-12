@@ -13,10 +13,10 @@ import {
   type DocumentProblem,
   parseMessageType,
 } from '@/components/documents/manual-submission'
+import { RunStatusBadge } from '@/components/documents/run-status'
+import { useRunTitle } from '@/components/documents/run-title'
 import { describedBy, FormField, SelectField } from '@/components/form-field'
 import { MessageTypeName, usePlainNames } from '@/components/plain-names'
-import { RunStatusBadge } from '@/components/runs/run-status'
-import { useRunTitle } from '@/components/runs/run-title'
 import { useLookup } from '@/hooks/use-lookup'
 import { ApiError, submitDocument } from '@/lib/api/client'
 import {
@@ -26,7 +26,7 @@ import {
   overviewKeys,
   runKeys,
 } from '@/lib/api/queries'
-import { runHref } from '@/lib/navigation'
+import { documentHref } from '@/lib/navigation'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -415,7 +415,9 @@ function CreatedRun({ run }: { run: RunSummary }) {
         </div>
       </ItemContent>
       <ItemActions>
-        <Link href={runHref(run.id)} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+        <Link
+          href={documentHref(run.id)}
+          className={buttonVariants({ variant: 'outline', size: 'sm' })}>
           {t('open')}
           <span className="sr-only">: {title}</span>
         </Link>

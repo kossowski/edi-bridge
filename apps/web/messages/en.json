@@ -550,7 +550,8 @@
         "description": "The transmissions could not be loaded. Try again.",
         "retry": "Try again"
       }
-    }
+    },
+    "noFailureStage": "No Failure Stage"
   },
   "Document": {
     "title": "Document",
@@ -841,103 +842,6 @@
       }
     }
   },
-  "Runs": {
-    "openRun": "– open Run from {tradingPartner}, {messageType}",
-    "noFailureStage": "No Failure Stage",
-    "columns": {
-      "receivedAt": "Received",
-      "status": "Status",
-      "failureStage": "Failure Stage",
-      "messageType": "Message Type",
-      "flow": "Flow"
-    },
-    "manualSubmission": {
-      "manual": "Manual Submission",
-      "channel": "Channel"
-    }
-  },
-  "RunDetail": {
-    "title": "Run",
-    "name": "Document {id}",
-    "loading": "Loading Run",
-    "notFound": {
-      "title": "Run not found",
-      "description": "No Run with this ID exists in this Workspace."
-    },
-    "error": {
-      "title": "Run unavailable",
-      "description": "The Run could not be loaded. Try again.",
-      "retry": "Try again"
-    },
-    "facts": {
-      "label": "Run details",
-      "receivedAt": "Received",
-      "tradingPartner": "Trading Partner",
-      "messageType": "Message Type",
-      "direction": "Direction",
-      "flow": "Flow",
-      "source": "Source",
-      "mappingVersion": "Mapping Version",
-      "interchange": "Transmission",
-      "replaces": "Replaces",
-      "replacedBy": "Replaced by"
-    },
-    "direction": {
-      "inbound": "Inbound",
-      "outbound": "Outbound"
-    },
-    "mappingVersion": "{mappingName}, version {version}",
-    "notMapped": "Not mapped yet",
-    "noInterchange": "None produced yet",
-    "interchangeLink": "Control reference {controlReference}",
-    "runLink": "Run {id}",
-    "failure": {
-      "title": "Error",
-      "code": "Code {code}"
-    },
-    "steps": {
-      "title": "Steps"
-    },
-    "remedy": {
-      "title": "Remedy",
-      "retry": {
-        "description": "The delivery failed. Retry repeats the delivery step unchanged.",
-        "button": "Retry",
-        "pending": "Retrying",
-        "viewOnly": "An Admin can retry the delivery step.",
-        "failed": "The Retry did not start. Try again."
-      },
-      "reprocess": {
-        "description": "The mapping failed. Reprocess starts a new Run from the original, unmodified Document with the Mapping Version you choose.",
-        "version": "Mapping Version",
-        "button": "Reprocess",
-        "pending": "Reprocessing",
-        "viewOnly": "An Admin can reprocess this Run with a chosen Mapping Version.",
-        "failed": "The Reprocess did not start. Try again.",
-        "versionsUnavailable": "The Mapping Versions could not be loaded."
-      },
-      "awaitingResend": {
-        "title": "Awaiting resend from the trading partner",
-        "description": "{failureStage}: EDI Bridge rejected the transmission from {tradingPartner} with a receipt confirmation. Only a corrected resend from the trading partner fixes it."
-      },
-      "replaced": {
-        "description": "A Reprocess replaced this Run.",
-        "link": "Open the replacing Run"
-      },
-      "none": {
-        "description": "No Retry or Reprocess is available for a Run that failed at this Failure Stage."
-      }
-    },
-    "raw": {
-      "title": "Raw Interchange",
-      "none": "This Run has not produced an Interchange yet."
-    },
-    "tree": {
-      "title": "Parsed Message",
-      "unparsed": "The Message could not be parsed. The raw Interchange shows the error position.",
-      "none": "This Run has no parsed Message yet."
-    }
-  },
   "OrderLifecycle": {
     "loading": "Loading the Order Lifecycle for {businessReference}",
     "search": {
@@ -984,7 +888,16 @@
     },
     "showAll": "Show all {count, number} {messageType} Messages",
     "showLatest": "Show the latest {count, number}",
-    "latestShown": "Latest {shown, number} of {count, number}"
+    "latestShown": "Latest {shown, number} of {count, number}",
+    "direction": {
+      "inbound": "Inbound",
+      "outbound": "Outbound"
+    },
+    "receivedAt": "Received",
+    "openDocument": "– open document from {tradingPartner}, {messageType}",
+    "interchangeLink": "Control reference {controlReference}",
+    "replacedBy": "Replaced by",
+    "documentLink": "Document {id}"
   },
   "TradingPartners": {
     "add": "Add trading partner",

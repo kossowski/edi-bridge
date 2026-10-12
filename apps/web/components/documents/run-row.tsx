@@ -7,10 +7,10 @@ import Link from 'next/link'
 
 import { FixerBadge } from '@/components/documents/fixer-badge'
 import { RelativeTime } from '@/components/documents/relative-time'
+import { RunStatusBadge } from '@/components/documents/run-status'
+import { useRunTitle } from '@/components/documents/run-title'
 import { usePlainNames } from '@/components/plain-names'
-import { RunStatusBadge } from '@/components/runs/run-status'
-import { useRunTitle } from '@/components/runs/run-title'
-import { orderHref, runHref } from '@/lib/navigation'
+import { documentHref, orderHref } from '@/lib/navigation'
 import { whoFixes } from '@edi-bridge/contracts'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -31,7 +31,7 @@ export function RunRow({ run }: { run: RunSummary }) {
   const plainNames = usePlainNames()
   const title = useRunTitle(run)
   const fixer = whoFixes(run)
-  const href = runHref(run.id)
+  const href = documentHref(run.id)
   const reference = run.businessReference
 
   return (

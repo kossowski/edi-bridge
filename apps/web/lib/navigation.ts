@@ -190,10 +190,6 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export function runHref(id: string) {
-  return `/runs/${id}`
-}
-
 export function interchangeHref(controlReference: string) {
   const search = new URLSearchParams({ view: 'transmissions', q: controlReference })
 

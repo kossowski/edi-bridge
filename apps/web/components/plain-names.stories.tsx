@@ -1,7 +1,7 @@
 import { expect } from 'storybook/test'
 
+import { FailureStageLabel, RunStatusBadge } from '@/components/documents/run-status'
 import { MessageTypeName, usePlainNames } from '@/components/plain-names'
-import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { darkMode, german } from '@/components/story-helpers'
 import { failureStages, messageTypes, runStatuses } from '@edi-bridge/contracts'
 

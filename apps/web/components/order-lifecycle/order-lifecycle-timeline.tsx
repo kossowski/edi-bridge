@@ -8,6 +8,8 @@ import { useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
 import { linkClass } from '@/components/detail-parts'
+import { RunLink, shortId } from '@/components/documents/run-link'
+import { FailureStageLabel, RunStatusBadge } from '@/components/documents/run-status'
 import { AcknowledgementStateBadge } from '@/components/order-lifecycle/acknowledgement-state'
 import {
   acknowledgementCounts,
@@ -16,9 +18,7 @@ import {
   orderLifecycleSteps,
   shownMessages,
 } from '@/components/order-lifecycle/order-lifecycle-steps'
-import { RunLink, shortId } from '@/components/runs/run-link'
-import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
-import { interchangeHref, runHref } from '@/lib/navigation'
+import { documentHref, interchangeHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -33,18 +33,16 @@ function MessageEntry({
   tradingPartner: string
 }) {
   const t = useTranslations('OrderLifecycle')
-  const tRuns = useTranslations('Runs')
-  const tRun = useTranslations('RunDetail')
   const { run, interchange } = message
 
   return (
     <li className="hover:bg-muted/50 relative flex flex-col gap-1.5 rounded-lg border p-3 text-sm">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className="font-medium">{tRun(`direction.${message.direction}`)}</span>
+        <span className="font-medium">{t(`direction.${message.direction}`)}</span>
         <span className="flex flex-wrap items-baseline gap-x-1.5">
-          <span className="text-muted-foreground">{tRuns('columns.receivedAt')}</span>
+          <span className="text-muted-foreground">{t('receivedAt')}</span>
           <RunLink
-            description={tRuns('openRun', { tradingPartner, messageType: message.messageType })}
+            description={t('openDocument', { tradingPartner, messageType: message.messageType })}
             run={{ id: run.id, receivedAt: message.receivedAt }}
           />
         </span>
@@ -64,7 +62,7 @@ function MessageEntry({
             <Link
               href={interchangeHref(interchange.controlReference)}
               className={cn(linkClass, 'relative')}>
-              {tRun('interchangeLink', { controlReference: interchange.controlReference })}
+              {t('interchangeLink', { controlReference: interchange.controlReference })}
             </Link>
           ) : (
             t('noInterchange')
@@ -78,9 +76,9 @@ function MessageEntry({
         )}
         {run.replacedBy && (
           <span>
-            {tRun('facts.replacedBy')}{' '}
-            <Link href={runHref(run.replacedBy.id)} className={cn(linkClass, 'relative')}>
-              {tRun('runLink', { id: shortId(run.replacedBy.id) })}
+            {t('replacedBy')}{' '}
+            <Link href={documentHref(run.replacedBy.id)} className={cn(linkClass, 'relative')}>
+              {t('documentLink', { id: shortId(run.replacedBy.id) })}
             </Link>
           </span>
         )}
