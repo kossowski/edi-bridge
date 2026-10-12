@@ -4,15 +4,19 @@
 
 **Blocked by:** 56 (App frame with account menu and two-row header)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The tabs are kept in the URL (`?tab=`) and render in the header's tab row
-- [ ] Every tab has the same centred width
-- [ ] Members lists users with role and last activity; inviting stays with the Operator (no email is sent in the MVP, see the spec), so Admins see who to ask
-- [ ] Retention and AI budget are shown by their effect and are read-only here
-- [ ] Viewers can change nothing; Admins see only what they can change as editable
-- [ ] The lab's Notifications tab is left out, because the MVP sends no emails
-- [ ] The current settings screen and its stories are replaced; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] The tabs are kept in the URL (`?tab=`) and render in the header's tab row
+- [x] Every tab has the same centred width
+- [x] Members lists users with role and last activity; inviting stays with the Operator (no email is sent in the MVP, see the spec), so Admins see who to ask
+- [x] Retention and AI budget are shown by their effect and are read-only here
+- [x] Viewers can change nothing; Admins see only what they can change as editable
+- [x] The lab's Notifications tab is left out, because the MVP sends no emails
+- [x] The current settings screen and its stories are replaced; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #79, #81, #85.
