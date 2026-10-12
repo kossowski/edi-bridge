@@ -2,15 +2,18 @@
 
 import { useTranslations } from 'next-intl'
 
-import type { FailureStage, MessageType } from '@edi-bridge/contracts'
+import type { FailureStage, MessageType, RunStatus } from '@edi-bridge/contracts'
 
-export type WhoFixes = 'you' | 'partner' | 'retry'
+export function usePlainNames() {
+  const t = useTranslations('PlainNames')
 
-export const failureStageWhoFixes: Record<FailureStage, WhoFixes> = {
-  parse: 'partner',
-  validation: 'partner',
-  mapping: 'you',
-  delivery: 'retry',
+  return {
+    runStatus: (status: RunStatus) => t(`runStatus.${status}`),
+    failureStageTitle: (stage: FailureStage) => t(`failureStage.${stage}.title`),
+    failureStageSummary: (stage: FailureStage) => t(`failureStage.${stage}.summary`),
+    messageTypeName: (messageType: MessageType, plural = false) =>
+      t(`messageType.${messageType}.${plural ? 'plural' : 'name'}`),
+  }
 }
 
 export function MessageTypeName({
@@ -20,11 +23,11 @@ export function MessageTypeName({
   messageType: MessageType
   plural?: boolean
 }) {
-  const t = useTranslations('PlainNames.messageType')
+  const plainNames = usePlainNames()
 
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-      {plural ? t(`${messageType}.plural`) : t(`${messageType}.name`)}
+      {plainNames.messageTypeName(messageType, plural)}
       <span className="text-muted-foreground font-mono text-xs">{messageType}</span>
     </span>
   )

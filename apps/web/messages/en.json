@@ -316,7 +316,7 @@
       "processing": "In progress",
       "delivered": "Delivered",
       "failed": "Needs attention",
-      "duplicate": "Ignored duplicate"
+      "duplicate": "Duplicate"
     },
     "failureStage": {
       "parse": {
@@ -335,11 +335,6 @@
         "title": "The document could not be delivered",
         "summary": "The receiving system did not accept the document, often because it was unreachable. Try again once it is back."
       }
-    },
-    "whoFixes": {
-      "you": "You fix this",
-      "partner": "Your trading partner fixes this",
-      "retry": "Just try again"
     }
   },
   "Runs": {
@@ -481,8 +476,8 @@
         "versionsUnavailable": "The Mapping Versions could not be loaded."
       },
       "awaitingResend": {
-        "title": "Awaiting resend from the Trading Partner",
-        "description": "{failureStage}: EDI Bridge rejected the Interchange from {tradingPartner} with a CONTRL. Only a corrected resend from the Trading Partner fixes it."
+        "title": "Awaiting resend from the trading partner",
+        "description": "{failureStage}: EDI Bridge rejected the transmission from {tradingPartner} with a receipt confirmation. Only a corrected resend from the trading partner fixes it."
       },
       "replaced": {
         "description": "A Reprocess replaced this Run.",

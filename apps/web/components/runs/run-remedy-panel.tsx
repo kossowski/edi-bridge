@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
+import { usePlainNames } from '@/components/plain-names'
 import { type RunRemedy, runRemedy } from '@/components/runs/run-remedy'
 import { useCanChange } from '@/hooks/use-session'
 import { reprocessRun, retryRun } from '@/lib/api/client'
@@ -176,7 +177,7 @@ function ViewOnlyRemedy({ remedy }: { remedy: ActionRemedy }) {
 
 export function RunRemedyPanel({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail.remedy')
-  const tFailureStage = useTranslations('PlainNames.failureStage')
+  const plainNames = usePlainNames()
   const remedy = runRemedy(run)
   const canChange = useCanChange()
 
@@ -205,7 +206,7 @@ export function RunRemedyPanel({ run }: { run: RunDetail }) {
           />
           {t('awaitingResend.description', {
             tradingPartner: run.tradingPartner.name,
-            failureStage: tFailureStage(`${run.failureStage}.title`),
+            failureStage: plainNames.failureStageTitle(run.failureStage),
           })}
         </p>
       )}

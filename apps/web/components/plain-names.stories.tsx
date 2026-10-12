@@ -1,7 +1,6 @@
-import { useTranslations } from 'next-intl'
 import { expect } from 'storybook/test'
 
-import { failureStageWhoFixes, MessageTypeName } from '@/components/plain-names'
+import { MessageTypeName, usePlainNames } from '@/components/plain-names'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { darkMode, german } from '@/components/story-helpers'
 import { failureStages, messageTypes, runStatuses } from '@edi-bridge/contracts'
@@ -9,7 +8,7 @@ import { failureStages, messageTypes, runStatuses } from '@edi-bridge/contracts'
 import preview from '../.storybook/preview'
 
 function PlainNamesOverview() {
-  const t = useTranslations('PlainNames')
+  const plainNames = usePlainNames()
 
   return (
     <div className="bg-background text-foreground flex flex-col gap-6 p-4 text-sm">
@@ -32,10 +31,7 @@ function PlainNamesOverview() {
             <dt className="font-medium">
               <FailureStageLabel failureStage={stage} />
             </dt>
-            <dd className="text-muted-foreground">
-              {t(`whoFixes.${failureStageWhoFixes[stage]}`)}
-            </dd>
-            <dd>{t(`failureStage.${stage}.summary`)}</dd>
+            <dd className="text-muted-foreground">{plainNames.failureStageSummary(stage)}</dd>
           </div>
         ))}
       </dl>
@@ -54,7 +50,7 @@ export const Light = meta.story({
     await expect(canvas.getAllByText('ORDERS')).toHaveLength(2)
     await expect(canvas.getByText('Needs attention')).toBeVisible()
     await expect(canvas.getByText('The file could not be read')).toBeVisible()
-    await expect(canvas.getAllByText('Your trading partner fixes this')).toHaveLength(2)
+    await expect(canvas.getByText('Duplicate')).toBeVisible()
   },
 })
 
@@ -65,6 +61,7 @@ export const German = meta.story({
   async play({ canvas }) {
     await expect(canvas.getByText('Bestellung')).toBeVisible()
     await expect(canvas.getByText('Handlungsbedarf')).toBeVisible()
+    await expect(canvas.getByText('Duplikat')).toBeVisible()
     await expect(canvas.getByText('Die Datei konnte nicht gelesen werden')).toBeVisible()
   },
 })

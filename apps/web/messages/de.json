@@ -316,7 +316,7 @@
       "processing": "In Bearbeitung",
       "delivered": "Zugestellt",
       "failed": "Handlungsbedarf",
-      "duplicate": "Duplikat ignoriert"
+      "duplicate": "Duplikat"
     },
     "failureStage": {
       "parse": {
@@ -335,11 +335,6 @@
         "title": "Der Beleg konnte nicht zugestellt werden",
         "summary": "Das empfangende System hat den Beleg nicht angenommen, oft weil es nicht erreichbar war. Versuchen Sie es erneut, sobald es wieder erreichbar ist."
       }
-    },
-    "whoFixes": {
-      "you": "Sie beheben das",
-      "partner": "Ihr Handelspartner behebt das",
-      "retry": "Einfach erneut versuchen"
     }
   },
   "Runs": {
@@ -481,8 +476,8 @@
         "versionsUnavailable": "Die Mapping Versions konnten nicht geladen werden."
       },
       "awaitingResend": {
-        "title": "Wartet auf erneutes Senden durch den Trading Partner",
-        "description": "{failureStage}: EDI Bridge hat das Interchange von {tradingPartner} mit einem CONTRL abgelehnt. Nur ein korrigiertes erneutes Senden durch den Trading Partner behebt den Fehler."
+        "title": "Wartet auf erneutes Senden durch den Handelspartner",
+        "description": "{failureStage}: EDI Bridge hat die Übertragung von {tradingPartner} mit einer Empfangsbestätigung abgelehnt. Nur ein korrigiertes erneutes Senden durch den Handelspartner behebt den Fehler."
       },
       "replaced": {
         "description": "Ein Reprocess hat diesen Run ersetzt.",

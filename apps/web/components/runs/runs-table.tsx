@@ -130,7 +130,7 @@ function RunRow({
       <TableCell>
         <RunStatusBadge status={run.status} />
       </TableCell>
-      <TableCell>
+      <TableCell className="max-w-56 min-w-40 whitespace-normal">
         <FailureStageLabel failureStage={run.failureStage} />
       </TableCell>
       <TableCell>{run.tradingPartner.name}</TableCell>
