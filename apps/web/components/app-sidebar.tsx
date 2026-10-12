@@ -4,7 +4,7 @@ import { ArrowDown01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 
 import { AppBrand } from '@/components/app-brand'
@@ -134,7 +134,8 @@ function CollapsibleGroup({ group, activeKey }: GroupProps) {
 
 export function AppSidebar() {
   const tShell = useTranslations('Shell')
-  const activeKey = activeSidebarItem(usePathname())
+  const searchParams = useSearchParams()
+  const activeKey = activeSidebarItem(usePathname(), searchParams)
 
   return (
     <Sidebar collapsible="icon" label={tShell('mainNavigation')}>

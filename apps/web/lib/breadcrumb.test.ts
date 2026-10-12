@@ -44,13 +44,6 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
-  it('links a section without a list page to its sidebar target', () => {
-    expect(breadcrumbTrail('/interchanges/ic-1')[0]).toEqual({
-      href: '/documents',
-      label: { kind: 'item', key: 'transmissions' },
-    })
-  })
-
   it('leaves out segments without a page of their own', () => {
     expect(breadcrumbTrail('/operator/workspaces/ws-1')).toEqual([
       { href: '/operator', label: { kind: 'session', key: 'operatorArea' } },

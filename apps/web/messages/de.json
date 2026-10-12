@@ -456,6 +456,11 @@
     }
   },
   "Documents": {
+    "views": {
+      "label": "Ansicht",
+      "documents": "Belege",
+      "transmissions": "Übertragungen"
+    },
     "filters": {
       "label": "Belege filtern",
       "search": "Bestellnummer oder Partner suchen",
@@ -463,7 +468,8 @@
       "allTradingPartners": "Alle Handelspartner",
       "messageType": "Belegart",
       "allMessageTypes": "Alle Belegarten",
-      "clear": "Filter zurücksetzen"
+      "clear": "Filter zurücksetzen",
+      "searchTransmissions": "Dateinummer, Bestellnummer oder Partner suchen"
     },
     "statusGroups": "Status",
     "list": "Belege, neueste zuerst",
@@ -514,6 +520,36 @@
       "title": "Belege nicht verfügbar",
       "description": "Die Belege konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
+    },
+    "transmissions": {
+      "explanation": "Eine Übertragung ist eine Datei, die Sie mit einem Partner austauschen. Meist enthält sie einen einzigen Beleg, eine Datei kann aber auch mehrere enthalten, zum Beispiel zwei Bestellungen, die zusammen gesendet wurden. Diese Ansicht hilft, wenn ein Partner fragt: „Haben Sie unsere Datei 00123 erhalten?“",
+      "list": "Übertragungen, neueste zuerst",
+      "loading": "Übertragungen werden geladen",
+      "count": "{count, plural, one {# Übertragung} other {# Übertragungen}}",
+      "row": {
+        "title": "{direction, select, inbound {Datei von {tradingPartner}} other {Datei an {tradingPartner}}}",
+        "fileNumber": "Nr. {controlReference}",
+        "documents": "{count, plural, one {# Beleg} other {# Belege}}"
+      },
+      "empty": {
+        "noTransmissions": {
+          "title": "Noch keine Übertragungen",
+          "description": "Dateien erscheinen hier, sobald ein Partner eine sendet oder ein Beleg an einen Partner hinausgeht."
+        },
+        "nothingMatches": {
+          "title": "Keine passenden Übertragungen",
+          "description": "Versuchen Sie eine andere Suche oder setzen Sie die Filter zurück."
+        },
+        "pageOutOfRange": {
+          "title": "Diese Seite ist leer",
+          "description": "Es gibt jetzt weniger Übertragungen. Die erste Seite zeigt die neuesten."
+        }
+      },
+      "error": {
+        "title": "Übertragungen nicht verfügbar",
+        "description": "Die Übertragungen konnten nicht geladen werden. Versuchen Sie es erneut.",
+        "retry": "Erneut versuchen"
+      }
     }
   },
   "Runs": {
@@ -639,36 +675,6 @@
       "empty": "leer",
       "unparsed": "Die Message konnte nicht geparst werden. Das rohe Interchange zeigt die Fehlerposition.",
       "none": "Dieser Run hat noch keine geparste Message."
-    }
-  },
-  "Interchange": {
-    "title": "Interchange",
-    "name": "Übertragung {controlReference}",
-    "loading": "Interchange wird geladen",
-    "notFound": {
-      "title": "Interchange nicht gefunden",
-      "description": "In diesem Workspace gibt es kein Interchange mit dieser ID."
-    },
-    "error": {
-      "title": "Interchange nicht verfügbar",
-      "description": "Das Interchange konnte nicht geladen werden. Versuchen Sie es erneut.",
-      "retry": "Erneut versuchen"
-    },
-    "facts": {
-      "label": "Details zum Interchange",
-      "direction": "Richtung",
-      "sender": "Absender",
-      "receiver": "Empfänger",
-      "party": "{name}, GLN {gln}"
-    },
-    "runs": {
-      "title": "Runs",
-      "count": "{count, plural, one {Dieses Interchange hat # Run erzeugt.} other {Dieses Interchange hat # Runs erzeugt.}}",
-      "caption": "Von diesem Interchange erzeugte Runs",
-      "columns": {
-        "message": "Message"
-      },
-      "openRun": "– Run zu Message {messageReference} öffnen, {messageType}"
     }
   },
   "OrderLifecycle": {

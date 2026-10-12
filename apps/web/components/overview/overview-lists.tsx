@@ -9,6 +9,7 @@ import { type ReactNode, useId, useState } from 'react'
 import { linkClass, rowLinkClass } from '@/components/detail-parts'
 import { HealthStatusBadge } from '@/components/overview/health-status'
 import { useFormats } from '@/components/overview/overview-formats'
+import { interchangeHref } from '@/lib/navigation'
 import {
   errorRate,
   type OverdueAcknowledgement,
@@ -258,7 +259,7 @@ function OverdueRow({
     <TableRow>
       <TableCell>
         <Link
-          href={`/interchanges/${acknowledgement.interchange.id}`}
+          href={interchangeHref(acknowledgement.interchange.controlReference)}
           aria-label={t('interchangeLink', {
             controlReference: acknowledgement.interchange.controlReference,
           })}

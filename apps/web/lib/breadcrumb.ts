@@ -23,7 +23,7 @@ function sidebarSections() {
   const byFirstSegment = new Map<string, Section>()
 
   for (const item of sidebarItems) {
-    const segment = item.href.split('/').find(Boolean)
+    const segment = item.href.split('?')[0]?.split('/').find(Boolean)
 
     if (segment !== undefined && !byFirstSegment.has(segment)) {
       byFirstSegment.set(segment, itemSection(item.key))
@@ -36,7 +36,6 @@ function sidebarSections() {
 const sections = new Map<string, Section>([
   ...sidebarSections(),
   ['runs', itemSection('documents')],
-  ['interchanges', itemSection('transmissions')],
   [
     'settings',
     { label: { kind: 'session', key: 'settings' }, href: navigationItems.settings.href },

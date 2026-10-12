@@ -16,7 +16,7 @@ import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { RunTimeline } from '@/components/runs/run-timeline'
 import { ApiError } from '@/lib/api/client'
 import { runQuery } from '@/lib/api/queries'
-import { runHref } from '@/lib/navigation'
+import { interchangeHref, runHref } from '@/lib/navigation'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { ErrorPosition, RunDetail } from '@edi-bridge/contracts'
@@ -68,7 +68,7 @@ function RunFacts({ run }: { run: RunDetail }) {
       </Fact>
       <Fact label={t('facts.interchange')}>
         {run.interchange ? (
-          <Link href={`/interchanges/${run.interchange.id}`} className={linkClass}>
+          <Link href={interchangeHref(run.interchange.controlReference)} className={linkClass}>
             {t('interchangeLink', { controlReference: run.interchange.controlReference })}
           </Link>
         ) : (
