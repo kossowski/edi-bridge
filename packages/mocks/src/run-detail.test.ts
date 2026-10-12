@@ -12,8 +12,12 @@ import {
   runEndpoint,
   type RunSummary,
   toPath,
+  waitForPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
+import { seedChannels } from './channel'
+import { seedFlows } from './flow'
+import { seedLookupTableNamed } from './lookup-table'
 import { createRun, createRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 
@@ -228,6 +232,190 @@ describe('GET /runs/:id', () => {
   })
 })
 
+describe('the problem of a failed Run', () => {
+  it('leaves an unreadable inbound Interchange to the Trading Partner', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'parse' })
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+
+    expect(body).toMatchObject({
+      problem: {
+        reason: 'unreadable',
+        whoFixes: 'partner',
+        fixTarget: {
+          kind: 'tradingPartner',
+          tradingPartnerId: hansemarkt.id,
+          name: hansemarkt.name,
+        },
+      },
+      waitingForPartnerSince: null,
+    })
+  })
+
+  it('leaves invalid inbound content to the Trading Partner', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', {
+      failureStage: 'validation',
+    })
+
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+
+    expect(body?.problem).toMatchObject({ reason: 'invalidContent', whoFixes: 'partner' })
+  })
+
+  it('points invalid outbound content at the Mapping field that fills the empty party', async () => {
+    const run = createRun({
+      id: '00000000-0000-4000-8000-000000000002',
+      tradingPartner: hansemarkt,
+      messageType: 'INVOIC',
+      flow: invoicFlow,
+      status: 'failed',
+      failureStage: 'validation',
+    })
+
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+
+    expect(body?.problem).toEqual({
+      reason: 'invalidContent',
+      whoFixes: 'you',
+      fixTarget: {
+        kind: 'mapping',
+        mappingId: body?.mappingVersion?.mappingId,
+        name: body?.mappingVersion?.mappingName,
+        fieldPath: 'supplier.gln',
+      },
+    })
+  })
+
+  it('points a missing code at the code translation that lacks it', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
+    const units = seedLookupTableNamed('Units of measure')
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+
+    expect(body?.problem).toEqual({
+      reason: 'missingCode',
+      whoFixes: 'you',
+      fixTarget: { kind: 'lookupTable', lookupTableId: units.id, name: units.name, code: 'KRT' },
+    })
+  })
+
+  it('points a missing ERP field at the Mapping field that reads it', async () => {
+    const runs = Array.from({ length: 12 }, (_, index) =>
+      createRun({
+        id: `00000000-0000-4000-8000-0000000001${String(index).padStart(2, '0')}`,
+        tradingPartner: hansemarkt,
+        messageType: 'INVOIC',
+        flow: invoicFlow,
+        status: 'failed',
+        failureStage: 'mapping',
+      }),
+    )
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+    const bodies = await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body!))
+    const missingField = bodies.find(({ problem }) => problem?.reason === 'missingField')
+
+    expect(missingField?.error?.message).toContain('lines[')
+    expect(missingField?.problem).toEqual({
+      reason: 'missingField',
+      whoFixes: 'you',
+      fixTarget: {
+        kind: 'mapping',
+        mappingId: missingField?.mappingVersion?.mappingId,
+        name: missingField?.mappingVersion?.mappingName,
+        fieldPath: 'lines[].gtin',
+      },
+    })
+  })
+
+  it('offers a retry for an unreachable destination and points at its Channel', async () => {
+    const run = createRun({
+      id: '00000000-0000-4000-8000-000000000001',
+      status: 'failed',
+      failureStage: 'delivery',
+    })
+
+    const flow = seedFlows.find(({ id }) => id === run.flow.id)!
+    const channel = seedChannels.find(({ id }) => id === flow.destinationChannelId)!
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+
+    expect(body?.problem).toEqual({
+      reason: 'unreachable',
+      whoFixes: 'retry',
+      fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
+    })
+  })
+
+  it('seeds every kind of fix target and everyone who fixes a problem', async () => {
+    const runs = createRuns({ count: 2000 })
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    const problems = await Promise.all(
+      runs
+        .filter(({ status }) => status === 'failed')
+        .map(async ({ id }) => (await getRun(id)).body!.problem!),
+    )
+
+    expect(new Set(problems.map(({ whoFixes }) => whoFixes))).toEqual(
+      new Set(['you', 'retry', 'partner']),
+    )
+    expect(new Set(problems.map(({ fixTarget }) => fixTarget?.kind))).toEqual(
+      new Set(['mapping', 'lookupTable', 'channel', 'tradingPartner']),
+    )
+  })
+
+  it('leaves a delivered Run without a problem', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001')
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+
+    expect(body).toMatchObject({ problem: null, waitingForPartnerSince: null, duplicateOf: null })
+  })
+})
+
+describe('a Duplicate', () => {
+  it('links to the earlier Run of the same Flow that it repeats', async () => {
+    const original = inboundOrders('00000000-0000-4000-8000-000000000001')
+
+    const duplicate = createRun({
+      ...original,
+      id: '00000000-0000-4000-8000-000000000002',
+      receivedAt: '2026-10-02T08:00:00.000Z',
+      status: 'duplicate',
+      failureStage: null,
+    })
+
+    server.use(...runDetailHandlers(apiUrl, { runs: [original, duplicate] }))
+
+    const { body } = await getRun(duplicate.id)
+
+    expect(body?.duplicateOf).toEqual({ id: original.id })
+  })
+
+  it('has no original when no earlier Run of the Flow is known', async () => {
+    const duplicate = createRun({
+      ...inboundOrders('00000000-0000-4000-8000-000000000002'),
+      status: 'duplicate',
+      failureStage: null,
+    })
+
+    server.use(...runDetailHandlers(apiUrl, { runs: [duplicate] }))
+
+    const { body } = await getRun(duplicate.id)
+
+    expect(body?.duplicateOf).toBeNull()
+  })
+})
+
 async function post(path: string, body?: ReprocessRunBody) {
   const response = await fetch(`${apiUrl}${path}`, {
     method: 'POST',
@@ -279,6 +467,54 @@ describe('POST /runs/:id/retry', () => {
       expect(status).toBe(409)
     },
   )
+})
+
+describe('POST /runs/:id/wait-for-partner', () => {
+  it('marks a Run that the Trading Partner fixes as waiting for the Trading Partner', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'parse' })
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+    const before = Date.now()
+
+    const { status, body } = await post(toPath(waitForPartnerEndpoint.path, { id: run.id }))
+    const { body: after } = await getRun(run.id)
+
+    expect(status).toBe(200)
+    expect(Date.parse(body!.waitingForPartnerSince!)).toBeGreaterThanOrEqual(before)
+    expect(after?.waitingForPartnerSince).toBe(body?.waitingForPartnerSince)
+  })
+
+  it('keeps the first mark when the Run is marked again', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'parse' })
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+    const path = toPath(waitForPartnerEndpoint.path, { id: run.id })
+    const { body: first } = await post(path)
+
+    const { body: second } = await post(path)
+
+    expect(second?.waitingForPartnerSince).toBe(first?.waitingForPartnerSince)
+  })
+
+  it.each(['mapping', 'delivery'] as const)(
+    'refuses a Run that failed at %s, which the Trading Partner does not fix',
+    async (failureStage) => {
+      const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage })
+      server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+      const { status } = await post(toPath(waitForPartnerEndpoint.path, { id: run.id }))
+
+      expect(status).toBe(409)
+    },
+  )
+
+  it('answers 404 for an unknown Run', async () => {
+    server.use(...runDetailHandlers(apiUrl, { runs: [] }))
+
+    const { status } = await post(
+      toPath(waitForPartnerEndpoint.path, { id: '00000000-0000-4000-8000-0000000000ff' }),
+    )
+
+    expect(status).toBe(404)
+  })
 })
 
 describe('POST /runs/:id/reprocess', () => {

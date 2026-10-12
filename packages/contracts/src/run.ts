@@ -4,7 +4,7 @@ import { controlReferenceSchema, segmentTagSchema } from './edifact'
 import { flowSummarySchema } from './flow'
 import { listPageFields, listQueryFields, many } from './list'
 import { mappingVersionSummarySchema } from './mapping-version'
-import { directionSchema, messageTypeSchema } from './message-type'
+import { type Direction, directionSchema, messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
 
 import type { Endpoint } from './endpoint'
@@ -20,6 +20,36 @@ export const failureStages = ['parse', 'validation', 'mapping', 'delivery'] as c
 export const failureStageSchema = z.enum(failureStages)
 
 export type FailureStage = z.infer<typeof failureStageSchema>
+
+export const fixers = ['you', 'retry', 'partner'] as const
+
+export const fixerSchema = z.enum(fixers)
+
+export type Fixer = z.infer<typeof fixerSchema>
+
+export function whoFixes(run: {
+  failureStage: FailureStage | null
+  direction: Direction
+}): Fixer | null {
+  switch (run.failureStage) {
+    case null: {
+      return null
+    }
+
+    case 'delivery': {
+      return 'retry'
+    }
+
+    case 'parse':
+    case 'validation': {
+      return run.direction === 'inbound' ? 'partner' : 'you'
+    }
+
+    case 'mapping': {
+      return 'you'
+    }
+  }
+}
 
 export const interchangeReferenceSchema = z.object({
   id: z.uuid(),
@@ -146,6 +176,53 @@ export const runReferenceSchema = z.object({ id: z.uuid() })
 
 export type RunReference = z.infer<typeof runReferenceSchema>
 
+export const problemReasons = [
+  'unreadable',
+  'invalidContent',
+  'missingCode',
+  'missingField',
+  'unreachable',
+] as const
+
+export const problemReasonSchema = z.enum(problemReasons)
+
+export type ProblemReason = z.infer<typeof problemReasonSchema>
+
+export const fixTargetSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('mapping'),
+    mappingId: z.uuid(),
+    name: z.string().min(1),
+    fieldPath: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('lookupTable'),
+    lookupTableId: z.uuid(),
+    name: z.string().min(1),
+    code: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('channel'),
+    channelId: z.uuid(),
+    name: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('tradingPartner'),
+    tradingPartnerId: z.uuid(),
+    name: z.string().min(1),
+  }),
+])
+
+export type FixTarget = z.infer<typeof fixTargetSchema>
+
+export const runProblemSchema = z.object({
+  reason: problemReasonSchema,
+  whoFixes: fixerSchema,
+  fixTarget: fixTargetSchema.nullable(),
+})
+
+export type RunProblem = z.infer<typeof runProblemSchema>
+
 const runDetailFields = {
   steps: z.array(runStepSchema).min(1),
   interchange: runInterchangeSchema.nullable(),
@@ -155,20 +232,54 @@ const runDetailFields = {
   replacedBy: runReferenceSchema.nullable(),
 }
 
-export const runDetailSchema = z.discriminatedUnion('status', [
-  runSummaryBaseSchema.extend({
-    ...runDetailFields,
-    status: z.literal('failed'),
-    failureStage: failureStageSchema,
-    error: runErrorSchema,
-  }),
-  runSummaryBaseSchema.extend({
-    ...runDetailFields,
-    status: runStatusSchema.exclude(['failed']),
-    failureStage: z.null(),
-    error: z.null(),
-  }),
-])
+const unfailedFields = {
+  failureStage: z.null(),
+  error: z.null(),
+  problem: z.null(),
+  waitingForPartnerSince: z.null(),
+}
+
+export const runDetailSchema = z
+  .discriminatedUnion('status', [
+    runSummaryBaseSchema.extend({
+      ...runDetailFields,
+      status: z.literal('failed'),
+      failureStage: failureStageSchema,
+      error: runErrorSchema,
+      problem: runProblemSchema,
+      waitingForPartnerSince: z.iso.datetime().nullable(),
+      duplicateOf: z.null(),
+    }),
+    runSummaryBaseSchema.extend({
+      ...runDetailFields,
+      ...unfailedFields,
+      status: z.literal('duplicate'),
+      duplicateOf: runReferenceSchema.nullable(),
+    }),
+    runSummaryBaseSchema.extend({
+      ...runDetailFields,
+      ...unfailedFields,
+      status: runStatusSchema.exclude(['failed', 'duplicate']),
+      duplicateOf: z.null(),
+    }),
+  ])
+  .superRefine((run, context) => {
+    if (run.problem && run.problem.whoFixes !== whoFixes(run)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['problem', 'whoFixes'],
+        message: 'Who fixes a problem follows from the Failure Stage and the direction',
+      })
+    }
+
+    if (run.waitingForPartnerSince !== null && run.problem?.whoFixes !== 'partner') {
+      context.addIssue({
+        code: 'custom',
+        path: ['waitingForPartnerSince'],
+        message: 'Only a Run that the Trading Partner fixes waits for the Trading Partner',
+      })
+    }
+  })
 
 export type RunDetail = z.infer<typeof runDetailSchema>
 
@@ -181,6 +292,17 @@ export const runEndpoint: Endpoint<RunDetail, undefined, undefined, '/runs/:id'>
 export const retryRunEndpoint: Endpoint<RunDetail, undefined, undefined, '/runs/:id/retry'> = {
   method: 'POST',
   path: '/runs/:id/retry',
+  response: runDetailSchema,
+}
+
+export const waitForPartnerEndpoint: Endpoint<
+  RunDetail,
+  undefined,
+  undefined,
+  '/runs/:id/wait-for-partner'
+> = {
+  method: 'POST',
+  path: '/runs/:id/wait-for-partner',
   response: runDetailSchema,
 }
 

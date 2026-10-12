@@ -28,12 +28,23 @@ type Fault = {
   message: string
 }
 
+export type MissingPiece =
+  { kind: 'code'; lookupTableName: string; code: string } | { kind: 'field'; fieldPath: string }
+
 export type GeneratedMessage = {
   reference: string
   segments: Segment[]
   parsed: ParsedMessage | null
   fault: Fault | null
   error: RunError | null
+  missing: MissingPiece | null
+}
+
+const missingUnit = { lookupTableName: 'Units of measure', code: 'KRT' } as const
+
+const gtinFields: Readonly<Partial<Record<MessageType, string>>> = {
+  DESADV: 'packages[].lines[].gtin',
+  INVOIC: 'lines[].gtin',
 }
 
 const segmentNames = new Map(
@@ -273,22 +284,46 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
     }
 
     case 'mapping': {
+      if (outbound && faker.datatype.boolean()) {
+        return { segments, fault: null }
+      }
+
       const qty = indexOf(segments, 'QTY')
 
       return {
-        segments: segments.with(qty, setComponent(segments[qty]!, 1, 3, 'KRT')),
+        segments: segments.with(qty, setComponent(segments[qty]!, 1, 3, missingUnit.code)),
         fault: {
           segment: qty,
           element: 1,
           component: 3,
           code: 'lookupMissing',
-          message: 'The Lookup Table "Units" has no entry for "KRT".',
+          message: `The Lookup Table "${missingUnit.lookupTableName}" has no entry for "${missingUnit.code}".`,
         },
       }
     }
 
     default: {
       return { segments, fault: null }
+    }
+  }
+}
+
+function gtinFieldOf(run: Pick<RunSummary, 'messageType'>) {
+  return gtinFields[run.messageType] ?? 'lines[].gtin'
+}
+
+function missingIn(run: RunSummary, error: RunError | null): MissingPiece | null {
+  switch (error?.code) {
+    case 'lookupMissing': {
+      return { kind: 'code', ...missingUnit }
+    }
+
+    case 'missingSourceField': {
+      return { kind: 'field', fieldPath: gtinFieldOf(run) }
+    }
+
+    default: {
+      return null
     }
   }
 }
@@ -304,10 +339,11 @@ function errorFor(run: RunSummary, faker: Faker, fault: Fault | null): RunError 
 
   if (run.failureStage === 'mapping') {
     const line = faker.number.int({ min: 1, max: 5 })
+    const field = gtinFieldOf(run).replace('lines[]', `lines[${line}]`)
 
     return {
       code: 'missingSourceField',
-      message: `The required source field "lines[${line}].gtin" is missing.`,
+      message: `The required source field "${field}" is missing.`,
       position: null,
     }
   }
@@ -364,12 +400,15 @@ export function generateMessage(run: RunSummary, reference: string): GeneratedMe
           })),
         }
 
+  const error = errorFor(run, faker, faulty.fault)
+
   return {
     reference,
     segments: faulty.segments,
     parsed,
     fault: faulty.fault,
-    error: errorFor(run, faker, faulty.fault),
+    error,
+    missing: missingIn(run, error),
   }
 }
 
