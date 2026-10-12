@@ -231,7 +231,7 @@ export function documentStructureHref(id: string) {
   return `${navigationItems.documentStructures.href}/${id}`
 }
 
-export function codeTranslationHref(id: string) {
+export function lookupTableHref(id: string) {
   return `${navigationItems.codeTranslations.href}/${id}`
 }
 
@@ -250,7 +250,7 @@ export function fixTargetHref(target: FixTarget) {
     case 'lookupTable': {
       const search = new URLSearchParams({ code: target.code })
 
-      return `${codeTranslationHref(target.lookupTableId)}?${search}`
+      return `${lookupTableHref(target.lookupTableId)}?${search}`
     }
 
     case 'channel': {

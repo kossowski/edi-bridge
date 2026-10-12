@@ -3341,10 +3341,13 @@
     "uses": {
       "label": "Used for",
       "use": "{documents} {direction, select, inbound {from} other {to}} {partners}",
-      "none": "Not used in a mapping yet"
+      "none": "Not used in a mapping yet",
+      "more": "and {count} more"
     },
-    "blocking": "{count, plural, one {# code blocks documents} other {# codes block documents}}",
+    "missing": "{codes} missing",
+    "moreCodes": "{count} more",
     "open": "Open",
+    "add": "Add {code}",
     "showAll": "Show all {count} lists",
     "actions": {
       "label": "Actions for {name}",
@@ -3374,57 +3377,57 @@
       "workspace": "Workspace"
     },
     "form": {
-      "createTitle": "New Lookup Table",
-      "createDescription": "Name the Lookup Table and choose where it applies. You add the entries afterwards.",
+      "createTitle": "New list",
+      "createDescription": "Name the list and choose who receives it. You add the values afterwards.",
       "editTitle": "Edit {name}",
-      "editDescription": "Rename the Lookup Table or change where it applies. The entries stay as they are.",
+      "editDescription": "Rename the list or change who receives it. The values stay as they are.",
       "close": "Close",
       "cancel": "Cancel",
-      "create": "Create Lookup Table",
+      "create": "Create list",
       "save": "Save",
       "saving": "Saving…",
       "fields": {
         "name": {
           "label": "Name",
-          "description": "Unique within the scope, e.g. Units of measure."
+          "description": "Unique for the same receiver, e.g. Units of measure."
         },
         "scope": {
-          "label": "Scope",
+          "label": "Who receives it?",
           "description": {
-            "workspace": "A Workspace Lookup Table applies to all Trading Partners.",
-            "tradingPartner": "A Trading Partner Lookup Table applies only to the chosen Trading Partner."
+            "workspace": "Every partner gets the translated codes.",
+            "tradingPartner": "Only the chosen trading partner gets the translated codes."
           },
-          "workspace": "Workspace",
-          "tradingPartner": "A single Trading Partner"
+          "workspace": "Sent to every partner",
+          "tradingPartner": "Only for one trading partner"
         },
         "tradingPartner": {
-          "label": "Trading Partner",
-          "description": "The Trading Partner this Lookup Table belongs to.",
-          "placeholder": "Choose a Trading Partner",
-          "loading": "Loading Trading Partners…",
-          "empty": "There are no Trading Partners yet. Create one first, or use the Workspace scope.",
-          "error": "The Trading Partners could not be loaded.",
+          "label": "Trading partner",
+          "description": "The trading partner who receives this list.",
+          "placeholder": "Choose a trading partner",
+          "loading": "Loading trading partners…",
+          "empty": "There are no trading partners yet. Create one first, or send the list to every partner.",
+          "error": "The trading partners could not be loaded.",
           "retry": "Try again"
         }
       },
       "errors": {
         "required": {
           "name": "Enter a name.",
-          "tradingPartnerId": "Choose a Trading Partner."
+          "tradingPartnerId": "Choose a trading partner."
         },
         "tooLong": "Use at most {max} characters.",
-        "taken": "Another Lookup Table of this scope already uses this name.",
-        "saveFailed": "The Lookup Table could not be saved. Try again."
+        "taken": "Another list for the same receiver already uses this name.",
+        "saveFailed": "The list could not be saved. Try again."
       }
     },
     "delete": {
       "title": "Delete {name}?",
-      "description": "{count, plural, =0 {The Lookup Table is deleted.} one {The Lookup Table and its # entry are deleted.} other {The Lookup Table and its # entries are deleted.}} This cannot be undone.",
+      "description": "{count, plural, =0 {The list is deleted.} one {The list and its # value are deleted.} other {The list and its # values are deleted.}} This cannot be undone.",
       "close": "Close",
       "cancel": "Cancel",
-      "confirm": "Delete Lookup Table",
+      "confirm": "Delete list",
       "pending": "Deleting…",
-      "failed": "The Lookup Table could not be deleted. Try again."
+      "failed": "The list could not be deleted. Try again."
     }
   },
   "LookupTable": {

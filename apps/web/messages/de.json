@@ -3341,10 +3341,13 @@
     "uses": {
       "label": "Verwendet für",
       "use": "{documents} {direction, select, inbound {von} other {an}} {partners}",
-      "none": "Noch in keinem Mapping verwendet"
+      "none": "Noch in keinem Mapping verwendet",
+      "more": "und {count} weitere"
     },
-    "blocking": "{count, plural, one {# Code blockiert Belege} other {# Codes blockieren Belege}}",
+    "missing": "{count, plural, one {{codes} fehlt} other {{codes} fehlen}}",
+    "moreCodes": "{count} weitere",
     "open": "Öffnen",
+    "add": "{code} hinzufügen",
     "showAll": "Alle {count} Listen anzeigen",
     "actions": {
       "label": "Aktionen für {name}",
@@ -3374,57 +3377,57 @@
       "workspace": "Workspace"
     },
     "form": {
-      "createTitle": "Neue Lookup Table",
-      "createDescription": "Benennen Sie die Lookup Table und wählen Sie, wo sie gilt. Die Einträge fügen Sie danach hinzu.",
+      "createTitle": "Neue Liste",
+      "createDescription": "Benennen Sie die Liste und wählen Sie, wer sie erhält. Die Werte fügen Sie danach hinzu.",
       "editTitle": "{name} bearbeiten",
-      "editDescription": "Benennen Sie die Lookup Table um oder ändern Sie, wo sie gilt. Die Einträge bleiben unverändert.",
+      "editDescription": "Benennen Sie die Liste um oder ändern Sie, wer sie erhält. Die Werte bleiben unverändert.",
       "close": "Schließen",
       "cancel": "Abbrechen",
-      "create": "Lookup Table anlegen",
+      "create": "Liste anlegen",
       "save": "Speichern",
       "saving": "Wird gespeichert…",
       "fields": {
         "name": {
           "label": "Name",
-          "description": "Eindeutig im Geltungsbereich, z. B. Maßeinheiten."
+          "description": "Eindeutig für denselben Empfänger, z. B. Mengeneinheiten."
         },
         "scope": {
-          "label": "Geltungsbereich",
+          "label": "Wer erhält sie?",
           "description": {
-            "workspace": "Eine Lookup Table des Workspace gilt für alle Trading Partners.",
-            "tradingPartner": "Eine Lookup Table eines Trading Partners gilt nur für den gewählten Trading Partner."
+            "workspace": "Jeder Partner erhält die übersetzten Codes.",
+            "tradingPartner": "Nur der gewählte Handelspartner erhält die übersetzten Codes."
           },
-          "workspace": "Workspace",
-          "tradingPartner": "Ein einzelner Trading Partner"
+          "workspace": "An jeden Partner gesendet",
+          "tradingPartner": "Nur für einen Handelspartner"
         },
         "tradingPartner": {
-          "label": "Trading Partner",
-          "description": "Der Trading Partner, zu dem diese Lookup Table gehört.",
-          "placeholder": "Trading Partner wählen",
-          "loading": "Trading Partners werden geladen…",
-          "empty": "Es gibt noch keine Trading Partners. Legen Sie zuerst einen an oder wählen Sie den Workspace als Geltungsbereich.",
-          "error": "Die Trading Partners konnten nicht geladen werden.",
+          "label": "Handelspartner",
+          "description": "Der Handelspartner, der diese Liste erhält.",
+          "placeholder": "Handelspartner wählen",
+          "loading": "Handelspartner werden geladen…",
+          "empty": "Es gibt noch keine Handelspartner. Legen Sie zuerst einen an oder senden Sie die Liste an jeden Partner.",
+          "error": "Die Handelspartner konnten nicht geladen werden.",
           "retry": "Erneut versuchen"
         }
       },
       "errors": {
         "required": {
           "name": "Geben Sie einen Namen ein.",
-          "tradingPartnerId": "Wählen Sie einen Trading Partner."
+          "tradingPartnerId": "Wählen Sie einen Handelspartner."
         },
         "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
-        "taken": "Eine andere Lookup Table dieses Geltungsbereichs verwendet diesen Namen bereits.",
-        "saveFailed": "Die Lookup Table konnte nicht gespeichert werden. Versuchen Sie es erneut."
+        "taken": "Eine andere Liste für denselben Empfänger verwendet diesen Namen bereits.",
+        "saveFailed": "Die Liste konnte nicht gespeichert werden. Versuchen Sie es erneut."
       }
     },
     "delete": {
       "title": "{name} löschen?",
-      "description": "{count, plural, =0 {Die Lookup Table wird gelöscht.} one {Die Lookup Table und ihr # Eintrag werden gelöscht.} other {Die Lookup Table und ihre # Einträge werden gelöscht.}} Das lässt sich nicht rückgängig machen.",
+      "description": "{count, plural, =0 {Die Liste wird gelöscht.} one {Die Liste und ihr # Wert werden gelöscht.} other {Die Liste und ihre # Werte werden gelöscht.}} Das lässt sich nicht rückgängig machen.",
       "close": "Schließen",
       "cancel": "Abbrechen",
-      "confirm": "Lookup Table löschen",
+      "confirm": "Liste löschen",
       "pending": "Wird gelöscht…",
-      "failed": "Die Lookup Table konnte nicht gelöscht werden. Versuchen Sie es erneut."
+      "failed": "Die Liste konnte nicht gelöscht werden. Versuchen Sie es erneut."
     }
   },
   "LookupTable": {

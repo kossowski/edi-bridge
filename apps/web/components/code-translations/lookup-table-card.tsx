@@ -12,7 +12,7 @@ import Link from 'next/link'
 import { useId, useRef } from 'react'
 
 import { usePlainNames } from '@/components/plain-names'
-import { codeTranslationHref } from '@/lib/navigation'
+import { lookupTableHref, mappingHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@edi-bridge/ui/components/card'
@@ -24,44 +24,48 @@ import {
 } from '@edi-bridge/ui/components/dropdown-menu'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-import type {
-  Direction,
-  LookupTableSummary,
-  LookupTableUse,
-  MessageType,
-} from '@edi-bridge/contracts'
+import type { LookupTableSummary, LookupTableUse } from '@edi-bridge/contracts'
 
 export type CardAction = (table: LookupTableSummary, trigger: HTMLElement | null) => void
 
 export type CardActions = { onEdit: CardAction; onDelete: CardAction }
 
-type UseGroup = { messageType: MessageType; direction: Direction; partners: Set<string> }
+const shownUses = 3
 
-function byMessageType(uses: ReadonlyArray<LookupTableUse>) {
-  const groups = new Map<MessageType, UseGroup>()
+const namedCodes = 2
 
-  for (const { messageType, direction, tradingPartners } of uses) {
-    const group = groups.get(messageType) ?? { messageType, direction, partners: new Set() }
+export function hasBlockingCodes(table: Pick<LookupTableSummary, 'blockingCodes'>) {
+  return table.blockingCodes.length > 0
+}
 
-    for (const { name } of tradingPartners) {
-      group.partners.add(name)
+function useUseSentence() {
+  const t = useTranslations('CodeTranslations.uses')
+  const format = useFormatter()
+  const plainNames = usePlainNames()
+
+  return ({ messageType, direction, tradingPartners }: LookupTableUse) => {
+    const documents = plainNames.messageTypeName(messageType, true)
+
+    if (tradingPartners.length === 0) {
+      return documents
     }
 
-    groups.set(messageType, group)
-  }
+    const partners = format.list(tradingPartners.map(({ name }) => name))
 
-  return [...groups.values()]
+    return t('use', { documents, direction, partners })
+  }
 }
 
 function UsesList({ uses }: { uses: ReadonlyArray<LookupTableUse> }) {
   const t = useTranslations('CodeTranslations.uses')
-  const format = useFormatter()
-  const plainNames = usePlainNames()
+  const sentence = useUseSentence()
   const labelId = useId()
 
   if (uses.length === 0) {
     return <p className="text-muted-foreground text-sm">{t('none')}</p>
   }
+
+  const hidden = uses.length - shownUses
 
   return (
     <div className="flex flex-col gap-1 text-sm">
@@ -69,19 +73,35 @@ function UsesList({ uses }: { uses: ReadonlyArray<LookupTableUse> }) {
         {t('label')}
       </p>
       <ul aria-labelledby={labelId} className="flex flex-col gap-0.5">
-        {byMessageType(uses).map(({ messageType, direction, partners }) => {
-          const documents = plainNames.messageTypeName(messageType, true)
-
-          return (
-            <li key={messageType}>
-              {partners.size === 0
-                ? documents
-                : t('use', { documents, direction, partners: format.list([...partners]) })}
-            </li>
-          )
-        })}
+        {uses.slice(0, shownUses).map((use) => (
+          <li key={use.mappingId}>
+            <Link
+              href={mappingHref(use.mappingId)}
+              className="decoration-muted-foreground/50 hover:decoration-foreground focus-visible:ring-ring/50 rounded-sm underline underline-offset-4 outline-none focus-visible:ring-3">
+              {sentence(use)}
+            </Link>
+          </li>
+        ))}
+        {hidden > 0 && <li className="text-muted-foreground">{t('more', { count: hidden })}</li>}
       </ul>
     </div>
+  )
+}
+
+function BlockingBadge({ codes }: { codes: ReadonlyArray<string> }) {
+  const t = useTranslations('CodeTranslations')
+  const format = useFormatter()
+  const hidden = codes.length - namedCodes
+  const named = codes.slice(0, namedCodes)
+
+  return (
+    <Badge variant="outline" className="bg-red-500/10 text-red-800 dark:text-red-300">
+      <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} aria-hidden />
+      {t('missing', {
+        count: codes.length,
+        codes: format.list(hidden > 0 ? [...named, t('moreCodes', { count: hidden })] : named),
+      })}
+    </Badge>
   )
 }
 
@@ -114,7 +134,7 @@ function ActionsMenu({ table, actions }: { table: LookupTableSummary; actions: C
   )
 }
 
-export function CodeTranslationCard({
+export function LookupTableCard({
   table,
   actions,
 }: {
@@ -123,23 +143,20 @@ export function CodeTranslationCard({
 }) {
   const t = useTranslations('CodeTranslations')
   const titleId = useId()
-  const href = codeTranslationHref(table.id)
-  const blocking = table.missingCodeCounts.blocking
+  const href = lookupTableHref(table.id)
+  const [firstBlockingCode] = table.blockingCodes
 
   return (
-    <Card className={cn('h-full', blocking > 0 && 'ring-destructive/40')}>
+    <Card className={cn('h-full', hasBlockingCodes(table) && 'ring-destructive/40')}>
       <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <h3 id={titleId} className="font-heading min-w-0 text-base leading-snug font-medium">
-          <Link href={href} className="break-words hover:underline">
+          <Link
+            href={href}
+            className="focus-visible:ring-ring/50 rounded-sm break-words outline-none hover:underline focus-visible:ring-3">
             {table.name}
           </Link>
         </h3>
-        {blocking > 0 && (
-          <Badge variant="outline" className="bg-red-500/10 text-red-800 dark:text-red-300">
-            <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} aria-hidden />
-            {t('blocking', { count: blocking })}
-          </Badge>
-        )}
+        {hasBlockingCodes(table) && <BlockingBadge codes={table.blockingCodes} />}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <p className="text-muted-foreground text-sm">
@@ -148,14 +165,25 @@ export function CodeTranslationCard({
         </p>
         <UsesList uses={table.uses} />
       </CardContent>
-      <CardFooter className="mt-auto flex items-center justify-end gap-2 py-3">
+      <CardFooter className="mt-auto flex flex-wrap items-center justify-end gap-2 py-3">
         {actions && <ActionsMenu actions={actions} table={table} />}
         <Link
           href={href}
           aria-describedby={titleId}
-          className={buttonVariants({ size: 'sm', variant: blocking > 0 ? 'default' : 'outline' })}>
+          className={cn(
+            buttonVariants({ size: 'sm', variant: 'outline' }),
+            'border-foreground/20 dark:border-input',
+          )}>
           {t('open')}
         </Link>
+        {firstBlockingCode !== undefined && (
+          <Link
+            href={`${href}?${new URLSearchParams({ add: firstBlockingCode })}`}
+            aria-describedby={titleId}
+            className={buttonVariants({ size: 'sm' })}>
+            {t('add', { code: firstBlockingCode })}
+          </Link>
+        )}
       </CardFooter>
     </Card>
   )

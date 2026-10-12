@@ -1,11 +1,6 @@
 'use client'
 
-import {
-  Add01Icon,
-  Building03Icon,
-  Table01Icon,
-  UserMultiple02Icon,
-} from '@hugeicons/core-free-icons'
+import { Add01Icon, Table01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
@@ -16,14 +11,20 @@ import { AppPage } from '@/components/app-page'
 import {
   type CardAction,
   type CardActions,
-  CodeTranslationCard,
-} from '@/components/code-translations/code-translation-card'
+  hasBlockingCodes,
+  LookupTableCard,
+} from '@/components/code-translations/lookup-table-card'
 import { LoadError } from '@/components/load-error'
 import { DeleteLookupTableDialog } from '@/components/lookup-tables/delete-lookup-table-dialog'
 import { LookupTableFormDialog } from '@/components/lookup-tables/lookup-table-form-dialog'
+import {
+  scopeIcons,
+  scopeKey,
+  workspaceScopeKey,
+} from '@/components/lookup-tables/lookup-table-scope'
 import { useCanChange } from '@/hooks/use-session'
 import { lookupTablesQuery } from '@/lib/api/queries'
-import { codeTranslationHref } from '@/lib/navigation'
+import { lookupTableHref } from '@/lib/navigation'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -35,53 +36,49 @@ import {
 } from '@edi-bridge/ui/components/empty'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { LookupTable, LookupTableSummary } from '@edi-bridge/contracts'
+import type { LookupTable, LookupTableScope, LookupTableSummary } from '@edi-bridge/contracts'
 
 const shownPerGroup = 12
 
-type ReceiverGroup = {
+type ScopeGroup = {
   key: string
-  tradingPartnerName: string | null
+  scope: LookupTableScope
   tables: ReadonlyArray<LookupTableSummary>
 }
 
 function blockingFirst(a: LookupTableSummary, b: LookupTableSummary) {
-  return Number(b.missingCodeCounts.blocking > 0) - Number(a.missingCodeCounts.blocking > 0)
+  return Number(hasBlockingCodes(b)) - Number(hasBlockingCodes(a))
 }
 
-function byReceiver(tables: ReadonlyArray<LookupTableSummary>): ReceiverGroup[] {
-  const workspace: LookupTableSummary[] = []
-  const partners = new Map<string, { name: string; tables: LookupTableSummary[] }>()
+function partnerName({ scope }: ScopeGroup) {
+  return scope.kind === 'tradingPartner' ? scope.tradingPartner.name : ''
+}
+
+function byScope(tables: ReadonlyArray<LookupTableSummary>): ScopeGroup[] {
+  const groups = new Map<string, { scope: LookupTableScope; tables: LookupTableSummary[] }>()
 
   for (const table of tables) {
-    if (table.scope.kind === 'workspace') {
-      workspace.push(table)
-    } else {
-      const { id, name } = table.scope.tradingPartner
-      const group = partners.get(id) ?? { name, tables: [] }
+    const key = scopeKey(table.scope)
+    const group = groups.get(key) ?? { scope: table.scope, tables: [] }
 
-      group.tables.push(table)
-      partners.set(id, group)
-    }
+    group.tables.push(table)
+    groups.set(key, group)
   }
 
-  const partnerGroups = [...partners]
-    .toSorted(([, a], [, b]) => a.name.localeCompare(b.name))
-    .map(([key, { name, tables: partnerTables }]) => ({
+  return [...groups]
+    .map(([key, group]) => ({
       key,
-      tradingPartnerName: name,
-      tables: partnerTables.toSorted(blockingFirst),
+      scope: group.scope,
+      tables: group.tables.toSorted(blockingFirst),
     }))
-
-  return [
-    ...(workspace.length > 0
-      ? [{ key: 'workspace', tradingPartnerName: null, tables: workspace.toSorted(blockingFirst) }]
-      : []),
-    ...partnerGroups,
-  ]
+    .toSorted(
+      (a, b) =>
+        Number(a.key !== workspaceScopeKey) - Number(b.key !== workspaceScopeKey) ||
+        partnerName(a).localeCompare(partnerName(b)),
+    )
 }
 
-function Group({ group, actions }: { group: ReceiverGroup; actions: CardActions | null }) {
+function Group({ group, actions }: { group: ScopeGroup; actions: CardActions | null }) {
   const t = useTranslations('CodeTranslations')
   const headingId = useId()
   const listId = useId()
@@ -92,14 +89,14 @@ function Group({ group, actions }: { group: ReceiverGroup; actions: CardActions 
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <h2 id={headingId} className="flex items-center gap-2 text-base font-semibold">
         <HugeiconsIcon
-          icon={group.tradingPartnerName === null ? Building03Icon : UserMultiple02Icon}
+          icon={scopeIcons[group.scope.kind]}
           strokeWidth={2}
           aria-hidden
           className="text-muted-foreground size-4"
         />
-        {group.tradingPartnerName === null
+        {group.scope.kind === 'workspace'
           ? t('groups.workspace')
-          : t('groups.tradingPartner', { name: group.tradingPartnerName })}
+          : t('groups.tradingPartner', { name: group.scope.tradingPartner.name })}
         <span className="text-muted-foreground font-normal tabular-nums">
           ({group.tables.length})
         </span>
@@ -107,7 +104,7 @@ function Group({ group, actions }: { group: ReceiverGroup; actions: CardActions 
       <ul id={listId} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {shown.map((table) => (
           <li key={table.id}>
-            <CodeTranslationCard actions={actions} table={table} />
+            <LookupTableCard actions={actions} table={table} />
           </li>
         ))}
       </ul>
@@ -115,7 +112,6 @@ function Group({ group, actions }: { group: ReceiverGroup; actions: CardActions 
         <Button
           variant="outline"
           aria-controls={listId}
-          aria-expanded={false}
           className="self-start"
           onClick={() => setExpanded(true)}>
           {t('showAll', { count: group.tables.length })}
@@ -227,7 +223,7 @@ export function CodeTranslationsScreen() {
 
   function saved(table: LookupTable) {
     if (!dialogs.state.form.table) {
-      router.push(codeTranslationHref(table.id))
+      router.push(lookupTableHref(table.id))
 
       return
     }
@@ -261,12 +257,10 @@ export function CodeTranslationsScreen() {
       return <NoLists onCreate={canChange ? dialogs.create : null} />
     }
 
-    return byReceiver(data).map((group) => (
-      <Group key={group.key} actions={actions} group={group} />
-    ))
+    return byScope(data).map((group) => <Group key={group.key} actions={actions} group={group} />)
   }
 
-  const blockingLists = data?.filter(({ missingCodeCounts }) => missingCodeCounts.blocking > 0)
+  const blockingLists = data?.filter(hasBlockingCodes)
 
   return (
     <AppPage
