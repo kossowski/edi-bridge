@@ -112,7 +112,7 @@ export const KeyboardShortcut = meta.story({
     await userEvent.keyboard('code translations')
     await waitFor(() => expect(dialog.getAllByRole('option')).toHaveLength(1))
     await userEvent.keyboard('{Enter}')
-    await expect(getRouter().push).toHaveBeenCalledWith('/lookup-tables')
+    await expect(getRouter().push).toHaveBeenCalledWith('/code-translations')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   },
 })

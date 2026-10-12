@@ -65,7 +65,7 @@ export const Admin = meta.story({
     )
     await expect(canvas.getByRole('link', { name: 'Code translations' })).toHaveAttribute(
       'href',
-      '/lookup-tables',
+      '/code-translations',
     )
     await expect(canvas.queryByRole('link', { name: 'Settings' })).toBeNull()
     await expect(

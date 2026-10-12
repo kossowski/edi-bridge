@@ -36,7 +36,9 @@ const meta = preview.meta({
 export const Default = meta.story({
   async play() {
     await dialog()
-    await expect(screen.getByText(/its 4 entries are deleted/)).toBeVisible()
+    await expect(
+      screen.getByText('The list and its 4 values are deleted. This cannot be undone.'),
+    ).toBeVisible()
     await expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
   },
 })
@@ -51,7 +53,7 @@ export const German = meta.story({
   ],
   async play() {
     await dialog()
-    await expect(screen.getByRole('button', { name: 'Lookup Table löschen' })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Liste löschen' })).toBeVisible()
   },
 })
 
@@ -63,6 +65,6 @@ export const Dark = meta.story({
   },
   async play() {
     await dialog()
-    await expect(screen.getByRole('button', { name: 'Delete Lookup Table' })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Delete list' })).toBeVisible()
   },
 })

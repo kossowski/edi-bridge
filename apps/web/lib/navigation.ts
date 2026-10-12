@@ -48,7 +48,7 @@ export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = 
   flows: { href: '/flows', icon: WorkflowSquare03Icon },
   mappings: { href: '/mappings', icon: FlowConnectionIcon },
   documentStructures: { href: '/data-formats', icon: HierarchySquare02Icon },
-  lookupTables: { href: '/lookup-tables', icon: Table01Icon },
+  codeTranslations: { href: '/code-translations', icon: Table01Icon },
   settings: { href: '/settings', icon: Settings02Icon },
   operator: { href: '/operator', icon: UserShield01Icon },
   help: { href: '/help', icon: HelpCircleIcon },
@@ -108,7 +108,7 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
     items: [
       { key: 'tradingPartners', page: 'tradingPartners' },
       { key: 'mappings', page: 'mappings' },
-      { key: 'codeTranslations', page: 'lookupTables' },
+      { key: 'codeTranslations', page: 'codeTranslations' },
       { key: 'dataFormats', page: 'documentStructures' },
     ],
   },
@@ -231,6 +231,10 @@ export function documentStructureHref(id: string) {
   return `${navigationItems.documentStructures.href}/${id}`
 }
 
+export function lookupTableHref(id: string) {
+  return `${navigationItems.codeTranslations.href}/${id}`
+}
+
 export function orderHref(businessReference: string) {
   return `${navigationItems.orders.href}/${encodeURIComponent(businessReference)}`
 }
@@ -246,7 +250,7 @@ export function fixTargetHref(target: FixTarget) {
     case 'lookupTable': {
       const search = new URLSearchParams({ code: target.code })
 
-      return `${navigationItems.lookupTables.href}/${target.lookupTableId}?${search}`
+      return `${lookupTableHref(target.lookupTableId)}?${search}`
     }
 
     case 'channel': {

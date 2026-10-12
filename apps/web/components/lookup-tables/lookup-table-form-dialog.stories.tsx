@@ -47,11 +47,10 @@ const meta = preview.meta({
 export const Create = meta.story({
   async play() {
     await dialog()
+    await expect(screen.getByRole('heading', { name: 'New list' })).toBeVisible()
     await expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('')
-    await expect(screen.getByRole('radio', { name: 'Workspace' })).toBeChecked()
-    await expect(
-      screen.getByText('A Workspace Lookup Table applies to all Trading Partners.'),
-    ).toBeVisible()
+    await expect(screen.getByRole('radio', { name: 'Sent to every partner' })).toBeChecked()
+    await expect(screen.getByText('Every partner gets the translated codes.')).toBeVisible()
   },
 })
 
@@ -61,11 +60,9 @@ export const EditTradingPartnerScope = meta.story({
     await dialog()
     await expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Hansemarkt units')
     await expect(
-      screen.getByText(
-        'A Trading Partner Lookup Table applies only to the chosen Trading Partner.',
-      ),
+      screen.getByText('Only the chosen trading partner gets the translated codes.'),
     ).toBeVisible()
-    const tradingPartner = await screen.findByRole('combobox', { name: 'Trading Partner' })
+    const tradingPartner = await screen.findByRole('combobox', { name: 'Trading partner' })
     await waitFor(() => expect(tradingPartner).toHaveTextContent('Hansemarkt GmbH'))
   },
 })
@@ -77,7 +74,7 @@ export const NoTradingPartners = meta.story({
   },
   async play() {
     await dialog()
-    await expect(await screen.findByText(/There are no Trading Partners yet/)).toBeVisible()
+    await expect(await screen.findByText(/There are no trading partners yet/)).toBeVisible()
   },
 })
 
@@ -93,6 +90,7 @@ export const German = meta.story({
   async play() {
     await dialog()
     await expect(screen.getByRole('heading', { name: 'Hansemarkt units bearbeiten' })).toBeVisible()
+    await expect(screen.getByRole('radio', { name: 'Nur für einen Handelspartner' })).toBeChecked()
   },
 })
 
@@ -105,7 +103,7 @@ export const Dark = meta.story({
   },
   async play() {
     await dialog()
-    const tradingPartner = await screen.findByRole('combobox', { name: 'Trading Partner' })
+    const tradingPartner = await screen.findByRole('combobox', { name: 'Trading partner' })
     await waitFor(() => expect(tradingPartner).toHaveTextContent('Hansemarkt GmbH'))
   },
 })
