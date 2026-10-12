@@ -9,6 +9,7 @@ import { LoadFailure } from '@/components/detail-parts'
 import { HeaderTabs } from '@/components/header-tabs'
 import { PartnerConnections } from '@/components/trading-partners/partner-connections-panel'
 import { PartnerDocuments } from '@/components/trading-partners/partner-documents-panel'
+import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import { PartnerLoading, PartnerOverview } from '@/components/trading-partners/partner-overview'
 import { awaitsReceiptConfirmation } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSettings } from '@/components/trading-partners/partner-settings'
@@ -115,11 +116,7 @@ export function PartnerScreen({ id }: { id: string }) {
         data && (
           <>
             <TestModeBadge testMode={data.testMode} />
-            {data.gln === null ? (
-              <span>{t('noGln')}</span>
-            ) : (
-              <span className="font-mono tabular-nums">{t('gln', { gln: data.gln })}</span>
-            )}
+            <PartnerGln gln={data.gln} label="prefix" />
           </>
         )
       }

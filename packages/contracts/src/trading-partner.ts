@@ -95,6 +95,10 @@ export function canSwitchToProduction(
   return onboardingChecklist(tradingPartner, workspaceGln).at(-1)?.state === 'current'
 }
 
+export function glnRequired(tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>) {
+  return !tradingPartner.testMode || tradingPartner.onboarding.testInterchangeSentAt !== null
+}
+
 export function canSendTestInterchange(
   tradingPartner: Pick<TradingPartner, 'gln' | 'testMode' | 'onboarding'>,
   workspaceGln: string | null,

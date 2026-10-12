@@ -1096,8 +1096,8 @@
       "settings": "Einstellungen"
     },
     "gln": "GLN {gln}",
-    "noGln": "GLN noch nicht erfasst",
-    "glnLater": "Noch nicht erfasst",
+    "glnMissing": "GLN noch nicht erfasst",
+    "glnMissingAfterLabel": "Noch nicht erfasst",
     "setup": {
       "title": "Einrichtung",
       "description": "Solange {name} im Testbetrieb ist, wird jeder Beleg als Test markiert. Gehen Sie die Schritte der Reihe nach durch.",
@@ -1446,7 +1446,7 @@
       },
       "gln": {
         "label": "GLN",
-        "description": "Die 13-stellige Standortnummer (GLN) des Partners, einschließlich Prüfziffer. Sie steht im EDI-Infoblatt des Partners. Lassen Sie das Feld leer, wenn Sie sie noch nicht haben; vor dem Testbeleg brauchen Sie sie."
+        "description": "Die 13-stellige Standortnummer (GLN) des Partners, einschließlich Prüfziffer. Sie steht im EDI-Infoblatt des Partners. Lassen Sie das Feld leer, wenn Sie sie noch nicht haben. Sobald ein Testbeleg gesendet wurde, lässt sie sich nicht mehr entfernen."
       },
       "characterSet": {
         "label": "Zeichensatz",
@@ -1473,7 +1473,8 @@
       "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
       "range": "Geben Sie eine ganze Zahl von {min} bis {max} Stunden ein.",
       "gln": {
-        "taken": "Ein anderer Trading Partner verwendet diese GLN bereits."
+        "taken": "Ein anderer Trading Partner verwendet diese GLN bereits.",
+        "stillNeeded": "Geben Sie die GLN ein. Die mit diesem Partner ausgetauschten Belege sind an sie adressiert, deshalb lässt sie sich nicht entfernen."
       },
       "saveFailed": "Der Trading Partner konnte nicht gespeichert werden. Versuchen Sie es erneut."
     },

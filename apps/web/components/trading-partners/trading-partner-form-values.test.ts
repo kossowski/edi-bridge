@@ -33,6 +33,28 @@ describe('validateTradingPartnerForm', () => {
     expect(validateTradingPartnerForm({ ...valid, gln })).toMatchObject({ input: { gln: null } })
   })
 
+  it('keeps the GLN of a Trading Partner that already exchanged a test Interchange', () => {
+    const tradingPartner = createTradingPartner({
+      testMode: true,
+      onboarding: { testInterchangeSentAt: '2026-10-01T08:00:00.000Z', contrlReceivedAt: null },
+    })
+
+    expect(validateTradingPartnerForm({ ...valid, gln: '' }, tradingPartner)).toEqual({
+      errors: { gln: 'stillNeeded' },
+    })
+  })
+
+  it('lets a Trading Partner without traffic clear its GLN', () => {
+    const tradingPartner = createTradingPartner({
+      testMode: true,
+      onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+    })
+
+    expect(validateTradingPartnerForm({ ...valid, gln: '' }, tradingPartner)).toMatchObject({
+      input: { gln: null },
+    })
+  })
+
   it('reports every invalid field at once', () => {
     expect(
       validateTradingPartnerForm({

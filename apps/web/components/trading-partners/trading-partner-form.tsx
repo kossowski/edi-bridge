@@ -35,6 +35,8 @@ function useFieldErrorMessage() {
         return t('tooLong', { max: tradingPartnerInputSchema.shape.name.maxLength ?? 0 })
       case 'range':
         return t('range', acknowledgementTimeLimitHours)
+      case 'stillNeeded':
+        return t('gln.stillNeeded')
       case 'required':
         if (field === 'name' || field === 'characterSet') {
           return t(`required.${field}`)
@@ -81,7 +83,7 @@ export function TradingPartnerForm({
     },
   })
 
-  const result = validateTradingPartnerForm(values)
+  const result = validateTradingPartnerForm(values, tradingPartner)
   const errors = submitted && 'errors' in result ? result.errors : {}
 
   const conflict =

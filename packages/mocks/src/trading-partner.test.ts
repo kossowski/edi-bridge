@@ -219,6 +219,35 @@ describe('tradingPartnerHandlers', () => {
   })
 
   it.each([
+    ['once a test Interchange was sent', awaitingContrl],
+    ['in production', { ...awaitingProduction, testMode: false }],
+  ])('refuses to clear the GLN of a Trading Partner %s', async (_, tradingPartner) => {
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [tradingPartner] }))
+    const path = toPath(updateTradingPartnerEndpoint.path, { id: tradingPartner.id })
+
+    const response = await send('PUT', path, { ...input, gln: null })
+    const stored = await send('GET', toPath(tradingPartnerEndpoint.path, tradingPartner))
+
+    expect(response.status).toBe(422)
+    expect(tradingPartnerSchema.parse(await stored.json()).gln).toBe(tradingPartner.gln)
+  })
+
+  it('lets a Trading Partner without traffic clear its GLN', async () => {
+    const notStarted = createTradingPartner({
+      gln: '0200000000035',
+      testMode: true,
+      onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+    })
+
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [notStarted] }))
+    const path = toPath(updateTradingPartnerEndpoint.path, { id: notStarted.id })
+
+    const response = await send('PUT', path, { ...input, gln: null })
+
+    expect(response.status).toBe(200)
+  })
+
+  it.each([
     ['create', 'POST', createTradingPartnerEndpoint.path],
     ['update', 'PUT', toPath(updateTradingPartnerEndpoint.path, { id: awaitingProduction.id })],
   ])('rejects a GLN that another Trading Partner uses on %s', async (_, method, path) => {

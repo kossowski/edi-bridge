@@ -324,8 +324,8 @@ function partnerOf(mappingName: string, faker: Faker): Party {
   const short = mappingName.split(':')[0]!
   const found = seedTradingPartners.find(({ name }) => name.startsWith(short))
 
-  return found
-    ? { name: found.name, gln: found.gln ?? randomGln(faker) }
+  return found?.gln
+    ? { name: found.name, gln: found.gln }
     : { name: `${short} GmbH`, gln: randomGln(faker) }
 }
 

@@ -11,6 +11,7 @@ import type { ReactNode } from 'react'
 import { AppPage } from '@/components/app-page'
 import { ListEmpty, NewLink } from '@/components/list-table'
 import { LoadError } from '@/components/load-error'
+import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import { partnerSetup } from '@/components/trading-partners/partner-setup'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
 import {
@@ -103,7 +104,6 @@ function PartnerCard({
   now: Date
 }) {
   const t = useTranslations('TradingPartners')
-  const tPartner = useTranslations('TradingPartner')
   const format = useFormatter()
 
   return (
@@ -113,13 +113,9 @@ function PartnerCard({
           <h2 className="min-w-0 break-words">{tradingPartner.name}</h2>
           <TestModeBadge testMode={tradingPartner.testMode} />
         </CardTitle>
-        {tradingPartner.gln === null ? (
-          <CardDescription className="text-xs">{tPartner('noGln')}</CardDescription>
-        ) : (
-          <CardDescription className="font-mono text-xs tabular-nums">
-            {tradingPartner.gln}
-          </CardDescription>
-        )}
+        <CardDescription className="text-xs">
+          <PartnerGln gln={tradingPartner.gln} />
+        </CardDescription>
         <CardAction>
           <Link
             href={`/trading-partners/${tradingPartner.id}`}

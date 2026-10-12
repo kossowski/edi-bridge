@@ -1,6 +1,7 @@
 import {
   acknowledgementTimeLimitHours,
   type CharacterSet,
+  glnRequired,
   type TradingPartner,
   type TradingPartnerInput,
   tradingPartnerInputSchema,
@@ -18,7 +19,7 @@ export type TradingPartnerFormValues = {
 
 export type TradingPartnerField = keyof TradingPartnerFormValues
 
-export type FieldError = 'required' | 'tooLong' | 'range' | GlnError
+export type FieldError = 'required' | 'tooLong' | 'range' | 'stillNeeded' | GlnError
 
 export type TradingPartnerFormResult =
   { input: TradingPartnerInput } | { errors: Partial<Record<TradingPartnerField, FieldError>> }
@@ -49,21 +50,34 @@ function fieldError(
 
 export function validateTradingPartnerForm(
   values: TradingPartnerFormValues,
+  tradingPartner?: TradingPartner,
 ): TradingPartnerFormResult {
+  const gln = normalizeGln(values.gln) || null
+
   const parsed = tradingPartnerInputSchema.safeParse({
     name: values.name,
-    gln: normalizeGln(values.gln) || null,
+    gln,
     characterSet: values.characterSet,
     acknowledgementTimeLimitHours: Number(values.acknowledgementTimeLimitHours),
   })
 
-  if (parsed.success) {
+  const stillNeeded = gln === null && tradingPartner !== undefined && glnRequired(tradingPartner)
+
+  if (parsed.success && !stillNeeded) {
     return { input: parsed.data }
   }
 
+  const errors: Partial<Record<TradingPartnerField, FieldError>> = parsed.success
+    ? {}
+    : fieldErrors(parsed.error.issues, fields, (field, issue) => fieldError(field, issue, values))
+
   return {
-    errors: fieldErrors(parsed.error.issues, fields, (field, issue) =>
-      fieldError(field, issue, values),
+    errors: Object.fromEntries(
+      fields.flatMap((field): Array<[TradingPartnerField, FieldError]> => {
+        const error = field === 'gln' && stillNeeded ? 'stillNeeded' : errors[field]
+
+        return error ? [[field, error]] : []
+      }),
     ),
   }
 }

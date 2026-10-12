@@ -406,6 +406,22 @@ export const SettingsClearGln = meta.story({
   },
 })
 
+export const SettingsKeepGlnAfterTest = meta.story({
+  ...at(awaiting, 'settings'),
+  async play({ canvas }) {
+    const gln = await canvas.findByLabelText('GLN')
+    await userEvent.clear(gln)
+    await userEvent.click(canvas.getByRole('button', { name: 'Save changes' }))
+    await expect(gln).toHaveAttribute('aria-invalid', 'true')
+    await expect(gln).toHaveFocus()
+    await expect(
+      canvas.getByText(
+        'Enter the GLN. Documents exchanged with this partner are addressed with it, so it cannot be removed.',
+      ),
+    ).toBeVisible()
+  },
+})
+
 export const SettingsWithoutGlnAsViewer = meta.story({
   ...at(withoutGln, 'settings'),
   ...asViewer(async ({ canvas }) => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   canSendTestInterchange,
   canSwitchToProduction,
+  glnRequired,
   onboardingChecklist,
   type TradingPartner,
   tradingPartnerInputSchema,
@@ -193,5 +194,21 @@ describe('canSendTestInterchange', () => {
     ],
   ])('refuses %s', (_, tradingPartner, gln) => {
     expect(canSendTestInterchange(tradingPartner, gln)).toBe(false)
+  })
+})
+
+describe('glnRequired', () => {
+  it('lets a Trading Partner without traffic leave its GLN for later', () => {
+    expect(glnRequired(partner())).toBe(false)
+  })
+
+  it.each<[string, OnboardingPartner]>([
+    [
+      'once a test Interchange was sent',
+      partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: null } }),
+    ],
+    ['for a Trading Partner in production', partner({ testMode: false })],
+  ])('needs the GLN %s', (_, tradingPartner) => {
+    expect(glnRequired(tradingPartner)).toBe(true)
   })
 })

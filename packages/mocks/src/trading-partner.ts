@@ -7,6 +7,7 @@ import {
   type CharacterSet,
   characterSets,
   createTradingPartnerEndpoint,
+  glnRequired,
   switchToProductionEndpoint,
   type TradingPartner,
   tradingPartnerEndpoint,
@@ -20,7 +21,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { randomGln } from './gln'
-import { conflict } from './responses'
+import { conflict, unprocessable } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { seedWorkspace, toWorkspaceStore, type WorkspaceStore } from './workspace'
@@ -42,7 +43,7 @@ function onboarded(day: string): TradingPartnerOnboarding {
 const seeds: ReadonlyArray<
   Pick<TradingPartner, 'name' | 'characterSet' | 'acknowledgementTimeLimitHours' | 'testMode'> & {
     onboarding: TradingPartnerOnboarding
-    glnLater?: true
+    gln?: null
   }
 > = [
   {
@@ -100,17 +101,15 @@ const seeds: ReadonlyArray<
     acknowledgementTimeLimitHours: 24,
     testMode: true,
     onboarding: notStarted,
-    glnLater: true,
+    gln: null,
   },
 ]
 
-export const seedTradingPartners: ReadonlyArray<TradingPartner> = seeds.map(
-  ({ glnLater, ...seed }, index) => {
-    const id = seedId(1, index + 1)
+export const seedTradingPartners: ReadonlyArray<TradingPartner> = seeds.map((seed, index) => {
+  const id = seedId(1, index + 1)
 
-    return tradingPartnerSchema.parse({ ...seed, id, gln: glnLater ? null : seedGln(id) })
-  },
-)
+  return tradingPartnerSchema.parse({ id, gln: seedGln(id), ...seed })
+})
 
 function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
   const stage = faker.helpers.weightedArrayElement([
@@ -172,11 +171,11 @@ export function createTradingPartners({
 
     const { gln } = tradingPartner
 
-    if (gln !== null && glns.has(gln)) {
-      continue
-    }
-
     if (gln !== null) {
+      if (glns.has(gln)) {
+        continue
+      }
+
       glns.add(gln)
     }
 
@@ -338,6 +337,10 @@ export function tradingPartnerHandlers(
 
         if (glnTaken(parsed.input.gln, existing.id)) {
           return glnConflict()
+        }
+
+        if (parsed.input.gln === null && glnRequired(existing)) {
+          return unprocessable('The Trading Partner needs its GLN once Interchanges were exchanged')
         }
 
         const updated = { ...existing, ...parsed.input }
