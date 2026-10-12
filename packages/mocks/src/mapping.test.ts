@@ -2,6 +2,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  createMappingEndpoint,
   documentStructureEndpoint,
   lookupTablesEndpoint,
   type MappingDraft,
@@ -18,19 +19,26 @@ import {
 
 import {
   createDocumentStructure,
+  createDocumentStructures,
   documentStructureHandlers,
+  seedDocumentStructureOf,
   documentStructureLeaves,
 } from './document-structure'
-import { seedMappings } from './flow'
+import { seedFlows, seedMappings } from './flow'
 import { createLookupTables, lookupTableListHandler, seedLookupTables } from './lookup-table'
 import {
   createMappingDrafts,
   createMappingDraftStore,
+  createMappingsWithTraffic,
   mappingHandlers,
   type MappingDraftRecord,
+  mappingsStateHandlers,
   seedMappingDrafts,
+  unpublishedDraftId,
 } from './mapping'
 import { edifactLeaves, messageTypeStructureHandler } from './message-type-structure'
+import { createRun } from './run'
+import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
 
@@ -161,6 +169,93 @@ describe('GET /mappings', () => {
     expect(await listMappings()).toEqual([])
   })
 
+  it('serves a large volume of generated Mappings with their partners and traffic', async () => {
+    server.use(...mappingHandlers(apiUrl, createMappingsWithTraffic({ count: 300 })))
+    const mappings = await listMappings()
+
+    expect(mappings).toHaveLength(300)
+    expect(mappings.some(({ partners }) => partners.length > 1)).toBe(true)
+    expect(mappings.some(({ failedRunsLast7Days }) => failedRunsLast7Days > 0)).toBe(true)
+    expect(
+      mappings.some(
+        ({ documentsLast7Days, failedRunsLast7Days }) =>
+          documentsLast7Days > 0 && failedRunsLast7Days === 0,
+      ),
+    ).toBe(true)
+    expect(mappings.some(({ latestVersion }) => latestVersion === null)).toBe(true)
+  })
+
+  it('names the Trading Partners whose Flows use each Mapping', async () => {
+    server.use(...mappingHandlers(apiUrl))
+    const mappings = await listMappings()
+
+    for (const flow of seedFlows) {
+      const { mappingId } = seedMappings.find(({ versions }) =>
+        versions.some(({ id }) => id === flow.mappingVersionId),
+      )!
+
+      const tradingPartner = seedTradingPartners.find(({ id }) => id === flow.tradingPartnerId)!
+
+      expect(mappings.find(({ id }) => id === mappingId)?.partners).toContainEqual({
+        id: tradingPartner.id,
+        name: tradingPartner.name,
+      })
+    }
+
+    expect(mappings.find(({ id }) => id === unpublishedDraftId)?.partners).toEqual([])
+  })
+
+  it('counts the Documents and failed Runs of the last 7 days of the Flows using a Mapping', async () => {
+    const [flow, otherFlow] = seedFlows
+    const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString()
+    const ofFlow = { id: flow!.id, name: flow!.name }
+
+    const runs = [
+      createRun({ flow: ofFlow, receivedAt: daysAgo(1), status: 'delivered', failureStage: null }),
+      createRun({ flow: ofFlow, receivedAt: daysAgo(2), status: 'failed', failureStage: 'parse' }),
+      createRun({ flow: ofFlow, receivedAt: daysAgo(6), status: 'processing', failureStage: null }),
+      createRun({ flow: ofFlow, receivedAt: daysAgo(8), status: 'failed', failureStage: 'parse' }),
+      createRun({
+        flow: { id: otherFlow!.id, name: otherFlow!.name },
+        receivedAt: daysAgo(1),
+        status: 'failed',
+        failureStage: 'parse',
+      }),
+    ]
+
+    server.use(...mappingHandlers(apiUrl, { runs }))
+    const mappings = await listMappings()
+    const { mappingId } = seedMappings[0]!
+
+    expect(mappings.find(({ id }) => id === mappingId)).toMatchObject({
+      documentsLast7Days: 3,
+      failedRunsLast7Days: 1,
+    })
+    expect(mappings.find(({ id }) => id === unpublishedDraftId)).toMatchObject({
+      documentsLast7Days: 0,
+      failedRunsLast7Days: 0,
+    })
+  })
+
+  it('tells when the latest version was published and whether the Draft changed since', async () => {
+    server.use(...mappingHandlers(apiUrl))
+    const mappings = await listMappings()
+
+    for (const { mappingId, versions } of seedMappings) {
+      expect(mappings.find(({ id }) => id === mappingId)).toMatchObject({
+        latestVersionPublishedAt: versions[0]!.publishedAt,
+        unpublishedChanges: seedMappingDrafts.find(({ id }) => id === mappingId)!
+          .unpublishedChanges,
+      })
+    }
+
+    expect(mappings.find(({ id }) => id === unpublishedDraftId)).toMatchObject({
+      latestVersion: null,
+      latestVersionPublishedAt: null,
+      unpublishedChanges: true,
+    })
+  })
+
   it('serves a large volume of generated Mappings in both directions', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: createMappingDrafts({ count: 300 }) }))
     const mappings = await listMappings()
@@ -170,6 +265,107 @@ describe('GET /mappings', () => {
       new Set(['inbound', 'outbound']),
     )
   })
+})
+
+async function createMapping(body: { messageType?: string }) {
+  return fetch(`${apiUrl}${createMappingEndpoint.path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+describe('POST /mappings', () => {
+  it('creates a never-published Mapping for the Message Type, without traffic', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+    const response = await createMapping({ messageType: 'INVOIC' })
+
+    expect(response.status).toBe(201)
+    expect(createMappingEndpoint.response.parse(await response.json())).toMatchObject({
+      direction: 'outbound',
+      messageType: 'INVOIC',
+      latestVersion: null,
+      latestVersionPublishedAt: null,
+      unpublishedChanges: true,
+      partners: [],
+      documentsLast7Days: 0,
+      failedRunsLast7Days: 0,
+    })
+  })
+
+  it('uses the Document Structure the other Mappings of the Message Type use', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+
+    const created = createMappingEndpoint.response.parse(
+      await (await createMapping({ messageType: 'ORDERS' })).json(),
+    )
+
+    expect(created).toMatchObject({
+      direction: 'inbound',
+      documentStructureId: seedDocumentStructureOf.ORDERS.id,
+      documentStructureName: seedDocumentStructureOf.ORDERS.name,
+    })
+  })
+
+  it('falls back to the first Document Structure of the Workspace', async () => {
+    const documentStructures = createDocumentStructures({ count: 2 })
+
+    server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures }))
+
+    const created = createMappingEndpoint.response.parse(
+      await (await createMapping({ messageType: 'DESADV' })).json(),
+    )
+
+    expect(created.documentStructureId).toBe(documentStructures[0]!.id)
+  })
+
+  it('opens the created Mapping with an empty Draft and lists it', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+
+    const created = createMappingEndpoint.response.parse(
+      await (await createMapping({ messageType: 'DESADV' })).json(),
+    )
+
+    expect(await getDraft(created.id)).toMatchObject({
+      mappingId: created.id,
+      name: created.name,
+      direction: 'outbound',
+      target: { kind: 'messageType', messageType: 'DESADV' },
+      links: [],
+      transforms: [],
+      transformLinks: [],
+      latestVersion: null,
+      unpublishedChanges: true,
+      aiReview: null,
+    })
+    expect(await listMappings()).toContainEqual(created)
+  })
+
+  it('refuses a Workspace without a Document Structure with a plain reason', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }))
+    const response = await createMapping({ messageType: 'INVOIC' })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({
+      message: 'The Workspace has no Document Structure to map yet.',
+    })
+  })
+
+  it('fails listing and creating Mappings in the error state', async () => {
+    server.use(...mappingsStateHandlers(apiUrl, 'error'))
+
+    expect((await get(mappingsEndpoint.path)).status).toBe(500)
+    expect((await createMapping({ messageType: 'INVOIC' })).status).toBe(500)
+  })
+
+  it.each([{ messageType: 'CONTRL' }, { messageType: 'APERAK' }, {}])(
+    'rejects the body %j',
+    async (body) => {
+      server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+
+      expect((await createMapping(body)).status).toBe(400)
+    },
+  )
 })
 
 describe('GET /mappings/:id/draft', () => {

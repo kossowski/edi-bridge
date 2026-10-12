@@ -17,6 +17,7 @@ import type {
   MappingComparisonQuery,
   MappingDraft,
   MappingGraph,
+  MappingSummary,
   MappingVersionSummary,
   MessageType,
   OverviewWindow,
@@ -252,6 +253,15 @@ export const mappingsQuery = queryOptions({
   queryKey: mappingKeys.list(),
   queryFn: listMappings,
 })
+
+export function storeCreatedMapping(queryClient: QueryClient, created: MappingSummary) {
+  queryClient.setQueryData<MappingSummary[]>(
+    mappingsQuery.queryKey,
+    (mappings) =>
+      mappings && [...mappings, created].sort((a, b) => a.name.localeCompare(b.name, 'de')),
+  )
+  void queryClient.invalidateQueries({ queryKey: mappingKeys.list() })
+}
 
 export function mappingDraftQuery(id: string) {
   return queryOptions({

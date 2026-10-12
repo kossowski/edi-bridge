@@ -151,10 +151,13 @@ export { manualSubmissionHandler } from './manual-submission'
 export {
   createMappingDrafts,
   createMappingDraftStore,
+  createMappingsWithTraffic,
   incompleteDraftId,
   mappingHandlers,
   type MappingDraftRecord,
   type MappingDraftStore,
+  type MappingsState,
+  mappingsStateHandlers,
   seedMappingDrafts,
   toMappingDraft,
   toMappingDraftStore,
@@ -410,6 +413,10 @@ export function createHandlers(
     ...mappingHandlers(apiUrl, {
       mappings: mappingDraftStore,
       documentStructures: documentStructureStore,
+      flows,
+      runs,
+      tradingPartners: tradingPartnerStore,
+      versions: mappingVersionStore,
     }),
     ...aiDraftHandlers(apiUrl, {
       ...aiDraft,

@@ -15,6 +15,8 @@ import {
   type CreateDocumentStructureBody,
   createDocumentStructureEndpoint,
   createFlowEndpoint,
+  type CreateMappingBody,
+  createMappingEndpoint,
   createInviteEndpoint,
   createLookupTableEndpoint,
   createTradingPartnerEndpoint,
@@ -383,6 +385,10 @@ export function aiBudgetExhaustedProblemOf(error: Error | null): AiBudgetExhaust
 
 export function listMappings() {
   return request(mappingsEndpoint)
+}
+
+export function createMapping(body: CreateMappingBody) {
+  return request(createMappingEndpoint, { body })
 }
 
 export function getMappingDraft(id: string) {

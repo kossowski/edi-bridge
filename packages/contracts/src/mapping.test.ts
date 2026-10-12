@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { type MappingDraft, mappingDraftSchema, saveMappingDraftBodySchema } from './mapping'
+import {
+  createMappingEndpoint,
+  type MappingDraft,
+  mappingDraftSchema,
+  type MappingSummary,
+  mappingSummarySchema,
+  saveMappingDraftBodySchema,
+} from './mapping'
 
 import type { MappingTransform, TransformLink } from './transform'
 
@@ -41,6 +48,93 @@ const inbound: MappingDraft = {
   unpublishedChanges: false,
   aiReview: null,
 }
+
+const summary: MappingSummary = {
+  id: '00000007-0000-4000-8000-000000000003',
+  name: 'Hansemarkt: ERP JSON to INVOIC',
+  direction: 'outbound',
+  messageType: 'INVOIC',
+  documentStructureId: '00000006-0000-4000-8000-000000000003',
+  documentStructureName: 'ERP invoice',
+  latestVersion: 3,
+  latestVersionPublishedAt: '2026-08-20T09:00:00.000Z',
+  unpublishedChanges: true,
+  draftUpdatedAt: '2026-09-14T08:30:00.000Z',
+  partners: [
+    { id: '00000001-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' },
+    { id: '00000001-0000-4000-8000-000000000002', name: 'Alpenfrisch Märkte AG' },
+  ],
+  documentsLast7Days: 42,
+  failedRunsLast7Days: 3,
+}
+
+const neverPublished: MappingSummary = {
+  ...summary,
+  latestVersion: null,
+  latestVersionPublishedAt: null,
+  unpublishedChanges: true,
+  partners: [],
+  documentsLast7Days: 0,
+  failedRunsLast7Days: 0,
+}
+
+describe('mappingSummarySchema', () => {
+  it.each([summary, neverPublished])(
+    'accepts the facts a Mapping card shows (latest version $latestVersion)',
+    (mapping) => {
+      expect(mappingSummarySchema.parse(mapping)).toEqual(mapping)
+    },
+  )
+
+  it('has a publication date exactly when it has a latest version', () => {
+    expect(
+      mappingSummarySchema.safeParse({ ...summary, latestVersionPublishedAt: null }).success,
+    ).toBe(false)
+    expect(
+      mappingSummarySchema.safeParse({
+        ...neverPublished,
+        latestVersionPublishedAt: '2026-08-20T09:00:00.000Z',
+      }).success,
+    ).toBe(false)
+  })
+
+  it('has unpublished changes when it was never published', () => {
+    expect(
+      mappingSummarySchema.safeParse({ ...neverPublished, unpublishedChanges: false }).success,
+    ).toBe(false)
+  })
+
+  it('counts no more failed Runs than Documents', () => {
+    expect(
+      mappingSummarySchema.safeParse({ ...summary, documentsLast7Days: 2, failedRunsLast7Days: 3 })
+        .success,
+    ).toBe(false)
+  })
+
+  it('lists each Trading Partner once', () => {
+    const [partner] = summary.partners
+
+    expect(
+      mappingSummarySchema.safeParse({ ...summary, partners: [partner, partner] }).success,
+    ).toBe(false)
+  })
+})
+
+describe('createMappingEndpoint', () => {
+  it.each(['ORDERS', 'DESADV', 'INVOIC'] as const)('creates a Mapping for %s', (messageType) => {
+    expect(createMappingEndpoint.body.parse({ messageType })).toEqual({ messageType })
+  })
+
+  it('creates no Mapping for CONTRL, which is linked to its Interchange, not mapped', () => {
+    expect(createMappingEndpoint.body.safeParse({ messageType: 'CONTRL' }).success).toBe(false)
+  })
+
+  it('takes only the Message Type', () => {
+    expect(
+      createMappingEndpoint.body.safeParse({ messageType: 'INVOIC', name: 'Invoices' }).success,
+    ).toBe(false)
+  })
+})
 
 describe('mappingDraftSchema', () => {
   it.each([outbound, inbound])(
