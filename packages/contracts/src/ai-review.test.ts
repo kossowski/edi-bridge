@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { aiReviewKeys, type AiReview, remainingAiReview, transformLinkKey } from './ai-review'
+import {
+  acceptedAiReview,
+  aiReviewKeys,
+  type AiReview,
+  remainingAiReview,
+  transformLinkKey,
+} from './ai-review'
 
 import type { GraphParts } from './mapping'
 import type { MappingTransform, TransformLink } from './transform'
@@ -113,5 +119,32 @@ describe('remainingAiReview', () => {
     }
 
     expect(remainingAiReview(review, proposed, after)).toEqual(review)
+  })
+})
+
+describe('acceptedAiReview', () => {
+  it('drops the marks of the accepted parts and keeps the others', () => {
+    expect(
+      acceptedAiReview(review, {
+        links: ['BGM/1004'],
+        transforms: [dateFormat.id],
+        transformLinks: [`input:${dateFormat.id}/value`, 'target:DTM+137/C507/2380'],
+      }),
+    ).toEqual({
+      sampleId: review.sampleId,
+      proposedLinks: ['SG2+BY/NAD+BY/C082/3039'],
+      proposedTransforms: [],
+      proposedTransformLinks: [],
+    })
+  })
+
+  it('closes the review once nothing proposed is left', () => {
+    expect(
+      acceptedAiReview(review, {
+        links: ['BGM/1004', 'SG2+BY/NAD+BY/C082/3039'],
+        transforms: [dateFormat.id],
+        transformLinks: [`input:${dateFormat.id}/value`, 'target:DTM+137/C507/2380'],
+      }),
+    ).toBeNull()
   })
 })

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { aiReviewKeys } from './ai-review'
+import { aiReviewKeys, type AiReviewParts, aiReviewPartsSchema } from './ai-review'
 import { type Endpoint, type EventStreamEndpoint, parseStreamEvent } from './endpoint'
 import { type MappingDraft, mappingDraftSchema, mappingGraphSchema } from './mapping'
 import { aiTokenBudgetSchema } from './workspace-settings'
@@ -100,6 +100,28 @@ export const acceptAiDraftEndpoint: Endpoint<
 > = {
   method: 'POST',
   path: '/mappings/:id/ai-draft/accept',
+  response: mappingDraftSchema,
+}
+
+export const acceptAiProposedPartsBodySchema = aiReviewPartsSchema.refine(
+  ({ links, transforms, transformLinks }) =>
+    links.length + transforms.length + transformLinks.length > 0,
+  { message: 'Accept at least one AI-proposed part' },
+)
+
+export type AcceptAiProposedPartsBody = AiReviewParts
+
+// Accepting parts drops their marks from the AI review; once no mark is left, the review closes
+// and the returned Draft's `aiReview` is null.
+export const acceptAiProposedPartsEndpoint: Endpoint<
+  MappingDraft,
+  undefined,
+  AcceptAiProposedPartsBody,
+  '/mappings/:id/ai-draft/accept-parts'
+> = {
+  method: 'POST',
+  path: '/mappings/:id/ai-draft/accept-parts',
+  body: acceptAiProposedPartsBodySchema,
   response: mappingDraftSchema,
 }
 

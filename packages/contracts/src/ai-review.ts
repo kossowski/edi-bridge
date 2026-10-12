@@ -104,3 +104,33 @@ export function remainingAiReview(review: AiReview, before: GraphParts, after: G
     ),
   }
 }
+
+export const aiReviewPartsSchema = z.object({
+  links: z.array(z.string().min(1)),
+  transforms: z.array(z.uuid()),
+  transformLinks: z.array(z.string().min(1)),
+})
+
+export type AiReviewParts = z.infer<typeof aiReviewPartsSchema>
+
+export function acceptedAiReview(review: AiReview, accepted: AiReviewParts): AiReview | null {
+  const without = (marked: ReadonlyArray<string>, keys: ReadonlyArray<string>) => {
+    const gone = new Set(keys)
+
+    return marked.filter((key) => !gone.has(key))
+  }
+
+  const remaining = {
+    ...review,
+    proposedLinks: without(review.proposedLinks, accepted.links),
+    proposedTransforms: without(review.proposedTransforms, accepted.transforms),
+    proposedTransformLinks: without(review.proposedTransformLinks, accepted.transformLinks),
+  }
+
+  const left =
+    remaining.proposedLinks.length +
+    remaining.proposedTransforms.length +
+    remaining.proposedTransformLinks.length
+
+  return left === 0 ? null : remaining
+}
