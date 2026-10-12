@@ -60,6 +60,11 @@ export {
   type ChannelSummary,
   channelSummarySchema,
   channelsEndpoint,
+  type ChannelTestFailureReason,
+  channelTestFailureReasons,
+  channelTestFailureReasonSchema,
+  type ChannelTestResult,
+  channelTestResultSchema,
   type ChannelType,
   channelTypeSchema,
   channelTypes,
@@ -79,6 +84,7 @@ export {
   sftpAuthenticationSchema,
   sftpAuthentications,
   sftpPort,
+  testChannelEndpoint,
   updateChannelEndpoint,
   webhookAuthorization,
   webhookPath,
@@ -495,6 +501,7 @@ export {
 
 export {
   acknowledgementTimeLimitHours,
+  canSendTestInterchange,
   canSwitchToProduction,
   type CharacterSet,
   characterSetSchema,
@@ -505,6 +512,7 @@ export {
   type OnboardingStep,
   type OnboardingStepState,
   onboardingSteps,
+  sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
   type TradingPartner,
   tradingPartnerEndpoint,
@@ -518,6 +526,23 @@ export {
   tradingPartnersEndpoint,
   updateTradingPartnerEndpoint,
 } from './trading-partner'
+
+export {
+  type ActivityDay,
+  activityDays,
+  activityDaySchema,
+  type FlowActivity,
+  flowActivitySchema,
+  type OpenProblem,
+  openProblemListLimit,
+  openProblemSchema,
+  tradingPartnerActivitiesEndpoint,
+  type TradingPartnerActivity,
+  type TradingPartnerActivityDetail,
+  tradingPartnerActivityDetailSchema,
+  tradingPartnerActivityEndpoint,
+  tradingPartnerActivitySchema,
+} from './trading-partner-activity'
 
 export {
   createInviteEndpoint,

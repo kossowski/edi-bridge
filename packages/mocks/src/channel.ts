@@ -7,6 +7,8 @@ import {
   type ChannelInput,
   channelInputSchema,
   type ChannelKind,
+  type ChannelTestFailureReason,
+  type ChannelTestResult,
   channelKinds,
   channelSchema,
   channelsEndpoint,
@@ -16,6 +18,7 @@ import {
   type MaskedSecret,
   regenerateWebhookTokenEndpoint,
   sftpAuthentications,
+  testChannelEndpoint,
   toPath,
   updateChannelEndpoint,
   webhookPath,
@@ -340,11 +343,32 @@ function applyUpdate(
   return kindChanged()
 }
 
+const awaitingContrl = seedTradingPartners.find(
+  ({ testMode, onboarding }) =>
+    testMode && onboarding.testInterchangeSentAt !== null && onboarding.contrlReceivedAt === null,
+)
+
+const rejectedLogin = seedChannels.find(
+  ({ type, direction, tradingPartnerId }) =>
+    type === 'sftp' && direction === 'outbound' && tradingPartnerId === awaitingContrl?.id,
+)
+
+export const seedConnectionFailures: ReadonlyMap<string, ChannelTestFailureReason> = new Map(
+  rejectedLogin ? [[rejectedLogin.id, 'loginRejected']] : [],
+)
+
 export function channelHandlers(
   apiUrl: string,
-  { channels = seedChannels }: { channels?: ReadonlyArray<ChannelRecord> | ChannelStore } = {},
+  {
+    channels = seedChannels,
+    connectionFailures = seedConnectionFailures,
+  }: {
+    channels?: ReadonlyArray<ChannelRecord> | ChannelStore
+    connectionFailures?: ReadonlyMap<string, ChannelTestFailureReason>
+  } = {},
 ) {
   const store = toChannelStore(channels)
+  const failures = new Map(connectionFailures)
 
   return [
     http.get(`${apiUrl}${channelsEndpoint.path}`, () =>
@@ -405,6 +429,7 @@ export function channelHandlers(
         }
 
         store.set(updated.record)
+        failures.delete(existing.id)
 
         return HttpResponse.json(toChannel(updated.record, apiUrl))
       },
@@ -424,6 +449,18 @@ export function channelHandlers(
       store.set(updated)
 
       return HttpResponse.json({ channel: toChannel(updated, apiUrl), webhookToken: updated.token })
+    }),
+    http.post<{ id: string }>(`${apiUrl}${testChannelEndpoint.path}`, ({ params }) => {
+      if (!store.get(params.id)) {
+        return notFound()
+      }
+
+      const testedAt = new Date().toISOString()
+      const reason = failures.get(params.id)
+
+      return HttpResponse.json<ChannelTestResult>(
+        reason ? { outcome: 'failed', reason, testedAt } : { outcome: 'succeeded', testedAt },
+      )
     }),
   ]
 }

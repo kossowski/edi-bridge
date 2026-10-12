@@ -88,6 +88,17 @@ export function canSwitchToProduction(
   return onboardingChecklist(tradingPartner, workspaceGln).at(-1)?.state === 'current'
 }
 
+export function canSendTestInterchange(
+  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+  workspaceGln: string | null,
+) {
+  return (
+    tradingPartner.testMode &&
+    workspaceGln !== null &&
+    tradingPartner.onboarding.contrlReceivedAt === null
+  )
+}
+
 export const tradingPartnersEndpoint: Endpoint<TradingPartner[]> = {
   method: 'GET',
   path: '/trading-partners',
@@ -137,5 +148,16 @@ export const switchToProductionEndpoint: Endpoint<
 > = {
   method: 'POST',
   path: '/trading-partners/:id/production',
+  response: tradingPartnerSchema,
+}
+
+export const sendTestInterchangeEndpoint: Endpoint<
+  TradingPartner,
+  undefined,
+  undefined,
+  '/trading-partners/:id/test-interchange'
+> = {
+  method: 'POST',
+  path: '/trading-partners/:id/test-interchange',
   response: tradingPartnerSchema,
 }

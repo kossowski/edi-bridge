@@ -8,6 +8,7 @@ import {
   channelsEndpoint,
   createChannelEndpoint,
   regenerateWebhookTokenEndpoint,
+  testChannelEndpoint,
   toPath,
   updateChannelEndpoint,
 } from '@edi-bridge/contracts'
@@ -19,6 +20,7 @@ import {
   createChannels,
   createChannelStore,
   seedChannels,
+  seedConnectionFailures,
   toChannel,
 } from './channel'
 import { seedTradingPartners } from './trading-partner'
@@ -29,7 +31,10 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers()
+  vi.useRealTimers()
+})
 
 afterAll(() => server.close())
 
@@ -326,5 +331,74 @@ describe('channelHandlers', () => {
     const response = await send('POST', toPath(regenerateWebhookTokenEndpoint.path, existing))
 
     expect(response.status).toBe(409)
+  })
+})
+
+describe('POST /channels/:id/test', () => {
+  async function testChannel(id: string) {
+    const response = await send('POST', toPath(testChannelEndpoint.path, { id }))
+
+    const body: unknown = await response.json()
+
+    return { status: response.status, body }
+  }
+
+  it('reaches a working Channel', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-10T12:00:00.000Z'))
+    const existing = createChannel({ type: 'sftp', direction: 'outbound' })
+    server.use(...channelHandlers(apiUrl, { channels: [existing] }))
+
+    const { body } = await testChannel(existing.id)
+
+    expect(testChannelEndpoint.response.parse(body)).toEqual({
+      outcome: 'succeeded',
+      testedAt: '2026-10-10T12:00:00.000Z',
+    })
+  })
+
+  it('names the reason a Channel cannot be reached until its settings are updated', async () => {
+    const existing: ChannelRecord = { ...sftpInput, id: crypto.randomUUID() }
+
+    server.use(
+      ...channelHandlers(apiUrl, {
+        channels: [existing],
+        connectionFailures: new Map([[existing.id, 'loginRejected']]),
+      }),
+    )
+
+    expect(testChannelEndpoint.response.parse((await testChannel(existing.id)).body)).toMatchObject(
+      { outcome: 'failed', reason: 'loginRejected' },
+    )
+
+    await send('PUT', toPath(updateChannelEndpoint.path, existing), {
+      ...sftpInput,
+      credential: 'new-password',
+    })
+
+    expect(testChannelEndpoint.response.parse((await testChannel(existing.id)).body)).toMatchObject(
+      { outcome: 'succeeded' },
+    )
+  })
+
+  it('seeds a rejected login on an outbound SFTP Channel of a Trading Partner', async () => {
+    server.use(...channelHandlers(apiUrl))
+    const [id, reason] = [...seedConnectionFailures][0]!
+    const channel = seedChannels.find((record) => record.id === id)
+
+    expect(channel).toMatchObject({ type: 'sftp', direction: 'outbound' })
+    expect(channel?.tradingPartnerId).not.toBeNull()
+    expect(reason).toBe('loginRejected')
+
+    expect(testChannelEndpoint.response.parse((await testChannel(id)).body)).toMatchObject({
+      outcome: 'failed',
+      reason: 'loginRejected',
+    })
+  })
+
+  it('answers 404 for an unknown Channel', async () => {
+    server.use(...channelHandlers(apiUrl, { channels: [] }))
+
+    expect((await testChannel(crypto.randomUUID())).status).toBe(404)
   })
 })

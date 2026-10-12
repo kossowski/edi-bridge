@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { canSwitchToProduction, onboardingChecklist, type TradingPartner } from './trading-partner'
+import {
+  canSendTestInterchange,
+  canSwitchToProduction,
+  onboardingChecklist,
+  type TradingPartner,
+} from './trading-partner'
 
 const ownGln = '4006381333931'
 
@@ -108,5 +113,39 @@ describe('canSwitchToProduction', () => {
         ownGln,
       ),
     ).toBe(false)
+  })
+})
+
+describe('canSendTestInterchange', () => {
+  it('allows the first test Interchange of a Trading Partner in Test Mode', () => {
+    expect(canSendTestInterchange(partner(), ownGln)).toBe(true)
+  })
+
+  it('allows sending again while the CONTRL is still awaited', () => {
+    expect(
+      canSendTestInterchange(
+        partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: null } }),
+        ownGln,
+      ),
+    ).toBe(true)
+  })
+
+  it.each<[string, Pick<TradingPartner, 'testMode' | 'onboarding'>, string | null]>([
+    ['without the Workspace GLN', partner(), null],
+    [
+      'once the CONTRL is received',
+      partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received } }),
+      ownGln,
+    ],
+    [
+      'for a Trading Partner in production',
+      partner({
+        testMode: false,
+        onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received },
+      }),
+      ownGln,
+    ],
+  ])('refuses %s', (_, tradingPartner, gln) => {
+    expect(canSendTestInterchange(tradingPartner, gln)).toBe(false)
   })
 })
