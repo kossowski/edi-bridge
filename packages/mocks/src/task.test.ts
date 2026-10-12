@@ -4,15 +4,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { type TradingPartner, tasksEndpoint, tasksSchema } from '@edi-bridge/contracts'
 
 import { createOverdueAcknowledgement } from './overdue-acknowledgement'
-import { createRun, seedRuns } from './run'
+import { createRun } from './run'
 import { createRunStore } from './run-store'
 import { tasksHandler } from './task'
+import { seedRunsBeforeAll } from './test-helpers'
 import { createTradingPartner } from './trading-partner'
-import {
-  emptyWorkspaceActivity,
-  type WorkspaceActivity,
-  workspaceActivityOf,
-} from './workspace-activity'
+import { emptyWorkspaceActivity, type WorkspaceActivity } from './workspace-activity'
 
 const apiUrl = 'http://api.test'
 
@@ -22,16 +19,7 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-// A busy CI runner takes seconds to build the 12,000 seeded and the 30,000 large-volume Runs.
-// Built once here, at the tests' time, they stay out of the time limit of the first test that
-// reads them.
-beforeAll(() => {
-  vi.useFakeTimers({ toFake: ['Date'] })
-  vi.setSystemTime(now)
-  seedRuns()
-  workspaceActivityOf('large')
-  vi.useRealTimers()
-})
+seedRunsBeforeAll({ at: now, largeWorkspaceActivity: true })
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })

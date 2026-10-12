@@ -88,7 +88,7 @@ import {
 } from './index'
 import { day } from './overdue'
 import { publishDraft } from './publish-request'
-import { seedRuns } from './run'
+import { seedRunsBeforeAll } from './test-helpers'
 
 const apiUrl = 'http://api.test'
 
@@ -96,11 +96,7 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-// A busy CI runner takes seconds to build the 12,000 seeded Runs. Built once here, they stay out
-// of the time limit of the first test that reads them.
-beforeAll(() => {
-  seedRuns()
-})
+seedRunsBeforeAll()
 
 afterEach(() => server.resetHandlers())
 

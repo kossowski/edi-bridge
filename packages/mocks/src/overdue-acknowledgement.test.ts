@@ -6,6 +6,7 @@ import { interchangeEndpoint, toPath } from '@edi-bridge/contracts'
 import { seedOverdueAcknowledgements } from './overdue-acknowledgement'
 import { seedRuns } from './run'
 import { runDetailHandlers } from './run-detail'
+import { seedRunsBeforeAll } from './test-helpers'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -14,11 +15,7 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-// A busy CI runner takes seconds to build the 12,000 seeded Runs. Built once here, they stay out
-// of the time limit of the first test that reads them.
-beforeAll(() => {
-  seedRuns()
-})
+seedRunsBeforeAll()
 
 afterEach(() => {
   server.resetHandlers()

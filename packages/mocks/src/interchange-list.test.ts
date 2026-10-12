@@ -14,6 +14,7 @@ import { interchangesHandler } from './interchange-list'
 import { createRun, createRuns, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
+import { seedRunsBeforeAll } from './test-helpers'
 
 const apiUrl = 'http://api.test'
 
@@ -21,11 +22,7 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-// A busy CI runner takes seconds to build the 12,000 seeded Runs. Built once here, they stay out
-// of the time limit of the first test that reads them.
-beforeAll(() => {
-  seedRuns()
-})
+seedRunsBeforeAll()
 
 afterEach(() => server.resetHandlers())
 

@@ -27,8 +27,8 @@ import {
 import { seedMappingSamples } from './mapping-sample'
 import { mappingVersionHandlers } from './mapping-version'
 import { publishDraft } from './publish-request'
-import { seedRuns } from './run'
 import { showcaseViewerSession } from './session'
+import { seedRunsBeforeAll } from './test-helpers'
 import { createWorkspaceSettings, createWorkspaceSettingsStore } from './workspace-settings'
 
 const apiUrl = 'http://api.test'
@@ -39,11 +39,7 @@ let streams: AbortController
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-// A busy CI runner takes seconds to build the 12,000 seeded Runs. Built once here, they stay out
-// of the time limit of the first test that reads them.
-beforeAll(() => {
-  seedRuns()
-})
+seedRunsBeforeAll()
 
 beforeEach(() => {
   streams = new AbortController()

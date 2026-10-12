@@ -12,10 +12,10 @@ import { seedChannels } from './channel'
 import { seedFlows } from './flow'
 import { createHandlers } from './index'
 import { createOverdueAcknowledgement } from './overdue-acknowledgement'
-import { createRun, seedRuns } from './run'
+import { createRun } from './run'
+import { seedRunsBeforeAll } from './test-helpers'
 import { createTradingPartner, seedTradingPartners } from './trading-partner'
 import { tradingPartnerActivityHandlers } from './trading-partner-activity'
-import { workspaceActivityOf } from './workspace-activity'
 
 const apiUrl = 'http://api.test'
 
@@ -25,16 +25,7 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-// A busy CI runner takes seconds to build the 12,000 seeded and the 30,000 large-volume Runs.
-// Built once here, at the tests' time, they stay out of the time limit of the first test that
-// reads them.
-beforeAll(() => {
-  vi.useFakeTimers({ toFake: ['Date'] })
-  vi.setSystemTime(now)
-  seedRuns()
-  workspaceActivityOf('large')
-  vi.useRealTimers()
-})
+seedRunsBeforeAll({ at: now, largeWorkspaceActivity: true })
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
