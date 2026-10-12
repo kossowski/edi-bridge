@@ -783,6 +783,7 @@
     "tabs": {
       "label": "Partner sections",
       "overview": "Overview",
+      "connections": "Connections",
       "settings": "Settings"
     },
     "gln": "GLN {gln}",
@@ -884,6 +885,133 @@
       "title": "Partner details",
       "description": "How EDI Bridge addresses the documents it exchanges with {name}.",
       "saved": "Changes saved."
+    },
+    "connections": {
+      "loading": "Loading the connections",
+      "error": {
+        "title": "Connections unavailable",
+        "description": "The connections could not be loaded. Try again.",
+        "retry": "Try again"
+      },
+      "add": "Add a connection",
+      "added": "{name} is added. Test it to make sure it works.",
+      "own": {
+        "title": "With {name}",
+        "description": "How documents arrive from {name} and leave to it. Each way is a <term>connection</term>.",
+        "list": "Connections with {name}"
+      },
+      "shared": {
+        "title": "Your systems (shared)",
+        "description": "Set up once and used with every partner. Change them under <link>All connections</link>.",
+        "list": "Shared connections of your systems",
+        "empty": "No shared connections of your systems yet."
+      },
+      "empty": {
+        "title": "No connections yet",
+        "description": "Without a connection, no documents can arrive from {name} or leave to it. Add one to continue the setup.",
+        "viewOnlyDescription": "Connections appear here once an Admin adds one."
+      },
+      "way": {
+        "partner": {
+          "inbound": "Receive from {name}",
+          "outbound": "Send to {name}"
+        },
+        "shared": {
+          "inbound": "Receive from your systems",
+          "outbound": "Send to your systems"
+        }
+      },
+      "how": {
+        "sftp": "SFTP",
+        "webhook": "Webhook",
+        "http": "HTTP"
+      },
+      "test": {
+        "button": "Test connection",
+        "pending": "Testing…",
+        "pendingStatus": "Testing {name}…",
+        "succeeded": "The connection works.",
+        "testedAt": "Tested <when>{time}</when>.",
+        "requestFailed": "The test could not run. Try again.",
+        "failed": {
+          "loginRejected": {
+            "title": "Login was rejected.",
+            "hint": "Check the username and the password or key. The other side's IT team can confirm them."
+          },
+          "hostUnreachable": {
+            "title": "The server could not be reached.",
+            "hint": "Check the server address, and ask the other side's IT team whether their firewall lets EDI Bridge in."
+          },
+          "timedOut": {
+            "title": "The server did not answer in time.",
+            "hint": "Try again in a few minutes. If it keeps happening, ask the other side's IT team whether the server is running."
+          },
+          "remotePathMissing": {
+            "title": "The folder does not exist.",
+            "hint": "Check the folder path. The other side's IT team can tell you the right one."
+          },
+          "permissionDenied": {
+            "title": "EDI Bridge may not use the folder.",
+            "hint": "Ask the other side's IT team to allow this user to read and write in the folder."
+          },
+          "unexpectedResponse": {
+            "title": "The server answered in an unexpected way.",
+            "hint": "Check the address. If it is right, ask the other side's IT team to look at their server's log."
+          }
+        }
+      }
+    },
+    "addConnection": {
+      "title": "Add a connection",
+      "description": "A connection is one way for documents to arrive or leave. Answer two questions, then fill in the details.",
+      "close": "Close",
+      "way": {
+        "label": "Which way do documents travel?",
+        "inbound": {
+          "title": "{name} sends to you",
+          "description": "For example purchase orders."
+        },
+        "outbound": {
+          "title": "You send to {name}",
+          "description": "For example dispatch advices and invoices."
+        }
+      },
+      "how": {
+        "label": "How do they travel?",
+        "recommended": "Recommended",
+        "sftp-inbound": {
+          "title": "From an SFTP folder",
+          "description": "EDI Bridge picks up files from a folder on an SFTP server. The most common choice."
+        },
+        "webhook-inbound": {
+          "title": "To a web address of EDI Bridge",
+          "description": "EDI Bridge creates a web address and a key. The partner's system sends each document there."
+        },
+        "sftp-outbound": {
+          "title": "To an SFTP folder",
+          "description": "EDI Bridge uploads files to a folder on an SFTP server. The most common choice."
+        },
+        "http-outbound": {
+          "title": "To a web address of the partner",
+          "description": "EDI Bridge sends each document to a web address the partner gives you."
+        }
+      },
+      "name": "Shown in the lists of connections and document routes.",
+      "suggestedName": {
+        "sftp-inbound": "{name} SFTP inbox",
+        "webhook-inbound": "{name} webhook",
+        "sftp-outbound": "{name} SFTP outbox",
+        "http-outbound": "{name} HTTP delivery"
+      },
+      "create": "Add connection",
+      "creating": "Adding…",
+      "cancel": "Cancel",
+      "failed": "The connection could not be added. Try again.",
+      "webhook": {
+        "created": "{name} is added. Give the web address and the token below to {partner}.",
+        "url": "Web address",
+        "done": "Done"
+      }
     }
   },
   "TradingPartnerForm": {

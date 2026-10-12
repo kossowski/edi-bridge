@@ -783,6 +783,7 @@
     "tabs": {
       "label": "Bereiche des Partners",
       "overview": "Übersicht",
+      "connections": "Verbindungen",
       "settings": "Einstellungen"
     },
     "gln": "GLN {gln}",
@@ -884,6 +885,133 @@
       "title": "Partnerdaten",
       "description": "Wie EDI Bridge die Belege adressiert, die es mit {name} austauscht.",
       "saved": "Änderungen gespeichert."
+    },
+    "connections": {
+      "loading": "Verbindungen werden geladen",
+      "error": {
+        "title": "Verbindungen nicht verfügbar",
+        "description": "Die Verbindungen konnten nicht geladen werden. Versuchen Sie es erneut.",
+        "retry": "Erneut versuchen"
+      },
+      "add": "Verbindung hinzufügen",
+      "added": "{name} ist hinzugefügt. Testen Sie die Verbindung, um sicherzugehen, dass sie funktioniert.",
+      "own": {
+        "title": "Mit {name}",
+        "description": "Wie Belege von {name} ankommen und an {name} gehen. Jeder Weg ist eine <term>Verbindung</term>.",
+        "list": "Verbindungen mit {name}"
+      },
+      "shared": {
+        "title": "Ihre Systeme (gemeinsam)",
+        "description": "Einmal eingerichtet und für alle Partner genutzt. Ändern Sie sie unter <link>Alle Verbindungen</link>.",
+        "list": "Gemeinsame Verbindungen Ihrer Systeme",
+        "empty": "Noch keine gemeinsamen Verbindungen Ihrer Systeme."
+      },
+      "empty": {
+        "title": "Noch keine Verbindungen",
+        "description": "Ohne Verbindung können keine Belege von {name} ankommen oder an {name} gehen. Fügen Sie eine hinzu, um mit der Einrichtung weiterzumachen.",
+        "viewOnlyDescription": "Verbindungen erscheinen hier, sobald ein Admin eine hinzufügt."
+      },
+      "way": {
+        "partner": {
+          "inbound": "Empfangen von {name}",
+          "outbound": "Senden an {name}"
+        },
+        "shared": {
+          "inbound": "Empfangen von Ihren Systemen",
+          "outbound": "Senden an Ihre Systeme"
+        }
+      },
+      "how": {
+        "sftp": "SFTP",
+        "webhook": "Webhook",
+        "http": "HTTP"
+      },
+      "test": {
+        "button": "Verbindung testen",
+        "pending": "Wird getestet…",
+        "pendingStatus": "{name} wird getestet…",
+        "succeeded": "Die Verbindung funktioniert.",
+        "testedAt": "Getestet <when>{time}</when>.",
+        "requestFailed": "Der Test konnte nicht laufen. Versuchen Sie es erneut.",
+        "failed": {
+          "loginRejected": {
+            "title": "Die Anmeldung wurde abgelehnt.",
+            "hint": "Prüfen Sie den Benutzernamen und das Passwort oder den Schlüssel. Die IT der Gegenseite kann sie bestätigen."
+          },
+          "hostUnreachable": {
+            "title": "Der Server war nicht erreichbar.",
+            "hint": "Prüfen Sie die Serveradresse und fragen Sie die IT der Gegenseite, ob ihre Firewall EDI Bridge durchlässt."
+          },
+          "timedOut": {
+            "title": "Der Server hat nicht rechtzeitig geantwortet.",
+            "hint": "Versuchen Sie es in ein paar Minuten erneut. Passiert es öfter, fragen Sie die IT der Gegenseite, ob der Server läuft."
+          },
+          "remotePathMissing": {
+            "title": "Den Ordner gibt es nicht.",
+            "hint": "Prüfen Sie den Ordnerpfad. Die IT der Gegenseite kann Ihnen den richtigen nennen."
+          },
+          "permissionDenied": {
+            "title": "EDI Bridge darf den Ordner nicht nutzen.",
+            "hint": "Bitten Sie die IT der Gegenseite, diesem Benutzer Lesen und Schreiben im Ordner zu erlauben."
+          },
+          "unexpectedResponse": {
+            "title": "Der Server hat unerwartet geantwortet.",
+            "hint": "Prüfen Sie die Adresse. Stimmt sie, bitten Sie die IT der Gegenseite, das Protokoll ihres Servers anzusehen."
+          }
+        }
+      }
+    },
+    "addConnection": {
+      "title": "Verbindung hinzufügen",
+      "description": "Eine Verbindung ist ein Weg, auf dem Belege ankommen oder gehen. Beantworten Sie zwei Fragen und ergänzen Sie dann die Angaben.",
+      "close": "Schließen",
+      "way": {
+        "label": "In welche Richtung gehen die Belege?",
+        "inbound": {
+          "title": "{name} sendet an Sie",
+          "description": "Zum Beispiel Bestellungen."
+        },
+        "outbound": {
+          "title": "Sie senden an {name}",
+          "description": "Zum Beispiel Lieferavise und Rechnungen."
+        }
+      },
+      "how": {
+        "label": "Auf welchem Weg?",
+        "recommended": "Empfohlen",
+        "sftp-inbound": {
+          "title": "Aus einem SFTP-Ordner",
+          "description": "EDI Bridge holt Dateien aus einem Ordner auf einem SFTP-Server ab. Die häufigste Wahl."
+        },
+        "webhook-inbound": {
+          "title": "An eine Webadresse von EDI Bridge",
+          "description": "EDI Bridge erstellt eine Webadresse und einen Schlüssel. Das System des Partners sendet jeden Beleg dorthin."
+        },
+        "sftp-outbound": {
+          "title": "In einen SFTP-Ordner",
+          "description": "EDI Bridge lädt Dateien in einen Ordner auf einem SFTP-Server hoch. Die häufigste Wahl."
+        },
+        "http-outbound": {
+          "title": "An eine Webadresse des Partners",
+          "description": "EDI Bridge sendet jeden Beleg an eine Webadresse, die Ihnen der Partner nennt."
+        }
+      },
+      "name": "Erscheint in den Listen der Verbindungen und Belegwege.",
+      "suggestedName": {
+        "sftp-inbound": "{name} SFTP-Eingang",
+        "webhook-inbound": "{name} Webhook",
+        "sftp-outbound": "{name} SFTP-Ausgang",
+        "http-outbound": "{name} HTTP-Zustellung"
+      },
+      "create": "Verbindung hinzufügen",
+      "creating": "Wird hinzugefügt…",
+      "cancel": "Abbrechen",
+      "failed": "Die Verbindung konnte nicht hinzugefügt werden. Versuchen Sie es erneut.",
+      "webhook": {
+        "created": "{name} ist hinzugefügt. Geben Sie die Webadresse und das Token unten an {partner} weiter.",
+        "url": "Webadresse",
+        "done": "Fertig"
+      }
     }
   },
   "TradingPartnerForm": {

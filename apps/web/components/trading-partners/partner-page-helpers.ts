@@ -5,6 +5,13 @@ import {
   type TradingPartnerActivityDetail,
 } from '@edi-bridge/contracts'
 
+export type PartnerPanelProps = {
+  tradingPartner: TradingPartner
+  addingConnection: boolean
+  onAddingConnectionChange: (adding: boolean) => void
+  onAddConnection: () => void
+}
+
 export type PartnerActivityProps = {
   tradingPartner: TradingPartner
   activity: TradingPartnerActivityDetail

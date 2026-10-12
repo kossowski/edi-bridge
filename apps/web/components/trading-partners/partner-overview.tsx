@@ -15,12 +15,13 @@ import { RunLink } from '@/components/runs/run-link'
 import {
   dayTotals,
   type PartnerActivityProps,
+  type PartnerPanelProps,
   problemKey,
 } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSetupCard } from '@/components/trading-partners/partner-setup-card'
 import { tradingPartnerActivityQuery } from '@/lib/api/queries'
 import { interchangeHref } from '@/lib/navigation'
-import { type OpenProblem, type TradingPartner } from '@edi-bridge/contracts'
+import { type OpenProblem } from '@edi-bridge/contracts'
 import {
   Card,
   CardContent,
@@ -277,7 +278,7 @@ export function PartnerLoading({ label }: { label: string }) {
   )
 }
 
-export function PartnerOverview({ tradingPartner }: { tradingPartner: TradingPartner }) {
+export function PartnerOverview({ tradingPartner, onAddConnection }: PartnerPanelProps) {
   const t = useTranslations('TradingPartner')
   const activity = useQuery(tradingPartnerActivityQuery(tradingPartner.id))
 
@@ -300,7 +301,7 @@ export function PartnerOverview({ tradingPartner }: { tradingPartner: TradingPar
 
   return (
     <div className="flex flex-col gap-4">
-      <PartnerSetupCard {...props} />
+      <PartnerSetupCard {...props} onAddConnection={onAddConnection} />
       <div className="grid gap-4 lg:grid-cols-2">
         <DaysCard {...props} />
         <FlowsCard {...props} />

@@ -7,14 +7,15 @@ export type PartnerSetupStep = OnboardingStep | 'connections' | 'documents'
 export type PartnerSetupStepState = 'done' | 'next' | 'open'
 
 export type PartnerSetupAction =
-  | { kind: 'link'; step: 'identity' | 'connections' | 'documents'; href: string }
+  | { kind: 'link'; step: 'identity' | 'documents'; href: string }
+  | { kind: 'addConnection' }
   | { kind: 'sendTest' }
   | { kind: 'awaitConfirmation' }
   | { kind: 'goLive' }
 
 const stepActions: Record<PartnerSetupStep, PartnerSetupAction> = {
   identity: { kind: 'link', step: 'identity', href: '/settings' },
-  connections: { kind: 'link', step: 'connections', href: '/channels/new' },
+  connections: { kind: 'addConnection' },
   documents: { kind: 'link', step: 'documents', href: '/flows/new' },
   testInterchange: { kind: 'sendTest' },
   contrl: { kind: 'awaitConfirmation' },
