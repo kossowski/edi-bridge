@@ -80,6 +80,20 @@ function LoadingCharts() {
   )
 }
 
+function PendingPage({ label }: { label: string }) {
+  return (
+    <div aria-busy className="flex min-w-0 flex-1 flex-col gap-6 p-6">
+      <p aria-live="polite" className="sr-only">
+        {label}
+      </p>
+      <div aria-hidden className="flex flex-col gap-6">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-80 w-full" />
+      </div>
+    </div>
+  )
+}
+
 export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWindow }) {
   const t = useTranslations()
   const [timeWindow, setTimeWindow] = useState<HomeWindow>(defaultWindow)
@@ -87,28 +101,26 @@ export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWind
   const router = useRouter()
   const liveStatus = useLiveEvents()
 
-  const home = useQuery(homeQuery(timeWindow))
+  const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(homeQuery(timeWindow))
   const firstSteps = useQuery(firstStepsQuery)
   const setup = firstSteps.data && firstStepsProgress(firstSteps.data)
-  const leaving = setup?.hasTradingPartner === false
-  const deciding = firstSteps.isPending || leaving
+  const redirectsToFirstSteps = setup?.hasTradingPartner === false
 
   useEffect(() => {
-    if (leaving) {
+    if (redirectsToFirstSteps) {
       router.replace(navigationItems.firstSteps.href)
     }
-  }, [leaving, router])
-
-  const data = deciding ? undefined : home.data
-  const isError = home.isError && !deciding
-  const isPlaceholderData = home.isPlaceholderData && !deciding
-  const { refetch } = home
+  }, [redirectsToFirstSteps, router])
 
   const shownWindow = data?.window ?? timeWindow
   const fetchedAt = queryClient.getQueryState(homeKeys.window(shownWindow))?.dataUpdatedAt ?? 0
   const rows = data && toBucketRows(data.throughput, fetchedAt)
   const totals = rows && totalsOf(rows)
-  const busy = home.isPending || isPlaceholderData || deciding
+  const busy = isPending || isPlaceholderData
+
+  if (firstSteps.isPending || redirectsToFirstSteps) {
+    return <PendingPage label={t('Shell.workspace.loading')} />
+  }
 
   function charts() {
     if (!rows || !totals) {
@@ -164,7 +176,7 @@ export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWind
             'flex flex-col gap-6',
             isPlaceholderData && 'opacity-60 transition-opacity',
           )}>
-          {setup?.hasTradingPartner && setup.done < setup.total && (
+          {setup && setup.done < setup.total && (
             <HomeSetupLink done={setup.done} total={setup.total} />
           )}
           <HomeKeyNumbers

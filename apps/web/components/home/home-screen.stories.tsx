@@ -98,7 +98,9 @@ export const FreshWorkspace = meta.story({
   },
   async play({ canvas }) {
     await waitFor(() => expect(getRouter().replace).toHaveBeenCalledWith('/first-steps'))
-    await expect(canvas.getByText('Loading Home')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading Workspace')).toBeInTheDocument()
+    await expect(canvas.queryByText('Loading Home')).toBeNull()
+    await expect(canvas.queryByRole('heading', { name: 'Home' })).toBeNull()
     await expect(canvas.queryByText('No trading partners yet')).toBeNull()
     await expect(canvas.queryByText('No finished documents')).toBeNull()
   },
@@ -223,7 +225,7 @@ export const Loading = meta.story({
     msw.use(homeHandler(apiUrl, 'loading'))
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Home')).toBeInTheDocument()
+    await expect(await canvas.findByText('Loading Home')).toBeInTheDocument()
     await expect(canvas.getByRole('link', { name: /^Needs attention/ })).toHaveAttribute(
       'href',
       '/tasks#for-you',
