@@ -29,6 +29,7 @@ export type RunStore = {
   groupOf: (runId: string) => RunGroup | undefined
   group: (id: string) => RunGroup | undefined
   groups: () => readonly RunGroup[]
+  withBusinessReference: (businessReference: string) => readonly RunSummary[]
 }
 
 // The first Run of an Interchange names it: Run ids come from a fixed seed, while the seeded
@@ -137,6 +138,7 @@ export function createRunStore(
   let placement: Placement | undefined
   let newestFirst: RunSummary[] | undefined
   let groups: RunGroup[] | undefined
+  let byBusinessReference: Map<string, RunSummary[]> | undefined
 
   const placed = () => (placement ??= place([...byId.values()], replaces))
 
@@ -144,6 +146,23 @@ export function createRunStore(
     placement = undefined
     newestFirst = undefined
     groups = undefined
+    byBusinessReference = undefined
+  }
+
+  function indexByBusinessReference() {
+    const index = new Map<string, RunSummary[]>()
+
+    for (const run of placed().runs) {
+      if (run.businessReference === null) {
+        continue
+      }
+
+      const runs = index.get(run.businessReference) ?? []
+      runs.push(run)
+      index.set(run.businessReference, runs)
+    }
+
+    return index
   }
 
   return {
@@ -176,6 +195,8 @@ export function createRunStore(
     groupOf: (runId) => placed().groupOf.get(runId),
     group: (id) => placed().groups.get(id),
     groups: () => (groups ??= [...placed().groups.values()]),
+    withBusinessReference: (businessReference) =>
+      (byBusinessReference ??= indexByBusinessReference()).get(businessReference) ?? [],
   }
 }
 

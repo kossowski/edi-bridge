@@ -348,6 +348,68 @@ describe('createHandlers', () => {
     },
   )
 
+  it('shows the Order Lifecycle of a Business Reference taken from the Run list', async () => {
+    server.use(...createHandlers(apiUrl))
+    const { runs } = await listRuns({ messageType: ['DESADV'], status: ['delivered'] })
+    const listed = runs[0]!
+    const businessReference = listed.businessReference!
+
+    const response = await fetch(
+      `${apiUrl}${orderLifecyclesEndpoint.path}?${toSearchParams({ businessReference })}`,
+    )
+
+    const lifecycles = orderLifecyclesEndpoint.response.parse(await response.json())
+    const messages = lifecycles.flatMap(({ messages }) => messages)
+
+    expect(lifecycles.map(({ tradingPartner }) => tradingPartner)).toContainEqual(
+      listed.tradingPartner,
+    )
+    expect(messages.find(({ run }) => run.id === listed.id)).toMatchObject({
+      messageType: 'DESADV',
+      direction: 'outbound',
+      receivedAt: listed.receivedAt,
+      run: { status: 'delivered', failureStage: null, replacedBy: null },
+      interchange: { id: listed.interchange!.id },
+    })
+
+    for (const { run, interchange } of messages) {
+      const detail = await getRun(run.id)
+
+      expect(detail).toMatchObject({ status: run.status })
+      expect(detail.interchange?.id ?? null).toBe(interchange?.id ?? null)
+    }
+  })
+
+  it('follows some orders from the Run list through DESADV and INVOIC', async () => {
+    server.use(...createHandlers(apiUrl))
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+    const { runs } = await listRuns({ messageType: ['ORDERS'], receivedTo: twoWeeksAgo })
+
+    const lifecycles = await Promise.all(
+      runs.map(async ({ businessReference }) => {
+        const response = await fetch(
+          `${apiUrl}${orderLifecyclesEndpoint.path}?${toSearchParams({ businessReference: businessReference! })}`,
+        )
+
+        return orderLifecyclesEndpoint.response.parse(await response.json())
+      }),
+    )
+
+    const followed = lifecycles
+      .flat()
+      .filter(({ messages }) =>
+        ['DESADV', 'INVOIC'].every((messageType) =>
+          messages.some((message) => message.messageType === messageType),
+        ),
+      )
+
+    expect(followed.length).toBeGreaterThan(0)
+
+    for (const { messages } of followed) {
+      expect(messages[0]!.messageType).toBe('ORDERS')
+    }
+  })
+
   it('lists and shows the Runs of a Manual Submission', async () => {
     server.use(...createHandlers(apiUrl))
     const inbox = seedChannels.find(({ name }) => name === 'Hansemarkt SFTP inbox')!

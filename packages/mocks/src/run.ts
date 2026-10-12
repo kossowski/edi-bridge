@@ -105,6 +105,61 @@ export function createRun(overrides: Partial<RunSummary> = {}): RunSummary {
   })
 }
 
+type Order = { receivedAt: number; businessReference: string | null }
+
+function latestOrderBefore(orders: ReadonlyArray<Order>, receivedAt: number) {
+  let low = 0
+  let high = orders.length
+
+  while (low < high) {
+    const middle = (low + high) >>> 1
+
+    if (orders[middle]!.receivedAt < receivedAt) {
+      low = middle + 1
+    } else {
+      high = middle
+    }
+  }
+
+  return orders[low - 1]
+}
+
+// A Trading Partner answers many of its ORDERS with a DESADV and an INVOIC for the same order.
+function followOrders(runs: ReadonlyArray<RunFields>): RunFields[] {
+  const ordersByTradingPartner = new Map<string, Order[]>()
+
+  for (const run of runs) {
+    if (run.messageType === 'ORDERS') {
+      const orders = ordersByTradingPartner.get(run.tradingPartner.id) ?? []
+      orders.push({
+        receivedAt: Date.parse(run.receivedAt),
+        businessReference: businessReferenceOf(run),
+      })
+      ordersByTradingPartner.set(run.tradingPartner.id, orders)
+    }
+  }
+
+  for (const orders of ordersByTradingPartner.values()) {
+    orders.sort((a, b) => a.receivedAt - b.receivedAt)
+  }
+
+  return runs.map((run) => {
+    const orders = ordersByTradingPartner.get(run.tradingPartner.id)
+
+    if (
+      !orders ||
+      (run.messageType !== 'DESADV' && run.messageType !== 'INVOIC') ||
+      hash(`follows-order:${run.id}`) % 10 >= 4
+    ) {
+      return run
+    }
+
+    const order = latestOrderBefore(orders, Date.parse(run.receivedAt))
+
+    return order ? { ...run, businessReference: order.businessReference } : run
+  })
+}
+
 export function createRuns({
   count,
   now = new Date(),
@@ -140,7 +195,9 @@ export function createRuns({
     runs.push(run, ...siblings)
   }
 
-  return createRunStore(runs.slice(0, count).map(toRunSummary)).all().slice()
+  return createRunStore(followOrders(runs.slice(0, count)).map(toRunSummary))
+    .all()
+    .slice()
 }
 
 let seedRunsCache: RunSummary[] | undefined

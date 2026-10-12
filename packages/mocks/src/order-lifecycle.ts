@@ -9,6 +9,7 @@ import {
   type OrderLifecycleInterchange,
   orderLifecycleMessageSchema,
   type OrderLifecycleMessageType,
+  orderLifecycleMessageTypeSchema,
   orderLifecycleSchema,
   orderLifecyclesEndpoint,
   type RunSummary,
@@ -16,12 +17,12 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedFlows } from './flow'
-import { hour, overdueSinceOf } from './overdue'
+import { hour, isUnacknowledged, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
 import { toRunSummary } from './run'
-import { createRunStore, type Reprocessed } from './run-store'
+import { createRunStore, type Reprocessed, type RunStore } from './run-store'
 import { stableUuid } from './seed-id'
-import { seedTradingPartners } from './trading-partner'
+import { seedTradingPartners, type TradingPartnerStore } from './trading-partner'
 
 export const orderLifecycleReferences = {
   full: '4711',
@@ -170,7 +171,7 @@ export type OrderLifecycleSeed = {
 function interchangeOf(
   run: RunSummary,
   acknowledgement: AcknowledgementOutcome | undefined,
-  tradingPartner: TradingPartner,
+  tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
   now: Date,
 ): OrderLifecycleInterchange | null {
   if (run.interchange === null) {
@@ -292,11 +293,71 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
   return { runs, reprocessed, orderLifecycles }
 }
 
+const defaultTimeLimit = { acknowledgementTimeLimitHours: 24 }
+
+// Without a curated seed, the Runs of the Business Reference form one Order Lifecycle per Trading
+// Partner, with the same Acknowledgements the Overview counts as overdue.
+function orderLifecyclesOfRuns(
+  businessReference: string,
+  runs: RunStore,
+  tradingPartners: Pick<TradingPartnerStore, 'get'>,
+  now: Date,
+): OrderLifecycle[] {
+  const byTradingPartner = new Map<string, RunSummary[]>()
+
+  for (const run of runs.withBusinessReference(businessReference)) {
+    if (!orderLifecycleMessageTypeSchema.safeParse(run.messageType).success) {
+      continue
+    }
+
+    const partnerRuns = byTradingPartner.get(run.tradingPartner.id) ?? []
+    partnerRuns.push(run)
+    byTradingPartner.set(run.tradingPartner.id, partnerRuns)
+  }
+
+  return [...byTradingPartner.values()].map((lifecycleRuns) => {
+    const { tradingPartner } = lifecycleRuns[0]!
+    const timeLimit = tradingPartners.get(tradingPartner.id) ?? defaultTimeLimit
+
+    return orderLifecycleSchema.parse({
+      businessReference,
+      tradingPartner,
+      messages: lifecycleRuns
+        .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt))
+        .map((run) => {
+          const replacing = runs.replacingOf(run.id)
+
+          return {
+            messageType: run.messageType,
+            direction: directionOf(run),
+            receivedAt: run.receivedAt,
+            run: {
+              id: run.id,
+              status: run.status,
+              failureStage: run.failureStage,
+              replacedBy: replacing !== undefined && runs.get(replacing) ? { id: replacing } : null,
+            },
+            interchange: interchangeOf(
+              run,
+              isUnacknowledged(run) ? undefined : 'accepted',
+              timeLimit,
+              now,
+            ),
+          }
+        }),
+    })
+  })
+}
+
 export type OrderLifecycleState = 'loading' | 'error'
 
 export function orderLifecycleHandler(
   apiUrl: string,
   source?: ReadonlyArray<OrderLifecycle> | OrderLifecycleState,
+  {
+    runs,
+    tradingPartners = { get: (id) => seedTradingPartners.find((candidate) => candidate.id === id) },
+  }: { runs?: RunStore; tradingPartners?: Pick<TradingPartnerStore, 'get'> } = {},
 ) {
   const path = `${apiUrl}${orderLifecyclesEndpoint.path}`
 
@@ -329,10 +390,17 @@ export function orderLifecycleHandler(
       return serverError()
     }
 
+    const curated = orderLifecycles.filter(
+      (lifecycle) => lifecycle.businessReference === businessReference,
+    )
+
+    const found =
+      curated.length > 0 || !runs
+        ? curated
+        : orderLifecyclesOfRuns(businessReference, runs, tradingPartners, new Date())
+
     return HttpResponse.json(
-      orderLifecycles
-        .filter((lifecycle) => lifecycle.businessReference === businessReference)
-        .toSorted((a, b) => a.tradingPartner.name.localeCompare(b.tradingPartner.name)),
+      found.toSorted((a, b) => a.tradingPartner.name.localeCompare(b.tradingPartner.name)),
     )
   })
 }

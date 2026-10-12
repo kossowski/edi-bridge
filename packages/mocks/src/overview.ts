@@ -24,8 +24,7 @@ import {
   type TradingPartnerHealth,
 } from '@edi-bridge/contracts'
 
-import { hash } from './hash'
-import { hour, overdueSinceOf } from './overdue'
+import { hour, isUnacknowledged, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
 import { seedRuns, toRunSummary } from './run'
 import { controlReferenceOf, interchangeIdOf, type RunStore, toRunStore } from './run-store'
@@ -238,10 +237,6 @@ export function createOverviewData({
         )
 
   return { runs, tradingPartners, overdueAcknowledgements }
-}
-
-function isUnacknowledged(run: RunSummary) {
-  return hash(`overdue:${run.id}`) / 2 ** 32 < 0.02
 }
 
 // An outbound Run delivers its own Interchange, so a few recent delivered ones stand for sent

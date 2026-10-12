@@ -391,7 +391,10 @@ export function createHandlers(
     interchangesHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
     overviewHandler(apiUrl, seedOverviewData(runs)),
-    orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles),
+    orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles, {
+      runs,
+      tradingPartners: tradingPartnerStore,
+    }),
     ...mappingVersionHandlers(apiUrl, {
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
