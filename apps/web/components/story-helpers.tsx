@@ -1,5 +1,6 @@
 import { NextIntlClientProvider } from 'next-intl'
 import { type ReactNode } from 'react'
+import { expect } from 'storybook/test'
 
 import messagesDe from '@/messages/de.json'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@edi-bridge/ui/components/sidebar'
@@ -8,6 +9,12 @@ export function darkMode() {
   document.documentElement.classList.add('dark')
 
   return () => document.documentElement.classList.remove('dark')
+}
+
+export async function expectNoPageScroll(canvasElement: HTMLElement) {
+  const page = canvasElement.ownerDocument.documentElement
+
+  await expect(page.scrollWidth).toBeLessThanOrEqual(page.clientWidth)
 }
 
 export const german = (Story: () => ReactNode) => (
