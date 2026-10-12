@@ -1247,7 +1247,11 @@
       "empty": "Gerade nichts hier",
       "showAll": "Alle {count} anzeigen",
       "partner": "Handelspartner",
-      "erp": "Ihr ERP"
+      "erp": "Ihr ERP",
+      "another": {
+        "inbound": "Weiterer eingehender Beleg",
+        "outbound": "Weiterer ausgehender Beleg"
+      }
     },
     "path": {
       "inbound": "geht in",
@@ -1283,6 +1287,24 @@
       "title": "Mappings nicht verfügbar",
       "description": "Die Mappings konnten nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
+    },
+    "new": {
+      "button": "Neues Mapping",
+      "title": "Neues Mapping",
+      "description": "Wählen Sie den Beleg. Die KI entwirft das Mapping aus einem Beispiel, Sie prüfen jede Verknüpfung.",
+      "choice": "{documents}, die Sie {direction, select, inbound {empfangen} other {senden}}",
+      "aiHint": "Mit KI entwerfen",
+      "creating": "Mapping wird angelegt…",
+      "failed": "Das Mapping konnte nicht angelegt werden. Versuchen Sie es erneut.",
+      "noDocumentStructure": "Legen Sie zuerst Ihr Datenformat an, damit die KI die Form Ihrer Dateien kennt.",
+      "addDataFormat": "Datenformat anlegen",
+      "close": "Schließen"
+    },
+    "first": {
+      "title": "Übersetzen Sie Ihren ersten Beleg",
+      "partners": "Ihre Partner",
+      "description": "Die KI entwirft ihn aus einem Beispiel, Sie prüfen jede Verknüpfung.",
+      "viewOnlyDescription": "Mappings erscheinen hier, sobald ein Admin eines anlegt."
     }
   },
   "Mapping": {

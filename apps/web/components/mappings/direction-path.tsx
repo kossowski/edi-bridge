@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight02Icon, DatabaseIcon } from '@hugeicons/core-free-icons'
+import { ArrowRight02Icon, DatabaseIcon, Store01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 
@@ -41,5 +41,23 @@ export function DirectionPath({
       </span>
       {direction === 'inbound' ? erpEnd : partner}
     </p>
+  )
+}
+
+export function DirectionHint({ direction }: { direction: Direction }) {
+  const t = useTranslations('Mappings.lane')
+
+  return (
+    <DirectionPath
+      direction={direction}
+      erp={t('erp')}
+      partner={
+        <span className="inline-flex items-center gap-1">
+          <HugeiconsIcon icon={Store01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
+          {t('partner')}
+        </span>
+      }
+      className="text-muted-foreground inline-flex text-xs"
+    />
   )
 }

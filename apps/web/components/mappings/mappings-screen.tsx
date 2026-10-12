@@ -1,6 +1,13 @@
 'use client'
 
-import { ArrowDownLeft01Icon, ArrowUpRight01Icon, Store01Icon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  AiMagicIcon,
+  ArrowDownLeft01Icon,
+  ArrowRight02Icon,
+  ArrowUpRight01Icon,
+  DatabaseIcon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
@@ -8,7 +15,7 @@ import { useId, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadError } from '@/components/load-error'
-import { DirectionPath } from '@/components/mappings/direction-path'
+import { DirectionHint } from '@/components/mappings/direction-path'
 import { MappingCard } from '@/components/mappings/mapping-card'
 import {
   byState,
@@ -17,6 +24,8 @@ import {
   mappingFilters,
   matchesFilter,
 } from '@/components/mappings/mapping-state'
+import { NewMappingChoices, NewMappingSheet } from '@/components/mappings/new-mapping'
+import { useCanChange } from '@/hooks/use-session'
 import { mappingsQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
@@ -27,32 +36,16 @@ const directions = ['inbound', 'outbound'] as const satisfies ReadonlyArray<Dire
 
 const shownPerLane = 20
 
-function DirectionHint({ direction }: { direction: Direction }) {
-  const t = useTranslations('Mappings.lane')
-
-  return (
-    <DirectionPath
-      direction={direction}
-      erp={t('erp')}
-      partner={
-        <span className="inline-flex items-center gap-1">
-          <HugeiconsIcon icon={Store01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
-          {t('partner')}
-        </span>
-      }
-      className="text-muted-foreground inline-flex text-xs"
-    />
-  )
-}
-
 function Lane({
   direction,
   mappings,
   loading,
+  onAddAnother,
 }: {
   direction: Direction
   mappings: ReadonlyArray<MappingSummary>
   loading: boolean
+  onAddAnother: (() => void) | null
 }) {
   const t = useTranslations('Mappings.lane')
   const headingId = useId()
@@ -96,6 +89,47 @@ function Lane({
           {t('showAll', { count: mappings.length })}
         </Button>
       )}
+      {!loading && onAddAnother && (
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground hover:border-primary hover:bg-primary/5 focus-visible:border-ring focus-visible:ring-ring/50 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed p-4 text-sm transition-colors outline-none focus-visible:ring-3"
+          onClick={onAddAnother}>
+          <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden className="size-4" />
+          {t(`another.${direction}`)}
+        </button>
+      )}
+    </section>
+  )
+}
+
+function FirstMapping({ canChange }: { canChange: boolean }) {
+  const t = useTranslations('Mappings')
+  const titleId = useId()
+
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="bg-muted/40 mx-auto flex w-full max-w-3xl flex-col items-center gap-6 rounded-2xl border px-4 py-10 text-center sm:px-10">
+      <div aria-hidden className="flex items-center gap-3 text-sm">
+        <span className="bg-background rounded-full border px-3 py-1.5">{t('first.partners')}</span>
+        <span className="text-muted-foreground flex flex-col items-center leading-none">
+          <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} className="size-4" />
+          <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} className="size-4 rotate-180" />
+        </span>
+        <span className="bg-primary text-primary-foreground flex items-center gap-2 rounded-full px-3 py-1.5">
+          <HugeiconsIcon icon={DatabaseIcon} strokeWidth={2} className="size-4" />
+          {t('lane.erp')}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <h2 id={titleId} className="text-xl font-semibold text-balance">
+          {t('first.title')}
+        </h2>
+        <p className="text-muted-foreground text-sm text-pretty">
+          {canChange ? t('first.description') : t('first.viewOnlyDescription')}
+        </p>
+      </div>
+      {canChange && <NewMappingChoices className="w-full text-left sm:grid-cols-3" />}
     </section>
   )
 }
@@ -104,7 +138,15 @@ export function MappingsScreen() {
   const t = useTranslations()
   const tMappings = useTranslations('Mappings')
   const mappings = useQuery(mappingsQuery)
+  const canChange = useCanChange()
   const [filter, setFilter] = useState<MappingFilter>('all')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetDirection, setSheetDirection] = useState<Direction | null>(null)
+
+  function openSheet(direction: Direction | null) {
+    setSheetDirection(direction)
+    setSheetOpen(true)
+  }
 
   if (mappings.isError) {
     return (
@@ -123,30 +165,49 @@ export function MappingsScreen() {
   const counts = filterCounts(all)
   const sorted = byState(all.filter((mapping) => matchesFilter(mapping, filter)))
 
+  if (mappings.isSuccess && all.length === 0) {
+    return (
+      <AppPage title={t('Sidebar.items.mappings.label')}>
+        <FirstMapping canChange={canChange} />
+      </AppPage>
+    )
+  }
+
   return (
-    <AppPage busy={mappings.isPending} title={t('Sidebar.items.mappings.label')}>
-      {mappings.isPending ? (
-        <p role="status" className="sr-only">
-          {tMappings('loading')}
-        </p>
-      ) : (
-        <div role="group" aria-label={tMappings('filter.label')} className="flex flex-wrap gap-1">
-          {mappingFilters.map((key) => (
-            <Button
-              key={key}
-              size="sm"
-              variant={filter === key ? 'secondary' : 'ghost'}
-              aria-pressed={filter === key}
-              onClick={() => setFilter(key)}>
-              {key === 'attention' && counts.attention > 0 && (
-                <span aria-hidden className="bg-destructive size-2 rounded-full" />
-              )}
-              {tMappings(`filter.${key}`)}
-              <span className="tabular-nums">{counts[key]}</span>
-            </Button>
-          ))}
-        </div>
-      )}
+    <AppPage
+      busy={mappings.isPending}
+      changeActions={
+        <Button onClick={() => openSheet(null)}>
+          <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />
+          {tMappings('new.button')}
+        </Button>
+      }
+      meta={
+        mappings.isPending ? (
+          <p role="status" className="sr-only">
+            {tMappings('loading')}
+          </p>
+        ) : (
+          <div role="group" aria-label={tMappings('filter.label')} className="flex flex-wrap gap-1">
+            {mappingFilters.map((key) => (
+              <Button
+                key={key}
+                size="sm"
+                variant={filter === key ? 'secondary' : 'ghost'}
+                aria-pressed={filter === key}
+                className="text-foreground"
+                onClick={() => setFilter(key)}>
+                {key === 'attention' && counts.attention > 0 && (
+                  <span aria-hidden className="bg-destructive size-2 rounded-full" />
+                )}
+                {tMappings(`filter.${key}`)}
+                <span className="tabular-nums">{counts[key]}</span>
+              </Button>
+            ))}
+          </div>
+        )
+      }
+      title={t('Sidebar.items.mappings.label')}>
       <div className="grid items-start gap-6 lg:grid-cols-2">
         {directions.map((direction) => (
           <Lane
@@ -154,9 +215,11 @@ export function MappingsScreen() {
             direction={direction}
             loading={mappings.isPending}
             mappings={sorted.filter((mapping) => mapping.direction === direction)}
+            onAddAnother={canChange ? () => openSheet(direction) : null}
           />
         ))}
       </div>
+      <NewMappingSheet direction={sheetDirection} open={sheetOpen} onOpenChange={setSheetOpen} />
     </AppPage>
   )
 }
