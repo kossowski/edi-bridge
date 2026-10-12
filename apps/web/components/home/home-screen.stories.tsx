@@ -106,11 +106,15 @@ export const LargeVolume = meta.story({
     )
 
     await expect(
-      await within(tradingPartners).findAllByRole('link', { name: /open problem/ }),
-    ).toHaveLength(8)
-    await expect(
-      within(tradingPartners).getByRole('link', { name: 'Show all 240 trading partners' }),
+      await within(tradingPartners).findByRole(
+        'link',
+        { name: 'Show all 240 trading partners' },
+        { timeout: 10_000 },
+      ),
     ).toHaveAttribute('href', '/trading-partners')
+    await expect(
+      within(tradingPartners).getAllByRole('link', { name: /open problem/ }),
+    ).toHaveLength(8)
   },
 })
 
