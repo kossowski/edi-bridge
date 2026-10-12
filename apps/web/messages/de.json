@@ -2598,7 +2598,8 @@
         "yes": "Ja",
         "no": "Nein"
       },
-      "neverReset": "Nie"
+      "neverReset": "Nie",
+      "noActivity": "Noch keine Aktivität"
     },
     "workspaces": {
       "title": "Workspaces",
@@ -2655,13 +2656,29 @@
     "workspace": {
       "title": "Workspace",
       "loading": "Workspace wird geladen",
-      "facts": {
-        "label": "Angaben zum Workspace",
-        "gln": "GLN",
+      "tabs": {
+        "overview": "Übersicht",
+        "members": "Mitglieder & Einladungen",
+        "limits": "Limits",
+        "danger": "Gefahrenbereich"
+      },
+      "overview": {
+        "label": "Arbeitsbereich auf einen Blick",
+        "kind": "Art",
+        "kindDescription": {
+          "standard": "Der eigene Arbeitsbereich eines Kunden mit echten Belegen.",
+          "showcase": "Besucher sehen sich seine Beispieldaten an, können aber nichts ändern.",
+          "sandbox": "Besucher dürfen alles ändern. Sie setzen ihn auf seine Beispieldaten zurück."
+        },
         "members": "Mitglieder",
-        "seeded": "Seed-Daten",
-        "createdAt": "Angelegt",
-        "lastResetAt": "Zuletzt zurückgesetzt"
+        "pendingInvites": "{count, plural, =0 {Keine offenen Einladungen} one {# offene Einladung} other {# offene Einladungen}}",
+        "documentsToday": "Belege heute",
+        "lastActivity": "Letzte Aktivität",
+        "lastReset": "Zuletzt zurückgesetzt",
+        "detailsLabel": "Weitere Angaben",
+        "gln": "Unternehmens-ID (GLN)",
+        "seeded": "Mit Beispieldaten gestartet",
+        "createdAt": "Angelegt"
       },
       "notFound": {
         "title": "Workspace nicht gefunden",
@@ -2730,19 +2747,21 @@
         }
       }
     },
-    "settings": {
-      "title": "Aufbewahrung und KI-Budget",
-      "description": "Wie lange dieser Workspace Roh-Documents aufbewahrt und wie viele KI-Tokens er pro Tag verbrauchen darf.",
-      "loading": "Aufbewahrung und KI-Budget werden geladen",
+    "limits": {
+      "shown": {
+        "title": "Mitglieder sehen diese Limits",
+        "description": "Sie finden sie in ihren Einstellungen unter Daten & KI und können sie dort nicht ändern."
+      },
+      "loading": "Limits werden geladen",
       "error": {
-        "title": "Aufbewahrung und KI-Budget nicht verfügbar",
-        "description": "Die Aufbewahrungsdauer und das KI-Budget konnten nicht geladen werden.",
+        "title": "Limits nicht verfügbar",
+        "description": "Die Limits konnten nicht geladen werden.",
         "retry": "Erneut versuchen"
       },
       "retention": {
-        "title": "Aufbewahrungsdauer für Documents",
-        "description": "Ältere Roh-Documents werden gelöscht. Ein Run lässt sich nur per Reprocess erneut verarbeiten, solange sein Roh-Document aufbewahrt wird.",
-        "label": "Aufbewahrungsdauer in Tagen",
+        "title": "Wie lange Belege aufbewahrt werden",
+        "description": "Ältere Belege werden gelöscht. Ein Beleg lässt sich nur erneut verarbeiten, solange er aufbewahrt wird.",
+        "label": "Belege aufbewahren (Tage)",
         "hint": "Zwischen {min} und {max} Tagen.",
         "errors": {
           "required": "Geben Sie eine Aufbewahrungsdauer ein.",
@@ -2751,32 +2770,41 @@
         }
       },
       "budget": {
-        "title": "KI-Token-Budget",
-        "description": "Das tägliche Limit an KI-Tokens, zum Beispiel, wenn die KI ein Mapping entwirft. Der Verbrauch beginnt jeden Tag wieder bei null.",
-        "label": "Tageslimit in Tokens",
-        "hint": "Zwischen {min} und {max} Tokens. 0 schaltet KI für diesen Workspace aus.",
+        "title": "KI-Budget",
+        "description": "Mit dem KI-Budget entwirft die KI Mappings. Es beginnt jeden Tag neu.",
+        "label": "KI-Tokens pro Tag",
+        "hint": "Zwischen {min} und {max} Tokens. 0 schaltet die KI-Hilfe für diesen Arbeitsbereich aus.",
         "errors": {
           "required": "Geben Sie ein Tageslimit ein.",
           "notWhole": "Geben Sie eine ganze Zahl von Tokens ein.",
           "outOfRange": "Geben Sie einen Wert zwischen {min} und {max} Tokens ein."
         }
       },
-      "save": "Aufbewahrung und KI-Budget speichern",
+      "save": "Limits speichern",
       "saving": "Wird gespeichert…",
-      "saved": "Aufbewahrung und KI-Budget gespeichert.",
-      "failed": "Die Aufbewahrungsdauer und das KI-Budget konnten nicht gespeichert werden. Versuchen Sie es erneut."
+      "saved": "Limits gespeichert.",
+      "failed": "Die Limits konnten nicht gespeichert werden. Versuchen Sie es erneut."
+    },
+    "danger": {
+      "title": "Auf Beispieldaten zurücksetzen",
+      "sandbox": "Ersetzt alles, was in dieser Sandbox geändert wurde, durch ihre Beispieldaten. So ist sie vor einem Termin wieder sauber.",
+      "lastReset": "Zuletzt zurückgesetzt",
+      "unavailable": {
+        "standard": "Nur Sandbox-Arbeitsbereiche lassen sich zurücksetzen. Dieser Arbeitsbereich enthält echte Daten eines Kunden, die nie zurückgesetzt werden.",
+        "showcase": "Nur Sandbox-Arbeitsbereiche lassen sich zurücksetzen. Besucher können eine Demo nicht ändern, daher bleiben seine Beispieldaten unverändert."
+      }
     },
     "reset": {
       "trigger": "Sandbox zurücksetzen",
       "title": "{name} zurücksetzen?",
-      "replaced": "Alle Änderungen im Sandbox-Workspace werden durch seine Seed-Daten ersetzt: Trading Partners, Mappings, Runs und jede andere Änderung seit dem letzten Zurücksetzen.",
+      "replaced": "Alle Änderungen in dieser Sandbox werden durch ihre Beispieldaten ersetzt: Handelspartner, Mappings, Belege und jede andere Änderung seit dem letzten Zurücksetzen.",
       "untouched": "Andere Workspaces bleiben unverändert.",
       "irreversible": "Das kann nicht rückgängig gemacht werden.",
       "cancel": "Abbrechen",
       "confirm": "Sandbox zurücksetzen",
       "resetting": "Wird zurückgesetzt…",
       "failed": "Die Sandbox konnte nicht zurückgesetzt werden. Versuchen Sie es erneut.",
-      "done": "{name} wurde auf seine Seed-Daten zurückgesetzt."
+      "done": "{name} wurde auf seine Beispieldaten zurückgesetzt."
     }
   }
 }

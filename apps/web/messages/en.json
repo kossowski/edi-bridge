@@ -2598,7 +2598,8 @@
         "yes": "Yes",
         "no": "No"
       },
-      "neverReset": "Never"
+      "neverReset": "Never",
+      "noActivity": "No activity yet"
     },
     "workspaces": {
       "title": "Workspaces",
@@ -2655,13 +2656,29 @@
     "workspace": {
       "title": "Workspace",
       "loading": "Loading Workspace",
-      "facts": {
-        "label": "Workspace details",
-        "gln": "GLN",
+      "tabs": {
+        "overview": "Overview",
+        "members": "Members & invites",
+        "limits": "Limits",
+        "danger": "Danger zone"
+      },
+      "overview": {
+        "label": "Workspace at a glance",
+        "kind": "Kind",
+        "kindDescription": {
+          "standard": "A customer's own Workspace with real documents.",
+          "showcase": "Visitors look around in its example data but cannot change anything.",
+          "sandbox": "Visitors may change anything. You reset it to its example data."
+        },
         "members": "Members",
-        "seeded": "Seed data",
-        "createdAt": "Created",
-        "lastResetAt": "Last reset"
+        "pendingInvites": "{count, plural, =0 {No open invites} one {# open invite} other {# open invites}}",
+        "documentsToday": "Documents today",
+        "lastActivity": "Last activity",
+        "lastReset": "Last reset",
+        "detailsLabel": "More details",
+        "gln": "Company ID (GLN)",
+        "seeded": "Started with example data",
+        "createdAt": "Created"
       },
       "notFound": {
         "title": "Workspace not found",
@@ -2730,19 +2747,21 @@
         }
       }
     },
-    "settings": {
-      "title": "Retention and AI budget",
-      "description": "How long this Workspace keeps raw Documents and how many AI tokens it may use per day.",
-      "loading": "Loading retention and AI budget",
+    "limits": {
+      "shown": {
+        "title": "Members see these limits",
+        "description": "They find them in their settings under Data & AI and cannot change them there."
+      },
+      "loading": "Loading limits",
       "error": {
-        "title": "Retention and AI budget unavailable",
-        "description": "The retention period and AI budget could not be loaded.",
+        "title": "Limits unavailable",
+        "description": "The limits could not be loaded.",
         "retry": "Try again"
       },
       "retention": {
-        "title": "Document retention period",
-        "description": "Raw Documents older than this are deleted. A Run can only be reprocessed while its raw Document is kept.",
-        "label": "Retention period in days",
+        "title": "How long documents are kept",
+        "description": "Documents older than this are deleted. A document can be processed again only while it is kept.",
+        "label": "Keep documents for (days)",
         "hint": "Between {min} and {max} days.",
         "errors": {
           "required": "Enter a retention period.",
@@ -2751,32 +2770,41 @@
         }
       },
       "budget": {
-        "title": "AI token budget",
-        "description": "The daily limit of AI tokens, for example when the AI drafts a Mapping. Usage starts again at zero every day.",
-        "label": "Daily limit in tokens",
-        "hint": "Between {min} and {max} tokens. 0 turns AI off for this Workspace.",
+        "title": "AI budget",
+        "description": "The AI budget lets the AI draft mappings. It starts again every day.",
+        "label": "AI tokens per day",
+        "hint": "Between {min} and {max} tokens. 0 turns the AI helper off for this Workspace.",
         "errors": {
           "required": "Enter a daily limit.",
           "notWhole": "Enter a whole number of tokens.",
           "outOfRange": "Enter between {min} and {max} tokens."
         }
       },
-      "save": "Save retention and AI budget",
+      "save": "Save limits",
       "saving": "Saving…",
-      "saved": "Retention and AI budget saved.",
-      "failed": "The retention period and AI budget could not be saved. Try again."
+      "saved": "Limits saved.",
+      "failed": "The limits could not be saved. Try again."
+    },
+    "danger": {
+      "title": "Reset to example data",
+      "sandbox": "Replaces everything changed in this Sandbox with its example data, so it is clean before a meeting.",
+      "lastReset": "Last reset",
+      "unavailable": {
+        "standard": "Only Sandbox Workspaces can be reset. This Workspace holds a customer's real data, which is never reset.",
+        "showcase": "Only Sandbox Workspaces can be reset. Visitors cannot change a Demo, so its example data stays as it is."
+      }
     },
     "reset": {
       "trigger": "Reset Sandbox",
       "title": "Reset {name}?",
-      "replaced": "All changes in the Sandbox Workspace are replaced by its seed data: Trading Partners, Mappings, Runs and every other change made since the last reset.",
+      "replaced": "All changes in this Sandbox are replaced by its example data: trading partners, mappings, documents and every other change made since the last reset.",
       "untouched": "Other Workspaces are not affected.",
       "irreversible": "This cannot be undone.",
       "cancel": "Cancel",
       "confirm": "Reset Sandbox",
       "resetting": "Resetting…",
       "failed": "The Sandbox could not be reset. Try again.",
-      "done": "{name} was reset to its seed data."
+      "done": "{name} was reset to its example data."
     }
   }
 }

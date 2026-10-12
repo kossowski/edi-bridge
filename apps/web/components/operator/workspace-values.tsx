@@ -48,3 +48,16 @@ export function WorkspaceLastReset({ lastResetAt }: { lastResetAt: string | null
     <span className="text-muted-foreground">{t('neverReset')}</span>
   )
 }
+
+export function WorkspaceLastActivity({ lastActivityAt }: { lastActivityAt: string | null }) {
+  const t = useTranslations('Operator.values')
+  const format = useFormatter()
+
+  return lastActivityAt ? (
+    <time dateTime={lastActivityAt} className="tabular-nums">
+      {format.dateTime(new Date(lastActivityAt), { dateStyle: 'medium', timeStyle: 'short' })}
+    </time>
+  ) : (
+    <span className="text-muted-foreground">{t('noActivity')}</span>
+  )
+}
