@@ -120,7 +120,7 @@ export const Idle = meta.story({
     await expect(
       await dialog.findByRole('combobox', { name: 'Sample Document' }),
     ).toHaveTextContent(sample.name)
-    await expect(dialog.getByText('Document Structure', { exact: false })).toBeVisible()
+    await expect(dialog.getByText('Data format', { exact: false })).toBeVisible()
     await expect(dialog.getByText('Message Type INVOIC')).toBeVisible()
     await expect(await dialog.findByText('151,650 of 200,000 tokens left today.')).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Start the AI draft' })).not.toHaveAttribute(

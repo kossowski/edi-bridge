@@ -42,7 +42,7 @@ function documentItem(node: DocumentStructureNode): TreeItem {
     path: node.path,
     label: node.name,
     required: node.required,
-    name: null,
+    name: node.label,
   }
 
   switch (node.kind) {

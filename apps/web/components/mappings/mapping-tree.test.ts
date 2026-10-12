@@ -22,6 +22,28 @@ describe('documentTree', () => {
     expect(lines?.children?.map(({ path }) => path)).toContain('lines[].gtin')
   })
 
+  it('names each part by its plain name and labels it with its technical name', () => {
+    expect(
+      find(
+        documentTree({
+          children: [
+            {
+              kind: 'field',
+              path: 'EPreis',
+              name: 'EPreis',
+              label: 'Unit price',
+              labelReason: null,
+              labelUnsure: false,
+              required: true,
+              type: 'number',
+            },
+          ],
+        }),
+        'EPreis',
+      ),
+    ).toMatchObject({ label: 'EPreis', name: 'Unit price' })
+  })
+
   it('nests objects', () => {
     expect(find(tree, 'buyer.contact')).toMatchObject({ kind: 'object', repeat: null })
     expect(find(tree, 'buyer.contact.name')).toMatchObject({ kind: 'field', detail: 'string' })

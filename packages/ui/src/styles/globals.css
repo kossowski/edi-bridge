@@ -148,3 +148,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+@utility scroll-shadow-x {
+  background:
+    linear-gradient(to right, var(--card) 40%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--card) 40%, transparent) right / 2rem 100% no-repeat local,
+    linear-gradient(to right, color-mix(in oklab, var(--foreground) 18%, transparent), transparent)
+      left / 0.75rem 100% no-repeat scroll,
+    linear-gradient(to left, color-mix(in oklab, var(--foreground) 18%, transparent), transparent)
+      right / 0.75rem 100% no-repeat scroll;
+}

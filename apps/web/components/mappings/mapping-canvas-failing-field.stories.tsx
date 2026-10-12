@@ -116,9 +116,14 @@ const meta = preview.meta({
 
 export const TargetField = meta.story({
   async play({ canvas, canvasElement }) {
-    const alert = await findAlert(canvasElement, 'A document failed at lines › gtin')
+    const alert = await findAlert(
+      canvasElement,
+      'A document failed at lines › gtin (Article number (GTIN))',
+    )
 
-    await expect(alert.getByText(/The field is in the target: Document Structure/)).toBeVisible()
+    await expect(
+      alert.getByText(/The field is in the target: Data format ERP purchase order\./),
+    ).toBeVisible()
     await expect(alert.getByText(/It is marked on the canvas\./)).toBeVisible()
     await expect(alert.getByRole('button', { name: 'Show the field' })).toBeVisible()
     await expect(alert.getByRole('link', { name: 'Back to documents' })).toHaveAttribute(
@@ -227,9 +232,14 @@ export const SourceFieldInRepetition = meta.story({
   ...on('desktop'),
   args: { id: outbound.id, field: repeatedSource.path },
   async play({ canvas, canvasElement }) {
-    const alert = await findAlert(canvasElement, 'A document failed at packages › lines › gtin')
+    const alert = await findAlert(
+      canvasElement,
+      'A document failed at packages › lines › gtin (Article number (GTIN))',
+    )
 
-    await expect(alert.getByText(/The field is in the source: Document Structure/)).toBeVisible()
+    await expect(
+      alert.getByText(/The field is in the source: Data format ERP dispatch advice\./),
+    ).toBeVisible()
 
     // Collapsed, the part holding the field carries the mark instead.
     await userEvent.click(await canvas.findByRole('button', { name: 'Collapse packages' }))
@@ -309,7 +319,10 @@ export const German = meta.story({
     ),
   ],
   async play({ canvasElement }) {
-    const alert = await findAlert(canvasElement, 'Ein Beleg ist an buyer › gln gescheitert')
+    const alert = await findAlert(
+      canvasElement,
+      'Ein Beleg ist an buyer › gln (Location number (GLN)) gescheitert',
+    )
 
     await expect(alert.getByText(/Das Feld liegt im Ziel/)).toBeVisible()
     await expect(alert.getByRole('link', { name: 'Zurück zu den Belegen' })).toBeVisible()
