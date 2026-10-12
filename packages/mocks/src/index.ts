@@ -163,6 +163,7 @@ export { dayMs } from './duration'
 export { liveEventsHandler, type LiveEventsMode, type LiveEventsOptions } from './live-event'
 
 export {
+  type BlockingCode,
   createLookupTables,
   createLookupTableStore,
   lookupTableHandlers,

@@ -38,6 +38,7 @@ import {
   type LookupTableStore,
   seedLookupTables,
   toLookupTableStore,
+  workspaceScope,
 } from './lookup-table-seed'
 import {
   type MappingDraftRecord,
@@ -57,6 +58,7 @@ import {
 } from './trading-partner'
 
 export {
+  type BlockingCode,
   createLookupTables,
   createLookupTableStore,
   type LookupTableRecord,
@@ -72,14 +74,12 @@ type TradingPartnerNames = {
   get: (id: string) => Pick<TradingPartner, 'id' | 'name'> | undefined
 }
 
-const workspace = { kind: 'workspace' } as const
-
 function scopeOf(
   scope: LookupTableScopeInput,
   tradingPartners: TradingPartnerNames,
 ): LookupTableScope {
   if (scope.kind === 'workspace') {
-    return workspace
+    return workspaceScope
   }
 
   const tradingPartner = tradingPartners.get(scope.tradingPartnerId)
@@ -169,7 +169,7 @@ function failedRunReference(run: RunSummary): FailedRunReference {
   }
 }
 
-function newestFirst(a: RunSummary, b: RunSummary) {
+function newestFirst(a: Pick<RunSummary, 'receivedAt'>, b: Pick<RunSummary, 'receivedAt'>) {
   return Date.parse(b.receivedAt) - Date.parse(a.receivedAt)
 }
 
@@ -215,12 +215,12 @@ export function createLookupTableUsage(
     const ids = new Set(
       flows
         .all()
-        .filter(
-          ({ mappingVersionId }) =>
-            versions.find(mappingVersionId)?.version.mappingId === mappingId,
-        )
-        .map(({ tradingPartnerId }) => tradingPartnerId)
-        .filter((id) => scope.kind === 'workspace' || id === scope.tradingPartnerId),
+        .flatMap(({ mappingVersionId, tradingPartnerId }) =>
+          versions.find(mappingVersionId)?.version.mappingId === mappingId &&
+          (scope.kind === 'workspace' || tradingPartnerId === scope.tradingPartnerId)
+            ? [tradingPartnerId]
+            : [],
+        ),
     )
 
     return [...ids]
@@ -235,49 +235,58 @@ export function createLookupTableUsage(
   function usesOf(table: LookupTableRecord): LookupTableUse[] {
     return mappings
       .all()
-      .filter((mapping) => readsTable(mapping, table.id))
-      .map((mapping) => ({
-        mappingId: mapping.id,
-        name: mapping.name,
-        messageType: mapping.messageType,
-        direction: directionOf(mapping),
-        tradingPartners: partnersOf(mapping.id, table.scope),
-      }))
+      .flatMap((mapping) =>
+        readsTable(mapping, table.id)
+          ? [
+              {
+                mappingId: mapping.id,
+                name: mapping.name,
+                messageType: mapping.messageType,
+                direction: directionOf(mapping),
+                tradingPartners: partnersOf(mapping.id, table.scope),
+              },
+            ]
+          : [],
+      )
       .sort(byName)
   }
 
   function missingCodesOf(table: LookupTableRecord): MissingCode[] {
     const translated = new Set(table.entries.map(({ sourceCode }) => sourceCode))
-    const failedRuns = new Map<string, RunSummary[]>()
+    const failedRuns = new Map<string, FailedRunReference[]>()
+
+    function block(code: string, references: ReadonlyArray<FailedRunReference>) {
+      if (!translated.has(code)) {
+        failedRuns.set(code, [...(failedRuns.get(code) ?? []), ...references])
+      }
+    }
 
     for (const run of runs().all()) {
       const target = targetOf(run)
 
-      if (
-        target?.lookupTableId === table.id &&
-        !translated.has(target.code) &&
-        runs().replacingOf(run.id) === undefined
-      ) {
-        failedRuns.set(target.code, [...(failedRuns.get(target.code) ?? []), run])
+      if (target?.lookupTableId === table.id && runs().replacingOf(run.id) === undefined) {
+        block(target.code, [failedRunReference(run)])
       }
     }
 
-    const blocking = [...failedRuns].map(([code, codeRuns]): MissingCode => ({
+    for (const { code, failedRuns: references } of table.blockingCodes ?? []) {
+      block(code, references)
+    }
+
+    const blocking = [...failedRuns].map(([code, references]): MissingCode => ({
       urgency: 'blocking',
       code,
       ...hintFor(table.kind, code),
-      failedRuns: codeRuns.sort(newestFirst).map(failedRunReference),
+      failedRuns: references.toSorted(newestFirst),
     }))
 
     const upcoming = (table.upcomingCodes ?? [])
-      .filter(({ code }) => !translated.has(code) && !failedRuns.has(code))
       .toSorted((a, b) => b.itemCount - a.itemCount)
-      .map(({ code, itemCount }): MissingCode => ({
-        urgency: 'upcoming',
-        code,
-        ...hintFor(table.kind, code),
-        itemCount,
-      }))
+      .flatMap(({ code, itemCount }): MissingCode[] =>
+        translated.has(code) || failedRuns.has(code)
+          ? []
+          : [{ urgency: 'upcoming', code, ...hintFor(table.kind, code), itemCount }],
+      )
 
     return [...blocking, ...upcoming]
   }

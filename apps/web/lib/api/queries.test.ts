@@ -21,6 +21,7 @@ import {
   lookupTableMissingCodesQuery,
   lookupTableQuery,
   lookupTablesQuery,
+  lookupTableSuggestionsQuery,
   mappingDraftQuery,
   mappingsQuery,
   mappingVersionsQuery,
@@ -148,6 +149,22 @@ describe('forgetDeletedLookupTable', () => {
 
     expect(queryClient.getQueryState(lookupTableQuery(deleted.id).queryKey)).toBeUndefined()
     expect(queryClient.getQueryState(lookupTablesQuery.queryKey)?.isInvalidated).toBe(true)
+  })
+})
+
+describe('lookupTableSuggestionsQuery', () => {
+  it('keys the suggestions by kind and Trading Partner and keeps them fresh', () => {
+    const units = lookupTableSuggestionsQuery({ kind: 'units' })
+
+    const hansemarktUnits = lookupTableSuggestionsQuery({
+      kind: 'units',
+      tradingPartnerId: seedTradingPartners[0]!.id,
+    })
+
+    expect(lookupTableSuggestionsQuery({ kind: 'units' }).queryKey).toEqual(units.queryKey)
+    expect(hansemarktUnits.queryKey).not.toEqual(units.queryKey)
+    expect(lookupTableSuggestionsQuery({ kind: 'countries' }).queryKey).not.toEqual(units.queryKey)
+    expect(units.staleTime).toBe(Infinity)
   })
 })
 

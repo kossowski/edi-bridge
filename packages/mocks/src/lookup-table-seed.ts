@@ -2,35 +2,36 @@ import { en, Faker } from '@faker-js/faker'
 import { z } from 'zod'
 
 import {
-  type LookupTable,
+  blockingMissingCodeSchema,
+  type FailedRunReference,
   type LookupTableEntry,
   lookupTableInputSchema,
   type LookupTableKind,
   type LookupTableScopeInput,
-  missingCodeSchema,
+  messageTypes,
   type TradingPartner,
+  upcomingMissingCodeSchema,
 } from '@edi-bridge/contracts'
 
 import { seedId } from './seed-id'
 import { seedGln, seedTradingPartners } from './trading-partner'
 
-const upcomingCodeSchema = missingCodeSchema.options[1].pick({ code: true, itemCount: true })
+const upcomingCodeSchema = upcomingMissingCodeSchema.pick({ code: true, itemCount: true })
 
 export type UpcomingCode = z.infer<typeof upcomingCodeSchema>
+
+const blockingCodeSchema = blockingMissingCodeSchema.pick({ code: true, failedRuns: true })
+
+export type BlockingCode = z.infer<typeof blockingCodeSchema>
 
 const lookupTableRecordSchema = lookupTableInputSchema.extend({
   id: z.uuid(),
   updatedAt: z.iso.datetime(),
   upcomingCodes: z.array(upcomingCodeSchema).optional(),
+  blockingCodes: z.array(blockingCodeSchema).optional(),
 })
 
-export type LookupTableRecord = Pick<
-  LookupTable,
-  'id' | 'name' | 'kind' | 'entries' | 'updatedAt'
-> & {
-  scope: LookupTableScopeInput
-  upcomingCodes?: ReadonlyArray<UpcomingCode>
-}
+export type LookupTableRecord = z.infer<typeof lookupTableRecordSchema>
 
 type TradingPartnerIds = ReadonlyArray<Pick<TradingPartner, 'id'>>
 
@@ -147,6 +148,8 @@ function generateEntries(faker: Faker, count: number): LookupTableEntry[] {
   }))
 }
 
+type TradingPartnerNames = ReadonlyArray<Pick<TradingPartner, 'id' | 'name'>>
+
 function generateUpcomingCodes(faker: Faker, count: number): UpcomingCode[] {
   return Array.from({ length: count }, (_, index) => ({
     code: `${faker.string.alpha({ length: 3, casing: 'upper' })}-${index + 1}`,
@@ -154,10 +157,41 @@ function generateUpcomingCodes(faker: Faker, count: number): UpcomingCode[] {
   }))
 }
 
+function generateFailedRuns(
+  faker: Faker,
+  tradingPartners: TradingPartnerNames,
+  now: Date,
+): FailedRunReference[] {
+  return Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () => {
+    const { id, name } = faker.helpers.arrayElement(tradingPartners)
+
+    return {
+      id: faker.string.uuid(),
+      receivedAt: faker.date.recent({ days: 14, refDate: now }).toISOString(),
+      tradingPartner: { id, name },
+      messageType: faker.helpers.arrayElement(messageTypes),
+      businessReference: faker.helpers.maybe(() => `PO-${faker.string.numeric(6)}`) ?? null,
+    }
+  }).toSorted((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))
+}
+
+function generateBlockingCodes(
+  faker: Faker,
+  count: number,
+  tradingPartners: TradingPartnerNames,
+  now: Date,
+): BlockingCode[] {
+  return Array.from({ length: count }, (_, index) => ({
+    code: `${faker.string.alpha({ length: 2, casing: 'upper' })}-${index + 1}`,
+    failedRuns: generateFailedRuns(faker, tradingPartners, now),
+  }))
+}
+
 export function createLookupTables({
   count,
   entryCount,
   upcomingCodeCount = 0,
+  blockingCodeCount = 0,
   now = new Date(),
   seed = 31,
   tradingPartners = seedTradingPartners,
@@ -165,9 +199,10 @@ export function createLookupTables({
   count: number
   entryCount?: number
   upcomingCodeCount?: number
+  blockingCodeCount?: number
   now?: Date
   seed?: number
-  tradingPartners?: ReadonlyArray<Pick<TradingPartner, 'id' | 'name'>>
+  tradingPartners?: TradingPartnerNames
 }): LookupTableRecord[] {
   const faker = new Faker({ locale: [en], seed })
 
@@ -185,6 +220,12 @@ export function createLookupTables({
       updatedAt: faker.date.past({ years: 1, refDate: now }).toISOString(),
       entries: generateEntries(faker, entryCount ?? faker.number.int({ min: 0, max: 12 })),
       upcomingCodes: generateUpcomingCodes(faker, upcomingCodeCount),
+      blockingCodes: generateBlockingCodes(
+        faker,
+        blockingCodeCount,
+        tradingPartner ? [tradingPartner] : tradingPartners,
+        now,
+      ),
     }
 
     assertValid(record, tradingPartners)

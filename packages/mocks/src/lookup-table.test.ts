@@ -521,11 +521,18 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
     expect(await getMissingCodes(seedLookupTableNamed('VAT categories').id)).toEqual([])
   })
 
-  it('serves a large volume of missing codes', async () => {
-    const [large] = createLookupTables({ count: 1, upcomingCodeCount: 500 })
+  it('serves a large volume of blocking and upcoming codes', async () => {
+    const [large] = createLookupTables({ count: 1, blockingCodeCount: 200, upcomingCodeCount: 500 })
     server.use(...lookupTableHandlers(apiUrl, { lookupTables: [large!], runs: [] }))
 
-    expect(await getMissingCodes(large!.id)).toHaveLength(500)
+    const codes = await getMissingCodes(large!.id)
+
+    expect(codes.filter(({ urgency }) => urgency === 'blocking')).toHaveLength(200)
+    expect(codes.filter(({ urgency }) => urgency === 'upcoming')).toHaveLength(500)
+    expect((await listLookupTables())[0]?.missingCodeCounts).toEqual({
+      blocking: 200,
+      upcoming: 500,
+    })
   })
 
   it('answers 404 for an unknown Lookup Table', async () => {
@@ -562,6 +569,18 @@ describe('Lookup Table uses', () => {
     }
   })
 
+  it('names the ORDERS Mappings that read the units the blocking KRT is missing from', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const { uses, missingCodeCounts } = await getLookupTable(units.id)
+
+    expect(missingCodeCounts.blocking).toBe(1)
+    expect(uses.length).toBeGreaterThan(0)
+    expect(new Set(uses.map(({ messageType }) => messageType))).toEqual(new Set(['ORDERS']))
+    expect(uses.every(({ tradingPartners }) => tradingPartners.length > 0)).toBe(true)
+  })
+
   it('names only the Trading Partner a partner table belongs to', async () => {
     const countries = seedLookupTableNamed('Country codes')
     const lookupTables = [{ ...countries, scope: partnerScope(hansemarkt) }]
@@ -577,7 +596,9 @@ describe('Lookup Table uses', () => {
   it('lists no uses for a table that no Mapping reads', async () => {
     server.use(...lookupTableHandlers(apiUrl))
 
-    expect((await getLookupTable(seedLookupTableNamed('Hansemarkt units').id)).uses).toEqual([])
+    expect(
+      (await getLookupTable(seedLookupTableNamed('Hansemarkt store numbers').id)).uses,
+    ).toEqual([])
   })
 })
 

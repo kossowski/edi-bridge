@@ -1,6 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect } from 'storybook/test'
+import { expect, within } from 'storybook/test'
 
 import { LookupTablesScreen } from '@/components/lookup-tables/lookup-tables-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
@@ -23,7 +23,11 @@ const meta = preview.meta({
 export const Default = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('cell', { name: 'Units of measure' })).toBeVisible()
-    await expect(canvas.getAllByRole('cell', { name: 'Hansemarkt GmbH' })[0]).toBeVisible()
+    const hansemarktUnits = canvas.getByRole('row', { name: /Hansemarkt units/ })
+
+    await expect(
+      within(hansemarktUnits).getByRole('cell', { name: 'Hansemarkt GmbH' }),
+    ).toBeVisible()
     await expect(
       await canvas.findByRole('button', { name: 'Actions for Country codes' }),
     ).toBeVisible()

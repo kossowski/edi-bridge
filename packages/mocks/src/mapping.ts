@@ -239,6 +239,11 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
       { inputs: { value: 'SG2+SU/NAD+SU/3207' }, outputs: { value: 'supplier.country' } },
     ),
     transformTemplate(
+      'lookupTable',
+      { lookupTableId: seedLookupTableNamed('Units of measure').id, fallback: 'fail' },
+      { inputs: { value: 'SG25/QTY+21/C186/6411' }, outputs: { value: 'lines[].unit' } },
+    ),
+    transformTemplate(
       'substring',
       { start: 0, length: 35 },
       { inputs: { value: 'SG2+SU/NAD+SU/C080/3036' }, outputs: { value: 'supplier.name' } },

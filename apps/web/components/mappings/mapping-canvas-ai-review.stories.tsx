@@ -106,11 +106,14 @@ export const InboundWithLookupTable = meta.story({
       panel.getAllByRole('button', { name: /^Reject the AI-proposed link from/ }).length,
     ).toBeGreaterThan(0)
 
+    const lookupTables = () => canvas.queryAllByRole('group', { name: /^Transform Lookup Table/ })
+    const before = lookupTables().length
+
     await userEvent.click(panel.getByRole('button', { name: 'Reject Lookup Table 1' }))
     await waitFor(() =>
       expect(liveStatus(canvasElement)).toHaveTextContent('AI-proposed Lookup Table 1 rejected.'),
     )
-    await expect(canvas.queryByRole('group', { name: 'Transform Lookup Table 1' })).toBeNull()
+    await expect(lookupTables()).toHaveLength(before - 1)
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
   },
 })
