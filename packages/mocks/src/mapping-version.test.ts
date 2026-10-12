@@ -39,6 +39,7 @@ import {
   seedMappingVersions,
   toMappingVersion,
 } from './mapping-version'
+import { publishDraft } from './publish-request'
 import { seedSession } from './session'
 
 const apiUrl = 'http://api.test'
@@ -57,15 +58,8 @@ async function listVersions(mappingId: string) {
   return mappingVersionsEndpoint.response.parse(await response.json())
 }
 
-async function publish(
-  mappingId: string,
-  body: Partial<PublishMappingDraftBody> = { changeNote: '' },
-) {
-  return fetch(`${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId })}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+function publish(mappingId: string, body?: Partial<PublishMappingDraftBody>) {
+  return publishDraft(apiUrl, mappingId, body)
 }
 
 async function getFlow(id: string) {
@@ -379,22 +373,19 @@ describe('POST /mappings/:mappingId/versions', () => {
 })
 
 describe('POST /mappings/:mappingId/versions with a change note and Flows to move', () => {
+  const flowsOf = (mappingId: string) =>
+    seedFlows.filter((flow) =>
+      seedMappingVersions.some(
+        (version) => version.mappingId === mappingId && version.id === flow.mappingVersionId,
+      ),
+    )
+
   const draft = seedMappingDrafts.find(
     ({ id, unpublishedChanges }) =>
-      unpublishedChanges &&
-      id !== incompleteDraftId &&
-      seedFlows.filter((flow) =>
-        seedMappingVersions.some(
-          (version) => version.mappingId === id && version.id === flow.mappingVersionId,
-        ),
-      ).length >= 2,
+      unpublishedChanges && id !== incompleteDraftId && flowsOf(id).length >= 2,
   )!
 
-  const [moved, staying] = seedFlows.filter((flow) =>
-    seedMappingVersions.some(
-      (version) => version.mappingId === draft.id && version.id === flow.mappingVersionId,
-    ),
-  )
+  const [moved, staying] = flowsOf(draft.id)
 
   function handlers() {
     const mappings = createMappingDraftStore()

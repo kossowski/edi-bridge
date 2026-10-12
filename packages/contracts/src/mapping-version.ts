@@ -11,8 +11,6 @@ import {
 } from './mapping'
 import { documentContentSchema, previewNoteSchema } from './mapping-preview'
 import { messageTypeSchema } from './message-type'
-import { sessionUserSchema } from './session'
-import { tradingPartnerSummarySchema } from './trading-partner'
 import { mappingTransformSchema, transformLinkSchema } from './transform'
 
 import type { Endpoint } from './endpoint'
@@ -26,33 +24,6 @@ export const mappingVersionSummarySchema = z.object({
 })
 
 export type MappingVersionSummary = z.infer<typeof mappingVersionSummarySchema>
-
-export const pinnedFlowSchema = z.object({
-  id: z.uuid(),
-  name: z.string().min(1),
-  tradingPartner: tradingPartnerSummarySchema,
-})
-
-export type PinnedFlow = z.infer<typeof pinnedFlowSchema>
-
-export const mappingVersionEntrySchema = mappingVersionSummarySchema.extend({
-  changeNote: z.string().min(1).nullable(),
-  publishedBy: sessionUserSchema.pick({ id: true, name: true }),
-  flows: z.array(pinnedFlowSchema),
-})
-
-export type MappingVersionEntry = z.infer<typeof mappingVersionEntrySchema>
-
-export const mappingVersionsEndpoint: Endpoint<
-  MappingVersionEntry[],
-  undefined,
-  undefined,
-  '/mappings/:mappingId/versions'
-> = {
-  method: 'GET',
-  path: '/mappings/:mappingId/versions',
-  response: z.array(mappingVersionEntrySchema),
-}
 
 export const publishedMappingVersionsQuerySchema = z.object({
   messageType: messageTypeSchema.optional(),
@@ -90,30 +61,6 @@ export const mappingVersionEndpoint: Endpoint<
   method: 'GET',
   path: '/mappings/:mappingId/versions/:versionId',
   response: mappingVersionSchema,
-}
-
-export const maxChangeNoteLength = 500
-
-export const publishMappingDraftBodySchema = z.object({
-  changeNote: z.string().trim().max(maxChangeNoteLength),
-  moveFlowIds: z
-    .array(z.uuid())
-    .default([])
-    .refine((ids) => new Set(ids).size === ids.length, { message: 'Each Flow is chosen once' }),
-})
-
-export type PublishMappingDraftBody = z.infer<typeof publishMappingDraftBodySchema>
-
-export const publishMappingDraftEndpoint: Endpoint<
-  MappingVersionEntry,
-  undefined,
-  PublishMappingDraftBody,
-  '/mappings/:mappingId/versions'
-> = {
-  method: 'POST',
-  path: '/mappings/:mappingId/versions',
-  body: publishMappingDraftBodySchema,
-  response: mappingVersionEntrySchema,
 }
 
 export const restoreMappingVersionEndpoint: Endpoint<

@@ -28,7 +28,6 @@ import {
   publishMappingDraftEndpoint,
   restoreMappingVersionEndpoint,
   type Session,
-  type SessionUser,
   type TradingPartner,
   type TransformLink,
   transformIssues,
@@ -94,17 +93,18 @@ function toGraph({ links, transforms, transformLinks }: GraphParts): MappingGrap
   return { links: [...links], transforms: [...transforms], transformLinks: [...transformLinks] }
 }
 
-export type Publisher = Pick<SessionUser, 'id' | 'name'>
+type VersionHistory = Pick<MappingVersionEntry, 'changeNote' | 'publishedBy'>
 
 export type MappingVersionRecord = MappingVersionSummary &
-  GraphParts & {
+  GraphParts &
+  VersionHistory & {
     messageType: MessageType
     documentStructureId: string
-    changeNote: string | null
-    publishedBy: Publisher
   }
 
-const seedPublishers: ReadonlyArray<Publisher> = [...seedWorkspaceMembers.values()]
+const seedPublishers: ReadonlyArray<VersionHistory['publishedBy']> = [
+  ...seedWorkspaceMembers.values(),
+]
   .flat()
   .filter(({ role }) => role === 'admin')
   .map(({ id, name }) => ({ id, name }))
@@ -123,7 +123,7 @@ const seedChangeNotes = [
 // Versions from before change notes existed carry none.
 const changeNotesSince = Date.parse('2026-04-01T00:00:00.000Z')
 
-function seedHistory({ id, publishedAt }: MappingVersionSummary) {
+function seedHistory({ id, publishedAt }: MappingVersionSummary): VersionHistory {
   return {
     changeNote:
       Date.parse(publishedAt) < changeNotesSince
@@ -263,32 +263,13 @@ export function toMappingVersionSummary({
   mappingName,
   version,
   publishedAt,
-}: MappingVersionRecord): MappingVersionSummary {
+}: MappingVersionSummary): MappingVersionSummary {
   return { id, mappingId, mappingName, version, publishedAt }
 }
 
-export function toMappingVersionEntry(
-  record: MappingVersionRecord,
-  flows: ReadonlyArray<PinnedFlow>,
-): MappingVersionEntry {
-  return mappingVersionEntrySchema.parse({
-    ...toMappingVersionSummary(record),
-    changeNote: record.changeNote,
-    publishedBy: record.publishedBy,
-    flows,
-  })
-}
-
-export function seedMappingVersionEntry(
-  summary: MappingVersionSummary,
-  flows: ReadonlyArray<PinnedFlow>,
-): MappingVersionEntry {
-  return mappingVersionEntrySchema.parse({ ...summary, ...seedHistory(summary), flows })
-}
-
-export function pinnedFlows(
-  flows: ReadonlyArray<FlowRecord> | FlowStore = seedFlows,
-  tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore = seedTradingPartners,
+function pinnedFlows(
+  flows: ReadonlyArray<FlowRecord> | FlowStore,
+  tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore,
 ) {
   const flowStore = toFlowStore(flows)
   const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
@@ -317,6 +298,24 @@ export function pinnedFlows(
   }
 
   return (versionId: string) => byVersion.get(versionId) ?? []
+}
+
+export function mappingVersionEntries(
+  flows: ReadonlyArray<FlowRecord> | FlowStore = seedFlows,
+  tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore = seedTradingPartners,
+) {
+  const flowsOf = pinnedFlows(flows, tradingPartners)
+
+  return (version: MappingVersionSummary | MappingVersionRecord): MappingVersionEntry => {
+    const { changeNote, publishedBy } = 'publishedBy' in version ? version : seedHistory(version)
+
+    return mappingVersionEntrySchema.parse({
+      ...toMappingVersionSummary(version),
+      changeNote,
+      publishedBy,
+      flows: flowsOf(version.id),
+    })
+  }
 }
 
 export function toMappingVersion(
@@ -472,9 +471,6 @@ export function mappingVersionHandlers(
 
   const sessionStore = sessionStoreOf(session)
 
-  const toEntry = (record: MappingVersionRecord) =>
-    toMappingVersionEntry(record, pinnedFlows(flowStore, tradingPartnerStore)(record.id))
-
   const versionStore = toMappingVersionStore(versions ?? createMappingVersions(store.all()))
 
   const versionOf = (mappingId: string, versionId: string) => {
@@ -493,12 +489,10 @@ export function mappingVersionHandlers(
           return notFound()
         }
 
-        const flowsOf = pinnedFlows(flowStore, tradingPartnerStore)
-
         return HttpResponse.json(
           versionStore
             .of(params.mappingId)
-            .map((record) => toMappingVersionEntry(record, flowsOf(record.id))),
+            .map(mappingVersionEntries(flowStore, tradingPartnerStore)),
         )
       },
     ),
@@ -590,7 +584,9 @@ export function mappingVersionHandlers(
           }
         }
 
-        return HttpResponse.json(toEntry(record), { status: 201 })
+        return HttpResponse.json(mappingVersionEntries(flowStore, tradingPartnerStore)(record), {
+          status: 201,
+        })
       },
     ),
     http.post<{ mappingId: string; versionId: string }>(

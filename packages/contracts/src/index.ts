@@ -352,20 +352,11 @@ export {
   mappingDifferenceSchema,
   type MappingVersion,
   mappingVersionEndpoint,
-  type MappingVersionEntry,
-  mappingVersionEntrySchema,
   mappingVersionSchema,
   type MappingVersionSummary,
   mappingVersionSummarySchema,
-  mappingVersionsEndpoint,
-  maxChangeNoteLength,
   type OutputDifference,
   outputDifferenceSchema,
-  type PinnedFlow,
-  pinnedFlowSchema,
-  type PublishMappingDraftBody,
-  publishMappingDraftBodySchema,
-  publishMappingDraftEndpoint,
   publishedMappingVersionsEndpoint,
   type PublishedMappingVersionsQuery,
   publishedMappingVersionsQuerySchema,
@@ -373,6 +364,18 @@ export {
   type VersionOutput,
   versionOutputSchema,
 } from './mapping-version'
+
+export {
+  type MappingVersionEntry,
+  mappingVersionEntrySchema,
+  mappingVersionsEndpoint,
+  maxChangeNoteLength,
+  type PinnedFlow,
+  pinnedFlowSchema,
+  type PublishMappingDraftBody,
+  publishMappingDraftBodySchema,
+  publishMappingDraftEndpoint,
+} from './mapping-version-history'
 
 export {
   type Direction,

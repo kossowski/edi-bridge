@@ -8,7 +8,6 @@ import {
   type AiDraftEvent,
   type MappingDraft,
   mappingDraftEndpoint,
-  publishMappingDraftEndpoint,
   parseAiDraftEvent,
   type RequestAiDraftBody,
   requestAiDraftEndpoint,
@@ -27,6 +26,7 @@ import {
 } from './mapping'
 import { seedMappingSamples } from './mapping-sample'
 import { mappingVersionHandlers } from './mapping-version'
+import { publishDraft } from './publish-request'
 import { showcaseViewerSession } from './session'
 import { createWorkspaceSettings, createWorkspaceSettingsStore } from './workspace-settings'
 
@@ -445,18 +445,7 @@ describe('POST /mappings/:id/ai-draft/accept', () => {
     use()
     const { draft } = await draftedEvent(withoutLinks.id)
 
-    expect(
-      (
-        await fetch(
-          `${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId: draft.mappingId })}`,
-          {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ changeNote: '' }),
-          },
-        )
-      ).status,
-    ).toBe(423)
+    expect((await publishDraft(apiUrl, draft.mappingId)).status).toBe(423)
 
     const response = await accept(withoutLinks.id)
     const accepted = acceptAiDraftEndpoint.response.parse(await response.json())
@@ -464,18 +453,7 @@ describe('POST /mappings/:id/ai-draft/accept', () => {
     expect(accepted.aiReview).toBeNull()
     expect(partsOf(accepted)).toEqual(partsOf(draft))
     await expect(getDraft(withoutLinks.id)).resolves.toEqual(accepted)
-    expect(
-      (
-        await fetch(
-          `${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId: draft.mappingId })}`,
-          {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ changeNote: '' }),
-          },
-        )
-      ).status,
-    ).toBe(201)
+    expect((await publishDraft(apiUrl, draft.mappingId)).status).toBe(201)
   })
 
   it('answers 409 for a Draft without an open AI review', async () => {

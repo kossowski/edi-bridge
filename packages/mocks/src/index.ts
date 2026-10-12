@@ -215,10 +215,8 @@ export {
   type MappingVersionStore,
   type MappingVersionsState,
   publishedMappingVersionsHandler,
-  type Publisher,
   seedMappingVersions,
   toMappingVersion,
-  toMappingVersionEntry,
   toMappingVersionStore,
   toMappingVersionSummary,
 } from './mapping-version'

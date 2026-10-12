@@ -85,6 +85,7 @@ import {
   seedWorkspace,
 } from './index'
 import { day } from './overdue'
+import { publishDraft } from './publish-request'
 
 const apiUrl = 'http://api.test'
 
@@ -256,13 +257,7 @@ describe('createHandlers', () => {
     })
 
     const published = publishMappingDraftEndpoint.response.parse(
-      await (
-        await fetch(`${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId })}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ changeNote: '' }),
-        })
-      ).json(),
+      await (await publishDraft(apiUrl, mappingId)).json(),
     )
 
     const offered = publishedMappingVersionsEndpoint.response.parse(
@@ -310,16 +305,7 @@ describe('createHandlers', () => {
     ).toMatchObject({ mappingId: created.id, latestVersion: null, links: [] })
 
     const published = publishMappingDraftEndpoint.response.parse(
-      await (
-        await fetch(
-          `${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId: created.id })}`,
-          {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ changeNote: '' }),
-          },
-        )
-      ).json(),
+      await (await publishDraft(apiUrl, created.id)).json(),
     )
 
     const mappings = mappingsEndpoint.response.parse(

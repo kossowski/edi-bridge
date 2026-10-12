@@ -17,6 +17,7 @@ import {
   type RunStepStage,
   type RunSummary,
   runSummarySchema,
+  type TradingPartner,
   waitForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
 
@@ -31,9 +32,8 @@ import {
 } from './interchange'
 import { type LookupTableStore, toLookupTableStore } from './lookup-table'
 import {
+  mappingVersionEntries,
   type MappingVersionStore,
-  pinnedFlows,
-  seedMappingVersionEntry,
   toMappingVersionSummary,
 } from './mapping-version'
 import { seedRuns } from './run'
@@ -47,6 +47,8 @@ import {
   toRunStore,
 } from './run-store'
 import { seededFaker } from './seeded-faker'
+
+import type { TradingPartnerStore } from './trading-partner'
 
 const stepDurations: Readonly<Record<RunStepStage, readonly [number, number]>> = {
   receipt: [20, 200],
@@ -107,6 +109,7 @@ export type RunDetailOptions = (
   channels?: ChannelStore
   lookupTables?: LookupTableStore
   waitingForTradingPartnerSince?: Map<string, string>
+  tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
 }
 
 export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): Reprocessed[] {
@@ -375,11 +378,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     `${apiUrl}${mappingVersionsEndpoint.path}`,
     ({ params }) => {
       const versions = versionsOf(params.mappingId)
-      const flowsOf = pinnedFlows()
 
       return versions
         ? HttpResponse.json(
-            versions.map((version) => seedMappingVersionEntry(version, flowsOf(version.id))),
+            versions.map(mappingVersionEntries(problemSources.flows, options.tradingPartners)),
           )
         : problem(404, 'Not Found')
     },
