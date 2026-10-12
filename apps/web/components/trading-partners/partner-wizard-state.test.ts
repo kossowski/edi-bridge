@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { toFormValues } from '../channels/channel-form-values'
 import {
   channelFieldErrors,
+  chooseMapping,
   chooseWay,
   connectionFields,
   firstInvalidField,
@@ -309,5 +310,120 @@ describe('neededDirections', () => {
     ],
   ] as const)('the documents %j need the directions %j', (documents, expected) => {
     expect(neededDirections(documents)).toEqual(expected)
+  })
+})
+
+describe('mappings step', () => {
+  function withMappings(mappings: PartnerWizardState['mappings']): PartnerWizardState {
+    return { ...initialWizardState, documents: ['ORDERS', 'INVOIC'], mappings }
+  }
+
+  it('asks for a choice for each chosen document, in document order', () => {
+    const errors = stepErrors('mappings', withMappings({ INVOIC: { way: 'later' } }))
+
+    expect(errors).toEqual({ 'ORDERS.mapping': 'required' })
+    expect(firstInvalidField(stepErrors('mappings', withMappings({})))).toBe('ORDERS.mapping')
+  })
+
+  it('asks which mapping when an existing one is chosen without picking it', () => {
+    expect(
+      stepErrors(
+        'mappings',
+        withMappings({
+          ORDERS: { way: 'existing', mappingVersionId: null },
+          INVOIC: { way: 'ai' },
+        }),
+        { ORDERS: ['v1', 'v2'] },
+      ),
+    ).toEqual({ 'ORDERS.mappingVersion': 'required' })
+  })
+
+  it('accepts an offered existing mapping, an AI draft or later', () => {
+    expect(
+      stepErrors(
+        'mappings',
+        withMappings({
+          ORDERS: { way: 'existing', mappingVersionId: 'v1' },
+          INVOIC: { way: 'ai' },
+        }),
+        { ORDERS: ['v1', 'v2'] },
+      ),
+    ).toEqual({})
+    expect(
+      stepErrors('mappings', withMappings({ ORDERS: { way: 'later' }, INVOIC: { way: 'ai' } })),
+    ).toEqual({})
+  })
+
+  it.each([
+    ['no mapping is published', { ORDERS: [] }],
+    ['the mappings are still loading or could not be loaded', {}],
+  ])('asks for a choice again when an existing mapping was chosen but %s', (_, offered) => {
+    expect(
+      stepErrors(
+        'mappings',
+        withMappings({
+          ORDERS: { way: 'existing', mappingVersionId: 'v1' },
+          INVOIC: { way: 'later' },
+        }),
+        offered,
+      ),
+    ).toEqual({ 'ORDERS.mapping': 'required' })
+  })
+
+  it('asks again for a picked mapping that is no longer offered', () => {
+    const state = withMappings({
+      ORDERS: { way: 'existing', mappingVersionId: 'gone' },
+      INVOIC: { way: 'later' },
+    })
+
+    expect(stepErrors('mappings', state, { ORDERS: ['v1', 'v2'] })).toEqual({
+      'ORDERS.mappingVersion': 'required',
+    })
+    expect(stepErrors('mappings', state, { ORDERS: ['v1'] })).toEqual({
+      'ORDERS.mapping': 'required',
+    })
+  })
+})
+
+describe('chooseMapping', () => {
+  it('picks the only existing mapping', () => {
+    expect(chooseMapping(undefined, 'existing', ['v1'])).toEqual({
+      way: 'existing',
+      mappingVersionId: 'v1',
+    })
+  })
+
+  it('waits for a pick among several, and keeps an earlier pick', () => {
+    expect(chooseMapping(undefined, 'existing', ['v1', 'v2'])).toEqual({
+      way: 'existing',
+      mappingVersionId: null,
+    })
+    expect(
+      chooseMapping({ way: 'existing', mappingVersionId: 'v2' }, 'existing', ['v1', 'v2']),
+    ).toEqual({ way: 'existing', mappingVersionId: 'v2' })
+  })
+
+  it('drops the pick for an AI draft or later', () => {
+    expect(chooseMapping({ way: 'existing', mappingVersionId: 'v1' }, 'ai', ['v1'])).toEqual({
+      way: 'ai',
+    })
+    expect(chooseMapping(undefined, 'later', [])).toEqual({ way: 'later' })
+  })
+})
+
+describe('wizardResult mappings', () => {
+  it('hands on the mappings of the chosen documents only', () => {
+    const state: PartnerWizardState = {
+      ...initialWizardState,
+      documents: ['ORDERS'],
+      mappings: {
+        ORDERS: { way: 'existing', mappingVersionId: 'v1' },
+        INVOIC: { way: 'ai' },
+      },
+    }
+
+    expect(wizardResult(state).mappings).toEqual({
+      ORDERS: { way: 'existing', mappingVersionId: 'v1' },
+    })
   })
 })

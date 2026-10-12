@@ -12,6 +12,11 @@ import { GlnField, TextField, useGlnErrorMessage } from '@/components/form-field
 import { CheckboxCards } from '@/components/trading-partners/choice-cards'
 import { ConnectionsStep } from '@/components/trading-partners/partner-wizard-connections'
 import {
+  MappingsStep,
+  useOfferedMappings,
+} from '@/components/trading-partners/partner-wizard-mappings'
+import { ReviewStep } from '@/components/trading-partners/partner-wizard-review'
+import {
   firstInvalidField,
   initialWizardState,
   type PartnerField,
@@ -69,8 +74,10 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
   const [step, setStep] = useState<WizardStep>('partner')
   const [attempted, setAttempted] = useState(false)
 
+  const offeredMappings = useOfferedMappings(state.documents, step === 'mappings')
+
   const index = wizardSteps.indexOf(step)
-  const errors = attempted ? stepErrors(step, state) : {}
+  const errors = attempted ? stepErrors(step, state, offeredMappings) : {}
 
   const glnLaterId = `${baseId}-gln-later`
 
@@ -103,7 +110,7 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const found = stepErrors(step, state)
+    const found = stepErrors(step, state, offeredMappings)
     const first = firstInvalidField(found)
 
     if (first) {
@@ -254,6 +261,23 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
               }
             />
           )}
+
+          {step === 'mappings' && (
+            <MappingsStep
+              documents={state.documents}
+              errors={errors}
+              idPrefix={baseId}
+              mappings={state.mappings}
+              onUpdate={(document, update) =>
+                setState((current) => ({
+                  ...current,
+                  mappings: { ...current.mappings, [document]: update(current.mappings[document]) },
+                }))
+              }
+            />
+          )}
+
+          {step === 'review' && <ReviewStep result={wizardResult(state)} />}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
             {previous ? (

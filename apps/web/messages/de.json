@@ -1566,6 +1566,63 @@
         "copy": "Anfrage"
       }
     },
+    "mappings": {
+      "label": "Mapping für {documents}",
+      "use": "{mapping} verwenden",
+      "suggested": "Vorgeschlagen",
+      "existing": {
+        "title": "Ein vorhandenes Mapping verwenden",
+        "description": "{count, plural, one {# veröffentlichtes Mapping} other {# veröffentlichte Mappings}} für {documents} zur Auswahl."
+      },
+      "ai": {
+        "title": "Von der KI entwerfen lassen",
+        "description": "Die KI entwirft das Mapping aus einem Beispielbeleg. Sie prüfen und veröffentlichen es, bevor ein Beleg es verwendet."
+      },
+      "later": {
+        "title": "Später",
+        "description": "Sie wählen das Mapping auf der Partnerseite. Bis dahin werden diese Belege nicht übersetzt."
+      },
+      "select": {
+        "label": "Welches Mapping übersetzt {documents}?",
+        "description": "Jedes Mapping nutzt seine neueste veröffentlichte Version.",
+        "placeholder": "Mapping wählen"
+      },
+      "loading": "Die Mappings für {documents} werden geladen…",
+      "empty": "Für {documents} ist noch kein Mapping veröffentlicht. Lassen Sie die KI eines entwerfen, oder wählen Sie später.",
+      "failed": "Die Mappings für {documents} konnten nicht geladen werden. Sie können trotzdem die KI eines entwerfen lassen oder später wählen."
+    },
+    "review": {
+      "loading": "Ihre Verbindungen und Mappings werden geladen…",
+      "failed": "Ihre Verbindungen und Mappings konnten nicht geladen werden. Daher lässt sich die Einrichtung noch nicht auflisten.",
+      "partner": {
+        "title": "Partner"
+      },
+      "connections": {
+        "title": "Verbindungen",
+        "none": "Noch keine Verbindung. Sie legen sie auf der Partnerseite an, sobald der Partner die Angaben schickt."
+      },
+      "mappings": {
+        "title": "Mappings",
+        "draft": "Neues Mapping für {documents}",
+        "detail": "Die KI entwirft es aus einem Beispielbeleg. Sie prüfen und veröffentlichen es im Mapping-Editor."
+      },
+      "routes": {
+        "title": "Belegwege",
+        "detail": "Von {from} an {to}, mit dem Mapping {mapping}, Version {version}.",
+        "left": "Belegweg für {documents}: später auf der Partnerseite einrichten",
+        "reasons": {
+          "connectionPostponed": "{name} schickt Ihnen noch die Verbindungsangaben.",
+          "noOwnConnection": "Noch keine Ihrer eigenen Verbindungen passt zu {documents}.",
+          "severalOwnConnections": "Mehrere Ihrer eigenen Verbindungen passen zu {documents}. Sie wählen dort eine aus.",
+          "mappingDraft": "Der Belegweg folgt, sobald der KI-Entwurf veröffentlicht ist.",
+          "mappingLater": "Sie wählen das Mapping dort."
+        }
+      },
+      "testing": {
+        "title": "Im Testbetrieb angelegt",
+        "description": "Alles, was Sie mit {name} austauschen, ist als Test markiert. So erreicht nichts die echte Auftragsverarbeitung. Sobald {name} Ihren Test bestätigt, gehen Sie live."
+      }
+    },
     "request": {
       "greeting": "Guten Tag,",
       "intro": "wir möchten EDI-Belege mit Ihnen austauschen. Damit wir das einrichten können, senden Sie uns bitte:",
@@ -1587,12 +1644,19 @@
       },
       "way": {
         "required": "Wählen Sie, wie die Belege ans Ziel kommen."
+      },
+      "mapping": {
+        "required": "Wählen Sie ein Mapping, lassen Sie die KI eines entwerfen, oder wählen Sie später."
+      },
+      "mappingVersion": {
+        "required": "Wählen Sie ein Mapping."
       }
     },
     "cancel": "Abbrechen",
     "back": "Zurück",
     "continue": "Weiter",
-    "finish": "Partner im Testbetrieb anlegen"
+    "finish": "Partner im Testbetrieb anlegen",
+    "retry": "Erneut versuchen"
   },
   "Channels": {
     "new": "Neuer Channel",

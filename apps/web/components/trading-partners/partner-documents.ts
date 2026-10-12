@@ -1,5 +1,6 @@
 import {
   type ChannelSummary,
+  type Direction,
   directionOf,
   fitsFlow,
   type FlowChannelField,
@@ -33,20 +34,43 @@ export function ownSideField(messageType: MessageType): FlowChannelField {
   return directionOf({ messageType }) === 'inbound' ? 'destinationChannelId' : 'inboundChannelId'
 }
 
-export function documentConnections<
-  Channel extends Pick<ChannelSummary, 'name' | 'direction' | 'tradingPartnerId'>,
->(channels: ReadonlyArray<Channel>, messageType: MessageType, tradingPartnerId: string) {
+type ConnectionChannel = Pick<ChannelSummary, 'name' | 'direction' | 'tradingPartnerId'>
+
+function byName<Channel extends ConnectionChannel>(channels: ReadonlyArray<Channel>) {
+  return channels.toSorted((a, b) => a.name.localeCompare(b.name, 'de'))
+}
+
+export function documentConnections<Channel extends ConnectionChannel>(
+  channels: ReadonlyArray<Channel>,
+  messageType: MessageType,
+  tradingPartnerId: string,
+) {
   const flow = { messageType, tradingPartnerId }
 
   const fitting = (field: FlowChannelField) =>
-    channels
-      .filter((channel) => fitsFlow(channel, field, flow))
-      .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    byName(channels.filter((channel) => fitsFlow(channel, field, flow)))
 
   return {
     partner: fitting(partnerSideField(messageType)),
     own: fitting(ownSideField(messageType)),
   }
+}
+
+function ownSideDirection(messageType: MessageType): Direction {
+  return directionOf({ messageType }) === 'inbound' ? 'outbound' : 'inbound'
+}
+
+export function ownConnections<Channel extends ConnectionChannel>(
+  channels: ReadonlyArray<Channel>,
+  messageType: MessageType,
+) {
+  const direction = ownSideDirection(messageType)
+
+  return byName(
+    channels.filter(
+      (channel) => channel.tradingPartnerId === null && channel.direction === direction,
+    ),
+  )
 }
 
 export function latestMappingVersions(
@@ -68,6 +92,10 @@ export function chosenOrOnly<Value>(
   return options.length === 1 ? (options[0] ?? null) : null
 }
 
+export function flowName(name: string) {
+  return name.slice(0, maxFlowNameLength).trim()
+}
+
 export function newDocumentFlow({
   name,
   tradingPartnerId,
@@ -86,7 +114,7 @@ export function newDocumentFlow({
   const fromPartner = directionOf({ messageType }) === 'inbound'
 
   return {
-    name: name.slice(0, maxFlowNameLength).trim(),
+    name: flowName(name),
     tradingPartnerId,
     messageType,
     inboundChannelId: fromPartner ? partnerChannelId : ownChannelId,
