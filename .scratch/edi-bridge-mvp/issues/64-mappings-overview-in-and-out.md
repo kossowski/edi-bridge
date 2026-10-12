@@ -4,11 +4,15 @@
 
 **Blocked by:** 57 (Help & glossary page and plain names)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Lanes, card facts and the single next action per card as described; status is readable without colour
-- [ ] The New mapping sheet asks only the document and lands on `/mappings/[id]?ai-draft=start`; a lane's own "Another document coming in / going out" preselects the direction
-- [ ] The current Mappings table and its stories are replaced; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Lanes, card facts and the single next action per card as described; status is readable without colour
+- [x] The New mapping sheet asks only the document and lands on `/mappings/[id]?ai-draft=start`; a lane's own "Another document coming in / going out" preselects the direction
+- [x] The current Mappings table and its stories are replaced; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #94, #99, #104.

@@ -1,8 +1,12 @@
-import { expect, userEvent, within } from 'storybook/test'
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
+import { delay, http, HttpResponse } from 'msw'
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingsScreen } from '@/components/mappings/mappings-screen'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
+import { createMappingEndpoint } from '@edi-bridge/contracts'
 import { createHandlers, createMappingsWithTraffic, mappingHandlers } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -33,6 +37,16 @@ async function badges(canvasElement: HTMLElement, name: string) {
     (badge) => badge.textContent ?? '',
   )
 }
+
+async function openNewMappingSheet(canvasElement: HTMLElement, name = 'New Mapping') {
+  await userEvent.click(await within(canvasElement).findByRole('button', { name }))
+
+  return within(await screen.findByRole('dialog', { name }))
+}
+
+const choices = ['Purchase orders you receive', 'Dispatch advices you send', 'Invoices you send']
+
+const createUrl = `${apiUrl}${createMappingEndpoint.path}`
 
 const stateOrder = ['Documents failed', 'Draft not published', 'Never published', 'Running fine']
 
@@ -155,13 +169,201 @@ export const LargeVolume = meta.story({
   },
 })
 
-export const Empty = meta.story({
+export const NewMappingSheet = meta.story({
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await expect(sheet.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(3)
+
+    for (const name of choices) {
+      await expect(sheet.getByRole('button', { name })).toBeEnabled()
+    }
+
+    await expect(sheet.getAllByText('Draft with AI')).toHaveLength(3)
+    await expect(
+      sheet.getByRole('button', { name: 'Purchase orders you receive' }),
+    ).toHaveAccessibleDescription('Trading partner goes into Your ERP')
+
+    await userEvent.click(sheet.getByRole('button', { name: 'Invoices you send' }))
+
+    await waitFor(() =>
+      expect(getRouter().push).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
+      ),
+    )
+  },
+})
+
+export const NewMappingFromLane = meta.story({
+  async play({ canvasElement }) {
+    const goingOut = await lane(canvasElement, 'Going out')
+
+    await userEvent.click(
+      await goingOut.findByRole('button', { name: 'Another document going out' }),
+    )
+
+    const sheet = within(await screen.findByRole('dialog', { name: 'New Mapping' }))
+
+    await waitFor(() =>
+      expect(sheet.getByRole('button', { name: 'Dispatch advices you send' })).toBeVisible(),
+    )
+    await expect(sheet.getByRole('button', { name: 'Invoices you send' })).toBeVisible()
+    await expect(sheet.queryByRole('button', { name: 'Purchase orders you receive' })).toBeNull()
+  },
+})
+
+export const CreatingMapping = meta.story({
+  beforeEach({ msw }) {
+    msw.use(http.post(createUrl, () => delay('infinite')))
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await userEvent.click(sheet.getByRole('button', { name: 'Dispatch advices you send' }))
+
+    await expect(await sheet.findByRole('status')).toHaveTextContent('Creating the Mapping…')
+
+    for (const name of choices) {
+      await expect(sheet.getByRole('button', { name })).toBeDisabled()
+    }
+  },
+})
+
+export const CreateMappingFailed = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(createUrl, () =>
+        HttpResponse.json(
+          { message: 'The Workspace has no Document Structure to map yet.' },
+          { status: 422 },
+        ),
+      ),
+    )
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await userEvent.click(sheet.getByRole('button', { name: 'Purchase orders you receive' }))
+
+    await expect(await sheet.findByRole('alert')).toHaveTextContent(
+      'Add your data format first, so the AI knows the shape of your files.',
+    )
+    await expect(sheet.getByRole('link', { name: 'Add a data format' })).toHaveAttribute(
+      'href',
+      '/document-structures/new',
+    )
+    await expect(sheet.getByRole('button', { name: 'Purchase orders you receive' })).toBeEnabled()
+  },
+})
+
+export const CreateMappingUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(http.post(createUrl, () => HttpResponse.json({ message: 'Down' }, { status: 500 })))
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await userEvent.click(sheet.getByRole('button', { name: 'Invoices you send' }))
+
+    await expect(await sheet.findByRole('alert')).toHaveTextContent(
+      'The Mapping could not be created. Try again.',
+    )
+  },
+})
+
+export const EmptyWorkspace = meta.story({
   beforeEach({ msw }) {
     msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
   },
   async play({ canvas }) {
-    await expect(await canvas.findAllByText('Nothing here right now')).toHaveLength(2)
+    await expect(
+      await canvas.findByRole('heading', { name: 'Translate your first document' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'The AI drafts the Mapping from an example document, and you check every link.',
+      ),
+    ).toBeVisible()
+
+    for (const name of choices) {
+      await expect(canvas.getByRole('button', { name })).toBeVisible()
+    }
+
+    await expect(canvas.queryByRole('group', { name: 'Show' })).toBeNull()
+    await expect(canvas.queryByRole('region', { name: 'Coming in' })).toBeNull()
   },
+})
+
+export const EmptyWorkspaceWithoutDataFormat = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }))
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Purchase orders you receive' }),
+    )
+
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'Add your data format first, so the AI knows the shape of your files.',
+    )
+  },
+})
+
+export const EmptyWorkspaceGerman = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'Übersetzen Sie Ihren ersten Beleg' }),
+    ).toBeVisible()
+
+    for (const name of [
+      'Bestellungen, die Sie empfangen',
+      'Lieferavise, die Sie senden',
+      'Rechnungen, die Sie senden',
+    ]) {
+      await expect(canvas.getByRole('button', { name })).toBeVisible()
+    }
+  },
+})
+
+export const EmptyWorkspaceDark = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'Translate your first document' }),
+    ).toBeVisible()
+  },
+})
+
+export const Viewer = meta.story({
+  ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      await lane(canvasElement, 'Going out')
+      await canvas.findByRole('link', { name: 'Dispatch advices to 2 partners' })
+
+      await expect(canvas.queryByRole('button', { name: 'New Mapping' })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: /^Another document/ })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerEmpty = meta.story({
+  ...viewerStory({
+    handlers: [...mappingHandlers(apiUrl, { mappings: [] })],
+    async play({ canvas }) {
+      await expect(
+        await canvas.findByText('Mappings appear here once an Admin creates one.'),
+      ).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Invoices you send' })).toBeNull()
+    },
+  }),
 })
 
 export const German = meta.story({
@@ -178,6 +380,14 @@ export const German = meta.story({
       comingIn.getByRole('link', { name: 'Bestellungen von Bodensee Handelshaus AG' }),
     ).toBeVisible()
     await expect(goingOut.getByRole('link', { name: 'Mit KI entwerfen' })).toBeVisible()
+
+    await userEvent.click(goingOut.getByRole('button', { name: 'Weiterer ausgehender Beleg' }))
+
+    const sheet = within(await screen.findByRole('dialog', { name: 'Neues Mapping' }))
+
+    await waitFor(() =>
+      expect(sheet.getByRole('button', { name: 'Rechnungen, die Sie senden' })).toBeVisible(),
+    )
   },
 })
 
@@ -196,6 +406,17 @@ export const Dark = meta.story({
     ]
 
     await expect(new Set(shown)).toEqual(new Set(stateOrder))
+  },
+})
+
+export const NewMappingSheetDark = meta.story({
+  beforeEach() {
+    return darkMode()
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await expect(sheet.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(3)
   },
 })
 

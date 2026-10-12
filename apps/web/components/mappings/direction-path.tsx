@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight02Icon, DatabaseIcon } from '@hugeicons/core-free-icons'
+import { ArrowRight02Icon, DatabaseIcon, Store01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 
@@ -9,6 +9,26 @@ import type { ReactNode } from 'react'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { Direction } from '@edi-bridge/contracts'
+
+export function ErpEnd({ children }: { children: ReactNode }) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="bg-primary text-primary-foreground flex size-6 shrink-0 items-center justify-center rounded-full">
+        <HugeiconsIcon icon={DatabaseIcon} strokeWidth={2} aria-hidden className="size-3.5" />
+      </span>
+      {children}
+    </span>
+  )
+}
+
+export function PartnerEnd({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <HugeiconsIcon icon={Store01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
+      {children}
+    </span>
+  )
+}
 
 export function DirectionPath({
   direction,
@@ -22,15 +42,7 @@ export function DirectionPath({
   className?: string
 }) {
   const t = useTranslations('Mappings.path')
-
-  const erpEnd = (
-    <span className="flex min-w-0 items-center gap-2">
-      <span className="bg-primary text-primary-foreground flex size-6 shrink-0 items-center justify-center rounded-full">
-        <HugeiconsIcon icon={DatabaseIcon} strokeWidth={2} aria-hidden className="size-3.5" />
-      </span>
-      {erp}
-    </span>
-  )
+  const erpEnd = <ErpEnd>{erp}</ErpEnd>
 
   return (
     <p className={cn('items-center gap-2', className)}>
@@ -41,5 +53,18 @@ export function DirectionPath({
       </span>
       {direction === 'inbound' ? erpEnd : partner}
     </p>
+  )
+}
+
+export function DirectionHint({ direction }: { direction: Direction }) {
+  const t = useTranslations('Mappings.lane')
+
+  return (
+    <DirectionPath
+      direction={direction}
+      erp={t('erp')}
+      partner={<PartnerEnd>{t('partner')}</PartnerEnd>}
+      className="text-muted-foreground inline-flex text-xs"
+    />
   )
 }

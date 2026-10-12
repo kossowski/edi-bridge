@@ -1247,7 +1247,11 @@
       "empty": "Nothing here right now",
       "showAll": "Show all {count}",
       "partner": "Trading partner",
-      "erp": "Your ERP"
+      "erp": "Your ERP",
+      "another": {
+        "inbound": "Another document coming in",
+        "outbound": "Another document going out"
+      }
     },
     "path": {
       "inbound": "goes into",
@@ -1283,6 +1287,24 @@
       "title": "Mappings unavailable",
       "description": "The Mappings could not be loaded. Try again.",
       "retry": "Try again"
+    },
+    "new": {
+      "button": "New Mapping",
+      "title": "New Mapping",
+      "description": "Pick the document. The AI drafts the Mapping from an example document, and you check every link.",
+      "choice": "{documents} {direction, select, inbound {you receive} other {you send}}",
+      "aiHint": "Draft with AI",
+      "creating": "Creating the Mapping…",
+      "failed": "The Mapping could not be created. Try again.",
+      "noDocumentStructure": "Add your data format first, so the AI knows the shape of your files.",
+      "addDataFormat": "Add a data format",
+      "close": "Close"
+    },
+    "first": {
+      "title": "Translate your first document",
+      "partners": "Your partners",
+      "description": "The AI drafts the Mapping from an example document, and you check every link.",
+      "viewOnlyDescription": "Mappings appear here once an Admin creates one."
     }
   },
   "Mapping": {

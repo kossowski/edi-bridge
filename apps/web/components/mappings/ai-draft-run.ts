@@ -19,6 +19,8 @@ export type EndedAiDraftRun = Extract<AiDraftRun, { status: 'drafted' | 'empty' 
 
 export type AiDraftOutcome = 'drafted' | 'empty' | AiDraftProblem
 
+export const aiDraftStartHref = (mappingId: string) => `/mappings/${mappingId}?ai-draft=start`
+
 export const idleRun: AiDraftRun = { status: 'idle' }
 
 export const startedRun: AiDraftRun = { status: 'running', steps: [] }
