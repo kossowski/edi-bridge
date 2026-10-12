@@ -17,6 +17,7 @@ import {
   documentStructuresEndpoint,
   type DocumentStructureSummary,
   documentStructureSummarySchema,
+  examplePreview,
   type GraphParts,
   inferDocumentStructureEndpoint,
   type InferredDocumentStructure,
@@ -25,12 +26,14 @@ import {
   type MessageType,
   messageTypes,
   nodeContent,
+  summaryFieldLabelCount,
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 
 import {
   adjustDocumentStructure,
+  applyLabels,
   DocumentStructureProblemError,
   findNode,
   inferDocumentStructure,
@@ -38,10 +41,12 @@ import {
   visitedNode,
 } from './document-structure-inference'
 import { documentStructureOrigins } from './document-structure-origin'
+import { plainNameOf } from './field-label'
 import { byNameAndNewest } from './flow'
 import { containerOf } from './paths'
-import { badRequest, notFound } from './responses'
+import { badRequest, notFound, serverError } from './responses'
 import { seedId } from './seed-id'
+import { seededFaker } from './seeded-faker'
 
 import type { MappingDraftStore } from './mapping'
 import type { MappingVersionStore } from './mapping-version'
@@ -62,7 +67,14 @@ function toNodes(specs: ReadonlyArray<Spec>, parentPath: string): DocumentStruct
     if (isField(spec)) {
       const [name, type, required = true] = spec
 
-      return { kind: 'field', path: childPath(parentPath, name), name, type, required }
+      return {
+        kind: 'field',
+        path: childPath(parentPath, name),
+        name,
+        ...plainNameOf(name),
+        type,
+        required,
+      }
     }
 
     if ('object' in spec) {
@@ -72,36 +84,111 @@ function toNodes(specs: ReadonlyArray<Spec>, parentPath: string): DocumentStruct
         kind: 'object',
         path,
         name: spec.object,
+        ...plainNameOf(spec.object),
         required: spec.required ?? true,
         children: toNodes(spec.fields, path),
       }
     }
 
     const path = arrayPath(childPath(parentPath, spec.array))
+    const named = { path, name: spec.array, ...plainNameOf(spec.array) }
 
     return {
       kind: 'array',
-      path,
-      name: spec.array,
+      ...named,
       required: spec.required ?? true,
-      items: {
-        kind: 'object',
-        path,
-        name: spec.array,
-        required: true,
-        children: toNodes(spec.fields, path),
-      },
+      items: { kind: 'object', ...named, required: true, children: toNodes(spec.fields, path) },
     }
   })
 }
 
-function structure(index: number, name: string, specs: ReadonlyArray<Spec>): DocumentStructure {
+type JsonValue = string | number | boolean | JsonValue[] | { [name: string]: JsonValue }
+
+const exampleTexts = new Map<string, ReadonlyArray<string>>([
+  ['gln', ['4012345000016', '4098765000013', '4012345000023']],
+  ['gtin', ['04012345123456', '04012345654321', '04012345777777']],
+  ['sscc', ['340123450000000017', '340123450000000024']],
+  ['currency', ['EUR']],
+  ['country', ['DE']],
+  ['city', ['Lübeck', 'Hamburg', 'Bremen']],
+  ['name', ['Hansemarkt GmbH', 'Nordfrost Logistik GmbH', 'Alpenfrisch Märkte AG']],
+  ['unit', ['PCE', 'KGM']],
+  ['street', ['Hafenstraße 12', 'Industrieweg 4', 'Am Markt 1']],
+  ['postalCode', ['23552', '20457', '28195']],
+  ['description', ['Haferdrink Bio 1 l', 'Dinkeldrink 1 l', 'Haferdrink Barista 1 l']],
+  ['note', ['Rampe 2', 'Kühlware']],
+  ['email', ['einkauf@hansemarkt.example']],
+  ['phone', ['+49 451 123456']],
+  ['status', ['accepted']],
+])
+
+// Every array gets two items, so the example shows that the list repeats.
+function exampleOf(
+  nodes: ReadonlyArray<DocumentStructureNode>,
+  faker: Faker,
+): Record<string, JsonValue> {
+  const valueOf = (node: DocumentField | DocumentStructureNode): JsonValue => {
+    switch (node.kind) {
+      case 'object':
+        return exampleOf(node.children, faker)
+      case 'array':
+        return [valueOf(node.items), valueOf(node.items)]
+      default:
+        return fieldValue(node, faker)
+    }
+  }
+
+  return Object.fromEntries(nodes.map((node) => [node.name, valueOf(node)]))
+}
+
+function fieldValue(field: DocumentField, faker: Faker): JsonValue {
+  const known = exampleTexts.get(field.name)
+
+  if (known) {
+    return faker.helpers.arrayElement(known)
+  }
+
+  switch (field.type) {
+    case 'number':
+      return faker.number.float({ min: 1, max: 500, fractionDigits: 2 })
+    case 'integer':
+      return faker.number.int({ min: 1, max: 48 })
+    case 'boolean':
+      return faker.datatype.boolean()
+    case 'date':
+      return `2026-10-${String(faker.number.int({ min: 1, max: 28 })).padStart(2, '0')}`
+    default:
+      return `${faker.string.alpha({ length: 2, casing: 'upper' })}-${faker.string.numeric(5)}`
+  }
+}
+
+function jsonExample(
+  fileName: string,
+  children: ReadonlyArray<DocumentStructureNode>,
+  takenAt: string,
+) {
+  return {
+    fileName,
+    text: JSON.stringify(exampleOf(children, seededFaker(`example:${fileName}`)), null, 2),
+    takenAt,
+  }
+}
+
+function structure(
+  index: number,
+  name: string,
+  fileName: string,
+  specs: ReadonlyArray<Spec>,
+): DocumentStructure {
+  const children = toNodes(specs, '')
+
   return documentStructureSchema.parse({
     id: seedId(6, index),
     name,
     format: 'json',
     root: 'object',
-    children: toNodes(specs, ''),
+    example: jsonExample(fileName, children, `2026-09-${String(10 + index)}T10:00:00.000Z`),
+    children,
   })
 }
 
@@ -123,7 +210,7 @@ const party = (name: string, required = true, extra: ReadonlyArray<Spec> = []): 
 const vatId: FieldSpec = ['vatId', 'string', false]
 
 export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStructure>> = {
-  ORDERS: structure(1, 'ERP purchase order', [
+  ORDERS: structure(1, 'ERP purchase order', 'order-4711.json', [
     ['orderNumber', 'string'],
     ['orderDate', 'date'],
     ['requestedDeliveryDate', 'date', false],
@@ -161,7 +248,7 @@ export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStruc
     },
     ['lineCount', 'integer', false],
   ]),
-  DESADV: structure(2, 'ERP dispatch advice', [
+  DESADV: structure(2, 'ERP dispatch advice', 'dispatch-4715.json', [
     ['despatchNumber', 'string'],
     ['despatchDate', 'date'],
     ['documentDate', 'date'],
@@ -190,7 +277,7 @@ export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStruc
       ],
     },
   ]),
-  INVOIC: structure(3, 'ERP invoice', [
+  INVOIC: structure(3, 'ERP invoice', 'invoice-r-2026-1188.json', [
     ['invoiceNumber', 'string'],
     ['invoiceDate', 'date'],
     ['isCreditNote', 'boolean'],
@@ -233,7 +320,7 @@ export const seedDocumentStructureOf: Readonly<Record<MessageType, DocumentStruc
       ],
     },
   ]),
-  CONTRL: structure(4, 'ERP acknowledgement status', [
+  CONTRL: structure(4, 'ERP acknowledgement status', 'acknowledgement-0815.json', [
     ['interchangeReference', 'string'],
     ['senderGln', 'string'],
     ['recipientGln', 'string'],
@@ -345,15 +432,18 @@ export function createDocumentStructure({
     }
   }
 
+  const children = toNodes(
+    specs.filter((spec) => isField(spec) || spec.fields.length > 0),
+    '',
+  )
+
   return documentStructureSchema.parse({
     id: faker.string.uuid(),
     name,
     format: 'json',
     root: 'object',
-    children: toNodes(
-      specs.filter((spec) => isField(spec) || spec.fields.length > 0),
-      '',
-    ),
+    example: jsonExample(`export-${seed}.json`, children, '2026-09-20T10:00:00.000Z'),
+    children,
   })
 }
 
@@ -369,12 +459,21 @@ export const seedUnusedDocumentStructures: ReadonlyArray<DocumentStructure> = [
   toDocumentStructure(
     seedId(6, 5),
     'ERP dispatch export (CSV)',
-    inferDocumentStructure(documentStructureOrigins.windows1252CsvDocument),
+    inferDocumentStructure(documentStructureOrigins.windows1252CsvDocument, {
+      takenAt: '2026-09-18T10:00:00.000Z',
+    }),
   ),
   toDocumentStructure(
     seedId(6, 6),
     'ERP article master',
     inferDocumentStructure(documentStructureOrigins.jsonSchema),
+  ),
+  toDocumentStructure(
+    seedId(6, 7),
+    'ERP invoice export (CSV)',
+    inferDocumentStructure(documentStructureOrigins.invoiceCsvDocument, {
+      takenAt: '2026-10-08T16:30:00.000Z',
+    }),
   ),
 ]
 
@@ -396,7 +495,11 @@ export function createDocumentStructures({
       )
 
     return index % 4 === 3
-      ? toDocumentStructure(faker.string.uuid(), name, inferDocumentStructure(csvOrigin))
+      ? toDocumentStructure(
+          faker.string.uuid(),
+          name,
+          inferDocumentStructure(csvOrigin, { takenAt: '2026-09-25T10:00:00.000Z' }),
+        )
       : createDocumentStructure({
           fieldCount: faker.number.int({ min: 5, max: 120 }),
           seed: seed + index,
@@ -449,11 +552,20 @@ function toDocumentStructureSummary(
   documentStructure: DocumentStructure,
   { mappings }: MappingUse = {},
 ): DocumentStructureSummary {
+  const leaves = documentStructureLeaves(documentStructure)
+  const { example } = documentStructure
+
   return documentStructureSummarySchema.parse({
     id: documentStructure.id,
     name: documentStructure.name,
     format: documentStructure.format,
-    fieldCount: documentStructureLeaves(documentStructure).length,
+    fieldCount: leaves.length,
+    firstFieldLabels: leaves.slice(0, summaryFieldLabelCount).map(({ label }) => label),
+    example: example && {
+      fileName: example.fileName,
+      takenAt: example.takenAt,
+      preview: examplePreview(example.text),
+    },
     mappings: (mappings?.all() ?? [])
       .filter(({ documentStructureId }) => documentStructureId === documentStructure.id)
       .map(({ id, name }) => ({ id, name }))
@@ -481,19 +593,25 @@ function summaries(versions: ReadonlyArray<MappingVersionSummary>) {
   return versions.map((version) => mappingVersionSummarySchema.parse(version)).sort(byNameAndNewest)
 }
 
+// Plain names only label a node, so a rename changes no shape a Mapping relies on.
+const linkedNodeKeys = ['path', 'name', 'kind', 'required', 'type', 'children', 'items']
+
 function fingerprintAt(nodes: ReadonlyArray<DocumentStructureNode>, path: string) {
   const visited = visitedNode(nodes, path)
 
   return (
     visited &&
-    JSON.stringify([
-      ...visited.ancestors.map(({ path: ancestorPath, kind, required }) => ({
-        path: ancestorPath,
-        kind,
-        required,
-      })),
-      visited.node,
-    ])
+    JSON.stringify(
+      [
+        ...visited.ancestors.map(({ path: ancestorPath, kind, required }) => ({
+          path: ancestorPath,
+          kind,
+          required,
+        })),
+        visited.node,
+      ],
+      linkedNodeKeys,
+    )
   )
 }
 
@@ -609,16 +727,38 @@ function attempt<Result>(run: () => Result): { result: Result } | { response: Re
   }
 }
 
+export type DocumentStructuresState = 'loading' | 'error'
+
 export function documentStructureHandlers(
   apiUrl: string,
   {
     documentStructures = createDocumentStructureStore(),
     mappings,
     versions,
+    state,
   }: {
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
+    state?: DocumentStructuresState | undefined
   } & MappingUse = {},
 ) {
+  if (state) {
+    const respond = async () => {
+      if (state === 'loading') {
+        await delay('infinite')
+      }
+
+      return serverError()
+    }
+
+    return [
+      http.get(`${apiUrl}${documentStructuresEndpoint.path}`, respond),
+      http.post(`${apiUrl}${inferDocumentStructureEndpoint.path}`, respond),
+      http.post(`${apiUrl}${createDocumentStructureEndpoint.path}`, respond),
+      http.get(`${apiUrl}${documentStructureEndpoint.path}`, respond),
+      http.put(`${apiUrl}${updateDocumentStructureEndpoint.path}`, respond),
+    ]
+  }
+
   const store = toDocumentStructureStore(documentStructures)
   const use = { mappings, versions }
 
@@ -655,7 +795,8 @@ export function documentStructureHandlers(
 
       await delay()
 
-      const inferred = attempt(() => inferDocumentStructure(body.data.origin))
+      const { origin, labels = [] } = body.data
+      const inferred = attempt(() => applyLabels(inferDocumentStructure(origin), labels))
 
       if ('response' in inferred) {
         return inferred.response

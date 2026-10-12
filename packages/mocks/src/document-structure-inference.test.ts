@@ -12,6 +12,7 @@ import {
 import { seedDocumentStructureOf } from './document-structure'
 import {
   adjustDocumentStructure,
+  renamedLabelReason,
   decodeText,
   DocumentStructureProblemError,
   findNode,
@@ -116,6 +117,88 @@ describe('inferFromJson', () => {
     expect(problemOf(() => inferFromJson('{"lines":[{"a":{"b":1}},{"a":2}]}')).path).toBe(
       'lines[].a',
     )
+  })
+})
+
+describe('plain names', () => {
+  const invoices = inferDocumentStructure(documentStructureOrigins.invoiceCsvDocument)
+
+  it('names known ERP columns in plain words', () => {
+    expect(at(invoices, 'rows[].RechNr')).toMatchObject({ label: 'Invoice number', unsure: false })
+    expect(at(invoices, 'rows[].Menge')).toMatchObject({ label: 'Quantity', unsure: false })
+    expect(at(invoices, 'rows[].RechNr')?.labelReason).toContain('Rechnungsnummer')
+  })
+
+  it('marks a guess unsure and tells why', () => {
+    expect(at(invoices, 'rows[].EPreis')).toMatchObject({ label: 'Unit price', unsure: true })
+    expect(at(invoices, 'rows[].EPreis')?.labelReason).toContain('Einzelpreis')
+    expect(at(invoices, 'rows[].ME')).toMatchObject({ label: 'Unit', unsure: true })
+  })
+
+  it('names fields of a JSON Document regardless of how they are written', () => {
+    const order = inferFromJson('{"order_number":"PO-1","GTIN":"04012345123456"}')
+
+    expect(at(order, 'order_number')).toMatchObject({ label: 'Order number', unsure: false })
+    expect(at(order, 'GTIN')).toMatchObject({ label: 'Article number (GTIN)', unsure: false })
+  })
+
+  it('spells out a name it does not know and marks it unsure', () => {
+    const order = inferFromJson('{"deliveryWindowStart":"08:00","LAGER_ORT":"B4"}')
+
+    expect(at(order, 'deliveryWindowStart')).toMatchObject({
+      label: 'Delivery window start',
+      unsure: true,
+    })
+    expect(at(order, 'deliveryWindowStart')?.labelReason).toContain('deliveryWindowStart')
+    expect(at(order, 'LAGER_ORT')).toMatchObject({ label: 'Lager ort', unsure: true })
+  })
+
+  it('gives a list and its items the same plain name', () => {
+    const order = inferDocumentStructure(documentStructureOrigins.jsonDocument)
+
+    expect(at(order, 'lines[]')).toMatchObject({
+      label: 'Lines',
+      items: { label: 'Lines', unsure: false },
+    })
+  })
+
+  it('names the properties of a JSON Schema', () => {
+    const article = inferDocumentStructure(documentStructureOrigins.jsonSchema)
+
+    expect(at(article, 'articleNumber')).toMatchObject({ label: 'Article number', unsure: false })
+  })
+})
+
+describe('reading facts and example file', () => {
+  it('counts the columns and rows of a CSV Document', () => {
+    expect(inferDocumentStructure(documentStructureOrigins.invoiceCsvDocument).facts).toEqual({
+      columnCount: 12,
+      rowCount: 3,
+    })
+  })
+
+  it('counts the fields of a JSON Document and a JSON Schema', () => {
+    expect(inferDocumentStructure(documentStructureOrigins.jsonDocument).facts).toEqual({
+      fieldCount: 13,
+    })
+    expect(inferDocumentStructure(documentStructureOrigins.jsonSchema).facts).toEqual({
+      fieldCount: 12,
+    })
+  })
+
+  it('keeps the decoded Document as the example file', () => {
+    const takenAt = '2026-10-12T09:30:00.000Z'
+
+    const dispatch = inferDocumentStructure(documentStructureOrigins.windows1252CsvDocument, {
+      takenAt,
+    })
+
+    expect(dispatch.example).toMatchObject({ fileName: 'lieferscheine-ansi.csv', takenAt })
+    expect(dispatch.example?.text).toContain('Königstraße 12')
+  })
+
+  it('has no example file for a JSON Schema', () => {
+    expect(inferDocumentStructure(documentStructureOrigins.jsonSchema).example).toBeNull()
   })
 })
 
@@ -490,6 +573,45 @@ describe('adjustDocumentStructure', () => {
         }),
       ).code,
     ).toBe('notAdjustable')
+  })
+
+  it('renames a field, which is then no longer unsure', () => {
+    const adjusted = adjust([{ path: 'lines[].quantity', label: 'Ordered quantity' }])
+
+    expect(at(adjusted, 'lines[].quantity')).toMatchObject({
+      label: 'Ordered quantity',
+      labelReason: renamedLabelReason,
+      unsure: false,
+    })
+  })
+
+  it('renames a list together with its items', () => {
+    expect(at(adjust([{ path: 'lines[]', label: 'Order lines' }]), 'lines[]')).toMatchObject({
+      label: 'Order lines',
+      items: { label: 'Order lines', labelReason: renamedLabelReason },
+    })
+  })
+
+  it('keeps a new plain name when a list turns into one object', () => {
+    expect(
+      at(adjust([{ path: 'lines[]', label: 'Order lines', repeating: false }]), 'lines'),
+    ).toMatchObject({ kind: 'object', label: 'Order lines' })
+  })
+
+  it('keeps the plain names of the columns when a CSV Document is read again', () => {
+    const renamed = adjustDocumentStructure(csvStructure, {
+      name: 'Dispatch',
+      adjustments: [{ path: 'rows[].Menge', label: 'Delivered quantity' }],
+    })
+
+    const reread = adjustDocumentStructure(renamed, {
+      name: 'Dispatch',
+      document: createCsvDocument({ rowCount: 3 }),
+      adjustments: [],
+    })
+
+    expect(at(reread, 'rows[].Menge')).toMatchObject({ label: 'Delivered quantity' })
+    expect(reread.example).toMatchObject({ fileName: 'lieferscheine-3.csv' })
   })
 
   it('leaves a structure without adjustments as it was', () => {

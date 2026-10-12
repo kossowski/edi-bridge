@@ -18,6 +18,7 @@ import {
 } from './channel'
 import {
   documentStructureHandlers,
+  type DocumentStructuresState,
   type DocumentStructureStore,
   seedDocumentStructures,
   seedUnusedDocumentStructures,
@@ -146,12 +147,15 @@ export {
   createDocumentStructureStore,
   documentStructureHandlers,
   documentStructureLeaves,
+  type DocumentStructuresState,
   type DocumentStructureStore,
   seedDocumentStructureOf,
   seedDocumentStructures,
   seedUnusedDocumentStructures,
   toDocumentStructureStore,
 } from './document-structure'
+
+export { renamedLabelReason } from './document-structure-inference'
 
 export { createCsvDocument, documentStructureOrigins } from './document-structure-origin'
 
@@ -352,6 +356,7 @@ export function createHandlers(
     testInterchange = {},
     mappingDrafts = seedMappingDrafts,
     documentStructures = [...seedDocumentStructures, ...seedUnusedDocumentStructures],
+    documentStructuresState,
     lookupTables = seedLookupTables,
     mappingSamples = seedMappingSamples,
     mappingVersions,
@@ -370,6 +375,7 @@ export function createHandlers(
     testInterchange?: TestInterchangeOptions
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
+    documentStructuresState?: DocumentStructuresState
     lookupTables?: ReadonlyArray<LookupTableRecord>
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
@@ -519,6 +525,7 @@ export function createHandlers(
       documentStructures: documentStructureStore,
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
+      state: documentStructuresState,
     }),
     messageTypeStructureHandler(apiUrl),
     ...lookupTableHandlers(apiUrl, {

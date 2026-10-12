@@ -15,6 +15,8 @@ import {
 
 import type { StructureTree } from './structure-tree'
 
+const plainName = { label: 'Name', labelReason: 'A name for the test.', unsure: false }
+
 const ansi = documentStructureOrigins.windows1252CsvDocument.document
 
 const semicolons = { delimiter: ';', headerRow: true, encoding: 'utf-8' } as const
@@ -80,6 +82,7 @@ describe('CSV text', () => {
       kind: 'field',
       path: `rows[].${name}`,
       name,
+      ...plainName,
       type: 'string',
       required: true,
     })
@@ -91,11 +94,13 @@ describe('CSV text', () => {
           kind: 'array',
           path: 'rows[]',
           name: 'rows',
+          ...plainName,
           required: true,
           items: {
             kind: 'object',
             path: 'rows[]',
             name: 'rows',
+            ...plainName,
             required: true,
             children: [column('Ort'), column('column2')],
           },

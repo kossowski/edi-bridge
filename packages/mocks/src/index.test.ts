@@ -684,6 +684,12 @@ describe('createHandlers', () => {
     expect(summaries.find(({ id }) => id === created.id)).toMatchObject({ mappings: [] })
   })
 
+  it('fails the Document Structures when asked', async () => {
+    server.use(...createHandlers(apiUrl, { documentStructuresState: 'error' }))
+
+    expect((await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)).status).toBe(500)
+  })
+
   it('lists Lookup Tables for the Lookup Table node, and none when asked', async () => {
     const listLookupTables = async () =>
       lookupTablesEndpoint.response.parse(

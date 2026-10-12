@@ -5,39 +5,70 @@ import {
   type DocumentStructure,
   documentStructureProblemSchema,
   documentStructureSchema,
+  documentStructureSummarySchema,
+  examplePreview,
   inferredDocumentStructureSchema,
   updateDocumentStructureBodySchema,
 } from './document-structure'
+
+function named(label: string, unsure = false) {
+  return { label, labelReason: `A known name for ${label.toLowerCase()}.`, unsure }
+}
 
 const purchaseOrder: DocumentStructure = {
   id: '00000006-0000-4000-8000-000000000001',
   name: 'ERP purchase order',
   format: 'json',
   root: 'object',
+  example: {
+    fileName: 'order-4711.json',
+    text: '{ "orderNumber": "4711", "buyer": { "gln": "4012345000009" }, "lines": [] }',
+    takenAt: '2026-09-15T10:00:00.000Z',
+  },
   children: [
-    { kind: 'field', path: 'orderNumber', name: 'orderNumber', type: 'string', required: true },
+    {
+      kind: 'field',
+      path: 'orderNumber',
+      name: 'orderNumber',
+      ...named('Order number'),
+      type: 'string',
+      required: true,
+    },
     {
       kind: 'object',
       path: 'buyer',
       name: 'buyer',
+      ...named('Buyer'),
       required: true,
-      children: [{ kind: 'field', path: 'buyer.gln', name: 'gln', type: 'string', required: true }],
+      children: [
+        {
+          kind: 'field',
+          path: 'buyer.gln',
+          name: 'gln',
+          ...named('GLN', true),
+          type: 'string',
+          required: true,
+        },
+      ],
     },
     {
       kind: 'array',
       path: 'lines[]',
       name: 'lines',
+      ...named('Lines'),
       required: true,
       items: {
         kind: 'object',
         path: 'lines[]',
         name: 'lines',
+        ...named('Lines'),
         required: true,
         children: [
           {
             kind: 'field',
             path: 'lines[].quantity',
             name: 'quantity',
+            ...named('Quantity'),
             type: 'number',
             required: true,
           },
@@ -60,8 +91,16 @@ describe('documentStructureSchema', () => {
           kind: 'array',
           path: 'tags[]',
           name: 'tags',
+          ...named('Tags'),
           required: false,
-          items: { kind: 'field', path: 'tags[]', name: 'tags', type: 'string', required: true },
+          items: {
+            kind: 'field',
+            path: 'tags[]',
+            name: 'tags',
+            ...named('Tags'),
+            type: 'string',
+            required: true,
+          },
         },
       ],
     }
@@ -76,6 +115,34 @@ describe('documentStructureSchema', () => {
     }
 
     expect(documentStructureSchema.safeParse(withUnknownType).success).toBe(false)
+  })
+
+  it('rejects a node without a plain name', () => {
+    const unnamed = { ...purchaseOrder.children[0]!, label: undefined }
+
+    expect(
+      documentStructureSchema.safeParse({ ...purchaseOrder, children: [unnamed] }).success,
+    ).toBe(false)
+  })
+
+  it('rejects a plain name of only spaces', () => {
+    const blank = { ...purchaseOrder.children[0]!, label: '   ' }
+
+    expect(documentStructureSchema.safeParse({ ...purchaseOrder, children: [blank] }).success).toBe(
+      false,
+    )
+  })
+
+  it('accepts a structure without an example file, as created from a JSON Schema', () => {
+    expect(documentStructureSchema.safeParse({ ...purchaseOrder, example: null }).success).toBe(
+      true,
+    )
+  })
+
+  it('rejects an example file without the time it was taken', () => {
+    const undated = { ...purchaseOrder, example: { ...purchaseOrder.example, takenAt: undefined } }
+
+    expect(documentStructureSchema.safeParse(undated).success).toBe(false)
   })
 
   it('rejects an empty structure', () => {
@@ -108,18 +175,42 @@ describe('documentStructureSchema refinements', () => {
     expect(documentStructureSchema.safeParse(moved).success).toBe(false)
   })
 
+  it('rejects array items with another plain name than their array', () => {
+    const lines = purchaseOrder.children[2]!
+
+    const renamed = {
+      ...purchaseOrder,
+      children: [
+        lines.kind === 'array'
+          ? { ...lines, items: { ...lines.items, label: 'Order lines' } }
+          : lines,
+      ],
+    }
+
+    expect(documentStructureSchema.safeParse(renamed).success).toBe(false)
+  })
+
   const rows = {
     kind: 'array',
     path: 'rows[]',
     name: 'rows',
+    ...named('Rows'),
     required: true,
     items: {
       kind: 'object',
       path: 'rows[]',
       name: 'rows',
+      ...named('Rows'),
       required: true,
       children: [
-        { kind: 'field', path: 'rows[].Straße', name: 'Straße', type: 'string', required: false },
+        {
+          kind: 'field',
+          path: 'rows[].Straße',
+          name: 'Straße',
+          ...named('Street'),
+          type: 'string',
+          required: false,
+        },
       ],
     },
   }
@@ -129,6 +220,11 @@ describe('documentStructureSchema refinements', () => {
     name: 'ERP dispatch export',
     format: 'csv',
     csv: { delimiter: ';', headerRow: true, encoding: 'windows-1252' },
+    example: {
+      fileName: 'lieferscheine.csv',
+      text: 'Straße\nKönigstraße 12\n',
+      takenAt: '2026-09-18T10:00:00.000Z',
+    },
     children: [rows],
   }
 
@@ -171,6 +267,7 @@ describe('documentStructureSchema refinements', () => {
               kind: 'field',
               path: 'items[].orderNumber',
               name: 'orderNumber',
+              ...named('Order number'),
               type: 'string',
               required: true,
             },
@@ -204,13 +301,81 @@ describe('documentStructureSchema refinements', () => {
   })
 
   it('checks an inferred structure the same way, without id and name', () => {
-    const inferred = { ...csvStructure, id: undefined, name: undefined }
+    const inferred = {
+      ...csvStructure,
+      id: undefined,
+      name: undefined,
+      facts: { columnCount: 1, rowCount: 1 },
+    }
 
     expect(inferredDocumentStructureSchema.safeParse(inferred).success).toBe(true)
     expect(
       inferredDocumentStructureSchema.safeParse({ ...inferred, children: purchaseOrder.children })
         .success,
     ).toBe(false)
+  })
+})
+
+describe('inferredDocumentStructureSchema', () => {
+  const tree = { ...purchaseOrder, id: undefined, name: undefined }
+
+  it('counts the fields of a JSON Document for the reading steps', () => {
+    expect(
+      inferredDocumentStructureSchema.safeParse({ ...tree, facts: { fieldCount: 2 } }).success,
+    ).toBe(true)
+  })
+
+  it('rejects the facts of another format', () => {
+    expect(
+      inferredDocumentStructureSchema.safeParse({
+        ...tree,
+        facts: { columnCount: 2, rowCount: 3 },
+      }).success,
+    ).toBe(false)
+  })
+})
+
+describe('documentStructureSummarySchema', () => {
+  const summary = {
+    id: '00000006-0000-4000-8000-000000000001',
+    name: 'ERP invoice export',
+    format: 'csv',
+    fieldCount: 12,
+    firstFieldLabels: ['Invoice number', 'Invoice date', 'Order number'],
+    example: {
+      fileName: 'Rechnungsexport_2026-10-08.csv',
+      takenAt: '2026-09-16T10:00:00.000Z',
+      preview: 'RechNr;RechDatum\nR-2026-1188;08.10.2026',
+    },
+    mappings: [],
+  }
+
+  it('shows the example file and the first plain names on the card', () => {
+    expect(documentStructureSummarySchema.parse(summary)).toEqual(summary)
+  })
+
+  it('accepts a format without an example file', () => {
+    expect(documentStructureSummarySchema.safeParse({ ...summary, example: null }).success).toBe(
+      true,
+    )
+  })
+
+  it('names at most three fields', () => {
+    const many = { ...summary, firstFieldLabels: ['A', 'B', 'C', 'D'] }
+
+    expect(documentStructureSummarySchema.safeParse(many).success).toBe(false)
+  })
+})
+
+describe('examplePreview', () => {
+  it('keeps the first seven lines of an example file', () => {
+    const text = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].join('\r\n')
+
+    expect(examplePreview(text)).toBe('1\n2\n3\n4\n5\n6\n7')
+  })
+
+  it('keeps a short example file whole', () => {
+    expect(examplePreview('{ "a": 1 }\n')).toBe('{ "a": 1 }\n')
   })
 })
 
@@ -228,6 +393,32 @@ describe('createDocumentStructureBodySchema', () => {
     }
 
     expect(createDocumentStructureBodySchema.safeParse(body).success).toBe(true)
+  })
+
+  it('takes confirmed and renamed plain names by path', () => {
+    const body = {
+      name: 'ERP dispatch export',
+      origin: { kind: 'jsonDocument', document },
+      labels: [
+        { path: 'rows[].Menge', label: 'Quantity' },
+        { path: 'rows[].ME', label: 'Unit of measure' },
+      ],
+    }
+
+    expect(createDocumentStructureBodySchema.safeParse(body).success).toBe(true)
+  })
+
+  it('rejects two plain names for the same path', () => {
+    const body = {
+      name: 'ERP dispatch export',
+      origin: { kind: 'jsonDocument', document },
+      labels: [
+        { path: 'rows[].ME', label: 'Unit' },
+        { path: 'rows[].ME', label: 'Unit of measure' },
+      ],
+    }
+
+    expect(createDocumentStructureBodySchema.safeParse(body).success).toBe(false)
   })
 
   it('rejects a CSV Document without CSV settings', () => {
@@ -268,6 +459,21 @@ describe('updateDocumentStructureBodySchema', () => {
     }
 
     expect(updateDocumentStructureBodySchema.safeParse(body).success).toBe(true)
+  })
+
+  it('takes a rename of a field', () => {
+    const body = {
+      name: 'ERP purchase order',
+      adjustments: [{ path: 'lines[].quantity', label: 'Ordered quantity' }],
+    }
+
+    expect(updateDocumentStructureBodySchema.safeParse(body).success).toBe(true)
+  })
+
+  it('rejects a rename to an empty name', () => {
+    const body = { name: 'ERP purchase order', adjustments: [{ path: 'buyer', label: ' ' }] }
+
+    expect(updateDocumentStructureBodySchema.safeParse(body).success).toBe(false)
   })
 
   it('rejects an adjustment that changes nothing', () => {

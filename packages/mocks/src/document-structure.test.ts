@@ -149,6 +149,44 @@ describe('seed Document Structures', () => {
       expect(new Set(paths).size).toBe(paths.length)
     },
   )
+
+  const allSeeds = [...seedDocumentStructures, ...seedUnusedDocumentStructures]
+
+  it('keeps the example file each seed was read from, except the one from a JSON Schema', () => {
+    const withoutExample = allSeeds.filter(({ example }) => example === null)
+
+    expect(withoutExample.map(({ name }) => name)).toEqual(['ERP article master'])
+
+    for (const { format, example } of allSeeds) {
+      if (format === 'json' && example) {
+        expect(() => {
+          JSON.parse(example.text)
+        }).not.toThrow()
+      }
+    }
+  })
+
+  it('names the columns of the invoice export in plain words, a few of them unsure', () => {
+    const invoices = allSeeds.find(({ name }) => name === 'ERP invoice export (CSV)')!
+
+    expect(nodeAt(invoices.children, 'rows[].EPreis')).toMatchObject({
+      label: 'Unit price',
+      unsure: true,
+    })
+    expect(nodeAt(invoices.children, 'rows[].RechNr')).toMatchObject({
+      label: 'Invoice number',
+      unsure: false,
+    })
+    expect(invoices.example?.text).toContain('EPreis')
+  })
+
+  it('is unsure about only a few plain names', () => {
+    const leaves = allSeeds.flatMap((structure) => documentStructureLeaves(structure))
+    const unsure = leaves.filter((leaf) => leaf.unsure)
+
+    expect(unsure.length).toBeGreaterThan(0)
+    expect(unsure.length).toBeLessThan(leaves.length / 4)
+  })
 })
 
 function post(path: string, body: CreateDocumentStructureBody | DocumentStructureOrigin) {
@@ -223,6 +261,27 @@ describe('GET /document-structures', () => {
     })
   })
 
+  it('shows the example file and the first plain names on each card', async () => {
+    useHandlers()
+
+    const response = await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)
+    const summaries = documentStructuresEndpoint.response.parse(await response.json())
+    const order = summaries.find(({ id }) => id === purchaseOrder.id)!
+
+    expect(order.firstFieldLabels).toEqual([
+      'Order number',
+      'Order date',
+      'Requested delivery date',
+    ])
+    expect(order.example).toMatchObject({
+      fileName: purchaseOrder.example?.fileName,
+      takenAt: purchaseOrder.example?.takenAt,
+    })
+    expect(order.example?.preview.startsWith('{')).toBe(true)
+    expect(order.example?.preview.split('\n')).toHaveLength(7)
+    expect(summaries.find(({ name }) => name === 'ERP article master')?.example).toBeNull()
+  })
+
   it('serves an empty list', async () => {
     useHandlers({ documentStructures: [] })
 
@@ -259,6 +318,20 @@ describe('POST /document-structures/inference', () => {
     expect(store.all()).toHaveLength(count)
   })
 
+  it('tells what the reading steps show', async () => {
+    useHandlers()
+
+    const response = await post(
+      inferDocumentStructureEndpoint.path,
+      documentStructureOrigins.invoiceCsvDocument,
+    )
+
+    const inferred = inferDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(inferred.facts).toEqual({ columnCount: 12, rowCount: 3 })
+    expect(inferred.example?.fileName).toBe('Rechnungsexport_2026-10-08.csv')
+  })
+
   it('answers 400 for a body outside the contract', async () => {
     useHandlers()
 
@@ -273,11 +346,59 @@ describe('POST /document-structures/inference', () => {
 })
 
 describe('POST /document-structures', () => {
-  async function create(origin: DocumentStructureOrigin, name = 'ERP export') {
-    const body: CreateDocumentStructureBody = { name, origin }
+  async function create(
+    origin: DocumentStructureOrigin,
+    name = 'ERP export',
+    labels?: CreateDocumentStructureBody['labels'],
+  ) {
+    const body: CreateDocumentStructureBody = { name, origin, ...(labels && { labels }) }
 
     return post(createDocumentStructureEndpoint.path, body)
   }
+
+  it('saves the confirmed and renamed plain names, none of them unsure', async () => {
+    useHandlers()
+
+    const response = await create(documentStructureOrigins.invoiceCsvDocument, 'Invoices', [
+      { path: 'rows[].EPreis', label: 'Unit price' },
+      { path: 'rows[].ME', label: 'Unit of measure' },
+    ])
+
+    const created = createDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(nodeAt(created.children, 'rows[].EPreis')).toMatchObject({
+      label: 'Unit price',
+      unsure: false,
+    })
+    expect(nodeAt(created.children, 'rows[].EPreis')?.labelReason).toContain('Einzelpreis')
+    expect(nodeAt(created.children, 'rows[].ME')).toMatchObject({
+      label: 'Unit of measure',
+      unsure: false,
+    })
+    expect(created.example).toMatchObject({ fileName: 'Rechnungsexport_2026-10-08.csv' })
+  })
+
+  it('answers unknownPath for a plain name of a node it does not have', async () => {
+    const store = useHandlers()
+    const count = store.all().length
+
+    const problem = await problemOf(
+      await create(documentStructureOrigins.invoiceCsvDocument, 'Invoices', [
+        { path: 'rows[].Rabatt', label: 'Discount' },
+      ]),
+    )
+
+    expect(problem).toMatchObject({ code: 'unknownPath', path: 'rows[].Rabatt' })
+    expect(store.all()).toHaveLength(count)
+  })
+
+  it('keeps no example file for a structure from a JSON Schema', async () => {
+    useHandlers()
+
+    const response = await create(documentStructureOrigins.jsonSchema)
+
+    expect(createDocumentStructureEndpoint.response.parse(await response.json()).example).toBeNull()
+  })
 
   it('creates a structure from a JSON Document and serves it afterwards', async () => {
     useHandlers()
@@ -381,6 +502,22 @@ describe('PUT /document-structures/:id', () => {
         .map(({ id }) => id)
         .sort(),
     )
+  })
+
+  it('renames a field a published Mapping Version links', async () => {
+    useHandlers()
+
+    const response = await put(purchaseOrder.id, {
+      name: purchaseOrder.name,
+      adjustments: [{ path: 'buyer.gln', label: 'Buyer GLN' }],
+    })
+
+    const updated = updateDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(nodeAt(updated.children, 'buyer.gln')).toMatchObject({
+      label: 'Buyer GLN',
+      unsure: false,
+    })
   })
 
   it('refuses a change above a node a published Mapping Version links', async () => {
@@ -556,6 +693,32 @@ describe('PUT /document-structures/:id with CSV settings', () => {
     )
 
     expect(problem.code).toBe('notAdjustable')
+  })
+})
+
+describe('Document Structure handler states', () => {
+  it('answers every request with a server error', async () => {
+    server.use(...documentStructureHandlers(apiUrl, { state: 'error' }))
+
+    expect((await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)).status).toBe(500)
+    expect((await getStructure(purchaseOrder.id)).status).toBe(500)
+  })
+
+  it('keeps every request loading', async () => {
+    server.use(...documentStructureHandlers(apiUrl, { state: 'loading' }))
+    const controller = new AbortController()
+
+    const answered = await Promise.race([
+      fetch(`${apiUrl}${documentStructuresEndpoint.path}`, { signal: controller.signal }).then(
+        () => true,
+        () => false,
+      ),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 50)),
+    ])
+
+    controller.abort()
+
+    expect(answered).toBe(false)
   })
 })
 

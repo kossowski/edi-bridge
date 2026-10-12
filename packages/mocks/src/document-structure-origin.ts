@@ -75,6 +75,13 @@ const dispatchCsv = [
   'LS-88122;04.10.2026;Alpenfrisch Märkte AG;Maximilianstraße 3;München;04012345777777;6;Größe XL',
 ].join('\r\n')
 
+const invoiceCsv = [
+  'RechNr;RechDatum;AuftrNr;KdNr;ArtNr;Bezeichnung;Menge;ME;EPreis;Netto;MwSt;Whg',
+  'R-2026-1188;08.10.2026;4711;K-20931;4006381333931;Haferdrink 1 l;24;KRT;4,20;100,80;19;EUR',
+  'R-2026-1188;08.10.2026;4711;K-20931;4006381333948;Haferdrink Barista 1 l;12;KRT;4,60;55,20;19;EUR',
+  'R-2026-1189;08.10.2026;4712;K-11872;4006381333955;Dinkeldrink 1 l;6;ST;2,10;12,60;7;EUR',
+].join('\r\n')
+
 const articleSchema = JSON.stringify(
   {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -126,6 +133,11 @@ export const documentStructureOrigins = {
   csvDocument: {
     kind: 'csvDocument',
     document: toEncodedFile('lieferscheine.csv', dispatchCsv),
+    csv: defaultCsvSettings,
+  },
+  invoiceCsvDocument: {
+    kind: 'csvDocument',
+    document: toEncodedFile('Rechnungsexport_2026-10-08.csv', invoiceCsv),
     csv: defaultCsvSettings,
   },
   windows1252CsvDocument: {
