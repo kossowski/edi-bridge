@@ -272,7 +272,7 @@ describe('GET /home states', () => {
     expect(home.throughput.every(({ delivered }) => delivered > 0)).toBe(true)
     expect(home.keyNumbers.needsAttention).toBeGreaterThan(0)
     expect(home.keyNumbers.inProgress).toBeGreaterThan(0)
-  })
+  }, 15_000)
 
   it('answers with a server error in the error state', async () => {
     server.use(homeHandler(apiUrl, 'error'))

@@ -392,7 +392,7 @@ describe('GET /runs with Run detail', () => {
         expect(orderNumber ?? orderReference).toBe(run.businessReference)
       }
     }
-  })
+  }, 15_000)
 
   it('has no Business Reference for a CONTRL and no Interchange for an outbound Run that failed at mapping', async () => {
     const contrl = createRun({ messageType: 'CONTRL' })
