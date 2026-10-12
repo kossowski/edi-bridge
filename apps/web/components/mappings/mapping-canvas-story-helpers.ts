@@ -145,13 +145,19 @@ export const source = (path: string): RowRef => ({ side: 'source', path })
 
 export const target = (path: string): RowRef => ({ side: 'target', path })
 
-// A sheet renders in a portal outside the story's root, and fades in.
+// A sheet renders in a portal outside the story's root, and fades in. A busy CI runner can take
+// longer than the default second to finish the open transition.
+export async function findSheetElement(canvasElement: HTMLElement, name: string) {
+  const wait = { timeout: 5000 }
+  const sheet = await page(canvasElement).findByRole('dialog', { name }, wait)
+
+  await waitFor(() => expect(sheet).toBeVisible(), wait)
+
+  return sheet
+}
+
 export async function findSheet(canvasElement: HTMLElement, name: string) {
-  const sheet = await page(canvasElement).findByRole('dialog', { name })
-
-  await waitFor(() => expect(sheet).toBeVisible())
-
-  return within(sheet)
+  return within(await findSheetElement(canvasElement, name))
 }
 
 export function detailsPanel(canvasElement: HTMLElement, name = 'Details') {

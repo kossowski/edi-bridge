@@ -1,9 +1,10 @@
 import { delay, http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
-import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
+import { expect, screen, userEvent, waitFor } from 'storybook/test'
 
-import type { queries } from 'storybook/test'
+import type { queries, within } from 'storybook/test'
 
+import { openDetails } from '@/components/mappings/mapping-canvas-story-helpers'
 import { MappingPreviewSheet } from '@/components/mappings/mapping-preview-panel'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
@@ -59,17 +60,10 @@ const samplesUrl = `${apiUrl}${mappingSamplesEndpoint.path}`
 
 const previewUrl = `${apiUrl}${mappingPreviewEndpoint.path}`
 
-// The sheet renders in a portal outside the story's root.
 type SheetQueries = ReturnType<typeof within<typeof queries>>
 
-async function openPreview(canvasElement: HTMLElement, name = 'Preview'): Promise<SheetQueries> {
-  await userEvent.click(await within(canvasElement).findByRole('button', { name }))
-
-  const sheet = await screen.findByRole('dialog', { name })
-
-  await waitFor(() => expect(sheet).toBeVisible())
-
-  return within(sheet)
+function openPreview(canvasElement: HTMLElement, name = 'Preview'): Promise<SheetQueries> {
+  return openDetails(canvasElement, name)
 }
 
 function targetDocument(sheet: SheetQueries, sample: string, timeout = 1000) {

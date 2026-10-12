@@ -8,6 +8,7 @@ import type { BeforeEach } from 'storybook/internal/csf'
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
   expectSavedLinkCount,
+  findSheet,
   page,
   seeded,
 } from '@/components/mappings/mapping-canvas-story-helpers'
@@ -70,11 +71,7 @@ function aiDraft(
 async function openAiDraft(canvasElement: HTMLElement, action: string | RegExp = 'Draft with AI') {
   await userEvent.click(await within(canvasElement).findByRole('button', { name: action }))
 
-  const dialog = await page(canvasElement).findByRole('dialog', { name: 'Draft with AI' })
-
-  await waitFor(() => expect(dialog).toBeVisible())
-
-  return within(dialog)
+  return findSheet(canvasElement, 'Draft with AI')
 }
 
 async function startAiDraft(canvasElement: HTMLElement, budgetText = /tokens left today/) {
@@ -429,9 +426,7 @@ export const German = meta.story({
       await within(canvasElement).findByRole('button', { name: 'Mit KI entwerfen' }),
     )
 
-    const dialog = within(
-      await page(canvasElement).findByRole('dialog', { name: 'Mit KI entwerfen' }),
-    )
+    const dialog = await findSheet(canvasElement, 'Mit KI entwerfen')
 
     const budget = await dialog.findByText('Heute noch 151.650 von 200.000 Tokens übrig.')
 

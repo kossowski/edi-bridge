@@ -13,6 +13,7 @@ import {
   seeded,
   target,
   findSheet,
+  findSheetElement,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { findRowButton } from '@/components/mappings/tree-node'
 import { viewerStory } from '@/components/session/session-story-helpers'
@@ -48,11 +49,7 @@ async function findPanel(
 ) {
   await userEvent.click(await findShowButton(canvasElement, button))
 
-  const sheet = await page(canvasElement).findByRole('dialog', { name }, wait)
-
-  await waitFor(() => expect(sheet).toBeVisible())
-
-  return sheet
+  return findSheetElement(canvasElement, name)
 }
 
 function heading(title: string, count?: number) {
