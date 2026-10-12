@@ -3004,6 +3004,7 @@
     "notUsed": "Noch nicht verwendet",
     "fieldCount": "{count, plural, one {# Feld} other {# Felder}}",
     "moreFields": "{count} weitere",
+    "moreMappings": "und {count} weitere",
     "readBy": "Gelesen von",
     "notRead": "Noch kein Mapping liest es",
     "open": "Öffnen",
@@ -3012,8 +3013,8 @@
       "csv": "CSV"
     },
     "add": {
-      "title": "Export aus Ihrem ERP ablegen",
-      "description": "EDI Bridge liest ihn und benennt jedes Feld in einfachen Worten. Daraus wird ein neues Datenformat."
+      "title": "Datenformat aus einem ERP-Export anlegen",
+      "description": "EDI Bridge liest die Datei und benennt jedes Feld in einfachen Worten."
     },
     "sample": {
       "label": "Beispieldatei",

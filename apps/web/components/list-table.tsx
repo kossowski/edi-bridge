@@ -29,14 +29,11 @@ import {
   TableHeader,
   TableRow,
 } from '@edi-bridge/ui/components/table'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
-type ListMessageKey =
-  | 'search'
-  | 'loading'
-  | 'count'
-  | 'filteredCount'
-  | 'caption'
-  | 'noMatch'
+type ToolbarMessageKey = 'search' | 'loading' | 'count' | 'filteredCount'
+
+type StateMessageKey =
   | 'error.title'
   | 'error.description'
   | 'error.retry'
@@ -44,7 +41,16 @@ type ListMessageKey =
   | 'empty.description'
   | 'empty.viewOnlyDescription'
 
-type ListTranslator = (key: ListMessageKey, values?: { count: number; total?: number }) => string
+type ListTranslator<
+  Key extends string = ToolbarMessageKey | StateMessageKey | 'caption' | 'noMatch',
+> = (key: Key, values?: { count: number; total?: number }) => string
+
+type ListQuery<Item> = {
+  data: ReadonlyArray<Item> | undefined
+  isError: boolean
+  isPending: boolean
+  refetch: () => void
+}
 
 export function NewLink({ href, label }: { href: string; label: string }) {
   return (
@@ -84,6 +90,103 @@ export function ListEmpty({
   )
 }
 
+export function ListStates<Item>({
+  query,
+  t,
+  emptyIcon,
+  emptyAction,
+  children,
+}: {
+  query: ListQuery<Item>
+  t: ListTranslator<StateMessageKey>
+  emptyIcon: IconSvgElement
+  emptyAction?: ReactNode
+  children: ReactNode
+}) {
+  if (query.isError) {
+    return (
+      <LoadError
+        description={t('error.description')}
+        retryLabel={t('error.retry')}
+        title={t('error.title')}
+        onRetry={() => query.refetch()}
+      />
+    )
+  }
+
+  if (query.data?.length === 0) {
+    return (
+      <ListEmpty
+        action={emptyAction}
+        description={t('empty.description')}
+        icon={emptyIcon}
+        title={t('empty.title')}
+        viewOnlyDescription={t('empty.viewOnlyDescription')}
+      />
+    )
+  }
+
+  return children
+}
+
+export function ListToolbar({
+  t,
+  search,
+  onSearchChange,
+  busy,
+  filtered,
+  count,
+  total,
+  children,
+}: {
+  t: ListTranslator<ToolbarMessageKey>
+  search: string
+  onSearchChange: (search: string) => void
+  busy: boolean
+  filtered: boolean
+  count: number
+  total: number
+  children?: ReactNode
+}) {
+  const searchId = useId()
+
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
+        <div className="flex w-full flex-col gap-1.5 sm:w-72">
+          <label htmlFor={searchId} className="text-sm font-medium">
+            {t('search')}
+          </label>
+          <Input
+            id={searchId}
+            type="search"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+          />
+        </div>
+        {children}
+      </div>
+      <p aria-live="polite" className="text-muted-foreground text-sm">
+        {busy
+          ? t('loading')
+          : filtered
+            ? t('filteredCount', { count, total })
+            : t('count', { count })}
+      </p>
+    </div>
+  )
+}
+
+export function ListNoMatch({
+  t,
+  className,
+}: {
+  t: ListTranslator<'noMatch'>
+  className?: string
+}) {
+  return <p className={cn('text-muted-foreground py-6 text-center', className)}>{t('noMatch')}</p>
+}
+
 function LoadingRows({ count, columns }: { count: number; columns: number }) {
   return Array.from({ length: count }, (_, row) => (
     <TableRow key={row}>
@@ -109,12 +212,7 @@ export function ListTable<Item>({
   matches,
   row,
 }: {
-  query: {
-    data: ReadonlyArray<Item> | undefined
-    isError: boolean
-    isPending: boolean
-    refetch: () => void
-  }
+  query: ListQuery<Item>
   pending: boolean
   t: ListTranslator
   emptyIcon: IconSvgElement
@@ -126,39 +224,7 @@ export function ListTable<Item>({
   matches: (item: Item, term: string) => boolean
   row: (item: Item) => ReactNode
 }) {
-  const searchId = useId()
   const [search, setSearch] = useState('')
-
-  if (query.isError) {
-    return (
-      <LoadError
-        description={t('error.description')}
-        retryLabel={t('error.retry')}
-        title={t('error.title')}
-        onRetry={() => query.refetch()}
-      />
-    )
-  }
-
-  if (query.data?.length === 0) {
-    return (
-      <ListEmpty
-        action={
-          newLink || emptyAction ? (
-            <>
-              {newLink && <NewLink href={newLink.href} label={newLink.label} />}
-              {emptyAction}
-            </>
-          ) : undefined
-        }
-        description={t('empty.description')}
-        icon={emptyIcon}
-        title={t('empty.title')}
-        viewOnlyDescription={t('empty.viewOnlyDescription')}
-      />
-    )
-  }
-
   const busy = query.isPending || pending
   const term = search.trim().toLocaleLowerCase()
   const filtered = term !== '' || filter !== undefined
@@ -168,59 +234,60 @@ export function ListTable<Item>({
   )
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
-          <div className="flex w-full flex-col gap-1.5 sm:w-72">
-            <label htmlFor={searchId} className="text-sm font-medium">
-              {t('search')}
-            </label>
-            <Input
-              id={searchId}
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </div>
+    <ListStates
+      emptyAction={
+        newLink || emptyAction ? (
+          <>
+            {newLink && <NewLink href={newLink.href} label={newLink.label} />}
+            {emptyAction}
+          </>
+        ) : undefined
+      }
+      emptyIcon={emptyIcon}
+      query={query}
+      t={t}>
+      <div className="flex flex-col gap-3">
+        <ListToolbar
+          busy={busy}
+          count={shown.length}
+          filtered={filtered}
+          search={search}
+          t={t}
+          total={query.data?.length ?? 0}
+          onSearchChange={setSearch}>
           {toolbar}
-        </div>
-        <p aria-live="polite" className="text-muted-foreground text-sm">
-          {busy
-            ? t('loading')
-            : !filtered
-              ? t('count', { count: shown.length })
-              : t('filteredCount', { count: shown.length, total: query.data?.length ?? 0 })}
-        </p>
-      </div>
-      <div className="@container rounded-lg border">
-        <Table aria-busy={busy}>
-          <TableCaption className="sr-only">{t('caption')}</TableCaption>
-          <TableHeader>
-            <TableRow>
-              {columns.map((column) => (
-                <TableHead key={column.key} scope="col">
-                  {column.hidden ? <span className="sr-only">{column.label}</span> : column.label}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {busy ? (
-              <LoadingRows columns={columns.length} count={6} />
-            ) : shown.length === 0 ? (
+        </ListToolbar>
+        <div className="@container rounded-lg border">
+          <Table aria-busy={busy}>
+            <TableCaption className="sr-only">{t('caption')}</TableCaption>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={columns.length} className="p-0">
-                  <p className="text-muted-foreground sticky left-0 w-[100cqw] px-2 py-6 text-center whitespace-normal">
-                    {t('noMatch')}
-                  </p>
-                </TableCell>
+                {columns.map((column) => (
+                  <TableHead key={column.key} scope="col">
+                    {column.hidden ? <span className="sr-only">{column.label}</span> : column.label}
+                  </TableHead>
+                ))}
               </TableRow>
-            ) : (
-              shown.map(row)
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {busy ? (
+                <LoadingRows columns={columns.length} count={6} />
+              ) : shown.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="p-0">
+                    <ListNoMatch
+                      t={t}
+                      className="sticky left-0 w-[100cqw] px-2 whitespace-normal"
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                shown.map(row)
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
-    </div>
+    </ListStates>
   )
 }

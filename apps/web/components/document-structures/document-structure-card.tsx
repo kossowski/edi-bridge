@@ -6,17 +6,11 @@ import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useId } from 'react'
 
-import { documentStructureHref, mappingHref, newDocumentStructureHref } from '@/lib/navigation'
+import { MappingList } from '@/components/document-structures/mapping-list'
+import { documentStructureHref, newDocumentStructureHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@edi-bridge/ui/components/card'
+import { Card, CardContent, CardFooter, CardHeader } from '@edi-bridge/ui/components/card'
 
 import type { DocumentStructureSummary } from '@edi-bridge/contracts'
 
@@ -100,23 +94,13 @@ function ReadingMappings({ mappings }: { mappings: DocumentStructureSummary['map
   const t = useTranslations('DocumentStructures')
 
   if (mappings.length === 0) {
-    return <p className="text-muted-foreground text-xs">{t('notRead')}</p>
+    return <p className="text-muted-foreground">{t('notRead')}</p>
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-1 text-xs">
-      <p className="text-muted-foreground">{t('readBy')}</p>
-      <ul className="flex flex-col gap-1">
-        {mappings.map((mapping) => (
-          <li key={mapping.id} className="min-w-0">
-            <Link
-              href={mappingHref(mapping.id)}
-              className="text-foreground font-medium break-words underline-offset-4 hover:underline">
-              {mapping.name}
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <p className="text-muted-foreground text-xs">{t('readBy')}</p>
+      <MappingList limit={2} mappings={mappings} />
     </div>
   )
 }
@@ -128,28 +112,26 @@ export function DocumentStructureCard({ summary }: { summary: DocumentStructureS
 
   return (
     <Card className="h-full">
-      <CardHeader>
-        <CardTitle>
-          <h2 id={titleId} className="min-w-0 break-words">
-            <Link href={href} className="hover:underline">
-              {summary.name}
-            </Link>
-          </h2>
-        </CardTitle>
-        <CardAction>
-          <Badge variant="outline">{t(`format.${summary.format}`)}</Badge>
-        </CardAction>
+      <CardHeader className="flex items-start justify-between gap-2">
+        <h2
+          id={titleId}
+          className="font-heading min-w-0 text-base leading-snug font-medium break-words">
+          <Link href={href} className="hover:underline">
+            {summary.name}
+          </Link>
+        </h2>
+        <Badge variant="outline">{t(`format.${summary.format}`)}</Badge>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {summary.sample ? <SamplePreview sample={summary.sample} /> : <NoSample />}
         <FieldNames summary={summary} />
-      </CardContent>
-      <CardFooter className="mt-auto flex items-end justify-between gap-3">
         <ReadingMappings mappings={summary.mappings} />
+      </CardContent>
+      <CardFooter className="mt-auto flex justify-end py-3">
         <Link
           href={href}
           aria-describedby={titleId}
-          className={buttonVariants({ size: 'sm', variant: 'outline', className: 'shrink-0' })}>
+          className={buttonVariants({ size: 'sm', variant: 'outline' })}>
           {t('open')}
         </Link>
       </CardFooter>

@@ -3,9 +3,15 @@ import { expect, userEvent, within } from 'storybook/test'
 
 import { DocumentStructuresScreen } from '@/components/document-structures/document-structures-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
+import { desktop, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { createDocumentStructures, createHandlers } from '@edi-bridge/mocks'
+import {
+  createDocumentStructures,
+  createHandlers,
+  seedDocumentStructures,
+  seedMappingDrafts,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -28,7 +34,8 @@ export const Default = meta.story({
 
     await expect(order.getByText('JSON')).toBeVisible()
     await expect(order.getByText('order-4711.json')).toBeVisible()
-    await expect(order.getByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON' })).toBeVisible()
+    await expect(order.getAllByRole('link', { name: /ORDERS/ })).toHaveLength(2)
+    await expect(order.getByText(/^and \d+ more$/)).toBeVisible()
 
     const dispatch = cardOf(canvas.getByRole('heading', { name: 'ERP dispatch export (CSV)' }))
 
@@ -39,8 +46,62 @@ export const Default = meta.story({
 
     await expect(schema.getByText('Created from a JSON Schema')).toBeVisible()
     await expect(
-      canvas.getByRole('link', { name: /Drop an export from your ERP/ }),
+      canvas.getByRole('link', { name: /Add a data format from an ERP export/ }),
     ).toHaveAttribute('href', '/data-formats/new')
+  },
+})
+
+const [manyReaders, noReader, oneReader] = seedDocumentStructures
+
+const mappingCountStructures = [
+  { ...manyReaders!, name: 'A export read by six Mappings' },
+  { ...noReader!, name: 'B export read by no Mapping' },
+  { ...oneReader!, name: 'C export read by one Mapping' },
+]
+
+const mappingCountDrafts = seedMappingDrafts.slice(0, 7).map((draft, index) => ({
+  ...draft,
+  documentStructureId: (index < 6 ? manyReaders! : oneReader!).id,
+}))
+
+export const MappingCountsInARow = meta.story({
+  ...desktop,
+  parameters: {
+    ...desktop.parameters,
+    a11y: { config: { rules: [{ id: 'target-size', enabled: true }] } },
+  },
+  beforeEach({ msw }) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        documentStructures: mappingCountStructures,
+        mappingDrafts: mappingCountDrafts,
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const many = cardOf(await canvas.findByRole('heading', { name: /read by six/ }))
+    const none = cardOf(canvas.getByRole('heading', { name: /read by no/ }))
+
+    await expect(many.getAllByRole('listitem')).toHaveLength(3)
+    await expect(many.getByText('and 4 more')).toBeVisible()
+    await expect(none.getByText('No Mapping reads it yet')).toBeVisible()
+
+    const manyBar = many.getByRole('link', { name: 'Open' }).getBoundingClientRect()
+    const noneBar = none.getByRole('link', { name: 'Open' }).getBoundingClientRect()
+
+    await expect(noneBar.top).toBe(manyBar.top)
+    await expect(noneBar.left).toBeGreaterThan(manyBar.right)
+  },
+})
+
+export const Mobile = meta.story({
+  ...mobile,
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { name: 'ERP purchase order' })
+
+    await expect(canvasElement.ownerDocument.documentElement.scrollWidth).toBeLessThanOrEqual(
+      canvasElement.ownerDocument.documentElement.clientWidth,
+    )
   },
 })
 
@@ -133,7 +194,9 @@ export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas }) {
       await expect(await canvas.findByRole('heading', { name: 'ERP purchase order' })).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: /Drop an export from your ERP/ })).toBeNull()
+      await expect(
+        canvas.queryByRole('link', { name: /Add a data format from an ERP export/ }),
+      ).toBeNull()
     },
   }),
 })
