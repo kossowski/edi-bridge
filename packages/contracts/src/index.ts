@@ -517,6 +517,7 @@ export {
   maxWorkspaceNameLength,
   operatorWorkspacesEndpoint,
   resetSandboxWorkspaceEndpoint,
+  revokeInviteEndpoint,
   type WorkspaceInput,
   workspaceInputSchema,
   workspaceInvitesEndpoint,
@@ -559,6 +560,7 @@ export {
 } from './workspace'
 
 export {
+  operatorWorkspaceMembersEndpoint,
   type WorkspaceMember,
   workspaceMemberSchema,
   workspaceMembersEndpoint,

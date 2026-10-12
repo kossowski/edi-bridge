@@ -17,3 +17,14 @@ export const workspaceMembersEndpoint: Endpoint<WorkspaceMember[]> = {
   path: '/workspaces/current/members',
   response: z.array(workspaceMemberSchema),
 }
+
+export const operatorWorkspaceMembersEndpoint: Endpoint<
+  WorkspaceMember[],
+  undefined,
+  undefined,
+  '/operator/workspaces/:workspaceId/members'
+> = {
+  method: 'GET',
+  path: '/operator/workspaces/:workspaceId/members',
+  response: z.array(workspaceMemberSchema),
+}

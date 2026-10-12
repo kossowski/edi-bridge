@@ -7,12 +7,15 @@ import {
   type InviteInput,
   inviteSchema,
   inviteValidityDays,
+  operatorWorkspaceMembersEndpoint,
   resetSandboxWorkspaceEndpoint,
+  revokeInviteEndpoint,
   toPath,
   workspaceInvitesEndpoint,
   glnIssue,
   type WorkspaceInput,
   operatorWorkspacesEndpoint,
+  type WorkspaceSummary,
   workspaceSummarySchema,
 } from '@edi-bridge/contracts'
 
@@ -24,8 +27,9 @@ import {
   seedInvites,
   seedWorkspaceSummaries,
 } from './operator'
-import { sandboxAdminSession } from './session'
+import { sandboxAdminSession, showcaseViewerSession } from './session'
 import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
+import { createWorkspaceMembers } from './workspace-member'
 
 const apiUrl = 'http://api.test'
 
@@ -64,6 +68,13 @@ describe('seedWorkspaceSummaries', () => {
     )
   })
 
+  it('gives every seed Workspace documents today and a last activity', () => {
+    for (const { documentsToday, lastActivityAt } of seedWorkspaceSummaries) {
+      expect(documentsToday).toBeGreaterThan(0)
+      expect(lastActivityAt).not.toBeNull()
+    }
+  })
+
   it('marks every seed Workspace as seeded', () => {
     expect(seedWorkspaceSummaries.every(({ seeded }) => seeded)).toBe(true)
   })
@@ -85,9 +96,18 @@ describe('createWorkspaceSummaries', () => {
     expect(new Set(workspaces.map(({ name }) => name)).size).toBe(300)
 
     for (const workspace of workspaces) {
-      expect(workspaceSummarySchema.parse(workspace)).toEqual(workspace)
+      expect(workspaceSummarySchema.omit({ pendingInviteCount: true }).parse(workspace)).toEqual(
+        workspace,
+      )
       expect(workspace.gln === null || /^02\d{11}$/.test(workspace.gln)).toBe(true)
     }
+  })
+
+  it('generates quiet Workspaces without activity next to busy ones', () => {
+    const workspaces = createWorkspaceSummaries({ count: 300 })
+
+    expect(workspaces.some(({ lastActivityAt }) => lastActivityAt === null)).toBe(true)
+    expect(workspaces.some(({ documentsToday }) => documentsToday > 1000)).toBe(true)
   })
 
   it('generates the same Workspaces for the same seed and date', () => {
@@ -153,6 +173,9 @@ describe('POST /operator/workspaces', () => {
       gln: null,
       kind: 'standard',
       memberCount: 0,
+      pendingInviteCount: 0,
+      documentsToday: 0,
+      lastActivityAt: null,
       lastResetAt: null,
       seeded: false,
     })
@@ -211,6 +234,64 @@ const unknownWorkspaceId = '00000000-0000-4000-8000-000000000000'
 async function listInvites(workspaceId: string) {
   return fetch(`${apiUrl}${toPath(workspaceInvitesEndpoint.path, { workspaceId })}`)
 }
+
+async function listMembers(workspaceId: string) {
+  return fetch(`${apiUrl}${toPath(operatorWorkspaceMembersEndpoint.path, { workspaceId })}`)
+}
+
+describe('GET /operator/workspaces/:workspaceId/members', () => {
+  it('lists the members of any Workspace with their role', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const response = await listMembers(seedShowcaseWorkspace.id)
+    const members = operatorWorkspaceMembersEndpoint.response.parse(await response.json())
+
+    expect(response.status).toBe(200)
+    expect(members.map(({ email, role }) => ({ email, role }))).toEqual([
+      { email: showcaseViewerSession.user.email, role: 'viewer' },
+      { email: 'clara.weidner@lindenhof-feinkost.example', role: 'admin' },
+      { email: 'felix.brandt@lindenhof-feinkost.example', role: 'viewer' },
+      { email: 'nele.albers@lindenhof-feinkost.example', role: 'viewer' },
+    ])
+  })
+
+  it('counts as many members as the seed Workspace summaries say', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    for (const { id, memberCount } of seedWorkspaceSummaries) {
+      const members = operatorWorkspaceMembersEndpoint.response.parse(
+        await (await listMembers(id)).json(),
+      )
+
+      expect(members).toHaveLength(memberCount)
+    }
+  })
+
+  it('lists hundreds of members for the large-volume state', async () => {
+    const members = createWorkspaceMembers({ count: 200 })
+    server.use(...operatorHandlers(apiUrl, { members }))
+
+    expect(await (await listMembers(seedWorkspace.id)).json()).toEqual(members)
+  })
+
+  it('lists no members for a Workspace without any', async () => {
+    server.use(...operatorHandlers(apiUrl, { members: [] }))
+
+    expect(await (await listMembers(seedWorkspace.id)).json()).toEqual([])
+  })
+
+  it('answers 404 for an unknown Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await listMembers(unknownWorkspaceId)).status).toBe(404)
+  })
+
+  it('answers 403 for an Admin who is not the Operator', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
+
+    expect((await listMembers(seedSandboxWorkspace.id)).status).toBe(403)
+  })
+})
 
 describe('createInvites', () => {
   it('generates hundreds of valid invites with unique emails for one Workspace', () => {
@@ -288,6 +369,7 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
       ...invite,
       workspaceId: seedSandboxWorkspace.id,
       acceptedAt: null,
+      revokedAt: null,
     })
     expect(created.link).toMatch(/^https:\/\/app\.test\/invite\/[\w-]{16,}$/)
     expect(Date.parse(created.expiresAt) - Date.parse(created.createdAt)).toBe(
@@ -330,6 +412,145 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
     )
 
     expect(response.status).toBe(403)
+  })
+})
+
+function pendingInviteCountOf(workspaces: ReadonlyArray<WorkspaceSummary>, id: string) {
+  return workspaces.find((workspace) => workspace.id === id)?.pendingInviteCount
+}
+
+describe('DELETE /operator/workspaces/:workspaceId/invites/:inviteId', () => {
+  const pending = seedInvites.find(
+    ({ workspaceId, acceptedAt }) => workspaceId === seedWorkspace.id && acceptedAt === null,
+  )!
+
+  const accepted = seedInvites.find(
+    ({ workspaceId, acceptedAt }) => workspaceId === seedWorkspace.id && acceptedAt !== null,
+  )!
+
+  const revoke = (workspaceId: string, inviteId: string) =>
+    fetch(`${apiUrl}${toPath(revokeInviteEndpoint.path, { workspaceId, inviteId })}`, {
+      method: 'DELETE',
+    })
+
+  it('revokes a pending invite, drops it from the list and the pending count', async () => {
+    server.use(...operatorHandlers(apiUrl, { now: () => new Date('2026-10-12T08:00:00.000Z') }))
+    const before = Date.now()
+
+    const response = await revoke(seedWorkspace.id, pending.id)
+    const revoked = revokeInviteEndpoint.response.parse(await response.json())
+
+    const listed = workspaceInvitesEndpoint.response.parse(
+      await (await listInvites(seedWorkspace.id)).json(),
+    )
+
+    expect(response.status).toBe(200)
+    expect(revoked).toMatchObject({ id: pending.id, acceptedAt: null })
+    expect(Date.parse(revoked.revokedAt!)).toBeGreaterThanOrEqual(before)
+    expect(listed.map(({ id }) => id)).not.toContain(pending.id)
+    expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(0)
+  })
+
+  it('answers 409 for an accepted invite', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await revoke(seedWorkspace.id, accepted.id)).status).toBe(409)
+  })
+
+  it('answers 404 for an invite revoked before', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    await revoke(seedWorkspace.id, pending.id)
+
+    expect((await revoke(seedWorkspace.id, pending.id)).status).toBe(404)
+  })
+
+  it.each([
+    ['an unknown invite', seedWorkspace.id, unknownWorkspaceId],
+    ['an invite of another Workspace', seedSandboxWorkspace.id, pending.id],
+    ['an unknown Workspace', unknownWorkspaceId, pending.id],
+  ])('answers 404 for %s', async (_, workspaceId, inviteId) => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await revoke(workspaceId, inviteId)).status).toBe(404)
+  })
+
+  it('answers 403 for an Admin who is not the Operator', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
+
+    expect((await revoke(seedWorkspace.id, pending.id)).status).toBe(403)
+  })
+
+  it('counts a created invite as pending', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    await post(toPath(createInviteEndpoint.path, { workspaceId: seedSandboxWorkspace.id }), {
+      email: 'jonas.weber@havelland.example',
+      role: 'admin',
+    })
+
+    expect(pendingInviteCountOf(await listWorkspaces(), seedSandboxWorkspace.id)).toBe(1)
+  })
+})
+
+describe('pending invite count', () => {
+  const beforeSeedExpiry = new Date('2026-10-12T08:00:00.000Z')
+  const afterSeedExpiry = new Date('2026-10-16T08:00:00.000Z')
+
+  const pending = seedInvites.find(
+    ({ workspaceId, acceptedAt }) => workspaceId === seedWorkspace.id && acceptedAt === null,
+  )!
+
+  it('counts the pending invites of each seed Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl, { now: () => beforeSeedExpiry }))
+
+    const workspaces = await listWorkspaces()
+
+    expect(
+      Object.fromEntries(workspaces.map(({ id, pendingInviteCount }) => [id, pendingInviteCount])),
+    ).toEqual({
+      [seedWorkspace.id]: 1,
+      [seedShowcaseWorkspace.id]: 0,
+      [seedSandboxWorkspace.id]: 0,
+    })
+  })
+
+  it('does not count an expired invite as pending', async () => {
+    server.use(...operatorHandlers(apiUrl, { now: () => afterSeedExpiry }))
+
+    expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(0)
+  })
+
+  it('revokes an expired invite without counting it as pending', async () => {
+    server.use(...operatorHandlers(apiUrl, { now: () => afterSeedExpiry }))
+
+    const response = await fetch(
+      `${apiUrl}${toPath(revokeInviteEndpoint.path, { workspaceId: seedWorkspace.id, inviteId: pending.id })}`,
+      { method: 'DELETE' },
+    )
+
+    expect(response.status).toBe(200)
+    expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(0)
+  })
+
+  it('derives the count from hundreds of generated invites', async () => {
+    const now = new Date('2026-10-12T08:00:00.000Z')
+    const invites = createInvites({ count: 200, workspaceId: seedWorkspace.id, now })
+    server.use(...operatorHandlers(apiUrl, { invites, now: () => now }))
+
+    const listed = workspaceInvitesEndpoint.response.parse(
+      await (await listInvites(seedWorkspace.id)).json(),
+    )
+
+    const unansweredInLastWeek = invites.filter(
+      ({ acceptedAt, createdAt }) =>
+        acceptedAt === null && now.getTime() - Date.parse(createdAt) < inviteValidityDays * dayMs,
+    )
+
+    expect(listed).toHaveLength(200)
+    expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(
+      unansweredInLastWeek.length,
+    )
   })
 })
 

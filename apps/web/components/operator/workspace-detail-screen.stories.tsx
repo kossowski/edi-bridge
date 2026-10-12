@@ -15,7 +15,6 @@ import {
   operatorWorkspacesEndpoint,
   resetSandboxWorkspaceEndpoint,
   workspaceInvitesEndpoint,
-  type WorkspaceSummary,
 } from '@edi-bridge/contracts'
 import {
   createInvites,
@@ -29,6 +28,7 @@ import {
   seedWorkspace,
   seedWorkspaceSummaries,
   sessionHandlers,
+  type WorkspaceSummaryRecord,
   workspaceSettingsHandlers,
 } from '@edi-bridge/mocks'
 
@@ -60,7 +60,7 @@ function operatorMocks({
 }: {
   invites?: ReadonlyArray<Invite>
   session?: typeof seedSession
-  workspaceSummaries?: ReadonlyArray<WorkspaceSummary>
+  workspaceSummaries?: ReadonlyArray<WorkspaceSummaryRecord>
 } = {}) {
   const sessionStore = createSessionStore(session)
   const workspaces = createOperatorStore({ workspaces: workspaceSummaries, invites })

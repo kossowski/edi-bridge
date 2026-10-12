@@ -9,6 +9,9 @@ export const maxWorkspaceNameLength = 70
 export const workspaceSummarySchema = workspaceSchema.extend({
   kind: workspaceKindSchema,
   memberCount: z.number().int().min(0),
+  pendingInviteCount: z.number().int().min(0),
+  documentsToday: z.number().int().min(0),
+  lastActivityAt: z.iso.datetime().nullable(),
   seeded: z.boolean(),
   createdAt: z.iso.datetime(),
   lastResetAt: z.iso.datetime().nullable(),
@@ -50,6 +53,7 @@ export const inviteSchema = z.object({
   createdAt: z.iso.datetime(),
   expiresAt: z.iso.datetime(),
   acceptedAt: z.iso.datetime().nullable(),
+  revokedAt: z.iso.datetime().nullable(),
 })
 
 export type Invite = z.infer<typeof inviteSchema>
@@ -83,6 +87,17 @@ export const createInviteEndpoint: Endpoint<
   method: 'POST',
   path: '/operator/workspaces/:workspaceId/invites',
   body: inviteInputSchema,
+  response: inviteSchema,
+}
+
+export const revokeInviteEndpoint: Endpoint<
+  Invite,
+  undefined,
+  undefined,
+  '/operator/workspaces/:workspaceId/invites/:inviteId'
+> = {
+  method: 'DELETE',
+  path: '/operator/workspaces/:workspaceId/invites/:inviteId',
   response: inviteSchema,
 }
 
