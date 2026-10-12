@@ -11,6 +11,7 @@ import {
   toSearchParams,
 } from '@edi-bridge/contracts'
 
+import { seedFlows, seedMappings } from './flow'
 import { createRun, createRuns, runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
@@ -164,6 +165,42 @@ describe('GET /runs', () => {
     })
 
     expect(body?.runs.map((run) => run.id)).toEqual(['00000000-0000-4000-8000-000000000001'])
+  })
+
+  it('filters by the Mapping that the Flow of each Run uses', async () => {
+    const mappingOf = (flowId: string) => {
+      const versionId = seedFlows.find(({ id }) => id === flowId)!.mappingVersionId
+
+      return seedMappings.find(({ versions }) => versions.some(({ id }) => id === versionId))!
+    }
+
+    const shared = seedFlows.filter(
+      (flow, _, flows) =>
+        flows.filter((other) => mappingOf(other.id) === mappingOf(flow.id)).length > 1,
+    )
+
+    const [first, second] = shared
+    const other = seedFlows.find((flow) => mappingOf(flow.id) !== mappingOf(first!.id))!
+
+    server.use(
+      runsHandler(
+        apiUrl,
+        [first!, second!, other].map((flow, index) =>
+          createRun({
+            id: `00000000-0000-4000-8000-00000000000${index + 1}`,
+            flow: { id: flow.id, name: flow.name },
+            messageType: flow.messageType,
+          }),
+        ),
+      ),
+    )
+
+    const { body } = await listRuns({ mappingId: [mappingOf(first!.id).mappingId] })
+
+    expect(body?.runs.map((run) => run.id).sort()).toEqual([
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002',
+    ])
   })
 
   it('filters by a time range that includes both of its ends', async () => {

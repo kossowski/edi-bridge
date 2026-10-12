@@ -4,12 +4,15 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import {
   aiReviewOpenStatus,
   directionOf,
+  flowEndpoint,
   mappingComparisonEndpoint,
   type MappingComparisonQuery,
   mappingDraftEndpoint,
   mappingVersionEndpoint,
   mappingVersionsEndpoint,
+  type PublishMappingDraftBody,
   publishMappingDraftEndpoint,
+  restoreMappingVersionEndpoint,
   saveMappingDraftEndpoint,
   toPath,
   toSearchParams,
@@ -17,7 +20,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedDocumentStructures } from './document-structure'
-import { seedMappings } from './flow'
+import { createFlows, createFlowStore, flowHandlers, seedFlows, seedMappings } from './flow'
 import {
   createMappingDrafts,
   createMappingDraftStore,
@@ -29,12 +32,15 @@ import {
 import { seedMappingSamples } from './mapping-sample'
 import {
   createMappingVersions,
+  createMappingVersionStore,
   deriveMappingVersions,
   mappingDifferences,
   mappingVersionHandlers,
   seedMappingVersions,
   toMappingVersion,
 } from './mapping-version'
+import { publishDraft } from './publish-request'
+import { seedSession } from './session'
 
 const apiUrl = 'http://api.test'
 
@@ -52,10 +58,14 @@ async function listVersions(mappingId: string) {
   return mappingVersionsEndpoint.response.parse(await response.json())
 }
 
-async function publish(mappingId: string) {
-  return fetch(`${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId })}`, {
-    method: 'POST',
-  })
+function publish(mappingId: string, body?: Partial<PublishMappingDraftBody>) {
+  return publishDraft(apiUrl, mappingId, body)
+}
+
+async function getFlow(id: string) {
+  const response = await fetch(`${apiUrl}${toPath(flowEndpoint.path, { id })}`)
+
+  return flowEndpoint.response.parse(await response.json())
 }
 
 async function compare(mappingId: string, query: MappingComparisonQuery) {
@@ -152,6 +162,53 @@ describe('GET /mappings/:mappingId/versions', () => {
   })
 })
 
+describe('GET /mappings/:mappingId/versions history', () => {
+  const pinnedVersionIds = new Set(seedFlows.map(({ mappingVersionId }) => mappingVersionId))
+
+  const pinnedMapping = seedMappingDrafts.find(({ id }) =>
+    seedMappingVersions.some(
+      (version) => version.mappingId === id && pinnedVersionIds.has(version.id),
+    ),
+  )!
+
+  it('names the Flows pinned to each version with their Trading Partner', async () => {
+    server.use(...mappingVersionHandlers(apiUrl))
+    const versions = await listVersions(pinnedMapping.id)
+
+    for (const version of versions) {
+      const expected = seedFlows.filter(({ mappingVersionId }) => mappingVersionId === version.id)
+
+      expect(version.flows.map(({ id }) => id).sort()).toEqual(expected.map(({ id }) => id).sort())
+
+      for (const flow of version.flows) {
+        const record = expected.find(({ id }) => id === flow.id)!
+        expect(flow.tradingPartner.id).toBe(record.tradingPartnerId)
+      }
+    }
+
+    expect(versions.some(({ flows }) => flows.length > 0)).toBe(true)
+  })
+
+  it('shows change notes for newer versions and none for old ones, with who published', async () => {
+    server.use(...mappingVersionHandlers(apiUrl))
+    const all = (await Promise.all(seedMappingDrafts.map(({ id }) => listVersions(id)))).flat()
+
+    expect(all.some(({ changeNote }) => changeNote === null)).toBe(true)
+    expect(all.some(({ changeNote }) => changeNote !== null)).toBe(true)
+    expect(new Set(all.map(({ publishedBy }) => publishedBy.name)).size).toBeGreaterThan(1)
+  })
+
+  it('lists every Flow of a large volume pinned to one version', async () => {
+    const flows = createFlows({ count: 300 })
+    server.use(...mappingVersionHandlers(apiUrl, { flows }))
+    const [version] = await listVersions(pinnedMapping.id)
+
+    const expected = flows.filter(({ mappingVersionId }) => mappingVersionId === version!.id)
+
+    expect(version!.flows).toHaveLength(expected.length)
+  })
+})
+
 describe('GET /mappings/:mappingId/versions/:versionId', () => {
   it('returns the graph of a version', async () => {
     server.use(...mappingVersionHandlers(apiUrl))
@@ -166,7 +223,16 @@ describe('GET /mappings/:mappingId/versions/:versionId', () => {
       await (await fetch(`${apiUrl}${path}`)).json(),
     )
 
-    expect(version).toMatchObject({ ...older, direction: directionOf(published) })
+    const { id, mappingId, mappingName, version: number, publishedAt } = older!
+
+    expect(version).toMatchObject({
+      id,
+      mappingId,
+      mappingName,
+      version: number,
+      publishedAt,
+      direction: directionOf(published),
+    })
     expect(version.links.length).toBeLessThan(published.links.length)
   })
 
@@ -297,6 +363,178 @@ describe('POST /mappings/:mappingId/versions', () => {
 
     expect((await publish(crypto.randomUUID())).status).toBe(404)
   })
+
+  it('answers 400 without a change note', async () => {
+    handlers()
+    const draft = publishable.find(({ latestVersion }) => latestVersion !== null)!
+
+    expect((await publish(draft.id, {})).status).toBe(400)
+  })
+})
+
+describe('POST /mappings/:mappingId/versions with a change note and Flows to move', () => {
+  const flowsOf = (mappingId: string) =>
+    seedFlows.filter((flow) =>
+      seedMappingVersions.some(
+        (version) => version.mappingId === mappingId && version.id === flow.mappingVersionId,
+      ),
+    )
+
+  const draft = seedMappingDrafts.find(
+    ({ id, unpublishedChanges }) =>
+      unpublishedChanges && id !== incompleteDraftId && flowsOf(id).length >= 2,
+  )!
+
+  const [moved, staying] = flowsOf(draft.id)
+
+  function handlers() {
+    const mappings = createMappingDraftStore()
+    const versions = createMappingVersionStore()
+    const flows = createFlowStore()
+
+    server.use(
+      ...mappingVersionHandlers(apiUrl, { mappings, versions, flows }),
+      ...flowHandlers(apiUrl, { flows, mappings: versions }),
+    )
+  }
+
+  it('stores the change note and who published it', async () => {
+    handlers()
+
+    const response = await publish(draft.id, { changeNote: '  Delivery date added  ' })
+    const created = publishMappingDraftEndpoint.response.parse(await response.json())
+
+    expect(created).toMatchObject({
+      changeNote: 'Delivery date added',
+      publishedBy: { id: seedSession.user.id, name: seedSession.user.name },
+    })
+    expect((await listVersions(draft.id))[0]).toEqual(created)
+  })
+
+  it('keeps an empty change note as none', async () => {
+    handlers()
+
+    const created = publishMappingDraftEndpoint.response.parse(
+      await (await publish(draft.id, { changeNote: '   ' })).json(),
+    )
+
+    expect(created.changeNote).toBeNull()
+  })
+
+  it('moves no Flow unless chosen', async () => {
+    handlers()
+    const before = await getFlow(moved!.id)
+
+    const created = publishMappingDraftEndpoint.response.parse(
+      await (await publish(draft.id, { changeNote: 'Delivery date added' })).json(),
+    )
+
+    expect(created.flows).toEqual([])
+    expect((await getFlow(moved!.id)).mappingVersion.id).toBe(before.mappingVersion.id)
+  })
+
+  it('moves only the chosen Flows to the new version', async () => {
+    handlers()
+    const before = await getFlow(staying!.id)
+
+    const created = publishMappingDraftEndpoint.response.parse(
+      await (
+        await publish(draft.id, { changeNote: 'Unit codes', moveFlowIds: [moved!.id] })
+      ).json(),
+    )
+
+    expect(created.flows.map(({ id }) => id)).toEqual([moved!.id])
+    expect((await getFlow(moved!.id)).mappingVersion.id).toBe(created.id)
+    expect((await getFlow(staying!.id)).mappingVersion.id).toBe(before.mappingVersion.id)
+  })
+
+  it('answers 422 and publishes nothing for a Flow of another Mapping', async () => {
+    handlers()
+    const foreign = seedFlows.find((flow) => ![moved!.id, staying!.id].includes(flow.id))!
+    const before = await listVersions(draft.id)
+
+    const response = await publish(draft.id, { changeNote: '', moveFlowIds: [foreign.id] })
+
+    expect(response.status).toBe(422)
+    expect(await listVersions(draft.id)).toEqual(before)
+  })
+})
+
+describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
+  function handlers(mappings = createMappingDraftStore()) {
+    server.use(
+      ...mappingHandlers(apiUrl, { mappings }),
+      ...mappingVersionHandlers(apiUrl, { mappings }),
+    )
+  }
+
+  async function restore(mappingId: string, versionId: string) {
+    const path = toPath(restoreMappingVersionEndpoint.path, { mappingId, versionId })
+
+    return fetch(`${apiUrl}${path}`, { method: 'POST' })
+  }
+
+  it('copies the graph of an older version into the Draft, which differs from the latest', async () => {
+    handlers()
+    const [, older] = await listVersions(published.id)
+
+    const response = await restore(published.id, older!.id)
+    const restored = restoreMappingVersionEndpoint.response.parse(await response.json())
+
+    const versionPath = toPath(mappingVersionEndpoint.path, {
+      mappingId: published.id,
+      versionId: older!.id,
+    })
+
+    const version = mappingVersionEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${versionPath}`)).json(),
+    )
+
+    expect(response.status).toBe(200)
+    expect(restored).toMatchObject({
+      links: version.links,
+      transforms: version.transforms,
+      transformLinks: version.transformLinks,
+      unpublishedChanges: true,
+      latestVersion: published.latestVersion,
+    })
+    expect(await getDraft(published.id)).toEqual(restored)
+  })
+
+  it('leaves no unpublished changes after restoring the latest version', async () => {
+    handlers()
+    const [latest] = await listVersions(changed.id)
+
+    const restored = restoreMappingVersionEndpoint.response.parse(
+      await (await restore(changed.id, latest!.id)).json(),
+    )
+
+    expect(restored.unpublishedChanges).toBe(false)
+  })
+
+  it('answers 404 for a version of another Mapping', async () => {
+    handlers()
+    const [foreign] = await listVersions(changed.id)
+
+    expect((await restore(published.id, foreign!.id)).status).toBe(404)
+  })
+
+  it('answers 423 while the AI review of the Draft is open', async () => {
+    const reviewing: MappingDraftRecord = {
+      ...published,
+      aiReview: {
+        sampleId: '00000008-0000-4000-8000-000000000001',
+        proposedLinks: [published.links[0]!.targetPath],
+        proposedTransforms: [],
+        proposedTransformLinks: [],
+      },
+    }
+
+    handlers(createMappingDraftStore([reviewing]))
+    const [, older] = await listVersions(reviewing.id)
+
+    expect((await restore(reviewing.id, older!.id)).status).toBe(aiReviewOpenStatus)
+  })
 })
 
 describe('GET /mappings/:mappingId/comparison', () => {
@@ -370,6 +608,37 @@ describe('GET /mappings/:mappingId/comparison', () => {
     expect((await compare(published.id, { ...versions, sampleId: foreignSample.id })).status).toBe(
       404,
     )
+  })
+})
+
+describe('mapping version states', () => {
+  it('answers 500 for the history, publishing and restoring in the error state', async () => {
+    server.use(...mappingVersionHandlers(apiUrl, { versions: 'error' }))
+    const [version] = seedMappingVersions.filter(({ mappingId }) => mappingId === published.id)
+
+    const restorePath = toPath(restoreMappingVersionEndpoint.path, {
+      mappingId: published.id,
+      versionId: version!.id,
+    })
+
+    expect(
+      (await fetch(`${apiUrl}${toPath(mappingVersionsEndpoint.path, { mappingId: published.id })}`))
+        .status,
+    ).toBe(500)
+    expect((await publish(changed.id)).status).toBe(500)
+    expect((await fetch(`${apiUrl}${restorePath}`, { method: 'POST' })).status).toBe(500)
+  })
+
+  it('never answers the history in the loading state', async () => {
+    server.use(...mappingVersionHandlers(apiUrl, { versions: 'loading' }))
+    const path = toPath(mappingVersionsEndpoint.path, { mappingId: published.id })
+
+    const answer = await Promise.race([
+      fetch(`${apiUrl}${path}`).then(() => 'answered'),
+      new Promise((resolve) => setTimeout(() => resolve('pending'), 50)),
+    ])
+
+    expect(answer).toBe('pending')
   })
 })
 

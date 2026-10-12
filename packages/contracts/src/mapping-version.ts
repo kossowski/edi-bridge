@@ -1,6 +1,14 @@
 import { z } from 'zod'
 
-import { checkGraph, graphFields, inboundSides, mappingLinkSchema, outboundSides } from './mapping'
+import {
+  checkGraph,
+  graphFields,
+  inboundSides,
+  type MappingDraft,
+  mappingDraftSchema,
+  mappingLinkSchema,
+  outboundSides,
+} from './mapping'
 import { documentContentSchema, previewNoteSchema } from './mapping-preview'
 import { messageTypeSchema } from './message-type'
 import { mappingTransformSchema, transformLinkSchema } from './transform'
@@ -16,17 +24,6 @@ export const mappingVersionSummarySchema = z.object({
 })
 
 export type MappingVersionSummary = z.infer<typeof mappingVersionSummarySchema>
-
-export const mappingVersionsEndpoint: Endpoint<
-  MappingVersionSummary[],
-  undefined,
-  undefined,
-  '/mappings/:mappingId/versions'
-> = {
-  method: 'GET',
-  path: '/mappings/:mappingId/versions',
-  response: z.array(mappingVersionSummarySchema),
-}
 
 export const publishedMappingVersionsQuerySchema = z.object({
   messageType: messageTypeSchema.optional(),
@@ -66,15 +63,15 @@ export const mappingVersionEndpoint: Endpoint<
   response: mappingVersionSchema,
 }
 
-export const publishMappingDraftEndpoint: Endpoint<
-  MappingVersionSummary,
+export const restoreMappingVersionEndpoint: Endpoint<
+  MappingDraft,
   undefined,
   undefined,
-  '/mappings/:mappingId/versions'
+  '/mappings/:mappingId/versions/:versionId/restore'
 > = {
   method: 'POST',
-  path: '/mappings/:mappingId/versions',
-  response: mappingVersionSummarySchema,
+  path: '/mappings/:mappingId/versions/:versionId/restore',
+  response: mappingDraftSchema,
 }
 
 export const differenceChanges = ['added', 'removed', 'changed'] as const

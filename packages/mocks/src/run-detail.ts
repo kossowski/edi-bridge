@@ -17,6 +17,7 @@ import {
   type RunStepStage,
   type RunSummary,
   runSummarySchema,
+  type TradingPartner,
   waitForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
 
@@ -30,7 +31,11 @@ import {
   serializeInterchange,
 } from './interchange'
 import { type LookupTableStore, toLookupTableStore } from './lookup-table'
-import { type MappingVersionStore, toMappingVersionSummary } from './mapping-version'
+import {
+  mappingVersionEntries,
+  type MappingVersionStore,
+  toMappingVersionSummary,
+} from './mapping-version'
 import { seedRuns } from './run'
 import { problemOf } from './run-problem'
 import { stagesOf, statusOf, stepStatuses } from './run-steps'
@@ -42,6 +47,8 @@ import {
   toRunStore,
 } from './run-store'
 import { seededFaker } from './seeded-faker'
+
+import type { TradingPartnerStore } from './trading-partner'
 
 const stepDurations: Readonly<Record<RunStepStage, readonly [number, number]>> = {
   receipt: [20, 200],
@@ -102,6 +109,7 @@ export type RunDetailOptions = (
   channels?: ChannelStore
   lookupTables?: LookupTableStore
   waitingForTradingPartnerSince?: Map<string, string>
+  tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
 }
 
 export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): Reprocessed[] {
@@ -371,7 +379,11 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     ({ params }) => {
       const versions = versionsOf(params.mappingId)
 
-      return versions ? HttpResponse.json(versions) : problem(404, 'Not Found')
+      return versions
+        ? HttpResponse.json(
+            versions.map(mappingVersionEntries(problemSources.flows, options.tradingPartners)),
+          )
+        : problem(404, 'Not Found')
     },
   )
 

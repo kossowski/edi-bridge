@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
+import { mappingVersionSummarySchema } from '@edi-bridge/contracts'
 import {
   channelHandlers,
   createRun,
@@ -126,7 +127,7 @@ describe('Run detail actions', () => {
     const run = await reprocessRun(mappingFailure.id, { mappingVersionId: versions.at(-1)!.id })
 
     expect(run.replaces).toEqual({ id: mappingFailure.id })
-    expect(run.mappingVersion).toEqual(versions.at(-1))
+    expect(run.mappingVersion).toEqual(mappingVersionSummarySchema.parse(versions.at(-1)))
   })
 
   it('rejects with the response status when an action is not allowed', async () => {
@@ -288,7 +289,9 @@ describe('publishMappingDraft', () => {
 
     server.use(...mappingVersionHandlers(apiUrl, { mappings: [changed] }))
 
-    await expect(publishMappingDraft(changed.id)).resolves.toMatchObject({
+    await expect(
+      publishMappingDraft(changed.id, { changeNote: 'Delivery date added', moveFlowIds: [] }),
+    ).resolves.toMatchObject({
       mappingId: changed.id,
       version: changed.latestVersion! + 1,
     })
@@ -297,7 +300,9 @@ describe('publishMappingDraft', () => {
   it('rejects with 409 when the Draft has no changes since its latest version', async () => {
     server.use(...mappingVersionHandlers(apiUrl, { mappings: [unchanged] }))
 
-    await expect(publishMappingDraft(unchanged.id)).rejects.toMatchObject({ status: 409 })
+    await expect(
+      publishMappingDraft(unchanged.id, { changeNote: '', moveFlowIds: [] }),
+    ).rejects.toMatchObject({ status: 409 })
   })
 })
 

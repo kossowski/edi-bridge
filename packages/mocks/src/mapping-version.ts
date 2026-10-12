@@ -16,13 +16,19 @@ import {
   type MappingTransform,
   type MappingVersion,
   mappingVersionEndpoint,
+  type MappingVersionEntry,
+  mappingVersionEntrySchema,
   mappingVersionSchema,
   mappingVersionsEndpoint,
   type MappingVersionSummary,
   type MessageType,
   type OutputDifference,
+  type PinnedFlow,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
+  restoreMappingVersionEndpoint,
+  type Session,
+  type TradingPartner,
   type TransformLink,
   transformIssues,
 } from '@edi-bridge/contracts'
@@ -34,10 +40,15 @@ import {
 } from './document-structure'
 import {
   byNameAndNewest,
+  type FlowRecord,
+  type FlowStore,
   type MappingCatalogue,
   type MappingRecord,
+  seedFlows,
+  toFlowStore,
   toMappingCatalogue,
 } from './flow'
+import { hash } from './hash'
 import {
   type LookupTableRecord,
   type LookupTableStore,
@@ -53,11 +64,28 @@ import {
   seedMappingDrafts,
   sideLeaves,
   structureOf,
+  toMappingDraft,
   toMappingDraftStore,
 } from './mapping'
 import { lookUpIn, previewOutput } from './mapping-preview'
 import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'
-import { aiReviewOpen, badRequest, conflict, notFound, unprocessable } from './responses'
+import {
+  aiReviewOpen,
+  badRequest,
+  conflict,
+  notFound,
+  serverError,
+  unauthorized,
+  unprocessable,
+} from './responses'
+import { seedSession } from './session'
+import { type SessionStore, sessionStoreOf } from './session-access'
+import {
+  seedTradingPartners,
+  type TradingPartnerStore,
+  toTradingPartnerStore,
+} from './trading-partner'
+import { seedWorkspaceMembers } from './workspace-member'
 
 import type { Entry } from './document-values'
 
@@ -65,8 +93,45 @@ function toGraph({ links, transforms, transformLinks }: GraphParts): MappingGrap
   return { links: [...links], transforms: [...transforms], transformLinks: [...transformLinks] }
 }
 
+type VersionHistory = Pick<MappingVersionEntry, 'changeNote' | 'publishedBy'>
+
 export type MappingVersionRecord = MappingVersionSummary &
-  GraphParts & { messageType: MessageType; documentStructureId: string }
+  GraphParts &
+  VersionHistory & {
+    messageType: MessageType
+    documentStructureId: string
+  }
+
+const seedPublishers: ReadonlyArray<VersionHistory['publishedBy']> = [
+  ...seedWorkspaceMembers.values(),
+]
+  .flat()
+  .filter(({ role }) => role === 'admin')
+  .map(({ id, name }) => ({ id, name }))
+
+const seedChangeNotes = [
+  'Despatch number taken from the ERP delivery note',
+  'Unit codes translated with the code translation',
+  'Delivery date added to the header',
+  'GTIN read from the article master instead of the order line',
+  'Buyer and supplier GLNs swapped back',
+  'Free text shortened to 70 characters',
+  'Prices rounded to two decimal places',
+  'Package count added per line',
+] as const
+
+// Versions from before change notes existed carry none.
+const changeNotesSince = Date.parse('2026-04-01T00:00:00.000Z')
+
+function seedHistory({ id, publishedAt }: MappingVersionSummary): VersionHistory {
+  return {
+    changeNote:
+      Date.parse(publishedAt) < changeNotesSince
+        ? null
+        : seedChangeNotes[hash(`change-note:${id}`) % seedChangeNotes.length]!,
+    publishedBy: seedPublishers[hash(`published-by:${id}`) % seedPublishers.length]!,
+  }
+}
 
 type DocumentStructures = ReadonlyArray<DocumentStructure>
 
@@ -123,6 +188,7 @@ export function deriveMappingVersions(draft: MappingDraftRecord): MappingVersion
 
   return summaries.map((summary) => ({
     ...summary,
+    ...seedHistory(summary),
     messageType: draft.messageType,
     documentStructureId: draft.documentStructureId,
     ...stepsBack(draft, latest - summary.version + unpublished),
@@ -197,8 +263,59 @@ export function toMappingVersionSummary({
   mappingName,
   version,
   publishedAt,
-}: MappingVersionRecord): MappingVersionSummary {
+}: MappingVersionSummary): MappingVersionSummary {
   return { id, mappingId, mappingName, version, publishedAt }
+}
+
+function pinnedFlows(
+  flows: ReadonlyArray<FlowRecord> | FlowStore,
+  tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore,
+) {
+  const flowStore = toFlowStore(flows)
+  const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
+  const byVersion = new Map<string, PinnedFlow[]>()
+
+  for (const flow of flowStore.all()) {
+    const tradingPartner = tradingPartnerStore.get(flow.tradingPartnerId)
+
+    if (tradingPartner) {
+      const pinned = byVersion.get(flow.mappingVersionId) ?? []
+      pinned.push({
+        id: flow.id,
+        name: flow.name,
+        tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
+      })
+      byVersion.set(flow.mappingVersionId, pinned)
+    }
+  }
+
+  for (const pinned of byVersion.values()) {
+    pinned.sort(
+      (a, b) =>
+        a.tradingPartner.name.localeCompare(b.tradingPartner.name, 'de') ||
+        a.name.localeCompare(b.name, 'de'),
+    )
+  }
+
+  return (versionId: string) => byVersion.get(versionId) ?? []
+}
+
+export function mappingVersionEntries(
+  flows: ReadonlyArray<FlowRecord> | FlowStore = seedFlows,
+  tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore = seedTradingPartners,
+) {
+  const flowsOf = pinnedFlows(flows, tradingPartners)
+
+  return (version: MappingVersionSummary | MappingVersionRecord): MappingVersionEntry => {
+    const { changeNote, publishedBy } = 'publishedBy' in version ? version : seedHistory(version)
+
+    return mappingVersionEntrySchema.parse({
+      ...toMappingVersionSummary(version),
+      changeNote,
+      publishedBy,
+      flows: flowsOf(version.id),
+    })
+  }
 }
 
 export function toMappingVersion(
@@ -302,6 +419,24 @@ export function outputDifferences(
   })
 }
 
+export type MappingVersionsState = 'loading' | 'error'
+
+function mappingVersionStateHandlers(apiUrl: string, state: MappingVersionsState) {
+  const respond = async () => {
+    if (state === 'loading') {
+      await delay('infinite')
+    }
+
+    return serverError()
+  }
+
+  return [
+    http.get(`${apiUrl}${mappingVersionsEndpoint.path}`, respond),
+    http.post(`${apiUrl}${publishMappingDraftEndpoint.path}`, respond),
+    http.post(`${apiUrl}${restoreMappingVersionEndpoint.path}`, respond),
+  ]
+}
+
 export function mappingVersionHandlers(
   apiUrl: string,
   {
@@ -310,17 +445,31 @@ export function mappingVersionHandlers(
     samples = seedMappingSamples,
     documentStructures = seedDocumentStructures,
     lookupTables = seedLookupTables,
+    flows = seedFlows,
+    tradingPartners = seedTradingPartners,
+    session = seedSession,
   }: {
     mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
-    versions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
+    versions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore | MappingVersionsState
+    flows?: ReadonlyArray<FlowRecord> | FlowStore
+    tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
+    session?: Session | null | SessionStore
     samples?: ReadonlyArray<MappingSampleRecord>
     documentStructures?: DocumentStructures | DocumentStructureStore
     lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore
   } = {},
 ) {
+  if (versions === 'loading' || versions === 'error') {
+    return mappingVersionStateHandlers(apiUrl, versions)
+  }
+
   const store = toMappingDraftStore(mappings)
   const structures = toDocumentStructureStore(documentStructures)
   const lookUp = lookUpIn(toLookupTableStore(lookupTables))
+  const flowStore = toFlowStore(flows)
+  const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
+
+  const sessionStore = sessionStoreOf(session)
 
   const versionStore = toMappingVersionStore(versions ?? createMappingVersions(store.all()))
 
@@ -336,9 +485,15 @@ export function mappingVersionHandlers(
       async ({ params }) => {
         await delay()
 
-        return store.get(params.mappingId)
-          ? HttpResponse.json(versionStore.of(params.mappingId).map(toMappingVersionSummary))
-          : notFound()
+        if (!store.get(params.mappingId)) {
+          return notFound()
+        }
+
+        return HttpResponse.json(
+          versionStore
+            .of(params.mappingId)
+            .map(mappingVersionEntries(flowStore, tradingPartnerStore)),
+        )
       },
     ),
     http.get<{ mappingId: string; versionId: string }>(
@@ -356,13 +511,27 @@ export function mappingVersionHandlers(
     ),
     http.post<{ mappingId: string }>(
       `${apiUrl}${publishMappingDraftEndpoint.path}`,
-      async ({ params }) => {
+      async ({ params, request }) => {
         const draft = store.get(params.mappingId)
+
+        const body = publishMappingDraftEndpoint.body.safeParse(
+          await request.json().catch(() => null),
+        )
 
         await delay()
 
         if (!draft) {
           return notFound()
+        }
+
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
+
+        const publisher = sessionStore.get()?.user
+
+        if (!publisher) {
+          return unauthorized()
         }
 
         if (draft.aiReview) {
@@ -383,6 +552,16 @@ export function mappingVersionHandlers(
           return unprocessable('Every transform is configured and connected before publishing.')
         }
 
+        const moving = body.data.moveFlowIds.map((id) => flowStore.get(id))
+
+        if (
+          moving.some(
+            (flow) => !flow || versionStore.get(flow.mappingVersionId)?.mappingId !== draft.id,
+          )
+        ) {
+          return unprocessable('Only Flows that use this Mapping move to the new version.')
+        }
+
         const record: MappingVersionRecord = {
           id: crypto.randomUUID(),
           mappingId: draft.id,
@@ -391,13 +570,54 @@ export function mappingVersionHandlers(
           publishedAt: new Date().toISOString(),
           messageType: draft.messageType,
           documentStructureId: draft.documentStructureId,
+          changeNote: body.data.changeNote === '' ? null : body.data.changeNote,
+          publishedBy: { id: publisher.id, name: publisher.name },
           ...toGraph(draft),
         }
 
         versionStore.add(record)
         store.set({ ...draft, latestVersion: record.version, unpublishedChanges: false })
 
-        return HttpResponse.json(toMappingVersionSummary(record), { status: 201 })
+        for (const flow of moving) {
+          if (flow) {
+            flowStore.set({ ...flow, mappingVersionId: record.id })
+          }
+        }
+
+        return HttpResponse.json(mappingVersionEntries(flowStore, tradingPartnerStore)(record), {
+          status: 201,
+        })
+      },
+    ),
+    http.post<{ mappingId: string; versionId: string }>(
+      `${apiUrl}${restoreMappingVersionEndpoint.path}`,
+      async ({ params }) => {
+        const draft = store.get(params.mappingId)
+        const version = versionOf(params.mappingId, params.versionId)
+
+        await delay()
+
+        if (!draft || !version) {
+          return notFound()
+        }
+
+        if (draft.aiReview) {
+          return aiReviewOpen()
+        }
+
+        const graph = toGraph(version)
+        const [latest] = versionStore.of(draft.id)
+
+        const record: MappingDraftRecord = {
+          ...draft,
+          ...graph,
+          unpublishedChanges: !latest || mappingDifferences(latest, graph).length > 0,
+          updatedAt: new Date().toISOString(),
+        }
+
+        store.set(record)
+
+        return HttpResponse.json(toMappingDraft(record, structures.all()))
       },
     ),
     http.get<{ mappingId: string }>(

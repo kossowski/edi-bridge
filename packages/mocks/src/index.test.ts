@@ -25,6 +25,7 @@ import {
   mappingSamplesEndpoint,
   mappingsEndpoint,
   mappingVersionsEndpoint,
+  mappingVersionSummarySchema,
   messageTypeStructureEndpoint,
   operatorWorkspacesEndpoint,
   orderLifecycleEndpoint,
@@ -84,6 +85,7 @@ import {
   seedWorkspace,
 } from './index'
 import { day } from './overdue'
+import { publishDraft } from './publish-request'
 
 const apiUrl = 'http://api.test'
 
@@ -255,11 +257,7 @@ describe('createHandlers', () => {
     })
 
     const published = publishMappingDraftEndpoint.response.parse(
-      await (
-        await fetch(`${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId })}`, {
-          method: 'POST',
-        })
-      ).json(),
+      await (await publishDraft(apiUrl, mappingId)).json(),
     )
 
     const offered = publishedMappingVersionsEndpoint.response.parse(
@@ -278,9 +276,11 @@ describe('createHandlers', () => {
       mappingVersionId: published.id,
     })
 
-    expect(offered).toContainEqual(published)
-    expect(flow.newerMappingVersions).toContainEqual(published)
-    expect(replacing.mappingVersion).toEqual(published)
+    const summary = mappingVersionSummarySchema.parse(published)
+
+    expect(offered).toContainEqual(summary)
+    expect(flow.newerMappingVersions).toContainEqual(summary)
+    expect(replacing.mappingVersion).toEqual(summary)
   })
 
   it('opens a Mapping created within the same createHandlers call and shows its publication', async () => {
@@ -305,14 +305,7 @@ describe('createHandlers', () => {
     ).toMatchObject({ mappingId: created.id, latestVersion: null, links: [] })
 
     const published = publishMappingDraftEndpoint.response.parse(
-      await (
-        await fetch(
-          `${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId: created.id })}`,
-          {
-            method: 'POST',
-          },
-        )
-      ).json(),
+      await (await publishDraft(apiUrl, created.id)).json(),
     )
 
     const mappings = mappingsEndpoint.response.parse(

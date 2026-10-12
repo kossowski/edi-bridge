@@ -89,6 +89,7 @@ export const runListQuerySchema = z.object({
   tradingPartnerId: many(z.uuid()),
   messageType: many(messageTypeSchema),
   flowId: many(z.uuid()),
+  mappingId: many(z.uuid()),
   receivedFrom: z.iso.datetime().optional(),
   receivedTo: z.iso.datetime().optional(),
   manualSubmission: z.stringbool().optional(),
