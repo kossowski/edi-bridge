@@ -5,14 +5,14 @@ import { Suspense } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { DocumentsInbox } from '@/components/documents/documents-inbox'
-import { ManualSubmissionDialog } from '@/components/manual-submission/manual-submission-dialog'
+import { ManualSubmissionSheet } from '@/components/documents/manual-submission-sheet'
 
 export function DocumentsScreen() {
   const t = useTranslations('Sidebar.items')
 
   return (
     <AppPage
-      changeActions={<ManualSubmissionDialog />}
+      changeActions={<ManualSubmissionSheet />}
       title={t('documents.label')}
       className="gap-4">
       <Suspense>

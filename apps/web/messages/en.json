@@ -2459,52 +2459,54 @@
     }
   },
   "ManualSubmission": {
-    "open": "Submit a Document",
-    "title": "Manual Submission",
-    "description": "Hand over a Document as if it had arrived on an inbound Channel. EDI Bridge processes it like Channel traffic and marks its Runs as manual.",
+    "open": "Upload a document",
+    "title": "Upload a document",
+    "description": "Hand in a document yourself, for example one a partner sent by email. EDI Bridge processes it as if it had arrived on the connection you choose and marks it as uploaded by hand.",
     "close": "Close",
     "cancel": "Cancel",
-    "submit": "Submit Document",
-    "submitting": "Submitting Document…",
+    "submit": "Upload",
+    "submitting": "Uploading…",
+    "retry": "Try again",
+    "newFlow": "Set up a document route",
     "channel": {
-      "label": "Inbound Channel",
-      "description": "The Document is processed as if it had arrived on this Channel.",
-      "placeholder": "Choose an inbound Channel",
-      "loading": "Loading Channels…",
-      "error": "The Channels could not be loaded.",
-      "retry": "Try again",
+      "label": "Where does the document come from?",
+      "description": "Choose the incoming connection the document would normally arrive on.",
+      "placeholder": "Choose a connection",
+      "loading": "Loading connections…",
+      "detail": "{kind} · {tradingPartner}",
+      "error": "The connections could not be loaded.",
       "empty": {
-        "title": "No inbound Channel yet",
-        "description": "A Manual Submission needs an inbound Channel. Create one first.",
-        "action": "New Channel"
+        "title": "No incoming connection yet",
+        "description": "An upload needs a connection that documents arrive on. Set one up first.",
+        "action": "Set up a connection"
       }
     },
-    "document": {
-      "label": "Document",
-      "description": "An EDIFACT Interchange from a Trading Partner, or a JSON or CSV Document from your own systems.",
-      "drop": "Drop the file here or choose it."
+    "file": {
+      "label": "File",
+      "description": "An EDI file from a partner, or a JSON or CSV file from your own systems. At most 5 million characters.",
+      "drop": "Drop the file here or choose it.",
+      "chosen": "Chosen: {fileName}"
     },
     "errors": {
-      "channelRequired": "Choose an inbound Channel.",
-      "document": {
+      "channelRequired": "Choose where the document comes from.",
+      "file": {
         "required": "Choose a file.",
-        "empty": "The Document is empty.",
-        "tooLarge": "The Document is too large. A Document can have at most 5 million characters."
+        "empty": "The file is empty.",
+        "tooLarge": "The file is too large. A file can have at most 5 million characters."
       },
-      "unroutable": "No Flow on this Channel routes the Messages of this Document. Create a Flow for their Message Type first.",
-      "failed": "The Document could not be submitted. Try again."
+      "unroutable": "No document route on this connection handles the documents in this file. Set up a document route for them first.",
+      "failed": "The file could not be uploaded. Try again."
     },
     "result": {
-      "title": "{count, plural, one {# Run created} other {# Runs created}}",
-      "description": "{fileName} was submitted on {channel}.",
-      "run": "{messageType} from {tradingPartner} · {flow}",
-      "open": "Open Run",
-      "openContext": "{messageType} from {tradingPartner}",
-      "another": "Submit another Document",
+      "title": "{count, plural, one {# document created} other {# documents created}}",
+      "description": "{fileName} was processed as if it had arrived on {channel}.",
+      "list": "Created documents",
+      "open": "Open it",
+      "another": "Upload another file",
       "done": "Done",
       "notRouted": {
-        "title": "{count, plural, one {# Message not routed} other {# Messages not routed}}",
-        "description": "No Flow on {channel} routes these Message Types, so EDI Bridge created no Run for them. Create a Flow for the Message Type to process such Messages."
+        "title": "{count, plural, one {# part of the file was not processed} other {# parts of the file were not processed}}",
+        "description": "No document route on {channel} handles these document types, so EDI Bridge created no document for them."
       }
     }
   },

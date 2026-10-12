@@ -4,15 +4,19 @@
 
 **Blocked by:** 57 (Help & glossary page and plain names)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Rows show the listed facts; "Needs attention" rows have no red background, other red accents stay; status is readable without colour
-- [ ] Status filters, search, partner and document-type filters combine and can be cleared; the chosen status and view are kept in the URL (`?status=`, `?view=transmissions`)
-- [ ] The Transmissions view lists each file with its control reference, direction, partner and contained documents
-- [ ] The upload sheet replaces the Manual Submission dialog: pick where the document comes from, add the file, see the result and open it
-- [ ] The list stays responsive with 10,000+ documents and is fully keyboard-operable
-- [ ] Empty states distinguish "nothing matches", "nothing needs attention" and "no documents yet"
-- [ ] `/runs`, `/interchanges/[id]` and the Manual Submission dialog are removed with their stories, or their stories move to the new screen; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Rows show the listed facts; "Needs attention" rows have no red background, other red accents stay; status is readable without colour
+- [x] Status filters, search, partner and document-type filters combine and can be cleared; the chosen status and view are kept in the URL (`?status=`, `?view=transmissions`)
+- [x] The Transmissions view lists each file with its control reference, direction, partner and contained documents
+- [x] The upload sheet replaces the Manual Submission dialog: pick where the document comes from, add the file, see the result and open it
+- [x] The list stays responsive with 10,000+ documents and is fully keyboard-operable
+- [x] Empty states distinguish "nothing matches", "nothing needs attention" and "no documents yet"
+- [x] `/runs`, `/interchanges/[id]` and the Manual Submission dialog are removed with their stories, or their stories move to the new screen; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #91, #96, #101, #103.

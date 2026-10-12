@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { whoFixes, type Fixer } from '@/components/documents/who-fixes'
 import { usePlainNames } from '@/components/plain-names'
 import { RunStatusBadge } from '@/components/runs/run-status'
+import { useRunTitle } from '@/components/runs/run-title'
 import { navigationItems, runHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
@@ -38,21 +39,6 @@ const fixerIcons: Record<Fixer, IconSvgElement> = {
 
 function orderHref(businessReference: string) {
   return `${navigationItems.orderLifecycle.href}?${new URLSearchParams({ businessReference })}`
-}
-
-function useRunTitle(run: RunSummary) {
-  const t = useTranslations('Documents.row')
-  const plainNames = usePlainNames()
-
-  const values = {
-    direction: run.direction,
-    messageType: plainNames.messageTypeName(run.messageType),
-    tradingPartner: run.tradingPartner.name,
-  }
-
-  return run.businessReference === null
-    ? t('titleWithoutReference', values)
-    : t('title', { ...values, reference: run.businessReference })
 }
 
 function FixerBadge({ fixer }: { fixer: Fixer }) {
