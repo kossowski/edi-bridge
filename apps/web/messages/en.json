@@ -52,6 +52,10 @@
         "label": "Home",
         "hint": "Key numbers, charts and your partners"
       },
+      "tasks": {
+        "label": "Tasks",
+        "hint": "Everything that needs someone, grouped by who acts"
+      },
       "documents": {
         "label": "Documents",
         "hint": "Every document received or sent"
@@ -127,6 +131,7 @@
   },
   "Navigation": {
     "overview": "Overview",
+    "tasks": "Tasks",
     "documents": "Documents",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
@@ -295,6 +300,54 @@
       "title": "Overview unavailable",
       "description": "The Overview could not be loaded. Try again.",
       "retry": "Try again"
+    }
+  },
+  "Tasks": {
+    "intro": "Everything that needs someone right now, grouped by who acts. Each entry has one button that takes you to the fix.",
+    "loading": "Loading tasks",
+    "error": {
+      "title": "Tasks unavailable",
+      "description": "The tasks could not be loaded. Try again in a moment.",
+      "retry": "Try again"
+    },
+    "empty": {
+      "title": "Nothing needs you",
+      "description": "Every document went through and no partner is waiting for you.",
+      "home": "Back to home"
+    },
+    "groups": {
+      "you": {
+        "title": "For you to fix",
+        "badge": "You fix this"
+      },
+      "retry": {
+        "title": "Try again",
+        "badge": "Try again"
+      },
+      "partner": {
+        "title": "Waiting for a partner",
+        "badge": "Your partner fixes this"
+      }
+    },
+    "showAll": "{count, plural, one {Show the # task} other {Show all # tasks}}",
+    "showNewest": "Show the newest {count}",
+    "failedRun": {
+      "detail": "{direction, select, inbound {{messageType} from {partner}} other {{messageType} to {partner}}}",
+      "action": {
+        "you": "Fix it",
+        "retry": "Try again",
+        "partner": "See details"
+      }
+    },
+    "overdueAcknowledgement": {
+      "title": "{partner} has not confirmed receipt",
+      "detail": "{messageType} {controlReference}: the <term>receipt confirmation</term> was due within {hours, plural, one {# hour} other {# hours}}",
+      "action": "Open transmission"
+    },
+    "failingTradingPartner": {
+      "title": "Many documents with {partner} fail",
+      "detail": "{failed} of {total} documents failed in the last 24 hours",
+      "action": "Open partner"
     }
   },
   "PlainNames": {

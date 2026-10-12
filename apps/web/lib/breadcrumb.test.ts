@@ -19,6 +19,12 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
+  it('names the tasks page', () => {
+    expect(breadcrumbTrail('/tasks')).toEqual([
+      { href: '/tasks', label: { kind: 'item', key: 'tasks' } },
+    ])
+  })
+
   it('adds a detail crumb and the subpages below it', () => {
     expect(breadcrumbTrail('/flows/fl-1/edit')).toEqual([
       { href: '/flows', label: { kind: 'item', key: 'allDocumentRoutes' } },

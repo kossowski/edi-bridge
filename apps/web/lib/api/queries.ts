@@ -42,6 +42,7 @@ import {
   getOverview,
   getRun,
   getSession,
+  getTasks,
   getTradingPartner,
   getTradingPartnerActivity,
   getWorkspaceSettings,
@@ -189,6 +190,15 @@ export function overviewQuery(window: OverviewWindow) {
     placeholderData: keepPreviousData,
   })
 }
+
+export const taskKeys = {
+  all: () => ['tasks'] as const,
+}
+
+export const tasksQuery = queryOptions({
+  queryKey: taskKeys.all(),
+  queryFn: getTasks,
+})
 
 export const orderLifecycleKeys = {
   all: () => ['order-lifecycles'] as const,

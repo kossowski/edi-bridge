@@ -52,6 +52,10 @@
         "label": "Start",
         "hint": "Kennzahlen, Diagramme und Ihre Handelspartner"
       },
+      "tasks": {
+        "label": "Aufgaben",
+        "hint": "Alles, was jemanden braucht, nach Zuständigkeit gruppiert"
+      },
       "documents": {
         "label": "Belege",
         "hint": "Alle empfangenen und gesendeten Belege"
@@ -127,6 +131,7 @@
   },
   "Navigation": {
     "overview": "Übersicht",
+    "tasks": "Aufgaben",
     "documents": "Belege",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
@@ -295,6 +300,54 @@
       "title": "Übersicht nicht verfügbar",
       "description": "Die Übersicht konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
+    }
+  },
+  "Tasks": {
+    "intro": "Alles, was gerade jemanden braucht, gruppiert danach, wer handelt. Jeder Eintrag hat einen Knopf, der Sie zur Lösung führt.",
+    "loading": "Aufgaben werden geladen",
+    "error": {
+      "title": "Aufgaben nicht verfügbar",
+      "description": "Die Aufgaben konnten nicht geladen werden. Versuchen Sie es gleich noch einmal.",
+      "retry": "Erneut versuchen"
+    },
+    "empty": {
+      "title": "Nichts braucht Sie",
+      "description": "Jeder Beleg ist durchgelaufen und kein Handelspartner wartet auf Sie.",
+      "home": "Zurück zum Start"
+    },
+    "groups": {
+      "you": {
+        "title": "Von Ihnen zu beheben",
+        "badge": "Sie beheben das"
+      },
+      "retry": {
+        "title": "Erneut versuchen",
+        "badge": "Erneut versuchen"
+      },
+      "partner": {
+        "title": "Wartet auf einen Handelspartner",
+        "badge": "Ihr Handelspartner behebt das"
+      }
+    },
+    "showAll": "{count, plural, one {Die # Aufgabe zeigen} other {Alle # Aufgaben zeigen}}",
+    "showNewest": "Die neuesten {count} zeigen",
+    "failedRun": {
+      "detail": "{direction, select, inbound {{messageType} von {partner}} other {{messageType} an {partner}}}",
+      "action": {
+        "you": "Beheben",
+        "retry": "Erneut versuchen",
+        "partner": "Details ansehen"
+      }
+    },
+    "overdueAcknowledgement": {
+      "title": "{partner} hat den Empfang nicht bestätigt",
+      "detail": "{messageType} {controlReference}: die <term>Empfangsbestätigung</term> war innerhalb von {hours, plural, one {# Stunde} other {# Stunden}} fällig",
+      "action": "Übertragung öffnen"
+    },
+    "failingTradingPartner": {
+      "title": "Viele Belege mit {partner} schlagen fehl",
+      "detail": "{failed} von {total} Belegen sind in den letzten 24 Stunden fehlgeschlagen",
+      "action": "Handelspartner öffnen"
     }
   },
   "PlainNames": {

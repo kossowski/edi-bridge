@@ -10,6 +10,7 @@ import {
   Settings02Icon,
   ShoppingBasket01Icon,
   Table01Icon,
+  Task01Icon,
   UserMultiple02Icon,
   UserShield01Icon,
   WorkflowSquare03Icon,
@@ -37,6 +38,7 @@ export const appIcon = ArrowDataTransferHorizontalIcon
 
 export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = {
   overview: { href: '/', icon: DashboardSquare01Icon },
+  tasks: { href: '/tasks', icon: Task01Icon },
   documents: { href: '/documents', icon: File02Icon },
   orderLifecycle: { href: '/order-lifecycle', icon: Route01Icon },
   tradingPartners: { href: '/trading-partners', icon: UserMultiple02Icon },
@@ -94,6 +96,7 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
     collapsible: false,
     items: [
       { key: 'home', page: 'overview' },
+      { key: 'tasks', page: 'tasks' },
       { key: 'documents', page: 'documents' },
       { key: 'orders', page: 'orderLifecycle', icon: ShoppingBasket01Icon },
     ],
