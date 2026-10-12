@@ -15,14 +15,9 @@ import {
 
 import { seedFlows } from './flow'
 import { hash } from './hash'
-import {
-  controlReferenceOf,
-  createRunStore,
-  hasInterchange,
-  interchangeIdOf,
-  type RunStore,
-  toRunStore,
-} from './run-store'
+import { includesText, pageOf } from './list'
+import { badRequest } from './responses'
+import { createRunStore, type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
 export type RunFields = Pick<
@@ -37,29 +32,22 @@ export type RunFields = Pick<
   | 'failureStage'
 > & { businessReference?: string | null }
 
-// A CONTRL acknowledges a whole Interchange, so it carries no order number.
+// A CONTRL acknowledges a whole Interchange, so it carries no Business Reference.
 function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messageType'>) {
   return messageType === 'CONTRL'
     ? null
     : `PO${String(hash(`business-reference:${id}`) % 1_000_000).padStart(6, '0')}`
 }
 
+// The Run Store places each Run in its Interchange.
 export function toRunSummary(run: RunFields): RunSummary {
-  const summary = runSummarySchema.parse({
+  return runSummarySchema.parse({
     ...run,
     direction: directionOf(run),
     businessReference:
       run.businessReference === undefined ? businessReferenceOf(run) : run.businessReference,
     interchange: null,
   })
-
-  if (!hasInterchange(summary)) {
-    return summary
-  }
-
-  const id = interchangeIdOf(summary)
-
-  return { ...summary, interchange: { id, controlReference: controlReferenceOf(id) } }
 }
 
 export function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
@@ -163,10 +151,6 @@ export function seedRuns() {
   return seedRunsCache
 }
 
-export function includesText(value: string | null, text: string) {
-  return value !== null && value.toLowerCase().includes(text)
-}
-
 function matchesExceptStatus(run: RunSummary, query: RunListQuery, text: string) {
   const receivedAt = Date.parse(run.receivedAt)
 
@@ -192,11 +176,11 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | R
     const query = runsEndpoint.query.safeParse(fromSearchParams(new URL(request.url).searchParams))
 
     if (!query.success) {
-      return HttpResponse.json({ message: query.error.message }, { status: 400 })
+      return badRequest(query.error.message)
     }
 
     store ??= toRunStore(runs ?? seedRuns())
-    const { page, pageSize, status } = query.data
+    const { status } = query.data
     const text = query.data.q?.toLowerCase() ?? ''
 
     const statusCounts: Record<RunStatus, number> = {
@@ -221,12 +205,8 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | R
       }
     }
 
-    return HttpResponse.json({
-      runs: filtered.slice((page - 1) * pageSize, page * pageSize),
-      total: filtered.length,
-      statusCounts,
-      page,
-      pageSize,
-    })
+    const { items, ...paging } = pageOf(filtered, query.data)
+
+    return HttpResponse.json({ runs: items, statusCounts, ...paging })
   })
 }

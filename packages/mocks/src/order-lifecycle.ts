@@ -19,7 +19,7 @@ import { seedFlows } from './flow'
 import { hour, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
 import { toRunSummary } from './run'
-import { controlReferenceOf, interchangeIdOf, type Reprocessed } from './run-store'
+import { createRunStore, type Reprocessed } from './run-store'
 import { stableUuid } from './seed-id'
 import { seedTradingPartners } from './trading-partner'
 
@@ -173,31 +173,32 @@ function interchangeOf(
   tradingPartner: TradingPartner,
   now: Date,
 ): OrderLifecycleInterchange | null {
-  const outbound = directionOf(run) === 'outbound'
-
-  if (outbound && run.failureStage === 'mapping') {
+  if (run.interchange === null) {
     return null
   }
 
-  const id = interchangeIdOf(run)
-  const sent = outbound && run.status === 'delivered'
-
+  const sent = directionOf(run) === 'outbound' && run.status === 'delivered'
   const overdueSince = overdueSinceOf(run.receivedAt, tradingPartner)
 
   return {
-    id,
-    controlReference: controlReferenceOf(id),
+    ...run.interchange,
     acknowledgement: sent
       ? (acknowledgement ?? (overdueSince <= now.getTime() ? 'overdue' : 'pending'))
       : null,
   }
 }
 
+type MessageEntry = {
+  runId: string
+  acknowledgement: AcknowledgementOutcome | undefined
+  replacedBy: RunSummary | null
+}
+
 export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
   const runs: RunSummary[] = []
   const reprocessed: Reprocessed[] = []
 
-  const orderLifecycles = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
+  const seeded = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
     const tradingPartner = seedTradingPartners.find(({ name }) => name === seed.tradingPartner)!
     const tradingPartnerSummary = { id: tradingPartner.id, name: tradingPartner.name }
 
@@ -231,29 +232,11 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
       return run
     }
 
-    const toMessage = (
-      run: RunSummary,
-      acknowledgement: AcknowledgementOutcome | undefined,
-      replacedBy: RunSummary | null = null,
-    ) =>
-      orderLifecycleMessageSchema.parse({
-        messageType: run.messageType,
-        direction: directionOf(run),
-        receivedAt: run.receivedAt,
-        run: {
-          id: run.id,
-          status: run.status,
-          failureStage: run.failureStage,
-          replacedBy: replacedBy && { id: replacedBy.id },
-        },
-        interchange: interchangeOf(run, acknowledgement, tradingPartner, now),
-      })
-
-    const entries = messages.flatMap((message, index) => {
+    const entries = messages.flatMap((message, index): MessageEntry[] => {
       const run = toRun(String(index), message)
 
       if (!message.reprocessed) {
-        return [toMessage(run, message.acknowledgement)]
+        return [{ runId: run.id, acknowledgement: message.acknowledgement, replacedBy: null }]
       }
 
       const replacing = toRun(`${index}:reprocessed`, {
@@ -265,15 +248,44 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
       reprocessed.push({ replaced: run.id, replacing: replacing.id })
 
       return [
-        toMessage(run, undefined, replacing),
-        toMessage(replacing, message.reprocessed.acknowledgement),
+        { runId: run.id, acknowledgement: undefined, replacedBy: replacing },
+        {
+          runId: replacing.id,
+          acknowledgement: message.reprocessed.acknowledgement,
+          replacedBy: null,
+        },
       ]
     })
 
+    return { businessReference, tradingPartner, entries }
+  })
+
+  const store = createRunStore(runs, reprocessed)
+
+  const orderLifecycles = seeded.map(({ businessReference, tradingPartner, entries }) => {
+    const toMessage = ({ runId, acknowledgement, replacedBy }: MessageEntry) => {
+      const run = store.get(runId)!
+
+      return orderLifecycleMessageSchema.parse({
+        messageType: run.messageType,
+        direction: directionOf(run),
+        receivedAt: run.receivedAt,
+        run: {
+          id: run.id,
+          status: run.status,
+          failureStage: run.failureStage,
+          replacedBy: replacedBy && { id: replacedBy.id },
+        },
+        interchange: interchangeOf(run, acknowledgement, tradingPartner, now),
+      })
+    }
+
     return orderLifecycleSchema.parse({
       businessReference,
-      tradingPartner: tradingPartnerSummary,
-      messages: entries.toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
+      tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
+      messages: entries
+        .map(toMessage)
+        .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
     })
   })
 

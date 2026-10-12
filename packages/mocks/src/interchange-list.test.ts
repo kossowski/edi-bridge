@@ -119,7 +119,7 @@ describe('GET /interchanges', () => {
     expect(body?.interchanges[0]?.runs.map(({ id }) => id)).toEqual([first.id, second.id])
   })
 
-  it('searches the control reference, the Trading Partner and the order number, ignoring case', async () => {
+  it('searches the control reference, the Trading Partner and the Business Reference, ignoring case', async () => {
     const order = inboundOrders(
       '00000000-0000-4000-8000-000000000001',
       '2026-10-01T08:00:00.000Z',
@@ -136,14 +136,15 @@ describe('GET /interchanges', () => {
       },
     )
 
-    server.use(interchangesHandler(apiUrl, [order, other]))
+    const runs = createRunStore([order, other])
+    server.use(interchangesHandler(apiUrl, runs))
 
     const idsFor = async (q: string) =>
       (await listInterchanges({ q })).body?.interchanges.map(({ runs }) => runs[0]!.id)
 
     expect(await idsFor('po-47')).toEqual([order.id])
     expect(await idsFor('KAUFHOF')).toEqual([other.id])
-    expect(await idsFor(other.interchange!.controlReference)).toEqual([other.id])
+    expect(await idsFor(runs.get(other.id)!.interchange!.controlReference)).toEqual([other.id])
     expect(await idsFor('  ')).toEqual([other.id, order.id])
   })
 

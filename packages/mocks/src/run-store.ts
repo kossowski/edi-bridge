@@ -6,21 +6,23 @@ import { stableUuid } from './seed-id'
 
 export type Reprocessed = { replaced: string; replacing: string }
 
-export type InterchangeMember = { runId: string; run: RunSummary }
+export type MessageOwner = { runId: string; run: RunSummary }
 
+// An inbound replacing Run reprocesses the Message of the Run it replaced, so it is among the
+// allRunIds of the group but owns no Message.
 export type RunGroup = {
   id: string
   controlReference: string
-  hasInterchange: boolean
-  members: InterchangeMember[]
-  runIds: string[]
+  formsInterchange: boolean
+  messageOwners: MessageOwner[]
+  allRunIds: string[]
 }
 
 export type RunStore = {
   all: () => readonly RunSummary[]
   newestFirst: () => readonly RunSummary[]
   get: (id: string) => RunSummary | undefined
-  set: (run: RunSummary) => void
+  set: (...runs: RunSummary[]) => RunSummary[]
   reprocess: (link: Reprocessed) => void
   replacedOf: (id: string) => string | undefined
   replacingOf: (id: string) => string | undefined
@@ -47,7 +49,7 @@ export function bundleKeyOf(
     : run.id
 }
 
-export function hasInterchange(firstRun: Parameters<typeof statusOf>[0]) {
+function hasInterchange(firstRun: Parameters<typeof statusOf>[0]) {
   return directionOf(firstRun) === 'inbound' || statusOf(firstRun, 'mapping') === 'succeeded'
 }
 
@@ -80,17 +82,17 @@ function place(runs: ReadonlyArray<RunSummary>, replaces: ReadonlyMap<string, st
     const group = bundles.get(key) ?? {
       id,
       controlReference: controlReferenceOf(id),
-      hasInterchange: false,
-      members: [],
-      runIds: [],
+      formsInterchange: false,
+      messageOwners: [],
+      allRunIds: [],
     }
 
     // An outbound replacing Run maps the same ERP Document again, into its own Interchange.
-    group.members.push({
+    group.messageOwners.push({
       runId: run.id,
       run: replaced ? { ...replaced, status: 'delivered', failureStage: null } : run,
     })
-    group.runIds.push(run.id)
+    group.allRunIds.push(run.id)
     bundles.set(key, group)
     groups.set(group.id, group)
     groupOf.set(run.id, group)
@@ -100,13 +102,13 @@ function place(runs: ReadonlyArray<RunSummary>, replaces: ReadonlyMap<string, st
     const group = groupOf.get(replaced.id)
 
     if (group) {
-      group.runIds.push(run.id)
+      group.allRunIds.push(run.id)
       groupOf.set(run.id, group)
     }
   }
 
   for (const group of groups.values()) {
-    group.hasInterchange = hasInterchange(group.members[0]!.run)
+    group.formsInterchange = hasInterchange(group.messageOwners[0]!.run)
   }
 
   const placed = runs.map((run): RunSummary => {
@@ -116,7 +118,7 @@ function place(runs: ReadonlyArray<RunSummary>, replaces: ReadonlyMap<string, st
     return {
       ...run,
       businessReference: replaced ? replaced.businessReference : run.businessReference,
-      interchange: group?.hasInterchange
+      interchange: group?.formsInterchange
         ? { id: group.id, controlReference: group.controlReference }
         : null,
     }
@@ -151,9 +153,14 @@ export function createRunStore(
         (a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt),
       )),
     get: (id) => placed().byId.get(id),
-    set: (run) => {
-      byId.set(run.id, run)
+    set: (...changed) => {
+      for (const run of changed) {
+        byId.set(run.id, run)
+      }
+
       invalidate()
+
+      return changed.map((run) => placed().byId.get(run.id)!)
     },
     reprocess: ({ replaced, replacing }) => {
       if (replaces.get(replacing) === replaced) {
@@ -176,13 +183,5 @@ export function toRunStore(
   runs: ReadonlyArray<RunSummary> | RunStore,
   reprocessed: ReadonlyArray<Reprocessed> = [],
 ) {
-  if (!('newestFirst' in runs)) {
-    return createRunStore(runs, reprocessed)
-  }
-
-  for (const link of reprocessed) {
-    runs.reprocess(link)
-  }
-
-  return runs
+  return 'newestFirst' in runs ? runs : createRunStore(runs, reprocessed)
 }

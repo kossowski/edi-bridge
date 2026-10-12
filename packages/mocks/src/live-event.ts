@@ -57,19 +57,14 @@ export function liveEventsHandler(
   let connections = 0
 
   function applyNextChanges(): RunSummary[] {
-    const current = (store ??= toRunStore(runs ?? seedRuns()))
+    store ??= toRunStore(runs ?? seedRuns())
 
     const finishing = inFlight.shift()
-    const pending = finishing === undefined ? undefined : current.get(finishing)
+    const pending = finishing === undefined ? undefined : store.get(finishing)
     const received = receive(faker)
     inFlight.push(received.id)
-    const changes = [...(pending ? [finish(faker, pending)] : []), received]
 
-    for (const run of changes) {
-      current.set(run)
-    }
-
-    return changes.map((run) => current.get(run.id) ?? run)
+    return store.set(...(pending ? [finish(faker, pending)] : []), received)
   }
 
   return http.get(path, async ({ request }) => {

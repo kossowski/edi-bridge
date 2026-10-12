@@ -9,11 +9,13 @@ import {
   type RunSummary,
 } from '@edi-bridge/contracts'
 
-import { includesText, seedRuns } from './run'
+import { includesText, pageOf } from './list'
+import { badRequest } from './responses'
+import { seedRuns } from './run'
 import { type RunGroup, type RunStore, toRunStore } from './run-store'
 
 function toInterchangeSummary(group: RunGroup, store: RunStore): InterchangeSummary {
-  const first = group.members[0]!.run
+  const first = group.messageOwners[0]!.run
 
   return {
     id: group.id,
@@ -21,7 +23,7 @@ function toInterchangeSummary(group: RunGroup, store: RunStore): InterchangeSumm
     direction: directionOf(first),
     tradingPartner: first.tradingPartner,
     preparedAt: first.receivedAt,
-    runs: group.runIds.map((runId) => store.get(runId)!),
+    runs: group.allRunIds.map((runId) => store.get(runId)!),
   }
 }
 
@@ -49,7 +51,7 @@ export function interchangesHandler(apiUrl: string, runs?: ReadonlyArray<RunSumm
     if (groups !== current.groups()) {
       groups = current.groups()
       newestFirst = groups
-        .flatMap((group) => (group.hasInterchange ? [toInterchangeSummary(group, current)] : []))
+        .flatMap((group) => (group.formsInterchange ? [toInterchangeSummary(group, current)] : []))
         .sort((a, b) => Date.parse(b.preparedAt) - Date.parse(a.preparedAt))
     }
 
@@ -62,18 +64,14 @@ export function interchangesHandler(apiUrl: string, runs?: ReadonlyArray<RunSumm
     )
 
     if (!query.success) {
-      return HttpResponse.json({ message: query.error.message }, { status: 400 })
+      return badRequest(query.error.message)
     }
 
-    const { page, pageSize } = query.data
     const text = query.data.q?.toLowerCase() ?? ''
     const filtered = interchanges().filter((interchange) => matches(interchange, query.data, text))
 
-    return HttpResponse.json({
-      interchanges: filtered.slice((page - 1) * pageSize, page * pageSize),
-      total: filtered.length,
-      page,
-      pageSize,
-    })
+    const { items, ...paging } = pageOf(filtered, query.data)
+
+    return HttpResponse.json({ interchanges: items, ...paging })
   })
 }

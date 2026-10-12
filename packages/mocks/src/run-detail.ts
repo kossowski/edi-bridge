@@ -39,8 +39,6 @@ import {
 } from './run-store'
 import { seededFaker } from './seeded-faker'
 
-export { controlReferenceOf, interchangeIdOf, type Reprocessed } from './run-store'
-
 const stepDurations: Readonly<Record<RunStepStage, readonly [number, number]>> = {
   receipt: [20, 200],
   parse: [5, 80],
@@ -90,11 +88,11 @@ type GeneratedGroup = {
   interchange: (GeneratedInterchange & { controlReference: string }) | null
 }
 
-export type RunDetailOptions = {
-  runs?: ReadonlyArray<RunSummary> | RunStore
-  reprocessed?: ReadonlyArray<Reprocessed>
-  mappingVersions?: MappingVersionStore
-}
+// A Run Store already holds its reprocessing links.
+export type RunDetailOptions = (
+  | { runs?: ReadonlyArray<RunSummary>; reprocessed?: ReadonlyArray<Reprocessed> }
+  | { runs: RunStore; reprocessed?: never }
+) & { mappingVersions?: MappingVersionStore }
 
 export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): Reprocessed[] {
   const bundleSizes = Map.groupBy(runs, bundleKeyOf)
@@ -142,10 +140,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       return cached
     }
 
-    const first = group.members[0]!.run
+    const first = group.messageOwners[0]!.run
 
     const messages = new Map(
-      group.members.map(({ runId, run }, position) => [
+      group.messageOwners.map(({ runId, run }, position) => [
         runId,
         generateMessage(run, String(position + 1)),
       ]),
@@ -153,14 +151,14 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
     const result: GeneratedGroup = {
       messages,
-      interchange: group.hasInterchange
+      interchange: group.formsInterchange
         ? {
             controlReference: group.controlReference,
             ...serializeInterchange({
               controlReference: group.controlReference,
               parties: partiesOf(first),
               preparedAt: first.receivedAt,
-              messages: group.members.map(({ runId }) => ({
+              messages: group.messageOwners.map(({ runId }) => ({
                 runId,
                 message: messages.get(runId)!,
               })),
@@ -176,7 +174,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
   // An inbound replacing Run reprocesses the Message of the Run it replaced.
   function messageOwnerOf(group: RunGroup, runId: string) {
-    return group.members.some((member) => member.runId === runId)
+    return group.messageOwners.some((owner) => owner.runId === runId)
       ? runId
       : runs().replacedOf(runId)!
   }
@@ -264,8 +262,8 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     })
 
     chosenVersions.set(replacing.id, version)
-    runs().set(replacing)
     runs().reprocess({ replaced: replaced.id, replacing: replacing.id })
+    runs().set(replacing)
 
     return detail(replacing.id)!
   }
@@ -279,7 +277,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       return undefined
     }
 
-    const first = group.members[0]!.run
+    const first = group.messageOwners[0]!.run
 
     return interchangeSchema.parse({
       id: group.id,
@@ -287,7 +285,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       direction: directionOf(first),
       ...partiesOf(first),
       raw: generatedInterchange.raw,
-      runs: group.runIds.map((runId) => ({
+      runs: group.allRunIds.map((runId) => ({
         ...runSummarySchema.parse(detail(runId)),
         messageReference: generatedGroup.messages.get(messageOwnerOf(group, runId))!.reference,
       })),

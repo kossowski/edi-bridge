@@ -1,11 +1,6 @@
 import { http, HttpResponse } from 'msw'
 
-import {
-  directionOf,
-  type RunSummary,
-  submitDocumentEndpoint,
-  type TradingPartner,
-} from '@edi-bridge/contracts'
+import { directionOf, submitDocumentEndpoint, type TradingPartner } from '@edi-bridge/contracts'
 
 import { type ChannelRecord, type ChannelStore, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, toFlowStore } from './flow'
@@ -111,41 +106,34 @@ export function manualSubmissionHandler(
       return unprocessable('No Flow on this Channel routes a Message of this Document')
     }
 
-    const outcomes = routedOutcomes.map((outcome) => ({
-      ...outcome,
-      tradingPartner: tradingPartners.find(({ id }) => id === outcome.flow.tradingPartnerId),
-    }))
+    const outcomes = routedOutcomes.flatMap((outcome) => {
+      const tradingPartner = tradingPartners.find(({ id }) => id === outcome.flow.tradingPartnerId)
 
-    if (outcomes.some(({ tradingPartner }) => !tradingPartner)) {
+      return tradingPartner ? [{ ...outcome, tradingPartner }] : []
+    })
+
+    if (outcomes.length < routedOutcomes.length) {
       return unprocessable('The Trading Partner of the Flow does not exist')
     }
 
     const receivedAt = new Date().toISOString()
 
-    const created: RunSummary[] = outcomes.flatMap(({ flow, failed, tradingPartner }) =>
-      tradingPartner
-        ? [
-            toRunSummary({
-              id: crypto.randomUUID(),
-              receivedAt,
-              tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
-              messageType: flow.messageType,
-              flow: { id: flow.id, name: flow.name },
-              manualSubmission: true,
-              status: failed ? 'failed' : 'delivered',
-              failureStage: failed ? 'parse' : null,
-            }),
-          ]
-        : [],
+    const created = runs.set(
+      ...outcomes.map(({ flow, failed, tradingPartner }) =>
+        toRunSummary({
+          id: crypto.randomUUID(),
+          receivedAt,
+          tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
+          messageType: flow.messageType,
+          flow: { id: flow.id, name: flow.name },
+          manualSubmission: true,
+          status: failed ? 'failed' : 'delivered',
+          failureStage: failed ? 'parse' : null,
+        }),
+      ),
     )
 
-    for (const run of created) {
-      runs.set(run)
-    }
-
-    const placed = created.map((run) => runs.get(run.id) ?? run)
-
-    return HttpResponse.json(submitDocumentEndpoint.response.parse({ runs: placed, notRouted }), {
+    return HttpResponse.json(submitDocumentEndpoint.response.parse({ runs: created, notRouted }), {
       status: 201,
     })
   })
