@@ -327,6 +327,9 @@ export function createHandlers(
       ...workspace,
       kind: 'standard',
       memberCount: 1,
+      pendingInviteCount: 0,
+      documentsToday: 0,
+      lastActivityAt: null,
       seeded: false,
       createdAt: new Date().toISOString(),
       lastResetAt: null,
@@ -369,7 +372,11 @@ export function createHandlers(
       workspaces: operatorStore,
     }),
     ...workspaceMemberHandlers(apiUrl, { members: workspaceMembers, session: sessionStore }),
-    ...operatorHandlers(apiUrl, { workspaces: operatorStore, session: sessionStore }),
+    ...operatorHandlers(apiUrl, {
+      workspaces: operatorStore,
+      members: workspaceMembers,
+      session: sessionStore,
+    }),
     ...tradingPartnerHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,
       workspace: workspaceStore,
