@@ -98,7 +98,6 @@ import {
   updateLookupTableEndpoint,
   updateOperatorWorkspaceSettingsEndpoint,
   updateTradingPartnerEndpoint,
-  updateWorkspaceSettingsEndpoint,
   workspaceSettingsEndpoint,
   type WorkspaceInput,
   workspaceInvitesEndpoint,
@@ -214,10 +213,6 @@ export function updateCompanyIdentity(body: CompanyIdentityInput) {
 
 export function getWorkspaceSettings() {
   return request(workspaceSettingsEndpoint)
-}
-
-export function updateWorkspaceSettings(body: WorkspaceSettingsInput) {
-  return request(updateWorkspaceSettingsEndpoint, { body })
 }
 
 export function listOperatorWorkspaces() {

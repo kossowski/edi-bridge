@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 
 import { AppPage } from '@/components/app-page'
@@ -8,6 +8,7 @@ import { Fact, Failure } from '@/components/detail-parts'
 import { SandboxReset } from '@/components/operator/sandbox-reset'
 import { WorkspaceInvites } from '@/components/operator/workspace-invites'
 import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
+import { WorkspaceSettingsSection } from '@/components/operator/workspace-settings-section'
 import {
   WorkspaceCreatedAt,
   WorkspaceGln,
@@ -15,19 +16,11 @@ import {
   WorkspaceMembers,
   WorkspaceSeeded,
 } from '@/components/operator/workspace-values'
-import { RetentionAndBudgetForm } from '@/components/settings/retention-and-budget-form'
-import { SettingsSection } from '@/components/settings/settings-section'
-import { useSession } from '@/hooks/use-session'
-import { updateOperatorWorkspaceSettings } from '@/lib/api/client'
-import {
-  operatorWorkspaceSettingsQuery,
-  operatorWorkspacesQuery,
-  storeSavedOperatorWorkspaceSettings,
-} from '@/lib/api/queries'
+import { operatorWorkspacesQuery } from '@/lib/api/queries'
 import { Separator } from '@edi-bridge/ui/components/separator'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { WorkspaceSettingsInput, WorkspaceSummary } from '@edi-bridge/contracts'
+import type { WorkspaceSummary } from '@edi-bridge/contracts'
 
 function WorkspaceFacts({
   workspace,
@@ -60,30 +53,6 @@ function WorkspaceFacts({
         </Fact>
       )}
     </dl>
-  )
-}
-
-function WorkspaceSettingsSection({ workspaceId }: { workspaceId: string }) {
-  const t = useTranslations('Operator.settings')
-  const queryClient = useQueryClient()
-  const { session } = useSession()
-  const { data, status, refetch } = useQuery(operatorWorkspaceSettingsQuery(workspaceId))
-
-  async function save(input: WorkspaceSettingsInput) {
-    const updated = await updateOperatorWorkspaceSettings(workspaceId, input)
-    storeSavedOperatorWorkspaceSettings(queryClient, workspaceId, updated, session?.workspace.id)
-
-    return updated
-  }
-
-  return (
-    <SettingsSection
-      description={t('description')}
-      status={status}
-      title={t('title')}
-      onRetry={() => void refetch()}>
-      {data && <RetentionAndBudgetForm editable save={save} settings={data} />}
-    </SettingsSection>
   )
 }
 

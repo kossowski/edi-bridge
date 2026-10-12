@@ -1,51 +1,63 @@
 'use client'
 
+import { Alert02Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { type FormEvent, useId, useState } from 'react'
 
 import { GlnField, useGlnErrorMessage } from '@/components/form-field'
-import { SettingsSection } from '@/components/settings/settings-section'
+import { SettingsCard, SettingsTabContent } from '@/components/settings/settings-card'
 import { useSession } from '@/hooks/use-session'
 import { updateCompanyIdentity } from '@/lib/api/client'
 import { currentWorkspaceQuery } from '@/lib/api/queries'
 import { glnError, normalizeGln } from '@/lib/forms/gln'
+import { Alert, AlertDescription, AlertTitle } from '@edi-bridge/ui/components/alert'
 import { Button } from '@edi-bridge/ui/components/button'
 
 import type { Workspace } from '@edi-bridge/contracts'
 
-function MissingGln() {
-  const t = useTranslations('Settings.companyIdentity')
+function MissingGln({ canChange }: { canChange: boolean }) {
+  const t = useTranslations('Settings.company.missing')
 
   return (
-    <p className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm">
-      {t('missing')}
-    </p>
+    <Alert role={undefined} className="border-amber-600/40 bg-amber-500/10">
+      <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} />
+      <AlertTitle>{t('title')}</AlertTitle>
+      <AlertDescription className="text-foreground">
+        {canChange ? t('admin') : t('viewer')}
+      </AlertDescription>
+    </Alert>
   )
 }
 
-function IdentityView({ workspace }: { workspace: Workspace }) {
-  const t = useTranslations('Settings.companyIdentity')
+function CompanyName({ name }: { name: string }) {
+  const t = useTranslations('Settings.company')
 
   return (
-    <div className="flex max-w-xl flex-col gap-6">
-      {workspace.gln === null && <MissingGln />}
-      <dl className="flex flex-col gap-4">
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground text-xs">{t('companyName')}</dt>
-          <dd className="text-sm">{workspace.name}</dd>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground text-xs">{t('gln.label')}</dt>
-          <dd className="font-mono text-sm">{workspace.gln ?? t('notSet')}</dd>
-        </div>
+    <dl className="flex flex-col gap-0.5">
+      <dt className="text-muted-foreground text-xs">{t('name')}</dt>
+      <dd className="text-sm font-medium">{name}</dd>
+    </dl>
+  )
+}
+
+function CompanyView({ workspace }: { workspace: Workspace }) {
+  const t = useTranslations('Settings.company')
+
+  return (
+    <div className="flex flex-col gap-4">
+      <CompanyName name={workspace.name} />
+      <dl className="flex flex-col gap-0.5">
+        <dt className="text-muted-foreground text-xs">{t('gln.label')}</dt>
+        <dd className="font-mono text-sm">{workspace.gln ?? t('notSet')}</dd>
       </dl>
     </div>
   )
 }
 
-function IdentityForm({ workspace }: { workspace: Workspace }) {
-  const t = useTranslations('Settings.companyIdentity')
+function CompanyForm({ workspace }: { workspace: Workspace }) {
+  const t = useTranslations('Settings.company')
   const errorMessage = useGlnErrorMessage()
   const queryClient = useQueryClient()
   const id = useId()
@@ -78,12 +90,8 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
   }
 
   return (
-    <form noValidate className="flex max-w-xl flex-col gap-6" onSubmit={submit}>
-      {workspace.gln === null && <MissingGln />}
-      <dl className="flex flex-col gap-0.5">
-        <dt className="text-muted-foreground text-xs">{t('companyName')}</dt>
-        <dd className="text-sm">{workspace.name}</dd>
-      </dl>
+    <form noValidate className="flex flex-col gap-4" onSubmit={submit}>
+      <CompanyName name={workspace.name} />
       <GlnField
         id={id}
         description={t('gln.description')}
@@ -115,19 +123,25 @@ function IdentityForm({ workspace }: { workspace: Workspace }) {
   )
 }
 
-export function CompanyIdentitySection() {
-  const t = useTranslations('Settings.companyIdentity')
+export function CompanyTab() {
+  const t = useTranslations('Settings.company')
   const session = useSession()
-  const { data, status, refetch } = useQuery(currentWorkspaceQuery)
+  const query = useQuery(currentWorkspaceQuery)
 
   return (
-    <SettingsSection
-      description={t('description')}
-      status={session.isPending ? 'pending' : status}
-      title={t('title')}
-      onRetry={() => void refetch()}>
-      {data &&
-        (session.canChange ? <IdentityForm workspace={data} /> : <IdentityView workspace={data} />)}
-    </SettingsSection>
+    <SettingsTabContent query={query} waiting={session.isPending}>
+      {(workspace) => (
+        <>
+          {workspace.gln === null && <MissingGln canChange={session.canChange} />}
+          <SettingsCard description={t('description')} title={t('title')}>
+            {session.canChange ? (
+              <CompanyForm workspace={workspace} />
+            ) : (
+              <CompanyView workspace={workspace} />
+            )}
+          </SettingsCard>
+        </>
+      )}
+    </SettingsTabContent>
   )
 }

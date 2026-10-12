@@ -101,18 +101,6 @@ export function operatorWorkspaceSettingsQuery(workspaceId: string) {
   })
 }
 
-export function storeSavedWorkspaceSettings(
-  queryClient: QueryClient,
-  saved: WorkspaceSettings,
-  workspaceId: string | undefined,
-) {
-  queryClient.setQueryData(workspaceSettingsQuery.queryKey, saved)
-
-  if (workspaceId !== undefined) {
-    void queryClient.invalidateQueries({ queryKey: operatorKeys.settings(workspaceId) })
-  }
-}
-
 export function storeCreatedWorkspace(queryClient: QueryClient, created: WorkspaceSummary) {
   queryClient.setQueryData<WorkspaceSummary[]>(
     operatorWorkspacesQuery.queryKey,
