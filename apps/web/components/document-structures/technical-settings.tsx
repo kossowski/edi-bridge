@@ -169,9 +169,9 @@ function CsvSection({
       {reading.csvDocument && (
         <FirstRows csv={reading.csv} file={reading.csvDocument} tree={reading.tree} />
       )}
-      <RefusalAlert error={reading.reread.error} failed={tForm('preview.failed')}>
+      <RefusalAlert error={reading.reread.error} failed={tForm('failed.message')}>
         <Button size="sm" variant="outline" onClick={reading.retry}>
-          {tForm('preview.retry')}
+          {tForm('failed.retry')}
         </Button>
       </RefusalAlert>
     </CsvSettingsFields>

@@ -87,7 +87,7 @@ export function withAdjustment(
   return next
 }
 
-export function rootListPath(tree: StructureTree) {
+function rootListPath(tree: StructureTree) {
   if (tree.format === 'csv') {
     return csvRowsPath
   }

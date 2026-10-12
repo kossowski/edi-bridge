@@ -4,14 +4,18 @@
 
 **Blocked by:** 57 (Help & glossary page and plain names)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Cards show the example file, field count and Mappings; action bars align at the bottom of each row
-- [ ] The format page shows file and fields side by side; selecting one highlights the other; renaming a field updates the name shown in Mappings
-- [ ] Adding a format shows the reading steps, then only the unsure names to confirm; saving is blocked until they are confirmed and the format has a name
-- [ ] JSON Schema creation and CSV settings remain reachable; refusals of incompatible changes stay explained
-- [ ] The Document Structure contract gains plain field names with their reason and an unsure flag; the live API follows in tickets 26 and 72
-- [ ] `/document-structures` and its screens and stories are replaced; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Cards show the example file, field count and Mappings; action bars align at the bottom of each row
+- [x] The format page shows file and fields side by side; selecting one highlights the other; renaming a field updates the name shown in Mappings
+- [x] Adding a format shows the reading steps, then only the unsure names to confirm; saving is blocked until they are confirmed and the format has a name
+- [x] JSON Schema creation and CSV settings remain reachable; refusals of incompatible changes stay explained
+- [x] The Document Structure contract gains plain field names with their reason and an unsure flag; the live API follows in tickets 26 and 72
+- [x] `/document-structures` and its screens and stories are replaced; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #137, #139, #142, #144.

@@ -4,6 +4,7 @@ import {
   type CsvSettings,
   type DocumentStructure,
   type DocumentStructureSample,
+  type InferredDocumentStructure,
   type JsonContent,
   jsonContentSchema,
   jsonItemsName,
@@ -105,7 +106,7 @@ const sampleRowLimit = 50
 
 type CsvColumn = { path: string; name: string }
 
-function csvColumns(structure: DocumentStructure): CsvColumn[] {
+function csvColumns(structure: DocumentStructure | InferredDocumentStructure): CsvColumn[] {
   const [rows] = structure.children
 
   if (rows?.kind !== 'array' || rows.items.kind !== 'object') {
@@ -121,7 +122,7 @@ export type SampleContent =
   | { kind: 'text' }
 
 export function sampleContent(
-  structure: DocumentStructure,
+  structure: DocumentStructure | InferredDocumentStructure,
   sample: DocumentStructureSample,
 ): SampleContent {
   if (structure.format === 'csv') {

@@ -27,7 +27,7 @@ import {
   TableRow,
 } from '@edi-bridge/ui/components/table'
 
-const delimiterKeys = {
+export const delimiterKeys = {
   ',': 'comma',
   ';': 'semicolon',
   '\t': 'tab',
@@ -83,6 +83,10 @@ function SettingSelect<Value extends string>({
   )
 }
 
+export function csvDelimiterId(id: string) {
+  return `${id}-delimiter`
+}
+
 export function CsvSettingsFields({
   id,
   csv,
@@ -108,7 +112,7 @@ export function CsvSettingsFields({
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <SettingSelect
-          id={`${id}-delimiter`}
+          id={csvDelimiterId(id)}
           description={t('delimiterDescription')}
           label={t('delimiter')}
           labelOf={(delimiter) => t(`delimiters.${delimiterKeys[delimiter]}`)}

@@ -135,7 +135,7 @@
     "channels": "Channels",
     "flows": "Flows",
     "mappings": "Mappings",
-    "documentStructures": "Document Structures",
+    "documentStructures": "Datenformate",
     "lookupTables": "Lookup Tables",
     "settings": "Einstellungen",
     "operator": "Operator",
@@ -2440,8 +2440,8 @@
       "transforms": "Transforms"
     },
     "direction": {
-      "inbound": "Eingehend: Message Type zu Document Structure",
-      "outbound": "Ausgehend: Document Structure zu Message Type"
+      "inbound": "Eingehend: Message Type zu Datenformat",
+      "outbound": "Ausgehend: Datenformat zu Message Type"
     },
     "linkCount": "{count, plural, =0 {Noch keine Verknüpfungen} one {# Verknüpfung} other {# Verknüpfungen}}",
     "side": {
@@ -3116,12 +3116,12 @@
       "rename": {
         "label": "Name in Mappings",
         "submit": "Umbenennen",
-        "keep": "Namen behalten",
+        "confirm": "Namen behalten",
         "saving": "Wird gespeichert…",
         "required": "Geben Sie einen Namen ein.",
         "failed": "Das Feld konnte nicht umbenannt werden. Versuchen Sie es erneut.",
         "renamed": "Umbenannt in „{label}“.",
-        "kept": "Name „{label}“ behalten."
+        "confirmed": "Name „{label}“ behalten."
       }
     },
     "technical": {
@@ -3138,46 +3138,100 @@
   },
   "DocumentStructureForm": {
     "createTitle": "Neues Datenformat",
-    "origin": {
-      "label": "Erstellen aus",
-      "description": "EDI Bridge leitet die Felder, ihre Verschachtelung und Wiederholungen aus der Datei ab.",
-      "kinds": {
-        "jsonDocument": "Einem JSON-Document",
-        "csvDocument": "Einem CSV-Document",
-        "jsonSchema": "Einem JSON Schema"
+    "drop": {
+      "title": "Legen Sie einen Export aus Ihrem ERP ab",
+      "description": "Eine CSV- oder JSON-Datei, die Ihr ERP schreibt oder liest, höchstens 5 MB. EDI Bridge liest sie und benennt jedes Feld in einfachen Worten. Sie prüfen die Namen, bei denen es unsicher ist.",
+      "choose": "Oder Datei auswählen"
+    },
+    "reading": {
+      "title": "{fileName} wird gelesen",
+      "steps": {
+        "opening": "Datei öffnen",
+        "finding": {
+          "csv": "Spalten finden",
+          "json": "Felder finden"
+        },
+        "naming": "Felder in einfachen Worten benennen"
+      },
+      "states": {
+        "done": "erledigt",
+        "active": "läuft",
+        "pending": "noch nicht begonnen"
+      },
+      "facts": {
+        "columns": "{count, plural, one {# Spalte} other {# Spalten}} gefunden, getrennt durch {delimiter, select, comma {Kommas} semicolon {Semikolons} tab {Tabulatoren} other {senkrechte Striche}}",
+        "rows": "{count, plural, one {# Zeile} other {# Zeilen}} gelesen",
+        "fields": "{count, plural, one {# Feld} other {# Felder}} gefunden",
+        "labels": "{count, plural, =0 {Alle Namen sind eindeutig} one {# Name zu prüfen} other {# Namen zu prüfen}}"
       }
+    },
+    "failed": {
+      "title": "{fileName} konnte nicht gelesen werden",
+      "message": "Die Datei konnte nicht gelesen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen",
+      "csvHint": "Wenn die Datei in Ordnung ist, braucht sie vielleicht andere CSV-Einstellungen, etwa ein anderes Trennzeichen oder eine andere Zeichenkodierung.",
+      "csvSettings": "CSV-Einstellungen ändern"
+    },
+    "anotherFile": "Andere Datei verwenden",
+    "review": {
+      "title": "Felder aus {fileName}",
+      "titleNoSample": "Felder aus dem JSON Schema",
+      "fields": "{count, plural, one {# Feld gefunden} other {# Felder gefunden}}",
+      "toCheck": "{count, plural, one {# Name zu prüfen} other {# Namen zu prüfen}}",
+      "allChecked": "Alle Namen geprüft",
+      "fieldsLabel": "Felder"
+    },
+    "field": {
+      "from": "aus <code>{name}</code>",
+      "noReason": "EDI Bridge konnte nicht erkennen, was dieses Feld enthält.",
+      "confirm": "Ja, „{label}“ stimmt",
+      "rename": {
+        "label": "Oder geben Sie einen besseren Namen für {name} ein",
+        "submit": "Diesen Namen verwenden",
+        "required": "Geben Sie einen Namen ein."
+      },
+      "confirmed": "Sie haben diesen Namen bestätigt.",
+      "renamed": "Sie haben dieses Feld benannt.",
+      "change": "Ändern",
+      "changeLabel": "„{label}“ ändern",
+      "announce": {
+        "confirmed": "„{label}“ bestätigt.",
+        "renamed": "Umbenannt in „{label}“.",
+        "left": "{count, plural, =0 {Alle Namen sind geprüft.} one {# Name ist noch zu prüfen.} other {# Namen sind noch zu prüfen.}}"
+      }
+    },
+    "name": {
+      "label": "Name dieses Datenformats",
+      "description": "Erscheint in Ihren Datenformaten und beim Erstellen eines Mappings."
+    },
+    "save": {
+      "submit": "Datenformat speichern",
+      "saving": "Wird gespeichert…",
+      "checkLabels": "{count, plural, one {Zuerst den letzten Namen prüfen} other {Zuerst # Namen prüfen}}",
+      "nameFirst": "Zuerst das Datenformat benennen",
+      "failed": "Das Datenformat konnte nicht gespeichert werden. Versuchen Sie es erneut."
+    },
+    "technical": {
+      "title": "Technische Optionen",
+      "description": "Beginnen Sie stattdessen mit einem JSON Schema, oder ändern Sie, wie CSV-Dateien gelesen werden.",
+      "jsonSchema": {
+        "title": "Stattdessen aus einem JSON Schema erstellen",
+        "label": "JSON Schema",
+        "description": "Das JSON Schema, das Ihr System bereitstellt, höchstens 5 MB. Es enthält keine Beispielwerte, daher werden die Felder ohne sie gezeigt."
+      },
+      "csvDescription": "EDI Bridge liest CSV-Dateien mit diesen Einstellungen. Jede Änderung liest die Datei erneut."
     },
     "file": {
       "label": "Datei",
       "description": "Ein Beispiel-Document aus Ihren eigenen Systemen oder das JSON Schema, das sie bereitstellen. Höchstens 5 MB.",
       "drop": "Datei hier ablegen oder auswählen."
     },
-    "name": {
-      "label": "Name",
-      "description": "Erscheint in der Mapping-Liste und auf dem Mapping-Canvas."
-    },
-    "preview": {
-      "title": "Vorschau",
-      "description": "Die Document Structure, die EDI Bridge aus der Datei ableitet. Gespeichert wird erst, wenn Sie sie erstellen.",
-      "none": "Wählen Sie eine Datei, um die daraus abgeleitete Document Structure zu sehen.",
-      "loading": "Datei wird gelesen…",
-      "fields": "{count, plural, one {# Feld} other {# Felder}}",
-      "failed": "Die Datei konnte nicht gelesen werden. Versuchen Sie es erneut.",
-      "retry": "Erneut versuchen",
-      "adjustLater": "Nach dem Erstellen können Sie Felder als optional oder wiederholend markieren und ihre Typen anpassen."
-    },
-    "create": "Document Structure erstellen",
-    "creating": "Wird erstellt…",
-    "failed": "Die Document Structure konnte nicht erstellt werden. Versuchen Sie es erneut.",
     "errors": {
-      "nameRequired": "Geben Sie einen Namen ein.",
-      "fileRequired": "Wählen Sie eine Datei.",
       "empty": "Die Datei ist leer.",
       "tooLarge": "Die Datei ist zu groß. Sie darf höchstens 5 MB haben.",
       "unreadable": "Beheben Sie das Problem in der Datei oder wählen Sie eine andere.",
       "unreadableCsv": "Passen Sie die CSV-Einstellungen an, beheben Sie das Problem in der Datei oder wählen Sie eine andere."
-    },
-    "csvDescription": "EDI Bridge liest das CSV-Document mit diesen Einstellungen. Die Vorschau folgt jeder Änderung."
+    }
   },
   "DocumentStructureTree": {
     "label": "Felder von {name}",
