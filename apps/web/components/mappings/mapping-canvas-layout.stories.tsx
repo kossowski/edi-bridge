@@ -16,6 +16,7 @@ import {
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { transformsHiddenKey } from '@/components/mappings/transform-list'
 import { viewerStory } from '@/components/session/session-story-helpers'
+import { laptop } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { createHandlers } from '@edi-bridge/mocks'
@@ -64,6 +65,32 @@ export const Toolbar = meta.story({
     await expect(canvas.getByRole('link', { name: 'Mapping Versions' })).toBeVisible()
     await expect(canvas.getByRole('button', { name: /^Publish/ })).toBeVisible()
     await expect(await canvas.findByRole('heading', { name: 'Add a Transform' })).toBeVisible()
+  },
+})
+
+function shownTooltips(canvasElement: HTMLElement) {
+  return [
+    ...canvasElement.ownerDocument.querySelectorAll<HTMLElement>('[data-slot="tooltip-content"]'),
+  ].filter((tooltip) => tooltip.checkVisibility())
+}
+
+// Below 90rem the toolbar shows icons, so a tooltip names each one; moving along them by keyboard
+// shows only the name of the focused one, not the fading names of those left behind.
+export const ToolbarTooltipsOneAtATime = meta.story({
+  ...laptop,
+  async play({ canvas, canvasElement }) {
+    const draft = await canvas.findByRole('button', { name: 'Draft with AI' })
+
+    draft.focus()
+    await userEvent.keyboard('{Shift>}{Tab}{/Shift}')
+
+    for (const name of ['Draft with AI', 'Preview', 'Details', 'Mapping Versions']) {
+      await userEvent.tab()
+      await expect(shownTooltips(canvasElement).length).toBeLessThanOrEqual(1)
+      await waitFor(() =>
+        expect(shownTooltips(canvasElement).map((tooltip) => tooltip.textContent)).toEqual([name]),
+      )
+    }
   },
 })
 
