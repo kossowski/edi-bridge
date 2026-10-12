@@ -233,11 +233,14 @@ export const ConnectByKeyboard = meta.story({
     // From the transform's output into a target element, with the L shortcut.
     await pressOn(output, 'l')
     await expect(output).toHaveAttribute('aria-pressed', 'true')
+
+    const details = await openDetails(canvasElement)
+
     await expect(
-      (await openDetails(canvasElement)).getByText('Linking from Date format 1 (Result).', {
-        exact: false,
-      }),
+      details.getByText('Linking from Date format 1 (Result).', { exact: false }),
     ).toBeVisible()
+    // The details take the focus a frame after they open; an L typed before that goes to them.
+    await waitFor(() => expect(details.getByRole('group', { name: 'Details' })).toHaveFocus())
 
     const to = await findRow(canvasElement, target('DTM+137/C507/2380'))
 
