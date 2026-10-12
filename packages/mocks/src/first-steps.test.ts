@@ -9,7 +9,6 @@ import {
   firstStepsEndpoint,
   firstStepsProgress,
   firstStepsSchema,
-  publishMappingDraftEndpoint,
   type SaveMappingDraftBody,
   saveMappingDraftEndpoint,
   sendTestInterchangeEndpoint,
@@ -24,6 +23,7 @@ import {
 import { firstStepsHandler } from './first-steps'
 import { createHandlers } from './index'
 import { seedMappingDrafts } from './mapping'
+import { publishDraft } from './publish-request'
 import { createWorkspace } from './workspace'
 
 const apiUrl = 'http://api.test'
@@ -145,7 +145,7 @@ describe('GET /workspaces/current/first-steps', () => {
       transforms: [],
       transformLinks: [],
     })
-    await send('POST', toPath(publishMappingDraftEndpoint.path, { mappingId }))
+    await publishDraft(apiUrl, mappingId)
     expect(await progress()).toMatchObject({ done: 4, next: 'testInterchange' })
 
     const { id } = tradingPartner
