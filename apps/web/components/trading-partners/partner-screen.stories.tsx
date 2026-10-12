@@ -188,7 +188,7 @@ export const ConfirmationArrives = meta.story({
       }),
     )
   },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Send a test document' }))
     await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
     await expect(
@@ -198,7 +198,23 @@ export const ConfirmationArrives = meta.story({
         { timeout: 10_000 },
       ),
     ).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Go live' })).toBeVisible()
+    const goLive = canvas.getByRole('button', { name: 'Go live' })
+    await userEvent.click(goLive)
+
+    const dialog = await within(canvasElement.ownerDocument.body).findByRole('alertdialog')
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+    )
+    await userEvent.tab()
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Go live now' })).toHaveFocus(),
+    )
+    await userEvent.tab()
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+    )
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(goLive).toHaveFocus())
   },
 })
 
@@ -214,11 +230,16 @@ export const AwaitingConfirmation = meta.story({
   },
 })
 
-export const ConfirmationArrived = meta.story({
+export const ConfirmedOnLoad = meta.story({
   ...at(confirmed),
   async play({ canvas }) {
     const current = await canvas.findByRole('listitem', { current: 'step' })
     await expect(current).toHaveTextContent('Go live')
+    await expect(
+      within(current).getByText(
+        'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
+      ),
+    ).toBeVisible()
     await expect(canvas.getByRole('progressbar', { name: 'Setup' })).toHaveAttribute(
       'aria-valuetext',
       '5 of 6 steps done',
@@ -272,9 +293,14 @@ export const ViewerAwaitingConfirmation = meta.story({
   }),
 })
 
-export const ViewerConfirmationArrived = meta.story({
+export const ViewerConfirmedOnLoad = meta.story({
   ...at(confirmed),
   ...asViewer(async ({ canvas }) => {
+    await expect(
+      await canvas.findByText(
+        'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
+      ),
+    ).toBeVisible()
     await expect(await canvas.findByText('An Admin continues the setup.')).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Go live' })).toBeNull()
   }),
@@ -288,6 +314,13 @@ export const ChooseSettingsTab = meta.story({
       `/trading-partners/${live.id}?tab=settings`,
       { scroll: false },
     )
+    await userEvent.click(canvas.getByRole('tab', { name: 'Overview' }))
+    await userEvent.click(canvas.getByRole('tab', { name: 'Settings' }))
+    await expect(canvas.getByRole('tab', { name: 'Settings' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(await canvas.findByLabelText('Name')).toHaveValue(live.name)
   },
 })
 
@@ -453,6 +486,16 @@ export const Dark = meta.story({
   beforeEach: darkMode,
   async play({ canvas }) {
     await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
+  },
+})
+
+export const DarkConfirmedOnLoad = meta.story({
+  ...at(confirmed),
+  beforeEach: darkMode,
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(/The receipt confirmation from Spreewald Frische GmbH arrived/),
+    ).toBeVisible()
   },
 })
 

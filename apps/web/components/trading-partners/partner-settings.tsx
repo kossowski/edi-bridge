@@ -2,8 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 
-import type { ReactNode } from 'react'
-
+import { Fact } from '@/components/detail-parts'
 import { SettingsCard } from '@/components/settings/settings-card'
 import { TradingPartnerForm } from '@/components/trading-partners/trading-partner-form'
 import { useSession } from '@/hooks/use-session'
@@ -11,31 +10,22 @@ import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { TradingPartner } from '@edi-bridge/contracts'
 
-function Detail({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="text-sm font-medium">{children}</dd>
-    </div>
-  )
-}
-
 function PartnerDetails({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartnerForm')
   const tList = useTranslations('TradingPartners')
 
   return (
     <dl className="flex flex-col gap-4">
-      <Detail label={t('fields.name.label')}>{tradingPartner.name}</Detail>
-      <Detail label={t('fields.gln.label')}>
+      <Fact label={t('fields.name.label')}>{tradingPartner.name}</Fact>
+      <Fact label={t('fields.gln.label')}>
         <span className="font-mono tabular-nums">{tradingPartner.gln}</span>
-      </Detail>
-      <Detail label={t('fields.characterSet.label')}>
+      </Fact>
+      <Fact label={t('fields.characterSet.label')}>
         {t(`characterSets.${tradingPartner.characterSet}`)}
-      </Detail>
-      <Detail label={t('fields.acknowledgementTimeLimitHours.label')}>
+      </Fact>
+      <Fact label={t('fields.acknowledgementTimeLimitHours.label')}>
         {tList('hours', { hours: tradingPartner.acknowledgementTimeLimitHours })}
-      </Detail>
+      </Fact>
     </dl>
   )
 }

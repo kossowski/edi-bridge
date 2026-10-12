@@ -7,8 +7,16 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 
-import { awaitsReceiptConfirmation } from '@/components/trading-partners/partner-page-helpers'
-import { partnerSetup, type PartnerSetupStep } from '@/components/trading-partners/partner-setup'
+import {
+  awaitsReceiptConfirmation,
+  type PartnerActivityProps,
+} from '@/components/trading-partners/partner-page-helpers'
+import {
+  type PartnerSetup,
+  type PartnerSetupItem,
+  partnerSetup,
+  type PartnerSetupStepState,
+} from '@/components/trading-partners/partner-setup'
 import { useSession } from '@/hooks/use-session'
 import { sendTestInterchange, switchToProduction } from '@/lib/api/client'
 import { currentWorkspaceQuery, storeSavedTradingPartner } from '@/lib/api/queries'
@@ -16,7 +24,6 @@ import {
   canSendTestInterchange,
   canSwitchToProduction,
   type TradingPartner,
-  type TradingPartnerActivityDetail,
 } from '@edi-bridge/contracts'
 import {
   AlertDialog,
@@ -27,6 +34,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@edi-bridge/ui/components/alert-dialog'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
@@ -37,15 +45,22 @@ import {
   CardHeader,
   CardTitle,
 } from '@edi-bridge/ui/components/card'
-import { Progress, ProgressLabel } from '@edi-bridge/ui/components/progress'
+import { Progress } from '@edi-bridge/ui/components/progress'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-const stepLinks: Partial<Record<PartnerSetupStep, string>> = {
-  identity: '/settings',
-  connections: '/channels/new',
-  documents: '/flows/new',
+type SetupContext = {
+  tradingPartner: TradingPartner
+  workspaceGln: string | null
+  canChange: boolean
+  onLive: () => void
 }
+
+const stepBadges = {
+  done: 'secondary',
+  next: 'default',
+  open: 'outline',
+} as const satisfies Record<PartnerSetupStepState, 'secondary' | 'default' | 'outline'>
 
 function SendTestDocument({
   tradingPartner,
@@ -98,7 +113,6 @@ function GoLive({
 }) {
   const t = useTranslations('TradingPartner.setup')
   const queryClient = useQueryClient()
-  const trigger = useRef<HTMLButtonElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
   const name = tradingPartner.name
@@ -125,14 +139,11 @@ function GoLive({
 
   return (
     <AlertDialog open={open} onOpenChange={changeOpen}>
-      <Button ref={trigger} size="sm" className="w-fit" onClick={() => changeOpen(true)}>
+      <AlertDialogTrigger render={<Button size="sm" className="w-fit" />}>
         <HugeiconsIcon icon={Rocket01Icon} strokeWidth={2} aria-hidden data-icon="inline-start" />
         {t('actions.production')}
-      </Button>
-      <AlertDialogContent
-        finalFocus={trigger}
-        initialFocus={cancel}
-        aria-busy={production.isPending || undefined}>
+      </AlertDialogTrigger>
+      <AlertDialogContent initialFocus={cancel} aria-busy={production.isPending || undefined}>
         <AlertDialogHeader>
           <AlertDialogTitle>{t('goLive.title', { name })}</AlertDialogTitle>
           <AlertDialogDescription>{t('goLive.description', { name })}</AlertDialogDescription>
@@ -172,7 +183,7 @@ function Waiting({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const sentAt = tradingPartner.onboarding.testInterchangeSentAt
 
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-sky-600/40 bg-sky-500/10 p-3 text-sm">
+    <div className="border-info/40 bg-info/10 flex flex-col gap-1 rounded-lg border p-3 text-sm">
       <p className="flex items-start gap-2">
         <HugeiconsIcon
           icon={Loading03Icon}
@@ -194,139 +205,117 @@ function Waiting({ tradingPartner }: { tradingPartner: TradingPartner }) {
   )
 }
 
-function StepAction({
-  step,
-  tradingPartner,
-  workspaceGln,
-  canChange,
-  arrived,
-  onLive,
-}: {
-  step: PartnerSetupStep
-  tradingPartner: TradingPartner
-  workspaceGln: string | null
-  canChange: boolean
-  arrived: boolean
-  onLive: () => void
-}) {
+function Confirmed({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner.setup')
-  const link = stepLinks[step]
 
-  if (step === 'contrl') {
-    return (
-      <>
-        <Waiting tradingPartner={tradingPartner} />
-        {canChange && canSendTestInterchange(tradingPartner, workspaceGln) && (
-          <SendTestDocument again tradingPartner={tradingPartner} />
-        )}
-      </>
-    )
+  if (!tradingPartner.testMode || tradingPartner.onboarding.contrlReceivedAt === null) {
+    return null
   }
 
-  const arrivedNote = step === 'production' && arrived && (
+  return (
     <p className="flex items-center gap-2 text-sm">
       <HugeiconsIcon
         icon={CheckmarkCircle02Icon}
         strokeWidth={2}
         aria-hidden
-        className="size-4 shrink-0 text-emerald-700 dark:text-emerald-300"
+        className="text-success-text size-4 shrink-0"
       />
       {t('arrived', { name: tradingPartner.name })}
     </p>
   )
-
-  if (!canChange) {
-    return (
-      <>
-        {arrivedNote}
-        <p className="text-sm">
-          {step === 'identity' ? t('viewOnly.identity') : t('viewOnly.other')}
-        </p>
-      </>
-    )
-  }
-
-  if (link) {
-    return (
-      <Link href={link} className={cn(buttonVariants({ size: 'sm' }), 'w-fit')}>
-        {t(`actions.${step}`)}
-      </Link>
-    )
-  }
-
-  if (step === 'testInterchange' && canSendTestInterchange(tradingPartner, workspaceGln)) {
-    return <SendTestDocument again={false} tradingPartner={tradingPartner} />
-  }
-
-  if (step === 'production' && canSwitchToProduction(tradingPartner, workspaceGln)) {
-    return (
-      <>
-        {arrivedNote}
-        <GoLive tradingPartner={tradingPartner} onLive={onLive} />
-      </>
-    )
-  }
-
-  return null
 }
 
-function doneAt(step: PartnerSetupStep, tradingPartner: TradingPartner) {
-  switch (step) {
-    case 'testInterchange':
-      return tradingPartner.onboarding.testInterchangeSentAt
-    case 'contrl':
-      return tradingPartner.onboarding.contrlReceivedAt
-    default:
-      return null
+function StepAction({ item, context }: { item: PartnerSetupItem; context: SetupContext }) {
+  const t = useTranslations('TradingPartner.setup')
+  const { tradingPartner, workspaceGln, canChange, onLive } = context
+  const { step, action } = item
+
+  const viewOnly = (
+    <p className="text-sm">{step === 'identity' ? t('viewOnly.identity') : t('viewOnly.other')}</p>
+  )
+
+  switch (action.kind) {
+    case 'link':
+      return canChange ? (
+        <Link href={action.href} className={cn(buttonVariants({ size: 'sm' }), 'w-fit')}>
+          {t(`actions.${action.step}`)}
+        </Link>
+      ) : (
+        viewOnly
+      )
+    case 'sendTest':
+      if (!canChange) {
+        return viewOnly
+      }
+
+      return canSendTestInterchange(tradingPartner, workspaceGln) ? (
+        <SendTestDocument again={false} tradingPartner={tradingPartner} />
+      ) : null
+    case 'awaitConfirmation':
+      return (
+        <>
+          <Waiting tradingPartner={tradingPartner} />
+          {canChange && canSendTestInterchange(tradingPartner, workspaceGln) && (
+            <SendTestDocument again tradingPartner={tradingPartner} />
+          )}
+        </>
+      )
+    case 'goLive':
+      return (
+        <>
+          <Confirmed tradingPartner={tradingPartner} />
+          {canChange
+            ? canSwitchToProduction(tradingPartner, workspaceGln) && (
+                <GoLive tradingPartner={tradingPartner} onLive={onLive} />
+              )
+            : viewOnly}
+        </>
+      )
   }
 }
 
 function SetupSteps({
-  tradingPartner,
-  activity,
-  workspaceGln,
-  canChange,
-  arrived,
-  onLive,
+  setup,
+  titleId,
+  context,
 }: {
-  tradingPartner: TradingPartner
-  activity: TradingPartnerActivityDetail
-  workspaceGln: string | null
-  canChange: boolean
-  arrived: boolean
-  onLive: () => void
+  setup: PartnerSetup
+  titleId: string
+  context: SetupContext
 }) {
   const t = useTranslations('TradingPartner.setup')
   const format = useFormatter()
-  const setup = partnerSetup(tradingPartner, activity, workspaceGln)
   const progress = t('progress', { done: setup.done, total: setup.total })
 
   return (
     <>
-      <Progress getAriaValueText={() => progress} value={(setup.done / setup.total) * 100}>
-        <ProgressLabel>{t('title')}</ProgressLabel>
-        <span className="text-muted-foreground ml-auto text-sm tabular-nums">{progress}</span>
+      <Progress
+        getAriaValueText={() => progress}
+        value={(setup.done / setup.total) * 100}
+        aria-labelledby={titleId}>
+        <span className="text-muted-foreground text-sm tabular-nums">{progress}</span>
       </Progress>
       <ol className="flex flex-col gap-3">
-        {setup.steps.map(({ step, done }, index) => {
-          const next = step === setup.next
-          const at = done ? doneAt(step, tradingPartner) : null
+        {setup.steps.map((item, index) => {
+          const { step, state, doneAt } = item
 
           return (
             <li
               key={step}
-              aria-current={next ? 'step' : undefined}
+              aria-current={state === 'next' ? 'step' : undefined}
               className={cn(
                 'flex gap-3 rounded-xl border p-4',
-                next && 'border-primary/40 bg-primary/5',
+                state === 'next' && 'border-primary/40 bg-primary/5',
               )}>
               <span
                 aria-hidden
                 className={cn(
                   'flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-medium tabular-nums',
-                  done ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                  state === 'done'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground',
                 )}>
-                {done ? (
+                {state === 'done' ? (
                   <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-4" />
                 ) : (
                   index + 1
@@ -335,34 +324,23 @@ function SetupSteps({
               <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-medium">{t(`steps.${step}.title`)}</h3>
-                  <Badge variant={done ? 'secondary' : next ? 'default' : 'outline'}>
-                    {done ? t('state.done') : next ? t('state.next') : t('state.open')}
-                  </Badge>
+                  <Badge variant={stepBadges[state]}>{t(`state.${state}`)}</Badge>
                 </div>
-                <p className={cn('text-sm', !next && 'text-muted-foreground')}>
+                <p className={cn('text-sm', state !== 'next' && 'text-muted-foreground')}>
                   {t(`steps.${step}.description`)}
                 </p>
-                {at && (
+                {doneAt && (
                   <p className="text-sm">
                     {t.rich('doneAt', {
-                      at: format.dateTime(new Date(at), {
+                      at: format.dateTime(new Date(doneAt), {
                         dateStyle: 'medium',
                         timeStyle: 'short',
                       }),
-                      when: (chunks) => <time dateTime={at}>{chunks}</time>,
+                      when: (chunks) => <time dateTime={doneAt}>{chunks}</time>,
                     })}
                   </p>
                 )}
-                {next && (
-                  <StepAction
-                    arrived={arrived}
-                    canChange={canChange}
-                    step={step}
-                    tradingPartner={tradingPartner}
-                    workspaceGln={workspaceGln}
-                    onLive={onLive}
-                  />
-                )}
+                {state === 'next' && <StepAction context={context} item={item} />}
               </div>
             </li>
           )
@@ -372,13 +350,7 @@ function SetupSteps({
   )
 }
 
-export function PartnerSetupCard({
-  tradingPartner,
-  activity,
-}: {
-  tradingPartner: TradingPartner
-  activity: TradingPartnerActivityDetail
-}) {
+export function PartnerSetupCard({ tradingPartner, activity }: PartnerActivityProps) {
   const t = useTranslations('TradingPartner.setup')
   const workspace = useQuery(currentWorkspaceQuery)
   const session = useSession()
@@ -388,12 +360,11 @@ export function PartnerSetupCard({
   const awaiting = awaitsReceiptConfirmation(tradingPartner)
   const [sawWaiting, setSawWaiting] = useState(awaiting)
   const name = tradingPartner.name
+  const workspaceGln = workspace.data?.gln ?? null
 
   if (awaiting && !sawWaiting) {
     setSawWaiting(true)
   }
-
-  const arrived = sawWaiting && !awaiting && tradingPartner.testMode
 
   useEffect(() => {
     if (wentLive && !tradingPartner.testMode) {
@@ -403,7 +374,7 @@ export function PartnerSetupCard({
 
   const status = !tradingPartner.testMode
     ? wentLive && t('goLive.done', { name })
-    : arrived && t('arrived', { name })
+    : sawWaiting && !awaiting && t('arrived', { name })
 
   return (
     <Card role="region" aria-labelledby={titleId}>
@@ -425,7 +396,7 @@ export function PartnerSetupCard({
               icon={CheckmarkCircle02Icon}
               strokeWidth={2}
               aria-hidden
-              className="size-4 shrink-0 text-emerald-700 dark:text-emerald-300"
+              className="text-success-text size-4 shrink-0"
             />
             {t('complete', { name })}
           </p>
@@ -433,12 +404,14 @@ export function PartnerSetupCard({
           <Skeleton className="h-64 w-full" />
         ) : (
           <SetupSteps
-            activity={activity}
-            arrived={arrived}
-            canChange={session.canChange}
-            tradingPartner={tradingPartner}
-            workspaceGln={workspace.data?.gln ?? null}
-            onLive={() => setWentLive(true)}
+            context={{
+              tradingPartner,
+              workspaceGln,
+              canChange: session.canChange,
+              onLive: () => setWentLive(true),
+            }}
+            setup={partnerSetup(tradingPartner, activity, workspaceGln)}
+            titleId={titleId}
           />
         )}
       </CardContent>

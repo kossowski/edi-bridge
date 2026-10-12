@@ -2,13 +2,12 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { type ComponentType, Suspense } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadFailure } from '@/components/detail-parts'
 import { HeaderTabs } from '@/components/header-tabs'
-import { PartnerOverview } from '@/components/trading-partners/partner-overview'
+import { PartnerLoading, PartnerOverview } from '@/components/trading-partners/partner-overview'
 import {
   awaitsReceiptConfirmation,
   type PartnerTab,
@@ -17,9 +16,9 @@ import {
 } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSettings } from '@/components/trading-partners/partner-settings'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
+import { useTabParam } from '@/hooks/use-tab-param'
 import { ApiError } from '@/lib/api/client'
 import { tradingPartnerQuery } from '@/lib/api/queries'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
 import type { TradingPartner } from '@edi-bridge/contracts'
@@ -33,16 +32,7 @@ const panels: Record<PartnerTab, ComponentType<{ tradingPartner: TradingPartner 
 
 function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner.tabs')
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const tab = partnerTabOf(searchParams.get('tab'))
-
-  function changeTab(value: string) {
-    const params = new URLSearchParams(searchParams)
-    params.set('tab', partnerTabOf(value))
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }
+  const [tab, changeTab] = useTabParam(partnerTabOf)
 
   return (
     <Tabs value={tab} onValueChange={changeTab}>
@@ -68,23 +58,6 @@ function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
   )
 }
 
-function PartnerLoading() {
-  const t = useTranslations('TradingPartner')
-
-  return (
-    <div aria-busy className="flex flex-col gap-4">
-      <p role="status" className="sr-only">
-        {t('loading')}
-      </p>
-      <Skeleton className="h-48 w-full rounded-xl" />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Skeleton className="h-64 w-full rounded-xl" />
-        <Skeleton className="h-64 w-full rounded-xl" />
-      </div>
-    </div>
-  )
-}
-
 export function PartnerScreen({ id }: { id: string }) {
   const t = useTranslations('TradingPartner')
 
@@ -106,7 +79,7 @@ export function PartnerScreen({ id }: { id: string }) {
       }
       name={data?.name}>
       {isPending ? (
-        <PartnerLoading />
+        <PartnerLoading label={t('loading')} />
       ) : data ? (
         <Suspense>
           <PartnerTabs tradingPartner={data} />

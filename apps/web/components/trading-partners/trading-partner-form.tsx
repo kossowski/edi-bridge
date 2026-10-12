@@ -204,9 +204,11 @@ export function TradingPartnerForm({
           {save.isPending ? t('saving') : tradingPartner ? t('save') : t('create')}
         </Button>
         {tradingPartner ? (
-          <p role="status" className="text-sm">
-            {save.isSuccess && savedLabel}
-          </p>
+          savedLabel && (
+            <p role="status" className="text-sm">
+              {save.isSuccess && savedLabel}
+            </p>
+          )
         ) : (
           <Link href="/trading-partners" className={buttonVariants({ variant: 'outline' })}>
             {t('cancel')}

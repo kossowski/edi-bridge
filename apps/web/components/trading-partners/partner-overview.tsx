@@ -12,14 +12,14 @@ import { documentsHref } from '@/components/documents/document-filters'
 import { LoadError } from '@/components/load-error'
 import { MessageTypeName, usePlainNames } from '@/components/plain-names'
 import { RunLink } from '@/components/runs/run-link'
-import { dayTotals, problemKey } from '@/components/trading-partners/partner-page-helpers'
+import {
+  dayTotals,
+  type PartnerActivityProps,
+  problemKey,
+} from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSetupCard } from '@/components/trading-partners/partner-setup-card'
 import { tradingPartnerActivityQuery } from '@/lib/api/queries'
-import {
-  type OpenProblem,
-  type TradingPartner,
-  type TradingPartnerActivityDetail,
-} from '@edi-bridge/contracts'
+import { type OpenProblem, type TradingPartner } from '@edi-bridge/contracts'
 import {
   Card,
   CardContent,
@@ -60,13 +60,7 @@ function dayOf(date: string) {
   return new Date(`${date}T00:00:00.000Z`)
 }
 
-function DaysCard({
-  activity,
-  tradingPartner,
-}: {
-  activity: TradingPartnerActivityDetail
-  tradingPartner: TradingPartner
-}) {
+function DaysCard({ activity, tradingPartner }: PartnerActivityProps) {
   const t = useTranslations('TradingPartner.days')
   const format = useFormatter()
   const totals = dayTotals(activity.days)
@@ -140,13 +134,7 @@ function DaysCard({
   )
 }
 
-function FlowsCard({
-  activity,
-  tradingPartner,
-}: {
-  activity: TradingPartnerActivityDetail
-  tradingPartner: TradingPartner
-}) {
+function FlowsCard({ activity, tradingPartner }: PartnerActivityProps) {
   const t = useTranslations('TradingPartner.flows')
 
   return (
@@ -232,13 +220,7 @@ function ProblemItem({ problem, now }: { problem: OpenProblem; now: Date }) {
   )
 }
 
-function ProblemsCard({
-  activity,
-  tradingPartner,
-}: {
-  activity: TradingPartnerActivityDetail
-  tradingPartner: TradingPartner
-}) {
+function ProblemsCard({ activity, tradingPartner }: PartnerActivityProps) {
   const t = useTranslations('TradingPartner.problems')
   const now = useNow({ updateInterval: 60_000 })
 
@@ -250,7 +232,7 @@ function ProblemsCard({
             icon={CheckmarkCircle02Icon}
             strokeWidth={2}
             aria-hidden
-            className="size-4 shrink-0 text-emerald-700 dark:text-emerald-300"
+            className="text-success-text size-4 shrink-0"
           />
           {t('none')}
         </p>
@@ -279,13 +261,11 @@ function ProblemsCard({
   )
 }
 
-function OverviewLoading() {
-  const t = useTranslations('TradingPartner.activity')
-
+export function PartnerLoading({ label }: { label: string }) {
   return (
     <div aria-busy className="flex flex-col gap-4">
       <p role="status" className="sr-only">
-        {t('loading')}
+        {label}
       </p>
       <Skeleton className="h-48 w-full rounded-xl" />
       <div className="grid gap-4 lg:grid-cols-2">
@@ -301,7 +281,7 @@ export function PartnerOverview({ tradingPartner }: { tradingPartner: TradingPar
   const activity = useQuery(tradingPartnerActivityQuery(tradingPartner.id))
 
   if (activity.isPending) {
-    return <OverviewLoading />
+    return <PartnerLoading label={t('activity.loading')} />
   }
 
   if (activity.isError) {
@@ -315,13 +295,15 @@ export function PartnerOverview({ tradingPartner }: { tradingPartner: TradingPar
     )
   }
 
+  const props = { activity: activity.data, tradingPartner }
+
   return (
     <div className="flex flex-col gap-4">
-      <PartnerSetupCard activity={activity.data} tradingPartner={tradingPartner} />
+      <PartnerSetupCard {...props} />
       <div className="grid gap-4 lg:grid-cols-2">
-        <DaysCard activity={activity.data} tradingPartner={tradingPartner} />
-        <FlowsCard activity={activity.data} tradingPartner={tradingPartner} />
-        <ProblemsCard activity={activity.data} tradingPartner={tradingPartner} />
+        <DaysCard {...props} />
+        <FlowsCard {...props} />
+        <ProblemsCard {...props} />
       </div>
     </div>
   )

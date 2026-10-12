@@ -82,7 +82,7 @@ describe('partnerSetup', () => {
     const setup = partnerSetup(livePartner, setUp, gln)
 
     expect(setup).toMatchObject({ done: 6, total: 6, next: null })
-    expect(setup.steps.every(({ done }) => done)).toBe(true)
+    expect(setup.steps.every(({ state }) => state === 'done')).toBe(true)
   })
 
   it('names the first missing step even when later ones are done', () => {
@@ -90,5 +90,36 @@ describe('partnerSetup', () => {
       done: 5,
       next: 'connections',
     })
+  })
+
+  it('marks each step as done, next or open', () => {
+    expect(
+      partnerSetup(newPartner, { channelCount: 1, flowCount: 0 }, gln).steps.map(
+        ({ state }) => state,
+      ),
+    ).toEqual(['done', 'done', 'next', 'open', 'open', 'open'])
+  })
+
+  it('carries when the test document and the receipt confirmation were done', () => {
+    const steps = partnerSetup({ ...livePartner, testMode: true }, setUp, gln).steps
+
+    expect(steps.find(({ step }) => step === 'testInterchange')?.doneAt).toBe(
+      livePartner.onboarding.testInterchangeSentAt,
+    )
+    expect(steps.find(({ step }) => step === 'contrl')?.doneAt).toBe(
+      livePartner.onboarding.contrlReceivedAt,
+    )
+    expect(steps.find(({ step }) => step === 'production')?.doneAt).toBeNull()
+  })
+
+  it('names the action of each step', () => {
+    expect(partnerSetup(newPartner, nothingSetUp, null).steps.map(({ action }) => action)).toEqual([
+      { kind: 'link', step: 'identity', href: '/settings' },
+      { kind: 'link', step: 'connections', href: '/channels/new' },
+      { kind: 'link', step: 'documents', href: '/flows/new' },
+      { kind: 'sendTest' },
+      { kind: 'awaitConfirmation' },
+      { kind: 'goLive' },
+    ])
   })
 })

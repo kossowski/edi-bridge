@@ -4,8 +4,32 @@ import type { OnboardingStep, TradingPartner, TradingPartnerActivity } from '@ed
 
 export type PartnerSetupStep = OnboardingStep | 'connections' | 'documents'
 
+export type PartnerSetupStepState = 'done' | 'next' | 'open'
+
+export type PartnerSetupAction =
+  | { kind: 'link'; step: 'identity' | 'connections' | 'documents'; href: string }
+  | { kind: 'sendTest' }
+  | { kind: 'awaitConfirmation' }
+  | { kind: 'goLive' }
+
+const stepActions: Record<PartnerSetupStep, PartnerSetupAction> = {
+  identity: { kind: 'link', step: 'identity', href: '/settings' },
+  connections: { kind: 'link', step: 'connections', href: '/channels/new' },
+  documents: { kind: 'link', step: 'documents', href: '/flows/new' },
+  testInterchange: { kind: 'sendTest' },
+  contrl: { kind: 'awaitConfirmation' },
+  production: { kind: 'goLive' },
+}
+
+export type PartnerSetupItem = {
+  step: PartnerSetupStep
+  state: PartnerSetupStepState
+  doneAt: string | null
+  action: PartnerSetupAction
+}
+
 export type PartnerSetup = {
-  steps: ReadonlyArray<{ step: PartnerSetupStep; done: boolean }>
+  steps: ReadonlyArray<PartnerSetupItem>
   done: number
   total: number
   next: PartnerSetupStep | null
@@ -16,21 +40,37 @@ export function partnerSetup(
   activity: Pick<TradingPartnerActivity, 'channelCount' | 'flowCount'>,
   workspaceGln: string | null,
 ): PartnerSetup {
-  const steps = onboardingChecklist(tradingPartner, workspaceGln).flatMap(
-    ({ step, state }): PartnerSetup['steps'] =>
+  const checks = onboardingChecklist(tradingPartner, workspaceGln).flatMap(
+    ({
+      step,
+      state,
+      at,
+    }): ReadonlyArray<{ step: PartnerSetupStep; done: boolean; at: string | null }> =>
       step === 'identity'
         ? [
-            { step, done: state === 'done' },
-            { step: 'connections', done: activity.channelCount > 0 },
-            { step: 'documents', done: activity.flowCount > 0 },
+            { step, done: state === 'done', at },
+            { step: 'connections', done: activity.channelCount > 0, at: null },
+            { step: 'documents', done: activity.flowCount > 0, at: null },
           ]
-        : [{ step, done: state === 'done' }],
+        : [{ step, done: state === 'done', at }],
   )
+
+  const next = checks.find(({ done }) => !done)?.step ?? null
+
+  const steps = checks.map(({ step, done, at }): PartnerSetupItem => {
+    const action = stepActions[step]
+
+    if (done) {
+      return { step, state: 'done', doneAt: at, action }
+    }
+
+    return { step, state: step === next ? 'next' : 'open', doneAt: null, action }
+  })
 
   return {
     steps,
-    done: steps.filter(({ done }) => done).length,
-    total: steps.length,
-    next: steps.find(({ done }) => !done)?.step ?? null,
+    done: checks.filter(({ done }) => done).length,
+    total: checks.length,
+    next,
   }
 }
