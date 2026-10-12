@@ -1,4 +1,4 @@
-import { expect, screen, userEvent, waitFor } from 'storybook/test'
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { AppHeader } from '@/components/app-header'
 import { HeaderTabs, headerTabsId } from '@/components/header-tabs'
@@ -70,7 +70,9 @@ export const Admin = meta.story({
     await expect(canvas.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
     await expect(tabRow(canvasElement)).not.toBeVisible()
-    await expect(headerActions(canvasElement)).not.toBeVisible()
+    await expect(headerActions(canvasElement)).toContainElement(
+      canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
+    )
   },
 })
 
@@ -195,6 +197,30 @@ export const WithTabs = meta.story({
   },
 })
 
+export const Search = meta.story({
+  parameters: { a11y: { context: 'body' } },
+  beforeEach({ msw }) {
+    msw.use(...sessionHandlers(sandboxAdminSession))
+  },
+  async play({ canvas }) {
+    const search = await canvas.findByRole('button', {
+      name: 'Search orders, partners, documents, pages…',
+    })
+
+    await userEvent.keyboard('{Control>}k{/Control}')
+    const dialog = await screen.findByRole('dialog', { name: 'Search' })
+
+    await waitFor(() => expect(dialog).toBeVisible())
+    await expect(
+      await within(dialog).findByRole('group', { name: 'Trading partners' }),
+    ).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await userEvent.click(search)
+    await expect(await screen.findByRole('dialog', { name: 'Search' })).toBeInTheDocument()
+  },
+})
+
 export const Viewer = meta.story({
   beforeEach({ msw }) {
     msw.use(...sessionHandlers(showcaseViewerSession))
@@ -212,6 +238,9 @@ export const German = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('Nur ansehen')).toBeVisible()
+    await expect(
+      canvas.getByRole('button', { name: 'Aufträge, Handelspartner, Belege, Seiten suchen …' }),
+    ).toBeVisible()
     await expect(
       canvas.getByRole('button', { name: 'Seitenleiste ein- oder ausblenden' }),
     ).toBeVisible()
@@ -261,8 +290,11 @@ export const Tablet = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('View only')).toBeVisible()
-    await expect(canvas.getByRole('link', { name: 'Mappings' })).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Compare' })).toBeVisible()
+    await expect(
+      canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: 'Mappings' })).toBeNull()
     await expect(canvas.queryByRole('link', { name: 'Versions' })).toBeNull()
 
     await userEvent.click(canvas.getByRole('button', { name: 'Show the whole path' }))
@@ -274,7 +306,7 @@ export const Tablet = meta.story({
       ).toBeVisible(),
     )
     await expect(screen.getByRole('menuitem', { name: 'Versions' })).toBeVisible()
-    await expect(screen.queryByRole('menuitem', { name: 'Mappings' })).toBeNull()
+    await expect(screen.getByRole('menuitem', { name: 'Mappings' })).toBeVisible()
   },
 })
 
@@ -288,13 +320,19 @@ export const Mobile = meta.story({
     msw.use(...sessionHandlers(sandboxAdminSession))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('link', { name: 'All connections' })).toBeVisible()
-    await expect(canvas.getByRole('link', { name: 'Edit' })).toHaveAttribute('aria-current', 'page')
+    await expect(await canvas.findByRole('link', { name: 'Edit' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await expect(canvas.queryByRole('link', { name: 'All connections' })).toBeNull()
+    await expect(
+      canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
+    ).toBeVisible()
 
     await userEvent.click(canvas.getByRole('button', { name: 'Show the whole path' }))
     await waitFor(async () =>
       expect(await screen.findByRole('menuitem', { name: 'Details' })).toBeVisible(),
     )
-    await expect(screen.queryByRole('menuitem', { name: 'All connections' })).toBeNull()
+    await expect(screen.getByRole('menuitem', { name: 'All connections' })).toBeVisible()
   },
 })

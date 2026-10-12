@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import messages from '../messages/en.json'
-import { sidebarItem, sidebarItems } from './navigation'
+import { accountMenuItems, sidebarItem, sidebarItems } from './navigation'
 
 describe('sidebarItem', () => {
   it('finds an item for every sidebar label', () => {
@@ -9,5 +9,12 @@ describe('sidebarItem', () => {
       Object.keys(messages.Sidebar.items).toSorted(),
     )
     expect(sidebarItem('codeTranslations').href).toBe('/lookup-tables')
+  })
+})
+
+describe('accountMenuItems', () => {
+  it('offers the Operator area to the Operator only', () => {
+    expect(accountMenuItems(false).map((item) => item.href)).toEqual(['/settings'])
+    expect(accountMenuItems(true).map((item) => item.href)).toEqual(['/settings', '/operator'])
   })
 })

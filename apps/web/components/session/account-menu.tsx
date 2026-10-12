@@ -5,10 +5,8 @@ import {
   LanguageSkillIcon,
   Logout03Icon,
   Moon02Icon,
-  Settings02Icon,
   Sun03Icon,
   UnfoldMoreIcon,
-  UserShield01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -23,6 +21,7 @@ import { useSession } from '@/hooks/use-session'
 import { locales } from '@/i18n/locales'
 import { setLocale } from '@/i18n/set-locale'
 import { signOut } from '@/lib/api/client'
+import { accountMenuItems } from '@/lib/navigation'
 import { Avatar, AvatarFallback } from '@edi-bridge/ui/components/avatar'
 import {
   DropdownMenu,
@@ -149,20 +148,15 @@ export function AccountMenu() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      render={<Link href="/settings" />}
-                      onClick={() => setOpenMobile(false)}>
-                      <HugeiconsIcon icon={Settings02Icon} strokeWidth={2} />
-                      {t('session.settings')}
-                    </DropdownMenuItem>
-                    {operator && (
+                    {accountMenuItems(operator).map((item) => (
                       <DropdownMenuItem
-                        render={<Link href="/operator" />}
+                        key={item.key}
+                        render={<Link href={item.href} />}
                         onClick={() => setOpenMobile(false)}>
-                        <HugeiconsIcon icon={UserShield01Icon} strokeWidth={2} />
-                        {t('session.operatorArea')}
+                        <HugeiconsIcon icon={item.icon} strokeWidth={2} />
+                        {t(`session.${item.key}`)}
                       </DropdownMenuItem>
-                    )}
+                    ))}
                   </DropdownMenuGroup>
                 </>
               )}
