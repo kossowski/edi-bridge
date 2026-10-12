@@ -485,7 +485,8 @@
       "label": "Pages",
       "page": "Page {page} of {pageCount}",
       "previous": "Previous page",
-      "next": "Next page"
+      "next": "Next page",
+      "first": "Go to the first page"
     },
     "empty": {
       "noDocuments": {
@@ -503,6 +504,10 @@
       "emptyGroup": {
         "title": "No documents with this status",
         "description": "Choose another status above."
+      },
+      "pageOutOfRange": {
+        "title": "This page is empty",
+        "description": "There are fewer documents now. The first page shows the newest."
       }
     },
     "error": {
@@ -819,10 +824,10 @@
       "failed": "The Flows could not be loaded."
     },
     "runs": {
-      "title": "Recent Runs",
-      "none": "No Runs for this Trading Partner yet.",
-      "failed": "The recent Runs could not be loaded.",
-      "viewAll": "View all {count, plural, one {# Run} other {# Runs}} of this Trading Partner"
+      "title": "Recent documents",
+      "none": "No documents for this trading partner yet.",
+      "failed": "The recent documents could not be loaded.",
+      "viewAll": "View all {count, plural, one {# document} other {# documents}} of this trading partner"
     }
   },
   "TradingPartnerForm": {

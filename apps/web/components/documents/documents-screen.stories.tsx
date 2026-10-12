@@ -1,8 +1,8 @@
 import { delay, http, HttpResponse } from 'msw'
-import { expect } from 'storybook/test'
+import { expect, within } from 'storybook/test'
 
 import { DocumentsScreen } from '@/components/documents/documents-screen'
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { runsEndpoint } from '@edi-bridge/contracts'
 import { createRuns, runsHandler, seedRuns } from '@edi-bridge/mocks'
@@ -104,6 +104,19 @@ export const NothingMatches = meta.story({
   },
 })
 
+export const PageOutOfRange = meta.story({
+  parameters: {
+    nextjs: { navigation: { pathname: '/documents', query: { status: 'all', page: '99999' } } },
+  },
+  beforeEach({ msw }) {
+    msw.use(runsHandler(apiUrl, runs))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('This page is empty')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Go to the first page' })).toBeVisible()
+  },
+})
+
 export const LargeVolume = meta.story({
   parameters: allStatuses,
   beforeEach({ msw }) {
@@ -139,12 +152,34 @@ export const Dark = meta.story({
   },
 })
 
+async function expectRowsStacked(canvasElement: HTMLElement) {
+  const list = await within(canvasElement).findByRole('list', { name: 'Documents, newest first' })
+  const row = list.querySelector('li')
+  const content = row?.querySelector('[data-slot="item-content"]')
+
+  await expect(content?.getBoundingClientRect().width).toBeGreaterThan(200)
+  await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth)
+}
+
 export const Mobile = meta.story({
   ...mobile,
   beforeEach({ msw }) {
     msw.use(runsHandler(apiUrl, runs))
   },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await expect(await canvas.findByText(/^\d+ documents?$/)).toBeVisible()
+    await expectRowsStacked(canvasElement)
+  },
+})
+
+export const Tablet = meta.story({
+  ...tablet,
+  decorators: [besideSidebar],
+  beforeEach({ msw }) {
+    msw.use(runsHandler(apiUrl, runs))
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText(/^\d+ documents?$/)).toBeVisible()
+    await expectRowsStacked(canvasElement)
   },
 })

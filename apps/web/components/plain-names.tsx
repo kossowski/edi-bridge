@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 
-import type { StatusGroup } from '@/components/documents/document-filters'
+import type { StatusGroup } from '@/lib/status-groups'
 import type { FailureStage, MessageType, RunStatus } from '@edi-bridge/contracts'
 
 export function usePlainNames() {

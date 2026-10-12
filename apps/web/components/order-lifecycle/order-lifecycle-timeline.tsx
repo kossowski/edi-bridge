@@ -18,6 +18,7 @@ import {
 } from '@/components/order-lifecycle/order-lifecycle-steps'
 import { RunLink, shortId } from '@/components/runs/run-link'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
+import { runHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -76,7 +77,7 @@ function MessageEntry({
         {run.replacedBy && (
           <span>
             {tRun('facts.replacedBy')}{' '}
-            <Link href={`/runs/${run.replacedBy.id}`} className={cn(linkClass, 'relative')}>
+            <Link href={runHref(run.replacedBy.id)} className={cn(linkClass, 'relative')}>
               {tRun('runLink', { id: shortId(run.replacedBy.id) })}
             </Link>
           </span>

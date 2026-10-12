@@ -5,19 +5,11 @@ import {
   type RunStatus,
 } from '@edi-bridge/contracts'
 
-export const statusGroups = ['attention', 'progress', 'done', 'all'] as const
-
-export type StatusGroup = (typeof statusGroups)[number]
+import { groupStatuses, type StatusGroup, statusGroups } from '../../lib/status-groups'
 
 export const defaultStatusGroup: StatusGroup = 'attention'
 
-export const groupStatuses: Readonly<Record<Exclude<StatusGroup, 'all'>, readonly RunStatus[]>> = {
-  attention: ['failed'],
-  progress: ['received', 'processing'],
-  done: ['delivered', 'duplicate'],
-}
-
-export const documentPageSize = 50
+export const runPageSize = 50
 
 export type DocumentFilters = {
   status: StatusGroup
@@ -27,11 +19,15 @@ export type DocumentFilters = {
   page: number
 }
 
-export const emptyDocumentFilters: DocumentFilters = {
-  status: defaultStatusGroup,
+export const clearedSearchFilters = {
   q: '',
   tradingPartnerId: '',
   messageType: '',
+} satisfies Partial<DocumentFilters>
+
+export const emptyDocumentFilters: DocumentFilters = {
+  status: defaultStatusGroup,
+  ...clearedSearchFilters,
   page: 1,
 }
 
@@ -95,7 +91,7 @@ export function toRunListQuery(filters: DocumentFilters): RunListQuery {
     messageType: filters.messageType === '' ? undefined : [filters.messageType],
     q: q === '' ? undefined : q,
     page: filters.page,
-    pageSize: documentPageSize,
+    pageSize: runPageSize,
   }
 }
 
@@ -103,8 +99,10 @@ export function statusGroupCount(
   statusCounts: Readonly<Partial<Record<RunStatus, number>>>,
   group: StatusGroup,
 ) {
-  const statuses: readonly RunStatus[] =
-    group === 'all' ? Object.values(groupStatuses).flat() : groupStatuses[group]
+  const counts =
+    group === 'all'
+      ? Object.values(statusCounts)
+      : groupStatuses[group].map((status) => statusCounts[status])
 
-  return statuses.reduce((sum, status) => sum + (statusCounts[status] ?? 0), 0)
+  return counts.reduce<number>((sum, count) => sum + (count ?? 0), 0)
 }

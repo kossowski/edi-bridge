@@ -478,14 +478,15 @@
     },
     "whoFixes": {
       "partner": "Ihr Partner behebt das",
-      "retry": "Einfach erneut versuchen",
+      "retry": "Erneut versuchen genügt",
       "you": "Sie beheben das"
     },
     "pagination": {
       "label": "Seiten",
       "page": "Seite {page} von {pageCount}",
       "previous": "Vorherige Seite",
-      "next": "Nächste Seite"
+      "next": "Nächste Seite",
+      "first": "Zur ersten Seite"
     },
     "empty": {
       "noDocuments": {
@@ -503,6 +504,10 @@
       "emptyGroup": {
         "title": "Keine Belege mit diesem Status",
         "description": "Wählen Sie oben einen anderen Status."
+      },
+      "pageOutOfRange": {
+        "title": "Diese Seite ist leer",
+        "description": "Es gibt jetzt weniger Belege. Die erste Seite zeigt die neuesten."
       }
     },
     "error": {
@@ -819,10 +824,10 @@
       "failed": "Die Flows konnten nicht geladen werden."
     },
     "runs": {
-      "title": "Letzte Runs",
-      "none": "Für diesen Trading Partner gibt es noch keine Runs.",
-      "failed": "Die letzten Runs konnten nicht geladen werden.",
-      "viewAll": "Alle {count, plural, one {# Run} other {# Runs}} dieses Trading Partners anzeigen"
+      "title": "Letzte Belege",
+      "none": "Für diesen Handelspartner gibt es noch keine Belege.",
+      "failed": "Die letzten Belege konnten nicht geladen werden.",
+      "viewAll": "Alle {count, plural, one {# Beleg} other {# Belege}} dieses Handelspartners anzeigen"
     }
   },
   "TradingPartnerForm": {

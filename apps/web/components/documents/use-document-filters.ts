@@ -9,7 +9,6 @@ import {
   parseDocumentFilters,
 } from '@/components/documents/document-filters'
 
-// The filters live in the URL; local state keeps the screen responsive until the router catches up.
 export function useDocumentFilters() {
   const searchParams = useSearchParams()
   const router = useRouter()

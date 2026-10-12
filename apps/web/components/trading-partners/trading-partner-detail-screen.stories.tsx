@@ -43,7 +43,7 @@ export const InProduction = meta.story({
     await expect(
       await flows.findByRole('link', { name: 'Hansemarkt ORDERS inbound' }),
     ).toHaveAttribute('href', `/flows/${seedFlows[0]!.id}`)
-    await expect(await canvas.findByRole('link', { name: /View all .* Runs/ })).toBeVisible()
+    await expect(await canvas.findByRole('link', { name: /View all .* documents/ })).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Switch to production' })).toBeNull()
   },
 })
@@ -98,7 +98,9 @@ export const WithoutTraffic = meta.story({
     await expect(
       await canvas.findByText('You can switch to production once the test Interchange is sent.'),
     ).toBeVisible()
-    await expect(await canvas.findByText('No Runs for this Trading Partner yet.')).toBeVisible()
+    await expect(
+      await canvas.findByText('No documents for this trading partner yet.'),
+    ).toBeVisible()
     await expect(canvas.getByText('No Flows for this Trading Partner yet.')).toBeVisible()
   },
 })

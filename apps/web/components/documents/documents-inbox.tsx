@@ -15,19 +15,19 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { useEffect, useId, useRef, useState } from 'react'
 
 import {
+  clearedSearchFilters,
   type DocumentFilters,
-  documentPageSize,
   hasSearchFilters,
-  type StatusGroup,
+  runPageSize,
   statusGroupCount,
-  statusGroups,
   toRunListQuery,
 } from '@/components/documents/document-filters'
-import { DocumentRow, DocumentRowSkeleton } from '@/components/documents/document-row'
+import { RunRow, RunRowSkeleton } from '@/components/documents/run-row'
 import { useDocumentFilters } from '@/components/documents/use-document-filters'
 import { LoadError } from '@/components/load-error'
 import { usePlainNames } from '@/components/plain-names'
 import { runsQuery, tradingPartnersQuery } from '@/lib/api/queries'
+import { type StatusGroup, statusGroups } from '@/lib/status-groups'
 import { messageTypes, type RunList } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -51,11 +51,19 @@ function SearchField({ value, onSearch }: { value: string; onSearch: (q: string)
   const [text, setText] = useState(value)
   const [shown, setShown] = useState(value)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const searched = useRef(value)
 
   if (value !== shown) {
     setShown(value)
     setText(value)
   }
+
+  useEffect(() => {
+    if (value !== searched.current) {
+      searched.current = value
+      clearTimeout(timer.current)
+    }
+  }, [value])
 
   useEffect(() => () => clearTimeout(timer.current), [])
 
@@ -75,7 +83,10 @@ function SearchField({ value, onSearch }: { value: string; onSearch: (q: string)
 
           setText(next)
           clearTimeout(timer.current)
-          timer.current = setTimeout(() => onSearch(next), searchDelay)
+          timer.current = setTimeout(() => {
+            searched.current = next
+            onSearch(next)
+          }, searchDelay)
         }}
       />
     </InputGroup>
@@ -84,10 +95,14 @@ function SearchField({ value, onSearch }: { value: string; onSearch: (q: string)
 
 function Filters({
   filters,
+  searchKey,
   onChange,
+  onClear,
 }: {
   filters: DocumentFilters
+  searchKey: number
   onChange: (change: Partial<DocumentFilters>) => void
+  onClear: () => void
 }) {
   const t = useTranslations('Documents.filters')
   const plainNames = usePlainNames()
@@ -95,7 +110,7 @@ function Filters({
 
   return (
     <search aria-label={t('label')} className="flex flex-wrap items-center gap-2">
-      <SearchField value={filters.q} onSearch={(q) => onChange({ q })} />
+      <SearchField key={searchKey} value={filters.q} onSearch={(q) => onChange({ q })} />
       <NativeSelect
         value={filters.tradingPartnerId}
         aria-label={t('tradingPartner')}
@@ -123,9 +138,7 @@ function Filters({
         ))}
       </NativeSelect>
       {hasSearchFilters(filters) && (
-        <Button
-          variant="ghost"
-          onClick={() => onChange({ q: '', tradingPartnerId: '', messageType: '' })}>
+        <Button variant="ghost" onClick={onClear}>
           <HugeiconsIcon icon={FilterRemoveIcon} strokeWidth={2} data-icon="inline-start" />
           {t('clear')}
         </Button>
@@ -148,53 +161,60 @@ function StatusGroupFilter({
   const format = useFormatter()
 
   return (
-    <ToggleGroup
-      spacing={0}
-      value={[value]}
-      variant="outline"
-      aria-label={t('statusGroups')}
-      className="max-w-full flex-wrap"
-      onValueChange={(next) => {
-        const status = statusGroups.find((group) => group === next[0])
+    <div className="-m-1 max-w-[calc(100%+0.5rem)] overflow-x-auto p-1">
+      <ToggleGroup
+        spacing={0}
+        value={[value]}
+        variant="outline"
+        aria-label={t('statusGroups')}
+        onValueChange={(next) => {
+          const status = statusGroups.find((group) => group === next[0])
 
-        if (status) {
-          onChange(status)
-        }
-      }}>
-      {statusGroups.map((group) => {
-        const count = statusCounts && statusGroupCount(statusCounts, group)
+          if (status) {
+            onChange(status)
+          }
+        }}>
+        {statusGroups.map((group) => {
+          const count = statusCounts && statusGroupCount(statusCounts, group)
 
-        return (
-          <ToggleGroupItem key={group} value={group} className="gap-2">
-            {plainNames.statusGroup(group)}
-            {count !== undefined && (
-              <Badge
-                variant={
-                  group === 'attention' && count > 0 && group !== value
-                    ? 'destructive'
-                    : 'secondary'
-                }
-                className="tabular-nums">
-                {format.number(count)}
-              </Badge>
-            )}
-          </ToggleGroupItem>
-        )
-      })}
-    </ToggleGroup>
+          return (
+            <ToggleGroupItem key={group} value={group} className="gap-2">
+              {plainNames.statusGroup(group)}
+              {count !== undefined && (
+                <Badge
+                  variant={
+                    group === 'attention' && count > 0 && group !== value
+                      ? 'destructive'
+                      : 'secondary'
+                  }
+                  className="tabular-nums">
+                  {format.number(count)}
+                </Badge>
+              )}
+            </ToggleGroupItem>
+          )
+        })}
+      </ToggleGroup>
+    </div>
   )
 }
 
-type EmptyKind = 'noDocuments' | 'nothingNeedsAttention' | 'nothingMatches' | 'emptyGroup'
+type EmptyKind =
+  'noDocuments' | 'nothingNeedsAttention' | 'nothingMatches' | 'emptyGroup' | 'pageOutOfRange'
 
 const emptyIcons: Record<EmptyKind, IconSvgElement> = {
   noDocuments: File02Icon,
   nothingNeedsAttention: CheckmarkCircle02Icon,
   nothingMatches: SearchRemoveIcon,
   emptyGroup: File02Icon,
+  pageOutOfRange: File02Icon,
 }
 
 function emptyKind(filters: DocumentFilters, list: RunList): EmptyKind {
+  if (list.total > 0) {
+    return 'pageOutOfRange'
+  }
+
   if (hasSearchFilters(filters)) {
     return 'nothingMatches'
   }
@@ -206,7 +226,15 @@ function emptyKind(filters: DocumentFilters, list: RunList): EmptyKind {
   return filters.status === 'attention' ? 'nothingNeedsAttention' : 'emptyGroup'
 }
 
-function EmptyDocuments({ kind, onClear }: { kind: EmptyKind; onClear: () => void }) {
+function EmptyDocuments({
+  kind,
+  onClear,
+  onFirstPage,
+}: {
+  kind: EmptyKind
+  onClear: () => void
+  onFirstPage: () => void
+}) {
   const t = useTranslations('Documents')
 
   return (
@@ -225,6 +253,13 @@ function EmptyDocuments({ kind, onClear }: { kind: EmptyKind; onClear: () => voi
           </Button>
         </EmptyContent>
       )}
+      {kind === 'pageOutOfRange' && (
+        <EmptyContent>
+          <Button variant="outline" onClick={onFirstPage}>
+            {t('pagination.first')}
+          </Button>
+        </EmptyContent>
+      )}
     </Empty>
   )
 }
@@ -239,7 +274,7 @@ function Pagination({
   onPage: (page: number) => void
 }) {
   const t = useTranslations('Documents.pagination')
-  const pageCount = Math.max(1, Math.ceil(total / documentPageSize))
+  const pageCount = Math.max(1, Math.ceil(total / runPageSize))
 
   if (pageCount === 1) {
     return null
@@ -274,12 +309,18 @@ export function DocumentsInbox() {
   const t = useTranslations('Documents')
   const [filters, updateFilters] = useDocumentFilters()
   const listId = useId()
+  const [searchKey, setSearchKey] = useState(0)
 
   const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(
     runsQuery(toRunListQuery(filters)),
   )
 
-  const clearFilters = () => updateFilters({ q: '', tradingPartnerId: '', messageType: '' })
+  const settled = isPlaceholderData ? undefined : data
+
+  const clearFilters = () => {
+    setSearchKey((key) => key + 1)
+    updateFilters(clearedSearchFilters)
+  }
 
   function results() {
     if (isError && !data) {
@@ -293,9 +334,17 @@ export function DocumentsInbox() {
       )
     }
 
-    if (data?.total === 0) {
-      return <EmptyDocuments kind={emptyKind(filters, data)} onClear={clearFilters} />
+    if (settled?.runs.length === 0) {
+      return (
+        <EmptyDocuments
+          kind={emptyKind(filters, settled)}
+          onClear={clearFilters}
+          onFirstPage={() => updateFilters({ page: 1 })}
+        />
+      )
     }
+
+    const waiting = isPending || (isPlaceholderData && data.runs.length === 0)
 
     return (
       <>
@@ -304,12 +353,12 @@ export function DocumentsInbox() {
           aria-busy={isPending || isPlaceholderData}
           aria-label={t('list')}
           className={cn(
-            'flex flex-col gap-2',
+            '@container flex flex-col gap-2',
             isPlaceholderData && 'opacity-60 transition-opacity',
           )}>
-          {isPending
-            ? Array.from({ length: 8 }, (_, index) => <DocumentRowSkeleton key={index} />)
-            : data.runs.map((run) => <DocumentRow key={run.id} run={run} />)}
+          {waiting
+            ? Array.from({ length: 8 }, (_, index) => <RunRowSkeleton key={index} />)
+            : data.runs.map((run) => <RunRow key={run.id} run={run} />)}
         </ul>
         {data && (
           <Pagination
@@ -327,7 +376,12 @@ export function DocumentsInbox() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Filters filters={filters} onChange={updateFilters} />
+      <Filters
+        filters={filters}
+        searchKey={searchKey}
+        onChange={updateFilters}
+        onClear={clearFilters}
+      />
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <StatusGroupFilter
           statusCounts={data?.statusCounts}

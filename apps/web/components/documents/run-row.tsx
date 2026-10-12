@@ -14,7 +14,7 @@ import Link from 'next/link'
 import { whoFixes, type Fixer } from '@/components/documents/who-fixes'
 import { usePlainNames } from '@/components/plain-names'
 import { RunStatusBadge } from '@/components/runs/run-status'
-import { navigationItems } from '@/lib/navigation'
+import { navigationItems, runHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -26,6 +26,7 @@ import {
   ItemTitle,
 } from '@edi-bridge/ui/components/item'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { RunSummary } from '@edi-bridge/contracts'
 
@@ -39,7 +40,7 @@ function orderHref(businessReference: string) {
   return `${navigationItems.orderLifecycle.href}?${new URLSearchParams({ businessReference })}`
 }
 
-function useDocumentTitle(run: RunSummary) {
+function useRunTitle(run: RunSummary) {
   const t = useTranslations('Documents.row')
   const plainNames = usePlainNames()
 
@@ -65,14 +66,14 @@ function FixerBadge({ fixer }: { fixer: Fixer }) {
   )
 }
 
-export function DocumentRow({ run }: { run: RunSummary }) {
+export function RunRow({ run }: { run: RunSummary }) {
   const t = useTranslations('Documents.row')
   const plainNames = usePlainNames()
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
-  const title = useDocumentTitle(run)
+  const title = useRunTitle(run)
   const fixer = whoFixes(run)
-  const href = `/runs/${run.id}`
+  const href = runHref(run.id)
   const receivedAt = new Date(run.receivedAt)
   const reference = run.businessReference
 
@@ -104,7 +105,7 @@ export function DocumentRow({ run }: { run: RunSummary }) {
                 link: (chunks) => (
                   <Link
                     href={orderHref(reference)}
-                    className="text-foreground focus-visible:ring-ring/50 rounded-sm outline-none focus-visible:ring-3">
+                    className="text-foreground focus-visible:ring-ring/50 rounded-sm underline underline-offset-2 outline-none focus-visible:ring-3">
                     {chunks}
                   </Link>
                 ),
@@ -128,10 +129,10 @@ export function DocumentRow({ run }: { run: RunSummary }) {
           </div>
         )}
       </ItemContent>
-      <ItemActions className="ml-auto flex-wrap justify-end">
+      <ItemActions className="basis-full flex-wrap pl-10.5 @2xl:ml-auto @2xl:basis-auto @2xl:justify-end @2xl:pl-0">
         <RunStatusBadge status={run.status} />
         {run.status === 'failed' && (
-          <Link href={href} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <Link href={href} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             {t('whatToDo')}
             <span className="sr-only">: {title}</span>
           </Link>
@@ -141,7 +142,7 @@ export function DocumentRow({ run }: { run: RunSummary }) {
   )
 }
 
-export function DocumentRowSkeleton() {
+export function RunRowSkeleton() {
   return (
     <Item render={<li />} variant="outline" className="items-start">
       <Skeleton className="size-8 rounded-full" />
