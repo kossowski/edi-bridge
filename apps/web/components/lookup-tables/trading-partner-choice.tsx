@@ -24,7 +24,7 @@ export function TradingPartnerChoice({
   if (tradingPartners.isError) {
     return (
       <div className="flex flex-col items-start gap-2">
-        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+        <p role="alert" className="text-destructive-text text-sm">
           {t('error')}
         </p>
         <Button size="sm" variant="outline" onClick={() => void tradingPartners.refetch()}>

@@ -235,6 +235,10 @@ export function lookupTableHref(id: string) {
   return `${navigationItems.codeTranslations.href}/${id}`
 }
 
+export function newLookupTableHref() {
+  return `${navigationItems.codeTranslations.href}/new`
+}
+
 export function orderHref(businessReference: string) {
   return `${navigationItems.orders.href}/${encodeURIComponent(businessReference)}`
 }

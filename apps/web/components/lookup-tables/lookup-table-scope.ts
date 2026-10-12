@@ -24,3 +24,14 @@ export function toScopeInput(scope: LookupTableScope): LookupTableScopeInput {
     ? { kind: 'workspace' }
     : { kind: 'tradingPartner', tradingPartnerId: scope.tradingPartner.id }
 }
+
+export function scopeInputOf(
+  kind: LookupTableScopeInput['kind'],
+  tradingPartnerId: string | null,
+): LookupTableScopeInput | null {
+  if (kind === 'workspace') {
+    return { kind: 'workspace' }
+  }
+
+  return tradingPartnerId === null ? null : { kind: 'tradingPartner', tradingPartnerId }
+}

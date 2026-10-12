@@ -3403,7 +3403,8 @@
   },
   "CodeTranslationNew": {
     "title": "New list",
-    "intro": "Choose what your partners write differently and who receives it. The list starts with suggested values that you accept or change.",
+    "titleNamed": "New: {name}",
+    "intro": "Choose what your partners write differently and which partners the list applies to. The list starts with suggested values that you accept or change.",
     "kind": {
       "question": "What is written differently?",
       "examples": {
@@ -3414,14 +3415,14 @@
       }
     },
     "receiver": {
-      "question": "Who receives it?",
+      "question": "{direction, select, inbound {Whose codes does it translate?} other {Who receives it?}}",
       "workspace": {
         "title": "Every partner",
-        "description": "Every partner gets the translated codes."
+        "description": "{direction, select, inbound {Codes from every partner are translated.} other {Every partner gets the translated codes.}}"
       },
       "tradingPartner": {
         "title": "One trading partner",
-        "description": "Only the chosen trading partner gets the translated codes."
+        "description": "{direction, select, inbound {Only codes from the chosen trading partner are translated.} other {Only the chosen trading partner gets the translated codes.}}"
       }
     },
     "name": {
@@ -3429,12 +3430,12 @@
     },
     "suggestions": {
       "title": "Suggested values",
-      "description": "Accept the values that fit, change what the partner gets, or skip them.",
+      "description": "{direction, select, inbound {Accept the values that fit, change what they become, or skip them.} other {Accept the values that fit, change what the partner gets, or skip them.}}",
       "loading": "Loading suggested values",
       "none": "There are no suggestions for this kind. Add your own values below.",
       "done": "You have gone through every suggestion.",
       "row": "Suggestion {code}",
-      "sendAs": "Send {code} as",
+      "sendAs": "{direction, select, inbound {{code} becomes} other {Send {code} as}}",
       "accept": "Accept {code}",
       "acceptShort": "Accept",
       "skip": "Skip {code}",
@@ -3446,7 +3447,8 @@
         "title": "Suggestions unavailable",
         "description": "The suggested values could not be loaded. Try again, or add your own values.",
         "retry": "Try again"
-      }
+      },
+      "byAi": "Suggested by AI"
     },
     "values": {
       "title": "Values in the new list",
@@ -3460,6 +3462,24 @@
       "submit": "Create list",
       "creating": "Creating…",
       "failed": "The list could not be created. Try again."
+    },
+    "sides": {
+      "units": {
+        "yours": "Your unit",
+        "partner": "Unit code"
+      },
+      "countries": {
+        "yours": "Your country",
+        "partner": "Country code"
+      },
+      "addresses": {
+        "yours": "Your address ID",
+        "partner": "Their store number"
+      },
+      "other": {
+        "yours": "Your value",
+        "partner": "Their value"
+      }
     }
   },
   "CodeTranslations": {

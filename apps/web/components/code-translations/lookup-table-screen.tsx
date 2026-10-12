@@ -102,7 +102,7 @@ export function LookupTableScreen({
           />
           {session.canChange && (
             <ImportCsvDialog
-              direction={tableDirection(data.uses)}
+              direction={tableDirection(data)}
               finalFocus={importButton}
               open={importOpen}
               table={data}

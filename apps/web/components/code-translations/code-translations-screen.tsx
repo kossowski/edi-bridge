@@ -24,7 +24,7 @@ import {
 } from '@/components/lookup-tables/lookup-table-scope'
 import { useCanChange } from '@/hooks/use-session'
 import { lookupTablesQuery } from '@/lib/api/queries'
-import { navigationItems } from '@/lib/navigation'
+import { newLookupTableHref } from '@/lib/navigation'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -37,8 +37,6 @@ import {
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { LookupTable, LookupTableScope, LookupTableSummary } from '@edi-bridge/contracts'
-
-const newListHref = `${navigationItems.codeTranslations.href}/new`
 
 const shownPerGroup = 12
 
@@ -127,7 +125,7 @@ function NewListLink({ ref }: { ref?: Ref<HTMLAnchorElement> }) {
   const t = useTranslations('CodeTranslations')
 
   return (
-    <Link href={newListHref} ref={ref} className={buttonVariants()}>
+    <Link href={newLookupTableHref()} ref={ref} className={buttonVariants()}>
       <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden data-icon="inline-start" />
       {t('new')}
     </Link>

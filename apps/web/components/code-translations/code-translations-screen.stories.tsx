@@ -155,7 +155,10 @@ export const Empty = meta.story({
     const newLinks = canvas.getAllByRole('link', { name: 'New list' })
 
     await expect(newLinks).toHaveLength(2)
-    await expect(newLinks[1]).toHaveAttribute('href', '/code-translations/new')
+
+    for (const link of newLinks) {
+      await expect(link).toHaveAttribute('href', '/code-translations/new')
+    }
   },
 })
 

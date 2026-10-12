@@ -17,7 +17,7 @@ import {
   tradingPartnerHandlers,
 } from '@edi-bridge/mocks'
 
-import type { LookupTableKind } from '@edi-bridge/contracts'
+import type { LookupTableKind, SuggestedEntry } from '@edi-bridge/contracts'
 
 import preview from '../../.storybook/preview'
 
@@ -40,6 +40,12 @@ const kindLabels = {
   other: 'Other codes',
 } as const satisfies Record<LookupTableKind, string>
 
+const manySuggestions: SuggestedEntry[] = Array.from({ length: 200 }, (_, index) => ({
+  sourceCode: `U${String(index + 1).padStart(3, '0')}`,
+  targetCode: `P${String(index + 1).padStart(3, '0')}`,
+  targetMeaning: null,
+}))
+
 function startsWith(text: string) {
   return (name: string) => name.startsWith(text)
 }
@@ -53,6 +59,10 @@ async function chooseKindAndEveryPartner(root: HTMLElement, kind: LookupTableKin
 
   await userEvent.click(await canvas.findByRole('radio', { name: startsWith(kindLabels[kind]) }))
   await userEvent.click(await canvas.findByRole('radio', { name: startsWith('Every partner') }))
+}
+
+async function valueList(root: HTMLElement) {
+  return within(await within(root).findByRole('list', { name: /^Values in the new list/ }))
 }
 
 async function suggestionList(root: HTMLElement) {
@@ -83,6 +93,7 @@ export const Default = meta.story({
     ).toHaveAccessibleDescription('Your ST is sent as PCE')
     await expect(canvas.queryByRole('radiogroup', { name: 'Who receives it?' })).toBeNull()
     await expect(canvas.queryByRole('button', { name: 'Create list' })).toBeNull()
+    await expect(canvas.getByRole('heading', { level: 1 })).toHaveTextContent('New list')
   },
 })
 
@@ -93,8 +104,13 @@ export const Units = meta.story({
 
     await expect(await suggestions.findByRole('textbox', { name: 'Send ST as' })).toHaveValue('PCE')
     await expect(suggestions.getByText('PCE means Piece.')).toBeVisible()
+    await expect(canvas.getByText('Suggested by AI')).toBeVisible()
+    await expect(canvas.getByRole('heading', { name: 'Who receives it?' })).toBeVisible()
     await expect(canvas.getByText(/^Creates/)).toHaveTextContent(
       'Creates Units of measure (2) with no values.',
+    )
+    await expect(canvas.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'New: Units of measure (2)',
     )
   },
 })
@@ -118,12 +134,30 @@ export const Addresses = meta.story({
     await chooseKindAndEveryPartner(canvasElement, 'addresses')
 
     await expect(
+      canvas.getByRole('heading', { name: 'Whose codes does it translate?' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole('radio', { name: startsWith('Every partner') }),
+    ).toHaveAccessibleDescription('Codes from every partner are translated.')
+    await expect(
       await canvas.findByText('There are no suggestions for this kind. Add your own values below.'),
     ).toBeVisible()
+    await expect(canvas.queryByRole('heading', { name: /^Suggested values/ })).toBeNull()
+    await expect(canvas.queryByText('Suggested by AI')).toBeNull()
+    await expect(canvas.queryByText(/^No values yet/)).toBeNull()
     const add = within(canvas.getByRole('form', { name: 'Add a value' }))
+    const storeNumber = add.getByRole('textbox', { name: 'Their store number' })
 
-    await expect(add.getByRole('textbox', { name: 'Your value' })).not.toHaveFocus()
+    await expect(storeNumber).not.toHaveFocus()
     await expect(canvas.getByRole('radio', { name: startsWith('Every partner') })).toHaveFocus()
+
+    await userEvent.type(storeNumber, '4711')
+    await userEvent.type(add.getByRole('textbox', { name: 'Your address ID' }), 'DA-4711')
+    await userEvent.click(add.getByRole('button', { name: 'Save' }))
+
+    const [row] = (await valueList(canvasElement)).getAllByRole('listitem')
+
+    await expect(row).toHaveTextContent(/^4711\s*becomes\s*DA-4711/)
   },
 })
 
@@ -133,7 +167,7 @@ export const Other = meta.story({
     const add = within(await canvas.findByRole('form', { name: 'Add a value' }))
 
     await userEvent.type(add.getByRole('textbox', { name: 'Your value' }), 'S')
-    await userEvent.type(add.getByRole('textbox', { name: 'What the partner gets' }), 'STANDARD')
+    await userEvent.type(add.getByRole('textbox', { name: 'Their value' }), 'STANDARD')
     await userEvent.click(add.getByRole('button', { name: 'Save' }))
 
     const values = within(canvas.getByRole('list', { name: /^Values in the new list/ }))
@@ -311,8 +345,10 @@ export const German = meta.story({
     const suggestions = within(await canvas.findByRole('list', { name: /^Vorgeschlagene Werte/ }))
 
     await expect(await suggestions.findByRole('button', { name: 'Übernehmen: ST' })).toBeVisible()
-    await expect(canvas.getByText(/^Legt/)).toHaveTextContent(
-      'Legt Mengeneinheiten mit keinen Werten an.',
+    await expect(canvas.getByText(/^Legt/)).toHaveTextContent('Legt Mengeneinheiten ohne Werte an.')
+    await expect(canvas.getByText('Von der KI vorgeschlagen')).toBeVisible()
+    await expect(canvas.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Neu: Mengeneinheiten',
     )
   },
 })
@@ -337,6 +373,133 @@ export const Mobile = meta.story({
   async play({ canvasElement }) {
     await chooseKindAndEveryPartner(canvasElement)
     await (await suggestionList(canvasElement)).findByRole('button', { name: 'Accept ST' })
+    await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const GermanAddresses = meta.story({
+  decorators: [german],
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('radio', { name: startsWith('Filial- oder Lieferadressen') }),
+    )
+    await userEvent.click(canvas.getByRole('radio', { name: startsWith('Jeder Partner') }))
+
+    await expect(canvas.getByRole('heading', { name: 'Wessen Codes übersetzt sie?' })).toBeVisible()
+    const add = within(await canvas.findByRole('form', { name: 'Wert hinzufügen' }))
+
+    await expect(add.getByRole('textbox', { name: 'Filialnummer des Partners' })).toBeVisible()
+    await expect(add.getByRole('textbox', { name: 'Ihre Adress-ID' })).toBeVisible()
+  },
+})
+
+export const ManySuggestions = meta.story({
+  beforeEach({ msw }) {
+    msw.use(suggestionsResponding(() => HttpResponse.json({ entries: manySuggestions })))
+  },
+  async play({ canvas, canvasElement }) {
+    await chooseKindAndEveryPartner(canvasElement)
+    const suggestions = await suggestionList(canvasElement)
+
+    await expect(await suggestions.findAllByRole('listitem')).toHaveLength(200)
+    await expect(canvas.getByRole('heading', { name: /^Suggested values\s*200$/ })).toBeVisible()
+
+    await userEvent.click(suggestions.getByRole('button', { name: 'Accept U001' }))
+    await expect(suggestions.getByRole('textbox', { name: 'Send U002 as' })).toHaveFocus()
+    await expect(
+      canvas.getByText('199 suggestions you have not accepted are left out.'),
+    ).toBeVisible()
+  },
+})
+
+export const ShowSkippedFocusesRestored = meta.story({
+  async play({ canvas, canvasElement }) {
+    await chooseKindAndEveryPartner(canvasElement)
+    const suggestions = await suggestionList(canvasElement)
+
+    await userEvent.click(await suggestions.findByRole('button', { name: 'Accept ST' }))
+    await userEvent.click(suggestions.getByRole('button', { name: 'Skip KRT' }))
+    await userEvent.click(suggestions.getByRole('button', { name: 'Skip KG' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Show again' }))
+
+    await expect(suggestions.getByRole('textbox', { name: 'Send KRT as' })).toHaveFocus()
+  },
+})
+
+export const ShowSkippedAfterLast = meta.story({
+  async play({ canvas, canvasElement }) {
+    await chooseKindAndEveryPartner(canvasElement, 'countries')
+    const suggestions = await suggestionList(canvasElement)
+
+    for (const code of ['Deutschland', 'Österreich', 'Niederlande', 'Frankreich']) {
+      await userEvent.click(await suggestions.findByRole('button', { name: `Skip ${code}` }))
+    }
+
+    await expect(canvas.getByText('You have gone through every suggestion.')).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: 'Show again' }))
+
+    await expect(
+      within(await canvas.findByRole('list', { name: /^Suggested values/ })).getByRole('textbox', {
+        name: 'Send Deutschland as',
+      }),
+    ).toHaveFocus()
+  },
+})
+
+export const CancelAddingFocusesAddButton = meta.story({
+  async play({ canvas, canvasElement }) {
+    await chooseKindAndEveryPartner(canvasElement)
+    await suggestionList(canvasElement)
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Add a value' }))
+    await expect(
+      within(canvas.getByRole('form', { name: 'Add a value' })).getByRole('textbox', {
+        name: 'Your unit',
+      }),
+    ).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    await expect(canvas.getByRole('button', { name: 'Add a value' })).toHaveFocus()
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Add a value' }))
+    await userEvent.click(
+      within(canvas.getByRole('form', { name: 'Add a value' })).getByRole('button', {
+        name: 'Cancel',
+      }),
+    )
+    await expect(canvas.getByRole('button', { name: 'Add a value' })).toHaveFocus()
+  },
+})
+
+export const EditingKeepsFocus = meta.story({
+  async play({ canvasElement }) {
+    await chooseKindAndEveryPartner(canvasElement)
+    const suggestions = await suggestionList(canvasElement)
+
+    await userEvent.click(await suggestions.findByRole('button', { name: 'Accept ST' }))
+    await userEvent.click(suggestions.getByRole('button', { name: 'Accept KRT' }))
+    const values = await valueList(canvasElement)
+
+    await userEvent.click(values.getByRole('button', { name: 'Edit KRT' }))
+    const source = values.getByRole('textbox', { name: 'Your unit' })
+
+    await userEvent.clear(source)
+    await userEvent.type(source, 'KAR')
+    await userEvent.click(values.getByRole('button', { name: 'Save' }))
+
+    await expect(values.getByRole('button', { name: 'Edit KAR' })).toHaveFocus()
+  },
+})
+
+export const MobileAddRow = meta.story({
+  ...mobile,
+  async play({ canvas, canvasElement }) {
+    await chooseKindAndEveryPartner(canvasElement, 'other')
+    const add = within(await canvas.findByRole('form', { name: 'Add a value' }))
+    const source = add.getByRole('textbox', { name: 'Your value' })
+    const target = add.getByRole('textbox', { name: 'Their value' })
+
+    await expect(target.getBoundingClientRect().left).toBe(source.getBoundingClientRect().left)
+    await expect(target.getBoundingClientRect().width).toBe(source.getBoundingClientRect().width)
     await expectNoPageScroll(canvasElement)
   },
 })

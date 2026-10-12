@@ -18,7 +18,7 @@ import { scopeKey } from '@/components/lookup-tables/lookup-table-scope'
 import { TradingPartnerChoice } from '@/components/lookup-tables/trading-partner-choice'
 import { isConflict, updateLookupTable } from '@/lib/api/client'
 import { lookupTableQuery, storeSavedLookupTable } from '@/lib/api/queries'
-import { lookupTableInputSchema } from '@edi-bridge/contracts'
+import { maxLookupTableNameLength } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Dialog,
@@ -38,9 +38,7 @@ function useFieldErrorMessage() {
   const t = useTranslations('LookupTables.form.errors')
 
   return (field: LookupTableField, error: LookupTableFieldError) =>
-    error === 'tooLong'
-      ? t('tooLong', { max: lookupTableInputSchema.shape.name.maxLength ?? 0 })
-      : t(`required.${field}`)
+    error === 'tooLong' ? t('tooLong', { max: maxLookupTableNameLength }) : t(`required.${field}`)
 }
 
 function LookupTableForm({

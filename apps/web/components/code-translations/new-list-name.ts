@@ -1,20 +1,13 @@
 import {
-  lookupTableInputSchema,
-  type LookupTableScope,
   type LookupTableScopeInput,
   type LookupTableSummary,
+  maxLookupTableNameLength,
 } from '@edi-bridge/contracts'
 
-const maxNameLength = lookupTableInputSchema.shape.name.maxLength ?? 70
+import { scopeKey } from '../lookup-tables/lookup-table-scope'
 
 function sameName(a: string, b: string) {
   return a.localeCompare(b, undefined, { sensitivity: 'accent' }) === 0
-}
-
-function sameScope(scope: LookupTableScope, input: LookupTableScopeInput) {
-  return scope.kind === 'tradingPartner'
-    ? input.kind === 'tradingPartner' && scope.tradingPartner.id === input.tradingPartnerId
-    : input.kind === 'workspace'
 }
 
 function shortened(name: string, length: number) {
@@ -23,19 +16,19 @@ function shortened(name: string, length: number) {
 
 function numbered(base: string, number: number) {
   if (number === 1) {
-    return shortened(base, maxNameLength)
+    return shortened(base, maxLookupTableNameLength)
   }
 
   const suffix = ` (${number})`
 
-  return `${shortened(base, maxNameLength - suffix.length)}${suffix}`
+  return `${shortened(base, maxLookupTableNameLength - suffix.length)}${suffix}`
 }
 
 export function namesFor(
   tables: ReadonlyArray<Pick<LookupTableSummary, 'name' | 'scope'>>,
   scope: LookupTableScopeInput,
 ) {
-  return tables.flatMap((table) => (sameScope(table.scope, scope) ? [table.name] : []))
+  return tables.flatMap((table) => (scopeKey(table.scope) === scopeKey(scope) ? [table.name] : []))
 }
 
 export function uniqueListName(base: string, taken: ReadonlyArray<string>) {

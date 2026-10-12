@@ -30,6 +30,7 @@ import {
   type AddDraft,
   AddValueForm,
   focusOnMount,
+  useDirectionSides,
   ValueRow,
 } from '@/components/code-translations/value-row'
 import { ActionError } from '@/components/documents/action-error'
@@ -295,7 +296,8 @@ export function LookupTableValues({
   const t = useTranslations('CodeTranslation.values')
   const valuesId = useId()
   const filterId = useId()
-  const direction = tableDirection(table.uses)
+  const direction = tableDirection(table)
+  const sides = useDirectionSides(direction)
   const requestedExists = requestedCode !== undefined && hasValue(table.entries, requestedCode)
   const nextKey = useRef(1)
   const [adding, setAdding] = useState<AddDraft | null>(null)
@@ -440,14 +442,14 @@ export function LookupTableValues({
                   </span>
                 </h2>
                 <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
-                  <span>{t('source', { direction })}</span>
+                  <span>{sides.source}</span>
                   <HugeiconsIcon
                     icon={ArrowRight02Icon}
                     strokeWidth={2}
                     aria-label={t('arrow', { direction })}
                     className="size-4"
                   />
-                  <span>{t('target', { direction })}</span>
+                  <span>{sides.target}</span>
                 </p>
               </div>
               {canChange && addForm === null && (
@@ -465,6 +467,7 @@ export function LookupTableValues({
                 initial={addForm}
                 meaningOf={meaningOf}
                 saving={save.isPending}
+                sides={sides}
                 suggestionsOf={suggestionsOf}
                 onAdd={add}
                 onCancel={() => {
@@ -531,6 +534,7 @@ export function LookupTableValues({
                         index={index}
                         meaningOf={meaningOf}
                         saving={save.isPending}
+                        sides={sides}
                         onRemove={() => remove(index)}
                         onSave={(edited, done) => edit(index, edited, done)}
                       />

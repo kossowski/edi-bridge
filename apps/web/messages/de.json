@@ -3403,7 +3403,8 @@
   },
   "CodeTranslationNew": {
     "title": "Neue Liste",
-    "intro": "Wählen Sie, was Ihre Partner anders schreiben und wer die Liste erhält. Die Liste beginnt mit vorgeschlagenen Werten, die Sie übernehmen oder ändern.",
+    "titleNamed": "Neu: {name}",
+    "intro": "Wählen Sie, was Ihre Partner anders schreiben und für welche Partner die Liste gilt. Die Liste beginnt mit vorgeschlagenen Werten, die Sie übernehmen oder ändern.",
     "kind": {
       "question": "Was wird anders geschrieben?",
       "examples": {
@@ -3414,14 +3415,14 @@
       }
     },
     "receiver": {
-      "question": "Wer erhält sie?",
+      "question": "{direction, select, inbound {Wessen Codes übersetzt sie?} other {Wer erhält sie?}}",
       "workspace": {
         "title": "Jeder Partner",
-        "description": "Jeder Partner erhält die übersetzten Codes."
+        "description": "{direction, select, inbound {Codes von jedem Partner werden übersetzt.} other {Jeder Partner erhält die übersetzten Codes.}}"
       },
       "tradingPartner": {
         "title": "Ein Handelspartner",
-        "description": "Nur der gewählte Handelspartner erhält die übersetzten Codes."
+        "description": "{direction, select, inbound {Nur Codes des gewählten Handelspartners werden übersetzt.} other {Nur der gewählte Handelspartner erhält die übersetzten Codes.}}"
       }
     },
     "name": {
@@ -3429,12 +3430,12 @@
     },
     "suggestions": {
       "title": "Vorgeschlagene Werte",
-      "description": "Übernehmen Sie die passenden Werte, ändern Sie, was der Partner erhält, oder überspringen Sie sie.",
+      "description": "{direction, select, inbound {Übernehmen Sie die passenden Werte, ändern Sie, wozu sie werden, oder überspringen Sie sie.} other {Übernehmen Sie die passenden Werte, ändern Sie, was der Partner erhält, oder überspringen Sie sie.}}",
       "loading": "Vorgeschlagene Werte werden geladen",
       "none": "Für diese Art gibt es keine Vorschläge. Fügen Sie unten eigene Werte hinzu.",
       "done": "Sie haben alle Vorschläge durchgesehen.",
       "row": "Vorschlag {code}",
-      "sendAs": "{code} senden als",
+      "sendAs": "{direction, select, inbound {{code} wird zu} other {{code} senden als}}",
       "accept": "Übernehmen: {code}",
       "acceptShort": "Übernehmen",
       "skip": "Überspringen: {code}",
@@ -3446,7 +3447,8 @@
         "title": "Vorschläge nicht verfügbar",
         "description": "Die vorgeschlagenen Werte konnten nicht geladen werden. Versuchen Sie es erneut oder fügen Sie eigene Werte hinzu.",
         "retry": "Erneut versuchen"
-      }
+      },
+      "byAi": "Von der KI vorgeschlagen"
     },
     "values": {
       "title": "Werte in der neuen Liste",
@@ -3455,11 +3457,29 @@
       "removed": "{code} entfernt."
     },
     "create": {
-      "summary": "Legt <strong>{name}</strong> mit {count, plural, =0 {keinen Werten} one {# Wert} other {# Werten}} an.",
+      "summary": "Legt <strong>{name}</strong> {count, plural, =0 {ohne Werte} one {mit # Wert} other {mit # Werten}} an.",
       "pendingLeftOut": "{count, plural, one {# Vorschlag, den Sie nicht übernommen haben, bleibt außen vor.} other {# Vorschläge, die Sie nicht übernommen haben, bleiben außen vor.}}",
       "submit": "Liste anlegen",
       "creating": "Wird angelegt…",
       "failed": "Die Liste konnte nicht angelegt werden. Versuchen Sie es erneut."
+    },
+    "sides": {
+      "units": {
+        "yours": "Ihre Einheit",
+        "partner": "Einheitencode"
+      },
+      "countries": {
+        "yours": "Ihr Land",
+        "partner": "Ländercode"
+      },
+      "addresses": {
+        "yours": "Ihre Adress-ID",
+        "partner": "Filialnummer des Partners"
+      },
+      "other": {
+        "yours": "Ihr Wert",
+        "partner": "Wert des Partners"
+      }
     }
   },
   "CodeTranslations": {
