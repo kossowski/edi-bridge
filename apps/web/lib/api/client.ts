@@ -92,6 +92,7 @@ import {
   switchToProductionEndpoint,
   toPath,
   toSearchParams,
+  tradingPartnerActivitiesEndpoint,
   tradingPartnerEndpoint,
   type TradingPartnerInput,
   tradingPartnersEndpoint,
@@ -503,6 +504,10 @@ export function importLookupTable(id: string, body: LookupTableImportBody) {
 
 export function listTradingPartners() {
   return request(tradingPartnersEndpoint)
+}
+
+export function listTradingPartnerActivities() {
+  return request(tradingPartnerActivitiesEndpoint)
 }
 
 export function getTradingPartner(id: string) {

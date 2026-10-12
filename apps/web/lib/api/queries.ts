@@ -58,6 +58,7 @@ import {
   listOrderLifecycles,
   listPublishedMappingVersions,
   listRuns,
+  listTradingPartnerActivities,
   listTradingPartners,
   listWorkspaceInvites,
   listWorkspaceMembers,
@@ -424,11 +425,17 @@ export const tradingPartnerKeys = {
   all: () => ['trading-partners'] as const,
   list: () => [...tradingPartnerKeys.all(), 'list'] as const,
   detail: (id: string) => [...tradingPartnerKeys.all(), 'detail', id] as const,
+  activities: () => [...tradingPartnerKeys.all(), 'activities'] as const,
 }
 
 export const tradingPartnersQuery = queryOptions({
   queryKey: tradingPartnerKeys.list(),
   queryFn: listTradingPartners,
+})
+
+export const tradingPartnerActivitiesQuery = queryOptions({
+  queryKey: tradingPartnerKeys.activities(),
+  queryFn: listTradingPartnerActivities,
 })
 
 export function tradingPartnerQuery(id: string) {
