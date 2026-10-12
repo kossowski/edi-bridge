@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Graph } from '@/components/mappings/mapping-graph'
 import type { AiReview, MappingTransform, TransformLink } from '@edi-bridge/contracts'
 
-import { aiAcceptParts, reviewAfterAccepting } from './ai-review-accept'
+import { partsAcceptedWith, reviewAfterAccepting } from './ai-review-accept'
 
 const dateId = '1c9e6e2f-8a5f-4e7c-8b4a-3b9a5d2a6f32'
 
@@ -59,9 +59,9 @@ const review: AiReview = {
   ],
 }
 
-describe('aiAcceptParts', () => {
+describe('partsAcceptedWith', () => {
   it('accepts a plain link on its own', () => {
-    expect(aiAcceptParts(review, graph, { kind: 'link', link: graph.links[0]! })).toEqual({
+    expect(partsAcceptedWith(review, graph, { kind: 'link', link: graph.links[0]! })).toEqual({
       links: ['BGM/1004'],
       transforms: [],
       transformLinks: [],
@@ -76,8 +76,35 @@ describe('aiAcceptParts', () => {
     }
 
     for (const link of [intoDate, dateIntoLookup, outOfLookup]) {
-      expect(aiAcceptParts(review, graph, { kind: 'transformLink', link })).toEqual(expected)
+      expect(partsAcceptedWith(review, graph, { kind: 'transformLink', link })).toEqual(expected)
     }
+  })
+
+  it("accepts a fan-out chain as a whole, including the other target's Transform Link", () => {
+    const intoSecondTarget: TransformLink = {
+      from: { kind: 'transform', transformId: lookupId, output: 'value' },
+      to: { kind: 'target', path: 'DTM+2/2380' },
+    }
+
+    const fanOut = { ...graph, transformLinks: [...graph.transformLinks, intoSecondTarget] }
+
+    const marked = {
+      ...review,
+      proposedTransformLinks: [...review.proposedTransformLinks, 'target:DTM+2/2380'],
+    }
+
+    expect(partsAcceptedWith(marked, fanOut, { kind: 'transformLink', link: outOfLookup })).toEqual(
+      {
+        links: [],
+        transforms: [dateId, lookupId],
+        transformLinks: [
+          `input:${dateId}/value`,
+          `input:${lookupId}/value`,
+          'target:DTM+137/2380',
+          'target:DTM+2/2380',
+        ],
+      },
+    )
   })
 
   it('leaves out the parts of the chain the review no longer marks', () => {
@@ -87,7 +114,7 @@ describe('aiAcceptParts', () => {
       proposedTransformLinks: [`input:${dateId}/value`, 'target:BGM/C002/1001'],
     }
 
-    expect(aiAcceptParts(edited, graph, { kind: 'transformLink', link: outOfLookup })).toEqual({
+    expect(partsAcceptedWith(edited, graph, { kind: 'transformLink', link: outOfLookup })).toEqual({
       links: [],
       transforms: [dateId],
       transformLinks: [`input:${dateId}/value`],
@@ -98,7 +125,7 @@ describe('aiAcceptParts', () => {
     const added = { sourcePath: 'note', targetPath: 'FTX/4440' }
 
     expect(
-      aiAcceptParts(
+      partsAcceptedWith(
         review,
         { ...graph, links: [...graph.links, added] },
         { kind: 'link', link: added },

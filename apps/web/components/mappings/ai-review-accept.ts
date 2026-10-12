@@ -1,13 +1,8 @@
-import {
-  acceptedAiReview,
-  type AiReview,
-  type AiReviewParts,
-  transformLinkKey,
-} from '@edi-bridge/contracts'
+import { acceptedAiReview, markedAiReviewParts, transformLinkKey } from '@edi-bridge/contracts'
 
 import type { Graph } from '@/components/mappings/mapping-graph'
 import type { RowLink } from '@/components/mappings/mapping-links'
-import type { TransformLink } from '@edi-bridge/contracts'
+import type { AiReview, AiReviewParts, TransformLink } from '@edi-bridge/contracts'
 
 function transformIdsOf({ from, to }: TransformLink) {
   return [
@@ -43,26 +38,15 @@ function chainOf(graph: Graph, start: TransformLink) {
   }
 }
 
-export function aiAcceptParts(review: AiReview, graph: Graph, link: RowLink): AiReviewParts {
-  const marked = (proposed: ReadonlyArray<string>) => (key: string) => proposed.includes(key)
+export function partsAcceptedWith(review: AiReview, graph: Graph, link: RowLink): AiReviewParts {
+  const parts =
+    link.kind === 'link'
+      ? { links: [link.link.targetPath], transforms: [], transformLinks: [] }
+      : { links: [], ...chainOf(graph, link.link) }
 
-  if (link.kind === 'link') {
-    return {
-      links: [link.link.targetPath].filter(marked(review.proposedLinks)),
-      transforms: [],
-      transformLinks: [],
-    }
-  }
-
-  const chain = chainOf(graph, link.link)
-
-  return {
-    links: [],
-    transforms: chain.transforms.filter(marked(review.proposedTransforms)),
-    transformLinks: chain.transformLinks.filter(marked(review.proposedTransformLinks)),
-  }
+  return markedAiReviewParts(review, parts)
 }
 
 export function reviewAfterAccepting(review: AiReview, graph: Graph, link: RowLink) {
-  return acceptedAiReview(review, aiAcceptParts(review, graph, link))
+  return acceptedAiReview(review, partsAcceptedWith(review, graph, link))
 }
