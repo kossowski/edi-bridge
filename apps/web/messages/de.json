@@ -1483,6 +1483,83 @@
     "saving": "Wird gespeichert…",
     "cancel": "Abbrechen"
   },
+  "PartnerWizard": {
+    "title": "Handelspartner hinzufügen",
+    "progress": "Fortschritt",
+    "stepOf": "Schritt {current} von {total}",
+    "stepDone": "erledigt",
+    "steps": {
+      "partner": {
+        "label": "Partner",
+        "title": "Wer ist der Partner?",
+        "description": "Nur das Wichtigste. Sie können es später ändern."
+      },
+      "documents": {
+        "label": "Belege",
+        "title": "Welche Belege tauschen Sie aus?",
+        "description": "Wählen Sie alles, was Sie mit diesem Partner austauschen wollen. Weitere können Sie später hinzufügen."
+      },
+      "connections": {
+        "label": "Verbindungen",
+        "title": "Wie kommen die Belege ans Ziel?",
+        "description": "Wählen Sie den Weg, der zu Ihrem Partner passt. Wenn Sie ihn noch nicht kennen, helfen wir beim Nachfragen."
+      },
+      "mappings": {
+        "label": "Mappings",
+        "title": "Welches Mapping nutzt jeder Beleg?",
+        "description": "Die Belege des Partners und Ihre Systeme nutzen verschiedene Formate. Ein Mapping übersetzt zwischen ihnen."
+      },
+      "review": {
+        "label": "Prüfen",
+        "title": "Prüfen und anlegen",
+        "description": "Das richten wir ein."
+      }
+    },
+    "fields": {
+      "name": {
+        "label": "Firmenname",
+        "description": "Der Firmenname des Partners, so wie Ihr Team ihn kennt."
+      },
+      "gln": {
+        "label": "Standortnummer (GLN)",
+        "description": "13 Ziffern, im EDI-Infoblatt des Partners. Fragen Sie den Partner, wenn Sie sie nicht kennen."
+      },
+      "glnLater": {
+        "label": "Ich trage sie später ein",
+        "description": "Alles andere können Sie jetzt einrichten. Der erste Testbeleg braucht die GLN."
+      }
+    },
+    "documents": {
+      "ORDERS": {
+        "title": "Bestellungen empfangen",
+        "benefit": "Der Partner bestellt Ware bei Ihnen, und die Bestellung landet in Ihrem ERP-System."
+      },
+      "DESADV": {
+        "title": "Lieferavise senden",
+        "benefit": "Sie teilen dem Partner mit, was wann geliefert wird, bevor der Lkw ankommt."
+      },
+      "INVOIC": {
+        "title": "Rechnungen senden",
+        "benefit": "Ihre Rechnungen erreichen die Buchhaltung des Partners ohne E-Mail oder Papier."
+      }
+    },
+    "errors": {
+      "name": {
+        "required": "Geben Sie den Firmennamen ein.",
+        "tooLong": "Verwenden Sie höchstens {max} Zeichen."
+      },
+      "gln": {
+        "required": "Geben Sie die GLN ein oder wählen Sie „Ich trage sie später ein“."
+      },
+      "documents": {
+        "required": "Wählen Sie mindestens einen Beleg."
+      }
+    },
+    "cancel": "Abbrechen",
+    "back": "Zurück",
+    "continue": "Weiter",
+    "finish": "Partner im Testbetrieb anlegen"
+  },
   "Channels": {
     "new": "Neuer Channel",
     "caption": "Channels, nach Name",

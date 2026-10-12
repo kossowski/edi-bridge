@@ -349,7 +349,7 @@ export function useGlnErrorMessage() {
   return (error: GlnError) => t(error)
 }
 
-export function GlnField(props: FieldProps) {
+export function GlnField(props: FieldProps & Pick<ComponentProps<'input'>, 'disabled'>) {
   return (
     <TextField
       {...props}
