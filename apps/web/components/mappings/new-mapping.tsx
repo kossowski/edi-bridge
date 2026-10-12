@@ -2,26 +2,22 @@
 
 import { AiMagicIcon, ArrowRight02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useId } from 'react'
 
-import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
+import {
+  CreateMappingError,
+  useCreateMappingWithDraft,
+} from '@/components/mappings/create-mapping-with-draft'
 import { DirectionHint } from '@/components/mappings/direction-path'
 import { usePlainNames } from '@/components/plain-names'
-import { ApiError, createMapping } from '@/lib/api/client'
-import { storeCreatedMapping } from '@/lib/api/queries'
 import {
   type CreateMappingBody,
   type Direction,
   directionOf,
   newMappingMessageTypes,
 } from '@edi-bridge/contracts'
-import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Badge } from '@edi-bridge/ui/components/badge'
-import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Sheet,
   SheetContent,
@@ -46,22 +42,24 @@ function Choice({
   onChoose: () => void
 }) {
   const t = useTranslations('Mappings.new')
+  const tCreate = useTranslations('Mappings.create')
   const plainNames = usePlainNames()
   const pathId = useId()
   const direction = directionOf({ messageType })
 
   return (
     <li
-      className="bg-card has-[button:hover:enabled]:border-primary has-[button:hover:enabled]:bg-primary/5 has-[button:focus-visible]:ring-ring/50 has-[button:focus-visible]:border-ring data-chosen:border-primary relative flex h-full flex-col gap-2 rounded-lg border p-4 transition-colors has-[button:focus-visible]:ring-3"
-      data-chosen={chosen || undefined}>
+      className="bg-card not-data-locked:has-[button:hover]:border-primary not-data-locked:has-[button:hover]:bg-primary/5 has-[button:focus-visible]:ring-ring/50 has-[button:focus-visible]:border-ring data-chosen:border-primary relative flex h-full flex-col gap-2 rounded-lg border p-4 transition-colors has-[button:focus-visible]:ring-3"
+      data-chosen={chosen || undefined}
+      data-locked={locked || undefined}>
       <span id={pathId}>
         <DirectionHint direction={direction} />
       </span>
       <button
-        disabled={locked}
         type="button"
         aria-describedby={pathId}
-        className="flex items-center justify-between gap-2 text-left font-medium outline-none after:absolute after:inset-0 after:rounded-lg disabled:cursor-not-allowed"
+        aria-disabled={locked || undefined}
+        className="flex items-center justify-between gap-2 text-left font-medium outline-none after:absolute after:inset-0 after:rounded-lg aria-disabled:cursor-progress"
         onClick={onChoose}>
         {t('choice', { documents: plainNames.messageTypeName(messageType, true), direction })}
         <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} aria-hidden className="size-4" />
@@ -69,7 +67,7 @@ function Choice({
       {chosen ? (
         <p role="status" className="text-muted-foreground mt-auto flex items-center gap-2 text-xs">
           <Spinner role="presentation" aria-hidden className="size-3.5" />
-          {t('creating')}
+          {tCreate('creating')}
         </p>
       ) : (
         <Badge variant="secondary" className="mt-auto">
@@ -88,20 +86,7 @@ export function NewMappingChoices({
   direction: Direction | null
   className?: string
 }) {
-  const t = useTranslations('Mappings.new')
-  const router = useRouter()
-  const queryClient = useQueryClient()
-
-  const create = useMutation({
-    mutationFn: createMapping,
-    onSuccess: (created) => {
-      storeCreatedMapping(queryClient, created)
-      router.push(aiDraftStartHref(created.id))
-    },
-  })
-
-  const locked = create.isPending || create.isSuccess
-  const noDocumentStructure = create.error instanceof ApiError && create.error.status === 422
+  const create = useCreateMappingWithDraft()
 
   const shown = newMappingMessageTypes.filter(
     (messageType) => !direction || directionOf({ messageType }) === direction,
@@ -113,27 +98,14 @@ export function NewMappingChoices({
         {shown.map((messageType) => (
           <Choice
             key={messageType}
-            chosen={locked && create.variables?.messageType === messageType}
-            locked={locked}
+            chosen={create.locked && create.messageType === messageType}
+            locked={create.locked}
             messageType={messageType}
-            onChoose={() => create.mutate({ messageType })}
+            onChoose={() => create.start({ messageType })}
           />
         ))}
       </ul>
-      {create.isError && (
-        <Alert variant="destructive">
-          <AlertDescription className="flex flex-col items-start gap-2">
-            {noDocumentStructure ? t('noDocumentStructure') : t('failed')}
-            {noDocumentStructure && (
-              <Link
-                href="/document-structures/new"
-                className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                {t('addDataFormat')}
-              </Link>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
+      <CreateMappingError error={create.error} />
     </div>
   )
 }

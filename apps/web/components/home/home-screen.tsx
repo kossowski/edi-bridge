@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { AppPage } from '@/components/app-page'
 import { BucketTable, ErrorRateChart, ThroughputChart } from '@/components/home/home-charts'
 import { toBucketRows, totalsOf } from '@/components/home/home-data'
+import { HomeDraftPromo } from '@/components/home/home-draft-promo'
 import { HomeKeyNumbers } from '@/components/home/home-key-numbers'
 import { HomeTradingPartners } from '@/components/home/home-trading-partners'
 import { LiveIndicator } from '@/components/live-indicator'
@@ -149,6 +150,7 @@ export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWind
             keyNumbers={data?.keyNumbers}
             timeWindow={shownWindow}
           />
+          <HomeDraftPromo />
           <div className="flex flex-col gap-4">{charts()}</div>
           <HomeTradingPartners tradingPartners={data?.tradingPartners} />
         </div>
