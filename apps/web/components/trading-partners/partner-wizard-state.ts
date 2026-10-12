@@ -9,7 +9,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { tooLongOr } from '../../lib/forms/field-errors'
-import { type GlnError, glnError, normalizeGln } from '../../lib/forms/gln'
+import { type GlnError, glnError, isTakenGln, normalizeGln } from '../../lib/forms/gln'
 import {
   type ChannelField,
   channelFields,
@@ -67,7 +67,7 @@ export type PartnerField = 'name' | 'gln' | 'documents'
 
 export type WizardFieldErrors = {
   name: 'required' | 'tooLong'
-  gln: GlnError
+  gln: GlnError | 'taken'
   documents: 'required'
 } & { [Key in `${Direction}.way`]: 'required' } & {
   [Key in `${Direction}.${ConnectionField}`]: FieldError
@@ -186,6 +186,18 @@ function mappingsErrors(
   }
 
   return errors
+}
+
+export function withTakenGln(
+  errors: WizardErrors,
+  { partner }: PartnerWizardState,
+  takenGln: string | null,
+): WizardErrors {
+  if (errors.gln !== undefined || partner.glnLater) {
+    return errors
+  }
+
+  return isTakenGln(partner.gln, takenGln) ? { ...errors, gln: 'taken' } : errors
 }
 
 export function stepErrors(

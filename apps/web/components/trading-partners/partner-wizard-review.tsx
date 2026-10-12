@@ -9,6 +9,7 @@ import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import {
   type PlanChannel,
   type PlannedRoute,
+  type SetupPlan,
   setupPlan,
 } from '@/components/trading-partners/partner-setup-plan'
 import {
@@ -50,20 +51,22 @@ function routeEnds(route: PlannedRoute<PlanChannel>) {
     : { from: route.ownChannel.name, to: partner }
 }
 
-export function ReviewStep({ result }: { result: WizardResult }) {
-  const t = useTranslations('PartnerWizard.review')
-  const tWizard = useTranslations('PartnerWizard')
-  const tHow = useTranslations('TradingPartner.addConnection.how')
+export type SetupPlanState =
+  | { status: 'loading' }
+  | { status: 'failed'; retry: () => void }
+  | { status: 'ready'; plan: SetupPlan<PlanChannel> }
+
+export function useSetupPlan(result: WizardResult, active: boolean): SetupPlanState {
   const tSuggested = useTranslations('TradingPartner.addConnection.suggestedName')
   const tRoute = useTranslations('TradingPartner.addDocument.routeName')
   const plainNames = usePlainNames()
   const name = result.partner.name
-  const channels = useQuery(channelsQuery)
+  const channels = useQuery({ ...channelsQuery, enabled: active })
 
   const versions = useQueries({
     queries: result.documents.flatMap((document) =>
       result.mappings[document]?.way === 'existing'
-        ? [publishedMappingVersionsQuery(document)]
+        ? [{ ...publishedMappingVersionsQuery(document), enabled: active }]
         : [],
     ),
   })
@@ -71,36 +74,54 @@ export function ReviewStep({ result }: { result: WizardResult }) {
   const queries = [channels, ...versions]
 
   if (queries.some((query) => query.isError)) {
-    return (
-      <WizardLoadFailed
-        message={t('failed')}
-        onRetry={() => {
-          for (const query of queries) {
-            if (query.isError) {
-              void query.refetch()
-            }
+    return {
+      status: 'failed',
+      retry: () => {
+        for (const query of queries) {
+          if (query.isError) {
+            void query.refetch()
           }
-        }}
-      />
-    )
+        }
+      },
+    }
   }
 
   if (channels.data === undefined || versions.some((query) => query.data === undefined)) {
+    return { status: 'loading' }
+  }
+
+  return {
+    status: 'ready',
+    plan: setupPlan(result, {
+      channels: channels.data,
+      mappingVersions: versions.flatMap((query) => query.data ?? []),
+      names: {
+        connection: (kind) => tSuggested(kind, { name }),
+        route: (messageType) =>
+          tRoute(directionOf({ messageType }), {
+            document: plainNames.messageTypeName(messageType, true),
+            name,
+          }),
+      },
+    }),
+  }
+}
+
+export function ReviewStep({ state }: { state: SetupPlanState }) {
+  const t = useTranslations('PartnerWizard.review')
+  const tWizard = useTranslations('PartnerWizard')
+  const tHow = useTranslations('TradingPartner.addConnection.how')
+
+  if (state.status === 'failed') {
+    return <WizardLoadFailed message={t('failed')} onRetry={state.retry} />
+  }
+
+  if (state.status === 'loading') {
     return <WizardLoading message={t('loading')} />
   }
 
-  const plan = setupPlan(result, {
-    channels: channels.data,
-    mappingVersions: versions.flatMap((query) => query.data ?? []),
-    names: {
-      connection: (kind) => tSuggested(kind, { name }),
-      route: (messageType) =>
-        tRoute(directionOf({ messageType }), {
-          document: plainNames.messageTypeName(messageType, true),
-          name,
-        }),
-    },
-  })
+  const { plan } = state
+  const { name } = plan.partner
 
   return (
     <div className="flex flex-col gap-6">

@@ -1,5 +1,5 @@
 import { delay, http, HttpResponse } from 'msw'
-import { expect, fn, userEvent, within } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 
 import type { StoryContext } from '@storybook/nextjs-vite'
 
@@ -45,12 +45,11 @@ const httpOutbound = channelKinds.find(
 const meta = preview.meta({
   title: 'Trading Partners/PartnerWizard/Review',
   component: PartnerWizard,
-  args: { onFinish: fn() },
   parameters: { layout: 'fullscreen' },
 })
 
 export const AllRoutes = meta.story({
-  async play({ args, canvas }) {
+  async play({ canvas }) {
     await toMappings(canvas, ['ORDERS', 'INVOIC'])
     await toReview(canvas)
 
@@ -78,9 +77,6 @@ export const AllRoutes = meta.story({
       routes.getByText(new RegExp(`^From ERP webhook to ${wizardPartner} HTTP delivery`)),
     ).toBeVisible()
     await expect(canvas.getByText('Created for testing')).toBeVisible()
-
-    await userEvent.click(canvas.getByRole('button', { name: 'Create partner for testing' }))
-    await expect(args.onFinish).toHaveBeenCalledOnce()
   },
 })
 

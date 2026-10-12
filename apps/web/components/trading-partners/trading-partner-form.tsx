@@ -2,8 +2,6 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { type FormEvent, useId, useRef, useState } from 'react'
 
 import { GlnField, SelectField, TextField, useGlnErrorMessage } from '@/components/form-field'
@@ -14,7 +12,8 @@ import {
   type TradingPartnerFormValues,
   validateTradingPartnerForm,
 } from '@/components/trading-partners/trading-partner-form-values'
-import { createTradingPartner, isConflict, updateTradingPartner } from '@/lib/api/client'
+import { useTakenGln } from '@/hooks/use-taken-gln'
+import { updateTradingPartner } from '@/lib/api/client'
 import { storeSavedTradingPartner } from '@/lib/api/queries'
 import {
   acknowledgementTimeLimitHours,
@@ -23,7 +22,7 @@ import {
   type TradingPartnerInput,
   tradingPartnerInputSchema,
 } from '@edi-bridge/contracts'
-import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
+import { Button } from '@edi-bridge/ui/components/button'
 
 function useFieldErrorMessage() {
   const t = useTranslations('TradingPartnerForm.errors')
@@ -53,43 +52,29 @@ export function TradingPartnerForm({
   tradingPartner,
   savedLabel,
 }: {
-  tradingPartner?: TradingPartner
-  savedLabel?: string
+  tradingPartner: TradingPartner
+  savedLabel: string
 }) {
   const t = useTranslations('TradingPartnerForm')
   const errorMessage = useFieldErrorMessage()
   const queryClient = useQueryClient()
-  const router = useRouter()
   const baseId = useId()
   const formRef = useRef<HTMLFormElement>(null)
   const [values, setValues] = useState<TradingPartnerFormValues>(() => toFormValues(tradingPartner))
   const [submitted, setSubmitted] = useState(false)
-  const [glnTaken, setGlnTaken] = useState<string | null>(null)
+  const takenGln = useTakenGln()
 
   const save = useMutation({
-    mutationFn: (input: TradingPartnerInput) =>
-      tradingPartner ? updateTradingPartner(tradingPartner.id, input) : createTradingPartner(input),
-    onSuccess: (saved) => {
-      storeSavedTradingPartner(queryClient, saved)
-
-      if (!tradingPartner) {
-        router.push(`/trading-partners/${saved.id}`)
-      }
-    },
-    onError: (error, input) => {
-      if (isConflict(error)) {
-        setGlnTaken(input.gln)
-      }
-    },
+    mutationFn: (input: TradingPartnerInput) => updateTradingPartner(tradingPartner.id, input),
+    onSuccess: (saved) => storeSavedTradingPartner(queryClient, saved),
+    onError: (error, input) => takenGln.remember(error, input.gln),
   })
 
   const result = validateTradingPartnerForm(values, tradingPartner)
   const errors = submitted && 'errors' in result ? result.errors : {}
 
   const conflict =
-    'input' in result && glnTaken !== null && result.input.gln === glnTaken
-      ? t('errors.gln.taken')
-      : null
+    'input' in result && takenGln.isTaken(result.input.gln) ? t('errors.gln.taken') : null
 
   function messageFor(field: TradingPartnerField) {
     const error = errors[field]
@@ -142,11 +127,6 @@ export function TradingPartnerForm({
 
   return (
     <form noValidate ref={formRef} className="flex max-w-xl flex-col gap-6" onSubmit={submit}>
-      {!tradingPartner && (
-        <p className="rounded-lg border border-amber-600/40 bg-amber-500/10 p-3 text-sm">
-          {t('testModeNotice')}
-        </p>
-      )}
       <TextField
         id={ids.name}
         autoComplete="organization"
@@ -203,19 +183,11 @@ export function TradingPartnerForm({
           type="submit"
           aria-disabled={save.isPending || undefined}
           className="aria-disabled:cursor-progress aria-disabled:opacity-50">
-          {save.isPending ? t('saving') : tradingPartner ? t('save') : t('create')}
+          {save.isPending ? t('saving') : t('save')}
         </Button>
-        {tradingPartner ? (
-          savedLabel && (
-            <p role="status" className="text-sm">
-              {save.isSuccess && savedLabel}
-            </p>
-          )
-        ) : (
-          <Link href="/trading-partners" className={buttonVariants({ variant: 'outline' })}>
-            {t('cancel')}
-          </Link>
-        )}
+        <p role="status" className="text-sm">
+          {save.isSuccess && savedLabel}
+        </p>
       </div>
     </form>
   )

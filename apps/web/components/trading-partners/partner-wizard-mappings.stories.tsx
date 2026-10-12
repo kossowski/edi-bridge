@@ -1,5 +1,5 @@
 import { delay, http, HttpResponse } from 'msw'
-import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
+import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
 import { PartnerWizard } from '@/components/trading-partners/partner-wizard'
@@ -30,7 +30,6 @@ const onlyOrdersMappingName = onlyOrdersMapping?.versions[0]?.mappingName ?? ''
 const meta = preview.meta({
   title: 'Trading Partners/PartnerWizard/Mappings',
   component: PartnerWizard,
-  args: { onFinish: fn() },
   parameters: { layout: 'fullscreen' },
 })
 

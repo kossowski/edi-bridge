@@ -1078,6 +1078,45 @@
   },
   "TradingPartner": {
     "title": "Trading partner",
+    "created": {
+      "title": "{name} is created for testing",
+      "description": "Documents with {name} are marked as tests until you go live. The setup steps below show what comes next.",
+      "webhook": {
+        "title": "Web address for {name}",
+        "description": "Give the web address and the token below to {name}. {name} sends documents to this address."
+      },
+      "drafts": {
+        "title": "AI drafts",
+        "description": "The AI drafts each mapping in the mapping editor from an example document. Once you have reviewed and published it, add the document route here.",
+        "open": "Draft the mapping for {documents} with AI"
+      },
+      "left": {
+        "title": "Not created",
+        "description": "These could not be created. Add them with the setup steps below.",
+        "connection": "Connection {name}",
+        "connectionInvalid": "Connection {name}: some of its details are not valid",
+        "mappingDraft": "New mapping for {documents}",
+        "route": "Document route {name}"
+      },
+      "later": {
+        "title": "Set up later",
+        "description": "You left these for later. Add them with the setup steps below when you are ready.",
+        "connection": {
+          "inbound": "Connection for documents from {name}",
+          "outbound": "Connection for documents to {name}"
+        },
+        "connectionNext": "Add it once {name} sends you the connection details.",
+        "route": "Document route for {documents}",
+        "reasons": {
+          "connectionPostponed": "It follows once the connection to {name} is added.",
+          "noOwnConnection": "None of your own connections fits {documents} yet. Add one first.",
+          "severalOwnConnections": "Several of your own connections fit {documents}. Choose one in the setup steps.",
+          "mappingDraft": "It needs the published AI draft.",
+          "mappingLater": "Choose the mapping in the setup steps."
+        }
+      },
+      "dismiss": "Done"
+    },
     "loading": "Loading trading partner",
     "notFound": {
       "title": "Trading partner not found",
@@ -1437,8 +1476,6 @@
     }
   },
   "TradingPartnerForm": {
-    "createTitle": "New trading partner",
-    "testModeNotice": "A new Trading Partner starts in Test Mode. Every Interchange with it is flagged as a test until you switch it to production.",
     "fields": {
       "name": {
         "label": "Name",
@@ -1478,10 +1515,8 @@
       },
       "saveFailed": "The Trading Partner could not be saved. Try again."
     },
-    "create": "Create Trading Partner",
     "save": "Save changes",
-    "saving": "Saving…",
-    "cancel": "Cancel"
+    "saving": "Saving…"
   },
   "PartnerWizard": {
     "title": "Add a trading partner",
@@ -1637,7 +1672,8 @@
         "tooLong": "Use at most {max} characters."
       },
       "gln": {
-        "required": "Enter the GLN, or choose “I'll add it later”."
+        "required": "Enter the GLN, or choose “I'll add it later”.",
+        "taken": "Another trading partner already uses this GLN. Check it for typos, or choose “I'll add it later”."
       },
       "documents": {
         "required": "Choose at least one document."
@@ -1656,6 +1692,8 @@
     "back": "Back",
     "continue": "Continue",
     "finish": "Create partner for testing",
+    "finishing": "Creating the partner…",
+    "finishFailed": "{name} could not be created, so nothing is set up yet. Try again.",
     "retry": "Try again"
   },
   "Channels": {

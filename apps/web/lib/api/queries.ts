@@ -3,7 +3,9 @@ import {
   type QueryClient,
   queryOptions,
   useMutation,
+  useQueryClient,
 } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 
 import type {
   AiBudget,
@@ -68,6 +70,11 @@ import {
   listWorkspaceMembers,
   previewMapping,
 } from './client'
+
+import type {
+  FinishedSetup,
+  SetupSummary,
+} from '../../components/trading-partners/partner-wizard-finish'
 
 export const sessionQuery = queryOptions({
   queryKey: ['session'],
@@ -485,6 +492,33 @@ export function storeSavedTradingPartner(queryClient: QueryClient, saved: Tradin
   void queryClient.invalidateQueries({ queryKey: tradingPartnerKeys.activities() })
 }
 
+export const setupSummaryKeys = {
+  all: () => ['setup-summaries'] as const,
+  detail: (tradingPartnerId: string) => [...setupSummaryKeys.all(), tradingPartnerId] as const,
+}
+
+export function storeSetupSummary(
+  queryClient: QueryClient,
+  tradingPartnerId: string,
+  summary: SetupSummary,
+) {
+  queryClient.setQueryData(setupSummaryKeys.detail(tradingPartnerId), summary)
+}
+
+export function useTakenSetupSummary(tradingPartnerId: string) {
+  const queryClient = useQueryClient()
+
+  const [summary, setSummary] = useState(
+    () => queryClient.getQueryData<SetupSummary>(setupSummaryKeys.detail(tradingPartnerId)) ?? null,
+  )
+
+  useEffect(() => {
+    queryClient.removeQueries({ queryKey: setupSummaryKeys.detail(tradingPartnerId), exact: true })
+  }, [queryClient, tradingPartnerId])
+
+  return [summary, () => setSummary(null)] as const
+}
+
 export const channelKeys = {
   all: () => ['channels'] as const,
   list: () => [...channelKeys.all(), 'list'] as const,
@@ -541,4 +575,23 @@ export function flowQuery(id: string) {
 export function storeSavedFlow(queryClient: QueryClient, saved: Flow) {
   queryClient.setQueryData(flowQuery(saved.id).queryKey, saved)
   void queryClient.invalidateQueries({ queryKey: flowKeys.list() })
+}
+
+export function storeFinishedSetup(
+  queryClient: QueryClient,
+  { tradingPartner, channels, mappings, flows }: FinishedSetup,
+) {
+  storeSavedTradingPartner(queryClient, tradingPartner)
+
+  for (const created of Object.values(channels)) {
+    storeSavedChannel(queryClient, created.channel)
+  }
+
+  for (const mapping of Object.values(mappings)) {
+    storeCreatedMapping(queryClient, mapping)
+  }
+
+  for (const flow of Object.values(flows)) {
+    storeSavedFlow(queryClient, flow)
+  }
 }

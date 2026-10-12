@@ -1078,6 +1078,45 @@
   },
   "TradingPartner": {
     "title": "Handelspartner",
+    "created": {
+      "title": "{name} ist im Testbetrieb angelegt",
+      "description": "Belege mit {name} sind als Test markiert, bis Sie live gehen. Die Einrichtungsschritte unten zeigen, wie es weitergeht.",
+      "webhook": {
+        "title": "Webadresse für {name}",
+        "description": "Geben Sie die Webadresse und das Token unten an {name} weiter. {name} schickt Belege an diese Adresse."
+      },
+      "drafts": {
+        "title": "KI-Entwürfe",
+        "description": "Die KI entwirft jedes Mapping im Mapping-Editor aus einem Beispielbeleg. Sobald Sie es geprüft und veröffentlicht haben, fügen Sie hier den Belegweg hinzu.",
+        "open": "Mapping für {documents} mit KI entwerfen"
+      },
+      "left": {
+        "title": "Nicht angelegt",
+        "description": "Diese Punkte konnten nicht angelegt werden. Fügen Sie sie über die Einrichtungsschritte unten hinzu.",
+        "connection": "Verbindung {name}",
+        "connectionInvalid": "Verbindung {name}: Einige Angaben sind ungültig",
+        "mappingDraft": "Neues Mapping für {documents}",
+        "route": "Belegweg {name}"
+      },
+      "later": {
+        "title": "Später einrichten",
+        "description": "Diese Punkte haben Sie für später gelassen. Fügen Sie sie über die Einrichtungsschritte unten hinzu, sobald Sie so weit sind.",
+        "connection": {
+          "inbound": "Verbindung für Belege von {name}",
+          "outbound": "Verbindung für Belege an {name}"
+        },
+        "connectionNext": "Fügen Sie sie hinzu, sobald {name} Ihnen die Verbindungsangaben schickt.",
+        "route": "Belegweg für {documents}",
+        "reasons": {
+          "connectionPostponed": "Er folgt, sobald die Verbindung zu {name} hinzugefügt ist.",
+          "noOwnConnection": "Noch keine Ihrer eigenen Verbindungen passt zu {documents}. Fügen Sie zuerst eine hinzu.",
+          "severalOwnConnections": "Mehrere Ihrer eigenen Verbindungen passen zu {documents}. Wählen Sie eine in den Einrichtungsschritten aus.",
+          "mappingDraft": "Er braucht den veröffentlichten KI-Entwurf.",
+          "mappingLater": "Wählen Sie das Mapping in den Einrichtungsschritten."
+        }
+      },
+      "dismiss": "Fertig"
+    },
     "loading": "Handelspartner wird geladen",
     "notFound": {
       "title": "Handelspartner nicht gefunden",
@@ -1437,8 +1476,6 @@
     }
   },
   "TradingPartnerForm": {
-    "createTitle": "Neuer Handelspartner",
-    "testModeNotice": "Ein neuer Trading Partner startet im Test Mode. Jedes Interchange mit ihm ist als Test markiert, bis Sie ihn auf Produktion umstellen.",
     "fields": {
       "name": {
         "label": "Name",
@@ -1478,10 +1515,8 @@
       },
       "saveFailed": "Der Trading Partner konnte nicht gespeichert werden. Versuchen Sie es erneut."
     },
-    "create": "Trading Partner anlegen",
     "save": "Änderungen speichern",
-    "saving": "Wird gespeichert…",
-    "cancel": "Abbrechen"
+    "saving": "Wird gespeichert…"
   },
   "PartnerWizard": {
     "title": "Handelspartner hinzufügen",
@@ -1637,7 +1672,8 @@
         "tooLong": "Verwenden Sie höchstens {max} Zeichen."
       },
       "gln": {
-        "required": "Geben Sie die GLN ein oder wählen Sie „Ich trage sie später ein“."
+        "required": "Geben Sie die GLN ein oder wählen Sie „Ich trage sie später ein“.",
+        "taken": "Ein anderer Handelspartner verwendet diese GLN bereits. Prüfen Sie sie auf Tippfehler oder wählen Sie „Ich trage sie später ein“."
       },
       "documents": {
         "required": "Wählen Sie mindestens einen Beleg."
@@ -1656,6 +1692,8 @@
     "back": "Zurück",
     "continue": "Weiter",
     "finish": "Partner im Testbetrieb anlegen",
+    "finishing": "Partner wird angelegt…",
+    "finishFailed": "{name} konnte nicht angelegt werden. Es ist also noch nichts eingerichtet. Versuchen Sie es erneut.",
     "retry": "Erneut versuchen"
   },
   "Channels": {
