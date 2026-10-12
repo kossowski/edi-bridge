@@ -82,7 +82,11 @@ export const ChosenVersionsAndSample = meta.story({
     await expect(table.getByRole('columnheader', { name: 'Version 1' })).toBeVisible()
     await expect(table.getByRole('columnheader', { name: 'Version 3' })).toBeVisible()
     await expect(
-      await canvas.findByText(new RegExp(`for ${samples[1]!.name}`), {}, { timeout: 5000 }),
+      await canvas.findByText(
+        new RegExp(`\\d+ (value differs|values differ) for ${samples[1]!.name}`),
+        {},
+        { timeout: 5000 },
+      ),
     ).toBeVisible()
   },
 })

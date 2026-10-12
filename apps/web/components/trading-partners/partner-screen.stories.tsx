@@ -67,6 +67,10 @@ const largeFlows = [
   ).values(),
 ]
 
+// The overview waits for the partner's activity, counted over the whole seeded Run volume, which
+// takes a busy CI runner more than the default second.
+const activityLoaded = { timeout: 5000 }
+
 function region(canvasElement: HTMLElement, name: string | RegExp) {
   return within(within(canvasElement).getByRole('region', { name }))
 }
@@ -99,7 +103,11 @@ export const Live = meta.story({
     )
     await expect(canvas.getByRole('tab', { name: 'Settings' })).toBeVisible()
     await expect(
-      await canvas.findByText('Hansemarkt GmbH is set up and exchanging real documents.'),
+      await canvas.findByText(
+        'Hansemarkt GmbH is set up and exchanging real documents.',
+        {},
+        activityLoaded,
+      ),
     ).toBeVisible()
     await expect(canvas.queryByRole('progressbar')).toBeNull()
     await expect(canvas.queryByRole('button', { name: 'Go live' })).toBeNull()
@@ -125,7 +133,9 @@ export const Live = meta.story({
 export const NewPartnerWithoutActivity = meta.story({
   ...at(untouched),
   async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByRole('progressbar', { name: 'Setup' })).toBeVisible()
+    await expect(
+      await canvas.findByRole('progressbar', { name: 'Setup' }, activityLoaded),
+    ).toBeVisible()
     await expect(await canvas.findByRole('listitem', { current: 'step' })).toBeVisible()
     await expect(canvas.getByText('No documents in the last 7 days.')).toBeVisible()
     await expect(
@@ -148,7 +158,7 @@ export const SendTestDocument = meta.story({
     )
   },
   async play({ canvas }) {
-    const current = await canvas.findByRole('listitem', { current: 'step' })
+    const current = await canvas.findByRole('listitem', { current: 'step' }, activityLoaded)
     await expect(current).toHaveTextContent('Send a test document')
     await userEvent.click(within(current).getByRole('button', { name: 'Send a test document' }))
     await expect(
@@ -170,7 +180,9 @@ export const ConfirmationArrives = meta.story({
     )
   },
   async play({ canvas, canvasElement }) {
-    await userEvent.click(await canvas.findByRole('button', { name: 'Send a test document' }))
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
     await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
     await expect(
       await canvas.findByText(
@@ -203,7 +215,11 @@ export const AwaitingConfirmation = meta.story({
   ...at(awaiting),
   async play({ canvas }) {
     await expect(
-      await canvas.findByText(/Waiting for the receipt confirmation from Bodensee Handelshaus AG/),
+      await canvas.findByText(
+        /Waiting for the receipt confirmation from Bodensee Handelshaus AG/,
+        {},
+        activityLoaded,
+      ),
     ).toBeVisible()
     await expect(canvas.getByText(/^Test document sent/)).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Send the test again' })).toBeVisible()
@@ -214,7 +230,7 @@ export const AwaitingConfirmation = meta.story({
 export const ConfirmedOnLoad = meta.story({
   ...at(confirmed),
   async play({ canvas }) {
-    const current = await canvas.findByRole('listitem', { current: 'step' })
+    const current = await canvas.findByRole('listitem', { current: 'step' }, activityLoaded)
     await expect(current).toHaveTextContent('Go live')
     await expect(
       within(current).getByText(
@@ -232,7 +248,7 @@ export const GoLive = meta.story({
   ...at(confirmed),
   async play({ canvas, canvasElement }) {
     const body = within(canvasElement.ownerDocument.body)
-    const goLive = await canvas.findByRole('button', { name: 'Go live' })
+    const goLive = await canvas.findByRole('button', { name: 'Go live' }, activityLoaded)
 
     await userEvent.click(goLive)
 
@@ -261,7 +277,7 @@ export const WorkspaceWithoutGln = meta.story({
   },
   async play({ canvas }) {
     await expect(
-      await canvas.findByRole('link', { name: "Record your company's GLN" }),
+      await canvas.findByRole('link', { name: "Record your company's GLN" }, activityLoaded),
     ).toHaveAttribute('href', '/settings')
   },
 })
@@ -270,7 +286,7 @@ export const PartnerWithoutGln = meta.story({
   ...at(withoutGln),
   async play({ canvas }) {
     await expect(await canvas.findByText('GLN not added yet')).toBeVisible()
-    const current = await canvas.findByRole('listitem', { current: 'step' })
+    const current = await canvas.findByRole('listitem', { current: 'step' }, activityLoaded)
     await expect(current).toHaveTextContent("The partner's GLN")
     await expect(
       within(current).getByRole('link', { name: "Add the partner's GLN" }),
@@ -284,7 +300,7 @@ export const PartnerWithoutGlnGerman = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('GLN noch nicht erfasst')).toBeVisible()
     await expect(
-      await canvas.findByRole('link', { name: 'GLN des Partners erfassen' }),
+      await canvas.findByRole('link', { name: 'GLN des Partners erfassen' }, activityLoaded),
     ).toBeVisible()
   },
 })
@@ -300,7 +316,9 @@ export const PartnerWithoutGlnDark = meta.story({
 export const ViewerAwaitingConfirmation = meta.story({
   ...at(awaiting),
   ...asViewer(async ({ canvas }) => {
-    await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
+    await expect(
+      await canvas.findByText(/Waiting for the receipt confirmation/, {}, activityLoaded),
+    ).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Send the test again' })).toBeNull()
   }),
 })
@@ -311,6 +329,8 @@ export const ViewerConfirmedOnLoad = meta.story({
     await expect(
       await canvas.findByText(
         'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
+        {},
+        activityLoaded,
       ),
     ).toBeVisible()
     await expect(await canvas.findByText('An Admin continues the setup.')).toBeVisible()
@@ -505,7 +525,12 @@ export const LargeVolume = meta.story({
     )
   },
   async play({ canvas, canvasElement }) {
-    const problems = await canvas.findByRole('region', { name: /^Open problems \(/ })
+    const problems = await canvas.findByRole(
+      'region',
+      { name: /^Open problems \(/ },
+      activityLoaded,
+    )
+
     await expect(within(problems).getAllByRole('listitem')).toHaveLength(20)
     await expect(within(problems).getByText(/^Showing 20 of/)).toBeVisible()
     await expect(
@@ -523,7 +548,9 @@ export const German = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('tab', { name: 'Übersicht' })).toBeVisible()
     await expect(canvas.getByRole('tab', { name: 'Einstellungen' })).toBeVisible()
-    await expect(await canvas.findByRole('button', { name: 'Live schalten' })).toBeVisible()
+    await expect(
+      await canvas.findByRole('button', { name: 'Live schalten' }, activityLoaded),
+    ).toBeVisible()
     await expect(canvas.getByRole('region', { name: 'Belege der letzten 7 Tage' })).toBeVisible()
   },
 })
@@ -542,7 +569,9 @@ export const Dark = meta.story({
   ...at(awaiting),
   beforeEach: darkMode,
   async play({ canvas }) {
-    await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
+    await expect(
+      await canvas.findByText(/Waiting for the receipt confirmation/, {}, activityLoaded),
+    ).toBeVisible()
   },
 })
 
@@ -551,7 +580,11 @@ export const DarkConfirmedOnLoad = meta.story({
   beforeEach: darkMode,
   async play({ canvas }) {
     await expect(
-      await canvas.findByText(/The receipt confirmation from Spreewald Frische GmbH arrived/),
+      await canvas.findByText(
+        /The receipt confirmation from Spreewald Frische GmbH arrived/,
+        {},
+        activityLoaded,
+      ),
     ).toBeVisible()
   },
 })
@@ -560,7 +593,9 @@ export const DarkLive = meta.story({
   ...at(live),
   beforeEach: darkMode,
   async play({ canvas }) {
-    await expect(await canvas.findByText(/is set up and exchanging real documents/)).toBeVisible()
+    await expect(
+      await canvas.findByText(/is set up and exchanging real documents/, {}, activityLoaded),
+    ).toBeVisible()
   },
 })
 
