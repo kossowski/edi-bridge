@@ -1,7 +1,7 @@
 import { DocumentStructuresScreen } from '@/components/document-structures/document-structures-screen'
-import { placeholderMetadata } from '@/components/page-placeholder'
+import { pageMetadata } from '@/components/page-metadata'
 
-export const generateMetadata = placeholderMetadata('documentStructures')
+export const generateMetadata = pageMetadata('dataFormats')
 
 export default function Page() {
   return <DocumentStructuresScreen />

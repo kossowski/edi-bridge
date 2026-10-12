@@ -3,7 +3,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 
-import { BackToRuns, Fact, LoadFailure, Section } from '@/components/detail-parts'
+import { AppPage } from '@/components/app-page'
+import { Fact, LoadFailure, Section } from '@/components/detail-parts'
 import { RawInterchange } from '@/components/runs/raw-interchange'
 import { RunLink } from '@/components/runs/run-link'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
@@ -86,12 +87,6 @@ function InterchangeView({ interchange }: { interchange: Interchange }) {
 
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {t('heading', { controlReference: interchange.controlReference })}
-        </h1>
-        <p className="text-muted-foreground font-mono text-sm break-all">{interchange.id}</p>
-      </div>
       <dl
         aria-label={t('facts.label')}
         className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
@@ -121,7 +116,6 @@ function InterchangeLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-64" />
       <Skeleton className="h-20 w-full" />
       <Skeleton className="h-48 w-full" />
     </div>
@@ -133,8 +127,9 @@ export function InterchangeScreen({ id }: { id: string }) {
   const { data, error, isPending, refetch } = useQuery(interchangeQuery(id))
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackToRuns label={t('back')} />
+    <AppPage
+      meta={data && <span className="font-mono break-all">{data.id}</span>}
+      name={data && t('name', { controlReference: data.controlReference })}>
       {isPending ? (
         <InterchangeLoading />
       ) : data ? (
@@ -146,6 +141,6 @@ export function InterchangeScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }

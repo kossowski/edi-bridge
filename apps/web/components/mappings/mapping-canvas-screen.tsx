@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useId } from 'react'
 
-import { BackLink, Fact, LoadFailure } from '@/components/detail-parts'
+import { AppPage } from '@/components/app-page'
+import { Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
 import { AiReviewPanel } from '@/components/mappings/ai-review-panel'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
@@ -138,63 +139,24 @@ function DesktopOnlyNotice() {
   )
 }
 
-function MappingView({ draft, canChange }: { draft: MappingDraft; canChange: boolean }) {
+function MappingFacts({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping')
   const sideTitle = useSideTitle()
-  const desktop = useDesktop()
-  const stateId = useId()
-  const reviewSummaryId = useId()
-  const publishHintId = useId()
-  const reviewPanelId = useId()
-  const aiDraft = useAiDraftRun(draft.mappingId)
-  const aiReview = canChange ? draft.aiReview : null
 
   return (
-    <MappingCanvasProvider aiReview={aiReview} viewOnly={!canChange}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
-        <DraftStateLabel id={stateId} draft={draft} />
-        {canChange && <GraphSaveStatus mappingId={draft.mappingId} />}
-        <div className="ms-auto flex flex-wrap items-center gap-2">
-          {canChange ? (
-            <>
-              {desktop && (
-                <AiDraftAction aiDraft={aiDraft} draft={draft} reviewSummaryId={reviewSummaryId} />
-              )}
-              <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
-            </>
-          ) : (
-            <MappingVersionsLink mappingId={draft.mappingId} />
-          )}
-        </div>
-        {canChange && (
-          <AiReviewState
-            draft={draft}
-            publishHintId={publishHintId}
-            reviewPanelId={desktop ? reviewPanelId : null}
-            summaryId={reviewSummaryId}
-          />
-        )}
-      </div>
-      <dl
-        aria-label={t('facts.label')}
-        className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
-        <Fact label={t('facts.direction')}>{t(`direction.${draft.direction}`)}</Fact>
-        <Fact label={t('facts.source')}>{sideTitle(draft.source)}</Fact>
-        <Fact label={t('facts.target')}>{sideTitle(draft.target)}</Fact>
-        <Fact label={t('facts.links')}>
-          {t('linkCount', { count: draft.links.length + draft.transformLinks.length })}
-        </Fact>
-        <Fact label={t('facts.transforms')}>
-          {t('transforms.count', { count: draft.transforms.length })}
-        </Fact>
-      </dl>
-      <DesktopOnlyNotice />
-      {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
-      <div className="hidden min-h-0 flex-1 flex-col lg:flex">
-        {desktop && <Canvas aiReview={aiReview} draft={draft} reviewPanelId={reviewPanelId} />}
-      </div>
-    </MappingCanvasProvider>
+    <dl
+      aria-label={t('facts.label')}
+      className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
+      <Fact label={t('facts.direction')}>{t(`direction.${draft.direction}`)}</Fact>
+      <Fact label={t('facts.source')}>{sideTitle(draft.source)}</Fact>
+      <Fact label={t('facts.target')}>{sideTitle(draft.target)}</Fact>
+      <Fact label={t('facts.links')}>
+        {t('linkCount', { count: draft.links.length + draft.transformLinks.length })}
+      </Fact>
+      <Fact label={t('facts.transforms')}>
+        {t('transforms.count', { count: draft.transforms.length })}
+      </Fact>
+    </dl>
   )
 }
 
@@ -206,7 +168,6 @@ function MappingLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-64" />
       <Skeleton className="h-20 w-full" />
       <Skeleton className="h-96 w-full" />
     </div>
@@ -214,26 +175,75 @@ function MappingLoading() {
 }
 
 export function MappingCanvasScreen({ id }: { id: string }) {
-  const t = useTranslations('Mapping')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
   const session = useSession()
+  const desktop = useDesktop()
+  const stateId = useId()
+  const reviewSummaryId = useId()
+  const publishHintId = useId()
+  const reviewPanelId = useId()
+  const aiDraft = useAiDraftRun(id)
+  const draft = session.isPending ? undefined : data
+  const canChange = session.canChange
+  const aiReview = canChange ? (draft?.aiReview ?? null) : null
 
-  // On desktop the screen takes the viewport below the app header (h-14), so the canvas and the
-  // band under it share the height without page scrolling.
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 lg:h-[calc(100svh-3.5rem)] lg:flex-none lg:gap-3 lg:py-4">
-      <BackLink href="/mappings" label={t('back')} />
-      {isPending || session.isPending ? (
-        <MappingLoading />
-      ) : data ? (
-        <MappingView canChange={session.canChange} draft={data} />
-      ) : (
-        <LoadFailure
-          namespace="Mapping"
-          notFound={error instanceof ApiError && error.status === 404}
-          onRetry={() => void refetch()}
-        />
-      )}
-    </div>
+    <MappingCanvasProvider aiReview={aiReview} viewOnly={!canChange}>
+      {/* On desktop the screen fills the viewport below the header, so the canvas and the band
+          under it share the height without page scrolling. */}
+      <AppPage
+        actions={
+          draft &&
+          (canChange ? (
+            <>
+              {desktop && (
+                <AiDraftAction aiDraft={aiDraft} draft={draft} reviewSummaryId={reviewSummaryId} />
+              )}
+              <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
+            </>
+          ) : (
+            <MappingVersionsLink mappingId={id} />
+          ))
+        }
+        meta={
+          draft && (
+            <>
+              <DraftStateLabel id={stateId} draft={draft} />
+              {canChange && <GraphSaveStatus mappingId={id} />}
+            </>
+          )
+        }
+        name={draft?.name}
+        className="lg:gap-3 lg:py-4 lg:contain-size">
+        {draft ? (
+          <>
+            {canChange && (
+              <AiReviewState
+                draft={draft}
+                publishHintId={publishHintId}
+                reviewPanelId={desktop ? reviewPanelId : null}
+                summaryId={reviewSummaryId}
+              />
+            )}
+            <MappingFacts draft={draft} />
+            <DesktopOnlyNotice />
+            {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
+            <div className="hidden min-h-0 flex-1 flex-col lg:flex">
+              {desktop && (
+                <Canvas aiReview={aiReview} draft={draft} reviewPanelId={reviewPanelId} />
+              )}
+            </div>
+          </>
+        ) : isPending || session.isPending ? (
+          <MappingLoading />
+        ) : (
+          <LoadFailure
+            namespace="Mapping"
+            notFound={error instanceof ApiError && error.status === 404}
+            onRetry={() => void refetch()}
+          />
+        )}
+      </AppPage>
+    </MappingCanvasProvider>
   )
 }

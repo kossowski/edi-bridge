@@ -1,7 +1,7 @@
 import { LookupTablesScreen } from '@/components/lookup-tables/lookup-tables-screen'
-import { placeholderMetadata } from '@/components/page-placeholder'
+import { pageMetadata } from '@/components/page-metadata'
 
-export const generateMetadata = placeholderMetadata('lookupTables')
+export const generateMetadata = pageMetadata('codeTranslations')
 
 export default function Page() {
   return <LookupTablesScreen />

@@ -3,7 +3,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 
-import { BackLink, LoadFailure } from '@/components/detail-parts'
+import { AppPage } from '@/components/app-page'
+import { LoadFailure } from '@/components/detail-parts'
 import { LookupTableEntryEditor } from '@/components/lookup-tables/lookup-table-entry-editor'
 import { ScopeLabel } from '@/components/lookup-tables/lookup-table-scope-label'
 import { useSession } from '@/hooks/use-session'
@@ -24,34 +25,28 @@ export function LookupTableEditorScreen({ id }: { id: string }) {
   const session = useSession()
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/lookup-tables" label={t('back')} />
+    <AppPage
+      meta={
+        data && (
+          <dl className="flex flex-wrap gap-x-2">
+            <dt>{tLookupTables('columns.scope')}:</dt>
+            <dd>
+              <ScopeLabel scope={data.scope} />
+            </dd>
+          </dl>
+        )
+      }
+      name={data?.name}
+      titleRef={data && !session.isPending ? focusIfNothingFocused : undefined}>
       {isPending || session.isPending ? (
         <div aria-busy className="flex flex-col gap-6">
           <p role="status" className="sr-only">
             {t('loading')}
           </p>
-          <Skeleton className="h-8 w-64" />
           <Skeleton className="h-96 w-full" />
         </div>
       ) : data ? (
-        <>
-          <div className="flex flex-col gap-1">
-            <h1
-              ref={focusIfNothingFocused}
-              tabIndex={-1}
-              className="text-2xl font-semibold tracking-tight outline-none">
-              {data.name}
-            </h1>
-            <dl className="text-muted-foreground flex flex-wrap gap-x-2 text-sm">
-              <dt>{tLookupTables('columns.scope')}:</dt>
-              <dd>
-                <ScopeLabel scope={data.scope} />
-              </dd>
-            </dl>
-          </div>
-          <LookupTableEntryEditor key={data.id} canChange={session.canChange} table={data} />
-        </>
+        <LookupTableEntryEditor key={data.id} canChange={session.canChange} table={data} />
       ) : (
         <LoadFailure
           namespace="LookupTable"
@@ -59,6 +54,6 @@ export function LookupTableEditorScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }

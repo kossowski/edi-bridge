@@ -7,8 +7,9 @@ import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { type Ref, useRef, useState } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { linkClass, rowLinkClass } from '@/components/detail-parts'
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { ListTable } from '@/components/list-table'
 import { CreateWorkspaceDialog } from '@/components/operator/create-workspace-dialog'
 import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
 import {
@@ -72,6 +73,7 @@ function CreateWorkspaceButton({
 
 export function WorkspacesScreen() {
   const t = useTranslations('Operator.workspaces')
+  const tSession = useTranslations('Shell.session')
   const workspaces = useQuery(operatorWorkspacesQuery)
   const createButton = useRef<HTMLButtonElement>(null)
   const [dialog, setDialog] = useState({ open: false, run: 0 })
@@ -86,10 +88,10 @@ export function WorkspacesScreen() {
   }
 
   return (
-    <ListScreen
-      action={<CreateWorkspaceButton ref={createButton} onClick={openDialog} />}
-      subtitle={t('subtitle')}
-      title={t('title')}>
+    <AppPage
+      actions={<CreateWorkspaceButton ref={createButton} onClick={openDialog} />}
+      title={tSession('operatorArea')}
+      className="gap-4">
       <div role="status">
         {created && (
           <Alert role={undefined} variant="success">
@@ -125,6 +127,6 @@ export function WorkspacesScreen() {
         }}
         onOpenChange={(open) => !open && closeDialog()}
       />
-    </ListScreen>
+    </AppPage>
   )
 }

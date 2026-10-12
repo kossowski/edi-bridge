@@ -1,9 +1,8 @@
 'use client'
 
-import { AlertCircleIcon, ArrowLeft01Icon, FileNotFoundIcon } from '@hugeicons/core-free-icons'
+import { AlertCircleIcon, FileNotFoundIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
-import Link from 'next/link'
 
 import type { ReactNode } from 'react'
 
@@ -24,21 +23,6 @@ export const linkClass =
 
 export const rowLinkClass =
   'focus-visible:after:ring-ring font-medium underline-offset-4 outline-none after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:after:ring-2 focus-visible:after:ring-inset'
-
-export function BackToRuns({ label }: { label: string }) {
-  return <BackLink href="/runs" label={label} />
-}
-
-export function BackLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex w-fit items-center gap-1 rounded-sm text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3">
-      <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} aria-hidden className="size-4" />
-      {label}
-    </Link>
-  )
-}
 
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (

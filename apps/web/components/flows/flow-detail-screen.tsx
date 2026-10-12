@@ -1,14 +1,14 @@
 'use client'
 
-import { PencilEdit02Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { useChannelKindLabel } from '@/components/channels/channel-parts'
-import { BackLink, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { EditLink } from '@/components/edit-link'
 import {
   useFlowChannels,
   useFlowReferences,
@@ -19,7 +19,6 @@ import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { flowQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
-import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { Flow } from '@edi-bridge/contracts'
@@ -107,22 +106,9 @@ function PinnedMappingVersion({ flow }: { flow: Flow }) {
 
 function FlowView({ flow }: { flow: Flow }) {
   const t = useTranslations('Flow')
-  const canChange = useCanChange()
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{flow.name}</h1>
-          <Badge variant="outline">{flow.messageType}</Badge>
-        </div>
-        {canChange && (
-          <Link href={`/flows/${flow.id}/edit`} className={buttonVariants({ variant: 'outline' })}>
-            <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-            {t('edit')}
-          </Link>
-        )}
-      </div>
       <dl
         aria-label={t('facts.label')}
         className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
@@ -154,19 +140,19 @@ function FlowLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-64" />
       <Skeleton className="h-32 w-full" />
     </div>
   )
 }
 
 export function FlowDetailScreen({ id }: { id: string }) {
-  const t = useTranslations('Flow')
   const { data, error, isPending, refetch } = useQuery(flowQuery(id))
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/flows" label={t('back')} />
+    <AppPage
+      changeActions={data && <EditLink href={`/flows/${data.id}/edit`} />}
+      meta={data && <Badge variant="outline">{data.messageType}</Badge>}
+      name={data?.name}>
       {isPending ? (
         <FlowLoading />
       ) : data ? (
@@ -178,6 +164,6 @@ export function FlowDetailScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }

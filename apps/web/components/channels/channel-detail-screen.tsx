@@ -1,24 +1,22 @@
 'use client'
 
-import { PencilEdit02Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { AppPage } from '@/components/app-page'
 import {
   MaskedSecretText,
   useChannelKindLabel,
   useChannelTradingPartners,
 } from '@/components/channels/channel-parts'
 import { WebhookAccess } from '@/components/channels/webhook-token'
-import { BackLink, Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { EditLink } from '@/components/edit-link'
 import { ManualSubmissionDialog } from '@/components/manual-submission/manual-submission-dialog'
-import { useCanChange } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
 import { channelQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
-import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { Channel } from '@edi-bridge/contracts'
@@ -93,32 +91,21 @@ function ConnectionFacts({ channel }: { channel: Channel }) {
   }
 }
 
+function ChannelActions({ channel }: { channel: Channel }) {
+  return (
+    <>
+      {channel.direction === 'inbound' && <ManualSubmissionDialog defaultChannelId={channel.id} />}
+      <EditLink href={`/channels/${channel.id}/edit`} />
+    </>
+  )
+}
+
 function ChannelView({ channel }: { channel: Channel }) {
   const t = useTranslations('Channel')
   const kindLabel = useChannelKindLabel()
-  const canChange = useCanChange()
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{channel.name}</h1>
-          <Badge variant="outline">{kindLabel(channel)}</Badge>
-        </div>
-        {canChange && (
-          <div className="flex flex-wrap items-center gap-3">
-            {channel.direction === 'inbound' && (
-              <ManualSubmissionDialog defaultChannelId={channel.id} />
-            )}
-            <Link
-              href={`/channels/${channel.id}/edit`}
-              className={buttonVariants({ variant: 'outline' })}>
-              <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-              {t('edit')}
-            </Link>
-          </div>
-        )}
-      </div>
       <dl
         aria-label={t('facts.label')}
         className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
@@ -145,19 +132,20 @@ function ChannelLoading() {
       <p role="status" className="sr-only">
         {t('loading')}
       </p>
-      <Skeleton className="h-8 w-64" />
       <Skeleton className="h-32 w-full" />
     </div>
   )
 }
 
 export function ChannelDetailScreen({ id }: { id: string }) {
-  const t = useTranslations('Channel')
   const { data, error, isPending, refetch } = useQuery(channelQuery(id))
+  const kindLabel = useChannelKindLabel()
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/channels" label={t('back')} />
+    <AppPage
+      changeActions={data && <ChannelActions channel={data} />}
+      meta={data && <Badge variant="outline">{kindLabel(data)}</Badge>}
+      name={data?.name}>
       {isPending ? (
         <ChannelLoading />
       ) : data ? (
@@ -169,6 +157,6 @@ export function ChannelDetailScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }

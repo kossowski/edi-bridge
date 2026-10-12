@@ -5,13 +5,14 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { AppPage } from '@/components/app-page'
 import {
   channelAddress,
   useChannelKindLabel,
   useChannelTradingPartners,
 } from '@/components/channels/channel-parts'
 import { rowLinkClass } from '@/components/detail-parts'
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { ListTable, NewLink } from '@/components/list-table'
 import { channelsQuery } from '@/lib/api/queries'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
 
@@ -79,10 +80,11 @@ export function ChannelsScreen() {
   const t = useTranslations()
 
   return (
-    <ListScreen
-      newLink={{ href: '/channels/new', label: t('Channels.new') }}
-      title={t('Navigation.channels')}>
+    <AppPage
+      changeActions={<NewLink href="/channels/new" label={t('Channels.new')} />}
+      title={t('Sidebar.items.allConnections.label')}
+      className="gap-4">
       <ChannelsTable />
-    </ListScreen>
+    </AppPage>
   )
 }

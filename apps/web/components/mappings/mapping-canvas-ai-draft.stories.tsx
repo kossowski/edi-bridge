@@ -404,7 +404,9 @@ export const SmallScreen = meta.story({
 export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas }) {
-      await expect(await canvas.findByRole('heading', { level: 1 })).toBeVisible()
+      await expect(
+        await canvas.findByRole('heading', { level: 1, name: withoutLinks.name }),
+      ).toBeInTheDocument()
       await expect(canvas.queryByRole('button', { name: 'Draft with AI' })).toBeNull()
       await expect(canvas.queryByText(/\bAI\b/)).toBeNull()
     },

@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
+import { AppPage } from '@/components/app-page'
 import { LiveIndicator } from '@/components/live-indicator'
 import { LoadError } from '@/components/load-error'
 import { BucketTable, ErrorRateChart, ThroughputChart } from '@/components/overview/overview-charts'
@@ -126,14 +127,10 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
   const busy = isPending || isPlaceholderData
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{t('Navigation.overview')}</h1>
-          <LiveIndicator status={liveStatus} />
-        </div>
-        <WindowSwitch value={timeWindow} onChange={setTimeWindow} />
-      </div>
+    <AppPage
+      actions={<WindowSwitch value={timeWindow} onChange={setTimeWindow} />}
+      meta={<LiveIndicator status={liveStatus} />}
+      title={t('Sidebar.items.home.label')}>
       <p aria-live="polite" className="sr-only">
         {busy && !isError ? t('Overview.loading') : ''}
       </p>
@@ -191,6 +188,6 @@ export function OverviewScreen({ defaultWindow = '24h' }: { defaultWindow?: Over
           )}
         </div>
       )}
-    </div>
+    </AppPage>
   )
 }

@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { type ReactNode, useId, useState } from 'react'
 
-import { BackLink, Fact, LoadFailure, Loading } from '@/components/detail-parts'
+import { AppPage } from '@/components/app-page'
+import { Fact, LoadFailure, Loading } from '@/components/detail-parts'
 import {
   CsvSettingsFacts,
   CsvSettingsFields,
@@ -456,9 +457,7 @@ export function DocumentStructureScreen({ id }: { id: string }) {
   const session = useSession()
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/document-structures" label={t('back')} />
-      <h1 className="text-2xl font-semibold tracking-tight">{data?.name ?? t('title')}</h1>
+    <AppPage name={data?.name}>
       {isPending || session.isPending ? (
         <div aria-busy className="flex flex-col gap-4">
           <p role="status" className="sr-only">
@@ -480,6 +479,6 @@ export function DocumentStructureScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </div>
+    </AppPage>
   )
 }

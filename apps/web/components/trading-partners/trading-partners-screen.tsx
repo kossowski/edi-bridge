@@ -5,8 +5,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { AppPage } from '@/components/app-page'
 import { rowLinkClass } from '@/components/detail-parts'
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { ListTable, NewLink } from '@/components/list-table'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
 import { currentWorkspaceQuery, tradingPartnersQuery } from '@/lib/api/queries'
 import { onboardingChecklist, type TradingPartner } from '@edi-bridge/contracts'
@@ -102,10 +103,11 @@ export function TradingPartnersScreen() {
   const t = useTranslations()
 
   return (
-    <ListScreen
-      newLink={{ href: '/trading-partners/new', label: t('TradingPartners.new') }}
-      title={t('Navigation.tradingPartners')}>
+    <AppPage
+      changeActions={<NewLink href="/trading-partners/new" label={t('TradingPartners.new')} />}
+      title={t('Sidebar.items.tradingPartners.label')}
+      className="gap-4">
       <TradingPartnersTable />
-    </ListScreen>
+    </AppPage>
   )
 }

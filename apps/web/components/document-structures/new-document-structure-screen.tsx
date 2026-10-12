@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { useId, useState } from 'react'
 
-import { BackLink, Loading } from '@/components/detail-parts'
+import { AppPage } from '@/components/app-page'
+import { Loading } from '@/components/detail-parts'
 import { CsvSettingsFields, FirstRows } from '@/components/document-structures/csv-settings'
 import {
   encodeFile,
@@ -189,9 +190,7 @@ export function NewDocumentStructureScreen() {
   }
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <BackLink href="/document-structures" label={t('back')} />
-      <h1 className="text-2xl font-semibold tracking-tight">{t('createTitle')}</h1>
+    <AppPage title={t('createTitle')}>
       <form
         noValidate
         aria-busy={create.isPending || undefined}
@@ -276,6 +275,6 @@ export function NewDocumentStructureScreen() {
           </Button>
         </div>
       </form>
-    </div>
+    </AppPage>
   )
 }

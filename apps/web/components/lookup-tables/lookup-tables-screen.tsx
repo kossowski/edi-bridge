@@ -14,7 +14,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type Ref, type RefObject, useMemo, useRef, useState } from 'react'
 
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { AppPage } from '@/components/app-page'
+import { ListTable } from '@/components/list-table'
 import { DeleteLookupTableDialog } from '@/components/lookup-tables/delete-lookup-table-dialog'
 import { LookupTableFormDialog } from '@/components/lookup-tables/lookup-table-form-dialog'
 import {
@@ -210,7 +211,7 @@ function useLookupTableDialogs(newButton: RefObject<HTMLButtonElement | null>) {
 
 export function LookupTablesScreen() {
   const t = useTranslations('LookupTables')
-  const tNavigation = useTranslations('Navigation')
+  const tSidebar = useTranslations('Sidebar.items')
   const lookupTables = useQuery(lookupTablesQuery)
   const router = useRouter()
   const newButton = useRef<HTMLButtonElement>(null)
@@ -236,9 +237,10 @@ export function LookupTablesScreen() {
   }
 
   return (
-    <ListScreen
-      action={canChange && <NewLookupTableButton ref={newButton} onClick={dialogs.create} />}
-      title={tNavigation('lookupTables')}>
+    <AppPage
+      changeActions={<NewLookupTableButton ref={newButton} onClick={dialogs.create} />}
+      title={tSidebar('codeTranslations.label')}
+      className="gap-4">
       <p role="status" className="sr-only">
         {announcement}
       </p>
@@ -282,6 +284,6 @@ export function LookupTablesScreen() {
         onDeleted={deleted}
         onOpenChange={(open) => !open && dialogs.close('delete')}
       />
-    </ListScreen>
+    </AppPage>
   )
 }

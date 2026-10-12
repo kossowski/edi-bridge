@@ -1,8 +1,8 @@
 import { OrderLifecycleScreen } from '@/components/order-lifecycle/order-lifecycle-screen'
-import { placeholderMetadata } from '@/components/page-placeholder'
+import { pageMetadata } from '@/components/page-metadata'
 import { firstSearchParam } from '@/lib/search-params'
 
-export const generateMetadata = placeholderMetadata('orderLifecycle')
+export const generateMetadata = pageMetadata('orders')
 
 export default async function Page({ searchParams }: PageProps<'/order-lifecycle'>) {
   const { businessReference } = await searchParams

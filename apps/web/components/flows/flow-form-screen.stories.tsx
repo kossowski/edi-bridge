@@ -40,7 +40,9 @@ const meta = preview.meta({
 
 export const New = meta.story({
   async play({ canvas }) {
-    await expect(canvas.getByRole('heading', { name: 'New Flow' })).toBeVisible()
+    await expect(
+      canvas.getByRole('heading', { level: 1, name: 'New document route' }),
+    ).toBeInTheDocument()
     await expect(canvas.getByRole('combobox', { name: 'Trading Partner' })).toHaveTextContent(
       'Choose a Trading Partner',
     )

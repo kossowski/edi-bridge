@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { useId } from 'react'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
+import { AppPage } from '@/components/app-page'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
 import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { apiUrl } from '@/lib/api/config'
@@ -50,14 +51,12 @@ function DraftHeader({ id }: { id: string }) {
   const publishHintId = useId()
 
   return draft ? (
-    <div className="flex flex-wrap items-center gap-3 p-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{draft.name}</h1>
-      <DraftStateLabel id={stateId} draft={draft} />
-      <div className="ms-auto">
-        <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
-      </div>
+    <AppPage
+      actions={<PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />}
+      meta={<DraftStateLabel id={stateId} draft={draft} />}
+      name={draft.name}>
       <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={summaryId} />
-    </div>
+    </AppPage>
   ) : null
 }
 

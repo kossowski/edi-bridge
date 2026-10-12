@@ -20,7 +20,9 @@ const meta = preview.meta({
 
 export const New = meta.story({
   async play({ canvas }) {
-    await expect(canvas.getByRole('heading', { name: 'New Trading Partner' })).toBeVisible()
+    await expect(
+      canvas.getByRole('heading', { level: 1, name: 'New trading partner' }),
+    ).toBeInTheDocument()
     await expect(canvas.getByLabelText('GLN')).toHaveValue('')
     await expect(canvas.getByText(/starts in Test Mode/)).toBeVisible()
   },

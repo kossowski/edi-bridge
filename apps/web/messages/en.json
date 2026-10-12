@@ -112,17 +112,6 @@
     "settings": "Settings",
     "operator": "Operator"
   },
-  "Placeholder": {
-    "title": "Not built yet",
-    "runs": "Every Run with its outcome, steps, errors and output.",
-    "tradingPartners": "The Trading Partners of this Workspace, their Channels and Flows.",
-    "channels": "The inbound and outbound Channels and their connection settings.",
-    "flows": "The Flows that route Documents from a Channel through a Mapping Version to a destination Channel.",
-    "mappings": "Mappings, their versions and the mapping canvas.",
-    "documentStructures": "The Document Structures that describe the JSON and CSV Documents of your own systems.",
-    "lookupTables": "Lookup Tables for the Workspace and for single Trading Partners.",
-    "settings": "Settings for this Workspace."
-  },
   "NotFound": {
     "title": "Page not found",
     "description": "This page does not exist. Use the navigation to go to another screen."
@@ -354,7 +343,7 @@
   },
   "RunDetail": {
     "title": "Run",
-    "back": "Back to Runs",
+    "name": "Document {id}",
     "loading": "Loading Run",
     "notFound": {
       "title": "Run not found",
@@ -464,8 +453,7 @@
   },
   "Interchange": {
     "title": "Interchange",
-    "heading": "Interchange {controlReference}",
-    "back": "Back to Runs",
+    "name": "Transmission {controlReference}",
     "loading": "Loading Interchange",
     "notFound": {
       "title": "Interchange not found",
@@ -577,9 +565,7 @@
   },
   "TradingPartner": {
     "title": "Trading Partner",
-    "back": "Back to Trading Partners",
     "loading": "Loading Trading Partner",
-    "edit": "Edit",
     "notFound": {
       "title": "Trading Partner not found",
       "description": "No Trading Partner with this ID exists in this Workspace."
@@ -655,10 +641,9 @@
     }
   },
   "TradingPartnerForm": {
-    "createTitle": "New Trading Partner",
+    "createTitle": "New trading partner",
     "editTitle": "Edit {name}",
     "editPageTitle": "Edit Trading Partner",
-    "backTo": "Back to {name}",
     "testModeNotice": "A new Trading Partner starts in Test Mode. Every Interchange with it is flagged as a test until you switch it to production.",
     "fields": {
       "name": {
@@ -732,9 +717,7 @@
   },
   "Channel": {
     "title": "Channel",
-    "back": "Back to Channels",
     "loading": "Loading Channel",
-    "edit": "Edit",
     "notFound": {
       "title": "Channel not found",
       "description": "There is no Channel with this ID in this Workspace."
@@ -796,10 +779,9 @@
     }
   },
   "ChannelForm": {
-    "createTitle": "New Channel",
+    "createTitle": "New connection",
     "editTitle": "Edit {name}",
     "editPageTitle": "Edit Channel",
-    "backTo": "Back to {name}",
     "webhookNotice": "EDI Bridge generates the webhook URL and token when you create the Channel.",
     "sections": {
       "sftp": "SFTP connection",
@@ -951,9 +933,7 @@
   },
   "Flow": {
     "title": "Flow",
-    "back": "Back to Flows",
     "loading": "Loading Flow",
-    "edit": "Edit",
     "unknownChannel": "Unknown Channel",
     "notFound": {
       "title": "Flow not found",
@@ -992,10 +972,9 @@
     }
   },
   "FlowForm": {
-    "createTitle": "New Flow",
+    "createTitle": "New document route",
     "editTitle": "Edit {name}",
     "editPageTitle": "Edit Flow",
-    "backTo": "Back to {name}",
     "sections": {
       "channels": "Channels",
       "mappingVersion": "Mapping Version"
@@ -1090,7 +1069,6 @@
   },
   "Mapping": {
     "title": "Mapping",
-    "back": "Back to Mappings",
     "loading": "Loading Mapping",
     "notFound": {
       "title": "Mapping not found",
@@ -1675,7 +1653,7 @@
   },
   "MappingVersions": {
     "title": "Mapping Versions",
-    "back": "Back to the Draft",
+    "heading": "Versions of {name}",
     "openDraft": "Open the Draft",
     "caption": "Mapping Versions, newest first",
     "loading": "Loading Mapping Versions",
@@ -1704,7 +1682,7 @@
   },
   "MappingComparison": {
     "title": "Compare Mapping Versions",
-    "back": "Back to the Mapping Versions",
+    "heading": "Compare versions of {name}",
     "loading": "Loading the comparison",
     "openDraft": "Open the Draft",
     "from": "From",
@@ -1846,7 +1824,6 @@
   },
   "DocumentStructure": {
     "title": "Document Structure",
-    "back": "Back to Document Structures",
     "loading": "Loading Document Structure",
     "notFound": {
       "title": "Document Structure not found",
@@ -1898,8 +1875,7 @@
     "viewOnlyFieldsDescription": "The fields EDI Bridge expects in Documents of this Document Structure, with their type and whether they are required or repeat."
   },
   "DocumentStructureForm": {
-    "createTitle": "New Document Structure",
-    "back": "Back to Document Structures",
+    "createTitle": "New data format",
     "origin": {
       "label": "Create from",
       "description": "EDI Bridge infers the fields, their nesting and repetitions from the file.",
@@ -2126,7 +2102,6 @@
   },
   "LookupTable": {
     "title": "Lookup Table",
-    "back": "Back to Lookup Tables",
     "loading": "Loading Lookup Table",
     "notFound": {
       "title": "Lookup Table not found",
@@ -2440,7 +2415,6 @@
     },
     "workspaces": {
       "title": "Workspaces",
-      "subtitle": "Every Workspace on the platform. Create a Workspace, then invite its users.",
       "new": "Create Workspace",
       "caption": "Workspaces, by name",
       "loading": "Loading Workspaces",
@@ -2493,7 +2467,6 @@
     },
     "workspace": {
       "title": "Workspace",
-      "back": "All Workspaces",
       "loading": "Loading Workspace",
       "facts": {
         "label": "Workspace details",

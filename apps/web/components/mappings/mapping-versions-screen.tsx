@@ -6,8 +6,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { AppPage } from '@/components/app-page'
 import { linkClass, LoadFailure } from '@/components/detail-parts'
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { ListTable } from '@/components/list-table'
 import { DraftStateLabel } from '@/components/mappings/publish-draft'
 import { comparisonHref, newestFirst } from '@/components/mappings/version-comparison'
 import { ApiError } from '@/lib/api/client'
@@ -119,12 +120,13 @@ function VersionsLoading() {
 
 export function MappingVersionsScreen({ id }: { id: string }) {
   const t = useTranslations('MappingVersions')
+  const tBreadcrumb = useTranslations('Breadcrumb')
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
   const versions = useQuery({ ...mappingVersionsQuery(id), enabled: data !== undefined })
 
   return (
-    <ListScreen
-      action={
+    <AppPage
+      actions={
         (versions.data?.length ?? 0) > 1 && (
           <Link href={comparisonHref(id)} className={buttonVariants({ variant: 'outline' })}>
             <HugeiconsIcon icon={GitCompareIcon} strokeWidth={2} aria-hidden />
@@ -132,9 +134,9 @@ export function MappingVersionsScreen({ id }: { id: string }) {
           </Link>
         )
       }
-      back={{ href: `/mappings/${id}`, label: t('back') }}
-      subtitle={data?.name}
-      title={t('title')}>
+      name={data?.name}
+      title={data ? t('heading', { name: data.name }) : tBreadcrumb('versions')}
+      className="gap-4">
       {isPending ? (
         <VersionsLoading />
       ) : data ? (
@@ -146,6 +148,6 @@ export function MappingVersionsScreen({ id }: { id: string }) {
           onRetry={() => void refetch()}
         />
       )}
-    </ListScreen>
+    </AppPage>
   )
 }

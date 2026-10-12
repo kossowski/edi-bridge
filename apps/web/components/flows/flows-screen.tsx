@@ -6,9 +6,10 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
+import { AppPage } from '@/components/app-page'
 import { rowLinkClass } from '@/components/detail-parts'
 import { useFlowReferences } from '@/components/flows/flow-parts'
-import { ListScreen, ListTable } from '@/components/list-screen'
+import { ListTable, NewLink } from '@/components/list-table'
 import { flowsQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { TableCell, TableRow } from '@edi-bridge/ui/components/table'
@@ -94,10 +95,11 @@ export function FlowsScreen() {
   const t = useTranslations()
 
   return (
-    <ListScreen
-      newLink={{ href: '/flows/new', label: t('Flows.new') }}
-      title={t('Navigation.flows')}>
+    <AppPage
+      changeActions={<NewLink href="/flows/new" label={t('Flows.new')} />}
+      title={t('Sidebar.items.allDocumentRoutes.label')}
+      className="gap-4">
       <FlowsTable />
-    </ListScreen>
+    </AppPage>
   )
 }
