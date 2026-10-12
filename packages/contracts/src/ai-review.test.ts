@@ -4,6 +4,7 @@ import {
   acceptedAiReview,
   aiReviewKeys,
   type AiReview,
+  marksAll,
   remainingAiReview,
   transformLinkKey,
 } from './ai-review'
@@ -146,5 +147,17 @@ describe('acceptedAiReview', () => {
         transformLinks: [`input:${dateFormat.id}/value`, 'target:DTM+137/C507/2380'],
       }),
     ).toBeNull()
+  })
+})
+
+describe('marksAll', () => {
+  it('holds only when the review marks every given part', () => {
+    expect(
+      marksAll(review, { links: ['BGM/1004'], transforms: [dateFormat.id], transformLinks: [] }),
+    ).toBe(true)
+
+    expect(
+      marksAll(review, { links: ['BGM/1004', 'FTX/4440'], transforms: [], transformLinks: [] }),
+    ).toBe(false)
   })
 })

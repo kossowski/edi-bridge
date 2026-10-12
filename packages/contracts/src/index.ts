@@ -49,8 +49,11 @@ export {
   type AiReview,
   type AiReviewParts,
   aiReviewPartsSchema,
+  aiReviewPartsSize,
   aiReviewSchema,
   linkEndKey,
+  markedAiReviewParts,
+  marksAll,
   remainingAiReview,
   transformLinkKey,
 } from './ai-review'

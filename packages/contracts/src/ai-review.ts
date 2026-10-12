@@ -113,6 +113,33 @@ export const aiReviewPartsSchema = z.object({
 
 export type AiReviewParts = z.infer<typeof aiReviewPartsSchema>
 
+export function aiReviewPartsSize({ links, transforms, transformLinks }: AiReviewParts) {
+  return links.length + transforms.length + transformLinks.length
+}
+
+const proposedParts = (review: AiReview): AiReviewParts => ({
+  links: review.proposedLinks,
+  transforms: review.proposedTransforms,
+  transformLinks: review.proposedTransformLinks,
+})
+
+export function markedAiReviewParts(review: AiReview, parts: AiReviewParts): AiReviewParts {
+  const proposed = proposedParts(review)
+
+  const marked = (keys: ReadonlyArray<string>, marks: ReadonlyArray<string>) =>
+    keys.filter((key) => marks.includes(key))
+
+  return {
+    links: marked(parts.links, proposed.links),
+    transforms: marked(parts.transforms, proposed.transforms),
+    transformLinks: marked(parts.transformLinks, proposed.transformLinks),
+  }
+}
+
+export function marksAll(review: AiReview, parts: AiReviewParts) {
+  return aiReviewPartsSize(markedAiReviewParts(review, parts)) === aiReviewPartsSize(parts)
+}
+
 export function acceptedAiReview(review: AiReview, accepted: AiReviewParts): AiReview | null {
   const without = (marked: ReadonlyArray<string>, keys: ReadonlyArray<string>) => {
     const gone = new Set(keys)
@@ -127,10 +154,5 @@ export function acceptedAiReview(review: AiReview, accepted: AiReviewParts): AiR
     proposedTransformLinks: without(review.proposedTransformLinks, accepted.transformLinks),
   }
 
-  const left =
-    remaining.proposedLinks.length +
-    remaining.proposedTransforms.length +
-    remaining.proposedTransformLinks.length
-
-  return left === 0 ? null : remaining
+  return aiReviewPartsSize(proposedParts(remaining)) === 0 ? null : remaining
 }

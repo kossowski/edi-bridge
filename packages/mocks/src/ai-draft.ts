@@ -4,7 +4,6 @@ import {
   acceptAiDraftEndpoint,
   acceptAiProposedPartsEndpoint,
   acceptedAiReview,
-  type AiReviewParts,
   type AiBudget,
   aiBudgetEndpoint,
   aiBudgetExhausted,
@@ -15,6 +14,7 @@ import {
   aiReviewKeys,
   type DocumentStructure,
   type MappingLink,
+  marksAll,
   requestAiDraftEndpoint,
   type Session,
   type TransformLink,
@@ -237,16 +237,6 @@ export function withAiProposal(
         updatedAt: new Date().toISOString(),
       }
     : record
-}
-
-function marksAll({ proposedLinks, proposedTransforms, proposedTransformLinks }: AiReview) {
-  const marked = (keys: ReadonlyArray<string>, proposed: ReadonlyArray<string>) =>
-    keys.every((key) => proposed.includes(key))
-
-  return (parts: AiReviewParts) =>
-    marked(parts.links, proposedLinks) &&
-    marked(parts.transforms, proposedTransforms) &&
-    marked(parts.transformLinks, proposedTransformLinks)
 }
 
 function segmentTags(proposal: AiProposal) {
@@ -540,7 +530,7 @@ export function aiDraftHandlers(
           return conflict('The Draft has no open AI review.')
         }
 
-        if (!marksAll(record.aiReview)(body.data)) {
+        if (!marksAll(record.aiReview, body.data)) {
           return conflict('The AI review does not mark every part to accept.')
         }
 
