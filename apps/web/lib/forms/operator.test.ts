@@ -51,12 +51,15 @@ describe('inviteStatus', () => {
   const expiresAt = new Date(pending.expiresAt)
 
   it('marks an accepted invite as accepted', () => {
-    expect(inviteStatus(invite, new Date(invite.createdAt))).toBe('accepted')
+    expect(inviteStatus(invite, new Date(invite.createdAt))).toEqual({
+      status: 'accepted',
+      on: invite.acceptedAt,
+    })
   })
 
   it('keeps an unaccepted invite pending until it expires', () => {
-    expect(inviteStatus(pending, new Date(expiresAt.getTime() - 1))).toBe('pending')
-    expect(inviteStatus(pending, expiresAt)).toBe('expired')
+    expect(inviteStatus(pending, new Date(expiresAt.getTime() - 1))).toEqual({ status: 'pending' })
+    expect(inviteStatus(pending, expiresAt)).toEqual({ status: 'expired', on: pending.expiresAt })
   })
 })
 

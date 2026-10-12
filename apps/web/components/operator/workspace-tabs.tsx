@@ -4,21 +4,17 @@ import { useTranslations } from 'next-intl'
 
 import { HeaderTabs } from '@/components/header-tabs'
 import { WorkspaceDangerTab } from '@/components/operator/workspace-danger-tab'
-import { WorkspaceInvites } from '@/components/operator/workspace-invites'
 import { WorkspaceLimitsTab } from '@/components/operator/workspace-limits-tab'
+import { WorkspaceMembersTab } from '@/components/operator/workspace-members-tab'
 import { WorkspaceOverviewTab } from '@/components/operator/workspace-overview-tab'
 import { useUrlTab } from '@/hooks/use-url-tab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
 import type { WorkspaceSummary } from '@edi-bridge/contracts'
 
-function MembersAndInvitesTab({ workspace }: { workspace: WorkspaceSummary }) {
-  return <WorkspaceInvites workspaceId={workspace.id} />
-}
-
 const workspaceTabs = [
   { value: 'overview', Panel: WorkspaceOverviewTab },
-  { value: 'members', Panel: MembersAndInvitesTab },
+  { value: 'members', Panel: WorkspaceMembersTab },
   { value: 'limits', Panel: WorkspaceLimitsTab },
   { value: 'danger', Panel: WorkspaceDangerTab },
 ] as const

@@ -51,6 +51,7 @@ import {
   listMappingSamples,
   listMappings,
   listMappingVersions,
+  listOperatorWorkspaceMembers,
   listOperatorWorkspaces,
   listOrderLifecycles,
   listPublishedMappingVersions,
@@ -85,6 +86,7 @@ export const operatorKeys = {
   all: () => ['operator', 'workspaces'] as const,
   list: () => [...operatorKeys.all(), 'list'] as const,
   invites: (id: string) => [...operatorKeys.all(), id, 'invites'] as const,
+  members: (id: string) => [...operatorKeys.all(), id, 'members'] as const,
   settings: (id: string) => [...operatorKeys.all(), id, 'settings'] as const,
 }
 
@@ -97,6 +99,13 @@ export function workspaceInvitesQuery(workspaceId: string) {
   return queryOptions({
     queryKey: operatorKeys.invites(workspaceId),
     queryFn: () => listWorkspaceInvites(workspaceId),
+  })
+}
+
+export function operatorWorkspaceMembersQuery(workspaceId: string) {
+  return queryOptions({
+    queryKey: operatorKeys.members(workspaceId),
+    queryFn: () => listOperatorWorkspaceMembers(workspaceId),
   })
 }
 
@@ -121,6 +130,15 @@ export function storeCreatedInvite(queryClient: QueryClient, workspaceId: string
     workspaceInvitesQuery(workspaceId).queryKey,
     (invites) => invites && [created, ...invites],
   )
+  void queryClient.invalidateQueries({ queryKey: operatorWorkspacesQuery.queryKey })
+}
+
+export function storeRevokedInvite(queryClient: QueryClient, revoked: Invite) {
+  queryClient.setQueryData<Invite[]>(
+    workspaceInvitesQuery(revoked.workspaceId).queryKey,
+    (invites) => invites?.filter((invite) => invite.id !== revoked.id),
+  )
+  void queryClient.invalidateQueries({ queryKey: operatorWorkspacesQuery.queryKey })
 }
 
 export function storeSavedOperatorWorkspaceSettings(
