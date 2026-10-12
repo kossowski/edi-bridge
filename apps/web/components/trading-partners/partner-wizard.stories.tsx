@@ -2,7 +2,14 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test'
 
 import type { StoryContext } from '@storybook/nextjs-vite'
 
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import {
+  besideSidebar,
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+  tablet,
+} from '@/components/story-helpers'
 import { PartnerWizard } from '@/components/trading-partners/partner-wizard'
 
 import preview from '../../.storybook/preview'
@@ -28,6 +35,12 @@ async function toDocuments(canvas: Canvas) {
 
 function progressSteps(canvas: Canvas) {
   return within(canvas.getByRole('list', { name: 'Progress' })).getAllByRole('listitem')
+}
+
+async function expectProgressFits(canvas: Canvas) {
+  const progress = canvas.getByRole('list', { name: 'Progress' })
+
+  await expect(progress.scrollWidth).toBeLessThanOrEqual(progress.clientWidth)
 }
 
 function currentStep(canvas: Canvas) {
@@ -196,5 +209,36 @@ export const Mobile = meta.story({
       canvas.getByRole('heading', { level: 2, name: 'Who is the partner?' }),
     ).toBeVisible()
     await expect(currentStep(canvas)).toHaveTextContent('Partner')
+  },
+})
+
+export const Tablet = meta.story({
+  ...tablet,
+  decorators: [besideSidebar],
+  async play({ canvas, canvasElement }) {
+    await expect(currentStep(canvas)).toHaveTextContent('Partner')
+    await expectProgressFits(canvas)
+    await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const MediumWidth = meta.story({
+  decorators: [
+    (Story) => (
+      <div className="w-[39rem]">
+        <Story />
+      </div>
+    ),
+  ],
+  async play({ canvas, canvasElement }) {
+    for (const label of ['Partner', 'Documents', 'Connections', 'Mappings', 'Review']) {
+      const text = canvas.getByText(label, { selector: 'ol span' })
+
+      await expect(text).toBeVisible()
+      await expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth)
+    }
+
+    await expectProgressFits(canvas)
+    await expectNoPageScroll(canvasElement)
   },
 })

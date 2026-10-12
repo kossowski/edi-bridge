@@ -123,15 +123,15 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
 
   return (
     <AppPage title={t('title')}>
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <div className="@container mx-auto flex w-full max-w-2xl flex-col gap-6">
         <ol aria-label={t('progress')} className="flex items-center gap-2">
           {wizardSteps.map((item, itemIndex) => (
             <li
               key={item}
               aria-current={item === step ? 'step' : undefined}
               className={cn(
-                'flex items-center gap-2',
-                itemIndex < wizardSteps.length - 1 && 'flex-1',
+                'flex min-w-0 items-center gap-2',
+                itemIndex < wizardSteps.length - 1 && 'flex-auto',
               )}>
               <span
                 aria-hidden="true"
@@ -149,7 +149,7 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
               </span>
               <span
                 className={cn(
-                  'sr-only text-xs sm:not-sr-only',
+                  'sr-only text-xs @xl:not-sr-only @xl:truncate',
                   itemIndex === index ? 'font-medium' : 'text-muted-foreground',
                 )}>
                 {t(`steps.${item}.label`)}
