@@ -16,6 +16,7 @@ import {
   wizardFieldId,
   wizardResult,
   wizardSteps,
+  withTakenGln,
 } from './partner-wizard-state'
 
 function withPartner(partner: Partial<PartnerWizardState['partner']>): PartnerWizardState {
@@ -425,5 +426,28 @@ describe('wizardResult mappings', () => {
     expect(wizardResult(state).mappings).toEqual({
       ORDERS: { way: 'existing', mappingVersionId: 'v1' },
     })
+  })
+})
+
+describe('withTakenGln', () => {
+  const taken = '0234567890129'
+
+  it('marks the GLN another partner already uses', () => {
+    const state = withPartner({ ...validPartner, gln: '0234 5678 90129' })
+
+    expect(withTakenGln({}, state, taken)).toEqual({ gln: 'taken' })
+  })
+
+  it('accepts a changed GLN or one left for later', () => {
+    expect(withTakenGln({}, withPartner({ ...validPartner, gln: '4012345000009' }), taken)).toEqual(
+      {},
+    )
+    expect(withTakenGln({}, withPartner({ ...validPartner, glnLater: true }), taken)).toEqual({})
+  })
+
+  it('keeps an error the GLN already has', () => {
+    const state = withPartner({ ...validPartner, gln: '0234567890128' })
+
+    expect(withTakenGln({ gln: 'checkDigit' }, state, taken)).toEqual({ gln: 'checkDigit' })
   })
 })

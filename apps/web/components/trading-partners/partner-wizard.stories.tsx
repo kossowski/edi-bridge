@@ -1,4 +1,5 @@
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test'
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import type { StoryContext } from '@storybook/nextjs-vite'
 
@@ -11,7 +12,8 @@ import {
   tablet,
 } from '@/components/story-helpers'
 import { PartnerWizard } from '@/components/trading-partners/partner-wizard'
-import { type WizardResult } from '@/components/trading-partners/partner-wizard-state'
+import { apiUrl } from '@/lib/api/config'
+import { createHandlers } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -51,7 +53,6 @@ function currentStep(canvas: Canvas) {
 const meta = preview.meta({
   title: 'Trading Partners/PartnerWizard',
   component: PartnerWizard,
-  args: { onFinish: fn() },
   parameters: { layout: 'fullscreen' },
 })
 
@@ -147,14 +148,11 @@ export const BackKeepsValues = meta.story({
   },
 })
 
-const finished = fn<(result: WizardResult) => void>()
-
 export const Review = meta.story({
-  args: { onFinish: finished },
-  beforeEach() {
-    finished.mockClear()
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl))
   },
-  async play({ args, canvas }) {
+  async play({ canvas }) {
     await toDocuments(canvas)
     await userEvent.click(canvas.getByRole('checkbox', { name: /Receive purchase orders/ }))
     await continueTo(canvas, 'How do documents travel?')
@@ -162,15 +160,13 @@ export const Review = meta.story({
     await continueTo(canvas, 'Which mapping does each document use?')
     await userEvent.click(await canvas.findByRole('radio', { name: /Let AI draft one/ }))
     await continueTo(canvas, 'Review and create')
+    await canvas.findByRole('region', { name: 'Mappings' })
     await userEvent.click(canvas.getByRole('button', { name: 'Create partner for testing' }))
-    await expect(args.onFinish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        partner: { name: 'Kieler Kontor GmbH', gln: '0234567890129' },
-        documents: ['ORDERS'],
-        mappings: { ORDERS: { way: 'ai' } },
-      }),
+    await waitFor(() =>
+      expect(getRouter().push).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/trading-partners\/[\da-f-]+$/),
+      ),
     )
-    await expect(finished.mock.calls[0]?.[0].connections.inbound?.way).toBe('ask')
   },
 })
 

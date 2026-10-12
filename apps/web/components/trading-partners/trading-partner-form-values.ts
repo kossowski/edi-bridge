@@ -10,6 +10,8 @@ import {
 import { fieldErrors, type FormIssue, tooLongOr } from '../../lib/forms/field-errors'
 import { type GlnError, glnError, normalizeGln } from '../../lib/forms/gln'
 
+export const defaultCharacterSet: CharacterSet = 'UNOC'
+
 export type TradingPartnerFormValues = {
   name: string
   gln: string
@@ -86,7 +88,7 @@ export function toFormValues(tradingPartner?: TradingPartner): TradingPartnerFor
   return {
     name: tradingPartner?.name ?? '',
     gln: tradingPartner?.gln ?? '',
-    characterSet: tradingPartner?.characterSet ?? 'UNOC',
+    characterSet: tradingPartner?.characterSet ?? defaultCharacterSet,
     acknowledgementTimeLimitHours: String(
       tradingPartner?.acknowledgementTimeLimitHours ?? acknowledgementTimeLimitHours.default,
     ),

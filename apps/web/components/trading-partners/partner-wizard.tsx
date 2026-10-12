@@ -2,20 +2,29 @@
 
 import { Tick02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { type FormEvent, useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
 import { AppPage } from '@/components/app-page'
 import { GlnField, TextField, useGlnErrorMessage } from '@/components/form-field'
 import { CheckboxCards } from '@/components/trading-partners/choice-cards'
+import { storeSetupSummary } from '@/components/trading-partners/partner-setup-notice'
+import { type PlanChannel, type SetupPlan } from '@/components/trading-partners/partner-setup-plan'
 import { ConnectionsStep } from '@/components/trading-partners/partner-wizard-connections'
+import {
+  type FinishedSetup,
+  finishSetup,
+  setupSummary,
+} from '@/components/trading-partners/partner-wizard-finish'
 import {
   MappingsStep,
   useOfferedMappings,
 } from '@/components/trading-partners/partner-wizard-mappings'
-import { ReviewStep } from '@/components/trading-partners/partner-wizard-review'
+import { ReviewStep, useSetupPlan } from '@/components/trading-partners/partner-wizard-review'
 import {
   firstInvalidField,
   initialWizardState,
@@ -27,11 +36,24 @@ import {
   type WizardField,
   wizardDocuments,
   wizardFieldId,
-  type WizardResult,
   wizardResult,
   type WizardStep,
   wizardSteps,
+  withTakenGln,
 } from '@/components/trading-partners/partner-wizard-state'
+import {
+  createChannel,
+  createFlow,
+  createMapping,
+  createTradingPartner,
+  isConflict,
+} from '@/lib/api/client'
+import {
+  storeCreatedMapping,
+  storeSavedChannel,
+  storeSavedFlow,
+  storeSavedTradingPartner,
+} from '@/lib/api/queries'
 import { tradingPartnerInputSchema } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Checkbox } from '@edi-bridge/ui/components/checkbox'
@@ -58,14 +80,39 @@ function useErrorMessage() {
           return null
         }
 
-        return errors.gln === 'required' ? t('gln.required') : glnErrorMessage(errors.gln)
+        if (errors.gln === 'required' || errors.gln === 'taken') {
+          return t(`gln.${errors.gln}`)
+        }
+
+        return glnErrorMessage(errors.gln)
       case 'documents':
         return errors.documents === undefined ? null : t('documents.required')
     }
   }
 }
 
-export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) => void }) {
+const finishApi = { createTradingPartner, createChannel, createMapping, createFlow }
+
+function storeFinishedSetup(
+  queryClient: QueryClient,
+  { tradingPartner, channels, mappings, flows }: FinishedSetup,
+) {
+  storeSavedTradingPartner(queryClient, tradingPartner)
+
+  for (const created of Object.values(channels)) {
+    storeSavedChannel(queryClient, created.channel)
+  }
+
+  for (const mapping of Object.values(mappings)) {
+    storeCreatedMapping(queryClient, mapping)
+  }
+
+  for (const flow of Object.values(flows)) {
+    storeSavedFlow(queryClient, flow)
+  }
+}
+
+export function PartnerWizard() {
   const t = useTranslations('PartnerWizard')
   const errorMessage = useErrorMessage()
   const baseId = useId()
@@ -73,11 +120,41 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
   const [state, setState] = useState(initialWizardState)
   const [step, setStep] = useState<WizardStep>('partner')
   const [attempted, setAttempted] = useState(false)
+  const [takenGln, setTakenGln] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  const router = useRouter()
 
   const offeredMappings = useOfferedMappings(state.documents, step === 'mappings')
+  const result = wizardResult(state)
+  const plan = useSetupPlan(result, step === 'review')
 
+  const finish = useMutation({
+    mutationFn: (setup: SetupPlan<PlanChannel>) => finishSetup(setup, finishApi),
+    onSuccess: (finished, setup) => {
+      storeFinishedSetup(queryClient, finished)
+      storeSetupSummary(queryClient, finished.tradingPartner.id, setupSummary(setup, finished))
+      router.push(`/trading-partners/${finished.tradingPartner.id}`)
+    },
+    onError: (error, setup) => {
+      if (isConflict(error)) {
+        setTakenGln(setup.partner.gln)
+        flushSync(() => {
+          setStep('partner')
+          setAttempted(true)
+        })
+        focusField('gln')
+      }
+    },
+  })
+
+  const finishing = finish.isPending || finish.isSuccess
   const index = wizardSteps.indexOf(step)
-  const errors = attempted ? stepErrors(step, state, offeredMappings) : {}
+
+  function currentErrors() {
+    return withTakenGln(stepErrors(step, state, offeredMappings), state, takenGln)
+  }
+
+  const errors = attempted ? currentErrors() : {}
 
   const glnLaterId = `${baseId}-gln-later`
 
@@ -100,6 +177,7 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
   }
 
   function goTo(next: WizardStep) {
+    finish.reset()
     flushSync(() => {
       setStep(next)
       setAttempted(false)
@@ -110,7 +188,11 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const found = stepErrors(step, state, offeredMappings)
+    if (finishing) {
+      return
+    }
+
+    const found = currentErrors()
     const first = firstInvalidField(found)
 
     if (first) {
@@ -124,9 +206,17 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
 
     if (next) {
       goTo(next)
-    } else {
-      onFinish(wizardResult(state))
+    } else if (plan.status === 'ready') {
+      finish.mutate(plan.plan)
     }
+  }
+
+  function submitLabel() {
+    if (index < wizardSteps.length - 1) {
+      return t('continue')
+    }
+
+    return finishing ? t('finishing') : t('finish')
   }
 
   const previous = wizardSteps[index - 1]
@@ -277,11 +367,21 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
             />
           )}
 
-          {step === 'review' && <ReviewStep result={wizardResult(state)} />}
+          {step === 'review' && <ReviewStep state={plan} />}
+
+          {finish.isError && !isConflict(finish.error) && (
+            <p role="alert" className="text-destructive-text text-sm">
+              {t('finishFailed', { name: result.partner.name })}
+            </p>
+          )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
             {previous ? (
-              <Button type="button" variant="outline" onClick={() => goTo(previous)}>
+              <Button
+                disabled={finishing}
+                type="button"
+                variant="outline"
+                onClick={() => goTo(previous)}>
                 {t('back')}
               </Button>
             ) : (
@@ -289,8 +389,13 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
                 {t('cancel')}
               </Link>
             )}
-            <Button type="submit">
-              {index < wizardSteps.length - 1 ? t('continue') : t('finish')}
+            <Button
+              type="submit"
+              aria-disabled={
+                finishing || (step === 'review' && plan.status !== 'ready') || undefined
+              }
+              className="aria-disabled:cursor-progress aria-disabled:opacity-50">
+              {submitLabel()}
             </Button>
           </div>
         </form>

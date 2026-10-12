@@ -84,7 +84,6 @@ function stubClipboard() {
 const meta = preview.meta({
   title: 'Trading Partners/PartnerWizard/Connections',
   component: PartnerWizard,
-  args: { onFinish: fn() },
   parameters: { layout: 'fullscreen' },
 })
 

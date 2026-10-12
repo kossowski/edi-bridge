@@ -67,7 +67,7 @@ export type PartnerField = 'name' | 'gln' | 'documents'
 
 export type WizardFieldErrors = {
   name: 'required' | 'tooLong'
-  gln: GlnError
+  gln: GlnError | 'taken'
   documents: 'required'
 } & { [Key in `${Direction}.way`]: 'required' } & {
   [Key in `${Direction}.${ConnectionField}`]: FieldError
@@ -186,6 +186,18 @@ function mappingsErrors(
   }
 
   return errors
+}
+
+export function withTakenGln(
+  errors: WizardErrors,
+  { partner }: PartnerWizardState,
+  takenGln: string | null,
+): WizardErrors {
+  if (errors.gln !== undefined || partner.glnLater || takenGln === null) {
+    return errors
+  }
+
+  return normalizeGln(partner.gln) === takenGln ? { ...errors, gln: 'taken' } : errors
 }
 
 export function stepErrors(
