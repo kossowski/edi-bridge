@@ -11,6 +11,8 @@ import { AppPage } from '@/components/app-page'
 import { GlnField, TextField, useGlnErrorMessage } from '@/components/form-field'
 import { CheckboxCards } from '@/components/trading-partners/choice-cards'
 import { ConnectionsStep } from '@/components/trading-partners/partner-wizard-connections'
+import { MappingsStep } from '@/components/trading-partners/partner-wizard-mappings'
+import { ReviewStep } from '@/components/trading-partners/partner-wizard-review'
 import {
   firstInvalidField,
   initialWizardState,
@@ -254,6 +256,23 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
               }
             />
           )}
+
+          {step === 'mappings' && (
+            <MappingsStep
+              documents={state.documents}
+              errors={errors}
+              idPrefix={baseId}
+              mappings={state.mappings}
+              onUpdate={(document, update) =>
+                setState((current) => ({
+                  ...current,
+                  mappings: { ...current.mappings, [document]: update(current.mappings[document]) },
+                }))
+              }
+            />
+          )}
+
+          {step === 'review' && <ReviewStep result={wizardResult(state)} />}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
             {previous ? (

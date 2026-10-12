@@ -1566,6 +1566,65 @@
         "copy": "request"
       }
     },
+    "mappings": {
+      "label": "Mapping for {documents}",
+      "use": "Use {mapping}",
+      "suggested": "Suggested",
+      "existing": {
+        "title": "Use an existing mapping",
+        "description": "{count, plural, one {# published mapping} other {# published mappings}} for {documents} to choose from."
+      },
+      "ai": {
+        "title": "Let AI draft one",
+        "description": "The AI drafts the mapping from an example document. You review and publish it before any document uses it."
+      },
+      "later": {
+        "title": "Later",
+        "description": "You choose the mapping on the partner page. Until then, these documents are not translated."
+      },
+      "select": {
+        "label": "Which mapping translates {documents}?",
+        "description": "Each mapping uses its newest published version.",
+        "placeholder": "Choose a mapping"
+      },
+      "loading": "Loading the mappings for {documents}…",
+      "empty": "No mapping for {documents} is published yet. Let the AI draft one, or choose one later.",
+      "failed": "The mappings for {documents} could not be loaded. You can still let the AI draft one or choose later.",
+      "retry": "Try again"
+    },
+    "review": {
+      "loading": "Loading your connections and mappings…",
+      "failed": "Your connections and mappings could not be loaded, so the setup cannot be listed yet.",
+      "retry": "Try again",
+      "partner": {
+        "title": "Partner"
+      },
+      "connections": {
+        "title": "Connections",
+        "none": "No connection yet. You add them on the partner page once the partner sends the details."
+      },
+      "mappings": {
+        "title": "Mappings",
+        "draft": "New mapping for {documents}",
+        "detail": "The AI drafts it from an example document. You review and publish it in the mapping editor."
+      },
+      "routes": {
+        "title": "Document routes",
+        "detail": "From {from} to {to}, with the mapping {mapping}, version {version}.",
+        "left": "{documents}: set up later on the partner page",
+        "reasons": {
+          "connectionPostponed": "{name} still sends you the connection details.",
+          "noOwnConnection": "None of your own connections fits {documents} yet.",
+          "severalOwnConnections": "Several of your own connections fit {documents}. You choose one there.",
+          "mappingDraft": "The route follows once the AI draft is published.",
+          "mappingLater": "You choose the mapping there."
+        }
+      },
+      "testing": {
+        "title": "Created for testing",
+        "description": "Everything you exchange with {name} is marked as a test, so nothing reaches real order processing. Once {name} confirms your test, you go live."
+      }
+    },
     "request": {
       "greeting": "Hello,",
       "intro": "we would like to exchange EDI documents with you. To set this up, please send us:",
@@ -1587,6 +1646,12 @@
       },
       "way": {
         "required": "Choose how the documents travel."
+      },
+      "mapping": {
+        "required": "Choose a mapping, let the AI draft one, or choose later."
+      },
+      "mappingVersion": {
+        "required": "Choose a mapping."
       }
     },
     "cancel": "Cancel",

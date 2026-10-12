@@ -160,12 +160,14 @@ export const Review = meta.story({
     await continueTo(canvas, 'How do documents travel?')
     await userEvent.click(canvas.getByRole('radio', { name: /ask the partner/ }))
     await continueTo(canvas, 'Which mapping does each document use?')
+    await userEvent.click(await canvas.findByRole('radio', { name: /Let AI draft one/ }))
     await continueTo(canvas, 'Review and create')
     await userEvent.click(canvas.getByRole('button', { name: 'Create partner for testing' }))
     await expect(args.onFinish).toHaveBeenCalledWith(
       expect.objectContaining({
         partner: { name: 'Kieler Kontor GmbH', gln: '0234567890129' },
         documents: ['ORDERS'],
+        mappings: { ORDERS: { way: 'ai' } },
       }),
     )
     await expect(finished.mock.calls[0]?.[0].connections.inbound?.way).toBe('ask')

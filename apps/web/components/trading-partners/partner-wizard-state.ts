@@ -20,6 +20,7 @@ import {
   validateNewChannel,
 } from '../channels/channel-form-values'
 import { defaultKindKey, type DetailedWay, wayKind } from './partner-connections'
+import { chosenOrOnly } from './partner-documents'
 
 export const wizardSteps = ['partner', 'documents', 'connections', 'mappings', 'review'] as const
 
@@ -48,7 +49,12 @@ function isConnectionField(field: ChannelField): field is ConnectionField {
 export const connectionFields = channelFields.filter(isConnectionField)
 
 export type WizardMapping =
-  { kind: 'existing'; mappingVersionId: string } | { kind: 'ai' } | { kind: 'later' }
+  { way: 'existing'; mappingVersionId: string | null } | { way: 'ai' } | { way: 'later' }
+
+export type MappingWay = WizardMapping['way']
+
+export type MappingResult =
+  { way: 'existing'; mappingVersionId: string } | { way: 'ai' } | { way: 'later' }
 
 export type PartnerWizardState = {
   partner: { name: string; gln: string; glnLater: boolean }
@@ -65,7 +71,7 @@ export type WizardFieldErrors = {
   documents: 'required'
 } & { [Key in `${Direction}.way`]: 'required' } & {
   [Key in `${Direction}.${ConnectionField}`]: FieldError
-}
+} & { [Key in `${WizardDocument}.${'mapping' | 'mappingVersion'}`]: 'required' }
 
 export type WizardField = keyof WizardFieldErrors
 
@@ -77,9 +83,10 @@ export function wizardFieldId(baseId: string, field: WizardField | Direction) {
 
 export type ConnectionResult = { way: 'ask' } | { way: DetailedWay; values: ChannelFormValues }
 
-export type WizardResult = Omit<PartnerWizardState, 'partner' | 'connections'> & {
+export type WizardResult = Pick<PartnerWizardState, 'documents'> & {
   partner: Pick<TradingPartnerInput, 'name' | 'gln'>
   connections: Partial<Record<Direction, ConnectionResult>>
+  mappings: Partial<Record<WizardDocument, MappingResult>>
 }
 
 export const initialWizardState: PartnerWizardState = {
@@ -141,6 +148,22 @@ function connectionsErrors({ documents, connections }: PartnerWizardState): Wiza
   return errors
 }
 
+function mappingsErrors({ documents, mappings }: PartnerWizardState): WizardErrors {
+  const errors: WizardErrors = {}
+
+  for (const document of documents) {
+    const mapping = mappings[document]
+
+    if (mapping === undefined) {
+      errors[`${document}.mapping`] = 'required'
+    } else if (mapping.way === 'existing' && mapping.mappingVersionId === null) {
+      errors[`${document}.mappingVersion`] = 'required'
+    }
+  }
+
+  return errors
+}
+
 export function stepErrors(step: WizardStep, state: PartnerWizardState): WizardErrors {
   switch (step) {
     case 'partner':
@@ -150,6 +173,7 @@ export function stepErrors(step: WizardStep, state: PartnerWizardState): WizardE
     case 'connections':
       return connectionsErrors(state)
     case 'mappings':
+      return mappingsErrors(state)
     case 'review':
       return {}
   }
@@ -195,13 +219,39 @@ function neededConnections({ documents, connections }: PartnerWizardState) {
   return needed
 }
 
+function mappingResult(mapping: WizardMapping): MappingResult | null {
+  if (mapping.way !== 'existing') {
+    return mapping
+  }
+
+  const { mappingVersionId } = mapping
+
+  return mappingVersionId === null ? null : { way: mapping.way, mappingVersionId }
+}
+
+function chosenMappings({ documents, mappings }: PartnerWizardState) {
+  const chosen: WizardResult['mappings'] = {}
+
+  for (const document of documents) {
+    const mapping = mappings[document]
+    const result = mapping && mappingResult(mapping)
+
+    if (result) {
+      chosen[document] = result
+    }
+  }
+
+  return chosen
+}
+
 export function wizardResult(state: PartnerWizardState): WizardResult {
   const { name, gln, glnLater } = state.partner
 
   return {
-    ...state,
+    documents: state.documents,
     partner: { name: name.trim(), gln: glnLater ? null : normalizeGln(gln) },
     connections: neededConnections(state),
+    mappings: chosenMappings(state),
   }
 }
 
@@ -230,6 +280,20 @@ export function documentsTravelling(
 
 export function postponedDirections({ documents, connections }: PartnerWizardState): Direction[] {
   return neededDirections(documents).filter((direction) => connections[direction]?.way === 'ask')
+}
+
+export function chooseMapping(
+  mapping: WizardMapping | undefined,
+  way: MappingWay,
+  versionIds: ReadonlyArray<string>,
+): WizardMapping {
+  if (way !== 'existing') {
+    return { way }
+  }
+
+  const kept = mapping?.way === 'existing' ? mapping.mappingVersionId : null
+
+  return { way, mappingVersionId: chosenOrOnly(kept, versionIds) }
 }
 
 export function initialConnectionValues(direction: Direction): ChannelFormValues {

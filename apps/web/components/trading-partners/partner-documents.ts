@@ -33,20 +33,39 @@ export function ownSideField(messageType: MessageType): FlowChannelField {
   return directionOf({ messageType }) === 'inbound' ? 'destinationChannelId' : 'inboundChannelId'
 }
 
-export function documentConnections<
-  Channel extends Pick<ChannelSummary, 'name' | 'direction' | 'tradingPartnerId'>,
->(channels: ReadonlyArray<Channel>, messageType: MessageType, tradingPartnerId: string) {
+type ConnectionChannel = Pick<ChannelSummary, 'name' | 'direction' | 'tradingPartnerId'>
+
+function fittingConnections<Channel extends ConnectionChannel>(
+  channels: ReadonlyArray<Channel>,
+  field: FlowChannelField,
+  flow: Pick<FlowSummary, 'messageType' | 'tradingPartnerId'>,
+) {
+  return channels
+    .filter((channel) => fitsFlow(channel, field, flow))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+}
+
+export function documentConnections<Channel extends ConnectionChannel>(
+  channels: ReadonlyArray<Channel>,
+  messageType: MessageType,
+  tradingPartnerId: string,
+) {
   const flow = { messageType, tradingPartnerId }
 
-  const fitting = (field: FlowChannelField) =>
-    channels
-      .filter((channel) => fitsFlow(channel, field, flow))
-      .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-
   return {
-    partner: fitting(partnerSideField(messageType)),
-    own: fitting(ownSideField(messageType)),
+    partner: fittingConnections(channels, partnerSideField(messageType), flow),
+    own: fittingConnections(channels, ownSideField(messageType), flow),
   }
+}
+
+export function ownConnections<Channel extends ConnectionChannel>(
+  channels: ReadonlyArray<Channel>,
+  messageType: MessageType,
+) {
+  return fittingConnections(channels, ownSideField(messageType), {
+    messageType,
+    tradingPartnerId: '',
+  })
 }
 
 export function latestMappingVersions(

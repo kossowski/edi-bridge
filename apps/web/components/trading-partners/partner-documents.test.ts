@@ -6,6 +6,7 @@ import {
   latestMappingVersions,
   newDocumentFlow,
   newestVersion,
+  ownConnections,
   partnerFlows,
 } from './partner-documents'
 
@@ -72,6 +73,20 @@ describe('documentConnections', () => {
       partner: ['out'],
       own: ['erp-in'],
     })
+  })
+})
+
+describe('ownConnections', () => {
+  const channels = [
+    { id: 'erp-b', name: 'B delivery', direction: 'outbound', tradingPartnerId: null },
+    { id: 'erp-a', name: 'A delivery', direction: 'outbound', tradingPartnerId: null },
+    { id: 'erp-in', name: 'ERP webhook', direction: 'inbound', tradingPartnerId: null },
+    { id: 'out', name: 'Outbox', direction: 'outbound', tradingPartnerId: partner },
+  ] as const
+
+  it('finds your own connections for a partner that does not exist yet, by name', () => {
+    expect(ownConnections(channels, 'ORDERS').map(({ id }) => id)).toEqual(['erp-a', 'erp-b'])
+    expect(ownConnections(channels, 'DESADV').map(({ id }) => id)).toEqual(['erp-in'])
   })
 })
 
