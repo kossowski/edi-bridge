@@ -45,6 +45,7 @@ import {
   signInEndpoint,
   signOutEndpoint,
   submitDocumentEndpoint,
+  tasksEndpoint,
   toPath,
   toSearchParams,
   type TradingPartnerInput,
@@ -183,6 +184,31 @@ describe('createHandlers', () => {
     await post(toPath(retryRunEndpoint.path, { id: failed.id }))
 
     expect(await failedInWindow()).toBe(before! - 1)
+  })
+
+  it('drops a retried Run from the Tasks', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const taskIds = async () => {
+      const response = await fetch(`${apiUrl}${tasksEndpoint.path}`)
+      const { tasks } = tasksEndpoint.response.parse(await response.json())
+
+      return tasks.map(({ id }) => id)
+    }
+
+    const { runs } = await listRuns({
+      status: ['failed'],
+      failureStage: ['delivery'],
+      receivedFrom: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString(),
+    })
+
+    const failed = runs[0]!
+
+    expect(await taskIds()).toContain(`run:${failed.id}`)
+
+    await post(toPath(retryRunEndpoint.path, { id: failed.id }))
+
+    expect(await taskIds()).not.toContain(`run:${failed.id}`)
   })
 
   it('lists the Run that a Reprocess started', async () => {
