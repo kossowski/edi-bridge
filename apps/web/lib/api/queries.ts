@@ -8,6 +8,8 @@ import {
 } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
+import { remainingAiReview } from '@edi-bridge/contracts'
+
 import type {
   AcceptAiProposedPartsBody,
   AiBudget,
@@ -292,6 +294,7 @@ export const mappingKeys = {
   detail: (id: string) => [...mappingKeys.all(), 'detail', id] as const,
   draft: (id: string) => [...mappingKeys.detail(id), 'draft'] as const,
   graph: (id: string) => [...mappingKeys.draft(id), 'graph'] as const,
+  acceptParts: (id: string) => [...mappingKeys.draft(id), 'acceptParts'] as const,
   versions: (id: string) => [...mappingKeys.detail(id), 'versions'] as const,
   version: (id: string, versionId: string) => [...mappingKeys.versions(id), versionId] as const,
   comparison: (id: string, query: MappingComparisonQuery) =>
@@ -421,10 +424,48 @@ export function storeAcceptedAiDraft(queryClient: QueryClient, draft: MappingDra
   queryClient.setQueryData(mappingDraftQuery(draft.mappingId).queryKey, draft)
 }
 
+// Graph saves and accepts of one Mapping run one after another, and only the last of them writes
+// the whole answer into the cache, so no answer drops a change made after it.
+export function graphChangeScope(mappingId: string) {
+  return { id: mappingKeys.graph(mappingId).join('/') }
+}
+
+export function isLastGraphChange(queryClient: QueryClient, mappingId: string) {
+  const { id } = graphChangeScope(mappingId)
+
+  return queryClient.isMutating({ predicate: ({ options }) => options.scope?.id === id }) === 1
+}
+
 export function acceptAiProposedPartsMutation(queryClient: QueryClient, mappingId: string) {
+  const { queryKey } = mappingDraftQuery(mappingId)
+
   return mutationOptions({
+    mutationKey: mappingKeys.acceptParts(mappingId),
+    scope: graphChangeScope(mappingId),
     mutationFn: (parts: AcceptAiProposedPartsBody) => acceptAiProposedParts(mappingId, parts),
-    onSuccess: (draft: MappingDraft) => storeAcceptedAiDraft(queryClient, draft),
+    onMutate: () => queryClient.cancelQueries({ queryKey }),
+    onSuccess: (saved: MappingDraft) => {
+      if (isLastGraphChange(queryClient, mappingId)) {
+        storeAcceptedAiDraft(queryClient, saved)
+
+        return
+      }
+
+      // A save waiting behind the accept already shows its change, so only the review is taken.
+      queryClient.setQueryData<MappingDraft>(
+        queryKey,
+        (draft) =>
+          draft && {
+            ...draft,
+            aiReview: saved.aiReview && remainingAiReview(saved.aiReview, saved, draft),
+          },
+      )
+    },
+    onError: () => {
+      if (isLastGraphChange(queryClient, mappingId)) {
+        void queryClient.invalidateQueries({ queryKey })
+      }
+    },
   })
 }
 
