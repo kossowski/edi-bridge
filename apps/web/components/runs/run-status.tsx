@@ -14,6 +14,7 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 
+import { usePlainNames } from '@/components/plain-names'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -43,18 +44,19 @@ export const failureStageIcons: Record<FailureStage, IconSvgElement> = {
 }
 
 export function RunStatusBadge({ status }: { status: RunStatus }) {
-  const t = useTranslations('Runs.status')
+  const plainNames = usePlainNames()
 
   return (
     <Badge variant="outline" className={cn('gap-1', runStatusStyles[status])}>
       <HugeiconsIcon icon={runStatusIcons[status]} strokeWidth={2} aria-hidden />
-      {t(status)}
+      {plainNames.runStatus(status)}
     </Badge>
   )
 }
 
 export function FailureStageLabel({ failureStage }: { failureStage: FailureStage | null }) {
   const t = useTranslations('Runs')
+  const plainNames = usePlainNames()
 
   if (failureStage === null) {
     return (
@@ -68,14 +70,14 @@ export function FailureStageLabel({ failureStage }: { failureStage: FailureStage
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-start gap-1.5">
       <HugeiconsIcon
         icon={failureStageIcons[failureStage]}
         strokeWidth={2}
         aria-hidden
-        className="size-4"
+        className="mt-0.5 size-4 shrink-0"
       />
-      {t(`failureStage.${failureStage}`)}
+      {plainNames.failureStageTitle(failureStage)}
     </span>
   )
 }

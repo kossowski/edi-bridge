@@ -167,11 +167,13 @@ export const Failures = meta.story({
     const desadv = within(stepOf(timeline, 'DESADV'))
 
     await expect(desadv.getByText('2 Messages')).toBeVisible()
-    await expect(desadv.getByText('Mapping')).toBeVisible()
+    await expect(desadv.getByText('The document could not be translated')).toBeVisible()
     await expect(desadv.getAllByText('Acknowledgement')).toHaveLength(1)
     await expect(desadv.getByText('Rejected')).toBeVisible()
     await expect(desadv.getByRole('link', { name: /^Run [0-9a-f]{8}$/ })).toBeVisible()
-    await expect(within(stepOf(timeline, 'INVOIC')).getByText('Delivery')).toBeVisible()
+    await expect(
+      within(stepOf(timeline, 'INVOIC')).getByText('The document could not be delivered'),
+    ).toBeVisible()
   },
 })
 

@@ -1,4 +1,5 @@
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
+import { darkMode, german } from '@/components/story-helpers'
 import { failureStages, runStatuses } from '@edi-bridge/contracts'
 
 import preview from '../../.storybook/preview'
@@ -27,10 +28,6 @@ const meta = preview.meta({
 
 export const Light = meta.story({})
 
-export const Dark = meta.story({
-  beforeEach() {
-    document.documentElement.classList.add('dark')
+export const Dark = meta.story({ beforeEach: darkMode })
 
-    return () => document.documentElement.classList.remove('dark')
-  },
-})
+export const German = meta.story({ decorators: [german] })

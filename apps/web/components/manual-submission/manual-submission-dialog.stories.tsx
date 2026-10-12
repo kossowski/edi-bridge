@@ -133,8 +133,8 @@ export const ParseFailure = meta.story({
     const content = within(await dialog())
 
     await expect(await content.findByRole('heading', { name: '1 Run created' })).toBeVisible()
-    await expect(content.getByText('Failed')).toBeVisible()
-    await expect(content.getByText('Parse')).toBeVisible()
+    await expect(content.getByText('Needs attention')).toBeVisible()
+    await expect(content.getByText('The file could not be read')).toBeVisible()
   },
 })
 
@@ -359,6 +359,6 @@ export const Dark = meta.story({
   async play() {
     await submit(notes)
 
-    await expect(await within(await dialog()).findByText('Failed')).toBeVisible()
+    await expect(await within(await dialog()).findByText('Needs attention')).toBeVisible()
   },
 })

@@ -292,6 +292,51 @@
       "retry": "Try again"
     }
   },
+  "PlainNames": {
+    "messageType": {
+      "ORDERS": {
+        "name": "Purchase order",
+        "plural": "Purchase orders"
+      },
+      "DESADV": {
+        "name": "Dispatch advice",
+        "plural": "Dispatch advices"
+      },
+      "INVOIC": {
+        "name": "Invoice",
+        "plural": "Invoices"
+      },
+      "CONTRL": {
+        "name": "Receipt confirmation",
+        "plural": "Receipt confirmations"
+      }
+    },
+    "runStatus": {
+      "received": "Received",
+      "processing": "In progress",
+      "delivered": "Delivered",
+      "failed": "Needs attention",
+      "duplicate": "Duplicate"
+    },
+    "failureStage": {
+      "parse": {
+        "title": "The file could not be read",
+        "summary": "The file is not valid EDI. Your trading partner has been told automatically and has to send a corrected file."
+      },
+      "validation": {
+        "title": "The document breaks the EDI rules",
+        "summary": "A required value is missing or has the wrong format. For incoming documents your trading partner must resend; for outgoing ones the mapping needs a fix."
+      },
+      "mapping": {
+        "title": "The document could not be translated",
+        "summary": "A field could not be converted between your format and EDI. Fix the mapping or code translation, then process the document again."
+      },
+      "delivery": {
+        "title": "The document could not be delivered",
+        "summary": "The receiving system did not accept the document, often because it was unreachable. Try again once it is back."
+      }
+    }
+  },
   "Runs": {
     "caption": "Runs, newest first",
     "loading": "Loading Runs",
@@ -306,19 +351,6 @@
       "messageType": "Message Type",
       "flow": "Flow",
       "source": "Source"
-    },
-    "status": {
-      "received": "Received",
-      "processing": "Processing",
-      "delivered": "Delivered",
-      "failed": "Failed",
-      "duplicate": "Duplicate"
-    },
-    "failureStage": {
-      "parse": "Parse",
-      "validation": "Validation",
-      "mapping": "Mapping",
-      "delivery": "Delivery"
     },
     "timeRange": {
       "any": "Any time",
@@ -444,8 +476,8 @@
         "versionsUnavailable": "The Mapping Versions could not be loaded."
       },
       "awaitingResend": {
-        "title": "Awaiting resend from the Trading Partner",
-        "description": "The Interchange from {tradingPartner} failed at {failureStage}. EDI Bridge rejected it with a CONTRL. Only a corrected resend from the Trading Partner fixes it."
+        "title": "Awaiting resend from the trading partner",
+        "description": "{failureStage}: EDI Bridge rejected the transmission from {tradingPartner} with a receipt confirmation. Only a corrected resend from the trading partner fixes it."
       },
       "replaced": {
         "description": "A Reprocess replaced this Run.",
