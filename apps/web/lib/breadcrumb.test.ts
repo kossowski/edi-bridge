@@ -43,10 +43,10 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
-  it('puts a Run under the documents', () => {
-    expect(breadcrumbTrail('/runs/run-1')).toEqual([
+  it('puts a document under the documents', () => {
+    expect(breadcrumbTrail('/documents/run-1')).toEqual([
       { href: '/documents', label: { kind: 'item', key: 'documents' } },
-      { href: '/runs/run-1', label: { kind: 'detail' } },
+      { href: '/documents/run-1', label: { kind: 'detail' } },
     ])
   })
 

@@ -1,4 +1,4 @@
-import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
+import { FailureStageLabel, RunStatusBadge } from '@/components/documents/run-status'
 import { darkMode, german } from '@/components/story-helpers'
 import { failureStages, runStatuses } from '@edi-bridge/contracts'
 
@@ -22,7 +22,7 @@ function RunStatusOverview() {
 }
 
 const meta = preview.meta({
-  title: 'Runs/RunStatus',
+  title: 'Documents/RunStatus',
   component: RunStatusOverview,
 })
 

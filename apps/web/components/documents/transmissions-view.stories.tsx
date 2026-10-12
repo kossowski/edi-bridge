@@ -41,7 +41,7 @@ export const Default = meta.story({
     await expect(within(list).getAllByText(/^File (from|to) /).length).toBeGreaterThan(0)
     await expect(within(list).getAllByRole('link')[0]).toHaveAttribute(
       'href',
-      expect.stringMatching(/^\/runs\//),
+      expect.stringMatching(/^\/documents\/[^/?]+$/),
     )
   },
 })

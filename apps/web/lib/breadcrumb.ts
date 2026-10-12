@@ -43,7 +43,6 @@ function sidebarSections() {
 
 const sections = new Map<string, Section>([
   ...sidebarSections(),
-  ['runs', itemSection('documents')],
   [
     'settings',
     { label: { kind: 'session', key: 'settings' }, href: navigationItems.settings.href },

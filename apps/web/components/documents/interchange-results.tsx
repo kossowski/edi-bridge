@@ -24,10 +24,10 @@ import {
   ListResults,
   useEmptyActions,
 } from '@/components/documents/list-parts'
+import { RunStatusBadge } from '@/components/documents/run-status'
 import { usePlainNames } from '@/components/plain-names'
-import { RunStatusBadge } from '@/components/runs/run-status'
 import { interchangesQuery } from '@/lib/api/queries'
-import { runHref } from '@/lib/navigation'
+import { documentHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import {
   Item,
@@ -81,7 +81,7 @@ function InterchangeRow({ interchange }: { interchange: InterchangeSummary }) {
           {interchange.runs.map((run) => (
             <li key={run.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <Link
-                href={runHref(run.id)}
+                href={documentHref(run.id)}
                 className="focus-visible:ring-ring/50 rounded-sm underline underline-offset-2 outline-none focus-visible:ring-3">
                 {plainNames.messageTypeName(run.messageType)}
                 {run.businessReference !== null && ` ${run.businessReference}`}

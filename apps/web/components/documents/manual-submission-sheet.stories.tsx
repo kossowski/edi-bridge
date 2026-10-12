@@ -164,7 +164,10 @@ export const OneDocument = meta.story({
       name: /^Open it\W+Purchase order \w+ from Hansemarkt GmbH$/,
     })
 
-    await expect(link).toHaveAttribute('href', expect.stringMatching(/^\/runs\/[0-9a-f-]{36}$/))
+    await expect(link).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/documents\/[0-9a-f-]{36}$/),
+    )
     await expect(content.getByText('Delivered')).toBeVisible()
   },
 })
