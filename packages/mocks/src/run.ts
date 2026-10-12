@@ -17,7 +17,7 @@ import { seedFlows } from './flow'
 import { hash } from './hash'
 import { includesText, pageOf } from './list'
 import { badRequest } from './responses'
-import { createRunStore, type RunStore, toRunStore } from './run-store'
+import { createRunStore, interchangeIdOf, type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
 export type RunFields = Pick<
@@ -107,21 +107,24 @@ export function createRun(overrides: Partial<RunSummary> = {}): RunSummary {
 
 type Order = { receivedAt: number; businessReference: string | null }
 
-function latestOrderBefore(orders: ReadonlyArray<Order>, receivedAt: number) {
+function latestBefore<T extends { receivedAt: number }>(
+  entries: ReadonlyArray<T>,
+  receivedAt: number,
+) {
   let low = 0
-  let high = orders.length
+  let high = entries.length
 
   while (low < high) {
     const middle = (low + high) >>> 1
 
-    if (orders[middle]!.receivedAt < receivedAt) {
+    if (entries[middle]!.receivedAt < receivedAt) {
       low = middle + 1
     } else {
       high = middle
     }
   }
 
-  return orders[low - 1]
+  return entries[low - 1]
 }
 
 // A Trading Partner answers many of its ORDERS with a DESADV and an INVOIC for the same order.
@@ -154,9 +157,53 @@ function followOrders(runs: ReadonlyArray<RunFields>): RunFields[] {
       return run
     }
 
-    const order = latestOrderBefore(orders, Date.parse(run.receivedAt))
+    const order = latestBefore(orders, Date.parse(run.receivedAt))
 
     return order ? { ...run, businessReference: order.businessReference } : run
+  })
+}
+
+type Original = Order & { controlReference: string }
+
+// A Duplicate is an Interchange received again, so it repeats the control reference and the
+// Business Reference of an earlier Interchange from the same Trading Partner.
+function receiveAgain(runs: ReadonlyArray<RunSummary>): RunSummary[] {
+  const originalsByFlow = new Map<string, Original[]>()
+  const flowKeyOf = (run: RunSummary) => `${run.tradingPartner.id}|${run.flow.id}`
+
+  for (const run of runs) {
+    if (run.status !== 'duplicate' && run.interchange !== null) {
+      const originals = originalsByFlow.get(flowKeyOf(run)) ?? []
+      originals.push({
+        receivedAt: Date.parse(run.receivedAt),
+        businessReference: run.businessReference,
+        controlReference: run.interchange.controlReference,
+      })
+      originalsByFlow.set(flowKeyOf(run), originals)
+    }
+  }
+
+  for (const originals of originalsByFlow.values()) {
+    originals.sort((a, b) => a.receivedAt - b.receivedAt)
+  }
+
+  return runs.map((run) => {
+    if (run.status !== 'duplicate' || run.interchange?.id !== interchangeIdOf(run)) {
+      return run
+    }
+
+    const original = latestBefore(
+      originalsByFlow.get(flowKeyOf(run)) ?? [],
+      Date.parse(run.receivedAt),
+    )
+
+    return original
+      ? {
+          ...run,
+          businessReference: original.businessReference,
+          interchange: { ...run.interchange, controlReference: original.controlReference },
+        }
+      : run
   })
 }
 
@@ -195,9 +242,9 @@ export function createRuns({
     runs.push(run, ...siblings)
   }
 
-  return createRunStore(followOrders(runs.slice(0, count)).map(toRunSummary))
-    .all()
-    .slice()
+  const placed = createRunStore(followOrders(runs.slice(0, count)).map(toRunSummary)).all()
+
+  return createRunStore(receiveAgain(placed)).all().slice()
 }
 
 let seedRunsCache: RunSummary[] | undefined

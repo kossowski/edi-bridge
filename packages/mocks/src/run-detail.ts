@@ -17,9 +17,11 @@ import {
   type RunStepStage,
   type RunSummary,
   runSummarySchema,
+  waitForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
 
-import { mappingVersionsForFlow } from './flow'
+import { type ChannelStore, toChannelStore } from './channel'
+import { type FlowStore, mappingVersionsForFlow, toFlowStore } from './flow'
 import {
   type GeneratedInterchange,
   type GeneratedMessage,
@@ -27,8 +29,10 @@ import {
   partiesOf,
   serializeInterchange,
 } from './interchange'
+import { type LookupTableStore, toLookupTableStore } from './lookup-table'
 import { type MappingVersionStore, toMappingVersionSummary } from './mapping-version'
 import { seedRuns } from './run'
+import { problemOf } from './run-problem'
 import { stagesOf, statusOf, stepStatuses } from './run-steps'
 import {
   bundleKeyOf,
@@ -92,7 +96,12 @@ type GeneratedGroup = {
 export type RunDetailOptions = (
   | { runs?: ReadonlyArray<RunSummary>; reprocessed?: ReadonlyArray<Reprocessed> }
   | { runs: RunStore; reprocessed?: never }
-) & { mappingVersions?: MappingVersionStore }
+) & {
+  mappingVersions?: MappingVersionStore
+  flows?: FlowStore
+  channels?: ChannelStore
+  lookupTables?: LookupTableStore
+}
 
 export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): Reprocessed[] {
   const bundleSizes = Map.groupBy(runs, bundleKeyOf)
@@ -126,6 +135,13 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   const generated = new WeakMap<RunGroup, GeneratedGroup>()
   const chosenVersions = new Map<string, MappingVersionSummary>()
   const retried = new Map<string, RunDetail>()
+  const waitingSince = new Map<string, string>()
+
+  const problemSources = {
+    flows: toFlowStore(options.flows),
+    channels: toChannelStore(options.channels),
+    lookupTables: toLookupTableStore(options.lookupTables),
+  }
 
   function runs() {
     store ??= toRunStore(options.runs ?? seedRuns(), options.reprocessed)
@@ -200,13 +216,22 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     const message = messages.get(messageOwner)!
     const direction = directionOf(run)
 
+    const mappingVersion = ['pending', 'skipped'].includes(statusOf(run, 'mapping')!)
+      ? null
+      : (chosenVersions.get(id) ?? pinnedVersion(run))
+
+    const runError = run.status === 'failed' ? message.error : null
+
     return runDetailSchema.parse({
       ...run,
       steps: timeSteps(run),
-      error:
-        run.status === 'failed' && message.error
-          ? { ...message.error, position: interchange?.positions.get(messageOwner) ?? null }
-          : null,
+      error: runError && {
+        ...runError,
+        position: interchange?.positions.get(messageOwner) ?? null,
+      },
+      problem: runError && problemOf(run, message, mappingVersion, problemSources),
+      waitingForTradingPartnerSince: waitingSince.get(id) ?? null,
+      duplicateOf: run.status === 'duplicate' ? originalOf(run) : null,
       interchange: interchange && {
         id: group.id,
         controlReference: interchange.controlReference,
@@ -216,12 +241,42 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
         statusOf(run, direction === 'inbound' ? 'parse' : 'mapping') === 'succeeded'
           ? message.parsed
           : null,
-      mappingVersion: ['pending', 'skipped'].includes(statusOf(run, 'mapping')!)
-        ? null
-        : (chosenVersions.get(id) ?? pinnedVersion(run)),
+      mappingVersion,
       replaces: replaced ? { id: replaced } : null,
       replacedBy: replacing ? { id: replacing } : null,
     })
+  }
+
+  function originalOf(duplicate: RunSummary) {
+    const controlReference = duplicate.interchange?.controlReference
+    const receivedAt = Date.parse(duplicate.receivedAt)
+
+    if (controlReference === undefined) {
+      return null
+    }
+
+    const candidates = runs()
+      .all()
+      .filter(
+        (run) =>
+          run.status !== 'duplicate' &&
+          run.tradingPartner.id === duplicate.tradingPartner.id &&
+          run.interchange?.controlReference === controlReference &&
+          Date.parse(run.receivedAt) < receivedAt,
+      )
+
+    const original =
+      candidates.find((run) => run.businessReference === duplicate.businessReference) ??
+      candidates[0]
+
+    return original ? { id: original.id } : null
+  }
+
+  function waitForTradingPartner(run: RunDetail) {
+    const since = waitingSince.get(run.id) ?? new Date().toISOString()
+    waitingSince.set(run.id, since)
+
+    return runDetailSchema.parse({ ...run, waitingForTradingPartnerSince: since })
   }
 
   function retry(run: RunDetail) {
@@ -232,6 +287,8 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       status: 'delivered',
       failureStage: null,
       error: null,
+      problem: null,
+      waitingForTradingPartnerSince: null,
       steps: run.steps.map((step) =>
         step.stage === 'delivery'
           ? {
@@ -338,6 +395,23 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       return HttpResponse.json(retry(run))
     }),
 
+    http.post<{ id: string }>(`${apiUrl}${waitForTradingPartnerRunEndpoint.path}`, ({ params }) => {
+      const run = detail(params.id)
+
+      if (run === undefined) {
+        return problem(404, 'Not Found')
+      }
+
+      if (run.problem?.whoFixes !== 'tradingPartner') {
+        return problem(
+          409,
+          'Only a Run that the Trading Partner fixes can wait for the Trading Partner.',
+        )
+      }
+
+      return HttpResponse.json(waitForTradingPartner(run))
+    }),
+
     http.post<{ id: string }>(
       `${apiUrl}${reprocessRunEndpoint.path}`,
       async ({ params, request }) => {
@@ -347,10 +421,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
           return problem(404, 'Not Found')
         }
 
-        if (run.status !== 'failed' || run.failureStage !== 'mapping' || run.replacedBy) {
+        if (run.problem?.whoFixes !== 'you' || run.replacedBy) {
           return problem(
             409,
-            'Only a Run that failed at mapping and is not replaced can be reprocessed.',
+            'Only a failed Run that the Workspace fixes and that is not replaced can be reprocessed.',
           )
         }
 

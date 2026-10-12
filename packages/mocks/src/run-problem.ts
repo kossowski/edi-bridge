@@ -1,0 +1,111 @@
+import {
+  type Fixer,
+  type FixTarget,
+  type MappingVersionSummary,
+  type ProblemReason,
+  type RunProblem,
+  type RunSummary,
+  whoFixes,
+} from '@edi-bridge/contracts'
+
+import type { ChannelStore } from './channel'
+import type { FlowStore } from './flow'
+import type { BrokenPiece, GeneratedErrorCode, GeneratedMessage } from './interchange'
+import type { LookupTableStore } from './lookup-table'
+
+export type ProblemSources = {
+  flows: FlowStore
+  channels: ChannelStore
+  lookupTables: LookupTableStore
+}
+
+const reasons = {
+  invalidCharacter: 'unreadable',
+  segmentCountMismatch: 'unreadable',
+  missingComponent: 'invalidContent',
+  unknownCode: 'invalidContent',
+  invalidDate: 'invalidContent',
+  lookupMissing: 'missingCode',
+  missingSourceField: 'missingField',
+  destinationUnreachable: 'unreachable',
+  destinationUnavailable: 'unreachable',
+} as const satisfies Record<GeneratedErrorCode, ProblemReason>
+
+function brokenPieceTarget(
+  broken: BrokenPiece | null,
+  mapping: MappingVersionSummary | null,
+  sources: ProblemSources,
+): FixTarget | null {
+  switch (broken?.kind) {
+    case undefined: {
+      return null
+    }
+
+    case 'mapping': {
+      return (
+        mapping && {
+          kind: 'mapping',
+          mappingId: mapping.mappingId,
+          name: mapping.mappingName,
+          fieldPath: broken.fieldPath,
+        }
+      )
+    }
+
+    case 'lookupTable': {
+      const table = sources.lookupTables.all().find(({ name }) => name === broken.name)
+
+      return table
+        ? { kind: 'lookupTable', lookupTableId: table.id, name: table.name, code: broken.code }
+        : null
+    }
+  }
+}
+
+function fixTargetOf(
+  run: RunSummary,
+  fixer: Fixer,
+  broken: BrokenPiece | null,
+  mapping: MappingVersionSummary | null,
+  sources: ProblemSources,
+): FixTarget | null {
+  switch (fixer) {
+    case 'tradingPartner': {
+      return {
+        kind: 'tradingPartner',
+        tradingPartnerId: run.tradingPartner.id,
+        name: run.tradingPartner.name,
+      }
+    }
+
+    case 'retry': {
+      const flow = sources.flows.get(run.flow.id)
+      const channel = flow && sources.channels.get(flow.destinationChannelId)
+
+      return channel ? { kind: 'channel', channelId: channel.id, name: channel.name } : null
+    }
+
+    case 'you': {
+      return brokenPieceTarget(broken, mapping, sources)
+    }
+  }
+}
+
+export function problemOf(
+  run: RunSummary,
+  { error, broken }: Pick<GeneratedMessage, 'error' | 'broken'>,
+  mapping: MappingVersionSummary | null,
+  sources: ProblemSources,
+): RunProblem | null {
+  const fixer = whoFixes(run)
+
+  if (fixer === null || error === null) {
+    return null
+  }
+
+  return {
+    reason: reasons[error.code],
+    whoFixes: fixer,
+    fixTarget: fixTargetOf(run, fixer, broken, mapping, sources),
+  }
+}

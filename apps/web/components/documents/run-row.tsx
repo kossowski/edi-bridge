@@ -11,11 +11,11 @@ import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
-import { whoFixes, type Fixer } from '@/components/documents/who-fixes'
 import { usePlainNames } from '@/components/plain-names'
 import { RunStatusBadge } from '@/components/runs/run-status'
 import { useRunTitle } from '@/components/runs/run-title'
 import { navigationItems, runHref } from '@/lib/navigation'
+import { type Fixer, whoFixes } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -32,8 +32,8 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 import type { RunSummary } from '@edi-bridge/contracts'
 
 const fixerIcons: Record<Fixer, IconSvgElement> = {
-  partner: UserMultiple02Icon,
   retry: Refresh01Icon,
+  tradingPartner: UserMultiple02Icon,
   you: UserIcon,
 }
 

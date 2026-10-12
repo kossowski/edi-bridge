@@ -440,6 +440,9 @@ export function createHandlers(
     ...runDetailHandlers(apiUrl, {
       runs,
       mappingVersions: mappingVersionStore,
+      flows,
+      channels: channelStore,
+      lookupTables: lookupTableStore,
     }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),
     ...mappingHandlers(apiUrl, {
