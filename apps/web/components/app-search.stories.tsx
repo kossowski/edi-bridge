@@ -75,7 +75,7 @@ export const Results = meta.story({
       'Find an order, a trading partner, a document or a page',
     )
     await expect(await dialog.findByRole('group', { name: 'Trading partners' })).toBeVisible()
-    await expect(dialog.getByRole('group', { name: 'Documents' })).toBeVisible()
+    await expect(await dialog.findByRole('group', { name: 'Documents' })).toBeVisible()
     await expect(dialog.getByRole('group', { name: 'Pages' })).toBeVisible()
     await expect(dialog.queryByRole('group', { name: 'Orders' })).toBeNull()
     await expect(dialog.queryByRole('option', { name: /^Operator area/ })).toBeNull()
@@ -98,7 +98,7 @@ export const KeyboardShortcut = meta.story({
     await userEvent.keyboard('{Control>}k{/Control}')
     const dialog = within(await screen.findByRole('dialog', { name: 'Search' }))
 
-    await expect(dialog.getByRole('combobox')).toHaveFocus()
+    await waitFor(() => expect(dialog.getByRole('combobox')).toHaveFocus())
     await userEvent.keyboard('code translations')
     await waitFor(() => expect(dialog.getAllByRole('option')).toHaveLength(1))
     await userEvent.keyboard('{Enter}')
@@ -206,7 +206,7 @@ export const Unavailable = meta.story({
       await dialog.findByRole('option', { name: /^Trading partners could not be loaded/ }),
     ).toBeVisible()
     await expect(
-      dialog.getByRole('option', { name: /^Documents could not be loaded/ }),
+      await dialog.findByRole('option', { name: /^Documents could not be loaded/ }),
     ).toBeVisible()
     await expect(dialog.queryByText('Nothing found.')).toBeNull()
     await userEvent.type(dialog.getByRole('combobox'), orderLifecycleReferences.full)
@@ -232,6 +232,7 @@ export const OrderUnavailable = meta.story({
     const dialog = await openPalette(canvas)
 
     await dialog.findByRole('group', { name: 'Trading partners' })
+    await dialog.findByRole('group', { name: 'Documents' })
     await userEvent.type(dialog.getByRole('combobox'), orderLifecycleReferences.full)
     await expect(
       await dialog.findByRole(
@@ -258,7 +259,7 @@ export const LargeVolume = meta.story({
 
     await expect(within(tradingPartners).getAllByRole('option')).toHaveLength(400)
     await expect(
-      within(dialog.getByRole('group', { name: 'Documents' })).getAllByRole('option'),
+      within(await dialog.findByRole('group', { name: 'Documents' })).getAllByRole('option'),
     ).toHaveLength(50)
   },
 })
@@ -283,7 +284,7 @@ export const German = meta.story({
 
     await expect(screen.getByRole('dialog', { name: 'Suche' })).toBeVisible()
     await expect(await dialog.findByRole('group', { name: 'Handelspartner' })).toBeVisible()
-    await expect(dialog.getByRole('group', { name: 'Belege' })).toBeVisible()
+    await expect(await dialog.findByRole('group', { name: 'Belege' })).toBeVisible()
     await expect(dialog.getByRole('option', { name: /^Einstellungen/ })).toBeVisible()
     await userEvent.type(dialog.getByRole('combobox'), 'nordpol')
     await expect(await dialog.findByText('Nichts gefunden.')).toBeVisible()
