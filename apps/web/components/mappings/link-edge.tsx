@@ -118,7 +118,9 @@ function LinkEdgeView({
             strokeWidth: 2.5,
           }),
           ...(highlighted && { strokeWidth: data?.aiAttention ? 3.5 : 2.5 }),
-          ...(highlighted && !data?.aiProposed && { stroke: 'var(--foreground)' }),
+          ...(highlighted &&
+            !data?.aiProposed &&
+            !data?.aiAttention && { stroke: 'var(--foreground)' }),
         }}
       />
     </>

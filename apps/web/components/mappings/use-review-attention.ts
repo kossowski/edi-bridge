@@ -13,15 +13,16 @@ import { useDraftPreview } from '@/components/mappings/use-draft-preview'
 import type { TreeItem } from '@/components/mappings/mapping-tree'
 import type { MappingDraft } from '@edi-bridge/contracts'
 
-// The toolbar, the review sheet and the canvas each ask; the preview behind the warnings is one
-// shared request.
+// The review sheet and the canvas only exist on desktop, so a small screen sends no preview for it.
 export function useReviewAttention(
   draft: MappingDraft,
   targetItems: ReadonlyArray<TreeItem> | undefined,
+  enabled: boolean,
 ) {
   const marks = useAiMarks()
-  const review = marks.open ? draft.aiReview : null
-  const { preview, updating } = useDraftPreview(draft, review?.sampleId ?? null)
+  const review = enabled && marks.open ? draft.aiReview : null
+  const sampleId = review?.sampleId ?? null
+  const { preview, updating } = useDraftPreview(draft, sampleId)
   const notes = preview.data?.notes
 
   const attention = useMemo(
@@ -35,5 +36,7 @@ export function useReviewAttention(
     [attention, marks],
   )
 
-  return { attention, onCanvas, preview, updating }
+  return { attention, onCanvas, preview, updating, sampleId }
 }
+
+export type ReviewState = ReturnType<typeof useReviewAttention>

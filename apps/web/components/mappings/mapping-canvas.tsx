@@ -608,10 +608,10 @@ export function MappingCanvas({
         : tAi('edgeLabelSome', { label, count: proposed, total })
     }
 
-    const edgeLabel = (label: string, proposed: number, total: number, attention: boolean) => {
+    const edgeLabel = (label: string, proposed: number, total: number, needsAttention: boolean) => {
       const named = proposedLabel(label, proposed, total)
 
-      return attention ? tAi('edgeLabelAttention', { label: named }) : named
+      return needsAttention ? tAi('edgeLabelAttention', { label: named }) : named
     }
 
     const transformEdges = graph.transformLinks.flatMap((link): LinkFlowEdge[] => {
@@ -624,7 +624,7 @@ export function MappingCanvas({
 
       const names = { source: text.start(link.from), target: text.end(link.to) }
       const aiProposed = marks.transformLink(link)
-      const aiAttentionNeeded = aiAttention.transformLink(link)
+      const needsAttention = aiAttention.transformLink(link)
 
       return [
         {
@@ -639,11 +639,11 @@ export function MappingCanvas({
             link,
             ...names,
             aiProposed,
-            aiAttention: aiAttentionNeeded,
+            aiAttention: needsAttention,
           },
           selectable: false,
           ...menuEdge,
-          ariaLabel: edgeLabel(t('link', names), aiProposed ? 1 : 0, 1, aiAttentionNeeded),
+          ariaLabel: edgeLabel(t('link', names), aiProposed ? 1 : 0, 1, needsAttention),
         },
       ]
     })
@@ -779,7 +779,8 @@ export function MappingCanvas({
     const plainEdges = shown.map(({ id, sourcePath, targetPath, links: merged }): LinkFlowEdge => {
       const [first] = merged
       const proposed = proposedLinkCount(marks, merged)
-      const attention = merged.some((link) => aiAttention.link(link))
+      const aiProposed = proposed === merged.length
+      const needsAttention = aiProposed && merged.some((link) => aiAttention.link(link))
 
       const label =
         merged.length === 1 && first
@@ -796,12 +797,12 @@ export function MappingCanvas({
           sourcePath,
           targetPath,
           links: merged,
-          aiProposed: proposed === merged.length,
-          aiAttention: attention,
+          aiProposed,
+          aiAttention: needsAttention,
         },
         selectable: false,
         ...menuEdge,
-        ariaLabel: edgeLabel(label, proposed, merged.length, attention),
+        ariaLabel: edgeLabel(label, proposed, merged.length, needsAttention),
       }
     })
 

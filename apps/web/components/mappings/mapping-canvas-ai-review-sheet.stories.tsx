@@ -8,6 +8,7 @@ import {
   findSaveStatus,
   inReview,
   inReviewWith,
+  openDetails,
   page,
   reviewing,
   seeded,
@@ -38,6 +39,8 @@ const large = inReview('Bodensee: ERP JSON to INVOIC', 'large')
 const previewUrl = `${apiUrl}${mappingPreviewEndpoint.path}`
 
 const wait = { timeout: 5000 }
+
+let previewRequests = 0
 
 const sheetName = 'What needs attention'
 
@@ -213,7 +216,7 @@ export const DetailAndBack = meta.story({
       await expect(focused).toHaveTextContent(path)
     })
     await expect(detail.getByRole('heading', { name: 'What to do' })).toBeVisible()
-    await expect(detail.getByText(/^The partner needs this field/)).toBeVisible()
+    await expect(detail.getByText(/^The trading partner needs this field/)).toBeVisible()
     await expect(detail.getByRole('button', { name: 'Show on canvas' })).toBeVisible()
     await expect(detail.queryByRole('heading', { name: changing })).toBeNull()
 
@@ -231,12 +234,13 @@ export const ShowOnCanvas = meta.story({
     await userEvent.click(entry!)
     await userEvent.click(within(sheet).getByRole('button', { name: 'Show on canvas' }))
     await waitFor(() => expect(findRowButton(canvasElement, target(path))).toHaveFocus())
-    await expect(
-      (await detailsPanel(canvasElement)).getByText('This part has no links yet.'),
-    ).toBeVisible()
     await waitFor(() =>
       expect(page(canvasElement).queryByRole('dialog', { name: sheetName })).toBeNull(),
     )
+    await expect(page(canvasElement).queryByRole('dialog', { name: 'Details' })).toBeNull()
+    await expect(
+      (await openDetails(canvasElement)).getByText('This part has no links yet.'),
+    ).toBeVisible()
 
     const reopened = await openSheet(canvasElement)
     const [chain] = entriesUnder(reopened, changing)
@@ -265,7 +269,7 @@ export const RejectUpdatesList = meta.story({
     await userEvent.click(within(sheet).getByRole('button', { name: 'Show on canvas' }))
     await waitFor(() => expect(findRowButton(canvasElement, target(path))).toHaveFocus())
     await userEvent.click(
-      (await detailsPanel(canvasElement)).getByRole('button', {
+      (await openDetails(canvasElement)).getByRole('button', {
         name: /^Reject the AI-proposed link from/,
       }),
     )
@@ -342,7 +346,7 @@ export const German = meta.story({
   async play({ canvasElement }) {
     const sheet = await openSheet(canvasElement, {
       name: 'Was zu prüfen ist',
-      button: /^\d+ mit Handlungsbedarf$/,
+      button: /^\d+ Einträge? mit Handlungsbedarf$/,
     })
 
     const groups = within(sheet)
@@ -376,6 +380,29 @@ export const Dark = meta.story({
     await expect(await within(sheet).findByRole('heading', { name: warnings }, wait)).toBeVisible()
     await userEvent.click(entriesUnder(sheet, changing)[0]!)
     await expect(within(sheet).getByRole('heading', { name: 'What to do' })).toBeVisible()
+  },
+})
+
+export const SmallScreen = meta.story({
+  globals: { viewport: { value: 'tablet', isRotated: false } },
+  beforeEach: [
+    reviewing(outbound),
+    ({ msw }) => {
+      msw.use(
+        http.post(previewUrl, () => {
+          previewRequests += 1
+
+          return HttpResponse.json({ message: 'Unexpected' }, { status: 500 })
+        }),
+      )
+      previewRequests = 0
+    },
+  ],
+  async play({ canvas }) {
+    await expect(await canvas.findByText('The Mapping canvas needs a larger screen')).toBeVisible()
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    await expect(previewRequests).toBe(0)
+    await expect(canvas.queryByRole('button', { name: /attention$/ })).toBeNull()
   },
 })
 

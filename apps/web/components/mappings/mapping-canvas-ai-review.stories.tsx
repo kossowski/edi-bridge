@@ -91,7 +91,6 @@ export const ReviewOpen = meta.story({
   },
 })
 
-// Only the proposed links the review asks about stand out, in amber and with their own dash.
 export const AttentionMarks = meta.story({
   async play({ canvas, canvasElement }) {
     await findSummary(canvasElement)

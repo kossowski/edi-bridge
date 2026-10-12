@@ -23,14 +23,13 @@ import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { useGraphText } from '@/components/mappings/graph-text'
 import { useCanvasRefs, useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
 import { PreviewFailure } from '@/components/mappings/mapping-preview-panel'
-import { useSide } from '@/components/mappings/mapping-side'
 import { findItem, type TreeItem } from '@/components/mappings/mapping-tree'
 import { findTransformButton } from '@/components/mappings/transform-node'
 import { findRowButton } from '@/components/mappings/tree-node'
-import { useReviewAttention } from '@/components/mappings/use-review-attention'
+import { type ReviewState } from '@/components/mappings/use-review-attention'
 import { whenRendered } from '@/components/mappings/when-rendered'
 import { lookupTablesQuery, mappingSamplesQuery } from '@/lib/api/queries'
-import { type AiReview, type MappingDraft, previewNoteKey } from '@edi-bridge/contracts'
+import { type MappingDraft, previewNoteKey } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
@@ -46,8 +45,6 @@ type Entry = {
   detail: string
   show: (() => void) | undefined
 }
-
-type ReviewState = ReturnType<typeof useReviewAttention>
 
 // The canvas pans the focused part into view itself, so the page does not scroll to it.
 function focusWhenShown(find: () => HTMLElement | null | undefined) {
@@ -181,17 +178,13 @@ function EntryDetail({
 
 function ReviewEntries({
   draft,
-  review,
   targetItems,
-  attention,
   state,
   onShow,
 }: {
   draft: MappingDraft
-  review: AiReview
   targetItems: ReadonlyArray<TreeItem>
-  attention: ReviewAttention
-  state: ReviewState
+  state: ReviewState & { attention: ReviewAttention }
   onShow: (focus: () => void) => void
 }) {
   const t = useTranslations('Mapping.aiReview.panel')
@@ -206,22 +199,19 @@ function ReviewEntries({
   const lookupTables = useQuery({ ...lookupTablesQuery, enabled: usesLookupTables })
   const text = useGraphText(draft.transforms, lookupTables.data)
   const samples = useQuery(mappingSamplesQuery(draft.mappingId))
-  const sample = samples.data?.find(({ id: sampleId }) => sampleId === review.sampleId)
-  const { preview, updating } = state
+  const { attention, preview, updating, sampleId } = state
+  const sample = samples.data?.find(({ id }) => id === sampleId)
 
-  const nameOf = (path: string) => {
-    const item = findItem(targetItems, path)
+  const nameOf = (item: TreeItem | undefined) => item?.name ?? item?.label
 
-    return item?.name ?? item?.label
-  }
+  const nameAt = (path: string) => nameOf(findItem(targetItems, path))
 
   const showTarget = (path: string) => () => {
-    const { expand, select, openDetails } = store.getState()
+    const { expand, select } = store.getState()
     const row = { side: 'target' as const, path }
 
     expand('target', ancestorPaths(targetItems, path))
     select(row)
-    openDetails()
     onShow(
       focusWhenShown(() => {
         const root = refs.canvas.current
@@ -267,27 +257,20 @@ function ReviewEntries({
     key: `unmapped:${item.path}`,
     group: 'unmapped',
     path: item.path,
-    name: item.name ?? item.label,
+    name: nameOf(item),
     detail: t('unmapped.detail'),
     show: showTarget(item.path),
   }))
 
-  const chainName = ({ targetPath, transformIds: [first] }: ProposedChain) => {
-    if (targetPath !== null) {
-      return nameOf(targetPath)
-    }
-
-    return first === undefined ? undefined : text.name(first)
-  }
-
   const chains = attention.chains.map((chain): Entry => {
     const [first] = chain.transformIds
+    const firstName = first === undefined ? undefined : text.name(first)
 
     return {
       key: `transforms:${chain.targetPath ?? chain.transformIds.join()}`,
       group: 'transforms',
       path: chain.targetPath,
-      name: chainName(chain),
+      name: chain.targetPath === null ? firstName : nameAt(chain.targetPath),
       detail: chainDetail(chain),
       show: first === undefined ? undefined : showTransform(first),
     }
@@ -306,7 +289,7 @@ function ReviewEntries({
       key: `warnings:${previewNoteKey(note)}`,
       group: 'warnings',
       path: note.targetPath,
-      name: nameOf(note.targetPath),
+      name: nameAt(note.targetPath),
       detail: tNotes(note.code, { transform: note.transformId ? text.name(note.transformId) : '' }),
       show: showNote(),
     }
@@ -316,7 +299,7 @@ function ReviewEntries({
     key: `plain:${link.targetPath}`,
     group: 'plain',
     path: link.targetPath,
-    name: nameOf(link.targetPath),
+    name: nameAt(link.targetPath),
     detail: t('plain.detail', { source: link.sourcePath }),
     show: showTarget(link.targetPath),
   }))
@@ -395,12 +378,17 @@ function ReviewEntries({
   )
 }
 
-// Modal, over the canvas: "Show on canvas" closes it and moves the focus to that part.
-export function AiReviewSheet({ draft, review }: { draft: MappingDraft; review: AiReview }) {
+export function AiReviewSheet({
+  draft,
+  targetItems,
+  state,
+}: {
+  draft: MappingDraft
+  targetItems: ReadonlyArray<TreeItem> | undefined
+  state: ReviewState
+}) {
   const t = useTranslations('Mapping.aiReview')
   const tCanvas = useTranslations('Mapping.canvas')
-  const target = useSide(draft.target)
-  const state = useReviewAttention(draft, target.items)
   const { attention } = state
   // Until the warnings are in, a count would be too low, and "nothing" could be wrong.
   const known = attention && (attention.warnings !== undefined || state.preview.isError)
@@ -448,13 +436,11 @@ export function AiReviewSheet({ draft, review }: { draft: MappingDraft; review: 
         finalFocus={() => focusAfterClose.current === null}
         title={t('panel.title')}
         className="data-[side=right]:sm:max-w-md">
-        {target.items && attention ? (
+        {targetItems && attention ? (
           <ReviewEntries
-            attention={attention}
             draft={draft}
-            review={review}
-            state={state}
-            targetItems={target.items}
+            state={{ ...state, attention }}
+            targetItems={targetItems}
             onShow={show}
           />
         ) : (

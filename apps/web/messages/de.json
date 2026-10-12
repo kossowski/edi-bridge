@@ -2401,7 +2401,7 @@
       "rejectTransformLabel": "KI-Vorschlag ablehnen: {name}",
       "rejectedLink": "KI-Vorschlag abgelehnt: Verknüpfung von {source} zu {target} entfernt.",
       "rejectedTransform": "KI-Vorschlag abgelehnt: {name} entfernt.",
-      "attention": "{count, plural, =0 {Kein Handlungsbedarf} other {# mit Handlungsbedarf}}",
+      "attention": "{count, plural, =0 {Kein Handlungsbedarf} one {# Eintrag mit Handlungsbedarf} other {# Einträge mit Handlungsbedarf}}",
       "panel": {
         "title": "Was zu prüfen ist",
         "description": "Prüfen Sie diese Einträge, bevor Sie den KI-Entwurf übernehmen. Wählen Sie einen Eintrag, um zu sehen, was zu tun ist.",
@@ -2413,12 +2413,12 @@
           "title": "Felder ohne Verknüpfung",
           "detail": "Pflichtfeld. Noch nichts verknüpft.",
           "empty": "Jedes Pflichtfeld hat eine Verknüpfung.",
-          "explain": "Der Partner braucht dieses Feld, aber nichts aus Ihren Daten ist damit verknüpft. Verknüpfen Sie ein Feld Ihrer Daten damit, oder fragen Sie Ihren EDI-Ansprechpartner, was hierher gehört."
+          "explain": "Der Handelspartner braucht dieses Feld, aber nichts aus Ihren Daten ist damit verknüpft. Verknüpfen Sie ein Feld Ihrer Daten damit, oder fragen Sie Ihren EDI-Ansprechpartner, was hierher gehört."
         },
         "transforms": {
           "title": "Verknüpfungen, die den Wert ändern",
-          "empty": "Keine Verknüpfung der KI ändert einen Wert unterwegs.",
-          "explain": "Die KI hat Schritte eingefügt, die den Wert unterwegs ändern, zum Beispiel ein Datumsformat oder eine Code-Übersetzung. Prüfen Sie, ob das Ergebnis dem entspricht, was der Partner erwartet."
+          "empty": "Keine von der KI vorgeschlagene Verknüpfung ändert unterwegs einen Wert.",
+          "explain": "Die KI hat Schritte eingefügt, die den Wert unterwegs ändern, zum Beispiel ein Datumsformat oder eine Code-Übersetzung. Prüfen Sie, ob das Ergebnis dem entspricht, was der Handelspartner erwartet."
         },
         "through": "Von {sources} über {transforms}",
         "throughOnly": "Über {transforms}",
@@ -2430,7 +2430,7 @@
           "emptyUnnamed": "Der Test des Entwurfs mit dem Beispielbeleg ergab keine Warnungen.",
           "loading": "Der Entwurf wird mit dem Beispielbeleg getestet",
           "error": "Die Warnungen konnten nicht geladen werden.",
-          "explain": "Wir haben den Entwurf mit dem Beispielbeleg getestet. Dieses Feld kam falsch oder leer heraus. Korrigieren Sie die Verknüpfung, bevor Sie den KI-Entwurf übernehmen."
+          "explain": "Wir haben den Entwurf mit dem Beispielbeleg getestet. Im Ergebnis war dieses Feld falsch oder leer. Korrigieren Sie die Verknüpfung, bevor Sie den KI-Entwurf übernehmen."
         },
         "plain": {
           "title": "Weitere Verknüpfungen der KI",

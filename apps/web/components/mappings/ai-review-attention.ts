@@ -196,8 +196,6 @@ export type AttentionMarks = {
 
 export const noAttention: AttentionMarks = { link: () => false, transformLink: () => false }
 
-// A proposed link needs attention when it belongs to a chain through Transforms, or when a warning
-// on the example document names the field it fills.
 export function attentionMarks(
   marks: AiMarks,
   { chains, warnings }: Pick<ReviewAttention, 'chains' | 'warnings'>,
