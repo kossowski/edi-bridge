@@ -15,7 +15,7 @@ import {
   withAdjustment,
 } from './structure-tree'
 
-const plainName = { label: 'Name', labelReason: 'A name for the test.', unsure: false }
+const plainName = { label: 'Name', labelReason: 'A name for the test.', labelUnsure: false }
 
 const order = seedDocumentStructureOf.ORDERS
 

@@ -21,11 +21,11 @@ import {
   createDocumentStructures,
   createDocumentStructureStore,
   documentStructureHandlers,
-  documentStructureLeaves,
   seedDocumentStructureOf,
   seedDocumentStructures,
   seedUnusedDocumentStructures,
 } from './document-structure'
+import { documentStructureLeaves } from './document-structure-inference'
 import { documentStructureOrigins, toEncodedFile } from './document-structure-origin'
 import { createMappingDraftStore, seedMappingDrafts } from './mapping'
 import {
@@ -152,15 +152,15 @@ describe('seed Document Structures', () => {
 
   const allSeeds = [...seedDocumentStructures, ...seedUnusedDocumentStructures]
 
-  it('keeps the example file each seed was read from, except the one from a JSON Schema', () => {
-    const withoutExample = allSeeds.filter(({ example }) => example === null)
+  it('keeps the sample file each seed was read from, except the one from a JSON Schema', () => {
+    const withoutSample = allSeeds.filter(({ sample }) => sample === null)
 
-    expect(withoutExample.map(({ name }) => name)).toEqual(['ERP article master'])
+    expect(withoutSample.map(({ name }) => name)).toEqual(['ERP article master'])
 
-    for (const { format, example } of allSeeds) {
-      if (format === 'json' && example) {
+    for (const { format, sample } of allSeeds) {
+      if (format === 'json' && sample) {
         expect(() => {
-          JSON.parse(example.text)
+          JSON.parse(sample.text)
         }).not.toThrow()
       }
     }
@@ -171,18 +171,18 @@ describe('seed Document Structures', () => {
 
     expect(nodeAt(invoices.children, 'rows[].EPreis')).toMatchObject({
       label: 'Unit price',
-      unsure: true,
+      labelUnsure: true,
     })
     expect(nodeAt(invoices.children, 'rows[].RechNr')).toMatchObject({
       label: 'Invoice number',
-      unsure: false,
+      labelUnsure: false,
     })
-    expect(invoices.example?.text).toContain('EPreis')
+    expect(invoices.sample?.text).toContain('EPreis')
   })
 
   it('is unsure about only a few plain names', () => {
     const leaves = allSeeds.flatMap((structure) => documentStructureLeaves(structure))
-    const unsure = leaves.filter((leaf) => leaf.unsure)
+    const unsure = leaves.filter((leaf) => leaf.labelUnsure)
 
     expect(unsure.length).toBeGreaterThan(0)
     expect(unsure.length).toBeLessThan(leaves.length / 4)
@@ -261,7 +261,7 @@ describe('GET /document-structures', () => {
     })
   })
 
-  it('shows the example file and the first plain names on each card', async () => {
+  it('shows the sample file and the first plain names on each card', async () => {
     useHandlers()
 
     const response = await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)
@@ -273,13 +273,13 @@ describe('GET /document-structures', () => {
       'Order date',
       'Requested delivery date',
     ])
-    expect(order.example).toMatchObject({
-      fileName: purchaseOrder.example?.fileName,
-      takenAt: purchaseOrder.example?.takenAt,
+    expect(order.sample).toMatchObject({
+      fileName: purchaseOrder.sample?.fileName,
+      takenAt: purchaseOrder.sample?.takenAt,
     })
-    expect(order.example?.preview.startsWith('{')).toBe(true)
-    expect(order.example?.preview.split('\n')).toHaveLength(7)
-    expect(summaries.find(({ name }) => name === 'ERP article master')?.example).toBeNull()
+    expect(order.sample?.preview.startsWith('{')).toBe(true)
+    expect(order.sample?.preview.split('\n')).toHaveLength(7)
+    expect(summaries.find(({ name }) => name === 'ERP article master')?.sample).toBeNull()
   })
 
   it('serves an empty list', async () => {
@@ -329,7 +329,7 @@ describe('POST /document-structures/inference', () => {
     const inferred = inferDocumentStructureEndpoint.response.parse(await response.json())
 
     expect(inferred.facts).toEqual({ columnCount: 12, rowCount: 3 })
-    expect(inferred.example?.fileName).toBe('Rechnungsexport_2026-10-08.csv')
+    expect(inferred.sample?.fileName).toBe('Rechnungsexport_2026-10-08.csv')
   })
 
   it('answers 400 for a body outside the contract', async () => {
@@ -368,14 +368,14 @@ describe('POST /document-structures', () => {
 
     expect(nodeAt(created.children, 'rows[].EPreis')).toMatchObject({
       label: 'Unit price',
-      unsure: false,
+      labelUnsure: false,
     })
     expect(nodeAt(created.children, 'rows[].EPreis')?.labelReason).toContain('Einzelpreis')
     expect(nodeAt(created.children, 'rows[].ME')).toMatchObject({
       label: 'Unit of measure',
-      unsure: false,
+      labelUnsure: false,
     })
-    expect(created.example).toMatchObject({ fileName: 'Rechnungsexport_2026-10-08.csv' })
+    expect(created.sample).toMatchObject({ fileName: 'Rechnungsexport_2026-10-08.csv' })
   })
 
   it('answers unknownPath for a plain name of a node it does not have', async () => {
@@ -392,12 +392,12 @@ describe('POST /document-structures', () => {
     expect(store.all()).toHaveLength(count)
   })
 
-  it('keeps no example file for a structure from a JSON Schema', async () => {
+  it('keeps no sample file for a structure from a JSON Schema', async () => {
     useHandlers()
 
     const response = await create(documentStructureOrigins.jsonSchema)
 
-    expect(createDocumentStructureEndpoint.response.parse(await response.json()).example).toBeNull()
+    expect(createDocumentStructureEndpoint.response.parse(await response.json()).sample).toBeNull()
   })
 
   it('creates a structure from a JSON Document and serves it afterwards', async () => {
@@ -516,7 +516,7 @@ describe('PUT /document-structures/:id', () => {
 
     expect(nodeAt(updated.children, 'buyer.gln')).toMatchObject({
       label: 'Buyer GLN',
-      unsure: false,
+      labelUnsure: false,
     })
   })
 

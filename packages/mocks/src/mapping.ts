@@ -36,12 +36,12 @@ import {
 } from '@edi-bridge/contracts'
 
 import {
-  documentStructureLeaves,
   type DocumentStructureStore,
   seedDocumentStructureOf,
   seedDocumentStructures,
   toDocumentStructureStore,
 } from './document-structure'
+import { documentStructureLeaves } from './document-structure-inference'
 import {
   createFlows,
   type FlowRecord,

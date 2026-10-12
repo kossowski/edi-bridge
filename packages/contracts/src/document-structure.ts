@@ -27,7 +27,7 @@ const node = {
   name: z.string().min(1),
   label: fieldLabelSchema,
   labelReason: z.string().trim().min(1),
-  unsure: z.boolean(),
+  labelUnsure: z.boolean(),
   required: z.boolean(),
 }
 
@@ -46,7 +46,7 @@ export const documentObjectSchema = z.object({
   name: node.name,
   label: node.label,
   labelReason: node.labelReason,
-  unsure: node.unsure,
+  labelUnsure: node.labelUnsure,
   required: node.required,
   kind: z.literal('object'),
   get children(): z.ZodArray<
@@ -65,7 +65,7 @@ export const documentArraySchema = z.object({
   name: node.name,
   label: node.label,
   labelReason: node.labelReason,
-  unsure: node.unsure,
+  labelUnsure: node.labelUnsure,
   required: node.required,
   kind: z.literal('array'),
   get items(): z.ZodUnion<[typeof documentFieldSchema, typeof documentObjectSchema]> {
@@ -190,7 +190,7 @@ function treeProblems(tree: DocumentTree): string[] {
       if (
         node.items.label !== node.label ||
         node.items.labelReason !== node.labelReason ||
-        node.items.unsure !== node.unsure
+        node.items.labelUnsure !== node.labelUnsure
       ) {
         problems.push(`The items of ${node.path} must share its plain name`)
       }
@@ -235,19 +235,18 @@ const fileNameSchema = z.string().trim().min(1).max(255)
 
 // The decoded text of the sample Document a structure was read from. A structure created from a
 // JSON Schema has none.
-export const documentExampleSchema = z.object({
+export const documentStructureSampleSchema = z.object({
   fileName: fileNameSchema,
   text: z.string().min(1),
   takenAt: z.iso.datetime(),
 })
 
-export type DocumentExample = z.infer<typeof documentExampleSchema>
+export type DocumentStructureSample = z.infer<typeof documentStructureSampleSchema>
 
-const exampleFields = { example: documentExampleSchema.nullable() }
+const sampleFields = { sample: documentStructureSampleSchema.nullable() }
 
 const count = z.number().int().min(0)
 
-// What the reading steps tell while a Document is read.
 const factFields = {
   json: { facts: z.object({ fieldCount: count }) },
   csv: { facts: z.object({ columnCount: count, rowCount: count }) },
@@ -255,8 +254,8 @@ const factFields = {
 
 export const inferredDocumentStructureSchema = z
   .discriminatedUnion('format', [
-    z.object({ ...formatFields.json, ...factFields.json, ...exampleFields, ...treeFields }),
-    z.object({ ...formatFields.csv, ...factFields.csv, ...exampleFields, ...treeFields }),
+    z.object({ ...formatFields.json, ...factFields.json, ...sampleFields, ...treeFields }),
+    z.object({ ...formatFields.csv, ...factFields.csv, ...sampleFields, ...treeFields }),
   ])
   .superRefine(checkTree)
 
@@ -266,8 +265,8 @@ const identityFields = { id: z.uuid(), name: structureName }
 
 export const documentStructureSchema = z
   .discriminatedUnion('format', [
-    z.object({ ...identityFields, ...formatFields.json, ...exampleFields, ...treeFields }),
-    z.object({ ...identityFields, ...formatFields.csv, ...exampleFields, ...treeFields }),
+    z.object({ ...identityFields, ...formatFields.json, ...sampleFields, ...treeFields }),
+    z.object({ ...identityFields, ...formatFields.csv, ...sampleFields, ...treeFields }),
   ])
   .superRefine(checkTree)
 
@@ -284,10 +283,10 @@ export const documentStructureEndpoint: Endpoint<
   response: documentStructureSchema,
 }
 
-export const examplePreviewLineCount = 7
+export const samplePreviewLineCount = 7
 
-export function examplePreview(text: string) {
-  return text.split(/\r?\n/).slice(0, examplePreviewLineCount).join('\n')
+export function samplePreview(text: string) {
+  return text.split(/\r?\n/).slice(0, samplePreviewLineCount).join('\n')
 }
 
 export const summaryFieldLabelCount = 3
@@ -298,8 +297,9 @@ export const documentStructureSummarySchema = z.object({
   format: documentFormatSchema,
   fieldCount: count,
   firstFieldLabels: z.array(fieldLabelSchema).max(summaryFieldLabelCount),
-  example: z
-    .object({ fileName: fileNameSchema, takenAt: z.iso.datetime(), preview: z.string() })
+  sample: documentStructureSampleSchema
+    .omit({ text: true })
+    .extend({ preview: z.string() })
     .nullable(),
   mappings: z.array(z.object({ id: z.uuid(), name: z.string().min(1) })),
 })

@@ -1,8 +1,8 @@
-import { maxFieldLabelLength } from '@edi-bridge/contracts'
+import { type DocumentField, maxFieldLabelLength } from '@edi-bridge/contracts'
 
-export type PlainName = { label: string; labelReason: string; unsure: boolean }
+export type PlainName = Pick<DocumentField, 'label' | 'labelReason' | 'labelUnsure'>
 
-type Known = { label: string; meaning?: string; unsure?: boolean }
+type Known = { label: string; meaning?: string; labelUnsure?: boolean }
 
 const known = new Map<string, Known>()
 
@@ -61,7 +61,7 @@ const meanings: ReadonlyArray<readonly [ReadonlyArray<string>, Known]> = [
     {
       label: 'Unit',
       meaning: '"Mengeneinheit", the unit the quantity is counted in, if the values are units',
-      unsure: true,
+      labelUnsure: true,
     },
   ],
   [
@@ -76,7 +76,7 @@ const meanings: ReadonlyArray<readonly [ReadonlyArray<string>, Known]> = [
     {
       label: 'Unit price',
       meaning: '"Einzelpreis", the price of one unit, if it is not the price of the whole line',
-      unsure: true,
+      labelUnsure: true,
     },
   ],
   [['einzelpreis'], { label: 'Unit price', meaning: '"Einzelpreis", the price of one unit' }],
@@ -225,13 +225,13 @@ export function plainNameOf(name: string): PlainName {
       labelReason: entry.meaning
         ? `"${name}" stands for ${entry.meaning}.`
         : `"${name}" is a common name for "${entry.label}".`,
-      unsure: entry.unsure ?? false,
+      labelUnsure: entry.labelUnsure ?? false,
     }
   }
 
   return {
     label: spelledOut(name).slice(0, maxFieldLabelLength).trim(),
     labelReason: `No known name matches "${name}", so its words are spelled out. Check that this is what it holds.`,
-    unsure: true,
+    labelUnsure: true,
   }
 }

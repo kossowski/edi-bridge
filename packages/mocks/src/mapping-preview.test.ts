@@ -14,7 +14,8 @@ import {
   toPath,
 } from '@edi-bridge/contracts'
 
-import { documentStructureLeaves, seedDocumentStructureOf } from './document-structure'
+import { seedDocumentStructureOf } from './document-structure'
+import { documentStructureLeaves } from './document-structure-inference'
 import { seedMappingDrafts } from './mapping'
 import { mappingPreviewHandlers } from './mapping-preview'
 import { createMappingSample } from './mapping-sample'

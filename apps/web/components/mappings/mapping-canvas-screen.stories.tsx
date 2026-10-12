@@ -384,7 +384,7 @@ export const EmptyPart = meta.story({
               name: 'header',
               label: 'Header',
               labelReason: '"header" is a common name for "Header".',
-              unsure: false,
+              labelUnsure: false,
               required: true,
               children: [],
             },

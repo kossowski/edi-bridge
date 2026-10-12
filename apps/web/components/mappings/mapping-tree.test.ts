@@ -10,7 +10,7 @@ import {
   layoutTree,
 } from './mapping-tree'
 
-const plainName = { label: 'Name', labelReason: 'A name for the test.', unsure: false }
+const plainName = { label: 'Name', labelReason: 'A name for the test.', labelUnsure: false }
 
 describe('documentTree', () => {
   const tree = documentTree(seedDocumentStructureOf.ORDERS)

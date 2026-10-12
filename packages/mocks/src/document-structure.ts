@@ -11,21 +11,20 @@ import {
   type DocumentStructure,
   documentStructureEndpoint,
   type DocumentStructureNode,
-  documentStructureNodes,
   type DocumentStructureProblem,
   documentStructureSchema,
   documentStructuresEndpoint,
   type DocumentStructureSummary,
   documentStructureSummarySchema,
-  examplePreview,
+  samplePreview,
   type GraphParts,
   inferDocumentStructureEndpoint,
   type InferredDocumentStructure,
+  type JsonContent,
   type MappingVersionSummary,
   mappingVersionSummarySchema,
   type MessageType,
   messageTypes,
-  nodeContent,
   summaryFieldLabelCount,
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
@@ -34,6 +33,7 @@ import {
 import {
   adjustDocumentStructure,
   applyLabels,
+  documentStructureLeaves,
   DocumentStructureProblemError,
   findNode,
   inferDocumentStructure,
@@ -102,9 +102,7 @@ function toNodes(specs: ReadonlyArray<Spec>, parentPath: string): DocumentStruct
   })
 }
 
-type JsonValue = string | number | boolean | JsonValue[] | { [name: string]: JsonValue }
-
-const exampleTexts = new Map<string, ReadonlyArray<string>>([
+const sampleTexts = new Map<string, ReadonlyArray<string>>([
   ['gln', ['4012345000016', '4098765000013', '4012345000023']],
   ['gtin', ['04012345123456', '04012345654321', '04012345777777']],
   ['sscc', ['340123450000000017', '340123450000000024']],
@@ -122,15 +120,15 @@ const exampleTexts = new Map<string, ReadonlyArray<string>>([
   ['status', ['accepted']],
 ])
 
-// Every array gets two items, so the example shows that the list repeats.
-function exampleOf(
+// Every array gets two items, so the sample shows that the list repeats.
+function sampleOf(
   nodes: ReadonlyArray<DocumentStructureNode>,
   faker: Faker,
-): Record<string, JsonValue> {
-  const valueOf = (node: DocumentField | DocumentStructureNode): JsonValue => {
+): Record<string, JsonContent> {
+  const valueOf = (node: DocumentField | DocumentStructureNode): JsonContent => {
     switch (node.kind) {
       case 'object':
-        return exampleOf(node.children, faker)
+        return sampleOf(node.children, faker)
       case 'array':
         return [valueOf(node.items), valueOf(node.items)]
       default:
@@ -141,8 +139,8 @@ function exampleOf(
   return Object.fromEntries(nodes.map((node) => [node.name, valueOf(node)]))
 }
 
-function fieldValue(field: DocumentField, faker: Faker): JsonValue {
-  const known = exampleTexts.get(field.name)
+function fieldValue(field: DocumentField, faker: Faker): JsonContent {
+  const known = sampleTexts.get(field.name)
 
   if (known) {
     return faker.helpers.arrayElement(known)
@@ -162,14 +160,14 @@ function fieldValue(field: DocumentField, faker: Faker): JsonValue {
   }
 }
 
-function jsonExample(
+function jsonSample(
   fileName: string,
   children: ReadonlyArray<DocumentStructureNode>,
   takenAt: string,
 ) {
   return {
     fileName,
-    text: JSON.stringify(exampleOf(children, seededFaker(`example:${fileName}`)), null, 2),
+    text: JSON.stringify(sampleOf(children, seededFaker(`sample:${fileName}`)), null, 2),
     takenAt,
   }
 }
@@ -187,7 +185,7 @@ function structure(
     name,
     format: 'json',
     root: 'object',
-    example: jsonExample(fileName, children, `2026-09-${String(10 + index)}T10:00:00.000Z`),
+    sample: jsonSample(fileName, children, `2026-09-${String(10 + index)}T10:00:00.000Z`),
     children,
   })
 }
@@ -351,16 +349,6 @@ export const seedDocumentStructures: ReadonlyArray<DocumentStructure> = messageT
   (messageType) => seedDocumentStructureOf[messageType],
 )
 
-export function documentStructureLeaves(
-  documentStructure: Pick<DocumentStructure, 'children'>,
-): DocumentField[] {
-  return [...documentStructureNodes(documentStructure.children)].flatMap(({ node }) => {
-    const content = nodeContent(node)
-
-    return content.kind === 'field' ? [content] : []
-  })
-}
-
 // Spreads the fields over plain fields, objects and arrays of objects with a nested array, so a
 // large structure still shows every kind of nesting.
 export function createDocumentStructure({
@@ -442,7 +430,7 @@ export function createDocumentStructure({
     name,
     format: 'json',
     root: 'object',
-    example: jsonExample(`export-${seed}.json`, children, '2026-09-20T10:00:00.000Z'),
+    sample: jsonSample(`export-${seed}.json`, children, '2026-09-20T10:00:00.000Z'),
     children,
   })
 }
@@ -553,7 +541,7 @@ function toDocumentStructureSummary(
   { mappings }: MappingUse = {},
 ): DocumentStructureSummary {
   const leaves = documentStructureLeaves(documentStructure)
-  const { example } = documentStructure
+  const { sample } = documentStructure
 
   return documentStructureSummarySchema.parse({
     id: documentStructure.id,
@@ -561,10 +549,10 @@ function toDocumentStructureSummary(
     format: documentStructure.format,
     fieldCount: leaves.length,
     firstFieldLabels: leaves.slice(0, summaryFieldLabelCount).map(({ label }) => label),
-    example: example && {
-      fileName: example.fileName,
-      takenAt: example.takenAt,
-      preview: examplePreview(example.text),
+    sample: sample && {
+      fileName: sample.fileName,
+      takenAt: sample.takenAt,
+      preview: samplePreview(sample.text),
     },
     mappings: (mappings?.all() ?? [])
       .filter(({ documentStructureId }) => documentStructureId === documentStructure.id)
@@ -628,11 +616,11 @@ function usedByMappingVersion(
   message: string,
   path: string | null,
 ): DocumentStructureProblem {
-  const named = versions.map(({ mappingName, version }) => `${mappingName} v${version}`)
+  const versionNames = versions.map(({ mappingName, version }) => `${mappingName} v${version}`)
 
   return {
     code: 'usedByMappingVersion',
-    message: `${message}: ${named.join(', ')}`,
+    message: `${message}: ${versionNames.join(', ')}`,
     path,
     line: null,
     mappingVersions: [...versions],

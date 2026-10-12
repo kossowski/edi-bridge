@@ -6,13 +6,13 @@ import {
   documentStructureProblemSchema,
   documentStructureSchema,
   documentStructureSummarySchema,
-  examplePreview,
+  samplePreview,
   inferredDocumentStructureSchema,
   updateDocumentStructureBodySchema,
 } from './document-structure'
 
-function named(label: string, unsure = false) {
-  return { label, labelReason: `A known name for ${label.toLowerCase()}.`, unsure }
+function named(label: string, labelUnsure = false) {
+  return { label, labelReason: `A known name for ${label.toLowerCase()}.`, labelUnsure }
 }
 
 const purchaseOrder: DocumentStructure = {
@@ -20,7 +20,7 @@ const purchaseOrder: DocumentStructure = {
   name: 'ERP purchase order',
   format: 'json',
   root: 'object',
-  example: {
+  sample: {
     fileName: 'order-4711.json',
     text: '{ "orderNumber": "4711", "buyer": { "gln": "4012345000009" }, "lines": [] }',
     takenAt: '2026-09-15T10:00:00.000Z',
@@ -133,14 +133,12 @@ describe('documentStructureSchema', () => {
     )
   })
 
-  it('accepts a structure without an example file, as created from a JSON Schema', () => {
-    expect(documentStructureSchema.safeParse({ ...purchaseOrder, example: null }).success).toBe(
-      true,
-    )
+  it('accepts a structure without a sample file, as created from a JSON Schema', () => {
+    expect(documentStructureSchema.safeParse({ ...purchaseOrder, sample: null }).success).toBe(true)
   })
 
-  it('rejects an example file without the time it was taken', () => {
-    const undated = { ...purchaseOrder, example: { ...purchaseOrder.example, takenAt: undefined } }
+  it('rejects a sample file without the time it was taken', () => {
+    const undated = { ...purchaseOrder, sample: { ...purchaseOrder.sample, takenAt: undefined } }
 
     expect(documentStructureSchema.safeParse(undated).success).toBe(false)
   })
@@ -220,7 +218,7 @@ describe('documentStructureSchema refinements', () => {
     name: 'ERP dispatch export',
     format: 'csv',
     csv: { delimiter: ';', headerRow: true, encoding: 'windows-1252' },
-    example: {
+    sample: {
       fileName: 'lieferscheine.csv',
       text: 'Straße\nKönigstraße 12\n',
       takenAt: '2026-09-18T10:00:00.000Z',
@@ -342,7 +340,7 @@ describe('documentStructureSummarySchema', () => {
     format: 'csv',
     fieldCount: 12,
     firstFieldLabels: ['Invoice number', 'Invoice date', 'Order number'],
-    example: {
+    sample: {
       fileName: 'Rechnungsexport_2026-10-08.csv',
       takenAt: '2026-09-16T10:00:00.000Z',
       preview: 'RechNr;RechDatum\nR-2026-1188;08.10.2026',
@@ -350,12 +348,12 @@ describe('documentStructureSummarySchema', () => {
     mappings: [],
   }
 
-  it('shows the example file and the first plain names on the card', () => {
+  it('shows the sample file and the first plain names on the card', () => {
     expect(documentStructureSummarySchema.parse(summary)).toEqual(summary)
   })
 
-  it('accepts a format without an example file', () => {
-    expect(documentStructureSummarySchema.safeParse({ ...summary, example: null }).success).toBe(
+  it('accepts a format without a sample file', () => {
+    expect(documentStructureSummarySchema.safeParse({ ...summary, sample: null }).success).toBe(
       true,
     )
   })
@@ -367,15 +365,15 @@ describe('documentStructureSummarySchema', () => {
   })
 })
 
-describe('examplePreview', () => {
-  it('keeps the first seven lines of an example file', () => {
+describe('samplePreview', () => {
+  it('keeps the first seven lines of a sample file', () => {
     const text = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].join('\r\n')
 
-    expect(examplePreview(text)).toBe('1\n2\n3\n4\n5\n6\n7')
+    expect(samplePreview(text)).toBe('1\n2\n3\n4\n5\n6\n7')
   })
 
-  it('keeps a short example file whole', () => {
-    expect(examplePreview('{ "a": 1 }\n')).toBe('{ "a": 1 }\n')
+  it('keeps a short sample file whole', () => {
+    expect(samplePreview('{ "a": 1 }\n')).toBe('{ "a": 1 }\n')
   })
 })
 

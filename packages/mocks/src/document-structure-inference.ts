@@ -12,6 +12,7 @@ import {
   type DocumentFieldType,
   type DocumentStructure,
   type DocumentStructureNode,
+  type DocumentStructureSample,
   documentStructureNodes,
   type DocumentStructureProblem,
   type DocumentStructureProblemCode,
@@ -265,10 +266,14 @@ function observedNode(name: string, observed: Observed, path: string): DocumentS
   }
 }
 
-function fieldCount(children: ReadonlyArray<DocumentStructureNode>) {
-  return [...documentStructureNodes(children)].filter(
-    ({ node }) => nodeContent(node).kind === 'field',
-  ).length
+export function documentStructureLeaves(
+  documentStructure: Pick<DocumentStructure, 'children'>,
+): DocumentField[] {
+  return [...documentStructureNodes(documentStructure.children)].flatMap(({ node }) => {
+    const content = nodeContent(node)
+
+    return content.kind === 'field' ? [content] : []
+  })
 }
 
 function inferredJson(
@@ -278,8 +283,8 @@ function inferredJson(
   return inferredDocumentStructureSchema.parse({
     format: 'json',
     root,
-    facts: { fieldCount: fieldCount(children) },
-    example: null,
+    facts: { fieldCount: documentStructureLeaves({ children }).length },
+    sample: null,
     children,
   })
 }
@@ -485,7 +490,7 @@ export function inferFromCsv(text: string, csv: CsvSettings): InferredDocumentSt
     format: 'csv',
     csv,
     facts: { columnCount: fields.length, rowCount: dataRows.length },
-    example: null,
+    sample: null,
     children: [
       { kind: 'array', ...rowList, items: { kind: 'object', ...rowList, children: fields } },
     ],
@@ -769,13 +774,11 @@ export function inferFromJsonSchema(text: string): InferredDocumentStructure {
   return inferredJson('object', children)
 }
 
-function withExample(
+function withSample(
   inferred: InferredDocumentStructure,
-  fileName: string,
-  text: string,
-  takenAt: string,
+  sample: DocumentStructureSample,
 ): InferredDocumentStructure {
-  return { ...inferred, example: { fileName, text, takenAt } }
+  return { ...inferred, sample }
 }
 
 export function inferDocumentStructure(
@@ -786,13 +789,17 @@ export function inferDocumentStructure(
     case 'jsonDocument': {
       const text = decodeText(origin.document.content, 'utf-8')
 
-      return withExample(inferFromJson(text), origin.document.fileName, text, takenAt)
+      return withSample(inferFromJson(text), { fileName: origin.document.fileName, text, takenAt })
     }
 
     case 'csvDocument': {
       const text = decodeText(origin.document.content, origin.csv.encoding)
 
-      return withExample(inferFromCsv(text, origin.csv), origin.document.fileName, text, takenAt)
+      return withSample(inferFromCsv(text, origin.csv), {
+        fileName: origin.document.fileName,
+        text,
+        takenAt,
+      })
     }
 
     case 'jsonSchema':
@@ -802,14 +809,14 @@ export function inferDocumentStructure(
 
 export const renamedLabelReason = 'Named by hand.'
 
-function nameOf({ label, labelReason, unsure }: PlainName): PlainName {
-  return { label, labelReason, unsure }
+function plainNameOfNode({ label, labelReason, labelUnsure }: PlainName): PlainName {
+  return { label, labelReason, labelUnsure }
 }
 
 function chosenName(current: PlainName, label: string): PlainName {
   return label === current.label
-    ? { label, labelReason: current.labelReason, unsure: false }
-    : { label, labelReason: renamedLabelReason, unsure: false }
+    ? { label, labelReason: current.labelReason, labelUnsure: false }
+    : { label, labelReason: renamedLabelReason, labelUnsure: false }
 }
 
 function renamedNodes(
@@ -817,20 +824,20 @@ function renamedNodes(
   nameAt: (node: DocumentStructureNode) => PlainName | undefined,
 ): DocumentStructureNode[] {
   return nodes.map((node): DocumentStructureNode => {
-    const named = nameAt(node) ?? nameOf(node)
+    const plainName = nameAt(node) ?? plainNameOfNode(node)
 
     switch (node.kind) {
       case 'field':
-        return { ...node, ...named }
+        return { ...node, ...plainName }
       case 'object':
-        return { ...node, ...named, children: renamedNodes(node.children, nameAt) }
+        return { ...node, ...plainName, children: renamedNodes(node.children, nameAt) }
       case 'array': {
         const items =
           node.items.kind === 'object'
-            ? { ...node.items, ...named, children: renamedNodes(node.items.children, nameAt) }
-            : { ...node.items, ...named }
+            ? { ...node.items, ...plainName, children: renamedNodes(node.items.children, nameAt) }
+            : { ...node.items, ...plainName }
 
-        return { ...node, ...named, items }
+        return { ...node, ...plainName, items }
       }
     }
   })
@@ -912,11 +919,11 @@ function treeOf(
       ...read,
       id: structure.id,
       name: structure.name,
-      example: { fileName: document.fileName, text, takenAt: new Date().toISOString() },
+      sample: { fileName: document.fileName, text, takenAt: new Date().toISOString() },
       children: renamedNodes(read.children, (node) => {
         const previous = findNode(structure.children, node.path)
 
-        return previous && nameOf(previous)
+        return previous && plainNameOfNode(previous)
       }),
     })
   }
@@ -977,7 +984,9 @@ export function adjustDocumentStructure(
       const named = {
         name: node.name,
         path,
-        ...(adjustment?.label === undefined ? nameOf(node) : chosenName(node, adjustment.label)),
+        ...(adjustment?.label === undefined
+          ? plainNameOfNode(node)
+          : chosenName(node, adjustment.label)),
       }
 
       const content: DocumentStructureNode =

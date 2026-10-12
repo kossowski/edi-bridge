@@ -146,7 +146,6 @@ export {
   createDocumentStructures,
   createDocumentStructureStore,
   documentStructureHandlers,
-  documentStructureLeaves,
   type DocumentStructuresState,
   type DocumentStructureStore,
   seedDocumentStructureOf,
@@ -155,7 +154,7 @@ export {
   toDocumentStructureStore,
 } from './document-structure'
 
-export { renamedLabelReason } from './document-structure-inference'
+export { documentStructureLeaves, renamedLabelReason } from './document-structure-inference'
 
 export { createCsvDocument, documentStructureOrigins } from './document-structure-origin'
 
