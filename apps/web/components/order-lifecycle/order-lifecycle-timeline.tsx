@@ -10,14 +10,13 @@ import { flushSync } from 'react-dom'
 import { linkClass } from '@/components/detail-parts'
 import { RunLink, shortId } from '@/components/documents/run-link'
 import { FailureStageLabel, RunStatusBadge } from '@/components/documents/run-status'
-import { AcknowledgementStateBadge } from '@/components/order-lifecycle/acknowledgement-state'
+import { acknowledgementCounts } from '@/components/order-lifecycle/order-lifecycle-steps'
+import { AcknowledgementStateBadge } from '@/components/orders/acknowledgement-state'
 import {
-  acknowledgementCounts,
   latestMessageCount,
   type OrderLifecycleStep,
   orderLifecycleSteps,
-  shownMessages,
-} from '@/components/order-lifecycle/order-lifecycle-steps'
+} from '@/components/orders/order-steps'
 import { documentHref, interchangeHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -158,13 +157,15 @@ function Step({
               </p>
             )}
             <ol id={listId} className="flex flex-col gap-2">
-              {shownMessages(step.messages, expanded).map((message) => (
-                <MessageEntry
-                  key={message.run.id}
-                  message={message}
-                  tradingPartner={tradingPartner}
-                />
-              ))}
+              {(expanded ? step.messages : step.messages.slice(-latestMessageCount)).map(
+                (message) => (
+                  <MessageEntry
+                    key={message.run.id}
+                    message={message}
+                    tradingPartner={tradingPartner}
+                  />
+                ),
+              )}
             </ol>
             {collapsible && (
               <Button

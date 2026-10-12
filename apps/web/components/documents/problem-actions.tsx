@@ -9,7 +9,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useState } from 'react'
 
@@ -178,13 +178,11 @@ export function TryAgainStep({ run }: { run: FailedRun }) {
 
 function usePartnerMessage(run: FailedRun) {
   const t = useTranslations('Document.partnerMessage')
-  const locale = useLocale()
   const plainNames = usePlainNames()
-  const name = plainNames.messageTypeName(run.messageType)
 
   return partnerMessage(run, {
     t: (key, values) => t(key, values),
-    messageTypeName: locale === 'de' ? name : name.toLocaleLowerCase(locale),
+    messageTypeName: plainNames.messageTypeNameInText(run.messageType),
   })
 }
 

@@ -293,7 +293,7 @@ export const Summary = meta.story({
     )
     await expect(facts.getByRole('link', { name: delivered.businessReference! })).toHaveAttribute(
       'href',
-      `/order-lifecycle?businessReference=${delivered.businessReference}`,
+      `/orders/${delivered.businessReference}`,
     )
     await expect(facts.getByText(`Incoming: from ${partner.name} to your ERP`)).toBeVisible()
     await expect(facts.getByRole('link', { name: flowFor('ORDERS').name })).toHaveAttribute(

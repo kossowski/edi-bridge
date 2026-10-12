@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { linkClass, LoadFailure, Loading } from '@/components/detail-parts'
@@ -15,6 +15,7 @@ import { ProblemCard } from '@/components/documents/problem-card'
 import { RelativeTime } from '@/components/documents/relative-time'
 import { RunStatusBadge } from '@/components/documents/run-status'
 import { useRunTitle } from '@/components/documents/run-title'
+import { useLocationHash } from '@/hooks/use-location-hash'
 import { ApiError } from '@/lib/api/client'
 import { runQuery } from '@/lib/api/queries'
 import { navigationItems, orderHref } from '@/lib/navigation'
@@ -42,8 +43,23 @@ function DocumentHeader({ run }: { run: RunDetail }) {
   )
 }
 
+// The document loads after the navigation, so the browser finds no target for the hash itself.
+function useHashTarget() {
+  const hash = useLocationHash()
+
+  useEffect(() => {
+    const target = hash === '' ? null : document.getElementById(hash)
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    target?.scrollIntoView({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' })
+    target?.focus({ preventScroll: true })
+  }, [hash])
+}
+
 function DocumentView({ run }: { run: RunDetail }) {
   const title = useRunTitle(run)
+
+  useHashTarget()
 
   return (
     <AppPage meta={<DocumentHeader run={run} />} name={title}>

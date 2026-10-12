@@ -1,20 +1,28 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 import type { StatusGroup } from '@/lib/status-groups'
 import type { FailureStage, MessageType, RunStatus } from '@edi-bridge/contracts'
 
 export function usePlainNames() {
   const t = useTranslations('PlainNames')
+  const locale = useLocale()
+
+  const messageTypeName = (messageType: MessageType, plural = false) =>
+    t(`messageType.${messageType}.${plural ? 'plural' : 'name'}`)
 
   return {
     runStatus: (status: RunStatus) => t(`runStatus.${status}`),
     statusGroup: (group: StatusGroup) => t(`statusGroup.${group}`),
     failureStageTitle: (stage: FailureStage) => t(`failureStage.${stage}.title`),
     failureStageSummary: (stage: FailureStage) => t(`failureStage.${stage}.summary`),
-    messageTypeName: (messageType: MessageType, plural = false) =>
-      t(`messageType.${messageType}.${plural ? 'plural' : 'name'}`),
+    messageTypeName,
+    messageTypeNameInText: (messageType: MessageType) => {
+      const name = messageTypeName(messageType)
+
+      return locale === 'de' ? name : name.toLocaleLowerCase(locale)
+    },
   }
 }
 

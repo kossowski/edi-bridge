@@ -1032,6 +1032,82 @@
     "replacedBy": "Ersetzt durch",
     "documentLink": "Beleg {id}"
   },
+  "Orders": {
+    "title": "Auftrag {businessReference}",
+    "loading": "Auftrag {businessReference} wird geladen",
+    "error": {
+      "title": "Auftrag nicht verfügbar",
+      "description": "Auftrag {businessReference} konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "notFound": {
+      "title": "Auftrag nicht gefunden",
+      "description": "Kein Beleg trägt die Bestellnummer {businessReference}. Prüfen Sie die Nummer und suchen Sie erneut.",
+      "back": "Nach einem Auftrag suchen"
+    },
+    "tradingPartnerCount": "Diese Bestellnummer wird mit {count, number} Handelspartnern verwendet. Jeder hat seinen eigenen Verlauf.",
+    "status": {
+      "on-track": "Im Plan",
+      "needs-attention": "Handlungsbedarf",
+      "waiting-for-trading-partner": "Wartet auf Partner",
+      "done": "Erledigt"
+    },
+    "verdict": {
+      "failed": "{direction, select, inbound {{messageType, select, DESADV {Das} other {Die}} {document} von {tradingPartner} konnte nicht verarbeitet werden} other {{messageType, select, DESADV {Das} other {Die}} {document} an {tradingPartner} konnte nicht verarbeitet werden}}",
+      "rejected": "{tradingPartner} hat {messageType, select, DESADV {das} other {die}} {document} abgelehnt",
+      "overdue": "{tradingPartner} hat {messageType, select, DESADV {das} other {die}} {document} nicht bestätigt",
+      "resendAwaited": "Wartet darauf, dass {tradingPartner} {messageType, select, DESADV {das} other {die}} {document} erneut sendet",
+      "confirmationPending": "Wartet darauf, dass {tradingPartner} {messageType, select, DESADV {das} other {die}} {document} bestätigt",
+      "inProgress": "{messageType, select, DESADV {Das} other {Die}} {document} wird verarbeitet",
+      "sentUnconfirmed": "{messageType, select, DESADV {Das} other {Die}} {document} wurde an {tradingPartner} gesendet, noch ohne Empfangsbestätigung",
+      "nextDocument": "Wartet auf {messageType, select, DESADV {das} other {die}} {document}",
+      "done": "Für diesen Auftrag ist alles erledigt",
+      "progress": "{done, number} von {total, number} Belegen erledigt"
+    },
+    "facts": {
+      "label": "Angaben zum Auftrag",
+      "orderNumber": "Bestellnummer",
+      "tradingPartner": "Handelspartner",
+      "startedAt": "Begonnen",
+      "lastActivityAt": "Letzte Aktivität"
+    },
+    "timeline": {
+      "label": "Belege mit {tradingPartner}, von der Bestellung bis zur Rechnung",
+      "state": {
+        "open": "Noch nicht",
+        "missing": "Fehlt",
+        "in-progress": "In Bearbeitung",
+        "needs-attention": "Handlungsbedarf",
+        "waiting-for-trading-partner": "Wartet auf Partner",
+        "done": "Erledigt"
+      },
+      "open": "Noch {messageType, select, DESADV {kein} other {keine}} {document}.",
+      "missing": "Für diesen Auftrag wurde {messageType, select, DESADV {kein} other {keine}} {document} gefunden.",
+      "messageCount": "{count, plural, one {# Beleg} other {# Belege}}",
+      "latestShown": "Neueste {shown, number} von {count, number}{attention, plural, =0 {} other {, dazu # mit Handlungsbedarf}}",
+      "showAll": "Alle {count, number} anzeigen",
+      "showLatest": "Nur die neuesten {count, number} anzeigen"
+    },
+    "message": {
+      "at": "{kind, select, received {Empfangen} sent {Gesendet} other {Erstellt}} <time>{date}</time>",
+      "receiptConfirmation": "Empfangsbestätigung",
+      "waiting": "{unit, select, days {Wartet seit {value, plural, one {# Tag} other {# Tagen}}} other {Wartet seit {value, number} h}} — Frist {limit, number} h",
+      "replaced": "Ersetzt",
+      "replacedBy": "Erneut verarbeitet:",
+      "replacement": "zum neuen Beleg",
+      "seeWhatToDo": "Ansehen, was zu tun ist",
+      "waitingForResend": "Wartet seit {since} darauf, dass {tradingPartner} den Beleg erneut sendet"
+    },
+    "overdue": {
+      "question": "Was bedeutet das?",
+      "explanation": "{tradingPartner} sollte jeden Beleg innerhalb von {limit, plural, one {# Stunde} other {# Stunden}} mit einer <term>Empfangsbestätigung</term> bestätigen. Ohne sie wissen Sie nicht sicher, ob der Beleg angekommen ist.",
+      "ask": "Partner fragen",
+      "askHint": "Bereitet eine Nachricht vor, die Sie per E-Mail senden können.",
+      "messageLabel": "Nachricht an {tradingPartner}",
+      "copyLabel": "Nachricht",
+      "text": "Hallo {tradingPartner}-Team,\n\nwir haben Ihnen am {sentAt} {messageType, select, DESADV {das} other {die}} {document} zur Bestellung {businessReference} gesendet (Übertragung {controlReference}), aber noch keine Empfangsbestätigung erhalten. Könnten Sie prüfen, ob {messageType, select, DESADV {es} other {sie}} in Ihrem System angekommen ist?\n\nVielen Dank und freundliche Grüße"
+    }
+  },
   "TradingPartners": {
     "add": "Handelspartner hinzufügen",
     "list": "Handelspartner",

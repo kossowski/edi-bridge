@@ -1,7 +1,7 @@
 import { useTranslations } from 'next-intl'
 
 import { CommandItemHint } from '@/components/search/command-item-hint'
-import { navigationItems } from '@/lib/navigation'
+import { orderHref } from '@/lib/navigation'
 import { type OrderLifecycle } from '@edi-bridge/contracts'
 import { CommandGroup, CommandItem } from '@edi-bridge/ui/components/command'
 
@@ -31,11 +31,7 @@ export function OrderLifecycleResults({
           key={orderLifecycle.tradingPartner.id}
           keywords={[businessReference, orderLifecycle.businessReference]}
           value={orderLifecycleResultValue(orderLifecycle)}
-          onSelect={() =>
-            onOpen(
-              `${navigationItems.orderLifecycle.href}?${new URLSearchParams({ businessReference: orderLifecycle.businessReference })}`,
-            )
-          }>
+          onSelect={() => onOpen(orderHref(orderLifecycle.businessReference))}>
           <span className="truncate">
             {t('order', { businessReference: orderLifecycle.businessReference })}
           </span>

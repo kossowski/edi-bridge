@@ -203,7 +203,7 @@ function WhatToDo({ children }: { children: ReactNode }) {
 
   return (
     <section aria-labelledby="what-to-do" className="flex min-w-0 flex-col gap-3">
-      <h3 id="what-to-do" className="text-sm font-semibold">
+      <h3 id="what-to-do" tabIndex={-1} className="scroll-mt-20 text-sm font-semibold outline-none">
         {t('whatToDo')}
       </h3>
       {children}
