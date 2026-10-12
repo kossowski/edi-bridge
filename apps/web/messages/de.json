@@ -3116,12 +3116,12 @@
       "rename": {
         "label": "Name in Mappings",
         "submit": "Umbenennen",
-        "keep": "Namen behalten",
+        "confirm": "Namen behalten",
         "saving": "Wird gespeichert…",
         "required": "Geben Sie einen Namen ein.",
         "failed": "Das Feld konnte nicht umbenannt werden. Versuchen Sie es erneut.",
         "renamed": "Umbenannt in „{label}“.",
-        "kept": "Name „{label}“ behalten."
+        "confirmed": "Name „{label}“ behalten."
       }
     },
     "technical": {
@@ -3162,7 +3162,7 @@
         "columns": "{count, plural, one {# Spalte} other {# Spalten}} gefunden, getrennt durch {delimiter, select, comma {Kommas} semicolon {Semikolons} tab {Tabulatoren} other {senkrechte Striche}}",
         "rows": "{count, plural, one {# Zeile} other {# Zeilen}} gelesen",
         "fields": "{count, plural, one {# Feld} other {# Felder}} gefunden",
-        "names": "{count, plural, =0 {Alle Namen sind eindeutig} one {# Name zu prüfen} other {# Namen zu prüfen}}"
+        "labels": "{count, plural, =0 {Alle Namen sind eindeutig} one {# Name zu prüfen} other {# Namen zu prüfen}}"
       }
     },
     "failed": {
@@ -3207,8 +3207,8 @@
     "save": {
       "submit": "Datenformat speichern",
       "saving": "Wird gespeichert…",
-      "checkNames": "{count, plural, one {Zuerst den letzten Namen prüfen} other {Zuerst # Namen prüfen}}",
-      "nameFirst": "Zuerst das Format benennen",
+      "checkLabels": "{count, plural, one {Zuerst den letzten Namen prüfen} other {Zuerst # Namen prüfen}}",
+      "nameFirst": "Zuerst das Datenformat benennen",
       "failed": "Das Datenformat konnte nicht gespeichert werden. Versuchen Sie es erneut."
     },
     "technical": {

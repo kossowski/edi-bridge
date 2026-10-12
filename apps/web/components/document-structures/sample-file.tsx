@@ -299,10 +299,3 @@ export function scrollToValue(container: HTMLElement | null, path: string) {
 
   first?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
-
-export function scrollToField(list: HTMLElement | null, path: string) {
-  list
-    ?.querySelector(`[data-path="${CSS.escape(path)}"]`)
-    ?.closest('li')
-    ?.scrollIntoView({ block: 'nearest' })
-}

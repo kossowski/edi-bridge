@@ -8,7 +8,16 @@ import { CanChangeOnly } from '@/components/session/can-change-only'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import { createDocumentStructureEndpoint, type FieldLabelChoice } from '@edi-bridge/contracts'
+import {
+  createDocumentStructureEndpoint,
+  csvRowsName,
+  csvRowsPath,
+  defaultCsvSettings,
+  type DocumentField,
+  type FieldLabelChoice,
+  inferDocumentStructureEndpoint,
+  type InferredDocumentStructure,
+} from '@edi-bridge/contracts'
 import { createHandlers, documentStructureOrigins } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -19,7 +28,65 @@ const dropLabel = /^Drop an export from your ERP/
 
 const reviewTitle = 'Fields read from Rechnungsexport_2026-10-08.csv'
 
+const readingTitle = 'Reading Rechnungsexport_2026-10-08.csv'
+
 const createPath = `${apiUrl}${createDocumentStructureEndpoint.path}`
+
+const inferencePath = `${apiUrl}${inferDocumentStructureEndpoint.path}`
+
+const wideColumns = Array.from(
+  { length: 200 },
+  (_, index) => `Merkmal${String(index + 1).padStart(3, '0')}`,
+)
+
+const wideText = [
+  wideColumns.join(';'),
+  ...Array.from({ length: 3 }, (_, row) =>
+    wideColumns.map((_, column) => `W${row + 1}-${column + 1}`).join(';'),
+  ),
+].join('\r\n')
+
+const wideExport = new File([wideText], 'artikelstamm-breit.csv')
+
+function wideField(name: string, index: number): DocumentField {
+  const unsure = index % 50 === 7
+
+  return {
+    kind: 'field',
+    path: `${csvRowsPath}.${name}`,
+    name,
+    label: `Attribute ${index + 1}`,
+    labelReason: unsure
+      ? `No known name matches "${name}". Check that this is what it holds.`
+      : `"${name}" is attribute ${index + 1} of the article master data.`,
+    labelUnsure: unsure,
+    type: 'string',
+    required: true,
+  }
+}
+
+const wideRows = {
+  path: csvRowsPath,
+  name: csvRowsName,
+  label: 'Rows',
+  labelReason: 'Each line of the file.',
+  labelUnsure: false,
+  required: true,
+} as const
+
+const wideInferred: InferredDocumentStructure = {
+  format: 'csv',
+  csv: defaultCsvSettings,
+  facts: { columnCount: wideColumns.length, rowCount: 3 },
+  sample: { fileName: wideExport.name, text: wideText, takenAt: '2026-10-12T08:00:00.000Z' },
+  children: [
+    {
+      ...wideRows,
+      kind: 'array',
+      items: { ...wideRows, kind: 'object', children: wideColumns.map(wideField) },
+    },
+  ],
+}
 
 async function drop(canvasElement: HTMLElement, file: File, label = dropLabel) {
   await userEvent.upload(within(canvasElement).getByLabelText(label), file)
@@ -69,15 +136,15 @@ export const Reading = meta.story({
   },
   async play({ canvas, canvasElement }) {
     await drop(canvasElement, invoiceExport)
-    await expect(
-      await canvas.findByRole('heading', { name: 'Reading Rechnungsexport_2026-10-08.csv' }),
-    ).toBeVisible()
-    const steps = canvas.getAllByRole('listitem')
+    await expect(await canvas.findByRole('heading', { name: readingTitle })).toBeVisible()
+    const steps = [...canvas.getAllByRole('list')[0]!.children]
 
     await expect(steps[0]).toHaveTextContent('Opening the file: done')
-    await expect(steps[1]).toHaveTextContent('Finding the columns: in progress')
-    await expect(steps[1]).toHaveAttribute('aria-current', 'step')
-    await expect(steps[2]).toHaveTextContent('Naming the fields in plain words: not started')
+    await expect(steps[1]).toHaveTextContent('Finding the columns: done')
+    await expect(steps[1]).toHaveTextContent('Found 12 columns, separated by semicolons')
+    await expect(steps[1]).toHaveTextContent('3 rows read')
+    await expect(steps[2]).toHaveTextContent('Naming the fields in plain words: in progress')
+    await expect(steps[2]).toHaveAttribute('aria-current', 'step')
   },
 })
 
@@ -167,7 +234,7 @@ export const NameMissing = meta.story({
     await userEvent.click(canvas.getByRole('button', { name: 'Yes, “Unit” is right' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Yes, “Unit price” is right' }))
     await userEvent.clear(canvas.getByRole('textbox', { name: 'Name of this data format' }))
-    await expect(canvas.getByRole('button', { name: 'Name the format first' })).toBeDisabled()
+    await expect(canvas.getByRole('button', { name: 'Name the data format first' })).toBeDisabled()
   },
 })
 
@@ -213,6 +280,7 @@ export const CsvSettings = meta.story({
     const delimiter = canvas.getByRole('combobox', { name: 'Delimiter' })
 
     await expect(delimiter).toHaveFocus()
+    await expect(canvas.queryByRole('button', { name: 'Change the CSV settings' })).toBeNull()
     await userEvent.selectOptions(
       canvas.getByRole('combobox', { name: 'Character encoding' }),
       'windows-1252',
@@ -221,6 +289,110 @@ export const CsvSettings = meta.story({
     const values = canvas.getByRole('group', { name: /lieferscheine-ansi\.csv/ })
 
     await expect(within(values).getAllByText('Lübeck').length).toBeGreaterThan(0)
+  },
+})
+
+export const CsvSettingsKeepChoices = meta.story({
+  async play({ canvas, canvasElement }) {
+    await drop(canvasElement, invoiceExport)
+    await review(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: 'Yes, “Unit” is right' }))
+    await userEvent.type(
+      canvas.getByRole('textbox', { name: 'Or type a better name for EPreis' }),
+      'Price per unit',
+    )
+    await userEvent.click(canvas.getByRole('button', { name: 'Use this name' }))
+    await openTechnicalOptions(canvasElement)
+    await userEvent.selectOptions(
+      canvas.getByRole('combobox', { name: 'Character encoding' }),
+      'windows-1252',
+    )
+    await canvas.findByRole('heading', { name: readingTitle })
+    await review(canvasElement)
+    await expect(canvas.getByText('All names checked')).toBeVisible()
+    await expect(canvas.getAllByText('Price per unit').length).toBeGreaterThan(0)
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'The first row names the columns' }))
+    await canvas.findByRole('heading', { name: readingTitle })
+    await review(canvasElement)
+    await expect(canvas.queryByText('All names checked')).toBeNull()
+    await expect(canvas.queryAllByText('Price per unit')).toHaveLength(0)
+  },
+})
+
+export const JsonSchemaAfterFile = meta.story({
+  async play({ canvas, canvasElement }) {
+    await drop(canvasElement, invoiceExport)
+    await review(canvasElement)
+    await openTechnicalOptions(canvasElement)
+    await userEvent.upload(
+      canvas.getByLabelText(/^JSON Schema/),
+      toFile(documentStructureOrigins.jsonSchema.jsonSchema),
+    )
+    await review(canvasElement, 'Fields read from the JSON Schema')
+    await expect(canvas.getByRole('textbox', { name: 'Name of this data format' })).toHaveValue(
+      'article',
+    )
+  },
+})
+
+export const EditedNameKept = meta.story({
+  async play({ canvas, canvasElement }) {
+    await drop(canvasElement, invoiceExport)
+    await review(canvasElement)
+    const name = canvas.getByRole('textbox', { name: 'Name of this data format' })
+
+    await userEvent.clear(name)
+    await userEvent.type(name, 'ERP invoices')
+    await openTechnicalOptions(canvasElement)
+    await userEvent.upload(
+      canvas.getByLabelText(/^JSON Schema/),
+      toFile(documentStructureOrigins.jsonSchema.jsonSchema),
+    )
+    await review(canvasElement, 'Fields read from the JSON Schema')
+    await expect(canvas.getByRole('textbox', { name: 'Name of this data format' })).toHaveValue(
+      'ERP invoices',
+    )
+  },
+})
+
+export const LargeVolume = meta.story({
+  beforeEach({ msw }) {
+    msw.use(http.post(inferencePath, () => HttpResponse.json(wideInferred)))
+  },
+  parameters: { a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } } },
+  async play({ canvas, canvasElement }) {
+    await drop(canvasElement, wideExport)
+    await review(canvasElement, 'Fields read from artikelstamm-breit.csv')
+    await expect(canvas.getByText('200 fields found')).toBeVisible()
+    await expect(canvas.getByText('4 names to check')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Check 4 names first' })).toBeDisabled()
+    await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const GermanDrop = meta.story({
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      canvas.getByRole('heading', { level: 1, name: 'Neues Datenformat' }),
+    ).toBeInTheDocument()
+    await expect(canvas.getByLabelText(/^Legen Sie einen Export/)).toHaveAttribute('type', 'file')
+    await expect(canvas.getByRole('button', { name: 'Technische Optionen' })).toBeVisible()
+  },
+})
+
+export const GermanReading = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { documentStructureInferenceState: 'loading' }))
+  },
+  async play({ canvas, canvasElement }) {
+    await drop(canvasElement, invoiceExport, /^Legen Sie einen Export/)
+    await expect(
+      await canvas.findByRole('heading', { name: 'Rechnungsexport_2026-10-08.csv wird gelesen' }),
+    ).toBeVisible()
+    await expect(canvas.getByText('12 Spalten gefunden, getrennt durch Semikolons')).toBeVisible()
+    await expect(canvas.getByText(/^Felder in einfachen Worten benennen/)).toBeVisible()
   },
 })
 
@@ -252,7 +424,7 @@ export const DarkReading = meta.story({
   },
   async play({ canvas, canvasElement }) {
     await drop(canvasElement, invoiceExport)
-    await expect(await canvas.findByText('Finding the columns')).toBeVisible()
+    await expect(await canvas.findByText('Naming the fields in plain words')).toBeVisible()
   },
 })
 

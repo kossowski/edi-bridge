@@ -9,13 +9,9 @@ import { flushSync } from 'react-dom'
 
 import { AppPage } from '@/components/app-page'
 import { Fact, FactGrid, LoadFailure, Loading } from '@/components/detail-parts'
-import { fieldEntries, FieldList } from '@/components/document-structures/field-list'
+import { fieldEntries, FieldList, scrollToField } from '@/components/document-structures/field-list'
 import { type Mappings, UsedByMappings } from '@/components/document-structures/mapping-list'
-import {
-  SampleFile,
-  scrollToField,
-  scrollToValue,
-} from '@/components/document-structures/sample-file'
+import { SampleFile, scrollToValue } from '@/components/document-structures/sample-file'
 import { firstValues, sampleContent } from '@/components/document-structures/sample-segments'
 import { leafCount } from '@/components/document-structures/structure-tree'
 import { TechnicalSettings } from '@/components/document-structures/technical-settings'

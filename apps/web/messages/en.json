@@ -3116,12 +3116,12 @@
       "rename": {
         "label": "Name shown in Mappings",
         "submit": "Rename",
-        "keep": "Keep this name",
+        "confirm": "Keep this name",
         "saving": "Saving…",
         "required": "Enter a name.",
         "failed": "The field could not be renamed. Try again.",
         "renamed": "Renamed to “{label}”.",
-        "kept": "Kept the name “{label}”."
+        "confirmed": "Kept the name “{label}”."
       }
     },
     "technical": {
@@ -3162,7 +3162,7 @@
         "columns": "Found {count, plural, one {# column} other {# columns}}, separated by {delimiter, select, comma {commas} semicolon {semicolons} tab {tabs} other {pipes}}",
         "rows": "{count, plural, one {# row} other {# rows}} read",
         "fields": "{count, plural, one {# field} other {# fields}} found",
-        "names": "{count, plural, =0 {Every name is clear} one {# name to check} other {# names to check}}"
+        "labels": "{count, plural, =0 {Every name is clear} one {# name to check} other {# names to check}}"
       }
     },
     "failed": {
@@ -3207,8 +3207,8 @@
     "save": {
       "submit": "Save data format",
       "saving": "Saving…",
-      "checkNames": "{count, plural, one {Check the last name first} other {Check # names first}}",
-      "nameFirst": "Name the format first",
+      "checkLabels": "{count, plural, one {Check the last name first} other {Check # names first}}",
+      "nameFirst": "Name the data format first",
       "failed": "The data format could not be saved. Try again."
     },
     "technical": {
