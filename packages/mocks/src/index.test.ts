@@ -40,6 +40,7 @@ import {
   retryRunEndpoint,
   type RunListQuery,
   runDetailSchema,
+  lookupTableMissingCodesEndpoint,
   runEndpoint,
   runListSchema,
   runsEndpoint,
@@ -731,6 +732,7 @@ describe('createHandlers', () => {
 
     const response = await send('POST', createLookupTableEndpoint.path, {
       name: 'Havelland units',
+      kind: 'units',
       scope: { kind: 'tradingPartner', tradingPartnerId: partner.id },
       entries: [],
     })
@@ -739,6 +741,27 @@ describe('createHandlers', () => {
     expect(lookupTableEndpoint.response.parse(await response.json()).scope).toEqual({
       kind: 'tradingPartner',
       tradingPartner: { id: partner.id, name: 'Havelland Feinkost GmbH' },
+    })
+  })
+
+  it('lists a seeded blocking code whose failed Run points back at the same table', async () => {
+    server.use(...createHandlers(apiUrl))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const codes = lookupTableMissingCodesEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${toPath(lookupTableMissingCodesEndpoint.path, units)}`)).json(),
+    )
+
+    const krt = codes.find(({ code }) => code === 'KRT')
+    const runId = krt?.urgency === 'blocking' ? krt.failedRuns[0]!.id : ''
+    const run = await getRun(runId)
+
+    expect(krt?.urgency).toBe('blocking')
+    expect(run.problem?.fixTarget).toEqual({
+      kind: 'lookupTable',
+      lookupTableId: units.id,
+      name: 'Units of measure',
+      code: 'KRT',
     })
   })
 
@@ -808,6 +831,7 @@ describe('createHandlers', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         name: vat.name,
+        kind: vat.kind,
         scope: { kind: 'workspace' },
         entries: [
           { sourceCode: '19', targetCode: 'E' },

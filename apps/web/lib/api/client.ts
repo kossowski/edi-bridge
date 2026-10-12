@@ -46,7 +46,10 @@ import {
   type LookupTableImportBody,
   lookupTableImportPreviewEndpoint,
   type LookupTableInput,
+  lookupTableMissingCodesEndpoint,
   lookupTablesEndpoint,
+  lookupTableSuggestionsEndpoint,
+  type LookupTableSuggestionsQuery,
   type ManualSubmissionInput,
   mappingDraftEndpoint,
   mappingPreviewEndpoint,
@@ -505,6 +508,16 @@ export function listLookupTables() {
 
 export function getLookupTable(id: string) {
   return request(lookupTableEndpoint, { path: toPath(lookupTableEndpoint.path, { id }) })
+}
+
+export function listLookupTableMissingCodes(id: string) {
+  return request(lookupTableMissingCodesEndpoint, {
+    path: toPath(lookupTableMissingCodesEndpoint.path, { id }),
+  })
+}
+
+export function getLookupTableSuggestions(query: LookupTableSuggestionsQuery) {
+  return request(lookupTableSuggestionsEndpoint, { query })
 }
 
 export function createLookupTable(body: LookupTableInput) {

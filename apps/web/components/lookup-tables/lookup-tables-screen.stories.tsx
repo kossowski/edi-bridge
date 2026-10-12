@@ -23,7 +23,7 @@ const meta = preview.meta({
 export const Default = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('cell', { name: 'Units of measure' })).toBeVisible()
-    await expect(canvas.getByRole('cell', { name: 'Hansemarkt GmbH' })).toBeVisible()
+    await expect(canvas.getAllByRole('cell', { name: 'Hansemarkt GmbH' })[0]).toBeVisible()
     await expect(
       await canvas.findByRole('button', { name: 'Actions for Country codes' }),
     ).toBeVisible()

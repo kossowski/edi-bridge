@@ -51,7 +51,7 @@ import {
   seedMappings,
   toFlowStore,
 } from './flow'
-import { seedLookupTableNamed } from './lookup-table'
+import { seedLookupTableNamed } from './lookup-table-seed'
 import { edifactLeaves, messageTypeStructures } from './message-type-structure'
 import { day } from './overdue'
 import { containerOf } from './paths'
@@ -753,7 +753,9 @@ export type PublishedVersions = {
   find: (versionId: string) => { version: MappingVersionSummary } | undefined
 }
 
-function publishedVersionsByMapping(drafts: ReadonlyArray<MappingDraftRecord>): PublishedVersions {
+export function publishedVersionsByMapping(
+  drafts: ReadonlyArray<MappingDraftRecord>,
+): PublishedVersions {
   const byMapping = new Map(drafts.map((draft) => [draft.id, publishedVersionsOf(draft)]))
 
   const byId = new Map(

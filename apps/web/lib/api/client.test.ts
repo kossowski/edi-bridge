@@ -35,9 +35,11 @@ import {
   documentStructureProblemOf,
   getChannel,
   getLookupTable,
+  getLookupTableSuggestions,
   inferDocumentStructure,
   getRun,
   importLookupTable,
+  listLookupTableMissingCodes,
   listLookupTables,
   listMappingVersions,
   listRuns,
@@ -397,6 +399,7 @@ describe('Lookup Table actions', () => {
 
     const created = await createLookupTable({
       name: 'Packaging types',
+      kind: 'other',
       scope: { kind: 'tradingPartner', tradingPartnerId: hansemarkt.id },
       entries: [],
     })
@@ -413,8 +416,39 @@ describe('Lookup Table actions', () => {
     const { entries } = await getLookupTable(units.id)
 
     await expect(
-      updateLookupTable(units.id, { name: 'Units', scope: { kind: 'workspace' }, entries }),
+      updateLookupTable(units.id, {
+        name: 'Units',
+        kind: 'units',
+        scope: { kind: 'workspace' },
+        entries,
+      }),
     ).resolves.toMatchObject({ name: 'Units', entries: units.entries })
+  })
+
+  it('lists the codes a Lookup Table is missing', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [] }))
+
+    const codes = await listLookupTableMissingCodes(units.id)
+
+    expect(codes.map(({ code, urgency }) => [code, urgency])).toEqual([
+      ['BTL', 'upcoming'],
+      ['SET', 'upcoming'],
+    ])
+  })
+
+  it('asks for suggested first values of a kind for one Trading Partner', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const { entries } = await getLookupTableSuggestions({
+      kind: 'countries',
+      tradingPartnerId: hansemarkt.id,
+    })
+
+    expect(entries[0]).toEqual({
+      sourceCode: 'Deutschland',
+      targetCode: 'DE',
+      targetMeaning: 'Germany',
+    })
   })
 
   it('deletes a Lookup Table from a response without a body', async () => {

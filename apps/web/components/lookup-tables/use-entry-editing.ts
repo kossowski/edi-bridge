@@ -39,6 +39,7 @@ function useSaveEntries(table: LookupTable, onSaved: (saved: LookupTable) => voi
 
       return updateLookupTable(table.id, {
         name: current.name,
+        kind: current.kind,
         scope: toScopeInput(current.scope),
         entries,
       })

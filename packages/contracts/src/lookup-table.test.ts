@@ -3,8 +3,15 @@ import { describe, expect, it } from 'vitest'
 import {
   lookupTableEntriesSchema,
   lookupTableInputSchema,
+  lookupTableMissingCodesEndpoint,
+  lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
+  lookupTableUseSchema,
 } from './lookup-table'
+
+const hansemarkt = { id: '00000001-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' }
+
+const noMissingCodes = { blocking: 0, upcoming: 0 }
 
 describe('lookupTablesEndpoint', () => {
   it('lists Lookup Tables of the Workspace and of single Trading Partners', () => {
@@ -12,23 +19,49 @@ describe('lookupTablesEndpoint', () => {
       {
         id: '00000008-0000-4000-8000-000000000001',
         name: 'Units',
+        kind: 'units',
         scope: { kind: 'workspace' },
         entryCount: 4,
+        uses: [
+          {
+            mappingId: '00000007-0000-4000-8000-000000000001',
+            name: 'ERP JSON to INVOIC',
+            messageType: 'INVOIC',
+            direction: 'outbound',
+            tradingPartners: [hansemarkt],
+          },
+        ],
+        missingCodeCounts: { blocking: 1, upcoming: 2 },
         updatedAt: '2026-09-14T08:30:00.000Z',
       },
       {
         id: '00000008-0000-4000-8000-000000000002',
         name: 'Hansemarkt units',
-        scope: {
-          kind: 'tradingPartner',
-          tradingPartner: { id: '00000001-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' },
-        },
+        kind: 'units',
+        scope: { kind: 'tradingPartner', tradingPartner: hansemarkt },
         entryCount: 0,
+        uses: [],
+        missingCodeCounts: noMissingCodes,
         updatedAt: '2026-09-15T10:00:00.000Z',
       },
     ]
 
     expect(lookupTablesEndpoint.response.parse(tables)).toEqual(tables)
+  })
+
+  it('rejects a kind outside the fixed list', () => {
+    const table = {
+      id: '00000008-0000-4000-8000-000000000001',
+      name: 'Units',
+      kind: 'vatCodes',
+      scope: { kind: 'workspace' },
+      entryCount: 0,
+      uses: [],
+      missingCodeCounts: noMissingCodes,
+      updatedAt: '2026-09-14T08:30:00.000Z',
+    }
+
+    expect(lookupTablesEndpoint.response.safeParse([table]).success).toBe(false)
   })
 
   it('rejects a Lookup Table without a scope', () => {
@@ -69,6 +102,7 @@ describe('lookupTableInputSchema', () => {
   it('scopes a Lookup Table to a Trading Partner by its id', () => {
     const input = {
       name: ' Hansemarkt units ',
+      kind: 'units',
       scope: { kind: 'tradingPartner', tradingPartnerId: '00000001-0000-4000-8000-000000000001' },
       entries: [{ sourceCode: 'ST', targetCode: 'PCE' }],
     }
@@ -77,8 +111,92 @@ describe('lookupTableInputSchema', () => {
   })
 
   it('rejects an empty name', () => {
-    const input = { name: ' ', scope: { kind: 'workspace' }, entries: [] }
+    const input = { name: ' ', kind: 'other', scope: { kind: 'workspace' }, entries: [] }
 
     expect(lookupTableInputSchema.safeParse(input).success).toBe(false)
+  })
+})
+
+describe('lookupTableUseSchema', () => {
+  const use = {
+    mappingId: '00000007-0000-4000-8000-000000000001',
+    name: 'ORDERS to ERP JSON',
+    messageType: 'ORDERS',
+    direction: 'inbound',
+    tradingPartners: [hansemarkt],
+  }
+
+  it('names the Trading Partners whose Flows run the Mapping', () => {
+    expect(lookupTableUseSchema.parse(use)).toEqual(use)
+  })
+
+  it('rejects a direction that does not fit the Message Type', () => {
+    expect(lookupTableUseSchema.safeParse({ ...use, direction: 'outbound' }).success).toBe(false)
+  })
+})
+
+describe('lookupTableMissingCodesEndpoint', () => {
+  const failedRun = {
+    id: '00000000-0000-4000-8000-000000000001',
+    receivedAt: '2026-10-10T08:00:00.000Z',
+    tradingPartner: hansemarkt,
+    messageType: 'INVOIC',
+    businessReference: '4711',
+  }
+
+  const blocking = {
+    urgency: 'blocking',
+    code: 'KRT',
+    meaning: 'carton',
+    suggestions: [{ code: 'CT', meaning: 'Carton' }],
+    failedRuns: [failedRun],
+  }
+
+  const upcoming = {
+    urgency: 'upcoming',
+    code: 'BTL',
+    meaning: null,
+    suggestions: [],
+    itemCount: 14,
+  }
+
+  it('lists codes that made documents fail and codes that will', () => {
+    expect(lookupTableMissingCodesEndpoint.response.parse([blocking, upcoming])).toEqual([
+      blocking,
+      upcoming,
+    ])
+  })
+
+  it('rejects a blocking code without the Run it made fail', () => {
+    expect(
+      lookupTableMissingCodesEndpoint.response.safeParse([{ ...blocking, failedRuns: [] }]).success,
+    ).toBe(false)
+  })
+
+  it('rejects a code that is listed twice', () => {
+    const result = lookupTableMissingCodesEndpoint.response.safeParse([
+      blocking,
+      { ...upcoming, code: 'KRT' },
+    ])
+
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('lookupTableSuggestionsEndpoint', () => {
+  it('asks for a kind and, for one Trading Partner, its id', () => {
+    expect(
+      lookupTableSuggestionsEndpoint.query.parse({
+        kind: 'units',
+        tradingPartnerId: hansemarkt.id,
+      }),
+    ).toEqual({ kind: 'units', tradingPartnerId: hansemarkt.id })
+    expect(lookupTableSuggestionsEndpoint.query.parse({ kind: 'countries' })).toEqual({
+      kind: 'countries',
+    })
+  })
+
+  it('rejects a request without a kind', () => {
+    expect(lookupTableSuggestionsEndpoint.query.safeParse({}).success).toBe(false)
   })
 })

@@ -18,6 +18,7 @@ import {
   documentStructureQuery,
   documentStructuresQuery,
   forgetDeletedLookupTable,
+  lookupTableMissingCodesQuery,
   lookupTableQuery,
   lookupTablesQuery,
   mappingDraftQuery,
@@ -27,6 +28,7 @@ import {
   storeCreatedMapping,
   storePublishedMappingVersion,
   storeSavedDocumentStructure,
+  storeSavedLookupTable,
   storeSavedTradingPartner,
   tradingPartnerQuery,
   tradingPartnersQuery,
@@ -109,6 +111,25 @@ describe('storeSavedDocumentStructure', () => {
 
     expect(queryClient.getQueryData(documentStructureQuery(saved!.id).queryKey)).toEqual(saved)
     expect(queryClient.getQueryState(documentStructuresQuery.queryKey)?.isInvalidated).toBe(true)
+  })
+})
+
+describe('storeSavedLookupTable', () => {
+  it('caches the saved Lookup Table and marks its missing codes as stale', () => {
+    const queryClient = new QueryClient()
+
+    const saved = toLookupTable(seedLookupTables[0]!, {
+      get: (id) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
+    })
+
+    queryClient.setQueryData(lookupTableMissingCodesQuery(saved.id).queryKey, [])
+
+    storeSavedLookupTable(queryClient, saved)
+
+    expect(queryClient.getQueryData(lookupTableQuery(saved.id).queryKey)).toEqual(saved)
+    expect(
+      queryClient.getQueryState(lookupTableMissingCodesQuery(saved.id).queryKey)?.isInvalidated,
+    ).toBe(true)
   })
 })
 

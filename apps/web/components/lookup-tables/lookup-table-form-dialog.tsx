@@ -116,7 +116,7 @@ function LookupTableForm({
   const save = useMutation({
     mutationFn: async (settings: LookupTableSettings) => {
       if (!table) {
-        return createLookupTable({ ...settings, entries: [] })
+        return createLookupTable({ ...settings, kind: 'other', entries: [] })
       }
 
       const { entries } = await queryClient.fetchQuery({
@@ -124,7 +124,7 @@ function LookupTableForm({
         staleTime: 0,
       })
 
-      return updateLookupTable(table.id, { ...settings, entries })
+      return updateLookupTable(table.id, { ...settings, kind: table.kind, entries })
     },
     onSuccess: (saved) => {
       storeSavedLookupTable(queryClient, saved)

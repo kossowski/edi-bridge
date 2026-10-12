@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { directionOf, directionSchema, messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
 
 import type { Endpoint } from './endpoint'
@@ -37,18 +38,54 @@ export const lookupTableEntriesSchema = z
     })
   })
 
+export const lookupTableKinds = ['units', 'countries', 'addresses', 'other'] as const
+
+export const lookupTableKindSchema = z.enum(lookupTableKinds)
+
+export type LookupTableKind = z.infer<typeof lookupTableKindSchema>
+
+export const lookupTableUseSchema = z
+  .object({
+    mappingId: z.uuid(),
+    name: z.string().min(1),
+    messageType: messageTypeSchema,
+    direction: directionSchema,
+    tradingPartners: z.array(tradingPartnerSummarySchema),
+  })
+  .refine((use) => use.direction === directionOf(use), {
+    message: 'The direction follows from the Message Type',
+    path: ['direction'],
+  })
+
+export type LookupTableUse = z.infer<typeof lookupTableUseSchema>
+
+export const missingCodeCountsSchema = z.object({
+  blocking: z.number().int().nonnegative(),
+  upcoming: z.number().int().nonnegative(),
+})
+
+export type MissingCodeCounts = z.infer<typeof missingCodeCountsSchema>
+
 export const lookupTableSummarySchema = z.object({
   id: z.uuid(),
   name: z.string().min(1),
+  kind: lookupTableKindSchema,
   scope: lookupTableScopeSchema,
   entryCount: z.number().int().nonnegative(),
+  uses: z.array(lookupTableUseSchema),
+  missingCodeCounts: missingCodeCountsSchema,
   updatedAt: z.iso.datetime(),
 })
 
 export type LookupTableSummary = z.infer<typeof lookupTableSummarySchema>
 
+export const codeMeaningSchema = z.object({ code: codeSchema, meaning: z.string().min(1) })
+
+export type CodeMeaning = z.infer<typeof codeMeaningSchema>
+
 export const lookupTableSchema = lookupTableSummarySchema.extend({
   entries: lookupTableEntriesSchema,
+  codeMeanings: z.array(codeMeaningSchema),
 })
 
 export type LookupTable = z.infer<typeof lookupTableSchema>
@@ -62,6 +99,7 @@ export type LookupTableScopeInput = z.infer<typeof lookupTableScopeInputSchema>
 
 export const lookupTableInputSchema = z.object({
   name: z.string().trim().min(1).max(70),
+  kind: lookupTableKindSchema,
   scope: lookupTableScopeInputSchema,
   entries: lookupTableEntriesSchema,
 })
@@ -118,6 +156,89 @@ export const deleteLookupTableEndpoint: Endpoint<
   method: 'DELETE',
   path: '/lookup-tables/:id',
   response: z.undefined(),
+}
+
+export const missingCodeUrgencies = ['blocking', 'upcoming'] as const
+
+export type MissingCodeUrgency = (typeof missingCodeUrgencies)[number]
+
+export const failedRunReferenceSchema = z.object({
+  id: z.uuid(),
+  receivedAt: z.iso.datetime(),
+  tradingPartner: tradingPartnerSummarySchema,
+  messageType: messageTypeSchema,
+  businessReference: z.string().min(1).nullable(),
+})
+
+export type FailedRunReference = z.infer<typeof failedRunReferenceSchema>
+
+const missingCodeFields = {
+  code: codeSchema,
+  meaning: z.string().min(1).nullable(),
+  suggestions: z.array(codeMeaningSchema),
+}
+
+export const missingCodeSchema = z.discriminatedUnion('urgency', [
+  z.object({
+    urgency: z.literal('blocking'),
+    ...missingCodeFields,
+    failedRuns: z.array(failedRunReferenceSchema).min(1),
+  }),
+  z.object({
+    urgency: z.literal('upcoming'),
+    ...missingCodeFields,
+    itemCount: z.number().int().positive(),
+  }),
+])
+
+export type MissingCode = z.infer<typeof missingCodeSchema>
+
+export const missingCodesSchema = z
+  .array(missingCodeSchema)
+  .refine((codes) => new Set(codes.map(({ code }) => code)).size === codes.length, {
+    message: 'A missing code is listed once',
+  })
+
+export const lookupTableMissingCodesEndpoint: Endpoint<
+  MissingCode[],
+  undefined,
+  undefined,
+  '/lookup-tables/:id/missing-codes'
+> = {
+  method: 'GET',
+  path: '/lookup-tables/:id/missing-codes',
+  response: missingCodesSchema,
+}
+
+export const lookupTableSuggestionsQuerySchema = z.object({
+  kind: lookupTableKindSchema,
+  tradingPartnerId: z.uuid().optional(),
+})
+
+export type LookupTableSuggestionsQuery = z.infer<typeof lookupTableSuggestionsQuerySchema>
+
+export const suggestedEntrySchema = lookupTableEntrySchema.extend({
+  targetMeaning: z.string().min(1).nullable(),
+})
+
+export type SuggestedEntry = z.infer<typeof suggestedEntrySchema>
+
+export const lookupTableSuggestionsSchema = z.object({
+  entries: z.array(suggestedEntrySchema),
+})
+
+export type LookupTableSuggestions = z.infer<typeof lookupTableSuggestionsSchema>
+
+export const lookupTableSuggestionsEndpoint: Endpoint<
+  LookupTableSuggestions,
+  LookupTableSuggestionsQuery,
+  undefined,
+  '/lookup-table-suggestions'
+> = {
+  method: 'GET',
+  path: '/lookup-table-suggestions',
+  query: lookupTableSuggestionsQuerySchema,
+  response: lookupTableSuggestionsSchema,
 }
 
 export const maxLookupTableCsvLength = 2_000_000

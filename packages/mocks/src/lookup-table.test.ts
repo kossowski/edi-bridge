@@ -9,18 +9,30 @@ import {
   type LookupTableInput,
   lookupTableImportPreviewEndpoint,
   lookupTableEndpoint,
+  lookupTableMissingCodesEndpoint,
   lookupTableSchema,
   lookupTablesEndpoint,
+  lookupTableSuggestionsEndpoint,
+  mappingsEndpoint,
+  runDetailSchema,
+  type RunSummary,
+  runEndpoint,
   toPath,
+  toSearchParams,
   updateLookupTableEndpoint,
 } from '@edi-bridge/contracts'
 
+import { seedFlows } from './flow'
 import {
   createLookupTables,
   lookupTableHandlers,
+  partnerScope,
   seedLookupTableNamed,
   seedLookupTables,
 } from './lookup-table'
+import { mappingHandlers } from './mapping'
+import { createRun } from './run'
+import { runDetailHandlers } from './run-detail'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -45,6 +57,7 @@ const hansemarkt = seedTradingPartners[0]!
 
 const input: LookupTableInput = {
   name: 'Packaging types',
+  kind: 'other',
   scope: { kind: 'tradingPartner', tradingPartnerId: hansemarkt.id },
   entries: [{ sourceCode: 'KAR', targetCode: 'CT' }],
 }
@@ -84,6 +97,7 @@ describe('lookupTableHandlers', () => {
     expect(response.status).toBe(201)
     expect(created).toMatchObject({
       name: 'Packaging types',
+      kind: 'other',
       scope: {
         kind: 'tradingPartner',
         tradingPartner: { id: hansemarkt.id, name: 'Hansemarkt GmbH' },
@@ -96,8 +110,11 @@ describe('lookupTableHandlers', () => {
       {
         id: created.id,
         name: created.name,
+        kind: 'other',
         scope: created.scope,
         entryCount: 1,
+        uses: [],
+        missingCodeCounts: { blocking: 0, upcoming: 0 },
         updatedAt: created.updatedAt,
       },
     ])
@@ -170,6 +187,7 @@ describe('lookupTableHandlers', () => {
 
     await send('PUT', toPath(updateLookupTableEndpoint.path, { id: units.id }), {
       name: units.name,
+      kind: units.kind,
       scope: { kind: 'workspace' },
       entries: [],
     })
@@ -185,6 +203,7 @@ describe('lookupTableHandlers', () => {
 
     const response = await send('PUT', toPath(updateLookupTableEndpoint.path, { id: units.id }), {
       name: 'Units of measure',
+      kind: 'units',
       scope: { kind: 'workspace' },
       entries: [],
     })
@@ -363,5 +382,262 @@ describe('POST /lookup-tables/:id/import', () => {
     const path = toPath(importLookupTableEndpoint.path, { id: seedLookupTables[0]!.id })
 
     expect((await send('POST', path, { csv: 'ST;PCE' })).status).toBe(404)
+  })
+})
+
+const hansemarktOrdersFlow = seedFlows.find(
+  ({ tradingPartnerId, messageType }) =>
+    tradingPartnerId === hansemarkt.id && messageType === 'ORDERS',
+)!
+
+function failedOrders(id: string, receivedAt: string): RunSummary {
+  return createRun({
+    id,
+    tradingPartner: { id: hansemarkt.id, name: hansemarkt.name },
+    messageType: 'ORDERS',
+    direction: 'inbound',
+    flow: { id: hansemarktOrdersFlow.id, name: hansemarktOrdersFlow.name },
+    receivedAt,
+    status: 'failed',
+    failureStage: 'mapping',
+  })
+}
+
+const olderFailure = failedOrders(
+  '00000000-0000-4000-8000-000000000001',
+  '2026-10-01T08:00:00.000Z',
+)
+
+const newerFailure = failedOrders(
+  '00000000-0000-4000-8000-000000000002',
+  '2026-10-03T08:00:00.000Z',
+)
+
+async function getMissingCodes(id: string) {
+  const response = await send('GET', toPath(lookupTableMissingCodesEndpoint.path, { id }))
+
+  return lookupTableMissingCodesEndpoint.response.parse(await response.json())
+}
+
+describe('GET /lookup-tables/:id/missing-codes', () => {
+  it('lists a code that made documents fail as blocking, newest failure first', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [olderFailure, newerFailure] }))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const [krt] = await getMissingCodes(units.id)
+
+    expect(krt).toEqual({
+      urgency: 'blocking',
+      code: 'KRT',
+      meaning: 'carton',
+      suggestions: [
+        { code: 'CT', meaning: 'Carton' },
+        { code: 'PK', meaning: 'Package' },
+        { code: 'BX', meaning: 'Box' },
+      ],
+      failedRuns: [
+        {
+          id: newerFailure.id,
+          receivedAt: newerFailure.receivedAt,
+          tradingPartner: { id: hansemarkt.id, name: hansemarkt.name },
+          messageType: 'ORDERS',
+          businessReference: newerFailure.businessReference,
+        },
+        expect.objectContaining({ id: olderFailure.id }),
+      ],
+    })
+  })
+
+  it('points the blocking code at a Run whose problem names the same table and code', async () => {
+    const runs = [newerFailure]
+    server.use(...lookupTableHandlers(apiUrl, { runs }), ...runDetailHandlers(apiUrl, { runs }))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const [krt] = await getMissingCodes(units.id)
+    const runId = krt?.urgency === 'blocking' ? krt.failedRuns[0]!.id : ''
+
+    const run = runDetailSchema.parse(
+      await (await send('GET', toPath(runEndpoint.path, { id: runId }))).json(),
+    )
+
+    expect(run.problem?.fixTarget).toEqual({
+      kind: 'lookupTable',
+      lookupTableId: units.id,
+      name: 'Units of measure',
+      code: 'KRT',
+    })
+  })
+
+  it('lists codes from your data that no document used yet after the blocking ones', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [newerFailure] }))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const codes = await getMissingCodes(units.id)
+
+    expect(codes.map(({ code, urgency }) => [code, urgency])).toEqual([
+      ['KRT', 'blocking'],
+      ['BTL', 'upcoming'],
+      ['SET', 'upcoming'],
+    ])
+    expect(codes[1]).toMatchObject({ meaning: 'bottle', itemCount: 14 })
+  })
+
+  it('drops a code once the table translates it and counts the rest on the list', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [newerFailure] }))
+    const units = seedLookupTableNamed('Units of measure')
+
+    await send('PUT', toPath(updateLookupTableEndpoint.path, { id: units.id }), {
+      name: units.name,
+      kind: units.kind,
+      scope: { kind: 'workspace' },
+      entries: [...units.entries, { sourceCode: 'KRT', targetCode: 'CT' }],
+    })
+
+    expect((await getMissingCodes(units.id)).map(({ code }) => code)).toEqual(['BTL', 'SET'])
+    expect((await listLookupTables()).find(({ id }) => id === units.id)?.missingCodeCounts).toEqual(
+      { blocking: 0, upcoming: 2 },
+    )
+  })
+
+  it('no longer blocks on a Run that was reprocessed', async () => {
+    const replacing = createRun({ ...newerFailure, id: '00000000-0000-4000-8000-000000000003' })
+    const runs = [newerFailure, { ...replacing, status: 'delivered', failureStage: null } as const]
+
+    server.use(
+      ...lookupTableHandlers(apiUrl, {
+        runs,
+        reprocessed: [{ replaced: newerFailure.id, replacing: replacing.id }],
+      }),
+    )
+
+    const codes = await getMissingCodes(seedLookupTableNamed('Units of measure').id)
+
+    expect(codes.map(({ urgency }) => urgency)).not.toContain('blocking')
+  })
+
+  it('answers with no codes for a table without traffic', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [] }))
+
+    expect(await getMissingCodes(seedLookupTableNamed('VAT categories').id)).toEqual([])
+  })
+
+  it('serves a large volume of missing codes', async () => {
+    const [large] = createLookupTables({ count: 1, upcomingCodeCount: 500 })
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables: [large!], runs: [] }))
+
+    expect(await getMissingCodes(large!.id)).toHaveLength(500)
+  })
+
+  it('answers 404 for an unknown Lookup Table', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables: [] }))
+    const path = toPath(lookupTableMissingCodesEndpoint.path, { id: seedLookupTables[0]!.id })
+
+    expect((await send('GET', path)).status).toBe(404)
+  })
+})
+
+describe('Lookup Table uses', () => {
+  it('names the Mappings that use a table with the Trading Partners of their Flows', async () => {
+    server.use(...lookupTableHandlers(apiUrl), ...mappingHandlers(apiUrl))
+    const countries = seedLookupTableNamed('Country codes')
+
+    const { uses } = await getLookupTable(countries.id)
+
+    const mappings = mappingsEndpoint.response.parse(
+      await (await send('GET', mappingsEndpoint.path)).json(),
+    )
+
+    expect(uses.length).toBeGreaterThan(0)
+
+    for (const use of uses) {
+      const mapping = mappings.find(({ id }) => id === use.mappingId)
+
+      expect(use).toEqual({
+        mappingId: mapping?.id,
+        name: mapping?.name,
+        messageType: 'ORDERS',
+        direction: 'inbound',
+        tradingPartners: mapping?.partners,
+      })
+    }
+  })
+
+  it('names only the Trading Partner a partner table belongs to', async () => {
+    const countries = seedLookupTableNamed('Country codes')
+    const lookupTables = [{ ...countries, scope: partnerScope(hansemarkt) }]
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables }))
+
+    const { uses } = await getLookupTable(countries.id)
+
+    expect(
+      new Set(uses.flatMap(({ tradingPartners }) => tradingPartners.map(({ id }) => id))),
+    ).toEqual(new Set([hansemarkt.id]))
+  })
+
+  it('lists no uses for a table that no Mapping reads', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    expect((await getLookupTable(seedLookupTableNamed('Hansemarkt units').id)).uses).toEqual([])
+  })
+})
+
+describe('code meanings', () => {
+  it('explains the target codes it knows for the kind of the table', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const { codeMeanings } = await getLookupTable(seedLookupTableNamed('Units of measure').id)
+
+    expect(codeMeanings).toEqual([
+      { code: 'PCE', meaning: 'Piece' },
+      { code: 'KGM', meaning: 'Kilogram' },
+      { code: 'LTR', meaning: 'Litre' },
+    ])
+  })
+})
+
+describe('GET /lookup-table-suggestions', () => {
+  async function suggest(query: Record<string, string>) {
+    return send('GET', `${lookupTableSuggestionsEndpoint.path}?${toSearchParams(query)}`)
+  }
+
+  it('suggests first values for a kind with the meaning of each code', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const response = await suggest({ kind: 'units', tradingPartnerId: hansemarkt.id })
+    const { entries } = lookupTableSuggestionsEndpoint.response.parse(await response.json())
+
+    expect(entries[0]).toEqual({ sourceCode: 'ST', targetCode: 'PCE', targetMeaning: 'Piece' })
+    expect(entries.map(({ sourceCode }) => sourceCode)).toEqual(['ST', 'KRT', 'KG', 'PAL'])
+  })
+
+  it('suggests nothing for a kind without a known code list', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const response = await suggest({ kind: 'other' })
+
+    expect(await response.json()).toEqual({ entries: [] })
+  })
+
+  it('rejects an unknown kind and an unknown Trading Partner', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    expect((await suggest({ kind: 'vatCodes' })).status).toBe(400)
+    expect(
+      (await suggest({ kind: 'units', tradingPartnerId: '10000000-0000-4000-8000-000000000099' }))
+        .status,
+    ).toBe(422)
+  })
+})
+
+describe('lookupTableHandlers states', () => {
+  it.each([
+    ['GET', lookupTablesEndpoint.path],
+    ['GET', toPath(lookupTableEndpoint.path, { id: seedLookupTables[0]!.id })],
+    ['GET', toPath(lookupTableMissingCodesEndpoint.path, { id: seedLookupTables[0]!.id })],
+    ['GET', `${lookupTableSuggestionsEndpoint.path}?kind=units`],
+  ])('answers %s %s with a server error in the error state', async (method, path) => {
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables: 'error' }))
+
+    expect((await send(method, path)).status).toBe(500)
   })
 })

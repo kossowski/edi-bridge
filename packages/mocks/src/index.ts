@@ -168,11 +168,16 @@ export {
   lookupTableHandlers,
   type LookupTableRecord,
   lookupTableListHandler,
+  type LookupTablesState,
   type LookupTableStore,
+  type LookupTableUsage,
+  type LookupTableWorld,
+  partnerScope,
   seedLookupTableNamed,
   seedLookupTables,
   toLookupTable,
   toLookupTableSummary,
+  type UpcomingCode,
 } from './lookup-table'
 
 export { manualSubmissionHandler } from './manual-submission'
@@ -533,6 +538,10 @@ export function createHandlers(
     ...lookupTableHandlers(apiUrl, {
       lookupTables: lookupTableStore,
       tradingPartners: tradingPartnerStore,
+      mappings: mappingDraftStore,
+      flows,
+      channels: channelStore,
+      runs,
     }),
   ]
 }

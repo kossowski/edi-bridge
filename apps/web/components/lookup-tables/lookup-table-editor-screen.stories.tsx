@@ -151,6 +151,9 @@ function InvalidEntries() {
           ...unitsOfMeasure,
           scope: { kind: 'workspace' },
           entryCount: 5,
+          uses: [],
+          missingCodeCounts: { blocking: 0, upcoming: 0 },
+          codeMeanings: [],
           entries: [
             { sourceCode: 'ST', targetCode: 'PCE' },
             { sourceCode: 'KG', targetCode: '' },

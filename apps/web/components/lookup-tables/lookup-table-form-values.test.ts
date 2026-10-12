@@ -56,11 +56,14 @@ describe('toFormValues', () => {
       toFormValues({
         id: '00000000-0000-4000-8000-000000000001',
         name: 'Units',
+        kind: 'units',
         scope: {
           kind: 'tradingPartner',
           tradingPartner: { id: hansemarkt.id, name: 'Hansemarkt' },
         },
         entryCount: 2,
+        uses: [],
+        missingCodeCounts: { blocking: 0, upcoming: 0 },
         updatedAt: '2026-10-01T08:00:00.000Z',
       }),
     ).toEqual({ name: 'Units', scopeKind: 'tradingPartner', tradingPartnerId: hansemarkt.id })
