@@ -1,3 +1,5 @@
+import { clamp } from '../../lib/clamp'
+
 export type CellPosition = { row: number; column: number }
 
 export type GridSize = {
@@ -111,10 +113,6 @@ export function gridCommand(press: KeyPress, editing: boolean): GridCommand | nu
   return press.key.length === 1 && !command && !press.altKey
     ? { kind: 'type', text: press.key }
     : null
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max)
 }
 
 function tabStep({ row, column }: CellPosition, size: GridSize, step: 1 | -1) {

@@ -18,6 +18,8 @@ import {
   transformNodeOf,
   expectSavedLinkCount,
   expectTransformCount,
+  findLinkLine,
+  openLinkMenuByMouse,
   page,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { viewerStory } from '@/components/session/session-story-helpers'
@@ -63,12 +65,6 @@ async function findNode(canvasElement: HTMLElement, name: string) {
   return node(canvasElement, name)
 }
 
-function edgeNamed(canvasElement: HTMLElement, name: string) {
-  return within(canvasElement)
-    .getByRole('img', { name })
-    .querySelector<SVGElement>('.react-flow__edge-interaction')!
-}
-
 async function place(canvasElement: HTMLElement, kind: string, name: string) {
   const canvas = within(canvasElement)
 
@@ -96,13 +92,13 @@ export const TransformNodes = meta.story({
       dateFormat.getByRole('button', { name: 'Result output of Date format 1' }),
     ).toHaveAccessibleDescription('Linked to DTM+137/C507/2380.')
     await expect(
-      await canvas.findByRole('img', { name: 'Link from invoiceDate to Date format 1 (Value)' }),
+      await canvas.findByRole('group', { name: 'Link from invoiceDate to Date format 1 (Value)' }),
     ).toBeInTheDocument()
     await expect(
-      canvas.getByRole('img', { name: 'Link from Date format 1 (Result) to DTM+137/C507/2380' }),
+      canvas.getByRole('group', { name: 'Link from Date format 1 (Result) to DTM+137/C507/2380' }),
     ).toBeInTheDocument()
     await expect(
-      canvas.getByRole('img', { name: 'Link from Constant 1 (Result) to Conditional 1 (Then)' }),
+      canvas.getByRole('group', { name: 'Link from Constant 1 (Result) to Conditional 1 (Then)' }),
     ).toBeInTheDocument()
 
     // A target a transform fills counts as linked, so a pending link does not offer it.
@@ -226,7 +222,7 @@ export const ConnectByKeyboard = meta.story({
     )
     await pressOn(input, '{Enter}')
     await expect(
-      await canvas.findByRole('img', { name: 'Link from invoiceDate to Date format 1 (Value)' }),
+      await canvas.findByRole('group', { name: 'Link from invoiceDate to Date format 1 (Value)' }),
     ).toBeInTheDocument()
 
     // From the transform's output into a target element, with the L shortcut.
@@ -243,7 +239,7 @@ export const ConnectByKeyboard = meta.story({
     await expect(to.closest('[data-link-target]')).not.toBeNull()
     await pressOn(to, 'l')
     await expect(
-      await canvas.findByRole('img', {
+      await canvas.findByRole('group', {
         name: 'Link from Date format 1 (Result) to DTM+137/C507/2380',
       }),
     ).toBeInTheDocument()
@@ -285,7 +281,9 @@ export const ConnectByMouse = meta.story({
       handle: 'in:part1',
     })
     await expect(
-      await canvas.findByRole('img', { name: 'Link from invoiceNumber to Concatenate 1 (Part 1)' }),
+      await canvas.findByRole('group', {
+        name: 'Link from invoiceNumber to Concatenate 1 (Part 1)',
+      }),
     ).toBeInTheDocument()
 
     await dragLink(canvasElement, source('orderNumber'), {
@@ -299,7 +297,7 @@ export const ConnectByMouse = meta.story({
     )
 
     await expect(
-      await canvas.findByRole('img', { name: 'Link from Concatenate 1 (Result) to BGM/1004' }),
+      await canvas.findByRole('group', { name: 'Link from Concatenate 1 (Result) to BGM/1004' }),
     ).toBeInTheDocument()
     await waitFor(() =>
       expect(node(canvasElement, 'Concatenate 1').queryByText(/not linked/)).toBeNull(),
@@ -406,7 +404,9 @@ export const LowerConcatenateParts = meta.story({
     const concatenate = await findNode(canvasElement, 'Concatenate 1')
 
     await expect(
-      await canvas.findByRole('img', { name: 'Link from shipTo.city to Concatenate 1 (Part 2)' }),
+      await canvas.findByRole('group', {
+        name: 'Link from shipTo.city to Concatenate 1 (Part 2)',
+      }),
     ).toBeInTheDocument()
 
     await userEvent.click(concatenate.getByRole('button', { name: 'Concatenate 1' }))
@@ -428,7 +428,7 @@ export const LowerConcatenateParts = meta.story({
       ),
     )
     await expect(
-      canvas.queryByRole('img', { name: 'Link from shipTo.city to Concatenate 1 (Part 2)' }),
+      canvas.queryByRole('group', { name: 'Link from shipTo.city to Concatenate 1 (Part 2)' }),
     ).toBeNull()
     await expect(concatenate.queryByRole('button', { name: /Part 2 input/ })).toBeNull()
     await expect(concatenate.getByText('Number of parts must be between 2 and 10.')).toBeVisible()
@@ -441,14 +441,14 @@ export const RemoveTransforms = meta.story({
   async play({ canvas, canvasElement }) {
     await expectTransformCount(canvasElement, 7)
     await expect(
-      await canvas.findByRole('img', { name: 'Link from Constant 1 (Result) to BGM/C002/1001' }),
+      await canvas.findByRole('group', { name: 'Link from Constant 1 (Result) to BGM/C002/1001' }),
     ).toBeInTheDocument()
 
     // By mouse: the node's remove button takes its links along, and focus moves to the next one.
     await userEvent.click(canvas.getByRole('button', { name: 'Remove Constant 1' }))
     await waitFor(() =>
       expect(
-        canvas.queryByRole('img', { name: 'Link from Constant 1 (Result) to BGM/C002/1001' }),
+        canvas.queryByRole('group', { name: 'Link from Constant 1 (Result) to BGM/C002/1001' }),
       ).toBeNull(),
     )
     await waitFor(() => expect(canvas.getByRole('button', { name: 'Substring 1' })).toHaveFocus())
@@ -463,19 +463,20 @@ export const RemoveTransforms = meta.story({
     await pressOn(canvas.getByRole('button', { name: 'Part 2 input of Concatenate 1' }), '{Delete}')
     await waitFor(() =>
       expect(
-        canvas.queryByRole('img', { name: 'Link from shipTo.city to Concatenate 1 (Part 2)' }),
+        canvas.queryByRole('group', { name: 'Link from shipTo.city to Concatenate 1 (Part 2)' }),
       ).toBeNull(),
     )
 
-    // A transform link's own remove button, shown on hover.
-    await userEvent.hover(
-      edgeNamed(canvasElement, 'Link from shipTo.postalCode to Concatenate 1 (Part 1)'),
+    // A transform link's menu removes it.
+    const menu = await openLinkMenuByMouse(
+      canvasElement,
+      'Link from shipTo.postalCode to Concatenate 1 (Part 1)',
     )
-    await userEvent.click(
-      await canvas.findByRole('button', {
-        name: 'Remove link from shipTo.postalCode to Concatenate 1 (Part 1)',
-      }),
-    )
+
+    await expect(
+      menu.getByRole('menuitem', { name: 'Show the Transform Concatenate 1' }),
+    ).toBeVisible()
+    await userEvent.click(menu.getByRole('menuitem', { name: 'Remove link' }))
     await waitFor(() =>
       expect(node(canvasElement, 'Concatenate 1').getByText('2 problems')).toBeVisible(),
     )
@@ -626,7 +627,7 @@ export const German = meta.story({
       numberFormat.getByText('Nachkommastellen: Der Wert muss zwischen 0 und 6 sein.'),
     ).toBeVisible()
     await expect(
-      await canvas.findByRole('img', {
+      await canvas.findByRole('group', {
         name: 'Verknüpfung von invoiceDate zu Datumsformat 1 (Wert)',
       }),
     ).toBeInTheDocument()
@@ -697,15 +698,24 @@ export const Viewer = meta.story({
       await pressOn(row, 'l')
       await pressOn(header, '{Delete}')
       await expectTransformCount(canvasElement, 9)
-      await expect(canvas.getByRole('img', { name: linked })).toBeInTheDocument()
+      await expect(canvas.getByRole('group', { name: linked })).toBeInTheDocument()
       await expect(canvas.queryByText(/^Linking from/)).toBeNull()
 
-      const edge = edgeNamed(canvasElement, linked)
+      const edge = await findLinkLine(canvasElement, linked)
       const path = edge.parentElement!.querySelector<SVGPathElement>('.react-flow__edge-path')!
 
       await userEvent.hover(edge)
       await waitFor(() => expect(path.style.strokeWidth).toBe('2.5'))
-      await expect(canvas.queryByRole('button', { name: /^Remove link/ })).toBeNull()
+
+      // Viewing only, a link's menu shows its ends and removes nothing.
+      const menu = await openLinkMenuByMouse(canvasElement, linked)
+
+      await expect(
+        menu.getByRole('menuitem', { name: 'Show the Transform Date format 1' }),
+      ).toBeVisible()
+      await expect(menu.queryByRole('menuitem', { name: 'Remove link' })).toBeNull()
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
 
       await pressOn(header, '{Enter}')
 

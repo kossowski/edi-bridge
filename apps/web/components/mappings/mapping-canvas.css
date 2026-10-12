@@ -69,3 +69,25 @@
 .mapping-canvas .react-flow__handle.part-handle {
   pointer-events: none;
 }
+
+/* A ring in the text colour, apart from the line by a gap in the canvas colour, marks the focused link. */
+.mapping-canvas .link-focus-ring,
+.mapping-canvas .link-focus-gap {
+  fill: none;
+  stroke: none;
+  pointer-events: none;
+}
+
+.mapping-canvas .react-flow__edge:focus-visible .link-focus-ring {
+  stroke: var(--foreground);
+  stroke-width: 10px;
+}
+
+.mapping-canvas .react-flow__edge:focus-visible .link-focus-gap {
+  stroke: var(--background);
+  stroke-width: 6px;
+}
+
+.mapping-canvas .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke-width: 2.5;
+}

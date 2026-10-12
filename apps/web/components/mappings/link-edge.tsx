@@ -1,25 +1,13 @@
 'use client'
 
-import { Cancel01Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
-import {
-  BaseEdge,
-  type Edge,
-  EdgeLabelRenderer,
-  type EdgeProps,
-  getBezierPath,
-  useStore,
-  type XYPosition,
-} from '@xyflow/react'
-import { useTranslations } from 'next-intl'
-import { createContext, memo, useCallback, useContext, useState } from 'react'
+import { BaseEdge, type Edge, type EdgeProps, getBezierPath, type XYPosition } from '@xyflow/react'
+import { memo } from 'react'
 
-import { useCanvasViewOnly, useCanvasStore } from '@/components/mappings/mapping-canvas-store'
-import { panelGutter } from '@/components/mappings/mapping-tree'
-import { useRemoveText } from '@/components/mappings/use-remove-text'
+import { useCanvasStore } from '@/components/mappings/mapping-canvas-store'
 
+import type { RowLink } from '@/components/mappings/mapping-links'
 import type { CanvasLink } from '@/components/mappings/mapping-tree'
-import type { MappingLink, TransformLink } from '@edi-bridge/contracts'
+import type { LinkStart, TransformLink } from '@edi-bridge/contracts'
 
 export type PlainEdgeData = Omit<CanvasLink, 'id'>
 
@@ -30,154 +18,62 @@ export type LinkEdgeData = (
 
 export type LinkFlowEdge = Edge<LinkEdgeData, 'link'>
 
-export type LinkActions = {
-  remove: (link: MappingLink) => void
-  removeTransformLink: (link: TransformLink) => void
-  // A merged edge stands for several links; they are listed by name before any is removed.
-  show: (edge: PlainEdgeData) => void
+// Links into a collapsed part are drawn as one, which stands for several and removes none.
+export function singleLink(data: LinkEdgeData): RowLink | null {
+  if (data.kind === 'transformLink') {
+    return { kind: 'transformLink', link: data.link }
+  }
+
+  const [only, ...more] = data.links
+
+  return only && more.length === 0 ? { kind: 'link', link: only } : null
 }
 
-export const LinkActionsContext = createContext<LinkActions | null>(null)
-
-function useLinkActions() {
-  const actions = useContext(LinkActionsContext)
-
-  if (!actions) {
-    throw new Error('LinkEdge needs a LinkActionsContext')
-  }
-
-  return actions
+// A link drawn from a collapsed part starts at that part, not at the hidden field inside it.
+export function startOfLink(data: LinkEdgeData): LinkStart {
+  return data.kind === 'link' ? { kind: 'source', path: data.sourcePath } : data.link.from
 }
 
-function EdgeButton({ id, data }: { id: string; data: LinkEdgeData }) {
-  const t = useTranslations('Mapping.links')
-  const removeText = useRemoveText()
-  const actions = useLinkActions()
-  const hoverEdge = useCanvasStore((state) => state.hoverEdge)
-  const leaveEdge = useCanvasStore((state) => state.leaveEdge)
-  const plain = data.kind === 'link' ? data : null
-  const [only] = plain?.links ?? []
-  const single = plain === null || (plain.links.length === 1 && only !== undefined)
-
-  const onClick = () => {
-    if (data.kind === 'transformLink') {
-      actions.removeTransformLink(data.link)
-    } else if (single && only) {
-      actions.remove(only)
-    } else {
-      actions.show(data)
-    }
-  }
-
-  const label = () => {
-    if (data.kind === 'transformLink') {
-      return removeText.linkLabel(data.aiProposed, { source: data.source, target: data.target })
-    }
-
-    return single && only
-      ? removeText.linkLabel(data.aiProposed, { source: only.sourcePath, target: only.targetPath })
-      : t('showLinksLabel', {
-          count: data.links.length,
-          source: data.sourcePath,
-          target: data.targetPath,
-        })
-  }
-
+export function linkElement(container: HTMLElement | null, edgeId: string) {
   return (
-    <button
-      type="button"
-      aria-label={label()}
-      className="nodrag nopan bg-card text-foreground hover:bg-muted focus-visible:ring-ring/50 inline-flex h-7.5 min-w-7.5 items-center justify-center gap-1 rounded-full border px-1.5 text-xs font-medium shadow-sm outline-none focus-visible:ring-3"
-      onBlur={() => leaveEdge(id)}
-      onClick={onClick}
-      onFocus={() => hoverEdge(id)}
-      onMouseEnter={() => hoverEdge(id)}
-      onMouseLeave={() => leaveEdge(id)}>
-      {single ? (
-        <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden className="size-4" />
-      ) : (
-        <span aria-hidden>{t('showLinks', { count: plain?.links.length ?? 1 })}</span>
-      )}
-    </button>
+    container?.querySelector<SVGGElement>(`.react-flow__edge[data-id="${CSS.escape(edgeId)}"]`) ??
+    null
   )
 }
 
-// Screen pixels kept between the button and the pane's border.
-const paneInset = 8
-
-// Screen pixels between the hovered point and the nearer side of the button.
-const pointerGap = 20
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), Math.max(min, max))
+export function linkIdOf(target: EventTarget | null) {
+  return target instanceof Element && target.matches('.react-flow__edge')
+    ? target.getAttribute('data-id')
+    : null
 }
 
-function useSize() {
-  const [size, setSize] = useState({ width: 0, height: 0 })
+const pointsAlongLink = 64
 
-  const ref = useCallback((element: HTMLElement | null) => {
-    if (!element) {
-      return
-    }
-
-    const observer = new ResizeObserver(() =>
-      setSize({ width: element.offsetWidth, height: element.offsetHeight }),
-    )
-
-    observer.observe(element)
-
-    return () => observer.disconnect()
-  }, [])
-
-  return [size, ref] as const
-}
-
-// The button sits where the pointer met the edge and stays inside the pane, so a long edge whose
-// middle is out of view still shows it.
-function EdgeButtonAnchor({
-  id,
-  data,
-  midpoint,
-}: {
-  id: string
-  data: LinkEdgeData
-  midpoint: XYPosition
-}) {
-  const pointer = useCanvasStore((state) => state.edgeAnchor)
-  const at = pointer ?? midpoint
-  const [x, y, zoom] = useStore((state) => state.transform)
-  const paneWidth = useStore((state) => state.width)
-  const paneHeight = useStore((state) => state.height)
-  const [size, measure] = useSize()
-
-  const left = clamp(
-    at.x,
-    (panelGutter - x) / zoom + size.width / 2,
-    (paneWidth - paneInset - x) / zoom - size.width / 2,
-  )
-
-  const minTop = (paneInset - y) / zoom + size.height / 2
-  const maxTop = (paneHeight - paneInset - y) / zoom - size.height / 2
-  const shift = pointerGap / zoom + size.height / 2
-  const above = at.y - shift
-
-  // Beside the pointer, not under it: a click on the edge there must not remove the link.
-  const top = clamp(pointer ? (above >= minTop ? above : at.y + shift) : at.y, minTop, maxTop)
-
+export function insidePane(point: XYPosition, pane: DOMRect) {
   return (
-    <EdgeLabelRenderer>
-      <div
-        ref={measure}
-        className="pointer-events-auto absolute"
-        // Above the edges, which sit on a raised layer so they cross the parts.
-        style={{
-          transform: `translate(-50%, -50%) translate(${left}px, ${top}px)`,
-          zIndex: 1000,
-        }}>
-        <EdgeButton id={id} data={data} />
-      </div>
-    </EdgeLabelRenderer>
+    point.x >= pane.left && point.x <= pane.right && point.y >= pane.top && point.y <= pane.bottom
   )
+}
+
+// The middle of the link's part inside the pane, on the screen; null when none of it is in view.
+export function pointInView(link: Element, pane: DOMRect): XYPosition | null {
+  const path = link.querySelector<SVGPathElement>('.react-flow__edge-path')
+  const matrix = path?.getScreenCTM()
+
+  if (!path || !matrix) {
+    return null
+  }
+
+  const length = path.getTotalLength()
+
+  const inView = Array.from({ length: pointsAlongLink + 1 }, (_, step) => {
+    const { x, y } = path.getPointAtLength((length * step) / pointsAlongLink)
+    const { x: screenX, y: screenY } = new DOMPoint(x, y).matrixTransform(matrix)
+
+    return { x: screenX, y: screenY }
+  }).filter((point) => insidePane(point, pane))
+
+  return inView[Math.floor(inView.length / 2)] ?? null
 }
 
 function LinkEdgeView({
@@ -192,10 +88,11 @@ function LinkEdgeView({
   style,
   interactionWidth = 20,
 }: EdgeProps<LinkFlowEdge>) {
-  const hovered = useCanvasStore((state) => state.hoveredEdge === id)
-  const viewOnly = useCanvasViewOnly()
+  const highlighted = useCanvasStore(
+    (state) => state.hoveredEdge === id || (state.linkMenuOpen && state.linkMenu?.edgeId === id),
+  )
 
-  const [path, labelX, labelY] = getBezierPath({
+  const [path] = getBezierPath({
     sourceX,
     sourceY,
     targetX,
@@ -206,19 +103,18 @@ function LinkEdgeView({
 
   return (
     <>
+      <path d={path} className="link-focus-ring" />
+      <path d={path} className="link-focus-gap" />
       <BaseEdge
         interactionWidth={interactionWidth}
         path={path}
         style={{
           ...style,
           ...(data?.aiProposed && { stroke: 'var(--ai-proposed)', strokeDasharray: '6 3' }),
-          ...(hovered && { strokeWidth: 2.5 }),
-          ...(hovered && !data?.aiProposed && { stroke: 'var(--foreground)' }),
+          ...(highlighted && { strokeWidth: 2.5 }),
+          ...(highlighted && !data?.aiProposed && { stroke: 'var(--foreground)' }),
         }}
       />
-      {hovered && data && !viewOnly && (
-        <EdgeButtonAnchor id={id} data={data} midpoint={{ x: labelX, y: labelY }} />
-      )}
     </>
   )
 }

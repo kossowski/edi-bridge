@@ -63,11 +63,11 @@ export const ReviewOpen = meta.story({
     const rows = await canvas.findAllByRole('button', { name: proposedRow })
 
     await expect(rows.length).toBeGreaterThan(0)
-    await expect(canvas.getAllByRole('img', { name: proposedEdge }).length).toBeGreaterThan(
+    await expect(canvas.getAllByRole('group', { name: proposedEdge }).length).toBeGreaterThan(
       rows.length - 1,
     )
-    await expect(canvas.getAllByRole('img', { name: /^Link from/ }).length).toBeGreaterThan(
-      canvas.getAllByRole('img', { name: proposedEdge }).length,
+    await expect(canvas.getAllByRole('group', { name: /^Link from/ }).length).toBeGreaterThan(
+      canvas.getAllByRole('group', { name: proposedEdge }).length,
     )
 
     const lookup = transformNodeOf(canvasElement, 'Lookup Table 1')
@@ -189,7 +189,7 @@ export const AcceptDraft = meta.story({
     await waitFor(() => expect(done.closest('[role="status"]')).toHaveFocus())
     await expect(canvas.queryByText('AI review open')).toBeNull()
     await expect(aiMarks(canvasElement)).toHaveLength(0)
-    await expect(canvas.queryAllByRole('img', { name: proposedEdge })).toHaveLength(0)
+    await expect(canvas.queryAllByRole('group', { name: proposedEdge })).toHaveLength(0)
     await expect(canvas.queryByText('Accept the draft before publishing.')).toBeNull()
     await expect(canvas.getByRole('button', { name: 'Publish' })).toBeEnabled()
 
@@ -231,14 +231,14 @@ export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas, canvasElement }) {
       await expect(
-        (await canvas.findAllByRole('img', { name: /^Link from/ })).length,
+        (await canvas.findAllByRole('group', { name: /^Link from/ })).length,
       ).toBeGreaterThan(0)
       await expect(canvas.queryByText('AI review open')).toBeNull()
       await expect(canvas.queryByText(/AI proposals? to review$/)).toBeNull()
       await expect(canvas.queryByText('Accept the draft before publishing.')).toBeNull()
       await expect(canvas.queryByRole('button', { name: 'Accept draft' })).toBeNull()
       await expect(canvas.queryAllByRole('button', { name: proposedRow })).toHaveLength(0)
-      await expect(canvas.queryAllByRole('img', { name: proposedEdge })).toHaveLength(0)
+      await expect(canvas.queryAllByRole('group', { name: proposedEdge })).toHaveLength(0)
       await expect(aiMarks(canvasElement)).toHaveLength(0)
 
       await userEvent.click(canvas.getByRole('button', { name: 'Lookup Table 1' }))
@@ -256,7 +256,7 @@ export const LargeVolume = meta.story({
   async play({ canvas, canvasElement }) {
     await findSummary(canvasElement)
     await waitFor(() =>
-      expect(canvas.getAllByRole('img', { name: proposedEdge }).length).toBeGreaterThan(20),
+      expect(canvas.getAllByRole('group', { name: proposedEdge }).length).toBeGreaterThan(20),
     )
   },
 })

@@ -2410,12 +2410,10 @@
       "item": "{source} to {target}",
       "remove": "Remove link",
       "removeLabel": "Remove link from {source} to {target}",
-      "showLinks": "{count, plural, one {# link} other {# links}}",
-      "showLinksLabel": "{count, plural, one {Show the link from {source} to {target}} other {Show the # links from {source} to {target}}}",
       "linkFromHere": "Link from here",
       "linkToHere": "Link to here",
       "cancel": "Cancel link",
-      "shortcut": "Shortcut: press L on a source field or element, a repeating source part, or a Transform output, to start a link, and L on a target or a Transform input to finish it. Delete removes the only link of a part, a Transform input or a Transform output, or a selected Transform.",
+      "shortcut": "Shortcut: press L on a source field or element, a repeating source part, or a Transform output, to start a link, and L on a target or a Transform input to finish it. Delete removes the only link of a part, a Transform input or a Transform output, or a selected Transform. On a link, the arrow keys move to the other links, and Enter, Space, Shift+F10 or the menu key opens its actions.",
       "pending": "Linking from {source}. Select a target and choose Link to here, or press L on it. Press Escape to cancel.",
       "started": "Linking from {source}. Move to a target and press L, or select it and choose Link to here.",
       "cancelled": "Link from {source} cancelled.",
@@ -2432,7 +2430,17 @@
       "removeFailed": "Removing the link from {source} to {target} could not be saved, so the link is back. Try again.",
       "saving": "Saving…",
       "saved": "Saved",
-      "saveFailed": "Not saved"
+      "saveFailed": "Not saved",
+      "menu": {
+        "hint": "The arrow keys move to the other links. Enter, Space, Shift+F10 or the menu key opens the actions of the link.",
+        "link": "Link",
+        "links": "{count, plural, one {# link} other {# links}}",
+        "names": "{source} → {target}",
+        "showLinks": "{count, plural, one {Show the link} other {Show the # links}}",
+        "showSource": "Show {name} in the source",
+        "showTarget": "Show {name} in the target",
+        "showTransform": "Show the Transform {name}"
+      }
     },
     "desktopOnly": {
       "title": "The Mapping canvas needs a larger screen",

@@ -407,7 +407,7 @@ export const LoopByKeyboard = meta.story({
     await waitFor(() => expect(items.closest('[data-link-target]')).not.toBeNull())
     await pressOn(items, 'l')
     await expect(
-      await canvas.findByRole('img', {
+      await canvas.findByRole('group', {
         name: 'Link from lines[] to Loop over line items 1 (Items)',
       }),
     ).toBeInTheDocument()
@@ -422,7 +422,9 @@ export const LoopByKeyboard = meta.story({
     ).toBeNull()
     await pressOn(sg25, 'l')
     await expect(
-      await canvas.findByRole('img', { name: 'Link from Loop over line items 1 (Items) to SG25' }),
+      await canvas.findByRole('group', {
+        name: 'Link from Loop over line items 1 (Items) to SG25',
+      }),
     ).toBeInTheDocument()
     await waitFor(() =>
       expect(
@@ -452,7 +454,7 @@ export const LoopByMouse = meta.story({
       handle: 'in:items',
     })
     await expect(
-      await canvas.findByRole('img', {
+      await canvas.findByRole('group', {
         name: 'Link from lines[] to Loop over line items 1 (Items)',
       }),
     ).toBeInTheDocument()
@@ -463,13 +465,15 @@ export const LoopByMouse = meta.story({
       target('SG25'),
     )
     await expect(
-      await canvas.findByRole('img', { name: 'Link from Loop over line items 1 (Items) to SG25' }),
+      await canvas.findByRole('group', {
+        name: 'Link from Loop over line items 1 (Items) to SG25',
+      }),
     ).toBeInTheDocument()
 
     // Fields beneath the parts then link per item.
     await dragLink(canvasElement, source('lines[].quantity'), target('SG25/QTY+47/C186/6060'))
     await expect(
-      await canvas.findByRole('img', {
+      await canvas.findByRole('group', {
         name: 'Link from lines[].quantity to SG25/QTY+47/C186/6060',
       }),
     ).toBeInTheDocument()

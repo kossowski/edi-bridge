@@ -19,7 +19,6 @@ import {
 } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
 import {
-  type MouseEvent,
   type ReactNode,
   type Ref,
   useCallback,
@@ -33,11 +32,12 @@ import {
 import { proposedLinkCount, useAiMarks } from '@/components/mappings/ai-marks'
 import { type GraphText, useGraphText } from '@/components/mappings/graph-text'
 import {
-  LinkActionsContext,
-  type LinkActions,
   LinkEdge,
   type LinkFlowEdge,
+  singleLink,
+  startOfLink,
 } from '@/components/mappings/link-edge'
+import { LinkMenu, type LinkMenuActions } from '@/components/mappings/link-menu'
 import {
   detailsShown,
   LinkableRowsContext,
@@ -93,6 +93,8 @@ import {
   panelGutter,
   rowOfNodeId,
   type Side,
+  transformNodeId,
+  transformOfNodeId,
   type TreeItem,
   type TreeRow,
 } from '@/components/mappings/mapping-tree'
@@ -133,6 +135,8 @@ import {
   TreeNode,
   type TreeFlowNode,
 } from '@/components/mappings/tree-node'
+import { useLinkMenu } from '@/components/mappings/use-link-menu'
+import { useLinkTabStop } from '@/components/mappings/use-link-tab-stop'
 import { whenRendered } from '@/components/mappings/when-rendered'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import { transformPorts } from '@edi-bridge/contracts'
@@ -173,13 +177,6 @@ const plainNode = { 'aria-roledescription': undefined, 'aria-describedby': undef
 
 // Above the edges, which cross the trees, so a link passing behind a transform does not hide it.
 const transformLayer = 200
-
-const transformPrefix = 'transform:'
-
-const transformNodeId = (id: string) => `${transformPrefix}${id}`
-
-const transformOfNodeId = (id: string) =>
-  id.startsWith(transformPrefix) ? id.slice(transformPrefix.length) : null
 
 // Kept in the space between the trees, two columns wide.
 const transformExtent: [[number, number], [number, number]] = [
@@ -359,6 +356,14 @@ function DetailsPanel({
     </div>
   )
 }
+
+// A link takes the focus, so the keyboard opens its menu; above the trees, so it crosses the parts.
+// It stays a group: as a button, axe counts its whole box as a target crowding the rows' buttons.
+const menuEdge = {
+  focusable: true,
+  zIndex: 100,
+  domAttributes: { 'aria-roledescription': undefined },
+} satisfies Partial<LinkFlowEdge>
 
 // Focus moves once the change has rendered, when the button it goes to exists.
 function afterRender(focus: () => void) {
@@ -592,8 +597,7 @@ export function MappingCanvas({
           targetHandle: to.handle,
           data: { kind: 'transformLink', link, ...names, aiProposed },
           selectable: false,
-          focusable: false,
-          zIndex: 100,
+          ...menuEdge,
           ariaLabel: edgeLabel(t('link', names), aiProposed ? 1 : 0, 1),
         },
       ]
@@ -737,8 +741,7 @@ export function MappingCanvas({
           aiProposed: proposed === merged.length,
         },
         selectable: false,
-        focusable: false,
-        zIndex: 100,
+        ...menuEdge,
         ariaLabel: edgeLabel(label, proposed, merged.length),
       }
     })
@@ -772,17 +775,6 @@ export function MappingCanvas({
     target.title,
     text,
   ])
-
-  // A point outside the pane, like the 0,0 of a synthetic event, is on no visible part of the
-  // edge; the button then falls back to the edge's middle.
-  const pointOf = (event: MouseEvent) => {
-    const pane = container.current?.getBoundingClientRect()
-    const { clientX: x, clientY: y } = event
-
-    return pane && x >= pane.left && x <= pane.right && y >= pane.top && y <= pane.bottom
-      ? flow.current?.screenToFlowPosition({ x, y })
-      : undefined
-  }
 
   const onInit = useCallback((instance: ReactFlowInstance<CanvasNode, LinkFlowEdge>) => {
     flow.current = instance
@@ -1111,25 +1103,69 @@ export function MappingCanvas({
     [focusAfterRemoval, graph, removeButtons, removeTransformById, save, store, transformButton],
   )
 
-  const edgeActions = useMemo(
-    (): LinkActions => ({
-      remove: (removed) => removeRowLink({ kind: 'link', link: removed }),
-      removeTransformLink: (removed) => removeRowLink({ kind: 'transformLink', link: removed }),
-      show: (edge) => {
-        store.getState().select(rowListingLinks(edge))
-        store.getState().openDetails()
+  const linkMenuActions = useMemo((): LinkMenuActions => {
+    const removeButton = () => detailsBody.current?.querySelector<HTMLElement>('[data-remove-link]')
 
-        const removeButton = () =>
-          detailsBody.current?.querySelector<HTMLElement>('[data-remove-link]')
+    const showRow = (row: RowRef, focus = () => focusRow(row)) => {
+      store.getState().select(row)
+      store.getState().openDetails()
+      focus()
+    }
 
-        whenRendered(
-          () => Boolean(removeButton()),
-          () => removeButton()?.focus(),
+    return {
+      // Editing, the focus goes to the remove button of the first link listed.
+      showLinks: (edge) => {
+        const row = rowListingLinks(edge)
+
+        showRow(
+          row,
+          viewOnly
+            ? undefined
+            : () =>
+                whenRendered(
+                  () => Boolean(removeButton()),
+                  () => removeButton()?.focus(),
+                ),
         )
       },
-    }),
-    [detailsBody, removeRowLink, store],
-  )
+      showRow: (row) => showRow(row),
+      showTransform: (transformId) => {
+        store.getState().selectTransform(transformId)
+        afterRender(() => transformButton({ kind: 'header', transformId })?.focus())
+      },
+      remove: (data, linkFocused) => {
+        const removed = singleLink(data)
+
+        if (!removed) {
+          return
+        }
+
+        removeRowLink(removed)
+
+        // The link takes its focus with it, so it moves to where the link started.
+        if (!linkFocused) {
+          return
+        }
+
+        const start = startOfLink(data)
+
+        if (start.kind === 'source') {
+          focusRow({ side: 'source', path: start.path })
+        } else {
+          afterRender(() =>
+            transformButton({
+              kind: 'output',
+              transformId: start.transformId,
+              port: start.output,
+            })?.focus(),
+          )
+        }
+      },
+    }
+  }, [detailsBody, focusRow, removeRowLink, store, transformButton, viewOnly])
+
+  const { openLinkMenu, target: linkMenuTarget } = useLinkMenu(container, edges, text)
+  const edgesWithTabStop = useLinkTabStop(container, flow, edges)
 
   // A taken target or input is no valid drop, so the drag does not mark it as one.
   const isValidConnection = useCallback<IsValidConnection<LinkFlowEdge>>(
@@ -1441,51 +1477,54 @@ export function MappingCanvas({
               })
             }}>
             <div className="absolute inset-0">
-              <LinkActionsContext value={edgeActions}>
-                <TransformActionsContext value={transformActions}>
-                  <LinkableRowsContext value={rows}>
-                    <ReactFlow<CanvasNode, LinkFlowEdge>
-                      ariaLabelConfig={{
-                        'controls.ariaLabel': t('controls.panel'),
-                        'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
-                        'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
-                        'controls.fitView.ariaLabel': t('controls.fitView'),
-                      }}
-                      attributionPosition="bottom-left"
-                      deleteKeyCode={null}
-                      edges={edges}
-                      edgesFocusable={false}
-                      edgesReconnectable={false}
-                      edgeTypes={edgeTypes}
-                      elementsSelectable={false}
-                      isValidConnection={isValidConnection}
-                      maxZoom={1.5}
-                      minZoom={0.2}
-                      nodes={nodes}
-                      nodesConnectable={!viewOnly}
-                      nodesDraggable={false}
-                      nodesFocusable={false}
-                      nodeTypes={nodeTypes}
-                      panOnScroll
-                      zoomOnDoubleClick={false}
-                      aria-label={label}
-                      onConnect={onConnect}
-                      onConnectEnd={onConnectEnd}
-                      onConnectStart={onConnectStart}
-                      // A click shows the remove button too, for pointers that cannot hover.
-                      onEdgeClick={(event, edge) => hoverEdge(edge.id, pointOf(event))}
-                      onEdgeMouseEnter={(event, edge) => hoverEdge(edge.id, pointOf(event))}
-                      onEdgeMouseLeave={(_, edge) => leaveEdge(edge.id)}
-                      onInit={onInit}
-                      onNodeDrag={onNodeDrag}
-                      onNodeDragStop={onNodeDragStop}
-                      onPaneClick={clearSelection}>
-                      <Background gap={16} variant={BackgroundVariant.Dots} />
-                      <Controls position="top-left" showInteractive={false} />
-                    </ReactFlow>
-                  </LinkableRowsContext>
-                </TransformActionsContext>
-              </LinkActionsContext>
+              <TransformActionsContext value={transformActions}>
+                <LinkableRowsContext value={rows}>
+                  <ReactFlow<CanvasNode, LinkFlowEdge>
+                    ariaLabelConfig={{
+                      'controls.ariaLabel': t('controls.panel'),
+                      'controls.zoomIn.ariaLabel': t('controls.zoomIn'),
+                      'controls.zoomOut.ariaLabel': t('controls.zoomOut'),
+                      'controls.fitView.ariaLabel': t('controls.fitView'),
+                      'edge.a11yDescription.default': tLinks('menu.hint'),
+                    }}
+                    attributionPosition="bottom-left"
+                    deleteKeyCode={null}
+                    edges={edgesWithTabStop}
+                    edgesReconnectable={false}
+                    edgeTypes={edgeTypes}
+                    elementsSelectable={false}
+                    isValidConnection={isValidConnection}
+                    maxZoom={1.5}
+                    minZoom={0.2}
+                    nodes={nodes}
+                    nodesConnectable={!viewOnly}
+                    nodesDraggable={false}
+                    nodesFocusable={false}
+                    nodeTypes={nodeTypes}
+                    panOnScroll
+                    zoomOnDoubleClick={false}
+                    aria-label={label}
+                    onConnect={onConnect}
+                    onConnectEnd={onConnectEnd}
+                    onConnectStart={onConnectStart}
+                    onEdgeClick={(event, edge) =>
+                      openLinkMenu(edge.id, { x: event.clientX, y: event.clientY })
+                    }
+                    onEdgeContextMenu={(event, edge) => {
+                      event.preventDefault()
+                      openLinkMenu(edge.id, { x: event.clientX, y: event.clientY })
+                    }}
+                    onEdgeMouseEnter={(_, edge) => hoverEdge(edge.id)}
+                    onEdgeMouseLeave={(_, edge) => leaveEdge(edge.id)}
+                    onInit={onInit}
+                    onNodeDrag={onNodeDrag}
+                    onNodeDragStop={onNodeDragStop}
+                    onPaneClick={clearSelection}>
+                    <Background gap={16} variant={BackgroundVariant.Dots} />
+                    <Controls position="top-left" showInteractive={false} />
+                  </ReactFlow>
+                </LinkableRowsContext>
+              </TransformActionsContext>
             </div>
           </div>
           <DetailsPanel
@@ -1505,6 +1544,7 @@ export function MappingCanvas({
       </div>
       <MeaningTooltip />
       <LinkHints text={text} />
+      <LinkMenu actions={linkMenuActions} target={linkMenuTarget} />
     </div>
   )
 }
