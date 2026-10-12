@@ -39,7 +39,8 @@
       "unavailableDescription": "Your session details could not be loaded. You can still sign out.",
       "loading": "Loading session…",
       "redirecting": "Your session has ended. Opening the sign-in page…"
-    }
+    },
+    "toasts": "Messages"
   },
   "Sidebar": {
     "groups": {
@@ -122,7 +123,6 @@
     "details": "Details",
     "new": "New",
     "edit": "Edit",
-    "versions": "Versions",
     "compare": "Compare"
   },
   "Navigation": {
@@ -2201,7 +2201,6 @@
       "unpublishedChanges": "Unpublished changes since Version {version}",
       "published": "No changes since Version {version}"
     },
-    "versionsLink": "Mapping Versions",
     "publish": {
       "button": "Publish",
       "title": "Publish the Draft as Version {version}?",
@@ -2216,6 +2215,53 @@
         "incomplete": "The Draft cannot be published yet: every link and Transform must be complete. Complete them, then publish again.",
         "reviewOpen": "The Draft cannot be published while its AI review is open. Accept the draft first, then publish.",
         "failed": "The Draft could not be published. Try again."
+      }
+    },
+    "versions": {
+      "title": "Versions & problems",
+      "close": "Close versions and problems",
+      "description": "The published versions of this Mapping and the documents that failed with it.",
+      "neverPublished": "Not published yet, so no document route uses this Mapping.",
+      "notLive": "Version {version} is the latest. No document route uses this Mapping yet.",
+      "live": "Version {version} is live for {partners}.",
+      "heading": "Versions",
+      "loading": "Loading the versions",
+      "empty": "Nothing published yet. Once the Draft is published, each version appears here with its change note and who published it.",
+      "error": {
+        "title": "Versions unavailable",
+        "description": "The versions could not be loaded. Try again.",
+        "retry": "Try again"
+      },
+      "version": "Version {version}",
+      "liveMark": "Live",
+      "published": "Published <time></time> by {name}",
+      "noNote": "No note",
+      "usedBy": "{count, plural, one {Used by # document route:} other {Used by # document routes:}}",
+      "route": "{route} · {partner}",
+      "unused": "No document route uses this version.",
+      "compare": "Compare with previous<hidden> (version {version})</hidden>",
+      "restore": {
+        "button": "Restore into Draft<hidden> (version {version})</hidden>",
+        "reviewOpen": "A version can be restored once the AI review is done.",
+        "title": "Restore version {version} into the Draft?",
+        "description": "This overwrites the links and Transforms of the Draft with those of version {version}. Nothing goes live until you publish.",
+        "confirm": "Restore version {version}",
+        "pending": "Restoring…",
+        "cancel": "Cancel",
+        "done": "Version {version} restored into the Draft. It goes live once you publish.",
+        "problem": {
+          "reviewOpen": "No version can be restored while the AI review of the Draft is open. Accept the AI draft first, then restore.",
+          "failed": "The version could not be restored. Try again."
+        }
+      },
+      "failed": {
+        "title": "Failed documents, last 7 days",
+        "loading": "Loading the failed documents",
+        "none": "None.",
+        "error": "The failed documents could not be loaded.",
+        "retry": "Try again",
+        "detail": "{stage} · <time></time>",
+        "more": "Showing the latest {shown} of {total}."
       }
     },
     "aiDraft": {
@@ -2780,35 +2826,6 @@
       "description": "The target Document this Mapping makes of an example document, with the links as they are now.",
       "close": "Close preview"
     }
-  },
-  "MappingVersions": {
-    "title": "Mapping Versions",
-    "heading": "Versions of {name}",
-    "openDraft": "Open the Draft",
-    "caption": "Mapping Versions, newest first",
-    "loading": "Loading Mapping Versions",
-    "count": "{count, plural, one {# Mapping Version} other {# Mapping Versions}}",
-    "filteredCount": "{count} of {total} Mapping Versions",
-    "search": "Search by version number",
-    "noMatch": "No Mapping Version matches the search.",
-    "version": "Version {version}",
-    "latest": "Latest",
-    "columns": {
-      "version": "Version",
-      "publishedAt": "Published"
-    },
-    "empty": {
-      "title": "No Mapping Versions yet",
-      "description": "The Draft of this Mapping was never published. Publish it on the canvas to create Version 1, which Flows can then be pinned to.",
-      "viewOnlyDescription": "The Draft of this Mapping was never published. Version 1 appears here once an Admin publishes it."
-    },
-    "error": {
-      "title": "Mapping Versions unavailable",
-      "description": "The Mapping Versions could not be loaded. Try again.",
-      "retry": "Try again"
-    },
-    "compare": "Compare versions",
-    "compareWith": "Compare with Version {version}"
   },
   "MappingComparison": {
     "title": "Compare Mapping Versions",

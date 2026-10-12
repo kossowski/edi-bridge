@@ -94,20 +94,16 @@ export const UnpublishedChanges = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('Unpublished changes since Version 3')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Publish' })).toBeEnabled()
-    await expect(canvas.getByRole('link', { name: 'Mapping Versions' })).toHaveAttribute(
-      'href',
-      `/mappings/${changed.id}/versions`,
-    )
   },
 })
 
 export const KeyboardFocus = meta.story({
   async play({ canvas }) {
-    const link = await canvas.findByRole('link', { name: 'Mapping Versions' })
+    const publish = await canvas.findByRole('button', { name: 'Publish' })
 
     await userEvent.tab()
-    await expect(link).toHaveFocus()
-    await expect(getComputedStyle(link).boxShadow).not.toBe('none')
+    await expect(publish).toHaveFocus()
+    await expect(getComputedStyle(publish).boxShadow).not.toBe('none')
   },
 })
 

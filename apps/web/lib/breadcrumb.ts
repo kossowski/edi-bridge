@@ -10,7 +10,7 @@ import {
 
 import type { SearchParamsReader } from './search-params'
 
-const subpageKeys = ['new', 'edit', 'versions', 'compare'] as const
+const subpageKeys = ['new', 'edit', 'compare'] as const
 
 type SubpageKey = (typeof subpageKeys)[number]
 
@@ -46,6 +46,7 @@ function sidebarSections() {
 
 const sections = new Map<string, Section>([
   ...sidebarSections(),
+  ['mappings', { ...itemSection('mappings'), skip: ['versions'] }],
   ...pageItems.map(({ key, href }): [string, Section] => [
     href.slice(1),
     { label: { kind: 'page', key }, href },

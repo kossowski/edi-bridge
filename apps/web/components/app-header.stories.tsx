@@ -258,7 +258,7 @@ export const Viewer = meta.story({
 
 export const German = meta.story({
   decorators: [german],
-  parameters: { nextjs: { navigation: { pathname: '/mappings/m-1/versions' } } },
+  parameters: { nextjs: { navigation: { pathname: '/mappings/m-1/versions/compare' } } },
   beforeEach({ msw }) {
     msw.use(...sessionHandlers(showcaseViewerSession), tasksHandler(apiUrl, 'empty'))
   },
@@ -275,7 +275,7 @@ export const German = meta.story({
     ).toBeVisible()
     await expect(canvas.getByRole('navigation', { name: 'Navigationspfad' })).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Details' })).toBeVisible()
-    await expect(canvas.getByRole('link', { name: 'Versionen' })).toHaveAttribute(
+    await expect(canvas.getByRole('link', { name: 'Vergleichen' })).toHaveAttribute(
       'aria-current',
       'page',
     )
@@ -324,7 +324,6 @@ export const Tablet = meta.story({
       canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
     ).toBeVisible()
     await expect(canvas.queryByRole('link', { name: 'Mappings' })).toBeNull()
-    await expect(canvas.queryByRole('link', { name: 'Versions' })).toBeNull()
 
     await userEvent.click(canvas.getByRole('button', { name: 'Show the whole path' }))
     await waitFor(async () =>
@@ -334,7 +333,6 @@ export const Tablet = meta.story({
         }),
       ).toBeVisible(),
     )
-    await expect(screen.getByRole('menuitem', { name: 'Versions' })).toBeVisible()
     await expect(screen.getByRole('menuitem', { name: 'Mappings' })).toBeVisible()
   },
 })

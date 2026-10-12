@@ -1,10 +1,9 @@
 'use client'
 
-import { CloudUploadIcon, WorkHistoryIcon } from '@hugeicons/core-free-icons'
+import { CloudUploadIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import Link from 'next/link'
 import { useRef, useState } from 'react'
 
 import {
@@ -19,7 +18,7 @@ import { useGraphSaveState } from '@/components/mappings/use-save-graph'
 import { ApiError, publishMappingDraft } from '@/lib/api/client'
 import { mappingDraftQuery, storePublishedMappingVersion } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
-import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
+import { Button } from '@edi-bridge/ui/components/button'
 import {
   Dialog,
   DialogClose,
@@ -49,23 +48,6 @@ export function DraftStateLabel({ draft, id }: { draft: VersionFacts; id?: strin
           : t(`state.${state.kind}`, { version: state.version })}
       </StateBadge>
     </span>
-  )
-}
-
-export function MappingVersionsLink({ mappingId }: { mappingId: string }) {
-  const t = useTranslations('Mapping')
-
-  return (
-    <ToolbarAction
-      icon={<HugeiconsIcon icon={WorkHistoryIcon} strokeWidth={2} aria-hidden />}
-      label={t('versionsLink')}
-      render={
-        <Link
-          href={`/mappings/${mappingId}/versions`}
-          className={buttonVariants({ variant: 'outline' })}
-        />
-      }
-    />
   )
 }
 
@@ -120,7 +102,6 @@ export function PublishDraft({
         className="absolute end-0 top-full mt-1 text-sm whitespace-nowrap text-emerald-800 outline-none empty:hidden dark:text-emerald-300">
         {justPublished && t('done', { version: publishedVersion })}
       </p>
-      <MappingVersionsLink mappingId={draft.mappingId} />
       <Dialog
         open={open}
         onOpenChange={(next) => {

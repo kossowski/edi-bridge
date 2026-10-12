@@ -12,7 +12,7 @@ import {
   startedRun,
 } from '@/components/mappings/ai-draft-run'
 import { aiBudgetExhaustedProblemOf, isAiReviewOpen, streamAiDraft } from '@/lib/api/client'
-import { aiKeys, mappingDraftQuery, storeAiBudget, storeAiDraftedDraft } from '@/lib/api/queries'
+import { aiKeys, mappingDraftQuery, storeAiBudget, storeReplacedDraft } from '@/lib/api/queries'
 
 export type AiDraftRunControls = ReturnType<typeof useAiDraftRun>
 
@@ -50,7 +50,7 @@ export function useAiDraftRun(mappingId: string) {
         signal: controller.signal,
         onEvent: (event) => {
           if (event.type === 'drafted') {
-            storeAiDraftedDraft(queryClient, event.draft)
+            storeReplacedDraft(queryClient, event.draft)
           }
 
           if (event.type !== 'step') {

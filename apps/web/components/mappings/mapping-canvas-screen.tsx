@@ -22,14 +22,11 @@ import {
 } from '@/components/mappings/mapping-canvas-store'
 import { MappingPreviewSheet } from '@/components/mappings/mapping-preview-panel'
 import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
-import {
-  DraftStateLabel,
-  MappingVersionsLink,
-  PublishDraft,
-} from '@/components/mappings/publish-draft'
+import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
+import { VersionsSheet } from '@/components/mappings/versions-sheet'
 import { whenRendered } from '@/components/mappings/when-rendered'
 import { useDesktop } from '@/hooks/use-desktop'
 import { useSession } from '@/hooks/use-session'
@@ -233,10 +230,9 @@ export function MappingCanvasScreen({ id }: { id: string }) {
               )}
               <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
               <DetailsAction draft={draft} />
-              {canChange ? (
+              <VersionsSheet draft={draft} />
+              {canChange && (
                 <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
-              ) : (
-                <MappingVersionsLink mappingId={id} />
               )}
             </>
           )

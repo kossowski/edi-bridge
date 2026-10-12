@@ -683,7 +683,7 @@ export const Viewer = meta.story({
       await expect(canvas.queryByRole('region', { name: 'Add a Transform' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Add / })).toBeNull()
       await expect(canvas.queryByRole('button', { name: 'Publish' })).toBeNull()
-      await expect(canvas.getByRole('link', { name: 'Mapping Versions' })).toBeVisible()
+      await expect(canvas.getByRole('button', { name: 'Versions & problems' })).toBeVisible()
       await expect(canvas.queryByRole('button', { name: /^Remove / })).toBeNull()
       await expect(
         dateFormat.queryByRole('button', { name: 'Value input of Date format 1' }),

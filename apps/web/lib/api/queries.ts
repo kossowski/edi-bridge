@@ -415,7 +415,7 @@ export function storeAcceptedAiDraft(queryClient: QueryClient, draft: MappingDra
   queryClient.setQueryData(mappingDraftQuery(draft.mappingId).queryKey, draft)
 }
 
-export function storeAiDraftedDraft(queryClient: QueryClient, draft: MappingDraft) {
+export function storeReplacedDraft(queryClient: QueryClient, draft: MappingDraft) {
   const { queryKey } = mappingDraftQuery(draft.mappingId)
 
   void queryClient.cancelQueries({ queryKey })

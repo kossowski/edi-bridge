@@ -80,6 +80,7 @@ import {
   reprocessRunEndpoint,
   resetSandboxWorkspaceEndpoint,
   revokeInviteEndpoint,
+  restoreMappingVersionEndpoint,
   retryRunEndpoint,
   type SaveMappingDraftBody,
   sessionEndpoint,
@@ -357,6 +358,12 @@ export function publishMappingDraft(mappingId: string, body: PublishMappingDraft
   return request(publishMappingDraftEndpoint, {
     path: toPath(publishMappingDraftEndpoint.path, { mappingId }),
     body,
+  })
+}
+
+export function restoreMappingVersion(mappingId: string, versionId: string) {
+  return request(restoreMappingVersionEndpoint, {
+    path: toPath(restoreMappingVersionEndpoint.path, { mappingId, versionId }),
   })
 }
 
