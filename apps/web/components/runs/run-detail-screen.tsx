@@ -8,30 +8,19 @@ import Link from 'next/link'
 
 import { AppPage } from '@/components/app-page'
 import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
-import { MessageTree } from '@/components/runs/message-tree'
-import { RawInterchange } from '@/components/runs/raw-interchange'
+import { PositionText } from '@/components/documents/error-position'
+import { MessageTree } from '@/components/documents/message-tree'
+import { RawInterchange } from '@/components/documents/raw-interchange'
+import { StepTimings } from '@/components/documents/step-timings'
 import { shortId } from '@/components/runs/run-link'
 import { RunRemedyPanel } from '@/components/runs/run-remedy-panel'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
-import { RunTimeline } from '@/components/runs/run-timeline'
 import { ApiError } from '@/lib/api/client'
 import { runQuery } from '@/lib/api/queries'
 import { interchangeHref, runHref } from '@/lib/navigation'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { ErrorPosition, RunDetail } from '@edi-bridge/contracts'
-
-function PositionText({ position }: { position: ErrorPosition }) {
-  const t = useTranslations('RunDetail.failure')
-
-  return [
-    t('segment', { segment: position.segment, tag: position.tag }),
-    position.element !== null && t('element', { element: position.element }),
-    position.component !== null && t('component', { component: position.component }),
-  ]
-    .filter(Boolean)
-    .join(', ')
-}
+import type { RunDetail } from '@edi-bridge/contracts'
 
 function RunFacts({ run }: { run: RunDetail }) {
   const t = useTranslations('RunDetail')
@@ -144,7 +133,7 @@ function RunDetailView({ run }: { run: RunDetail }) {
       <RunRemedyPanel run={run} />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Section id="run-steps" title={t('steps.title')}>
-          <RunTimeline steps={run.steps} />
+          <StepTimings steps={run.steps} />
         </Section>
         <Section id="run-raw" title={t('raw.title')}>
           {run.interchange ? (

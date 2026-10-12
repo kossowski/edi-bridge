@@ -358,7 +358,7 @@ export const Delivered = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'All good, nothing to do' }),
     ).toBeVisible()
-    await expect(canvas.getByText(/^Received/)).toBeVisible()
+    await expect(canvas.getByText('Received', { selector: 'span:has(> time)' })).toBeVisible()
     await expect(
       canvas.getByText(
         `This purchase order from ${partner.name} was translated and passed to your ERP.`,

@@ -3,9 +3,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
+import { Suspense } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { linkClass, LoadFailure, Loading } from '@/components/detail-parts'
+import { DocumentPathCard } from '@/components/documents/document-path-card'
+import { DocumentTabs } from '@/components/documents/document-tabs'
 import { DocumentVerdict } from '@/components/documents/document-verdict'
 import { RunActionResultAlert } from '@/components/documents/problem-actions'
 import { ProblemCard } from '@/components/documents/problem-card'
@@ -46,6 +49,10 @@ function DocumentView({ run }: { run: RunDetail }) {
     <AppPage meta={<DocumentHeader run={run} />} name={title}>
       <RunActionResultAlert run={run} />
       {run.status === 'failed' ? <ProblemCard run={run} /> : <DocumentVerdict run={run} />}
+      <DocumentPathCard run={run} />
+      <Suspense>
+        <DocumentTabs run={run} />
+      </Suspense>
     </AppPage>
   )
 }

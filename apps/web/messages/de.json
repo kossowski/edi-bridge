@@ -712,6 +712,132 @@
         "descriptionWithoutReference": "{direction, select, inbound {{tradingPartner} hat diese Datei ein zweites Mal gesendet. EDI Bridge hat sie erkannt und nicht erneut weitergegeben, damit Ihr ERP den Auftrag nur einmal hat.} other {Ihr ERP hat diesen Beleg ein zweites Mal erstellt. EDI Bridge hat ihn erkannt und nicht erneut gesendet, damit {tradingPartner} den Auftrag nur einmal hat.}}",
         "original": "Ursprünglichen Beleg öffnen"
       }
+    },
+    "path": {
+      "title": "Der Weg dieses Belegs",
+      "description": "Zeigen Sie auf einen Schritt oder wählen Sie ihn mit der Tastatur an, um zu sehen, was er bedeutet.",
+      "step": {
+        "received": "Empfangen",
+        "read": "Gelesen",
+        "checked": "Geprüft",
+        "translated": "Übersetzt",
+        "delivered": "Zugestellt"
+      },
+      "hint": {
+        "received": "{direction, select, inbound {Der Beleg ist von {tradingPartner} bei EDI Bridge angekommen.} other {Ihr ERP hat den Beleg an EDI Bridge übergeben.}}",
+        "read": "EDI Bridge hat die Datei geöffnet und ihren Aufbau verstanden.",
+        "checked": "EDI Bridge hat geprüft, dass der Inhalt den Regeln für diese Belegart folgt.",
+        "translated": "{direction, select, inbound {EDI Bridge hat den Beleg in das Format Ihres ERP übersetzt.} other {EDI Bridge hat Ihre Daten in das Format übersetzt, das {tradingPartner} erwartet.}}",
+        "delivered": "{direction, select, inbound {EDI Bridge hat den Beleg an Ihr ERP übergeben.} other {EDI Bridge hat den Beleg an {tradingPartner} gesendet.}}"
+      },
+      "state": {
+        "done": "erledigt",
+        "failed": "hier fehlgeschlagen",
+        "running": "läuft",
+        "pending": "noch nicht",
+        "skipped": "übersprungen",
+        "notReached": "nicht erreicht"
+      },
+      "stepName": "{step}: {state}"
+    },
+    "tabs": {
+      "label": "Details zum Beleg",
+      "summary": "Übersicht",
+      "content": "Inhalt",
+      "technical": "Technische Details"
+    },
+    "summary": {
+      "label": "Übersicht",
+      "whatItIs": "Was es ist",
+      "order": "Auftrag",
+      "noOrder": "Keine Bestellnummer",
+      "tradingPartner": "Handelspartner",
+      "direction": "Richtung",
+      "directionValue": "{direction, select, inbound {Eingehend: von {tradingPartner} an Ihr ERP} other {Ausgehend: von Ihrem ERP an {tradingPartner}}}",
+      "mapping": "Mapping",
+      "mappingVersion": "Version {version}",
+      "notTranslated": "Noch nicht übersetzt",
+      "route": "Belegweg",
+      "receivedAt": "{direction, select, inbound {Empfangen} other {Erstellt}}",
+      "source": "Herkunft",
+      "uploaded": "Von Hand hochgeladen",
+      "connection": "Über eine Verbindung"
+    },
+    "content": {
+      "description": "Eine lesbare Ansicht der Positionen in diesem Beleg.",
+      "label": "Positionen des Belegs",
+      "lineCount": "{count, plural, one {# Position} other {# Positionen}}",
+      "column": {
+        "line": "Pos.",
+        "item": "Artikel",
+        "gtin": "Artikelnummer (GTIN)",
+        "quantity": "Menge",
+        "unit": "Einheit",
+        "amount": "Betrag"
+      },
+      "missing": "fehlt",
+      "noTranslation": "keine Übersetzung",
+      "empty": {
+        "title": "Keine Positionen",
+        "noLines": "Dieser Beleg hat keine Positionen.",
+        "failed": "EDI Bridge konnte diesen Beleg nicht lesen oder übersetzen, daher sind seine Positionen unbekannt. Die technischen Details zeigen, was schiefging.",
+        "notYet": "Die Positionen erscheinen, sobald EDI Bridge den Beleg gelesen hat."
+      }
+    },
+    "technical": {
+      "facts": {
+        "label": "Technische Details",
+        "failedStep": "Fehlgeschlagener Schritt",
+        "noFailure": "Keiner",
+        "errorCode": "Fehlercode",
+        "errorMessage": "Fehlermeldung",
+        "position": "Position",
+        "noPosition": "Nicht zutreffend",
+        "mappingVersion": "Mapping-Version",
+        "mappingVersionValue": "{mappingName}, Version {version}",
+        "notTranslated": "Noch nicht übersetzt",
+        "transmission": "Übertragung",
+        "transmissionLink": "Kontrollreferenz {controlReference}",
+        "noTransmission": "Noch keine erzeugt",
+        "replaces": "Ersetzt",
+        "replacedBy": "Ersetzt durch",
+        "documentLink": "Beleg {id}",
+        "id": "Beleg-ID"
+      },
+      "position": {
+        "segment": "Segment {segment} ({tag})",
+        "element": "Datenelement {element}",
+        "component": "Komponente {component}"
+      },
+      "steps": {
+        "title": "Dauer der Schritte",
+        "status": {
+          "succeeded": "Erfolgreich",
+          "failed": "Fehlgeschlagen",
+          "running": "Läuft",
+          "pending": "Ausstehend",
+          "skipped": "Übersprungen"
+        },
+        "failedHere": "Hier fehlgeschlagen"
+      },
+      "raw": {
+        "title": "Übertragung im Original",
+        "label": "Übertragung im Original, ein Segment pro Zeile",
+        "errorPosition": "Fehlerposition",
+        "emptyValue": "leer",
+        "positionMissing": "Die Fehlerposition liegt nicht in dieser Übertragung.",
+        "none": "Dieser Beleg hat noch keine Übertragung erzeugt."
+      },
+      "tree": {
+        "title": "Gelesene Nachricht",
+        "label": "Segmente der Nachricht",
+        "heading": "Nachricht {reference}, {messageType}",
+        "element": "Datenelement {number}",
+        "component": "Komponente {number}",
+        "empty": "leer",
+        "unparsed": "Die Nachricht konnte nicht gelesen werden. Die Übertragung zeigt die Fehlerposition.",
+        "none": "Dieser Beleg hat noch keine gelesene Nachricht."
+      }
     }
   },
   "Runs": {
@@ -766,28 +892,10 @@
     "runLink": "Run {id}",
     "failure": {
       "title": "Fehler",
-      "code": "Code {code}",
-      "segment": "Segment {segment} ({tag})",
-      "element": "Datenelement {element}",
-      "component": "Komponente {component}"
+      "code": "Code {code}"
     },
     "steps": {
-      "title": "Schritte",
-      "stage": {
-        "receipt": "Empfang",
-        "parse": "Parsen",
-        "validation": "Validierung",
-        "mapping": "Mapping",
-        "delivery": "Zustellung"
-      },
-      "status": {
-        "succeeded": "Erfolgreich",
-        "failed": "Fehlgeschlagen",
-        "running": "Läuft",
-        "pending": "Ausstehend",
-        "skipped": "Übersprungen"
-      },
-      "failedHere": "Failure Stage"
+      "title": "Schritte"
     },
     "remedy": {
       "title": "Abhilfe",
@@ -821,18 +929,10 @@
     },
     "raw": {
       "title": "Rohes Interchange",
-      "label": "Rohes Interchange, ein Segment pro Zeile",
-      "errorPosition": "Fehlerposition",
-      "emptyValue": "leer",
-      "positionMissing": "Die Fehlerposition liegt nicht in diesem Interchange.",
       "none": "Dieser Run hat noch kein Interchange erzeugt."
     },
     "tree": {
       "title": "Geparste Message",
-      "heading": "Message {reference}, {messageType}",
-      "element": "Datenelement {number}",
-      "component": "Komponente {number}",
-      "empty": "leer",
       "unparsed": "Die Message konnte nicht geparst werden. Das rohe Interchange zeigt die Fehlerposition.",
       "none": "Dieser Run hat noch keine geparste Message."
     }
