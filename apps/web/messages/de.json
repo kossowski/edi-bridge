@@ -343,6 +343,19 @@
       "action": "Handelspartner öffnen"
     }
   },
+  "TaskBell": {
+    "title": "Aufgaben",
+    "label": "{count, plural, =0 {Aufgaben, nichts offen} other {Aufgaben, {shownCount} offen}}",
+    "counts": {
+      "you": "{count} von Ihnen zu beheben",
+      "retry": "{count} erneut zu versuchen",
+      "tradingPartner": "{count, plural, one {# wartet} other {# warten}} auf einen Handelspartner"
+    },
+    "newest": "Die neuesten {shown} von {count}",
+    "loading": "Aufgaben werden geladen",
+    "error": "Die Aufgaben konnten nicht geladen werden. Öffnen Sie die Aufgabenseite, um es erneut zu versuchen.",
+    "all": "Alle Aufgaben öffnen"
+  },
   "PlainNames": {
     "messageType": {
       "ORDERS": {

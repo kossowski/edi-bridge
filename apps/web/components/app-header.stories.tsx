@@ -4,8 +4,15 @@ import { AppHeader } from '@/components/app-header'
 import { HeaderTabs, headerTabsId } from '@/components/header-tabs'
 import { sessionHandlers } from '@/components/session/session-story-helpers'
 import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
+import { everyKind } from '@/components/tasks/task-story-helpers'
 import { useBreadcrumbName } from '@/hooks/use-breadcrumb-name'
-import { sandboxAdminSession, seedSession, showcaseViewerSession } from '@edi-bridge/mocks'
+import { apiUrl } from '@/lib/api/config'
+import {
+  sandboxAdminSession,
+  seedSession,
+  showcaseViewerSession,
+  tasksHandler,
+} from '@edi-bridge/mocks'
 import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
@@ -55,6 +62,9 @@ const meta = preview.meta({
       </SidebarProvider>
     ),
   ],
+  beforeEach({ msw }) {
+    msw.use(tasksHandler(apiUrl, everyKind()))
+  },
 })
 
 export const Admin = meta.story({
@@ -73,11 +83,17 @@ export const Admin = meta.story({
     await expect(headerActions(canvasElement)).toContainElement(
       canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
     )
+    await expect(headerActions(canvasElement)).toContainElement(
+      await canvas.findByRole('button', { name: 'Tasks, 5 open' }),
+    )
   },
 })
 
 export const Operator = meta.story({
-  parameters: { nextjs: { navigation: { pathname: '/operator/workspaces/ws-1' } } },
+  parameters: {
+    a11y: { context: 'body' },
+    nextjs: { navigation: { pathname: '/operator/workspaces/ws-1' } },
+  },
   beforeEach({ msw }) {
     msw.use(...sessionHandlers(seedSession))
   },
@@ -87,6 +103,16 @@ export const Operator = meta.story({
     await expect(canvas.getByRole('link', { name: 'Operator area' })).toHaveAttribute(
       'href',
       '/operator',
+    )
+
+    await userEvent.click(await canvas.findByRole('button', { name: 'Tasks, 5 open' }))
+    const popover = await screen.findByRole('dialog')
+
+    await waitFor(() => expect(popover).toBeVisible())
+    await expect(within(popover).getAllByRole('listitem')).toHaveLength(5)
+    await expect(within(popover).getByRole('link', { name: 'Open all tasks' })).toHaveAttribute(
+      'href',
+      '/tasks',
     )
   },
 })
@@ -234,10 +260,13 @@ export const German = meta.story({
   decorators: [german],
   parameters: { nextjs: { navigation: { pathname: '/mappings/m-1/versions' } } },
   beforeEach({ msw }) {
-    msw.use(...sessionHandlers(showcaseViewerSession))
+    msw.use(...sessionHandlers(showcaseViewerSession), tasksHandler(apiUrl, 'empty'))
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('Nur ansehen')).toBeVisible()
+    await expect(
+      await canvas.findByRole('button', { name: 'Aufgaben, nichts offen' }),
+    ).toBeVisible()
     await expect(
       canvas.getByRole('button', { name: 'Aufträge, Handelspartner, Belege, Seiten suchen …' }),
     ).toBeVisible()

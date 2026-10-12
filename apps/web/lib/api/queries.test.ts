@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 
+import { type Task } from '@edi-bridge/contracts'
 import {
   createTradingPartner,
   publishedVersionsOf,
@@ -22,6 +23,7 @@ import {
   mappingDraftQuery,
   mappingsQuery,
   mappingVersionsQuery,
+  newestTasksFirst,
   storeCreatedMapping,
   storePublishedMappingVersion,
   storeSavedDocumentStructure,
@@ -125,5 +127,36 @@ describe('forgetDeletedLookupTable', () => {
 
     expect(queryClient.getQueryState(lookupTableQuery(deleted.id).queryKey)).toBeUndefined()
     expect(queryClient.getQueryState(lookupTablesQuery.queryKey)?.isInvalidated).toBe(true)
+  })
+})
+
+describe('newestTasksFirst', () => {
+  function partnerTask(id: string, at: string): Task {
+    return {
+      id,
+      kind: 'failingTradingPartner',
+      whoActs: 'you',
+      tradingPartner: { id: '10000000-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' },
+      at,
+      delivered: 1,
+      failed: 4,
+      target: { kind: 'tradingPartner', tradingPartnerId: '10000000-0000-4000-8000-000000000001' },
+    }
+  }
+
+  it('orders the tasks by time, newest first, and keeps the counts', () => {
+    const counts = { you: 3, retry: 0, tradingPartner: 0 }
+
+    const sorted = newestTasksFirst({
+      counts,
+      tasks: [
+        partnerTask('older', '2026-10-10T08:00:00Z'),
+        partnerTask('newest', '2026-10-11T09:30:00.000Z'),
+        partnerTask('middle', '2026-10-11T08:00:00Z'),
+      ],
+    })
+
+    expect(sorted.tasks.map((task) => task.id)).toEqual(['newest', 'middle', 'older'])
+    expect(sorted.counts).toBe(counts)
   })
 })

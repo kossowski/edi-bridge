@@ -343,6 +343,19 @@
       "action": "Open partner"
     }
   },
+  "TaskBell": {
+    "title": "Tasks",
+    "label": "{count, plural, =0 {Tasks, nothing open} other {Tasks, {shownCount} open}}",
+    "counts": {
+      "you": "{count} for you to fix",
+      "retry": "{count} to try again",
+      "tradingPartner": "{count} waiting for a partner"
+    },
+    "newest": "Showing the newest {shown} of {count}",
+    "loading": "Loading tasks",
+    "error": "The tasks could not be loaded. Open the tasks page to try again.",
+    "all": "Open all tasks"
+  },
   "PlainNames": {
     "messageType": {
       "ORDERS": {

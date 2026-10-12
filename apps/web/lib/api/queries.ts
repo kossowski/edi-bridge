@@ -22,6 +22,7 @@ import type {
   MessageType,
   OverviewWindow,
   RunListQuery,
+  Tasks,
   TradingPartner,
   WorkspaceSettings,
   WorkspaceSummary,
@@ -195,9 +196,17 @@ export const taskKeys = {
   all: () => ['tasks'] as const,
 }
 
+export function newestTasksFirst(data: Tasks): Tasks {
+  return {
+    ...data,
+    tasks: data.tasks.toSorted((a, b) => Date.parse(b.at) - Date.parse(a.at)),
+  }
+}
+
 export const tasksQuery = queryOptions({
   queryKey: taskKeys.all(),
   queryFn: getTasks,
+  select: newestTasksFirst,
 })
 
 export const orderLifecycleKeys = {
