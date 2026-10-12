@@ -783,6 +783,7 @@
     "tabs": {
       "label": "Bereiche des Partners",
       "overview": "Übersicht",
+      "documents": "Belege",
       "connections": "Verbindungen",
       "settings": "Einstellungen"
     },
@@ -827,7 +828,7 @@
       "actions": {
         "identity": "GLN Ihres Unternehmens erfassen",
         "connections": "Verbindung hinzufügen",
-        "documents": "Belegweg hinzufügen",
+        "documents": "Belegart hinzufügen",
         "testInterchange": "Testbeleg senden",
         "sending": "Wird gesendet…",
         "resend": "Test erneut senden",
@@ -880,6 +881,48 @@
       "openInterchange": "Übertragung {controlReference} öffnen",
       "more": "{shown} von {total} werden angezeigt.",
       "showAll": "Alle Belege anzeigen, die Aufmerksamkeit brauchen"
+    },
+    "documents": {
+      "loading": "Belegarten werden geladen",
+      "error": {
+        "title": "Belegarten nicht verfügbar",
+        "description": "Die Belegarten konnten nicht geladen werden. Versuchen Sie es erneut.",
+        "retry": "Erneut versuchen"
+      },
+      "title": "Belege, die Sie mit {name} austauschen",
+      "description": "Jede Belegart hat ihren eigenen <term>Belegweg</term>: die Verbindungen, auf denen sie ankommt und geht, und das Mapping, das sie übersetzt.",
+      "list": "Belegarten mit {name}",
+      "add": "Belegart hinzufügen",
+      "empty": {
+        "title": "Noch keine Belegarten",
+        "description": "Fügen Sie die erste hinzu, zum Beispiel die Bestellungen, die {name} Ihnen sendet.",
+        "viewOnlyDescription": "Belegarten erscheinen hier, sobald ein Admin eine hinzufügt."
+      },
+      "way": {
+        "inbound": "{name} sendet diese an Sie",
+        "outbound": "Sie senden diese an {name}"
+      },
+      "route": "Belegweg",
+      "connections": "Verbindungen",
+      "connectionPath": "Von <from></from> an <to></to>",
+      "unknownChannel": "einer unbekannten Verbindung",
+      "mapping": "Mapping",
+      "mappingVersion": "<link>{mapping}</link>, Version {version}",
+      "newer": {
+        "available": "{count, plural, one {Eine neuere Version des Mappings ist verfügbar: Version {latest}.} other {# neuere Versionen des Mappings sind verfügbar, bis Version {latest}.}}",
+        "kept": "Die Belege verwenden weiter Version {version}, bis Sie sie umstellen."
+      },
+      "move": {
+        "button": "Auf Version {version} umstellen",
+        "for": "für {route}",
+        "title": "Auf Version {version} von {mapping} umstellen?",
+        "description": "{route} verwendet heute Version {current}. Belege, die nach der Umstellung ankommen, verwenden Version {version}. Bereits verarbeitete Belege behalten ihre Version.",
+        "confirm": "Auf Version {version} umstellen",
+        "cancel": "Abbrechen",
+        "pending": "Wird umgestellt…",
+        "failed": "Der Belegweg konnte nicht umgestellt werden. Versuchen Sie es erneut.",
+        "done": "{route} verwendet jetzt Version {version}."
+      }
     },
     "settings": {
       "title": "Partnerdaten",
@@ -959,6 +1002,70 @@
             "hint": "Prüfen Sie die Adresse. Stimmt sie, bitten Sie die IT der Gegenseite, das Protokoll ihres Servers anzusehen."
           }
         }
+      }
+    },
+    "addDocument": {
+      "title": "Belegart hinzufügen",
+      "description": "Beantworten Sie drei Fragen: welcher Beleg, welche Verbindung und welches Mapping ihn übersetzt.",
+      "close": "Schließen",
+      "document": {
+        "label": "Welcher Beleg?",
+        "inbound": "{name} sendet diese an Sie.",
+        "outbound": "Sie senden diese an {name}.",
+        "existing": "Schon eingerichtet"
+      },
+      "connection": {
+        "label": {
+          "inbound": "Wo kommen sie von {name} an?",
+          "outbound": "Wo gehen sie an {name}?"
+        },
+        "none": {
+          "inbound": "Noch keine Verbindung empfängt Belege von {name}. Fügen Sie zuerst eine hinzu, dann die Belegart.",
+          "outbound": "Noch keine Verbindung sendet Belege an {name}. Fügen Sie zuerst eine hinzu, dann die Belegart."
+        },
+        "add": "Verbindung hinzufügen",
+        "own": {
+          "label": {
+            "inbound": "Welches Ihrer Systeme empfängt sie?",
+            "outbound": "Aus welchem Ihrer Systeme kommen sie?"
+          },
+          "only": {
+            "inbound": "Sie gehen über {channel} weiter an Ihre Systeme.",
+            "outbound": "Sie kommen über {channel} aus Ihren Systemen."
+          },
+          "none": {
+            "inbound": "Noch keines Ihrer Systeme kann diese Belege empfangen. Fügen Sie unter <link>Alle Verbindungen</link> eine Verbindung hinzu.",
+            "outbound": "Noch keines Ihrer Systeme kann diese Belege senden. Fügen Sie unter <link>Alle Verbindungen</link> eine Verbindung hinzu."
+          }
+        }
+      },
+      "mapping": {
+        "label": "Welches Mapping übersetzt sie?",
+        "loading": "Mappings werden geladen…",
+        "failed": "Die Mappings konnten nicht geladen werden. Sie können trotzdem ein neues mit KI erstellen.",
+        "ai": {
+          "title": "Ein neues mit KI erstellen",
+          "description": "Die KI entwirft das Mapping aus einem Beispielbeleg. Sie prüfen und veröffentlichen es, bevor ein Beleg es verwendet."
+        }
+      },
+      "routeName": {
+        "inbound": "{document} von {name}",
+        "outbound": "{document} an {name}"
+      },
+      "create": "Belegart hinzufügen",
+      "creating": "Wird hinzugefügt…",
+      "createMapping": "Mapping erstellen",
+      "creatingMapping": "Wird erstellt…",
+      "cancel": "Abbrechen",
+      "added": "{document} sind jetzt mit {name} eingerichtet.",
+      "failed": "Die Belegart konnte nicht hinzugefügt werden. Versuchen Sie es erneut.",
+      "mappingFailed": "Das Mapping konnte nicht erstellt werden. Versuchen Sie es erneut.",
+      "noDataFormat": "Ihr Workspace hat noch kein Datenformat, in das übersetzt werden kann. Fügen Sie zuerst eines hinzu und erstellen Sie dann das Mapping.",
+      "drafting": {
+        "created": "Das Mapping {mapping} ist erstellt.",
+        "next": "Die KI entwirft es im Mapping-Editor aus einem Beispielbeleg. Sobald Sie es geprüft und veröffentlicht haben, fügen Sie „{document}“ hier erneut hinzu und wählen das Mapping.",
+        "open": "Mapping öffnen und mit KI entwerfen",
+        "done": "Fertig"
       }
     },
     "addConnection": {

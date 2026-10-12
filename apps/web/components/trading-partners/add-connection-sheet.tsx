@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { type FormEvent, type ReactNode, type RefObject, useId, useRef, useState } from 'react'
+import { type FormEvent, type ReactNode, type RefObject, useRef, useState } from 'react'
 
 import {
   ChannelKindFields,
@@ -18,6 +18,7 @@ import {
 import { WebhookTokenReveal } from '@/components/channels/webhook-token'
 import { CopyableValue } from '@/components/copy-button'
 import { TextField } from '@/components/form-field'
+import { ChoiceCards } from '@/components/trading-partners/choice-cards'
 import {
   defaultKindKey,
   kindKeysTravelling,
@@ -26,9 +27,7 @@ import {
 import { createChannel } from '@/lib/api/client'
 import { storeSavedChannel, tradingPartnerKeys } from '@/lib/api/queries'
 import { type CreatedChannel, type Direction, directions } from '@edi-bridge/contracts'
-import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
-import { RadioGroup, RadioGroupItem } from '@edi-bridge/ui/components/radio-group'
 import {
   Sheet,
   SheetContent,
@@ -38,65 +37,6 @@ import {
 } from '@edi-bridge/ui/components/sheet'
 
 import type { TradingPartner } from '@edi-bridge/contracts'
-
-type Choice<Value extends string> = {
-  value: Value
-  title: string
-  description: string
-  badge?: string | undefined
-}
-
-function ChoiceCards<Value extends string>({
-  label,
-  value,
-  items,
-  onChange,
-}: {
-  label: string
-  value: Value | null
-  items: ReadonlyArray<Choice<Value>>
-  onChange: (value: Value) => void
-}) {
-  const id = useId()
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span id={`${id}-label`} className="text-sm font-medium">
-        {label}
-      </span>
-      <RadioGroup
-        value={value}
-        aria-labelledby={`${id}-label`}
-        className="flex flex-col gap-2"
-        onValueChange={(next) => {
-          const item = items.find((candidate) => candidate.value === next)
-
-          if (item) {
-            onChange(item.value)
-          }
-        }}>
-        {items.map((item) => (
-          <label
-            key={item.value}
-            className="has-data-checked:border-primary has-data-checked:bg-muted/50 grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 gap-y-0.5 rounded-lg border p-3">
-            <RadioGroupItem
-              value={item.value}
-              aria-describedby={`${id}-${item.value}`}
-              className="mt-0.5"
-            />
-            <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
-              {item.title}
-              {item.badge && <Badge variant="secondary">{item.badge}</Badge>}
-            </span>
-            <span id={`${id}-${item.value}`} className="text-muted-foreground col-start-2 text-sm">
-              {item.description}
-            </span>
-          </label>
-        ))}
-      </RadioGroup>
-    </div>
-  )
-}
 
 function CreatedWebhook({
   created,

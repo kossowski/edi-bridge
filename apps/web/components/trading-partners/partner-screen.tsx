@@ -8,6 +8,7 @@ import { AppPage } from '@/components/app-page'
 import { LoadFailure } from '@/components/detail-parts'
 import { HeaderTabs } from '@/components/header-tabs'
 import { PartnerConnections } from '@/components/trading-partners/partner-connections-panel'
+import { PartnerDocuments } from '@/components/trading-partners/partner-documents-panel'
 import { PartnerLoading, PartnerOverview } from '@/components/trading-partners/partner-overview'
 import { awaitsReceiptConfirmation } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSettings } from '@/components/trading-partners/partner-settings'
@@ -21,7 +22,12 @@ import type { TradingPartner } from '@edi-bridge/contracts'
 
 export const receiptConfirmationPollMs = 3000
 
-const partnerTabs = [{ value: 'overview' }, { value: 'connections' }, { value: 'settings' }] as const
+const partnerTabs = [
+  { value: 'overview' },
+  { value: 'documents' },
+  { value: 'connections' },
+  { value: 'settings' },
+] as const
 
 type PartnerTab = (typeof partnerTabs)[number]['value']
 
@@ -29,16 +35,38 @@ function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner.tabs')
   const [tab, changeTab] = useUrlTab(partnerTabs, 'overview')
   const [addingConnection, setAddingConnection] = useState(false)
+  const [addingDocument, setAddingDocument] = useState(false)
 
   function addConnection() {
+    setAddingDocument(false)
     changeTab('connections')
     setAddingConnection(true)
+  }
+
+  function addDocument() {
+    changeTab('documents')
+    setAddingDocument(true)
   }
 
   function panel(value: PartnerTab) {
     switch (value) {
       case 'overview':
-        return <PartnerOverview tradingPartner={tradingPartner} onAddConnection={addConnection} />
+        return (
+          <PartnerOverview
+            tradingPartner={tradingPartner}
+            onAddConnection={addConnection}
+            onAddDocument={addDocument}
+          />
+        )
+      case 'documents':
+        return (
+          <PartnerDocuments
+            addingDocument={addingDocument}
+            tradingPartner={tradingPartner}
+            onAddConnection={addConnection}
+            onAddingDocumentChange={setAddingDocument}
+          />
+        )
       case 'connections':
         return (
           <PartnerConnections

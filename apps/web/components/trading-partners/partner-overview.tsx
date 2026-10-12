@@ -281,7 +281,8 @@ export function PartnerLoading({ label }: { label: string }) {
 export function PartnerOverview({
   tradingPartner,
   onAddConnection,
-}: PartnerPanelProps & { onAddConnection: () => void }) {
+  onAddDocument,
+}: PartnerPanelProps & { onAddConnection: () => void; onAddDocument: () => void }) {
   const t = useTranslations('TradingPartner')
   const activity = useQuery(tradingPartnerActivityQuery(tradingPartner.id))
 
@@ -304,7 +305,11 @@ export function PartnerOverview({
 
   return (
     <div className="flex flex-col gap-4">
-      <PartnerSetupCard {...props} onAddConnection={onAddConnection} />
+      <PartnerSetupCard
+        {...props}
+        onAddConnection={onAddConnection}
+        onAddDocument={onAddDocument}
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         <DaysCard {...props} />
         <FlowsCard {...props} />
