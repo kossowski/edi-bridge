@@ -6,7 +6,7 @@ import {
   latestMappingVersions,
   newDocumentFlow,
   newestVersion,
-  partnerDocuments,
+  partnerFlows,
 } from './partner-documents'
 
 const partner = '10000000-0000-4000-8000-000000000001'
@@ -23,7 +23,7 @@ function version(mappingId: string, number: number, mappingName = `Mapping ${map
   }
 }
 
-describe('partnerDocuments', () => {
+describe('partnerFlows', () => {
   it('keeps the partner’s Flows in Message Type order, then by name', () => {
     const flows = [
       { id: '1', name: 'Invoices', messageType: 'INVOIC', tradingPartnerId: partner },
@@ -33,11 +33,11 @@ describe('partnerDocuments', () => {
       { id: '5', name: 'Dispatch', messageType: 'DESADV', tradingPartnerId: partner },
     ] as const
 
-    expect(partnerDocuments(flows, partner).map(({ id }) => id)).toEqual(['4', '2', '5', '1'])
+    expect(partnerFlows(flows, partner).map(({ id }) => id)).toEqual(['4', '2', '5', '1'])
   })
 
   it('returns nothing for a partner without Flows', () => {
-    expect(partnerDocuments([], partner)).toEqual([])
+    expect(partnerFlows([], partner)).toEqual([])
   })
 })
 

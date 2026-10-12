@@ -13,7 +13,7 @@ import {
 
 export const aiMappingChoice = 'ai'
 
-export function partnerDocuments<
+export function partnerFlows<
   Item extends Pick<FlowSummary, 'tradingPartnerId' | 'messageType' | 'name'>,
 >(flows: ReadonlyArray<Item>, tradingPartnerId: string): Item[] {
   return flows
@@ -25,7 +25,6 @@ export function partnerDocuments<
     )
 }
 
-// The partner's side of a Flow is where its documents arrive from, or where yours leave to.
 export function partnerSideField(messageType: MessageType): FlowChannelField {
   return directionOf({ messageType }) === 'inbound' ? 'inboundChannelId' : 'destinationChannelId'
 }
@@ -53,17 +52,9 @@ export function documentConnections<
 export function latestMappingVersions(
   versions: ReadonlyArray<MappingVersionSummary>,
 ): MappingVersionSummary[] {
-  const latest = new Map<string, MappingVersionSummary>()
-
-  for (const version of versions) {
-    const current = latest.get(version.mappingId)
-
-    if (!current || version.version > current.version) {
-      latest.set(version.mappingId, version)
-    }
-  }
-
-  return [...latest.values()].sort((a, b) => a.mappingName.localeCompare(b.mappingName, 'de'))
+  return [...Map.groupBy(versions, (version) => version.mappingId).values()]
+    .flatMap((group) => newestVersion(group) ?? [])
+    .sort((a, b) => a.mappingName.localeCompare(b.mappingName, 'de'))
 }
 
 export function chosenOrOnly<Value>(

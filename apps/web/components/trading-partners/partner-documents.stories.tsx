@@ -153,6 +153,26 @@ export const MoveToNewerMappingVersion = meta.story({
     const moved = await documentItem(canvasElement, behindPartner.name, behind.name)
     await expect(moved.queryByRole('button', { name: /^Move to version/ })).toBeNull()
     await expect(moved.getByText(new RegExp(`, version ${newestOfBehind.version}$`))).toBeVisible()
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('heading', { name: `Documents you exchange with ${behindPartner.name}` }),
+      ).toHaveFocus(),
+    )
+  },
+})
+
+export const CancelMove = meta.story({
+  ...at(behindPartner, 'documents'),
+  async play({ canvasElement }) {
+    const item = await documentItem(canvasElement, behindPartner.name, behind.name)
+    const button = item.getByRole('button', { name: /^Move to version/ })
+    await userEvent.click(button)
+
+    const dialog = within(await sheetOf(canvasElement, /^Move to version/, 'alertdialog'))
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Cancel' })).toHaveFocus())
+    await userEvent.keyboard('{Escape}')
+
+    await waitFor(() => expect(button).toHaveFocus())
   },
 })
 
@@ -281,7 +301,9 @@ export const AddDocumentWithAi = meta.story({
     await userEvent.click(await sheet.findByRole('radio', { name: /^Create a new one with AI/ }))
     await userEvent.click(sheet.getByRole('button', { name: 'Create the mapping' }))
 
-    await expect(await sheet.findByText(/^The mapping .+ is created\.$/)).toBeVisible()
+    const created = await sheet.findByText(/^The mapping .+ is created\.$/)
+    await expect(created).toBeVisible()
+    await waitFor(() => expect(created).toHaveFocus())
     await expect(sheet.getByText(/add “Dispatch advices” here again/)).toBeVisible()
     await expect(
       sheet.getByRole('link', { name: 'Open the mapping and draft with AI' }),

@@ -5,7 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { type FormEvent, type RefObject, useEffect, useRef, useState } from 'react'
+import { type FormEvent, type RefObject, useLayoutEffect, useRef, useState } from 'react'
 
 import { channelAddress } from '@/components/channels/channel-parts'
 import { linkClass } from '@/components/detail-parts'
@@ -45,7 +45,7 @@ import {
 
 import type { TradingPartner } from '@edi-bridge/contracts'
 
-type DocumentChoice = (typeof newMappingMessageTypes)[number]
+type NewMappingMessageType = (typeof newMappingMessageTypes)[number]
 
 type Drafting = { mapping: MappingSummary; document: string }
 
@@ -53,7 +53,7 @@ function DraftingMapping({ drafting, onDone }: { drafting: Drafting; onDone: () 
   const t = useTranslations('TradingPartner.addDocument.drafting')
   const created = useRef<HTMLParagraphElement>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     created.current?.focus()
   }, [])
 
@@ -119,7 +119,7 @@ function DocumentRouteForm({
   onAddConnection,
 }: {
   tradingPartner: TradingPartner
-  messageType: DocumentChoice
+  messageType: NewMappingMessageType
   channels: ReadonlyArray<Channel>
   onAdded: (status: string) => void
   onDrafting: (drafting: Drafting) => void
@@ -136,7 +136,7 @@ function DocumentRouteForm({
   const document = plainNames.messageTypeName(messageType, true)
   const [partnerChoice, setPartnerChoice] = useState<string | null>(null)
   const [ownChoice, setOwnChoice] = useState<string | null>(null)
-  const [mappingChoice, setMappingChoice] = useState<string | null>(null)
+  const [chosenMappingVersion, setChosenMappingVersion] = useState<string | null>(null)
   const versions = useQuery(publishedMappingVersionsQuery(messageType))
 
   const add = useMutation({
@@ -168,8 +168,8 @@ function DocumentRouteForm({
   const ownChannelId = chosenOrOnly(ownChoice, ownChannelIds)
   const ownChannel = connections.own.length === 1 ? connections.own[0] : undefined
   const mappings = latestMappingVersions(versions.data ?? [])
-  const mappingId = mappingChoice ?? mappings[0]?.id ?? aiMappingChoice
-  const withAi = mappingId === aiMappingChoice
+  const mappingVersionChoice = chosenMappingVersion ?? mappings[0]?.id ?? aiMappingChoice
+  const withAi = mappingVersionChoice === aiMappingChoice
   const ready = partnerChannelId !== null && ownChannelId !== null && !versions.isPending
   const noDataFormat = draft.error instanceof ApiError && draft.error.status === 422
 
@@ -193,7 +193,7 @@ function DocumentRouteForm({
         messageType,
         partnerChannelId,
         ownChannelId,
-        mappingVersionId: mappingId,
+        mappingVersionId: mappingVersionChoice,
       }),
     )
   }
@@ -280,8 +280,8 @@ function DocumentRouteForm({
               },
             ]}
             label={t('mapping.label')}
-            value={mappingId}
-            onChange={setMappingChoice}
+            value={mappingVersionChoice}
+            onChange={setChosenMappingVersion}
           />
         </div>
       )}
@@ -315,7 +315,7 @@ function DocumentRouteForm({
 function AddDocumentForm({
   tradingPartner,
   channels,
-  documents,
+  flows,
   onAdded,
   onDrafting,
   onCancel,
@@ -323,19 +323,19 @@ function AddDocumentForm({
 }: {
   tradingPartner: TradingPartner
   channels: ReadonlyArray<Channel>
-  documents: ReadonlyArray<Flow>
+  flows: ReadonlyArray<Flow>
   onAdded: (status: string) => void
   onDrafting: (drafting: Drafting) => void
   onCancel: () => void
   onAddConnection: () => void
 }) {
   const t = useTranslations('TradingPartner.addDocument')
-  const [messageType, setMessageType] = useState<DocumentChoice | null>(null)
+  const [messageType, setMessageType] = useState<NewMappingMessageType | null>(null)
 
   return (
     <div className="flex flex-col gap-6">
       <DocumentChoices
-        documents={documents}
+        flows={flows}
         tradingPartner={tradingPartner}
         value={messageType}
         onChange={setMessageType}
@@ -362,14 +362,14 @@ function AddDocumentForm({
 
 function DocumentChoices({
   tradingPartner,
-  documents,
+  flows,
   value,
   onChange,
 }: {
   tradingPartner: TradingPartner
-  documents: ReadonlyArray<Flow>
-  value: DocumentChoice | null
-  onChange: (value: DocumentChoice) => void
+  flows: ReadonlyArray<Flow>
+  value: NewMappingMessageType | null
+  onChange: (value: NewMappingMessageType) => void
 }) {
   const t = useTranslations('TradingPartner.addDocument.document')
   const plainNames = usePlainNames()
@@ -380,9 +380,7 @@ function DocumentChoices({
         value: messageType,
         title: plainNames.messageTypeName(messageType, true),
         description: t(directionOf({ messageType }), { name: tradingPartner.name }),
-        badge: documents.some((flow) => flow.messageType === messageType)
-          ? t('existing')
-          : undefined,
+        badge: flows.some((flow) => flow.messageType === messageType) ? t('existing') : undefined,
       }))}
       label={t('label')}
       value={value}
@@ -394,7 +392,7 @@ function DocumentChoices({
 export function AddDocumentSheet({
   tradingPartner,
   channels,
-  documents,
+  flows,
   open,
   onOpenChange,
   onAdded,
@@ -403,7 +401,7 @@ export function AddDocumentSheet({
 }: {
   tradingPartner: TradingPartner
   channels: ReadonlyArray<Channel>
-  documents: ReadonlyArray<Flow>
+  flows: ReadonlyArray<Flow>
   open: boolean
   onOpenChange: (open: boolean) => void
   onAdded: (status: string) => void
@@ -437,7 +435,7 @@ export function AddDocumentSheet({
           ) : (
             <AddDocumentForm
               channels={channels}
-              documents={documents}
+              flows={flows}
               tradingPartner={tradingPartner}
               onAddConnection={onAddConnection}
               onAdded={(status) => {

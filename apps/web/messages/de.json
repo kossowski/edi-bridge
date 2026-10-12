@@ -904,7 +904,7 @@
       },
       "route": "Belegweg",
       "connections": "Verbindungen",
-      "connectionPath": "Von <from></from> an <to></to>",
+      "connectionPath": "Von <from></from> nach <to></to>",
       "unknownChannel": "einer unbekannten Verbindung",
       "mapping": "Mapping",
       "mappingVersion": "<link>{mapping}</link>, Version {version}",

@@ -1,16 +1,11 @@
 'use client'
 
-import {
-  Add01Icon,
-  ArrowUp02Icon,
-  CheckmarkCircle02Icon,
-  File02Icon,
-} from '@hugeicons/core-free-icons'
+import { Add01Icon, ArrowUp02Icon, File02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { type ReactNode, type RefObject, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
 import { ListEmpty } from '@/components/list-table'
@@ -18,8 +13,9 @@ import { LoadError } from '@/components/load-error'
 import { MessageTypeName } from '@/components/plain-names'
 import { Term } from '@/components/term'
 import { AddDocumentSheet } from '@/components/trading-partners/add-document-sheet'
-import { newestVersion, partnerDocuments } from '@/components/trading-partners/partner-documents'
+import { newestVersion, partnerFlows } from '@/components/trading-partners/partner-documents'
 import { type PartnerPanelProps } from '@/components/trading-partners/partner-page-helpers'
+import { PanelLoading, StatusLine } from '@/components/trading-partners/partner-panel-parts'
 import { useSession } from '@/hooks/use-session'
 import { moveFlowMappingVersion } from '@/lib/api/client'
 import { channelsQuery, flowsQuery, storeSavedFlow } from '@/lib/api/queries'
@@ -41,17 +37,14 @@ import {
   AlertDialogTrigger,
 } from '@edi-bridge/ui/components/alert-dialog'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 function MoveToVersion({
   flow,
   version,
-  finalFocus,
   onMoved,
 }: {
   flow: Flow
   version: MappingVersionSummary
-  finalFocus: RefObject<HTMLElement | null>
   onMoved: (moved: Flow) => void
 }) {
   const t = useTranslations('TradingPartner.documents.move')
@@ -90,10 +83,7 @@ function MoveToVersion({
         {t('button', { version: version.version })}
         <span className="sr-only"> {t('for', { route: flow.name })}</span>
       </AlertDialogTrigger>
-      <AlertDialogContent
-        finalFocus={finalFocus}
-        initialFocus={cancel}
-        aria-busy={move.isPending || undefined}>
+      <AlertDialogContent initialFocus={cancel} aria-busy={move.isPending || undefined}>
         <AlertDialogHeader>
           <AlertDialogTitle>
             {t('title', { version: version.version, mapping: version.mappingName })}
@@ -149,14 +139,12 @@ function DocumentItem({
   partnerName,
   channels,
   canChange,
-  finalFocus,
   onMoved,
 }: {
   flow: Flow
   partnerName: string
   channels: ReadonlyMap<string, Channel>
   canChange: boolean
-  finalFocus: RefObject<HTMLElement | null>
   onMoved: (moved: Flow) => void
 }) {
   const t = useTranslations('TradingPartner.documents')
@@ -213,43 +201,10 @@ function DocumentItem({
             </span>
             <span>{t('newer.kept', { version: flow.mappingVersion.version })}</span>
           </p>
-          {canChange && (
-            <MoveToVersion finalFocus={finalFocus} flow={flow} version={newer} onMoved={onMoved} />
-          )}
+          {canChange && <MoveToVersion flow={flow} version={newer} onMoved={onMoved} />}
         </div>
       )}
     </li>
-  )
-}
-
-function DocumentsLoading({ label }: { label: string }) {
-  return (
-    <div aria-busy className="flex flex-col gap-3">
-      <p role="status" className="sr-only">
-        {label}
-      </p>
-      <Skeleton className="h-6 w-64" />
-      <Skeleton className="h-36 w-full rounded-lg" />
-      <Skeleton className="h-36 w-full rounded-lg" />
-    </div>
-  )
-}
-
-function StatusLine({ children }: { children: ReactNode }) {
-  return (
-    <p role="status" className="flex items-center gap-2 text-sm empty:hidden">
-      {children && (
-        <>
-          <HugeiconsIcon
-            icon={CheckmarkCircle02Icon}
-            strokeWidth={2}
-            aria-hidden
-            className="text-success-text size-4 shrink-0"
-          />
-          {children}
-        </>
-      )}
-    </p>
   )
 }
 
@@ -264,42 +219,54 @@ export function PartnerDocuments({
   onAddConnection: () => void
 }) {
   const t = useTranslations('TradingPartner.documents')
-  const flows = useQuery(flowsQuery)
+  const allFlows = useQuery(flowsQuery)
   const channels = useQuery(channelsQuery)
   const session = useSession()
   const titleId = useId()
   const heading = useRef<HTMLHeadingElement>(null)
   const addButton = useRef<HTMLButtonElement>(null)
+  const focusHeadingAfterMove = useRef(false)
   const [status, setStatus] = useState<string | null>(null)
   const name = tradingPartner.name
   const canChange = session.canChange
 
-  if (flows.isPending || channels.isPending) {
-    return <DocumentsLoading label={t('loading')} />
+  useEffect(() => {
+    if (focusHeadingAfterMove.current) {
+      focusHeadingAfterMove.current = false
+      heading.current?.focus()
+    }
+  })
+
+  if (allFlows.isPending || channels.isPending) {
+    return <PanelLoading label={t('loading')} />
   }
 
-  if (flows.isError || channels.isError) {
+  if (allFlows.isError || channels.isError) {
     return (
       <LoadError
         description={t('error.description')}
         retryLabel={t('error.retry')}
         title={t('error.title')}
         onRetry={() => {
-          void flows.refetch()
+          void allFlows.refetch()
           void channels.refetch()
         }}
       />
     )
   }
 
-  const documents = partnerDocuments(flows.data, tradingPartner.id)
+  const flows = partnerFlows(allFlows.data, tradingPartner.id)
   const channelsById = new Map(channels.data.map((channel) => [channel.id, channel]))
 
   return (
     <section aria-labelledby={titleId} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="flex flex-col gap-1">
-          <h2 id={titleId} ref={heading} tabIndex={-1} className="font-medium outline-none">
+          <h2
+            id={titleId}
+            ref={heading}
+            tabIndex={-1}
+            className="focus:ring-ring/50 rounded-sm font-medium outline-none focus:ring-3">
             {t('title', { name })}
           </h2>
           <p className="text-muted-foreground text-sm">
@@ -316,7 +283,7 @@ export function PartnerDocuments({
         )}
       </div>
       <StatusLine>{status}</StatusLine>
-      {documents.length === 0 ? (
+      {flows.length === 0 ? (
         <ListEmpty
           description={t('empty.description', { name })}
           icon={File02Icon}
@@ -325,19 +292,19 @@ export function PartnerDocuments({
         />
       ) : (
         <ul aria-label={t('list', { name })} className="divide-y rounded-lg border">
-          {documents.map((flow) => (
+          {flows.map((flow) => (
             <DocumentItem
               key={flow.id}
               canChange={canChange}
               channels={channelsById}
-              finalFocus={heading}
               flow={flow}
               partnerName={name}
-              onMoved={(moved) =>
+              onMoved={(moved) => {
+                focusHeadingAfterMove.current = true
                 setStatus(
                   t('move.done', { route: moved.name, version: moved.mappingVersion.version }),
                 )
-              }
+              }}
             />
           ))}
         </ul>
@@ -345,8 +312,8 @@ export function PartnerDocuments({
       {canChange && (
         <AddDocumentSheet
           channels={channels.data}
-          documents={documents}
           finalFocus={addButton}
+          flows={flows}
           open={addingDocument}
           tradingPartner={tradingPartner}
           onAddConnection={onAddConnection}
