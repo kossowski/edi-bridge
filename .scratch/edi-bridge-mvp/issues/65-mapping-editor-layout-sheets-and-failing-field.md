@@ -4,17 +4,21 @@
 
 **Blocked by:** 64 (Mappings overview "In and out")
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Toolbar, docked and hideable transform list, and the full-height canvas as described; the hidden state of the transform list persists
-- [ ] Right-click or the keyboard opens a link's context menu with its actions; the hover "×" is removed
-- [ ] Preview, details and Versions & problems open as sheets and leave the canvas its full width
-- [ ] The version timeline shows change notes and users per version and restores a version into the Draft; the comparison page stays reachable from it
-- [ ] The publish dialog takes a change note and the document routes to move; nothing moves without being chosen
-- [ ] An empty Mapping shows "Start here" instead of a blank canvas
-- [ ] `?field=` marks the failing field and "Show the field" centres it without scrolling the source fields off-screen (known issue in the lab)
-- [ ] The Mapping contract gains the version change note and restore; the live API follows in ticket 29
-- [ ] The versions page is replaced by the sheet; existing canvas stories and unit tests stay green or are updated in the same PR (see tickets 51 and 53)
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] Toolbar, docked and hideable transform list, and the full-height canvas as described; the hidden state of the transform list persists
+- [x] Right-click or the keyboard opens a link's context menu with its actions; the hover "×" is removed
+- [x] Preview, details and Versions & problems open as sheets and leave the canvas its full width
+- [x] The version timeline shows change notes and users per version and restores a version into the Draft; the comparison page stays reachable from it
+- [x] The publish dialog takes a change note and the document routes to move; nothing moves without being chosen
+- [x] An empty Mapping shows "Start here" instead of a blank canvas
+- [x] `?field=` marks the failing field and "Show the field" centres it without scrolling the source fields off-screen (known issue in the lab)
+- [x] The Mapping contract gains the version change note and restore; the live API follows in ticket 29
+- [x] The versions page is replaced by the sheet; existing canvas stories and unit tests stay green or are updated in the same PR (see tickets 51 and 53)
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #112, #119, #125, #135, #138, #143.
