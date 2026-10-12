@@ -54,3 +54,21 @@ export const mobile = {
   },
   globals: { viewport: { value: 'mobile', isRotated: false } },
 }
+
+export const laptop = {
+  parameters: {
+    viewport: {
+      options: { laptop: { name: 'Laptop', styles: { width: '1024px', height: '768px' } } },
+    },
+  },
+  globals: { viewport: { value: 'laptop', isRotated: false } },
+}
+
+export const desktop = {
+  parameters: {
+    viewport: {
+      options: { desktop: { name: 'Desktop', styles: { width: '1440px', height: '900px' } } },
+    },
+  },
+  globals: { viewport: { value: 'desktop', isRotated: false } },
+}

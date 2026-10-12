@@ -71,7 +71,7 @@ export const Admin = meta.story({
     await expect(canvas.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
     await expect(tabRow(canvasElement)).not.toBeVisible()
     await expect(headerActions(canvasElement)).toContainElement(
-      canvas.getByRole('button', { name: 'Search orders, partners, documents…' }),
+      canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
     )
   },
 })
@@ -204,7 +204,7 @@ export const Search = meta.story({
   },
   async play({ canvas }) {
     const search = await canvas.findByRole('button', {
-      name: 'Search orders, partners, documents…',
+      name: 'Search orders, partners, documents, pages…',
     })
 
     await userEvent.keyboard('{Control>}k{/Control}')
@@ -239,7 +239,7 @@ export const German = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('Nur ansehen')).toBeVisible()
     await expect(
-      canvas.getByRole('button', { name: 'Aufträge, Handelspartner, Belege suchen …' }),
+      canvas.getByRole('button', { name: 'Aufträge, Handelspartner, Belege, Seiten suchen …' }),
     ).toBeVisible()
     await expect(
       canvas.getByRole('button', { name: 'Seitenleiste ein- oder ausblenden' }),
@@ -292,7 +292,7 @@ export const Tablet = meta.story({
     await expect(await canvas.findByText('View only')).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Compare' })).toBeVisible()
     await expect(
-      canvas.getByRole('button', { name: 'Search orders, partners, documents…' }),
+      canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
     ).toBeVisible()
     await expect(canvas.queryByRole('link', { name: 'Mappings' })).toBeNull()
     await expect(canvas.queryByRole('link', { name: 'Versions' })).toBeNull()
@@ -326,7 +326,7 @@ export const Mobile = meta.story({
     )
     await expect(canvas.queryByRole('link', { name: 'All connections' })).toBeNull()
     await expect(
-      canvas.getByRole('button', { name: 'Search orders, partners, documents…' }),
+      canvas.getByRole('button', { name: 'Search orders, partners, documents, pages…' }),
     ).toBeVisible()
 
     await userEvent.click(canvas.getByRole('button', { name: 'Show the whole path' }))

@@ -41,6 +41,23 @@ export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = 
   operator: { href: '/operator', icon: UserShield01Icon },
 }
 
+type AccountMenuItemKey = Extract<keyof Messages['Shell']['session'], 'settings' | 'operatorArea'>
+
+type AccountMenuItem = NavigationItem & { key: AccountMenuItemKey }
+
+type AccountMenuItemSource = { key: AccountMenuItemKey; page: NavigationKey; operatorOnly: boolean }
+
+const accountMenuItemSources: ReadonlyArray<AccountMenuItemSource> = [
+  { key: 'settings', page: 'settings', operatorOnly: false },
+  { key: 'operatorArea', page: 'operator', operatorOnly: true },
+]
+
+export function accountMenuItems(operator: boolean): ReadonlyArray<AccountMenuItem> {
+  return accountMenuItemSources.flatMap(({ key, page, operatorOnly }) =>
+    operator || !operatorOnly ? [{ key, ...navigationItems[page] }] : [],
+  )
+}
+
 export type SidebarItemKey = keyof Messages['Sidebar']['items']
 
 type SidebarItemSource = { key: SidebarItemKey; page: NavigationKey; icon?: IconSvgElement }

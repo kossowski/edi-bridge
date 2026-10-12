@@ -91,7 +91,7 @@
     }
   },
   "Search": {
-    "trigger": "Aufträge, Handelspartner, Belege suchen …",
+    "trigger": "Aufträge, Handelspartner, Belege, Seiten suchen …",
     "title": "Suche",
     "description": "Einen Auftrag, einen Handelspartner, einen Beleg oder eine Seite finden",
     "placeholder": "Bestellnummer, Handelspartner, Beleg …",

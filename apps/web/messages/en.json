@@ -91,7 +91,7 @@
     }
   },
   "Search": {
-    "trigger": "Search orders, partners, documents…",
+    "trigger": "Search orders, partners, documents, pages…",
     "title": "Search",
     "description": "Find an order, a trading partner, a document or a page",
     "placeholder": "Order number, partner, document…",
