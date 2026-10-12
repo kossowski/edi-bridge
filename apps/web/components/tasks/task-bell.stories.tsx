@@ -59,6 +59,31 @@ export const EveryKind = meta.story({
   },
 })
 
+export const OpenAllTasks = meta.story({
+  decorators: [
+    (Story) => (
+      <>
+        <Story />
+        <div id="main-content" tabIndex={-1} className="p-4 outline-none">
+          Main content
+        </div>
+      </>
+    ),
+  ],
+  beforeEach({ msw }) {
+    msw.use(tasksHandler(apiUrl, everyKind()))
+  },
+  async play({ canvasElement }) {
+    const popover = await openBell('Tasks, 5 open')
+
+    await userEvent.click(within(popover).getByRole('link', { name: 'Open all tasks' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() =>
+      expect(canvasElement.ownerDocument.activeElement).toHaveAttribute('id', 'main-content'),
+    )
+  },
+})
+
 export const Seeded = meta.story({
   beforeEach({ msw }) {
     msw.use(tasksHandler(apiUrl))

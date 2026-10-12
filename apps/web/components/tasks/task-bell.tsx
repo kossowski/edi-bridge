@@ -5,13 +5,20 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { TaskIcon, useTaskText } from '@/components/tasks/task-text'
 import { tasksQuery } from '@/lib/api/queries'
 import { taskHref } from '@/lib/task-href'
-import { type Task, type Tasks } from '@edi-bridge/contracts'
+import { type Task, taskActors, type Tasks } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@edi-bridge/ui/components/empty'
 import {
   Popover,
   PopoverContent,
@@ -56,28 +63,27 @@ function NewestTasks({ data, onOpen }: { data: Tasks; onOpen: () => void }) {
 
   if (data.tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-1 px-3 py-6 text-center">
-        <HugeiconsIcon
-          icon={CheckmarkCircle02Icon}
-          strokeWidth={2}
-          aria-hidden
-          className="text-muted-foreground mb-1 size-6"
-        />
-        <p className="font-medium">{t('Tasks.empty.title')}</p>
-        <p className="text-muted-foreground text-xs">{t('Tasks.empty.description')}</p>
-      </div>
+      <Empty className="gap-2 px-3 py-6">
+        <EmptyHeader className="gap-1">
+          <EmptyMedia variant="icon">
+            <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} />
+          </EmptyMedia>
+          <EmptyTitle>{t('Tasks.empty.title')}</EmptyTitle>
+          <EmptyDescription className="text-xs">{t('Tasks.empty.description')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
 
   return (
     <>
-      <ul className="max-h-80 divide-y overflow-y-auto">
+      <ul className="max-h-[36rem] min-h-0 divide-y overflow-y-auto">
         {newest.map((task) => (
           <TaskRow key={task.id} now={now} task={task} onOpen={onOpen} />
         ))}
       </ul>
       {data.tasks.length > newest.length && (
-        <p className="text-muted-foreground border-t px-3 py-2 text-xs">
+        <p className="text-muted-foreground shrink-0 border-t px-3 py-2 text-xs">
           {t('TaskBell.newest', { shown: newest.length, count: data.tasks.length })}
         </p>
       )}
@@ -110,7 +116,23 @@ export function TaskBell() {
   const { data, isError, isPending } = useQuery(tasksQuery)
   const count = data?.tasks.length ?? 0
   const shownCount = count > badgeLimit ? `${badgeLimit}+` : String(count)
+  const navigating = useRef(false)
   const close = () => setOpen(false)
+
+  function navigate() {
+    navigating.current = true
+    close()
+  }
+
+  function focusAfterClose() {
+    if (!navigating.current) {
+      return true
+    }
+
+    navigating.current = false
+
+    return document.getElementById('main-content') ?? false
+  }
 
   function content() {
     if (isError) {
@@ -121,7 +143,7 @@ export function TaskBell() {
       return <LoadingTasks />
     }
 
-    return <NewestTasks data={data} onOpen={close} />
+    return <NewestTasks data={data} onOpen={navigate} />
   }
 
   return (
@@ -144,25 +166,26 @@ export function TaskBell() {
           </span>
         )}
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))] gap-0 p-0">
-        <div className="flex flex-col gap-0.5 border-b px-3 py-2.5">
+      <PopoverContent
+        align="end"
+        finalFocus={focusAfterClose}
+        className="max-h-(--available-height) w-[min(22rem,calc(100vw-2rem))] gap-0 p-0">
+        <div className="flex shrink-0 flex-col gap-0.5 border-b px-3 py-2.5">
           <PopoverTitle>{t('title')}</PopoverTitle>
           {data && data.tasks.length > 0 && (
             <PopoverDescription className="text-xs">
-              {t('summary', {
-                you: data.counts.you,
-                retry: data.counts.retry,
-                tradingPartner: data.counts.tradingPartner,
-              })}
+              {taskActors
+                .map((whoActs) => t(`counts.${whoActs}`, { count: data.counts[whoActs] }))
+                .join(' · ')}
             </PopoverDescription>
           )}
         </div>
         {content()}
-        <div className="border-t p-2">
+        <div className="shrink-0 border-t p-2">
           <Link
             href="/tasks"
             className={buttonVariants({ size: 'sm', variant: 'outline', className: 'w-full' })}
-            onClick={close}>
+            onClick={navigate}>
             {t('all')}
           </Link>
         </div>

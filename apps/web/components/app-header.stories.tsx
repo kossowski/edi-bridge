@@ -62,11 +62,14 @@ const meta = preview.meta({
       </SidebarProvider>
     ),
   ],
+  beforeEach({ msw }) {
+    msw.use(tasksHandler(apiUrl, everyKind()))
+  },
 })
 
 export const Admin = meta.story({
   beforeEach({ msw }) {
-    msw.use(...sessionHandlers(sandboxAdminSession), tasksHandler(apiUrl, everyKind()))
+    msw.use(...sessionHandlers(sandboxAdminSession))
   },
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('button', { name: 'Toggle sidebar' })).toBeVisible()
@@ -87,7 +90,10 @@ export const Admin = meta.story({
 })
 
 export const Operator = meta.story({
-  parameters: { nextjs: { navigation: { pathname: '/operator/workspaces/ws-1' } } },
+  parameters: {
+    a11y: { context: 'body' },
+    nextjs: { navigation: { pathname: '/operator/workspaces/ws-1' } },
+  },
   beforeEach({ msw }) {
     msw.use(...sessionHandlers(seedSession))
   },
@@ -97,6 +103,16 @@ export const Operator = meta.story({
     await expect(canvas.getByRole('link', { name: 'Operator area' })).toHaveAttribute(
       'href',
       '/operator',
+    )
+
+    await userEvent.click(await canvas.findByRole('button', { name: 'Tasks, 5 open' }))
+    const popover = await screen.findByRole('dialog')
+
+    await waitFor(() => expect(popover).toBeVisible())
+    await expect(within(popover).getAllByRole('listitem')).toHaveLength(5)
+    await expect(within(popover).getByRole('link', { name: 'Open all tasks' })).toHaveAttribute(
+      'href',
+      '/tasks',
     )
   },
 })
