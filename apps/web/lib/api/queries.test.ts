@@ -18,8 +18,10 @@ import {
   documentStructureQuery,
   documentStructuresQuery,
   forgetDeletedLookupTable,
+  lookupTableMissingCodesQuery,
   lookupTableQuery,
   lookupTablesQuery,
+  lookupTableSuggestionsQuery,
   mappingDraftQuery,
   mappingsQuery,
   mappingVersionsQuery,
@@ -27,6 +29,7 @@ import {
   storeCreatedMapping,
   storePublishedMappingVersion,
   storeSavedDocumentStructure,
+  storeSavedLookupTable,
   storeSavedTradingPartner,
   tradingPartnerQuery,
   tradingPartnersQuery,
@@ -112,6 +115,25 @@ describe('storeSavedDocumentStructure', () => {
   })
 })
 
+describe('storeSavedLookupTable', () => {
+  it('caches the saved Lookup Table and marks its missing codes as stale', () => {
+    const queryClient = new QueryClient()
+
+    const saved = toLookupTable(seedLookupTables[0]!, {
+      get: (id) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
+    })
+
+    queryClient.setQueryData(lookupTableMissingCodesQuery(saved.id).queryKey, [])
+
+    storeSavedLookupTable(queryClient, saved)
+
+    expect(queryClient.getQueryData(lookupTableQuery(saved.id).queryKey)).toEqual(saved)
+    expect(
+      queryClient.getQueryState(lookupTableMissingCodesQuery(saved.id).queryKey)?.isInvalidated,
+    ).toBe(true)
+  })
+})
+
 describe('forgetDeletedLookupTable', () => {
   it('drops the deleted Lookup Table and marks the list as stale', () => {
     const queryClient = new QueryClient()
@@ -127,6 +149,22 @@ describe('forgetDeletedLookupTable', () => {
 
     expect(queryClient.getQueryState(lookupTableQuery(deleted.id).queryKey)).toBeUndefined()
     expect(queryClient.getQueryState(lookupTablesQuery.queryKey)?.isInvalidated).toBe(true)
+  })
+})
+
+describe('lookupTableSuggestionsQuery', () => {
+  it('keys the suggestions by kind and Trading Partner and keeps them fresh', () => {
+    const units = lookupTableSuggestionsQuery({ kind: 'units' })
+
+    const hansemarktUnits = lookupTableSuggestionsQuery({
+      kind: 'units',
+      tradingPartnerId: seedTradingPartners[0]!.id,
+    })
+
+    expect(lookupTableSuggestionsQuery({ kind: 'units' }).queryKey).toEqual(units.queryKey)
+    expect(hansemarktUnits.queryKey).not.toEqual(units.queryKey)
+    expect(lookupTableSuggestionsQuery({ kind: 'countries' }).queryKey).not.toEqual(units.queryKey)
+    expect(units.staleTime).toBe(Infinity)
   })
 })
 

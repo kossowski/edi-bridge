@@ -58,7 +58,7 @@ const meta = preview.meta({
 export const ReviewOpen = meta.story({
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByText('AI review open')).toBeVisible()
-    await expect(await findSummary(canvasElement)).toHaveTextContent('16 AI proposals to review')
+    await expect(await findSummary(canvasElement)).toHaveTextContent('19 AI proposals to review')
 
     const rows = await canvas.findAllByRole('button', { name: proposedRow })
 
@@ -106,11 +106,14 @@ export const InboundWithLookupTable = meta.story({
       panel.getAllByRole('button', { name: /^Reject the AI-proposed link from/ }).length,
     ).toBeGreaterThan(0)
 
+    const lookupTables = () => canvas.queryAllByRole('group', { name: /^Transform Lookup Table/ })
+    const before = lookupTables().length
+
     await userEvent.click(panel.getByRole('button', { name: 'Reject Lookup Table 1' }))
     await waitFor(() =>
       expect(liveStatus(canvasElement)).toHaveTextContent('AI-proposed Lookup Table 1 rejected.'),
     )
-    await expect(canvas.queryByRole('group', { name: 'Transform Lookup Table 1' })).toBeNull()
+    await expect(lookupTables()).toHaveLength(before - 1)
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
   },
 })
@@ -138,9 +141,9 @@ export const RejectLink = meta.story({
       ),
     )
     await expect(panel.getByText('This part has no links yet.')).toBeVisible()
-    await expect(summary).toHaveTextContent('15 AI proposals to review')
+    await expect(summary).toHaveTextContent('18 AI proposals to review')
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
-    await expect(summary).toHaveTextContent('15 AI proposals to review')
+    await expect(summary).toHaveTextContent('18 AI proposals to review')
   },
 })
 
@@ -271,7 +274,7 @@ export const German = meta.story({
   ],
   async play({ canvas }) {
     await expect(await canvas.findByText('Durchsicht des KI-Entwurfs offen')).toBeVisible()
-    await expect(canvas.getByText('16 KI-Vorschläge zu prüfen')).toBeVisible()
+    await expect(canvas.getByText('19 KI-Vorschläge zu prüfen')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'KI-Entwurf übernehmen' })).toBeVisible()
     await expect(
       canvas.getByText('Übernehmen Sie den KI-Entwurf, bevor Sie veröffentlichen.'),

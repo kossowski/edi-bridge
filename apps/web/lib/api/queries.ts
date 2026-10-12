@@ -18,6 +18,7 @@ import type {
   OrderLifecycleListQuery,
   Invite,
   LookupTable,
+  LookupTableSuggestionsQuery,
   MappingComparisonQuery,
   MappingDraft,
   MappingGraph,
@@ -42,6 +43,7 @@ import {
   getFlow,
   getHome,
   getLookupTable,
+  getLookupTableSuggestions,
   getMappingDraft,
   getMappingVersion,
   getOperatorWorkspaceSettings,
@@ -54,6 +56,7 @@ import {
   inferDocumentStructure,
   listChannels,
   listDocumentStructures,
+  listLookupTableMissingCodes,
   listLookupTables,
   listFlows,
   listInterchanges,
@@ -442,6 +445,9 @@ export const lookupTableKeys = {
   list: () => [...lookupTableKeys.all(), 'list'] as const,
   detail: (id: string) => [...lookupTableKeys.all(), 'detail', id] as const,
   import: (id: string) => [...lookupTableKeys.detail(id), 'import'] as const,
+  missingCodes: (id: string) => [...lookupTableKeys.all(), 'missing-codes', id] as const,
+  suggestions: (query: LookupTableSuggestionsQuery) =>
+    [...lookupTableKeys.all(), 'suggestions', query] as const,
 }
 
 export const lookupTablesQuery = queryOptions({
@@ -456,13 +462,30 @@ export function lookupTableQuery(id: string) {
   })
 }
 
+export function lookupTableMissingCodesQuery(id: string) {
+  return queryOptions({
+    queryKey: lookupTableKeys.missingCodes(id),
+    queryFn: () => listLookupTableMissingCodes(id),
+  })
+}
+
+export function lookupTableSuggestionsQuery(query: LookupTableSuggestionsQuery) {
+  return queryOptions({
+    queryKey: lookupTableKeys.suggestions(query),
+    queryFn: () => getLookupTableSuggestions(query),
+    staleTime: Infinity,
+  })
+}
+
 export function storeSavedLookupTable(queryClient: QueryClient, saved: LookupTable) {
   queryClient.setQueryData(lookupTableQuery(saved.id).queryKey, saved)
   void queryClient.invalidateQueries({ queryKey: lookupTableKeys.list() })
+  void queryClient.invalidateQueries({ queryKey: lookupTableKeys.missingCodes(saved.id) })
 }
 
 export function forgetDeletedLookupTable(queryClient: QueryClient, id: string) {
   queryClient.removeQueries({ queryKey: lookupTableKeys.detail(id) })
+  queryClient.removeQueries({ queryKey: lookupTableKeys.missingCodes(id) })
   void queryClient.invalidateQueries({ queryKey: lookupTableKeys.list() })
 }
 

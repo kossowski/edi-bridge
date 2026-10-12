@@ -142,7 +142,7 @@ export const Outbound = meta.story({
     const details = await openDetails(canvasElement)
 
     await expect(details.getByText('Outbound: data format to Message Type')).toBeVisible()
-    await expect(details.getByText('30 links')).toBeVisible()
+    await expect(details.getByText('32 links')).toBeVisible()
     await expect(details.getByRole('button', { name: 'Close details' })).toBeVisible()
   },
 })
@@ -801,7 +801,7 @@ export const RemoveLinkByMouse = meta.story({
       ).toBeNull(),
     )
     await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
-    await expectSavedLinkCount(outbound.id, 29)
+    await expectSavedLinkCount(outbound.id, 31)
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
 
     // A link into collapsed parts stands for several; its menu lists them by name first.
@@ -817,7 +817,7 @@ export const RemoveLinkByMouse = meta.story({
 
     // The panel also lists the loop that takes the whole part.
     await expect(panel.getAllByRole('button', { name: /^Remove link from packages/ })).toHaveLength(
-      10,
+      11,
     )
     // Focus moves a frame after the panel lists the links.
     await waitFor(() =>
@@ -827,7 +827,7 @@ export const RemoveLinkByMouse = meta.story({
         }),
       ).toHaveFocus(),
     )
-    await expectSavedLinkCount(outbound.id, 29)
+    await expectSavedLinkCount(outbound.id, 31)
   },
 })
 
@@ -853,7 +853,7 @@ export const RemoveLinkByKeyboard = meta.story({
     )
     await waitFor(() => expect(row).toHaveFocus())
     await expect(panel.getByText('This part has no links yet.')).toBeVisible()
-    await expectSavedLinkCount(outbound.id, 29)
+    await expectSavedLinkCount(outbound.id, 31)
 
     // Delete removes the only link of the focused part.
     await pressOn(await findRow(canvasElement, source('documentDate')), '{Delete}')
@@ -862,16 +862,16 @@ export const RemoveLinkByKeyboard = meta.story({
         canvas.queryByRole('group', { name: 'Link from documentDate to DTM+137/C507/2380' }),
       ).toBeNull(),
     )
-    await expectSavedLinkCount(outbound.id, 28)
+    await expectSavedLinkCount(outbound.id, 30)
 
     // A part holding several links keeps them and says how to remove them.
     await pressOn(await findRow(canvasElement, source('packages[]')), '{Delete}')
     await waitFor(() =>
       expect(liveStatus(canvasElement)).toHaveTextContent(
-        'packages has 10 links. Select it to remove them one by one.',
+        'packages has 11 links. Select it to remove them one by one.',
       ),
     )
-    await expectSavedLinkCount(outbound.id, 28)
+    await expectSavedLinkCount(outbound.id, 30)
 
     // The menu key on a focused link opens its menu; the focus goes to where the link started.
     await openLinkMenuByKeyboard(
@@ -888,7 +888,7 @@ export const RemoveLinkByKeyboard = meta.story({
     await waitFor(async () =>
       expect(await findRow(canvasElement, source('despatchDate'))).toHaveFocus(),
     )
-    await expectSavedLinkCount(outbound.id, 27)
+    await expectSavedLinkCount(outbound.id, 29)
   },
 })
 
@@ -1075,7 +1075,7 @@ export const DragOntoLinkedTarget = meta.story({
     await expect(
       canvas.queryByRole('group', { name: 'Link from despatchDate to BGM/1004' }),
     ).toBeNull()
-    await expectSavedLinkCount(outbound.id, 30)
+    await expectSavedLinkCount(outbound.id, 32)
   },
 })
 
@@ -1102,7 +1102,7 @@ export const TargetAlreadyLinked = meta.story({
     await expect(
       canvas.queryByRole('group', { name: 'Link from despatchDate to DTM+137/C507/2380' }),
     ).toBeNull()
-    await expectSavedLinkCount(outbound.id, 30)
+    await expectSavedLinkCount(outbound.id, 32)
     await expect(
       (await openDetails(canvasElement)).getByText('Linking from despatchDate.', { exact: false }),
     ).toBeVisible()

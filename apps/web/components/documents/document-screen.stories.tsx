@@ -83,7 +83,7 @@ const invalidContentInbound = storyRun(3, 'ORDERS', 'validation')
 
 const invalidContentOutbound = storyRun(4, 'DESADV', 'validation')
 
-const missingCode = storyRun(5, 'ORDERS', 'mapping')
+const missingCode = storyRun(5, 'INVOIC', 'mapping')
 
 const unreachableOutbound = storyRun(6, 'INVOIC', 'delivery')
 
@@ -153,16 +153,16 @@ const meta = preview.meta({
   },
 })
 
-const ordersMappingId = seedMappingVersions.find(
-  ({ id }) => id === flowFor('ORDERS').mappingVersionId,
+const invoicMappingId = seedMappingVersions.find(
+  ({ id }) => id === flowFor('INVOIC').mappingVersionId,
 )!.mappingId
 
-const ordersMapping = seedMappingDrafts.find(({ id }) => id === ordersMappingId)!
+const invoicMapping = seedMappingDrafts.find(({ id }) => id === invoicMappingId)!
 
-function ordersMappingDraft(unpublishedChanges: boolean) {
+function invoicMappingDraft(unpublishedChanges: boolean) {
   return mappingHandlers(apiUrl, {
     mappings: seedMappingDrafts.map((draft) =>
-      draft.id === ordersMappingId ? { ...draft, unpublishedChanges } : draft,
+      draft.id === invoicMappingId ? { ...draft, unpublishedChanges } : draft,
     ),
   })
 }
@@ -447,12 +447,12 @@ export const NotFound = meta.story({
 export const ProcessAgain = meta.story({
   args: { id: missingCode.id },
   beforeEach({ msw }) {
-    msw.use(...ordersMappingDraft(false))
+    msw.use(...invoicMappingDraft(false))
   },
   async play({ canvas }) {
     await expect(
       await canvas.findByText(
-        `Process it again. EDI Bridge uses the original file, so ${partner.name} does not have to send anything again.`,
+        'Process it again. EDI Bridge uses the original file, so your ERP does not have to send anything again.',
       ),
     ).toBeVisible()
     const version = await canvas.findByRole('combobox', { name: 'Version' })
@@ -478,13 +478,13 @@ export const ProcessAgain = meta.story({
   },
 })
 
-const missingCodeVersionsPath = `${apiUrl}${toPath(mappingVersionsEndpoint.path, { mappingId: ordersMappingId })}`
+const missingCodeVersionsPath = `${apiUrl}${toPath(mappingVersionsEndpoint.path, { mappingId: invoicMappingId })}`
 
 export const VersionsLoading = meta.story({
   args: { id: missingCode.id },
   beforeEach({ msw }) {
     msw.use(
-      ...ordersMappingDraft(false),
+      ...invoicMappingDraft(false),
       http.get(missingCodeVersionsPath, async () => {
         await delay('infinite')
       }),
@@ -502,14 +502,14 @@ export const NoPublishedVersions = meta.story({
   args: { id: missingCode.id },
   beforeEach({ msw }) {
     msw.use(
-      ...ordersMappingDraft(false),
+      ...invoicMappingDraft(false),
       http.get(missingCodeVersionsPath, () => HttpResponse.json([])),
     )
   },
   async play({ canvas }) {
     await expect(
       await canvas.findByText(
-        `“${ordersMapping.name}” has no published version yet. Publish it first, then process this document again.`,
+        `“${invoicMapping.name}” has no published version yet. Publish it first, then process this document again.`,
       ),
     ).toBeVisible()
     await expect(canvas.queryByRole('combobox', { name: 'Version' })).toBeNull()
@@ -522,13 +522,13 @@ export const GermanNoPublishedVersions = meta.story({
   decorators: [german],
   beforeEach({ msw }) {
     msw.use(
-      ...ordersMappingDraft(false),
+      ...invoicMappingDraft(false),
       http.get(missingCodeVersionsPath, () => HttpResponse.json([])),
     )
   },
   async play({ canvas }) {
     await expect(
-      await canvas.findByText(`„${ordersMapping.name}“ hat noch keine veröffentlichte Version.`, {
+      await canvas.findByText(`„${invoicMapping.name}“ hat noch keine veröffentlichte Version.`, {
         exact: false,
       }),
     ).toBeVisible()
@@ -566,7 +566,7 @@ export const TabletProcessAgain = meta.story({
   decorators: [besideSidebar],
   args: { id: missingCode.id },
   beforeEach({ msw }) {
-    msw.use(...ordersMappingDraft(false))
+    msw.use(...invoicMappingDraft(false))
   },
   async play({ canvas, canvasElement }) {
     const version = await canvas.findByRole('combobox', { name: 'Version' })
@@ -581,17 +581,17 @@ export const TabletProcessAgain = meta.story({
 export const UnpublishedChanges = meta.story({
   args: { id: missingCode.id },
   beforeEach({ msw }) {
-    msw.use(...ordersMappingDraft(true))
+    msw.use(...invoicMappingDraft(true))
   },
   async play({ canvas }) {
     await expect(
-      await canvas.findByText(`“${ordersMapping.name}” has unpublished changes.`, {
+      await canvas.findByText(`“${invoicMapping.name}” has unpublished changes.`, {
         exact: false,
       }),
     ).toBeVisible()
     await expectFixLink(
-      canvas.getByRole('link', { name: `Open “${ordersMapping.name}”` }),
-      `/mappings/${ordersMappingId}`,
+      canvas.getByRole('link', { name: `Open “${invoicMapping.name}”` }),
+      `/mappings/${invoicMappingId}`,
     )
   },
 })
@@ -599,7 +599,7 @@ export const UnpublishedChanges = meta.story({
 export const ProcessAgainFailed = meta.story({
   args: { id: missingCode.id },
   beforeEach({ msw }) {
-    msw.use(...ordersMappingDraft(false), failing(reprocessRunEndpoint.path))
+    msw.use(...invoicMappingDraft(false), failing(reprocessRunEndpoint.path))
   },
   async play({ canvas }) {
     const button = await canvas.findByRole('button', { name: 'Process again' })
@@ -818,12 +818,12 @@ export const GermanProcessAgain = meta.story({
   args: { id: missingCode.id },
   decorators: [german],
   beforeEach({ msw }) {
-    msw.use(...ordersMappingDraft(true))
+    msw.use(...invoicMappingDraft(true))
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('button', { name: 'Erneut verarbeiten' })).toBeVisible()
     await expect(
-      await canvas.findByText(`„${ordersMapping.name}“ hat unveröffentlichte Änderungen.`, {
+      await canvas.findByText(`„${invoicMapping.name}“ hat unveröffentlichte Änderungen.`, {
         exact: false,
       }),
     ).toBeVisible()
@@ -833,13 +833,13 @@ export const GermanProcessAgain = meta.story({
 export const DarkActions = meta.story({
   args: { id: missingCode.id },
   beforeEach({ msw }) {
-    msw.use(...ordersMappingDraft(true))
+    msw.use(...invoicMappingDraft(true))
 
     return darkMode()
   },
   async play({ canvas }) {
     await expect(
-      await canvas.findByText(`“${ordersMapping.name}” has unpublished changes.`, {
+      await canvas.findByText(`“${invoicMapping.name}” has unpublished changes.`, {
         exact: false,
       }),
     ).toBeVisible()

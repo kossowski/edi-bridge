@@ -51,7 +51,7 @@ import {
   seedMappings,
   toFlowStore,
 } from './flow'
-import { seedLookupTableNamed } from './lookup-table'
+import { seedLookupTableNamed } from './lookup-table-seed'
 import { edifactLeaves, messageTypeStructures } from './message-type-structure'
 import { day } from './overdue'
 import { containerOf } from './paths'
@@ -280,7 +280,7 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
     transformTemplate(
       'constant',
       { value: '' },
-      { outputs: { value: 'SG10/SG17/QTY+12/C186/6411' } },
+      { outputs: { value: 'SG10/SG17/QTY+12/C186/6063' } },
     ),
     transformTemplate(
       'concatenate',
@@ -288,6 +288,14 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
       {
         inputs: { part1: 'shipTo.postalCode', part2: 'shipTo.city' },
         outputs: { value: 'SG2+DP/NAD+DP/3164' },
+      },
+    ),
+    transformTemplate(
+      'lookupTable',
+      { lookupTableId: seedLookupTableNamed('Units of measure').id, fallback: 'fail' },
+      {
+        inputs: { value: 'packages[].lines[].unit' },
+        outputs: { value: 'SG10/SG17/QTY+12/C186/6411' },
       },
     ),
   ],
@@ -332,6 +340,11 @@ const transformTemplates: Readonly<Record<MessageType, ReadonlyArray<TransformTe
       'loop',
       { counterStart: 1 },
       { inputs: { items: 'lines[]' }, outputs: { items: 'SG25', counter: 'SG25/LIN/1082' } },
+    ),
+    transformTemplate(
+      'lookupTable',
+      { lookupTableId: seedLookupTableNamed('Units of measure').id, fallback: 'fail' },
+      { inputs: { value: 'lines[].unit' }, outputs: { value: 'SG25/QTY+47/C186/6411' } },
     ),
   ],
   CONTRL: [
@@ -753,7 +766,9 @@ export type PublishedVersions = {
   find: (versionId: string) => { version: MappingVersionSummary } | undefined
 }
 
-function publishedVersionsByMapping(drafts: ReadonlyArray<MappingDraftRecord>): PublishedVersions {
+export function publishedVersionsByMapping(
+  drafts: ReadonlyArray<MappingDraftRecord>,
+): PublishedVersions {
   const byMapping = new Map(drafts.map((draft) => [draft.id, publishedVersionsOf(draft)]))
 
   const byId = new Map(

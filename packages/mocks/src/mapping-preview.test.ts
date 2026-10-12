@@ -16,6 +16,7 @@ import {
 
 import { seedDocumentStructureOf } from './document-structure'
 import { documentStructureLeaves } from './document-structure-inference'
+import { seedLookupTableNamed } from './lookup-table'
 import { seedMappingDrafts } from './mapping'
 import { mappingPreviewHandlers } from './mapping-preview'
 import { createMappingSample } from './mapping-sample'
@@ -210,6 +211,36 @@ describe('POST /mappings/:id/preview', () => {
       transformId: jsonataNode.id,
       code: 'invalidTransform',
     })
+  })
+
+  it('translates your units of an outbound sample through units of measure', async () => {
+    server.use(...mappingPreviewHandlers(apiUrl))
+    const [invoice] = await samplesOf(hansemarktInvoic.id)
+    const { links, transforms, transformLinks } = hansemarktInvoic
+
+    const units = transforms.find(
+      (transform) =>
+        transform.kind === 'lookupTable' &&
+        transform.config.lookupTableId === seedLookupTableNamed('Units of measure').id,
+    )!
+
+    const preview = await previewOf(hansemarktInvoic.id, invoice!.id, {
+      links: [...links],
+      transforms: [...transforms],
+      transformLinks: [...transformLinks],
+    })
+
+    const { lines } = z
+      .object({ lines: z.array(z.object({ unit: z.string() })) })
+      .parse(invoice!.document.content)
+
+    expect(lines.map(({ unit }) => unit)).toEqual(['ST', 'KG', 'ST'])
+    expect(edifactLines(preview).filter((line) => line.startsWith('QTY+47'))).toEqual([
+      expect.stringMatching(/^QTY\+47:\d+:PCE'$/),
+      expect.stringMatching(/^QTY\+47:\d+:KGM'$/),
+      expect.stringMatching(/^QTY\+47:\d+:PCE'$/),
+    ])
+    expect(preview.notes.filter(({ transformId }) => transformId === units.id)).toEqual([])
   })
 
   it('applies the transforms of the graph to an outbound sample', async () => {

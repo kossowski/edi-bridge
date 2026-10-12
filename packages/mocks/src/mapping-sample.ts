@@ -1,6 +1,7 @@
 import type { Faker } from '@faker-js/faker'
 
 import {
+  directionOf,
   type DocumentField,
   type DocumentStructure,
   type DocumentStructureNode,
@@ -48,9 +49,12 @@ type Context = {
   own: Party
   variant: Variant
   day: Date
+  outbound: boolean
 }
 
 const cities = ['Hamburg', 'Bremen', 'Hannover', 'Kiel', 'Lübeck', 'Rostock', 'Oldenburg']
+
+const erpUnits = ['ST', 'KG']
 
 const contacts = ['Anna Petersen', 'Jonas Albers', 'Lena Hansen', 'Mehmet Yılmaz', 'Frauke Ahrens']
 
@@ -167,7 +171,7 @@ function fieldValue(field: DocumentField, context: Context, index: number) {
     case 'quantity':
       return faker.number.int({ min: 1, max: 48 })
     case 'unit':
-      return 'PCE'
+      return context.outbound ? erpUnits[index % erpUnits.length]! : 'PCE'
     case 'netPrice':
       return money(faker, 0.5, 20)
     case 'vatRate':
@@ -365,6 +369,7 @@ export function createMappingSample({
     own: { name: seedWorkspace.name, gln: seedWorkspace.gln ?? randomGln(faker) },
     variant: { lineCount, creditNote, rejected },
     day: new Date(firstSampleDay + index * 2 * 86_400_000),
+    outbound: directionOf(mapping) === 'outbound',
   }
 
   const entries = withTotals(

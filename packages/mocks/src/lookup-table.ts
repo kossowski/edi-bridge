@@ -1,54 +1,85 @@
-import { en, Faker } from '@faker-js/faker'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 
 import {
   createLookupTableEndpoint,
   deleteLookupTableEndpoint,
+  directionOf,
+  type FailedRunReference,
+  fromSearchParams,
+  type FixTarget,
   importLookupTableEndpoint,
   type LookupTable,
-  type LookupTableEntry,
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
   type LookupTableImportRow,
   type LookupTableInput,
-  lookupTableSchema,
+  lookupTableMissingCodesEndpoint,
   type LookupTableScope,
   type LookupTableScopeInput,
   lookupTablesEndpoint,
+  lookupTableSuggestionsEndpoint,
   type LookupTableSummary,
+  type LookupTableUse,
+  type MissingCode,
+  type MissingCodeCounts,
+  type RunSummary,
   type TradingPartner,
+  type TradingPartnerSummary,
   updateLookupTableEndpoint,
 } from '@edi-bridge/contracts'
 
+import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
+import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
+import { lookupTableFailureOf } from './interchange'
+import { codeMeaningsOf, firstValuesOf, hintFor } from './lookup-table-codes'
 import { applyImport, classifyImport } from './lookup-table-import'
-import { badRequest, conflict, notFound, unprocessable } from './responses'
-import { seedId } from './seed-id'
+import {
+  type LookupTableRecord,
+  type LookupTableStore,
+  seedLookupTables,
+  toLookupTableStore,
+  workspaceScope,
+} from './lookup-table-seed'
+import {
+  type MappingDraftRecord,
+  type MappingDraftStore,
+  publishedVersionsByMapping,
+  seedMappingDrafts,
+  toMappingDraftStore,
+} from './mapping'
+import { badRequest, conflict, notFound, serverError, unprocessable } from './responses'
+import { seedRuns } from './run'
+import { problemOf } from './run-problem'
+import { type Reprocessed, type RunStore, toRunStore } from './run-store'
 import {
   seedTradingPartners,
   toTradingPartnerStore,
   type TradingPartnerStore,
 } from './trading-partner'
 
-export type LookupTableRecord = Omit<LookupTable, 'entryCount' | 'scope'> & {
-  scope: LookupTableScopeInput
-}
+export {
+  type BlockingCode,
+  createLookupTables,
+  createLookupTableStore,
+  type LookupTableRecord,
+  type LookupTableStore,
+  partnerScope,
+  seedLookupTableNamed,
+  seedLookupTables,
+  toLookupTableStore,
+  type UpcomingCode,
+} from './lookup-table-seed'
 
 type TradingPartnerNames = {
   get: (id: string) => Pick<TradingPartner, 'id' | 'name'> | undefined
 }
-
-function namesOf(tradingPartners: ReadonlyArray<Pick<TradingPartner, 'id' | 'name'>>) {
-  return { get: (id: string) => tradingPartners.find((tradingPartner) => tradingPartner.id === id) }
-}
-
-const workspace = { kind: 'workspace' } as const
 
 function scopeOf(
   scope: LookupTableScopeInput,
   tradingPartners: TradingPartnerNames,
 ): LookupTableScope {
   if (scope.kind === 'workspace') {
-    return workspace
+    return workspaceScope
   }
 
   const tradingPartner = tradingPartners.get(scope.tradingPartnerId)
@@ -63,177 +94,267 @@ function scopeOf(
   }
 }
 
+export type LookupTableUsage = {
+  uses: LookupTableUse[]
+  missingCodes: MissingCode[]
+}
+
+const unused: LookupTableUsage = { uses: [], missingCodes: [] }
+
+function blockingCodesOf(missingCodes: ReadonlyArray<MissingCode>): string[] {
+  return missingCodes.flatMap(({ code, urgency }) => (urgency === 'blocking' ? [code] : []))
+}
+
+function countsOf(missingCodes: ReadonlyArray<MissingCode>): MissingCodeCounts {
+  const blocking = blockingCodesOf(missingCodes).length
+
+  return { blocking, upcoming: missingCodes.length - blocking }
+}
+
 export function toLookupTableSummary(
-  { entries, scope, ...table }: LookupTableRecord,
+  { id, name, kind, entries, scope, updatedAt }: LookupTableRecord,
   tradingPartners: TradingPartnerNames,
+  { uses, missingCodes }: LookupTableUsage = unused,
 ): LookupTableSummary {
-  return { ...table, scope: scopeOf(scope, tradingPartners), entryCount: entries.length }
+  return {
+    id,
+    name,
+    kind,
+    updatedAt,
+    scope: scopeOf(scope, tradingPartners),
+    entryCount: entries.length,
+    uses,
+    missingCodeCounts: countsOf(missingCodes),
+    blockingCodes: blockingCodesOf(missingCodes),
+  }
 }
 
 export function toLookupTable(
   record: LookupTableRecord,
   tradingPartners: TradingPartnerNames,
+  usage: LookupTableUsage = unused,
 ): LookupTable {
-  return { ...toLookupTableSummary(record, tradingPartners), entries: record.entries }
+  return {
+    ...toLookupTableSummary(record, tradingPartners, usage),
+    entries: record.entries,
+    codeMeanings: codeMeaningsOf(
+      record.kind,
+      record.entries.map(({ targetCode }) => targetCode),
+    ),
+  }
 }
 
-function assertValid(record: LookupTableRecord, tradingPartners: TradingPartnerNames) {
-  lookupTableSchema.parse(toLookupTable(record, tradingPartners))
+type LookupTableTarget = Extract<FixTarget, { kind: 'lookupTable' }>
+
+export type LookupTableWorld = {
+  mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
+  flows?: ReadonlyArray<FlowRecord> | FlowStore
+  channels?: ReadonlyArray<ChannelRecord> | ChannelStore
+  runs?: ReadonlyArray<RunSummary> | RunStore
+  reprocessed?: ReadonlyArray<Reprocessed>
 }
 
-function partnerScope({ id }: Pick<TradingPartner, 'id'>): LookupTableScopeInput {
-  return { kind: 'tradingPartner', tradingPartnerId: id }
+function readsTable(mapping: MappingDraftRecord, tableId: string) {
+  return mapping.transforms.some(
+    (transform) => transform.kind === 'lookupTable' && transform.config.lookupTableId === tableId,
+  )
 }
 
-function entries(...pairs: ReadonlyArray<readonly [string, string]>): LookupTableEntry[] {
-  return pairs.map(([sourceCode, targetCode]) => ({ sourceCode, targetCode }))
+function byName(a: { name: string }, b: { name: string }) {
+  return a.name.localeCompare(b.name, 'de')
 }
 
-const [hansemarkt, alpenfrisch] = seedTradingPartners
+function failedRunReference(run: RunSummary): FailedRunReference {
+  return {
+    id: run.id,
+    receivedAt: run.receivedAt,
+    tradingPartner: run.tradingPartner,
+    messageType: run.messageType,
+    businessReference: run.businessReference,
+  }
+}
 
-const seeds: ReadonlyArray<Omit<LookupTableRecord, 'id'>> = [
-  {
-    name: 'Units of measure',
-    scope: workspace,
-    updatedAt: '2026-09-14T08:30:00.000Z',
-    entries: entries(['ST', 'PCE'], ['STK', 'PCE'], ['KG', 'KGM'], ['L', 'LTR']),
-  },
-  {
-    name: 'Country codes',
-    scope: workspace,
-    updatedAt: '2026-08-02T13:05:00.000Z',
-    entries: entries(['Deutschland', 'DE'], ['Österreich', 'AT'], ['Schweiz', 'CH']),
-  },
-  {
-    name: 'VAT categories',
-    scope: workspace,
-    updatedAt: '2026-07-21T09:45:00.000Z',
-    entries: entries(['19', 'S'], ['7', 'AA'], ['0', 'Z']),
-  },
-  {
-    name: 'Hansemarkt units',
-    scope: partnerScope(hansemarkt!),
-    updatedAt: '2026-09-30T15:12:00.000Z',
-    entries: entries(['ST', 'PCE'], ['KAR', 'CT']),
-  },
-  {
-    name: 'Alpenfrisch article groups',
-    scope: partnerScope(alpenfrisch!),
-    updatedAt: '2026-10-02T11:20:00.000Z',
-    entries: entries(['OG', 'FRUIT'], ['MO', 'DAIRY'], ['BR', 'BAKERY']),
-  },
-]
+function newestFirst(a: Pick<RunSummary, 'receivedAt'>, b: Pick<RunSummary, 'receivedAt'>) {
+  return Date.parse(b.receivedAt) - Date.parse(a.receivedAt)
+}
 
-export const seedLookupTables: ReadonlyArray<LookupTableRecord> = seeds.map((seed, index) => {
-  const record = { id: seedId(8, index + 1), ...seed }
-  assertValid(record, namesOf(seedTradingPartners))
+let seedRunStore: RunStore | undefined
 
-  return record
-})
+export function createLookupTableUsage(
+  lookupTables: LookupTableStore,
+  tradingPartners: TradingPartnerStore,
+  world: LookupTableWorld = {},
+) {
+  const mappings = toMappingDraftStore(world.mappings ?? seedMappingDrafts)
+  const flows = toFlowStore(world.flows ?? seedFlows)
+  const channels = toChannelStore(world.channels ?? seedChannels)
+  let runStore: RunStore | undefined
+  const targets = new Map<string, LookupTableTarget | null>()
 
-export function seedLookupTableNamed(name: string): LookupTableRecord {
-  const found = seedLookupTables.find((table) => table.name === name)
+  function runs() {
+    runStore ??=
+      world.runs === undefined && world.reprocessed === undefined
+        ? (seedRunStore ??= toRunStore(seedRuns()))
+        : toRunStore(world.runs ?? seedRuns(), world.reprocessed)
 
-  if (!found) {
-    throw new Error(`No seed Lookup Table named ${name}`)
+    return runStore
   }
 
-  return found
-}
+  // Placing every Run is costly, and only a replacing Run takes another business reference.
+  function placedOf(run: RunSummary) {
+    return runs().replacedOf(run.id) === undefined ? run : runs().get(run.id)!
+  }
 
-const subjects = ['units', 'country codes', 'article groups', 'VAT categories', 'packaging types']
+  function targetOf(run: RunSummary): LookupTableTarget | null {
+    const failure = lookupTableFailureOf(run)
 
-function generateEntries(faker: Faker, count: number): LookupTableEntry[] {
-  return Array.from({ length: count }, (_, index) => ({
-    sourceCode: `${faker.string.alpha({ length: 2, casing: 'upper' })}${index + 1}`,
-    targetCode: faker.string.alphanumeric({ length: { min: 2, max: 3 }, casing: 'upper' }),
-  }))
-}
-
-export function createLookupTables({
-  count,
-  entryCount,
-  now = new Date(),
-  seed = 31,
-  tradingPartners = seedTradingPartners,
-}: {
-  count: number
-  entryCount?: number
-  now?: Date
-  seed?: number
-  tradingPartners?: ReadonlyArray<Pick<TradingPartner, 'id' | 'name'>>
-}): LookupTableRecord[] {
-  const faker = new Faker({ locale: [en], seed })
-
-  return Array.from({ length: count }, (_, index) => {
-    const tradingPartner = index % 3 === 0 ? null : faker.helpers.arrayElement(tradingPartners)
-    const subject = faker.helpers.arrayElement(subjects)
-
-    const record: LookupTableRecord = {
-      id: faker.string.uuid(),
-      name: tradingPartner
-        ? `${tradingPartner.name.split(/[\s,]/)[0]} ${subject} ${index + 1}`
-        : `${subject[0]!.toUpperCase()}${subject.slice(1)} ${index + 1}`,
-      scope: tradingPartner ? partnerScope(tradingPartner) : workspace,
-      updatedAt: faker.date.past({ years: 1, refDate: now }).toISOString(),
-      entries: generateEntries(faker, entryCount ?? faker.number.int({ min: 0, max: 12 })),
+    if (failure === null) {
+      return null
     }
 
-    assertValid(record, namesOf(tradingPartners))
+    if (!targets.has(run.id)) {
+      const problem = problemOf(run, failure, null, {
+        flows,
+        channels,
+        lookupTables,
+      })
 
-    return record
+      const target = problem?.fixTarget
+      targets.set(run.id, target?.kind === 'lookupTable' ? target : null)
+    }
+
+    return targets.get(run.id) ?? null
+  }
+
+  function partnersOf(mappingId: string, scope: LookupTableScopeInput): TradingPartnerSummary[] {
+    const versions = publishedVersionsByMapping(mappings.all())
+
+    const ids = new Set(
+      flows
+        .all()
+        .flatMap(({ mappingVersionId, tradingPartnerId }) =>
+          versions.find(mappingVersionId)?.version.mappingId === mappingId &&
+          (scope.kind === 'workspace' || tradingPartnerId === scope.tradingPartnerId)
+            ? [tradingPartnerId]
+            : [],
+        ),
+    )
+
+    return [...ids]
+      .flatMap((id) => {
+        const tradingPartner = tradingPartners.get(id)
+
+        return tradingPartner ? [{ id: tradingPartner.id, name: tradingPartner.name }] : []
+      })
+      .sort(byName)
+  }
+
+  function usesOf(table: LookupTableRecord): LookupTableUse[] {
+    return mappings
+      .all()
+      .flatMap((mapping) =>
+        readsTable(mapping, table.id)
+          ? [
+              {
+                mappingId: mapping.id,
+                name: mapping.name,
+                messageType: mapping.messageType,
+                direction: directionOf(mapping),
+                tradingPartners: partnersOf(mapping.id, table.scope),
+              },
+            ]
+          : [],
+      )
+      .sort(byName)
+  }
+
+  function missingCodesOf(table: LookupTableRecord): MissingCode[] {
+    const translated = new Set(table.entries.map(({ sourceCode }) => sourceCode))
+    const failedRuns = new Map<string, FailedRunReference[]>()
+
+    function block(code: string, references: ReadonlyArray<FailedRunReference>) {
+      if (!translated.has(code)) {
+        failedRuns.set(code, [...(failedRuns.get(code) ?? []), ...references])
+      }
+    }
+
+    for (const run of runs().unplaced()) {
+      const target = targetOf(run)
+
+      if (target?.lookupTableId === table.id && runs().replacingOf(run.id) === undefined) {
+        block(target.code, [failedRunReference(placedOf(run))])
+      }
+    }
+
+    for (const { code, failedRuns: references } of table.blockingCodes ?? []) {
+      block(code, references)
+    }
+
+    const blocking = [...failedRuns]
+      .map(([code, references]) => ({
+        urgency: 'blocking' as const,
+        code,
+        ...hintFor(table.kind, code),
+        failedRuns: references.toSorted(newestFirst),
+      }))
+      .toSorted((a, b) => newestFirst(a.failedRuns[0]!, b.failedRuns[0]!))
+
+    const upcoming = (table.upcomingCodes ?? [])
+      .toSorted((a, b) => b.itemCount - a.itemCount)
+      .flatMap(({ code, itemCount }): MissingCode[] =>
+        translated.has(code) || failedRuns.has(code)
+          ? []
+          : [{ urgency: 'upcoming', code, ...hintFor(table.kind, code), itemCount }],
+      )
+
+    return [...blocking, ...upcoming]
+  }
+
+  return (table: LookupTableRecord): LookupTableUsage => ({
+    uses: usesOf(table),
+    missingCodes: missingCodesOf(table),
   })
 }
 
-export type LookupTableStore = {
-  all: () => readonly LookupTableRecord[]
-  get: (id: string) => LookupTableRecord | undefined
-  translate: (id: string, value: string) => string | undefined
-  set: (table: LookupTableRecord) => void
-  delete: (id: string) => void
-}
-
-export function createLookupTableStore(
-  lookupTables: ReadonlyArray<LookupTableRecord> = seedLookupTables,
-): LookupTableStore {
-  const byId = new Map(lookupTables.map((table) => [table.id, table]))
-
-  return {
-    all: () => [...byId.values()],
-    get: (id) => byId.get(id),
-    translate: (id, value) =>
-      byId.get(id)?.entries.find(({ sourceCode }) => sourceCode === value)?.targetCode,
-    set: (table) => {
-      byId.set(table.id, table)
-    },
-    delete: (id) => {
-      byId.delete(id)
-    },
-  }
-}
-
-export function toLookupTableStore(
-  lookupTables: ReadonlyArray<LookupTableRecord> | LookupTableStore = seedLookupTables,
-) {
-  return 'get' in lookupTables ? lookupTables : createLookupTableStore(lookupTables)
-}
+type Usage = (table: LookupTableRecord) => LookupTableUsage
 
 export function lookupTableListHandler(
   apiUrl: string,
   lookupTables: ReadonlyArray<LookupTableRecord> | LookupTableStore = seedLookupTables,
   tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore = seedTradingPartners,
+  usage?: Usage,
 ) {
   const store = toLookupTableStore(lookupTables)
   const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
+  const usageOf = usage ?? createLookupTableUsage(store, tradingPartnerStore)
 
   return http.get(`${apiUrl}${lookupTablesEndpoint.path}`, () =>
     HttpResponse.json(
       store
         .all()
-        .map((table) => toLookupTableSummary(table, tradingPartnerStore))
-        .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+        .map((table) => toLookupTableSummary(table, tradingPartnerStore, usageOf(table)))
+        .sort(byName),
     ),
   )
+}
+
+export type LookupTablesState = 'loading' | 'error'
+
+function stateHandlers(apiUrl: string, state: LookupTablesState) {
+  const respond = async () => {
+    if (state === 'loading') {
+      await delay('infinite')
+    }
+
+    return serverError()
+  }
+
+  return [
+    http.get(`${apiUrl}${lookupTablesEndpoint.path}`, respond),
+    http.get(`${apiUrl}${lookupTableSuggestionsEndpoint.path}`, respond),
+    http.get(`${apiUrl}${lookupTableMissingCodesEndpoint.path}`, respond),
+    http.get(`${apiUrl}${lookupTableEndpoint.path}`, respond),
+  ]
 }
 
 function sameName(a: string, b: string) {
@@ -251,13 +372,19 @@ export function lookupTableHandlers(
   {
     lookupTables = seedLookupTables,
     tradingPartners = seedTradingPartners,
+    ...world
   }: {
-    lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore
+    lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore | LookupTablesState
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
-  } = {},
+  } & LookupTableWorld = {},
 ) {
+  if (lookupTables === 'loading' || lookupTables === 'error') {
+    return stateHandlers(apiUrl, lookupTables)
+  }
+
   const store = toLookupTableStore(lookupTables)
   const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
+  const usageOf = createLookupTableUsage(store, tradingPartnerStore, world)
 
   function nameTaken(name: string, scope: LookupTableScopeInput, ownId?: string) {
     return store
@@ -272,7 +399,8 @@ export function lookupTableHandlers(
     request: Request,
     ownId?: string,
   ): Promise<
-    { table: Pick<LookupTableRecord, 'name' | 'scope' | 'entries'> } | { response: Response }
+    | { table: Pick<LookupTableRecord, 'name' | 'kind' | 'scope' | 'entries'> }
+    | { response: Response }
   > {
     const body = createLookupTableEndpoint.body.safeParse(await request.json())
 
@@ -280,7 +408,7 @@ export function lookupTableHandlers(
       return { response: badRequest(body.error.message) }
     }
 
-    const { name, entries, scope }: LookupTableInput = body.data
+    const { name, kind, entries, scope }: LookupTableInput = body.data
 
     if (scope.kind === 'tradingPartner' && !tradingPartnerStore.get(scope.tradingPartnerId)) {
       return { response: unprocessable('Unknown Trading Partner') }
@@ -290,7 +418,7 @@ export function lookupTableHandlers(
       return { response: conflict('Another Lookup Table of this scope already uses this name') }
     }
 
-    return { table: { name, scope, entries } }
+    return { table: { name, kind, scope, entries } }
   }
 
   async function parseImport(
@@ -310,12 +438,38 @@ export function lookupTableHandlers(
       : { response: badRequest(body.error.message) }
   }
 
+  function serve(table: LookupTableRecord, init?: ResponseInit) {
+    return HttpResponse.json(toLookupTable(table, tradingPartnerStore, usageOf(table)), init)
+  }
+
   return [
-    lookupTableListHandler(apiUrl, store, tradingPartnerStore),
+    lookupTableListHandler(apiUrl, store, tradingPartnerStore, usageOf),
+    http.get(`${apiUrl}${lookupTableSuggestionsEndpoint.path}`, ({ request }) => {
+      const query = lookupTableSuggestionsEndpoint.query.safeParse(
+        fromSearchParams(new URL(request.url).searchParams),
+      )
+
+      if (!query.success) {
+        return badRequest(query.error.message)
+      }
+
+      const { kind, tradingPartnerId } = query.data
+
+      if (tradingPartnerId !== undefined && !tradingPartnerStore.get(tradingPartnerId)) {
+        return unprocessable('Unknown Trading Partner')
+      }
+
+      return HttpResponse.json({ entries: firstValuesOf(kind) })
+    }),
     http.get<{ id: string }>(`${apiUrl}${lookupTableEndpoint.path}`, ({ params }) => {
       const table = store.get(params.id)
 
-      return table ? HttpResponse.json(toLookupTable(table, tradingPartnerStore)) : notFound()
+      return table ? serve(table) : notFound()
+    }),
+    http.get<{ id: string }>(`${apiUrl}${lookupTableMissingCodesEndpoint.path}`, ({ params }) => {
+      const table = store.get(params.id)
+
+      return table ? HttpResponse.json(usageOf(table).missingCodes) : notFound()
     }),
     http.post(`${apiUrl}${createLookupTableEndpoint.path}`, async ({ request }) => {
       const parsed = await parseInput(request)
@@ -332,7 +486,7 @@ export function lookupTableHandlers(
 
       store.set(created)
 
-      return HttpResponse.json(toLookupTable(created, tradingPartnerStore), { status: 201 })
+      return serve(created, { status: 201 })
     }),
     http.put<{ id: string }>(
       `${apiUrl}${updateLookupTableEndpoint.path}`,
@@ -357,7 +511,7 @@ export function lookupTableHandlers(
 
         store.set(updated)
 
-        return HttpResponse.json(toLookupTable(updated, tradingPartnerStore))
+        return serve(updated)
       },
     ),
     http.delete<{ id: string }>(`${apiUrl}${deleteLookupTableEndpoint.path}`, ({ params }) => {
@@ -394,7 +548,7 @@ export function lookupTableHandlers(
 
         store.set(imported)
 
-        return HttpResponse.json(toLookupTable(imported, tradingPartnerStore))
+        return serve(imported)
       },
     ),
   ]
