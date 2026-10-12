@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import { type FormEvent, type ReactNode, useId, useState } from 'react'
 
-import { LoadFailure } from '@/components/detail-parts'
+import { Failure, Loading } from '@/components/detail-parts'
 import { TextField } from '@/components/form-field'
 import { BudgetUsage } from '@/components/settings/budget-usage'
 import { useSession } from '@/hooks/use-session'
@@ -23,7 +23,6 @@ import {
   type WorkspaceSettingsValues,
 } from '@/lib/forms/workspace-settings'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { WorkspaceSettings, WorkspaceSettingsInput } from '@edi-bridge/contracts'
 
@@ -144,11 +143,13 @@ function WorkspaceSettingsForm({
 
 export function WorkspaceSettingsSection({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Operator.settings')
-  const tSettings = useTranslations('Settings')
   const queryClient = useQueryClient()
-  const { session } = useSession()
-  const { data, status, refetch } = useQuery(operatorWorkspaceSettingsQuery(workspaceId))
   const id = useId()
+  const { session } = useSession()
+
+  const { data, isPending, isError, refetch } = useQuery(
+    operatorWorkspaceSettingsQuery(workspaceId),
+  )
 
   async function save(input: WorkspaceSettingsInput) {
     const updated = await updateOperatorWorkspaceSettings(workspaceId, input)
@@ -165,19 +166,21 @@ export function WorkspaceSettingsSection({ workspaceId }: { workspaceId: string 
         </h2>
         <p className="text-muted-foreground text-sm">{t('description')}</p>
       </div>
-      {status === 'pending' && (
-        <div aria-busy className="flex max-w-xl flex-col gap-4">
-          <p role="status" className="sr-only">
-            {tSettings('loading')}
-          </p>
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-20 w-full" />
-        </div>
+      {isPending ? (
+        <Loading label={t('loading')} rowClassName="h-10" rows={2} />
+      ) : isError ? (
+        <Failure
+          error={{
+            title: t('error.title'),
+            description: t('error.description'),
+            retry: t('error.retry'),
+          }}
+          notFound={null}
+          onRetry={() => void refetch()}
+        />
+      ) : (
+        <WorkspaceSettingsForm save={save} settings={data} />
       )}
-      {status === 'error' && (
-        <LoadFailure namespace="Settings" notFound={false} onRetry={() => void refetch()} />
-      )}
-      {status === 'success' && data && <WorkspaceSettingsForm save={save} settings={data} />}
     </section>
   )
 }

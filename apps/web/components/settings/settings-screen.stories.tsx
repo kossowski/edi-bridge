@@ -266,8 +266,9 @@ export const DataAndAi = meta.story({
     const data = panel(canvasElement)
     await expect(data.getByText('90 days')).toBeVisible()
     await expect(data.getByText(/process a document again only while it is kept/)).toBeVisible()
-    await expect(data.getByText('200,000 tokens')).toBeVisible()
-    await expect(data.getByRole('progressbar', { name: 'Used today' })).toHaveAttribute(
+    await expect(data.getByText('76% of today’s AI budget is left.')).toBeVisible()
+    await expect(data.getByText(/AI stops drafting mappings until tomorrow/)).toBeVisible()
+    await expect(data.getByRole('progressbar', { name: 'Tokens used today' })).toHaveAttribute(
       'aria-valuetext',
       '48,350 of 200,000 tokens (24%)',
     )
@@ -307,6 +308,7 @@ export const BudgetExhausted = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('Today’s AI budget is used up')).toBeVisible()
     await expect(canvas.getByText(/cannot draft mappings until tomorrow/)).toBeVisible()
+    await expect(canvas.queryByText(/budget is left/)).toBeNull()
     await expect(canvas.getByText('200,000 of 200,000 tokens (100%)')).toBeVisible()
   },
 })
@@ -319,7 +321,7 @@ export const AiTurnedOff = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('AI is turned off')).toBeVisible()
     await expect(canvas.queryByRole('progressbar')).toBeNull()
-    await expect(canvas.queryByText(/per day/)).toBeNull()
+    await expect(canvas.queryByText(/budget is left/)).toBeNull()
   },
 })
 
@@ -330,7 +332,7 @@ export const LargeNumbers = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('730 days')).toBeVisible()
-    await expect(canvas.getByText('10,000,000 tokens')).toBeVisible()
+    await expect(canvas.getByText('1% of today’s AI budget is left.')).toBeVisible()
     await expect(canvas.getByText('9,876,543 of 10,000,000 tokens (99%)')).toBeVisible()
   },
 })
@@ -365,7 +367,7 @@ export const DataAndAiGerman = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('Vom Operator festgelegt')).toBeVisible()
     await expect(canvas.getByText('730 Tage')).toBeVisible()
-    await expect(canvas.getByText('10.000.000 Tokens')).toBeVisible()
+    await expect(canvas.getByText(/des heutigen KI-Budgets sind noch übrig/)).toBeVisible()
     await expect(canvas.getByText('9.876.543 von 10.000.000 Tokens (99 %)')).toBeVisible()
   },
 })
@@ -390,7 +392,7 @@ export const DataAndAiDark = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('Today’s AI budget is used up')).toBeVisible()
-    await expect(canvas.getByRole('progressbar', { name: 'Used today' })).toBeVisible()
+    await expect(canvas.getByRole('progressbar', { name: 'Tokens used today' })).toBeVisible()
   },
 })
 

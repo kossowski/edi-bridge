@@ -8,12 +8,15 @@ import { CompanyTab } from '@/components/settings/company-tab'
 import { DataTab } from '@/components/settings/data-tab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
-const settingsTabs = ['company', 'data'] as const
+const settingsTabs = [
+  { value: 'company', Panel: CompanyTab },
+  { value: 'data', Panel: DataTab },
+] as const
 
-type SettingsTab = (typeof settingsTabs)[number]
+type SettingsTab = (typeof settingsTabs)[number]['value']
 
 function settingsTabOf(value: string | null): SettingsTab {
-  return settingsTabs.find((tab) => tab === value) ?? 'company'
+  return settingsTabs.find((tab) => tab.value === value)?.value ?? 'company'
 }
 
 export function SettingsTabs() {
@@ -33,16 +36,21 @@ export function SettingsTabs() {
     <Tabs value={tab} onValueChange={changeTab}>
       <HeaderTabs>
         <TabsList variant="line">
-          <TabsTrigger value="company">{t('company')}</TabsTrigger>
-          <TabsTrigger value="data">{t('data')}</TabsTrigger>
+          {settingsTabs.map(({ value }) => (
+            <TabsTrigger key={value} value={value}>
+              {t(value)}
+            </TabsTrigger>
+          ))}
         </TabsList>
       </HeaderTabs>
-      <TabsContent value="company" className="mx-auto flex w-full max-w-4xl flex-col gap-4">
-        <CompanyTab />
-      </TabsContent>
-      <TabsContent value="data" className="mx-auto flex w-full max-w-4xl flex-col gap-4">
-        <DataTab />
-      </TabsContent>
+      {settingsTabs.map(({ value, Panel }) => (
+        <TabsContent
+          key={value}
+          value={value}
+          className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+          <Panel />
+        </TabsContent>
+      ))}
     </Tabs>
   )
 }

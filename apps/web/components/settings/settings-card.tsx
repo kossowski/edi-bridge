@@ -2,8 +2,10 @@
 
 import { useTranslations } from 'next-intl'
 
+import type { UseQueryResult } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
+import { LoadFailure } from '@/components/detail-parts'
 import {
   Card,
   CardContent,
@@ -35,7 +37,7 @@ export function SettingsCard({
   )
 }
 
-export function SettingsTabLoading() {
+function SettingsTabLoading() {
   const t = useTranslations('Settings')
 
   return (
@@ -47,4 +49,26 @@ export function SettingsTabLoading() {
       <Skeleton className="h-28 w-full rounded-xl" />
     </div>
   )
+}
+
+export function SettingsTabContent<TData>({
+  query,
+  waiting = false,
+  children,
+}: {
+  query: UseQueryResult<TData>
+  waiting?: boolean
+  children: (data: TData) => ReactNode
+}) {
+  if (waiting || query.isPending) {
+    return <SettingsTabLoading />
+  }
+
+  if (query.isError) {
+    return (
+      <LoadFailure namespace="Settings" notFound={false} onRetry={() => void query.refetch()} />
+    )
+  }
+
+  return children(query.data)
 }

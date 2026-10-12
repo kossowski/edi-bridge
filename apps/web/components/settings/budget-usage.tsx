@@ -23,14 +23,32 @@ export function BudgetUsage({ budget }: { budget: AiTokenBudget }) {
     )
   }
 
+  const percent = (share: number) =>
+    format.number(share, { style: 'percent', maximumFractionDigits: 0 })
+
   const used = t('used', {
     used: format.number(budget.usedToday),
     limit: format.number(budget.dailyLimit),
-    share: format.number(usage.share, { style: 'percent', maximumFractionDigits: 0 }),
+    share: percent(usage.share),
   })
 
   return (
     <div className="flex flex-col gap-3">
+      {usage.exhausted ? (
+        <Alert role={undefined} className="border-red-700/40 bg-red-500/10">
+          <AlertTitle>{t('exhausted.title')}</AlertTitle>
+          <AlertDescription className="text-foreground">
+            {t('exhausted.description')}
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <p>
+          {t.rich('left', {
+            left: percent(1 - usage.share),
+            strong: (chunks) => <strong>{chunks}</strong>,
+          })}
+        </p>
+      )}
       <Progress
         getAriaValueText={() => used}
         max={1}
@@ -40,17 +58,11 @@ export function BudgetUsage({ budget }: { budget: AiTokenBudget }) {
           usage.exhausted &&
             '**:data-[slot=progress-indicator]:bg-red-700 dark:**:data-[slot=progress-indicator]:bg-red-400',
         )}>
-        <ProgressLabel>{t('usedLabel')}</ProgressLabel>
-        <ProgressValue className="text-foreground">{() => used}</ProgressValue>
+        <ProgressLabel className="text-muted-foreground font-normal">
+          {t('usedLabel')}
+        </ProgressLabel>
+        <ProgressValue>{() => used}</ProgressValue>
       </Progress>
-      {usage.exhausted && (
-        <Alert role={undefined} className="border-red-700/40 bg-red-500/10">
-          <AlertTitle>{t('exhausted.title')}</AlertTitle>
-          <AlertDescription className="text-foreground">
-            {t('exhausted.description')}
-          </AlertDescription>
-        </Alert>
-      )}
     </div>
   )
 }

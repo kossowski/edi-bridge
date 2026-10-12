@@ -8,7 +8,7 @@ import { Fact, Failure } from '@/components/detail-parts'
 import { SandboxReset } from '@/components/operator/sandbox-reset'
 import { WorkspaceInvites } from '@/components/operator/workspace-invites'
 import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
-import { WorkspaceSettingsSection } from '@/components/operator/workspace-settings-form'
+import { WorkspaceSettingsSection } from '@/components/operator/workspace-settings-section'
 import {
   WorkspaceCreatedAt,
   WorkspaceGln,

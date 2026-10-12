@@ -2380,12 +2380,12 @@
       },
       "budget": {
         "title": "KI-Budget",
-        "description": "Die KI verbraucht Tokens, wenn sie ein Mapping für Sie entwirft. Das Budget beginnt jeden Tag wieder bei null.",
-        "limit": "<strong>{limit, plural, one {# Token} other {# Tokens}}</strong> pro Tag"
+        "description": "Mit dem KI-Budget entwirft die KI Mappings für Sie. Es beginnt jeden Tag neu."
       }
     },
     "budgetUsage": {
-      "usedLabel": "Heute verbraucht",
+      "left": "<strong>{left} des heutigen KI-Budgets sind noch übrig.</strong> Ist es aufgebraucht, entwirft die KI bis morgen keine Mappings mehr. Alles andere funktioniert weiter.",
+      "usedLabel": "Heute verbrauchte Tokens",
       "used": "{used} von {limit} Tokens ({share})",
       "exhausted": {
         "title": "Das KI-Budget für heute ist aufgebraucht",
@@ -2567,6 +2567,12 @@
     "settings": {
       "title": "Aufbewahrung und KI-Budget",
       "description": "Wie lange dieser Workspace Roh-Documents aufbewahrt und wie viele KI-Tokens er pro Tag verbrauchen darf.",
+      "loading": "Aufbewahrung und KI-Budget werden geladen",
+      "error": {
+        "title": "Aufbewahrung und KI-Budget nicht verfügbar",
+        "description": "Die Aufbewahrungsdauer und das KI-Budget konnten nicht geladen werden.",
+        "retry": "Erneut versuchen"
+      },
       "retention": {
         "title": "Aufbewahrungsdauer für Documents",
         "description": "Ältere Roh-Documents werden gelöscht. Ein Run lässt sich nur per Reprocess erneut verarbeiten, solange sein Roh-Document aufbewahrt wird.",

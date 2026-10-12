@@ -2380,12 +2380,12 @@
       },
       "budget": {
         "title": "AI budget",
-        "description": "The AI uses tokens when it drafts a mapping for you. The budget starts again at zero every day.",
-        "limit": "<strong>{limit, plural, one {# token} other {# tokens}}</strong> per day"
+        "description": "The AI budget lets the AI draft mappings for you. It starts again every day."
       }
     },
     "budgetUsage": {
-      "usedLabel": "Used today",
+      "left": "<strong>{left} of today’s AI budget is left.</strong> When it is used up, the AI stops drafting mappings until tomorrow. Everything else keeps working.",
+      "usedLabel": "Tokens used today",
       "used": "{used} of {limit} tokens ({share})",
       "exhausted": {
         "title": "Today’s AI budget is used up",
@@ -2567,6 +2567,12 @@
     "settings": {
       "title": "Retention and AI budget",
       "description": "How long this Workspace keeps raw Documents and how many AI tokens it may use per day.",
+      "loading": "Loading retention and AI budget",
+      "error": {
+        "title": "Retention and AI budget unavailable",
+        "description": "The retention period and AI budget could not be loaded.",
+        "retry": "Try again"
+      },
       "retention": {
         "title": "Document retention period",
         "description": "Raw Documents older than this are deleted. A Run can only be reprocessed while its raw Document is kept.",

@@ -5,14 +5,12 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 
-import { LoadFailure } from '@/components/detail-parts'
 import { BudgetUsage } from '@/components/settings/budget-usage'
-import { SettingsCard, SettingsTabLoading } from '@/components/settings/settings-card'
-import { useSession } from '@/hooks/use-session'
+import { SettingsCard, SettingsTabContent } from '@/components/settings/settings-card'
 import { workspaceSettingsQuery } from '@/lib/api/queries'
 import { Alert, AlertDescription, AlertTitle } from '@edi-bridge/ui/components/alert'
 
-import type { WorkspaceSettings } from '@edi-bridge/contracts'
+import type { AiTokenBudget } from '@edi-bridge/contracts'
 
 function Retention({ days }: { days: number }) {
   const t = useTranslations('Settings.data.retention')
@@ -25,51 +23,33 @@ function Retention({ days }: { days: number }) {
   )
 }
 
-function AiBudget({ settings }: { settings: WorkspaceSettings }) {
+function AiBudget({ budget }: { budget: AiTokenBudget }) {
   const t = useTranslations('Settings.data.budget')
-  const { dailyLimit } = settings.aiTokenBudget
 
   return (
     <SettingsCard description={t('description')} title={t('title')}>
-      {dailyLimit > 0 && (
-        <p>
-          {t.rich('limit', {
-            limit: dailyLimit,
-            strong: (chunks) => <strong>{chunks}</strong>,
-          })}
-        </p>
-      )}
-      <BudgetUsage budget={settings.aiTokenBudget} />
+      <BudgetUsage budget={budget} />
     </SettingsCard>
   )
 }
 
 export function DataTab() {
   const t = useTranslations('Settings.data')
-  const session = useSession()
   const query = useQuery(workspaceSettingsQuery)
 
-  if (session.isPending || query.isPending) {
-    return <SettingsTabLoading />
-  }
-
-  if (query.isError) {
-    return (
-      <LoadFailure namespace="Settings" notFound={false} onRetry={() => void query.refetch()} />
-    )
-  }
-
-  const { data } = query
-
   return (
-    <>
-      <Alert role={undefined}>
-        <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} />
-        <AlertTitle>{t('setByOperator.title')}</AlertTitle>
-        <AlertDescription>{t('setByOperator.description')}</AlertDescription>
-      </Alert>
-      <Retention days={data.documentRetentionDays} />
-      <AiBudget settings={data} />
-    </>
+    <SettingsTabContent query={query}>
+      {(settings) => (
+        <>
+          <Alert role={undefined}>
+            <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} />
+            <AlertTitle>{t('setByOperator.title')}</AlertTitle>
+            <AlertDescription>{t('setByOperator.description')}</AlertDescription>
+          </Alert>
+          <Retention days={settings.documentRetentionDays} />
+          <AiBudget budget={settings.aiTokenBudget} />
+        </>
+      )}
+    </SettingsTabContent>
   )
 }

@@ -6,9 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { type FormEvent, useId, useState } from 'react'
 
-import { LoadFailure } from '@/components/detail-parts'
 import { GlnField, useGlnErrorMessage } from '@/components/form-field'
-import { SettingsCard, SettingsTabLoading } from '@/components/settings/settings-card'
+import { SettingsCard, SettingsTabContent } from '@/components/settings/settings-card'
 import { useSession } from '@/hooks/use-session'
 import { updateCompanyIdentity } from '@/lib/api/client'
 import { currentWorkspaceQuery } from '@/lib/api/queries'
@@ -47,16 +46,13 @@ function CompanyView({ workspace }: { workspace: Workspace }) {
   const t = useTranslations('Settings.company')
 
   return (
-    <dl className="flex flex-col gap-4">
-      <div className="flex flex-col gap-0.5">
-        <dt className="text-muted-foreground text-xs">{t('name')}</dt>
-        <dd className="text-sm font-medium">{workspace.name}</dd>
-      </div>
-      <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-4">
+      <CompanyName name={workspace.name} />
+      <dl className="flex flex-col gap-0.5">
         <dt className="text-muted-foreground text-xs">{t('gln.label')}</dt>
         <dd className="font-mono text-sm">{workspace.gln ?? t('notSet')}</dd>
-      </div>
-    </dl>
+      </dl>
+    </div>
   )
 }
 
@@ -132,24 +128,20 @@ export function CompanyTab() {
   const session = useSession()
   const query = useQuery(currentWorkspaceQuery)
 
-  if (session.isPending || query.isPending) {
-    return <SettingsTabLoading />
-  }
-
-  if (query.isError) {
-    return (
-      <LoadFailure namespace="Settings" notFound={false} onRetry={() => void query.refetch()} />
-    )
-  }
-
-  const { data } = query
-
   return (
-    <>
-      {data.gln === null && <MissingGln canChange={session.canChange} />}
-      <SettingsCard description={t('description')} title={t('title')}>
-        {session.canChange ? <CompanyForm workspace={data} /> : <CompanyView workspace={data} />}
-      </SettingsCard>
-    </>
+    <SettingsTabContent query={query} waiting={session.isPending}>
+      {(workspace) => (
+        <>
+          {workspace.gln === null && <MissingGln canChange={session.canChange} />}
+          <SettingsCard description={t('description')} title={t('title')}>
+            {session.canChange ? (
+              <CompanyForm workspace={workspace} />
+            ) : (
+              <CompanyView workspace={workspace} />
+            )}
+          </SettingsCard>
+        </>
+      )}
+    </SettingsTabContent>
   )
 }
