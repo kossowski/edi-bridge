@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useId } from 'react'
 
 import { navigationItems } from '@/lib/navigation'
+import { taskGroupHref } from '@/lib/task-href'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -102,7 +103,7 @@ export function HomeKeyNumbers({
               ? undefined
               : t('needsAttention.hint', { count: needsAttention })
           }
-          href={navigationItems.tasks.href}
+          href={taskGroupHref('you')}
           label={t('needsAttention.label')}
           value={needsAttention}
         />
@@ -124,7 +125,7 @@ export function HomeKeyNumbers({
               ? undefined
               : t('waitingForTradingPartner.hint', { count: waiting })
           }
-          href={navigationItems.tasks.href}
+          href={taskGroupHref('tradingPartner')}
           label={t('waitingForTradingPartner.label')}
           value={waiting}
         />

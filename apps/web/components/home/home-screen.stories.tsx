@@ -49,7 +49,7 @@ export const KeyNumbers = meta.story({
 
     await expect(
       numbers.getByRole('link', { name: /^Needs attention\s*Needs you\s*3\s*Open tasks for you/ }),
-    ).toHaveAttribute('href', '/tasks')
+    ).toHaveAttribute('href', '/tasks#for-you')
     await expect(
       numbers.getByRole('link', { name: /^Delivered in 24 hours\s*12\s*3 failed/ }),
     ).toHaveAttribute('href', '/documents?status=done')
@@ -58,7 +58,7 @@ export const KeyNumbers = meta.story({
     ).toHaveAttribute('href', '/documents?status=progress')
     await expect(
       numbers.getByRole('link', { name: /^Waiting for a partner\s*2\s*Show who/ }),
-    ).toHaveAttribute('href', '/tasks')
+    ).toHaveAttribute('href', '/tasks#waiting-for-partner')
 
     const tradingPartners = within(canvas.getByRole('region', { name: 'Your trading partners' }))
 
@@ -135,7 +135,7 @@ export const Loading = meta.story({
     await expect(canvas.getByText('Loading Home')).toBeInTheDocument()
     await expect(canvas.getByRole('link', { name: /^Needs attention/ })).toHaveAttribute(
       'href',
-      '/tasks',
+      '/tasks#for-you',
     )
   },
 })
@@ -159,7 +159,7 @@ export const German = meta.story({
     await expect(canvas.getByRole('heading', { name: 'Ihre Handelspartner' })).toBeVisible()
     await expect(
       canvas.getByRole('link', { name: /^Handlungsbedarf\s*Braucht Sie\s*3/ }),
-    ).toHaveAttribute('href', '/tasks')
+    ).toHaveAttribute('href', '/tasks#for-you')
   },
 })
 
