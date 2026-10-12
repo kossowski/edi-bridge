@@ -726,36 +726,45 @@
     "latestShown": "Latest {shown, number} of {count, number}"
   },
   "TradingPartners": {
-    "new": "New Trading Partner",
-    "caption": "Trading Partners, by name",
-    "loading": "Loading Trading Partners",
-    "count": "{count, plural, one {# Trading Partner} other {# Trading Partners}}",
-    "filteredCount": "{count} of {total} Trading Partners",
-    "search": "Search by name or GLN",
-    "noMatch": "No Trading Partner matches the search.",
-    "nextStep": "Next: {step}",
-    "complete": "Complete",
+    "add": "Add trading partner",
+    "list": "Trading partners",
+    "loading": "Loading trading partners",
+    "count": "{count, plural, one {# trading partner} other {# trading partners}}",
+    "open": "Open partner<hidden> {name}</hidden>",
     "hours": "{hours, plural, one {# hour} other {# hours}}",
-    "columns": {
-      "name": "Name",
-      "gln": "GLN",
-      "mode": "Mode",
-      "onboarding": "Onboarding",
-      "characterSet": "Character set",
-      "acknowledgementTimeLimit": "Acknowledgement time limit"
-    },
     "mode": {
-      "test": "Test Mode",
-      "production": "Production"
+      "test": "Testing",
+      "production": "Live"
+    },
+    "setup": {
+      "label": "Setup",
+      "progress": "{done} of {total} steps",
+      "next": "Next: {step}",
+      "complete": "Set up and exchanging real documents",
+      "steps": {
+        "identity": "Record your company's GLN",
+        "connections": "Add a connection",
+        "documents": "Choose the documents you exchange",
+        "testInterchange": "Send a test document",
+        "contrl": "Wait for the receipt confirmation",
+        "production": "Go live"
+      }
+    },
+    "facts": {
+      "documentsToday": "Documents today",
+      "openProblems": "Open problems",
+      "lastActivity": "Last activity",
+      "noActivity": "None yet"
     },
     "empty": {
-      "title": "No Trading Partners yet",
-      "description": "Create a Trading Partner to start onboarding it.",
-      "viewOnlyDescription": "Trading Partners appear here once an Admin creates one."
+      "title": "No trading partners yet",
+      "description": "A trading partner is a company you exchange documents with, like a retailer that orders from you.",
+      "viewOnlyDescription": "Trading partners appear here once an Admin adds one.",
+      "action": "Add your first trading partner"
     },
     "error": {
-      "title": "Trading Partners unavailable",
-      "description": "The Trading Partners could not be loaded. Try again.",
+      "title": "Trading partners unavailable",
+      "description": "The trading partners could not be loaded. Try again.",
       "retry": "Try again"
     }
   },
