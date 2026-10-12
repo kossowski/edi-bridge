@@ -42,7 +42,7 @@ export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = 
   tasks: { href: '/tasks', icon: Task01Icon },
   firstSteps: { href: '/first-steps', icon: Rocket01Icon },
   documents: { href: '/documents', icon: File02Icon },
-  orderLifecycle: { href: '/order-lifecycle', icon: Route01Icon },
+  orders: { href: '/orders', icon: ShoppingBasket01Icon },
   tradingPartners: { href: '/trading-partners', icon: UserMultiple02Icon },
   channels: { href: '/channels', icon: PlugSocketIcon },
   flows: { href: '/flows', icon: WorkflowSquare03Icon },
@@ -99,7 +99,7 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
     items: [
       { key: 'home', page: 'home' },
       { key: 'documents', page: 'documents' },
-      { key: 'orders', page: 'orderLifecycle', icon: ShoppingBasket01Icon },
+      { key: 'orders', page: 'orders' },
     ],
   },
   {
@@ -225,10 +225,8 @@ export function mappingHref(id: string) {
   return `${navigationItems.mappings.href}/${id}`
 }
 
-export const ordersPath = '/orders'
-
 export function orderHref(businessReference: string) {
-  return `${ordersPath}/${encodeURIComponent(businessReference)}`
+  return `${navigationItems.orders.href}/${encodeURIComponent(businessReference)}`
 }
 
 export function fixTargetHref(target: FixTarget) {

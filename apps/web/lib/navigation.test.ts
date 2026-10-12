@@ -49,6 +49,12 @@ describe('activeSidebarItem', () => {
     )
   })
 
+  it('marks the orders on the list and on an order page', () => {
+    expect(sidebarItem('orders').href).toBe('/orders')
+    expect(activeSidebarItem('/orders', new URLSearchParams('status=done'))).toBe('orders')
+    expect(activeSidebarItem('/orders/4711', new URLSearchParams())).toBe('orders')
+  })
+
   it('marks the longest matching path', () => {
     expect(activeSidebarItem('/', new URLSearchParams())).toBe('home')
     expect(activeSidebarItem('/flows/flow-1', new URLSearchParams())).toBe('allDocumentRoutes')

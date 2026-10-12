@@ -130,7 +130,7 @@
     "tasks": "Tasks",
     "firstSteps": "First Steps",
     "documents": "Documents",
-    "orderLifecycle": "Order Lifecycle",
+    "orders": "Orders",
     "tradingPartners": "Trading Partners",
     "channels": "Channels",
     "flows": "Flows",
@@ -620,13 +620,6 @@
       "tradingPartner": "Your partner fixes this",
       "you": "You fix this"
     },
-    "pagination": {
-      "label": "Pages",
-      "page": "Page {page} of {pageCount}",
-      "previous": "Previous page",
-      "next": "Next page",
-      "first": "Go to the first page"
-    },
     "empty": {
       "noDocuments": {
         "title": "No documents yet",
@@ -685,6 +678,13 @@
       }
     },
     "noFailureStage": "No Failure Stage"
+  },
+  "Pagination": {
+    "label": "Pages",
+    "page": "Page {page} of {pageCount}",
+    "previous": "Previous page",
+    "next": "Next page",
+    "first": "Go to the first page"
   },
   "Document": {
     "title": "Document",
@@ -975,65 +975,43 @@
       }
     }
   },
-  "OrderLifecycle": {
-    "loading": "Loading the Order Lifecycle for {businessReference}",
-    "search": {
-      "label": "Business Reference",
-      "hint": "Enter a Business Reference, such as an order number.",
-      "submit": "Search"
-    },
-    "initial": {
-      "title": "Search for a Business Reference",
-      "description": "Enter a Business Reference, such as an order number, to see its Order Lifecycle: ORDERS, DESADV and INVOIC in order."
-    },
-    "noResult": {
-      "title": "No Order Lifecycle found",
-      "description": "No Message carries the Business Reference {businessReference}. Check the reference and search again."
-    },
-    "error": {
-      "title": "Order Lifecycle unavailable",
-      "description": "The Order Lifecycle for {businessReference} could not be loaded. Try again.",
-      "retry": "Try again"
-    },
-    "resultCount": "{count, plural, one {# Order Lifecycle} other {# Order Lifecycles}} for the Business Reference {businessReference}",
-    "timelineLabel": "Order Lifecycle with {tradingPartner}",
-    "messageCount": "{count, plural, one {# Message} other {# Messages}}",
-    "open": {
-      "label": "Open",
-      "description": "No {messageType} yet."
-    },
-    "missing": {
-      "label": "Not found",
-      "description": "No {messageType} found."
-    },
-    "failureStage": "Failure Stage",
-    "noInterchange": "No Interchange",
-    "acknowledgement": {
-      "label": "Acknowledgement",
-      "summary": "Acknowledgements",
-      "summaryLabel": "Acknowledgements of the {messageType} Messages",
-      "state": {
-        "pending": "Pending",
-        "accepted": "Accepted",
-        "rejected": "Rejected",
-        "overdue": "Overdue"
-      }
-    },
-    "showAll": "Show all {count, number} {messageType} Messages",
-    "showLatest": "Show the latest {count, number}",
-    "latestShown": "Latest {shown, number} of {count, number}",
-    "direction": {
-      "inbound": "Inbound",
-      "outbound": "Outbound"
-    },
-    "receivedAt": "Received",
-    "openDocument": "– open document from {tradingPartner}, {messageType}",
-    "interchangeLink": "Control reference {controlReference}",
-    "replacedBy": "Replaced by",
-    "documentLink": "Document {id}"
-  },
   "Orders": {
     "title": "Order {businessReference}",
+    "list": {
+      "label": "Orders, latest activity first",
+      "filters": "Filter orders",
+      "search": "Search order number or partner",
+      "statusFilter": "Status",
+      "all": "All",
+      "loading": "Loading orders",
+      "count": "{count, plural, one {# order} other {# orders}}",
+      "row": {
+        "tradingPartnerAndActivity": "{tradingPartner} · last activity <time></time>",
+        "progress": "Progress from purchase order to invoice",
+        "step": "{document}: {state}"
+      },
+      "empty": {
+        "noOrders": {
+          "title": "No orders yet",
+          "description": "Orders appear here as soon as a purchase order arrives or goes out."
+        },
+        "nothingMatches": {
+          "title": "No orders match",
+          "description": "Nothing matches your search or filter. Check the order number or try the partner name."
+        },
+        "pageOutOfRange": {
+          "title": "This page is empty",
+          "description": "There are fewer orders now. The first page shows the latest."
+        }
+      },
+      "showAll": "Show all orders",
+      "firstPage": "Go to the first page",
+      "error": {
+        "title": "Orders unavailable",
+        "description": "The orders could not be loaded. Try again.",
+        "retry": "Try again"
+      }
+    },
     "loading": "Loading order {businessReference}",
     "error": {
       "title": "Order unavailable",
@@ -1106,6 +1084,14 @@
       "messageLabel": "Message to {tradingPartner}",
       "copyLabel": "message",
       "text": "Hello {tradingPartner} team,\n\nWe sent you the {document} for order {businessReference} on {sentAt} (transmission {controlReference}), but we have not received a receipt confirmation yet. Could you check whether it arrived in your system?\n\nThank you and kind regards"
+    },
+    "acknowledgement": {
+      "state": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "overdue": "Overdue"
+      }
     }
   },
   "TradingPartners": {

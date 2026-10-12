@@ -1,7 +1,6 @@
 import {
   activeSidebarItem,
   navigationItems,
-  ordersPath,
   type PageItemKey,
   pageItems,
   type SidebarItemKey,
@@ -51,7 +50,6 @@ const sections = new Map<string, Section>([
     href.slice(1),
     { label: { kind: 'page', key }, href },
   ]),
-  [ordersPath.slice(1), itemSection('orders')],
   [
     'settings',
     { label: { kind: 'session', key: 'settings' }, href: navigationItems.settings.href },

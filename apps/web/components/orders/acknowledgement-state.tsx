@@ -27,7 +27,7 @@ export function AcknowledgementStateBadge({
   state: AcknowledgementState
   count?: number
 }) {
-  const t = useTranslations('OrderLifecycle.acknowledgement.state')
+  const t = useTranslations('Orders.acknowledgement.state')
   const format = useFormatter()
 
   return (

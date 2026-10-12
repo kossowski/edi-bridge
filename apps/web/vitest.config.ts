@@ -30,6 +30,7 @@ function storybookProject(
 const testConfig: TestUserConfig = {
   projects: [
     {
+      resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
       test: {
         name: 'unit',
         environment: 'node',
