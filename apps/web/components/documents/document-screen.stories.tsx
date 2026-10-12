@@ -277,7 +277,7 @@ export const MissingCode = meta.story({
       await canvas.findByRole('heading', { name: 'The code “KRT” has no translation' }),
     ).toBeVisible()
     const link = canvas.getByRole('link', { name: 'Add KRT to “Units of measure”' })
-    await expect(link.getAttribute('href')).toMatch(/^\/lookup-tables\/[\w-]+\?code=KRT$/)
+    await expect(link.getAttribute('href')).toMatch(/^\/code-translations\/[\w-]+\?code=KRT$/)
   },
 })
 

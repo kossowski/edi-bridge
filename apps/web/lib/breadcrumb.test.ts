@@ -8,8 +8,8 @@ describe('breadcrumbTrail', () => {
   })
 
   it('uses the on-screen label for a section', () => {
-    expect(breadcrumbTrail('/lookup-tables')).toEqual([
-      { href: '/lookup-tables', label: { kind: 'item', key: 'codeTranslations' } },
+    expect(breadcrumbTrail('/code-translations')).toEqual([
+      { href: '/code-translations', label: { kind: 'item', key: 'codeTranslations' } },
     ])
   })
 

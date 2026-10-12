@@ -118,7 +118,7 @@ export const Operator = meta.story({
 })
 
 export const Section = meta.story({
-  parameters: { nextjs: { navigation: { pathname: '/lookup-tables' } } },
+  parameters: { nextjs: { navigation: { pathname: '/code-translations' } } },
   beforeEach({ msw }) {
     msw.use(...sessionHandlers(sandboxAdminSession))
   },

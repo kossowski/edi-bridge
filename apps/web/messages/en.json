@@ -136,7 +136,7 @@
     "flows": "Flows",
     "mappings": "Mappings",
     "documentStructures": "Data formats",
-    "lookupTables": "Lookup Tables",
+    "codeTranslations": "Code Translations",
     "settings": "Settings",
     "operator": "Operator",
     "help": "Help"
@@ -3321,46 +3321,57 @@
     },
     "csvSettingsUsedByMappingVersion": "Published Mapping Versions read CSV Documents with these settings, and a published Mapping Version never changes. Keep the saved CSV settings, or create a new data format with the new ones."
   },
-  "LookupTables": {
-    "new": "New Lookup Table",
-    "caption": "Lookup Tables, by name",
-    "loading": "Loading Lookup Tables",
-    "count": "{count, plural, one {# Lookup Table} other {# Lookup Tables}}",
-    "filteredCount": "{count} of {total} Lookup Tables",
-    "search": "Search by name or Trading Partner",
-    "noMatch": "No Lookup Table matches the search and filter.",
-    "entryCount": "{count, plural, one {# entry} other {# entries}}",
-    "columns": {
-      "name": "Name",
-      "scope": "Scope",
-      "entries": "Entries",
-      "updatedAt": "Last changed",
-      "actions": "Actions"
+  "CodeTranslations": {
+    "intro": "Values your partners write differently than your ERP, grouped by who receives them.",
+    "summary": "{count, plural, one {# list} other {# lists}}",
+    "blockingSummary": "{count, plural, one {# list blocks documents} other {# lists block documents}}",
+    "new": "New list",
+    "loading": "Loading code translations",
+    "groups": {
+      "workspace": "Sent to every partner",
+      "tradingPartner": "Only for {name}"
     },
-    "scope": {
-      "workspace": "Workspace"
+    "kinds": {
+      "units": "Units of measure",
+      "countries": "Countries",
+      "addresses": "Store or delivery addresses",
+      "other": "Other codes"
     },
-    "filters": {
-      "clear": "Clear filter"
+    "valueCount": "{count, plural, =0 {No values yet} one {# value} other {# values}}",
+    "uses": {
+      "label": "Used for",
+      "use": "{documents} {direction, select, inbound {from} other {to}} {partners}",
+      "none": "Not used in a mapping yet"
     },
+    "blocking": "{count, plural, one {# code blocks documents} other {# codes block documents}}",
+    "open": "Open",
+    "showAll": "Show all {count} lists",
     "actions": {
       "label": "Actions for {name}",
-      "edit": "Edit name and scope",
+      "edit": "Edit name and receiver",
       "delete": "Delete"
     },
     "announcements": {
-      "saved": "Lookup Table {name} saved.",
-      "deleted": "Lookup Table {name} deleted."
+      "saved": "{name} saved.",
+      "deleted": "{name} deleted."
     },
     "empty": {
-      "title": "No Lookup Tables yet",
-      "description": "Create a Lookup Table to translate codes in Mappings, e.g. unit ST to PCE.",
-      "viewOnlyDescription": "Lookup Tables translate codes in Mappings, e.g. unit ST to PCE. They appear here once an Admin creates one."
+      "title": "No code translations yet",
+      "description": "A code translation turns your values into the codes a partner expects, e.g. unit ST becomes PCE.",
+      "viewOnlyDescription": "A code translation turns your values into the codes a partner expects, e.g. unit ST becomes PCE. They appear here once an Admin creates one."
     },
     "error": {
-      "title": "Lookup Tables unavailable",
-      "description": "The Lookup Tables could not be loaded. Try again.",
+      "title": "Code translations unavailable",
+      "description": "The code translations could not be loaded. Try again.",
       "retry": "Try again"
+    }
+  },
+  "LookupTables": {
+    "columns": {
+      "scope": "Scope"
+    },
+    "scope": {
+      "workspace": "Workspace"
     },
     "form": {
       "createTitle": "New Lookup Table",

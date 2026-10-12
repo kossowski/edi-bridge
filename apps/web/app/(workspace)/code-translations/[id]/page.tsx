@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: { absolute: `${t('LookupTable.title')} · ${t('Shell.appName')}` } }
 }
 
-export default async function Page({ params }: PageProps<'/lookup-tables/[id]'>) {
+export default async function Page({ params }: PageProps<'/code-translations/[id]'>) {
   const { id } = await params
 
   return <LookupTableEditorScreen id={id} />

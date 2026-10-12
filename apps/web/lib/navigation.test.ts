@@ -19,7 +19,7 @@ describe('sidebarItem', () => {
     expect(sidebarItems.map((item) => item.key).toSorted()).toEqual(
       Object.keys(messages.Sidebar.items).toSorted(),
     )
-    expect(sidebarItem('codeTranslations').href).toBe('/lookup-tables')
+    expect(sidebarItem('codeTranslations').href).toBe('/code-translations')
     expect(sidebarItem('help').href).toBe('/help')
   })
 })
@@ -96,7 +96,7 @@ describe('fixTargetHref', () => {
   it('opens the Lookup Table with the missing code', () => {
     expect(
       fixTargetHref({ kind: 'lookupTable', lookupTableId: 't-1', name: 'Units', code: 'K&T' }),
-    ).toBe('/lookup-tables/t-1?code=K%26T')
+    ).toBe('/code-translations/t-1?code=K%26T')
   })
 
   it('opens the Channel and the Trading Partner', () => {
