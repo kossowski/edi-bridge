@@ -22,7 +22,7 @@ import {
 
 import { createHandlers } from './index'
 import { seedRuns } from './run'
-import { interchangeIdOf } from './run-detail'
+import { interchangeIdOf } from './run-store'
 import {
   createTradingPartner,
   createTradingPartners,

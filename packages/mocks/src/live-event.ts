@@ -1,10 +1,10 @@
 import { en, Faker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
-import { liveEventsEndpoint, type RunSummary, runSummarySchema } from '@edi-bridge/contracts'
+import { liveEventsEndpoint, type RunSummary } from '@edi-bridge/contracts'
 
 import { eventFrame, eventStreamHeaders, eventStreamOpened } from './event-stream'
-import { generateRun, pickFailureStage, seedRuns } from './run'
+import { generateRun, pickFailureStage, seedRuns, toRunSummary } from './run'
 import { type RunStore, toRunStore } from './run-store'
 
 export type LiveEventsMode = 'live' | 'quiet' | 'unavailable' | 'dropping' | 'stalling'
@@ -19,7 +19,7 @@ export type LiveEventsOptions = {
 }
 
 function receive(faker: Faker): RunSummary {
-  return runSummarySchema.parse({
+  return toRunSummary({
     ...generateRun(faker, new Date()),
     status: 'processing',
     failureStage: null,
@@ -27,7 +27,7 @@ function receive(faker: Faker): RunSummary {
 }
 
 function finish(faker: Faker, run: RunSummary): RunSummary {
-  return runSummarySchema.parse(
+  return toRunSummary(
     faker.datatype.boolean({ probability: 0.15 })
       ? { ...run, status: 'failed', failureStage: pickFailureStage(faker, run.messageType) }
       : { ...run, status: 'delivered', failureStage: null },
@@ -63,13 +63,8 @@ export function liveEventsHandler(
     const pending = finishing === undefined ? undefined : store.get(finishing)
     const received = receive(faker)
     inFlight.push(received.id)
-    const changes = [...(pending ? [finish(faker, pending)] : []), received]
 
-    for (const run of changes) {
-      store.set(run)
-    }
-
-    return changes
+    return store.set(...(pending ? [finish(faker, pending)] : []), received)
   }
 
   return http.get(path, async ({ request }) => {

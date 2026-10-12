@@ -14,8 +14,41 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedFlows } from './flow'
-import { type RunStore, toRunStore } from './run-store'
+import { hash } from './hash'
+import { includesText, pageOf } from './list'
+import { badRequest } from './responses'
+import { createRunStore, type RunStore, toRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
+
+export type RunFields = Pick<
+  RunSummary,
+  | 'id'
+  | 'receivedAt'
+  | 'tradingPartner'
+  | 'messageType'
+  | 'flow'
+  | 'manualSubmission'
+  | 'status'
+  | 'failureStage'
+> & { businessReference?: string | null }
+
+// A CONTRL acknowledges a whole Interchange, so it carries no Business Reference.
+function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messageType'>) {
+  return messageType === 'CONTRL'
+    ? null
+    : `PO${String(hash(`business-reference:${id}`) % 1_000_000).padStart(6, '0')}`
+}
+
+// The Run Store places each Run in its Interchange.
+export function toRunSummary(run: RunFields): RunSummary {
+  return runSummarySchema.parse({
+    ...run,
+    direction: directionOf(run),
+    businessReference:
+      run.businessReference === undefined ? businessReferenceOf(run) : run.businessReference,
+    interchange: null,
+  })
+}
 
 export function pickFailureStage(faker: Faker, messageType: MessageType): FailureStage {
   // Outbound Documents come from the ERP as JSON or CSV, so they never fail at EDIFACT parsing.
@@ -42,7 +75,7 @@ const weightedFlows = seedFlows.flatMap((flow) => {
   return [{ value: { flow, tradingPartner }, weight: tradingPartner.testMode ? 0.003 : 1 }]
 })
 
-export function generateRun(faker: Faker, receivedAt: Date) {
+export function generateRun(faker: Faker, receivedAt: Date): RunFields {
   const { flow, tradingPartner } = faker.helpers.weightedArrayElement(weightedFlows)
 
   const status = faker.helpers.weightedArrayElement<RunStatus>([
@@ -66,9 +99,64 @@ export function generateRun(faker: Faker, receivedAt: Date) {
 }
 
 export function createRun(overrides: Partial<RunSummary> = {}): RunSummary {
-  return runSummarySchema.parse({
+  return toRunSummary({
     ...generateRun(defaultFaker, defaultFaker.date.recent({ days: 30 })),
     ...overrides,
+  })
+}
+
+type Order = { receivedAt: number; businessReference: string | null }
+
+function latestOrderBefore(orders: ReadonlyArray<Order>, receivedAt: number) {
+  let low = 0
+  let high = orders.length
+
+  while (low < high) {
+    const middle = (low + high) >>> 1
+
+    if (orders[middle]!.receivedAt < receivedAt) {
+      low = middle + 1
+    } else {
+      high = middle
+    }
+  }
+
+  return orders[low - 1]
+}
+
+// A Trading Partner answers many of its ORDERS with a DESADV and an INVOIC for the same order.
+function followOrders(runs: ReadonlyArray<RunFields>): RunFields[] {
+  const ordersByTradingPartner = new Map<string, Order[]>()
+
+  for (const run of runs) {
+    if (run.messageType === 'ORDERS') {
+      const orders = ordersByTradingPartner.get(run.tradingPartner.id) ?? []
+      orders.push({
+        receivedAt: Date.parse(run.receivedAt),
+        businessReference: businessReferenceOf(run),
+      })
+      ordersByTradingPartner.set(run.tradingPartner.id, orders)
+    }
+  }
+
+  for (const orders of ordersByTradingPartner.values()) {
+    orders.sort((a, b) => a.receivedAt - b.receivedAt)
+  }
+
+  return runs.map((run) => {
+    const orders = ordersByTradingPartner.get(run.tradingPartner.id)
+
+    if (
+      !orders ||
+      (run.messageType !== 'DESADV' && run.messageType !== 'INVOIC') ||
+      hash(`follows-order:${run.id}`) % 10 >= 4
+    ) {
+      return run
+    }
+
+    const order = latestOrderBefore(orders, Date.parse(run.receivedAt))
+
+    return order ? { ...run, businessReference: order.businessReference } : run
   })
 }
 
@@ -86,7 +174,7 @@ export function createRuns({
   const faker = new Faker({ locale: [en], seed })
   const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 
-  const runs: RunSummary[] = []
+  const runs: RunFields[] = []
 
   while (runs.length < count) {
     const run = generateRun(faker, faker.date.between({ from, to: now }))
@@ -104,10 +192,12 @@ export function createRuns({
       flow: run.flow,
     }))
 
-    runs.push(...[run, ...siblings].map((item) => runSummarySchema.parse(item)))
+    runs.push(run, ...siblings)
   }
 
-  return runs.slice(0, count)
+  return createRunStore(followOrders(runs.slice(0, count)).map(toRunSummary))
+    .all()
+    .slice()
 }
 
 let seedRunsCache: RunSummary[] | undefined
@@ -118,11 +208,13 @@ export function seedRuns() {
   return seedRunsCache
 }
 
-function matches(run: RunSummary, query: RunListQuery) {
+function matchesExceptStatus(run: RunSummary, query: RunListQuery, text: string) {
   const receivedAt = Date.parse(run.receivedAt)
 
   return (
-    (!query.status?.length || query.status.includes(run.status)) &&
+    (text === '' ||
+      includesText(run.businessReference, text) ||
+      includesText(run.tradingPartner.name, text)) &&
     (!query.failureStage?.length ||
       (run.failureStage !== null && query.failureStage.includes(run.failureStage))) &&
     (!query.tradingPartnerId?.length || query.tradingPartnerId.includes(run.tradingPartner.id)) &&
@@ -141,18 +233,37 @@ export function runsHandler(apiUrl: string, runs?: ReadonlyArray<RunSummary> | R
     const query = runsEndpoint.query.safeParse(fromSearchParams(new URL(request.url).searchParams))
 
     if (!query.success) {
-      return HttpResponse.json({ message: query.error.message }, { status: 400 })
+      return badRequest(query.error.message)
     }
 
     store ??= toRunStore(runs ?? seedRuns())
-    const { page, pageSize } = query.data
-    const filtered = store.newestFirst().filter((run) => matches(run, query.data))
+    const { status } = query.data
+    const text = query.data.q?.toLowerCase() ?? ''
 
-    return HttpResponse.json({
-      runs: filtered.slice((page - 1) * pageSize, page * pageSize),
-      total: filtered.length,
-      page,
-      pageSize,
-    })
+    const statusCounts: Record<RunStatus, number> = {
+      received: 0,
+      processing: 0,
+      delivered: 0,
+      failed: 0,
+      duplicate: 0,
+    }
+
+    const filtered: RunSummary[] = []
+
+    for (const run of store.newestFirst()) {
+      if (!matchesExceptStatus(run, query.data, text)) {
+        continue
+      }
+
+      statusCounts[run.status] += 1
+
+      if (!status?.length || status.includes(run.status)) {
+        filtered.push(run)
+      }
+    }
+
+    const { items, ...paging } = pageOf(filtered, query.data)
+
+    return HttpResponse.json({ runs: items, statusCounts, ...paging })
   })
 }

@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { controlReferenceSchema, segmentTagSchema } from './edifact'
 import { flowSummarySchema } from './flow'
+import { listPageFields, listQueryFields, many } from './list'
 import { mappingVersionSummarySchema } from './mapping-version'
 import { directionSchema, messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
@@ -20,13 +21,23 @@ export const failureStageSchema = z.enum(failureStages)
 
 export type FailureStage = z.infer<typeof failureStageSchema>
 
+export const interchangeReferenceSchema = z.object({
+  id: z.uuid(),
+  controlReference: controlReferenceSchema,
+})
+
+export type InterchangeReference = z.infer<typeof interchangeReferenceSchema>
+
 const runSummaryBaseSchema = z.object({
   id: z.uuid(),
   receivedAt: z.iso.datetime(),
   tradingPartner: tradingPartnerSummarySchema,
   messageType: messageTypeSchema,
+  direction: directionSchema,
   flow: flowSummarySchema.pick({ id: true, name: true }),
   manualSubmission: z.boolean(),
+  businessReference: z.string().min(1).nullable(),
+  interchange: interchangeReferenceSchema.nullable(),
 })
 
 export const runSummarySchema = z.discriminatedUnion('status', [
@@ -42,13 +53,6 @@ export const runSummarySchema = z.discriminatedUnion('status', [
 
 export type RunSummary = z.infer<typeof runSummarySchema>
 
-function many<Item extends z.ZodType>(item: Item) {
-  return z.preprocess(
-    (value) => (value === undefined ? undefined : [value].flat()),
-    z.array(item).optional(),
-  )
-}
-
 export const runListQuerySchema = z.object({
   status: many(runStatusSchema),
   failureStage: many(failureStageSchema),
@@ -58,17 +62,15 @@ export const runListQuerySchema = z.object({
   receivedFrom: z.iso.datetime().optional(),
   receivedTo: z.iso.datetime().optional(),
   manualSubmission: z.stringbool().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  ...listQueryFields,
 })
 
 export type RunListQuery = z.output<typeof runListQuerySchema>
 
 export const runListSchema = z.object({
   runs: z.array(runSummarySchema),
-  total: z.number().int().min(0),
-  page: z.number().int().min(1),
-  pageSize: z.number().int().min(1),
+  statusCounts: z.record(runStatusSchema, z.number().int().min(0)),
+  ...listPageFields,
 })
 
 export type RunList = z.infer<typeof runListSchema>
@@ -134,9 +136,7 @@ export const parsedMessageSchema = z.object({
 
 export type ParsedMessage = z.infer<typeof parsedMessageSchema>
 
-export const runInterchangeSchema = z.object({
-  id: z.uuid(),
-  controlReference: controlReferenceSchema,
+export const runInterchangeSchema = interchangeReferenceSchema.extend({
   raw: z.string().min(1),
 })
 
@@ -147,7 +147,6 @@ export const runReferenceSchema = z.object({ id: z.uuid() })
 export type RunReference = z.infer<typeof runReferenceSchema>
 
 const runDetailFields = {
-  direction: directionSchema,
   steps: z.array(runStepSchema).min(1),
   interchange: runInterchangeSchema.nullable(),
   message: parsedMessageSchema.nullable(),

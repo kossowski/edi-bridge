@@ -17,6 +17,7 @@ import {
   toDocumentStructureStore,
 } from './document-structure'
 import { createFlowStore, flowHandlers } from './flow'
+import { interchangesHandler } from './interchange-list'
 import { liveEventsHandler, type LiveEventsOptions } from './live-event'
 import {
   createLookupTableStore,
@@ -223,14 +224,11 @@ export {
   toOverview,
 } from './overview'
 
-export { createRun, createRuns, runsHandler, seedRuns } from './run'
+export { createRun, createRuns, type RunFields, runsHandler, seedRuns, toRunSummary } from './run'
 
-export {
-  interchangeIdOf,
-  runDetailHandlers,
-  type RunDetailOptions,
-  seedReprocessed,
-} from './run-detail'
+export { interchangesHandler } from './interchange-list'
+
+export { runDetailHandlers, type RunDetailOptions, seedReprocessed } from './run-detail'
 
 export {
   createTradingPartner,
@@ -252,7 +250,13 @@ export {
   type WorkspaceStore,
 } from './workspace'
 
-export { createRunStore, type RunStore } from './run-store'
+export {
+  controlReferenceOf,
+  createRunStore,
+  interchangeIdOf,
+  type Reprocessed,
+  type RunStore,
+} from './run-store'
 
 export { type SessionStore } from './session-access'
 
@@ -322,7 +326,12 @@ export function createHandlers(
   } = {},
 ) {
   const orderLifecycles = seedOrderLifecycles()
-  const runs = createRunStore([...seedRuns(), ...orderLifecycles.runs])
+
+  const runs = createRunStore(
+    [...seedRuns(), ...orderLifecycles.runs],
+    [...seedReprocessed(), ...orderLifecycles.reprocessed],
+  )
+
   const ownWorkspace = workspace ?? seedWorkspace
   const operatorStore = createOperatorStore({ workspaces: operatorWorkspaces, invites })
 
@@ -379,9 +388,13 @@ export function createHandlers(
     ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings: mappingVersionStore }),
     publishedMappingVersionsHandler(apiUrl, mappingVersionStore),
     runsHandler(apiUrl, runs),
+    interchangesHandler(apiUrl, runs),
     liveEventsHandler(apiUrl, { ...liveEvents, runs }),
     overviewHandler(apiUrl, seedOverviewData(runs)),
-    orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles),
+    orderLifecycleHandler(apiUrl, orderLifecycles.orderLifecycles, {
+      runs,
+      tradingPartners: tradingPartnerStore,
+    }),
     ...mappingVersionHandlers(apiUrl, {
       mappings: mappingDraftStore,
       versions: mappingVersionStore,
@@ -391,8 +404,6 @@ export function createHandlers(
     }),
     ...runDetailHandlers(apiUrl, {
       runs,
-      reprocessed: [...seedReprocessed(), ...orderLifecycles.reprocessed],
-      businessReferences: orderLifecycles.businessReferences,
       mappingVersions: mappingVersionStore,
     }),
     manualSubmissionHandler(apiUrl, { channels: channelStore, flows, runs, tradingPartners }),

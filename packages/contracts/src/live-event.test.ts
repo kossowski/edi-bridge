@@ -9,8 +9,11 @@ const run = {
   receivedAt: '2026-10-10T12:00:00.000Z',
   tradingPartner: { id: '10000000-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' },
   messageType: 'ORDERS',
+  direction: 'inbound',
   flow: { id: '20000000-0000-4000-8000-000000000001', name: 'Hansemarkt ORDERS' },
   manualSubmission: false,
+  businessReference: 'PO000001',
+  interchange: { id: '30000000-0000-4000-8000-000000000001', controlReference: '1' },
 }
 
 describe('parseLiveEvent', () => {

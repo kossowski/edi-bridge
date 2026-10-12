@@ -9,19 +9,20 @@ import {
   type OrderLifecycleInterchange,
   orderLifecycleMessageSchema,
   type OrderLifecycleMessageType,
+  orderLifecycleMessageTypeSchema,
   orderLifecycleSchema,
   orderLifecyclesEndpoint,
   type RunSummary,
-  runSummarySchema,
   type TradingPartner,
 } from '@edi-bridge/contracts'
 
 import { seedFlows } from './flow'
-import { hour, overdueSinceOf } from './overdue'
+import { hour, isUnacknowledged, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
-import { controlReferenceOf, interchangeIdOf, type Reprocessed } from './run-detail'
+import { toRunSummary } from './run'
+import { createRunStore, type Reprocessed, type RunStore } from './run-store'
 import { stableUuid } from './seed-id'
-import { seedTradingPartners } from './trading-partner'
+import { seedTradingPartners, type TradingPartnerStore } from './trading-partner'
 
 export const orderLifecycleReferences = {
   full: '4711',
@@ -164,42 +165,41 @@ const lifecycleSeeds: LifecycleSeed[] = [
 export type OrderLifecycleSeed = {
   runs: RunSummary[]
   reprocessed: Reprocessed[]
-  businessReferences: ReadonlyMap<string, string>
   orderLifecycles: OrderLifecycle[]
 }
 
 function interchangeOf(
   run: RunSummary,
   acknowledgement: AcknowledgementOutcome | undefined,
-  tradingPartner: TradingPartner,
+  tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
   now: Date,
 ): OrderLifecycleInterchange | null {
-  const outbound = directionOf(run) === 'outbound'
-
-  if (outbound && run.failureStage === 'mapping') {
+  if (run.interchange === null) {
     return null
   }
 
-  const id = interchangeIdOf(run)
-  const sent = outbound && run.status === 'delivered'
-
+  const sent = directionOf(run) === 'outbound' && run.status === 'delivered'
   const overdueSince = overdueSinceOf(run.receivedAt, tradingPartner)
 
   return {
-    id,
-    controlReference: controlReferenceOf(id),
+    ...run.interchange,
     acknowledgement: sent
       ? (acknowledgement ?? (overdueSince <= now.getTime() ? 'overdue' : 'pending'))
       : null,
   }
 }
 
+type MessageEntry = {
+  runId: string
+  acknowledgement: AcknowledgementOutcome | undefined
+  replacedBy: RunSummary | null
+}
+
 export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
   const runs: RunSummary[] = []
   const reprocessed: Reprocessed[] = []
-  const businessReferences = new Map<string, string>()
 
-  const orderLifecycles = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
+  const seeded = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
     const tradingPartner = seedTradingPartners.find(({ name }) => name === seed.tradingPartner)!
     const tradingPartnerSummary = { id: tradingPartner.id, name: tradingPartner.name }
 
@@ -222,41 +222,22 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
         manualSubmission: false,
       }
 
-      const run = runSummarySchema.parse(
+      const run = toRunSummary(
         outcome === 'delivered'
-          ? { ...base, status: 'delivered', failureStage: null }
-          : { ...base, status: 'failed', failureStage: outcome },
+          ? { ...base, businessReference, status: 'delivered', failureStage: null }
+          : { ...base, businessReference, status: 'failed', failureStage: outcome },
       )
 
       runs.push(run)
-      businessReferences.set(run.id, businessReference)
 
       return run
     }
 
-    const toMessage = (
-      run: RunSummary,
-      acknowledgement: AcknowledgementOutcome | undefined,
-      replacedBy: RunSummary | null = null,
-    ) =>
-      orderLifecycleMessageSchema.parse({
-        messageType: run.messageType,
-        direction: directionOf(run),
-        receivedAt: run.receivedAt,
-        run: {
-          id: run.id,
-          status: run.status,
-          failureStage: run.failureStage,
-          replacedBy: replacedBy && { id: replacedBy.id },
-        },
-        interchange: interchangeOf(run, acknowledgement, tradingPartner, now),
-      })
-
-    const entries = messages.flatMap((message, index) => {
+    const entries = messages.flatMap((message, index): MessageEntry[] => {
       const run = toRun(String(index), message)
 
       if (!message.reprocessed) {
-        return [toMessage(run, message.acknowledgement)]
+        return [{ runId: run.id, acknowledgement: message.acknowledgement, replacedBy: null }]
       }
 
       const replacing = toRun(`${index}:reprocessed`, {
@@ -268,19 +249,104 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
       reprocessed.push({ replaced: run.id, replacing: replacing.id })
 
       return [
-        toMessage(run, undefined, replacing),
-        toMessage(replacing, message.reprocessed.acknowledgement),
+        { runId: run.id, acknowledgement: undefined, replacedBy: replacing },
+        {
+          runId: replacing.id,
+          acknowledgement: message.reprocessed.acknowledgement,
+          replacedBy: null,
+        },
       ]
     })
 
+    return { businessReference, tradingPartner, entries }
+  })
+
+  const store = createRunStore(runs, reprocessed)
+
+  const orderLifecycles = seeded.map(({ businessReference, tradingPartner, entries }) => {
+    const toMessage = ({ runId, acknowledgement, replacedBy }: MessageEntry) => {
+      const run = store.get(runId)!
+
+      return orderLifecycleMessageSchema.parse({
+        messageType: run.messageType,
+        direction: directionOf(run),
+        receivedAt: run.receivedAt,
+        run: {
+          id: run.id,
+          status: run.status,
+          failureStage: run.failureStage,
+          replacedBy: replacedBy && { id: replacedBy.id },
+        },
+        interchange: interchangeOf(run, acknowledgement, tradingPartner, now),
+      })
+    }
+
     return orderLifecycleSchema.parse({
       businessReference,
-      tradingPartner: tradingPartnerSummary,
-      messages: entries.toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
+      tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
+      messages: entries
+        .map(toMessage)
+        .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
     })
   })
 
-  return { runs, reprocessed, businessReferences, orderLifecycles }
+  return { runs, reprocessed, orderLifecycles }
+}
+
+const defaultTimeLimit = { acknowledgementTimeLimitHours: 24 }
+
+// Without a curated seed, the Runs of the Business Reference form one Order Lifecycle per Trading
+// Partner, with the same Acknowledgements the Overview counts as overdue.
+function orderLifecyclesOfRuns(
+  businessReference: string,
+  runs: RunStore,
+  tradingPartners: Pick<TradingPartnerStore, 'get'>,
+  now: Date,
+): OrderLifecycle[] {
+  const byTradingPartner = new Map<string, RunSummary[]>()
+
+  for (const run of runs.withBusinessReference(businessReference)) {
+    if (!orderLifecycleMessageTypeSchema.safeParse(run.messageType).success) {
+      continue
+    }
+
+    const partnerRuns = byTradingPartner.get(run.tradingPartner.id) ?? []
+    partnerRuns.push(run)
+    byTradingPartner.set(run.tradingPartner.id, partnerRuns)
+  }
+
+  return [...byTradingPartner.values()].map((lifecycleRuns) => {
+    const { tradingPartner } = lifecycleRuns[0]!
+    const timeLimit = tradingPartners.get(tradingPartner.id) ?? defaultTimeLimit
+
+    return orderLifecycleSchema.parse({
+      businessReference,
+      tradingPartner,
+      messages: lifecycleRuns
+        .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt))
+        .map((run) => {
+          const replacing = runs.replacingOf(run.id)
+
+          return {
+            messageType: run.messageType,
+            direction: directionOf(run),
+            receivedAt: run.receivedAt,
+            run: {
+              id: run.id,
+              status: run.status,
+              failureStage: run.failureStage,
+              replacedBy: replacing !== undefined && runs.get(replacing) ? { id: replacing } : null,
+            },
+            interchange: interchangeOf(
+              run,
+              isUnacknowledged(run) ? undefined : 'accepted',
+              timeLimit,
+              now,
+            ),
+          }
+        }),
+    })
+  })
 }
 
 export type OrderLifecycleState = 'loading' | 'error'
@@ -288,6 +354,10 @@ export type OrderLifecycleState = 'loading' | 'error'
 export function orderLifecycleHandler(
   apiUrl: string,
   source?: ReadonlyArray<OrderLifecycle> | OrderLifecycleState,
+  {
+    runs,
+    tradingPartners = { get: (id) => seedTradingPartners.find((candidate) => candidate.id === id) },
+  }: { runs?: RunStore; tradingPartners?: Pick<TradingPartnerStore, 'get'> } = {},
 ) {
   const path = `${apiUrl}${orderLifecyclesEndpoint.path}`
 
@@ -320,10 +390,17 @@ export function orderLifecycleHandler(
       return serverError()
     }
 
+    const curated = orderLifecycles.filter(
+      (lifecycle) => lifecycle.businessReference === businessReference,
+    )
+
+    const found =
+      curated.length > 0 || !runs
+        ? curated
+        : orderLifecyclesOfRuns(businessReference, runs, tradingPartners, new Date())
+
     return HttpResponse.json(
-      orderLifecycles
-        .filter((lifecycle) => lifecycle.businessReference === businessReference)
-        .toSorted((a, b) => a.tradingPartner.name.localeCompare(b.tradingPartner.name)),
+      found.toSorted((a, b) => a.tradingPartner.name.localeCompare(b.tradingPartner.name)),
     )
   })
 }
