@@ -4,6 +4,7 @@ import type {
   Session,
   TradingPartner,
   Workspace,
+  WorkspaceMember,
   WorkspaceSettings,
   WorkspaceSummary,
 } from '@edi-bridge/contracts'
@@ -64,6 +65,7 @@ import {
   tradingPartnerHandlers,
 } from './trading-partner'
 import { seedWorkspace, workspaceHandlers } from './workspace'
+import { seedWorkspaceMembers, workspaceMemberHandlers } from './workspace-member'
 import {
   createWorkspaceSettingsStore,
   seedWorkspaceSettings,
@@ -258,6 +260,13 @@ export {
 } from './session'
 
 export {
+  createWorkspaceMember,
+  createWorkspaceMembers,
+  seedWorkspaceMembers,
+  workspaceMemberHandlers,
+} from './workspace-member'
+
+export {
   createWorkspaceSettings,
   createWorkspaceSettingsStore,
   seedWorkspaceSettings,
@@ -272,6 +281,7 @@ export function createHandlers(
     session,
     workspace,
     workspaceSettings = seedWorkspaceSettings,
+    workspaceMembers = seedWorkspaceMembers,
     operatorWorkspaces = seedWorkspaceSummaries,
     invites = seedInvites,
     tradingPartners = seedTradingPartners,
@@ -287,6 +297,8 @@ export function createHandlers(
     session?: Session | null
     workspace?: Workspace
     workspaceSettings?: WorkspaceSettings
+    workspaceMembers?:
+      ReadonlyArray<WorkspaceMember> | ReadonlyMap<string, ReadonlyArray<WorkspaceMember>>
     operatorWorkspaces?: ReadonlyArray<WorkspaceSummary>
     invites?: ReadonlyArray<Invite>
     tradingPartners?: ReadonlyArray<TradingPartner>
@@ -351,6 +363,7 @@ export function createHandlers(
       session: sessionStore,
       workspaces: operatorStore,
     }),
+    ...workspaceMemberHandlers(apiUrl, { members: workspaceMembers, session: sessionStore }),
     ...operatorHandlers(apiUrl, { workspaces: operatorStore, session: sessionStore }),
     ...tradingPartnerHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,
