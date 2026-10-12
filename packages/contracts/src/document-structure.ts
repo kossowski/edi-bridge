@@ -21,12 +21,13 @@ export const maxFieldLabelLength = 70
 export const fieldLabelSchema = z.string().trim().min(1).max(maxFieldLabelLength)
 
 // Every node carries its path, e.g. `lines[].gtin`, which Mapping links point at, and a plain name
-// (`label`) with the reason it was chosen. An array's items share the array's path and plain name.
+// (`label`) with the reason it was chosen, or no reason when a person named it by hand. An array's
+// items share the array's path and plain name.
 const node = {
   path: z.string().min(1),
   name: z.string().min(1),
   label: fieldLabelSchema,
-  labelReason: z.string().trim().min(1),
+  labelReason: z.string().trim().min(1).nullable(),
   labelUnsure: z.boolean(),
   required: z.boolean(),
 }
@@ -181,6 +182,10 @@ function treeProblems(tree: DocumentTree): string[] {
     }
 
     paths.add(node.path)
+
+    if (node.labelReason === null && node.labelUnsure) {
+      problems.push(`The plain name of ${node.path} was given by hand, so it cannot be unsure`)
+    }
 
     if (node.kind === 'array') {
       if (node.items.path !== node.path) {
@@ -352,8 +357,8 @@ function onePerPath(entries: ReadonlyArray<{ path: string }>) {
   return new Set(entries.map(({ path }) => path)).size === entries.length
 }
 
-// A plain name the same as the inferred one confirms it; another one renames the field. Either way
-// the name is no longer unsure.
+// A plain name the same as the inferred one confirms it and keeps its reason; another one renames
+// the field by hand and has no reason. Either way the name is no longer unsure.
 export const fieldLabelChoiceSchema = z.object({ path: z.string().min(1), label: fieldLabelSchema })
 
 export type FieldLabelChoice = z.infer<typeof fieldLabelChoiceSchema>

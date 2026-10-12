@@ -807,8 +807,6 @@ export function inferDocumentStructure(
   }
 }
 
-export const renamedLabelReason = 'Named by hand.'
-
 function plainNameOfNode({ label, labelReason, labelUnsure }: PlainName): PlainName {
   return { label, labelReason, labelUnsure }
 }
@@ -816,7 +814,7 @@ function plainNameOfNode({ label, labelReason, labelUnsure }: PlainName): PlainN
 function chosenName(current: PlainName, label: string): PlainName {
   return label === current.label
     ? { label, labelReason: current.labelReason, labelUnsure: false }
-    : { label, labelReason: renamedLabelReason, labelUnsure: false }
+    : { label, labelReason: null, labelUnsure: false }
 }
 
 function renamedNodes(

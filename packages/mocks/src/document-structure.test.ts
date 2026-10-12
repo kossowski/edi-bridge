@@ -373,6 +373,7 @@ describe('POST /document-structures', () => {
     expect(nodeAt(created.children, 'rows[].EPreis')?.labelReason).toContain('Einzelpreis')
     expect(nodeAt(created.children, 'rows[].ME')).toMatchObject({
       label: 'Unit of measure',
+      labelReason: null,
       labelUnsure: false,
     })
     expect(created.sample).toMatchObject({ fileName: 'Rechnungsexport_2026-10-08.csv' })

@@ -12,7 +12,6 @@ import {
 import { seedDocumentStructureOf } from './document-structure'
 import {
   adjustDocumentStructure,
-  renamedLabelReason,
   decodeText,
   DocumentStructureProblemError,
   findNode,
@@ -581,12 +580,31 @@ describe('adjustDocumentStructure', () => {
     ).toBe('notAdjustable')
   })
 
-  it('renames a field, which is then no longer unsure', () => {
+  it('renames a field by hand, which leaves it without a reason and no longer unsure', () => {
     const adjusted = adjust([{ path: 'lines[].quantity', label: 'Ordered quantity' }])
 
     expect(at(adjusted, 'lines[].quantity')).toMatchObject({
       label: 'Ordered quantity',
-      labelReason: renamedLabelReason,
+      labelReason: null,
+      labelUnsure: false,
+    })
+  })
+
+  it('keeps the reason of a plain name it confirms', () => {
+    const invoices = documentStructureSchema.parse({
+      id: crypto.randomUUID(),
+      name: 'Invoices',
+      ...inferDocumentStructure(documentStructureOrigins.invoiceCsvDocument),
+    })
+
+    const confirmed = adjustDocumentStructure(invoices, {
+      name: 'Invoices',
+      adjustments: [{ path: 'rows[].EPreis', label: 'Unit price' }],
+    })
+
+    expect(at(confirmed, 'rows[].EPreis')).toMatchObject({
+      label: 'Unit price',
+      labelReason: at(invoices, 'rows[].EPreis')?.labelReason,
       labelUnsure: false,
     })
   })
@@ -594,7 +612,7 @@ describe('adjustDocumentStructure', () => {
   it('renames a list together with its items', () => {
     expect(at(adjust([{ path: 'lines[]', label: 'Order lines' }]), 'lines[]')).toMatchObject({
       label: 'Order lines',
-      items: { label: 'Order lines', labelReason: renamedLabelReason },
+      items: { label: 'Order lines', labelReason: null },
     })
   })
 

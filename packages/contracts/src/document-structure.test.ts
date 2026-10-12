@@ -125,6 +125,22 @@ describe('documentStructureSchema', () => {
     ).toBe(false)
   })
 
+  it('accepts a plain name given by hand, which has no reason', () => {
+    const byHand = { ...purchaseOrder.children[0]!, labelReason: null, labelUnsure: false }
+
+    expect(
+      documentStructureSchema.safeParse({ ...purchaseOrder, children: [byHand] }).success,
+    ).toBe(true)
+  })
+
+  it('rejects an unsure plain name given by hand', () => {
+    const byHand = { ...purchaseOrder.children[0]!, labelReason: null, labelUnsure: true }
+
+    expect(
+      documentStructureSchema.safeParse({ ...purchaseOrder, children: [byHand] }).success,
+    ).toBe(false)
+  })
+
   it('rejects a plain name of only spaces', () => {
     const blank = { ...purchaseOrder.children[0]!, label: '   ' }
 
