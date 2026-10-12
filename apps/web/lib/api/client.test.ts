@@ -480,6 +480,7 @@ describe('Lookup Table CSV import', () => {
     expect(imported.entries).toEqual([
       { sourceCode: 'ST', targetCode: 'PCE' },
       { sourceCode: 'STK', targetCode: 'PCE' },
+      { sourceCode: 'PCE', targetCode: 'PCE' },
       { sourceCode: 'KG', targetCode: 'KGS' },
       { sourceCode: 'L', targetCode: 'LTR' },
       { sourceCode: 'MTR', targetCode: 'MTR' },

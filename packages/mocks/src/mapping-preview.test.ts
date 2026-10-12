@@ -16,6 +16,7 @@ import {
 
 import { seedDocumentStructureOf } from './document-structure'
 import { documentStructureLeaves } from './document-structure-inference'
+import { seedLookupTableNamed } from './lookup-table'
 import { seedMappingDrafts } from './mapping'
 import { mappingPreviewHandlers } from './mapping-preview'
 import { createMappingSample } from './mapping-sample'
@@ -210,6 +211,32 @@ describe('POST /mappings/:id/preview', () => {
       transformId: jsonataNode.id,
       code: 'invalidTransform',
     })
+  })
+
+  it('translates the units of an inbound sample through units of measure', async () => {
+    server.use(...mappingPreviewHandlers(apiUrl))
+    const [sample] = await samplesOf(hansemarktOrders.id)
+    const { links, transforms, transformLinks } = hansemarktOrders
+
+    const units = transforms.find(
+      ({ kind, config }) =>
+        kind === 'lookupTable' &&
+        'lookupTableId' in config &&
+        config.lookupTableId === seedLookupTableNamed('Units of measure').id,
+    )!
+
+    const preview = await previewOf(hansemarktOrders.id, sample!.id, {
+      links: [...links],
+      transforms: [...transforms],
+      transformLinks: [...transformLinks],
+    })
+
+    const content = z
+      .object({ lines: z.array(z.object({ unit: z.string() })) })
+      .parse(preview.document.content)
+
+    expect(content.lines.map(({ unit }) => unit)).toEqual(['PCE', 'PCE', 'PCE'])
+    expect(preview.notes.filter(({ transformId }) => transformId === units.id)).toEqual([])
   })
 
   it('applies the transforms of the graph to an outbound sample', async () => {
