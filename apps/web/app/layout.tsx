@@ -42,6 +42,7 @@ export default async function RootLayout({
           <ThemeProvider>
             <QueryProvider>
               <TooltipProvider>{children}</TooltipProvider>
+              <Toaster />
             </QueryProvider>
             <Toaster containerAriaLabel={t('toasts')} />
           </ThemeProvider>

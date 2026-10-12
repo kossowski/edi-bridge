@@ -3034,22 +3034,22 @@
     }
   },
   "DocumentStructure": {
-    "title": "Document Structure",
-    "loading": "Loading Document Structure",
+    "title": "Data format",
+    "loading": "Loading data format",
     "notFound": {
-      "title": "Document Structure not found",
-      "description": "There is no Document Structure with this ID in this Workspace."
+      "title": "Data format not found",
+      "description": "There is no data format with this ID in this Workspace."
     },
     "error": {
-      "title": "Document Structure unavailable",
-      "description": "The Document Structure could not be loaded. Try again.",
+      "title": "Data format unavailable",
+      "description": "The data format could not be loaded. Try again.",
       "retry": "Try again"
     },
     "facts": {
-      "label": "Document Structure details",
+      "label": "About this data format",
       "format": "Format",
       "fields": "Fields",
-      "mappings": "Used by Mappings",
+      "mappings": "Read by",
       "mappingsLoading": "Loading Mappings"
     },
     "usedNote": "Published Mapping Versions never change, so EDI Bridge refuses changes to fields they use. Fields only a Draft links can change as long as they keep their place.",
@@ -3083,7 +3083,52 @@
       "reading": "Reading the CSV Document…",
       "unread": "The fields appear once EDI Bridge can read the CSV Document. Adjust the CSV settings or choose another CSV Document."
     },
-    "viewOnlyFieldsDescription": "The fields EDI Bridge expects in Documents of this Document Structure, with their type and whether they are required or repeat."
+    "viewOnlyFieldsDescription": "The fields EDI Bridge expects in Documents of this Document Structure, with their type and whether they are required or repeat.",
+    "sample": {
+      "title": "Sample file",
+      "takenAt": "Sample from {date}",
+      "hint": "Select a value to see its field. Use the arrow keys to move between values.",
+      "unreadable": "EDI Bridge cannot show this file value by value, so it shows the text.",
+      "valuesLabel": "Values in {fileName}",
+      "tableLabel": "Rows of {fileName}",
+      "value": "{value}, {field}",
+      "rows": "Shows the first {shown} of {total} rows.",
+      "none": "Created from a JSON Schema",
+      "noneDescription": "There is no sample file to show. The fields come from the JSON Schema."
+    },
+    "fieldList": {
+      "title": "Fields read from it",
+      "titleNoSample": "Fields",
+      "description": "Each field has a plain name, which Mappings show next to its technical name. Select a field to see what it holds and why it got its name.",
+      "unsure": "Unsure",
+      "unsureNote": "EDI Bridge is not sure about this name. Compare it with the sample file, then keep it or rename the field.",
+      "technicalName": "Technical name",
+      "path": "Path",
+      "holds": "Holds",
+      "group": "{count, plural, one {A group of # field} other {A group of # fields}}",
+      "required": "always filled",
+      "optional": "sometimes empty",
+      "repeats": "repeats",
+      "example": "In the sample",
+      "reason": "Why this name",
+      "namedByYou": "Named by you",
+      "readBy": "Read by",
+      "rename": {
+        "label": "Name shown in Mappings",
+        "submit": "Rename",
+        "keep": "Keep this name",
+        "saving": "Saving…",
+        "required": "Enter a name.",
+        "failed": "The field could not be renamed. Try again.",
+        "renamed": "Renamed to “{label}”.",
+        "kept": "Kept the name “{label}”."
+      }
+    },
+    "technical": {
+      "title": "Technical settings",
+      "description": "Change the CSV settings, replace the sample file of a CSV format, mark fields as required or repeating, and adjust their type.",
+      "viewOnlyDescription": "The CSV settings and the fields with their type and whether they are required or repeat."
+    }
   },
   "DocumentStructureForm": {
     "createTitle": "New data format",

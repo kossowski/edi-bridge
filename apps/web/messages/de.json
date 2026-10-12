@@ -3034,22 +3034,22 @@
     }
   },
   "DocumentStructure": {
-    "title": "Document Structure",
-    "loading": "Document Structure wird geladen",
+    "title": "Datenformat",
+    "loading": "Datenformat wird geladen",
     "notFound": {
-      "title": "Document Structure nicht gefunden",
-      "description": "In diesem Workspace gibt es keine Document Structure mit dieser ID."
+      "title": "Datenformat nicht gefunden",
+      "description": "In diesem Arbeitsbereich gibt es kein Datenformat mit dieser ID."
     },
     "error": {
-      "title": "Document Structure nicht verfügbar",
-      "description": "Die Document Structure konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Datenformat nicht verfügbar",
+      "description": "Das Datenformat konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     },
     "facts": {
-      "label": "Details der Document Structure",
+      "label": "Über dieses Datenformat",
       "format": "Format",
       "fields": "Felder",
-      "mappings": "Verwendet von Mappings",
+      "mappings": "Gelesen von",
       "mappingsLoading": "Mappings werden geladen"
     },
     "usedNote": "Veröffentlichte Mapping Versions ändern sich nie, deshalb lehnt EDI Bridge Änderungen an Feldern ab, die sie verwenden. Felder, die nur ein Draft verknüpft, lassen sich ändern, solange sie ihren Platz behalten.",
@@ -3083,7 +3083,52 @@
       "reading": "CSV-Document wird gelesen…",
       "unread": "Die Felder erscheinen, sobald EDI Bridge das CSV-Document lesen kann. Passen Sie die CSV-Einstellungen an oder wählen Sie ein anderes CSV-Document."
     },
-    "viewOnlyFieldsDescription": "Die Felder, die EDI Bridge in Documents dieser Document Structure erwartet, mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen."
+    "viewOnlyFieldsDescription": "Die Felder, die EDI Bridge in Documents dieser Document Structure erwartet, mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen.",
+    "sample": {
+      "title": "Beispieldatei",
+      "takenAt": "Beispiel vom {date}",
+      "hint": "Wählen Sie einen Wert, um sein Feld zu sehen. Mit den Pfeiltasten wechseln Sie zwischen den Werten.",
+      "unreadable": "EDI Bridge kann diese Datei nicht Wert für Wert zeigen und zeigt deshalb den Text.",
+      "valuesLabel": "Werte in {fileName}",
+      "tableLabel": "Zeilen von {fileName}",
+      "value": "{value}, {field}",
+      "rows": "Zeigt die ersten {shown} von {total} Zeilen.",
+      "none": "Aus einem JSON Schema erstellt",
+      "noneDescription": "Es gibt keine Beispieldatei zum Anzeigen. Die Felder stammen aus dem JSON Schema."
+    },
+    "fieldList": {
+      "title": "Daraus gelesene Felder",
+      "titleNoSample": "Felder",
+      "description": "Jedes Feld hat einen verständlichen Namen, den Mappings neben dem technischen Namen zeigen. Wählen Sie ein Feld, um zu sehen, was es enthält und warum es seinen Namen hat.",
+      "unsure": "Unsicher",
+      "unsureNote": "EDI Bridge ist sich bei diesem Namen nicht sicher. Vergleichen Sie ihn mit der Beispieldatei und behalten Sie ihn oder benennen Sie das Feld um.",
+      "technicalName": "Technischer Name",
+      "path": "Pfad",
+      "holds": "Enthält",
+      "group": "{count, plural, one {Eine Gruppe aus # Feld} other {Eine Gruppe aus # Feldern}}",
+      "required": "immer gefüllt",
+      "optional": "manchmal leer",
+      "repeats": "wiederholt sich",
+      "example": "Im Beispiel",
+      "reason": "Warum dieser Name",
+      "namedByYou": "Von Ihnen benannt",
+      "readBy": "Gelesen von",
+      "rename": {
+        "label": "Name in Mappings",
+        "submit": "Umbenennen",
+        "keep": "Namen behalten",
+        "saving": "Wird gespeichert…",
+        "required": "Geben Sie einen Namen ein.",
+        "failed": "Das Feld konnte nicht umbenannt werden. Versuchen Sie es erneut.",
+        "renamed": "Umbenannt in „{label}“.",
+        "kept": "Name „{label}“ behalten."
+      }
+    },
+    "technical": {
+      "title": "Technische Einstellungen",
+      "description": "Ändern Sie die CSV-Einstellungen, ersetzen Sie die Beispieldatei eines CSV-Formats, markieren Sie Felder als Pflicht oder wiederholend und passen Sie ihren Typ an.",
+      "viewOnlyDescription": "Die CSV-Einstellungen und die Felder mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen."
+    }
   },
   "DocumentStructureForm": {
     "createTitle": "Neues Datenformat",

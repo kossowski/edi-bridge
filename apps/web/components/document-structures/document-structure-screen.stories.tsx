@@ -1,10 +1,17 @@
 import { delay, http, HttpResponse } from 'msw'
-import { expect, userEvent, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { DocumentStructureScreen } from '@/components/document-structures/document-structure-screen'
 import { toFile } from '@/components/document-structures/document-structure-story-helpers'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
+import {
+  besideSidebar,
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+  tablet,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   documentStructureEndpoint,
@@ -23,12 +30,17 @@ import {
   seedMappingDrafts,
   seedUnusedDocumentStructures,
 } from '@edi-bridge/mocks'
+import { Toaster } from '@edi-bridge/ui/components/sonner'
 
 import preview from '../../.storybook/preview'
 
 const order = seedDocumentStructureOf.ORDERS
 
-const [csv] = seedUnusedDocumentStructures
+const [csv, fromJsonSchema] = seedUnusedDocumentStructures
+
+const invoiceExport = seedDocumentStructures.find(
+  ({ name }) => name === 'ERP invoice export (CSV)',
+)!
 
 const large = createDocumentStructure({ fieldCount: 2000 })
 
@@ -50,8 +62,23 @@ const ansiExport = toFile({
   fileName: 'lieferscheine-oktober.csv',
 })
 
-async function chooseCsvDocument(canvasElement: HTMLElement, label = 'CSV Document') {
+async function openTechnicalSettings(canvasElement: HTMLElement, name = 'Technical settings') {
   const canvas = within(canvasElement)
+  const trigger = await canvas.findByRole('button', { name })
+
+  if (trigger.getAttribute('aria-expanded') !== 'true') {
+    await userEvent.click(trigger)
+  }
+}
+
+async function chooseCsvDocument(
+  canvasElement: HTMLElement,
+  label = 'CSV Document',
+  settings = 'Technical settings',
+) {
+  const canvas = within(canvasElement)
+
+  await openTechnicalSettings(canvasElement, settings)
 
   await userEvent.upload(await canvas.findByLabelText(label), ansiExport)
   await canvas.findByRole('region', { name: /lieferscheine-oktober\.csv$/ })
@@ -89,10 +116,16 @@ async function expectReadableColumns(canvasElement: HTMLElement) {
   }
 }
 
-const english = { required: 'buyer.contact.phone is required', save: 'Save' }
+const english = {
+  settings: 'Technical settings',
+  required: 'buyer.contact.phone is required',
+  save: 'Save',
+}
 
 async function changeAndSave(canvasElement: HTMLElement, labels = english) {
   const canvas = within(canvasElement)
+
+  await openTechnicalSettings(canvasElement, labels.settings)
 
   await userEvent.click(await canvas.findByRole('checkbox', { name: labels.required }))
   await userEvent.click(canvas.getByRole('button', { name: labels.save }))
@@ -103,26 +136,164 @@ const meta = preview.meta({
   component: DocumentStructureScreen,
   parameters: { layout: 'fullscreen' },
   args: { id: order.id },
+  decorators: [
+    (Story) => (
+      <>
+        <Story />
+        <Toaster />
+      </>
+    ),
+  ],
   beforeEach({ msw }) {
     msw.use(...createHandlers(apiUrl))
   },
 })
 
+function fieldButton(canvasElement: HTMLElement, label: string) {
+  const escaped = label.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  return within(canvasElement).findByRole('button', { name: new RegExp(`^${escaped}`) })
+}
+
+async function selectField(canvasElement: HTMLElement, label: string) {
+  const field = await fieldButton(canvasElement, label)
+
+  await userEvent.click(field)
+  await expect(field).toHaveAttribute('aria-expanded', 'true')
+
+  return field
+}
+
+function pressedValues(canvasElement: HTMLElement) {
+  return [...canvasElement.querySelectorAll('[data-sample-value][aria-pressed=true]')]
+}
+
 export const Default = meta.story({
-  async play({ canvas }) {
-    await expect(
-      await canvas.findByRole('treegrid', { name: 'Fields of ERP purchase order' }),
-    ).toBeVisible()
+  async play({ canvas, canvasElement }) {
+    const values = await canvas.findByRole('group', { name: 'Values in order-4711.json' })
+
     await expect(
       await canvas.findByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON' }),
     ).toBeVisible()
-    await expect(canvas.getByText('No unsaved changes')).toBeVisible()
+    await selectField(canvasElement, 'Order number')
+
+    const [pressed] = pressedValues(canvasElement)
+
+    await expect(pressed).toHaveAttribute('data-path', 'orderNumber')
+    await expect(canvas.getByText('Why this name')).toBeVisible()
+
+    const gtin = values.querySelector<HTMLElement>('[data-path="lines[].gtin"]')!
+
+    await userEvent.click(gtin)
+    await expect(await fieldButton(canvasElement, 'Article number (GTIN)')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    await expect(pressedValues(canvasElement).length).toBe(2)
+  },
+})
+
+export const KeyboardValues = meta.story({
+  async play({ canvas }) {
+    const values = await canvas.findByRole('group', { name: 'Values in order-4711.json' })
+    const [first, second] = within(values).getAllByRole('button')
+
+    await expect(first).toHaveAttribute('tabindex', '0')
+    await expect(second).toHaveAttribute('tabindex', '-1')
+    first!.focus()
+    await userEvent.keyboard('{ArrowRight}')
+    await expect(second).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
+    await expect(second).toHaveAttribute('aria-pressed', 'true')
+  },
+})
+
+export const InvoiceExport = meta.story({
+  args: { id: invoiceExport.id },
+  async play({ canvas, canvasElement }) {
+    const rows = await canvas.findByRole('table', {
+      name: 'Rows of Rechnungsexport_2026-10-08.csv',
+    })
+
+    await expect(within(rows).getByRole('columnheader', { name: /Unit price/ })).toBeVisible()
+    await expect(canvas.getAllByText('Unsure')).toHaveLength(2)
+
+    const [price] = within(rows).getAllByRole('button', { name: /, Unit price$/ })
+
+    await userEvent.click(price!)
+    await expect(await fieldButton(canvasElement, 'Unit price')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    await expect(
+      canvas.getByText('EDI Bridge is not sure about this name.', { exact: false }),
+    ).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Keep this name' })).toBeVisible()
+  },
+})
+
+export const RenameField = meta.story({
+  args: { id: invoiceExport.id },
+  async play({ canvas, canvasElement }) {
+    await selectField(canvasElement, 'Unit price')
+
+    const name = canvas.getByRole('textbox', { name: 'Name shown in Mappings' })
+
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Price per unit')
+    await userEvent.click(canvas.getByRole('button', { name: 'Rename' }))
+    await expect(
+      await within(canvasElement.ownerDocument.body).findByText('Renamed to “Price per unit”.'),
+    ).toBeInTheDocument()
+    await expect(await fieldButton(canvasElement, 'Price per unit')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    await expect(canvas.getByText('Named by you')).toBeVisible()
+    await expect(canvas.getAllByText('Unsure')).toHaveLength(1)
+  },
+})
+
+export const RenameRefused = meta.story({
+  args: { id: invoiceExport.id },
+  beforeEach({ msw }) {
+    msw.use(
+      refuseUpdate(
+        {
+          code: 'unknownPath',
+          message: 'There is no node at rows[].EPreis',
+          path: 'rows[].EPreis',
+          line: null,
+          mappingVersions: null,
+        },
+        invoiceExport.id,
+      ),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await selectField(canvasElement, 'Unit price')
+    await userEvent.click(canvas.getByRole('button', { name: 'Keep this name' }))
+
+    const alert = await canvas.findByRole('alert')
+
+    await expect(alert).toHaveTextContent('The Document Structure has changed in the meantime.')
+    await expect(alert.parentElement).toHaveFocus()
+  },
+})
+
+export const FromJsonSchema = meta.story({
+  args: { id: fromJsonSchema!.id },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Created from a JSON Schema')).toBeVisible()
+    await expect(canvas.getByRole('heading', { level: 2, name: 'Fields' })).toBeVisible()
+    await expect(canvas.queryByRole('group', { name: /^Values in / })).toBeNull()
   },
 })
 
 export const Csv = meta.story({
   args: { id: csv!.id },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
+    await openTechnicalSettings(canvasElement)
     await expect(await canvas.findByRole('group', { name: 'CSV settings' })).toBeVisible()
     await expect(canvas.getByRole('combobox', { name: 'Character encoding' })).toHaveValue(
       'windows-1252',
@@ -131,7 +302,7 @@ export const Csv = meta.story({
     await expect(
       canvas.getByRole('checkbox', { name: 'The first row names the columns' }),
     ).toBeChecked()
-    await expect(await canvas.findByText('Not used yet')).toBeVisible()
+    await expect((await canvas.findAllByText('Not used yet'))[0]).toBeVisible()
   },
 })
 
@@ -155,6 +326,9 @@ export const CsvReread = meta.story({
     await expect(
       canvas.getByRole('checkbox', { name: 'The first row names the columns' }),
     ).not.toBeChecked()
+    await expect(
+      await canvas.findByRole('table', { name: 'Rows of lieferscheine-oktober.csv' }),
+    ).toBeVisible()
   },
 })
 
@@ -210,6 +384,7 @@ const csvDocumentNeeded = 'Choose a CSV Document to read it again with the new s
 export const CsvDocumentRequired = meta.story({
   args: { id: csv!.id },
   async play({ canvas, canvasElement }) {
+    await openTechnicalSettings(canvasElement)
     await userEvent.click(
       await canvas.findByRole('checkbox', { name: 'The first row names the columns' }),
     )
@@ -229,7 +404,8 @@ export const CsvDocumentRequired = meta.story({
 export const MobileCsvDocumentRequired = meta.story({
   ...mobile,
   args: { id: csv!.id },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
+    await openTechnicalSettings(canvasElement)
     await userEvent.selectOptions(await canvas.findByRole('combobox', { name: 'Delimiter' }), ',')
 
     const hint = canvas.getByText(csvDocumentNeeded)
@@ -315,7 +491,7 @@ export const TabletCsvReread = meta.story({
   args: { id: csv!.id },
   decorators: [besideSidebar, german],
   async play({ canvas, canvasElement }) {
-    await chooseCsvDocument(canvasElement, 'CSV-Document')
+    await chooseCsvDocument(canvasElement, 'CSV-Document', 'Technische Einstellungen')
     await expect(
       await canvas.findByRole('region', { name: 'Erste Zeilen von lieferscheine-oktober.csv' }),
     ).toBeVisible()
@@ -334,7 +510,8 @@ export const DarkCsvReread = meta.story({
 })
 
 export const UnsavedChanges = meta.story({
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
+    await openTechnicalSettings(canvasElement)
     await userEvent.click(
       await canvas.findByRole('checkbox', { name: 'buyer.contact.phone is required' }),
     )
@@ -372,6 +549,7 @@ export const TabletRefused = meta.story({
   },
   async play({ canvas, canvasElement }) {
     await changeAndSave(canvasElement, {
+      settings: 'Technische Einstellungen',
       required: 'buyer.contact.phone ist Pflicht',
       save: 'Speichern',
     })
@@ -385,6 +563,7 @@ export const Tablet = meta.story({
   ...tablet,
   decorators: [besideSidebar],
   async play({ canvas, canvasElement }) {
+    await openTechnicalSettings(canvasElement)
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
     await expectReadableColumns(canvasElement)
   },
@@ -392,6 +571,7 @@ export const Tablet = meta.story({
 
 export const KeyboardToggle = meta.story({
   async play({ canvas, canvasElement }) {
+    await openTechnicalSettings(canvasElement)
     await canvas.findByRole('treegrid')
     const buyer = canvasElement.querySelector<HTMLElement>('tr[data-path="buyer"]')!
     buyer.focus()
@@ -431,7 +611,9 @@ export const LargeVolume = meta.story({
     msw.use(...createHandlers(apiUrl, { documentStructures: [...seedDocumentStructures, large] }))
   },
   parameters: { a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } } },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByRole('group', { name: /^Values in / })).toBeVisible()
+    await openTechnicalSettings(canvasElement)
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
   },
 })
@@ -444,7 +626,8 @@ export const MappingsLoading = meta.story({
       }),
     )
   },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
+    await openTechnicalSettings(canvasElement)
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
     await expect(canvas.getByText('Loading Mappings').closest('[aria-busy]')).not.toBeNull()
   },
@@ -459,14 +642,14 @@ export const Loading = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Document Structure')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading data format')).toBeInTheDocument()
   },
 })
 
 export const NotFound = meta.story({
   args: { id: '00000000-0000-4000-8000-000000000000' },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Document Structure not found')).toBeVisible()
+    await expect(await canvas.findByText('Data format not found')).toBeVisible()
   },
 })
 
@@ -479,15 +662,23 @@ export const Unavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Document Structure unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Data format unavailable')).toBeVisible()
   },
 })
 
 export const German = meta.story({
+  args: { id: invoiceExport.id },
   decorators: [german],
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await expect(
-      await canvas.findByRole('treegrid', { name: 'Felder von ERP purchase order' }),
+      await canvas.findByRole('group', { name: 'Werte in Rechnungsexport_2026-10-08.csv' }),
+    ).toBeVisible()
+    await expect(canvas.getAllByText('Unsicher')).toHaveLength(2)
+    await selectField(canvasElement, 'Unit price')
+    await expect(canvas.getByRole('button', { name: 'Namen behalten' })).toBeVisible()
+    await openTechnicalSettings(canvasElement, 'Technische Einstellungen')
+    await expect(
+      await canvas.findByRole('treegrid', { name: 'Felder von ERP invoice export (CSV)' }),
     ).toBeVisible()
   },
 })
@@ -517,6 +708,9 @@ async function expectNothingToChange(canvasElement: HTMLElement) {
 export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas, canvasElement }) {
+      await selectField(canvasElement, 'Order number')
+      await expect(canvas.getByText('Why this name')).toBeVisible()
+      await openTechnicalSettings(canvasElement)
       await expect(
         await canvas.findByRole('treegrid', { name: 'Fields of ERP purchase order' }),
       ).toBeVisible()
@@ -543,12 +737,13 @@ export const ViewerCsv = meta.story({
   args: { id: csv!.id },
   ...viewerStory({
     async play({ canvas, canvasElement }) {
+      await openTechnicalSettings(canvasElement)
       const settings = await canvas.findByRole('region', { name: 'CSV settings' })
       await expect(within(settings).getByText('Semicolon (;)')).toBeVisible()
       await expect(within(settings).getByText('Windows-1252')).toBeVisible()
       await expect(within(settings).getByText('The first row names the columns')).toBeVisible()
       await expect(await canvas.findByRole('treegrid')).toBeVisible()
-      await expect(await canvas.findByText('Not used yet')).toBeVisible()
+      await expect((await canvas.findAllByText('Not used yet'))[0]).toBeVisible()
       await expectNothingToChange(canvasElement)
       await expect(canvas.queryByRole('button', { name: 'Save' })).toBeNull()
     },
@@ -560,6 +755,7 @@ export const ViewerGerman = meta.story({
   ...viewerStory({
     decorators: [german],
     async play({ canvas, canvasElement }) {
+      await openTechnicalSettings(canvasElement, 'Technische Einstellungen')
       const settings = await canvas.findByRole('region', { name: 'CSV-Einstellungen' })
       await expect(within(settings).getByText('Semikolon (;)')).toBeVisible()
       await expect(within(settings).getByText('Kopfzeile')).toBeVisible()
@@ -574,8 +770,45 @@ export const ViewerDark = meta.story({
   ...viewerStory({
     beforeEach: darkMode,
     async play({ canvas, canvasElement }) {
+      await selectField(canvasElement, 'Order number')
+      await openTechnicalSettings(canvasElement)
       await expect(await canvas.findByRole('treegrid')).toBeVisible()
       await expectNothingToChange(canvasElement)
     },
   }),
+})
+
+export const Mobile = meta.story({
+  ...mobile,
+  args: { id: invoiceExport.id },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('table', { name: 'Rows of Rechnungsexport_2026-10-08.csv' })
+    await selectField(canvasElement, 'Unit price')
+    await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const MobileJson = meta.story({
+  ...mobile,
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('group', { name: 'Values in order-4711.json' })
+    await selectField(canvasElement, 'Order number')
+    await openTechnicalSettings(canvasElement)
+    await waitFor(() => expectNoPageScroll(canvasElement))
+  },
+})
+
+export const DarkInvoiceExport = meta.story({
+  args: { id: invoiceExport.id },
+  beforeEach: darkMode,
+  async play({ canvas }) {
+    const rows = await canvas.findByRole('table', {
+      name: 'Rows of Rechnungsexport_2026-10-08.csv',
+    })
+
+    const [price] = within(rows).getAllByRole('button', { name: /, Unit price$/ })
+
+    await userEvent.click(price!)
+    await expect(price).toHaveAttribute('aria-pressed', 'true')
+  },
 })

@@ -1,11 +1,12 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowRight01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { type ReactNode, useId, useState } from 'react'
 
-import { AppPage } from '@/components/app-page'
-import { Fact, LoadFailure, Loading } from '@/components/detail-parts'
+import { Loading } from '@/components/detail-parts'
 import {
   CsvSettingsFacts,
   CsvSettingsFields,
@@ -19,11 +20,9 @@ import {
 } from '@/components/document-structures/document-file'
 import { RefusalAlert } from '@/components/document-structures/document-structure-problem'
 import { FileField } from '@/components/document-structures/file-field'
-import { UsedByMappings } from '@/components/document-structures/mapping-list'
 import {
   type Adjustments,
   ancestorPaths,
-  leafCount,
   type StructureTree,
   withAdjustment,
 } from '@/components/document-structures/structure-tree'
@@ -34,14 +33,8 @@ import {
   StructureTreeGrid,
 } from '@/components/document-structures/structure-tree-grid'
 import { TextField } from '@/components/form-field'
-import { useSession } from '@/hooks/use-session'
-import { ApiError, documentStructureProblemOf, updateDocumentStructure } from '@/lib/api/client'
-import {
-  documentStructureQuery,
-  documentStructuresQuery,
-  storeSavedDocumentStructure,
-  useDocumentStructureInference,
-} from '@/lib/api/queries'
+import { documentStructureProblemOf, updateDocumentStructure } from '@/lib/api/client'
+import { storeSavedDocumentStructure, useDocumentStructureInference } from '@/lib/api/queries'
 import {
   type CsvSettings,
   defaultCsvSettings,
@@ -52,9 +45,14 @@ import {
   maxDocumentStructureNameLength,
   type UpdateDocumentStructureBody,
 } from '@edi-bridge/contracts'
-import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
-import { Skeleton } from '@edi-bridge/ui/components/skeleton'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@edi-bridge/ui/components/collapsible'
+
+type Mappings = DocumentStructureSummary['mappings'] | undefined
 
 const markedCodes = new Set<DocumentStructureProblem['code']>([
   'usedByMappingVersion',
@@ -221,48 +219,12 @@ function Fields({
   )
 }
 
-function useMappings(id: string) {
-  const summaries = useQuery(documentStructuresQuery)
-
-  return summaries.data?.find((summary) => summary.id === id)?.mappings
-}
-
-function StructureFacts({
-  structure,
-  mappings,
-}: {
-  structure: DocumentStructure
-  mappings: DocumentStructureSummary['mappings'] | undefined
-}) {
-  const t = useTranslations('DocumentStructure')
-  const tList = useTranslations('DocumentStructures')
-
-  return (
-    <dl aria-label={t('facts.label')} className="grid gap-4 rounded-lg border p-4 sm:grid-cols-3">
-      <Fact label={t('facts.format')}>
-        <Badge variant="outline">{tList(`format.${structure.format}`)}</Badge>
-      </Fact>
-      <Fact label={t('facts.fields')}>
-        {tList('fieldCount', { count: leafCount(structure.children) })}
-      </Fact>
-      <Fact label={t('facts.mappings')}>
-        {mappings ? (
-          <UsedByMappings mappings={mappings} />
-        ) : (
-          <Loading label={t('facts.mappingsLoading')} rowClassName="h-4 w-32" rows={1} />
-        )}
-      </Fact>
-    </dl>
-  )
-}
-
 function StructureView({ structure }: { structure: DocumentStructure }) {
   const t = useTranslations('DocumentStructure')
   const id = useId()
 
   return (
     <div className="flex flex-col gap-6">
-      <StructureFacts mappings={useMappings(structure.id)} structure={structure} />
       {structure.format === 'csv' && <CsvSettingsFacts id={`${id}-csv`} csv={structure.csv} />}
       <section aria-labelledby={`${id}-fields`} className="flex min-w-0 flex-col gap-3">
         <div className="flex flex-col gap-1">
@@ -279,11 +241,10 @@ function StructureView({ structure }: { structure: DocumentStructure }) {
   )
 }
 
-function Editor({ structure }: { structure: DocumentStructure }) {
+function Editor({ structure, mappings }: { structure: DocumentStructure; mappings: Mappings }) {
   const t = useTranslations('DocumentStructure')
   const id = useId()
   const queryClient = useQueryClient()
-  const mappings = useMappings(structure.id)
   const [name, setName] = useState(structure.name)
   const [adjustments, setAdjustments] = useState<Adjustments>(new Map())
   const [reveal, setReveal] = useState<Reveal | null>(null)
@@ -337,7 +298,6 @@ function Editor({ structure }: { structure: DocumentStructure }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <StructureFacts mappings={mappings} structure={structure} />
       {mappings && mappings.length > 0 && (
         <p className="text-muted-foreground max-w-prose text-sm">{t('usedNote')}</p>
       )}
@@ -451,34 +411,42 @@ function Editor({ structure }: { structure: DocumentStructure }) {
   )
 }
 
-export function DocumentStructureScreen({ id }: { id: string }) {
-  const t = useTranslations('DocumentStructure')
-  const { data, error, isPending, refetch } = useQuery(documentStructureQuery(id))
-  const session = useSession()
+export function TechnicalSettings({
+  structure,
+  mappings,
+  canChange,
+}: {
+  structure: DocumentStructure
+  mappings: Mappings
+  canChange: boolean
+}) {
+  const t = useTranslations('DocumentStructure.technical')
 
   return (
-    <AppPage name={data?.name}>
-      {isPending || session.isPending ? (
-        <div aria-busy className="flex flex-col gap-4">
-          <p role="status" className="sr-only">
-            {t('loading')}
-          </p>
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      ) : data ? (
-        session.canChange ? (
-          <Editor structure={data} />
+    <Collapsible
+      render={<section aria-labelledby={`${structure.id}-technical`} />}
+      className="group/technical flex flex-col gap-4 border-t pt-4">
+      <h2 id={`${structure.id}-technical`} className="font-semibold">
+        <CollapsibleTrigger className="hover:bg-muted focus-visible:ring-ring/50 -mx-2 flex min-h-9 items-center gap-2 rounded-md px-2 outline-none focus-visible:ring-3">
+          <HugeiconsIcon
+            icon={ArrowRight01Icon}
+            strokeWidth={2}
+            aria-hidden
+            className="size-4 transition-transform group-data-open/technical:rotate-90"
+          />
+          {t('title')}
+        </CollapsibleTrigger>
+      </h2>
+      <p className="text-muted-foreground -mt-2 max-w-prose text-sm">
+        {canChange ? t('description') : t('viewOnlyDescription')}
+      </p>
+      <CollapsibleContent keepMounted>
+        {canChange ? (
+          <Editor mappings={mappings} structure={structure} />
         ) : (
-          <StructureView structure={data} />
-        )
-      ) : (
-        <LoadFailure
-          namespace="DocumentStructure"
-          notFound={error instanceof ApiError && error.status === 404}
-          onRetry={() => void refetch()}
-        />
-      )}
-    </AppPage>
+          <StructureView structure={structure} />
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
