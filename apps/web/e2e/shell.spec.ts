@@ -14,3 +14,27 @@ test('a link to a glossary entry scrolls to and highlights it', async ({ page })
   await expect(entry).toHaveAttribute('data-targeted')
   await expect(entry).toBeInViewport()
 })
+
+test('client-side navigation to glossary entries highlights them without errors', async ({
+  page,
+}) => {
+  const errors: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  page.on('pageerror', (error) => errors.push(error.message))
+
+  await page.goto('/runs')
+  await expect(page.getByRole('heading', { level: 1 })).toBeAttached()
+
+  for (const id of ['orders', 'run']) {
+    await page.evaluate(`window.next.router.push('/help#${id}')`)
+
+    const entry = page.locator(`#${id}`)
+
+    await expect(entry).toHaveAttribute('data-targeted')
+    await expect(entry).toBeInViewport()
+  }
+
+  expect(errors).toEqual([])
+})
