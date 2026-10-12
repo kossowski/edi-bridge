@@ -18,7 +18,7 @@ export function EditScreen<Item extends { name: string }>({
   children,
 }: {
   query: UseQueryResult<Item>
-  namespace: 'Channel' | 'Flow' | 'TradingPartner'
+  namespace: 'Channel' | 'Flow'
   width?: 'max-w-xl' | 'max-w-2xl'
   busy?: boolean
   children: (item: Item) => ReactNode

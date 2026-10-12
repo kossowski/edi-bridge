@@ -284,6 +284,12 @@ export const ChooseDataTab = meta.story({
     await expect(getRouter().replace).toHaveBeenCalledWith('/settings?tab=data', {
       scroll: false,
     })
+    await userEvent.click(canvas.getByRole('tab', { name: 'Company' }))
+    await userEvent.click(canvas.getByRole('tab', { name: 'Data & AI' }))
+    await expect(canvas.getByRole('tab', { name: 'Data & AI' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
   },
 })
 

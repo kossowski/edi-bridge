@@ -43,6 +43,7 @@ import {
   getRun,
   getSession,
   getTradingPartner,
+  getTradingPartnerActivity,
   getWorkspaceSettings,
   inferDocumentStructure,
   listChannels,
@@ -426,6 +427,7 @@ export const tradingPartnerKeys = {
   list: () => [...tradingPartnerKeys.all(), 'list'] as const,
   detail: (id: string) => [...tradingPartnerKeys.all(), 'detail', id] as const,
   activities: () => [...tradingPartnerKeys.all(), 'activities'] as const,
+  activity: (id: string) => [...tradingPartnerKeys.detail(id), 'activity'] as const,
 }
 
 export const tradingPartnersQuery = queryOptions({
@@ -445,9 +447,17 @@ export function tradingPartnerQuery(id: string) {
   })
 }
 
+export function tradingPartnerActivityQuery(id: string) {
+  return queryOptions({
+    queryKey: tradingPartnerKeys.activity(id),
+    queryFn: () => getTradingPartnerActivity(id),
+  })
+}
+
 export function storeSavedTradingPartner(queryClient: QueryClient, saved: TradingPartner) {
   queryClient.setQueryData(tradingPartnerQuery(saved.id).queryKey, saved)
   void queryClient.invalidateQueries({ queryKey: tradingPartnerKeys.list() })
+  void queryClient.invalidateQueries({ queryKey: tradingPartnerKeys.activities() })
 }
 
 export const channelKeys = {

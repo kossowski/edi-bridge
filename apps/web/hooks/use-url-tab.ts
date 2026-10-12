@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 
 export function useUrlTab<Tab extends string>(tabs: readonly { value: Tab }[], fallback: Tab) {
   const router = useRouter()
@@ -11,11 +12,22 @@ export function useUrlTab<Tab extends string>(tabs: readonly { value: Tab }[], f
     return tabs.find((tab) => tab.value === value)?.value ?? fallback
   }
 
+  const fromUrl = tabOf(searchParams.get('tab'))
+  const [tab, setTab] = useState(fromUrl)
+  const [syncedUrlTab, setSyncedUrlTab] = useState(fromUrl)
+
+  if (fromUrl !== syncedUrlTab) {
+    setSyncedUrlTab(fromUrl)
+    setTab(fromUrl)
+  }
+
   function changeTab(value: string) {
+    const next = tabOf(value)
     const params = new URLSearchParams(searchParams)
-    params.set('tab', tabOf(value))
+    params.set('tab', next)
+    setTab(next)
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  return [tabOf(searchParams.get('tab')), changeTab] as const
+  return [tab, changeTab] as const
 }
