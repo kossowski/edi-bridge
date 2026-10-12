@@ -128,6 +128,7 @@
   "Navigation": {
     "home": "Home",
     "tasks": "Tasks",
+    "firstSteps": "First Steps",
     "documents": "Documents",
     "orderLifecycle": "Order Lifecycle",
     "tradingPartners": "Trading Partners",
@@ -144,6 +145,10 @@
     "tasks": {
       "label": "Tasks",
       "hint": "Everything that needs someone, grouped by who acts"
+    },
+    "firstSteps": {
+      "label": "First steps",
+      "hint": "Set up your workspace step by step, from GLN to go-live"
     }
   },
   "NotFound": {
@@ -189,6 +194,10 @@
   },
   "Home": {
     "loading": "Loading Home",
+    "setup": {
+      "title": "Continue setup",
+      "progress": "{done} of {total} done"
+    },
     "window": {
       "label": "Time window",
       "24h": "24 hours",
@@ -282,6 +291,76 @@
     "error": {
       "title": "Home unavailable",
       "description": "Home could not be loaded. Try again.",
+      "retry": "Try again"
+    }
+  },
+  "FirstSteps": {
+    "loading": "Loading first steps",
+    "heading": "Welcome. {total, plural, other {# steps}} until your first live document.",
+    "progress": "{done} of {total} steps done",
+    "explainer": {
+      "title": "How EDI Bridge works",
+      "description": "Your retailers send <term>EDI files</term>. EDI Bridge reads them, translates them into the format of your ERP, and does the same in reverse for dispatch advices and invoices.",
+      "tradingPartner": {
+        "title": "Your trading partner",
+        "text": "Sends purchase orders, expects invoices"
+      },
+      "bridge": {
+        "title": "EDI Bridge",
+        "text": "Translates, delivers, tells you what went wrong"
+      },
+      "erp": {
+        "title": "Your ERP",
+        "text": "Receives orders, sends dispatch and invoices"
+      }
+    },
+    "steps": {
+      "label": "Steps",
+      "number": "Step {number}",
+      "next": "Next",
+      "done": "Done",
+      "open": "Open",
+      "viewer": "An admin of your workspace does this step.",
+      "gln": {
+        "title": "Enter your company ID (GLN)",
+        "effort": "2 minutes",
+        "why": "Your partners identify you by a 13-digit number, the GLN. Without it they cannot match your documents to your company.",
+        "action": "Open company settings"
+      },
+      "erpConnection": {
+        "title": "Connect your ERP",
+        "effort": "15 minutes, ask your IT",
+        "why": "EDI Bridge needs a <term>connection</term> to hand over incoming orders and to pick up dispatch advices and invoices. This is usually a web address or a shared folder.",
+        "action": "Connect your ERP"
+      },
+      "tradingPartner": {
+        "title": "Add your first trading partner",
+        "effort": "10 minutes",
+        "why": "A <term>trading partner</term> is a retailer you exchange documents with. You tell us who they are and how their documents arrive.",
+        "action": "Add a trading partner"
+      },
+      "mapping": {
+        "title": "Translate your first document type",
+        "effort": "20 minutes, AI helps",
+        "why": "Your ERP and your partner describe an order differently. A <term>mapping</term> tells EDI Bridge which field goes where. An AI draft does most of the work, you check it and publish it.",
+        "action": "Create a mapping"
+      },
+      "testInterchange": {
+        "title": "Send a test document",
+        "effort": "5 minutes",
+        "why": "Try everything with a test document. Nothing reaches your partner for real while the partner is in <term>testing</term>.",
+        "action": "Send a test"
+      },
+      "production": {
+        "title": "Go live",
+        "effort": "1 minute",
+        "why": "When the test looks right and your partner has confirmed it, switch the partner to live. Real documents flow from then on.",
+        "action": "Go live"
+      }
+    },
+    "error": {
+      "title": "First steps unavailable",
+      "description": "The first steps could not be loaded. Try again.",
       "retry": "Try again"
     }
   },

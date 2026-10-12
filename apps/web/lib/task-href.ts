@@ -1,6 +1,6 @@
 import type { TaskActor, TaskTarget } from '@edi-bridge/contracts'
 
-import { documentHref, interchangeHref, navigationItems } from './navigation'
+import { documentHref, interchangeHref, navigationItems, tradingPartnerHref } from './navigation'
 
 export const taskGroupIds = {
   you: 'for-you',
@@ -22,7 +22,7 @@ export function taskHref(target: TaskTarget) {
     }
 
     case 'tradingPartner': {
-      return `/trading-partners/${encodeURIComponent(target.tradingPartnerId)}`
+      return tradingPartnerHref(target.tradingPartnerId)
     }
   }
 }

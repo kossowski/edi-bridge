@@ -4,19 +4,22 @@ import { ChartLineData01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { BucketTable, ErrorRateChart, ThroughputChart } from '@/components/home/home-charts'
 import { toBucketRows, totalsOf } from '@/components/home/home-data'
 import { HomeDraftPromo } from '@/components/home/home-draft-promo'
 import { HomeKeyNumbers } from '@/components/home/home-key-numbers'
+import { HomeSetupLink } from '@/components/home/home-setup-link'
 import { HomeTradingPartners } from '@/components/home/home-trading-partners'
 import { LiveIndicator } from '@/components/live-indicator'
 import { LoadError } from '@/components/load-error'
 import { useLiveEvents } from '@/hooks/use-live-events'
-import { homeKeys, homeQuery } from '@/lib/api/queries'
-import { type HomeWindow, homeWindows } from '@edi-bridge/contracts'
+import { firstStepsQuery, homeKeys, homeQuery } from '@/lib/api/queries'
+import { navigationItems } from '@/lib/navigation'
+import { firstStepsProgress, type HomeWindow, homeWindows } from '@edi-bridge/contracts'
 import { Card } from '@edi-bridge/ui/components/card'
 import {
   Empty,
@@ -77,19 +80,47 @@ function LoadingCharts() {
   )
 }
 
+function PendingPage({ label }: { label: string }) {
+  return (
+    <div aria-busy className="flex min-w-0 flex-1 flex-col gap-6 p-6">
+      <p aria-live="polite" className="sr-only">
+        {label}
+      </p>
+      <div aria-hidden className="flex flex-col gap-6">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-80 w-full" />
+      </div>
+    </div>
+  )
+}
+
 export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWindow }) {
   const t = useTranslations()
   const [timeWindow, setTimeWindow] = useState<HomeWindow>(defaultWindow)
   const queryClient = useQueryClient()
+  const router = useRouter()
   const liveStatus = useLiveEvents()
 
   const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(homeQuery(timeWindow))
+  const firstSteps = useQuery(firstStepsQuery)
+  const setup = firstSteps.data && firstStepsProgress(firstSteps.data)
+  const redirectsToFirstSteps = setup?.hasTradingPartner === false
+
+  useEffect(() => {
+    if (redirectsToFirstSteps) {
+      router.replace(navigationItems.firstSteps.href)
+    }
+  }, [redirectsToFirstSteps, router])
 
   const shownWindow = data?.window ?? timeWindow
   const fetchedAt = queryClient.getQueryState(homeKeys.window(shownWindow))?.dataUpdatedAt ?? 0
   const rows = data && toBucketRows(data.throughput, fetchedAt)
   const totals = rows && totalsOf(rows)
   const busy = isPending || isPlaceholderData
+
+  if (firstSteps.isPending || redirectsToFirstSteps) {
+    return <PendingPage label={t('Shell.workspace.loading')} />
+  }
 
   function charts() {
     if (!rows || !totals) {
@@ -145,6 +176,9 @@ export function HomeScreen({ defaultWindow = '24h' }: { defaultWindow?: HomeWind
             'flex flex-col gap-6',
             isPlaceholderData && 'opacity-60 transition-opacity',
           )}>
+          {setup && setup.done < setup.total && (
+            <HomeSetupLink done={setup.done} total={setup.total} />
+          )}
           <HomeKeyNumbers
             failed={totals?.failed}
             keyNumbers={data?.keyNumbers}

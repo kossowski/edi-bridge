@@ -204,6 +204,18 @@ export {
   updateFlowEndpoint,
 } from './flow'
 
+export {
+  type FirstStep,
+  type FirstStepId,
+  firstStepIds,
+  type FirstSteps,
+  firstStepsEndpoint,
+  firstStepsOf,
+  firstStepsProgress,
+  firstStepsSchema,
+  type FirstStepTarget,
+} from './first-steps'
+
 export { type GlnIssue, glnIssue, glnSchema, withCheckDigit } from './gln'
 
 export {

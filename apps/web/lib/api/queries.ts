@@ -35,6 +35,7 @@ import {
   getChannel,
   getCurrentWorkspace,
   getDocumentStructure,
+  getFirstSteps,
   getFlow,
   getHome,
   getLookupTable,
@@ -76,6 +77,11 @@ export const sessionQuery = queryOptions({
 export const currentWorkspaceQuery = queryOptions({
   queryKey: ['workspaces', 'current'],
   queryFn: getCurrentWorkspace,
+})
+
+export const firstStepsQuery = queryOptions({
+  queryKey: [...currentWorkspaceQuery.queryKey, 'first-steps'],
+  queryFn: getFirstSteps,
 })
 
 export const workspaceSettingsQuery = queryOptions({

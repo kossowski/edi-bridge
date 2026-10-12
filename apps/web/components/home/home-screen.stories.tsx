@@ -1,5 +1,6 @@
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { type SetupWorker } from 'msw/browser'
-import { expect, userEvent, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { HomeScreen } from '@/components/home/home-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
@@ -8,6 +9,7 @@ import { everyKind, hansemarkt } from '@/components/tasks/task-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   createRunStore,
+  firstStepsHandler,
   homeHandler,
   liveEventsHandler,
   type LiveEventsOptions,
@@ -29,7 +31,7 @@ function keyNumbers(canvasElement: HTMLElement) {
 
 export const Seeded = meta.story({
   beforeEach({ msw }) {
-    msw.use(homeHandler(apiUrl))
+    msw.use(homeHandler(apiUrl), firstStepsHandler(apiUrl))
   },
   async play({ canvas }) {
     const documents = await canvas.findByRole('heading', { name: 'Documents' })
@@ -49,6 +51,69 @@ export const Seeded = meta.story({
     await expect(canvas.getByRole('heading', { name: 'Share that failed' })).toBeVisible()
     await expect(canvas.getByText('Show values as table')).toBeVisible()
     await expect(canvas.getByRole('heading', { name: 'Your trading partners' })).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: /Continue setup/ })).toBeNull()
+    await expect(getRouter().replace).not.toHaveBeenCalled()
+  },
+})
+
+export const ContinueSetup = meta.story({
+  decorators: [
+    (Story) => (
+      <div className="flex min-h-svh">
+        <main className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col">
+            <Story />
+          </div>
+        </main>
+      </div>
+    ),
+  ],
+  beforeEach({ msw }) {
+    msw.use(homeHandler(apiUrl, 'empty'), firstStepsHandler(apiUrl, 'partlyDone'))
+  },
+  async play({ canvas }) {
+    const setup = await canvas.findByRole('link', { name: /^Continue setup\s*3 of 6 done$/ })
+
+    await expect(setup).toHaveAttribute('href', '/first-steps')
+
+    const promo = await canvas.findByRole('region', { name: 'Let the AI draft your next mapping' })
+    const draft = within(promo).getByRole('button', { name: 'Draft a mapping with AI' })
+
+    await expect(draft).toBeVisible()
+    await expect(draft.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+      promo.getBoundingClientRect().bottom,
+    )
+    await expect(setup.getBoundingClientRect().height).toBeLessThan(120)
+    await expect(
+      setup.compareDocumentPosition(canvas.getByRole('region', { name: 'Key numbers' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    await expect(getRouter().replace).not.toHaveBeenCalled()
+  },
+})
+
+export const FreshWorkspace = meta.story({
+  beforeEach({ msw }) {
+    msw.use(homeHandler(apiUrl, 'empty'), firstStepsHandler(apiUrl, 'fresh'))
+  },
+  async play({ canvas }) {
+    await waitFor(() => expect(getRouter().replace).toHaveBeenCalledWith('/first-steps'))
+    await expect(canvas.getByText('Loading Workspace')).toBeInTheDocument()
+    await expect(canvas.queryByText('Loading Home')).toBeNull()
+    await expect(canvas.queryByRole('heading', { name: 'Home' })).toBeNull()
+    await expect(canvas.queryByText('No trading partners yet')).toBeNull()
+    await expect(canvas.queryByText('No finished documents')).toBeNull()
+  },
+})
+
+export const FirstStepsUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(homeHandler(apiUrl), firstStepsHandler(apiUrl, 'error'))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('heading', { name: 'Documents' })).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: /Continue setup/ })).toBeNull()
+    await expect(getRouter().replace).not.toHaveBeenCalled()
   },
 })
 
@@ -160,7 +225,7 @@ export const Loading = meta.story({
     msw.use(homeHandler(apiUrl, 'loading'))
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Home')).toBeInTheDocument()
+    await expect(await canvas.findByText('Loading Home')).toBeInTheDocument()
     await expect(canvas.getByRole('link', { name: /^Needs attention/ })).toHaveAttribute(
       'href',
       '/tasks#for-you',
@@ -180,7 +245,7 @@ export const Unavailable = meta.story({
 export const German = meta.story({
   decorators: [german],
   beforeEach({ msw }) {
-    msw.use(homeHandler(apiUrl, everyKind()))
+    msw.use(homeHandler(apiUrl, everyKind()), firstStepsHandler(apiUrl, 'partlyDone'))
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('heading', { name: 'Belege' })).toBeVisible()
@@ -191,12 +256,15 @@ export const German = meta.story({
     await expect(
       canvas.getByRole('link', { name: /^Handlungsbedarf\s*Braucht Sie\s*3/ }),
     ).toHaveAttribute('href', '/tasks#for-you')
+    await expect(
+      canvas.getByRole('link', { name: /^Einrichtung fortsetzen\s*3 von 6 erledigt$/ }),
+    ).toHaveAttribute('href', '/first-steps')
   },
 })
 
 export const Dark = meta.story({
   beforeEach({ msw }) {
-    msw.use(homeHandler(apiUrl, everyKind()))
+    msw.use(homeHandler(apiUrl, everyKind()), firstStepsHandler(apiUrl, 'partlyDone'))
 
     return darkMode()
   },
@@ -209,10 +277,14 @@ export const Dark = meta.story({
 export const Mobile = meta.story({
   ...mobile,
   beforeEach({ msw }) {
-    msw.use(homeHandler(apiUrl, everyKind()))
+    msw.use(homeHandler(apiUrl, everyKind()), firstStepsHandler(apiUrl, 'partlyDone'))
   },
   async play({ canvas, canvasElement }) {
     await canvas.findByRole('heading', { name: 'Documents' })
+    await expect(canvas.getByRole('link', { name: /^Continue setup/ })).toBeVisible()
+    await expect(
+      await canvas.findByRole('button', { name: 'Draft a mapping with AI' }),
+    ).toBeVisible()
     await expectNoPageScroll(canvasElement)
   },
 })

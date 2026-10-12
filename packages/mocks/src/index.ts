@@ -23,6 +23,7 @@ import {
   seedUnusedDocumentStructures,
   toDocumentStructureStore,
 } from './document-structure'
+import { firstStepsHandler } from './first-steps'
 import { createFlowStore, flowHandlers } from './flow'
 import { homeHandler } from './home'
 import { interchangesHandler } from './interchange-list'
@@ -111,6 +112,14 @@ export {
   seedConnectionFailures,
   toChannel,
 } from './channel'
+
+export {
+  firstStepsHandler,
+  type FirstStepsState,
+  type FirstStepsWorld,
+  freshFirstSteps,
+  partlyDoneFirstSteps,
+} from './first-steps'
 
 export {
   createFlows,
@@ -404,6 +413,16 @@ export function createHandlers(
   return [
     ...sessionHandlers(apiUrl, sessionStore),
     ...workspaceHandlers(apiUrl, workspaceStore, sessionStore),
+    firstStepsHandler(
+      apiUrl,
+      {
+        workspace: workspaceStore,
+        channels: channelStore,
+        tradingPartners: tradingPartnerStore,
+        mappingVersions: mappingVersionStore,
+      },
+      sessionStore,
+    ),
     ...workspaceSettingsHandlers(apiUrl, {
       settings: workspaceSettingsStore,
       session: sessionStore,
