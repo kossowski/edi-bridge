@@ -2,6 +2,7 @@ import { en, Faker, faker as defaultFaker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
 import {
+  canSendTestInterchange,
   canSwitchToProduction,
   type CharacterSet,
   characterSets,
@@ -12,6 +13,7 @@ import {
   type TradingPartnerInput,
   type TradingPartnerOnboarding,
   tradingPartnerSchema,
+  sendTestInterchangeEndpoint,
   tradingPartnersEndpoint,
   updateTradingPartnerEndpoint,
   type Workspace,
@@ -189,18 +191,47 @@ export function toTradingPartnerStore(
   return 'get' in tradingPartners ? tradingPartners : createTradingPartnerStore(tradingPartners)
 }
 
+export type TestInterchangeOptions = {
+  contrlDelayMs?: number | null
+}
+
+const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
+
 export function tradingPartnerHandlers(
   apiUrl: string,
   {
     tradingPartners = seedTradingPartners,
     workspace = seedWorkspace,
+    testInterchange: { contrlDelayMs = 5000 } = {},
   }: {
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
     workspace?: Workspace | WorkspaceStore
+    testInterchange?: TestInterchangeOptions
   } = {},
 ) {
   const store = toTradingPartnerStore(tradingPartners)
   const workspaceStore = toWorkspaceStore(workspace)
+  const contrlDueAt = new Map<string, number>()
+
+  function receiveDueContrls() {
+    for (const [id, dueAt] of contrlDueAt) {
+      const tradingPartner = store.get(id)
+
+      if (dueAt > Date.now() || !tradingPartner) {
+        continue
+      }
+
+      contrlDueAt.delete(id)
+
+      store.set({
+        ...tradingPartner,
+        onboarding: {
+          ...tradingPartner.onboarding,
+          contrlReceivedAt: new Date(dueAt).toISOString(),
+        },
+      })
+    }
+  }
 
   function glnTaken(gln: string, ownId?: string) {
     return store
@@ -224,10 +255,17 @@ export function tradingPartnerHandlers(
   const notFound = () => HttpResponse.json({ message: 'Not found' }, { status: 404 })
 
   return [
-    http.get(`${apiUrl}${tradingPartnersEndpoint.path}`, () =>
-      HttpResponse.json([...store.all()].sort((a, b) => a.name.localeCompare(b.name, 'de'))),
-    ),
+    http.get(`${apiUrl}${tradingPartnersEndpoint.path}`, () => {
+      receiveDueContrls()
+
+      return HttpResponse.json([...store.all()].sort((a, b) => a.name.localeCompare(b.name, 'de')))
+    }),
     http.get<{ id: string }>(`${apiUrl}${tradingPartnerEndpoint.path}`, ({ params }) => {
+      if (!uuid.test(params.id)) {
+        return undefined
+      }
+
+      receiveDueContrls()
       const tradingPartner = store.get(params.id)
 
       return tradingPartner ? HttpResponse.json(tradingPartner) : notFound()
@@ -280,6 +318,7 @@ export function tradingPartnerHandlers(
       },
     ),
     http.post<{ id: string }>(`${apiUrl}${switchToProductionEndpoint.path}`, ({ params }) => {
+      receiveDueContrls()
       const existing = store.get(params.id)
 
       if (!existing) {
@@ -292,6 +331,41 @@ export function tradingPartnerHandlers(
 
       const updated = { ...existing, testMode: false }
       store.set(updated)
+
+      return HttpResponse.json(updated)
+    }),
+    http.post<{ id: string }>(`${apiUrl}${sendTestInterchangeEndpoint.path}`, ({ params }) => {
+      receiveDueContrls()
+      const existing = store.get(params.id)
+
+      if (!existing) {
+        return notFound()
+      }
+
+      if (!canSendTestInterchange(existing, workspaceStore.get().gln)) {
+        return HttpResponse.json(
+          { message: 'The Trading Partner does not await a test Interchange' },
+          { status: 409 },
+        )
+      }
+
+      const sentAt = Date.now()
+
+      const updated: TradingPartner = {
+        ...existing,
+        onboarding: {
+          testInterchangeSentAt: new Date(sentAt).toISOString(),
+          contrlReceivedAt: null,
+        },
+      }
+
+      store.set(updated)
+
+      if (contrlDelayMs === null) {
+        contrlDueAt.delete(existing.id)
+      } else {
+        contrlDueAt.set(existing.id, sentAt + contrlDelayMs)
+      }
 
       return HttpResponse.json(updated)
     }),

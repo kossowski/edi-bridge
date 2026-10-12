@@ -1,5 +1,5 @@
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
   channelsEndpoint,
@@ -11,6 +11,7 @@ import {
   type TradingPartner,
   type TradingPartnerInput,
   toPath,
+  sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
   tradingPartnerEndpoint,
   tradingPartnerSchema,
@@ -38,7 +39,10 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers()
+  vi.useRealTimers()
+})
 
 afterAll(() => server.close())
 
@@ -244,6 +248,105 @@ describe('tradingPartnerHandlers', () => {
     const response = await send('POST', toPath(switchToProductionEndpoint.path, tradingPartner))
 
     expect(response.status).toBe(409)
+  })
+})
+
+describe('POST /trading-partners/:id/test-interchange', () => {
+  const notStarted = createTradingPartner({
+    id: '10000000-0000-4000-8000-000000000003',
+    gln: '0200000000035',
+    testMode: true,
+    onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
+  })
+
+  const sentAt = new Date('2026-10-10T12:00:00.000Z')
+
+  async function getTradingPartner(id: string) {
+    const response = await send('GET', toPath(tradingPartnerEndpoint.path, { id }))
+
+    return tradingPartnerSchema.parse(await response.json())
+  }
+
+  it('records the test Interchange and receives its CONTRL after the delay', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(sentAt)
+
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { contrlDelayMs: 60_000 },
+      }),
+    )
+
+    const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+
+    expect(tradingPartnerSchema.parse(await response.json()).onboarding).toEqual({
+      testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
+      contrlReceivedAt: null,
+    })
+
+    vi.setSystemTime(new Date('2026-10-10T12:00:59.000Z'))
+    expect((await getTradingPartner(notStarted.id)).onboarding.contrlReceivedAt).toBeNull()
+
+    vi.setSystemTime(new Date('2026-10-10T12:01:30.000Z'))
+
+    expect((await listTradingPartners())[0]?.onboarding).toEqual({
+      testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
+      contrlReceivedAt: '2026-10-10T12:01:00.000Z',
+    })
+  })
+
+  it('lets the production switch follow once the CONTRL is received', async () => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { contrlDelayMs: 0 },
+      }),
+    )
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+    const response = await send('POST', toPath(switchToProductionEndpoint.path, notStarted))
+
+    expect(response.status).toBe(200)
+  })
+
+  it('keeps waiting when the Trading Partner never confirms', async () => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { contrlDelayMs: null },
+      }),
+    )
+
+    await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+
+    expect((await getTradingPartner(notStarted.id)).onboarding.contrlReceivedAt).toBeNull()
+  })
+
+  it.each<[string, TradingPartner, string | null]>([
+    ['in production', { ...awaitingProduction, testMode: false }, '0212345000007'],
+    ['whose CONTRL is already received', awaitingProduction, '0212345000007'],
+    ['while the Workspace has no GLN', notStarted, null],
+  ])('refuses a Trading Partner %s', async (_, tradingPartner, gln) => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [tradingPartner],
+        workspace: createWorkspace({ gln }),
+      }),
+    )
+
+    const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, tradingPartner))
+
+    expect(response.status).toBe(409)
+    expect(await getTradingPartner(tradingPartner.id)).toEqual(tradingPartner)
+  })
+
+  it('answers 404 for an unknown Trading Partner', async () => {
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
+
+    const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+
+    expect(response.status).toBe(404)
   })
 })
 

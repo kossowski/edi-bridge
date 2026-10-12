@@ -1,4 +1,5 @@
 import type {
+  ChannelTestFailureReason,
   DocumentStructure,
   Invite,
   Session,
@@ -8,7 +9,13 @@ import type {
 } from '@edi-bridge/contracts'
 
 import { aiDraftHandlers, type AiDraftOptions } from './ai-draft'
-import { channelHandlers, type ChannelRecord, createChannelStore, seedChannels } from './channel'
+import {
+  channelHandlers,
+  type ChannelRecord,
+  createChannelStore,
+  seedChannels,
+  seedConnectionFailures,
+} from './channel'
 import {
   documentStructureHandlers,
   type DocumentStructureStore,
@@ -55,7 +62,7 @@ import {
   type WorkspaceSummaryRecord,
 } from './operator'
 import { orderLifecycleHandler, seedOrderLifecycles } from './order-lifecycle'
-import { overviewHandler, seedOverviewData } from './overview'
+import { overviewHandler, seedOverdueAcknowledgements, seedOverviewData } from './overview'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
@@ -63,8 +70,10 @@ import { createSessionStore, seedSession, sessionHandlers } from './session'
 import {
   createTradingPartnerStore,
   seedTradingPartners,
+  type TestInterchangeOptions,
   tradingPartnerHandlers,
 } from './trading-partner'
+import { tradingPartnerActivityHandlers } from './trading-partner-activity'
 import { seedWorkspace, workspaceHandlers } from './workspace'
 import {
   seedWorkspaceMembers,
@@ -96,6 +105,7 @@ export {
   createChannelStore,
   randomWebhookToken,
   seedChannels,
+  seedConnectionFailures,
   toChannel,
 } from './channel'
 
@@ -238,9 +248,17 @@ export {
   createTradingPartners,
   createTradingPartnerStore,
   seedTradingPartners,
+  type TestInterchangeOptions,
   tradingPartnerHandlers,
   type TradingPartnerStore,
 } from './trading-partner'
+
+export {
+  type TradingPartnerActivityData,
+  tradingPartnerActivityHandlers,
+  toTradingPartnerActivities,
+  toTradingPartnerActivityDetail,
+} from './trading-partner-activity'
 
 export {
   createWorkspace,
@@ -303,6 +321,8 @@ export function createHandlers(
     invites = seedInvites,
     tradingPartners = seedTradingPartners,
     channels = seedChannels,
+    connectionFailures = seedConnectionFailures,
+    testInterchange = {},
     mappingDrafts = seedMappingDrafts,
     documentStructures = [...seedDocumentStructures, ...seedUnusedDocumentStructures],
     lookupTables = seedLookupTables,
@@ -319,6 +339,8 @@ export function createHandlers(
     invites?: ReadonlyArray<Invite>
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
+    connectionFailures?: ReadonlyMap<string, ChannelTestFailureReason>
+    testInterchange?: TestInterchangeOptions
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     lookupTables?: ReadonlyArray<LookupTableRecord>
@@ -386,8 +408,16 @@ export function createHandlers(
     ...tradingPartnerHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,
       workspace: workspaceStore,
+      testInterchange,
     }),
-    ...channelHandlers(apiUrl, { channels: channelStore }),
+    ...tradingPartnerActivityHandlers(apiUrl, {
+      tradingPartners: tradingPartnerStore,
+      runs,
+      get overdueAcknowledgements() {
+        return seedOverdueAcknowledgements(runs.all(), tradingPartnerStore.all())
+      },
+    }),
+    ...channelHandlers(apiUrl, { channels: channelStore, connectionFailures }),
     ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings: mappingVersionStore }),
     publishedMappingVersionsHandler(apiUrl, mappingVersionStore),
     runsHandler(apiUrl, runs),
