@@ -5,12 +5,18 @@ import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 import { AppHeader } from '@/components/app-header'
 import { WorkspaceDetailScreen } from '@/components/operator/workspace-detail-screen'
 import { OperatorOnly } from '@/components/session/operator-only'
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
+import {
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+  pendingSince,
+  withWorkspace,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   createInviteEndpoint,
   type Invite,
-  inviteValidityDays,
   operatorWorkspaceMembersEndpoint,
   operatorWorkspaceSettingsEndpoint,
   operatorWorkspacesEndpoint,
@@ -42,20 +48,6 @@ import {
 import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
 
 import preview from '../../.storybook/preview'
-
-const dayMs = 24 * 60 * 60 * 1000
-
-function pendingSince(invite: Invite, days: number): Invite {
-  const createdAt = Date.now() - days * dayMs
-
-  return {
-    ...invite,
-    acceptedAt: null,
-    revokedAt: null,
-    createdAt: new Date(createdAt).toISOString(),
-    expiresAt: new Date(createdAt + inviteValidityDays * dayMs).toISOString(),
-  }
-}
 
 const pendingEmail = 'jan.petersen@nordwind-handel.example'
 
@@ -92,12 +84,6 @@ function operatorMocks({
       ...(settings && { settings }),
     }),
   ]
-}
-
-function withWorkspace(id: string, changes: Partial<WorkspaceSummaryRecord>) {
-  return seedWorkspaceSummaries.map((workspace) =>
-    workspace.id === id ? { ...workspace, ...changes } : workspace,
-  )
 }
 
 function failing(path: string, method: 'get' | 'put' | 'post' = 'get') {

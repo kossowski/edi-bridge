@@ -1,16 +1,22 @@
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
-import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
+import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { AppHeader } from '@/components/app-header'
 import { WorkspacesScreen } from '@/components/operator/workspaces-screen'
 import { OperatorOnly } from '@/components/session/operator-only'
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
+import {
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+  pendingSince,
+  withWorkspace,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   createWorkspaceEndpoint,
   type Invite,
-  inviteValidityDays,
   maxWorkspaceNameLength,
   operatorWorkspacesEndpoint,
   type Session,
@@ -34,23 +40,11 @@ import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
 
 import preview from '../../.storybook/preview'
 
-const dayMs = 24 * 60 * 60 * 1000
-
-function pendingInvites(count: number, workspaceId: string): Invite[] {
-  const createdAt = Date.now() - dayMs
-
-  return createInvites({ count, workspaceId }).map((invite) => ({
-    ...invite,
-    acceptedAt: null,
-    revokedAt: null,
-    createdAt: new Date(createdAt).toISOString(),
-    expiresAt: new Date(createdAt + inviteValidityDays * dayMs).toISOString(),
-  }))
-}
-
 function operatorMocks({
   workspaces = seedWorkspaceSummaries,
-  invites = pendingInvites(2, seedWorkspace.id),
+  invites = createInvites({ count: 2, workspaceId: seedWorkspace.id }).map((invite) =>
+    pendingSince(invite, 1),
+  ),
   session = seedSession,
 }: {
   workspaces?: ReadonlyArray<WorkspaceSummaryRecord>
@@ -138,11 +132,11 @@ export const NoActivityYet = meta.story({
     msw.use(
       ...operatorMocks({
         invites: [],
-        workspaces: seedWorkspaceSummaries.map((workspace) =>
-          workspace.id === seedWorkspace.id
-            ? { ...workspace, memberCount: 0, documentsToday: 0, lastActivityAt: null }
-            : workspace,
-        ),
+        workspaces: withWorkspace(seedWorkspace.id, {
+          memberCount: 0,
+          documentsToday: 0,
+          lastActivityAt: null,
+        }),
       }),
     )
   },
@@ -224,9 +218,12 @@ export const Unavailable = meta.story({
   },
 })
 
-async function openCreateDialog(canvas: { findByRole: typeof screen.findByRole }) {
+async function openCreateDialog(
+  canvas: { findByRole: typeof screen.findByRole },
+  label = 'Create Workspace',
+) {
   await canvas.findByRole('link', { name: seedWorkspace.name })
-  const create = await canvas.findByRole('button', { name: 'Create Workspace' })
+  const create = await canvas.findByRole('button', { name: label })
   await userEvent.click(create)
   const dialog = await screen.findByRole('dialog')
   await waitFor(() => expect(dialog).toBeVisible())
@@ -238,8 +235,21 @@ async function openCreateDialog(canvas: { findByRole: typeof screen.findByRole }
   }
 }
 
+const createRequested = fn()
+
+function recordCreateRequests() {
+  createRequested.mockClear()
+
+  return http.post(`${apiUrl}${createWorkspaceEndpoint.path}`, async ({ request }) => {
+    createRequested(await request.clone().json())
+  })
+}
+
 export const CreateWorkspace = meta.story({
   parameters: { a11y: { context: 'body' } },
+  beforeEach({ msw }) {
+    msw.use(recordCreateRequests())
+  },
   async play({ canvas }) {
     const { dialog, name } = await openCreateDialog(canvas)
     await expect(name).toHaveFocus()
@@ -254,11 +264,15 @@ export const CreateWorkspace = meta.story({
         expect.stringMatching(/^\/operator\/workspaces\/[\w-]+\?tab=members$/),
       ),
     )
+    await expect(createRequested).toHaveBeenCalledWith({ name: 'Ostsee Feinkost AG', seed: true })
   },
 })
 
 export const CreateWorkspaceWithoutExampleData = meta.story({
   parameters: { a11y: { context: 'body' } },
+  beforeEach({ msw }) {
+    msw.use(recordCreateRequests())
+  },
   async play({ canvas }) {
     const { dialog, name } = await openCreateDialog(canvas)
     const seed = dialog.getByRole('switch', { name: 'Start with example data' })
@@ -270,6 +284,7 @@ export const CreateWorkspaceWithoutExampleData = meta.story({
     await waitFor(() =>
       expect(getRouter().push).toHaveBeenCalledWith(expect.stringMatching(/\?tab=members$/)),
     )
+    await expect(createRequested).toHaveBeenCalledWith({ name: 'Ostsee Feinkost AG', seed: false })
   },
 })
 
@@ -335,11 +350,7 @@ export const CreateWorkspaceGerman = meta.story({
   parameters: { a11y: { context: 'body' } },
   decorators: [german],
   async play({ canvas }) {
-    await canvas.findByRole('link', { name: seedWorkspace.name })
-    await userEvent.click(canvas.getByRole('button', { name: 'Arbeitsbereich anlegen' }))
-    const element = await screen.findByRole('dialog')
-    await waitFor(() => expect(element).toBeVisible())
-    const dialog = within(element)
+    const { dialog } = await openCreateDialog(canvas, 'Arbeitsbereich anlegen')
     await expect(dialog.getByRole('switch', { name: 'Mit Beispieldaten starten' })).toBeChecked()
     await expect(dialog.getByRole('button', { name: 'Arbeitsbereich anlegen' })).toBeVisible()
   },
@@ -390,11 +401,9 @@ export const OnPhone = meta.story({
   beforeEach({ msw }) {
     msw.use(
       ...operatorMocks({
-        workspaces: seedWorkspaceSummaries.map((workspace) =>
-          workspace.id === seedWorkspace.id
-            ? { ...workspace, name: 'Nordwind Handelsgesellschaft für Feinkost und Getränke mbH' }
-            : workspace,
-        ),
+        workspaces: withWorkspace(seedWorkspace.id, {
+          name: 'Nordwind Handelsgesellschaft für Feinkost und Getränke mbH',
+        }),
       }),
     )
   },

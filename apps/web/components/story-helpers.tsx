@@ -3,6 +3,8 @@ import { type ReactNode } from 'react'
 import { expect } from 'storybook/test'
 
 import messagesDe from '@/messages/de.json'
+import { type Invite, inviteValidityDays } from '@edi-bridge/contracts'
+import { dayMs, seedWorkspaceSummaries, type WorkspaceSummaryRecord } from '@edi-bridge/mocks'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@edi-bridge/ui/components/sidebar'
 
 export function darkMode() {
@@ -15,6 +17,24 @@ export async function expectNoPageScroll(canvasElement: HTMLElement) {
   const page = canvasElement.ownerDocument.documentElement
 
   await expect(page.scrollWidth).toBeLessThanOrEqual(page.clientWidth)
+}
+
+export function pendingSince(invite: Invite, days: number): Invite {
+  const createdAt = Date.now() - days * dayMs
+
+  return {
+    ...invite,
+    acceptedAt: null,
+    revokedAt: null,
+    createdAt: new Date(createdAt).toISOString(),
+    expiresAt: new Date(createdAt + inviteValidityDays * dayMs).toISOString(),
+  }
+}
+
+export function withWorkspace(id: string, changes: Partial<WorkspaceSummaryRecord>) {
+  return seedWorkspaceSummaries.map((workspace) =>
+    workspace.id === id ? { ...workspace, ...changes } : workspace,
+  )
 }
 
 export const german = (Story: () => ReactNode) => (
