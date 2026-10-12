@@ -1805,11 +1805,13 @@
       "description": "Wählen Sie den Beleg. Die KI entwirft das Mapping aus einem Beispielbeleg, und Sie prüfen jede Verknüpfung.",
       "choice": "{documents}, die Sie {direction, select, inbound {empfangen} other {senden}}",
       "aiHint": "Mit KI entwerfen",
+      "close": "Schließen"
+    },
+    "create": {
       "creating": "Mapping wird angelegt…",
       "failed": "Das Mapping konnte nicht angelegt werden. Versuchen Sie es erneut.",
       "noDocumentStructure": "Legen Sie zuerst Ihr Datenformat an, damit die KI die Form Ihrer Dateien kennt.",
-      "addDataFormat": "Datenformat anlegen",
-      "close": "Schließen"
+      "addDataFormat": "Datenformat anlegen"
     },
     "first": {
       "title": "Übersetzen Sie Ihren ersten Beleg",

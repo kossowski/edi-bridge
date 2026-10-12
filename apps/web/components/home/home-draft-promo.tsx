@@ -2,18 +2,15 @@
 
 import { AiMagicIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useId } from 'react'
 
-import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
+import {
+  CreateMappingError,
+  useCreateMappingWithDraft,
+} from '@/components/mappings/create-mapping-with-draft'
 import { useCanChange } from '@/hooks/use-session'
-import { ApiError, createMapping } from '@/lib/api/client'
-import { storeCreatedMapping } from '@/lib/api/queries'
-import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
-import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
+import { Button } from '@edi-bridge/ui/components/button'
 import { Spinner } from '@edi-bridge/ui/components/spinner'
 
 const fieldHeight = 34
@@ -136,26 +133,14 @@ function MiniMapping() {
 
 export function HomeDraftPromo() {
   const t = useTranslations('Home.promo')
-  const tNew = useTranslations('Mappings.new')
+  const tCreate = useTranslations('Mappings.create')
   const headingId = useId()
-  const router = useRouter()
-  const queryClient = useQueryClient()
   const canChange = useCanChange()
-
-  const create = useMutation({
-    mutationFn: createMapping,
-    onSuccess: (created) => {
-      storeCreatedMapping(queryClient, created)
-      router.push(aiDraftStartHref(created.id))
-    },
-  })
+  const create = useCreateMappingWithDraft()
 
   if (!canChange) {
     return null
   }
-
-  const locked = create.isPending || create.isSuccess
-  const noDocumentStructure = create.error instanceof ApiError && create.error.status === 422
 
   return (
     <section
@@ -173,34 +158,21 @@ export function HomeDraftPromo() {
         </h2>
         <p className="text-muted-foreground text-sm text-pretty">{t('description')}</p>
         <Button
-          disabled={locked}
           size="lg"
-          className="mt-1"
-          onClick={() => create.mutate({ messageType: 'ORDERS' })}>
-          {locked ? (
+          aria-disabled={create.locked || undefined}
+          className="mt-1 aria-disabled:cursor-progress aria-disabled:opacity-50"
+          onClick={() => create.start({ messageType: 'ORDERS' })}>
+          {create.locked ? (
             <Spinner role="presentation" aria-hidden data-icon="inline-start" />
           ) : (
             <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />
           )}
-          {locked ? tNew('creating') : t('button')}
+          {create.locked ? tCreate('creating') : t('button')}
         </Button>
         <p role="status" className="sr-only">
-          {locked ? tNew('creating') : ''}
+          {create.locked ? tCreate('creating') : ''}
         </p>
-        {create.isError && (
-          <Alert variant="destructive" className="text-left">
-            <AlertDescription className="flex flex-col items-start gap-2">
-              {noDocumentStructure ? tNew('noDocumentStructure') : tNew('failed')}
-              {noDocumentStructure && (
-                <Link
-                  href="/document-structures/new"
-                  className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                  {tNew('addDataFormat')}
-                </Link>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
+        <CreateMappingError error={create.error} />
       </div>
     </section>
   )

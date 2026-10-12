@@ -1805,11 +1805,13 @@
       "description": "Pick the document. The AI drafts the Mapping from an example document, and you check every link.",
       "choice": "{documents} {direction, select, inbound {you receive} other {you send}}",
       "aiHint": "Draft with AI",
+      "close": "Close"
+    },
+    "create": {
       "creating": "Creating the Mapping…",
       "failed": "The Mapping could not be created. Try again.",
       "noDocumentStructure": "Add your data format first, so the AI knows the shape of your files.",
-      "addDataFormat": "Add a data format",
-      "close": "Close"
+      "addDataFormat": "Add a data format"
     },
     "first": {
       "title": "Translate your first document",

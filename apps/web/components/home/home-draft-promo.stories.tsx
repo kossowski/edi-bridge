@@ -2,6 +2,8 @@ import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
+import type { MswApi } from 'msw-storybook-addon'
+
 import { HomeDraftPromo } from '@/components/home/home-draft-promo'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
@@ -24,30 +26,39 @@ const createUrl = `${apiUrl}${createMappingEndpoint.path}`
 
 const button = 'Draft a mapping with AI'
 
-const createBodies: unknown[] = []
+function recordCreates(msw: MswApi) {
+  const bodies: unknown[] = []
+
+  msw.use(
+    http.post(createUrl, async ({ request }) => {
+      bodies.push(await request.clone().json())
+    }),
+  )
+
+  return bodies
+}
+
+async function expectOneDraftStart(bodies: unknown[]) {
+  await waitFor(() =>
+    expect(getRouter().push).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
+    ),
+  )
+  await expect(bodies).toEqual([{ messageType: 'ORDERS' }])
+  await expect(getRouter().push).toHaveBeenCalledOnce()
+}
 
 export const Default = meta.story({
-  beforeEach({ msw }) {
-    createBodies.length = 0
-    msw.use(
-      http.post(createUrl, async ({ request }) => {
-        createBodies.push(await request.clone().json())
-      }),
-    )
-  },
-  async play({ canvas }) {
+  async play({ canvas, msw }) {
+    const createBodies = recordCreates(msw)
+
     await expect(
       await canvas.findByRole('heading', { name: 'Let the AI draft your next mapping' }),
     ).toBeVisible()
 
     await userEvent.click(canvas.getByRole('button', { name: button }))
 
-    await waitFor(() =>
-      expect(getRouter().push).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
-      ),
-    )
-    await expect(createBodies).toEqual([{ messageType: 'ORDERS' }])
+    await expectOneDraftStart(createBodies)
 
     const href: unknown = getRouter().push.mock.lastCall?.[0]
     const id = new URL(String(href), window.location.origin).pathname.split('/').at(-1) ?? ''
@@ -66,7 +77,8 @@ export const Pending = meta.story({
 
     const creating = canvas.getByRole('button', { name: 'Creating the Mapping…' })
 
-    await expect(creating).toBeDisabled()
+    await expect(creating).toHaveAttribute('aria-disabled', 'true')
+    await expect(creating).toHaveFocus()
     await expect(canvas.getByRole('status')).toHaveTextContent('Creating the Mapping…')
   },
 })
@@ -81,7 +93,8 @@ export const Failed = meta.story({
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
       'The Mapping could not be created. Try again.',
     )
-    await expect(canvas.getByRole('button', { name: button })).toBeEnabled()
+    await expect(canvas.getByRole('button', { name: button })).not.toHaveAttribute('aria-disabled')
+    await expect(canvas.getByRole('button', { name: button })).toHaveFocus()
   },
 })
 
@@ -106,7 +119,30 @@ export const NoDataFormat = meta.story({
       'href',
       '/document-structures/new',
     )
-    await expect(canvas.getByRole('button', { name: button })).toBeEnabled()
+    await expect(canvas.getByRole('button', { name: button })).not.toHaveAttribute('aria-disabled')
+  },
+})
+
+export const DoubleClick = meta.story({
+  async play({ canvas, msw }) {
+    const createBodies = recordCreates(msw)
+
+    await userEvent.dblClick(await canvas.findByRole('button', { name: button }))
+
+    await expectOneDraftStart(createBodies)
+  },
+})
+
+export const RepeatedKeyPresses = meta.story({
+  async play({ canvas, msw }) {
+    const createBodies = recordCreates(msw)
+
+    const draft = await canvas.findByRole('button', { name: button })
+
+    draft.focus()
+    await userEvent.keyboard('{Enter}{Enter}[Space]')
+
+    await expectOneDraftStart(createBodies)
   },
 })
 

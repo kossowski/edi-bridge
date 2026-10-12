@@ -223,9 +223,36 @@ export const CreatingMapping = meta.story({
 
     await expect(await sheet.findByRole('status')).toHaveTextContent('Creating the Mapping…')
 
+    await expect(sheet.getByRole('button', { name: 'Dispatch advices you send' })).toHaveFocus()
+
     for (const name of choices) {
-      await expect(sheet.getByRole('button', { name })).toBeDisabled()
+      await expect(sheet.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true')
     }
+  },
+})
+
+export const CreateMappingOnce = meta.story({
+  async play({ canvasElement, msw }) {
+    const bodies: unknown[] = []
+
+    msw.use(
+      http.post(createUrl, async ({ request }) => {
+        bodies.push(await request.clone().json())
+      }),
+    )
+
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await userEvent.dblClick(sheet.getByRole('button', { name: 'Invoices you send' }))
+    await userEvent.click(sheet.getByRole('button', { name: 'Dispatch advices you send' }))
+
+    await waitFor(() =>
+      expect(getRouter().push).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
+      ),
+    )
+    await expect(bodies).toEqual([{ messageType: 'INVOIC' }])
+    await expect(getRouter().push).toHaveBeenCalledOnce()
   },
 })
 
