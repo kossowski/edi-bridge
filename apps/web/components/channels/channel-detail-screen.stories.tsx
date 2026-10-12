@@ -46,15 +46,15 @@ export const InboundSftp = meta.story({
   },
 })
 
-export const ManualSubmissionFromChannel = meta.story({
+export const UploadFromChannel = meta.story({
   args: { id: sftpInbox.id },
   async play({ canvas }) {
-    await userEvent.click(await canvas.findByRole('button', { name: 'Submit a Document' }))
-    const dialog = within(await screen.findByRole('dialog', { name: 'Manual Submission' }))
+    await userEvent.click(await canvas.findByRole('button', { name: 'Upload a document' }))
+    const sheet = within(await screen.findByRole('dialog', { name: 'Upload a document' }))
     await waitFor(() =>
-      expect(dialog.getByRole('combobox', { name: 'Inbound Channel' })).toHaveTextContent(
-        'Hansemarkt SFTP inbox',
-      ),
+      expect(
+        sheet.getByRole('combobox', { name: 'Where does the document come from?' }),
+      ).toHaveTextContent('Hansemarkt SFTP inbox'),
     )
   },
 })
@@ -64,7 +64,7 @@ export const OutboundSftp = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('Upload folder')).toBeVisible()
     await expect(canvas.queryByText('Polling interval')).toBeNull()
-    await expect(canvas.queryByRole('button', { name: 'Submit a Document' })).toBeNull()
+    await expect(canvas.queryByRole('button', { name: 'Upload a document' })).toBeNull()
   },
 })
 
@@ -193,7 +193,7 @@ export const ViewerInboundSftp = meta.story({
       await expect(
         await canvas.findByRole('heading', { level: 1, name: 'Hansemarkt SFTP inbox' }),
       ).toBeInTheDocument()
-      await expect(canvas.queryByRole('button', { name: 'Submit a Document' })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: 'Upload a document' })).toBeNull()
       await expect(canvas.queryByRole('link', { name: 'Edit' })).toBeNull()
     },
   }),

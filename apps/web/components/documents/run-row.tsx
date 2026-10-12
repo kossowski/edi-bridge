@@ -40,7 +40,7 @@ function orderHref(businessReference: string) {
   return `${navigationItems.orderLifecycle.href}?${new URLSearchParams({ businessReference })}`
 }
 
-function useRunTitle(run: RunSummary) {
+export function useRunTitle(run: RunSummary) {
   const t = useTranslations('Documents.row')
   const plainNames = usePlainNames()
 

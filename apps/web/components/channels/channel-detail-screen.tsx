@@ -12,8 +12,8 @@ import {
 } from '@/components/channels/channel-parts'
 import { WebhookAccess } from '@/components/channels/webhook-token'
 import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { UploadSheet } from '@/components/documents/upload-sheet'
 import { EditLink } from '@/components/edit-link'
-import { ManualSubmissionDialog } from '@/components/manual-submission/manual-submission-dialog'
 import { ApiError } from '@/lib/api/client'
 import { channelQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -94,7 +94,7 @@ function ConnectionFacts({ channel }: { channel: Channel }) {
 function ChannelActions({ channel }: { channel: Channel }) {
   return (
     <>
-      {channel.direction === 'inbound' && <ManualSubmissionDialog defaultChannelId={channel.id} />}
+      {channel.direction === 'inbound' && <UploadSheet defaultChannelId={channel.id} />}
       <EditLink href={`/channels/${channel.id}/edit`} />
     </>
   )
