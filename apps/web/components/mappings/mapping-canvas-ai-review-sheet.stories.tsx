@@ -4,7 +4,6 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
-  detailsPanel,
   findSaveStatus,
   inReview,
   inReviewWith,
@@ -241,6 +240,10 @@ export const ShowOnCanvas = meta.story({
     await expect(
       (await openDetails(canvasElement)).getByText('This part has no links yet.'),
     ).toBeVisible()
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Details' }))
+    await waitFor(() =>
+      expect(page(canvasElement).queryByRole('dialog', { name: 'Details' })).toBeNull(),
+    )
 
     const reopened = await openSheet(canvasElement)
     const [chain] = entriesUnder(reopened, changing)
@@ -252,9 +255,10 @@ export const ShowOnCanvas = meta.story({
         canvasElement.ownerDocument.activeElement?.closest('.react-flow__node'),
       ).not.toBeNull(),
     )
-    await expect(
-      (await detailsPanel(canvasElement)).getByRole('heading', { name: /AI-proposed Transform$/ }),
-    ).toBeVisible()
+    await waitFor(() =>
+      expect(page(canvasElement).queryByRole('dialog', { name: sheetName })).toBeNull(),
+    )
+    await expect(page(canvasElement).queryByRole('dialog', { name: 'Details' })).toBeNull()
   },
 })
 

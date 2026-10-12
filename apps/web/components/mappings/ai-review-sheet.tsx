@@ -222,7 +222,6 @@ function ReviewEntries({
   }
 
   const showTransform = (transformId: string) => () => {
-    store.getState().selectTransform(transformId)
     onShow(
       focusWhenShown(() => {
         const root = refs.canvas.current
