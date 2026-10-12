@@ -13,118 +13,184 @@ import { useCanChange } from '@/hooks/use-session'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Spinner } from '@edi-bridge/ui/components/spinner'
 
-const fieldHeight = 34
-
-const transformHeight = 44
-
-const boxWidth = 190
-
-const columns = { source: 24, transform: 385, target: 746 }
-
-const fields = [
-  { source: 'orderNumber', edi: 'BGM 1004', y: 28 },
-  { source: 'customer', edi: 'NAD+BY 3039', y: 88 },
-  { source: 'deliveryDate', edi: 'DTM+2 2380', y: 148 },
-  { source: 'itemCode', edi: 'LIN 7140', y: 208 },
-] as const
-
-const transforms = [
-  { key: 'lookUpPartner', y: 62, fieldY: 88 },
-  { key: 'changeDateFormat', y: 168, fieldY: 148 },
-] as const
-
-const transformed = new Set<number>(transforms.map(({ fieldY }) => fieldY))
-
-const fieldMiddle = (y: number) => y + fieldHeight / 2
-
-const transformMiddle = (y: number) => y + transformHeight / 2
-
-function curve(x1: number, y1: number, x2: number, y2: number) {
-  const middle = (x1 + x2) / 2
-
-  return `M ${x1} ${y1} C ${middle} ${y1}, ${middle} ${y2}, ${x2} ${y2}`
+type SketchField = {
+  key: 'orderNumber' | 'customer' | 'deliveryDate' | 'itemCode'
+  edi: string
+  transform?: { key: 'lookUpPartner' | 'changeDateFormat'; shift: number }
 }
 
-const sourceEnd = columns.source + boxWidth
+type Box = {
+  id: string
+  kind: 'source' | 'transform' | 'target'
+  field: SketchField
+  x: number
+  y: number
+  width: number
+  height: number
+}
 
-const transformEnd = columns.transform + boxWidth
+type Edge = { id: string; path: string }
 
-const edges = [
-  ...fields.flatMap(({ y }) =>
-    transformed.has(y) ? [] : [curve(sourceEnd, fieldMiddle(y), columns.target, fieldMiddle(y))],
-  ),
-  ...transforms.flatMap(({ y, fieldY }) => [
-    curve(sourceEnd, fieldMiddle(fieldY), columns.transform, transformMiddle(y)),
-    curve(transformEnd, transformMiddle(y), columns.target, fieldMiddle(fieldY)),
-  ]),
+type Sketch = { width: number; height: number; boxes: Box[]; edges: Edge[] }
+
+const fields: SketchField[] = [
+  { key: 'orderNumber', edi: 'BGM 1004' },
+  { key: 'customer', edi: 'NAD+BY 3039', transform: { key: 'lookUpPartner', shift: -21 } },
+  { key: 'deliveryDate', edi: 'DTM+2 2380', transform: { key: 'changeDateFormat', shift: 25 } },
+  { key: 'itemCode', edi: 'LIN 7140' },
 ]
 
-function MiniMapping() {
+function box(
+  field: SketchField,
+  kind: Box['kind'],
+  place: Pick<Box, 'x' | 'y' | 'width' | 'height'>,
+): Box {
+  return { id: `${field.key}-${kind}`, kind, field, ...place }
+}
+
+function sideways(from: Box, to: Box): Edge {
+  const x1 = from.x + from.width
+  const y1 = from.y + from.height / 2
+  const x2 = to.x
+  const y2 = to.y + to.height / 2
+  const middle = (x1 + x2) / 2
+
+  return {
+    id: `${from.id}-${to.id}`,
+    path: `M ${x1} ${y1} C ${middle} ${y1}, ${middle} ${y2}, ${x2} ${y2}`,
+  }
+}
+
+function downwards(from: Box, to: Box): Edge {
+  const x1 = from.x + from.width / 2
+  const y1 = from.y + from.height
+  const x2 = to.x + to.width / 2
+  const y2 = to.y
+  const middle = (y1 + y2) / 2
+
+  return {
+    id: `${from.id}-${to.id}`,
+    path: `M ${x1} ${y1} C ${x1} ${middle}, ${x2} ${middle}, ${x2} ${y2}`,
+  }
+}
+
+function wideSketch(): Sketch {
+  const fieldHeight = 34
+  const transformHeight = 44
+  const width = 190
+  const boxes: Box[] = []
+  const edges: Edge[] = []
+
+  fields.forEach((field, index) => {
+    const y = 28 + index * 60
+    const source = box(field, 'source', { x: 24, y, width, height: fieldHeight })
+    const target = box(field, 'target', { x: 746, y, width, height: fieldHeight })
+
+    boxes.push(source, target)
+
+    if (!field.transform) {
+      edges.push(sideways(source, target))
+
+      return
+    }
+
+    const transform = box(field, 'transform', {
+      x: 385,
+      y: y + (fieldHeight - transformHeight) / 2 + field.transform.shift,
+      width,
+      height: transformHeight,
+    })
+
+    boxes.push(transform)
+    edges.push(sideways(source, transform), sideways(transform, target))
+  })
+
+  return { width: 960, height: 270, boxes, edges }
+}
+
+function narrowSketch(): Sketch {
+  const height = 30
+  const gap = 8
+  const step = 44
+  const boxes: Box[] = []
+  const edges: Edge[] = []
+  let y = 4
+
+  for (const field of fields.filter(({ key }) => key !== 'deliveryDate')) {
+    const source = box(field, 'source', { x: 4, y, width: 136, height })
+
+    if (!field.transform) {
+      const target = box(field, 'target', { x: 220, y, width: 136, height })
+
+      boxes.push(source, target)
+      edges.push(sideways(source, target))
+      y += height + gap
+
+      continue
+    }
+
+    const transform = box(field, 'transform', { x: 95, y: y + step, width: 170, height })
+    const target = box(field, 'target', { x: 220, y: y + 2 * step, width: 136, height })
+
+    boxes.push(source, transform, target)
+    edges.push(downwards(source, transform), downwards(transform, target))
+    y += 2 * step + height + gap
+  }
+
+  return { width: 360, height: y - gap + 4, boxes, edges }
+}
+
+const wide = wideSketch()
+
+const narrow = narrowSketch()
+
+function MiniMapping({ sketch, className }: { sketch: Sketch; className: string }) {
   const t = useTranslations('Home.promo.sketch')
 
   return (
     <svg
-      preserveAspectRatio="xMidYMid slice"
-      viewBox="0 0 960 270"
+      viewBox={`0 0 ${sketch.width} ${sketch.height}`}
       aria-hidden
-      className="absolute inset-0 -z-10 size-full opacity-70 blur-[2px]">
-      {edges.map((path) => (
-        <path key={path} d={path} strokeWidth={2} className="stroke-primary/50 fill-none" />
+      className={className}
+      data-sketch={sketch === wide ? 'wide' : 'narrow'}>
+      {sketch.edges.map(({ id, path }) => (
+        <path key={id} d={path} strokeWidth={2} className="stroke-primary/50 fill-none" />
       ))}
-      {fields.map(({ source, y }) => (
-        <g key={source}>
+      {sketch.boxes.map(({ id, kind, field, x, y, width, height }) => (
+        <g key={id}>
           <rect
-            height={fieldHeight}
-            rx={8}
-            width={boxWidth}
-            x={columns.source}
+            height={height}
+            rx={kind === 'transform' ? 10 : 8}
+            strokeDasharray={kind === 'transform' ? '5 3' : undefined}
+            width={width}
+            x={x}
             y={y}
-            className="fill-card stroke-border"
+            className={
+              kind === 'transform' ? 'fill-background stroke-primary/60' : 'fill-card stroke-border'
+            }
           />
-          <text
-            x={columns.source + 14}
-            y={fieldMiddle(y) + 5}
-            className="fill-foreground text-[14px]">
-            {t(source)}
-          </text>
-        </g>
-      ))}
-      {transforms.map(({ key, y }) => (
-        <g key={key}>
-          <rect
-            height={transformHeight}
-            rx={10}
-            strokeDasharray="5 3"
-            width={boxWidth}
-            x={columns.transform}
-            y={y}
-            className="fill-background stroke-primary/60"
-          />
-          <text
-            textAnchor="middle"
-            x={columns.transform + boxWidth / 2}
-            y={transformMiddle(y) + 5}
-            className="fill-foreground text-[14px] font-medium">
-            {t(key)}
-          </text>
-        </g>
-      ))}
-      {fields.map(({ edi, y }) => (
-        <g key={edi}>
-          <rect
-            height={fieldHeight}
-            rx={8}
-            width={boxWidth}
-            x={columns.target}
-            y={y}
-            className="fill-card stroke-border"
-          />
-          <text
-            x={columns.target + 14}
-            y={fieldMiddle(y) + 5}
-            className="fill-muted-foreground font-mono text-[13px]">
-            {edi}
-          </text>
+          {kind === 'source' && (
+            <text x={x + 14} y={y + height / 2 + 5} className="fill-foreground text-[14px]">
+              {t(field.key)}
+            </text>
+          )}
+          {kind === 'transform' && field.transform && (
+            <text
+              textAnchor="middle"
+              x={x + width / 2}
+              y={y + height / 2 + 5}
+              className="fill-foreground text-[14px] font-medium">
+              {t(field.transform.key)}
+            </text>
+          )}
+          {kind === 'target' && (
+            <text
+              x={x + 14}
+              y={y + height / 2 + 5}
+              className="fill-muted-foreground font-mono text-[13px]">
+              {field.edi}
+            </text>
+          )}
         </g>
       ))}
     </svg>
@@ -145,9 +211,16 @@ export function HomeDraftPromo() {
   return (
     <section
       aria-labelledby={headingId}
-      className="bg-muted/40 relative isolate overflow-hidden rounded-2xl border px-4 py-10 sm:py-14">
-      <MiniMapping />
-      <div className="bg-background/85 mx-auto flex max-w-md flex-col items-center gap-3 rounded-xl border p-6 text-center shadow-lg backdrop-blur-sm">
+      className="bg-muted/40 @container relative isolate overflow-hidden rounded-2xl border p-4">
+      <MiniMapping
+        sketch={narrow}
+        className="mx-auto mb-4 block w-full max-w-sm opacity-80 @3xl:hidden"
+      />
+      <MiniMapping
+        sketch={wide}
+        className="absolute inset-0 -z-10 hidden size-full opacity-70 blur-[2px] @3xl:block"
+      />
+      <div className="bg-background/85 mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-xl border p-6 text-center shadow-lg backdrop-blur-sm @3xl:my-10">
         <span
           aria-hidden
           className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-lg">

@@ -178,6 +178,8 @@ export const Mobile = meta.story({
   ...mobile,
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('button', { name: button })).toBeVisible()
+    await expect(canvasElement.querySelector('[data-sketch="narrow"]')).toBeVisible()
+    await expect(canvasElement.querySelector('[data-sketch="wide"]')).not.toBeVisible()
     await expectNoPageScroll(canvasElement)
   },
 })
