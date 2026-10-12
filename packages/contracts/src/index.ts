@@ -229,6 +229,9 @@ export {
 export {
   type DocumentStructureSide,
   documentStructureSideSchema,
+  type CreateMappingBody,
+  createMappingBodySchema,
+  createMappingEndpoint,
   type GraphParts,
   type MappingDraft,
   mappingDraftEndpoint,
@@ -244,6 +247,7 @@ export {
   mappingSummarySchema,
   type MessageTypeSide,
   messageTypeSideSchema,
+  newMappingMessageTypes,
   type SaveMappingDraftBody,
   saveMappingDraftBodySchema,
   saveMappingDraftEndpoint,

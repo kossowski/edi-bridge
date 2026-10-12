@@ -19,7 +19,6 @@ import {
   mappingVersionSchema,
   mappingVersionsEndpoint,
   type MappingVersionSummary,
-  mappingVersionSummarySchema,
   type MessageType,
   type OutputDifference,
   publishedMappingVersionsEndpoint,
@@ -37,7 +36,6 @@ import {
   byNameAndNewest,
   type MappingCatalogue,
   type MappingRecord,
-  seedMappings,
   toMappingCatalogue,
 } from './flow'
 import {
@@ -51,6 +49,7 @@ import {
   type MappingDraftRecord,
   type MappingDraftStore,
   oriented,
+  publishedVersionsOf,
   seedMappingDrafts,
   sideLeaves,
   structureOf,
@@ -59,7 +58,6 @@ import {
 import { lookUpIn, previewOutput } from './mapping-preview'
 import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'
 import { aiReviewOpen, badRequest, conflict, notFound, unprocessable } from './responses'
-import { stableUuid } from './seed-id'
 
 import type { Entry } from './document-values'
 
@@ -71,32 +69,6 @@ export type MappingVersionRecord = MappingVersionSummary &
   GraphParts & { messageType: MessageType; documentStructureId: string }
 
 type DocumentStructures = ReadonlyArray<DocumentStructure>
-
-const versionSpacing = 9 * 86_400_000
-
-// Seed Mappings keep the versions their Flows and Runs already pin.
-function versionSummaries(draft: MappingDraftRecord): MappingVersionSummary[] {
-  const count = draft.latestVersion ?? 0
-  const seeded = seedMappings.find(({ mappingId }) => mappingId === draft.id)?.versions
-
-  if (seeded?.length === count) {
-    return [...seeded]
-  }
-
-  const newest = Date.parse(draft.updatedAt) - versionSpacing
-
-  return Array.from({ length: count }, (_, index) => {
-    const version = count - index
-
-    return mappingVersionSummarySchema.parse({
-      id: stableUuid(`${draft.id}:version:${version}`),
-      mappingId: draft.id,
-      mappingName: draft.name,
-      version,
-      publishedAt: new Date(newest - index * versionSpacing).toISOString(),
-    })
-  })
-}
 
 function earlierConfig(transform: MappingTransform): MappingTransform {
   switch (transform.kind) {
@@ -145,7 +117,7 @@ function stepsBack(graph: GraphParts, steps: number): GraphParts {
 }
 
 export function deriveMappingVersions(draft: MappingDraftRecord): MappingVersionRecord[] {
-  const summaries = versionSummaries(draft)
+  const summaries = publishedVersionsOf(draft)
   const latest = summaries[0]?.version ?? 0
   const unpublished = draft.unpublishedChanges ? 1 : 0
 

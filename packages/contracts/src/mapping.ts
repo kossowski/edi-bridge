@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { aiReviewProblems, aiReviewSchema } from './ai-review'
 import { directionSchema, messageTypeSchema } from './message-type'
+import { tradingPartnerSummarySchema } from './trading-partner'
 import {
   type MappingTransform,
   mappingTransformSchema,
@@ -13,16 +14,42 @@ import {
 
 import type { Endpoint } from './endpoint'
 
-export const mappingSummarySchema = z.object({
-  id: z.uuid(),
-  name: z.string().min(1),
-  direction: directionSchema,
-  messageType: messageTypeSchema,
-  documentStructureId: z.uuid(),
-  documentStructureName: z.string().min(1),
-  latestVersion: z.number().int().min(1).nullable(),
-  draftUpdatedAt: z.iso.datetime(),
-})
+export const mappingSummarySchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().min(1),
+    direction: directionSchema,
+    messageType: messageTypeSchema,
+    documentStructureId: z.uuid(),
+    documentStructureName: z.string().min(1),
+    latestVersion: z.number().int().min(1).nullable(),
+    latestVersionPublishedAt: z.iso.datetime().nullable(),
+    unpublishedChanges: z.boolean(),
+    draftUpdatedAt: z.iso.datetime(),
+    partners: z.array(tradingPartnerSummarySchema),
+    documentsLast7Days: z.number().int().min(0),
+    failedRunsLast7Days: z.number().int().min(0),
+  })
+  .refine(
+    ({ latestVersion, latestVersionPublishedAt }) =>
+      (latestVersion === null) === (latestVersionPublishedAt === null),
+    { message: 'A Mapping has a publication date exactly when it has a latest version' },
+  )
+  .refine(({ latestVersion, unpublishedChanges }) => latestVersion !== null || unpublishedChanges, {
+    message: 'A Mapping that was never published has unpublished changes',
+  })
+  .refine(
+    ({ latestVersion, partners, documentsLast7Days }) =>
+      latestVersion !== null || (partners.length === 0 && documentsLast7Days === 0),
+    { message: 'A Mapping that was never published has no partners and no Documents' },
+  )
+  .refine(
+    ({ documentsLast7Days, failedRunsLast7Days }) => failedRunsLast7Days <= documentsLast7Days,
+    { message: 'A Mapping has no more failed Runs than Documents' },
+  )
+  .refine(({ partners }) => new Set(partners.map(({ id }) => id)).size === partners.length, {
+    message: 'A Mapping lists each Trading Partner once',
+  })
 
 export type MappingSummary = z.infer<typeof mappingSummarySchema>
 
@@ -204,6 +231,26 @@ export const mappingsEndpoint: Endpoint<MappingSummary[]> = {
   method: 'GET',
   path: '/mappings',
   response: z.array(mappingSummarySchema),
+}
+
+export const newMappingMessageTypes = ['ORDERS', 'DESADV', 'INVOIC'] as const
+
+export const createMappingBodySchema = z.strictObject({
+  messageType: messageTypeSchema.extract(newMappingMessageTypes),
+})
+
+export type CreateMappingBody = z.infer<typeof createMappingBodySchema>
+
+export const createMappingEndpoint: Endpoint<
+  MappingSummary,
+  undefined,
+  CreateMappingBody,
+  '/mappings'
+> = {
+  method: 'POST',
+  path: '/mappings',
+  body: createMappingBodySchema,
+  response: mappingSummarySchema,
 }
 
 export const mappingDraftEndpoint: Endpoint<

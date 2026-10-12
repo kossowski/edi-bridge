@@ -8,6 +8,7 @@ import {
   createFlowEndpoint,
   createDocumentStructureEndpoint,
   createLookupTableEndpoint,
+  createMappingEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   documentStructureEndpoint,
@@ -72,11 +73,13 @@ import {
   seedFlows,
   seedLookupTableNamed,
   seedMappingDrafts,
+  seedMappings,
   seedSandboxWorkspace,
   seedShowcaseWorkspace,
   seedTradingPartners,
   seedWorkspace,
 } from './index'
+import { day } from './overdue'
 
 const apiUrl = 'http://api.test'
 
@@ -243,6 +246,78 @@ describe('createHandlers', () => {
     expect(offered).toContainEqual(published)
     expect(flow.newerMappingVersions).toContainEqual(published)
     expect(replacing.mappingVersion).toEqual(published)
+  })
+
+  it('opens a Mapping created within the same createHandlers call and shows its publication', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const created = createMappingEndpoint.response.parse(
+      await (
+        await fetch(`${apiUrl}${createMappingEndpoint.path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ messageType: 'INVOIC' }),
+        })
+      ).json(),
+    )
+
+    const versionsPath = toPath(mappingVersionsEndpoint.path, { mappingId: created.id })
+    const draftPath = toPath(mappingDraftEndpoint.path, { id: created.id })
+
+    expect(await (await fetch(`${apiUrl}${versionsPath}`)).json()).toEqual([])
+    expect(
+      mappingDraftEndpoint.response.parse(await (await fetch(`${apiUrl}${draftPath}`)).json()),
+    ).toMatchObject({ mappingId: created.id, latestVersion: null, links: [] })
+
+    const published = publishMappingDraftEndpoint.response.parse(
+      await (
+        await fetch(
+          `${apiUrl}${toPath(publishMappingDraftEndpoint.path, { mappingId: created.id })}`,
+          {
+            method: 'POST',
+          },
+        )
+      ).json(),
+    )
+
+    const mappings = mappingsEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${mappingsEndpoint.path}`)).json(),
+    )
+
+    expect(mappings.find(({ id }) => id === created.id)).toMatchObject({
+      latestVersion: 1,
+      latestVersionPublishedAt: published.publishedAt,
+      unpublishedChanges: false,
+    })
+  })
+
+  it('counts the same Documents on a Mapping card as the Run list shows for its Flow', async () => {
+    server.use(...createHandlers(apiUrl))
+    const [flow] = seedFlows
+    const { mappingId } = seedMappings[0]!
+    const receivedFrom = new Date(Date.now() - 7 * day).toISOString()
+    const all = await listRuns({ flowId: [flow!.id], receivedFrom, pageSize: 1 })
+    const failed = await listRuns({ flowId: [flow!.id], receivedFrom, status: ['failed'] })
+
+    const mappings = mappingsEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${mappingsEndpoint.path}`)).json(),
+    )
+
+    expect(all.total).toBeGreaterThan(0)
+    expect(mappings.find(({ id }) => id === mappingId)).toMatchObject({
+      documentsLast7Days: all.total,
+      failedRunsLast7Days: failed.total,
+    })
+  })
+
+  it('lists a Mapping that the Flows of two Trading Partners share', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const mappings = mappingsEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${mappingsEndpoint.path}`)).json(),
+    )
+
+    expect(mappings.some(({ partners }) => partners.length >= 2)).toBe(true)
   })
 
   it('keeps the changes of one createHandlers call out of another', async () => {

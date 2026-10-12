@@ -28,6 +28,7 @@ import {
   ApiError,
   createChannel,
   createLookupTable,
+  createMapping,
   createTradingPartner,
   deleteLookupTable,
   documentStructureProblemOf,
@@ -229,6 +230,25 @@ describe('Channel actions', () => {
     expect(regenerated.channel).toMatchObject({
       token: { lastFour: regenerated.webhookToken.slice(-4) },
     })
+  })
+})
+
+describe('createMapping', () => {
+  it('creates a never-published Mapping for the Message Type', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: [...seedMappingDrafts] }))
+
+    await expect(createMapping({ messageType: 'ORDERS' })).resolves.toMatchObject({
+      direction: 'inbound',
+      messageType: 'ORDERS',
+      latestVersion: null,
+      unpublishedChanges: true,
+    })
+  })
+
+  it('rejects with 422 when the Workspace has no Document Structure', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }))
+
+    await expect(createMapping({ messageType: 'INVOIC' })).rejects.toMatchObject({ status: 422 })
   })
 })
 

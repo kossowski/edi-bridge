@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createTradingPartner,
+  publishedVersionsOf,
   seedDocumentStructures,
   seedLookupTables,
   seedMappingDrafts,
   seedTradingPartners,
   toLookupTable,
   toMappingDraft,
+  toMappingSummary,
 } from '@edi-bridge/mocks'
 
 import {
@@ -18,7 +20,9 @@ import {
   lookupTableQuery,
   lookupTablesQuery,
   mappingDraftQuery,
+  mappingsQuery,
   mappingVersionsQuery,
+  storeCreatedMapping,
   storePublishedMappingVersion,
   storeSavedDocumentStructure,
   storeSavedTradingPartner,
@@ -36,6 +40,29 @@ describe('storeSavedTradingPartner', () => {
 
     expect(queryClient.getQueryData(tradingPartnerQuery(saved.id).queryKey)).toEqual(saved)
     expect(queryClient.getQueryState(tradingPartnersQuery.queryKey)?.isInvalidated).toBe(true)
+  })
+})
+
+describe('storeCreatedMapping', () => {
+  it('adds the created Mapping to the list by name and marks the list as stale', () => {
+    const queryClient = new QueryClient()
+
+    const [a, b, c] = seedMappingDrafts
+      .slice(0, 3)
+      .map((record) =>
+        toMappingSummary(record, seedDocumentStructures, {
+          facts: { partners: [], documentsLast7Days: 0, failedRunsLast7Days: 0 },
+          versions: publishedVersionsOf(record),
+        }),
+      )
+      .sort((x, y) => x.name.localeCompare(y.name, 'de'))
+
+    queryClient.setQueryData(mappingsQuery.queryKey, [a!, c!])
+
+    storeCreatedMapping(queryClient, b!)
+
+    expect(queryClient.getQueryData(mappingsQuery.queryKey)).toEqual([a, b, c])
+    expect(queryClient.getQueryState(mappingsQuery.queryKey)?.isInvalidated).toBe(true)
   })
 })
 
