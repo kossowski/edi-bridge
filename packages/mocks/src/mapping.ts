@@ -24,7 +24,6 @@ import {
   remainingAiReview,
   type RunStatus,
   type RunSummary,
-  runSummarySchema,
   saveMappingDraftEndpoint,
   type TradingPartner,
   type TradingPartnerSummary,
@@ -56,7 +55,7 @@ import { edifactLeaves, messageTypeStructures } from './message-type-structure'
 import { day } from './overdue'
 import { containerOf } from './paths'
 import { badRequest, notFound, serverError, unprocessable } from './responses'
-import { seedRuns } from './run'
+import { seedRuns, toRunSummary } from './run'
 import { type RunStore, toRunStore } from './run-store'
 import { seedId, stableUuid } from './seed-id'
 import { seededFaker } from './seeded-faker'
@@ -689,7 +688,7 @@ export function createMappingsWithTraffic({
     return Array.from({ length: faker.number.int({ min: 0, max: 12 }) }, () => {
       const status = healthy ? 'delivered' : faker.helpers.weightedArrayElement(trafficStatuses)
 
-      return runSummarySchema.parse({
+      return toRunSummary({
         id: faker.string.uuid(),
         status,
         failureStage: status === 'failed' ? 'validation' : null,
