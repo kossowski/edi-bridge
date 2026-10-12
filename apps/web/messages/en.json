@@ -1233,29 +1233,51 @@
     "cancel": "Cancel"
   },
   "Mappings": {
-    "caption": "Mappings, by name",
     "loading": "Loading Mappings",
-    "count": "{count, plural, one {# Mapping} other {# Mappings}}",
-    "filteredCount": "{count} of {total} Mappings",
-    "search": "Search by name, Message Type or Document Structure",
-    "noMatch": "No Mapping matches the search.",
-    "version": "Version {version}",
+    "filter": {
+      "label": "Show",
+      "all": "All",
+      "attention": "Needs you",
+      "live": "Running fine",
+      "new": "Not set up"
+    },
+    "lane": {
+      "inbound": "Coming in",
+      "outbound": "Going out",
+      "empty": "Nothing here right now",
+      "showAll": "Show all {count}",
+      "partner": "Trading partner",
+      "erp": "Your ERP"
+    },
+    "path": {
+      "inbound": "goes into",
+      "outbound": "goes to",
+      "dataFormat": "Your data format:",
+      "noPartner": "No trading partner yet"
+    },
+    "title": {
+      "onePartner": "{documents} {direction, select, inbound {from} other {to}} {partner}",
+      "partners": "{documents} {direction, select, inbound {from} other {to}} {count} partners"
+    },
+    "state": {
+      "failing": "Documents failed",
+      "draft": "Draft not published",
+      "new": "Never published",
+      "live": "Running fine"
+    },
+    "status": {
+      "failed": "{count, plural, one {# document failed} other {# documents failed}} in the last 7 days",
+      "unpublished": "Changes not published",
+      "nothingYet": "Nothing is translated yet",
+      "translated": "{count, plural, =0 {No documents in the last 7 days} one {# document translated in the last 7 days} other {# documents translated in the last 7 days}}"
+    },
+    "liveSince": "Version {version} live since {date}",
     "neverPublished": "Never published",
-    "direction": {
-      "inbound": "Inbound",
-      "outbound": "Outbound"
-    },
-    "columns": {
-      "name": "Name",
-      "direction": "Direction",
-      "messageType": "Message Type",
-      "documentStructure": "Document Structure",
-      "latestVersion": "Latest Mapping Version"
-    },
-    "empty": {
-      "title": "No Mappings yet",
-      "description": "Mappings describe how a Document is turned into EDIFACT and back. Once a Mapping exists, it is listed here.",
-      "viewOnlyDescription": "Mappings describe how a Document is turned into EDIFACT and back. They appear here once an Admin creates one."
+    "action": {
+      "failing": "See what failed",
+      "draft": "Review and publish",
+      "new": "Draft with AI",
+      "live": "Open"
     },
     "error": {
       "title": "Mappings unavailable",
