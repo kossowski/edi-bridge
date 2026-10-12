@@ -492,6 +492,28 @@ describe('adjustDocumentStructure', () => {
     }
   })
 
+  it('renames the rows of a CSV structure but refuses to change their shape with it', () => {
+    const renamed = adjustDocumentStructure(csvStructure, {
+      name: 'Dispatch',
+      adjustments: [{ path: 'rows[]', label: 'Delivery note lines' }],
+    })
+
+    expect(at(renamed, 'rows[]')).toMatchObject({
+      kind: 'array',
+      required: true,
+      label: 'Delivery note lines',
+      items: { label: 'Delivery note lines' },
+    })
+    expect(
+      problemOf(() =>
+        adjustDocumentStructure(csvStructure, {
+          name: 'Dispatch',
+          adjustments: [{ path: 'rows[]', label: 'Delivery note lines', required: false }],
+        }),
+      ),
+    ).toMatchObject({ code: 'notAdjustable', path: 'rows[]' })
+  })
+
   it('changes column types of a CSV structure', () => {
     const adjusted = adjustDocumentStructure(csvStructure, {
       name: 'Dispatch',

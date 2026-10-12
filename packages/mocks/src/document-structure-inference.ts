@@ -945,7 +945,9 @@ export function adjustDocumentStructure(
   const pending = new Map(body.adjustments.map((adjustment) => [adjustment.path, adjustment]))
 
   for (const adjustment of body.adjustments) {
-    if (adjustment.path === listPath) {
+    const { path, required, repeating, type } = adjustment
+
+    if (path === listPath && [required, repeating, type].some((value) => value !== undefined)) {
       fail('notAdjustable', `The ${listPath} list of the Document always repeats`, {
         path: adjustment.path,
       })
