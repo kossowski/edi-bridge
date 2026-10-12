@@ -28,17 +28,34 @@ function entry(version: number, flows: PinnedFlow[] = []): MappingVersionEntry {
 }
 
 describe('liveVersions', () => {
-  it('lists the versions that document routes use, newest first', () => {
+  it('marks only the newest version a document route uses as live', () => {
     const versions = [
       entry(1, [pinned('Orders in', 'Rheinkauf')]),
       entry(2),
       entry(3, [pinned('Orders in', 'Nordwind')]),
     ]
 
-    expect(liveVersions(versions)).toEqual([
-      { version: 3, partners: ['Nordwind'] },
-      { version: 1, partners: ['Rheinkauf'] },
-    ])
+    expect(liveVersions(versions)).toEqual({
+      live: { version: 3, partners: ['Nordwind'] },
+      stillInUse: [{ version: 1, partners: ['Rheinkauf'] }],
+    })
+  })
+
+  it('lists the older versions still in use newest first', () => {
+    const versions = [
+      entry(2, [pinned('Orders in', 'Rheinkauf')]),
+      entry(5),
+      entry(4, [pinned('Orders in', 'Nordwind')]),
+      entry(3, [pinned('Invoices out', 'Alpenfrisch')]),
+    ]
+
+    expect(liveVersions(versions)).toEqual({
+      live: { version: 4, partners: ['Nordwind'] },
+      stillInUse: [
+        { version: 3, partners: ['Alpenfrisch'] },
+        { version: 2, partners: ['Rheinkauf'] },
+      ],
+    })
   })
 
   it('names each partner of a version once, in alphabetical order', () => {
@@ -50,12 +67,15 @@ describe('liveVersions', () => {
       ]),
     ]
 
-    expect(liveVersions(versions)).toEqual([{ version: 4, partners: ['Alpenfrisch', 'Ölwerk'] }])
+    expect(liveVersions(versions)).toEqual({
+      live: { version: 4, partners: ['Alpenfrisch', 'Ölwerk'] },
+      stillInUse: [],
+    })
   })
 
   it('finds nothing live when no document route uses the mapping', () => {
-    expect(liveVersions([entry(1), entry(2)])).toEqual([])
-    expect(liveVersions([])).toEqual([])
+    expect(liveVersions([entry(1), entry(2)])).toEqual({ live: undefined, stillInUse: [] })
+    expect(liveVersions([])).toEqual({ live: undefined, stillInUse: [] })
   })
 })
 

@@ -1,9 +1,11 @@
 import type { MappingVersionEntry, RunListQuery } from '@edi-bridge/contracts'
 
-export type LiveVersion = { version: number; partners: string[] }
+export type VersionInUse = { version: number; partners: string[] }
 
-export function liveVersions(entries: ReadonlyArray<MappingVersionEntry>): LiveVersion[] {
-  return [...entries]
+export type VersionsInUse = { live: VersionInUse | undefined; stillInUse: VersionInUse[] }
+
+export function liveVersions(entries: ReadonlyArray<MappingVersionEntry>): VersionsInUse {
+  const [live, ...stillInUse] = [...entries]
     .sort((a, b) => b.version - a.version)
     .flatMap(({ version, flows }) =>
       flows.length === 0
@@ -17,6 +19,8 @@ export function liveVersions(entries: ReadonlyArray<MappingVersionEntry>): LiveV
             },
           ],
     )
+
+  return { live, stillInUse }
 }
 
 const failedWindowMs = 7 * 24 * 60 * 60 * 1000

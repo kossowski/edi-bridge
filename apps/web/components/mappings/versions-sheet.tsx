@@ -2,7 +2,7 @@
 
 import { WorkHistoryIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { type ReactNode, useId, useRef, useState } from 'react'
@@ -39,11 +39,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@edi-bridge/ui/components/alert-dialog'
+import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-import type { MappingDraft, MappingVersionEntry, RunSummary } from '@edi-bridge/contracts'
+import type { MappingDraft, MappingVersionEntry, RunList, RunSummary } from '@edi-bridge/contracts'
 
 const hidden = (chunks: ReactNode) => <span className="sr-only">{chunks}</span>
 
@@ -71,15 +72,18 @@ function useLiveDescription(versions: ReadonlyArray<MappingVersionEntry> | undef
     return t('neverPublished')
   }
 
-  const live = liveVersions(versions)
+  const { live, stillInUse } = liveVersions(versions)
 
-  if (live.length === 0) {
+  if (!live) {
     return t('notLive', { version: latest.version })
   }
 
-  return live
-    .map(({ version, partners }) => t('live', { version, partners: format.list(partners) }))
-    .join(' ')
+  return [
+    t('live', { version: live.version, partners: format.list(live.partners) }),
+    ...stillInUse.map(({ version, partners }) =>
+      t('stillInUse', { version, partners: format.list(partners) }),
+    ),
+  ].join(' ')
 }
 
 function RestoreDialog({
@@ -95,11 +99,10 @@ function RestoreDialog({
 }) {
   const t = useTranslations('Mapping.versions.restore')
   const queryClient = useQueryClient()
-  // The dialog keeps its text while it fades out.
-  const [shown, setShown] = useState(version)
+  const [lastShown, setLastShown] = useState(version)
 
-  if (version !== null && version !== shown) {
-    setShown(version)
+  if (version !== null && version !== lastShown) {
+    setLastShown(version)
   }
 
   const restore = useMutation({
@@ -130,12 +133,12 @@ function RestoreDialog({
       <AlertDialogContent
         finalFocus={() => returnFocus() ?? true}
         aria-busy={restore.isPending || undefined}>
-        {shown && (
+        {lastShown && (
           <>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('title', { version: shown.version })}</AlertDialogTitle>
+              <AlertDialogTitle>{t('title', { version: lastShown.version })}</AlertDialogTitle>
               <AlertDialogDescription>
-                {t('description', { version: shown.version })}
+                {t('description', { version: lastShown.version })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             {restore.isError && (
@@ -152,8 +155,8 @@ function RestoreDialog({
               <Button
                 disabled={restore.isPending}
                 focusableWhenDisabled
-                onClick={() => restore.mutate(shown)}>
-                {restore.isPending ? t('pending') : t('confirm', { version: shown.version })}
+                onClick={() => restore.mutate(lastShown)}>
+                {restore.isPending ? t('pending') : t('confirm', { version: lastShown.version })}
               </Button>
             </AlertDialogFooter>
           </>
@@ -163,24 +166,53 @@ function RestoreDialog({
   )
 }
 
+type VersionUse = 'live' | 'stillInUse' | 'unused'
+
+function versionUse(version: MappingVersionEntry, live: number | undefined): VersionUse {
+  if (version.version === live) {
+    return 'live'
+  }
+
+  return version.flows.length > 0 ? 'stillInUse' : 'unused'
+}
+
+type RestoreState = 'hidden' | 'saving' | 'reviewOpen' | 'ready'
+
+function restoreState(
+  draft: MappingDraft,
+  version: MappingVersionEntry,
+  { canChange, saving }: { canChange: boolean; saving: boolean },
+): RestoreState {
+  const isCurrentDraft = version.version === draft.latestVersion && !draft.unpublishedChanges
+
+  if (!canChange || isCurrentDraft) {
+    return 'hidden'
+  }
+
+  if (draft.aiReview !== null) {
+    return 'reviewOpen'
+  }
+
+  return saving ? 'saving' : 'ready'
+}
+
 function VersionItem({
   version,
   previous,
-  restorable,
-  restoreBlocked,
+  use,
+  restore,
   restoreHintId,
   onRestore,
 }: {
   version: MappingVersionEntry
   previous: MappingVersionEntry | undefined
-  restorable: boolean
-  restoreBlocked: boolean
-  restoreHintId: string | undefined
+  use: VersionUse
+  restore: RestoreState
+  restoreHintId: string
   onRestore: (version: MappingVersionEntry, button: HTMLButtonElement) => void
 }) {
   const t = useTranslations('Mapping.versions')
   const dateTime = useDateTime()
-  const live = version.flows.length > 0
 
   return (
     <li className="relative flex flex-col gap-1.5">
@@ -188,12 +220,13 @@ function VersionItem({
         aria-hidden
         className={cn(
           'ring-background bg-muted-foreground/40 absolute -start-[1.875rem] top-1.5 size-3 rounded-full ring-4',
-          live && 'bg-emerald-600 dark:bg-emerald-400',
+          use === 'live' && 'bg-emerald-600 dark:bg-emerald-400',
         )}
       />
       <div className="flex flex-wrap items-center gap-2">
         <h4 className="font-medium">{t('version', { version: version.version })}</h4>
-        {live && <StateBadge state="live">{t('liveMark')}</StateBadge>}
+        {use === 'live' && <StateBadge state="live">{t('liveMark')}</StateBadge>}
+        {use === 'stillInUse' && <Badge variant="outline">{t('stillInUseMark')}</Badge>}
       </div>
       <p className="text-muted-foreground text-xs">
         {t.rich('published', {
@@ -206,7 +239,9 @@ function VersionItem({
       ) : (
         <p className="text-sm break-words">{version.changeNote}</p>
       )}
-      {live ? (
+      {use === 'unused' ? (
+        <p className="text-muted-foreground text-xs">{t('unused')}</p>
+      ) : (
         <div className="text-muted-foreground flex flex-col gap-0.5 text-xs">
           <p>{t('usedBy', { count: version.flows.length })}</p>
           <ul className="flex flex-col gap-0.5">
@@ -217,25 +252,27 @@ function VersionItem({
             ))}
           </ul>
         </div>
-      ) : (
-        <p className="text-muted-foreground text-xs">{t('unused')}</p>
       )}
-      {(previous || restorable) && (
+      {(previous || restore !== 'hidden') && (
         <div className="flex flex-wrap gap-2 pt-1">
           {previous && (
             <Link
               href={comparisonHref(version.mappingId, { from: previous.id, to: version.id })}
               className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              {t.rich('compare', { version: previous.version, hidden })}
+              {t.rich('compare', {
+                previous: previous.version,
+                version: version.version,
+                hidden,
+              })}
             </Link>
           )}
-          {restorable && (
+          {restore !== 'hidden' && (
             <Button
-              disabled={restoreBlocked}
+              disabled={restore !== 'ready'}
               focusableWhenDisabled
               size="sm"
               variant="ghost"
-              aria-describedby={restoreBlocked ? restoreHintId : undefined}
+              aria-describedby={restore === 'reviewOpen' ? restoreHintId : undefined}
               onClick={(event) => onRestore(version, event.currentTarget)}>
               {t.rich('restore.button', { version: version.version, hidden })}
             </Button>
@@ -249,11 +286,9 @@ function VersionItem({
 function VersionTimeline({
   draft,
   versions,
-  onRetry,
 }: {
   draft: MappingDraft
-  versions: { data: MappingVersionEntry[] | undefined; isError: boolean }
-  onRetry: () => void
+  versions: UseQueryResult<MappingVersionEntry[]>
 }) {
   const t = useTranslations('Mapping.versions')
   const canChange = useCanChange()
@@ -271,7 +306,7 @@ function VersionTimeline({
           retry: t('error.retry'),
         }}
         notFound={null}
-        onRetry={onRetry}
+        onRetry={() => void versions.refetch()}
       />
     )
   }
@@ -290,11 +325,11 @@ function VersionTimeline({
     )
   }
 
-  const reviewOpen = draft.aiReview !== null
+  const live = liveVersions(ordered).live?.version
 
   return (
     <>
-      {canChange && reviewOpen && (
+      {canChange && draft.aiReview !== null && (
         <p id={restoreHintId} className="text-muted-foreground text-sm">
           {t('restore.reviewOpen')}
         </p>
@@ -304,11 +339,9 @@ function VersionTimeline({
           <VersionItem
             key={version.id}
             previous={ordered[index + 1]}
-            restorable={
-              canChange && !(version.version === draft.latestVersion && !draft.unpublishedChanges)
-            }
-            restoreBlocked={reviewOpen || saving}
-            restoreHintId={reviewOpen ? restoreHintId : undefined}
+            restore={restoreState(draft, version, { canChange, saving })}
+            restoreHintId={restoreHintId}
+            use={versionUse(version, live)}
             version={version}
             onRestore={(chosen, button) => {
               restoreButton.current = button
@@ -354,52 +387,44 @@ function FailedDocument({ run }: { run: RunSummary }) {
   )
 }
 
-function FailedDocuments({
-  mappingId,
-  since,
-  open,
-}: {
-  mappingId: string
-  since: Date
-  open: boolean
-}) {
+function FailedDocumentList({ runs }: { runs: UseQueryResult<RunList> }) {
   const t = useTranslations('Mapping.versions.failed')
-  const headingId = useId()
-  const runs = useQuery({ ...runsQuery(failedDocumentsQuery(mappingId, since)), enabled: open })
+
+  if (runs.isError) {
+    return (
+      <Failure
+        error={{
+          title: t('error.title'),
+          description: t('error.description'),
+          retry: t('error.retry'),
+        }}
+        notFound={null}
+        onRetry={() => void runs.refetch()}
+      />
+    )
+  }
+
+  if (!runs.data) {
+    return <Loading label={t('loading')} rowClassName="h-12" rows={3} />
+  }
+
+  if (runs.data.runs.length === 0) {
+    return <p className="text-muted-foreground text-sm">{t('none')}</p>
+  }
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <h3 id={headingId} className="font-semibold">
-        {t('title')}
-      </h3>
-      {runs.isError ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <p role="alert" className="text-sm text-red-800 dark:text-red-300">
-            {t('error')}
-          </p>
-          <Button size="sm" variant="outline" onClick={() => void runs.refetch()}>
-            {t('retry')}
-          </Button>
-        </div>
-      ) : !runs.data ? (
-        <Loading label={t('loading')} rowClassName="h-12" rows={3} />
-      ) : runs.data.runs.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t('none')}</p>
-      ) : (
-        <>
-          <ul className="divide-y overflow-hidden rounded-lg border">
-            {runs.data.runs.map((run) => (
-              <FailedDocument key={run.id} run={run} />
-            ))}
-          </ul>
-          {runs.data.total > runs.data.runs.length && (
-            <p className="text-muted-foreground text-xs">
-              {t('more', { shown: failedDocumentsShown, total: runs.data.total })}
-            </p>
-          )}
-        </>
+    <>
+      <ul className="divide-y overflow-hidden rounded-lg border">
+        {runs.data.runs.map((run) => (
+          <FailedDocument key={run.id} run={run} />
+        ))}
+      </ul>
+      {runs.data.total > runs.data.runs.length && (
+        <p className="text-muted-foreground text-xs">
+          {t('more', { shown: failedDocumentsShown, total: runs.data.total })}
+        </p>
       )}
-    </section>
+    </>
   )
 }
 
@@ -407,9 +432,16 @@ export function VersionsSheet({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping.versions')
   const [open, setOpen] = useState(false)
   const [openedAt, setOpenedAt] = useState(() => new Date())
-  const headingId = useId()
+  const versionsHeadingId = useId()
+  const failedHeadingId = useId()
 
   const versions = useQuery({ ...mappingVersionsQuery(draft.mappingId), enabled: open })
+
+  const failedRuns = useQuery({
+    ...runsQuery(failedDocumentsQuery(draft.mappingId, openedAt)),
+    enabled: open,
+  })
+
   const description = useLiveDescription(versions.data)
 
   return (
@@ -433,17 +465,18 @@ export function VersionsSheet({ draft }: { draft: MappingDraft }) {
         description={description}
         title={t('title')}
         className="data-[side=right]:sm:max-w-md">
-        <section aria-labelledby={headingId} className="flex flex-col gap-3">
-          <h3 id={headingId} className="font-semibold">
+        <section aria-labelledby={versionsHeadingId} className="flex flex-col gap-3">
+          <h3 id={versionsHeadingId} className="font-semibold">
             {t('heading')}
           </h3>
-          <VersionTimeline
-            draft={draft}
-            versions={versions}
-            onRetry={() => void versions.refetch()}
-          />
+          <VersionTimeline draft={draft} versions={versions} />
         </section>
-        <FailedDocuments mappingId={draft.mappingId} open={open} since={openedAt} />
+        <section aria-labelledby={failedHeadingId} className="flex flex-col gap-2">
+          <h3 id={failedHeadingId} className="font-semibold">
+            {t('failed.title')}
+          </h3>
+          <FailedDocumentList runs={failedRuns} />
+        </section>
       </EditorSheetContent>
     </Sheet>
   )

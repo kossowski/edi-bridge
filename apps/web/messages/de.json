@@ -2224,6 +2224,7 @@
       "neverPublished": "Noch nicht veröffentlicht, daher nutzt kein Belegweg dieses Mapping.",
       "notLive": "Version {version} ist die neueste. Noch nutzt kein Belegweg dieses Mapping.",
       "live": "Version {version} ist live für {partners}.",
+      "stillInUse": "Version {version} wird noch von {partners} genutzt.",
       "heading": "Versionen",
       "loading": "Versionen werden geladen",
       "empty": "Noch nichts veröffentlicht. Sobald der Draft veröffentlicht ist, erscheint hier jede Version mit ihrem Änderungshinweis und wer sie veröffentlicht hat.",
@@ -2234,12 +2235,13 @@
       },
       "version": "Version {version}",
       "liveMark": "Live",
+      "stillInUseMark": "Noch in Nutzung",
       "published": "Veröffentlicht am <time></time> von {name}",
       "noNote": "Kein Änderungshinweis",
       "usedBy": "{count, plural, one {Genutzt von # Belegweg:} other {Genutzt von # Belegwegen:}}",
       "route": "{route} · {partner}",
       "unused": "Kein Belegweg nutzt diese Version.",
-      "compare": "Mit vorheriger vergleichen<hidden> (Version {version})</hidden>",
+      "compare": "Mit vorheriger vergleichen<hidden> (Version {previous} zu {version})</hidden>",
       "restore": {
         "button": "In Draft wiederherstellen<hidden> (Version {version})</hidden>",
         "reviewOpen": "Eine Version lässt sich wiederherstellen, sobald die Durchsicht des KI-Entwurfs abgeschlossen ist.",
@@ -2258,8 +2260,11 @@
         "title": "Fehlgeschlagene Belege, letzte 7 Tage",
         "loading": "Fehlgeschlagene Belege werden geladen",
         "none": "Keine.",
-        "error": "Die fehlgeschlagenen Belege konnten nicht geladen werden.",
-        "retry": "Erneut versuchen",
+        "error": {
+          "title": "Fehlgeschlagene Belege nicht verfügbar",
+          "description": "Die fehlgeschlagenen Belege konnten nicht geladen werden. Versuchen Sie es erneut.",
+          "retry": "Erneut versuchen"
+        },
         "detail": "{stage} · <time></time>",
         "more": "Die neuesten {shown} von {total} werden angezeigt."
       }

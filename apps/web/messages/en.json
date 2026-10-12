@@ -2224,6 +2224,7 @@
       "neverPublished": "Not published yet, so no document route uses this Mapping.",
       "notLive": "Version {version} is the latest. No document route uses this Mapping yet.",
       "live": "Version {version} is live for {partners}.",
+      "stillInUse": "Version {version} is still used by {partners}.",
       "heading": "Versions",
       "loading": "Loading the versions",
       "empty": "Nothing published yet. Once the Draft is published, each version appears here with its change note and who published it.",
@@ -2234,12 +2235,13 @@
       },
       "version": "Version {version}",
       "liveMark": "Live",
+      "stillInUseMark": "Still in use",
       "published": "Published <time></time> by {name}",
       "noNote": "No note",
       "usedBy": "{count, plural, one {Used by # document route:} other {Used by # document routes:}}",
       "route": "{route} · {partner}",
       "unused": "No document route uses this version.",
-      "compare": "Compare with previous<hidden> (version {version})</hidden>",
+      "compare": "Compare with previous<hidden> (version {previous} to {version})</hidden>",
       "restore": {
         "button": "Restore into Draft<hidden> (version {version})</hidden>",
         "reviewOpen": "A version can be restored once the AI review is done.",
@@ -2258,8 +2260,11 @@
         "title": "Failed documents, last 7 days",
         "loading": "Loading the failed documents",
         "none": "None.",
-        "error": "The failed documents could not be loaded.",
-        "retry": "Try again",
+        "error": {
+          "title": "Failed documents unavailable",
+          "description": "The failed documents could not be loaded. Try again.",
+          "retry": "Try again"
+        },
         "detail": "{stage} · <time></time>",
         "more": "Showing the latest {shown} of {total}."
       }

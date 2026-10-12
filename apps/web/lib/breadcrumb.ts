@@ -24,10 +24,14 @@ export type CrumbLabel =
 
 export type Crumb = { href: string; label: CrumbLabel }
 
-type Section = { label: CrumbLabel; href: string; skip?: ReadonlyArray<string> }
+type Section = { label: CrumbLabel; href: string; skip?: ReadonlyArray<string> | undefined }
+
+const skippedSegments: Partial<Record<SidebarItemKey, ReadonlyArray<string>>> = {
+  mappings: ['versions'],
+}
 
 function itemSection(key: SidebarItemKey): Section {
-  return { label: { kind: 'item', key }, href: sidebarItem(key).href }
+  return { label: { kind: 'item', key }, href: sidebarItem(key).href, skip: skippedSegments[key] }
 }
 
 function sidebarSections() {
@@ -46,7 +50,6 @@ function sidebarSections() {
 
 const sections = new Map<string, Section>([
   ...sidebarSections(),
-  ['mappings', { ...itemSection('mappings'), skip: ['versions'] }],
   ...pageItems.map(({ key, href }): [string, Section] => [
     href.slice(1),
     { label: { kind: 'page', key }, href },
