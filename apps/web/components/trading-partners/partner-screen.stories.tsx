@@ -104,10 +104,12 @@ async function connectionItem(canvasElement: HTMLElement, list: string, way: str
   return within(items.getByText(way).closest('li')!)
 }
 
-function sheetOf(canvasElement: HTMLElement) {
-  return within(canvasElement.ownerDocument.body).findByRole('dialog', {
-    name: 'Add a connection',
-  })
+// Waits out the opening fade, so visibility checks see the settled sheet.
+async function sheetOf(canvasElement: HTMLElement, name = 'Add a connection') {
+  const element = await within(canvasElement.ownerDocument.body).findByRole('dialog', { name })
+  await waitFor(() => expect(element).toBeVisible())
+
+  return element
 }
 
 const meta = preview.meta({
@@ -842,7 +844,7 @@ export const AddConnectionFromSetup = meta.story({
       `/trading-partners/${untouched.id}?tab=connections`,
       { scroll: false },
     )
-    await expect(await sheetOf(canvasElement)).toBeVisible()
+    await sheetOf(canvasElement)
   },
 })
 
@@ -872,11 +874,7 @@ export const GermanAddConnectionSheet = meta.story({
   async play({ canvas, canvasElement }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Verbindung hinzufügen' }))
 
-    const sheet = within(
-      await within(canvasElement.ownerDocument.body).findByRole('dialog', {
-        name: 'Verbindung hinzufügen',
-      }),
-    )
+    const sheet = within(await sheetOf(canvasElement, 'Verbindung hinzufügen'))
 
     await userEvent.click(sheet.getByText('Mainfranken Getränke GmbH sendet an Sie'))
     await expect(sheet.getByLabelText('Name')).toHaveValue('Mainfranken Getränke GmbH SFTP-Eingang')
