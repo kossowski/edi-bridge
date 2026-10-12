@@ -8,11 +8,11 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
+import { ActionError } from '@/components/documents/action-error'
 import {
-  ActionError,
   MappingVersionSelect,
   useMappingVersionChoices,
-} from '@/components/documents/problem-actions'
+} from '@/components/documents/mapping-version-select'
 import { useReprocessRun, useRetryRun } from '@/components/documents/run-actions'
 import { usePlainNames } from '@/components/plain-names'
 import { type RunRemedy, runRemedy } from '@/components/runs/run-remedy'

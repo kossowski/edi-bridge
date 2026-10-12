@@ -13,17 +13,17 @@ import {
   MarkWaitingStep,
   ProcessAgainStep,
   ProcessedAgain,
-  reprocessMappingId,
+  reprocessMapping,
   TryAgainStep,
+  useFreshlyReprocessed,
 } from '@/components/documents/problem-actions'
 import { fixTargetHref } from '@/lib/navigation'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@edi-bridge/ui/components/card'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-import type { FixTarget, RunDetail } from '@edi-bridge/contracts'
-
-export type FailedRun = Extract<RunDetail, { status: 'failed' }>
+import type { FailedRun } from '@/components/documents/failed-run'
+import type { FixTarget } from '@edi-bridge/contracts'
 
 export type WhatToDoStep = { key: string; content: ReactNode }
 
@@ -124,36 +124,59 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
 
   switch (problem.whoFixes) {
     case 'you': {
-      const mappingId = reprocessMappingId(run)
+      const mapping = reprocessMapping(run)
+
+      if (target === null && mapping === null) {
+        return [
+          {
+            key: 'fix',
+            content: (
+              <StepBody
+                text={t('fixCauseWithoutTarget', {
+                  direction: run.direction,
+                  tradingPartner: tradingPartner.name,
+                })}
+              />
+            ),
+          },
+        ]
+      }
 
       return [
-        target && {
-          key: 'fix',
-          content: (
-            <StepBody text={t('fixCause')}>
-              <FixLink primary target={target} />
-            </StepBody>
-          ),
-        },
-        mappingId !== null && {
-          key: 'processAgain',
-          content: <ProcessAgainStep mappingId={mappingId} run={run} />,
-        },
-      ].filter((step) => step !== null && step !== false)
+        ...(target
+          ? [
+              {
+                key: 'fix',
+                content: (
+                  <StepBody text={t('fixCause')}>
+                    <FixLink primary target={target} />
+                  </StepBody>
+                ),
+              },
+            ]
+          : []),
+        ...(mapping
+          ? [{ key: 'processAgain', content: <ProcessAgainStep mapping={mapping} run={run} /> }]
+          : []),
+      ]
     }
 
     case 'retry': {
       return [
         { key: 'tryAgain', content: <TryAgainStep run={run} /> },
-        target && {
-          key: 'fix',
-          content: (
-            <StepBody text={t('checkConnection')}>
-              <FixLink primary={false} target={target} />
-            </StepBody>
-          ),
-        },
-      ].filter((step) => step !== null)
+        ...(target
+          ? [
+              {
+                key: 'fix',
+                content: (
+                  <StepBody text={t('checkConnection')}>
+                    <FixLink primary={false} target={target} />
+                  </StepBody>
+                ),
+              },
+            ]
+          : []),
+      ]
     }
 
     case 'tradingPartner': {
@@ -162,7 +185,7 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
           key: 'tell',
           content: (
             <StepBody text={t('tellTradingPartner', { tradingPartner: tradingPartner.name })}>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">
                 <CopyPartnerMessage run={run} />
                 {target && <FixLink primary={false} target={target} />}
               </div>
@@ -227,6 +250,7 @@ export function ProblemCard({ run }: { run: FailedRun }) {
   const t = useTranslations('Document.problem')
   const { title, description } = useProblemText(run)
   const steps = useFixSteps(run)
+  const freshlyReprocessed = useFreshlyReprocessed(run.id)
   const fixer = run.problem.whoFixes
 
   return (
@@ -264,17 +288,13 @@ export function ProblemCard({ run }: { run: FailedRun }) {
             <WaitingNote run={run} since={run.waitingForTradingPartnerSince} />
           )}
         </section>
-        {run.replacedBy ? (
-          <WhatToDo>
-            <ProcessedAgain replacedBy={run.replacedBy} />
-          </WhatToDo>
-        ) : (
-          steps.length > 0 && (
-            <WhatToDo>
-              <Steps steps={steps} />
-            </WhatToDo>
-          )
-        )}
+        <WhatToDo>
+          {run.replacedBy || freshlyReprocessed ? (
+            <ProcessedAgain replacedBy={freshlyReprocessed ? null : run.replacedBy} />
+          ) : (
+            <Steps steps={steps} />
+          )}
+        </WhatToDo>
       </CardContent>
     </Card>
   )

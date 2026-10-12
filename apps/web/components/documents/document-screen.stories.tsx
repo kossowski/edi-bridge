@@ -3,16 +3,25 @@ import { expect, fn, screen, userEvent, waitFor } from 'storybook/test'
 
 import { DocumentScreen } from '@/components/documents/document-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
+import {
+  besideSidebar,
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+  tablet,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   type FailureStage,
+  mappingVersionsEndpoint,
   type MessageType,
   reprocessRunEndpoint,
   retryRunEndpoint,
   runDetailSchema,
   runEndpoint,
   type RunStatus,
+  type RunDetail,
   toPath,
   waitForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
@@ -468,8 +477,8 @@ export const ProcessAgain = meta.story({
         `Process it again. EDI Bridge uses the original file, so ${partner.name} does not have to send anything again.`,
       ),
     ).toBeVisible()
-    const version = canvas.getByRole('combobox', { name: 'Version' })
-    await waitFor(() => expect(version).toBeEnabled())
+    const version = await canvas.findByRole('combobox', { name: 'Version' })
+    await expect(version).toBeEnabled()
     await expect(canvas.queryByText(/has unpublished changes/)).toBeNull()
 
     await userEvent.click(version)
@@ -479,13 +488,115 @@ export const ProcessAgain = meta.story({
     await userEvent.keyboard('{Escape}')
 
     await userEvent.click(canvas.getByRole('button', { name: 'Process again' }))
-    await expect(await canvas.findByText('Processing again')).toBeVisible()
-    const links = await canvas.findAllByRole('link', { name: 'Open the new attempt' })
+    await expect(
+      await canvas.findByText('This document was processed again. The new attempt replaces it.'),
+    ).toBeVisible()
+    await expect(canvas.getByText('Processing again')).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Process again' })).toBeNull()
+    const links = canvas.getAllByRole('link', { name: 'Open the new attempt' })
+    await expect(links).toHaveLength(1)
+    await expect(links[0]!.getAttribute('href')).toMatch(/^\/documents\/[\w-]+$/)
+    await expect(links[0]!.getAttribute('href')).not.toBe(`/documents/${missingCode.id}`)
+  },
+})
 
-    for (const link of links) {
-      await expect(link.getAttribute('href')).toMatch(/^\/documents\/[\w-]+$/)
-      await expect(link.getAttribute('href')).not.toBe(`/documents/${missingCode.id}`)
-    }
+const missingCodeVersionsPath = `${apiUrl}${toPath(mappingVersionsEndpoint.path, { mappingId: ordersMappingId })}`
+
+export const VersionsLoading = meta.story({
+  args: { id: missingCode.id },
+  beforeEach({ msw }) {
+    msw.use(
+      ...ordersMappingDraft(false),
+      http.get(missingCodeVersionsPath, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const loading = await canvas.findByText('Loading versions…')
+    await expect(loading).toBeVisible()
+    await expect(loading.closest('[aria-busy="true"]')).not.toBeNull()
+    await expect(canvas.queryByRole('combobox', { name: 'Version' })).toBeNull()
+  },
+})
+
+export const NoPublishedVersions = meta.story({
+  args: { id: missingCode.id },
+  beforeEach({ msw }) {
+    msw.use(
+      ...ordersMappingDraft(false),
+      http.get(missingCodeVersionsPath, () => HttpResponse.json([])),
+    )
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(
+        `“${ordersMapping.name}” has no published version yet. Publish it first, then process this document again.`,
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('combobox', { name: 'Version' })).toBeNull()
+    await expect(canvas.queryByRole('button', { name: 'Process again' })).toBeNull()
+  },
+})
+
+export const GermanNoPublishedVersions = meta.story({
+  args: { id: missingCode.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(
+      ...ordersMappingDraft(false),
+      http.get(missingCodeVersionsPath, () => HttpResponse.json([])),
+    )
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(`„${ordersMapping.name}“ hat noch keine veröffentlichte Version.`, {
+        exact: false,
+      }),
+    ).toBeVisible()
+  },
+})
+
+export const WithoutFixTargetOrVersion = meta.story({
+  args: { id: missingField.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${toPath(runEndpoint.path, { id: missingField.id })}`, () =>
+        HttpResponse.json({
+          ...missingFieldDetail,
+          mappingVersion: null,
+          problem: { ...missingFieldDetail.problem, fixTarget: null },
+        }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'A required field is empty' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'Fix the cause described here. EDI Bridge cannot process this document again, so send it again from your ERP.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Process again' })).toBeNull()
+  },
+})
+
+export const TabletProcessAgain = meta.story({
+  ...tablet,
+  decorators: [besideSidebar],
+  args: { id: missingCode.id },
+  beforeEach({ msw }) {
+    msw.use(...ordersMappingDraft(false))
+  },
+  async play({ canvas, canvasElement }) {
+    const version = await canvas.findByRole('combobox', { name: 'Version' })
+    await expectNoPageScroll(canvasElement)
+    const card = version.closest('[data-slot="card"]')!
+    await expect(version.getBoundingClientRect().right).toBeLessThanOrEqual(
+      card.getBoundingClientRect().right,
+    )
   },
 })
 
@@ -545,15 +656,60 @@ export const TryAgain = meta.story({
       ),
     ).toBeVisible()
     await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))
+    await expect(
+      await canvas.findByRole('heading', { name: 'All good, nothing to do' }),
+    ).toBeVisible()
+    await expect(canvas.queryByText('Delivering again')).toBeNull()
+  },
+})
+
+const unreachableOutboundPath = `${apiUrl}${toPath(runEndpoint.path, { id: unreachableOutbound.id })}`
+
+function retryAnswers(change: (run: RunDetail) => RunDetail) {
+  return http.post(`${apiUrl}${retryRunEndpoint.path}`, async () => {
+    const run = runDetailSchema.parse(await (await fetch(unreachableOutboundPath)).json())
+
+    return HttpResponse.json(change(run))
+  })
+}
+
+export const TryAgainPending = meta.story({
+  args: { id: unreachableOutbound.id },
+  beforeEach({ msw }) {
+    msw.use(
+      retryAnswers((run) =>
+        runDetailSchema.parse({
+          ...run,
+          status: 'processing',
+          failureStage: null,
+          error: null,
+          problem: null,
+          waitingForTradingPartnerSince: null,
+        }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Try again' }))
     await expect(await canvas.findByText('Delivering again')).toBeVisible()
     await expect(
       canvas.getByText(
         'EDI Bridge is sending the finished document once more. The result appears here.',
       ),
     ).toBeVisible()
-    await expect(
-      await canvas.findByRole('heading', { name: 'All good, nothing to do' }),
-    ).toBeVisible()
+  },
+})
+
+export const TryAgainFailedAgain = meta.story({
+  args: { id: unreachableOutbound.id },
+  beforeEach({ msw }) {
+    msw.use(retryAnswers((run) => run))
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Try again' }))
+    await expect(await canvas.findByText('Still not delivered')).toBeVisible()
+    await expect(canvas.queryByText('Delivering again')).toBeNull()
+    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeEnabled()
   },
 })
 
@@ -577,7 +733,7 @@ export const TellTradingPartner = meta.story({
     await userEvent.click(
       await canvas.findByRole('button', { name: `Copy a message for ${partner.name}` }),
     )
-    await expect(await canvas.findByText('Message copied')).toBeVisible()
+    await expect(await canvas.findByRole('button', { name: 'Message copied' })).toBeVisible()
     await expect(writeText).toHaveBeenCalledOnce()
     const message = writeText.mock.calls[0]![0]
     await expect(message).toMatch(new RegExp(`^Hello ${partner.name},\n\nwe could not process`))
@@ -771,6 +927,23 @@ export const Mobile = meta.story({
     const link = canvas.getByRole('link', { name: /at this field$/ })
     const card = link.closest('[data-slot="card"]')!
     await expect(link.getBoundingClientRect().right).toBeLessThanOrEqual(
+      card.getBoundingClientRect().right,
+    )
+  },
+})
+
+export const GermanMobileActions = meta.story({
+  ...mobile,
+  decorators: [german],
+  args: { id: invalidContentInbound.id },
+  async play({ canvas, canvasElement }) {
+    const button = await canvas.findByRole('button', {
+      name: `Nachricht für ${partner.name} kopieren`,
+    })
+
+    await expectNoPageScroll(canvasElement)
+    const card = button.closest('[data-slot="card"]')!
+    await expect(button.getBoundingClientRect().right).toBeLessThanOrEqual(
       card.getBoundingClientRect().right,
     )
   },

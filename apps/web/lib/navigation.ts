@@ -204,6 +204,10 @@ export function documentHref(id: string) {
   return `${navigationItems.documents.href}/${id}`
 }
 
+export function mappingHref(id: string) {
+  return `${navigationItems.mappings.href}/${id}`
+}
+
 export function orderHref(businessReference: string) {
   return `${navigationItems.orderLifecycle.href}?${new URLSearchParams({ businessReference })}`
 }
@@ -213,7 +217,7 @@ export function fixTargetHref(target: FixTarget) {
     case 'mapping': {
       const search = new URLSearchParams({ field: target.fieldPath })
 
-      return `${navigationItems.mappings.href}/${target.mappingId}?${search}`
+      return `${mappingHref(target.mappingId)}?${search}`
     }
 
     case 'lookupTable': {

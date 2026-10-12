@@ -607,6 +607,7 @@
       "waiting": "Als wartend auf {tradingPartner} markiert seit <time>{since}</time>.",
       "steps": {
         "fixCause": "Beheben Sie die Ursache.",
+        "fixCauseWithoutTarget": "Beheben Sie die hier beschriebene Ursache. EDI Bridge kann diesen Beleg nicht erneut verarbeiten, {direction, select, inbound {bitten Sie also {tradingPartner}, ihn erneut zu senden} other {senden Sie ihn also erneut aus Ihrem ERP}}.",
         "checkConnection": "Wenn es weiter fehlschlägt, prüfen Sie die Verbindungsdaten.",
         "processAgain": "Verarbeiten Sie den Beleg erneut. EDI Bridge nutzt die Originaldatei, {direction, select, inbound {{tradingPartner} muss} other {Ihr ERP muss}} also nichts erneut senden.",
         "tryAgain": "Versuchen Sie es erneut. Der fertige Beleg wird noch einmal gesendet, nichts wird neu übersetzt.",
@@ -629,6 +630,8 @@
         "newestUsedBefore": "Version {version}, veröffentlicht am {publishedAt} (neueste, zuvor verwendet)"
       },
       "versionsUnavailable": "Die Versionen konnten nicht geladen werden.",
+      "versionsLoading": "Versionen werden geladen …",
+      "noVersions": "„{mapping}“ hat noch keine veröffentlichte Version. Veröffentlichen Sie es zuerst und verarbeiten Sie den Beleg dann erneut.",
       "unpublished": {
         "description": "„{mapping}“ hat unveröffentlichte Änderungen. Veröffentlichen Sie Ihre Korrektur zuerst, sonst nutzt dieser Versuch sie nicht.",
         "link": "„{mapping}“ öffnen"
@@ -666,8 +669,14 @@
         "link": "Neuen Versuch öffnen"
       },
       "retried": {
-        "title": "Wird erneut zugestellt",
-        "description": "EDI Bridge sendet den fertigen Beleg noch einmal. Das Ergebnis erscheint hier."
+        "pending": {
+          "title": "Wird erneut zugestellt",
+          "description": "EDI Bridge sendet den fertigen Beleg noch einmal. Das Ergebnis erscheint hier."
+        },
+        "failedAgain": {
+          "title": "Weiterhin nicht zugestellt",
+          "description": "Der erneute Versuch hat nicht geholfen, die Zustellung ist wieder fehlgeschlagen. Was zu tun ist, steht unten."
+        }
       },
       "replaced": {
         "description": "Dieser Beleg wurde erneut verarbeitet. Der neue Versuch ersetzt ihn.",
@@ -792,8 +801,6 @@
       "reprocess": {
         "description": "Das Mapping ist fehlgeschlagen. Reprocess startet einen neuen Run aus dem originalen, unveränderten Document mit der gewählten Mapping Version.",
         "version": "Mapping Version",
-        "option": "Version {version}, veröffentlicht am {publishedAt}",
-        "used": "{option} (von diesem Run verwendet)",
         "button": "Reprocess",
         "pending": "Reprocess läuft",
         "viewOnly": "Ein Admin kann diesen Run per Reprocess mit einer gewählten Mapping Version erneut verarbeiten.",

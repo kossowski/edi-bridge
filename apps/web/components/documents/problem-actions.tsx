@@ -9,12 +9,16 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useFormatter, useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useId, useState } from 'react'
+import { useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
-import { type VersionChoice, versionChoices } from '@/components/documents/mapping-version-choices'
+import { ActionError } from '@/components/documents/action-error'
+import {
+  MappingVersionSelect,
+  useMappingVersionChoices,
+} from '@/components/documents/mapping-version-select'
 import { partnerMessage } from '@/components/documents/partner-message'
 import {
   useLatestRunActionResult,
@@ -24,114 +28,31 @@ import {
 } from '@/components/documents/run-actions'
 import { usePlainNames } from '@/components/plain-names'
 import { useCanChange } from '@/hooks/use-session'
-import { mappingDraftQuery, mappingVersionsQuery } from '@/lib/api/queries'
-import { documentHref, navigationItems } from '@/lib/navigation'
+import { mappingDraftQuery } from '@/lib/api/queries'
+import { documentHref, mappingHref } from '@/lib/navigation'
 import { Alert, AlertDescription, AlertTitle } from '@edi-bridge/ui/components/alert'
 import { Button } from '@edi-bridge/ui/components/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@edi-bridge/ui/components/select'
-import { cn } from '@edi-bridge/ui/lib/utils'
+import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { FailedRun } from '@/components/documents/problem-card'
+import type { FailedRun } from '@/components/documents/failed-run'
 import type { RunDetail, RunReference } from '@edi-bridge/contracts'
-
-export function ActionError({ message }: { message: string }) {
-  return (
-    <p role="alert" className="text-destructive-text text-sm">
-      {message}
-    </p>
-  )
-}
 
 function ViewOnly({ text }: { text: string }) {
   return <p className="text-muted-foreground">{text}</p>
 }
 
-export function useVersionChoiceLabel() {
-  const t = useTranslations('Document.actions.versionOption')
-  const format = useFormatter()
+export type ReprocessMapping = { id: string; name: string }
 
-  return ({ version, labelKey }: VersionChoice) =>
-    t(labelKey, {
-      version: version.version,
-      publishedAt: format.dateTime(new Date(version.publishedAt), { dateStyle: 'medium' }),
-    })
-}
-
-export function useMappingVersionChoices(mappingId: string | null, usedBeforeId: string | null) {
-  const versions = useQuery({
-    ...mappingVersionsQuery(mappingId ?? ''),
-    enabled: mappingId !== null,
-  })
-
-  return {
-    choices: versionChoices(versions.data ?? [], usedBeforeId),
-    isPending: versions.isPending,
-    isError: versions.isError,
-  }
-}
-
-export function MappingVersionSelect({
-  label,
-  choices,
-  value,
-  disabled,
-  onValueChange,
-}: {
-  label: string
-  choices: ReadonlyArray<VersionChoice>
-  value: string | null
-  disabled: boolean
-  onValueChange: (value: string) => void
-}) {
-  const labelId = useId()
-  const choiceLabel = useVersionChoiceLabel()
-
-  const items = choices.map((choice) => ({
-    value: choice.version.id,
-    label: choiceLabel(choice),
-  }))
-
-  return (
-    <div className="flex w-full min-w-0 flex-col gap-1.5 sm:w-auto">
-      <span id={labelId} className="text-sm font-medium">
-        {label}
-      </span>
-      <Select
-        disabled={disabled}
-        items={items}
-        value={value}
-        onValueChange={(next) => next !== null && onValueChange(next)}>
-        <SelectTrigger aria-labelledby={labelId} className="w-full sm:w-80">
-          <SelectValue className="min-w-0">
-            {(selected: string | null) => (
-              <span className="truncate">
-                {items.find((item) => item.value === selected)?.label}
-              </span>
-            )}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
-}
-
-export function reprocessMappingId(run: FailedRun) {
+export function reprocessMapping(run: FailedRun): ReprocessMapping | null {
   const target = run.problem.fixTarget
 
-  return target?.kind === 'mapping' ? target.mappingId : (run.mappingVersion?.mappingId ?? null)
+  if (target?.kind === 'mapping') {
+    return { id: target.mappingId, name: target.name }
+  }
+
+  return (
+    run.mappingVersion && { id: run.mappingVersion.mappingId, name: run.mappingVersion.mappingName }
+  )
 }
 
 function UnpublishedChanges({ mappingId }: { mappingId: string }) {
@@ -147,53 +68,78 @@ function UnpublishedChanges({ mappingId }: { mappingId: string }) {
   return (
     <p className="text-destructive-text">
       {t('description', { mapping })}{' '}
-      <Link href={`${navigationItems.mappings.href}/${mappingId}`} className={linkClass}>
+      <Link href={mappingHref(mappingId)} className={linkClass}>
         {t('link', { mapping })}
       </Link>
     </p>
   )
 }
 
-function ProcessAgainAction({ run, mappingId }: { run: FailedRun; mappingId: string }) {
+function VersionsLoading() {
   const t = useTranslations('Document.actions')
-  const versions = useMappingVersionChoices(mappingId, run.mappingVersion?.id ?? null)
+
+  return (
+    <div aria-busy className="flex w-full max-w-80 min-w-0 flex-col gap-1.5">
+      <span className="text-sm font-medium">{t('version')}</span>
+      <Skeleton aria-hidden className="h-8 w-full" />
+      <span className="text-muted-foreground">{t('versionsLoading')}</span>
+    </div>
+  )
+}
+
+function ProcessAgainAction({ run, mapping }: { run: FailedRun; mapping: ReprocessMapping }) {
+  const t = useTranslations('Document.actions')
+  const versions = useMappingVersionChoices(mapping.id, run.mappingVersion?.id ?? null)
   const reprocess = useReprocessRun(run.id)
   const [chosen, setChosen] = useState<string | null>(null)
   const selected = chosen ?? versions.choices[0]?.version.id ?? null
 
+  if (versions.isError) {
+    return <ActionError message={t('versionsUnavailable')} />
+  }
+
+  if (versions.isPending) {
+    return <VersionsLoading />
+  }
+
+  if (versions.choices.length === 0) {
+    return (
+      <>
+        <UnpublishedChanges mappingId={mapping.id} />
+        <p className="text-muted-foreground">{t('noVersions', { mapping: mapping.name })}</p>
+      </>
+    )
+  }
+
   return (
     <>
-      <UnpublishedChanges mappingId={mappingId} />
-      {versions.isError ? (
-        <ActionError message={t('versionsUnavailable')} />
-      ) : (
-        <div className="flex w-full flex-wrap items-end gap-2">
-          <MappingVersionSelect
-            choices={versions.choices}
-            disabled={versions.isPending}
-            label={t('version')}
-            value={selected}
-            onValueChange={setChosen}
-          />
-          <Button
-            disabled={selected === null || reprocess.isPending}
-            onClick={() => selected && reprocess.mutate(selected)}>
-            <HugeiconsIcon icon={Refresh01Icon} strokeWidth={2} aria-hidden />
-            {reprocess.isPending ? t('processAgain.pending') : t('processAgain.button')}
-          </Button>
-        </div>
-      )}
+      <UnpublishedChanges mappingId={mapping.id} />
+      <div className="flex w-full min-w-0 flex-wrap items-end gap-2">
+        <MappingVersionSelect
+          choices={versions.choices}
+          disabled={reprocess.isPending}
+          label={t('version')}
+          value={selected}
+          onValueChange={setChosen}
+        />
+        <Button
+          disabled={selected === null || reprocess.isPending}
+          onClick={() => selected && reprocess.mutate(selected)}>
+          <HugeiconsIcon icon={Refresh01Icon} strokeWidth={2} aria-hidden />
+          {reprocess.isPending ? t('processAgain.pending') : t('processAgain.button')}
+        </Button>
+      </div>
       {reprocess.isError && <ActionError message={t('processAgain.failed')} />}
     </>
   )
 }
 
-export function ProcessAgainStep({ run, mappingId }: { run: FailedRun; mappingId: string }) {
+export function ProcessAgainStep({ run, mapping }: { run: FailedRun; mapping: ReprocessMapping }) {
   const t = useTranslations('Document')
   const canChange = useCanChange()
 
   return (
-    <div className="flex min-w-0 flex-col items-start gap-2">
+    <div className="flex w-full min-w-0 flex-col items-start gap-2">
       <p>
         {t('problem.steps.processAgain', {
           direction: run.direction,
@@ -201,7 +147,7 @@ export function ProcessAgainStep({ run, mappingId }: { run: FailedRun; mappingId
         })}
       </p>
       {canChange ? (
-        <ProcessAgainAction mappingId={mappingId} run={run} />
+        <ProcessAgainAction mapping={mapping} run={run} />
       ) : (
         <ViewOnly text={t('actions.processAgain.viewOnly')} />
       )}
@@ -258,15 +204,18 @@ export function CopyPartnerMessage({ run }: { run: FailedRun }) {
 
   return (
     <>
-      <Button variant="outline" onClick={() => void copyMessage()}>
+      <Button
+        variant="outline"
+        className="h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal"
+        onClick={() => void copyMessage()}>
         <HugeiconsIcon
           icon={copy === 'copied' ? CheckmarkCircle02Icon : Copy01Icon}
           strokeWidth={2}
           aria-hidden
         />
-        {t('button', { tradingPartner: run.tradingPartner.name })}
+        {copy === 'copied' ? t('copied') : t('button', { tradingPartner: run.tradingPartner.name })}
       </Button>
-      <p aria-live="polite" className={cn('text-muted-foreground', copy !== 'copied' && 'sr-only')}>
+      <p aria-live="polite" className="sr-only">
         {copy === 'copied' && t('copied')}
       </p>
       {copy === 'failed' && <ActionError message={t('failed')} />}
@@ -304,15 +253,17 @@ export function MarkWaitingStep({ run }: { run: FailedRun }) {
   )
 }
 
-export function ProcessedAgain({ replacedBy }: { replacedBy: RunReference }) {
+export function ProcessedAgain({ replacedBy }: { replacedBy: RunReference | null }) {
   const t = useTranslations('Document.result.replaced')
 
   return (
     <div className="flex flex-col items-start gap-2 text-sm">
       <p>{t('description')}</p>
-      <Link href={documentHref(replacedBy.id)} className={linkClass}>
-        {t('link')}
-      </Link>
+      {replacedBy && (
+        <Link href={documentHref(replacedBy.id)} className={linkClass}>
+          {t('link')}
+        </Link>
+      )}
     </div>
   )
 }
@@ -337,8 +288,8 @@ function ReprocessedAlert({ replacing }: { replacing: RunDetail }) {
   )
 }
 
-function RetriedAlert() {
-  const t = useTranslations('Document.result.retried')
+function RetriedAlert({ outcome }: { outcome: 'pending' | 'failedAgain' }) {
+  const t = useTranslations(`Document.result.retried.${outcome}`)
 
   return (
     <Alert>
@@ -349,8 +300,30 @@ function RetriedAlert() {
   )
 }
 
-export function RunActionResultAlert({ id }: { id: string }) {
-  const result = useLatestRunActionResult(id)
+function retriedOutcome(run: RunDetail) {
+  switch (run.status) {
+    case 'received':
+    case 'processing': {
+      return 'pending'
+    }
+
+    case 'failed': {
+      return 'failedAgain'
+    }
+
+    case 'delivered':
+    case 'duplicate': {
+      return null
+    }
+  }
+}
+
+export function useFreshlyReprocessed(id: string) {
+  return useLatestRunActionResult(id)?.action === 'reprocessed'
+}
+
+export function RunActionResultAlert({ run }: { run: RunDetail }) {
+  const result = useLatestRunActionResult(run.id)
 
   switch (result?.action) {
     case undefined: {
@@ -362,7 +335,9 @@ export function RunActionResultAlert({ id }: { id: string }) {
     }
 
     case 'retried': {
-      return <RetriedAlert />
+      const outcome = retriedOutcome(run)
+
+      return outcome && <RetriedAlert outcome={outcome} />
     }
   }
 }

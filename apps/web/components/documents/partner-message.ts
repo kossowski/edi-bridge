@@ -1,4 +1,4 @@
-import type { FailedRun } from '@/components/documents/problem-card'
+import type { FailedRun } from '@/components/documents/failed-run'
 import type { ErrorPosition } from '@edi-bridge/contracts'
 
 export type PartnerMessageKey =

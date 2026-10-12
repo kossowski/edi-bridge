@@ -607,6 +607,7 @@
       "waiting": "Marked as waiting for {tradingPartner} since <time>{since}</time>.",
       "steps": {
         "fixCause": "Fix the cause.",
+        "fixCauseWithoutTarget": "Fix the cause described here. EDI Bridge cannot process this document again, so {direction, select, inbound {ask {tradingPartner} to send it again} other {send it again from your ERP}}.",
         "checkConnection": "If it keeps failing, check the connection details.",
         "processAgain": "Process it again. EDI Bridge uses the original file, so {direction, select, inbound {{tradingPartner} does} other {your ERP does}} not have to send anything again.",
         "tryAgain": "Try again. The finished document is sent once more, nothing is translated again.",
@@ -629,6 +630,8 @@
         "newestUsedBefore": "Version {version}, published {publishedAt} (newest, used before)"
       },
       "versionsUnavailable": "The versions could not be loaded.",
+      "versionsLoading": "Loading versions…",
+      "noVersions": "“{mapping}” has no published version yet. Publish it first, then process this document again.",
       "unpublished": {
         "description": "“{mapping}” has unpublished changes. Publish your fix first, otherwise this attempt does not use it.",
         "link": "Open “{mapping}”"
@@ -666,8 +669,14 @@
         "link": "Open the new attempt"
       },
       "retried": {
-        "title": "Delivering again",
-        "description": "EDI Bridge is sending the finished document once more. The result appears here."
+        "pending": {
+          "title": "Delivering again",
+          "description": "EDI Bridge is sending the finished document once more. The result appears here."
+        },
+        "failedAgain": {
+          "title": "Still not delivered",
+          "description": "Trying again did not help, the delivery failed again. See below what to do."
+        }
       },
       "replaced": {
         "description": "This document was processed again. The new attempt replaces it.",
@@ -792,8 +801,6 @@
       "reprocess": {
         "description": "The mapping failed. Reprocess starts a new Run from the original, unmodified Document with the Mapping Version you choose.",
         "version": "Mapping Version",
-        "option": "Version {version}, published {publishedAt}",
-        "used": "{option} (used by this Run)",
         "button": "Reprocess",
         "pending": "Reprocessing",
         "viewOnly": "An Admin can reprocess this Run with a chosen Mapping Version.",

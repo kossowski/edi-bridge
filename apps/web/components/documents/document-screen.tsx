@@ -44,7 +44,7 @@ function DocumentView({ run }: { run: RunDetail }) {
 
   return (
     <AppPage meta={<DocumentHeader run={run} />} name={title}>
-      <RunActionResultAlert id={run.id} />
+      <RunActionResultAlert run={run} />
       {run.status === 'failed' ? <ProblemCard run={run} /> : <DocumentVerdict run={run} />}
     </AppPage>
   )
