@@ -57,6 +57,7 @@ import {
   listRuns,
   listTradingPartners,
   listWorkspaceInvites,
+  listWorkspaceMembers,
   previewMapping,
 } from './client'
 
@@ -73,6 +74,11 @@ export const currentWorkspaceQuery = queryOptions({
 export const workspaceSettingsQuery = queryOptions({
   queryKey: ['workspaces', 'current', 'settings'],
   queryFn: getWorkspaceSettings,
+})
+
+export const workspaceMembersQuery = queryOptions({
+  queryKey: ['workspaces', 'current', 'members'],
+  queryFn: listWorkspaceMembers,
 })
 
 export const operatorKeys = {

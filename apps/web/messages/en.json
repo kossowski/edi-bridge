@@ -2347,6 +2347,7 @@
     },
     "tabs": {
       "company": "Company",
+      "members": "Members",
       "data": "Data & AI"
     },
     "company": {
@@ -2367,6 +2368,27 @@
       "saving": "Saving…",
       "saved": "Company ID saved.",
       "failed": "The company ID could not be saved. Try again."
+    },
+    "members": {
+      "title": "Members",
+      "description": "Everyone who can sign in to this Workspace.",
+      "count": "{count, plural, one {# member} other {# members}}",
+      "filteredCount": "{count, plural, one {# of {total} members} other {# of {total} members}}",
+      "search": "Find a member",
+      "noMatch": "No member matches “{search}”.",
+      "empty": "No one has access to this Workspace yet.",
+      "askOperator": {
+        "title": "Ask the Operator to add someone",
+        "admin": "The Operator creates the invites and changes roles. Tell the Operator who should join and whether they should be an Admin or a Viewer.",
+        "viewer": "The Operator adds members and changes roles. Ask an Admin of your company to contact the Operator."
+      },
+      "you": "You",
+      "roles": {
+        "admin": "Admin",
+        "viewer": "Viewer"
+      },
+      "lastActive": "Active {time}",
+      "neverSignedIn": "Never signed in"
     },
     "data": {
       "setByOperator": {

@@ -5,24 +5,29 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { AppHeader } from '@/components/app-header'
 import { sessionHandlers } from '@/components/session/session-story-helpers'
 import { SettingsScreen } from '@/components/settings/settings-screen'
-import { darkMode, german } from '@/components/story-helpers'
+import { darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   currentWorkspaceEndpoint,
   type Session,
   updateCompanyIdentityEndpoint,
+  workspaceMembersEndpoint,
+  type WorkspaceMember,
   workspaceSettingsEndpoint,
   type WorkspaceSettings,
 } from '@edi-bridge/contracts'
 import {
   createSessionStore,
   createWorkspace,
+  createWorkspaceMember,
+  createWorkspaceMembers,
   createWorkspaceSettings,
   sandboxAdminSession,
   seedSession,
   seedWorkspace,
   showcaseViewerSession,
   workspaceHandlers,
+  workspaceMemberHandlers,
   workspaceSettingsHandlers,
 } from '@edi-bridge/mocks'
 import { SidebarProvider } from '@edi-bridge/ui/components/sidebar'
@@ -33,7 +38,11 @@ const withoutGln = createWorkspace({ name: seedWorkspace.name, gln: null })
 
 function signedInAs(
   session: Session,
-  { settings, missingGln = false }: { settings?: WorkspaceSettings; missingGln?: boolean } = {},
+  {
+    settings,
+    members,
+    missingGln = false,
+  }: { settings?: WorkspaceSettings; members?: WorkspaceMember[]; missingGln?: boolean } = {},
 ) {
   const store = createSessionStore(session)
 
@@ -41,6 +50,7 @@ function signedInAs(
     ...sessionHandlers(store),
     ...workspaceHandlers(apiUrl, missingGln ? withoutGln : seedWorkspace, store),
     ...workspaceSettingsHandlers(apiUrl, { session: store, ...(settings && { settings }) }),
+    ...workspaceMemberHandlers(apiUrl, { session: store, ...(members && { members }) }),
   ]
 }
 
@@ -61,6 +71,39 @@ function panel(canvasElement: HTMLElement) {
 }
 
 const dataTab = { parameters: { nextjs: { navigation: { query: { tab: 'data' } } } } }
+
+const membersTab = { parameters: { nextjs: { navigation: { query: { tab: 'members' } } } } }
+
+const sandboxAdmin = createWorkspaceMember({
+  ...sandboxAdminSession.user,
+  role: 'admin',
+  lastActivityAt: '2026-10-11T09:30:00.000Z',
+})
+
+const [first, second, third] = createWorkspaceMembers({ count: 3 })
+
+const newViewer = createWorkspaceMember({ ...first, role: 'viewer', lastActivityAt: null })
+
+const viewer = createWorkspaceMember({ ...second, role: 'viewer' })
+
+const admin = createWorkspaceMember({ ...third, role: 'admin' })
+
+const team = [viewer, sandboxAdmin, admin, newViewer]
+
+const neverSignedIn = [
+  sandboxAdmin,
+  ...createWorkspaceMembers({ count: 3, seed: 7 }).map((member) =>
+    createWorkspaceMember({ ...member, role: 'viewer', lastActivityAt: null }),
+  ),
+]
+
+const manyMembers = [sandboxAdmin, ...createWorkspaceMembers({ count: 250 })]
+
+async function memberRows(canvasElement: HTMLElement) {
+  const list = await panel(canvasElement).findByRole('list')
+
+  return within(list).getAllByRole('listitem')
+}
 
 const exhausted = createWorkspaceSettings({
   aiTokenBudget: { dailyLimit: 200_000, usedToday: 200_000 },
@@ -405,5 +448,180 @@ export const AiTurnedOffDark = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('AI is turned off')).toBeVisible()
+  },
+})
+
+export const ChooseMembersTab = meta.story({
+  async play({ canvas }) {
+    const tabs = await canvas.findAllByRole('tab')
+    await expect(tabs.map((tab) => tab.textContent)).toEqual(['Company', 'Members', 'Data & AI'])
+    await userEvent.click(canvas.getByRole('tab', { name: 'Members' }))
+    await expect(getRouter().replace).toHaveBeenCalledWith('/settings?tab=members', {
+      scroll: false,
+    })
+  },
+})
+
+export const MembersAsAdmin = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { members: team }))
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByRole('tab', { name: 'Members' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(await canvas.findByText('Ask the Operator to add someone')).toBeVisible()
+    await expect(canvas.getByText(/Tell the Operator who should join/)).toBeVisible()
+    const rows = await memberRows(canvasElement)
+    await expect(rows.map((row) => within(row).getByText(/@/).textContent)).toEqual([
+      admin.email,
+      sandboxAdmin.email,
+      viewer.email,
+      newViewer.email,
+    ])
+    await expect(rows[0]).not.toHaveTextContent('You')
+    await expect(rows[1]).toHaveTextContent(/You.*Admin/)
+    await expect(rows[2]).toHaveTextContent(/Viewer\s*Active /)
+    await expect(rows[3]).toHaveTextContent(/Viewer\s*Never signed in/)
+    await expect(canvas.getByText('4 members')).toBeVisible()
+    const members = panel(canvasElement)
+    await expect(members.queryByRole('button')).toBeNull()
+    await expect(members.queryByRole('textbox')).toBeNull()
+    await expect(members.queryByRole('searchbox')).toBeNull()
+    await expect(members.queryByRole('link')).toBeNull()
+  },
+})
+
+export const MembersAsViewer = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(showcaseViewerSession))
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText(/Ask an Admin of your company/)).toBeVisible()
+    const rows = await memberRows(canvasElement)
+    await expect(rows).toHaveLength(4)
+    await expect(rows[0]).toHaveTextContent('Admin')
+    await expect(canvas.getByText('Never signed in')).toBeVisible()
+    const you = rows.find((row) => within(row).queryByText('You'))
+    await expect(you).toHaveTextContent(showcaseViewerSession.user.name)
+    await expect(panel(canvasElement).queryByRole('button')).toBeNull()
+  },
+})
+
+export const MembersEmpty = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { members: [] }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('No one has access to this Workspace yet.')).toBeVisible()
+    await expect(canvas.getByText('Ask the Operator to add someone')).toBeVisible()
+  },
+})
+
+export const MembersLoading = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(pending(workspaceMembersEndpoint.path))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Loading settings')).toBeInTheDocument()
+  },
+})
+
+export const MembersUnavailable = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(failing(workspaceMembersEndpoint.path))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Settings unavailable')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
+  },
+})
+
+export const ManyMembers = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { members: manyMembers }))
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText('251 members')).toBeVisible()
+    await expect(await memberRows(canvasElement)).toHaveLength(251)
+    const search = canvas.getByRole('searchbox', { name: 'Find a member' })
+    await userEvent.type(search, sandboxAdmin.email)
+    await expect(await canvas.findByText('1 of 251 members')).toBeVisible()
+    await userEvent.clear(search)
+    await userEvent.type(search, 'nobody-here')
+    await expect(await canvas.findByText('No member matches “nobody-here”.')).toBeVisible()
+  },
+})
+
+export const ManyMembersOnPhone = meta.story({
+  ...mobile,
+  parameters: { ...mobile.parameters, ...membersTab.parameters },
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { members: manyMembers }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('251 members')).toBeVisible()
+    await expect(canvas.getByRole('searchbox', { name: 'Find a member' })).toBeVisible()
+  },
+})
+
+export const MembersNeverSignedIn = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { members: neverSignedIn }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findAllByText('Never signed in')).toHaveLength(3)
+  },
+})
+
+export const MembersGerman = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { members: team }))
+  },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('tab', { name: 'Mitglieder' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(await canvas.findByText('Neue Mitglieder fügt der Operator hinzu')).toBeVisible()
+    await expect(canvas.getByText('4 Mitglieder')).toBeVisible()
+    await expect(canvas.getByText('Sie')).toBeVisible()
+    await expect(canvas.getByText('Nie angemeldet')).toBeVisible()
+    await expect(canvas.getAllByText(/^Aktiv /)).toHaveLength(3)
+  },
+})
+
+export const MembersDark = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession, { members: team }))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('You')).toBeVisible()
+    await expect(canvas.getByText('Never signed in')).toBeVisible()
+  },
+})
+
+export const MembersAsViewerDark = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(showcaseViewerSession))
+
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(/Ask an Admin of your company/)).toBeVisible()
   },
 })

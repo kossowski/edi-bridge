@@ -101,6 +101,7 @@ import {
   workspaceSettingsEndpoint,
   type WorkspaceInput,
   workspaceInvitesEndpoint,
+  workspaceMembersEndpoint,
   type WorkspaceSettingsInput,
 } from '@edi-bridge/contracts'
 
@@ -213,6 +214,10 @@ export function updateCompanyIdentity(body: CompanyIdentityInput) {
 
 export function getWorkspaceSettings() {
   return request(workspaceSettingsEndpoint)
+}
+
+export function listWorkspaceMembers() {
+  return request(workspaceMembersEndpoint)
 }
 
 export function listOperatorWorkspaces() {

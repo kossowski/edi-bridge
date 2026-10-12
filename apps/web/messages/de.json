@@ -2347,6 +2347,7 @@
     },
     "tabs": {
       "company": "Unternehmen",
+      "members": "Mitglieder",
       "data": "Daten & KI"
     },
     "company": {
@@ -2367,6 +2368,27 @@
       "saving": "Wird gespeichert…",
       "saved": "Unternehmens-ID gespeichert.",
       "failed": "Die Unternehmens-ID konnte nicht gespeichert werden. Versuchen Sie es erneut."
+    },
+    "members": {
+      "title": "Mitglieder",
+      "description": "Alle, die sich in diesem Workspace anmelden können.",
+      "count": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+      "filteredCount": "{count, plural, one {# von {total} Mitgliedern} other {# von {total} Mitgliedern}}",
+      "search": "Mitglied suchen",
+      "noMatch": "Kein Mitglied passt zu „{search}“.",
+      "empty": "Noch niemand hat Zugriff auf diesen Workspace.",
+      "askOperator": {
+        "title": "Neue Mitglieder fügt der Operator hinzu",
+        "admin": "Der Operator erstellt die Einladungen und ändert Rollen. Sagen Sie dem Operator, wer dazukommen soll und ob als Admin oder Viewer.",
+        "viewer": "Der Operator fügt Mitglieder hinzu und ändert Rollen. Bitten Sie einen Admin Ihres Unternehmens, sich an den Operator zu wenden."
+      },
+      "you": "Sie",
+      "roles": {
+        "admin": "Admin",
+        "viewer": "Viewer"
+      },
+      "lastActive": "Aktiv {time}",
+      "neverSignedIn": "Nie angemeldet"
     },
     "data": {
       "setByOperator": {
