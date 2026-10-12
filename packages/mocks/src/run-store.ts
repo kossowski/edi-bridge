@@ -20,6 +20,7 @@ export type RunGroup = {
 
 export type RunStore = {
   all: () => readonly RunSummary[]
+  unplaced: () => readonly RunSummary[]
   newestFirst: () => readonly RunSummary[]
   get: (id: string) => RunSummary | undefined
   set: (...runs: RunSummary[]) => RunSummary[]
@@ -169,6 +170,7 @@ export function createRunStore(
 
   return {
     all: () => placed().runs,
+    unplaced: () => [...byId.values()],
     newestFirst: () =>
       (newestFirst ??= placed()
         .runs.map((run) => ({ run, receivedAt: Date.parse(run.receivedAt) }))

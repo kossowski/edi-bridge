@@ -30,7 +30,7 @@ import {
 
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
-import { generateMessage, type GeneratedMessage } from './interchange'
+import { lookupTableFailureOf } from './interchange'
 import { codeMeaningsOf, firstValuesOf, hintFor } from './lookup-table-codes'
 import { applyImport, classifyImport } from './lookup-table-import'
 import {
@@ -180,20 +180,6 @@ function newestFirst(a: Pick<RunSummary, 'receivedAt'>, b: Pick<RunSummary, 'rec
 
 let seedRunStore: RunStore | undefined
 
-const failures = new WeakMap<RunSummary, Pick<GeneratedMessage, 'error' | 'broken'>>()
-
-function failureOf(run: RunSummary) {
-  let failure = failures.get(run)
-
-  if (!failure) {
-    const { error, broken } = generateMessage(run, '1')
-    failure = { error, broken }
-    failures.set(run, failure)
-  }
-
-  return failure
-}
-
 export function createLookupTableUsage(
   lookupTables: LookupTableStore,
   tradingPartners: TradingPartnerStore,
@@ -214,13 +200,20 @@ export function createLookupTableUsage(
     return runStore
   }
 
+  // Placing every Run is costly, and only a replacing Run takes another business reference.
+  function placedOf(run: RunSummary) {
+    return runs().replacedOf(run.id) === undefined ? run : runs().get(run.id)!
+  }
+
   function targetOf(run: RunSummary): LookupTableTarget | null {
-    if (run.status !== 'failed' || run.failureStage !== 'mapping') {
+    const failure = lookupTableFailureOf(run)
+
+    if (failure === null) {
       return null
     }
 
     if (!targets.has(run.id)) {
-      const problem = problemOf(run, failureOf(run), null, {
+      const problem = problemOf(run, failure, null, {
         flows,
         channels,
         lookupTables,
@@ -285,11 +278,11 @@ export function createLookupTableUsage(
       }
     }
 
-    for (const run of runs().all()) {
+    for (const run of runs().unplaced()) {
       const target = targetOf(run)
 
       if (target?.lookupTableId === table.id && runs().replacingOf(run.id) === undefined) {
-        block(target.code, [failedRunReference(run)])
+        block(target.code, [failedRunReference(placedOf(run))])
       }
     }
 

@@ -23,6 +23,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedFlows } from './flow'
+import { generateMessage, lookupTableFailureOf } from './interchange'
 import {
   createLookupTables,
   lookupTableHandlers,
@@ -31,7 +32,7 @@ import {
   seedLookupTables,
 } from './lookup-table'
 import { mappingHandlers } from './mapping'
-import { createRun } from './run'
+import { createRun, seedRuns } from './run'
 import { runDetailHandlers } from './run-detail'
 import { seedTradingPartners } from './trading-partner'
 
@@ -477,6 +478,23 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
       name: 'Units of measure',
       code: 'KRT',
     })
+  })
+
+  it('finds the same failing Runs as their generated Messages', () => {
+    const lookupFailures = seedRuns().flatMap((run) => {
+      const { error, broken } = generateMessage(run, '1')
+
+      return broken?.kind === 'lookupTable' ? [{ run, failure: { error, broken } }] : []
+    })
+
+    expect(lookupFailures.length).toBeGreaterThan(0)
+    expect(seedRuns().filter((run) => lookupTableFailureOf(run) !== null)).toHaveLength(
+      lookupFailures.length,
+    )
+
+    for (const { run, failure } of lookupFailures) {
+      expect(lookupTableFailureOf(run)).toEqual(failure)
+    }
   })
 
   it('lists codes from your data that no document used yet after the blocking ones', async () => {

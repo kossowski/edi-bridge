@@ -60,6 +60,12 @@ export type GeneratedMessage = Failure & {
 
 const missingUnit = { kind: 'lookupTable', name: 'Units of measure', code: 'KRT' } as const
 
+const missingUnitError = {
+  code: 'lookupMissing',
+  message: `The Lookup Table "${missingUnit.name}" has no entry for "${missingUnit.code}".`,
+  position: null,
+} as const
+
 let unitReadingFlowIds: ReadonlySet<string> | undefined
 
 // Only outbound Mappings translate your units for the partner, so only their Runs miss one.
@@ -91,6 +97,15 @@ function unitReadingFlows() {
       )
       .map(({ id }) => id),
   )
+}
+
+export function lookupTableFailureOf(run: RunSummary): Failure | null {
+  return run.status === 'failed' &&
+    run.failureStage === 'mapping' &&
+    directionOf(run) === 'outbound' &&
+    readsUnits(run)
+    ? { error: missingUnitError, broken: missingUnit }
+    : null
 }
 
 const partyGlnFields = { BY: 'buyer.gln', SU: 'supplier.gln' } as const
@@ -375,8 +390,8 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
           segment: qty,
           element: 1,
           component: 3,
-          code: 'lookupMissing',
-          message: `The Lookup Table "${missingUnit.name}" has no entry for "${missingUnit.code}".`,
+          code: missingUnitError.code,
+          message: missingUnitError.message,
         },
         broken: missingUnit,
       }
