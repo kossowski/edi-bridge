@@ -481,20 +481,22 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
   })
 
   it('finds the same failing Runs as their generated Messages', () => {
-    const lookupFailures = seedRuns().flatMap((run) => {
-      const { error, broken } = generateMessage(run, '1')
-
-      return broken?.kind === 'lookupTable' ? [{ run, failure: { error, broken } }] : []
-    })
-
-    expect(lookupFailures.length).toBeGreaterThan(0)
-    expect(seedRuns().filter((run) => lookupTableFailureOf(run) !== null)).toHaveLength(
-      lookupFailures.length,
+    const mappingFailures = seedRuns().filter(
+      ({ status, failureStage }) => status === 'failed' && failureStage === 'mapping',
     )
 
-    for (const { run, failure } of lookupFailures) {
-      expect(lookupTableFailureOf(run)).toEqual(failure)
-    }
+    const generated = mappingFailures.map((run) => {
+      const { error, broken } = generateMessage(run, '1')
+
+      return broken?.kind === 'lookupTable' ? { error, broken } : null
+    })
+
+    const flagged = seedRuns().filter((run) => lookupTableFailureOf(run) !== null)
+
+    expect(generated.filter((failure) => failure !== null)).toHaveLength(flagged.length)
+    expect(flagged.length).toBeGreaterThan(0)
+    expect(flagged.length).toBeLessThan(mappingFailures.length)
+    expect(mappingFailures.map(lookupTableFailureOf)).toEqual(generated)
   })
 
   it('lists codes from your data that no document used yet after the blocking ones', async () => {
