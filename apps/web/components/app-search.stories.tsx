@@ -277,6 +277,16 @@ export const Operator = meta.story({
   },
 })
 
+export const HelpPage = meta.story({
+  async play({ canvas }) {
+    const dialog = await openPalette(canvas)
+
+    await userEvent.type(dialog.getByRole('combobox'), 'glossary')
+    await userEvent.click(await dialog.findByRole('option', { name: /^Help & glossary/ }))
+    await expect(getRouter().push).toHaveBeenCalledWith('/help')
+  },
+})
+
 export const German = meta.story({
   decorators: [german],
   async play({ canvas }) {
@@ -348,5 +358,16 @@ export const Desktop = meta.story({
     await expect(button.getBoundingClientRect().width).toBe(384)
     await expect(label.height).toBeLessThanOrEqual(20)
     await expect(canvas.getByText('Ctrl K')).toBeVisible()
+  },
+})
+
+export const GermanDesktopPageLabels = meta.story({
+  ...desktop,
+  decorators: [german],
+  async play({ canvas }) {
+    const dialog = await openPalette(canvas, 'Aufträge, Handelspartner, Belege, Seiten suchen …')
+    const label = dialog.getByText('Hilfe & Glossar', { selector: 'span' })
+
+    await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth)
   },
 })

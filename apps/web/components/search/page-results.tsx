@@ -39,7 +39,7 @@ export function PageResults({
           value={`page ${page.key}`}
           onSelect={() => onOpen(page.href)}>
           <HugeiconsIcon icon={page.icon} strokeWidth={2} aria-hidden />
-          <span className="min-w-0 truncate">{page.label}</span>
+          <span className="max-w-full shrink-0 truncate">{page.label}</span>
           {page.hint && (
             <CommandItemHint className="hidden min-w-0 shrink truncate sm:inline">
               {page.hint}

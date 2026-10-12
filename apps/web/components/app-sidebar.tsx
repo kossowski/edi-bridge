@@ -10,7 +10,13 @@ import { useState } from 'react'
 import { AppBrand } from '@/components/app-brand'
 import { AccountMenu } from '@/components/session/account-menu'
 import { WorkspaceName } from '@/components/workspace-name'
-import { activeSidebarItem, type SidebarItemKey, sidebarGroups } from '@/lib/navigation'
+import {
+  activeSidebarItem,
+  type SidebarItem,
+  type SidebarItemKey,
+  sidebarFooterItems,
+  sidebarGroups,
+} from '@/lib/navigation'
 import {
   Collapsible,
   CollapsibleContent,
@@ -36,31 +42,40 @@ type GroupProps = {
   activeKey: SidebarItemKey | undefined
 }
 
-function GroupMenu({ group, activeKey }: GroupProps) {
+function SidebarItemButton({
+  item,
+  activeKey,
+}: {
+  item: SidebarItem
+  activeKey: SidebarItemKey | undefined
+}) {
   const t = useTranslations('Sidebar.items')
   const { setOpenMobile } = useSidebar()
+  const isActive = item.key === activeKey
+  const label = t(`${item.key}.label`)
 
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={isActive}
+        render={<Link href={item.href} />}
+        tooltip={`${label}: ${t(`${item.key}.hint`)}`}
+        aria-current={isActive ? 'page' : undefined}
+        onClick={() => setOpenMobile(false)}>
+        <HugeiconsIcon icon={item.icon} strokeWidth={2} />
+        <span>{label}</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
+}
+
+function GroupMenu({ group, activeKey }: GroupProps) {
   return (
     <SidebarGroupContent>
       <SidebarMenu>
-        {group.items.map((item) => {
-          const isActive = item.key === activeKey
-          const label = t(`${item.key}.label`)
-
-          return (
-            <SidebarMenuItem key={item.key}>
-              <SidebarMenuButton
-                isActive={isActive}
-                render={<Link href={item.href} />}
-                tooltip={`${label}: ${t(`${item.key}.hint`)}`}
-                aria-current={isActive ? 'page' : undefined}
-                onClick={() => setOpenMobile(false)}>
-                <HugeiconsIcon icon={item.icon} strokeWidth={2} />
-                <span>{label}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )
-        })}
+        {group.items.map((item) => (
+          <SidebarItemButton key={item.key} activeKey={activeKey} item={item} />
+        ))}
       </SidebarMenu>
     </SidebarGroupContent>
   )
@@ -141,6 +156,11 @@ export function AppSidebar() {
         </nav>
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+          {sidebarFooterItems.map((item) => (
+            <SidebarItemButton key={item.key} activeKey={activeKey} item={item} />
+          ))}
+        </SidebarMenu>
         <AccountMenu />
       </SidebarFooter>
       <SidebarRail label={tShell('toggleSidebar')} />

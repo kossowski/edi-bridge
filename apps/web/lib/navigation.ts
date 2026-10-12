@@ -3,6 +3,7 @@ import {
   DashboardSquare01Icon,
   File02Icon,
   FlowConnectionIcon,
+  HelpCircleIcon,
   HierarchySquare02Icon,
   PlayListIcon,
   PlugSocketIcon,
@@ -39,6 +40,7 @@ export const navigationItems: Readonly<Record<NavigationKey, NavigationItem>> = 
   lookupTables: { href: '/lookup-tables', icon: Table01Icon },
   settings: { href: '/settings', icon: Settings02Icon },
   operator: { href: '/operator', icon: UserShield01Icon },
+  help: { href: '/help', icon: HelpCircleIcon },
 }
 
 type AccountMenuItemKey = Extract<keyof Messages['Shell']['session'], 'settings' | 'operatorArea'>
@@ -62,7 +64,7 @@ export type SidebarItemKey = keyof Messages['Sidebar']['items']
 
 type SidebarItemSource = { key: SidebarItemKey; page: NavigationKey; icon?: IconSvgElement }
 
-type SidebarItem = NavigationItem & { key: SidebarItemKey }
+export type SidebarItem = NavigationItem & { key: SidebarItemKey }
 
 type SidebarGroup = {
   key: keyof Messages['Sidebar']['groups']
@@ -105,16 +107,23 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
   },
 ]
 
+function toSidebarItem({ key, page, icon }: SidebarItemSource): SidebarItem {
+  return { key, href: navigationItems[page].href, icon: icon ?? navigationItems[page].icon }
+}
+
 export const sidebarGroups: ReadonlyArray<SidebarGroup> = sidebarGroupSources.map((group) => ({
   ...group,
-  items: group.items.map(({ key, page, icon }) => ({
-    key,
-    href: navigationItems[page].href,
-    icon: icon ?? navigationItems[page].icon,
-  })),
+  items: group.items.map(toSidebarItem),
 }))
 
-export const sidebarItems = sidebarGroups.flatMap((group) => group.items)
+const sidebarFooterSources: ReadonlyArray<SidebarItemSource> = [{ key: 'help', page: 'help' }]
+
+export const sidebarFooterItems = sidebarFooterSources.map(toSidebarItem)
+
+export const sidebarItems = [
+  ...sidebarGroups.flatMap((group) => group.items),
+  ...sidebarFooterItems,
+]
 
 export function sidebarItem(key: SidebarItemKey) {
   const item = sidebarItems.find((entry) => entry.key === key)

@@ -172,6 +172,20 @@ export const DocumentsActiveOnce = meta.story({
   },
 })
 
+export const HelpActiveOnItsPage = meta.story({
+  parameters: { nextjs: { navigation: { pathname: '/help' } } },
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession))
+  },
+  async play({ canvas }) {
+    const help = await canvas.findByRole('link', { name: 'Help & glossary' })
+
+    await expect(help).toHaveAttribute('href', '/help')
+    await expect(help).toHaveAttribute('aria-current', 'page')
+    await expect(canvas.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+  },
+})
+
 export const Collapsed = meta.story({
   parameters: { sidebarOpen: false },
   beforeEach({ msw }) {
@@ -182,6 +196,12 @@ export const Collapsed = meta.story({
     await userEvent.hover(canvas.getByRole('link', { name: 'Documents' }))
     await waitFor(async () =>
       expect(await screen.findByText('Documents: Every document received or sent')).toBeVisible(),
+    )
+    await userEvent.hover(canvas.getByRole('link', { name: 'Help & glossary' }))
+    await waitFor(async () =>
+      expect(
+        await screen.findByText('Help & glossary: What the words on screen mean'),
+      ).toBeVisible(),
     )
     await userEvent.click(
       await canvas.findByRole('button', { name: accountMenuOf(seedSession.user.name) }),
@@ -224,6 +244,7 @@ export const German = meta.story({
     await expect(canvas.getByRole('button', { name: 'Erweitert' })).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Belege' })).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Ihre Datenformate' })).toBeVisible()
+    await expect(canvas.getByRole('link', { name: 'Hilfe & Glossar' })).toBeVisible()
     await waitFor(() =>
       expect(
         canvas.getByRole('button', { name: accountMenuOf(seedSession.user.name, 'Kontomenü') }),
