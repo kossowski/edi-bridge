@@ -1,13 +1,13 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { HeaderTabs } from '@/components/header-tabs'
 import { WorkspaceDangerTab } from '@/components/operator/workspace-danger-tab'
 import { WorkspaceInvites } from '@/components/operator/workspace-invites'
 import { WorkspaceLimitsTab } from '@/components/operator/workspace-limits-tab'
 import { WorkspaceOverviewTab } from '@/components/operator/workspace-overview-tab'
+import { useUrlTab } from '@/hooks/use-url-tab'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
 import type { WorkspaceSummary } from '@edi-bridge/contracts'
@@ -23,24 +23,9 @@ const workspaceTabs = [
   { value: 'danger', Panel: WorkspaceDangerTab },
 ] as const
 
-type WorkspaceTab = (typeof workspaceTabs)[number]['value']
-
-function workspaceTabOf(value: string | null): WorkspaceTab {
-  return workspaceTabs.find((tab) => tab.value === value)?.value ?? 'overview'
-}
-
 export function WorkspaceTabs({ workspace }: { workspace: WorkspaceSummary }) {
   const t = useTranslations('Operator.workspace.tabs')
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const tab = workspaceTabOf(searchParams.get('tab'))
-
-  function changeTab(value: string) {
-    const params = new URLSearchParams(searchParams)
-    params.set('tab', workspaceTabOf(value))
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }
+  const [tab, changeTab] = useUrlTab(workspaceTabs, 'overview')
 
   return (
     <Tabs value={tab} onValueChange={changeTab}>

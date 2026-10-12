@@ -6,7 +6,6 @@ import { Suspense } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { Failure } from '@/components/detail-parts'
-import { WorkspaceKindBadge } from '@/components/operator/workspace-kind-badge'
 import { WorkspaceTabs } from '@/components/operator/workspace-tabs'
 import { operatorWorkspacesQuery } from '@/lib/api/queries'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
@@ -38,7 +37,7 @@ export function WorkspaceDetailScreen({ id }: { id: string }) {
   })
 
   return (
-    <AppPage meta={data && <WorkspaceKindBadge kind={data.kind} />} name={data?.name}>
+    <AppPage name={data?.name}>
       {isPending ? (
         <WorkspaceLoading />
       ) : data ? (

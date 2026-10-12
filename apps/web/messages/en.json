@@ -2771,7 +2771,7 @@
       },
       "budget": {
         "title": "AI budget",
-        "description": "The AI budget lets the AI draft mappings. It starts again every day. When it is used up, the AI pauses until tomorrow; everything else keeps working.",
+        "description": "The AI budget lets the AI draft mappings. It starts again every day.",
         "label": "AI tokens per day",
         "hint": "Between {min} and {max} tokens. 0 turns the AI helper off for this Workspace.",
         "errors": {
@@ -2791,13 +2791,13 @@
       "lastReset": "Last reset",
       "unavailable": {
         "standard": "Only Sandbox Workspaces can be reset. This Workspace holds a customer's real data, which is never reset.",
-        "showcase": "Only Sandbox Workspaces can be reset. Visitors cannot change a Showcase, so its example data stays as it is."
+        "showcase": "Only Sandbox Workspaces can be reset. Visitors cannot change a Demo, so its example data stays as it is."
       }
     },
     "reset": {
       "trigger": "Reset Sandbox",
       "title": "Reset {name}?",
-      "replaced": "All changes in this Sandbox are replaced by its example data: partners, mappings, documents and every other change made since the last reset.",
+      "replaced": "All changes in this Sandbox are replaced by its example data: trading partners, mappings, documents and every other change made since the last reset.",
       "untouched": "Other Workspaces are not affected.",
       "irreversible": "This cannot be undone.",
       "cancel": "Cancel",

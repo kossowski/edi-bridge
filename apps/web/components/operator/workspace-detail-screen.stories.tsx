@@ -147,7 +147,7 @@ const meta = preview.meta({
   decorators: [
     (Story) => (
       <SidebarProvider>
-        <div className="w-full">
+        <div className="w-full min-w-0">
           <AppHeader />
           <OperatorOnly>
             <Story />
@@ -250,12 +250,30 @@ export const OverviewLargeNumbers = meta.story({
   },
 })
 
+async function expectNoPageScroll(canvasElement: HTMLElement) {
+  const page = canvasElement.ownerDocument.documentElement
+
+  await expect(page.scrollWidth).toBeLessThanOrEqual(page.clientWidth)
+}
+
 export const OverviewOnPhone = meta.story({
   ...mobile,
   args: { id: seedSandboxWorkspace.id },
-  async play({ canvas }) {
+  async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('tab', { name: 'Danger zone' })).toBeInTheDocument()
     await expect(canvas.getByText('Documents today')).toBeVisible()
+    await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const OverviewOnPhoneGerman = meta.story({
+  ...mobile,
+  args: { id: seedSandboxWorkspace.id },
+  decorators: [german],
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByRole('tab', { name: 'Gefahrenbereich' })).toBeInTheDocument()
+    await expect(canvas.getByText('Belege heute')).toBeVisible()
+    await expectNoPageScroll(canvasElement)
   },
 })
 
@@ -644,7 +662,7 @@ export const DangerZoneShowcase = meta.story({
   ...dangerTab,
   args: { id: seedShowcaseWorkspace.id },
   async play({ canvas }) {
-    await expect(await canvas.findByText(/Visitors cannot change a Showcase/)).toBeVisible()
+    await expect(await canvas.findByText(/Visitors cannot change a Demo/)).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Reset Sandbox' })).toBeNull()
   },
 })

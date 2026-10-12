@@ -2663,7 +2663,7 @@
         "danger": "Gefahrenbereich"
       },
       "overview": {
-        "label": "Workspace auf einen Blick",
+        "label": "Arbeitsbereich auf einen Blick",
         "kind": "Art",
         "kindDescription": {
           "standard": "Der eigene Arbeitsbereich eines Kunden mit echten Belegen.",
@@ -2771,7 +2771,7 @@
       },
       "budget": {
         "title": "KI-Budget",
-        "description": "Mit dem KI-Budget entwirft die KI Mappings. Es beginnt jeden Tag neu. Ist es aufgebraucht, pausiert die KI bis morgen; alles andere funktioniert weiter.",
+        "description": "Mit dem KI-Budget entwirft die KI Mappings. Es beginnt jeden Tag neu.",
         "label": "KI-Tokens pro Tag",
         "hint": "Zwischen {min} und {max} Tokens. 0 schaltet die KI-Hilfe für diesen Arbeitsbereich aus.",
         "errors": {
@@ -2791,13 +2791,13 @@
       "lastReset": "Zuletzt zurückgesetzt",
       "unavailable": {
         "standard": "Nur Sandbox-Arbeitsbereiche lassen sich zurücksetzen. Dieser Arbeitsbereich enthält echte Daten eines Kunden, die nie zurückgesetzt werden.",
-        "showcase": "Nur Sandbox-Arbeitsbereiche lassen sich zurücksetzen. Besucher können einen Showcase nicht ändern, daher bleiben seine Beispieldaten unverändert."
+        "showcase": "Nur Sandbox-Arbeitsbereiche lassen sich zurücksetzen. Besucher können eine Demo nicht ändern, daher bleiben seine Beispieldaten unverändert."
       }
     },
     "reset": {
       "trigger": "Sandbox zurücksetzen",
       "title": "{name} zurücksetzen?",
-      "replaced": "Alle Änderungen in dieser Sandbox werden durch ihre Beispieldaten ersetzt: Partner, Mappings, Belege und jede andere Änderung seit dem letzten Zurücksetzen.",
+      "replaced": "Alle Änderungen in dieser Sandbox werden durch ihre Beispieldaten ersetzt: Handelspartner, Mappings, Belege und jede andere Änderung seit dem letzten Zurücksetzen.",
       "untouched": "Andere Workspaces bleiben unverändert.",
       "irreversible": "Das kann nicht rückgängig gemacht werden.",
       "cancel": "Abbrechen",

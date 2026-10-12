@@ -21,7 +21,10 @@ export function AppHeader() {
           <AppSearch />
         </div>
       </div>
-      <div id={headerTabsId} className="bg-muted/60 border-t px-4 py-1.5 empty:hidden" />
+      <div
+        id={headerTabsId}
+        className="bg-muted/60 overflow-x-auto border-t px-4 py-1.5 empty:hidden"
+      />
     </header>
   )
 }

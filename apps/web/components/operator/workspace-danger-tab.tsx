@@ -18,28 +18,37 @@ import type { WorkspaceSummary } from '@edi-bridge/contracts'
 export function WorkspaceDangerTab({ workspace }: { workspace: WorkspaceSummary }) {
   const t = useTranslations('Operator.danger')
 
+  if (workspace.kind !== 'sandbox') {
+    return (
+      <Card className="border-destructive/40 border">
+        <CardHeader>
+          <CardTitle>
+            <h2>{t('title')}</h2>
+          </CardTitle>
+          <CardDescription>{t(`unavailable.${workspace.kind}`)}</CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
+
   return (
     <Card className="border-destructive/40 border">
       <CardHeader>
         <CardTitle>
           <h2>{t('title')}</h2>
         </CardTitle>
-        <CardDescription>
-          {workspace.kind === 'sandbox' ? t('sandbox') : t(`unavailable.${workspace.kind}`)}
-        </CardDescription>
+        <CardDescription>{t('sandbox')}</CardDescription>
       </CardHeader>
-      {workspace.kind === 'sandbox' && (
-        <CardContent className="flex flex-col gap-4">
-          <dl>
-            <Fact label={t('lastReset')}>
-              <WorkspaceLastReset lastResetAt={workspace.lastResetAt} />
-            </Fact>
-          </dl>
-          <div className="flex flex-wrap items-start">
-            <SandboxReset workspace={workspace} />
-          </div>
-        </CardContent>
-      )}
+      <CardContent className="flex flex-col gap-4">
+        <dl>
+          <Fact label={t('lastReset')}>
+            <WorkspaceLastReset lastResetAt={workspace.lastResetAt} />
+          </Fact>
+        </dl>
+        <div className="flex flex-wrap items-start">
+          <SandboxReset workspace={workspace} />
+        </div>
+      </CardContent>
     </Card>
   )
 }
