@@ -9,9 +9,9 @@ import { type ReactNode, useId } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
 import { documentsHref } from '@/components/documents/document-filters'
+import { RunLink } from '@/components/documents/run-link'
 import { LoadError } from '@/components/load-error'
 import { MessageTypeName, usePlainNames } from '@/components/plain-names'
-import { RunLink } from '@/components/runs/run-link'
 import {
   dayTotals,
   type PartnerActivityProps,
