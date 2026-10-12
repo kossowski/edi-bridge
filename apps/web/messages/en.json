@@ -2361,7 +2361,7 @@
       "missing": {
         "title": "Your company ID is missing",
         "admin": "Trading partners cannot finish setup without it. Add your GLN below.",
-        "viewer": "Trading partners cannot finish setup without it. Ask an admin of your company to add it."
+        "viewer": "Trading partners cannot finish setup without it. Ask an Admin of your company to add it."
       },
       "save": "Save",
       "saving": "Saving…",

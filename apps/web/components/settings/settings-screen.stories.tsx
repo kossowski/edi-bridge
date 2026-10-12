@@ -177,7 +177,7 @@ export const CompanyWithoutGlnAsViewer = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('Your company ID is missing')).toBeVisible()
-    await expect(canvas.getByText(/Ask an admin of your company/)).toBeVisible()
+    await expect(canvas.getByText(/Ask an Admin of your company/)).toBeVisible()
     await expect(canvas.getByText('Not set')).toBeVisible()
   },
 })
