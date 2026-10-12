@@ -1,6 +1,6 @@
 import type { FirstStepTarget } from '@edi-bridge/contracts'
 
-import { navigationItems } from './navigation'
+import { navigationItems, tradingPartnerHref } from './navigation'
 
 export function firstStepHref(target: FirstStepTarget) {
   switch (target.kind) {
@@ -21,7 +21,7 @@ export function firstStepHref(target: FirstStepTarget) {
     }
 
     case 'tradingPartner': {
-      return `${navigationItems.tradingPartners.href}/${encodeURIComponent(target.tradingPartnerId)}`
+      return tradingPartnerHref(target.tradingPartnerId)
     }
   }
 }

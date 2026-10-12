@@ -11,6 +11,7 @@ import {
   pageItems,
   sidebarItem,
   sidebarItems,
+  tradingPartnerHref,
 } from './navigation'
 
 describe('sidebarItem', () => {
@@ -96,6 +97,14 @@ describe('fixTargetHref', () => {
     expect(fixTargetHref({ kind: 'channel', channelId: 'c-1', name: 'SFTP' })).toBe('/channels/c-1')
     expect(fixTargetHref({ kind: 'tradingPartner', tradingPartnerId: 'p-1', name: 'Acme' })).toBe(
       '/trading-partners/p-1',
+    )
+  })
+})
+
+describe('tradingPartnerHref', () => {
+  it('opens the Trading Partner page', () => {
+    expect(tradingPartnerHref('10000000-0000-4000-8000-000000000001')).toBe(
+      '/trading-partners/10000000-0000-4000-8000-000000000001',
     )
   })
 })

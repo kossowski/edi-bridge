@@ -13,7 +13,7 @@ import { useId } from 'react'
 
 import { LinkCard } from '@/components/home/link-card'
 import { useCanChange } from '@/hooks/use-session'
-import { navigationItems } from '@/lib/navigation'
+import { navigationItems, tradingPartnerHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -62,9 +62,7 @@ function TradingPartnerCard({
 
   return (
     <li className="min-w-0">
-      <LinkCard
-        href={`${navigationItems.tradingPartners.href}/${tradingPartner.id}`}
-        className="gap-2 p-3">
+      <LinkCard href={tradingPartnerHref(tradingPartner.id)} className="gap-2 p-3">
         <span className="flex items-start justify-between gap-2">
           <span className="min-w-0 text-sm font-medium break-words">{tradingPartner.name}</span>
           <ModeBadge testMode={testMode} />
