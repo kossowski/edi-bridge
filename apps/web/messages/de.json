@@ -1723,8 +1723,8 @@
       },
       "remotePath": {
         "label": "Ordner",
-        "inbound": "Der Ordner, den EDI Bridge nach neuen Documents abfragt.",
-        "outbound": "Der Ordner, in den EDI Bridge Documents hochlädt."
+        "inbound": "Der Ordner, den EDI Bridge nach neuen Belegen abfragt.",
+        "outbound": "Der Ordner, in den EDI Bridge Belege hochlädt."
       },
       "authentication": {
         "label": "Anmeldung",
@@ -1736,7 +1736,7 @@
       },
       "pollingIntervalMinutes": {
         "label": "Abfrageintervall (Minuten)",
-        "description": "Wie oft EDI Bridge den Ordner nach neuen Documents abfragt."
+        "description": "Wie oft EDI Bridge den Ordner nach neuen Belegen abfragt."
       },
       "rateLimitPerMinute": {
         "label": "Rate Limit (Anfragen pro Minute)",
@@ -1744,7 +1744,7 @@
       },
       "url": {
         "label": "URL",
-        "description": "EDI Bridge schickt jedes Document per POST an diese Adresse."
+        "description": "EDI Bridge schickt jeden Beleg per POST an diese Adresse."
       },
       "sendAuthorization": {
         "label": "Authorization-Header mitsenden"

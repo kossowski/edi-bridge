@@ -12,14 +12,14 @@ import { tooLongOr } from '../../lib/forms/field-errors'
 import { type GlnError, glnError, normalizeGln } from '../../lib/forms/gln'
 import {
   type ChannelField,
+  channelFields,
   type ChannelFieldErrors,
   type ChannelFormValues,
-  type ChannelKindKey,
   type FieldError,
   toFormValues,
   validateNewChannel,
 } from '../channels/channel-form-values'
-import { defaultKindKey } from './partner-connections'
+import { defaultKindKey, type DetailedWay, wayKind } from './partner-connections'
 
 export const wizardSteps = ['partner', 'documents', 'connections', 'mappings', 'review'] as const
 
@@ -29,26 +29,23 @@ export const wizardDocuments = newMappingMessageTypes
 
 export type WizardDocument = (typeof wizardDocuments)[number]
 
-export const connectionWays = ['sftp', 'web', 'ask'] as const
+export const connectionWays = ['sftp', 'web', 'ask'] as const satisfies ReadonlyArray<
+  DetailedWay | 'ask'
+>
 
 export type ConnectionWay = (typeof connectionWays)[number]
 
 export type WizardConnection = { way: ConnectionWay; values: ChannelFormValues }
 
-export const connectionFields = [
-  'host',
-  'port',
-  'username',
-  'remotePath',
-  'pollingIntervalMinutes',
-  'authentication',
-  'credential',
-  'rateLimitPerMinute',
-  'url',
-  'authorization',
-] as const satisfies ReadonlyArray<ChannelField>
+const partnerFields = ['name', 'tradingPartnerId'] as const satisfies ReadonlyArray<ChannelField>
 
-export type ConnectionField = (typeof connectionFields)[number]
+export type ConnectionField = Exclude<ChannelField, (typeof partnerFields)[number]>
+
+function isConnectionField(field: ChannelField): field is ConnectionField {
+  return !partnerFields.some((partnerField) => partnerField === field)
+}
+
+export const connectionFields = channelFields.filter(isConnectionField)
 
 export type WizardMapping =
   { kind: 'existing'; mappingVersionId: string } | { kind: 'ai' } | { kind: 'later' }
@@ -74,8 +71,15 @@ export type WizardField = keyof WizardFieldErrors
 
 export type WizardErrors = { [Field in WizardField]?: WizardFieldErrors[Field] }
 
-export type WizardResult = Omit<PartnerWizardState, 'partner'> & {
+export function wizardFieldId(baseId: string, field: WizardField | Direction) {
+  return `${baseId}-${field.replace('.', '-')}`
+}
+
+export type ConnectionResult = { way: 'ask' } | { way: DetailedWay; values: ChannelFormValues }
+
+export type WizardResult = Omit<PartnerWizardState, 'partner' | 'connections'> & {
   partner: Pick<TradingPartnerInput, 'name' | 'gln'>
+  connections: Partial<Record<Direction, ConnectionResult>>
 }
 
 export const initialWizardState: PartnerWizardState = {
@@ -173,14 +177,18 @@ export function channelFieldErrors(errors: WizardErrors, direction: Direction) {
   return channelErrors
 }
 
+function connectionResult({ way, values }: WizardConnection): ConnectionResult {
+  return way === 'ask' ? { way } : { way, values }
+}
+
 function neededConnections({ documents, connections }: PartnerWizardState) {
-  const needed: PartnerWizardState['connections'] = {}
+  const needed: WizardResult['connections'] = {}
 
   for (const direction of neededDirections(documents)) {
     const connection = connections[direction]
 
     if (connection) {
-      needed[direction] = connection
+      needed[direction] = connectionResult(connection)
     }
   }
 
@@ -222,19 +230,6 @@ export function documentsTravelling(
 
 export function postponedDirections({ documents, connections }: PartnerWizardState): Direction[] {
   return neededDirections(documents).filter((direction) => connections[direction]?.way === 'ask')
-}
-
-const connectionKinds = {
-  inbound: { sftp: 'sftp-inbound', web: 'webhook-inbound' },
-  outbound: { sftp: 'sftp-outbound', web: 'http-outbound' },
-} as const satisfies {
-  [Way in Direction]: Record<DetailedWay, Extract<ChannelKindKey, `${string}-${Way}`>>
-}
-
-export type DetailedWay = Exclude<ConnectionWay, 'ask'>
-
-export function wayKind(direction: Direction, way: DetailedWay): ChannelKindKey {
-  return connectionKinds[direction][way]
 }
 
 export function initialConnectionValues(direction: Direction): ChannelFormValues {

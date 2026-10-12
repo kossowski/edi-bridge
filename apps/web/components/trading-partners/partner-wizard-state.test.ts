@@ -4,6 +4,7 @@ import { toFormValues } from '../channels/channel-form-values'
 import {
   channelFieldErrors,
   chooseWay,
+  connectionFields,
   firstInvalidField,
   initialWizardState,
   neededDirections,
@@ -11,6 +12,7 @@ import {
   postponedDirections,
   stepErrors,
   toggleDocument,
+  wizardFieldId,
   wizardResult,
   wizardSteps,
 } from './partner-wizard-state'
@@ -256,6 +258,33 @@ describe('wizardResult connections', () => {
     expect(wizardResult(withConnections(['ORDERS'], { inbound, outbound })).connections).toEqual({
       inbound,
     })
+  })
+
+  it('hands on no connection details for a direction asked of the partner', () => {
+    const inbound = { way: 'ask', values: sftpInbound } as const
+    const outbound = chooseWay(undefined, 'outbound', 'web')
+
+    expect(
+      wizardResult(withConnections(['ORDERS', 'INVOIC'], { inbound, outbound })).connections,
+    ).toEqual({ inbound: { way: 'ask' }, outbound })
+  })
+})
+
+describe('connectionFields', () => {
+  it('leaves out the name and the trading partner the wizard sets itself', () => {
+    expect(connectionFields).not.toContain('name')
+    expect(connectionFields).not.toContain('tradingPartnerId')
+    expect(connectionFields).toContain('host')
+  })
+})
+
+describe('wizardFieldId', () => {
+  it('builds the id of a connection field under the id of its direction', () => {
+    expect(wizardFieldId('wizard', 'name')).toBe('wizard-name')
+    expect(wizardFieldId('wizard', 'outbound.way')).toBe('wizard-outbound-way')
+    expect(wizardFieldId('wizard', 'inbound.host')).toBe(
+      `${wizardFieldId('wizard', 'inbound')}-host`,
+    )
   })
 })
 

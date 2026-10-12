@@ -1,3 +1,5 @@
+import { type Direction } from '@edi-bridge/contracts'
+
 import {
   documentsTravelling,
   type PartnerWizardState,
@@ -19,14 +21,29 @@ export type RequestFormat = {
   list: (items: ReadonlyArray<string>) => string
 }
 
-export function partnerRequest(state: PartnerWizardState, { t, list }: RequestFormat) {
+export type DocumentNamesFormat = {
+  t: (key: `documentNames.${WizardDocument}`) => string
+  list: RequestFormat['list']
+}
+
+export function travellingDocumentNames(
+  documents: ReadonlyArray<WizardDocument>,
+  direction: Direction,
+  { t, list }: DocumentNamesFormat,
+) {
+  return list(
+    documentsTravelling(documents, direction).map((messageType) =>
+      t(`documentNames.${messageType}`),
+    ),
+  )
+}
+
+export function partnerRequest(state: PartnerWizardState, format: RequestFormat) {
+  const { t } = format
+
   const items = postponedDirections(state).map((direction) =>
     t(`request.${direction}`, {
-      documents: list(
-        documentsTravelling(state.documents, direction).map((messageType) =>
-          t(`documentNames.${messageType}`),
-        ),
-      ),
+      documents: travellingDocumentNames(state.documents, direction, format),
     }),
   )
 

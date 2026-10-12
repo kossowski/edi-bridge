@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import messagesDe from '../../messages/de.json'
 import messagesEn from '../../messages/en.json'
-import { type RequestFormat, partnerRequest } from './partner-request'
+import { type RequestFormat, partnerRequest, travellingDocumentNames } from './partner-request'
 import {
   chooseWay,
   initialWizardState,
@@ -121,6 +121,17 @@ describe('partnerRequest', () => {
         '',
         'Vielen Dank!',
       ].join('\n'),
+    )
+  })
+})
+
+describe('travellingDocumentNames', () => {
+  it('lists the chosen documents of one direction', () => {
+    expect(travellingDocumentNames(['ORDERS', 'DESADV', 'INVOIC'], 'outbound', format('en'))).toBe(
+      'dispatch advices and invoices',
+    )
+    expect(travellingDocumentNames(['ORDERS', 'DESADV'], 'inbound', format('de'))).toBe(
+      'Bestellungen',
     )
   })
 })

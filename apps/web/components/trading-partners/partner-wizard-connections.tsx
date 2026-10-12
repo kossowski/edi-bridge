@@ -7,18 +7,21 @@ import { ChannelKindFields, useChannelFields } from '@/components/channels/chann
 import { type ChannelFormValues } from '@/components/channels/channel-form-values'
 import { CopyButton } from '@/components/copy-button'
 import { ChoiceCards } from '@/components/trading-partners/choice-cards'
-import { partnerRequest } from '@/components/trading-partners/partner-request'
+import { defaultKindKey, wayKind } from '@/components/trading-partners/partner-connections'
+import {
+  partnerRequest,
+  travellingDocumentNames,
+} from '@/components/trading-partners/partner-request'
 import {
   channelFieldErrors,
   chooseWay,
   connectionWays,
-  documentsTravelling,
   initialConnectionValues,
   neededDirections,
   type PartnerWizardState,
   type WizardConnection,
   type WizardErrors,
-  wayKind,
+  wizardFieldId,
 } from '@/components/trading-partners/partner-wizard-state'
 import { type Direction } from '@edi-bridge/contracts'
 import { Textarea } from '@edi-bridge/ui/components/textarea'
@@ -56,16 +59,15 @@ function DirectionConnection({
     values,
     setValues,
     channelFieldErrors(errors, direction),
-    `${idPrefix}-${direction}`,
+    wizardFieldId(idPrefix, direction),
   )
 
   const wayError = errors[`${direction}.way`]
 
-  const documents = format.list(
-    documentsTravelling(state.documents, direction).map((messageType) =>
-      t(`documentNames.${messageType}`),
-    ),
-  )
+  const documents = travellingDocumentNames(state.documents, direction, {
+    t,
+    list: (items) => format.list(items),
+  })
 
   const items = connectionWays.map((way) => {
     if (way === 'ask') {
@@ -82,7 +84,7 @@ function DirectionConnection({
       value: way,
       title: tHow(`${kind}.title`, { name }),
       description: tHow(`${kind}.description`),
-      badge: way === 'sftp' ? tHow('recommended') : undefined,
+      badge: kind === defaultKindKey(direction) ? tHow('recommended') : undefined,
     }
   })
 
@@ -91,7 +93,7 @@ function DirectionConnection({
   return (
     <div className="flex flex-col gap-4">
       <ChoiceCards
-        id={`${idPrefix}-${direction}-way`}
+        id={wizardFieldId(idPrefix, `${direction}.way`)}
         error={wayError === undefined ? null : t('errors.way.required')}
         items={items}
         label={t(`connections.${direction}.label`, { name, documents })}

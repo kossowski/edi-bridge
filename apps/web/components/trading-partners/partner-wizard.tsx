@@ -21,6 +21,7 @@ import {
   type WizardErrors,
   type WizardField,
   wizardDocuments,
+  wizardFieldId,
   type WizardResult,
   wizardResult,
   type WizardStep,
@@ -74,7 +75,7 @@ export function PartnerWizard({ onFinish }: { onFinish: (result: WizardResult) =
   const glnLaterId = `${baseId}-gln-later`
 
   function fieldId(field: WizardField) {
-    return `${baseId}-${field.replace('.', '-')}`
+    return wizardFieldId(baseId, field)
   }
 
   function updatePartner(changes: Partial<PartnerWizardState['partner']>) {
