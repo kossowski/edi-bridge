@@ -4,6 +4,8 @@ import {
   type OverdueAcknowledgement,
   type RunSummary,
   type Task,
+  type TaskActor,
+  taskActors,
   taskCountsOf,
   type Tasks,
   tasksEndpoint,
@@ -26,13 +28,15 @@ export type TasksData = {
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>
 }
 
-export const tasksLookback = 24 * hour
+const tasksLookback = 24 * hour
+
+type FailedRun = Extract<RunSummary, { status: 'failed' }>
+
+const isFailed = (run: RunSummary): run is FailedRun => run.status === 'failed'
 
 function failedRunTasks(runs: RunStore, from: number) {
   return runs.all().flatMap((run): Task[] =>
-    run.status === 'failed' &&
-    Date.parse(run.receivedAt) >= from &&
-    runs.replacingOf(run.id) === undefined
+    isFailed(run) && Date.parse(run.receivedAt) >= from && runs.replacingOf(run.id) === undefined
       ? [
           {
             id: `run:${run.id}`,
@@ -54,7 +58,7 @@ function overdueAcknowledgementTasks(
   return overdueAcknowledgements.map((acknowledgement) => ({
     id: `overdue:${acknowledgement.interchange.id}`,
     kind: 'overdueAcknowledgement',
-    whoActs: 'partner',
+    whoActs: 'tradingPartner',
     tradingPartner: acknowledgement.tradingPartner,
     at: acknowledgement.overdueSince,
     interchange: acknowledgement.interchange,
@@ -65,6 +69,13 @@ function overdueAcknowledgementTasks(
   }))
 }
 
+function dominantWhoActs(failedRuns: readonly FailedRun[]): TaskActor {
+  const counts = taskCountsOf(failedRuns.map((run) => ({ whoActs: whoActsOnFailedRun(run) })))
+  const [first, second] = taskActors.toSorted((a, b) => counts[b] - counts[a])
+
+  return counts[first!] > counts[second!] ? first! : 'you'
+}
+
 function failingTradingPartnerTasks(
   tradingPartners: ReadonlyArray<TradingPartner>,
   runs: readonly RunSummary[],
@@ -72,14 +83,19 @@ function failingTradingPartnerTasks(
   from: number,
   now: Date,
 ) {
+  const failedRuns = Map.groupBy(
+    runs.filter(isFailed).filter((run) => Date.parse(run.receivedAt) >= from),
+    (run) => run.tradingPartner.id,
+  )
+
   return tradingPartnerHealthOf(tradingPartners, runs, overdueAcknowledgements, from).flatMap(
     (health): Task[] =>
       health.status === 'failing'
         ? [
             {
-              id: `partner:${health.tradingPartner.id}`,
+              id: `tradingPartner:${health.tradingPartner.id}`,
               kind: 'failingTradingPartner',
-              whoActs: 'you',
+              whoActs: dominantWhoActs(failedRuns.get(health.tradingPartner.id) ?? []),
               tradingPartner: health.tradingPartner,
               at: health.lastRunAt ?? now.toISOString(),
               delivered: health.delivered,
@@ -91,7 +107,7 @@ function failingTradingPartnerTasks(
   )
 }
 
-export function toTasks(
+function toTasks(
   { runs, tradingPartners, overdueAcknowledgements }: TasksData,
   now = new Date(),
 ): Tasks {
@@ -112,10 +128,6 @@ export const emptyTasksData: TasksData = {
   runs: [],
   tradingPartners: [],
   overdueAcknowledgements: [],
-}
-
-export function createTasksData(options: Parameters<typeof createOverviewData>[0]): TasksData {
-  return createOverviewData(options)
 }
 
 function seedRunStore() {
@@ -143,7 +155,7 @@ function tasksDataOf(source: TasksData | 'empty' | 'large' | undefined): TasksDa
     case 'empty':
       return emptyTasksData
     case 'large':
-      return createTasksData({ tradingPartnerCount: 240, overdueCount: 400, runCount: 30_000 })
+      return createOverviewData({ tradingPartnerCount: 240, overdueCount: 400, runCount: 30_000 })
     default:
       return source
   }

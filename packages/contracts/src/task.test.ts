@@ -20,8 +20,8 @@ describe('whoActsOnFailedRun', () => {
     ['delivery', 'ORDERS', 'retry'],
     ['mapping', 'ORDERS', 'you'],
     ['mapping', 'DESADV', 'you'],
-    ['parse', 'ORDERS', 'partner'],
-    ['validation', 'CONTRL', 'partner'],
+    ['parse', 'ORDERS', 'tradingPartner'],
+    ['validation', 'CONTRL', 'tradingPartner'],
     ['validation', 'INVOIC', 'you'],
   ] as const)('gives a Run that failed at %s with a %s to %s', (failureStage, messageType, who) => {
     expect(whoActsOnFailedRun({ failureStage, messageType })).toBe(who)
@@ -48,7 +48,7 @@ describe('taskSchema', () => {
     ).toBe(false)
   })
 
-  it('leaves an Overdue Acknowledgement to the partner', () => {
+  it('leaves an Overdue Acknowledgement to the Trading Partner', () => {
     expect(
       taskSchema.safeParse({
         id: 'overdue:1',
@@ -68,10 +68,12 @@ describe('taskSchema', () => {
 
 describe('taskCountsOf', () => {
   it('counts the tasks per who acts', () => {
-    expect(taskCountsOf([{ whoActs: 'you' }, { whoActs: 'partner' }, { whoActs: 'you' }])).toEqual({
+    expect(
+      taskCountsOf([{ whoActs: 'you' }, { whoActs: 'tradingPartner' }, { whoActs: 'you' }]),
+    ).toEqual({
       you: 2,
       retry: 0,
-      partner: 1,
+      tradingPartner: 1,
     })
   })
 })

@@ -8,31 +8,23 @@ import { tradingPartnerSummarySchema } from './trading-partner'
 
 import type { Endpoint } from './endpoint'
 
-export const taskActors = ['you', 'retry', 'partner'] as const
+export const taskActors = ['you', 'retry', 'tradingPartner'] as const
 
-export const taskActorSchema = z.enum(taskActors)
+const taskActorSchema = z.enum(taskActors)
 
 export type TaskActor = z.infer<typeof taskActorSchema>
 
-export const runTaskTargetSchema = z.object({ kind: z.literal('run'), runId: z.uuid() })
+const runTaskTargetSchema = z.object({ kind: z.literal('run'), runId: z.uuid() })
 
-export const interchangeTaskTargetSchema = z.object({
+const interchangeTaskTargetSchema = z.object({
   kind: z.literal('interchange'),
   interchangeId: z.uuid(),
 })
 
-export const tradingPartnerTaskTargetSchema = z.object({
+const tradingPartnerTaskTargetSchema = z.object({
   kind: z.literal('tradingPartner'),
   tradingPartnerId: z.uuid(),
 })
-
-export const taskTargetSchema = z.discriminatedUnion('kind', [
-  runTaskTargetSchema,
-  interchangeTaskTargetSchema,
-  tradingPartnerTaskTargetSchema,
-])
-
-export type TaskTarget = z.infer<typeof taskTargetSchema>
 
 const countSchema = z.number().int().min(0)
 
@@ -42,7 +34,7 @@ const taskBaseSchema = z.object({
   at: z.iso.datetime(),
 })
 
-export const failedRunTaskSchema = taskBaseSchema.extend({
+const failedRunTaskSchema = taskBaseSchema.extend({
   kind: z.literal('failedRun'),
   whoActs: taskActorSchema,
   run: z.object({
@@ -53,9 +45,9 @@ export const failedRunTaskSchema = taskBaseSchema.extend({
   target: runTaskTargetSchema,
 })
 
-export const overdueAcknowledgementTaskSchema = taskBaseSchema.extend({
+const overdueAcknowledgementTaskSchema = taskBaseSchema.extend({
   kind: z.literal('overdueAcknowledgement'),
-  whoActs: z.literal('partner'),
+  whoActs: z.literal('tradingPartner'),
   interchange: z.object({ id: z.uuid(), controlReference: controlReferenceSchema }),
   messageType: messageTypeSchema.extract(overdueAcknowledgementMessageTypes),
   sentAt: z.iso.datetime(),
@@ -63,9 +55,9 @@ export const overdueAcknowledgementTaskSchema = taskBaseSchema.extend({
   target: interchangeTaskTargetSchema,
 })
 
-export const failingTradingPartnerTaskSchema = taskBaseSchema.extend({
+const failingTradingPartnerTaskSchema = taskBaseSchema.extend({
   kind: z.literal('failingTradingPartner'),
-  whoActs: z.literal('you'),
+  whoActs: taskActorSchema,
   delivered: countSchema,
   failed: countSchema,
   target: tradingPartnerTaskTargetSchema,
@@ -79,12 +71,12 @@ export const taskSchema = z.discriminatedUnion('kind', [
 
 export type Task = z.infer<typeof taskSchema>
 
-export type TaskKind = Task['kind']
+export type TaskTarget = Task['target']
 
-export const taskCountsSchema = z.object({
+const taskCountsSchema = z.object({
   you: countSchema,
   retry: countSchema,
-  partner: countSchema,
+  tradingPartner: countSchema,
 })
 
 export type TaskCounts = z.infer<typeof taskCountsSchema>
@@ -121,13 +113,13 @@ export function whoActsOnFailedRun({
     case 'parse':
     case 'validation': {
       // Outbound EDIFACT comes from our own Mapping, so only an inbound file is the partner's to resend.
-      return directionOf({ messageType }) === 'inbound' ? 'partner' : 'you'
+      return directionOf({ messageType }) === 'inbound' ? 'tradingPartner' : 'you'
     }
   }
 }
 
 export function taskCountsOf(tasks: ReadonlyArray<Pick<Task, 'whoActs'>>): TaskCounts {
-  const counts: TaskCounts = { you: 0, retry: 0, partner: 0 }
+  const counts: TaskCounts = { you: 0, retry: 0, tradingPartner: 0 }
 
   for (const { whoActs } of tasks) {
     counts[whoActs] += 1

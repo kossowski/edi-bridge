@@ -282,16 +282,7 @@ export {
   type RunStore,
 } from './run-store'
 
-export {
-  createTasksData,
-  emptyTasksData,
-  seedTasksData,
-  type TasksData,
-  tasksHandler,
-  tasksLookback,
-  type TasksState,
-  toTasks,
-} from './task'
+export { emptyTasksData, type TasksData, tasksHandler } from './task'
 
 export { type SessionStore } from './session-access'
 

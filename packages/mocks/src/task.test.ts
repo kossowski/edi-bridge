@@ -72,7 +72,7 @@ describe('GET /tasks', () => {
       receivedAt: '2026-10-10T11:00:00.000Z',
     })
 
-    const partner = createRun({
+    const tradingPartner = createRun({
       tradingPartner: summaryOf(rheinkauf),
       messageType: 'ORDERS',
       status: 'failed',
@@ -101,7 +101,7 @@ describe('GET /tasks', () => {
         apiUrl,
         data({
           runs: createRunStore(
-            [retry, partner, older, replaced, ...healthy],
+            [retry, tradingPartner, older, replaced, ...healthy],
             [{ replaced: replaced.id, replacing: healthy[0]!.id }],
           ),
           tradingPartners: [rheinkauf],
@@ -121,9 +121,9 @@ describe('GET /tasks', () => {
         run: { id: retry.id, messageType: 'INVOIC', failureStage: 'delivery' },
         target: { kind: 'run', runId: retry.id },
       },
-      expect.objectContaining({ id: `run:${partner.id}`, whoActs: 'partner' }),
+      expect.objectContaining({ id: `run:${tradingPartner.id}`, whoActs: 'tradingPartner' }),
     ])
-    expect(counts).toEqual({ you: 0, retry: 1, partner: 1 })
+    expect(counts).toEqual({ you: 0, retry: 1, tradingPartner: 1 })
   })
 
   it('drops a failed Run once a Reprocess replaces it', async () => {
@@ -146,7 +146,7 @@ describe('GET /tasks', () => {
     expect((await getTasks()).tasks).toEqual([])
   })
 
-  it('waits for the partner on an Overdue Acknowledgement, linked to its Interchange', async () => {
+  it('waits for the Trading Partner on an Overdue Acknowledgement, linked to its Interchange', async () => {
     const acknowledgement = createOverdueAcknowledgement({
       tradingPartner: summaryOf(hansemarkt),
       overdueSince: '2026-10-10T06:00:00.000Z',
@@ -160,7 +160,7 @@ describe('GET /tasks', () => {
       {
         id: `overdue:${acknowledgement.interchange.id}`,
         kind: 'overdueAcknowledgement',
-        whoActs: 'partner',
+        whoActs: 'tradingPartner',
         tradingPartner: summaryOf(hansemarkt),
         at: '2026-10-10T06:00:00.000Z',
         interchange: acknowledgement.interchange,
@@ -170,10 +170,10 @@ describe('GET /tasks', () => {
         target: { kind: 'interchange', interchangeId: acknowledgement.interchange.id },
       },
     ])
-    expect(counts).toEqual({ you: 0, retry: 0, partner: 1 })
+    expect(counts).toEqual({ you: 0, retry: 0, tradingPartner: 1 })
   })
 
-  it('asks you to check a failing Trading Partner, linked to the partner', async () => {
+  it('flags a failing Trading Partner, linked to the Trading Partner', async () => {
     const failing = Array.from({ length: 3 }, (_, index) =>
       createRun({
         tradingPartner: summaryOf(hansemarkt),
@@ -196,9 +196,9 @@ describe('GET /tasks', () => {
     const { tasks, counts } = await getTasks()
 
     expect(tasks[0]).toEqual({
-      id: `partner:${hansemarkt.id}`,
+      id: `tradingPartner:${hansemarkt.id}`,
       kind: 'failingTradingPartner',
-      whoActs: 'you',
+      whoActs: 'retry',
       tradingPartner: summaryOf(hansemarkt),
       at: '2026-10-10T05:00:00.000Z',
       delivered: 1,
@@ -211,13 +211,42 @@ describe('GET /tasks', () => {
       '2026-10-10T02:00:00.000Z',
       '2026-10-10T01:00:00.000Z',
     ])
-    expect(counts).toEqual({ you: 1, retry: 3, partner: 0 })
+    expect(counts).toEqual({ you: 0, retry: 4, tradingPartner: 0 })
   })
+
+  it.each([
+    [['parse', 'parse', 'delivery'], 'tradingPartner'],
+    [['delivery', 'delivery', 'mapping'], 'retry'],
+    [['mapping', 'mapping', 'parse'], 'you'],
+    [['parse', 'delivery', 'mapping'], 'you'],
+    [['parse', 'parse', 'delivery', 'delivery'], 'you'],
+  ] as const)(
+    'gives a Trading Partner whose Runs failed at %j to the most frequent who acts: %s',
+    async (failureStages, whoActs) => {
+      const failing = failureStages.map((failureStage, index) =>
+        createRun({
+          tradingPartner: summaryOf(hansemarkt),
+          messageType: 'ORDERS',
+          status: 'failed',
+          failureStage,
+          receivedAt: `2026-10-10T0${index + 1}:00:00.000Z`,
+        }),
+      )
+
+      server.use(tasksHandler(apiUrl, data({ runs: failing, tradingPartners: [hansemarkt] })))
+
+      const { tasks } = await getTasks()
+
+      expect(tasks.find(({ kind }) => kind === 'failingTradingPartner')).toEqual(
+        expect.objectContaining({ whoActs }),
+      )
+    },
+  )
 
   it('has nothing to do when all is good', async () => {
     server.use(tasksHandler(apiUrl, 'empty'))
 
-    expect(await getTasks()).toEqual({ tasks: [], counts: { you: 0, retry: 0, partner: 0 } })
+    expect(await getTasks()).toEqual({ tasks: [], counts: { you: 0, retry: 0, tradingPartner: 0 } })
   })
 
   it('serves a large volume of tasks for every kind', async () => {
@@ -229,7 +258,7 @@ describe('GET /tasks', () => {
     expect(new Set(tasks.map(({ kind }) => kind))).toEqual(
       new Set(['failedRun', 'overdueAcknowledgement', 'failingTradingPartner']),
     )
-    expect(counts.you + counts.retry + counts.partner).toBe(tasks.length)
+    expect(counts.you + counts.retry + counts.tradingPartner).toBe(tasks.length)
   })
 
   it('serves the seeded tasks', async () => {
