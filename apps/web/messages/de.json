@@ -4,12 +4,10 @@
     "skipToContent": "Zum Hauptinhalt springen",
     "mainNavigation": "Hauptnavigation",
     "toggleSidebar": "Seitenleiste ein- oder ausblenden",
-    "workspaceGroup": "Workspace",
-    "platformGroup": "Plattform",
     "workspace": {
-      "label": "Workspace",
-      "loading": "Workspace wird geladen",
-      "unavailable": "Workspace nicht verfügbar"
+      "label": "Arbeitsbereich",
+      "loading": "Arbeitsbereich wird geladen",
+      "unavailable": "Arbeitsbereich nicht verfügbar"
     },
     "theme": {
       "label": "Farbschema",
@@ -23,16 +21,17 @@
       "de": "Deutsch"
     },
     "session": {
-      "userMenu": "Benutzermenü von {name}",
-      "userMenuUnavailable": "Benutzermenü, Sitzung nicht verfügbar",
+      "accountMenu": "Kontomenü",
       "signedInAs": "Angemeldet als",
       "operator": "Operator",
       "role": {
         "admin": "Admin",
         "viewer": "Viewer"
       },
+      "settings": "Einstellungen",
+      "operatorArea": "Operator-Bereich",
       "viewOnly": "Nur ansehen",
-      "viewOnlyDescription": "Sie sehen alles in diesem Workspace, können aber nichts ändern.",
+      "viewOnlyDescription": "Sie sehen alles in diesem Arbeitsbereich, können aber nichts ändern.",
       "signOut": "Abmelden",
       "signingOut": "Wird abgemeldet …",
       "signOutFailed": "Abmelden fehlgeschlagen. Versuchen Sie es erneut.",
@@ -40,6 +39,55 @@
       "unavailableDescription": "Ihre Sitzungsdaten konnten nicht geladen werden. Abmelden ist trotzdem möglich.",
       "loading": "Sitzung wird geladen …",
       "redirecting": "Ihre Sitzung ist beendet. Die Anmeldeseite wird geöffnet …"
+    }
+  },
+  "Sidebar": {
+    "groups": {
+      "dailyWork": "Tagesgeschäft",
+      "setup": "Einrichtung",
+      "advanced": "Erweitert"
+    },
+    "items": {
+      "home": {
+        "label": "Start",
+        "hint": "Kennzahlen, Diagramme und Ihre Handelspartner"
+      },
+      "documents": {
+        "label": "Belege",
+        "hint": "Alle empfangenen und gesendeten Belege"
+      },
+      "orders": {
+        "label": "Aufträge",
+        "hint": "Einen Auftrag von der Bestellung bis zur Rechnung verfolgen"
+      },
+      "tradingPartners": {
+        "label": "Handelspartner",
+        "hint": "Mit wem Sie Belege austauschen und wie"
+      },
+      "mappings": {
+        "label": "Mappings",
+        "hint": "Wie Ihre Daten in EDI übersetzt werden und zurück"
+      },
+      "codeTranslations": {
+        "label": "Code-Übersetzungen",
+        "hint": "Codes, die übersetzt werden, z. B. Einheit ST wird PCE"
+      },
+      "dataFormats": {
+        "label": "Ihre Datenformate",
+        "hint": "Der Aufbau der Dateien aus Ihren eigenen Systemen"
+      },
+      "allConnections": {
+        "label": "Alle Verbindungen",
+        "hint": "Alle Verbindungen über alle Handelspartner"
+      },
+      "allDocumentRoutes": {
+        "label": "Alle Belegwege",
+        "hint": "Alle Belegwege über alle Handelspartner"
+      },
+      "transmissions": {
+        "label": "Übertragungen",
+        "hint": "Die gesendeten und empfangenen EDI-Umschläge"
+      }
     }
   },
   "Navigation": {

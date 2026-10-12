@@ -54,3 +54,8 @@ export function viewerStory({
     },
   }
 }
+
+export function accountMenuOf(name: string, menu = 'Account menu') {
+  return (accessibleName: string) =>
+    accessibleName.startsWith(name) && accessibleName.endsWith(menu)
+}

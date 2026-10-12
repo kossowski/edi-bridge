@@ -4,8 +4,6 @@
     "skipToContent": "Skip to main content",
     "mainNavigation": "Main navigation",
     "toggleSidebar": "Toggle sidebar",
-    "workspaceGroup": "Workspace",
-    "platformGroup": "Platform",
     "workspace": {
       "label": "Workspace",
       "loading": "Loading Workspace",
@@ -23,14 +21,15 @@
       "de": "Deutsch"
     },
     "session": {
-      "userMenu": "User menu of {name}",
-      "userMenuUnavailable": "User menu, session unavailable",
+      "accountMenu": "Account menu",
       "signedInAs": "Signed in as",
       "operator": "Operator",
       "role": {
         "admin": "Admin",
         "viewer": "Viewer"
       },
+      "settings": "Settings",
+      "operatorArea": "Operator area",
       "viewOnly": "View only",
       "viewOnlyDescription": "You can see everything in this Workspace but change nothing.",
       "signOut": "Sign out",
@@ -40,6 +39,55 @@
       "unavailableDescription": "Your session details could not be loaded. You can still sign out.",
       "loading": "Loading session…",
       "redirecting": "Your session has ended. Opening the sign-in page…"
+    }
+  },
+  "Sidebar": {
+    "groups": {
+      "dailyWork": "Daily work",
+      "setup": "Setup",
+      "advanced": "Advanced"
+    },
+    "items": {
+      "home": {
+        "label": "Home",
+        "hint": "Key numbers, charts and your partners"
+      },
+      "documents": {
+        "label": "Documents",
+        "hint": "Every document received or sent"
+      },
+      "orders": {
+        "label": "Orders",
+        "hint": "Follow an order from purchase order to invoice"
+      },
+      "tradingPartners": {
+        "label": "Trading partners",
+        "hint": "Who you exchange documents with, and how"
+      },
+      "mappings": {
+        "label": "Mappings",
+        "hint": "How your data is translated into EDI and back"
+      },
+      "codeTranslations": {
+        "label": "Code translations",
+        "hint": "Codes that are translated, e.g. unit ST becomes PCE"
+      },
+      "dataFormats": {
+        "label": "Your data formats",
+        "hint": "The shape of the files from your own systems"
+      },
+      "allConnections": {
+        "label": "All connections",
+        "hint": "Every connection across all partners"
+      },
+      "allDocumentRoutes": {
+        "label": "All document routes",
+        "hint": "Every document route across all partners"
+      },
+      "transmissions": {
+        "label": "Transmissions",
+        "hint": "The EDI envelopes sent and received"
+      }
     }
   },
   "Navigation": {
