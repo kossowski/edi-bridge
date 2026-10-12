@@ -4,14 +4,18 @@
 
 **Blocked by:** 60 (Document page with "what to do")
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The list shows each order's overall status readable without colour, filters by status, and searches order number and partner, with a no-result state
-- [ ] The order page shows the timeline with partial lifecycles, receipt confirmation states (pending, accepted, rejected, overdue) and the waiting time against the partner's limit
-- [ ] An overdue step offers a copyable message for the partner; a failed step links to its document's "what to do"
-- [ ] Each step links to its document page
-- [ ] The Order Lifecycle contract gains the order list with overall status; the live API follows in ticket 40
-- [ ] `/order-lifecycle` and its stories are removed or moved; tests stay green
-- [ ] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
-- [ ] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
-- [ ] Texts are available in English and German; the screen works in dark and light mode
+- [x] The list shows each order's overall status readable without colour, filters by status, and searches order number and partner, with a no-result state
+- [x] The order page shows the timeline with partial lifecycles, receipt confirmation states (pending, accepted, rejected, overdue) and the waiting time against the partner's limit
+- [x] An overdue step offers a copyable message for the partner; a failed step links to its document's "what to do"
+- [x] Each step links to its document page
+- [x] The Order Lifecycle contract gains the order list with overall status; the live API follows in ticket 40
+- [x] `/order-lifecycle` and its stories are removed or moved; tests stay green
+- [x] Dummy data is generated from the area's Zod contract and served by MSW handlers at the real API URLs, covering empty, loading, error and large-volume states
+- [x] Not test-first (prototype phase): screens get Storybook stories that run the automatic accessibility checks; interaction tests and Playwright happy paths are deferred to ticket 19
+- [x] Texts are available in English and German; the screen works in dark and light mode
+
+## Comments
+
+Resolved in #127, #130, #136.

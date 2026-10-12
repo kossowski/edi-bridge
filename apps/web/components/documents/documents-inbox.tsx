@@ -5,13 +5,12 @@ import {
   File02Icon,
   FilterRemoveIcon,
   Route01Icon,
-  Search01Icon,
   SearchRemoveIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
 import {
   clearedSearchFilters,
@@ -22,14 +21,10 @@ import {
   toRunListQuery,
 } from '@/components/documents/document-filters'
 import { InterchangeResults } from '@/components/documents/interchange-results'
-import {
-  type EmptyAction,
-  ListEmpty,
-  ListResults,
-  useEmptyActions,
-} from '@/components/documents/list-parts'
+import { useEmptyActions } from '@/components/documents/list-parts'
 import { RunRow, RunRowSkeleton } from '@/components/documents/run-row'
 import { useDocumentFilters } from '@/components/documents/use-document-filters'
+import { type EmptyAction, ListEmpty, ListResults, SearchField } from '@/components/list-parts'
 import { usePlainNames } from '@/components/plain-names'
 import { runsQuery, tradingPartnersQuery } from '@/lib/api/queries'
 import { type DocumentView, documentViews } from '@/lib/navigation'
@@ -37,65 +32,8 @@ import { type StatusGroup, statusGroups } from '@/lib/status-groups'
 import { messageTypes, type RunList } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@edi-bridge/ui/components/input-group'
 import { NativeSelect, NativeSelectOption } from '@edi-bridge/ui/components/native-select'
 import { ToggleGroup, ToggleGroupItem } from '@edi-bridge/ui/components/toggle-group'
-
-const searchDelay = 300
-
-function SearchField({
-  value,
-  label,
-  onSearch,
-}: {
-  value: string
-  label: string
-  onSearch: (q: string) => void
-}) {
-  const [text, setText] = useState(value)
-  const [shown, setShown] = useState(value)
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const searched = useRef(value)
-
-  if (value !== shown) {
-    setShown(value)
-    setText(value)
-  }
-
-  useEffect(() => {
-    if (value !== searched.current) {
-      searched.current = value
-      clearTimeout(timer.current)
-    }
-  }, [value])
-
-  useEffect(() => () => clearTimeout(timer.current), [])
-
-  return (
-    <InputGroup className="min-w-[min(100%,22rem)] flex-1 sm:max-w-sm">
-      <InputGroupAddon>
-        <HugeiconsIcon icon={Search01Icon} strokeWidth={2} aria-hidden />
-      </InputGroupAddon>
-      <InputGroupInput
-        autoComplete="off"
-        placeholder={label}
-        type="search"
-        value={text}
-        aria-label={label}
-        onChange={(event) => {
-          const next = event.target.value
-
-          setText(next)
-          clearTimeout(timer.current)
-          timer.current = setTimeout(() => {
-            searched.current = next
-            onSearch(next)
-          }, searchDelay)
-        }}
-      />
-    </InputGroup>
-  )
-}
 
 function Filters({
   filters,

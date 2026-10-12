@@ -7,13 +7,10 @@ import {
 } from '@edi-bridge/contracts'
 
 import { type DocumentView, documentViews } from '../../lib/navigation'
+import { listPageSize, parsePage, type SearchParamsReader, setPage } from '../../lib/search-params'
 import { groupStatuses, type StatusGroup, statusGroups } from '../../lib/status-groups'
 
-import type { SearchParamsReader } from '../../lib/search-params'
-
 export const defaultStatusGroup: StatusGroup = 'attention'
-
-export const listPageSize = 50
 
 export type DocumentFilters = {
   view: DocumentView
@@ -45,14 +42,11 @@ export const emptyDocumentFilters: DocumentFilters = {
 
 const uuidPattern = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 
-const pagePattern = /^[1-9]\d{0,5}$/
-
 export function parseDocumentFilters(params: SearchParamsReader): DocumentFilters {
   const view = documentViews.find((candidate) => candidate === params.get('view'))
   const status = statusGroups.find((group) => group === params.get('status'))
   const tradingPartnerId = params.get('partner') ?? ''
   const messageType = messageTypeSchema.safeParse(params.get('type'))
-  const page = params.get('page') ?? ''
 
   return {
     view: view ?? 'documents',
@@ -60,7 +54,7 @@ export function parseDocumentFilters(params: SearchParamsReader): DocumentFilter
     q: params.get('q') ?? '',
     tradingPartnerId: uuidPattern.test(tradingPartnerId) ? tradingPartnerId : '',
     messageType: messageType.success ? messageType.data : '',
-    page: pagePattern.test(page) ? Number(page) : 1,
+    page: parsePage(params),
   }
 }
 
@@ -87,9 +81,7 @@ export function documentFiltersSearch(filters: DocumentFilters) {
     params.set('type', filters.messageType)
   }
 
-  if (filters.page > 1) {
-    params.set('page', String(filters.page))
-  }
+  setPage(params, filters.page)
 
   return params.toString()
 }

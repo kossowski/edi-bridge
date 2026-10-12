@@ -64,7 +64,7 @@ describe('breadcrumbTrail', () => {
 
   it('puts an order under the orders', () => {
     expect(breadcrumbTrail('/orders/4711')).toEqual([
-      { href: '/order-lifecycle', label: { kind: 'item', key: 'orders' } },
+      { href: '/orders', label: { kind: 'item', key: 'orders' } },
       { href: '/orders/4711', label: { kind: 'detail' } },
     ])
   })

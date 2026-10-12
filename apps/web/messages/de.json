@@ -130,7 +130,7 @@
     "tasks": "Aufgaben",
     "firstSteps": "Erste Schritte",
     "documents": "Belege",
-    "orderLifecycle": "Order Lifecycle",
+    "orders": "Aufträge",
     "tradingPartners": "Trading Partners",
     "channels": "Channels",
     "flows": "Flows",
@@ -620,13 +620,6 @@
       "tradingPartner": "Ihr Partner behebt das",
       "you": "Sie beheben das"
     },
-    "pagination": {
-      "label": "Seiten",
-      "page": "Seite {page} von {pageCount}",
-      "previous": "Vorherige Seite",
-      "next": "Nächste Seite",
-      "first": "Zur ersten Seite"
-    },
     "empty": {
       "noDocuments": {
         "title": "Noch keine Belege",
@@ -685,6 +678,13 @@
       }
     },
     "noFailureStage": "Keine Failure Stage"
+  },
+  "Pagination": {
+    "label": "Seiten",
+    "page": "Seite {page} von {pageCount}",
+    "previous": "Vorherige Seite",
+    "next": "Nächste Seite",
+    "first": "Zur ersten Seite"
   },
   "Document": {
     "title": "Beleg",
@@ -975,65 +975,43 @@
       }
     }
   },
-  "OrderLifecycle": {
-    "loading": "Order Lifecycle für {businessReference} wird geladen",
-    "search": {
-      "label": "Business Reference",
-      "hint": "Geben Sie eine Business Reference ein, etwa eine Bestellnummer.",
-      "submit": "Suchen"
-    },
-    "initial": {
-      "title": "Nach einer Business Reference suchen",
-      "description": "Geben Sie eine Business Reference ein, etwa eine Bestellnummer, um ihren Order Lifecycle zu sehen: ORDERS, DESADV und INVOIC in zeitlicher Reihenfolge."
-    },
-    "noResult": {
-      "title": "Kein Order Lifecycle gefunden",
-      "description": "Keine Message trägt die Business Reference {businessReference}. Prüfen Sie die Referenz und suchen Sie erneut."
-    },
-    "error": {
-      "title": "Order Lifecycle nicht verfügbar",
-      "description": "Der Order Lifecycle für {businessReference} konnte nicht geladen werden. Versuchen Sie es erneut.",
-      "retry": "Erneut versuchen"
-    },
-    "resultCount": "{count, plural, one {# Order Lifecycle} other {# Order Lifecycles}} zur Business Reference {businessReference}",
-    "timelineLabel": "Order Lifecycle mit {tradingPartner}",
-    "messageCount": "{count, plural, one {# Message} other {# Messages}}",
-    "open": {
-      "label": "Offen",
-      "description": "Noch keine {messageType}."
-    },
-    "missing": {
-      "label": "Nicht gefunden",
-      "description": "Keine {messageType} gefunden."
-    },
-    "failureStage": "Failure Stage",
-    "noInterchange": "Kein Interchange",
-    "acknowledgement": {
-      "label": "Acknowledgement",
-      "summary": "Acknowledgements",
-      "summaryLabel": "Acknowledgements der {messageType}-Messages",
-      "state": {
-        "pending": "Ausstehend",
-        "accepted": "Akzeptiert",
-        "rejected": "Abgelehnt",
-        "overdue": "Überfällig"
-      }
-    },
-    "showAll": "Alle {count, number} {messageType}-Messages anzeigen",
-    "showLatest": "Nur die neuesten {count, number} anzeigen",
-    "latestShown": "Neueste {shown, number} von {count, number}",
-    "direction": {
-      "inbound": "Eingehend",
-      "outbound": "Ausgehend"
-    },
-    "receivedAt": "Empfangen",
-    "openDocument": "– Beleg von {tradingPartner} öffnen, {messageType}",
-    "interchangeLink": "Kontrollreferenz {controlReference}",
-    "replacedBy": "Ersetzt durch",
-    "documentLink": "Beleg {id}"
-  },
   "Orders": {
     "title": "Auftrag {businessReference}",
+    "list": {
+      "label": "Aufträge, neueste Aktivität zuerst",
+      "filters": "Aufträge filtern",
+      "search": "Bestellnummer oder Partner suchen",
+      "statusFilter": "Status",
+      "all": "Alle",
+      "loading": "Aufträge werden geladen",
+      "count": "{count, plural, one {# Auftrag} other {# Aufträge}}",
+      "row": {
+        "tradingPartnerAndActivity": "{tradingPartner} · letzte Aktivität <time></time>",
+        "progress": "Fortschritt von der Bestellung bis zur Rechnung",
+        "step": "{document}: {state}"
+      },
+      "empty": {
+        "noOrders": {
+          "title": "Noch keine Aufträge",
+          "description": "Aufträge erscheinen hier, sobald eine Bestellung eingeht oder versendet wird."
+        },
+        "nothingMatches": {
+          "title": "Keine passenden Aufträge",
+          "description": "Nichts passt zu Ihrer Suche oder Ihrem Filter. Prüfen Sie die Bestellnummer oder suchen Sie nach dem Partnernamen."
+        },
+        "pageOutOfRange": {
+          "title": "Diese Seite ist leer",
+          "description": "Es gibt jetzt weniger Aufträge. Die erste Seite zeigt die neuesten."
+        }
+      },
+      "showAll": "Alle Aufträge anzeigen",
+      "firstPage": "Zur ersten Seite",
+      "error": {
+        "title": "Aufträge nicht verfügbar",
+        "description": "Die Aufträge konnten nicht geladen werden. Versuchen Sie es erneut.",
+        "retry": "Erneut versuchen"
+      }
+    },
     "loading": "Auftrag {businessReference} wird geladen",
     "error": {
       "title": "Auftrag nicht verfügbar",
@@ -1106,6 +1084,14 @@
       "messageLabel": "Nachricht an {tradingPartner}",
       "copyLabel": "Nachricht",
       "text": "Hallo {tradingPartner}-Team,\n\nwir haben Ihnen am {sentAt} {messageType, select, DESADV {das} other {die}} {document} zur Bestellung {businessReference} gesendet (Übertragung {controlReference}), aber noch keine Empfangsbestätigung erhalten. Könnten Sie prüfen, ob {messageType, select, DESADV {es} other {sie}} in Ihrem System angekommen ist?\n\nVielen Dank und freundliche Grüße"
+    },
+    "acknowledgement": {
+      "state": {
+        "pending": "Ausstehend",
+        "accepted": "Akzeptiert",
+        "rejected": "Abgelehnt",
+        "overdue": "Überfällig"
+      }
     }
   },
   "TradingPartners": {

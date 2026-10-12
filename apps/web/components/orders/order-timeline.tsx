@@ -1,14 +1,5 @@
 'use client'
 
-import {
-  Alert02Icon,
-  CheckmarkCircle02Icon,
-  Clock01Icon,
-  DashedLineCircleIcon,
-  HourglassIcon,
-  Route01Icon,
-} from '@hugeicons/core-free-icons'
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useId, useRef, useState } from 'react'
@@ -20,6 +11,7 @@ import {
   OrderMessage,
   type OrderTradingPartner,
 } from '@/components/orders/order-message'
+import { OrderStatusIcon, type StepState, StepIcon } from '@/components/orders/order-status'
 import {
   latestMessageCount,
   type OrderLifecycleStep,
@@ -31,31 +23,11 @@ import { MessageTypeName, usePlainNames } from '@/components/plain-names'
 import { tradingPartnerHref } from '@/lib/navigation'
 import {
   type OrderLifecycle,
-  type OrderLifecycleStatus,
   type OrderLifecycleStep as SummaryStep,
-  type OrderLifecycleStepState,
   toOrderLifecycleSummary,
 } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@edi-bridge/ui/components/card'
-
-type StepState = OrderLifecycleStepState | 'missing'
-
-const statusIcons: Record<OrderLifecycleStatus, IconSvgElement> = {
-  'on-track': Route01Icon,
-  'needs-attention': Alert02Icon,
-  'waiting-for-trading-partner': Clock01Icon,
-  done: CheckmarkCircle02Icon,
-}
-
-const stepStateIcons: Record<StepState, IconSvgElement> = {
-  open: DashedLineCircleIcon,
-  missing: DashedLineCircleIcon,
-  'in-progress': HourglassIcon,
-  'needs-attention': Alert02Icon,
-  'waiting-for-trading-partner': Clock01Icon,
-  done: CheckmarkCircle02Icon,
-}
 
 function useVerdictText(tradingPartner: string, verdict: OrderVerdict) {
   const t = useTranslations('Orders.verdict')
@@ -85,13 +57,7 @@ function Verdict({ tradingPartner, verdict }: { tradingPartner: string; verdict:
       className="data-[status=needs-attention]:bg-destructive/5 data-[status=needs-attention]:ring-destructive/30 data-[status=done]:bg-emerald-500/5 data-[status=done]:ring-emerald-500/30 data-[status=waiting-for-trading-partner]:bg-amber-500/5 data-[status=waiting-for-trading-partner]:ring-amber-500/30"
       data-status={verdict.status}>
       <CardContent className="flex items-start gap-3">
-        <HugeiconsIcon
-          icon={statusIcons[verdict.status]}
-          strokeWidth={2}
-          aria-hidden
-          className="text-muted-foreground data-[status=done]:text-success-text data-[status=needs-attention]:text-destructive-text mt-0.5 size-6 shrink-0 data-[status=waiting-for-trading-partner]:text-amber-700 dark:data-[status=waiting-for-trading-partner]:text-amber-300"
-          data-status={verdict.status}
-        />
+        <OrderStatusIcon status={verdict.status} className="mt-0.5 size-6" />
         <div className="flex min-w-0 flex-col gap-1">
           <h3 className="text-lg font-medium text-balance">{text}</h3>
           <p className="text-sm">
@@ -104,22 +70,6 @@ function Verdict({ tradingPartner, verdict }: { tradingPartner: string; verdict:
         </div>
       </CardContent>
     </Card>
-  )
-}
-
-function StepIcon({ state }: { state: StepState }) {
-  return (
-    <span
-      className="bg-background data-[state=done]:border-success-text/40 data-[state=needs-attention]:border-destructive/40 data-[state=needs-attention]:bg-destructive/10 data-[state=in-progress]:border-info/40 data-[state=missing]:bg-muted/40 data-[state=open]:bg-muted/40 relative flex size-8 shrink-0 items-center justify-center rounded-full border data-[state=done]:bg-emerald-500/10 data-[state=in-progress]:bg-sky-500/10 data-[state=missing]:border-dashed data-[state=open]:border-dashed data-[state=waiting-for-trading-partner]:border-amber-500/40 data-[state=waiting-for-trading-partner]:bg-amber-500/10"
-      data-state={state}>
-      <HugeiconsIcon
-        icon={stepStateIcons[state]}
-        strokeWidth={2}
-        aria-hidden
-        className="text-muted-foreground data-[state=done]:text-success-text data-[state=in-progress]:text-info data-[state=needs-attention]:text-destructive-text size-4 data-[state=waiting-for-trading-partner]:text-amber-700 dark:data-[state=waiting-for-trading-partner]:text-amber-300"
-        data-state={state}
-      />
-    </span>
   )
 }
 
