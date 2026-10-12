@@ -61,8 +61,8 @@ function TradingPartnerCard({
   const t = useTranslations('Home.tradingPartners')
 
   return (
-    <li className="min-w-0">
-      <LinkCard href={tradingPartnerHref(tradingPartner.id)} className="gap-2 p-3">
+    <li className="flex min-w-0">
+      <LinkCard href={tradingPartnerHref(tradingPartner.id)} className="min-w-0 flex-1 gap-2 p-3">
         <span className="flex items-start justify-between gap-2">
           <span className="min-w-0 text-sm font-medium break-words">{tradingPartner.name}</span>
           <ModeBadge testMode={testMode} />

@@ -57,6 +57,17 @@ export const Seeded = meta.story({
 })
 
 export const ContinueSetup = meta.story({
+  decorators: [
+    (Story) => (
+      <div className="flex min-h-svh">
+        <main className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col">
+            <Story />
+          </div>
+        </main>
+      </div>
+    ),
+  ],
   beforeEach({ msw }) {
     msw.use(homeHandler(apiUrl, 'empty'), firstStepsHandler(apiUrl, 'partlyDone'))
   },
@@ -64,6 +75,15 @@ export const ContinueSetup = meta.story({
     const setup = await canvas.findByRole('link', { name: /^Continue setup\s*3 of 6 done$/ })
 
     await expect(setup).toHaveAttribute('href', '/first-steps')
+
+    const promo = await canvas.findByRole('region', { name: 'Let the AI draft your next mapping' })
+    const draft = within(promo).getByRole('button', { name: 'Draft a mapping with AI' })
+
+    await expect(draft).toBeVisible()
+    await expect(draft.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+      promo.getBoundingClientRect().bottom,
+    )
+    await expect(setup.getBoundingClientRect().height).toBeLessThan(120)
     await expect(
       setup.compareDocumentPosition(canvas.getByRole('region', { name: 'Key numbers' })) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -260,6 +280,9 @@ export const Mobile = meta.story({
   async play({ canvas, canvasElement }) {
     await canvas.findByRole('heading', { name: 'Documents' })
     await expect(canvas.getByRole('link', { name: /^Continue setup/ })).toBeVisible()
+    await expect(
+      await canvas.findByRole('button', { name: 'Draft a mapping with AI' }),
+    ).toBeVisible()
     await expectNoPageScroll(canvasElement)
   },
 })
