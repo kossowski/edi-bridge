@@ -14,19 +14,21 @@ import { useId, useRef, useState } from 'react'
 
 import { UsesList } from '@/components/code-translations/lookup-table-card'
 import {
-  FailedRunLink,
-  MissingCodes,
-  useDocumentTitle,
-} from '@/components/code-translations/missing-codes'
-import {
   hasValue,
   matchesFilter,
   restoredEntry,
   withEntry,
   withoutEntry,
-} from '@/components/code-translations/phrasebook-entries'
-import { type AddDraft, AddValueForm, ValueRow } from '@/components/code-translations/value-row'
+} from '@/components/code-translations/lookup-table-entries'
+import { FailedRunLink, MissingCodes } from '@/components/code-translations/missing-codes'
+import {
+  type AddDraft,
+  AddValueForm,
+  focusOnMount,
+  ValueRow,
+} from '@/components/code-translations/value-row'
 import { ActionError } from '@/components/documents/action-error'
+import { useRunTitle } from '@/components/documents/run-title'
 import { toScopeInput } from '@/components/lookup-tables/lookup-table-scope'
 import { updateLookupTable } from '@/lib/api/client'
 import { storeSavedLookupTable } from '@/lib/api/queries'
@@ -44,6 +46,7 @@ import {
 import { Input } from '@edi-bridge/ui/components/input'
 
 import type {
+  BlockingMissingCode,
   FailedRunReference,
   LookupTable,
   LookupTableEntry,
@@ -53,10 +56,6 @@ import type {
 type Removed = { entry: LookupTableEntry; index: number }
 
 type Fixed = { code: string; targetCode: string; failedRuns: ReadonlyArray<FailedRunReference> }
-
-function focusOnMount(element: HTMLElement | null) {
-  element?.focus()
-}
 
 function useSaveEntries(table: LookupTable) {
   const queryClient = useQueryClient()
@@ -82,10 +81,26 @@ function meaningsOf(table: LookupTable, missingCodes: ReadonlyArray<MissingCode>
   ])
 }
 
+function ReprocessOnlyRun({ code, run }: { code: string; run: FailedRunReference }) {
+  const t = useTranslations('CodeTranslation.fixed')
+  const runTitle = useRunTitle(run)
+  const descriptionId = useId()
+
+  return (
+    <>
+      <p id={descriptionId}>{t('description', { code, document: runTitle })}</p>
+      <Link
+        href={documentHref(run.id)}
+        aria-describedby={descriptionId}
+        className="text-foreground w-fit font-medium">
+        {t('reprocess')}
+      </Link>
+    </>
+  )
+}
+
 function FixedAlert({ fixed }: { fixed: Fixed }) {
   const t = useTranslations('CodeTranslation.fixed')
-  const documentTitle = useDocumentTitle()
-  const descriptionId = useId()
   const [onlyRun] = fixed.failedRuns
 
   return (
@@ -94,20 +109,10 @@ function FixedAlert({ fixed }: { fixed: Fixed }) {
       <AlertTitle>{t('title', { code: fixed.code, target: fixed.targetCode })}</AlertTitle>
       <AlertDescription className="flex flex-col gap-2">
         {fixed.failedRuns.length === 1 && onlyRun ? (
-          <>
-            <p id={descriptionId}>
-              {t('description', { code: fixed.code, document: documentTitle(onlyRun) })}
-            </p>
-            <Link
-              href={documentHref(onlyRun.id)}
-              aria-describedby={descriptionId}
-              className="text-foreground w-fit font-medium">
-              {t('processAgain')}
-            </Link>
-          </>
+          <ReprocessOnlyRun code={fixed.code} run={onlyRun} />
         ) : (
           <>
-            <p>{t('processAgainEach', { count: fixed.failedRuns.length })}</p>
+            <p>{t('reprocessEach', { count: fixed.failedRuns.length })}</p>
             <ul className="flex flex-col gap-1">
               {fixed.failedRuns.map((run) => (
                 <li key={run.id}>
@@ -172,7 +177,7 @@ function EmptyValues({ canChange }: { canChange: boolean }) {
   )
 }
 
-export function Phrasebook({
+export function LookupTableValues({
   table,
   missing,
   canChange,
@@ -229,7 +234,8 @@ export function Phrasebook({
 
   function add(entry: LookupTableEntry) {
     const blocking = missingCodes.find(
-      (missingCode) => missingCode.code === entry.sourceCode && missingCode.urgency === 'blocking',
+      (missingCode): missingCode is BlockingMissingCode =>
+        missingCode.code === entry.sourceCode && missingCode.urgency === 'blocking',
     )
 
     save.mutate(withEntry(table.entries, entry, null), {
@@ -238,7 +244,7 @@ export function Phrasebook({
         setRemoved(null)
         saved(entry.sourceCode, false)
 
-        if (blocking?.urgency === 'blocking') {
+        if (blocking) {
           setFixed((current) => [
             ...current.filter(({ code }) => code !== entry.sourceCode),
             {
@@ -418,7 +424,7 @@ export function Phrasebook({
         <aside>
           <Card size="sm">
             <CardContent>
-              <UsesList limit={table.uses.length} uses={table.uses} />
+              <UsesList showAll uses={table.uses} />
             </CardContent>
           </Card>
         </aside>

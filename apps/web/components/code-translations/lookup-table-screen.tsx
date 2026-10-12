@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
-import { Phrasebook } from '@/components/code-translations/phrasebook'
+import { LookupTableValues } from '@/components/code-translations/lookup-table-values'
 import { LoadFailure } from '@/components/detail-parts'
 import { ImportCsvDialog } from '@/components/lookup-tables/import-csv-dialog'
 import { useSession } from '@/hooks/use-session'
@@ -37,7 +37,7 @@ function Meta({ table }: { table: LookupTable }) {
   )
 }
 
-export function PhrasebookScreen({
+export function LookupTableScreen({
   id,
   add,
   code,
@@ -82,7 +82,7 @@ export function PhrasebookScreen({
         </div>
       ) : data ? (
         <>
-          <Phrasebook
+          <LookupTableValues
             key={`${data.id}:${requestedCode ?? ''}`}
             canChange={session.canChange}
             missing={missing}

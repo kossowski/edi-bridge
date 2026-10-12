@@ -1,6 +1,6 @@
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
-import { PhrasebookScreen } from '@/components/code-translations/phrasebook-screen'
+import { LookupTableScreen } from '@/components/code-translations/lookup-table-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
@@ -32,8 +32,8 @@ const [largeTable] = createLookupTables({
 })
 
 const meta = preview.meta({
-  title: 'Code Translations/PhrasebookScreen',
-  component: PhrasebookScreen,
+  title: 'Code Translations/LookupTableScreen',
+  component: LookupTableScreen,
   parameters: { layout: 'fullscreen' },
   args: { id: unitsOfMeasure.id },
   beforeEach({ msw }) {

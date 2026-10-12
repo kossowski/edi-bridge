@@ -3387,8 +3387,8 @@
     "fixed": {
       "title": "{code} wird jetzt als {target} gesendet",
       "description": "{document} wurde gestoppt, weil {code} keine Übersetzung hatte.",
-      "processAgain": "Beleg jetzt erneut verarbeiten",
-      "processAgainEach": "{count, plural, one {Verarbeiten Sie den Beleg jetzt erneut:} other {Verarbeiten Sie die # Belege jetzt erneut:}}"
+      "reprocess": "Beleg jetzt erneut verarbeiten",
+      "reprocessEach": "{count, plural, one {Verarbeiten Sie den Beleg jetzt erneut:} other {Verarbeiten Sie die # Belege jetzt erneut:}}"
     }
   },
   "CodeTranslations": {

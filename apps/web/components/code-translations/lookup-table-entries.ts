@@ -1,20 +1,10 @@
-import { type LookupTableEntry, maxLookupCodeLength } from '@edi-bridge/contracts'
+import { type LookupTableEntry, lookupTableEntrySchema } from '@edi-bridge/contracts'
 
 export type EntryProblem = 'required' | 'tooLong' | 'duplicate'
 
 export type EntryProblems = {
   sourceCode: EntryProblem | null
   targetCode: EntryProblem | null
-}
-
-function codeProblem(code: string): EntryProblem | null {
-  const length = code.trim().length
-
-  if (length === 0) {
-    return 'required'
-  }
-
-  return length > maxLookupCodeLength ? 'tooLong' : null
 }
 
 export function hasValue(entries: ReadonlyArray<LookupTableEntry>, sourceCode: string) {
@@ -26,22 +16,33 @@ export function problemsOf(
   draft: LookupTableEntry,
   index: number | null,
 ): EntryProblems | null {
+  const { error } = lookupTableEntrySchema.safeParse(draft)
   const sourceCode = draft.sourceCode.trim()
 
   const taken = entries.some(
     (entry, position) => position !== index && entry.sourceCode === sourceCode,
   )
 
+  function schemaProblem(field: keyof LookupTableEntry): EntryProblem | null {
+    const issue = error?.issues.find(({ path }) => path[0] === field)
+
+    if (!issue) {
+      return null
+    }
+
+    return issue.code === 'too_big' ? 'tooLong' : 'required'
+  }
+
   const problems = {
-    sourceCode: codeProblem(sourceCode) ?? (taken ? 'duplicate' : null),
-    targetCode: codeProblem(draft.targetCode),
+    sourceCode: schemaProblem('sourceCode') ?? (taken ? 'duplicate' : null),
+    targetCode: schemaProblem('targetCode'),
   }
 
   return problems.sourceCode === null && problems.targetCode === null ? null : problems
 }
 
-export function trimmedEntry({ sourceCode, targetCode }: LookupTableEntry): LookupTableEntry {
-  return { sourceCode: sourceCode.trim(), targetCode: targetCode.trim() }
+export function trimmedEntry(entry: LookupTableEntry): LookupTableEntry {
+  return lookupTableEntrySchema.parse(entry)
 }
 
 export function withEntry(

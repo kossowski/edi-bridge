@@ -10,7 +10,7 @@ import {
   type EntryProblems,
   problemsOf,
   trimmedEntry,
-} from '@/components/code-translations/phrasebook-entries'
+} from '@/components/code-translations/lookup-table-entries'
 import { type CodeMeaning, type LookupTableEntry, maxLookupCodeLength } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Input } from '@edi-bridge/ui/components/input'
@@ -18,8 +18,8 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 
 export type MeaningOf = (code: string) => string | null
 
-function focusOnMount(input: HTMLInputElement | null) {
-  input?.focus()
+export function focusOnMount(element: HTMLElement | null) {
+  element?.focus()
 }
 
 function revealOnMount(row: HTMLLIElement | null) {

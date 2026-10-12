@@ -58,10 +58,10 @@ function useUseSentence() {
 
 export function UsesList({
   uses,
-  limit = shownUses,
+  showAll = false,
 }: {
   uses: ReadonlyArray<LookupTableUse>
-  limit?: number
+  showAll?: boolean
 }) {
   const t = useTranslations('CodeTranslations.uses')
   const sentence = useUseSentence()
@@ -71,7 +71,8 @@ export function UsesList({
     return <p className="text-muted-foreground text-sm">{t('none')}</p>
   }
 
-  const hidden = uses.length - limit
+  const shown = showAll ? uses : uses.slice(0, shownUses)
+  const hidden = uses.length - shown.length
 
   return (
     <div className="flex flex-col gap-1 text-sm">
@@ -79,7 +80,7 @@ export function UsesList({
         {t('label')}
       </p>
       <ul aria-labelledby={labelId} className="flex flex-col gap-0.5">
-        {uses.slice(0, limit).map((use) => (
+        {shown.map((use) => (
           <li key={use.mappingId}>
             <Link
               href={mappingHref(use.mappingId)}

@@ -10,7 +10,7 @@ import {
   trimmedEntry,
   withEntry,
   withoutEntry,
-} from './phrasebook-entries'
+} from './lookup-table-entries'
 
 const entries = [
   { sourceCode: 'ST', targetCode: 'PCE' },

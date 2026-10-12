@@ -8,11 +8,10 @@ import { type ReactNode, useId, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
 import { ActionError } from '@/components/documents/action-error'
-import { usePlainNames } from '@/components/plain-names'
+import { useRunTitle } from '@/components/documents/run-title'
 import { documentHref } from '@/lib/navigation'
 import {
   type BlockingMissingCode,
-  directionOf,
   type FailedRunReference,
   type MissingCode,
   type UpcomingMissingCode,
@@ -24,31 +23,14 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 
 const shownPerGroup = 10
 
-export function useDocumentTitle() {
-  const t = useTranslations('Documents.row')
-  const plainNames = usePlainNames()
-
-  return (run: FailedRunReference) => {
-    const values = {
-      direction: directionOf(run),
-      messageType: plainNames.messageTypeName(run.messageType),
-      tradingPartner: run.tradingPartner.name,
-    }
-
-    return run.businessReference === null
-      ? t('titleWithoutReference', values)
-      : t('title', { ...values, reference: run.businessReference })
-  }
-}
-
 export function FailedRunLink({ run }: { run: FailedRunReference }) {
   const format = useFormatter()
-  const title = useDocumentTitle()
+  const title = useRunTitle(run)
 
   return (
     <span className="flex flex-wrap items-baseline gap-x-2">
       <Link href={documentHref(run.id)} className={linkClass}>
-        {title(run)}
+        {title}
       </Link>
       <time dateTime={run.receivedAt} className="text-xs tabular-nums">
         {format.dateTime(new Date(run.receivedAt), { dateStyle: 'medium', timeStyle: 'short' })}

@@ -3387,8 +3387,8 @@
     "fixed": {
       "title": "{code} is now sent as {target}",
       "description": "{document} stopped because {code} had no translation.",
-      "processAgain": "Now process the document again",
-      "processAgainEach": "{count, plural, one {Now process the document again:} other {Now process the # documents again:}}"
+      "reprocess": "Now process the document again",
+      "reprocessEach": "{count, plural, one {Now process the document again:} other {Now process the # documents again:}}"
     }
   },
   "CodeTranslations": {

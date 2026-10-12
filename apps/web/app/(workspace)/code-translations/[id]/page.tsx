@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import type { Metadata } from 'next'
 
-import { PhrasebookScreen } from '@/components/code-translations/phrasebook-screen'
+import { LookupTableScreen } from '@/components/code-translations/lookup-table-screen'
 import { firstSearchParam } from '@/lib/search-params'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -14,5 +14,5 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Page({ params, searchParams }: PageProps<'/code-translations/[id]'>) {
   const [{ id }, { add, code }] = await Promise.all([params, searchParams])
 
-  return <PhrasebookScreen id={id} add={firstSearchParam(add)} code={firstSearchParam(code)} />
+  return <LookupTableScreen id={id} add={firstSearchParam(add)} code={firstSearchParam(code)} />
 }
