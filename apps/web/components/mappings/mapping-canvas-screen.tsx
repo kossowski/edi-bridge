@@ -29,7 +29,7 @@ import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
 import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { StartHere } from '@/components/mappings/start-here'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
-import { type AiAccept, useAiAccept } from '@/components/mappings/use-ai-accept'
+import { AiAcceptContext, useAiAccept } from '@/components/mappings/use-ai-accept'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { type ReviewState, useReviewAttention } from '@/components/mappings/use-review-attention'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
@@ -79,7 +79,6 @@ function Canvas({
   target,
   failingField,
   review,
-  aiAccept,
   ref,
 }: {
   draft: MappingDraft
@@ -87,7 +86,6 @@ function Canvas({
   target: SideQuery
   failingField: FailingField | null
   review: ReviewState
-  aiAccept: AiAccept | undefined
   ref: RefObject<MappingCanvasHandle | null>
 }) {
   const t = useTranslations('Mapping.canvas')
@@ -112,7 +110,6 @@ function Canvas({
 
   return (
     <MappingCanvas
-      aiAccept={aiAccept}
       aiAttention={review.onCanvas}
       detailsFacts={<MappingFacts draft={draft} />}
       failingField={failingField}
@@ -223,7 +220,6 @@ function EditorBody({
   source,
   target,
   review,
-  aiAccept,
   field,
   canChange,
   startHere,
@@ -234,7 +230,6 @@ function EditorBody({
   source: SideQuery
   target: SideQuery
   review: ReviewState
-  aiAccept: AiAccept
   field: string | undefined
   canChange: boolean
   startHere: boolean
@@ -283,7 +278,6 @@ function EditorBody({
         <div className="hidden min-h-0 flex-1 flex-col lg:flex">
           {desktop && (
             <Canvas
-              aiAccept={canChange ? aiAccept : undefined}
               draft={draft}
               failingField={failingField}
               ref={canvas}
@@ -346,63 +340,59 @@ function MappingEditor({
   return (
     // On desktop the editor fills the viewport below the header: a thin toolbar, then the canvas at
     // full height without page scrolling.
-    <AppPage
-      actions={
-        <>
-          {aiReview && desktop && (
-            <AiReviewSheet
-              aiAccept={aiAccept}
-              draft={draft}
-              state={review}
-              targetItems={target.items}
-            />
-          )}
-          {canChange && desktop && (
-            <AiDraftAction
-              aiDraft={aiDraft}
-              draft={draft}
-              open={aiDraftOpen}
-              reviewSummaryId={reviewSummaryId}
-              onOpenChange={setAiDraftOpen}
-            />
-          )}
-          <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
-          <DetailsAction draft={draft} withoutCanvas={startHere} />
-          <VersionsSheet draft={draft} />
-          {canChange && (
-            <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
-          )}
-        </>
-      }
-      meta={
-        <>
-          <DraftStateLabel id={stateId} draft={draft} />
-          {canChange && <GraphSaveStatus mappingId={id} />}
-        </>
-      }
-      name={draft.name}
-      className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
-      {canChange && (
-        <AiReviewState
-          acceptedInParts={aiAccept.closedReview}
+    <AiAcceptContext value={aiAccept}>
+      <AppPage
+        actions={
+          <>
+            {aiReview && desktop && (
+              <AiReviewSheet draft={draft} state={review} targetItems={target.items} />
+            )}
+            {canChange && desktop && (
+              <AiDraftAction
+                aiDraft={aiDraft}
+                draft={draft}
+                open={aiDraftOpen}
+                reviewSummaryId={reviewSummaryId}
+                onOpenChange={setAiDraftOpen}
+              />
+            )}
+            <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
+            <DetailsAction draft={draft} withoutCanvas={startHere} />
+            <VersionsSheet draft={draft} />
+            {canChange && (
+              <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
+            )}
+          </>
+        }
+        meta={
+          <>
+            <DraftStateLabel id={stateId} draft={draft} />
+            {canChange && <GraphSaveStatus mappingId={id} />}
+          </>
+        }
+        name={draft.name}
+        className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
+        {canChange && (
+          <AiReviewState
+            closedReview={aiAccept.closedReview}
+            draft={draft}
+            publishHintId={publishHintId}
+            summaryId={reviewSummaryId}
+          />
+        )}
+        <EditorBody
+          canChange={canChange}
           draft={draft}
-          publishHintId={publishHintId}
-          summaryId={reviewSummaryId}
+          field={field}
+          review={review}
+          source={source}
+          startHere={startHere}
+          target={target}
+          onAiDraft={() => setAiDraftOpen(true)}
+          onLinkYourself={() => setStarted(true)}
         />
-      )}
-      <EditorBody
-        aiAccept={aiAccept}
-        canChange={canChange}
-        draft={draft}
-        field={field}
-        review={review}
-        source={source}
-        startHere={startHere}
-        target={target}
-        onAiDraft={() => setAiDraftOpen(true)}
-        onLinkYourself={() => setStarted(true)}
-      />
-    </AppPage>
+      </AppPage>
+    </AiAcceptContext>
   )
 }
 

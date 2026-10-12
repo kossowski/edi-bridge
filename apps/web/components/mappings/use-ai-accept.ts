@@ -1,15 +1,15 @@
 'use client'
 
-import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 
 import {
   partsAcceptedAt,
   partsAcceptedWith,
   partsAcceptedWithChain,
 } from '@/components/mappings/ai-review-accept'
+import { useCanvasViewOnly } from '@/components/mappings/mapping-canvas-store'
 import { useGraphSaveState } from '@/components/mappings/use-save-graph'
-import { mappingDraftQuery, useAcceptAiProposedParts } from '@/lib/api/queries'
+import { useAcceptAiProposedParts } from '@/lib/api/queries'
 import { type AiReviewParts, aiReviewPartsSize, type MappingDraft } from '@edi-bridge/contracts'
 
 import type { ProposedChain } from '@/components/mappings/ai-review-attention'
@@ -21,7 +21,6 @@ function acceptable(parts: AiReviewParts) {
 
 // One mutation for the sheet and the link menu, so neither accepts while the other is busy.
 export function useAiAccept(draft: MappingDraft) {
-  const queryClient = useQueryClient()
   const mutation = useAcceptAiProposedParts(draft.mappingId)
   const saving = useGraphSaveState(draft.mappingId) === 'saving'
   const review = draft.aiReview
@@ -40,12 +39,7 @@ export function useAiAccept(draft: MappingDraft) {
         setClosedReview(saved.aiReview === null)
         onSuccess?.()
       },
-      onError: () => {
-        void queryClient.invalidateQueries({
-          queryKey: mappingDraftQuery(draft.mappingId).queryKey,
-        })
-        onError?.()
-      },
+      onError: () => onError?.(),
     })
 
   return {
@@ -61,3 +55,12 @@ export function useAiAccept(draft: MappingDraft) {
 }
 
 export type AiAccept = ReturnType<typeof useAiAccept>
+
+export const AiAcceptContext = createContext<AiAccept | null>(null)
+
+// The one place that decides who may accept: nobody on a view-only canvas.
+export function useCanvasAiAccept() {
+  const aiAccept = useContext(AiAcceptContext)
+
+  return useCanvasViewOnly() ? null : aiAccept
+}

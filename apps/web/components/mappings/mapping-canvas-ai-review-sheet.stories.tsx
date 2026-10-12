@@ -377,7 +377,7 @@ export const AcceptChain = meta.story({
 
     await userEvent.click(chain!)
     await userEvent.click(
-      within(sheet).getByRole('button', { name: 'Accept the links and Transforms' }),
+      within(sheet).getByRole('button', { name: 'Accept links and Transforms' }),
     )
 
     await waitFor(
@@ -458,6 +458,19 @@ export const AcceptLastLink = meta.story({
   },
 })
 
+// A warning asks to fix the link first, so it offers no way to accept it.
+export const WarningWithoutAccept = meta.story({
+  async play({ canvasElement }) {
+    const sheet = await openSheet(canvasElement)
+
+    await within(sheet).findByRole('heading', { name: warnings }, wait)
+    await userEvent.click(entriesUnder(sheet, warnings)[0]!)
+
+    await expect(within(sheet).getByRole('heading', { name: 'What to do' })).toBeVisible()
+    await expect(within(sheet).queryByRole('button', { name: /^Accept/ })).toBeNull()
+  },
+})
+
 export const German = meta.story({
   decorators: [
     (Story) => (
@@ -508,7 +521,7 @@ export const Dark = meta.story({
     await userEvent.click(entriesUnder(sheet, changing)[0]!)
     await expect(within(sheet).getByRole('heading', { name: 'What to do' })).toBeVisible()
     await expect(
-      within(sheet).getByRole('button', { name: 'Accept the links and Transforms' }),
+      within(sheet).getByRole('button', { name: 'Accept links and Transforms' }),
     ).toBeVisible()
   },
 })

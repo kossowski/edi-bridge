@@ -301,7 +301,7 @@ export const AcceptChainFromMenu = meta.story({
     const name = attention[0]!.getAttribute('aria-label')!
     const menu = await openLinkMenuByMouse(canvasElement, name)
 
-    await userEvent.click(menu.getByRole('menuitem', { name: 'Accept the links and Transforms' }))
+    await userEvent.click(menu.getByRole('menuitem', { name: 'Accept links and Transforms' }))
 
     await expectToast(canvasElement, 'AI-proposed links and Transforms accepted.')
     await waitFor(() =>

@@ -4,11 +4,11 @@ import type { Graph } from '@/components/mappings/mapping-graph'
 import type { AiReview, MappingTransform, TransformLink } from '@edi-bridge/contracts'
 
 import {
+  acceptMessages,
   partsAcceptedAt,
   partsAcceptedWith,
   partsAcceptedWithChain,
   reviewAfterAccepting,
-  rowLinkInto,
 } from './ai-review-accept'
 
 const dateId = '1c9e6e2f-8a5f-4e7c-8b4a-3b9a5d2a6f32'
@@ -140,14 +140,6 @@ describe('partsAcceptedWith', () => {
   })
 })
 
-describe('rowLinkInto', () => {
-  it('finds the plain link or the Transform Link that fills a target', () => {
-    expect(rowLinkInto(graph, 'BGM/1004')).toEqual({ kind: 'link', link: graph.links[0] })
-    expect(rowLinkInto(graph, 'DTM+137/2380')).toEqual({ kind: 'transformLink', link: outOfLookup })
-    expect(rowLinkInto(graph, 'FTX/4440')).toBeNull()
-  })
-})
-
 describe('partsAcceptedAt', () => {
   it('accepts the link into a target, with its chain when it runs through Transforms', () => {
     expect(partsAcceptedAt(review, graph, 'NAD+BY/3039')).toEqual({
@@ -209,6 +201,19 @@ describe('partsAcceptedWithChain', () => {
         sourcePaths: [],
       }),
     ).toEqual({ links: [], transforms: [unusedId], transformLinks: [`input:${unusedId}/value`] })
+  })
+})
+
+describe('acceptMessages', () => {
+  it('words a plain link alone and a Transform Link as its chain', () => {
+    expect(acceptMessages(partsAcceptedAt(review, graph, 'BGM/1004'))).toEqual({
+      accept: 'acceptLink',
+      accepted: 'acceptedLink',
+    })
+    expect(acceptMessages(partsAcceptedAt(review, graph, 'DTM+137/2380'))).toEqual({
+      accept: 'acceptChain',
+      accepted: 'acceptedChain',
+    })
   })
 })
 

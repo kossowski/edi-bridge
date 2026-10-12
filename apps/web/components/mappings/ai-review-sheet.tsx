@@ -13,6 +13,7 @@ import { useTranslations } from 'next-intl'
 import { type ReactNode, type RefObject, useId, useLayoutEffect, useRef, useState } from 'react'
 
 import { Loading } from '@/components/detail-parts'
+import { acceptMessages } from '@/components/mappings/ai-review-accept'
 import {
   ancestorPaths,
   attentionCount,
@@ -21,16 +22,12 @@ import {
 } from '@/components/mappings/ai-review-attention'
 import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { useGraphText } from '@/components/mappings/graph-text'
-import {
-  useCanvasRefs,
-  useCanvasStoreApi,
-  useCanvasViewOnly,
-} from '@/components/mappings/mapping-canvas-store'
+import { useCanvasRefs, useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
 import { PreviewFailure } from '@/components/mappings/mapping-preview-panel'
 import { findItem, type TreeItem } from '@/components/mappings/mapping-tree'
 import { findTransformButton } from '@/components/mappings/transform-node'
 import { findRowButton } from '@/components/mappings/tree-node'
-import { type AiAccept } from '@/components/mappings/use-ai-accept'
+import { useCanvasAiAccept } from '@/components/mappings/use-ai-accept'
 import { type ReviewState } from '@/components/mappings/use-review-attention'
 import { whenRendered } from '@/components/mappings/when-rendered'
 import { lookupTablesQuery, mappingSamplesQuery } from '@/lib/api/queries'
@@ -183,9 +180,7 @@ function EntryDetail({
         {accept && onAccept && (
           <Button disabled={pending} focusableWhenDisabled onClick={() => onAccept(accept)}>
             <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} data-icon="inline-start" />
-            {pending
-              ? tAi('accepting')
-              : tAi(accept.links.length > 0 ? 'acceptLink' : 'acceptChain')}
+            {tAi(pending ? 'accepting' : acceptMessages(accept).accept)}
           </Button>
         )}
         {show && (
@@ -208,13 +203,11 @@ function ReviewEntries({
   draft,
   targetItems,
   state,
-  aiAccept,
   onShow,
 }: {
   draft: MappingDraft
   targetItems: ReadonlyArray<TreeItem>
   state: ReviewState & { attention: ReviewAttention }
-  aiAccept: AiAccept | undefined
   onShow: (focus: () => void) => void
 }) {
   const t = useTranslations('Mapping.aiReview.panel')
@@ -223,7 +216,7 @@ function ReviewEntries({
   const store = useCanvasStoreApi()
   const body = useRef<HTMLDivElement>(null)
   const detailHeading = useRef<HTMLHeadingElement>(null)
-  const viewOnly = useCanvasViewOnly()
+  const aiAccept = useCanvasAiAccept()
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [failedKey, setFailedKey] = useState<string | null>(null)
   // Back to the entry, or after accepting, to the one now in its place.
@@ -326,7 +319,7 @@ function ReviewEntries({
       name: nameAt(note.targetPath),
       detail: tNotes(note.code, { transform: note.transformId ? text.name(note.transformId) : '' }),
       show: showNote(),
-      accept: aiAccept?.partsAt(note.targetPath) ?? null,
+      accept: null,
     }
   })
 
@@ -418,7 +411,7 @@ function ReviewEntries({
           failed={failedKey === selected.key}
           headingRef={detailHeading}
           pending={aiAccept?.pending ?? false}
-          onAccept={viewOnly ? undefined : accept}
+          onAccept={aiAccept ? accept : undefined}
           onBack={back}
         />
       ) : (
@@ -454,12 +447,10 @@ export function AiReviewSheet({
   draft,
   targetItems,
   state,
-  aiAccept,
 }: {
   draft: MappingDraft
   targetItems: ReadonlyArray<TreeItem> | undefined
   state: ReviewState
-  aiAccept?: AiAccept | undefined
 }) {
   const t = useTranslations('Mapping.aiReview')
   const tCanvas = useTranslations('Mapping.canvas')
@@ -512,7 +503,6 @@ export function AiReviewSheet({
         className="data-[side=right]:sm:max-w-md">
         {targetItems && attention ? (
           <ReviewEntries
-            aiAccept={aiAccept}
             draft={draft}
             state={{ ...state, attention }}
             targetItems={targetItems}

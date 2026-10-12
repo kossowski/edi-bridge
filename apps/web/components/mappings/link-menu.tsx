@@ -6,12 +6,14 @@ import { useTranslations } from 'next-intl'
 import { useRef } from 'react'
 import { toast } from 'sonner'
 
+import { acceptMessages } from '@/components/mappings/ai-review-accept'
 import { singleLink } from '@/components/mappings/link-edge'
 import {
   type LinkMenuAnchor,
   useCanvasStore,
   useCanvasViewOnly,
 } from '@/components/mappings/mapping-canvas-store'
+import { useCanvasAiAccept } from '@/components/mappings/use-ai-accept'
 import { useRemoveText } from '@/components/mappings/use-remove-text'
 import {
   DropdownMenu,
@@ -24,7 +26,6 @@ import {
 
 import type { LinkEdgeData, PlainEdgeData } from '@/components/mappings/link-edge'
 import type { RowRef } from '@/components/mappings/mapping-links'
-import type { AiAccept } from '@/components/mappings/use-ai-accept'
 
 export type LinkMenuEnd =
   { kind: 'row'; row: RowRef } | { kind: 'transform'; transformId: string; name: string }
@@ -56,16 +57,15 @@ function names(data: LinkEdgeData) {
 export function LinkMenu({
   target,
   actions,
-  aiAccept,
 }: {
   target: LinkMenuTarget | null
   actions: LinkMenuActions
-  aiAccept: AiAccept | undefined
 }) {
   const t = useTranslations('Mapping.links.menu')
   const tAi = useTranslations('Mapping.aiReview')
   const removeText = useRemoveText()
   const viewOnly = useCanvasViewOnly()
+  const aiAccept = useCanvasAiAccept()
   const anchor = useCanvasStore((state) => state.linkMenu)
   const open = useCanvasStore((state) => state.linkMenuOpen)
   const closeLinkMenu = useCanvasStore((state) => state.closeLinkMenu)
@@ -78,7 +78,7 @@ export function LinkMenu({
   const { data, ends } = target
   const single = singleLink(data)
   const merged = data.kind === 'link' && !single ? data : null
-  const acceptParts = !viewOnly && single && aiAccept ? aiAccept.partsOf(single) : null
+  const acceptParts = single && aiAccept ? aiAccept.partsOf(single) : null
 
   const act = (action: () => void) => {
     actedOn.current = anchor
@@ -166,15 +166,12 @@ export function LinkMenu({
                 disabled={aiAccept.pending}
                 onClick={() =>
                   aiAccept.accept(acceptParts, {
-                    onSuccess: () =>
-                      toast.success(
-                        tAi(acceptParts.links.length > 0 ? 'acceptedLink' : 'acceptedChain'),
-                      ),
+                    onSuccess: () => toast.success(tAi(acceptMessages(acceptParts).accepted)),
                     onError: () => toast.error(tAi('acceptPartsFailed')),
                   })
                 }>
                 <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} aria-hidden />
-                {tAi(acceptParts.links.length > 0 ? 'acceptLink' : 'acceptChain')}
+                {tAi(acceptMessages(acceptParts).accept)}
               </DropdownMenuItem>
             )}
             <DropdownMenuItem

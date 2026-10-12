@@ -48,7 +48,7 @@ export function partsAcceptedWith(review: AiReview, graph: Graph, link: RowLink)
   return markedAiReviewParts(review, parts)
 }
 
-export function rowLinkInto(graph: Graph, targetPath: string): RowLink | null {
+function rowLinkInto(graph: Graph, targetPath: string): RowLink | null {
   const plain = graph.links.find((link) => link.targetPath === targetPath)
 
   if (plain) {
@@ -80,6 +80,13 @@ export function partsAcceptedWithChain(
   }
 
   return markedAiReviewParts(review, { links: [], ...chainOf(graph, transformIds) })
+}
+
+// A plain link is accepted on its own, a Transform Link with its whole chain.
+export function acceptMessages(parts: AiReviewParts) {
+  return parts.links.length > 0
+    ? ({ accept: 'acceptLink', accepted: 'acceptedLink' } as const)
+    : ({ accept: 'acceptChain', accepted: 'acceptedChain' } as const)
 }
 
 export function reviewAfterAccepting(review: AiReview, graph: Graph, link: RowLink) {
