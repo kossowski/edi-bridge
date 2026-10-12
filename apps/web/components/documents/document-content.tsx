@@ -10,6 +10,7 @@ import {
   type ContentLine,
   contentLines,
   isMissing,
+  isNumeric,
   type MissingPiece,
   missingPieceOf,
   shownColumns,
@@ -38,12 +39,11 @@ function ContentCell({
   const t = useTranslations('Document.content')
   const value = line[column]
   const missing = isMissing(line, column, piece)
-  const numeric = column === 'quantity' || column === 'amount'
 
   return (
     <TableCell
       className={cn(
-        numeric && 'text-right tabular-nums',
+        isNumeric(column) && 'text-right tabular-nums',
         column === 'gtin' && 'font-mono text-xs',
         missing && 'bg-destructive/10 text-destructive-text font-medium',
       )}>
@@ -99,11 +99,9 @@ export function DocumentContent({ run }: { run: RunDetail }) {
         <table className="w-full text-sm">
           <TableHeader className="bg-background sticky top-0 z-10">
             <TableRow>
-              <TableHead className="text-right">{t('column.line')}</TableHead>
+              <TableHead className="w-px text-right">{t('column.line')}</TableHead>
               {columns.map((column) => (
-                <TableHead
-                  key={column}
-                  className={cn((column === 'quantity' || column === 'amount') && 'text-right')}>
+                <TableHead key={column} className={cn(isNumeric(column) && 'text-right')}>
                   {t(`column.${column}`)}
                 </TableHead>
               ))}

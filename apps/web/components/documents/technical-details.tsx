@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
-import { Fact, linkClass, Section } from '@/components/detail-parts'
+import { Fact, FactGrid, linkClass, Section } from '@/components/detail-parts'
 import { pathStepKeys } from '@/components/documents/document-path'
 import { PositionText } from '@/components/documents/error-position'
 import { MessageTree } from '@/components/documents/message-tree'
@@ -19,9 +19,10 @@ function TechnicalFacts({ run }: { run: RunDetail }) {
   const tPath = useTranslations('Document.path.step')
 
   return (
-    <dl
-      aria-label={t('label')}
-      className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
+    <FactGrid label={t('label')}>
+      <Fact label={t('messageType')}>
+        <code className="font-mono text-xs">{run.messageType}</code>
+      </Fact>
       <Fact label={t('failedStep')}>
         {run.failureStage === null ? (
           t('noFailure')
@@ -85,7 +86,7 @@ function TechnicalFacts({ run }: { run: RunDetail }) {
       <Fact label={t('id')}>
         <code className="font-mono text-xs break-all">{run.id}</code>
       </Fact>
-    </dl>
+    </FactGrid>
   )
 }
 

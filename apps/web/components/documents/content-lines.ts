@@ -4,6 +4,10 @@ export const contentColumns = ['item', 'gtin', 'quantity', 'unit', 'amount'] as 
 
 export type ContentColumn = (typeof contentColumns)[number]
 
+export function isNumeric(column: ContentColumn) {
+  return column === 'quantity' || column === 'amount'
+}
+
 export type ContentLine = { line: string } & Record<ContentColumn, string | null>
 
 export type MissingPiece = { kind: 'code'; code: string } | { kind: 'field'; column: ContentColumn }

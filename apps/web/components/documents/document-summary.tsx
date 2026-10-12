@@ -3,7 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
-import { Fact, linkClass } from '@/components/detail-parts'
+import { Fact, FactGrid, linkClass } from '@/components/detail-parts'
 import { MessageTypeName } from '@/components/plain-names'
 import { flowHref, mappingHref, orderHref, tradingPartnerHref } from '@/lib/navigation'
 
@@ -16,9 +16,7 @@ export function DocumentSummary({ run }: { run: RunDetail }) {
   const values = { direction: run.direction, tradingPartner: run.tradingPartner.name }
 
   return (
-    <dl
-      aria-label={t('label')}
-      className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
+    <FactGrid label={t('label')}>
       <Fact label={t('whatItIs')}>
         <MessageTypeName messageType={run.messageType} />
       </Fact>
@@ -62,6 +60,6 @@ export function DocumentSummary({ run }: { run: RunDetail }) {
         </time>
       </Fact>
       <Fact label={t('source')}>{run.manualSubmission ? t('uploaded') : t('connection')}</Fact>
-    </dl>
+    </FactGrid>
   )
 }

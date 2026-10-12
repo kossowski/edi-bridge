@@ -787,6 +787,7 @@
     "technical": {
       "facts": {
         "label": "Technical details",
+        "messageType": "Message type",
         "failedStep": "Failed step",
         "noFailure": "None",
         "errorCode": "Error code",

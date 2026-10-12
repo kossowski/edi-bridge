@@ -239,6 +239,8 @@ export {
 
 export { createRun, createRuns, type RunFields, runsHandler, seedRuns, toRunSummary } from './run'
 
+export { serializeSegment } from './interchange'
+
 export { interchangesHandler } from './interchange-list'
 
 export { runDetailHandlers, type RunDetailOptions, seedReprocessed } from './run-detail'

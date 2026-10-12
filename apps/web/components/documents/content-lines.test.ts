@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import type { ParsedMessage, ParsedSegment } from '@edi-bridge/contracts'
 
-import { contentLines, isMissing, missingPieceOf, shownColumns } from './content-lines'
+import {
+  contentColumns,
+  contentLines,
+  isMissing,
+  isNumeric,
+  missingPieceOf,
+  shownColumns,
+} from './content-lines'
 
 function seg(tag: string, ...elements: Array<string | string[]>): ParsedSegment {
   return { tag, name: null, elements: elements.map((element) => [element].flat()) }
@@ -77,6 +84,12 @@ describe('shownColumns', () => {
     )
 
     expect(shownColumns(lines)).toEqual(['gtin', 'quantity', 'unit'])
+  })
+})
+
+describe('isNumeric', () => {
+  it('treats quantity and amount as numbers', () => {
+    expect(contentColumns.filter((column) => isNumeric(column))).toEqual(['quantity', 'amount'])
   })
 })
 

@@ -3,60 +3,28 @@ import { http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { DocumentScreen } from '@/components/documents/document-screen'
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
-import { apiUrl } from '@/lib/api/config'
+import { flowFor, partner, storyRunFactory } from '@/components/documents/document-story-helpers'
 import {
-  type FailureStage,
-  type MessageType,
-  runDetailSchema,
-  runEndpoint,
-  type RunStatus,
-  toPath,
-} from '@edi-bridge/contracts'
+  darkMode,
+  desktop,
+  expectNoPageScroll,
+  german,
+  laptop,
+  mobile,
+} from '@/components/story-helpers'
+import { apiUrl } from '@/lib/api/config'
+import { runDetailSchema, runEndpoint, toPath } from '@edi-bridge/contracts'
 import {
   controlReferenceOf,
-  createRun,
   runDetailHandlers,
-  seedFlows,
   seedMappingVersions,
-  seedTradingPartners,
+  serializeSegment,
   toMappingVersionSummary,
 } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
-const partner = seedTradingPartners[0]!
-
-function flowFor(messageType: MessageType) {
-  return seedFlows.find(
-    (candidate) =>
-      candidate.tradingPartnerId === partner.id && candidate.messageType === messageType,
-  )!
-}
-
-function storyRun(
-  index: number,
-  messageType: MessageType,
-  outcome: FailureStage | Exclude<RunStatus, 'failed'>,
-) {
-  const flow = flowFor(messageType)
-
-  const run = {
-    id: `41000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
-    receivedAt: `2026-10-08T08:${String(index).padStart(2, '0')}:13.000Z`,
-    tradingPartner: partner,
-    messageType,
-    flow: { id: flow.id, name: flow.name },
-    manualSubmission: false,
-  }
-
-  return outcome === 'parse' ||
-    outcome === 'validation' ||
-    outcome === 'mapping' ||
-    outcome === 'delivery'
-    ? createRun({ ...run, status: 'failed', failureStage: outcome })
-    : createRun({ ...run, status: outcome, failureStage: null })
-}
+const storyRun = storyRunFactory({ idPrefix: '41000000', hour: '08' })
 
 const delivered = storyRun(1, 'ORDERS', 'delivered')
 
@@ -96,10 +64,6 @@ const runs = [
 
 const largeLineCount = 600
 
-function serialize(tag: string, elements: string[][]) {
-  return `${[tag, ...elements.map((components) => components.join(':'))].join('+')}'`
-}
-
 function largeDetail() {
   const flow = flowFor('ORDERS')
   const run = storyRun(50, 'ORDERS', 'delivered')
@@ -122,7 +86,7 @@ function largeDetail() {
   const raw = [
     "UNA:+.? '",
     `UNB+UNOC:3+4012345000009:14+4099999000001:14+261008:0850+${controlReferenceOf(interchangeId)}'`,
-    ...segments.map(({ tag, elements }) => serialize(tag, elements)),
+    ...segments.map(serializeSegment),
     `UNZ+1+${controlReferenceOf(interchangeId)}'`,
   ].join('')
 
@@ -192,6 +156,29 @@ async function pathSteps(canvasElement: HTMLElement) {
   return within(path)
     .getAllByRole('button')
     .map((step) => step.textContent)
+}
+
+function wordsBrokenAcrossLines(path: HTMLElement) {
+  return [...path.querySelectorAll<HTMLElement>('[aria-hidden] > span')].flatMap((span) => {
+    const text = span.firstChild!
+    let offset = 0
+
+    return text.textContent!.split(' ').filter((word) => {
+      const range = document.createRange()
+      range.setStart(text, offset)
+      range.setEnd(text, offset + word.length)
+      offset += word.length + 1
+
+      return range.getClientRects().length > 1
+    })
+  })
+}
+
+async function expectWholeGermanWords(canvasElement: HTMLElement) {
+  const path = await within(canvasElement).findByRole('list', { name: 'Der Weg dieses Belegs' })
+  await expect(wordsBrokenAcrossLines(path)).toEqual([])
+  await expect(path.scrollWidth).toBeLessThanOrEqual(path.clientWidth)
+  await expectNoPageScroll(canvasElement)
 }
 
 export const PathDelivered = meta.story({
@@ -376,6 +363,7 @@ export const TechnicalDetails = meta.story({
   async play({ canvas, canvasElement }) {
     const facts = within(await canvas.findByLabelText('Technical details', { selector: 'dl' }))
     await expect(facts.getByText('Checked')).toBeVisible()
+    await expect(facts.getByText('ORDERS')).toBeVisible()
     await expect(facts.getByText('invalidDate')).toBeVisible()
     await expect(facts.getByText(/^Segment \d+ \(DTM\), element 1, component 2$/)).toBeVisible()
     await expect(facts.getByRole('link', { name: /^Control reference \d+$/ })).toHaveAttribute(
@@ -426,6 +414,8 @@ export const TechnicalUnreadable = meta.story({
         'The message could not be read. The transmission shows the error position.',
       ),
     ).toBeVisible()
+    const facts = within(canvas.getByLabelText('Technical details', { selector: 'dl' }))
+    await expect(facts.getByText('Message type').nextElementSibling).toHaveTextContent('ORDERS')
   },
 })
 
@@ -531,6 +521,24 @@ export const MobilePath = meta.story({
   },
 })
 
+export const GermanMobilePath = meta.story({
+  ...mobile,
+  args: { id: missingCode.id },
+  decorators: [german],
+  async play({ canvasElement }) {
+    await expectWholeGermanWords(canvasElement)
+  },
+})
+
+export const GermanLaptopPath = meta.story({
+  ...laptop,
+  args: { id: unreadable.id },
+  decorators: [german],
+  async play({ canvasElement }) {
+    await expectWholeGermanWords(canvasElement)
+  },
+})
+
 export const MobileContent = meta.story({
   ...mobile,
   parameters: { ...mobile.parameters, ...contentQuery },
@@ -538,6 +546,17 @@ export const MobileContent = meta.story({
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('region', { name: 'Lines of the document' })).toBeVisible()
     await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const DesktopContent = meta.story({
+  ...desktop,
+  parameters: { ...desktop.parameters, ...contentQuery },
+  args: { id: missingCode.id },
+  async play({ canvas }) {
+    const table = await canvas.findByRole('region', { name: 'Lines of the document' })
+    const line = within(table).getByRole('columnheader', { name: 'Line' })
+    await expect(line.getBoundingClientRect().width).toBeLessThan(table.clientWidth / 10)
   },
 })
 

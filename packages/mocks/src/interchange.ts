@@ -426,7 +426,7 @@ export function generateMessage(run: RunSummary, reference: string): GeneratedMe
 
 const releasable = /[:+?']/g
 
-function serializeSegment({ tag, elements }: Segment) {
+export function serializeSegment({ tag, elements }: Segment) {
   const data = elements.map((components) =>
     components.map((value) => value.replaceAll(releasable, '?$&')).join(':'),
   )

@@ -33,6 +33,16 @@ export function Fact({ label, children }: { label: string; children: ReactNode }
   )
 }
 
+export function FactGrid({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <dl
+      aria-label={label}
+      className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-x-6 gap-y-4 rounded-lg border p-4">
+      {children}
+    </dl>
+  )
+}
+
 export function Section({
   id,
   title,
