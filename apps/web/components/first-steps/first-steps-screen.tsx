@@ -86,7 +86,7 @@ function FlowArrow() {
       icon={ArrowRight01Icon}
       strokeWidth={2}
       aria-hidden
-      className="text-muted-foreground mx-auto size-5 shrink-0 rotate-90 md:rotate-0"
+      className="text-muted-foreground mx-auto size-5 shrink-0 rotate-90 @2xl:rotate-0"
     />
   )
 }
@@ -106,8 +106,8 @@ function Explainer() {
           })}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
+      <CardContent className="@container">
+        <div className="flex flex-col items-stretch gap-3 @2xl:flex-row @2xl:items-center">
           <ExplainerBox icon={Store01Icon} part="tradingPartner" />
           <FlowArrow />
           <ExplainerBox highlighted icon={Rocket01Icon} part="bridge" />
