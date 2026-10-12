@@ -9,6 +9,20 @@ function card() {
   return document.querySelector('[data-slot="hover-card-content"]')
 }
 
+async function hoverUntilOpen(trigger: HTMLElement) {
+  await waitFor(
+    async () => {
+      if (!trigger.hasAttribute('data-popup-open')) {
+        await userEvent.unhover(trigger)
+        await userEvent.hover(trigger)
+      }
+
+      await expect(trigger).toHaveAttribute('data-popup-open')
+    },
+    { timeout: 5000, interval: 1000 },
+  )
+}
+
 const meta = preview.meta({
   title: 'Shared/Term',
   component: Term,
@@ -19,7 +33,7 @@ const meta = preview.meta({
   ),
 })
 
-export const English = meta.story({
+export const Light = meta.story({
   args: { glossaryKey: 'lookupTable' },
   async play({ canvas }) {
     const term = canvas.getByRole('link', { name: 'Code translation' })
@@ -49,7 +63,7 @@ export const KeyboardFocus = meta.story({
 export const Hover = meta.story({
   args: { glossaryKey: 'lookupTable' },
   async play({ canvas }) {
-    await userEvent.hover(canvas.getByRole('link', { name: 'Code translation' }))
+    await hoverUntilOpen(canvas.getByRole('link', { name: 'Code translation' }))
 
     await waitFor(() => expect(card()).toBeVisible(), { timeout: 2000 })
     await expect(card()).toHaveTextContent('Technical term: Lookup Table')
@@ -98,5 +112,17 @@ export const Dark = meta.story({
     await userEvent.tab()
 
     await waitFor(() => expect(card()).toBeVisible(), { timeout: 2000 })
+  },
+})
+
+export const DarkGerman = meta.story({
+  args: { glossaryKey: 'lookupTable' },
+  decorators: [german],
+  beforeEach: darkMode,
+  async play() {
+    await userEvent.tab()
+
+    await waitFor(() => expect(card()).toBeVisible(), { timeout: 2000 })
+    await expect(card()).toHaveTextContent('Fachbegriff: Lookup Table')
   },
 })
