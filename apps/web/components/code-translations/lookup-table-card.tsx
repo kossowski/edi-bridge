@@ -56,7 +56,13 @@ function useUseSentence() {
   }
 }
 
-function UsesList({ uses }: { uses: ReadonlyArray<LookupTableUse> }) {
+export function UsesList({
+  uses,
+  limit = shownUses,
+}: {
+  uses: ReadonlyArray<LookupTableUse>
+  limit?: number
+}) {
   const t = useTranslations('CodeTranslations.uses')
   const sentence = useUseSentence()
   const labelId = useId()
@@ -65,7 +71,7 @@ function UsesList({ uses }: { uses: ReadonlyArray<LookupTableUse> }) {
     return <p className="text-muted-foreground text-sm">{t('none')}</p>
   }
 
-  const hidden = uses.length - shownUses
+  const hidden = uses.length - limit
 
   return (
     <div className="flex flex-col gap-1 text-sm">
@@ -73,7 +79,7 @@ function UsesList({ uses }: { uses: ReadonlyArray<LookupTableUse> }) {
         {t('label')}
       </p>
       <ul aria-labelledby={labelId} className="flex flex-col gap-0.5">
-        {uses.slice(0, shownUses).map((use) => (
+        {uses.slice(0, limit).map((use) => (
           <li key={use.mappingId}>
             <Link
               href={mappingHref(use.mappingId)}

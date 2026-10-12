@@ -70,25 +70,6 @@ function StatusBadge({ status }: { status: LookupTableImportStatus }) {
   )
 }
 
-function UnsavedNotice({ onDiscard }: { onDiscard: () => void }) {
-  const t = useTranslations('LookupTable.import')
-
-  return (
-    <>
-      <div className="flex flex-col gap-1 rounded-lg border p-3">
-        <p className="font-medium">{t('unsaved.title')}</p>
-        <p className="text-muted-foreground">{t('unsaved.description')}</p>
-      </div>
-      <DialogFooter>
-        <DialogClose render={<Button variant="outline" />}>{t('cancel')}</DialogClose>
-        <Button variant="destructive" onClick={onDiscard}>
-          {t('unsaved.discard')}
-        </Button>
-      </DialogFooter>
-    </>
-  )
-}
-
 function CsvSource({
   csv,
   error,
@@ -462,11 +443,9 @@ function ImportPreview({
 
 function ImportSteps({
   tableId,
-  focusOnMount,
   onImported,
 }: {
   tableId: string
-  focusOnMount: boolean
   onImported: (imported: LookupTable, counts: ImportCounts) => void
 }) {
   const queryClient = useQueryClient()
@@ -509,7 +488,7 @@ function ImportSteps({
     <CsvSource
       csv={csv}
       error={sourceError}
-      focusOnMount={focusOnMount || backFromPreview}
+      focusOnMount={backFromPreview}
       previewFailed={previewing.isError}
       previewing={previewing.isPending}
       onChange={(text) => {
@@ -531,24 +510,19 @@ function ImportSteps({
 
 export function ImportCsvDialog({
   table,
-  dirty,
   open,
   finalFocus,
   onOpenChange,
-  onDiscard,
   onImported,
 }: {
   table: Pick<LookupTable, 'id'>
-  dirty: boolean
   open: boolean
   finalFocus?: RefObject<HTMLElement | null>
   onOpenChange: (open: boolean) => void
-  onDiscard: () => void
   onImported: (imported: LookupTable, counts: ImportCounts) => void
 }) {
   const t = useTranslations('LookupTable.import')
   const [resetKey, setResetKey] = useState(0)
-  const [discarded, setDiscarded] = useState(false)
   const applying = useIsMutating({ mutationKey: lookupTableKeys.import(table.id) }) > 0
 
   return (
@@ -562,7 +536,6 @@ export function ImportCsvDialog({
       onOpenChangeComplete={(next) => {
         if (!next) {
           setResetKey((count) => count + 1)
-          setDiscarded(false)
         }
       }}>
       <DialogContent
@@ -573,21 +546,7 @@ export function ImportCsvDialog({
           <DialogTitle>{t('title')}</DialogTitle>
           <DialogDescription>{t('description')}</DialogDescription>
         </DialogHeader>
-        {dirty ? (
-          <UnsavedNotice
-            onDiscard={() => {
-              setDiscarded(true)
-              onDiscard()
-            }}
-          />
-        ) : (
-          <ImportSteps
-            key={resetKey}
-            focusOnMount={discarded}
-            tableId={table.id}
-            onImported={onImported}
-          />
-        )}
+        <ImportSteps key={resetKey} tableId={table.id} onImported={onImported} />
       </DialogContent>
     </Dialog>
   )

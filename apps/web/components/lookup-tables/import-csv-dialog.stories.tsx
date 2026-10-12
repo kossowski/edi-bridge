@@ -61,10 +61,8 @@ const meta = preview.meta({
   component: ImportCsvDialog,
   args: {
     table: unitsOfMeasure,
-    dirty: false,
     open: true,
     onOpenChange: fn(),
-    onDiscard: fn(),
     onImported: fn(),
   },
   // The dialog renders in a portal outside the story root.
@@ -89,15 +87,6 @@ export const MissingCsv = meta.story({
     await userEvent.click(screen.getByRole('button', { name: 'Preview import' }))
     await expect(screen.getByText('Choose a CSV file or paste CSV text.')).toBeVisible()
     await expect(screen.getByLabelText('CSV text')).toHaveFocus()
-  },
-})
-
-export const UnsavedChanges = meta.story({
-  args: { dirty: true },
-  async play() {
-    await dialog()
-    await expect(screen.getByText(/Save or discard them before you import/)).toBeVisible()
-    await expect(screen.getByRole('button', { name: 'Discard changes and continue' })).toBeVisible()
   },
 })
 
