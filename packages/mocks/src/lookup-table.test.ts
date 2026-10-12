@@ -115,6 +115,7 @@ describe('lookupTableHandlers', () => {
         entryCount: 1,
         uses: [],
         missingCodeCounts: { blocking: 0, upcoming: 0 },
+        blockingCodes: [],
         updatedAt: created.updatedAt,
       },
     ])
@@ -414,6 +415,16 @@ const newerFailure = failedOrders(
   '2026-10-03T08:00:00.000Z',
 )
 
+function failedRunAt(receivedAt: string) {
+  return {
+    id: olderFailure.id,
+    receivedAt,
+    tradingPartner: { id: hansemarkt.id, name: hansemarkt.name },
+    messageType: 'ORDERS' as const,
+    businessReference: null,
+  }
+}
+
 async function getMissingCodes(id: string) {
   const response = await send('GET', toPath(lookupTableMissingCodesEndpoint.path, { id }))
 
@@ -495,9 +506,10 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
     })
 
     expect((await getMissingCodes(units.id)).map(({ code }) => code)).toEqual(['BTL', 'SET'])
-    expect((await listLookupTables()).find(({ id }) => id === units.id)?.missingCodeCounts).toEqual(
-      { blocking: 0, upcoming: 2 },
-    )
+    expect((await listLookupTables()).find(({ id }) => id === units.id)).toMatchObject({
+      missingCodeCounts: { blocking: 0, upcoming: 2 },
+      blockingCodes: [],
+    })
   })
 
   it('no longer blocks on a Run that was reprocessed', async () => {
@@ -530,10 +542,30 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
 
     expect(codes.filter(({ urgency }) => urgency === 'blocking')).toHaveLength(200)
     expect(codes.filter(({ urgency }) => urgency === 'upcoming')).toHaveLength(500)
-    expect((await listLookupTables())[0]?.missingCodeCounts).toEqual({
-      blocking: 200,
-      upcoming: 500,
+    expect((await listLookupTables())[0]).toMatchObject({
+      missingCodeCounts: { blocking: 200, upcoming: 500 },
+      blockingCodes: codes.flatMap(({ code, urgency }) => (urgency === 'blocking' ? [code] : [])),
     })
+  })
+
+  it('names the blocking codes on the list, newest failure first', async () => {
+    const units = {
+      ...seedLookupTableNamed('Units of measure'),
+      blockingCodes: [
+        { code: 'PAL', failedRuns: [failedRunAt('2026-10-02T08:00:00.000Z')] },
+        { code: 'DOS', failedRuns: [failedRunAt('2026-10-05T08:00:00.000Z')] },
+      ],
+    }
+
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables: [units], runs: [newerFailure] }))
+
+    const codes = await getMissingCodes(units.id)
+    const [summary] = await listLookupTables()
+
+    expect(summary?.blockingCodes).toEqual(['DOS', 'KRT', 'PAL'])
+    expect(codes.flatMap(({ code, urgency }) => (urgency === 'blocking' ? [code] : []))).toEqual(
+      summary?.blockingCodes,
+    )
   })
 
   it('answers 404 for an unknown Lookup Table', async () => {

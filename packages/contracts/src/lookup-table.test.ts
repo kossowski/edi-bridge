@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  lookupTableEndpoint,
   lookupTableEntriesSchema,
   lookupTableInputSchema,
   lookupTableMissingCodesEndpoint,
@@ -32,6 +33,7 @@ describe('lookupTablesEndpoint', () => {
           },
         ],
         missingCodeCounts: { blocking: 1, upcoming: 2 },
+        blockingCodes: ['KRT'],
         updatedAt: '2026-09-14T08:30:00.000Z',
       },
       {
@@ -42,6 +44,7 @@ describe('lookupTablesEndpoint', () => {
         entryCount: 0,
         uses: [],
         missingCodeCounts: noMissingCodes,
+        blockingCodes: [],
         updatedAt: '2026-09-15T10:00:00.000Z',
       },
     ]
@@ -58,6 +61,26 @@ describe('lookupTablesEndpoint', () => {
       entryCount: 0,
       uses: [],
       missingCodeCounts: noMissingCodes,
+      blockingCodes: [],
+      updatedAt: '2026-09-14T08:30:00.000Z',
+    }
+
+    expect(lookupTablesEndpoint.response.safeParse([table]).success).toBe(false)
+  })
+
+  it.each([
+    ['fewer', []],
+    ['more', ['KRT', 'BTL']],
+  ])('rejects %s blocking codes than the blocking count', (_, blockingCodes) => {
+    const table = {
+      id: '00000008-0000-4000-8000-000000000001',
+      name: 'Units',
+      kind: 'units',
+      scope: { kind: 'workspace' },
+      entryCount: 4,
+      uses: [],
+      missingCodeCounts: { blocking: 1, upcoming: 0 },
+      blockingCodes,
       updatedAt: '2026-09-14T08:30:00.000Z',
     }
 
@@ -68,6 +91,26 @@ describe('lookupTablesEndpoint', () => {
     const table = { id: '00000008-0000-4000-8000-000000000001', name: 'Units' }
 
     expect(lookupTablesEndpoint.response.safeParse([table]).success).toBe(false)
+  })
+})
+
+describe('lookupTableEndpoint', () => {
+  it('rejects a blocking count that the blocking codes do not match', () => {
+    const table = {
+      id: '00000008-0000-4000-8000-000000000001',
+      name: 'Units',
+      kind: 'units',
+      scope: { kind: 'workspace' },
+      entryCount: 1,
+      uses: [],
+      missingCodeCounts: { blocking: 2, upcoming: 0 },
+      blockingCodes: ['KRT'],
+      updatedAt: '2026-09-14T08:30:00.000Z',
+      entries: [{ sourceCode: 'ST', targetCode: 'PCE' }],
+      codeMeanings: [],
+    }
+
+    expect(lookupTableEndpoint.response.safeParse(table).success).toBe(false)
   })
 })
 

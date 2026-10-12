@@ -101,8 +101,12 @@ export type LookupTableUsage = {
 
 const unused: LookupTableUsage = { uses: [], missingCodes: [] }
 
+function blockingCodesOf(missingCodes: ReadonlyArray<MissingCode>): string[] {
+  return missingCodes.flatMap(({ code, urgency }) => (urgency === 'blocking' ? [code] : []))
+}
+
 function countsOf(missingCodes: ReadonlyArray<MissingCode>): MissingCodeCounts {
-  const blocking = missingCodes.filter(({ urgency }) => urgency === 'blocking').length
+  const blocking = blockingCodesOf(missingCodes).length
 
   return { blocking, upcoming: missingCodes.length - blocking }
 }
@@ -121,6 +125,7 @@ export function toLookupTableSummary(
     entryCount: entries.length,
     uses,
     missingCodeCounts: countsOf(missingCodes),
+    blockingCodes: blockingCodesOf(missingCodes),
   }
 }
 
@@ -273,12 +278,14 @@ export function createLookupTableUsage(
       block(code, references)
     }
 
-    const blocking = [...failedRuns].map(([code, references]): MissingCode => ({
-      urgency: 'blocking',
-      code,
-      ...hintFor(table.kind, code),
-      failedRuns: references.toSorted(newestFirst),
-    }))
+    const blocking = [...failedRuns]
+      .map(([code, references]) => ({
+        urgency: 'blocking' as const,
+        code,
+        ...hintFor(table.kind, code),
+        failedRuns: references.toSorted(newestFirst),
+      }))
+      .toSorted((a, b) => newestFirst(a.failedRuns[0]!, b.failedRuns[0]!))
 
     const upcoming = (table.upcomingCodes ?? [])
       .toSorted((a, b) => b.itemCount - a.itemCount)

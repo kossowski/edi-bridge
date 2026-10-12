@@ -153,6 +153,7 @@ function InvalidEntries() {
           entryCount: 5,
           uses: [],
           missingCodeCounts: { blocking: 0, upcoming: 0 },
+          blockingCodes: [],
           codeMeanings: [],
           entries: [
             { sourceCode: 'ST', targetCode: 'PCE' },

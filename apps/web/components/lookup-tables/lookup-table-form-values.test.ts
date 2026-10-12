@@ -64,6 +64,7 @@ describe('toFormValues', () => {
         entryCount: 2,
         uses: [],
         missingCodeCounts: { blocking: 0, upcoming: 0 },
+        blockingCodes: [],
         updatedAt: '2026-10-01T08:00:00.000Z',
       }),
     ).toEqual({ name: 'Units', scopeKind: 'tradingPartner', tradingPartnerId: hansemarkt.id })

@@ -66,7 +66,7 @@ export const missingCodeCountsSchema = z.object({
 
 export type MissingCodeCounts = z.infer<typeof missingCodeCountsSchema>
 
-export const lookupTableSummarySchema = z.object({
+const summaryFields = {
   id: z.uuid(),
   name: z.string().min(1),
   kind: lookupTableKindSchema,
@@ -74,8 +74,28 @@ export const lookupTableSummarySchema = z.object({
   entryCount: z.number().int().nonnegative(),
   uses: z.array(lookupTableUseSchema),
   missingCodeCounts: missingCodeCountsSchema,
+  blockingCodes: z.array(codeSchema),
   updatedAt: z.iso.datetime(),
-})
+}
+
+function namesEachBlockingCode({
+  missingCodeCounts,
+  blockingCodes,
+}: {
+  missingCodeCounts: MissingCodeCounts
+  blockingCodes: ReadonlyArray<string>
+}) {
+  return blockingCodes.length === missingCodeCounts.blocking
+}
+
+const blockingCodesMatchCount = {
+  message: 'The blocking codes match the blocking count',
+  path: ['blockingCodes'],
+}
+
+export const lookupTableSummarySchema = z
+  .object(summaryFields)
+  .refine(namesEachBlockingCode, blockingCodesMatchCount)
 
 export type LookupTableSummary = z.infer<typeof lookupTableSummarySchema>
 
@@ -83,10 +103,13 @@ export const codeMeaningSchema = z.object({ code: codeSchema, meaning: z.string(
 
 export type CodeMeaning = z.infer<typeof codeMeaningSchema>
 
-export const lookupTableSchema = lookupTableSummarySchema.extend({
-  entries: lookupTableEntriesSchema,
-  codeMeanings: z.array(codeMeaningSchema),
-})
+export const lookupTableSchema = z
+  .object({
+    ...summaryFields,
+    entries: lookupTableEntriesSchema,
+    codeMeanings: z.array(codeMeaningSchema),
+  })
+  .refine(namesEachBlockingCode, blockingCodesMatchCount)
 
 export type LookupTable = z.infer<typeof lookupTableSchema>
 
