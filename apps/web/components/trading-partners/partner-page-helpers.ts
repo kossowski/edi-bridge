@@ -5,17 +5,9 @@ import {
   type TradingPartnerActivityDetail,
 } from '@edi-bridge/contracts'
 
-export const partnerTabs = ['overview', 'settings'] as const
-
-export type PartnerTab = (typeof partnerTabs)[number]
-
 export type PartnerActivityProps = {
   tradingPartner: TradingPartner
   activity: TradingPartnerActivityDetail
-}
-
-export function partnerTabOf(value: string | null): PartnerTab {
-  return partnerTabs.find((tab) => tab === value) ?? 'overview'
 }
 
 export function awaitsReceiptConfirmation({

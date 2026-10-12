@@ -1,16 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { awaitsReceiptConfirmation, dayTotals, partnerTabOf } from './partner-page-helpers'
-
-describe('partnerTabOf', () => {
-  it.each(['overview', 'settings'])('keeps the known tab %s', (tab) => {
-    expect(partnerTabOf(tab)).toBe(tab)
-  })
-
-  it.each([null, '', 'notifications'])('falls back to the overview for %j', (tab) => {
-    expect(partnerTabOf(tab)).toBe('overview')
-  })
-})
+import { awaitsReceiptConfirmation, dayTotals } from './partner-page-helpers'
 
 describe('awaitsReceiptConfirmation', () => {
   const sent = { testInterchangeSentAt: '2026-10-10T08:00:00.000Z', contrlReceivedAt: null }
