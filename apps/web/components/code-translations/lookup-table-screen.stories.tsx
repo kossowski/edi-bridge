@@ -18,6 +18,8 @@ import preview from '../../.storybook/preview'
 
 const unitsOfMeasure = seedLookupTableNamed('Units of measure')
 
+const countryCodes = seedLookupTableNamed('Country codes')
+
 const vatCategories = seedLookupTableNamed('VAT categories')
 
 const storeNumbers = seedLookupTableNamed('Hansemarkt store numbers')
@@ -43,13 +45,17 @@ const emptyOther = emptyTable('other', 3)
 
 const [hansemarkt] = seedTradingPartners
 
-function failedRun(index: number, receivedAt: string): FailedRunReference {
+function failedRun(
+  index: number,
+  receivedAt: string,
+  messageType: 'INVOIC' | 'ORDERS' = 'INVOIC',
+): FailedRunReference {
   return {
     id: `00000000-0000-4000-8000-0000000001a${index}`,
     receivedAt,
     tradingPartner: { id: hansemarkt!.id, name: hansemarkt!.name },
-    messageType: 'ORDERS',
-    businessReference: `PO-90000${index}`,
+    messageType,
+    businessReference: `${messageType === 'INVOIC' ? 'INV' : 'PO'}-90000${index}`,
   }
 }
 
@@ -71,6 +77,13 @@ const manyRuns = {
       ],
     },
   ],
+}
+
+const ordersRun = failedRun(5, '2030-01-01T08:00:00.000Z', 'ORDERS')
+
+const stoppedCountries = {
+  ...countryCodes,
+  blockingCodes: [{ code: 'Polen', failedRuns: [ordersRun] }],
 }
 
 const [largeTable] = createLookupTables({
@@ -96,6 +109,14 @@ const meta = preview.meta({
 function manyRunsHandlers() {
   return lookupTableHandlers(apiUrl, {
     lookupTables: lookupTables.map((table) => (table.id === unitsOfMeasure.id ? manyRuns : table)),
+  })
+}
+
+function stoppedCountriesHandlers() {
+  return lookupTableHandlers(apiUrl, {
+    lookupTables: lookupTables.map((table) =>
+      table.id === countryCodes.id ? stoppedCountries : table,
+    ),
   })
 }
 
@@ -130,22 +151,23 @@ export const Default = meta.story({
       await canvas.findByRole('heading', { level: 1, name: 'Units of measure' }),
     ).toBeInTheDocument()
     await expect(canvas.getByText('Units of measure · Sent to every partner')).toBeVisible()
-    await expect(canvas.getByText('What the partner sends')).toBeVisible()
+    await expect(canvas.getByText('Your value')).toBeVisible()
+    await expect(canvas.getByText('What the partner gets')).toBeVisible()
 
-    const values = within(await canvas.findByRole('list', { name: 'Values (5)' }))
+    const values = within(await canvas.findByRole('list', { name: 'Values (4)' }))
 
-    await expect(values.getAllByRole('listitem')).toHaveLength(5)
+    await expect(values.getAllByRole('listitem')).toHaveLength(4)
     await expect(valueRow('KG').getByText('KGM')).toBeVisible()
     await expect(valueRow('KG').getByText('Kilogram')).toBeVisible()
-    await expect(valueRow('KG').getByText('becomes')).toBeInTheDocument()
+    await expect(valueRow('KG').getByText('is sent as')).toBeInTheDocument()
     await expect(valueRow('KG').getByRole('button', { name: 'Edit KG' })).toBeVisible()
 
     const krt = await missingRow('KRT')
 
     await expect(krt.getByText('Carton')).toBeVisible()
-    await expect(krt.getByRole('textbox', { name: 'What KRT becomes' })).toHaveValue('CT')
+    await expect(krt.getByRole('textbox', { name: 'Send KRT as' })).toHaveValue('CT')
     await expect(krt.getByRole('button', { name: 'Use PK (Package)' })).toBeVisible()
-    await expect(krt.getByText(/^Stops Purchase order/)).toBeVisible()
+    await expect(krt.getByText(/^Stops (Invoice|Dispatch advice) .+ to /)).toBeVisible()
     await expect(krt.getAllByRole('link')[0]).toHaveAttribute(
       'href',
       expect.stringMatching(/^\/documents\/[\w-]+$/),
@@ -155,7 +177,7 @@ export const Default = meta.story({
     const btl = await missingRow('BTL')
 
     await expect(btl.getByText('14 items in your ERP data use it')).toBeVisible()
-    await expect(btl.getByRole('textbox', { name: 'What BTL becomes' })).toHaveValue('BO')
+    await expect(btl.getByRole('textbox', { name: 'Send BTL as' })).toHaveValue('BO')
 
     const usedFor = within(canvas.getByRole('list', { name: 'Used for' }))
 
@@ -175,6 +197,49 @@ export const Outgoing = meta.story({
     await expect(canvas.getByText('What the partner gets')).toBeVisible()
     await expect(valueRow('19').getByText('is sent as')).toBeInTheDocument()
     await expect(valueRow('19').getByText('Standard rate')).toBeVisible()
+  },
+})
+
+export const Incoming = meta.story({
+  args: { id: countryCodes.id },
+  async play({ canvas }) {
+    await canvas.findByRole('list', { name: 'Values (3)' })
+    await expect(canvas.getByText('What the partner sends')).toBeVisible()
+    await expect(canvas.getByText('Your value')).toBeVisible()
+    await expect(valueRow('Deutschland').getByText('becomes')).toBeInTheDocument()
+    await expect(valueRow('Deutschland').getByText('DE')).toBeVisible()
+    await expect(valueRow('Deutschland').getByText('Germany')).toBeVisible()
+
+    const polen = await missingRow('Polen')
+
+    await expect(polen.getByRole('textbox', { name: 'What Polen becomes' })).toHaveValue('PL')
+    await expect(polen.getByText('2 items in your ERP data use it')).toBeVisible()
+  },
+})
+
+export const AcceptIncoming = meta.story({
+  args: { id: countryCodes.id },
+  beforeEach({ msw }) {
+    msw.use(...stoppedCountriesHandlers())
+  },
+  async play() {
+    const polen = await missingRow('Polen')
+
+    await expect(
+      polen.getByText('Stops Purchase order PO-900005 from Hansemarkt GmbH'),
+    ).toBeVisible()
+    await userEvent.click(polen.getByRole('button', { name: 'Accept Polen' }))
+
+    const fixed = await fixedAlert('Polen now becomes PL')
+    const reprocess = fixed.getByRole('link', { name: /^Process .+ again$/ })
+
+    await expect(reprocess).toHaveAccessibleName(
+      'Process Purchase order PO-900005 from Hansemarkt GmbH again',
+    )
+    await expect(reprocess).toHaveAttribute('href', `/documents/${ordersRun.id}`)
+    await expect(reprocess).toHaveFocus()
+    await expect(valueRow('Polen').getByText('becomes')).toBeInTheDocument()
+    await expect(valueRow('Polen').getByText('PL')).toBeVisible()
   },
 })
 
@@ -276,7 +341,7 @@ export const LargeVolume = meta.story({
 export const AcceptInPlace = meta.story({
   async play({ canvas }) {
     const krt = await missingRow('KRT')
-    const input = krt.getByRole('textbox', { name: 'What KRT becomes' })
+    const input = krt.getByRole('textbox', { name: 'Send KRT as' })
 
     await userEvent.click(krt.getByRole('button', { name: 'Use PK (Package)' }))
     await expect(input).toHaveValue('PK')
@@ -284,7 +349,7 @@ export const AcceptInPlace = meta.story({
     await expect(krt.getByText('PK means Package.')).toBeVisible()
     await userEvent.click(krt.getByRole('button', { name: 'Accept KRT' }))
 
-    const fixed = await fixedAlert('KRT now becomes PK')
+    const fixed = await fixedAlert('KRT is now sent as PK')
 
     await expect(fixed.getByRole('link', { name: /^Process .+ again$/ })).toHaveFocus()
     await waitFor(() => expect(canvas.queryByRole('button', { name: 'Accept KRT' })).toBeNull())
@@ -299,14 +364,14 @@ export const AcceptUpcoming = meta.story({
     await userEvent.click(btl.getByRole('button', { name: 'Accept BTL' }))
 
     await waitFor(() => expect(canvas.getByRole('button', { name: 'Edit BTL' })).toHaveFocus())
-    await expect(canvas.queryByText(/^BTL now becomes/)).toBeNull()
+    await expect(canvas.queryByText(/^BTL is now sent as/)).toBeNull()
   },
 })
 
 export const RejectsEmptyAccept = meta.story({
   async play() {
     const krt = await missingRow('KRT')
-    const input = krt.getByRole('textbox', { name: 'What KRT becomes' })
+    const input = krt.getByRole('textbox', { name: 'Send KRT as' })
 
     await userEvent.clear(input)
     await userEvent.click(krt.getByRole('button', { name: 'Accept KRT' }))
@@ -321,9 +386,7 @@ export const MissingCodeFromLink = meta.story({
   async play({ canvas }) {
     const krt = await missingRow('KRT')
 
-    await waitFor(() =>
-      expect(krt.getByRole('textbox', { name: 'What KRT becomes' })).toHaveFocus(),
-    )
+    await waitFor(() => expect(krt.getByRole('textbox', { name: 'Send KRT as' })).toHaveFocus())
     await expect(krt.getByRole('button', { name: 'Accept KRT' })).toBeVisible()
     await expect(canvas.queryByRole('form', { name: 'Add a value' })).toBeNull()
   },
@@ -334,15 +397,15 @@ export const NewCodeFromLink = meta.story({
   async play() {
     const form = await addForm()
 
-    await expect(form.getByRole('textbox', { name: 'What the partner sends' })).toHaveValue('DOS')
-    await expect(form.getByRole('textbox', { name: 'Your value' })).toHaveFocus()
+    await expect(form.getByRole('textbox', { name: 'Your value' })).toHaveValue('DOS')
+    await expect(form.getByRole('textbox', { name: 'What the partner gets' })).toHaveFocus()
   },
 })
 
 export const ExistingCodeFromDocument = meta.story({
   args: { code: 'KG' },
   async play({ canvas }) {
-    await canvas.findByRole('list', { name: 'Values (5)' })
+    await canvas.findByRole('list', { name: 'Values (4)' })
     // SAFETY: the KG value row is a list item.
     const row = canvas.getByText('KG', { selector: 'span' }).closest('li') as HTMLElement
 
@@ -359,16 +422,14 @@ export const ReprocessOriginRun = meta.story({
   async play({ canvas }) {
     const krt = await missingRow('KRT')
 
-    await waitFor(() =>
-      expect(krt.getByRole('textbox', { name: 'What KRT becomes' })).toHaveFocus(),
-    )
+    await waitFor(() => expect(krt.getByRole('textbox', { name: 'Send KRT as' })).toHaveFocus())
     await userEvent.click(krt.getByRole('button', { name: 'Accept KRT' }))
 
-    const fixed = await fixedAlert('KRT now becomes CT')
+    const fixed = await fixedAlert('KRT is now sent as CT')
     const reprocess = fixed.getByRole('link', { name: /^Process .+ again$/ })
 
     await expect(reprocess).toHaveAccessibleName(
-      'Process Purchase order PO-900000 from Hansemarkt GmbH again',
+      'Process Invoice INV-900000 to Hansemarkt GmbH again',
     )
     await expect(reprocess).toHaveAttribute('href', `/documents/${originRun.id}`)
     await expect(reprocess).toHaveFocus()
@@ -394,7 +455,7 @@ export const ReprocessNewestFirst = meta.story({
 
     await userEvent.click(krt.getByRole('button', { name: 'Accept KRT' }))
 
-    const fixed = await fixedAlert('KRT now becomes CT')
+    const fixed = await fixedAlert('KRT is now sent as CT')
 
     await expect(fixed.getByRole('link', { name: /^Process .+ again$/ })).toHaveAttribute(
       'href',
@@ -405,16 +466,16 @@ export const ReprocessNewestFirst = meta.story({
 
 export const ReprocessAfterEdit = meta.story({
   async play({ canvas }) {
-    await canvas.findByRole('list', { name: 'Values (5)' })
+    await canvas.findByRole('list', { name: 'Values (4)' })
     await missingRow('KRT')
     await userEvent.click(valueRow('ST').getByRole('button', { name: 'Edit ST' }))
     const form = within(canvas.getByRole('form', { name: 'Change ST' }))
-    const source = form.getByRole('textbox', { name: 'What the partner sends' })
+    const source = form.getByRole('textbox', { name: 'Your value' })
 
     await userEvent.clear(source)
     await userEvent.type(source, 'KRT{Enter}')
 
-    const fixed = await fixedAlert('KRT now becomes PCE')
+    const fixed = await fixedAlert('KRT is now sent as PCE')
 
     await expect(fixed.getByRole('link', { name: /^Process .+ again$/ })).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Edit KRT' })).toHaveFocus()
@@ -433,7 +494,7 @@ export const ReprocessAfterImport = meta.story({
     await userEvent.click(dialog.getByRole('button', { name: 'Preview import' }))
     await userEvent.click(await dialog.findByRole('button', { name: 'Apply import' }))
 
-    const fixed = await fixedAlert('KRT now becomes CT')
+    const fixed = await fixedAlert('KRT is now sent as CT')
 
     await expect(fixed.getByRole('link', { name: /^Process .+ again$/ })).toBeVisible()
   },
@@ -459,10 +520,10 @@ export const LongSeenIn = meta.story({
 
 export const EditValue = meta.story({
   async play({ canvas }) {
-    await canvas.findByRole('list', { name: 'Values (5)' })
+    await canvas.findByRole('list', { name: 'Values (4)' })
     await userEvent.click(valueRow('KG').getByRole('button', { name: 'Edit KG' }))
     const form = within(canvas.getByRole('form', { name: 'Change KG' }))
-    const target = form.getByRole('textbox', { name: 'Your value' })
+    const target = form.getByRole('textbox', { name: 'What the partner gets' })
 
     await userEvent.clear(target)
     await userEvent.type(target, 'KGS{Enter}')
@@ -477,12 +538,12 @@ export const RejectsDuplicateValue = meta.story({
     await userEvent.click(await canvas.findByRole('button', { name: 'Add a value' }))
     const form = await addForm()
 
-    await userEvent.type(form.getByRole('textbox', { name: 'What the partner sends' }), 'KG')
-    await userEvent.type(form.getByRole('textbox', { name: 'Your value' }), 'KGS')
+    await userEvent.type(form.getByRole('textbox', { name: 'Your value' }), 'KG')
+    await userEvent.type(form.getByRole('textbox', { name: 'What the partner gets' }), 'KGS')
     await userEvent.click(form.getByRole('button', { name: 'Save' }))
 
     await expect(form.getByText('KG already has a translation.')).toBeVisible()
-    await expect(form.getByRole('textbox', { name: 'What the partner sends' })).toHaveAttribute(
+    await expect(form.getByRole('textbox', { name: 'Your value' })).toHaveAttribute(
       'aria-invalid',
       'true',
     )
@@ -491,19 +552,19 @@ export const RejectsDuplicateValue = meta.story({
 
 export const UndoAfterRemoving = meta.story({
   async play({ canvas }) {
-    await canvas.findByRole('list', { name: 'Values (5)' })
+    await canvas.findByRole('list', { name: 'Values (4)' })
     await userEvent.click(valueRow('ST').getByRole('button', { name: 'Remove ST' }))
 
-    await expect(await canvas.findByText('ST removed. It became PCE.')).toBeVisible()
-    await expect(await canvas.findByRole('list', { name: 'Values (4)' })).toBeVisible()
+    await expect(await canvas.findByText('ST removed. It was sent as PCE.')).toBeVisible()
+    await expect(await canvas.findByRole('list', { name: 'Values (3)' })).toBeVisible()
 
     const undo = canvas.getByRole('button', { name: 'Undo' })
 
     await expect(undo).toHaveFocus()
     await userEvent.click(undo)
 
-    await expect(await canvas.findByRole('list', { name: 'Values (5)' })).toBeVisible()
-    await expect(canvas.queryByText('ST removed. It became PCE.')).toBeNull()
+    await expect(await canvas.findByRole('list', { name: 'Values (4)' })).toBeVisible()
+    await expect(canvas.queryByText('ST removed. It was sent as PCE.')).toBeNull()
     await expect(canvas.getByRole('button', { name: 'Edit ST' })).toHaveFocus()
   },
 })
@@ -515,7 +576,7 @@ export const ImportCsv = meta.story({
 
     await expect(await screen.findByRole('dialog', { name: 'Import CSV' })).toBeInTheDocument()
     await waitFor(() =>
-      expect(screen.getByText(/what the partner sends and your value on each line/)).toBeVisible(),
+      expect(screen.getByText(/your value and what the partner gets on each line/)).toBeVisible(),
     )
   },
 })
@@ -523,11 +584,11 @@ export const ImportCsv = meta.story({
 export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas }) {
-      await canvas.findByRole('list', { name: 'Values (5)' })
+      await canvas.findByRole('list', { name: 'Values (4)' })
       await missingRow('KRT')
       await expect(canvas.queryByRole('button', { name: 'Add a value' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Accept / })).toBeNull()
-      await expect(canvas.queryByRole('textbox', { name: /becomes$/ })).toBeNull()
+      await expect(canvas.queryByRole('textbox', { name: /^Send .+ as$/ })).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^(Edit|Remove) / })).toBeNull()
       await expect(canvas.queryByRole('button', { name: 'Import CSV' })).toBeNull()
     },
@@ -538,7 +599,7 @@ export const ViewerFromDocument = meta.story({
   args: { code: 'KRT' },
   ...viewerStory({
     async play({ canvas }) {
-      await canvas.findByRole('list', { name: 'Values (5)' })
+      await canvas.findByRole('list', { name: 'Values (4)' })
       const missing = await canvas.findByRole('region', { name: 'Not translated yet' })
 
       // SAFETY: the KRT missing code row is a list item.
@@ -547,7 +608,7 @@ export const ViewerFromDocument = meta.story({
         .closest('li') as HTMLElement
 
       await expect(row).toHaveClass('ring-2')
-      await expect(within(row).getByText(/^Stops Purchase order/)).toBeVisible()
+      await expect(within(row).getByText(/^Stops (Invoice|Dispatch advice) /)).toBeVisible()
       await expect(canvas.queryByRole('form', { name: 'Add a value' })).toBeNull()
     },
   }),
@@ -557,25 +618,31 @@ export const German = meta.story({
   decorators: [german],
   args: { code: 'KRT' },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('list', { name: 'Werte (5)' })).toBeVisible()
+    await expect(await canvas.findByRole('list', { name: 'Werte (4)' })).toBeVisible()
     await expect(canvas.getByText('Mengeneinheiten · An jeden Partner gesendet')).toBeVisible()
-    await expect(canvas.getByText('Was der Partner sendet')).toBeVisible()
+    await expect(canvas.getByText('Was der Partner erhält')).toBeVisible()
 
     const missing = within(await canvas.findByRole('region', { name: 'Noch nicht übersetzt' }))
 
-    await expect(missing.getByRole('textbox', { name: 'Was aus KRT wird' })).toHaveValue('CT')
+    await expect(missing.getByRole('textbox', { name: 'KRT senden als' })).toHaveValue('CT')
     await userEvent.click(missing.getByRole('button', { name: 'Übernehmen: KRT' }))
-    await expect(await canvas.findByText('KRT wird jetzt zu CT')).toBeVisible()
+    await expect(await canvas.findByText('KRT wird jetzt als CT gesendet')).toBeVisible()
     await expect(canvas.getByRole('link', { name: /^.+ erneut verarbeiten$/ })).toHaveFocus()
   },
 })
 
-export const GermanOutgoing = meta.story({
+export const GermanIncoming = meta.story({
   decorators: [german],
-  args: { id: vatCategories.id },
+  args: { id: countryCodes.id },
   async play({ canvas }) {
-    await canvas.findByRole('list', { name: 'Werte (3)' })
-    await expect(canvas.getByText('Was der Partner erhält')).toBeVisible()
+    const values = within(await canvas.findByRole('list', { name: 'Werte (3)' }))
+
+    await expect(canvas.getByText('Was der Partner sendet')).toBeVisible()
+    await expect(values.getAllByText('wird zu')).toHaveLength(3)
+
+    const missing = within(await canvas.findByRole('region', { name: 'Noch nicht übersetzt' }))
+
+    await expect(missing.getByRole('textbox', { name: 'Was aus Polen wird' })).toHaveValue('PL')
   },
 })
 
@@ -596,7 +663,7 @@ export const Dark = meta.story({
     return darkMode()
   },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('list', { name: 'Values (5)' })).toBeVisible()
+    await expect(await canvas.findByRole('list', { name: 'Values (4)' })).toBeVisible()
     await expect(await canvas.findByRole('region', { name: 'Not translated yet' })).toBeVisible()
   },
 })
@@ -611,7 +678,7 @@ export const DarkAfterSaving = meta.story({
     const krt = await missingRow('KRT')
 
     await userEvent.click(krt.getByRole('button', { name: 'Accept KRT' }))
-    const fixed = await fixedAlert('KRT now becomes CT')
+    const fixed = await fixedAlert('KRT is now sent as CT')
 
     await userEvent.click(fixed.getByRole('button', { name: /^and \d+ more$/ }))
     await expect(fixed.getByRole('button', { name: /^Show all \d+$/ })).toBeVisible()
@@ -625,7 +692,7 @@ export const Mobile = meta.story({
   },
   args: { code: 'KRT' },
   async play({ canvas, canvasElement }) {
-    await canvas.findByRole('list', { name: 'Values (5)' })
+    await canvas.findByRole('list', { name: 'Values (4)' })
     await missingRow('KRT')
     await expectNoPageScroll(canvasElement)
   },

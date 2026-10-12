@@ -12,6 +12,8 @@ import preview from '../../.storybook/preview'
 
 const unitsOfMeasure = seedLookupTableNamed('Units of measure')
 
+const countryCodes = seedLookupTableNamed('Country codes')
+
 const [largeTable] = createLookupTables({ count: 1, entryCount: 5000 })
 
 const everyStatusCsv = [
@@ -22,6 +24,15 @@ const everyStatusCsv = [
   ';LTR',
   'CMT;CMT;cm',
   'MTR;M',
+].join('\n')
+
+const countryCsv = [
+  'source;target',
+  'Deutschland;DE',
+  'Österreich;OE',
+  ';PL',
+  'Polen;PL',
+  'Polen;POL',
 ].join('\n')
 
 const largeCsv = [
@@ -61,7 +72,7 @@ const meta = preview.meta({
   component: ImportCsvDialog,
   args: {
     table: unitsOfMeasure,
-    direction: 'inbound' as const,
+    direction: 'outbound' as const,
     open: true,
     onOpenChange: fn(),
     onImported: fn(),
@@ -69,7 +80,9 @@ const meta = preview.meta({
   // The dialog renders in a portal outside the story root.
   parameters: { a11y: { context: 'body' } },
   beforeEach({ msw }) {
-    msw.use(...lookupTableHandlers(apiUrl, { lookupTables: [unitsOfMeasure, largeTable!] }))
+    msw.use(
+      ...lookupTableHandlers(apiUrl, { lookupTables: [unitsOfMeasure, countryCodes, largeTable!] }),
+    )
   },
 })
 
@@ -101,26 +114,31 @@ export const Preview = meta.story({
     await expect(screen.getByRole('button', { name: 'Unchanged 1' })).toBeVisible()
     await expect(screen.getByRole('button', { name: 'Invalid 3' })).toBeVisible()
     await expect(screen.getByText('changed from KGM to KGS')).toBeInTheDocument()
-    await expect(
-      screen.getByRole('columnheader', { name: 'What the partner sends' }),
-    ).toBeInTheDocument()
-    await expect(visibleText('The partner’s code is missing.')).toBeVisible()
-    await expect(visibleText('Needs exactly two columns.')).toBeVisible()
-    await expect(visibleText('The partner’s code already occurs in an earlier line.')).toBeVisible()
-  },
-})
-
-export const OutgoingPreview = meta.story({
-  args: { direction: 'outbound' as const },
-  async play() {
-    await requestPreview(everyStatusCsv)
-
-    await expect(await screen.findByRole('heading', { name: 'Preview' })).toHaveFocus()
     await expect(screen.getByRole('columnheader', { name: 'Your value' })).toBeInTheDocument()
     await expect(
       screen.getByRole('columnheader', { name: 'What the partner gets' }),
     ).toBeInTheDocument()
     await expect(visibleText('Your value is missing.')).toBeVisible()
+    await expect(visibleText('Needs exactly two columns.')).toBeVisible()
+    await expect(visibleText('Your value already occurs in an earlier line.')).toBeVisible()
+  },
+})
+
+export const IncomingPreview = meta.story({
+  args: { table: countryCodes, direction: 'inbound' as const },
+  async play() {
+    await requestPreview(countryCsv)
+
+    await expect(await screen.findByRole('heading', { name: 'Preview' })).toHaveFocus()
+    await expect(screen.getByRole('button', { name: 'Added 1' })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Changed 1' })).toBeVisible()
+    await expect(screen.getByText('changed from AT to OE')).toBeInTheDocument()
+    await expect(
+      screen.getByRole('columnheader', { name: 'What the partner sends' }),
+    ).toBeInTheDocument()
+    await expect(screen.getByRole('columnheader', { name: 'Your value' })).toBeInTheDocument()
+    await expect(visibleText('The partner’s code is missing.')).toBeVisible()
+    await expect(visibleText('The partner’s code already occurs in an earlier line.')).toBeVisible()
   },
 })
 
@@ -260,7 +278,7 @@ export const German = meta.story({
     })
 
     await expect(await screen.findByRole('button', { name: 'Neu 1' })).toBeVisible()
-    await expect(visibleText('Der Code des Partners fehlt.')).toBeVisible()
+    await expect(visibleText('Ihr Wert fehlt.')).toBeVisible()
   },
 })
 
