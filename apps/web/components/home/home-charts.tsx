@@ -14,7 +14,13 @@ import {
   YAxis,
 } from 'recharts'
 
-import { type BucketRow, type HomeSeries, peakOf, rateTicks } from '@/components/home/home-data'
+import {
+  type BucketRow,
+  type HomeSeries,
+  peakOf,
+  rateTicks,
+  timeTicks,
+} from '@/components/home/home-data'
 import { useFormats } from '@/components/home/home-formats'
 import {
   Card,
@@ -201,7 +207,13 @@ export function ThroughputChart({ rows, totals, timeWindow }: HomeSeries) {
             </pattern>
           </defs>
           <CartesianGrid vertical={false} />
-          <XAxis dataKey="start" minTickGap={24} tickFormatter={formats.tick} {...axisProps} />
+          <XAxis
+            dataKey="start"
+            interval={0}
+            tickFormatter={formats.tick}
+            ticks={timeTicks(rows, timeWindow)}
+            {...axisProps}
+          />
           <YAxis allowDecimals={false} tickFormatter={formats.compact} width={40} {...axisProps} />
           <ChartTooltip content={<BucketTooltip rows={rows} timeWindow={timeWindow} />} />
           <Bar {...barProps} dataKey="delivered" fill="var(--color-delivered)" />
@@ -263,9 +275,10 @@ function rateDot(
 export function ErrorRateChart({ rows, totals, timeWindow }: HomeSeries) {
   const t = useTranslations('Home')
   const formats = useFormats(timeWindow)
-  const peak = peakOf(rows, (row) => row.errorRate)
-  const lastIndex = rows.findLastIndex((row) => row.errorRate !== null)
-  const ticks = rateTicks(rows)
+  const lineRows = rows.map((row) => (row.inProgress ? { ...row, errorRate: null } : row))
+  const peak = peakOf(lineRows, (row) => row.errorRate)
+  const lastIndex = lineRows.findLastIndex((row) => row.errorRate !== null)
+  const ticks = rateTicks(lineRows)
   const title = t('errorRate.title')
 
   return (
@@ -280,11 +293,17 @@ export function ErrorRateChart({ rows, totals, timeWindow }: HomeSeries) {
       title={title}>
       <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
         <LineChart
-          data={rows}
+          data={lineRows}
           margin={{ top: 8, right: 48, bottom: 0, left: 0 }}
           aria-label={title}>
           <CartesianGrid vertical={false} />
-          <XAxis dataKey="start" minTickGap={24} tickFormatter={formats.tick} {...axisProps} />
+          <XAxis
+            dataKey="start"
+            interval={0}
+            tickFormatter={formats.tick}
+            ticks={timeTicks(rows, timeWindow)}
+            {...axisProps}
+          />
           <YAxis
             domain={[0, ticks.at(-1) ?? 1]}
             tickFormatter={formats.percent}
@@ -301,7 +320,7 @@ export function ErrorRateChart({ rows, totals, timeWindow }: HomeSeries) {
               strokeWidth: 2,
             }}
             dataKey="errorRate"
-            dot={(props) => rateDot(props, rows, lastIndex, formats.percent)}
+            dot={(props) => rateDot(props, lineRows, lastIndex, formats.percent)}
             isAnimationActive={false}
             stroke="var(--color-errorRate)"
             strokeWidth={2}

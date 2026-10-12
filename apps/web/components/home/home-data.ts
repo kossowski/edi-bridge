@@ -60,6 +60,14 @@ export function rateTicks(rows: ReadonlyArray<BucketRow>) {
   return Array.from({ length: count + 1 }, (_, index) => Math.round(index * step * 100) / 100)
 }
 
+const tickSteps = { '24h': 6, '7d': 2, '30d': 7 } as const satisfies Record<HomeWindow, number>
+
+export function timeTicks(rows: ReadonlyArray<BucketRow>, timeWindow: HomeWindow) {
+  const step = tickSteps[timeWindow]
+
+  return rows.flatMap((row, index) => ((rows.length - 1 - index) % step === 0 ? [row.start] : []))
+}
+
 const timeOfDay = { hour: 'numeric', minute: '2-digit' } as const
 
 export const tickFormats = {
