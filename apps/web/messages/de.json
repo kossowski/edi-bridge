@@ -1252,7 +1252,7 @@
     "path": {
       "inbound": "geht in",
       "outbound": "geht an",
-      "erp": "Ihr ERP: {name}",
+      "dataFormat": "Ihr Datenformat:",
       "noPartner": "Noch kein Handelspartner"
     },
     "title": {
@@ -1260,16 +1260,16 @@
       "partners": "{documents} {direction, select, inbound {von {count} Partnern} other {an {count} Partner}}"
     },
     "state": {
-      "failing": "Dokumente fehlgeschlagen",
+      "failing": "Belege fehlgeschlagen",
       "draft": "Entwurf nicht veröffentlicht",
       "new": "Nie veröffentlicht",
       "live": "Läuft einwandfrei"
     },
     "status": {
-      "failed": "Diese Woche {count} fehlgeschlagen",
+      "failed": "In den letzten 7 Tagen {count, plural, one {# Beleg} other {# Belege}} fehlgeschlagen",
       "unpublished": "Änderungen nicht veröffentlicht",
       "nothingYet": "Noch nichts übersetzt",
-      "translated": "{count, plural, =0 {Diese Woche keine Dokumente} one {Diese Woche # Dokument übersetzt} other {Diese Woche # Dokumente übersetzt}}"
+      "translated": "{count, plural, =0 {In den letzten 7 Tagen keine Belege} one {In den letzten 7 Tagen # Beleg übersetzt} other {In den letzten 7 Tagen # Belege übersetzt}}"
     },
     "liveSince": "Version {version} live seit {date}",
     "neverPublished": "Nie veröffentlicht",

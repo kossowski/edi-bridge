@@ -1252,7 +1252,7 @@
     "path": {
       "inbound": "goes into",
       "outbound": "goes to",
-      "erp": "Your {name}",
+      "dataFormat": "Your data format:",
       "noPartner": "No trading partner yet"
     },
     "title": {
@@ -1266,10 +1266,10 @@
       "live": "Running fine"
     },
     "status": {
-      "failed": "{count} failed this week",
+      "failed": "{count, plural, one {# document failed} other {# documents failed}} in the last 7 days",
       "unpublished": "Changes not published",
       "nothingYet": "Nothing is translated yet",
-      "translated": "{count, plural, =0 {No documents this week} one {# document translated this week} other {# documents translated this week}}"
+      "translated": "{count, plural, =0 {No documents in the last 7 days} one {# document translated in the last 7 days} other {# documents translated in the last 7 days}}"
     },
     "liveSince": "Version {version} live since {date}",
     "neverPublished": "Never published",

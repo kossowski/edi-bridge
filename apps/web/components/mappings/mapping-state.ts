@@ -7,14 +7,9 @@ type StateFacts = Pick<
 
 export type MappingState = 'failing' | 'draft' | 'new' | 'live'
 
-export type MappingFilter = 'all' | 'attention' | 'live' | 'new'
+export const mappingFilters = ['all', 'attention', 'live', 'new'] as const
 
-export const mappingFilters = [
-  'all',
-  'attention',
-  'live',
-  'new',
-] as const satisfies ReadonlyArray<MappingFilter>
+export type MappingFilter = (typeof mappingFilters)[number]
 
 const stateRank = { failing: 0, draft: 1, new: 2, live: 3 } as const satisfies Record<
   MappingState,

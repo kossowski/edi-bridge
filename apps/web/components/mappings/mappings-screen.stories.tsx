@@ -48,19 +48,22 @@ export const Default = meta.story({
     )
 
     await expect(shared.getByText('Documents failed')).toBeVisible()
-    await expect(shared.getByText(/failed this week/)).toBeVisible()
+    await expect(shared.getByText(/failed in the last 7 days$/)).toBeVisible()
     await expect(
       shared.getByText('Bodensee Handelshaus AG and Spreewald Frische GmbH'),
     ).toBeVisible()
-    await expect(shared.getByText('Your ERP dispatch advice')).toBeVisible()
+    const dataFormat = shared.getByText('ERP dispatch advice')
+
+    await expect(dataFormat).toBeVisible()
+    await expect(dataFormat).toHaveTextContent('Your data format: ERP dispatch advice')
     await expect(shared.getByRole('link', { name: 'See what failed' })).toBeVisible()
 
-    const fresh = card(goingOut.getByRole('link', { name: 'Invoices' }))
+    const neverPublished = card(goingOut.getByRole('link', { name: 'Invoices' }))
 
-    await expect(fresh.getAllByText('Never published')).toHaveLength(2)
-    await expect(fresh.getByText('Nothing is translated yet')).toBeVisible()
-    await expect(fresh.getByText('No trading partner yet')).toBeVisible()
-    await expect(fresh.getByRole('link', { name: 'Draft with AI' })).toHaveAttribute(
+    await expect(neverPublished.getAllByText('Never published')).toHaveLength(2)
+    await expect(neverPublished.getByText('Nothing is translated yet')).toBeVisible()
+    await expect(neverPublished.getByText('No trading partner yet')).toBeVisible()
+    await expect(neverPublished.getByRole('link', { name: 'Draft with AI' })).toHaveAttribute(
       'href',
       expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
     )
@@ -79,7 +82,7 @@ export const Default = meta.story({
     )
 
     await expect(live.getByText('Running fine')).toBeVisible()
-    await expect(live.getByText(/translated this week|No documents this week/)).toBeVisible()
+    await expect(live.getByText(/(translated|No documents) in the last 7 days$/)).toBeVisible()
     await expect(live.getByRole('link', { name: 'Open' })).toBeVisible()
   },
 })
@@ -179,13 +182,20 @@ export const German = meta.story({
 })
 
 export const Dark = meta.story({
-  beforeEach() {
+  beforeEach({ msw }) {
+    msw.use(...mappingHandlers(apiUrl, createMappingsWithTraffic({ count: 16 })))
+
     return darkMode()
   },
-  async play({ canvas }) {
-    await expect(
-      await canvas.findByRole('link', { name: 'Dispatch advices to 2 partners' }),
-    ).toBeVisible()
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('button', { name: /Needs you/ })
+
+    const shown = [
+      ...(await badges(canvasElement, 'Coming in')),
+      ...(await badges(canvasElement, 'Going out')),
+    ]
+
+    await expect(new Set(shown)).toEqual(new Set(stateOrder))
   },
 })
 

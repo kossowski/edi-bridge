@@ -1,12 +1,6 @@
 'use client'
 
-import {
-  ArrowDownLeft01Icon,
-  ArrowRight02Icon,
-  ArrowUpRight01Icon,
-  DatabaseIcon,
-  Store01Icon,
-} from '@hugeicons/core-free-icons'
+import { ArrowDownLeft01Icon, ArrowUpRight01Icon, Store01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
@@ -14,6 +8,7 @@ import { useId, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadError } from '@/components/load-error'
+import { DirectionPath } from '@/components/mappings/direction-path'
 import { MappingCard } from '@/components/mappings/mapping-card'
 import {
   byState,
@@ -33,29 +28,20 @@ const directions = ['inbound', 'outbound'] as const satisfies ReadonlyArray<Dire
 const shownPerLane = 20
 
 function DirectionHint({ direction }: { direction: Direction }) {
-  const t = useTranslations('Mappings')
-
-  const partner = (
-    <span className="inline-flex items-center gap-1">
-      <HugeiconsIcon icon={Store01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
-      {t('lane.partner')}
-    </span>
-  )
-
-  const erp = (
-    <span className="inline-flex items-center gap-1">
-      <HugeiconsIcon icon={DatabaseIcon} strokeWidth={2} aria-hidden className="size-3.5" />
-      {t('lane.erp')}
-    </span>
-  )
+  const t = useTranslations('Mappings.lane')
 
   return (
-    <p className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
-      {direction === 'inbound' ? partner : erp}
-      <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} aria-hidden className="size-3.5" />
-      <span className="sr-only">{t(`path.${direction}`)}</span>
-      {direction === 'inbound' ? erp : partner}
-    </p>
+    <DirectionPath
+      direction={direction}
+      erp={t('erp')}
+      partner={
+        <span className="inline-flex items-center gap-1">
+          <HugeiconsIcon icon={Store01Icon} strokeWidth={2} aria-hidden className="size-3.5" />
+          {t('partner')}
+        </span>
+      }
+      className="text-muted-foreground inline-flex text-xs"
+    />
   )
 }
 

@@ -3,10 +3,8 @@
 import {
   AiMagicIcon,
   Alert02Icon,
-  ArrowRight02Icon,
   CheckmarkCircle02Icon,
   DashedLineCircleIcon,
-  DatabaseIcon,
   PencilEdit02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -14,6 +12,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useId } from 'react'
 
+import { DirectionPath } from '@/components/mappings/direction-path'
 import { mappingState, type MappingState } from '@/components/mappings/mapping-state'
 import { usePlainNames } from '@/components/plain-names'
 import { Badge } from '@edi-bridge/ui/components/badge'
@@ -112,38 +111,26 @@ function MappingPath({ mapping }: { mapping: MappingSummary }) {
   const names = mapping.partners.map(({ name }) => name)
   const partnerText = names.length > 0 ? format.list(names) : t('noPartner')
 
-  const partners = (
-    <span title={partnerText} className="min-w-0 sm:truncate">
-      {partnerText}
-    </span>
-  )
-
-  const erp = (
-    <span className="flex min-w-0 items-center gap-2">
-      <span className="bg-primary text-primary-foreground flex size-6 shrink-0 items-center justify-center rounded-full">
-        <HugeiconsIcon icon={DatabaseIcon} strokeWidth={2} aria-hidden className="size-3.5" />
-      </span>
-      <span className="min-w-0 sm:truncate">
-        {t('erp', { name: mapping.documentStructureName })}
-      </span>
-    </span>
-  )
-
   return (
-    <p className="bg-muted/50 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-lg px-3 py-2 text-xs">
-      {mapping.direction === 'inbound' ? partners : erp}
-      <span className="text-muted-foreground flex">
-        <HugeiconsIcon icon={ArrowRight02Icon} strokeWidth={2} aria-hidden className="size-4" />
-        <span className="sr-only"> {t(mapping.direction)} </span>
-      </span>
-      {mapping.direction === 'inbound' ? erp : partners}
-    </p>
+    <DirectionPath
+      direction={mapping.direction}
+      erp={
+        <span className="min-w-0 sm:truncate">
+          <span className="sr-only">{t('dataFormat')} </span>
+          {mapping.documentStructureName}
+        </span>
+      }
+      partner={
+        <span title={partnerText} className="min-w-0 sm:truncate">
+          {partnerText}
+        </span>
+      }
+      className="bg-muted/50 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] rounded-lg px-3 py-2 text-xs"
+    />
   )
 }
 
-function nextAction(mapping: MappingSummary, state: MappingState) {
-  const href = `/mappings/${mapping.id}`
-
+function nextAction(href: string, state: MappingState) {
   switch (state) {
     case 'failing':
       return { href, icon: Alert02Icon }
@@ -157,16 +144,16 @@ function nextAction(mapping: MappingSummary, state: MappingState) {
 }
 
 function NextAction({
-  mapping,
+  mappingHref,
   state,
   describedBy,
 }: {
-  mapping: MappingSummary
+  mappingHref: string
   state: MappingState
   describedBy: string
 }) {
   const t = useTranslations('Mappings.action')
-  const { href, icon } = nextAction(mapping, state)
+  const { href, icon } = nextAction(mappingHref, state)
 
   return (
     <Link
@@ -185,6 +172,7 @@ export function MappingCard({ mapping }: { mapping: MappingSummary }) {
   const titleId = useId()
   const state = mappingState(mapping)
   const title = useMappingTitle(mapping)
+  const href = `/mappings/${mapping.id}`
 
   return (
     <Card
@@ -194,7 +182,7 @@ export function MappingCard({ mapping }: { mapping: MappingSummary }) {
       )}>
       <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <h3 id={titleId} className="font-heading text-base leading-snug font-medium">
-          <Link href={`/mappings/${mapping.id}`} className="hover:underline">
+          <Link href={href} className="hover:underline">
             {title}
           </Link>
         </h3>
@@ -215,7 +203,7 @@ export function MappingCard({ mapping }: { mapping: MappingSummary }) {
               })
             : t('neverPublished')}
         </span>
-        <NextAction describedBy={titleId} mapping={mapping} state={state} />
+        <NextAction describedBy={titleId} mappingHref={href} state={state} />
       </CardFooter>
     </Card>
   )
