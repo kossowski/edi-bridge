@@ -52,10 +52,6 @@
         "label": "Start",
         "hint": "Kennzahlen, Diagramme und Ihre Handelspartner"
       },
-      "tasks": {
-        "label": "Aufgaben",
-        "hint": "Alles, was jemanden braucht, nach Zuständigkeit gruppiert"
-      },
       "documents": {
         "label": "Belege",
         "hint": "Alle empfangenen und gesendeten Belege"
@@ -143,6 +139,12 @@
     "settings": "Einstellungen",
     "operator": "Operator",
     "help": "Hilfe"
+  },
+  "Pages": {
+    "tasks": {
+      "label": "Aufgaben",
+      "hint": "Alles, was jemanden braucht, nach Zuständigkeit gruppiert"
+    }
   },
   "NotFound": {
     "title": "Seite nicht gefunden",
@@ -316,18 +318,9 @@
       "home": "Zurück zum Start"
     },
     "groups": {
-      "you": {
-        "title": "Von Ihnen zu beheben",
-        "badge": "Sie beheben das"
-      },
-      "retry": {
-        "title": "Erneut versuchen",
-        "badge": "Erneut versuchen"
-      },
-      "partner": {
-        "title": "Wartet auf einen Handelspartner",
-        "badge": "Ihr Handelspartner behebt das"
-      }
+      "you": "Von Ihnen zu beheben",
+      "retry": "Erneut versuchen",
+      "tradingPartner": "Wartet auf einen Handelspartner"
     },
     "showAll": "{count, plural, one {Die # Aufgabe zeigen} other {Alle # Aufgaben zeigen}}",
     "showNewest": "Die neuesten {count} zeigen",
@@ -335,8 +328,8 @@
       "detail": "{direction, select, inbound {{messageType} von {partner}} other {{messageType} an {partner}}}",
       "action": {
         "you": "Beheben",
-        "retry": "Erneut versuchen",
-        "partner": "Details ansehen"
+        "retry": "Öffnen und erneut versuchen",
+        "tradingPartner": "Details ansehen"
       }
     },
     "overdueAcknowledgement": {

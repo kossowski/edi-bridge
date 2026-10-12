@@ -52,10 +52,6 @@
         "label": "Home",
         "hint": "Key numbers, charts and your partners"
       },
-      "tasks": {
-        "label": "Tasks",
-        "hint": "Everything that needs someone, grouped by who acts"
-      },
       "documents": {
         "label": "Documents",
         "hint": "Every document received or sent"
@@ -143,6 +139,12 @@
     "settings": "Settings",
     "operator": "Operator",
     "help": "Help"
+  },
+  "Pages": {
+    "tasks": {
+      "label": "Tasks",
+      "hint": "Everything that needs someone, grouped by who acts"
+    }
   },
   "NotFound": {
     "title": "Page not found",
@@ -316,18 +318,9 @@
       "home": "Back to home"
     },
     "groups": {
-      "you": {
-        "title": "For you to fix",
-        "badge": "You fix this"
-      },
-      "retry": {
-        "title": "Try again",
-        "badge": "Try again"
-      },
-      "partner": {
-        "title": "Waiting for a partner",
-        "badge": "Your partner fixes this"
-      }
+      "you": "For you to fix",
+      "retry": "Try again",
+      "tradingPartner": "Waiting for a partner"
     },
     "showAll": "{count, plural, one {Show the # task} other {Show all # tasks}}",
     "showNewest": "Show the newest {count}",
@@ -335,8 +328,8 @@
       "detail": "{direction, select, inbound {{messageType} from {partner}} other {{messageType} to {partner}}}",
       "action": {
         "you": "Fix it",
-        "retry": "Try again",
-        "partner": "See details"
+        "retry": "Open and try again",
+        "tradingPartner": "See details"
       }
     },
     "overdueAcknowledgement": {

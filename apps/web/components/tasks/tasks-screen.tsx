@@ -25,7 +25,6 @@ import {
   taskActors,
   type TaskCounts,
 } from '@edi-bridge/contracts'
-import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
   Empty,
@@ -96,7 +95,6 @@ function useTaskText() {
 }
 
 function TaskItem({ task, now }: { task: Task; now: Date }) {
-  const t = useTranslations('Tasks')
   const format = useFormatter()
   const taskText = useTaskText()
   const titleId = useId()
@@ -114,11 +112,8 @@ function TaskItem({ task, now }: { task: Task; now: Date }) {
         />
       </ItemMedia>
       <ItemContent className="min-w-0">
-        <ItemTitle className="flex-wrap">
+        <ItemTitle>
           <h3 id={titleId}>{title}</h3>
-          <Badge variant={task.whoActs === 'you' ? 'destructive' : 'secondary'}>
-            {t(`groups.${task.whoActs}.badge`)}
-          </Badge>
         </ItemTitle>
         <ItemDescription className="line-clamp-none">
           {detail} &middot;{' '}
@@ -161,7 +156,7 @@ function TaskGroup({
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <h2 id={headingId} className="text-sm font-medium">
-        {t(`groups.${whoActs}.title`)} <span className="text-muted-foreground">({count})</span>
+        {t(`groups.${whoActs}`)} <span className="text-muted-foreground">({count})</span>
       </h2>
       <ItemGroup id={listId} className="gap-2">
         {shown.map((task) => (
@@ -271,7 +266,7 @@ export function TasksScreen() {
   }
 
   return (
-    <AppPage busy={isPending && !isError} title={t('Sidebar.items.tasks.label')}>
+    <AppPage busy={isPending && !isError} title={t('Pages.tasks.label')}>
       <p className="text-muted-foreground max-w-prose text-sm">{t('Tasks.intro')}</p>
       <p aria-live="polite" className="sr-only">
         {isPending && !isError ? t('Tasks.loading') : ''}

@@ -21,7 +21,7 @@ describe('breadcrumbTrail', () => {
 
   it('names the tasks page', () => {
     expect(breadcrumbTrail('/tasks')).toEqual([
-      { href: '/tasks', label: { kind: 'item', key: 'tasks' } },
+      { href: '/tasks', label: { kind: 'page', key: 'tasks' } },
     ])
   })
 

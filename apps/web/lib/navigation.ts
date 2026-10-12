@@ -96,7 +96,6 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
     collapsible: false,
     items: [
       { key: 'home', page: 'overview' },
-      { key: 'tasks', page: 'tasks' },
       { key: 'documents', page: 'documents' },
       { key: 'orders', page: 'orderLifecycle', icon: ShoppingBasket01Icon },
     ],
@@ -150,6 +149,12 @@ export const sidebarItems = [
   ...sidebarGroups.flatMap((group) => group.items),
   ...sidebarFooterItems,
 ]
+
+export type PageItemKey = keyof Messages['Pages']
+
+export type PageItem = NavigationItem & { key: PageItemKey }
+
+export const pageItems: ReadonlyArray<PageItem> = [{ key: 'tasks', ...navigationItems.tasks }]
 
 export function sidebarItem(key: SidebarItemKey) {
   const item = sidebarItems.find((entry) => entry.key === key)

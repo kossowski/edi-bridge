@@ -8,6 +8,7 @@ import {
   fixTargetHref,
   interchangeHref,
   orderHref,
+  pageItems,
   sidebarItem,
   sidebarItems,
 } from './navigation'
@@ -19,6 +20,15 @@ describe('sidebarItem', () => {
     )
     expect(sidebarItem('codeTranslations').href).toBe('/lookup-tables')
     expect(sidebarItem('help').href).toBe('/help')
+  })
+})
+
+describe('pageItems', () => {
+  it('keeps the pages outside the sidebar out of it', () => {
+    expect(pageItems.map((item) => item.key).toSorted()).toEqual(
+      Object.keys(messages.Pages).toSorted(),
+    )
+    expect(sidebarItems.map((item) => item.href)).not.toContain('/tasks')
   })
 })
 

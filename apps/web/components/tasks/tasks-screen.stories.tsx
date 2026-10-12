@@ -88,7 +88,7 @@ export const EveryKind = meta.story({
   async play({ canvas }) {
     const you = await canvas.findByRole('region', { name: 'For you to fix (2)' })
     const retry = canvas.getByRole('region', { name: 'Try again (1)' })
-    const partner = canvas.getByRole('region', { name: 'Waiting for a partner (2)' })
+    const tradingPartner = canvas.getByRole('region', { name: 'Waiting for a partner (2)' })
 
     await expect(
       within(you).getByRole('heading', { name: 'Many documents with Hansemarkt GmbH fail' }),
@@ -101,17 +101,18 @@ export const EveryKind = meta.story({
       'href',
       expect.stringMatching(/^\/runs\//),
     )
-    await expect(within(retry).getByRole('link', { name: 'Try again' })).toHaveAttribute(
+    await expect(within(retry).getByRole('link', { name: 'Open and try again' })).toHaveAttribute(
       'href',
       expect.stringMatching(/^\/runs\//),
     )
     await expect(
-      within(partner).getByRole('heading', { name: 'Rheinkauf eG has not confirmed receipt' }),
+      within(tradingPartner).getByRole('heading', {
+        name: 'Rheinkauf eG has not confirmed receipt',
+      }),
     ).toBeVisible()
-    await expect(within(partner).getByRole('link', { name: 'Open transmission' })).toHaveAttribute(
-      'href',
-      expect.stringMatching(/^\/interchanges\//),
-    )
+    await expect(
+      within(tradingPartner).getByRole('link', { name: 'Open transmission' }),
+    ).toHaveAttribute('href', expect.stringMatching(/^\/interchanges\//))
   },
 })
 
@@ -139,15 +140,15 @@ export const LargeVolume = meta.story({
     msw.use(tasksHandler(apiUrl, 'large'))
   },
   async play({ canvas }) {
-    const partner = await canvas.findByRole(
+    const tradingPartner = await canvas.findByRole(
       'region',
       { name: /^Waiting for a partner/ },
       { timeout: 10_000 },
     )
 
-    await expect(within(partner).getAllByRole('listitem')).toHaveLength(10)
+    await expect(within(tradingPartner).getAllByRole('listitem')).toHaveLength(10)
     await expect(
-      within(partner).getByRole('button', { name: /^Show all \d+ tasks$/ }),
+      within(tradingPartner).getByRole('button', { name: /^Show all \d+ tasks$/ }),
     ).toBeVisible()
   },
 })
