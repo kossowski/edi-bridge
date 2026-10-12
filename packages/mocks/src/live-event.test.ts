@@ -17,7 +17,7 @@ import {
 import { homeHandler } from './home'
 import { createHandlers } from './index'
 import { liveEventsHandler, type LiveEventsOptions } from './live-event'
-import { createRuns, runsHandler } from './run'
+import { createRuns, runsHandler, seedRuns } from './run'
 import { createRunStore } from './run-store'
 import { seedTradingPartners } from './trading-partner'
 
@@ -28,6 +28,12 @@ const server = setupServer()
 let streams: AbortController
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+// A busy CI runner takes seconds to build the 12,000 seeded Runs. Built once here, they stay out
+// of the time limit of the first test that reads them.
+beforeAll(() => {
+  seedRuns()
+})
 
 beforeEach(() => {
   streams = new AbortController()

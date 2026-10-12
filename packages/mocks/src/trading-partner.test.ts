@@ -39,6 +39,12 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
+// A busy CI runner takes seconds to build the 12,000 seeded Runs. Built once here, they stay out
+// of the time limit of the first test that reads them.
+beforeAll(() => {
+  seedRuns()
+})
+
 afterEach(() => {
   server.resetHandlers()
   vi.useRealTimers()

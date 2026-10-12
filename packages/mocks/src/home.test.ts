@@ -13,10 +13,14 @@ import {
 
 import { homeHandler } from './home'
 import { createOverdueAcknowledgement } from './overdue-acknowledgement'
-import { createRun } from './run'
+import { createRun, seedRuns } from './run'
 import { tasksHandler } from './task'
 import { createTradingPartner, seedTradingPartners } from './trading-partner'
-import { emptyWorkspaceActivity, type WorkspaceActivity } from './workspace-activity'
+import {
+  emptyWorkspaceActivity,
+  type WorkspaceActivity,
+  workspaceActivityOf,
+} from './workspace-activity'
 
 const apiUrl = 'http://api.test'
 
@@ -25,6 +29,17 @@ const now = new Date('2026-10-10T12:20:00.000Z')
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+// A busy CI runner takes seconds to build the 12,000 seeded and the 30,000 large-volume Runs.
+// Built once here, at the tests' time, they stay out of the time limit of the first test that
+// reads them.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(now)
+  seedRuns()
+  workspaceActivityOf('large')
+  vi.useRealTimers()
+})
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -272,7 +287,7 @@ describe('GET /home states', () => {
     expect(home.throughput.every(({ delivered }) => delivered > 0)).toBe(true)
     expect(home.keyNumbers.needsAttention).toBeGreaterThan(0)
     expect(home.keyNumbers.inProgress).toBeGreaterThan(0)
-  }, 15_000)
+  })
 
   it('answers with a server error in the error state', async () => {
     server.use(homeHandler(apiUrl, 'error'))

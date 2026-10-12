@@ -39,7 +39,7 @@ import {
 } from './mapping'
 import { edifactLeaves, messageTypeStructureHandler } from './message-type-structure'
 import { day } from './overdue'
-import { createRun } from './run'
+import { createRun, seedRuns } from './run'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -47,6 +47,12 @@ const apiUrl = 'http://api.test'
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+// A busy CI runner takes seconds to build the 12,000 seeded Runs. Built once here, they stay out
+// of the time limit of the first test that reads them.
+beforeAll(() => {
+  seedRuns()
+})
 
 afterEach(() => server.resetHandlers())
 
