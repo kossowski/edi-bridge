@@ -27,8 +27,10 @@ import {
   mappingVersionsEndpoint,
   messageTypeStructureEndpoint,
   operatorWorkspacesEndpoint,
+  orderLifecycleEndpoint,
   orderLifecyclesEndpoint,
   homeEndpoint,
+  orderLifecycleStatusOf,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   type ReprocessRunBody,
@@ -55,6 +57,7 @@ import {
   updateCompanyIdentityEndpoint,
   updateTradingPartnerEndpoint,
   updateWorkspaceSettingsEndpoint,
+  waitForTradingPartnerRunEndpoint,
   withCheckDigit,
   workspaceMembersEndpoint,
 } from '@edi-bridge/contracts'
@@ -102,6 +105,14 @@ async function getRun(id: string) {
   const response = await fetch(`${apiUrl}${toPath(runEndpoint.path, { id })}`)
 
   return runDetailSchema.parse(await response.json())
+}
+
+async function orderLifecyclesOf(businessReference: string) {
+  const response = await fetch(
+    `${apiUrl}${toPath(orderLifecycleEndpoint.path, { businessReference })}`,
+  )
+
+  return orderLifecycleEndpoint.response.parse(await response.json())
 }
 
 async function send(method: string, path: string, body: TradingPartnerInput | LookupTableInput) {
@@ -415,37 +426,37 @@ describe('createHandlers', () => {
     expect(response.status).toBe(201)
   })
 
-  it.each(['full', 'partial', 'multiPartner', 'failures', 'largeVolume'] as const)(
-    'links each Message of the %s Order Lifecycle to its Run detail',
-    async (name) => {
-      server.use(...createHandlers(apiUrl))
-      const businessReference = orderLifecycleReferences[name]
+  it.each([
+    'full',
+    'partial',
+    'multiPartner',
+    'failures',
+    'largeVolume',
+    'onTrack',
+    'waitingForTradingPartner',
+  ] as const)('links each Message of the %s Order Lifecycle to its Run detail', async (name) => {
+    server.use(...createHandlers(apiUrl))
+    const businessReference = orderLifecycleReferences[name]
+    const lifecycles = await orderLifecyclesOf(businessReference)
 
-      const response = await fetch(
-        `${apiUrl}${orderLifecyclesEndpoint.path}?${toSearchParams({ businessReference })}`,
-      )
+    for (const { run, interchange } of lifecycles.flatMap(({ messages }) => messages)) {
+      const detail = await getRun(run.id)
+      const referenceTag = detail.messageType === 'ORDERS' ? 'BGM' : 'RFF'
+      const reference = detail.message?.segments.find(({ tag }) => tag === referenceTag)
 
-      const lifecycles = orderLifecyclesEndpoint.response.parse(await response.json())
+      expect(detail).toMatchObject({
+        status: run.status,
+        failureStage: run.failureStage,
+        replacedBy: run.replacedBy,
+      })
+      expect(detail.interchange?.id ?? null).toBe(interchange?.id ?? null)
+      expect(detail.interchange?.controlReference).toBe(interchange?.controlReference)
 
-      for (const { run, interchange } of lifecycles.flatMap(({ messages }) => messages)) {
-        const detail = await getRun(run.id)
-        const referenceTag = detail.messageType === 'ORDERS' ? 'BGM' : 'RFF'
-        const reference = detail.message?.segments.find(({ tag }) => tag === referenceTag)
-
-        expect(detail).toMatchObject({
-          status: run.status,
-          failureStage: run.failureStage,
-          replacedBy: run.replacedBy,
-        })
-        expect(detail.interchange?.id ?? null).toBe(interchange?.id ?? null)
-        expect(detail.interchange?.controlReference).toBe(interchange?.controlReference)
-
-        if (detail.message) {
-          expect(reference?.elements.flat()).toContain(businessReference)
-        }
+      if (detail.message) {
+        expect(reference?.elements.flat()).toContain(businessReference)
       }
-    },
-  )
+    }
+  })
 
   it('shows the Order Lifecycle of a Business Reference taken from the Run list', async () => {
     server.use(...createHandlers(apiUrl))
@@ -453,14 +464,10 @@ describe('createHandlers', () => {
     const listed = runs[0]!
     const businessReference = listed.businessReference!
 
-    const response = await fetch(
-      `${apiUrl}${orderLifecyclesEndpoint.path}?${toSearchParams({ businessReference })}`,
-    )
-
-    const lifecycles = orderLifecyclesEndpoint.response.parse(await response.json())
+    const lifecycles = await orderLifecyclesOf(businessReference)
     const messages = lifecycles.flatMap(({ messages }) => messages)
 
-    expect(lifecycles.map(({ tradingPartner }) => tradingPartner)).toContainEqual(
+    expect(lifecycles.map(({ tradingPartner: { id, name } }) => ({ id, name }))).toContainEqual(
       listed.tradingPartner,
     )
     expect(messages.find(({ run }) => run.id === listed.id)).toMatchObject({
@@ -485,13 +492,7 @@ describe('createHandlers', () => {
     const { runs } = await listRuns({ messageType: ['ORDERS'], receivedTo: twoWeeksAgo })
 
     const lifecycles = await Promise.all(
-      runs.map(async ({ businessReference }) => {
-        const response = await fetch(
-          `${apiUrl}${orderLifecyclesEndpoint.path}?${toSearchParams({ businessReference: businessReference! })}`,
-        )
-
-        return orderLifecyclesEndpoint.response.parse(await response.json())
-      }),
+      runs.map(({ businessReference }) => orderLifecyclesOf(businessReference!)),
     )
 
     const followed = lifecycles
@@ -507,6 +508,68 @@ describe('createHandlers', () => {
     for (const { messages } of followed) {
       expect(messages[0]!.messageType).toBe('ORDERS')
     }
+  })
+
+  it('lists the orders of the Run list next to the curated ones', async () => {
+    server.use(...createHandlers(apiUrl))
+    const { runs } = await listRuns({ messageType: ['DESADV'], status: ['delivered'] })
+    const listed = runs[0]!
+
+    const response = await fetch(
+      `${apiUrl}${orderLifecyclesEndpoint.path}?${toSearchParams({ q: listed.businessReference! })}`,
+    )
+
+    const { orderLifecycles } = orderLifecyclesEndpoint.response.parse(await response.json())
+
+    expect(orderLifecycles).toContainEqual(
+      expect.objectContaining({
+        businessReference: listed.businessReference,
+        tradingPartner: listed.tradingPartner,
+      }),
+    )
+  })
+
+  it('shows an order as waiting for the partner once its failed Run is marked', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const { runs } = await listRuns({
+      messageType: ['ORDERS'],
+      status: ['failed'],
+      failureStage: ['parse'],
+    })
+
+    const failed = runs.find(
+      ({ businessReference, tradingPartner }) =>
+        businessReference !== null &&
+        runs.filter(
+          (other) =>
+            other.businessReference === businessReference &&
+            other.tradingPartner.id === tradingPartner.id,
+        ).length === 1,
+    )!
+
+    const lifecycleOf = async () =>
+      (await orderLifecyclesOf(failed.businessReference!)).find(
+        ({ tradingPartner }) => tradingPartner.id === failed.tradingPartner.id,
+      )!
+
+    expect(orderLifecycleStatusOf((await lifecycleOf()).messages)).toBe('needs-attention')
+
+    await post(toPath(waitForTradingPartnerRunEndpoint.path, { id: failed.id }))
+
+    expect(orderLifecycleStatusOf((await lifecycleOf()).messages)).toBe(
+      'waiting-for-trading-partner',
+    )
+  })
+
+  it('shows the seeded waiting mark of an order on its document', async () => {
+    server.use(...createHandlers(apiUrl))
+    const [lifecycle] = await orderLifecyclesOf(orderLifecycleReferences.waitingForTradingPartner)
+    const { run } = lifecycle!.messages[0]!
+
+    expect((await getRun(run.id)).waitingForTradingPartnerSince).toBe(
+      run.waitingForTradingPartnerSince,
+    )
   })
 
   it('lists and shows the Runs of a Manual Submission', async () => {

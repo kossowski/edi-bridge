@@ -3,6 +3,7 @@ import {
   acknowledgementStates,
   type OrderLifecycleMessage,
   type OrderLifecycleMessageType,
+  oldestFirst,
   openMessageTypes,
   orderLifecycleMessageTypes,
 } from '@edi-bridge/contracts'
@@ -29,9 +30,7 @@ export function orderLifecycleSteps(
       messageType,
       open,
       missing: empty && !open,
-      messages: messages
-        .filter((message) => message.messageType === messageType)
-        .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
+      messages: oldestFirst(messages.filter((message) => message.messageType === messageType)),
     }
   })
 }

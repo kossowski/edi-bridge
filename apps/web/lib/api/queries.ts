@@ -15,6 +15,7 @@ import type {
   Flow,
   HomeWindow,
   InterchangeListQuery,
+  OrderLifecycleListQuery,
   Invite,
   LookupTable,
   MappingComparisonQuery,
@@ -61,6 +62,7 @@ import {
   listMappingVersions,
   listOperatorWorkspaceMembers,
   listOperatorWorkspaces,
+  getOrderLifecyclesOf,
   listOrderLifecycles,
   listPublishedMappingVersions,
   listRuns,
@@ -224,13 +226,23 @@ export const tasksQuery = queryOptions({
 
 export const orderLifecycleKeys = {
   all: () => ['order-lifecycles'] as const,
-  search: (businessReference: string) => [...orderLifecycleKeys.all(), businessReference] as const,
+  list: (query: OrderLifecycleListQuery) => [...orderLifecycleKeys.all(), 'list', query] as const,
+  detail: (businessReference: string) =>
+    [...orderLifecycleKeys.all(), 'detail', businessReference] as const,
 }
 
-export function orderLifecyclesQuery(businessReference: string) {
+export function orderLifecycleListQuery(query: OrderLifecycleListQuery) {
   return queryOptions({
-    queryKey: orderLifecycleKeys.search(businessReference),
-    queryFn: () => listOrderLifecycles({ businessReference }),
+    queryKey: orderLifecycleKeys.list(query),
+    queryFn: () => listOrderLifecycles(query),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function orderLifecycleDetailQuery(businessReference: string) {
+  return queryOptions({
+    queryKey: orderLifecycleKeys.detail(businessReference),
+    queryFn: () => getOrderLifecyclesOf(businessReference),
   })
 }
 

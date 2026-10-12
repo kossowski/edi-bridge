@@ -64,7 +64,8 @@ import {
   parseAiDraftEvent,
   operatorWorkspacesEndpoint,
   moveFlowMappingVersionEndpoint,
-  type OrderLifecycleQuery,
+  orderLifecycleEndpoint,
+  type OrderLifecycleListQuery,
   orderLifecyclesEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
@@ -296,8 +297,14 @@ export function getTasks() {
   return request(tasksEndpoint)
 }
 
-export function listOrderLifecycles(query: OrderLifecycleQuery) {
+export function listOrderLifecycles(query: OrderLifecycleListQuery) {
   return request(orderLifecyclesEndpoint, { query })
+}
+
+export function getOrderLifecyclesOf(businessReference: string) {
+  return request(orderLifecycleEndpoint, {
+    path: toPath(orderLifecycleEndpoint.path, { businessReference }),
+  })
 }
 
 export function listRuns(query: RunListQuery) {

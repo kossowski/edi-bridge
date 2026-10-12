@@ -2,25 +2,34 @@ import { delay, http, HttpResponse } from 'msw'
 
 import {
   type AcknowledgementState,
+  businessReferenceSchema,
   directionOf,
   type FailureStage,
   fromSearchParams,
   type OrderLifecycle,
+  orderLifecycleEndpoint,
   type OrderLifecycleInterchange,
+  type OrderLifecycleMessage,
   orderLifecycleMessageSchema,
   type OrderLifecycleMessageType,
   orderLifecycleMessageTypeSchema,
   orderLifecycleSchema,
   orderLifecyclesEndpoint,
+  type OrderLifecycleStatus,
+  type OrderLifecycleSummary,
+  oldestFirst,
   type RunSummary,
+  toOrderLifecycleSummary,
   type TradingPartner,
+  type TradingPartnerSummary,
 } from '@edi-bridge/contracts'
 
 import { seedFlows } from './flow'
+import { includesText, pageOf } from './list'
 import { hour, isUnacknowledged, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
 import { toRunSummary } from './run'
-import { createRunStore, type Reprocessed, type RunStore } from './run-store'
+import { controlReferenceOf, createRunStore, type Reprocessed, type RunStore } from './run-store'
 import { stableUuid } from './seed-id'
 import { seedTradingPartners, type TradingPartnerStore } from './trading-partner'
 
@@ -30,6 +39,8 @@ export const orderLifecycleReferences = {
   multiPartner: '4713',
   failures: '4714',
   largeVolume: '4715',
+  onTrack: '4716',
+  waitingForTradingPartner: '4717',
   noMatch: '0000',
   serverError: '5000',
 } as const
@@ -41,6 +52,7 @@ type MessageSeed = {
   hoursAgo: number
   outcome: 'delivered' | FailureStage
   acknowledgement?: AcknowledgementOutcome | undefined
+  waitingHoursAgo?: number
   reprocessed?: { hoursAgo: number; acknowledgement: AcknowledgementOutcome }
 }
 
@@ -160,12 +172,42 @@ const lifecycleSeeds: LifecycleSeed[] = [
       ...partDeliveries(),
     ],
   },
+  {
+    businessReference: orderLifecycleReferences.onTrack,
+    tradingPartner: 'Spreewald Frische GmbH',
+    messages: [{ messageType: 'ORDERS', hoursAgo: 2, outcome: 'delivered' }],
+  },
+  {
+    businessReference: orderLifecycleReferences.waitingForTradingPartner,
+    tradingPartner: 'Rheinkauf eG',
+    messages: [{ messageType: 'ORDERS', hoursAgo: 20, outcome: 'parse', waitingHoursAgo: 18 }],
+  },
 ]
 
 export type OrderLifecycleSeed = {
   runs: RunSummary[]
   reprocessed: Reprocessed[]
   orderLifecycles: OrderLifecycle[]
+  waitingForTradingPartnerSince: Map<string, string>
+}
+
+function lifecycleTradingPartnerOf({
+  id,
+  name,
+  acknowledgementTimeLimitHours,
+}: TradingPartnerSummary & Pick<TradingPartner, 'acknowledgementTimeLimitHours'>) {
+  return { id, name, acknowledgementTimeLimitHours }
+}
+
+function acknowledgementOf(
+  sentAt: string,
+  outcome: AcknowledgementOutcome | undefined,
+  tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
+  now: Date,
+): AcknowledgementState {
+  return (
+    outcome ?? (overdueSinceOf(sentAt, tradingPartner) <= now.getTime() ? 'overdue' : 'pending')
+  )
 }
 
 function interchangeOf(
@@ -179,12 +221,11 @@ function interchangeOf(
   }
 
   const sent = directionOf(run) === 'outbound' && run.status === 'delivered'
-  const overdueSince = overdueSinceOf(run.receivedAt, tradingPartner)
 
   return {
     ...run.interchange,
     acknowledgement: sent
-      ? (acknowledgement ?? (overdueSince <= now.getTime() ? 'overdue' : 'pending'))
+      ? acknowledgementOf(run.receivedAt, acknowledgement, tradingPartner, now)
       : null,
   }
 }
@@ -198,6 +239,7 @@ type MessageEntry = {
 export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
   const runs: RunSummary[] = []
   const reprocessed: Reprocessed[] = []
+  const waitingForTradingPartnerSince = new Map<string, string>()
 
   const seeded = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
     const tradingPartner = seedTradingPartners.find(({ name }) => name === seed.tradingPartner)!
@@ -235,6 +277,13 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
 
     const entries = messages.flatMap((message, index): MessageEntry[] => {
       const run = toRun(String(index), message)
+
+      if (message.waitingHoursAgo !== undefined) {
+        waitingForTradingPartnerSince.set(
+          run.id,
+          new Date(now.getTime() - message.waitingHoursAgo * hour).toISOString(),
+        )
+      }
 
       if (!message.reprocessed) {
         return [{ runId: run.id, acknowledgement: message.acknowledgement, replacedBy: null }]
@@ -276,6 +325,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
           status: run.status,
           failureStage: run.failureStage,
           replacedBy: replacedBy && { id: replacedBy.id },
+          waitingForTradingPartnerSince: waitingForTradingPartnerSince.get(run.id) ?? null,
         },
         interchange: interchangeOf(run, acknowledgement, tradingPartner, now),
       })
@@ -283,98 +333,347 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
 
     return orderLifecycleSchema.parse({
       businessReference,
-      tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
-      messages: entries
-        .map(toMessage)
-        .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt)),
+      tradingPartner: lifecycleTradingPartnerOf(tradingPartner),
+      messages: oldestFirst(entries.map(toMessage)),
     })
   })
 
-  return { runs, reprocessed, orderLifecycles }
+  return { runs, reprocessed, orderLifecycles, waitingForTradingPartnerSince }
+}
+
+type VolumeStep = {
+  messageType: OrderLifecycleMessageType
+  hoursAgo: number
+  outcome: 'delivered' | 'processing' | FailureStage
+  acknowledgement?: AcknowledgementOutcome
+  waiting?: boolean
+}
+
+const volumeProfiles: ReadonlyArray<(hoursAgo: number, limit: number) => VolumeStep[]> = [
+  (hoursAgo) => [{ messageType: 'ORDERS', hoursAgo, outcome: 'delivered' }],
+  (hoursAgo) => [
+    { messageType: 'ORDERS', hoursAgo: hoursAgo + 6, outcome: 'delivered' },
+    { messageType: 'DESADV', hoursAgo, outcome: 'processing' },
+  ],
+  (hoursAgo) => [
+    { messageType: 'ORDERS', hoursAgo: hoursAgo + 48, outcome: 'delivered' },
+    {
+      messageType: 'DESADV',
+      hoursAgo: hoursAgo + 24,
+      outcome: 'delivered',
+      acknowledgement: 'accepted',
+    },
+    { messageType: 'INVOIC', hoursAgo, outcome: 'delivered', acknowledgement: 'accepted' },
+  ],
+  (hoursAgo, limit) => [
+    { messageType: 'ORDERS', hoursAgo: hoursAgo + 6, outcome: 'delivered' },
+    { messageType: 'DESADV', hoursAgo: Math.min(hoursAgo, limit / 2), outcome: 'delivered' },
+  ],
+  (hoursAgo) => [{ messageType: 'ORDERS', hoursAgo, outcome: 'parse', waiting: true }],
+  (hoursAgo) => [
+    { messageType: 'ORDERS', hoursAgo: hoursAgo + 6, outcome: 'delivered' },
+    { messageType: 'DESADV', hoursAgo, outcome: 'mapping' },
+  ],
+  (hoursAgo, limit) => [
+    { messageType: 'ORDERS', hoursAgo: hoursAgo + limit + 30, outcome: 'delivered' },
+    {
+      messageType: 'DESADV',
+      hoursAgo: hoursAgo + limit + 6,
+      outcome: 'delivered',
+      acknowledgement: 'accepted',
+    },
+    { messageType: 'INVOIC', hoursAgo: hoursAgo + limit + 1, outcome: 'delivered' },
+  ],
+  (hoursAgo) => [
+    { messageType: 'ORDERS', hoursAgo: hoursAgo + 30, outcome: 'delivered' },
+    { messageType: 'DESADV', hoursAgo, outcome: 'delivered', acknowledgement: 'rejected' },
+  ],
+]
+
+export function createLargeVolumeOrderLifecycles({
+  count = 320,
+  now = new Date(),
+}: { count?: number; now?: Date } = {}): OrderLifecycle[] {
+  return Array.from({ length: count }, (_, index) => {
+    const tradingPartner = seedTradingPartners[index % seedTradingPartners.length]!
+    const profile = volumeProfiles[Math.floor(index / 2) % volumeProfiles.length]!
+    const businessReference = `PO8${String(index + 1).padStart(5, '0')}`
+
+    const messages = profile(index * 1.5 + 0.25, tradingPartner.acknowledgementTimeLimitHours).map(
+      (step, position): OrderLifecycleMessage => {
+        const id = stableUuid(`order-lifecycle:large:${businessReference}:${position}`)
+        const receivedAt = new Date(now.getTime() - step.hoursAgo * hour).toISOString()
+        const direction = directionOf(step)
+
+        const run =
+          step.outcome === 'delivered' || step.outcome === 'processing'
+            ? {
+                id,
+                status: step.outcome,
+                failureStage: null,
+                replacedBy: null,
+                waitingForTradingPartnerSince: null,
+              }
+            : {
+                id,
+                status: 'failed' as const,
+                failureStage: step.outcome,
+                replacedBy: null,
+                waitingForTradingPartnerSince: step.waiting
+                  ? new Date(Date.parse(receivedAt) + hour).toISOString()
+                  : null,
+              }
+
+        return {
+          messageType: step.messageType,
+          direction,
+          receivedAt,
+          run,
+          interchange:
+            step.outcome === 'delivered'
+              ? {
+                  id,
+                  controlReference: controlReferenceOf(id),
+                  acknowledgement:
+                    direction === 'outbound'
+                      ? acknowledgementOf(receivedAt, step.acknowledgement, tradingPartner, now)
+                      : null,
+                }
+              : null,
+        }
+      },
+    )
+
+    return orderLifecycleSchema.parse({
+      businessReference,
+      tradingPartner: lifecycleTradingPartnerOf(tradingPartner),
+      messages: oldestFirst(messages),
+    })
+  })
 }
 
 const defaultTimeLimit = { acknowledgementTimeLimitHours: 24 }
 
-// Without a curated seed, the Runs of the Business Reference form one Order Lifecycle per Trading
+type OrderLifecycleSourceOptions = {
+  runs?: RunStore | undefined
+  tradingPartners?: Pick<TradingPartnerStore, 'get'>
+  waitingForTradingPartnerSince?: ReadonlyMap<string, string>
+}
+
+const seedTradingPartnerLookup: Pick<TradingPartnerStore, 'get'> = {
+  get: (id) => seedTradingPartners.find((candidate) => candidate.id === id),
+}
+
+// Without a curated seed, the Runs of a Business Reference form one Order Lifecycle per Trading
 // Partner, with the same Acknowledgements that GET /tasks lists as overdue.
-function orderLifecyclesOfRuns(
-  businessReference: string,
-  runs: RunStore,
-  tradingPartners: Pick<TradingPartnerStore, 'get'>,
-  now: Date,
-): OrderLifecycle[] {
-  const byTradingPartner = new Map<string, RunSummary[]>()
+function createOrderLifecycleSource(
+  curated: ReadonlyArray<OrderLifecycle>,
+  {
+    runs,
+    tradingPartners = seedTradingPartnerLookup,
+    waitingForTradingPartnerSince,
+  }: OrderLifecycleSourceOptions,
+) {
+  const curatedReferences = new Set(curated.map(({ businessReference }) => businessReference))
+  let derivedFor: readonly RunSummary[] | undefined
+  let derived: OrderLifecycle[] = []
 
-  for (const run of runs.withBusinessReference(businessReference)) {
-    if (!orderLifecycleMessageTypeSchema.safeParse(run.messageType).success) {
-      continue
-    }
+  function lifecyclesOfRuns(
+    store: RunStore,
+    lifecycleRuns: readonly RunSummary[],
+    now: Date,
+  ): OrderLifecycle[] {
+    const byLifecycle = Map.groupBy(
+      lifecycleRuns.filter(
+        (run) =>
+          run.businessReference !== null &&
+          !curatedReferences.has(run.businessReference) &&
+          orderLifecycleMessageTypeSchema.safeParse(run.messageType).success,
+      ),
+      (run) => `${run.businessReference} ${run.tradingPartner.id}`,
+    )
 
-    const partnerRuns = byTradingPartner.get(run.tradingPartner.id) ?? []
-    partnerRuns.push(run)
-    byTradingPartner.set(run.tradingPartner.id, partnerRuns)
+    return [...byLifecycle.values()].map((group) => {
+      const { tradingPartner, businessReference } = group[0]!
+      const timeLimit = tradingPartners.get(tradingPartner.id) ?? defaultTimeLimit
+
+      return {
+        businessReference: businessReference!,
+        tradingPartner: lifecycleTradingPartnerOf({
+          ...tradingPartner,
+          acknowledgementTimeLimitHours: timeLimit.acknowledgementTimeLimitHours,
+        }),
+        messages: oldestFirst(group).map((run): OrderLifecycleMessage => ({
+          messageType: orderLifecycleMessageTypeSchema.parse(run.messageType),
+          direction: directionOf(run),
+          receivedAt: run.receivedAt,
+          run: {
+            ...(run.status === 'failed'
+              ? { status: run.status, failureStage: run.failureStage }
+              : { status: run.status, failureStage: null }),
+            id: run.id,
+            replacedBy: replacedByOf(store, run.id),
+            waitingForTradingPartnerSince: null,
+          },
+          interchange: interchangeOf(
+            run,
+            isUnacknowledged(run) ? undefined : 'accepted',
+            timeLimit,
+            now,
+          ),
+        })),
+      }
+    })
   }
 
-  return [...byTradingPartner.values()].map((lifecycleRuns) => {
-    const { tradingPartner } = lifecycleRuns[0]!
-    const timeLimit = tradingPartners.get(tradingPartner.id) ?? defaultTimeLimit
+  function replacedByOf(store: RunStore, runId: string) {
+    const replacing = store.replacingOf(runId)
 
-    return orderLifecycleSchema.parse({
-      businessReference,
-      tradingPartner,
-      messages: lifecycleRuns
-        .toSorted((a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt))
-        .map((run) => {
-          const replacing = runs.replacingOf(run.id)
+    return replacing !== undefined && store.get(replacing) ? { id: replacing } : null
+  }
 
-          return {
-            messageType: run.messageType,
-            direction: directionOf(run),
-            receivedAt: run.receivedAt,
-            run: {
-              id: run.id,
-              status: run.status,
-              failureStage: run.failureStage,
-              replacedBy: replacing !== undefined && runs.get(replacing) ? { id: replacing } : null,
-            },
-            interchange: interchangeOf(
-              run,
-              isUnacknowledged(run) ? undefined : 'accepted',
-              timeLimit,
-              now,
-            ),
-          }
-        }),
-    })
-  })
+  function withWaiting(lifecycle: OrderLifecycle): OrderLifecycle {
+    if (!waitingForTradingPartnerSince?.size) {
+      return lifecycle
+    }
+
+    return {
+      ...lifecycle,
+      messages: lifecycle.messages.map((message) => {
+        const since = waitingForTradingPartnerSince.get(message.run.id)
+
+        return message.run.status === 'failed' && since !== undefined
+          ? { ...message, run: { ...message.run, waitingForTradingPartnerSince: since } }
+          : message
+      }),
+    }
+  }
+
+  function all() {
+    // The Run store returns a new array after every change, so a new array means new Runs.
+    if (runs && derivedFor !== runs.all()) {
+      derivedFor = runs.all()
+      derived = lifecyclesOfRuns(runs, derivedFor, new Date())
+    }
+
+    return [...curated, ...derived].map(withWaiting)
+  }
+
+  function of(businessReference: string) {
+    const found = curatedReferences.has(businessReference)
+      ? curated.filter((lifecycle) => lifecycle.businessReference === businessReference)
+      : runs
+        ? lifecyclesOfRuns(runs, runs.withBusinessReference(businessReference), new Date())
+        : []
+
+    return found.map((lifecycle) => orderLifecycleSchema.parse(withWaiting(lifecycle)))
+  }
+
+  return { all, of }
 }
 
 export type OrderLifecycleState = 'loading' | 'error'
 
+function unavailableHandler(path: string, state: OrderLifecycleState) {
+  return state === 'loading'
+    ? http.get(path, async () => {
+        await delay('infinite')
+      })
+    : http.get(path, () => serverError())
+}
+
 export function orderLifecycleHandler(
   apiUrl: string,
   source?: ReadonlyArray<OrderLifecycle> | OrderLifecycleState,
-  {
-    runs,
-    tradingPartners = { get: (id) => seedTradingPartners.find((candidate) => candidate.id === id) },
-  }: { runs?: RunStore; tradingPartners?: Pick<TradingPartnerStore, 'get'> } = {},
+  options: OrderLifecycleSourceOptions = {},
+) {
+  const path = `${apiUrl}${orderLifecycleEndpoint.path}`
+
+  if (source === 'loading' || source === 'error') {
+    return unavailableHandler(path, source)
+  }
+
+  let lifecycles: ReturnType<typeof createOrderLifecycleSource> | undefined
+
+  return http.get(path, ({ params }) => {
+    lifecycles ??= createOrderLifecycleSource(
+      source ?? seedOrderLifecycles().orderLifecycles,
+      options,
+    )
+
+    const businessReference = businessReferenceSchema.safeParse(params.businessReference)
+
+    if (!businessReference.success) {
+      return badRequest(businessReference.error.message)
+    }
+
+    if (businessReference.data === orderLifecycleReferences.serverError) {
+      return serverError()
+    }
+
+    return HttpResponse.json(
+      lifecycles
+        .of(businessReference.data)
+        .toSorted((a, b) => a.tradingPartner.name.localeCompare(b.tradingPartner.name)),
+    )
+  })
+}
+
+export type OrderLifecycleListState = 'empty' | 'large' | 'loading' | 'error'
+
+// Shared by every handler because building and parsing the large volume is slow.
+let largeVolumeOrderLifecycles: OrderLifecycle[] | undefined
+
+function listSourceOf(source: ReadonlyArray<OrderLifecycle> | 'empty' | 'large' | undefined) {
+  switch (source) {
+    case undefined: {
+      return seedOrderLifecycles().orderLifecycles
+    }
+
+    case 'empty': {
+      return []
+    }
+
+    case 'large': {
+      return (largeVolumeOrderLifecycles ??= createLargeVolumeOrderLifecycles())
+    }
+
+    default: {
+      return source
+    }
+  }
+}
+
+function statusCountsOf(summaries: ReadonlyArray<OrderLifecycleSummary>) {
+  const statusCounts: Record<OrderLifecycleStatus, number> = {
+    'on-track': 0,
+    'needs-attention': 0,
+    'waiting-for-trading-partner': 0,
+    done: 0,
+  }
+
+  for (const { status } of summaries) {
+    statusCounts[status] += 1
+  }
+
+  return statusCounts
+}
+
+export function orderLifecycleListHandler(
+  apiUrl: string,
+  source?: ReadonlyArray<OrderLifecycle> | OrderLifecycleListState,
+  options: OrderLifecycleSourceOptions = {},
 ) {
   const path = `${apiUrl}${orderLifecyclesEndpoint.path}`
 
-  if (source === 'loading') {
-    return http.get(path, async () => {
-      await delay('infinite')
-    })
+  if (source === 'loading' || source === 'error') {
+    return unavailableHandler(path, source)
   }
 
-  if (source === 'error') {
-    return http.get(path, () => serverError())
-  }
-
-  let orderLifecycles: ReadonlyArray<OrderLifecycle> | undefined
+  let lifecycles: ReturnType<typeof createOrderLifecycleSource> | undefined
 
   return http.get(path, ({ request }) => {
-    orderLifecycles ??= source ?? seedOrderLifecycles().orderLifecycles
+    lifecycles ??= createOrderLifecycleSource(listSourceOf(source), options)
 
     const query = orderLifecyclesEndpoint.query.safeParse(
       fromSearchParams(new URL(request.url).searchParams),
@@ -384,23 +683,33 @@ export function orderLifecycleHandler(
       return badRequest(query.error.message)
     }
 
-    const { businessReference } = query.data
+    const text = query.data.q?.toLowerCase() ?? ''
+    const statuses = query.data.status ?? []
 
-    if (businessReference === orderLifecycleReferences.serverError) {
-      return serverError()
-    }
+    const searched = lifecycles
+      .all()
+      .flatMap((lifecycle) =>
+        text === '' ||
+        includesText(lifecycle.businessReference, text) ||
+        includesText(lifecycle.tradingPartner.name, text)
+          ? [toOrderLifecycleSummary(lifecycle)]
+          : [],
+      )
 
-    const curated = orderLifecycles.filter(
-      (lifecycle) => lifecycle.businessReference === businessReference,
-    )
+    const filtered = searched
+      .filter(({ status }) => statuses.length === 0 || statuses.includes(status))
+      .toSorted(
+        (a, b) =>
+          Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt) ||
+          a.businessReference.localeCompare(b.businessReference),
+      )
 
-    const found =
-      curated.length > 0 || !runs
-        ? curated
-        : orderLifecyclesOfRuns(businessReference, runs, tradingPartners, new Date())
+    const { items, ...paging } = pageOf(filtered, query.data)
 
-    return HttpResponse.json(
-      found.toSorted((a, b) => a.tradingPartner.name.localeCompare(b.tradingPartner.name)),
-    )
+    return HttpResponse.json({
+      orderLifecycles: items,
+      statusCounts: statusCountsOf(searched),
+      ...paging,
+    })
   })
 }

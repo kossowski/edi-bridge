@@ -11,7 +11,7 @@ import { AppPage } from '@/components/app-page'
 import { Loading, Notice } from '@/components/detail-parts'
 import { LoadError } from '@/components/load-error'
 import { OrderLifecycleTimeline } from '@/components/order-lifecycle/order-lifecycle-timeline'
-import { orderLifecycleKeys, orderLifecyclesQuery } from '@/lib/api/queries'
+import { orderLifecycleKeys, orderLifecycleDetailQuery } from '@/lib/api/queries'
 import { businessReferenceSchema } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Input } from '@edi-bridge/ui/components/input'
@@ -69,7 +69,10 @@ function SearchForm({
 
 function Results({ businessReference }: { businessReference: string }) {
   const t = useTranslations('OrderLifecycle')
-  const { data, isError, isFetching, refetch } = useQuery(orderLifecyclesQuery(businessReference))
+
+  const { data, isError, isFetching, refetch } = useQuery(
+    orderLifecycleDetailQuery(businessReference),
+  )
 
   if (isError) {
     return (
@@ -125,7 +128,7 @@ export function OrderLifecycleScreen({
         businessReference={searched}
         onSearch={(next) => {
           if (next === searched) {
-            void queryClient.invalidateQueries({ queryKey: orderLifecycleKeys.search(next) })
+            void queryClient.invalidateQueries({ queryKey: orderLifecycleKeys.detail(next) })
           } else {
             router.push(`/order-lifecycle?${new URLSearchParams({ businessReference: next })}`)
           }

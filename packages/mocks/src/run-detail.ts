@@ -101,6 +101,7 @@ export type RunDetailOptions = (
   flows?: FlowStore
   channels?: ChannelStore
   lookupTables?: LookupTableStore
+  waitingForTradingPartnerSince?: Map<string, string>
 }
 
 export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): Reprocessed[] {
@@ -135,7 +136,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   const generated = new WeakMap<RunGroup, GeneratedGroup>()
   const chosenVersions = new Map<string, MappingVersionSummary>()
   const retried = new Map<string, RunDetail>()
-  const waitingSince = new Map<string, string>()
+  const waitingSince = options.waitingForTradingPartnerSince ?? new Map<string, string>()
 
   const problemSources = {
     flows: toFlowStore(options.flows),

@@ -19,7 +19,7 @@ import { useApplePlatform } from '@/hooks/use-apple-platform'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useSearchShortcut } from '@/hooks/use-search-shortcut'
 import { useSession } from '@/hooks/use-session'
-import { orderLifecyclesQuery, runsQuery, tradingPartnersQuery } from '@/lib/api/queries'
+import { orderLifecycleDetailQuery, runsQuery, tradingPartnersQuery } from '@/lib/api/queries'
 import { businessReferenceSchema } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
@@ -68,7 +68,7 @@ export function AppSearch() {
   const runs = useQuery({ ...runsQuery(latestRuns), enabled: open, retry: false })
 
   const orderLifecycles = useQuery({
-    ...orderLifecyclesQuery(searchedBusinessReference ?? ''),
+    ...orderLifecycleDetailQuery(searchedBusinessReference ?? ''),
     enabled: open && searchedBusinessReference !== undefined,
     retry: false,
   })
