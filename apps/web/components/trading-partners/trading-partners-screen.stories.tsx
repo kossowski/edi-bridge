@@ -1,4 +1,4 @@
-import { delay, http } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { expect, within } from 'storybook/test'
 
 import { viewerStory } from '@/components/session/session-story-helpers'
@@ -32,6 +32,8 @@ export const Default = meta.story({
     const live = await cardOf(canvasElement, 'Hansemarkt GmbH')
 
     await expect(live.getByText('Live')).toBeVisible()
+    await expect(live.getByText('Set up and exchanging real documents')).toBeVisible()
+    await expect(live.queryByRole('progressbar')).toBeNull()
     await expect(live.getByRole('link')).toHaveAccessibleName('Open partner Hansemarkt GmbH')
     await expect(live.getByRole('link')).toHaveAttribute(
       'href',
@@ -87,7 +89,22 @@ export const Loading = meta.story({
   },
 })
 
-export const Unavailable = meta.story({
+export const PartnersUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${tradingPartnersEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Trading partners unavailable')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: 'Add trading partner' })).toBeNull()
+  },
+})
+
+export const ActivityUnavailable = meta.story({
   beforeEach({ msw }) {
     msw.use(...tradingPartnerActivityHandlers(apiUrl, 'error'))
   },

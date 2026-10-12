@@ -1,6 +1,6 @@
 'use client'
 
-import { Add01Icon, Alert02Icon, UserMultiple02Icon } from '@hugeicons/core-free-icons'
+import { Alert02Icon, CheckmarkCircle02Icon, UserMultiple02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
@@ -9,10 +9,10 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { AppPage } from '@/components/app-page'
+import { ListEmpty, NewLink } from '@/components/list-table'
 import { LoadError } from '@/components/load-error'
 import { partnerSetup } from '@/components/trading-partners/partner-setup'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
-import { useCanChange } from '@/hooks/use-session'
 import {
   currentWorkspaceQuery,
   tradingPartnerActivitiesQuery,
@@ -27,14 +27,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@edi-bridge/ui/components/card'
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@edi-bridge/ui/components/empty'
 import { Progress, ProgressLabel } from '@edi-bridge/ui/components/progress'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -51,15 +43,6 @@ const noActivity: PartnerActivity = {
   flowCount: 0,
 }
 
-function AddPartnerLink({ label }: { label: string }) {
-  return (
-    <Link href="/trading-partners/new" className={buttonVariants()}>
-      <HugeiconsIcon icon={Add01Icon} strokeWidth={2} aria-hidden data-icon="inline-start" />
-      {label}
-    </Link>
-  )
-}
-
 function SetupProgress({
   tradingPartner,
   activity,
@@ -70,6 +53,21 @@ function SetupProgress({
   workspaceGln: string | null
 }) {
   const t = useTranslations('TradingPartners.setup')
+
+  if (!tradingPartner.testMode) {
+    return (
+      <p className="flex items-center gap-2 text-sm">
+        <HugeiconsIcon
+          icon={CheckmarkCircle02Icon}
+          strokeWidth={2}
+          aria-hidden
+          className="text-primary size-4 shrink-0"
+        />
+        {t('complete')}
+      </p>
+    )
+  }
+
   const { done, total, next } = partnerSetup(tradingPartner, activity, workspaceGln)
   const progress = t('progress', { done, total })
 
@@ -79,9 +77,7 @@ function SetupProgress({
         <ProgressLabel>{t('label')}</ProgressLabel>
         <span className="text-muted-foreground ml-auto text-sm tabular-nums">{progress}</span>
       </Progress>
-      <p className="text-sm">
-        {next === null ? t('complete') : t('next', { step: t(`steps.${next}`) })}
-      </p>
+      {next !== null && <p className="text-sm">{t('next', { step: t(`steps.${next}`) })}</p>}
     </div>
   )
 }
@@ -136,7 +132,7 @@ function PartnerCard({
           tradingPartner={tradingPartner}
           workspaceGln={workspaceGln}
         />
-        <dl className="mt-auto grid grid-cols-3 gap-3">
+        <dl className="mt-auto grid grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-3">
           <Fact label={t('facts.documentsToday')}>{format.number(activity.runsToday)}</Fact>
           <Fact label={t('facts.openProblems')}>
             <span
@@ -188,30 +184,6 @@ function LoadingCards() {
   ))
 }
 
-function EmptyPartners() {
-  const t = useTranslations('TradingPartners.empty')
-  const canChange = useCanChange()
-
-  return (
-    <Empty className="border border-dashed">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <HugeiconsIcon icon={UserMultiple02Icon} strokeWidth={2} />
-        </EmptyMedia>
-        <EmptyTitle>{t('title')}</EmptyTitle>
-        <EmptyDescription>
-          {canChange ? t('description') : t('viewOnlyDescription')}
-        </EmptyDescription>
-      </EmptyHeader>
-      {canChange && (
-        <EmptyContent>
-          <AddPartnerLink label={t('action')} />
-        </EmptyContent>
-      )}
-    </Empty>
-  )
-}
-
 function byName(a: TradingPartner, b: TradingPartner) {
   return a.name.localeCompare(b.name)
 }
@@ -250,13 +222,23 @@ export function TradingPartnersScreen() {
     }
 
     if (empty) {
-      return <EmptyPartners />
+      return (
+        <ListEmpty
+          action={
+            <NewLink href="/trading-partners/new" label={t('TradingPartners.empty.action')} />
+          }
+          description={t('TradingPartners.empty.description')}
+          icon={UserMultiple02Icon}
+          title={t('TradingPartners.empty.title')}
+          viewOnlyDescription={t('TradingPartners.empty.viewOnlyDescription')}
+        />
+      )
     }
 
     const shown = busy ? [] : [...(tradingPartners.data ?? [])].sort(byName)
 
     return (
-      <div className="flex flex-col gap-3">
+      <div className="@container flex flex-col gap-3">
         <p aria-live="polite" className="text-muted-foreground text-sm">
           {busy
             ? t('TradingPartners.loading')
@@ -265,7 +247,7 @@ export function TradingPartnersScreen() {
         <ul
           aria-busy={busy}
           aria-label={t('TradingPartners.list')}
-          className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          className="grid gap-4 @4xl:grid-cols-2 @7xl:grid-cols-3">
           {busy ? (
             <LoadingCards />
           ) : (
@@ -288,7 +270,9 @@ export function TradingPartnersScreen() {
   return (
     <AppPage
       changeActions={
-        !failed && !empty ? <AddPartnerLink label={t('TradingPartners.add')} /> : undefined
+        !failed && !empty ? (
+          <NewLink href="/trading-partners/new" label={t('TradingPartners.add')} />
+        ) : undefined
       }
       title={t('Sidebar.items.tradingPartners.label')}
       className="gap-4">
