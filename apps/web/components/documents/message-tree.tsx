@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl'
 import type { ParsedMessage, ParsedSegment } from '@edi-bridge/contracts'
 
 function Value({ value }: { value: string }) {
-  const t = useTranslations('RunDetail.tree')
+  const t = useTranslations('Document.technical.tree')
 
   return value === '' ? (
     <span className="text-muted-foreground italic">{t('empty')}</span>
@@ -17,7 +17,7 @@ function Value({ value }: { value: string }) {
 }
 
 function SegmentNode({ segment }: { segment: ParsedSegment }) {
-  const t = useTranslations('RunDetail.tree')
+  const t = useTranslations('Document.technical.tree')
 
   return (
     <li>
@@ -65,18 +65,25 @@ function SegmentNode({ segment }: { segment: ParsedSegment }) {
 }
 
 export function MessageTree({ message }: { message: ParsedMessage }) {
-  const t = useTranslations('RunDetail.tree')
+  const t = useTranslations('Document.technical.tree')
 
   return (
     <div className="flex flex-col gap-2 text-sm">
       <p className="font-medium">
         {t('heading', { reference: message.reference, messageType: message.messageType })}
       </p>
-      <ul className="flex flex-col">
-        {message.segments.map((segment, index) => (
-          <SegmentNode key={index} segment={segment} />
-        ))}
-      </ul>
+      <div
+        role="region"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Message
+        tabIndex={0}
+        aria-label={t('label')}
+        className="focus-visible:ring-ring/50 max-h-[32rem] overflow-auto rounded-lg border p-1 outline-none focus-visible:ring-3">
+        <ul className="flex flex-col">
+          {message.segments.map((segment, index) => (
+            <SegmentNode key={index} segment={segment} />
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }

@@ -106,9 +106,9 @@ const meta = preview.meta({
 export const Delivered = meta.story({
   args: { id: delivered.id },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Delivered')).toBeVisible()
+    await expect((await canvas.findAllByText('Delivered'))[0]).toBeVisible()
     await expect(
-      canvas.getByRole('region', { name: 'Raw Interchange, one segment per line' }),
+      canvas.getByRole('region', { name: 'Transmission as sent, one segment per line' }),
     ).toBeVisible()
     await expect(canvas.queryByRole('heading', { name: 'Remedy' })).toBeNull()
   },

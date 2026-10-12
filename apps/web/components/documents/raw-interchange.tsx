@@ -3,13 +3,13 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef } from 'react'
 
-import { interchangeLines, type InterchangeLine } from '@/components/runs/interchange-lines'
+import { interchangeLines, type InterchangeLine } from '@/components/documents/interchange-lines'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { ErrorPosition } from '@edi-bridge/contracts'
 
 function LineText({ line }: { line: InterchangeLine }) {
-  const t = useTranslations('RunDetail.raw')
+  const t = useTranslations('Document.technical.raw')
 
   if (line.highlight === null) {
     return line.text
@@ -39,7 +39,7 @@ function LineText({ line }: { line: InterchangeLine }) {
 }
 
 export function RawInterchange({ raw, position }: { raw: string; position: ErrorPosition | null }) {
-  const t = useTranslations('RunDetail.raw')
+  const t = useTranslations('Document.technical.raw')
   const { lines, precision } = useMemo(() => interchangeLines(raw, position), [raw, position])
   const container = useRef<HTMLDivElement>(null)
 

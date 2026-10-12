@@ -204,6 +204,14 @@ export function documentHref(id: string) {
   return `${navigationItems.documents.href}/${id}`
 }
 
+export function tradingPartnerHref(id: string) {
+  return `${navigationItems.tradingPartners.href}/${id}`
+}
+
+export function flowHref(id: string) {
+  return `${navigationItems.flows.href}/${id}`
+}
+
 export function mappingHref(id: string) {
   return `${navigationItems.mappings.href}/${id}`
 }
@@ -231,7 +239,7 @@ export function fixTargetHref(target: FixTarget) {
     }
 
     case 'tradingPartner': {
-      return `${navigationItems.tradingPartners.href}/${target.tradingPartnerId}`
+      return tradingPartnerHref(target.tradingPartnerId)
     }
   }
 }

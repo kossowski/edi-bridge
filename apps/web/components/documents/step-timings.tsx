@@ -10,6 +10,7 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useFormatter, useTranslations } from 'next-intl'
 
+import { pathStepKeys } from '@/components/documents/document-path'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { RunStep, RunStepStatus } from '@edi-bridge/contracts'
@@ -52,8 +53,9 @@ function Duration({ step }: { step: RunStep }) {
   )
 }
 
-export function RunTimeline({ steps }: { steps: RunStep[] }) {
-  const t = useTranslations('RunDetail.steps')
+export function StepTimings({ steps }: { steps: RunStep[] }) {
+  const t = useTranslations('Document.technical.steps')
+  const tPath = useTranslations('Document.path.step')
   const format = useFormatter()
 
   return (
@@ -70,7 +72,8 @@ export function RunTimeline({ steps }: { steps: RunStep[] }) {
             className={cn('relative size-5 shrink-0', stepStyles[step.status])}
           />
           <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
-            <span className="font-medium">{t(`stage.${step.stage}`)}</span>
+            <span className="font-medium">{tPath(pathStepKeys[step.stage])}</span>
+            <code className="text-muted-foreground font-mono text-xs">{step.stage}</code>
             <span
               className={cn(stepStyles[step.status], step.status === 'failed' && 'font-semibold')}>
               {t(`status.${step.status}`)}

@@ -712,6 +712,133 @@
         "descriptionWithoutReference": "{direction, select, inbound {{tradingPartner} sent this file a second time. EDI Bridge recognised it and did not pass it on again, so your ERP has only one order.} other {Your ERP created this document a second time. EDI Bridge recognised it and did not send it again, so {tradingPartner} has only one order.}}",
         "original": "Open the original document"
       }
+    },
+    "path": {
+      "title": "The path of this document",
+      "description": "Hover over or focus a step to see what it means.",
+      "step": {
+        "received": "Received",
+        "read": "Read",
+        "checked": "Checked",
+        "translated": "Translated",
+        "delivered": "Delivered"
+      },
+      "hint": {
+        "received": "{direction, select, inbound {The document arrived at EDI Bridge from {tradingPartner}.} other {Your ERP handed the document to EDI Bridge.}}",
+        "read": "EDI Bridge opened the file and understood its structure.",
+        "checked": "EDI Bridge checked that the content follows the rules for this kind of document.",
+        "translated": "{direction, select, inbound {EDI Bridge converted the document into the format of your ERP.} other {EDI Bridge converted your data into the format {tradingPartner} expects.}}",
+        "delivered": "{direction, select, inbound {EDI Bridge passed the document to your ERP.} other {EDI Bridge sent the document to {tradingPartner}.}}"
+      },
+      "state": {
+        "done": "done",
+        "failed": "failed here",
+        "running": "in progress",
+        "pending": "not yet",
+        "skipped": "skipped",
+        "notReached": "not reached"
+      },
+      "stepName": "{step}: {state}"
+    },
+    "tabs": {
+      "label": "Document details",
+      "summary": "Summary",
+      "content": "Content",
+      "technical": "Technical details"
+    },
+    "summary": {
+      "label": "Summary",
+      "whatItIs": "What it is",
+      "order": "Order",
+      "noOrder": "No order number",
+      "tradingPartner": "Trading partner",
+      "direction": "Direction",
+      "directionValue": "{direction, select, inbound {Incoming: from {tradingPartner} to your ERP} other {Outgoing: from your ERP to {tradingPartner}}}",
+      "mapping": "Mapping",
+      "mappingVersion": "version {version}",
+      "notTranslated": "Not translated yet",
+      "route": "Document route",
+      "receivedAt": "{direction, select, inbound {Received} other {Created}}",
+      "source": "How it arrived",
+      "uploaded": "Uploaded by hand",
+      "connection": "Through a connection"
+    },
+    "content": {
+      "description": "A readable view of the lines in this document.",
+      "label": "Lines of the document",
+      "lineCount": "{count, plural, one {# line} other {# lines}}",
+      "column": {
+        "line": "Line",
+        "item": "Item",
+        "gtin": "Article number (GTIN)",
+        "quantity": "Quantity",
+        "unit": "Unit",
+        "amount": "Amount"
+      },
+      "missing": "missing",
+      "noTranslation": "no translation",
+      "empty": {
+        "title": "No lines to show",
+        "noLines": "This document has no lines.",
+        "failed": "EDI Bridge could not read or translate this document, so its lines are unknown. The technical details show what went wrong.",
+        "notYet": "The lines appear once EDI Bridge has read the document."
+      }
+    },
+    "technical": {
+      "facts": {
+        "label": "Technical details",
+        "messageType": "Message type",
+        "failedStep": "Failed step",
+        "noFailure": "None",
+        "errorCode": "Error code",
+        "errorMessage": "Error message",
+        "position": "Position",
+        "noPosition": "Not applicable",
+        "mappingVersion": "Mapping version",
+        "mappingVersionValue": "{mappingName}, version {version}",
+        "notTranslated": "Not translated yet",
+        "transmission": "Transmission",
+        "transmissionLink": "Control reference {controlReference}",
+        "noTransmission": "None produced yet",
+        "replaces": "Replaces",
+        "replacedBy": "Replaced by",
+        "documentLink": "Document {id}",
+        "id": "Document ID"
+      },
+      "position": {
+        "segment": "Segment {segment} ({tag})",
+        "element": "element {element}",
+        "component": "component {component}"
+      },
+      "steps": {
+        "title": "Step timings",
+        "status": {
+          "succeeded": "Succeeded",
+          "failed": "Failed",
+          "running": "Running",
+          "pending": "Pending",
+          "skipped": "Skipped"
+        },
+        "failedHere": "Failed here"
+      },
+      "raw": {
+        "title": "Transmission as sent",
+        "label": "Transmission as sent, one segment per line",
+        "errorPosition": "Error position",
+        "emptyValue": "empty",
+        "positionMissing": "The error position is not inside this transmission.",
+        "none": "This document has not produced a transmission yet."
+      },
+      "tree": {
+        "title": "Read message",
+        "label": "Segments of the message",
+        "heading": "Message {reference}, {messageType}",
+        "element": "Element {number}",
+        "component": "Component {number}",
+        "empty": "empty",
+        "unparsed": "The message could not be read. The transmission shows the error position.",
+        "none": "This document has no read message yet."
+      }
     }
   },
   "Runs": {
@@ -766,28 +893,10 @@
     "runLink": "Run {id}",
     "failure": {
       "title": "Error",
-      "code": "Code {code}",
-      "segment": "Segment {segment} ({tag})",
-      "element": "element {element}",
-      "component": "component {component}"
+      "code": "Code {code}"
     },
     "steps": {
-      "title": "Steps",
-      "stage": {
-        "receipt": "Receipt",
-        "parse": "Parse",
-        "validation": "Validation",
-        "mapping": "Mapping",
-        "delivery": "Delivery"
-      },
-      "status": {
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "running": "Running",
-        "pending": "Pending",
-        "skipped": "Skipped"
-      },
-      "failedHere": "Failure Stage"
+      "title": "Steps"
     },
     "remedy": {
       "title": "Remedy",
@@ -821,18 +930,10 @@
     },
     "raw": {
       "title": "Raw Interchange",
-      "label": "Raw Interchange, one segment per line",
-      "errorPosition": "Error position",
-      "emptyValue": "empty",
-      "positionMissing": "The error position is not inside this Interchange.",
       "none": "This Run has not produced an Interchange yet."
     },
     "tree": {
       "title": "Parsed Message",
-      "heading": "Message {reference}, {messageType}",
-      "element": "Element {number}",
-      "component": "Component {number}",
-      "empty": "empty",
       "unparsed": "The Message could not be parsed. The raw Interchange shows the error position.",
       "none": "This Run has no parsed Message yet."
     }

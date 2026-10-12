@@ -2,6 +2,7 @@ import { delay, http, HttpResponse } from 'msw'
 import { expect, fn, screen, userEvent, waitFor } from 'storybook/test'
 
 import { DocumentScreen } from '@/components/documents/document-screen'
+import { flowFor, partner, storyRunFactory } from '@/components/documents/document-story-helpers'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import {
   besideSidebar,
@@ -13,14 +14,11 @@ import {
 } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
-  type FailureStage,
   mappingVersionsEndpoint,
-  type MessageType,
   reprocessRunEndpoint,
   retryRunEndpoint,
   runDetailSchema,
   runEndpoint,
-  type RunStatus,
   type RunDetail,
   toPath,
   waitForTradingPartnerRunEndpoint,
@@ -28,54 +26,18 @@ import {
 import {
   controlReferenceOf,
   createLookupTableStore,
-  createRun,
   interchangeIdOf,
   mappingHandlers,
   runDetailHandlers,
   seedChannels,
-  seedFlows,
   seedMappingDrafts,
   seedMappingVersions,
-  seedTradingPartners,
   toMappingVersionSummary,
 } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
-const partner = seedTradingPartners[0]!
-
-function flowFor(messageType: MessageType) {
-  return seedFlows.find(
-    (candidate) =>
-      candidate.tradingPartnerId === partner.id && candidate.messageType === messageType,
-  )!
-}
-
-function storyRun(
-  index: number,
-  messageType: MessageType,
-  outcome: FailureStage | Exclude<RunStatus, 'failed'>,
-  changes: { receivedAt?: string; manualSubmission?: boolean } = {},
-) {
-  const flow = flowFor(messageType)
-
-  const run = {
-    id: `40000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
-    receivedAt: `2026-10-08T07:${String(index).padStart(2, '0')}:13.000Z`,
-    tradingPartner: partner,
-    messageType,
-    flow: { id: flow.id, name: flow.name },
-    manualSubmission: false,
-    ...changes,
-  }
-
-  return outcome === 'parse' ||
-    outcome === 'validation' ||
-    outcome === 'mapping' ||
-    outcome === 'delivery'
-    ? createRun({ ...run, status: 'failed', failureStage: outcome })
-    : createRun({ ...run, status: outcome, failureStage: null })
-}
+const storyRun = storyRunFactory({ idPrefix: '40000000', hour: '07' })
 
 const missingField = storyRun(1, 'INVOIC', 'mapping')
 
@@ -358,7 +320,7 @@ export const Delivered = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'All good, nothing to do' }),
     ).toBeVisible()
-    await expect(canvas.getByText(/^Received/)).toBeVisible()
+    await expect(canvas.getByText('Received', { selector: 'span:has(> time)' })).toBeVisible()
     await expect(
       canvas.getByText(
         `This purchase order from ${partner.name} was translated and passed to your ERP.`,
