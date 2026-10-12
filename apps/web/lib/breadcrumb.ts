@@ -35,6 +35,7 @@ function sidebarSections() {
 
 const sections = new Map<string, Section>([
   ...sidebarSections(),
+  ['runs', itemSection('documents')],
   ['interchanges', itemSection('transmissions')],
   [
     'settings',

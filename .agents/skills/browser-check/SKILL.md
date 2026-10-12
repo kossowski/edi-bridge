@@ -55,7 +55,7 @@ let browser
 try {
 	browser = await launchBrowser()
 	const { page } = await openPage(browser, { baseUrl: server.baseUrl, width: 390 })
-	await gotoSettled(page, server.baseUrl + '/runs', 'light')
+	await gotoSettled(page, server.baseUrl + '/documents', 'light')
 	// interact and assert
 } finally {
 	await browser?.close()

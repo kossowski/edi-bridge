@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 
+import type { StatusGroup } from '@/lib/status-groups'
 import type { FailureStage, MessageType, RunStatus } from '@edi-bridge/contracts'
 
 export function usePlainNames() {
@@ -9,6 +10,7 @@ export function usePlainNames() {
 
   return {
     runStatus: (status: RunStatus) => t(`runStatus.${status}`),
+    statusGroup: (group: StatusGroup) => t(`statusGroup.${group}`),
     failureStageTitle: (stage: FailureStage) => t(`failureStage.${stage}.title`),
     failureStageSummary: (stage: FailureStage) => t(`failureStage.${stage}.summary`),
     messageTypeName: (messageType: MessageType, plural = false) =>

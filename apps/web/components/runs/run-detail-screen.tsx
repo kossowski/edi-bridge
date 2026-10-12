@@ -16,6 +16,7 @@ import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { RunTimeline } from '@/components/runs/run-timeline'
 import { ApiError } from '@/lib/api/client'
 import { runQuery } from '@/lib/api/queries'
+import { runHref } from '@/lib/navigation'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { ErrorPosition, RunDetail } from '@edi-bridge/contracts'
@@ -76,14 +77,14 @@ function RunFacts({ run }: { run: RunDetail }) {
       </Fact>
       {run.replaces && (
         <Fact label={t('facts.replaces')}>
-          <Link href={`/runs/${run.replaces.id}`} className={linkClass}>
+          <Link href={runHref(run.replaces.id)} className={linkClass}>
             {t('runLink', { id: shortId(run.replaces.id) })}
           </Link>
         </Fact>
       )}
       {run.replacedBy && (
         <Fact label={t('facts.replacedBy')}>
-          <Link href={`/runs/${run.replacedBy.id}`} className={linkClass}>
+          <Link href={runHref(run.replacedBy.id)} className={linkClass}>
             {t('runLink', { id: shortId(run.replacedBy.id) })}
           </Link>
         </Fact>

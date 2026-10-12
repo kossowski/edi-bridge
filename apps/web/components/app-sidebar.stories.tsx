@@ -59,7 +59,10 @@ export const Admin = meta.story({
     await expect(canvas.getByText('Daily work')).toBeVisible()
     await expect(canvas.getByText('Setup')).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
-    await expect(canvas.getByRole('link', { name: 'Documents' })).toHaveAttribute('href', '/runs')
+    await expect(canvas.getByRole('link', { name: 'Documents' })).toHaveAttribute(
+      'href',
+      '/documents',
+    )
     await expect(canvas.getByRole('link', { name: 'Code translations' })).toHaveAttribute(
       'href',
       '/lookup-tables',
@@ -156,7 +159,7 @@ export const AdvancedOpensOnNavigation = meta.story({
 })
 
 export const DocumentsActiveOnce = meta.story({
-  parameters: { nextjs: { navigation: { pathname: '/runs' } } },
+  parameters: { nextjs: { navigation: { pathname: '/documents' } } },
   beforeEach({ msw }) {
     msw.use(...signedInAs(sandboxAdminSession))
   },

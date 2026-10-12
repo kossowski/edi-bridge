@@ -9,8 +9,8 @@ import type { ReactNode } from 'react'
 import { AppPage } from '@/components/app-page'
 import { useChannelKindLabel } from '@/components/channels/channel-parts'
 import { Fact, linkClass, LoadFailure, Section } from '@/components/detail-parts'
+import { documentsHref } from '@/components/documents/document-filters'
 import { EditLink } from '@/components/edit-link'
-import { useRunFilters } from '@/components/runs/run-filters-store'
 import { RunLink } from '@/components/runs/run-link'
 import { RunStatusBadge } from '@/components/runs/run-status'
 import { OnboardingChecklist } from '@/components/trading-partners/onboarding-checklist'
@@ -145,12 +145,6 @@ function RecentRuns({ tradingPartner }: { tradingPartner: TradingPartner }) {
     runsQuery({ tradingPartnerId: [tradingPartner.id], page: 1, pageSize: recentRunCount }),
   )
 
-  function showAllRuns() {
-    const { clearFilters, setFilter } = useRunFilters.getState()
-    clearFilters()
-    setFilter('tradingPartnerId', [tradingPartner.id])
-  }
-
   return (
     <Section id="trading-partner-runs" title={t('title')}>
       <SectionBody
@@ -177,7 +171,9 @@ function RecentRuns({ tradingPartner }: { tradingPartner: TradingPartner }) {
                 </li>
               ))}
             </ul>
-            <Link href="/runs" className={cn(linkClass, 'w-fit text-sm')} onClick={showAllRuns}>
+            <Link
+              href={documentsHref({ status: 'all', tradingPartnerId: tradingPartner.id })}
+              className={cn(linkClass, 'w-fit text-sm')}>
               {t('viewAll', { count: runs.data?.total ?? 0 })}
             </Link>
           </>

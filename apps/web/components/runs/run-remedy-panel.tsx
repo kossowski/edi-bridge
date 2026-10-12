@@ -14,6 +14,7 @@ import { type RunRemedy, runRemedy } from '@/components/runs/run-remedy'
 import { useCanChange } from '@/hooks/use-session'
 import { reprocessRun, retryRun } from '@/lib/api/client'
 import { interchangeKeys, mappingVersionsQuery, runKeys, runQuery } from '@/lib/api/queries'
+import { runHref } from '@/lib/navigation'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Select,
@@ -99,7 +100,7 @@ function ReprocessAction({ run }: { run: RunDetail }) {
       void queryClient.invalidateQueries({ queryKey: runKeys.detail(run.id) })
       void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
       void queryClient.invalidateQueries({ queryKey: interchangeKeys.all() })
-      router.push(`/runs/${replacing.id}`)
+      router.push(runHref(replacing.id))
     },
   })
 
@@ -213,7 +214,7 @@ export function RunRemedyPanel({ run }: { run: RunDetail }) {
       {remedy === 'replaced' && run.replacedBy !== null && (
         <p className="text-sm">
           {t('replaced.description')}{' '}
-          <Link href={`/runs/${run.replacedBy.id}`} className={linkClass}>
+          <Link href={runHref(run.replacedBy.id)} className={linkClass}>
             {t('replaced.link')}
           </Link>
         </p>

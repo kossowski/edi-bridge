@@ -32,15 +32,21 @@ describe('breadcrumbTrail', () => {
   })
 
   it('names a page with two sidebar items after the first one', () => {
+    expect(breadcrumbTrail('/documents')).toEqual([
+      { href: '/documents', label: { kind: 'item', key: 'documents' } },
+    ])
+  })
+
+  it('puts a Run under the documents', () => {
     expect(breadcrumbTrail('/runs/run-1')).toEqual([
-      { href: '/runs', label: { kind: 'item', key: 'documents' } },
+      { href: '/documents', label: { kind: 'item', key: 'documents' } },
       { href: '/runs/run-1', label: { kind: 'detail' } },
     ])
   })
 
   it('links a section without a list page to its sidebar target', () => {
     expect(breadcrumbTrail('/interchanges/ic-1')[0]).toEqual({
-      href: '/runs',
+      href: '/documents',
       label: { kind: 'item', key: 'transmissions' },
     })
   })

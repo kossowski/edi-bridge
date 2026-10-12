@@ -13,6 +13,7 @@ import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
 import { useLookup } from '@/hooks/use-lookup'
 import { ApiError, submitDocument } from '@/lib/api/client'
 import { channelsQuery, runKeys } from '@/lib/api/queries'
+import { runHref } from '@/lib/navigation'
 import { maxDocumentLength } from '@edi-bridge/contracts'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -331,7 +332,7 @@ function SubmissionResult({
                 })}
               </p>
             </div>
-            <Link href={`/runs/${run.id}`} className={linkClass}>
+            <Link href={runHref(run.id)} className={linkClass}>
               {t('open')}
               <span className="sr-only">
                 {' '}

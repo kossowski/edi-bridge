@@ -24,7 +24,7 @@ test('client-side navigation to glossary entries highlights them without errors'
   })
   page.on('pageerror', (error) => errors.push(error.message))
 
-  await page.goto('/runs')
+  await page.goto('/documents')
   await expect(page.getByRole('heading', { level: 1 })).toBeAttached()
 
   for (const id of ['orders', 'run']) {
