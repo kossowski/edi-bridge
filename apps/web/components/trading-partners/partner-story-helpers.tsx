@@ -21,6 +21,8 @@ export const awaiting = seeded('Bodensee Handelshaus AG')
 
 export const untouched = seeded('Mainfranken Getränke GmbH')
 
+export const withoutGln = seeded('Ostsee Feinkost GmbH')
+
 export function at(tradingPartner: TradingPartner, tab?: string) {
   return {
     args: { id: tradingPartner.id },

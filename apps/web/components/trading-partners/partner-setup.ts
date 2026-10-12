@@ -7,20 +7,27 @@ export type PartnerSetupStep = OnboardingStep | 'connections' | 'documents'
 export type PartnerSetupStepState = 'done' | 'next' | 'open'
 
 export type PartnerSetupAction =
-  | { kind: 'link'; step: 'identity'; href: string }
+  | { kind: 'link'; step: 'identity' | 'partnerGln'; href: string }
   | { kind: 'addConnection' }
   | { kind: 'addDocument' }
   | { kind: 'sendTest' }
   | { kind: 'awaitConfirmation' }
   | { kind: 'goLive' }
 
-const stepActions: Record<PartnerSetupStep, PartnerSetupAction> = {
-  identity: { kind: 'link', step: 'identity', href: '/settings' },
-  connections: { kind: 'addConnection' },
-  documents: { kind: 'addDocument' },
-  testInterchange: { kind: 'sendTest' },
-  contrl: { kind: 'awaitConfirmation' },
-  production: { kind: 'goLive' },
+function stepActions(tradingPartnerId: string): Record<PartnerSetupStep, PartnerSetupAction> {
+  return {
+    identity: { kind: 'link', step: 'identity', href: '/settings' },
+    partnerGln: {
+      kind: 'link',
+      step: 'partnerGln',
+      href: `/trading-partners/${tradingPartnerId}?tab=settings`,
+    },
+    connections: { kind: 'addConnection' },
+    documents: { kind: 'addDocument' },
+    testInterchange: { kind: 'sendTest' },
+    contrl: { kind: 'awaitConfirmation' },
+    production: { kind: 'goLive' },
+  }
 }
 
 export type PartnerSetupItem = {
@@ -38,7 +45,7 @@ export type PartnerSetup = {
 }
 
 export function partnerSetup(
-  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+  tradingPartner: Pick<TradingPartner, 'id' | 'gln' | 'testMode' | 'onboarding'>,
   activity: Pick<TradingPartnerActivity, 'channelCount' | 'flowCount'>,
   workspaceGln: string | null,
 ): PartnerSetup {
@@ -48,7 +55,7 @@ export function partnerSetup(
       state,
       at,
     }): ReadonlyArray<{ step: PartnerSetupStep; done: boolean; at: string | null }> =>
-      step === 'identity'
+      step === 'partnerGln'
         ? [
             { step, done: state === 'done', at },
             { step: 'connections', done: activity.channelCount > 0, at: null },
@@ -57,10 +64,11 @@ export function partnerSetup(
         : [{ step, done: state === 'done', at }],
   )
 
+  const actions = stepActions(tradingPartner.id)
   const next = checks.find(({ done }) => !done)?.step ?? null
 
   const steps = checks.map(({ step, done, at }): PartnerSetupItem => {
-    const action = stepActions[step]
+    const action = actions[step]
 
     if (done) {
       return { step, state: 'done', doneAt: at, action }

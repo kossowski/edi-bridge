@@ -1050,6 +1050,7 @@
       "complete": "Eingerichtet, echte Belege werden ausgetauscht",
       "steps": {
         "identity": "GLN Ihres Unternehmens erfassen",
+        "partnerGln": "GLN des Partners erfassen",
         "connections": "Verbindung hinzufügen",
         "documents": "Belege auswählen, die Sie austauschen",
         "testInterchange": "Testbeleg senden",
@@ -1095,6 +1096,8 @@
       "settings": "Einstellungen"
     },
     "gln": "GLN {gln}",
+    "noGln": "GLN noch nicht erfasst",
+    "glnLater": "Noch nicht erfasst",
     "setup": {
       "title": "Einrichtung",
       "description": "Solange {name} im Testbetrieb ist, wird jeder Beleg als Test markiert. Gehen Sie die Schritte der Reihe nach durch.",
@@ -1109,6 +1112,10 @@
         "identity": {
           "title": "GLN Ihres Unternehmens",
           "description": "Ihre Partner erkennen Sie an der Standortnummer (GLN) Ihres Unternehmens. Sie steht in jedem Beleg, den Sie senden."
+        },
+        "partnerGln": {
+          "title": "GLN des Partners",
+          "description": "Die Standortnummer (GLN) des Partners adressiert jeden Beleg, den Sie mit ihm austauschen. Sie steht im EDI-Infoblatt des Partners."
         },
         "connections": {
           "title": "Verbindungen",
@@ -1134,6 +1141,7 @@
       "doneAt": "Erledigt am <when>{at}</when>",
       "actions": {
         "identity": "GLN Ihres Unternehmens erfassen",
+        "partnerGln": "GLN des Partners erfassen",
         "connections": "Verbindung hinzufügen",
         "documents": "Belegart hinzufügen",
         "testInterchange": "Testbeleg senden",
@@ -1438,7 +1446,7 @@
       },
       "gln": {
         "label": "GLN",
-        "description": "Die 13-stellige Standortnummer (GLN) des Partners, einschließlich Prüfziffer. Sie steht im EDI-Infoblatt des Partners."
+        "description": "Die 13-stellige Standortnummer (GLN) des Partners, einschließlich Prüfziffer. Sie steht im EDI-Infoblatt des Partners. Lassen Sie das Feld leer, wenn Sie sie noch nicht haben; vor dem Testbeleg brauchen Sie sie."
       },
       "characterSet": {
         "label": "Zeichensatz",

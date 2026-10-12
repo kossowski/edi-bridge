@@ -50,10 +50,15 @@ export const Default = meta.story({
     await expect(ready.getByText('Next: Go live')).toBeVisible()
     await expect(ready.getByRole('progressbar', { name: 'Setup' })).toHaveAttribute(
       'aria-valuetext',
-      '5 of 6 steps',
+      '6 of 7 steps',
     )
 
-    await expect(canvas.getByText('7 trading partners')).toBeVisible()
+    const withoutGln = await cardOf(canvasElement, 'Ostsee Feinkost GmbH')
+
+    await expect(withoutGln.getByText('GLN not added yet')).toBeVisible()
+    await expect(withoutGln.getByText("Next: Add the partner's GLN")).toBeVisible()
+
+    await expect(canvas.getByText('8 trading partners')).toBeVisible()
     await expect(canvas.getByRole('link', { name: 'Add trading partner' })).toBeVisible()
   },
 })

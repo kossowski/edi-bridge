@@ -13,6 +13,7 @@ export function TradingPartnerResults({
   onOpen: (href: string) => void
 }) {
   const t = useTranslations('Search')
+  const tPartner = useTranslations('TradingPartner')
 
   if (tradingPartners.length === 0) {
     return null
@@ -23,11 +24,17 @@ export function TradingPartnerResults({
       {tradingPartners.map((tradingPartner) => (
         <CommandItem
           key={tradingPartner.id}
-          keywords={[tradingPartner.name, tradingPartner.gln]}
+          keywords={
+            tradingPartner.gln === null
+              ? [tradingPartner.name]
+              : [tradingPartner.name, tradingPartner.gln]
+          }
           value={`trading-partner ${tradingPartner.id}`}
           onSelect={() => onOpen(`${navigationItems.tradingPartners.href}/${tradingPartner.id}`)}>
           <span className="min-w-0 truncate">{tradingPartner.name}</span>
-          <CommandItemHint className="tabular-nums">{tradingPartner.gln}</CommandItemHint>
+          <CommandItemHint className="tabular-nums">
+            {tradingPartner.gln ?? tPartner('noGln')}
+          </CommandItemHint>
         </CommandItem>
       ))}
     </CommandGroup>

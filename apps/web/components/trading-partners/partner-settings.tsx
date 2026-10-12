@@ -14,12 +14,17 @@ import type { TradingPartner } from '@edi-bridge/contracts'
 function PartnerDetails({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartnerForm')
   const tList = useTranslations('TradingPartners')
+  const tPartner = useTranslations('TradingPartner')
 
   return (
     <dl className="flex flex-col gap-4">
       <Fact label={t('fields.name.label')}>{tradingPartner.name}</Fact>
       <Fact label={t('fields.gln.label')}>
-        <span className="font-mono tabular-nums">{tradingPartner.gln}</span>
+        {tradingPartner.gln === null ? (
+          <span className="text-muted-foreground">{tPartner('glnLater')}</span>
+        ) : (
+          <span className="font-mono tabular-nums">{tradingPartner.gln}</span>
+        )}
       </Fact>
       <Fact label={t('fields.characterSet.label')}>
         {t(`characterSets.${tradingPartner.characterSet}`)}

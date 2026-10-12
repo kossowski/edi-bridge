@@ -115,7 +115,11 @@ export function PartnerScreen({ id }: { id: string }) {
         data && (
           <>
             <TestModeBadge testMode={data.testMode} />
-            <span className="font-mono tabular-nums">{t('gln', { gln: data.gln })}</span>
+            {data.gln === null ? (
+              <span>{t('noGln')}</span>
+            ) : (
+              <span className="font-mono tabular-nums">{t('gln', { gln: data.gln })}</span>
+            )}
           </>
         )
       }

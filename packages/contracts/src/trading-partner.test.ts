@@ -5,14 +5,16 @@ import {
   canSwitchToProduction,
   onboardingChecklist,
   type TradingPartner,
+  tradingPartnerInputSchema,
 } from './trading-partner'
 
 const ownGln = '4006381333931'
 
-function partner(
-  overrides: Partial<Pick<TradingPartner, 'testMode' | 'onboarding'>> = {},
-): Pick<TradingPartner, 'testMode' | 'onboarding'> {
+type OnboardingPartner = Pick<TradingPartner, 'gln' | 'testMode' | 'onboarding'>
+
+function partner(overrides: Partial<OnboardingPartner> = {}): OnboardingPartner {
   return {
+    gln: '4012345000009',
     testMode: true,
     onboarding: { testInterchangeSentAt: null, contrlReceivedAt: null },
     ...overrides,
@@ -27,10 +29,29 @@ function states(...args: Parameters<typeof onboardingChecklist>) {
   return onboardingChecklist(...args).map(({ step, state }) => `${step}:${state}`)
 }
 
+describe('tradingPartnerInputSchema', () => {
+  const input = {
+    name: 'Kieler Kontor GmbH',
+    characterSet: 'UNOC',
+    acknowledgementTimeLimitHours: 24,
+  }
+
+  it('accepts a Trading Partner whose GLN is added later', () => {
+    expect(tradingPartnerInputSchema.parse({ ...input, gln: null })).toMatchObject({ gln: null })
+  })
+
+  it('still checks a given GLN', () => {
+    expect(tradingPartnerInputSchema.safeParse({ ...input, gln: '4006381333932' }).success).toBe(
+      false,
+    )
+  })
+})
+
 describe('onboardingChecklist', () => {
   it('waits for the first test Interchange of a new Trading Partner', () => {
     expect(states(partner(), ownGln)).toEqual([
       'identity:done',
+      'partnerGln:done',
       'testInterchange:current',
       'contrl:pending',
       'production:pending',
@@ -40,6 +61,17 @@ describe('onboardingChecklist', () => {
   it('keeps the identity step open while the Workspace has no GLN', () => {
     expect(states(partner(), null)).toEqual([
       'identity:current',
+      'partnerGln:done',
+      'testInterchange:pending',
+      'contrl:pending',
+      'production:pending',
+    ])
+  })
+
+  it("asks for the Trading Partner's GLN when it was left for later", () => {
+    expect(states(partner({ gln: null }), ownGln)).toEqual([
+      'identity:done',
+      'partnerGln:current',
       'testInterchange:pending',
       'contrl:pending',
       'production:pending',
@@ -54,6 +86,7 @@ describe('onboardingChecklist', () => {
 
     expect(checklist).toEqual([
       { step: 'identity', state: 'done', at: null },
+      { step: 'partnerGln', state: 'done', at: null },
       { step: 'testInterchange', state: 'done', at: sent },
       { step: 'contrl', state: 'current', at: null },
       { step: 'production', state: 'pending', at: null },
@@ -66,7 +99,13 @@ describe('onboardingChecklist', () => {
         partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received } }),
         ownGln,
       ),
-    ).toEqual(['identity:done', 'testInterchange:done', 'contrl:done', 'production:current'])
+    ).toEqual([
+      'identity:done',
+      'partnerGln:done',
+      'testInterchange:done',
+      'contrl:done',
+      'production:current',
+    ])
   })
 
   it('completes every step for a Trading Partner in production', () => {
@@ -78,7 +117,13 @@ describe('onboardingChecklist', () => {
         }),
         ownGln,
       ),
-    ).toEqual(['identity:done', 'testInterchange:done', 'contrl:done', 'production:done'])
+    ).toEqual([
+      'identity:done',
+      'partnerGln:done',
+      'testInterchange:done',
+      'contrl:done',
+      'production:done',
+    ])
   })
 })
 
@@ -130,8 +175,9 @@ describe('canSendTestInterchange', () => {
     ).toBe(true)
   })
 
-  it.each<[string, Pick<TradingPartner, 'testMode' | 'onboarding'>, string | null]>([
+  it.each<[string, OnboardingPartner, string | null]>([
     ['without the Workspace GLN', partner(), null],
+    ["without the Trading Partner's GLN", partner({ gln: null }), ownGln],
     [
       'once the CONTRL is received',
       partner({ onboarding: { testInterchangeSentAt: sent, contrlReceivedAt: received } }),

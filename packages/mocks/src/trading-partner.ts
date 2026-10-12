@@ -42,6 +42,7 @@ function onboarded(day: string): TradingPartnerOnboarding {
 const seeds: ReadonlyArray<
   Pick<TradingPartner, 'name' | 'characterSet' | 'acknowledgementTimeLimitHours' | 'testMode'> & {
     onboarding: TradingPartnerOnboarding
+    glnLater?: true
   }
 > = [
   {
@@ -93,13 +94,23 @@ const seeds: ReadonlyArray<
     testMode: true,
     onboarding: notStarted,
   },
+  {
+    name: 'Ostsee Feinkost GmbH',
+    characterSet: 'UNOC',
+    acknowledgementTimeLimitHours: 24,
+    testMode: true,
+    onboarding: notStarted,
+    glnLater: true,
+  },
 ]
 
-export const seedTradingPartners: ReadonlyArray<TradingPartner> = seeds.map((seed, index) => {
-  const id = seedId(1, index + 1)
+export const seedTradingPartners: ReadonlyArray<TradingPartner> = seeds.map(
+  ({ glnLater, ...seed }, index) => {
+    const id = seedId(1, index + 1)
 
-  return tradingPartnerSchema.parse({ ...seed, id, gln: seedGln(id) })
-})
+    return tradingPartnerSchema.parse({ ...seed, id, gln: glnLater ? null : seedGln(id) })
+  },
+)
 
 function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
   const stage = faker.helpers.weightedArrayElement([
@@ -112,10 +123,12 @@ function generateTradingPartner(faker: Faker, now: Date): TradingPartner {
   const sentAt = faker.date.past({ years: 2, refDate: now })
   const receivedAt = new Date(sentAt.getTime() + faker.number.int({ min: 1, max: 600 }) * 1000)
 
+  const gln = randomGln(faker)
+
   return {
     id: faker.string.uuid(),
     name: faker.company.name(),
-    gln: randomGln(faker),
+    gln: stage === 'awaitingTestInterchange' && faker.datatype.boolean(0.3) ? null : gln,
     characterSet: faker.helpers.weightedArrayElement<CharacterSet>([
       { value: 'UNOC', weight: 70 },
       ...characterSets
@@ -157,10 +170,17 @@ export function createTradingPartners({
   while (tradingPartners.length < count) {
     const tradingPartner = generateTradingPartner(faker, now)
 
-    if (!glns.has(tradingPartner.gln)) {
-      glns.add(tradingPartner.gln)
-      tradingPartners.push(tradingPartnerSchema.parse(tradingPartner))
+    const { gln } = tradingPartner
+
+    if (gln !== null && glns.has(gln)) {
+      continue
     }
+
+    if (gln !== null) {
+      glns.add(gln)
+    }
+
+    tradingPartners.push(tradingPartnerSchema.parse(tradingPartner))
   }
 
   return tradingPartners
@@ -239,10 +259,13 @@ export function tradingPartnerHandlers(
     }
   }
 
-  function glnTaken(gln: string, ownId?: string) {
-    return store
-      .all()
-      .some((tradingPartner) => tradingPartner.gln === gln && tradingPartner.id !== ownId)
+  function glnTaken(gln: string | null, ownId?: string) {
+    return (
+      gln !== null &&
+      store
+        .all()
+        .some((tradingPartner) => tradingPartner.gln === gln && tradingPartner.id !== ownId)
+    )
   }
 
   async function parseInput(

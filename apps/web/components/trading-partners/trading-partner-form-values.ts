@@ -52,7 +52,7 @@ export function validateTradingPartnerForm(
 ): TradingPartnerFormResult {
   const parsed = tradingPartnerInputSchema.safeParse({
     name: values.name,
-    gln: normalizeGln(values.gln),
+    gln: normalizeGln(values.gln) || null,
     characterSet: values.characterSet,
     acknowledgementTimeLimitHours: Number(values.acknowledgementTimeLimitHours),
   })

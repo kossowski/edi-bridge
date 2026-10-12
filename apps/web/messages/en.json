@@ -1050,6 +1050,7 @@
       "complete": "Set up and exchanging real documents",
       "steps": {
         "identity": "Record your company's GLN",
+        "partnerGln": "Add the partner's GLN",
         "connections": "Add a connection",
         "documents": "Choose the documents you exchange",
         "testInterchange": "Send a test document",
@@ -1095,6 +1096,8 @@
       "settings": "Settings"
     },
     "gln": "GLN {gln}",
+    "noGln": "GLN not added yet",
+    "glnLater": "Not added yet",
     "setup": {
       "title": "Setup",
       "description": "While {name} is testing, every document is marked as a test. Work through the steps in order.",
@@ -1109,6 +1112,10 @@
         "identity": {
           "title": "Your company's GLN",
           "description": "Your partners know you by your company's location number (GLN). It goes into every document you send."
+        },
+        "partnerGln": {
+          "title": "The partner's GLN",
+          "description": "The partner's location number (GLN) addresses every document you exchange with them. It is on the partner's EDI info sheet."
         },
         "connections": {
           "title": "Connections",
@@ -1134,6 +1141,7 @@
       "doneAt": "Done on <when>{at}</when>",
       "actions": {
         "identity": "Record your company's GLN",
+        "partnerGln": "Add the partner's GLN",
         "connections": "Add a connection",
         "documents": "Add a document type",
         "testInterchange": "Send a test document",
@@ -1438,7 +1446,7 @@
       },
       "gln": {
         "label": "GLN",
-        "description": "The partner's 13-digit location number (GLN), including the check digit. It is on the partner's EDI info sheet."
+        "description": "The partner's 13-digit location number (GLN), including the check digit. It is on the partner's EDI info sheet. Leave it empty if you do not have it yet; you need it before the test document."
       },
       "characterSet": {
         "label": "Character set",

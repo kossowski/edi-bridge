@@ -28,7 +28,7 @@ export type TradingPartnerOnboarding = z.infer<typeof tradingPartnerOnboardingSc
 
 export const tradingPartnerInputSchema = z.object({
   name: z.string().trim().min(1).max(70),
-  gln: glnSchema,
+  gln: glnSchema.nullable(),
   characterSet: characterSetSchema,
   acknowledgementTimeLimitHours: z
     .number()
@@ -47,7 +47,13 @@ export const tradingPartnerSchema = tradingPartnerInputSchema.extend({
 
 export type TradingPartner = z.infer<typeof tradingPartnerSchema>
 
-export const onboardingSteps = ['identity', 'testInterchange', 'contrl', 'production'] as const
+export const onboardingSteps = [
+  'identity',
+  'partnerGln',
+  'testInterchange',
+  'contrl',
+  'production',
+] as const
 
 export type OnboardingStep = (typeof onboardingSteps)[number]
 
@@ -60,13 +66,14 @@ export type OnboardingChecklistItem = {
 }
 
 export function onboardingChecklist(
-  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+  tradingPartner: Pick<TradingPartner, 'gln' | 'testMode' | 'onboarding'>,
   workspaceGln: string | null,
 ): OnboardingChecklistItem[] {
   const { testInterchangeSentAt, contrlReceivedAt } = tradingPartner.onboarding
 
   const steps: ReadonlyArray<{ step: OnboardingStep; done: boolean; at: string | null }> = [
     { step: 'identity', done: workspaceGln !== null, at: null },
+    { step: 'partnerGln', done: tradingPartner.gln !== null, at: null },
     { step: 'testInterchange', done: testInterchangeSentAt !== null, at: testInterchangeSentAt },
     { step: 'contrl', done: contrlReceivedAt !== null, at: contrlReceivedAt },
     { step: 'production', done: !tradingPartner.testMode, at: null },
@@ -82,19 +89,20 @@ export function onboardingChecklist(
 }
 
 export function canSwitchToProduction(
-  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+  tradingPartner: Pick<TradingPartner, 'gln' | 'testMode' | 'onboarding'>,
   workspaceGln: string | null,
 ) {
   return onboardingChecklist(tradingPartner, workspaceGln).at(-1)?.state === 'current'
 }
 
 export function canSendTestInterchange(
-  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+  tradingPartner: Pick<TradingPartner, 'gln' | 'testMode' | 'onboarding'>,
   workspaceGln: string | null,
 ) {
   return (
     tradingPartner.testMode &&
     workspaceGln !== null &&
+    tradingPartner.gln !== null &&
     tradingPartner.onboarding.contrlReceivedAt === null
   )
 }

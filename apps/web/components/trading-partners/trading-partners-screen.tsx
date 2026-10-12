@@ -103,6 +103,7 @@ function PartnerCard({
   now: Date
 }) {
   const t = useTranslations('TradingPartners')
+  const tPartner = useTranslations('TradingPartner')
   const format = useFormatter()
 
   return (
@@ -112,9 +113,13 @@ function PartnerCard({
           <h2 className="min-w-0 break-words">{tradingPartner.name}</h2>
           <TestModeBadge testMode={tradingPartner.testMode} />
         </CardTitle>
-        <CardDescription className="font-mono text-xs tabular-nums">
-          {tradingPartner.gln}
-        </CardDescription>
+        {tradingPartner.gln === null ? (
+          <CardDescription className="text-xs">{tPartner('noGln')}</CardDescription>
+        ) : (
+          <CardDescription className="font-mono text-xs tabular-nums">
+            {tradingPartner.gln}
+          </CardDescription>
+        )}
         <CardAction>
           <Link
             href={`/trading-partners/${tradingPartner.id}`}

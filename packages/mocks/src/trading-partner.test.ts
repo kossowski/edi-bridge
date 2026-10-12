@@ -90,7 +90,7 @@ const awaitingContrl = createTradingPartner({
 
 describe('seedTradingPartners', () => {
   it('uses unique GLNs from the restricted-circulation prefixes 020–029', () => {
-    const glns = seedTradingPartners.map(({ gln }) => gln)
+    const glns = seedTradingPartners.flatMap(({ gln }) => (gln === null ? [] : [gln]))
 
     expect(new Set(glns).size).toBe(glns.length)
 
@@ -115,6 +115,10 @@ describe('seedTradingPartners', () => {
     expect(seedTradingPartners.some((tradingPartner) => !hasTraffic(tradingPartner))).toBe(true)
   })
 
+  it('covers a Trading Partner whose GLN is added later', () => {
+    expect(seedTradingPartners.some(({ gln }) => gln === null)).toBe(true)
+  })
+
   it('carries the same GLN as the Interchanges exchanged with the Trading Partner', async () => {
     server.use(...createHandlers(apiUrl))
     const run = seedRuns().find(({ messageType }) => messageType === 'ORDERS')!
@@ -136,11 +140,22 @@ describe('createTradingPartners', () => {
     const tradingPartners = createTradingPartners({ count: 500 })
 
     expect(tradingPartners).toHaveLength(500)
-    expect(new Set(tradingPartners.map(({ gln }) => gln)).size).toBe(500)
+    const glns = tradingPartners.flatMap(({ gln }) => (gln === null ? [] : [gln]))
+    expect(new Set(glns).size).toBe(glns.length)
     expect(new Set(tradingPartners.map(({ id }) => id)).size).toBe(500)
 
     for (const tradingPartner of tradingPartners) {
       expect(tradingPartnerSchema.parse(tradingPartner)).toEqual(tradingPartner)
+    }
+  })
+
+  it('leaves the GLN for later only before the first test Interchange', () => {
+    const withoutGln = createTradingPartners({ count: 500 }).filter(({ gln }) => gln === null)
+
+    expect(withoutGln.length).toBeGreaterThan(0)
+
+    for (const { onboarding } of withoutGln) {
+      expect(onboarding.testInterchangeSentAt).toBeNull()
     }
   })
 
@@ -169,6 +184,16 @@ describe('tradingPartnerHandlers', () => {
     })
 
     expect(await listTradingPartners()).toEqual([created])
+  })
+
+  it('creates several Trading Partners whose GLN is added later', async () => {
+    server.use(...tradingPartnerHandlers(apiUrl, { tradingPartners: [] }))
+
+    const first = await send('POST', createTradingPartnerEndpoint.path, { ...input, gln: null })
+    const second = await send('POST', createTradingPartnerEndpoint.path, { ...input, gln: null })
+
+    expect([first.status, second.status]).toEqual([201, 201])
+    expect((await listTradingPartners()).map(({ gln }) => gln)).toEqual([null, null])
   })
 
   it('updates the editable fields and keeps the onboarding state', async () => {
@@ -327,6 +352,7 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     ['in production', { ...awaitingProduction, testMode: false }, '0212345000007'],
     ['whose CONTRL is already received', awaitingProduction, '0212345000007'],
     ['while the Workspace has no GLN', notStarted, null],
+    ['without its own GLN', { ...notStarted, gln: null }, '0212345000007'],
   ])('refuses a Trading Partner %s', async (_, tradingPartner, gln) => {
     server.use(
       ...tradingPartnerHandlers(apiUrl, {
