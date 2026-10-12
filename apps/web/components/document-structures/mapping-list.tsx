@@ -9,7 +9,7 @@ import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { DocumentStructureSummary } from '@edi-bridge/contracts'
 
-type Mappings = DocumentStructureSummary['mappings']
+export type Mappings = DocumentStructureSummary['mappings']
 
 export function MappingList({ mappings, limit }: { mappings: Mappings; limit?: number }) {
   const t = useTranslations('DocumentStructures')

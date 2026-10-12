@@ -2445,7 +2445,7 @@
     },
     "linkCount": "{count, plural, =0 {No links yet} one {# link} other {# links}}",
     "side": {
-      "documentStructure": "Document Structure {name}",
+      "documentStructure": "Data format {name}",
       "messageType": "Message Type {messageType}"
     },
     "canvas": {
@@ -3064,13 +3064,13 @@
     "save": "Save",
     "saving": "Saving…",
     "discard": "Discard changes",
-    "saved": "The Document Structure is saved.",
-    "failed": "The Document Structure could not be saved. Try again.",
+    "saved": "The data format is saved.",
+    "failed": "The data format could not be saved. Try again.",
     "errors": {
       "nameRequired": "Enter a name."
     },
     "csv": {
-      "description": "EDI Bridge reads CSV Documents of this Document Structure with these settings. To change them, choose a CSV Document: EDI Bridge reads it again with the new settings and shows the fields it infers before you save.",
+      "description": "EDI Bridge reads CSV Documents of this data format with these settings. To change them, choose a CSV Document: EDI Bridge reads it again with the new settings and shows the fields it infers before you save.",
       "document": {
         "label": "CSV Document",
         "description": "A current export from your own systems. Saving replaces the fields with the ones read from it. At most 5 MB."
@@ -3083,7 +3083,7 @@
       "reading": "Reading the CSV Document…",
       "unread": "The fields appear once EDI Bridge can read the CSV Document. Adjust the CSV settings or choose another CSV Document."
     },
-    "viewOnlyFieldsDescription": "The fields EDI Bridge expects in Documents of this Document Structure, with their type and whether they are required or repeat.",
+    "viewOnlyFieldsDescription": "The fields EDI Bridge expects in Documents of this data format, with their type and whether they are required or repeat.",
     "sample": {
       "title": "Sample file",
       "takenAt": "Sample from {date}",
@@ -3126,8 +3126,14 @@
     },
     "technical": {
       "title": "Technical settings",
-      "description": "Change the CSV settings, replace the sample file of a CSV format, mark fields as required or repeating, and adjust their type.",
-      "viewOnlyDescription": "The CSV settings and the fields with their type and whether they are required or repeat."
+      "description": {
+        "csv": "Change the CSV settings, replace the sample file, mark fields as required or repeating, and adjust their type.",
+        "json": "Mark fields and objects as required or repeating, and adjust the type of a field."
+      },
+      "viewOnlyDescription": {
+        "csv": "The CSV settings and the fields with their type and whether they are required or repeat.",
+        "json": "The fields with their type and whether they are required or repeat."
+      }
     }
   },
   "DocumentStructureForm": {
@@ -3231,7 +3237,7 @@
       "none": "The CSV Document has no rows below the header row.",
       "column": "Column {number}"
     },
-    "viewOnlyDescription": "EDI Bridge reads CSV Documents of this Document Structure with these settings.",
+    "viewOnlyDescription": "EDI Bridge reads CSV Documents of this data format with these settings.",
     "headerRowFact": "Header row",
     "headerRowPresent": "The first row names the columns",
     "headerRowAbsent": "None, the columns are named column1, column2 and so on"
@@ -3243,23 +3249,23 @@
     "showInTree": "Show {path} in the tree",
     "versionsTitle": "Published Mapping Versions that use it:",
     "version": "{mappingName}, version {version}",
-    "mappingsTitle": "Mappings that use this Document Structure:",
+    "mappingsTitle": "Mappings that read this data format:",
     "codes": {
       "unreadableContent": "The file cannot be read with its character encoding. Older ERP exports often use Windows-1252.",
       "invalidJson": "The file is not valid JSON.",
       "invalidCsv": "The file is not a valid CSV Document.",
       "invalidJsonSchema": "The file is not a valid JSON Schema.",
-      "unsupportedJson": "The JSON Document has a shape a Document Structure cannot describe.",
-      "unsupportedJsonSchema": "The JSON Schema uses something a Document Structure cannot describe.",
-      "emptyDocument": "The Document has no fields to infer a Document Structure from.",
+      "unsupportedJson": "The JSON Document has a shape a data format cannot describe.",
+      "unsupportedJsonSchema": "The JSON Schema uses something a data format cannot describe.",
+      "emptyDocument": "The Document has no fields to infer a data format from.",
       "inconsistentCsvRows": "The rows of the CSV Document do not have the same number of columns.",
-      "unknownPath": "The Document Structure has changed in the meantime. Reload the page and adjust it again.",
-      "notAdjustable": "This part of the Document Structure cannot change this way.",
+      "unknownPath": "The data format has changed in the meantime. Reload the page and adjust it again.",
+      "notAdjustable": "This part of the data format cannot change this way.",
       "csvDocumentRequired": "Changing the CSV settings needs a CSV Document, which EDI Bridge reads again with the new settings.",
       "linkedByMapping": "A Mapping Draft links a field this change would remove. Remove the link on the mapping canvas first, or undo the change.",
-      "usedByMappingVersion": "Published Mapping Versions use this part, and a published Mapping Version never changes. Undo the change, or create a new Document Structure for the new shape."
+      "usedByMappingVersion": "Published Mapping Versions use this part, and a published Mapping Version never changes. Undo the change, or create a new data format for the new shape."
     },
-    "csvSettingsUsedByMappingVersion": "Published Mapping Versions read CSV Documents with these settings, and a published Mapping Version never changes. Keep the saved CSV settings, or create a new Document Structure with the new ones."
+    "csvSettingsUsedByMappingVersion": "Published Mapping Versions read CSV Documents with these settings, and a published Mapping Version never changes. Keep the saved CSV settings, or create a new data format with the new ones."
   },
   "LookupTables": {
     "new": "New Lookup Table",

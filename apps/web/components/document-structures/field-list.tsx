@@ -5,11 +5,10 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import { type Ref, useId, useState } from 'react'
-import { toast } from 'sonner'
 
 import { Loading } from '@/components/detail-parts'
 import { RefusalAlert } from '@/components/document-structures/document-structure-problem'
-import { UsedByMappings } from '@/components/document-structures/mapping-list'
+import { type Mappings, UsedByMappings } from '@/components/document-structures/mapping-list'
 import { TextField } from '@/components/form-field'
 import { updateDocumentStructure } from '@/lib/api/client'
 import { storeSavedDocumentStructure } from '@/lib/api/queries'
@@ -17,16 +16,13 @@ import {
   type DocumentStructure,
   type DocumentStructureNode,
   documentStructureNodes,
-  type DocumentStructureSummary,
   maxFieldLabelLength,
   nodeContent,
 } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 
-type Mappings = DocumentStructureSummary['mappings'] | undefined
-
-type FieldEntry = { node: DocumentStructureNode; depth: number }
+export type FieldEntry = { node: DocumentStructureNode; depth: number }
 
 export function fieldEntries(structure: DocumentStructure): FieldEntry[] {
   return [...documentStructureNodes(structure.children)].map(({ node, ancestors }) => ({
@@ -75,6 +71,7 @@ function RenameForm({
   const queryClient = useQueryClient()
   const [label, setLabel] = useState(node.label)
   const [touched, setTouched] = useState(false)
+  const [confirmed, setConfirmed] = useState<string | null>(null)
   const trimmed = label.trim()
   const missing = touched && trimmed === ''
 
@@ -85,10 +82,11 @@ function RenameForm({
         adjustments: [{ path: node.path, label: chosen }],
       }),
     onSuccess: (updated, chosen) => {
-      storeSavedDocumentStructure(queryClient, updated)
-      toast.success(
+      setConfirmed(
         chosen === node.label ? t('kept', { label: chosen }) : t('renamed', { label: chosen }),
       )
+      storeSavedDocumentStructure(queryClient, updated)
+      document.getElementById(id)?.focus()
     },
   })
 
@@ -107,6 +105,7 @@ function RenameForm({
           return
         }
 
+        setConfirmed(null)
         rename.mutate(trimmed)
       }}>
       <div className="flex flex-wrap items-end gap-2">
@@ -119,6 +118,7 @@ function RenameForm({
             value={label}
             onChange={(next) => {
               setLabel(next)
+              setConfirmed(null)
               rename.reset()
             }}
           />
@@ -139,6 +139,7 @@ function RenameForm({
               variant="outline"
               onClick={() => {
                 setLabel(node.label)
+                setConfirmed(null)
                 rename.mutate(node.label)
               }}>
               {t('keep')}
@@ -146,6 +147,9 @@ function RenameForm({
           )}
         </div>
       </div>
+      <p aria-live="polite" className="text-muted-foreground text-sm empty:hidden">
+        {confirmed}
+      </p>
       <RefusalAlert error={rename.error} failed={t('failed')} takeFocus />
     </form>
   )
@@ -163,7 +167,7 @@ function FieldDetails({
   structure: DocumentStructure
   node: DocumentStructureNode
   example: string | undefined
-  mappings: Mappings
+  mappings: Mappings | undefined
   canChange: boolean
 }) {
   const t = useTranslations('DocumentStructure.fieldList')
@@ -212,13 +216,14 @@ function FieldDetails({
           )}
         </dd>
       </dl>
-      {canChange && <RenameForm key={node.label} node={node} structure={structure} />}
+      {canChange && <RenameForm node={node} structure={structure} />}
     </div>
   )
 }
 
 export function FieldList({
   structure,
+  entries,
   examples,
   mappings,
   selected,
@@ -227,8 +232,9 @@ export function FieldList({
   listRef,
 }: {
   structure: DocumentStructure
+  entries: ReadonlyArray<FieldEntry>
   examples: ReadonlyMap<string, string>
-  mappings: Mappings
+  mappings: Mappings | undefined
   selected: string | null
   canChange: boolean
   onSelect: (path: string | null) => void
@@ -238,7 +244,7 @@ export function FieldList({
 
   return (
     <ul ref={listRef} className="flex flex-col gap-1.5">
-      {fieldEntries(structure).map(({ node, depth }) => {
+      {entries.map(({ node, depth }) => {
         const active = node.path === selected
         const detailsId = `${id}-${node.path}`
         const example = examples.get(node.path)
@@ -246,7 +252,7 @@ export function FieldList({
         return (
           <li
             key={node.path}
-            className="min-w-0"
+            className="min-w-0 scroll-mt-18 scroll-mb-4"
             style={{ marginInlineStart: `${Math.min(depth, 4) * 0.75}rem` }}>
             <button
               type="button"

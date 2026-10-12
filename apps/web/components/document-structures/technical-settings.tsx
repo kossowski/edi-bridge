@@ -40,7 +40,6 @@ import {
   defaultCsvSettings,
   type DocumentStructure,
   type DocumentStructureProblem,
-  type DocumentStructureSummary,
   type EncodedFile,
   maxDocumentStructureNameLength,
   type UpdateDocumentStructureBody,
@@ -52,7 +51,7 @@ import {
   CollapsibleTrigger,
 } from '@edi-bridge/ui/components/collapsible'
 
-type Mappings = DocumentStructureSummary['mappings'] | undefined
+import type { Mappings } from '@/components/document-structures/mapping-list'
 
 const markedCodes = new Set<DocumentStructureProblem['code']>([
   'usedByMappingVersion',
@@ -241,7 +240,13 @@ function StructureView({ structure }: { structure: DocumentStructure }) {
   )
 }
 
-function Editor({ structure, mappings }: { structure: DocumentStructure; mappings: Mappings }) {
+function Editor({
+  structure,
+  mappings,
+}: {
+  structure: DocumentStructure
+  mappings: Mappings | undefined
+}) {
   const t = useTranslations('DocumentStructure')
   const id = useId()
   const queryClient = useQueryClient()
@@ -417,7 +422,7 @@ export function TechnicalSettings({
   canChange,
 }: {
   structure: DocumentStructure
-  mappings: Mappings
+  mappings: Mappings | undefined
   canChange: boolean
 }) {
   const t = useTranslations('DocumentStructure.technical')
@@ -438,7 +443,9 @@ export function TechnicalSettings({
         </CollapsibleTrigger>
       </h2>
       <p className="text-muted-foreground -mt-2 max-w-prose text-sm">
-        {canChange ? t('description') : t('viewOnlyDescription')}
+        {canChange
+          ? t(`description.${structure.format}`)
+          : t(`viewOnlyDescription.${structure.format}`)}
       </p>
       <CollapsibleContent keepMounted>
         {canChange ? (

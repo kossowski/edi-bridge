@@ -5,16 +5,18 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useId, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 import { AppPage } from '@/components/app-page'
 import { Fact, FactGrid, LoadFailure, Loading } from '@/components/detail-parts'
 import { fieldEntries, FieldList } from '@/components/document-structures/field-list'
-import { UsedByMappings } from '@/components/document-structures/mapping-list'
+import { type Mappings, UsedByMappings } from '@/components/document-structures/mapping-list'
+import { SampleFile } from '@/components/document-structures/sample-file'
 import {
   firstValues,
-  SampleFile,
+  pathWithin,
   sampleContent,
-} from '@/components/document-structures/sample-file'
+} from '@/components/document-structures/sample-segments'
 import { leafCount } from '@/components/document-structures/structure-tree'
 import { TechnicalSettings } from '@/components/document-structures/technical-settings'
 import { useSession } from '@/hooks/use-session'
@@ -23,23 +25,35 @@ import { documentStructureQuery, documentStructuresQuery } from '@/lib/api/queri
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { DocumentStructure, DocumentStructureSummary } from '@edi-bridge/contracts'
+import type { DocumentStructure } from '@edi-bridge/contracts'
 
-type Mappings = DocumentStructureSummary['mappings'] | undefined
-
-function useMappings(id: string): Mappings {
+function useMappings(id: string): Mappings | undefined {
   const summaries = useQuery(documentStructuresQuery)
 
   return summaries.data?.find((summary) => summary.id === id)?.mappings
 }
 
-function scrollToPath(container: HTMLElement | null, path: string) {
-  container
-    ?.querySelector(`[data-path="${CSS.escape(path)}"]`)
-    ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+function scrollToValue(container: HTMLElement | null, path: string) {
+  const values = [...(container?.querySelectorAll('[data-sample-value]') ?? [])]
+  const first = values.find((value) => pathWithin(value.getAttribute('data-path') ?? '', path))
+
+  first?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
 
-function Facts({ structure, mappings }: { structure: DocumentStructure; mappings: Mappings }) {
+function scrollToField(list: HTMLElement | null, path: string) {
+  list
+    ?.querySelector(`[data-path="${CSS.escape(path)}"]`)
+    ?.closest('li')
+    ?.scrollIntoView({ block: 'nearest' })
+}
+
+function Facts({
+  structure,
+  mappings,
+}: {
+  structure: DocumentStructure
+  mappings: Mappings | undefined
+}) {
   const t = useTranslations('DocumentStructure.facts')
   const tList = useTranslations('DocumentStructures')
 
@@ -91,14 +105,15 @@ function StructurePage({
   const t = useTranslations('DocumentStructure.fieldList')
   const id = useId()
   const mappings = useMappings(structure.id)
-  const [selected, setSelected] = useState<string | null>(null)
   const valuesRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const { sample } = structure
+  const entries = useMemo(() => fieldEntries(structure), [structure])
+  const [selected, setSelected] = useState(() => entries[0]?.node.path ?? null)
 
   const labels = useMemo(
-    () => new Map(fieldEntries(structure).map(({ node }) => [node.path, node.label])),
-    [structure],
+    () => new Map(entries.map(({ node }) => [node.path, node.label])),
+    [entries],
   )
 
   const content = useMemo(() => sample && sampleContent(structure, sample), [structure, sample])
@@ -120,6 +135,7 @@ function StructurePage({
       </div>
       <FieldList
         canChange={canChange}
+        entries={entries}
         examples={examples}
         listRef={listRef}
         mappings={mappings}
@@ -129,7 +145,7 @@ function StructurePage({
           setSelected(path)
 
           if (path !== null) {
-            scrollToPath(valuesRef.current, path)
+            scrollToValue(valuesRef.current, path)
           }
         }}
       />
@@ -149,8 +165,8 @@ function StructurePage({
               selected={shown}
               valuesRef={valuesRef}
               onSelect={(path) => {
-                setSelected(path)
-                scrollToPath(listRef.current, path)
+                flushSync(() => setSelected(path))
+                scrollToField(listRef.current, path)
               }}
             />
           </div>

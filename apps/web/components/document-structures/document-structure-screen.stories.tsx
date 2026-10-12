@@ -30,7 +30,6 @@ import {
   seedMappingDrafts,
   seedUnusedDocumentStructures,
 } from '@edi-bridge/mocks'
-import { Toaster } from '@edi-bridge/ui/components/sonner'
 
 import preview from '../../.storybook/preview'
 
@@ -136,14 +135,6 @@ const meta = preview.meta({
   component: DocumentStructureScreen,
   parameters: { layout: 'fullscreen' },
   args: { id: order.id },
-  decorators: [
-    (Story) => (
-      <>
-        <Story />
-        <Toaster />
-      </>
-    ),
-  ],
   beforeEach({ msw }) {
     msw.use(...createHandlers(apiUrl))
   },
@@ -158,7 +149,10 @@ function fieldButton(canvasElement: HTMLElement, label: string) {
 async function selectField(canvasElement: HTMLElement, label: string) {
   const field = await fieldButton(canvasElement, label)
 
-  await userEvent.click(field)
+  if (field.getAttribute('aria-expanded') !== 'true') {
+    await userEvent.click(field)
+  }
+
   await expect(field).toHaveAttribute('aria-expanded', 'true')
 
   return field
@@ -172,9 +166,13 @@ export const Default = meta.story({
   async play({ canvas, canvasElement }) {
     const values = await canvas.findByRole('group', { name: 'Values in order-4711.json' })
 
-    await expect(
-      await canvas.findByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON' }),
-    ).toBeVisible()
+    await expect(canvasElement.querySelector('li [aria-expanded=true]')).toBe(
+      canvasElement.querySelector('li [data-path]'),
+    )
+
+    const [mapping] = await canvas.findAllByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON' })
+
+    await expect(mapping).toBeVisible()
     await selectField(canvasElement, 'Order number')
 
     const [pressed] = pressedValues(canvasElement)
@@ -217,6 +215,10 @@ export const InvoiceExport = meta.story({
 
     await expect(within(rows).getByRole('columnheader', { name: /Unit price/ })).toBeVisible()
     await expect(canvas.getAllByText('Unsure')).toHaveLength(2)
+    await expect(await fieldButton(canvasElement, 'Rows')).toHaveAttribute('aria-expanded', 'true')
+    await expect(pressedValues(canvasElement)).toHaveLength(
+      within(rows).getAllByRole('button').length,
+    )
 
     const [price] = within(rows).getAllByRole('button', { name: /, Unit price$/ })
 
@@ -242,14 +244,25 @@ export const RenameField = meta.story({
     await userEvent.clear(name)
     await userEvent.type(name, 'Price per unit')
     await userEvent.click(canvas.getByRole('button', { name: 'Rename' }))
-    await expect(
-      await within(canvasElement.ownerDocument.body).findByText('Renamed to “Price per unit”.'),
-    ).toBeInTheDocument()
+    await expect(await canvas.findByText('Renamed to “Price per unit”.')).toBeVisible()
+    await expect(name).toHaveFocus()
     await expect(await fieldButton(canvasElement, 'Price per unit')).toHaveAttribute(
       'aria-expanded',
       'true',
     )
     await expect(canvas.getByText('Named by you')).toBeVisible()
+    await expect(canvas.getAllByText('Unsure')).toHaveLength(1)
+  },
+})
+
+export const KeepName = meta.story({
+  args: { id: invoiceExport.id },
+  async play({ canvas, canvasElement }) {
+    await selectField(canvasElement, 'Unit price')
+    await userEvent.click(canvas.getByRole('button', { name: 'Keep this name' }))
+    await expect(await canvas.findByText('Kept the name “Unit price”.')).toBeVisible()
+    await expect(canvas.getByRole('textbox', { name: 'Name shown in Mappings' })).toHaveFocus()
+    await expect(canvas.queryByRole('button', { name: 'Keep this name' })).toBeNull()
     await expect(canvas.getAllByText('Unsure')).toHaveLength(1)
   },
 })
@@ -276,7 +289,7 @@ export const RenameRefused = meta.story({
 
     const alert = await canvas.findByRole('alert')
 
-    await expect(alert).toHaveTextContent('The Document Structure has changed in the meantime.')
+    await expect(alert).toHaveTextContent('The data format has changed in the meantime.')
     await expect(alert.parentElement).toHaveFocus()
   },
 })
@@ -322,7 +335,7 @@ export const CsvReread = meta.story({
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
     await expect(canvas.getByText('2 unsaved changes')).toBeVisible()
     await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
-    await expect(await canvas.findByText('The Document Structure is saved.')).toBeVisible()
+    await expect(await canvas.findByText('The data format is saved.')).toBeVisible()
     await expect(
       canvas.getByRole('checkbox', { name: 'The first row names the columns' }),
     ).not.toBeChecked()
@@ -610,7 +623,6 @@ export const LargeVolume = meta.story({
   beforeEach({ msw }) {
     msw.use(...createHandlers(apiUrl, { documentStructures: [...seedDocumentStructures, large] }))
   },
-  parameters: { a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } } },
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByRole('group', { name: /^Values in / })).toBeVisible()
     await openTechnicalSettings(canvasElement)
@@ -629,7 +641,7 @@ export const MappingsLoading = meta.story({
   async play({ canvas, canvasElement }) {
     await openTechnicalSettings(canvasElement)
     await expect(await canvas.findByRole('treegrid')).toBeVisible()
-    await expect(canvas.getByText('Loading Mappings').closest('[aria-busy]')).not.toBeNull()
+    await expect(canvas.getAllByText('Loading Mappings')[0]!.closest('[aria-busy]')).not.toBeNull()
   },
 })
 

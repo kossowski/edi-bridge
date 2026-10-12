@@ -9,7 +9,6 @@ import { QueryProvider } from '@/components/query-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 
 import '@edi-bridge/ui/globals.css'
-import { Toaster } from '@edi-bridge/ui/components/sonner'
 import { TooltipProvider } from '@edi-bridge/ui/components/tooltip'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -42,7 +41,6 @@ export default async function RootLayout({
           <ThemeProvider>
             <QueryProvider>
               <TooltipProvider>{children}</TooltipProvider>
-              <Toaster />
             </QueryProvider>
             <Toaster containerAriaLabel={t('toasts')} />
           </ThemeProvider>

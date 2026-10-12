@@ -6,8 +6,8 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { type KeyboardEvent, type Ref, useId } from 'react'
 
 import {
-  csvSampleRows,
-  jsonSampleSegments,
+  pathWithin,
+  type SampleContent,
   type SampleSegment,
 } from '@/components/document-structures/sample-segments'
 import {
@@ -17,74 +17,11 @@ import {
   TableHeader,
   TableRow,
 } from '@edi-bridge/ui/components/table'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
-import type { DocumentStructure, DocumentStructureSample } from '@edi-bridge/contracts'
+import type { DocumentStructureSample } from '@edi-bridge/contracts'
 
-export const sampleRowLimit = 50
-
-export type FieldLabels = ReadonlyMap<string, string>
-
-type CsvColumn = { path: string; name: string }
-
-function csvColumns(structure: DocumentStructure): CsvColumn[] {
-  const [rows] = structure.children
-
-  if (rows?.kind !== 'array' || rows.items.kind !== 'object') {
-    return []
-  }
-
-  return rows.items.children.map(({ path, name }) => ({ path, name }))
-}
-
-export type SampleContent =
-  | { kind: 'json'; segments: SampleSegment[] }
-  | { kind: 'csv'; columns: CsvColumn[]; rows: SampleSegment[][]; rowCount: number }
-  | { kind: 'text' }
-
-export function sampleContent(
-  structure: DocumentStructure,
-  sample: DocumentStructureSample,
-): SampleContent {
-  if (structure.format === 'csv') {
-    const columns = csvColumns(structure)
-
-    const read = csvSampleRows(
-      sample.text,
-      structure.csv,
-      columns.map(({ path }) => path),
-      sampleRowLimit,
-    )
-
-    return { kind: 'csv', columns, ...read }
-  }
-
-  const segments = jsonSampleSegments(sample.text)
-
-  return segments ? { kind: 'json', segments } : { kind: 'text' }
-}
-
-function valueSegments(content: SampleContent) {
-  switch (content.kind) {
-    case 'json':
-      return content.segments
-    case 'csv':
-      return content.rows.flat()
-    case 'text':
-      return []
-  }
-}
-
-export function firstValues(content: SampleContent) {
-  const values = new Map<string, string>()
-
-  for (const { path, text } of valueSegments(content)) {
-    if (path !== null && text !== '' && !values.has(path)) {
-      values.set(path, text)
-    }
-  }
-
-  return values
-}
+type FieldLabels = ReadonlyMap<string, string>
 
 function nextIndex(key: string, index: number, count: number) {
   switch (key) {
@@ -138,7 +75,7 @@ function Value({
       type="button"
       aria-label={t('value', { value: text, field: label })}
       aria-pressed={selected}
-      className="decoration-muted-foreground/70 hover:bg-primary/10 focus-visible:outline-ring aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:ring-primary aria-pressed:ring-offset-background rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 aria-pressed:font-semibold aria-pressed:no-underline aria-pressed:ring-2 aria-pressed:ring-offset-1"
+      className="decoration-muted-foreground/70 hover:bg-primary/10 focus-visible:outline-ring aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:ring-primary aria-pressed:ring-offset-background scroll-m-3 rounded-sm text-left underline decoration-dotted underline-offset-4 outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid aria-pressed:font-semibold aria-pressed:no-underline aria-pressed:ring-2 aria-pressed:ring-offset-1"
       data-path={path}
       data-sample-value
       onClick={() => onSelect(path)}
@@ -156,7 +93,13 @@ function tabStopIndex(
   const selectable = (segment: SampleSegment) =>
     segment.path !== null && segment.text !== '' && labels.has(segment.path)
 
-  const chosen = segments.findIndex((segment) => selectable(segment) && segment.path === selected)
+  const chosen = segments.findIndex(
+    (segment) =>
+      selectable(segment) &&
+      selected !== null &&
+      segment.path !== null &&
+      pathWithin(segment.path, selected),
+  )
 
   return chosen === -1 ? segments.findIndex(selectable) : chosen
 }
@@ -186,7 +129,7 @@ function JsonValues({
             key={index}
             label={label}
             segment={{ text: segment.text, path: segment.path }}
-            selected={segment.path === selected}
+            selected={selected !== null && pathWithin(segment.path, selected)}
             tabStop={index === tabStop}
             onSelect={onSelect}
           />
@@ -247,7 +190,7 @@ function CsvValues({
                       <Value
                         label={label}
                         segment={{ text: cell.text, path: cell.path }}
-                        selected={cell.path === selected}
+                        selected={selected !== null && pathWithin(cell.path, selected)}
                         tabStop={index === tabStop}
                         onSelect={onSelect}
                       />
@@ -323,7 +266,10 @@ export function SampleFile({
           role="group"
           aria-describedby={hintId}
           aria-label={t('valuesLabel', { fileName: sample.fileName })}
-          className="max-h-[32rem] min-h-0 overflow-auto lg:max-h-none"
+          className={cn(
+            'max-h-[32rem] min-h-0 overflow-auto lg:max-h-none',
+            content.kind === 'csv' && 'scroll-shadow-x',
+          )}
           data-sample-values>
           {content.kind === 'json' ? (
             <JsonValues

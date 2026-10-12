@@ -2445,7 +2445,7 @@
     },
     "linkCount": "{count, plural, =0 {Noch keine Verknüpfungen} one {# Verknüpfung} other {# Verknüpfungen}}",
     "side": {
-      "documentStructure": "Document Structure {name}",
+      "documentStructure": "Datenformat {name}",
       "messageType": "Message Type {messageType}"
     },
     "canvas": {
@@ -3064,13 +3064,13 @@
     "save": "Speichern",
     "saving": "Wird gespeichert…",
     "discard": "Änderungen verwerfen",
-    "saved": "Die Document Structure ist gespeichert.",
-    "failed": "Die Document Structure konnte nicht gespeichert werden. Versuchen Sie es erneut.",
+    "saved": "Das Datenformat ist gespeichert.",
+    "failed": "Das Datenformat konnte nicht gespeichert werden. Versuchen Sie es erneut.",
     "errors": {
       "nameRequired": "Geben Sie einen Namen ein."
     },
     "csv": {
-      "description": "EDI Bridge liest CSV-Documents dieser Document Structure mit diesen Einstellungen. Um sie zu ändern, wählen Sie ein CSV-Document: EDI Bridge liest es mit den neuen Einstellungen erneut und zeigt die abgeleiteten Felder, bevor Sie speichern.",
+      "description": "EDI Bridge liest CSV-Documents dieses Datenformats mit diesen Einstellungen. Um sie zu ändern, wählen Sie ein CSV-Document: EDI Bridge liest es mit den neuen Einstellungen erneut und zeigt die abgeleiteten Felder, bevor Sie speichern.",
       "document": {
         "label": "CSV-Document",
         "description": "Ein aktueller Export aus Ihren eigenen Systemen. Beim Speichern ersetzen die daraus gelesenen Felder die bisherigen. Höchstens 5 MB."
@@ -3083,7 +3083,7 @@
       "reading": "CSV-Document wird gelesen…",
       "unread": "Die Felder erscheinen, sobald EDI Bridge das CSV-Document lesen kann. Passen Sie die CSV-Einstellungen an oder wählen Sie ein anderes CSV-Document."
     },
-    "viewOnlyFieldsDescription": "Die Felder, die EDI Bridge in Documents dieser Document Structure erwartet, mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen.",
+    "viewOnlyFieldsDescription": "Die Felder, die EDI Bridge in Documents dieses Datenformats erwartet, mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen.",
     "sample": {
       "title": "Beispieldatei",
       "takenAt": "Beispiel vom {date}",
@@ -3126,8 +3126,14 @@
     },
     "technical": {
       "title": "Technische Einstellungen",
-      "description": "Ändern Sie die CSV-Einstellungen, ersetzen Sie die Beispieldatei eines CSV-Formats, markieren Sie Felder als Pflicht oder wiederholend und passen Sie ihren Typ an.",
-      "viewOnlyDescription": "Die CSV-Einstellungen und die Felder mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen."
+      "description": {
+        "csv": "Ändern Sie die CSV-Einstellungen, ersetzen Sie die Beispieldatei, markieren Sie Felder als Pflicht oder wiederholend und passen Sie ihren Typ an.",
+        "json": "Markieren Sie Felder und Objekte als Pflicht oder wiederholend und passen Sie den Typ eines Felds an."
+      },
+      "viewOnlyDescription": {
+        "csv": "Die CSV-Einstellungen und die Felder mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen.",
+        "json": "Die Felder mit ihrem Typ und ob sie Pflicht sind oder sich wiederholen."
+      }
     }
   },
   "DocumentStructureForm": {
@@ -3231,7 +3237,7 @@
       "none": "Das CSV-Document hat keine Zeilen unter der Kopfzeile.",
       "column": "Spalte {number}"
     },
-    "viewOnlyDescription": "EDI Bridge liest CSV-Documents dieser Document Structure mit diesen Einstellungen.",
+    "viewOnlyDescription": "EDI Bridge liest CSV-Documents dieses Datenformats mit diesen Einstellungen.",
     "headerRowFact": "Kopfzeile",
     "headerRowPresent": "Die erste Zeile benennt die Spalten",
     "headerRowAbsent": "Keine, die Spalten heißen column1, column2 und so weiter"
@@ -3243,23 +3249,23 @@
     "showInTree": "{path} im Baum zeigen",
     "versionsTitle": "Veröffentlichte Mapping Versions, die es verwenden:",
     "version": "{mappingName}, Version {version}",
-    "mappingsTitle": "Mappings, die diese Document Structure verwenden:",
+    "mappingsTitle": "Mappings, die dieses Datenformat lesen:",
     "codes": {
       "unreadableContent": "Die Datei lässt sich mit ihrer Zeichenkodierung nicht lesen. Ältere ERP-Exporte verwenden oft Windows-1252.",
       "invalidJson": "Die Datei ist kein gültiges JSON.",
       "invalidCsv": "Die Datei ist kein gültiges CSV-Document.",
       "invalidJsonSchema": "Die Datei ist kein gültiges JSON Schema.",
-      "unsupportedJson": "Das JSON-Document hat eine Form, die eine Document Structure nicht beschreiben kann.",
-      "unsupportedJsonSchema": "Das JSON Schema verwendet etwas, das eine Document Structure nicht beschreiben kann.",
-      "emptyDocument": "Das Document hat keine Felder, aus denen sich eine Document Structure ableiten lässt.",
+      "unsupportedJson": "Das JSON-Document hat eine Form, die ein Datenformat nicht beschreiben kann.",
+      "unsupportedJsonSchema": "Das JSON Schema verwendet etwas, das ein Datenformat nicht beschreiben kann.",
+      "emptyDocument": "Das Document hat keine Felder, aus denen sich ein Datenformat ableiten lässt.",
       "inconsistentCsvRows": "Die Zeilen des CSV-Documents haben nicht gleich viele Spalten.",
-      "unknownPath": "Die Document Structure hat sich inzwischen geändert. Laden Sie die Seite neu und passen Sie sie erneut an.",
-      "notAdjustable": "Dieser Teil der Document Structure lässt sich so nicht ändern.",
+      "unknownPath": "Das Datenformat hat sich inzwischen geändert. Laden Sie die Seite neu und passen Sie es erneut an.",
+      "notAdjustable": "Dieser Teil des Datenformats lässt sich so nicht ändern.",
       "csvDocumentRequired": "Für andere CSV-Einstellungen braucht es ein CSV-Document, das EDI Bridge mit den neuen Einstellungen erneut liest.",
       "linkedByMapping": "Ein Mapping-Draft verknüpft ein Feld, das diese Änderung entfernen würde. Entfernen Sie zuerst die Verknüpfung auf dem Mapping-Canvas oder machen Sie die Änderung rückgängig.",
-      "usedByMappingVersion": "Veröffentlichte Mapping Versions verwenden diesen Teil, und eine veröffentlichte Mapping Version ändert sich nie. Machen Sie die Änderung rückgängig oder erstellen Sie eine neue Document Structure für die neue Form."
+      "usedByMappingVersion": "Veröffentlichte Mapping Versions verwenden diesen Teil, und eine veröffentlichte Mapping Version ändert sich nie. Machen Sie die Änderung rückgängig oder erstellen Sie ein neues Datenformat für die neue Form."
     },
-    "csvSettingsUsedByMappingVersion": "Veröffentlichte Mapping Versions lesen CSV-Documents mit diesen Einstellungen, und eine veröffentlichte Mapping Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie eine neue Document Structure mit den neuen."
+    "csvSettingsUsedByMappingVersion": "Veröffentlichte Mapping Versions lesen CSV-Documents mit diesen Einstellungen, und eine veröffentlichte Mapping Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie ein neues Datenformat mit den neuen."
   },
   "LookupTables": {
     "new": "Neue Lookup Table",

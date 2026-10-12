@@ -2,6 +2,8 @@ import {
   arrayPath,
   childPath,
   type CsvSettings,
+  type DocumentStructure,
+  type DocumentStructureSample,
   type JsonContent,
   jsonContentSchema,
   jsonItemsName,
@@ -97,4 +99,72 @@ export function csvSampleRows(
       })),
     ),
   }
+}
+
+const sampleRowLimit = 50
+
+type CsvColumn = { path: string; name: string }
+
+function csvColumns(structure: DocumentStructure): CsvColumn[] {
+  const [rows] = structure.children
+
+  if (rows?.kind !== 'array' || rows.items.kind !== 'object') {
+    return []
+  }
+
+  return rows.items.children.map(({ path, name }) => ({ path, name }))
+}
+
+export type SampleContent =
+  | { kind: 'json'; segments: SampleSegment[] }
+  | { kind: 'csv'; columns: CsvColumn[]; rows: SampleSegment[][]; rowCount: number }
+  | { kind: 'text' }
+
+export function sampleContent(
+  structure: DocumentStructure,
+  sample: DocumentStructureSample,
+): SampleContent {
+  if (structure.format === 'csv') {
+    const columns = csvColumns(structure)
+
+    const read = csvSampleRows(
+      sample.text,
+      structure.csv,
+      columns.map(({ path }) => path),
+      sampleRowLimit,
+    )
+
+    return { kind: 'csv', columns, ...read }
+  }
+
+  const segments = jsonSampleSegments(sample.text)
+
+  return segments ? { kind: 'json', segments } : { kind: 'text' }
+}
+
+function valueSegments(content: SampleContent) {
+  switch (content.kind) {
+    case 'json':
+      return content.segments
+    case 'csv':
+      return content.rows.flat()
+    case 'text':
+      return []
+  }
+}
+
+export function firstValues(content: SampleContent) {
+  const values = new Map<string, string>()
+
+  for (const { path, text } of valueSegments(content)) {
+    if (path !== null && text !== '' && !values.has(path)) {
+      values.set(path, text)
+    }
+  }
+
+  return values
+}
+
+export function pathWithin(path: string, selected: string) {
+  return path === selected || path.startsWith(`${selected}.`) || path.startsWith(`${selected}[]`)
 }
