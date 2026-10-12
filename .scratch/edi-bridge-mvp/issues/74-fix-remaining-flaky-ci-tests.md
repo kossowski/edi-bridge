@@ -13,12 +13,14 @@ The canvas stories that failed on the `feat/67-*` branches ("30 links", the tran
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Document Structure Default waits for the data its link depends on, and the reason it takes about 5 s to render is known and fixed or recorded
-- [ ] Mapping Comparison Unavailable waits for the error state instead of racing the 1 s default
-- [ ] The `packages/mocks` tests run well within their timeout on a CI runner
-- [ ] `openDetails` waits until focus is inside the sheet
-- [ ] Each fixed test passes five times in a row locally
+- [x] Document Structure Default waits for the data its link depends on, and the reason it takes about 5 s to render is known and fixed or recorded
+- [x] Mapping Comparison Unavailable waits for the error state instead of racing the 1 s default
+- [x] The `packages/mocks` tests run well within their timeout on a CI runner
+- [x] `openDetails` waits until focus is inside the sheet
+- [x] Each fixed test passes five times in a row locally
 
 ## Comments
+
+Resolved in #150.
