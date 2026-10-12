@@ -479,6 +479,30 @@ export {
 } from './run'
 
 export {
+  failedRunTaskSchema,
+  failingTradingPartnerTaskSchema,
+  interchangeTaskTargetSchema,
+  overdueAcknowledgementTaskSchema,
+  runTaskTargetSchema,
+  type Task,
+  type TaskActor,
+  taskActors,
+  taskActorSchema,
+  type TaskCounts,
+  taskCountsOf,
+  taskCountsSchema,
+  type TaskKind,
+  type Tasks,
+  taskSchema,
+  tasksEndpoint,
+  tasksSchema,
+  type TaskTarget,
+  taskTargetSchema,
+  tradingPartnerTaskTargetSchema,
+  whoActsOnFailedRun,
+} from './task'
+
+export {
   type ConditionOperator,
   conditionOperators,
   concatenateInputs,
