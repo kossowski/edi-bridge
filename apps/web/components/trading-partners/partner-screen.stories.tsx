@@ -10,12 +10,16 @@ import { darkMode, german } from '@/components/story-helpers'
 import { PartnerScreen } from '@/components/trading-partners/partner-screen'
 import { apiUrl } from '@/lib/api/config'
 import {
+  channelsEndpoint,
   type RunSummary,
+  testChannelEndpoint,
   type TradingPartner,
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 import {
+  channelHandlers,
+  createChannels,
   createHandlers,
   createOverviewData,
   createWorkspace,
@@ -92,6 +96,20 @@ function asViewer(play: (context: StoryContext) => Promise<void>) {
 
 function region(canvasElement: HTMLElement, name: string | RegExp) {
   return within(within(canvasElement).getByRole('region', { name }))
+}
+
+async function connectionItem(canvasElement: HTMLElement, list: string, way: string) {
+  const items = within(await within(canvasElement).findByRole('list', { name: list }))
+
+  return within(items.getByText(way).closest('li')!)
+}
+
+// Waits out the opening fade, so visibility checks see the settled sheet.
+async function sheetOf(canvasElement: HTMLElement, name = 'Add a connection') {
+  const element = await within(canvasElement.ownerDocument.body).findByRole('dialog', { name })
+  await waitFor(() => expect(element).toBeVisible())
+
+  return element
 }
 
 const meta = preview.meta({
@@ -519,5 +537,373 @@ export const DarkSettings = meta.story({
   beforeEach: darkMode,
   async play({ canvas }) {
     await expect(await canvas.findByRole('button', { name: 'Save changes' })).toBeVisible()
+  },
+})
+
+export const Connections = meta.story({
+  ...at(live, 'connections'),
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('tab', { name: 'Connections' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(canvas.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Overview',
+      'Connections',
+      'Settings',
+    ])
+
+    const own = await canvas.findByRole('list', { name: 'Connections with Hansemarkt GmbH' })
+    await expect(within(own).getByText('Receive from Hansemarkt GmbH')).toBeVisible()
+    await expect(within(own).getByText('Send to Hansemarkt GmbH')).toBeVisible()
+    await expect(within(own).getByRole('link', { name: 'Hansemarkt SFTP inbox' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/channels\/[\da-f-]+$/),
+    )
+
+    const shared = canvas.getByRole('list', { name: 'Shared connections of your systems' })
+    await expect(within(shared).getByText('Receive from your systems')).toBeVisible()
+    await expect(within(shared).getByText('Send to your systems')).toBeVisible()
+    await expect(canvas.getByRole('link', { name: 'All connections' })).toHaveAttribute(
+      'href',
+      '/channels',
+    )
+  },
+})
+
+export const ConnectionsEmpty = meta.story({
+  ...at(untouched, 'connections'),
+  async play({ canvas }) {
+    await expect(await canvas.findByText('No connections yet')).toBeVisible()
+    await expect(
+      canvas.getByText(/no documents can arrive from Mainfranken Getränke GmbH/),
+    ).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Add a connection' })).toBeVisible()
+    await expect(
+      canvas.getByRole('list', { name: 'Shared connections of your systems' }),
+    ).toBeVisible()
+  },
+})
+
+export const ConnectionsWithoutAny = meta.story({
+  ...at(untouched, 'connections'),
+  beforeEach({ msw }) {
+    msw.use(...channelHandlers(apiUrl, { channels: [] }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('No connections yet')).toBeVisible()
+    await expect(canvas.getByText('No shared connections of your systems yet.')).toBeVisible()
+  },
+})
+
+export const ConnectionsLoading = meta.story({
+  ...at(live, 'connections'),
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${channelsEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Loading the connections')).toBeInTheDocument()
+  },
+})
+
+export const ConnectionsUnavailable = meta.story({
+  ...at(live, 'connections'),
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${channelsEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Connections unavailable')).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
+  },
+})
+
+export const ConnectionsLargeVolume = meta.story({
+  ...at(live, 'connections'),
+  beforeEach({ msw }) {
+    msw.use(
+      ...channelHandlers(apiUrl, {
+        channels: [
+          ...createChannels({ count: 120 }).map((channel) => ({
+            ...channel,
+            tradingPartnerId: live.id,
+          })),
+          ...createChannels({ count: 40, seed: 7 }).map((channel) => ({
+            ...channel,
+            tradingPartnerId: null,
+          })),
+        ],
+      }),
+    )
+  },
+  async play({ canvas }) {
+    const own = await canvas.findByRole('list', { name: 'Connections with Hansemarkt GmbH' })
+    await expect(within(own).getAllByRole('listitem')).toHaveLength(120)
+    await expect(
+      within(canvas.getByRole('list', { name: 'Shared connections of your systems' })).getAllByRole(
+        'listitem',
+      ),
+    ).toHaveLength(40)
+  },
+})
+
+export const ConnectionsAsViewer = meta.story({
+  ...at(live, 'connections'),
+  ...asViewer(async ({ canvas }) => {
+    await expect(
+      await canvas.findByRole('list', { name: 'Connections with Hansemarkt GmbH' }),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Add a connection' })).toBeNull()
+    await expect(canvas.queryByRole('button', { name: /^Test connection/ })).toBeNull()
+  }),
+})
+
+export const TestConnectionSucceeds = meta.story({
+  ...at(live, 'connections'),
+  async play({ canvasElement }) {
+    const item = await connectionItem(
+      canvasElement,
+      'Connections with Hansemarkt GmbH',
+      'Receive from Hansemarkt GmbH',
+    )
+
+    await userEvent.click(
+      item.getByRole('button', { name: 'Test connection Hansemarkt SFTP inbox' }),
+    )
+    await expect(await item.findByText('The connection works.')).toBeVisible()
+    await expect(item.getByText(/^Tested/)).toBeVisible()
+  },
+})
+
+export const TestConnectionLoginRejected = meta.story({
+  ...at(awaiting, 'connections'),
+  async play({ canvasElement }) {
+    const item = await connectionItem(
+      canvasElement,
+      'Connections with Bodensee Handelshaus AG',
+      'Send to Bodensee Handelshaus AG',
+    )
+
+    await userEvent.click(item.getByRole('button', { name: /^Test connection/ }))
+    await expect(await item.findByText('Login was rejected.')).toBeVisible()
+    await expect(item.getByText(/Check the username and the password or key/)).toBeVisible()
+  },
+})
+
+export const TestConnectionPending = meta.story({
+  ...at(live, 'connections'),
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${testChannelEndpoint.path}`, async () => {
+        await delay('infinite')
+      }),
+    )
+  },
+  async play({ canvasElement }) {
+    const item = await connectionItem(
+      canvasElement,
+      'Connections with Hansemarkt GmbH',
+      'Receive from Hansemarkt GmbH',
+    )
+
+    const button = item.getByRole('button', { name: /^Test connection/ })
+    await userEvent.click(button)
+    await expect(button).toHaveTextContent('Testing…')
+    await expect(button).toHaveAttribute('aria-disabled', 'true')
+  },
+})
+
+export const TestConnectionRequestFails = meta.story({
+  ...at(live, 'connections'),
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${testChannelEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvasElement }) {
+    const item = await connectionItem(
+      canvasElement,
+      'Connections with Hansemarkt GmbH',
+      'Receive from Hansemarkt GmbH',
+    )
+
+    await userEvent.click(item.getByRole('button', { name: /^Test connection/ }))
+    await expect(await item.findByText('The test could not run. Try again.')).toBeVisible()
+  },
+})
+
+export const AddConnectionSheet = meta.story({
+  ...at(untouched, 'connections'),
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Add a connection' }))
+
+    const sheet = within(await sheetOf(canvasElement))
+    await expect(sheet.queryByLabelText('Host')).toBeNull()
+    await userEvent.click(sheet.getByText('You send to Mainfranken Getränke GmbH'))
+    await expect(sheet.getByRole('radio', { name: /To an SFTP folder/ })).toBeChecked()
+    await expect(sheet.getByLabelText('Name')).toHaveValue('Mainfranken Getränke GmbH SFTP outbox')
+    await waitFor(() => expect(sheet.getByLabelText('Host')).toBeVisible())
+    await userEvent.click(sheet.getByText('To a web address of the partner'))
+    await expect(sheet.getByLabelText('Name')).toHaveValue(
+      'Mainfranken Getränke GmbH HTTP delivery',
+    )
+    await waitFor(() => expect(sheet.getByLabelText('URL')).toBeVisible())
+  },
+})
+
+export const AddSftpConnection = meta.story({
+  ...at(untouched, 'connections'),
+  async play({ canvas, canvasElement }) {
+    const add = await canvas.findByRole('button', { name: 'Add a connection' })
+    await userEvent.click(add)
+
+    const sheetElement = await sheetOf(canvasElement)
+    const sheet = within(sheetElement)
+    await userEvent.click(sheet.getByText('Mainfranken Getränke GmbH sends to you'))
+    await userEvent.click(sheet.getByRole('button', { name: 'Add connection' }))
+    await waitFor(() => expect(sheet.getByLabelText('Host')).toHaveFocus())
+
+    await userEvent.type(sheet.getByLabelText('Host'), 'sftp.mainfranken.example')
+    await userEvent.type(sheet.getByLabelText('Username'), 'edi-bridge')
+    await userEvent.clear(sheet.getByLabelText('Folder'))
+    await userEvent.type(sheet.getByLabelText('Folder'), '/outbox')
+    await userEvent.type(sheet.getByLabelText('Password'), 'secret')
+    await userEvent.click(sheet.getByRole('button', { name: 'Add connection' }))
+
+    await waitFor(() => expect(sheetElement).not.toBeInTheDocument())
+    await expect(
+      await canvas.findByText(
+        'Mainfranken Getränke GmbH SFTP inbox is added. Test it to make sure it works.',
+      ),
+    ).toBeVisible()
+
+    const own = await canvas.findByRole('list', {
+      name: 'Connections with Mainfranken Getränke GmbH',
+    })
+
+    await expect(within(own).getByText('Receive from Mainfranken Getränke GmbH')).toBeVisible()
+    await waitFor(() => expect(add).toHaveFocus())
+  },
+})
+
+export const AddWebhookConnection = meta.story({
+  ...at(untouched, 'connections'),
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Add a connection' }))
+
+    const sheet = within(await sheetOf(canvasElement))
+    await userEvent.click(sheet.getByText('Mainfranken Getränke GmbH sends to you'))
+    await userEvent.click(sheet.getByText('To a web address of EDI Bridge'))
+    await userEvent.click(sheet.getByRole('button', { name: 'Add connection' }))
+    await expect(
+      await sheet.findByRole('heading', { name: 'Copy the webhook token now' }),
+    ).toBeVisible()
+    await expect(sheet.getByText(/^Mainfranken Getränke GmbH webhook is added/)).toBeVisible()
+    await expect(sheet.getByRole('button', { name: 'Done' })).toBeVisible()
+  },
+})
+
+export const AddConnectionFails = meta.story({
+  ...at(untouched, 'connections'),
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(`${apiUrl}${channelsEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Add a connection' }))
+
+    const sheet = within(await sheetOf(canvasElement))
+    await userEvent.click(sheet.getByText('Mainfranken Getränke GmbH sends to you'))
+    await userEvent.click(sheet.getByText('To a web address of EDI Bridge'))
+    await userEvent.click(sheet.getByRole('button', { name: 'Add connection' }))
+    await expect(
+      await sheet.findByText('The connection could not be added. Try again.'),
+    ).toBeVisible()
+  },
+})
+
+export const AddConnectionFromSetup = meta.story({
+  ...at(untouched),
+  async play({ canvas, canvasElement }) {
+    const current = await canvas.findByRole('listitem', { current: 'step' })
+    await expect(current).toHaveTextContent('Connections')
+    await userEvent.click(within(current).getByRole('button', { name: 'Add a connection' }))
+    await expect(getRouter().replace).toHaveBeenCalledWith(
+      `/trading-partners/${untouched.id}?tab=connections`,
+      { scroll: false },
+    )
+    await sheetOf(canvasElement)
+  },
+})
+
+export const GermanConnections = meta.story({
+  ...at(awaiting, 'connections'),
+  decorators: [german],
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByRole('tab', { name: 'Verbindungen' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+
+    const item = await connectionItem(
+      canvasElement,
+      'Verbindungen mit Bodensee Handelshaus AG',
+      'Senden an Bodensee Handelshaus AG',
+    )
+
+    await userEvent.click(item.getByRole('button', { name: /^Verbindung testen/ }))
+    await expect(await item.findByText('Die Anmeldung wurde abgelehnt.')).toBeVisible()
+  },
+})
+
+export const GermanAddConnectionSheet = meta.story({
+  ...at(untouched, 'connections'),
+  decorators: [german],
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Verbindung hinzufügen' }))
+
+    const sheet = within(await sheetOf(canvasElement, 'Verbindung hinzufügen'))
+
+    await userEvent.click(sheet.getByText('Mainfranken Getränke GmbH sendet an Sie'))
+    await expect(sheet.getByLabelText('Name')).toHaveValue('Mainfranken Getränke GmbH SFTP-Eingang')
+  },
+})
+
+export const DarkConnections = meta.story({
+  ...at(awaiting, 'connections'),
+  beforeEach: darkMode,
+  async play({ canvasElement }) {
+    const item = await connectionItem(
+      canvasElement,
+      'Connections with Bodensee Handelshaus AG',
+      'Send to Bodensee Handelshaus AG',
+    )
+
+    await userEvent.click(item.getByRole('button', { name: /^Test connection/ }))
+    await expect(await item.findByText('Login was rejected.')).toBeVisible()
+  },
+})
+
+export const DarkAddConnectionSheet = meta.story({
+  ...at(untouched, 'connections'),
+  beforeEach: darkMode,
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Add a connection' }))
+
+    const sheet = within(await sheetOf(canvasElement))
+    await userEvent.click(sheet.getByText('You send to Mainfranken Getränke GmbH'))
+    await waitFor(() => expect(sheet.getByLabelText('Host')).toBeVisible())
   },
 })

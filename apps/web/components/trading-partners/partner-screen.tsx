@@ -2,11 +2,12 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadFailure } from '@/components/detail-parts'
 import { HeaderTabs } from '@/components/header-tabs'
+import { PartnerConnections } from '@/components/trading-partners/partner-connections-panel'
 import { PartnerLoading, PartnerOverview } from '@/components/trading-partners/partner-overview'
 import { awaitsReceiptConfirmation } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSettings } from '@/components/trading-partners/partner-settings'
@@ -20,14 +21,36 @@ import type { TradingPartner } from '@edi-bridge/contracts'
 
 export const receiptConfirmationPollMs = 3000
 
-const partnerTabs = [
-  { value: 'overview', Panel: PartnerOverview },
-  { value: 'settings', Panel: PartnerSettings },
-] as const
+const partnerTabs = [{ value: 'overview' }, { value: 'connections' }, { value: 'settings' }] as const
+
+type PartnerTab = (typeof partnerTabs)[number]['value']
 
 function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
   const t = useTranslations('TradingPartner.tabs')
   const [tab, changeTab] = useUrlTab(partnerTabs, 'overview')
+  const [addingConnection, setAddingConnection] = useState(false)
+
+  function addConnection() {
+    changeTab('connections')
+    setAddingConnection(true)
+  }
+
+  function panel(value: PartnerTab) {
+    switch (value) {
+      case 'overview':
+        return <PartnerOverview tradingPartner={tradingPartner} onAddConnection={addConnection} />
+      case 'connections':
+        return (
+          <PartnerConnections
+            addingConnection={addingConnection}
+            tradingPartner={tradingPartner}
+            onAddingConnectionChange={setAddingConnection}
+          />
+        )
+      case 'settings':
+        return <PartnerSettings tradingPartner={tradingPartner} />
+    }
+  }
 
   return (
     <Tabs value={tab} onValueChange={changeTab}>
@@ -40,9 +63,9 @@ function PartnerTabs({ tradingPartner }: { tradingPartner: TradingPartner }) {
           ))}
         </TabsList>
       </HeaderTabs>
-      {partnerTabs.map(({ value, Panel }) => (
+      {partnerTabs.map(({ value }) => (
         <TabsContent key={value} value={value} className="flex flex-col gap-4">
-          <Panel tradingPartner={tradingPartner} />
+          {panel(value)}
         </TabsContent>
       ))}
     </Tabs>

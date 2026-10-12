@@ -98,6 +98,7 @@ import {
   tradingPartnerEndpoint,
   type TradingPartnerInput,
   tradingPartnersEndpoint,
+  testChannelEndpoint,
   updateChannelEndpoint,
   updateCompanyIdentityEndpoint,
   type UpdateDocumentStructureBody,
@@ -565,6 +566,10 @@ export function regenerateWebhookToken(id: string) {
   return request(regenerateWebhookTokenEndpoint, {
     path: toPath(regenerateWebhookTokenEndpoint.path, { id }),
   })
+}
+
+export function testChannel(id: string) {
+  return request(testChannelEndpoint, { path: toPath(testChannelEndpoint.path, { id }) })
 }
 
 export function listFlows() {

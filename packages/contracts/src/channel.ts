@@ -42,8 +42,10 @@ export const maskedSecretSchema = z.strictObject({
 
 export type MaskedSecret = z.infer<typeof maskedSecretSchema>
 
+export const maxChannelNameLength = 70
+
 const channelIdentity = {
-  name: z.string().trim().min(1).max(70),
+  name: z.string().trim().min(1).max(maxChannelNameLength),
   tradingPartnerId: z.uuid().nullable(),
 }
 

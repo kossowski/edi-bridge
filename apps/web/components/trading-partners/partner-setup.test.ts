@@ -115,7 +115,7 @@ describe('partnerSetup', () => {
   it('names the action of each step', () => {
     expect(partnerSetup(newPartner, nothingSetUp, null).steps.map(({ action }) => action)).toEqual([
       { kind: 'link', step: 'identity', href: '/settings' },
-      { kind: 'link', step: 'connections', href: '/channels/new' },
+      { kind: 'addConnection' },
       { kind: 'link', step: 'documents', href: '/flows/new' },
       { kind: 'sendTest' },
       { kind: 'awaitConfirmation' },

@@ -4,10 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type FormEvent, useId, useRef, useState } from 'react'
+import { type Dispatch, type FormEvent, type SetStateAction, useId, useRef, useState } from 'react'
 
 import {
   type ChannelField,
+  type ChannelFieldErrors,
   type ChannelFormValues,
   channelKindKeys,
   channelKindOf,
@@ -128,7 +129,7 @@ type Submission = { create: ChannelInput } | { id: string; update: ChannelUpdate
 function toSubmission(
   values: ChannelFormValues,
   channel?: Channel,
-): { submission: Submission } | { errors: Partial<Record<ChannelField, FieldError>> } {
+): { submission: Submission } | { errors: ChannelFieldErrors } {
   if (channel) {
     const result = validateChannelUpdate(values, channel)
 
@@ -140,116 +141,65 @@ function toSubmission(
   return 'input' in result ? { submission: { create: result.input } } : result
 }
 
-export function ChannelForm({
-  channel,
-  onCreated,
-}: {
-  channel?: Channel
-  onCreated?: (created: CreatedChannel) => void
-}) {
-  const t = useTranslations('ChannelForm')
-  const tAuthentication = useTranslations('Channel.authentication')
+export function useChannelFields(
+  values: ChannelFormValues,
+  setValues: Dispatch<SetStateAction<ChannelFormValues>>,
+  errors: ChannelFieldErrors,
+) {
   const errorMessage = useFieldErrorMessage()
-  const queryClient = useQueryClient()
-  const router = useRouter()
   const baseId = useId()
-  const formRef = useRef<HTMLFormElement>(null)
-  const [values, setValues] = useState<ChannelFormValues>(() => toFormValues(channel))
-  const [submitted, setSubmitted] = useState(false)
-  const tradingPartners = useQuery(tradingPartnersQuery)
-
-  const save = useMutation({
-    mutationFn: async (submission: Submission): Promise<CreatedChannel> =>
-      'create' in submission
-        ? createChannel(submission.create)
-        : { channel: await updateChannel(submission.id, submission.update), webhookToken: null },
-    onSuccess: (saved) => {
-      storeSavedChannel(queryClient, saved.channel)
-
-      if (saved.webhookToken !== null && onCreated) {
-        onCreated(saved)
-      } else {
-        router.push(`/channels/${saved.channel.id}`)
-      }
-    },
-  })
-
-  const result = toSubmission(values, channel)
-  const errors = submitted && 'errors' in result ? result.errors : {}
-  const kind = channelKindOf(values.kind)
-
-  function messageFor(field: ChannelField) {
-    const error = errors[field]
-
-    return error ? errorMessage(field, error) : null
-  }
 
   function update<Field extends keyof ChannelFormValues>(
-    field: Field,
+    name: Field,
     value: ChannelFormValues[Field],
   ) {
-    setValues((current) => ({ ...current, [field]: value }))
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setSubmitted(true)
-
-    if ('errors' in result) {
-      const first = Object.keys(result.errors)[0]
-      formRef.current?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
-
-      return
-    }
-
-    save.mutate(result.submission)
+    setValues((current) => ({ ...current, [name]: value }))
   }
 
   function field(name: TextFieldName) {
+    const error = errors[name]
+
     return {
       name,
       id: `${baseId}-${name}`,
-      error: messageFor(name),
+      error: error ? errorMessage(name, error) : null,
       value: values[name],
       onChange: (next: string) => update(name, next),
     }
   }
 
-  const tradingPartnerItems = [
-    { value: ownSystems, label: t('fields.tradingPartner.none') },
-    ...(tradingPartners.data ?? []).map(({ id, name }) => ({ value: id, label: name })),
-  ]
+  return { baseId, update, field }
+}
 
+export type ChannelFields = ReturnType<typeof useChannelFields>
+
+export function focusFirstError(form: HTMLFormElement | null, errors: ChannelFieldErrors) {
+  const first = Object.keys(errors)[0]
+  form?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
+}
+
+export function ChannelKindFields({
+  fields,
+  values,
+  channel,
+}: {
+  fields: ChannelFields
+  values: ChannelFormValues
+  channel?: Channel | undefined
+}) {
+  const t = useTranslations('ChannelForm')
+  const tAuthentication = useTranslations('Channel.authentication')
+  const { baseId, update, field } = fields
+  const kind = channelKindOf(values.kind)
   const credential = field('credential')
+  const authorization = field('authorization')
 
   const credentialDescription = channel
     ? t('fields.credential.keep')
     : t('fields.credential.description')
 
-  const authorization = field('authorization')
-  const kindChanged = isConflict(save.error)
-
   return (
-    <form noValidate ref={formRef} className="flex max-w-2xl flex-col gap-6" onSubmit={submit}>
-      {channel ? (
-        <FixedKind channel={channel} />
-      ) : (
-        <KindChoice value={values.kind} onChange={(next) => update('kind', next)} />
-      )}
-      <TextField
-        {...field('name')}
-        autoComplete="off"
-        description={t('fields.name.description')}
-        label={t('fields.name.label')}
-      />
-      <SelectField
-        id={`${baseId}-tradingPartnerId`}
-        description={t('fields.tradingPartner.description')}
-        items={tradingPartnerItems}
-        label={t('fields.tradingPartner.label')}
-        value={values.tradingPartnerId === '' ? ownSystems : values.tradingPartnerId}
-        onChange={(next) => update('tradingPartnerId', next === ownSystems ? '' : next)}
-      />
+    <>
       {kind.type === 'sftp' && (
         <Fieldset legend={t('sections.sftp')}>
           <div className="grid gap-6 sm:grid-cols-[1fr_8rem]">
@@ -382,6 +332,88 @@ export function ChannelForm({
           )}
         </Fieldset>
       )}
+    </>
+  )
+}
+
+export function ChannelForm({
+  channel,
+  onCreated,
+}: {
+  channel?: Channel
+  onCreated?: (created: CreatedChannel) => void
+}) {
+  const t = useTranslations('ChannelForm')
+  const queryClient = useQueryClient()
+  const router = useRouter()
+  const formRef = useRef<HTMLFormElement>(null)
+  const [values, setValues] = useState<ChannelFormValues>(() => toFormValues(channel))
+  const [submitted, setSubmitted] = useState(false)
+  const tradingPartners = useQuery(tradingPartnersQuery)
+
+  const save = useMutation({
+    mutationFn: async (submission: Submission): Promise<CreatedChannel> =>
+      'create' in submission
+        ? createChannel(submission.create)
+        : { channel: await updateChannel(submission.id, submission.update), webhookToken: null },
+    onSuccess: (saved) => {
+      storeSavedChannel(queryClient, saved.channel)
+
+      if (saved.webhookToken !== null && onCreated) {
+        onCreated(saved)
+      } else {
+        router.push(`/channels/${saved.channel.id}`)
+      }
+    },
+  })
+
+  const result = toSubmission(values, channel)
+  const errors = submitted && 'errors' in result ? result.errors : {}
+  const fields = useChannelFields(values, setValues, errors)
+  const { baseId, update, field } = fields
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSubmitted(true)
+
+    if ('errors' in result) {
+      focusFirstError(formRef.current, result.errors)
+
+      return
+    }
+
+    save.mutate(result.submission)
+  }
+
+  const tradingPartnerItems = [
+    { value: ownSystems, label: t('fields.tradingPartner.none') },
+    ...(tradingPartners.data ?? []).map(({ id, name }) => ({ value: id, label: name })),
+  ]
+
+  const kindChanged = isConflict(save.error)
+
+  return (
+    <form noValidate ref={formRef} className="flex max-w-2xl flex-col gap-6" onSubmit={submit}>
+      {channel ? (
+        <FixedKind channel={channel} />
+      ) : (
+        <KindChoice value={values.kind} onChange={(next) => update('kind', next)} />
+      )}
+      <TextField
+        {...field('name')}
+        autoComplete="off"
+        description={t('fields.name.description')}
+        label={t('fields.name.label')}
+      />
+      <SelectField
+        id={`${baseId}-tradingPartnerId`}
+        description={t('fields.tradingPartner.description')}
+        items={tradingPartnerItems}
+        label={t('fields.tradingPartner.label')}
+        value={values.tradingPartnerId === '' ? ownSystems : values.tradingPartnerId}
+        onChange={(next) => update('tradingPartnerId', next === ownSystems ? '' : next)}
+      />
+      <ChannelKindFields channel={channel} fields={fields} values={values} />
       {save.isError && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">
           {kindChanged ? t('errors.kindChanged') : t('errors.saveFailed')}

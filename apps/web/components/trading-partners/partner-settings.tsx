@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 
 import { Fact } from '@/components/detail-parts'
 import { SettingsCard } from '@/components/settings/settings-card'
+import { type PartnerPanelProps } from '@/components/trading-partners/partner-page-helpers'
 import { TradingPartnerForm } from '@/components/trading-partners/trading-partner-form'
 import { useSession } from '@/hooks/use-session'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
@@ -30,7 +31,7 @@ function PartnerDetails({ tradingPartner }: { tradingPartner: TradingPartner }) 
   )
 }
 
-export function PartnerSettings({ tradingPartner }: { tradingPartner: TradingPartner }) {
+export function PartnerSettings({ tradingPartner }: PartnerPanelProps) {
   const t = useTranslations('TradingPartner.settings')
   const session = useSession()
 

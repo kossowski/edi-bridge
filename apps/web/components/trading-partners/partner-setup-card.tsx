@@ -54,6 +54,7 @@ type SetupContext = {
   workspaceGln: string | null
   canChange: boolean
   onLive: () => void
+  onAddConnection: () => void
 }
 
 const stepBadges = {
@@ -227,7 +228,7 @@ function Confirmed({ tradingPartner }: { tradingPartner: TradingPartner }) {
 
 function StepAction({ item, context }: { item: PartnerSetupItem; context: SetupContext }) {
   const t = useTranslations('TradingPartner.setup')
-  const { tradingPartner, workspaceGln, canChange, onLive } = context
+  const { tradingPartner, workspaceGln, canChange, onLive, onAddConnection } = context
   const { step, action } = item
 
   const viewOnly = (
@@ -240,6 +241,14 @@ function StepAction({ item, context }: { item: PartnerSetupItem; context: SetupC
         <Link href={action.href} className={cn(buttonVariants({ size: 'sm' }), 'w-fit')}>
           {t(`actions.${action.step}`)}
         </Link>
+      ) : (
+        viewOnly
+      )
+    case 'addConnection':
+      return canChange ? (
+        <Button size="sm" className="w-fit" onClick={onAddConnection}>
+          {t('actions.connections')}
+        </Button>
       ) : (
         viewOnly
       )
@@ -350,7 +359,11 @@ function SetupSteps({
   )
 }
 
-export function PartnerSetupCard({ tradingPartner, activity }: PartnerActivityProps) {
+export function PartnerSetupCard({
+  tradingPartner,
+  activity,
+  onAddConnection,
+}: PartnerActivityProps & { onAddConnection: () => void }) {
   const t = useTranslations('TradingPartner.setup')
   const workspace = useQuery(currentWorkspaceQuery)
   const session = useSession()
@@ -409,6 +422,7 @@ export function PartnerSetupCard({ tradingPartner, activity }: PartnerActivityPr
               workspaceGln,
               canChange: session.canChange,
               onLive: () => setWentLive(true),
+              onAddConnection,
             }}
             setup={partnerSetup(tradingPartner, activity, workspaceGln)}
             titleId={titleId}

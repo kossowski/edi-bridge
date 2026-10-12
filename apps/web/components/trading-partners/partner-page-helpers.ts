@@ -5,6 +5,10 @@ import {
   type TradingPartnerActivityDetail,
 } from '@edi-bridge/contracts'
 
+export type PartnerPanelProps = {
+  tradingPartner: TradingPartner
+}
+
 export type PartnerActivityProps = {
   tradingPartner: TradingPartner
   activity: TradingPartnerActivityDetail
