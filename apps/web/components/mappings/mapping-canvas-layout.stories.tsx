@@ -355,6 +355,6 @@ export const Dark = meta.story({
   async play({ canvasElement }) {
     const details = await openDetails(canvasElement)
 
-    await expect(details.getByText('30 links')).toBeVisible()
+    await expect(details.getByText('32 links')).toBeVisible()
   },
 })

@@ -81,7 +81,7 @@ async function place(canvasElement: HTMLElement, kind: string, name: string) {
 export const TransformNodes = meta.story({
   args: { id: invoic.id },
   async play({ canvas, canvasElement }) {
-    await expectTransformCount(canvasElement, 9)
+    await expectTransformCount(canvasElement, 10)
 
     const dateFormat = await findNode(canvasElement, 'Date format 1')
 
@@ -449,7 +449,7 @@ export const LowerConcatenateParts = meta.story({
 export const RemoveTransforms = meta.story({
   args: { id: desadv.id },
   async play({ canvas, canvasElement }) {
-    await expectTransformCount(canvasElement, 7)
+    await expectTransformCount(canvasElement, 8)
     await expect(
       await canvas.findByRole('group', { name: 'Link from Constant 1 (Result) to BGM/C002/1001' }),
     ).toBeInTheDocument()
@@ -462,12 +462,12 @@ export const RemoveTransforms = meta.story({
       ).toBeNull(),
     )
     await waitFor(() => expect(canvas.getByRole('button', { name: 'Substring 1' })).toHaveFocus())
-    await expectTransformCount(canvasElement, 6)
+    await expectTransformCount(canvasElement, 7)
 
     // By keyboard: Delete on a transform removes it.
     await userEvent.keyboard('{Delete}')
     await waitFor(() => expect(liveStatus(canvasElement)).toHaveTextContent('Substring 1 removed.'))
-    await expectTransformCount(canvasElement, 5)
+    await expectTransformCount(canvasElement, 6)
 
     // Delete on an input removes the link into it.
     await pressOn(canvas.getByRole('button', { name: 'Part 2 input of Concatenate 1' }), '{Delete}')
@@ -504,7 +504,7 @@ export const RemoveTransforms = meta.story({
     )
     await waitFor(() => expect(panel.getAllByText('Not linked yet')).toHaveLength(3))
     await userEvent.click(panel.getByRole('button', { name: 'Remove Concatenate 1' }))
-    await expectTransformCount(canvasElement, 4)
+    await expectTransformCount(canvasElement, 5)
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
   },
 })
@@ -626,7 +626,7 @@ export const German = meta.story({
     ),
   ],
   async play({ canvas, canvasElement }) {
-    await expectTransformCount(canvasElement, 9)
+    await expectTransformCount(canvasElement, 10)
     await expect(
       await canvas.findByRole('button', { name: 'Datumsformat hinzufügen' }),
     ).toBeVisible()
@@ -711,7 +711,7 @@ export const Viewer = meta.story({
       await pressOn(row, '{Delete}')
       await pressOn(row, 'l')
       await pressOn(header, '{Delete}')
-      await expectTransformCount(canvasElement, 9)
+      await expectTransformCount(canvasElement, 10)
       await expect(canvas.getByRole('group', { name: linked })).toBeInTheDocument()
       await expect(canvas.queryByText(/^Linking from/)).toBeNull()
 
