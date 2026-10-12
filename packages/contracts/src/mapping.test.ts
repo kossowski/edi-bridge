@@ -104,6 +104,14 @@ describe('mappingSummarySchema', () => {
     ).toBe(false)
   })
 
+  it.each([
+    { partners: summary.partners },
+    { documentsLast7Days: 1 },
+    { documentsLast7Days: 1, failedRunsLast7Days: 1 },
+  ])('has no partners and no traffic when it was never published (%j)', (traffic) => {
+    expect(mappingSummarySchema.safeParse({ ...neverPublished, ...traffic }).success).toBe(false)
+  })
+
   it('counts no more failed Runs than Documents', () => {
     expect(
       mappingSummarySchema.safeParse({ ...summary, documentsLast7Days: 2, failedRunsLast7Days: 3 })

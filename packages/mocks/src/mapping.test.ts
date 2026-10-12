@@ -21,8 +21,9 @@ import {
   createDocumentStructure,
   createDocumentStructures,
   documentStructureHandlers,
-  seedDocumentStructureOf,
   documentStructureLeaves,
+  seedDocumentStructureOf,
+  seedDocumentStructures,
 } from './document-structure'
 import { seedFlows, seedMappings } from './flow'
 import { createLookupTables, lookupTableListHandler, seedLookupTables } from './lookup-table'
@@ -32,11 +33,12 @@ import {
   createMappingsWithTraffic,
   mappingHandlers,
   type MappingDraftRecord,
-  mappingsStateHandlers,
   seedMappingDrafts,
+  toMappingSummary,
   unpublishedDraftId,
 } from './mapping'
 import { edifactLeaves, messageTypeStructureHandler } from './message-type-structure'
+import { day } from './overdue'
 import { createRun } from './run'
 import { seedTradingPartners } from './trading-partner'
 
@@ -205,9 +207,16 @@ describe('GET /mappings', () => {
     expect(mappings.find(({ id }) => id === unpublishedDraftId)?.partners).toEqual([])
   })
 
+  it('seeds a Mapping that the Flows of two Trading Partners share', async () => {
+    server.use(...mappingHandlers(apiUrl))
+    const mappings = await listMappings()
+
+    expect(mappings.some(({ partners }) => partners.length >= 2)).toBe(true)
+  })
+
   it('counts the Documents and failed Runs of the last 7 days of the Flows using a Mapping', async () => {
     const [flow, otherFlow] = seedFlows
-    const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString()
+    const daysAgo = (days: number) => new Date(Date.now() - days * day).toISOString()
     const ofFlow = { id: flow!.id, name: flow!.name }
 
     const runs = [
@@ -235,6 +244,15 @@ describe('GET /mappings', () => {
       documentsLast7Days: 0,
       failedRunsLast7Days: 0,
     })
+  })
+
+  it('refuses to summarise a published Mapping whose latest version is missing', () => {
+    const record = seedMappingDrafts.find(({ latestVersion }) => latestVersion !== null)!
+    const facts = { partners: [], documentsLast7Days: 0, failedRunsLast7Days: 0 }
+
+    expect(() => toMappingSummary(record, seedDocumentStructures, { facts, versions: [] })).toThrow(
+      `Mapping ${record.id} has no published version ${record.latestVersion}`,
+    )
   })
 
   it('tells when the latest version was published and whether the Draft changed since', async () => {
@@ -341,6 +359,30 @@ describe('POST /mappings', () => {
     expect(await listMappings()).toContainEqual(created)
   })
 
+  it('gives a second Mapping of the same Message Type its own name', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: [] }))
+
+    const first = createMappingEndpoint.response.parse(
+      await (await createMapping({ messageType: 'INVOIC' })).json(),
+    )
+
+    const second = createMappingEndpoint.response.parse(
+      await (await createMapping({ messageType: 'INVOIC' })).json(),
+    )
+
+    expect(second.name).toBe(`${first.name} 2`)
+  })
+
+  it('creates the first Mapping of an empty Workspace from its Document Structures', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: [] }))
+    const response = await createMapping({ messageType: 'ORDERS' })
+
+    expect(response.status).toBe(201)
+    expect(await listMappings()).toEqual([
+      createMappingEndpoint.response.parse(await response.json()),
+    ])
+  })
+
   it('refuses a Workspace without a Document Structure with a plain reason', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }))
     const response = await createMapping({ messageType: 'INVOIC' })
@@ -352,7 +394,7 @@ describe('POST /mappings', () => {
   })
 
   it('fails listing and creating Mappings in the error state', async () => {
-    server.use(...mappingsStateHandlers(apiUrl, 'error'))
+    server.use(...mappingHandlers(apiUrl, { mappings: 'error' }))
 
     expect((await get(mappingsEndpoint.path)).status).toBe(500)
     expect((await createMapping({ messageType: 'INVOIC' })).status).toBe(500)

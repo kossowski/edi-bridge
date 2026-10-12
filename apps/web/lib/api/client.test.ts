@@ -27,8 +27,8 @@ import {
 import {
   ApiError,
   createChannel,
-  createMapping,
   createLookupTable,
+  createMapping,
   createTradingPartner,
   deleteLookupTable,
   documentStructureProblemOf,

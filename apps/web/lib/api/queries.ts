@@ -260,7 +260,7 @@ export function storeCreatedMapping(queryClient: QueryClient, created: MappingSu
     (mappings) =>
       mappings && [...mappings, created].sort((a, b) => a.name.localeCompare(b.name, 'de')),
   )
-  void queryClient.invalidateQueries({ queryKey: mappingKeys.list() })
+  void queryClient.invalidateQueries({ queryKey: mappingsQuery.queryKey })
 }
 
 export function mappingDraftQuery(id: string) {

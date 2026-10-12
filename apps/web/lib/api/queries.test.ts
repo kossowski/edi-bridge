@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createTradingPartner,
+  publishedVersionsOf,
   seedDocumentStructures,
   seedLookupTables,
   seedMappingDrafts,
@@ -48,7 +49,12 @@ describe('storeCreatedMapping', () => {
 
     const [a, b, c] = seedMappingDrafts
       .slice(0, 3)
-      .map((record) => toMappingSummary(record, seedDocumentStructures))
+      .map((record) =>
+        toMappingSummary(record, seedDocumentStructures, {
+          facts: { partners: [], documentsLast7Days: 0, failedRunsLast7Days: 0 },
+          versions: publishedVersionsOf(record),
+        }),
+      )
       .sort((x, y) => x.name.localeCompare(y.name, 'de'))
 
     queryClient.setQueryData(mappingsQuery.queryKey, [a!, c!])

@@ -157,7 +157,7 @@ export {
   type MappingDraftRecord,
   type MappingDraftStore,
   type MappingsState,
-  mappingsStateHandlers,
+  publishedVersionsOf,
   seedMappingDrafts,
   toMappingDraft,
   toMappingDraftStore,

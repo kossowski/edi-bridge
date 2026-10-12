@@ -53,6 +53,7 @@ import {
 } from './flow'
 import { seedLookupTableNamed } from './lookup-table'
 import { edifactLeaves, messageTypeStructures } from './message-type-structure'
+import { day } from './overdue'
 import { containerOf } from './paths'
 import { badRequest, notFound, serverError, unprocessable } from './responses'
 import { seedRuns } from './run'
@@ -649,13 +650,14 @@ export function createMappingDrafts({
   })
 }
 
+const week = 7 * day
+
 const trafficStatuses = [
   { value: 'delivered', weight: 85 },
   { value: 'failed', weight: 10 },
   { value: 'processing', weight: 5 },
 ] as const satisfies ReadonlyArray<{ value: RunStatus; weight: number }>
 
-// Flows pin the generated Mappings' versions, and each Flow has had a week of Runs, mostly fine.
 export function createMappingsWithTraffic({
   count,
   seed = 31,
@@ -691,9 +693,7 @@ export function createMappingsWithTraffic({
         id: faker.string.uuid(),
         status,
         failureStage: status === 'failed' ? 'validation' : null,
-        receivedAt: faker.date
-          .between({ from: now.getTime() - 6 * 86_400_000, to: now })
-          .toISOString(),
+        receivedAt: faker.date.between({ from: now.getTime() - week, to: now }).toISOString(),
         tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
         messageType: flow.messageType,
         flow: { id: flow.id, name: flow.name },
@@ -720,7 +720,7 @@ export function structureOf(
   return found
 }
 
-const versionSpacing = 9 * 86_400_000
+const versionSpacing = 9 * day
 
 // Seed Mappings keep the versions their Flows and Runs already pin.
 export function publishedVersionsOf(
@@ -753,7 +753,7 @@ export type PublishedVersions = {
   find: (versionId: string) => { version: MappingVersionSummary } | undefined
 }
 
-function draftVersions(drafts: ReadonlyArray<MappingDraftRecord>): PublishedVersions {
+function publishedVersionsByMapping(drafts: ReadonlyArray<MappingDraftRecord>): PublishedVersions {
   const byMapping = new Map(drafts.map((draft) => [draft.id, publishedVersionsOf(draft)]))
 
   const byId = new Map(
@@ -777,12 +777,13 @@ type MappingCardFacts = Pick<
 
 const noTraffic: MappingCardFacts = { partners: [], documentsLast7Days: 0, failedRunsLast7Days: 0 }
 
-const week = 7 * 86_400_000
-
-function mappingCardFacts(
-  { flows, runs, tradingPartners, versions }: MappingTraffic,
-  now = Date.now(),
-): Map<string, MappingCardFacts> {
+function mappingCardFacts({
+  flows,
+  runs,
+  tradingPartners,
+  versions,
+}: MappingTraffic): Map<string, MappingCardFacts> {
+  const now = Date.now()
   const mappingOfFlow = new Map<string, string>()
   const facts = new Map<string, MappingCardFacts & { partners: TradingPartnerSummary[] }>()
 
@@ -832,20 +833,28 @@ function mappingCardFacts(
   return facts
 }
 
+function latestVersionPublishedAt(
+  record: Pick<MappingDraftRecord, 'id' | 'latestVersion'>,
+  versions: ReadonlyArray<MappingVersionSummary>,
+) {
+  if (record.latestVersion === null) {
+    return null
+  }
+
+  const latest = versions.find(({ version }) => version === record.latestVersion)
+
+  if (!latest) {
+    throw new Error(`Mapping ${record.id} has no published version ${record.latestVersion}`)
+  }
+
+  return latest.publishedAt
+}
+
 export function toMappingSummary(
   record: MappingDraftRecord,
   documentStructures: DocumentStructures,
-  {
-    facts = noTraffic,
-    versions = [],
-  }: { facts?: MappingCardFacts; versions?: ReadonlyArray<MappingVersionSummary> } = {},
+  { facts, versions }: { facts: MappingCardFacts; versions: ReadonlyArray<MappingVersionSummary> },
 ): MappingSummary {
-  const latest =
-    record.latestVersion === null
-      ? null
-      : (versions.find(({ version }) => version === record.latestVersion)?.publishedAt ??
-        record.updatedAt)
-
   return mappingSummarySchema.parse({
     id: record.id,
     name: record.name,
@@ -854,7 +863,7 @@ export function toMappingSummary(
     documentStructureId: record.documentStructureId,
     documentStructureName: structureOf(record, documentStructures).name,
     latestVersion: record.latestVersion,
-    latestVersionPublishedAt: latest,
+    latestVersionPublishedAt: latestVersionPublishedAt(record, versions),
     unpublishedChanges: record.unpublishedChanges,
     draftUpdatedAt: record.updatedAt,
     ...facts,
@@ -976,8 +985,6 @@ export function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideL
   return null
 }
 
-// A new Mapping takes the Document Structure its siblings of the same Message Type use, else the
-// Workspace's first one.
 function documentStructureForNew(
   messageType: MessageType,
   mappings: ReadonlyArray<MappingDraftRecord>,
@@ -992,9 +999,21 @@ function documentStructureForNew(
   return documentStructures.find(({ id }) => used.has(id)) ?? documentStructures[0]
 }
 
+function uniqueName(name: string, mappings: ReadonlyArray<MappingDraftRecord>) {
+  const taken = new Set(mappings.map((mapping) => mapping.name))
+  let count = 1
+
+  while (taken.has(count === 1 ? name : `${name} ${count}`)) {
+    count += 1
+  }
+
+  return count === 1 ? name : `${name} ${count}`
+}
+
 function newMappingDraft(
   messageType: MessageType,
   documentStructure: DocumentStructure,
+  mappings: ReadonlyArray<MappingDraftRecord>,
 ): MappingDraftRecord {
   const { source, target } = oriented(messageType, {
     document: documentStructure.name,
@@ -1003,7 +1022,7 @@ function newMappingDraft(
 
   return {
     id: crypto.randomUUID(),
-    name: `${source} to ${target}`,
+    name: uniqueName(`${source} to ${target}`, mappings),
     messageType,
     documentStructureId: documentStructure.id,
     latestVersion: null,
@@ -1016,6 +1035,8 @@ function newMappingDraft(
   }
 }
 
+export type MappingsState = 'loading' | 'error'
+
 export function mappingHandlers(
   apiUrl: string,
   {
@@ -1026,7 +1047,7 @@ export function mappingHandlers(
     tradingPartners = seedTradingPartners,
     versions,
   }: {
-    mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
+    mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore | MappingsState
     documentStructures?: DocumentStructures | DocumentStructureStore
     flows?: ReadonlyArray<FlowRecord> | FlowStore
     runs?: ReadonlyArray<RunSummary> | RunStore
@@ -1034,6 +1055,21 @@ export function mappingHandlers(
     versions?: PublishedVersions
   } = {},
 ) {
+  if (mappings === 'loading' || mappings === 'error') {
+    const respond = async () => {
+      if (mappings === 'loading') {
+        await delay('infinite')
+      }
+
+      return serverError()
+    }
+
+    return [
+      http.get(`${apiUrl}${mappingsEndpoint.path}`, respond),
+      http.post(`${apiUrl}${createMappingEndpoint.path}`, respond),
+    ]
+  }
+
   const store = toMappingDraftStore(mappings)
   const structures = toDocumentStructureStore(documentStructures)
   const flowStore = toFlowStore(flows)
@@ -1042,7 +1078,7 @@ export function mappingHandlers(
 
   const summaries = () => {
     runStore ??= toRunStore(runs ?? seedRuns())
-    const published = versions ?? draftVersions(store.all())
+    const published = versions ?? publishedVersionsByMapping(store.all())
 
     const facts = mappingCardFacts({
       flows: flowStore,
@@ -1077,10 +1113,13 @@ export function mappingHandlers(
         return unprocessable('The Workspace has no Document Structure to map yet.')
       }
 
-      const record = newMappingDraft(messageType, documentStructure)
+      const record = newMappingDraft(messageType, documentStructure, store.all())
       store.set(record)
 
-      return HttpResponse.json(toMappingSummary(record, structures.all()), { status: 201 })
+      return HttpResponse.json(
+        toMappingSummary(record, structures.all(), { facts: noTraffic, versions: [] }),
+        { status: 201 },
+      )
     }),
     http.get<{ id: string }>(`${apiUrl}${mappingDraftEndpoint.path}`, ({ params }) => {
       const record = store.get(params.id)
@@ -1123,22 +1162,5 @@ export function mappingHandlers(
         return HttpResponse.json(toMappingDraft(record, structures.all()))
       },
     ),
-  ]
-}
-
-export type MappingsState = 'loading' | 'error'
-
-export function mappingsStateHandlers(apiUrl: string, state: MappingsState) {
-  const respond = async () => {
-    if (state === 'loading') {
-      await delay('infinite')
-    }
-
-    return serverError()
-  }
-
-  return [
-    http.get(`${apiUrl}${mappingsEndpoint.path}`, respond),
-    http.post(`${apiUrl}${createMappingEndpoint.path}`, respond),
   ]
 }

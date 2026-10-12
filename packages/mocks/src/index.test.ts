@@ -71,14 +71,15 @@ import {
   seedChannels,
   seedDocumentStructureOf,
   seedFlows,
-  seedMappings,
   seedLookupTableNamed,
   seedMappingDrafts,
+  seedMappings,
   seedSandboxWorkspace,
   seedShowcaseWorkspace,
   seedTradingPartners,
   seedWorkspace,
 } from './index'
+import { day } from './overdue'
 
 const apiUrl = 'http://api.test'
 
@@ -294,7 +295,7 @@ describe('createHandlers', () => {
     server.use(...createHandlers(apiUrl))
     const [flow] = seedFlows
     const { mappingId } = seedMappings[0]!
-    const receivedFrom = new Date(Date.now() - 7 * 86_400_000).toISOString()
+    const receivedFrom = new Date(Date.now() - 7 * day).toISOString()
     const all = await listRuns({ flowId: [flow!.id], receivedFrom, pageSize: 1 })
     const failed = await listRuns({ flowId: [flow!.id], receivedFrom, status: ['failed'] })
 
@@ -307,6 +308,16 @@ describe('createHandlers', () => {
       documentsLast7Days: all.total,
       failedRunsLast7Days: failed.total,
     })
+  })
+
+  it('lists a Mapping that the Flows of two Trading Partners share', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const mappings = mappingsEndpoint.response.parse(
+      await (await fetch(`${apiUrl}${mappingsEndpoint.path}`)).json(),
+    )
+
+    expect(mappings.some(({ partners }) => partners.length >= 2)).toBe(true)
   })
 
   it('keeps the changes of one createHandlers call out of another', async () => {

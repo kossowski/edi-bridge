@@ -39,6 +39,11 @@ export const mappingSummarySchema = z
     message: 'A Mapping that was never published has unpublished changes',
   })
   .refine(
+    ({ latestVersion, partners, documentsLast7Days }) =>
+      latestVersion !== null || (partners.length === 0 && documentsLast7Days === 0),
+    { message: 'A Mapping that was never published has no partners and no Documents' },
+  )
+  .refine(
     ({ documentsLast7Days, failedRunsLast7Days }) => failedRunsLast7Days <= documentsLast7Days,
     { message: 'A Mapping has no more failed Runs than Documents' },
   )

@@ -4,6 +4,8 @@ import { hash } from './hash'
 
 export const hour = 60 * 60 * 1000
 
+export const day = 24 * hour
+
 export function overdueSinceOf(
   sentAt: string,
   { acknowledgementTimeLimitHours }: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,

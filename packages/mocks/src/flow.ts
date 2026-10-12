@@ -47,18 +47,24 @@ const seedSummaries: ReadonlyArray<FlowSummary> = seedTradingPartners
 
 const firstPublication = Date.parse('2026-03-02T09:00:00.000Z')
 
+const sharedMappingFlowIds = seedSummaries
+  .filter(({ messageType }) => messageType === 'DESADV')
+  .slice(-2)
+  .map(({ id }) => id)
+
 export function mappingVersionsForFlow({
   flow,
   messageType,
 }: Pick<RunSummary, 'flow' | 'messageType'>): MappingVersionSummary[] {
-  const faker = seededFaker(`mapping:${flow.id}`)
+  const shared = sharedMappingFlowIds.includes(flow.id)
+  const faker = seededFaker(`mapping:${shared ? sharedMappingFlowIds[0] : flow.id}`)
   const mappingId = faker.string.uuid()
-  const tradingPartnerName = flow.name.split(' ')[0]
+  const prefix = shared ? '' : `${flow.name.split(' ')[0]}: `
 
   const mappingName =
     directionOf({ messageType }) === 'outbound'
-      ? `${tradingPartnerName}: ERP JSON to ${messageType}`
-      : `${tradingPartnerName}: ${messageType} to ERP JSON`
+      ? `${prefix}ERP JSON to ${messageType}`
+      : `${prefix}${messageType} to ERP JSON`
 
   const count = faker.number.int({ min: 1, max: 5 })
 
@@ -121,7 +127,11 @@ export function toMappingCatalogue(mappings: ReadonlyArray<MappingRecord> | Mapp
   return 'published' in mappings ? mappings : createMappingCatalogue(mappings)
 }
 
-export const seedMappings: ReadonlyArray<MappingRecord> = seedSummaries.map(mappingOfFlow)
+export const seedMappings: ReadonlyArray<MappingRecord> = [
+  ...new Map(
+    seedSummaries.map(mappingOfFlow).map((mapping) => [mapping.mappingId, mapping]),
+  ).values(),
+]
 
 function channelsFitting(
   channels: ReadonlyArray<ChannelRecord>,
@@ -142,7 +152,7 @@ function seedFlowChannels(summary: FlowSummary) {
 
 // Some Flows stay one or two versions behind, so the seed shows Flows with newer versions.
 export const seedFlows: ReadonlyArray<FlowRecord> = seedSummaries.map((summary, index) => {
-  const { versions } = seedMappings[index]!
+  const { versions } = mappingOfFlow(summary)
 
   return {
     ...summary,
