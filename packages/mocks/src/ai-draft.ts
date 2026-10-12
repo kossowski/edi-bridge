@@ -2,6 +2,9 @@ import { delay, http, HttpResponse } from 'msw'
 
 import {
   acceptAiDraftEndpoint,
+  acceptAiProposedPartsEndpoint,
+  acceptedAiReview,
+  type AiReviewParts,
   type AiBudget,
   aiBudgetEndpoint,
   aiBudgetExhausted,
@@ -234,6 +237,16 @@ export function withAiProposal(
         updatedAt: new Date().toISOString(),
       }
     : record
+}
+
+function marksAll({ proposedLinks, proposedTransforms, proposedTransformLinks }: AiReview) {
+  const marked = (keys: ReadonlyArray<string>, proposed: ReadonlyArray<string>) =>
+    keys.every((key) => proposed.includes(key))
+
+  return (parts: AiReviewParts) =>
+    marked(parts.links, proposedLinks) &&
+    marked(parts.transforms, proposedTransforms) &&
+    marked(parts.transformLinks, proposedTransformLinks)
 }
 
 function segmentTags(proposal: AiProposal) {
@@ -501,6 +514,42 @@ export function aiDraftHandlers(
         }
 
         const accepted = { ...record, aiReview: null, updatedAt: new Date().toISOString() }
+        store.set(accepted)
+
+        return HttpResponse.json(toMappingDraft(accepted, structures.all()))
+      }),
+    ),
+    http.post<{ id: string }>(
+      `${apiUrl}${acceptAiProposedPartsEndpoint.path}`,
+      adminOnly(sessionStore, async ({ params, request }) => {
+        const record = store.get(params.id)
+
+        await delay()
+
+        if (!record) {
+          return notFound()
+        }
+
+        const body = acceptAiProposedPartsEndpoint.body.safeParse(await request.json())
+
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
+
+        if (!record.aiReview) {
+          return conflict('The Draft has no open AI review.')
+        }
+
+        if (!marksAll(record.aiReview)(body.data)) {
+          return conflict('The AI review does not mark every part to accept.')
+        }
+
+        const accepted = {
+          ...record,
+          aiReview: acceptedAiReview(record.aiReview, body.data),
+          updatedAt: new Date().toISOString(),
+        }
+
         store.set(accepted)
 
         return HttpResponse.json(toMappingDraft(accepted, structures.all()))
