@@ -34,7 +34,8 @@ import {
   type InviteInput,
   type FlowUpdate,
   importLookupTableEndpoint,
-  interchangeEndpoint,
+  type InterchangeListQuery,
+  interchangesEndpoint,
   liveEventsEndpoint,
   lookupTableEndpoint,
   type LookupTableImportBody,
@@ -298,8 +299,8 @@ export function reprocessRun(id: string, body: ReprocessRunBody) {
   return request(reprocessRunEndpoint, { path: toPath(reprocessRunEndpoint.path, { id }), body })
 }
 
-export function getInterchange(id: string) {
-  return request(interchangeEndpoint, { path: toPath(interchangeEndpoint.path, { id }) })
+export function listInterchanges(query: InterchangeListQuery) {
+  return request(interchangesEndpoint, { query })
 }
 
 export function listMappingVersions(mappingId: string) {

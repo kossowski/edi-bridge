@@ -130,7 +130,6 @@ export function LoadFailure({
   notFound: boolean
   namespace:
     | 'RunDetail'
-    | 'Interchange'
     | 'TradingPartner'
     | 'Channel'
     | 'Flow'

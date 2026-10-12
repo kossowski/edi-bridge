@@ -7,6 +7,7 @@ import {
   hasSearchFilters,
   parseDocumentFilters,
   statusGroupCount,
+  toInterchangeListQuery,
   toRunListQuery,
 } from './document-filters'
 
@@ -21,6 +22,7 @@ describe('parseDocumentFilters', () => {
     expect(
       parseDocumentFilters(
         new URLSearchParams({
+          view: 'transmissions',
           status: 'done',
           q: 'PO1',
           partner: partnerId,
@@ -29,6 +31,7 @@ describe('parseDocumentFilters', () => {
         }),
       ),
     ).toEqual({
+      view: 'transmissions',
       status: 'done',
       q: 'PO1',
       tradingPartnerId: partnerId,
@@ -40,7 +43,13 @@ describe('parseDocumentFilters', () => {
   it('ignores values the list cannot show', () => {
     expect(
       parseDocumentFilters(
-        new URLSearchParams({ status: 'failed', partner: 'acme', type: 'ORDRSP', page: '0' }),
+        new URLSearchParams({
+          view: 'files',
+          status: 'failed',
+          partner: 'acme',
+          type: 'ORDRSP',
+          page: '0',
+        }),
       ),
     ).toEqual(emptyDocumentFilters)
   })
@@ -54,8 +63,18 @@ describe('documentFiltersSearch', () => {
     ).toBe('status=all&page=2')
   })
 
+  it('leaves out the default status group in the transmissions view', () => {
+    expect(documentFiltersSearch({ ...emptyDocumentFilters, view: 'transmissions' })).toBe(
+      'view=transmissions',
+    )
+    expect(
+      documentFiltersSearch({ ...emptyDocumentFilters, view: 'transmissions', status: 'done' }),
+    ).toBe('view=transmissions&status=done')
+  })
+
   it('round-trips through parseDocumentFilters', () => {
     const filters = {
+      view: 'transmissions',
       status: 'progress',
       q: 'Hanse',
       tradingPartnerId: partnerId,
@@ -97,6 +116,7 @@ describe('toRunListQuery', () => {
   it('passes the filters and the page', () => {
     expect(
       toRunListQuery({
+        view: 'documents',
         status: 'done',
         q: ' PO1 ',
         tradingPartnerId: partnerId,
@@ -109,6 +129,26 @@ describe('toRunListQuery', () => {
       messageType: ['INVOIC'],
       q: 'PO1',
       page: 2,
+      pageSize: 50,
+    })
+  })
+})
+
+describe('toInterchangeListQuery', () => {
+  it('passes the filters and the page but no status', () => {
+    expect(
+      toInterchangeListQuery({
+        ...emptyDocumentFilters,
+        view: 'transmissions',
+        status: 'done',
+        q: ' 00123 ',
+        messageType: 'ORDERS',
+      }),
+    ).toEqual({
+      tradingPartnerId: undefined,
+      messageType: ['ORDERS'],
+      q: '00123',
+      page: 1,
       pageSize: 50,
     })
   })

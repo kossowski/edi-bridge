@@ -271,7 +271,7 @@
       "title": "Overdue Acknowledgements",
       "description": "{count, plural, =0 {Every sent Interchange was acknowledged in time.} one {# sent Interchange without an Acknowledgement within the time limit. Longest Overdue first.} other {# sent Interchanges without an Acknowledgement within the time limit. Longest Overdue first.}}",
       "caption": "Overdue Acknowledgements, longest Overdue first",
-      "interchangeLink": "Interchange {controlReference}",
+      "interchangeLink": "Transmission {controlReference}",
       "hours": "{hours, plural, one {# hour} other {# hours}}",
       "showAll": "Show all {count, number} Overdue Acknowledgements",
       "columns": {
@@ -456,6 +456,11 @@
     }
   },
   "Documents": {
+    "views": {
+      "label": "View",
+      "documents": "Documents",
+      "transmissions": "Transmissions"
+    },
     "filters": {
       "label": "Filter documents",
       "search": "Search order number or partner",
@@ -463,7 +468,8 @@
       "allTradingPartners": "All trading partners",
       "messageType": "Document type",
       "allMessageTypes": "All document types",
-      "clear": "Clear filters"
+      "clear": "Clear filters",
+      "searchInterchanges": "Search file number, order number or partner"
     },
     "statusGroups": "Status",
     "list": "Documents, newest first",
@@ -514,6 +520,36 @@
       "title": "Documents unavailable",
       "description": "The documents could not be loaded. Try again.",
       "retry": "Try again"
+    },
+    "interchanges": {
+      "explanation": "A transmission is one file exchanged with a partner. Most hold a single document, but a file can carry several, for example two purchase orders sent together. This view helps when a partner asks “did you get our file 00123?”.",
+      "list": "Transmissions, newest first",
+      "loading": "Loading transmissions",
+      "count": "{count, plural, one {# transmission} other {# transmissions}}",
+      "row": {
+        "title": "{direction, select, inbound {File from {tradingPartner}} other {File to {tradingPartner}}}",
+        "fileNumber": "No. {controlReference}",
+        "documents": "{count, plural, one {# document} other {# documents}}"
+      },
+      "empty": {
+        "noInterchanges": {
+          "title": "No transmissions yet",
+          "description": "Files appear here as soon as a partner sends one or a document goes out to a partner."
+        },
+        "nothingMatches": {
+          "title": "No transmissions match",
+          "description": "Try a different search or clear the filters."
+        },
+        "pageOutOfRange": {
+          "title": "This page is empty",
+          "description": "There are fewer transmissions now. The first page shows the newest."
+        }
+      },
+      "error": {
+        "title": "Transmissions unavailable",
+        "description": "The transmissions could not be loaded. Try again.",
+        "retry": "Try again"
+      }
     }
   },
   "Runs": {
@@ -553,7 +589,7 @@
       "flow": "Flow",
       "source": "Source",
       "mappingVersion": "Mapping Version",
-      "interchange": "Interchange",
+      "interchange": "Transmission",
       "replaces": "Replaces",
       "replacedBy": "Replaced by"
     },
@@ -639,36 +675,6 @@
       "empty": "empty",
       "unparsed": "The Message could not be parsed. The raw Interchange shows the error position.",
       "none": "This Run has no parsed Message yet."
-    }
-  },
-  "Interchange": {
-    "title": "Interchange",
-    "name": "Transmission {controlReference}",
-    "loading": "Loading Interchange",
-    "notFound": {
-      "title": "Interchange not found",
-      "description": "No Interchange with this ID exists in this Workspace."
-    },
-    "error": {
-      "title": "Interchange unavailable",
-      "description": "The Interchange could not be loaded. Try again.",
-      "retry": "Try again"
-    },
-    "facts": {
-      "label": "Interchange details",
-      "direction": "Direction",
-      "sender": "Sender",
-      "receiver": "Receiver",
-      "party": "{name}, GLN {gln}"
-    },
-    "runs": {
-      "title": "Runs",
-      "count": "{count, plural, one {This Interchange produced # Run.} other {This Interchange produced # Runs.}}",
-      "caption": "Runs produced by this Interchange",
-      "columns": {
-        "message": "Message"
-      },
-      "openRun": "– open Run of Message {messageReference}, {messageType}"
     }
   },
   "OrderLifecycle": {

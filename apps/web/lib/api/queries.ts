@@ -11,6 +11,7 @@ import type {
   DocumentStructure,
   DocumentStructureOrigin,
   Flow,
+  InterchangeListQuery,
   Invite,
   LookupTable,
   MappingComparisonQuery,
@@ -33,7 +34,6 @@ import {
   getCurrentWorkspace,
   getDocumentStructure,
   getFlow,
-  getInterchange,
   getLookupTable,
   getMappingDraft,
   getMappingVersion,
@@ -48,6 +48,7 @@ import {
   listDocumentStructures,
   listLookupTables,
   listFlows,
+  listInterchanges,
   listMappingSamples,
   listMappings,
   listMappingVersions,
@@ -206,7 +207,7 @@ export const runKeys = {
 
 export const interchangeKeys = {
   all: () => ['interchanges'] as const,
-  detail: (id: string) => [...interchangeKeys.all(), 'detail', id] as const,
+  list: (query: InterchangeListQuery) => [...interchangeKeys.all(), 'list', query] as const,
 }
 
 export function runsQuery(query: RunListQuery) {
@@ -224,10 +225,11 @@ export function runQuery(id: string) {
   })
 }
 
-export function interchangeQuery(id: string) {
+export function interchangesQuery(query: InterchangeListQuery) {
   return queryOptions({
-    queryKey: interchangeKeys.detail(id),
-    queryFn: () => getInterchange(id),
+    queryKey: interchangeKeys.list(query),
+    queryFn: () => listInterchanges(query),
+    placeholderData: keepPreviousData,
   })
 }
 

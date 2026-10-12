@@ -37,18 +37,17 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
+  it('names the Transmissions view of the documents', () => {
+    expect(breadcrumbTrail('/documents', new URLSearchParams({ view: 'transmissions' }))).toEqual([
+      { href: '/documents?view=transmissions', label: { kind: 'item', key: 'transmissions' } },
+    ])
+  })
+
   it('puts a Run under the documents', () => {
     expect(breadcrumbTrail('/runs/run-1')).toEqual([
       { href: '/documents', label: { kind: 'item', key: 'documents' } },
       { href: '/runs/run-1', label: { kind: 'detail' } },
     ])
-  })
-
-  it('links a section without a list page to its sidebar target', () => {
-    expect(breadcrumbTrail('/interchanges/ic-1')[0]).toEqual({
-      href: '/documents',
-      label: { kind: 'item', key: 'transmissions' },
-    })
   })
 
   it('leaves out segments without a page of their own', () => {

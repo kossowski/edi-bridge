@@ -1,4 +1,12 @@
-import { navigationItems, type SidebarItemKey, sidebarItem, sidebarItems } from './navigation'
+import {
+  activeSidebarItem,
+  navigationItems,
+  type SidebarItemKey,
+  sidebarItem,
+  sidebarItems,
+} from './navigation'
+
+import type { SearchParamsReader } from './search-params'
 
 const subpageKeys = ['new', 'edit', 'versions', 'compare'] as const
 
@@ -23,7 +31,7 @@ function sidebarSections() {
   const byFirstSegment = new Map<string, Section>()
 
   for (const item of sidebarItems) {
-    const segment = item.href.split('/').find(Boolean)
+    const segment = item.href.split('?')[0]?.split('/').find(Boolean)
 
     if (segment !== undefined && !byFirstSegment.has(segment)) {
       byFirstSegment.set(segment, itemSection(item.key))
@@ -36,7 +44,6 @@ function sidebarSections() {
 const sections = new Map<string, Section>([
   ...sidebarSections(),
   ['runs', itemSection('documents')],
-  ['interchanges', itemSection('transmissions')],
   [
     'settings',
     { label: { kind: 'session', key: 'settings' }, href: navigationItems.settings.href },
@@ -55,14 +62,18 @@ function subpageKey(segment: string) {
   return subpageKeys.find((key) => key === segment)
 }
 
-export function breadcrumbTrail(pathname: string): ReadonlyArray<Crumb> {
+export function breadcrumbTrail(
+  pathname: string,
+  searchParams: SearchParamsReader = new URLSearchParams(),
+): ReadonlyArray<Crumb> {
   const [first, ...rest] = pathname.split('/').filter(Boolean)
 
   if (first === undefined) {
     return [itemSection('home')]
   }
 
-  const section = sections.get(first)
+  const active = rest.length === 0 ? activeSidebarItem(pathname, searchParams) : undefined
+  const section = active ? itemSection(active) : sections.get(first)
 
   if (!section) {
     return [{ href: pathname, label: { kind: 'notFound' } }]

@@ -18,6 +18,12 @@ import {
 import type { IconSvgElement } from '@hugeicons/react'
 import type { Messages } from 'next-intl'
 
+import type { SearchParamsReader } from './search-params'
+
+export const documentViews = ['documents', 'transmissions'] as const
+
+export type DocumentView = (typeof documentViews)[number]
+
 export type NavigationKey = keyof Messages['Navigation']
 
 type NavigationItem = {
@@ -61,7 +67,12 @@ export function accountMenuItems(operator: boolean): ReadonlyArray<AccountMenuIt
 
 export type SidebarItemKey = keyof Messages['Sidebar']['items']
 
-type SidebarItemSource = { key: SidebarItemKey; page: NavigationKey; icon?: IconSvgElement }
+type SidebarItemSource = {
+  key: SidebarItemKey
+  page: NavigationKey
+  icon?: IconSvgElement
+  search?: { view: DocumentView }
+}
 
 export type SidebarItem = NavigationItem & { key: SidebarItemKey }
 
@@ -101,13 +112,24 @@ const sidebarGroupSources: ReadonlyArray<SidebarGroupSource> = [
     items: [
       { key: 'allConnections', page: 'channels' },
       { key: 'allDocumentRoutes', page: 'flows' },
-      { key: 'transmissions', page: 'documents', icon: Route01Icon },
+      {
+        key: 'transmissions',
+        page: 'documents',
+        icon: Route01Icon,
+        search: { view: 'transmissions' },
+      },
     ],
   },
 ]
 
-function toSidebarItem({ key, page, icon }: SidebarItemSource): SidebarItem {
-  return { key, href: navigationItems[page].href, icon: icon ?? navigationItems[page].icon }
+function toSidebarItem({ key, page, icon, search }: SidebarItemSource): SidebarItem {
+  const { href } = navigationItems[page]
+
+  return {
+    key,
+    href: search ? `${href}?${new URLSearchParams(search)}` : href,
+    icon: icon ?? navigationItems[page].icon,
+  }
 }
 
 export const sidebarGroups: ReadonlyArray<SidebarGroup> = sidebarGroupSources.map((group) => ({
@@ -134,11 +156,14 @@ export function sidebarItem(key: SidebarItemKey) {
   return item
 }
 
-export function activeSidebarItem(pathname: string) {
+export function activeSidebarItem(pathname: string, searchParams: SearchParamsReader) {
   let active: SidebarItem | undefined
 
   for (const item of sidebarItems) {
-    if (isActivePath(pathname, item.href) && (!active || item.href.length > active.href.length)) {
+    if (
+      isActiveHref(pathname, searchParams, item.href) &&
+      (!active || item.href.length > active.href.length)
+    ) {
       active = item
     }
   }
@@ -146,7 +171,16 @@ export function activeSidebarItem(pathname: string) {
   return active?.key
 }
 
-export function isActivePath(pathname: string, href: string) {
+function isActiveHref(pathname: string, searchParams: SearchParamsReader, href: string) {
+  const [path = href, search = ''] = href.split('?')
+
+  return (
+    isActivePath(pathname, path) &&
+    [...new URLSearchParams(search)].every(([name, value]) => searchParams.get(name) === value)
+  )
+}
+
+function isActivePath(pathname: string, href: string) {
   if (href === '/') {
     return pathname === '/'
   }
@@ -156,4 +190,10 @@ export function isActivePath(pathname: string, href: string) {
 
 export function runHref(id: string) {
   return `/runs/${id}`
+}
+
+export function interchangeHref(controlReference: string) {
+  const search = new URLSearchParams({ view: 'transmissions', q: controlReference })
+
+  return `${navigationItems.documents.href}?${search}`
 }

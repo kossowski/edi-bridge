@@ -18,7 +18,7 @@ import {
 } from '@/components/order-lifecycle/order-lifecycle-steps'
 import { RunLink, shortId } from '@/components/runs/run-link'
 import { FailureStageLabel, RunStatusBadge } from '@/components/runs/run-status'
-import { runHref } from '@/lib/navigation'
+import { interchangeHref, runHref } from '@/lib/navigation'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -61,7 +61,9 @@ function MessageEntry({
       <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1.5">
         <span>
           {interchange ? (
-            <Link href={`/interchanges/${interchange.id}`} className={cn(linkClass, 'relative')}>
+            <Link
+              href={interchangeHref(interchange.controlReference)}
+              className={cn(linkClass, 'relative')}>
               {tRun('interchangeLink', { controlReference: interchange.controlReference })}
             </Link>
           ) : (

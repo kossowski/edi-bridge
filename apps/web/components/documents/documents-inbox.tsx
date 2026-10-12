@@ -1,53 +1,57 @@
 'use client'
 
 import {
-  ArrowLeft01Icon,
-  ArrowRight01Icon,
   CheckmarkCircle02Icon,
   File02Icon,
   FilterRemoveIcon,
+  Route01Icon,
   Search01Icon,
   SearchRemoveIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   clearedSearchFilters,
   type DocumentFilters,
   hasSearchFilters,
-  runPageSize,
+  type ResultsProps,
   statusGroupCount,
   toRunListQuery,
 } from '@/components/documents/document-filters'
+import { InterchangeResults } from '@/components/documents/interchange-results'
+import {
+  type EmptyAction,
+  ListEmpty,
+  ListResults,
+  useEmptyActions,
+} from '@/components/documents/list-parts'
 import { RunRow, RunRowSkeleton } from '@/components/documents/run-row'
 import { useDocumentFilters } from '@/components/documents/use-document-filters'
-import { LoadError } from '@/components/load-error'
 import { usePlainNames } from '@/components/plain-names'
 import { runsQuery, tradingPartnersQuery } from '@/lib/api/queries'
+import { type DocumentView, documentViews } from '@/lib/navigation'
 import { type StatusGroup, statusGroups } from '@/lib/status-groups'
 import { messageTypes, type RunList } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@edi-bridge/ui/components/empty'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@edi-bridge/ui/components/input-group'
 import { NativeSelect, NativeSelectOption } from '@edi-bridge/ui/components/native-select'
 import { ToggleGroup, ToggleGroupItem } from '@edi-bridge/ui/components/toggle-group'
-import { cn } from '@edi-bridge/ui/lib/utils'
 
 const searchDelay = 300
 
-function SearchField({ value, onSearch }: { value: string; onSearch: (q: string) => void }) {
-  const t = useTranslations('Documents.filters')
+function SearchField({
+  value,
+  label,
+  onSearch,
+}: {
+  value: string
+  label: string
+  onSearch: (q: string) => void
+}) {
   const [text, setText] = useState(value)
   const [shown, setShown] = useState(value)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -68,16 +72,16 @@ function SearchField({ value, onSearch }: { value: string; onSearch: (q: string)
   useEffect(() => () => clearTimeout(timer.current), [])
 
   return (
-    <InputGroup className="min-w-48 flex-1 sm:max-w-sm">
+    <InputGroup className="min-w-[min(100%,22rem)] flex-1 sm:max-w-sm">
       <InputGroupAddon>
         <HugeiconsIcon icon={Search01Icon} strokeWidth={2} aria-hidden />
       </InputGroupAddon>
       <InputGroupInput
         autoComplete="off"
-        placeholder={t('search')}
+        placeholder={label}
         type="search"
         value={text}
-        aria-label={t('search')}
+        aria-label={label}
         onChange={(event) => {
           const next = event.target.value
 
@@ -110,7 +114,12 @@ function Filters({
 
   return (
     <search aria-label={t('label')} className="flex flex-wrap items-center gap-2">
-      <SearchField key={searchKey} value={filters.q} onSearch={(q) => onChange({ q })} />
+      <SearchField
+        key={searchKey}
+        label={filters.view === 'transmissions' ? t('searchInterchanges') : t('search')}
+        value={filters.q}
+        onSearch={(q) => onChange({ q })}
+      />
       <NativeSelect
         value={filters.tradingPartnerId}
         aria-label={t('tradingPartner')}
@@ -226,173 +235,123 @@ function emptyKind(filters: DocumentFilters, list: RunList): EmptyKind {
   return filters.status === 'attention' ? 'nothingNeedsAttention' : 'emptyGroup'
 }
 
-function EmptyDocuments({
-  kind,
-  onClear,
-  onFirstPage,
-}: {
-  kind: EmptyKind
-  onClear: () => void
-  onFirstPage: () => void
-}) {
+function RunResults({ filters, onChange, onClear }: ResultsProps) {
   const t = useTranslations('Documents')
 
+  const emptyActions: Partial<Record<EmptyKind, EmptyAction>> = useEmptyActions({
+    onChange,
+    onClear,
+  })
+
+  const query = useQuery(runsQuery(toRunListQuery(filters)))
+  const { data, isPending } = query
+
   return (
-    <Empty className="border border-dashed">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <HugeiconsIcon icon={emptyIcons[kind]} strokeWidth={2} />
-        </EmptyMedia>
-        <EmptyTitle>{t(`empty.${kind}.title`)}</EmptyTitle>
-        <EmptyDescription>{t(`empty.${kind}.description`)}</EmptyDescription>
-      </EmptyHeader>
-      {kind === 'nothingMatches' && (
-        <EmptyContent>
-          <Button variant="outline" onClick={onClear}>
-            {t('filters.clear')}
-          </Button>
-        </EmptyContent>
-      )}
-      {kind === 'pageOutOfRange' && (
-        <EmptyContent>
-          <Button variant="outline" onClick={onFirstPage}>
-            {t('pagination.first')}
-          </Button>
-        </EmptyContent>
-      )}
-    </Empty>
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <StatusGroupFilter
+          statusCounts={data?.statusCounts}
+          value={filters.status}
+          onChange={(status) => onChange({ status })}
+        />
+        <p aria-live="polite" className="text-muted-foreground text-sm">
+          {isPending ? t('loading') : data && t('count', { count: data.total })}
+        </p>
+      </div>
+      <ListResults
+        empty={(list) => {
+          const kind = emptyKind(filters, list)
+
+          return (
+            <ListEmpty
+              action={emptyActions[kind]}
+              description={t(`empty.${kind}.description`)}
+              icon={emptyIcons[kind]}
+              title={t(`empty.${kind}.title`)}
+            />
+          )
+        }}
+        entries={(list) => list.runs}
+        error={{
+          title: t('error.title'),
+          description: t('error.description'),
+          retry: t('error.retry'),
+        }}
+        label={t('list')}
+        page={filters.page}
+        query={query}
+        renderEntry={(run) => <RunRow key={run.id} run={run} />}
+        skeleton={<RunRowSkeleton />}
+        skeletonCount={8}
+        className="@container"
+        onPage={(page) => onChange({ page })}
+      />
+    </>
   )
 }
 
-function Pagination({
-  page,
-  total,
-  onPage,
-}: {
-  page: number
-  total: number
-  onPage: (page: number) => void
-}) {
-  const t = useTranslations('Documents.pagination')
-  const pageCount = Math.max(1, Math.ceil(total / runPageSize))
+const viewIcons: Record<DocumentView, IconSvgElement> = {
+  documents: File02Icon,
+  transmissions: Route01Icon,
+}
 
-  if (pageCount === 1) {
-    return null
-  }
+function ViewSwitch({
+  value,
+  onChange,
+}: {
+  value: DocumentView
+  onChange: (view: DocumentView) => void
+}) {
+  const t = useTranslations('Documents.views')
 
   return (
-    <nav aria-label={t('label')} className="flex items-center justify-end gap-3">
-      <p className="text-sm tabular-nums">{t('page', { page, pageCount })}</p>
-      <div className="flex items-center gap-1">
-        <Button
-          disabled={page <= 1}
-          size="icon-sm"
-          variant="outline"
-          aria-label={t('previous')}
-          onClick={() => onPage(page - 1)}>
-          <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} />
-        </Button>
-        <Button
-          disabled={page >= pageCount}
-          size="icon-sm"
-          variant="outline"
-          aria-label={t('next')}
-          onClick={() => onPage(page + 1)}>
-          <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} />
-        </Button>
-      </div>
-    </nav>
+    <ToggleGroup
+      size="sm"
+      spacing={1}
+      value={[value]}
+      aria-label={t('label')}
+      onValueChange={(next) => {
+        const view = documentViews.find((candidate) => candidate === next[0])
+
+        if (view) {
+          onChange(view)
+        }
+      }}>
+      {documentViews.map((view) => (
+        <ToggleGroupItem key={view} value={view}>
+          <HugeiconsIcon icon={viewIcons[view]} strokeWidth={2} data-icon="inline-start" />
+          {t(view)}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   )
 }
 
 export function DocumentsInbox() {
-  const t = useTranslations('Documents')
   const [filters, updateFilters] = useDocumentFilters()
-  const listId = useId()
   const [searchKey, setSearchKey] = useState(0)
-
-  const { data, isError, isPending, isPlaceholderData, refetch } = useQuery(
-    runsQuery(toRunListQuery(filters)),
-  )
-
-  const settled = isPlaceholderData ? undefined : data
 
   const clearFilters = () => {
     setSearchKey((key) => key + 1)
     updateFilters(clearedSearchFilters)
   }
 
-  function results() {
-    if (isError && !data) {
-      return (
-        <LoadError
-          description={t('error.description')}
-          retryLabel={t('error.retry')}
-          title={t('error.title')}
-          onRetry={() => void refetch()}
-        />
-      )
-    }
-
-    if (settled?.runs.length === 0) {
-      return (
-        <EmptyDocuments
-          kind={emptyKind(filters, settled)}
-          onClear={clearFilters}
-          onFirstPage={() => updateFilters({ page: 1 })}
-        />
-      )
-    }
-
-    const waiting = isPending || (isPlaceholderData && data.runs.length === 0)
-
-    return (
-      <>
-        <ul
-          id={listId}
-          aria-busy={isPending || isPlaceholderData}
-          aria-label={t('list')}
-          className={cn(
-            '@container flex flex-col gap-2',
-            isPlaceholderData && 'opacity-60 transition-opacity',
-          )}>
-          {waiting
-            ? Array.from({ length: 8 }, (_, index) => <RunRowSkeleton key={index} />)
-            : data.runs.map((run) => <RunRow key={run.id} run={run} />)}
-        </ul>
-        {data && (
-          <Pagination
-            page={filters.page}
-            total={data.total}
-            onPage={(page) => {
-              updateFilters({ page })
-              document.getElementById(listId)?.scrollIntoView({ block: 'start' })
-            }}
-          />
-        )}
-      </>
-    )
-  }
+  const resultsProps = { filters, onChange: updateFilters, onClear: clearFilters }
 
   return (
     <div className="flex flex-col gap-4">
+      <ViewSwitch value={filters.view} onChange={(view) => updateFilters({ view })} />
       <Filters
         filters={filters}
         searchKey={searchKey}
         onChange={updateFilters}
         onClear={clearFilters}
       />
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <StatusGroupFilter
-          statusCounts={data?.statusCounts}
-          value={filters.status}
-          onChange={(status) => updateFilters({ status })}
-        />
-        <p aria-live="polite" className="text-muted-foreground text-sm">
-          {isPending ? t('loading') : data && t('count', { count: data.total })}
-        </p>
-      </div>
-      {results()}
+      {filters.view === 'transmissions' ? (
+        <InterchangeResults {...resultsProps} />
+      ) : (
+        <RunResults {...resultsProps} />
+      )}
     </div>
   )
 }

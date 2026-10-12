@@ -1,22 +1,33 @@
 import {
+  type InterchangeListQuery,
   type MessageType,
   messageTypeSchema,
   type RunListQuery,
   type RunStatus,
 } from '@edi-bridge/contracts'
 
+import { type DocumentView, documentViews } from '../../lib/navigation'
 import { groupStatuses, type StatusGroup, statusGroups } from '../../lib/status-groups'
+
+import type { SearchParamsReader } from '../../lib/search-params'
 
 export const defaultStatusGroup: StatusGroup = 'attention'
 
-export const runPageSize = 50
+export const listPageSize = 50
 
 export type DocumentFilters = {
+  view: DocumentView
   status: StatusGroup
   q: string
   tradingPartnerId: string
   messageType: MessageType | ''
   page: number
+}
+
+export type ResultsProps = {
+  filters: DocumentFilters
+  onChange: (change: Partial<DocumentFilters>) => void
+  onClear: () => void
 }
 
 export const clearedSearchFilters = {
@@ -26,24 +37,25 @@ export const clearedSearchFilters = {
 } satisfies Partial<DocumentFilters>
 
 export const emptyDocumentFilters: DocumentFilters = {
+  view: 'documents',
   status: defaultStatusGroup,
   ...clearedSearchFilters,
   page: 1,
 }
-
-type SearchParamsReader = { get: (name: string) => string | null }
 
 const uuidPattern = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 
 const pagePattern = /^[1-9]\d{0,5}$/
 
 export function parseDocumentFilters(params: SearchParamsReader): DocumentFilters {
+  const view = documentViews.find((candidate) => candidate === params.get('view'))
   const status = statusGroups.find((group) => group === params.get('status'))
   const tradingPartnerId = params.get('partner') ?? ''
   const messageType = messageTypeSchema.safeParse(params.get('type'))
   const page = params.get('page') ?? ''
 
   return {
+    view: view ?? 'documents',
     status: status ?? defaultStatusGroup,
     q: params.get('q') ?? '',
     tradingPartnerId: uuidPattern.test(tradingPartnerId) ? tradingPartnerId : '',
@@ -53,7 +65,15 @@ export function parseDocumentFilters(params: SearchParamsReader): DocumentFilter
 }
 
 export function documentFiltersSearch(filters: DocumentFilters) {
-  const params = new URLSearchParams({ status: filters.status })
+  const params = new URLSearchParams()
+
+  if (filters.view === 'transmissions') {
+    params.set('view', filters.view)
+  }
+
+  if (filters.view === 'documents' || filters.status !== defaultStatusGroup) {
+    params.set('status', filters.status)
+  }
 
   if (filters.q.trim() !== '') {
     params.set('q', filters.q)
@@ -82,16 +102,22 @@ export function hasSearchFilters(filters: DocumentFilters) {
   return filters.q.trim() !== '' || filters.tradingPartnerId !== '' || filters.messageType !== ''
 }
 
-export function toRunListQuery(filters: DocumentFilters): RunListQuery {
+export function toInterchangeListQuery(filters: DocumentFilters): InterchangeListQuery {
   const q = filters.q.trim()
 
   return {
-    status: filters.status === 'all' ? undefined : [...groupStatuses[filters.status]],
     tradingPartnerId: filters.tradingPartnerId === '' ? undefined : [filters.tradingPartnerId],
     messageType: filters.messageType === '' ? undefined : [filters.messageType],
     q: q === '' ? undefined : q,
     page: filters.page,
-    pageSize: runPageSize,
+    pageSize: listPageSize,
+  }
+}
+
+export function toRunListQuery(filters: DocumentFilters): RunListQuery {
+  return {
+    status: filters.status === 'all' ? undefined : [...groupStatuses[filters.status]],
+    ...toInterchangeListQuery(filters),
   }
 }
 

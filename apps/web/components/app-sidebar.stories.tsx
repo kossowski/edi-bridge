@@ -175,6 +175,24 @@ export const DocumentsActiveOnce = meta.story({
   },
 })
 
+export const TransmissionsActiveInItsView = meta.story({
+  parameters: {
+    nextjs: { navigation: { pathname: '/documents', query: { view: 'transmissions' } } },
+  },
+  beforeEach({ msw }) {
+    msw.use(...signedInAs(sandboxAdminSession))
+  },
+  async play({ canvas }) {
+    const transmissions = await canvas.findByRole('link', { name: 'Transmissions' })
+
+    await expect(transmissions).toHaveAttribute('href', '/documents?view=transmissions')
+    await expect(transmissions).toHaveAttribute('aria-current', 'page')
+    await expect(canvas.getByRole('link', { name: 'Documents' })).not.toHaveAttribute(
+      'aria-current',
+    )
+  },
+})
+
 export const HelpActiveOnItsPage = meta.story({
   parameters: { nextjs: { navigation: { pathname: '/help' } } },
   beforeEach({ msw }) {
