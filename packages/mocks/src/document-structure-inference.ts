@@ -467,7 +467,7 @@ export function inferFromCsv(text: string, csv: CsvSettings): InferredDocumentSt
       kind: 'field',
       path: childPath(csvRowsPath, segment),
       name,
-      ...plainNameOf(name),
+      ...plainNameOf(name, filled),
       type:
         filled
           .map(cellType)

@@ -137,6 +137,19 @@ describe('plain names', () => {
     expect(at(invoices, 'rows[].ME')).toMatchObject({ label: 'Unit', labelUnsure: true })
   })
 
+  it('points at the values of the sample when it is unsure', () => {
+    expect(at(invoices, 'rows[].ME')?.labelReason).toContain('Values KRT and ST look like units.')
+    expect(at(invoices, 'rows[].EPreis')?.labelReason).toContain(
+      'Values 4,20, 4,60 and 2,10 look like prices.',
+    )
+  })
+
+  it('shows the values of a column whose name it does not know', () => {
+    const stock = inferFromCsv('LagerOrt\nB4\nB4\nC1\n', defaultCsvSettings)
+
+    expect(at(stock, 'rows[].LagerOrt')?.labelReason).toContain('Values seen: B4 and C1.')
+  })
+
   it('names fields of a JSON Document regardless of how they are written', () => {
     const order = inferFromJson('{"order_number":"PO-1","GTIN":"04012345123456"}')
 

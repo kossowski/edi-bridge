@@ -2,7 +2,7 @@ import { type DocumentField, maxFieldLabelLength } from '@edi-bridge/contracts'
 
 export type PlainName = Pick<DocumentField, 'label' | 'labelReason' | 'labelUnsure'>
 
-type Known = { label: string; meaning?: string; labelUnsure?: boolean }
+type Known = { label: string; meaning?: string; labelUnsure?: boolean; valuesLookLike?: string }
 
 const known = new Map<string, Known>()
 
@@ -62,6 +62,7 @@ const meanings: ReadonlyArray<readonly [ReadonlyArray<string>, Known]> = [
       label: 'Unit',
       meaning: '"Mengeneinheit", the unit the quantity is counted in, if the values are units',
       labelUnsure: true,
+      valuesLookLike: 'units',
     },
   ],
   [
@@ -77,6 +78,7 @@ const meanings: ReadonlyArray<readonly [ReadonlyArray<string>, Known]> = [
       label: 'Unit price',
       meaning: '"Einzelpreis", the price of one unit, if it is not the price of the whole line',
       labelUnsure: true,
+      valuesLookLike: 'prices',
     },
   ],
   [['einzelpreis'], { label: 'Unit price', meaning: '"Einzelpreis", the price of one unit' }],
@@ -216,22 +218,45 @@ function spelledOut(name: string) {
   return words === '' ? name : `${words.charAt(0).toUpperCase()}${words.slice(1)}`
 }
 
-export function plainNameOf(name: string): PlainName {
+const shownValueCount = 3
+
+function listed(values: ReadonlyArray<string>) {
+  const shown = [...new Set(values.filter((value) => value !== ''))].slice(0, shownValueCount)
+  const last = shown.pop()
+
+  return last === undefined ? undefined : [shown.join(', '), last].filter(Boolean).join(' and ')
+}
+
+function evidence(values: ReadonlyArray<string>, lookLike: string | undefined) {
+  const seen = listed(values)
+
+  if (seen === undefined) {
+    return ''
+  }
+
+  return lookLike ? ` Values ${seen} look like ${lookLike}.` : ` Values seen: ${seen}.`
+}
+
+export function plainNameOf(name: string, values: ReadonlyArray<string> = []): PlainName {
   const entry = known.get(normalized(name))
 
   if (entry) {
+    const labelUnsure = entry.labelUnsure ?? false
+
+    const meaning = entry.meaning
+      ? `"${name}" stands for ${entry.meaning}.`
+      : `"${name}" is a common name for "${entry.label}".`
+
     return {
       label: entry.label,
-      labelReason: entry.meaning
-        ? `"${name}" stands for ${entry.meaning}.`
-        : `"${name}" is a common name for "${entry.label}".`,
-      labelUnsure: entry.labelUnsure ?? false,
+      labelReason: labelUnsure ? `${meaning}${evidence(values, entry.valuesLookLike)}` : meaning,
+      labelUnsure,
     }
   }
 
   return {
     label: spelledOut(name).slice(0, maxFieldLabelLength).trim(),
-    labelReason: `No known name matches "${name}", so its words are spelled out. Check that this is what it holds.`,
+    labelReason: `No known name matches "${name}", so its words are spelled out.${evidence(values, undefined)} Check that this is what it holds.`,
     labelUnsure: true,
   }
 }
