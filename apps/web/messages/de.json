@@ -2516,23 +2516,12 @@
     "members": {
       "title": "Mitglieder",
       "description": "Alle, die sich in diesem Workspace anmelden können.",
-      "count": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
-      "filteredCount": "{count, plural, one {# von {total} Mitgliedern} other {# von {total} Mitgliedern}}",
-      "search": "Mitglied suchen",
-      "noMatch": "Kein Mitglied passt zu „{search}“.",
       "empty": "Noch niemand hat Zugriff auf diesen Workspace.",
       "askOperator": {
         "title": "Neue Mitglieder fügt der Operator hinzu",
         "admin": "Der Operator erstellt die Einladungen und ändert Rollen. Sagen Sie dem Operator, wer dazukommen soll und ob als Admin oder Viewer.",
         "viewer": "Der Operator fügt Mitglieder hinzu und ändert Rollen. Bitten Sie einen Admin Ihres Unternehmens, sich an den Operator zu wenden."
-      },
-      "you": "Sie",
-      "roles": {
-        "admin": "Admin",
-        "viewer": "Viewer"
-      },
-      "lastActive": "Aktiv {time}",
-      "neverSignedIn": "Nie angemeldet"
+      }
     },
     "data": {
       "setByOperator": {
@@ -2562,6 +2551,19 @@
         "description": "Die KI kann für diesen Arbeitsbereich keine Mappings entwerfen. Alles andere funktioniert weiter."
       }
     }
+  },
+  "Members": {
+    "count": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+    "filteredCount": "{count, plural, one {# von {total} Mitgliedern} other {# von {total} Mitgliedern}}",
+    "search": "Mitglied suchen",
+    "noMatch": "Kein Mitglied passt zu „{search}“.",
+    "you": "Sie",
+    "roles": {
+      "admin": "Admin",
+      "viewer": "Viewer"
+    },
+    "lastActive": "Aktiv {time}",
+    "neverSignedIn": "Nie angemeldet"
   },
   "GlnField": {
     "errors": {
@@ -2699,8 +2701,7 @@
         "description": "Die Mitglieder konnten nicht geladen werden.",
         "retry": "Erneut versuchen"
       },
-      "nobody": "Noch niemand hier. Laden Sie unten das erste Mitglied ein.",
-      "none": "Noch keine Mitglieder. Eingeladene erscheinen hier, sobald sie ihre Einladung annehmen."
+      "empty": "Noch keine Mitglieder. Eingeladene erscheinen hier, sobald sie ihre Einladung annehmen."
     },
     "invites": {
       "title": "Einladungen",
@@ -2721,13 +2722,11 @@
       },
       "status": {
         "accepted": "Angenommen am {date}",
-        "revoked": "Zurückgezogen am {date}",
-        "expired": "Abgelaufen am {date}",
-        "pending": "Gültig bis {date}"
+        "expired": "Abgelaufen am {date}"
       },
       "earlier": {
         "summary": "{count, plural, one {# frühere Einladung} other {# frühere Einladungen}}",
-        "description": "Angenommene, abgelaufene und zurückgezogene Einladungen. Hier ist nichts mehr zu tun."
+        "description": "Angenommene und abgelaufene Einladungen. Hier ist nichts mehr zu tun."
       },
       "revoke": {
         "trigger": "Zurückziehen",

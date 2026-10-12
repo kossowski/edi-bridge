@@ -363,24 +363,11 @@ export const NobodyYet = meta.story({
   },
   async play({ canvas }) {
     await expect(
-      await canvas.findByText('Nobody here yet. Invite the first member below.'),
+      await canvas.findByText('No members yet. People show up here once they accept their invite.'),
     ).toBeVisible()
     await expect(canvas.getByText('No open invites')).toBeVisible()
     await expect(canvas.getByText('Nobody is waiting to join.')).toBeVisible()
     await expect(canvas.queryByText(/earlier invite/)).toBeNull()
-  },
-})
-
-export const OnlyInvitesYet = meta.story({
-  ...membersTab,
-  beforeEach({ msw }) {
-    msw.use(...operatorMocks({ members: [] }))
-  },
-  async play({ canvas }) {
-    await expect(
-      await canvas.findByText('No members yet. People show up here once they accept their invite.'),
-    ).toBeVisible()
-    await expect(await canvas.findByText(pendingEmail)).toBeVisible()
   },
 })
 
@@ -400,12 +387,6 @@ export const ManyMembersAndInvites = meta.story({
         ],
       }),
     )
-  },
-  // Contrast is checked on the same rows in the small stories. Over a large DOM it makes axe
-  // outrun the test timeout on CI, so only the structural rules run here.
-  parameters: {
-    ...membersTab.parameters,
-    a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } },
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('200 members')).toBeVisible()
@@ -511,6 +492,23 @@ export const CreateInviteAndCopyLink = meta.story({
   },
 })
 
+export const CreateInviteDark = meta.story({
+  ...membersTab,
+  beforeEach() {
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await userEvent.type(
+      await canvas.findByRole('textbox', { name: 'Email' }),
+      'ana.berg@nordwind-handel.example',
+    )
+    await userEvent.click(canvas.getByRole('button', { name: 'Create invite link' }))
+    await expect(
+      await canvas.findByText('Invite link for ana.berg@nordwind-handel.example created'),
+    ).toBeVisible()
+  },
+})
+
 export const CopyPendingLink = meta.story({
   ...membersTab,
   beforeEach() {
@@ -569,6 +567,19 @@ export const RevokeConfirmation = meta.story({
     await waitFor(() =>
       expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
     )
+  },
+})
+
+export const RevokeConfirmationDark = meta.story({
+  ...membersTab,
+  beforeEach() {
+    return darkMode()
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Revoke' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await waitFor(() => expect(dialog).toBeVisible())
+    await expect(within(dialog).getByRole('button', { name: 'Revoke invite' })).toBeVisible()
   },
 })
 

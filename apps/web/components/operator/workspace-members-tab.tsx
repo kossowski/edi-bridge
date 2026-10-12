@@ -1,15 +1,14 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { type ReactNode, type RefObject, useId, useRef, useState } from 'react'
 
 import { CopyableValue, CopyButton } from '@/components/copy-button'
 import { Failure, Loading } from '@/components/detail-parts'
 import { RadioField, TextField } from '@/components/form-field'
-import { MemberList } from '@/components/settings/members-tab'
+import { ListNote, MemberList } from '@/components/members/member-list'
 import { SettingsCard } from '@/components/settings/settings-card'
-import { useSession } from '@/hooks/use-session'
 import { useValidatedSubmit } from '@/hooks/use-validated-submit'
 import { createInvite, revokeInvite } from '@/lib/api/client'
 import {
@@ -18,7 +17,7 @@ import {
   storeRevokedInvite,
   workspaceInvitesQuery,
 } from '@/lib/api/queries'
-import { inviteStatus, validateInviteForm } from '@/lib/forms/operator'
+import { inviteStatus, type InviteStatus, validateInviteForm } from '@/lib/forms/operator'
 import {
   type Invite,
   type InviteInput,
@@ -41,41 +40,53 @@ import {
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
 
-function Note({ children }: { children: ReactNode }) {
-  return <p className="text-muted-foreground rounded-lg border p-3 text-sm">{children}</p>
-}
-
 function useDate() {
   const format = useFormatter()
 
   return (value: string) => format.dateTime(new Date(value), { dateStyle: 'medium' })
 }
 
+function CardQuery<Data>({
+  query,
+  namespace,
+  children,
+}: {
+  query: UseQueryResult<Data>
+  namespace: 'Operator.members' | 'Operator.invites'
+  children: (data: Data) => ReactNode
+}) {
+  const t = useTranslations(namespace)
+
+  if (query.isPending) {
+    return <Loading label={t('loading')} rowClassName="h-12" rows={2} />
+  }
+
+  if (query.isError) {
+    return (
+      <Failure
+        error={{
+          title: t('error.title'),
+          description: t('error.description'),
+          retry: t('error.retry'),
+        }}
+        notFound={null}
+        onRetry={() => void query.refetch()}
+      />
+    )
+  }
+
+  return children(query.data)
+}
+
 function Members({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Operator.members')
-  const { session } = useSession()
   const members = useQuery(operatorWorkspaceMembersQuery(workspaceId))
-  const invites = useQuery(workspaceInvitesQuery(workspaceId))
 
   return (
     <SettingsCard description={t('description')} title={t('title')}>
-      {members.isPending ? (
-        <Loading label={t('loading')} rowClassName="h-12" rows={2} />
-      ) : members.isError ? (
-        <Failure
-          error={{
-            title: t('error.title'),
-            description: t('error.description'),
-            retry: t('error.retry'),
-          }}
-          notFound={null}
-          onRetry={() => void members.refetch()}
-        />
-      ) : members.data.length === 0 ? (
-        <Note>{invites.data?.length === 0 ? t('nobody') : t('none')}</Note>
-      ) : (
-        <MemberList members={members.data} userId={session?.user.id} />
-      )}
+      <CardQuery namespace="Operator.members" query={members}>
+        {(data) => <MemberList empty={t('empty')} members={data} />}
+      </CardQuery>
     </SettingsCard>
   )
 }
@@ -191,7 +202,7 @@ function OpenInvite({
   const id = useId()
 
   return (
-    <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-2 py-3 @xl:flex-row @xl:items-center @xl:justify-between">
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
           <span id={id} className="wrap-anywhere">
@@ -219,26 +230,20 @@ function OpenInvite({
   )
 }
 
-function EarlierInvite({ invite, now }: { invite: Invite; now: Date }) {
+type Earlier = { invite: Invite } & Exclude<InviteStatus, { status: 'pending' }>
+
+function EarlierInvite({ invite, status, on }: Earlier) {
   const t = useTranslations('Operator.invites')
   const date = useDate()
-  const status = inviteStatus(invite, now)
-
-  const statusDates = {
-    accepted: invite.acceptedAt,
-    revoked: invite.revokedAt,
-    expired: invite.expiresAt,
-    pending: invite.expiresAt,
-  }
 
   return (
-    <li className="flex flex-col gap-0.5 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+    <li className="flex flex-col gap-0.5 py-2 @xl:flex-row @xl:items-center @xl:justify-between @xl:gap-4">
       <span className="min-w-0 text-sm wrap-anywhere">
         {invite.email}
         <span className="text-muted-foreground"> · {t(`role.${invite.role}`)}</span>
       </span>
       <span className="text-muted-foreground shrink-0 text-xs">
-        {t(`status.${status}`, { date: date(statusDates[status] ?? invite.expiresAt) })}
+        {t(`status.${status}`, { date: date(on) })}
       </span>
     </li>
   )
@@ -324,13 +329,15 @@ function RevokeDialog({
 
 function splitInvites(invites: readonly Invite[], now: Date) {
   const open: Invite[] = []
-  const earlier: Invite[] = []
+  const earlier: Earlier[] = []
 
   for (const invite of invites) {
-    if (inviteStatus(invite, now) === 'pending') {
+    const state = inviteStatus(invite, now)
+
+    if (state.status === 'pending') {
       open.push(invite)
     } else {
-      earlier.push(invite)
+      earlier.push({ invite, ...state })
     }
   }
 
@@ -361,9 +368,9 @@ function InviteLists({ invites }: { invites: readonly Invite[] }) {
         {revoked && t('revoke.done', { email: revoked.email })}
       </p>
       {open.length === 0 ? (
-        <Note>{t('empty')}</Note>
+        <ListNote>{t('empty')}</ListNote>
       ) : (
-        <ul aria-labelledby={listId} className="divide-y border-y">
+        <ul aria-labelledby={listId} className="@container divide-y border-y">
           {open.map((invite) => (
             <OpenInvite
               key={invite.id}
@@ -384,9 +391,9 @@ function InviteLists({ invites }: { invites: readonly Invite[] }) {
           </summary>
           <div className="flex flex-col gap-2 border-t px-3 pt-2 pb-1">
             <p className="text-muted-foreground text-sm">{t('earlier.description')}</p>
-            <ul className="divide-y">
-              {earlier.map((invite) => (
-                <EarlierInvite key={invite.id} invite={invite} now={now} />
+            <ul className="@container divide-y">
+              {earlier.map((entry) => (
+                <EarlierInvite key={entry.invite.id} {...entry} />
               ))}
             </ul>
           </div>
@@ -414,21 +421,9 @@ function Invites({ workspaceId }: { workspaceId: string }) {
 
   return (
     <SettingsCard description={t('description')} title={t('title')}>
-      {invites.isPending ? (
-        <Loading label={t('loading')} rowClassName="h-12" rows={2} />
-      ) : invites.isError ? (
-        <Failure
-          error={{
-            title: t('error.title'),
-            description: t('error.description'),
-            retry: t('error.retry'),
-          }}
-          notFound={null}
-          onRetry={() => void invites.refetch()}
-        />
-      ) : (
-        <InviteLists invites={invites.data} />
-      )}
+      <CardQuery namespace="Operator.invites" query={invites}>
+        {(data) => <InviteLists invites={data} />}
+      </CardQuery>
     </SettingsCard>
   )
 }
