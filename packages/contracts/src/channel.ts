@@ -257,3 +257,44 @@ export const regenerateWebhookTokenEndpoint: Endpoint<
   path: '/channels/:id/webhook-token',
   response: regeneratedWebhookTokenSchema,
 }
+
+export const channelTestFailureReasons = [
+  'loginRejected',
+  'hostUnreachable',
+  'timedOut',
+  'remotePathMissing',
+  'permissionDenied',
+  'unexpectedResponse',
+] as const
+
+export const channelTestFailureReasonSchema = z.enum(channelTestFailureReasons)
+
+export type ChannelTestFailureReason = z.infer<typeof channelTestFailureReasonSchema>
+
+export const channelTestFailureReasonsByType = {
+  sftp: ['loginRejected', 'hostUnreachable', 'timedOut', 'remotePathMissing', 'permissionDenied'],
+  webhook: [],
+  http: ['loginRejected', 'hostUnreachable', 'timedOut', 'unexpectedResponse'],
+} as const satisfies Record<ChannelType, ReadonlyArray<ChannelTestFailureReason>>
+
+export const channelTestResultSchema = z.discriminatedUnion('outcome', [
+  z.object({ outcome: z.literal('succeeded'), testedAt: z.iso.datetime() }),
+  z.object({
+    outcome: z.literal('failed'),
+    reason: channelTestFailureReasonSchema,
+    testedAt: z.iso.datetime(),
+  }),
+])
+
+export type ChannelTestResult = z.infer<typeof channelTestResultSchema>
+
+export const testChannelEndpoint: Endpoint<
+  ChannelTestResult,
+  undefined,
+  undefined,
+  '/channels/:id/test'
+> = {
+  method: 'POST',
+  path: '/channels/:id/test',
+  response: channelTestResultSchema,
+}
