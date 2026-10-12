@@ -225,6 +225,19 @@
       },
       "alert": "Needs you"
     },
+    "promo": {
+      "title": "Let the AI draft your next mapping",
+      "description": "It reads an example order, links each field to the EDI document your partner expects, and you check every link before anything goes live.",
+      "button": "Draft a mapping with AI",
+      "sketch": {
+        "orderNumber": "Order number",
+        "customer": "Customer",
+        "deliveryDate": "Delivery date",
+        "itemCode": "Item code",
+        "lookUpPartner": "Look up partner ID",
+        "changeDateFormat": "Change date format"
+      }
+    },
     "series": {
       "delivered": "Delivered",
       "failed": "Failed",

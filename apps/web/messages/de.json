@@ -225,6 +225,19 @@
       },
       "alert": "Braucht Sie"
     },
+    "promo": {
+      "title": "Lassen Sie die KI Ihr nächstes Mapping entwerfen",
+      "description": "Sie liest eine Beispielbestellung, verknüpft jedes Feld mit dem EDI-Beleg, den Ihr Partner erwartet, und Sie prüfen jede Verknüpfung, bevor etwas live geht.",
+      "button": "Mapping mit KI entwerfen",
+      "sketch": {
+        "orderNumber": "Bestellnummer",
+        "customer": "Kunde",
+        "deliveryDate": "Liefertermin",
+        "itemCode": "Artikelnummer",
+        "lookUpPartner": "Partner-ID suchen",
+        "changeDateFormat": "Datum umformen"
+      }
+    },
     "series": {
       "delivered": "Zugestellt",
       "failed": "Fehlgeschlagen",

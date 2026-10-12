@@ -2,6 +2,7 @@ import { type SetupWorker } from 'msw/browser'
 import { expect, userEvent, within } from 'storybook/test'
 
 import { HomeScreen } from '@/components/home/home-screen'
+import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
 import { everyKind, hansemarkt } from '@/components/tasks/task-story-helpers'
 import { apiUrl } from '@/lib/api/config'
@@ -31,7 +32,20 @@ export const Seeded = meta.story({
     msw.use(homeHandler(apiUrl))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('heading', { name: 'Documents' })).toBeVisible()
+    const documents = await canvas.findByRole('heading', { name: 'Documents' })
+    const promo = await canvas.findByRole('region', { name: 'Let the AI draft your next mapping' })
+
+    await expect(documents).toBeVisible()
+    await expect(
+      within(promo).getByRole('button', { name: 'Draft a mapping with AI' }),
+    ).toBeEnabled()
+    await expect(
+      canvas.getByRole('region', { name: 'Key numbers' }).compareDocumentPosition(promo) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    await expect(
+      promo.compareDocumentPosition(documents) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     await expect(canvas.getByRole('heading', { name: 'Share that failed' })).toBeVisible()
     await expect(canvas.getByText('Show values as table')).toBeVisible()
     await expect(canvas.getByRole('heading', { name: 'Your trading partners' })).toBeVisible()
@@ -66,6 +80,16 @@ export const KeyNumbers = meta.story({
       tradingPartners.getByRole('link', { name: /^Hansemarkt GmbH\s*Live.*4 open problems$/ }),
     ).toHaveAttribute('href', `/trading-partners/${hansemarkt.id}`)
   },
+})
+
+export const Viewer = meta.story({
+  ...viewerStory({
+    handlers: [homeHandler(apiUrl)],
+    async play({ canvas }) {
+      await expect(await canvas.findByRole('heading', { name: 'Documents' })).toBeVisible()
+      await expect(canvas.queryByRole('button', { name: 'Draft a mapping with AI' })).toBeNull()
+    },
+  }),
 })
 
 export const SwitchWindow = meta.story({
@@ -161,6 +185,9 @@ export const German = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByRole('heading', { name: 'Belege' })).toBeVisible()
     await expect(canvas.getByRole('heading', { name: 'Ihre Handelspartner' })).toBeVisible()
+    await expect(
+      await canvas.findByRole('button', { name: 'Mapping mit KI entwerfen' }),
+    ).toBeVisible()
     await expect(
       canvas.getByRole('link', { name: /^Handlungsbedarf\s*Braucht Sie\s*3/ }),
     ).toHaveAttribute('href', '/tasks#for-you')
