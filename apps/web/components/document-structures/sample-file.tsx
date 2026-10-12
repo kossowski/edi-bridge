@@ -292,3 +292,17 @@ export function SampleFile({
     </figure>
   )
 }
+
+export function scrollToValue(container: HTMLElement | null, path: string) {
+  const values = [...(container?.querySelectorAll('[data-sample-value]') ?? [])]
+  const first = values.find((value) => pathWithin(value.getAttribute('data-path') ?? '', path))
+
+  first?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+
+export function scrollToField(list: HTMLElement | null, path: string) {
+  list
+    ?.querySelector(`[data-path="${CSS.escape(path)}"]`)
+    ?.closest('li')
+    ?.scrollIntoView({ block: 'nearest' })
+}

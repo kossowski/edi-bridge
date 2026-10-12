@@ -24,8 +24,6 @@ export function decodeBase64(content: string) {
 
 export type FileProblem = 'empty' | 'tooLarge'
 
-export type FileError = FileProblem | 'fileRequired'
-
 export function fileProblem(size: number): FileProblem | null {
   if (size === 0) {
     return 'empty'
@@ -50,12 +48,12 @@ export async function encodeFile(file: File): Promise<ChosenFile> {
 }
 
 export type FileMessage = {
-  key: FileError | 'unreadable' | 'unreadableCsv'
+  key: FileProblem | 'unreadable' | 'unreadableCsv'
   invalid: boolean
 }
 
 export function fileMessageOf(
-  fileError: FileError | null,
+  fileError: FileProblem | null,
   unreadable: boolean,
   csv: boolean,
 ): FileMessage | null {

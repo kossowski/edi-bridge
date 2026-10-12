@@ -11,12 +11,12 @@ import { AppPage } from '@/components/app-page'
 import { Fact, FactGrid, LoadFailure, Loading } from '@/components/detail-parts'
 import { fieldEntries, FieldList } from '@/components/document-structures/field-list'
 import { type Mappings, UsedByMappings } from '@/components/document-structures/mapping-list'
-import { SampleFile } from '@/components/document-structures/sample-file'
 import {
-  firstValues,
-  pathWithin,
-  sampleContent,
-} from '@/components/document-structures/sample-segments'
+  SampleFile,
+  scrollToField,
+  scrollToValue,
+} from '@/components/document-structures/sample-file'
+import { firstValues, sampleContent } from '@/components/document-structures/sample-segments'
 import { leafCount } from '@/components/document-structures/structure-tree'
 import { TechnicalSettings } from '@/components/document-structures/technical-settings'
 import { useSession } from '@/hooks/use-session'
@@ -31,20 +31,6 @@ function useMappings(id: string): Mappings | undefined {
   const summaries = useQuery(documentStructuresQuery)
 
   return summaries.data?.find((summary) => summary.id === id)?.mappings
-}
-
-function scrollToValue(container: HTMLElement | null, path: string) {
-  const values = [...(container?.querySelectorAll('[data-sample-value]') ?? [])]
-  const first = values.find((value) => pathWithin(value.getAttribute('data-path') ?? '', path))
-
-  first?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-}
-
-function scrollToField(list: HTMLElement | null, path: string) {
-  list
-    ?.querySelector(`[data-path="${CSS.escape(path)}"]`)
-    ?.closest('li')
-    ?.scrollIntoView({ block: 'nearest' })
 }
 
 function Facts({
@@ -108,7 +94,7 @@ function StructurePage({
   const valuesRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const { sample } = structure
-  const entries = useMemo(() => fieldEntries(structure), [structure])
+  const entries = useMemo(() => fieldEntries(structure.children), [structure])
   const [selected, setSelected] = useState(() => entries[0]?.node.path ?? null)
 
   const labels = useMemo(

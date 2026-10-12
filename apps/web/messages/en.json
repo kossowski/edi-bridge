@@ -3138,46 +3138,100 @@
   },
   "DocumentStructureForm": {
     "createTitle": "New data format",
-    "origin": {
-      "label": "Create from",
-      "description": "EDI Bridge infers the fields, their nesting and repetitions from the file.",
-      "kinds": {
-        "jsonDocument": "A JSON Document",
-        "csvDocument": "A CSV Document",
-        "jsonSchema": "A JSON Schema"
+    "drop": {
+      "title": "Drop an export from your ERP",
+      "description": "A CSV or JSON file your ERP writes or reads, at most 5 MB. EDI Bridge reads it and names every field in plain words. You check the names it is unsure about.",
+      "choose": "Or choose a file"
+    },
+    "reading": {
+      "title": "Reading {fileName}",
+      "steps": {
+        "opening": "Opening the file",
+        "finding": {
+          "csv": "Finding the columns",
+          "json": "Finding the fields"
+        },
+        "naming": "Naming the fields in plain words"
+      },
+      "states": {
+        "done": "done",
+        "active": "in progress",
+        "pending": "not started"
+      },
+      "facts": {
+        "columns": "Found {count, plural, one {# column} other {# columns}}, separated by {delimiter, select, comma {commas} semicolon {semicolons} tab {tabs} other {pipes}}",
+        "rows": "{count, plural, one {# row} other {# rows}} read",
+        "fields": "{count, plural, one {# field} other {# fields}} found",
+        "names": "{count, plural, =0 {Every name is clear} one {# name to check} other {# names to check}}"
       }
+    },
+    "failed": {
+      "title": "{fileName} could not be read",
+      "message": "The file could not be read. Try again.",
+      "retry": "Try again",
+      "csvHint": "If the file is fine, it may need other CSV settings, such as another delimiter or character encoding.",
+      "csvSettings": "Change the CSV settings"
+    },
+    "anotherFile": "Use another file",
+    "review": {
+      "title": "Fields read from {fileName}",
+      "titleNoSample": "Fields read from the JSON Schema",
+      "fields": "{count, plural, one {# field found} other {# fields found}}",
+      "toCheck": "{count, plural, one {# name to check} other {# names to check}}",
+      "allChecked": "All names checked",
+      "fieldsLabel": "Fields"
+    },
+    "field": {
+      "from": "from <code>{name}</code>",
+      "noReason": "EDI Bridge could not tell what this field holds.",
+      "confirm": "Yes, “{label}” is right",
+      "rename": {
+        "label": "Or type a better name for {name}",
+        "submit": "Use this name",
+        "required": "Enter a name."
+      },
+      "confirmed": "You confirmed this name.",
+      "renamed": "You named this field.",
+      "change": "Change",
+      "changeLabel": "Change “{label}”",
+      "announce": {
+        "confirmed": "“{label}” confirmed.",
+        "renamed": "Renamed to “{label}”.",
+        "left": "{count, plural, =0 {Every name is checked.} one {# name left to check.} other {# names left to check.}}"
+      }
+    },
+    "name": {
+      "label": "Name of this data format",
+      "description": "Shown in your data formats and when you create a Mapping."
+    },
+    "save": {
+      "submit": "Save data format",
+      "saving": "Saving…",
+      "checkNames": "{count, plural, one {Check the last name first} other {Check # names first}}",
+      "nameFirst": "Name the format first",
+      "failed": "The data format could not be saved. Try again."
+    },
+    "technical": {
+      "title": "Technical options",
+      "description": "Start from a JSON Schema instead, or change how CSV files are read.",
+      "jsonSchema": {
+        "title": "Create from a JSON Schema instead",
+        "label": "JSON Schema",
+        "description": "The JSON Schema your system provides, at most 5 MB. It has no example values, so the fields are shown without them."
+      },
+      "csvDescription": "EDI Bridge reads CSV files with these settings. Changing one reads the file again."
     },
     "file": {
       "label": "File",
       "description": "A sample Document from your own systems, or the JSON Schema they provide. At most 5 MB.",
       "drop": "Drop the file here or choose it."
     },
-    "name": {
-      "label": "Name",
-      "description": "Shown in the Mapping list and on the mapping canvas."
-    },
-    "preview": {
-      "title": "Preview",
-      "description": "The Document Structure EDI Bridge infers from the file. Nothing is saved until you create it.",
-      "none": "Choose a file to see the Document Structure EDI Bridge infers from it.",
-      "loading": "Reading the file…",
-      "fields": "{count, plural, one {# field} other {# fields}}",
-      "failed": "The file could not be read. Try again.",
-      "retry": "Try again",
-      "adjustLater": "After creating it, you can mark fields as optional or repeating and adjust their types."
-    },
-    "create": "Create Document Structure",
-    "creating": "Creating…",
-    "failed": "The Document Structure could not be created. Try again.",
     "errors": {
-      "nameRequired": "Enter a name.",
-      "fileRequired": "Choose a file.",
       "empty": "The file is empty.",
       "tooLarge": "The file is too large. It can have at most 5 MB.",
       "unreadable": "Fix the problem in the file or choose another one.",
       "unreadableCsv": "Adjust the CSV settings, fix the problem in the file, or choose another one."
-    },
-    "csvDescription": "EDI Bridge reads the CSV Document with these settings. The preview follows each change."
+    }
   },
   "DocumentStructureTree": {
     "label": "Fields of {name}",

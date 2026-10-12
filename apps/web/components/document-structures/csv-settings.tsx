@@ -27,7 +27,7 @@ import {
   TableRow,
 } from '@edi-bridge/ui/components/table'
 
-const delimiterKeys = {
+export const delimiterKeys = {
   ',': 'comma',
   ';': 'semicolon',
   '\t': 'tab',

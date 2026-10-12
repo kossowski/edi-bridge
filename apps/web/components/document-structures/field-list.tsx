@@ -24,14 +24,14 @@ import { Button } from '@edi-bridge/ui/components/button'
 
 export type FieldEntry = { node: DocumentStructureNode; depth: number }
 
-export function fieldEntries(structure: DocumentStructure): FieldEntry[] {
-  return [...documentStructureNodes(structure.children)].map(({ node, ancestors }) => ({
+export function fieldEntries(children: ReadonlyArray<DocumentStructureNode>): FieldEntry[] {
+  return [...documentStructureNodes(children)].map(({ node, ancestors }) => ({
     node,
     depth: ancestors.length,
   }))
 }
 
-function UnsureBadge() {
+export function UnsureBadge() {
   const t = useTranslations('DocumentStructure.fieldList')
 
   return (
