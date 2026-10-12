@@ -21,6 +21,7 @@ import {
 } from '@/components/mappings/ai-draft-run'
 import { AiDraftSamplePicker } from '@/components/mappings/ai-draft-sample-picker'
 import { useSideTitle } from '@/components/mappings/mapping-side'
+import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { type AiDraftRunControls } from '@/components/mappings/use-ai-draft-run'
 import { aiBudgetQuery, mappingSamplesQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
@@ -211,26 +212,22 @@ function AiDraftDialogBody({
   )
 }
 
-function ActionLabel({ run }: { run: AiDraftRun }) {
+function useActionLabel(run: AiDraftRun) {
   const t = useTranslations('Mapping.aiDraft')
 
   if (run.status === 'running') {
     const step = run.steps.at(-1)?.kind ?? 'starting'
 
-    return (
-      <>
-        <StepIcon state="current" />
-        {t('running', { step: t(`stepShort.${step}`) })}
-      </>
-    )
+    return {
+      icon: <StepIcon state="current" />,
+      label: t('running', { step: t(`stepShort.${step}`) }),
+    }
   }
 
-  return (
-    <>
-      <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} aria-hidden />
-      {isEnded(run) ? t('ended') : t('button')}
-    </>
-  )
+  return {
+    icon: <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} aria-hidden />,
+    label: isEnded(run) ? t('ended') : t('button'),
+  }
 }
 
 export function AiDraftAction({
@@ -251,6 +248,7 @@ export function AiDraftAction({
   const outcomeRef = useRef<HTMLHeadingElement>(null)
   const { run } = aiDraft
   const { phase } = runPresentation(run)
+  const action = useActionLabel(run)
 
   function changeOpen(next: boolean) {
     if (!next) {
@@ -269,18 +267,23 @@ export function AiDraftAction({
   const reviewBlocks = phase === 'choosing' && draft.aiReview !== null
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-2">
       <p role="status" className="sr-only">
         {!open && isEnded(run) && run !== seenRun ? outcomeDescription(run) : ''}
       </p>
-      <Button
-        disabled={reviewBlocks}
-        focusableWhenDisabled
-        variant="outline"
-        aria-describedby={reviewBlocks ? reviewSummaryId : undefined}
-        onClick={() => changeOpen(true)}>
-        <ActionLabel run={run} />
-      </Button>
+      <ToolbarAction
+        icon={action.icon}
+        label={action.label}
+        render={
+          <Button
+            disabled={reviewBlocks}
+            focusableWhenDisabled
+            variant="outline"
+            aria-describedby={reviewBlocks ? reviewSummaryId : undefined}
+            onClick={() => changeOpen(true)}
+          />
+        }
+      />
       <Dialog open={open} onOpenChange={changeOpen} onOpenChangeComplete={afterOpenChange}>
         <DialogContent
           closeLabel={t('closeDialog')}

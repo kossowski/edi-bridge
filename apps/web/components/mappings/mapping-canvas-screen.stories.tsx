@@ -159,10 +159,12 @@ function overlaps(a: DOMRect, b: DOMRect) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
 }
 
-async function expectClearTargets(canvasElement: HTMLElement, zoom: string) {
+async function expectClearTargets(canvasElement: HTMLElement, zoom?: string) {
   const viewport = canvasElement.querySelector<HTMLElement>('.react-flow__viewport')!
 
-  await waitFor(() => expect(viewport.style.transform).toContain(`scale(${zoom})`))
+  await waitFor(() =>
+    expect(viewport.style.transform).toContain(zoom === undefined ? 'scale(' : `scale(${zoom})`),
+  )
 
   for (const toggle of canvasElement.querySelectorAll('.react-flow__node button')) {
     const { width, height } = toggle.getBoundingClientRect()
@@ -197,7 +199,16 @@ export const Desktop = meta.story({
   globals: { viewport: { value: 'desktop', isRotated: false } },
   async play({ canvas, canvasElement }) {
     await canvas.findByRole('button', { name: 'Collapse DTM+137' })
-    await expectClearTargets(canvasElement, '1')
+    await expectClearTargets(canvasElement)
+
+    // The first view fits both trees into the pane beside the Transforms.
+    const pane = canvasElement.querySelector('.react-flow')!.getBoundingClientRect()
+
+    const targetHeading = canvasElement
+      .querySelector('.react-flow__node[data-id="target:heading"]')!
+      .getBoundingClientRect()
+
+    await expect(targetHeading.right).toBeLessThanOrEqual(pane.right)
   },
 })
 
@@ -218,7 +229,7 @@ export const MinimumZoom = meta.story({
   ],
   async play({ canvas, canvasElement }) {
     await canvas.findByRole('button', { name: 'Collapse DTM+137' })
-    await expectClearTargets(canvasElement, '0.85')
+    await expectClearTargets(canvasElement, '0.82')
   },
 })
 
@@ -435,11 +446,10 @@ export const German = meta.story({
     ).toBeInTheDocument()
 
     const row = await findRow(canvasElement, { side: 'source', path: 'DTM+137' })
+    const panel = await openDetails(canvasElement)
 
+    await expect(panel.getByText('Eingehend: Message Type zu Document Structure')).toBeVisible()
     await userEvent.click(row)
-
-    const panel = await detailsPanel(canvasElement, 'Details')
-
     await expect(panel.getByText('Quelle')).toBeVisible()
     await expect(panel.getByText('Dokumenten-/Nachrichtendatum/-zeit')).toBeVisible()
     await expect(panel.getByText('Muss')).toBeVisible()
@@ -471,15 +481,8 @@ export const German = meta.story({
       await canvas.findByRole('button', { name: 'Verknüpfung entfernen: BGM/1004 zu orderNumber' }),
     ).toBeVisible()
 
+    // Open, the details cover part of the canvas; closed, every part is in reach again.
     await userEvent.click(panel.getByRole('button', { name: 'Details schließen' }))
-    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
-
-    const details = await openDetails(canvasElement)
-
-    await expect(details.getByText('Eingehend: Message Type zu Document Structure')).toBeVisible()
-
-    // Open, the sheet covers part of the canvas; closed, every part is in reach again.
-    await userEvent.click(details.getByRole('button', { name: 'Details schließen' }))
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
   },
 })
@@ -495,11 +498,10 @@ export const Dark = meta.story({
     await expect(await canvas.findByText('despatchNumber')).toBeVisible()
 
     const row = await findRow(canvasElement, { side: 'target', path: 'DTM+137' })
+    const details = await openDetails(canvasElement)
 
     await userEvent.click(row)
-    await expect(
-      (await detailsPanel(canvasElement)).getByText('Document/message date/time'),
-    ).toBeVisible()
+    await expect(details.getByText('Document/message date/time')).toBeVisible()
     await userEvent.hover(row)
     await findTooltip(canvasElement)
 
@@ -544,6 +546,7 @@ export const KeyboardFocusMeaning = meta.story({
   args: { id: inbound.id },
   async play({ canvas, canvasElement }) {
     const row = await findRow(canvasElement, { side: 'source', path: 'DTM+137' })
+    const details = await openDetails(canvasElement)
 
     canvas.getByRole('button', { name: 'Collapse DTM+137' }).focus()
     await userEvent.tab()
@@ -554,9 +557,7 @@ export const KeyboardFocusMeaning = meta.story({
 
     await userEvent.keyboard('{Enter}')
     await expect(row).toHaveAttribute('aria-pressed', 'true')
-    await expect(
-      (await detailsPanel(canvasElement)).getByText('Document/message date/time'),
-    ).toBeVisible()
+    await expect(details.getByText('Document/message date/time')).toBeVisible()
 
     await userEvent.tab({ shift: true })
     await userEvent.tab()
@@ -569,7 +570,7 @@ export const KeyboardFocusMeaning = meta.story({
 
     await userEvent.keyboard('{Escape}')
     await expect(row).toHaveAttribute('aria-pressed', 'false')
-    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
+    await expect(details.getByText(/^Select a part/)).toBeVisible()
 
     await userEvent.keyboard(' ')
     await expect(row).toHaveAttribute('aria-pressed', 'true')
@@ -585,8 +586,9 @@ export const SelectedRow = meta.story({
 
     await userEvent.click(row)
     await expect(row).toHaveAttribute('aria-pressed', 'true')
+    await expect(page(canvasElement).queryByRole('dialog')).toBeNull()
 
-    const panel = await detailsPanel(canvasElement)
+    const panel = await openDetails(canvasElement)
 
     await expect(panel.getByText('Document/message date/time')).toBeVisible()
     await expect(panel.getByText('Source')).toBeVisible()
@@ -620,7 +622,7 @@ export const QualifiedGroup = meta.story({
 
     await userEvent.click(await findRow(canvasElement, { side: 'source', path: 'SG2+BY/NAD+BY' }))
 
-    const panel = await detailsPanel(canvasElement)
+    const panel = await openDetails(canvasElement)
 
     await expect(panel.getByText('NAD+BY')).toBeVisible()
     await expect(panel.getByText('Buyer')).toBeVisible()
@@ -634,7 +636,7 @@ export const CodedElement = meta.story({
       await findRow(canvasElement, { side: 'source', path: 'DTM+137/C507/2379' }),
     )
 
-    const panel = await detailsPanel(canvasElement)
+    const panel = await openDetails(canvasElement)
 
     await expect(panel.getByText('Date/time/period format qualifier')).toBeVisible()
     await expect(
@@ -680,7 +682,7 @@ export const DrawLinkByKeyboard = meta.story({
 
     await pressOn(from, '{Enter}')
 
-    const panel = await detailsPanel(canvasElement)
+    const panel = await openDetails(canvasElement)
 
     await expect(panel.getByText('Shortcut: press L', { exact: false })).toBeVisible()
     await pressOn(panel.getByRole('button', { name: 'Link from here' }), '{Enter}')
@@ -776,7 +778,7 @@ export const RemoveLinkByKeyboard = meta.story({
 
     await pressOn(row, '{Enter}')
 
-    const panel = await detailsPanel(canvasElement)
+    const panel = await openDetails(canvasElement)
 
     await pressOn(
       panel.getByRole('button', { name: 'Remove link from despatchNumber to BGM/1004' }),
@@ -898,13 +900,7 @@ export const DragOntoLinkedTarget = meta.story({
     await pressOn(await findRow(canvasElement, linked), 'l')
     await waitFor(() => expect(canvas.getByRole('alert')).toHaveTextContent('already linked'))
 
-    // Closing the Details sheet that the started link opened ends the link and the selection, so
-    // the sheet no longer covers the targets.
-    await userEvent.click(
-      (await detailsPanel(canvasElement)).getByRole('button', { name: 'Close details' }),
-    )
-    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
-    await expect(canvas.getByRole('alert')).toHaveTextContent('already linked')
+    await expect(page(canvasElement).queryByRole('dialog')).toBeNull()
 
     // A new drag clears the problem of the attempt before it.
     await startDrag(canvasElement, source('despatchDate'))
@@ -964,7 +960,7 @@ export const TargetAlreadyLinked = meta.story({
     ).toBeNull()
     await expectSavedLinkCount(outbound.id, 30)
     await expect(
-      (await detailsPanel(canvasElement)).getByText('Linking from despatchDate.', { exact: false }),
+      (await openDetails(canvasElement)).getByText('Linking from despatchDate.', { exact: false }),
     ).toBeVisible()
   },
 })

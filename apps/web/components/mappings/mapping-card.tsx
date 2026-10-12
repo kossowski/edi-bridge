@@ -1,12 +1,6 @@
 'use client'
 
-import {
-  AiMagicIcon,
-  Alert02Icon,
-  CheckmarkCircle02Icon,
-  DashedLineCircleIcon,
-  PencilEdit02Icon,
-} from '@hugeicons/core-free-icons'
+import { AiMagicIcon, Alert02Icon, PencilEdit02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
@@ -15,8 +9,8 @@ import { useId } from 'react'
 import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
 import { DirectionPath } from '@/components/mappings/direction-path'
 import { mappingState, type MappingState } from '@/components/mappings/mapping-state'
+import { StateBadge } from '@/components/mappings/state-badge'
 import { usePlainNames } from '@/components/plain-names'
-import { Badge } from '@edi-bridge/ui/components/badge'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@edi-bridge/ui/components/card'
 import { cn } from '@edi-bridge/ui/lib/utils'
@@ -46,38 +40,7 @@ function useMappingTitle(mapping: MappingSummary) {
 export function MappingStateBadge({ state }: { state: MappingState }) {
   const t = useTranslations('Mappings.state')
 
-  switch (state) {
-    case 'failing':
-      return (
-        <Badge variant="outline" className="bg-red-500/10 text-red-800 dark:text-red-300">
-          <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} aria-hidden />
-          {t('failing')}
-        </Badge>
-      )
-    case 'draft':
-      return (
-        <Badge variant="outline" className="bg-amber-500/10 text-amber-800 dark:text-amber-300">
-          <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
-          {t('draft')}
-        </Badge>
-      )
-    case 'new':
-      return (
-        <Badge variant="outline">
-          <HugeiconsIcon icon={DashedLineCircleIcon} strokeWidth={2} aria-hidden />
-          {t('new')}
-        </Badge>
-      )
-    case 'live':
-      return (
-        <Badge
-          variant="outline"
-          className="bg-emerald-500/10 text-emerald-800 dark:text-emerald-300">
-          <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} aria-hidden />
-          {t('live')}
-        </Badge>
-      )
-  }
+  return <StateBadge state={state}>{t(state)}</StateBadge>
 }
 
 function StatusLine({ mapping, state }: { mapping: MappingSummary; state: MappingState }) {

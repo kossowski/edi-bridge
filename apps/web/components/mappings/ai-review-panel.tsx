@@ -13,9 +13,11 @@ import {
   type ProposedChain,
   reviewAttention,
 } from '@/components/mappings/ai-review-attention'
+import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { useGraphText } from '@/components/mappings/graph-text'
-import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
+import { useCanvasRefs, useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
 import { PreviewFailure } from '@/components/mappings/mapping-preview-panel'
+import { useSide } from '@/components/mappings/mapping-side'
 import { findItem, type TreeItem } from '@/components/mappings/mapping-tree'
 import { findTransformButton } from '@/components/mappings/transform-node'
 import { findRowButton } from '@/components/mappings/tree-node'
@@ -30,13 +32,15 @@ import {
 } from '@edi-bridge/contracts'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Button } from '@edi-bridge/ui/components/button'
+import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
 
 // The canvas pans the focused part into view itself, so the page does not scroll to it.
 function focusWhenShown(find: () => HTMLElement | null | undefined) {
-  whenRendered(
-    () => Boolean(find()),
-    () => find()?.focus({ preventScroll: true }),
-  )
+  return () =>
+    whenRendered(
+      () => Boolean(find()),
+      () => find()?.focus({ preventScroll: true }),
+    )
 }
 
 function TargetName({ item, path }: { item: TreeItem | undefined; path: string }) {
@@ -116,22 +120,21 @@ function AttentionGroup({
   )
 }
 
-export function AiReviewPanel({
+function AiReviewPanel({
   draft,
   review,
   targetItems,
-  id,
+  onShow,
 }: {
   draft: MappingDraft
   review: AiReview
   targetItems: ReadonlyArray<TreeItem>
-  id: string
+  onShow: (focus: () => void) => void
 }) {
   const t = useTranslations('Mapping.aiReview.panel')
   const tNotes = useTranslations('Mapping.preview.notes')
-  const headingId = useId()
   const otherId = useId()
-  const ref = useRef<HTMLElement>(null)
+  const refs = useCanvasRefs()
   const store = useCanvasStoreApi()
   const marks = useAiMarks()
   const [showOther, setShowOther] = useState(false)
@@ -149,28 +152,31 @@ export function AiReviewPanel({
 
   const itemOf = (path: string) => findItem(targetItems, path)
 
-  const canvas = () => ref.current?.closest<HTMLElement>('[data-mapping-canvas]')
-
   const showTarget = (path: string) => {
-    const { expand, select } = store.getState()
+    const { expand, select, openDetails } = store.getState()
     const row = { side: 'target' as const, path }
 
     expand('target', ancestorPaths(targetItems, path))
     select(row)
-    focusWhenShown(() => {
-      const root = canvas()
+    openDetails()
+    onShow(
+      focusWhenShown(() => {
+        const root = refs.canvas.current
 
-      return root && findRowButton(root, row)
-    })
+        return root && findRowButton(root, row)
+      }),
+    )
   }
 
   const showTransform = (transformId: string) => {
     store.getState().selectTransform(transformId)
-    focusWhenShown(() => {
-      const root = canvas()
+    onShow(
+      focusWhenShown(() => {
+        const root = refs.canvas.current
 
-      return root && findTransformButton(root, { kind: 'header', transformId })
-    })
+        return root && findTransformButton(root, { kind: 'header', transformId })
+      }),
+    )
   }
 
   const transformText = (transformId: string) => {
@@ -230,92 +236,118 @@ export function AiReviewPanel({
   }
 
   return (
-    <section
-      id={id}
-      ref={ref}
-      tabIndex={-1}
-      aria-labelledby={headingId}
-      className="bg-card focus-visible:ring-ring/50 flex min-h-0 w-80 shrink-0 flex-col rounded-lg border outline-none focus-visible:ring-3 xl:w-96">
-      <div className="flex min-h-11 shrink-0 items-center px-4 py-1.5">
-        <h2 id={headingId} className="text-sm font-semibold">
-          {t('title')}
-        </h2>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border-t px-2 py-3">
-        <p className="text-muted-foreground px-2 text-sm">{t('description')}</p>
-        <AttentionGroup
-          count={attention.unmapped.length}
-          empty={t('unmapped.empty')}
-          title={t('unmapped.title')}>
-          {attention.unmapped.map((item) => (
-            <AttentionItem key={item.path} onActivate={() => showTarget(item.path)}>
-              <TargetName item={item} path={item.path} />
-              <AttentionDetail>{t('unmapped.detail')}</AttentionDetail>
-            </AttentionItem>
-          ))}
-        </AttentionGroup>
-        <AttentionGroup
-          count={attention.chains.length}
-          empty={t('transforms.empty')}
-          title={t('transforms.title')}>
-          {attention.chains.map((chain) => {
-            const [first] = chain.transformIds
+    <>
+      <AttentionGroup
+        count={attention.unmapped.length}
+        empty={t('unmapped.empty')}
+        title={t('unmapped.title')}>
+        {attention.unmapped.map((item) => (
+          <AttentionItem key={item.path} onActivate={() => showTarget(item.path)}>
+            <TargetName item={item} path={item.path} />
+            <AttentionDetail>{t('unmapped.detail')}</AttentionDetail>
+          </AttentionItem>
+        ))}
+      </AttentionGroup>
+      <AttentionGroup
+        count={attention.chains.length}
+        empty={t('transforms.empty')}
+        title={t('transforms.title')}>
+        {attention.chains.map((chain) => {
+          const [first] = chain.transformIds
 
-            return (
-              <AttentionItem
-                key={chain.targetPath ?? chain.transformIds.join()}
-                onActivate={first === undefined ? undefined : () => showTransform(first)}>
-                {chain.targetPath !== null ? (
-                  <TargetName item={itemOf(chain.targetPath)} path={chain.targetPath} />
-                ) : (
-                  first !== undefined && <span className="font-medium">{text.name(first)}</span>
-                )}
-                <AttentionDetail>{chainDetail(chain)}</AttentionDetail>
-              </AttentionItem>
-            )
-          })}
-        </AttentionGroup>
-        <AttentionGroup
-          busy={updating}
-          count={attention.warnings?.length ?? null}
-          empty={sample ? t('warnings.empty', { name: sample.name }) : t('warnings.emptyUnnamed')}
-          title={t('warnings.title')}>
-          {warnings()}
-        </AttentionGroup>
-        {attention.plain.length > 0 && (
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-medium">
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-controls={otherId}
-                aria-expanded={showOther}
-                className="gap-2"
-                onClick={() => setShowOther((shown) => !shown)}>
-                <HugeiconsIcon
-                  icon={showOther ? ArrowDown01Icon : ArrowRight01Icon}
-                  strokeWidth={2}
-                  aria-hidden
-                />
-                {t('plain.title')} <Badge variant="secondary">{attention.plain.length}</Badge>
-              </Button>
-            </h3>
-            <ul id={otherId} hidden={!showOther} aria-label={t('plain.title')}>
-              {showOther &&
-                attention.plain.map((link) => (
-                  <AttentionItem
-                    key={link.targetPath}
-                    onActivate={() => showTarget(link.targetPath)}>
-                    <TargetName item={itemOf(link.targetPath)} path={link.targetPath} />
-                    <AttentionDetail>
-                      {t('plain.detail', { source: link.sourcePath })}
-                    </AttentionDetail>
-                  </AttentionItem>
-                ))}
-            </ul>
-          </div>
+          return (
+            <AttentionItem
+              key={chain.targetPath ?? chain.transformIds.join()}
+              onActivate={first === undefined ? undefined : () => showTransform(first)}>
+              {chain.targetPath !== null ? (
+                <TargetName item={itemOf(chain.targetPath)} path={chain.targetPath} />
+              ) : (
+                first !== undefined && <span className="font-medium">{text.name(first)}</span>
+              )}
+              <AttentionDetail>{chainDetail(chain)}</AttentionDetail>
+            </AttentionItem>
+          )
+        })}
+      </AttentionGroup>
+      <AttentionGroup
+        busy={updating}
+        count={attention.warnings?.length ?? null}
+        empty={sample ? t('warnings.empty', { name: sample.name }) : t('warnings.emptyUnnamed')}
+        title={t('warnings.title')}>
+        {warnings()}
+      </AttentionGroup>
+      {attention.plain.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium">
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-controls={otherId}
+              aria-expanded={showOther}
+              className="gap-2"
+              onClick={() => setShowOther((shown) => !shown)}>
+              <HugeiconsIcon
+                icon={showOther ? ArrowDown01Icon : ArrowRight01Icon}
+                strokeWidth={2}
+                aria-hidden
+              />
+              {t('plain.title')} <Badge variant="secondary">{attention.plain.length}</Badge>
+            </Button>
+          </h3>
+          <ul id={otherId} hidden={!showOther} aria-label={t('plain.title')}>
+            {showOther &&
+              attention.plain.map((link) => (
+                <AttentionItem key={link.targetPath} onActivate={() => showTarget(link.targetPath)}>
+                  <TargetName item={itemOf(link.targetPath)} path={link.targetPath} />
+                  <AttentionDetail>
+                    {t('plain.detail', { source: link.sourcePath })}
+                  </AttentionDetail>
+                </AttentionItem>
+              ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
+// Modal, over the canvas: choosing an entry closes it and shows that entry on the canvas.
+export function AiReviewSheet({ draft, review }: { draft: MappingDraft; review: AiReview }) {
+  const t = useTranslations('Mapping.aiReview')
+  const tCanvas = useTranslations('Mapping.canvas')
+  const target = useSide(draft.target)
+  const [open, setOpen] = useState(false)
+  const focusAfterClose = useRef<(() => void) | null>(null)
+
+  const show = (focus: () => void) => {
+    focusAfterClose.current = focus
+    setOpen(false)
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={setOpen}
+      onOpenChangeComplete={(next) => {
+        if (!next) {
+          focusAfterClose.current?.()
+          focusAfterClose.current = null
+        }
+      }}>
+      <SheetTrigger render={<Button size="sm" variant="outline" />}>{t('showPanel')}</SheetTrigger>
+      <EditorSheetContent
+        bodyClassName="gap-4 px-2 py-3"
+        closeLabel={t('panel.close')}
+        description={t('panel.description')}
+        finalFocus={() => focusAfterClose.current === null}
+        title={t('panel.title')}
+        className="data-[side=right]:sm:max-w-md">
+        {target.items ? (
+          <AiReviewPanel draft={draft} review={review} targetItems={target.items} onShow={show} />
+        ) : (
+          <Loading label={tCanvas('loading')} rowClassName="h-4" rows={3} />
         )}
-      </div>
-    </section>
+      </EditorSheetContent>
+    </Sheet>
   )
 }

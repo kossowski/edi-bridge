@@ -45,18 +45,84 @@ const transformIcons: Record<TransformKind, IconSvgElement> = {
   jsonata: CodeIcon,
 }
 
-function onDragStart(kind: TransformKind) {
-  return (event: DragEvent) => {
-    event.dataTransfer.setData(transformDragType, kind)
-    event.dataTransfer.effectAllowed = 'copy'
+export const transformsHiddenKey = 'edi-bridge:mapping-editor:transforms-hidden'
+
+function TransformItem({
+  kind,
+  rail,
+  onPlace,
+}: {
+  kind: TransformKind
+  rail: boolean
+  onPlace: (kind: TransformKind) => void
+}) {
+  const t = useTranslations('Mapping.transforms')
+  const descriptionId = useId()
+  const name = t(`kinds.${kind}`)
+  const icon = <HugeiconsIcon icon={transformIcons[kind]} strokeWidth={2} aria-hidden />
+
+  const place = {
+    draggable: true,
+    'aria-label': t('palette.add', { kind: name }),
+    'data-place': kind,
+    onClick: () => onPlace(kind),
+    onDragStart: (event: DragEvent) => {
+      event.dataTransfer.setData(transformDragType, kind)
+      event.dataTransfer.effectAllowed = 'copy'
+    },
   }
+
+  if (rail) {
+    return (
+      <li>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="cursor-grab active:cursor-grabbing"
+                {...place}
+              />
+            }>
+            {icon}
+          </TooltipTrigger>
+          <TooltipContent side="right">{name}</TooltipContent>
+        </Tooltip>
+      </li>
+    )
+  }
+
+  return (
+    <li className="flex flex-col gap-0.5 rounded-md px-1 py-1">
+      <button
+        type="button"
+        aria-describedby={descriptionId}
+        className="group/place hover:bg-muted focus-visible:ring-ring/50 flex min-h-8 w-full cursor-grab items-center gap-2.5 rounded-md px-1 text-start text-sm font-medium outline-none focus-visible:ring-3 active:cursor-grabbing"
+        {...place}>
+        <span className="bg-muted group-hover/place:bg-background flex size-7 shrink-0 items-center justify-center rounded-md border">
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">{name}</span>
+        <HugeiconsIcon
+          icon={DragDropVerticalIcon}
+          strokeWidth={2}
+          aria-hidden
+          className="text-muted-foreground size-4 shrink-0 opacity-0 group-hover/place:opacity-100 group-focus-visible/place:opacity-100"
+        />
+      </button>
+      <p id={descriptionId} className="text-muted-foreground line-clamp-2 ps-11 pe-1 text-xs">
+        {t(`descriptions.${kind}`)}
+      </p>
+    </li>
+  )
 }
 
 export function TransformList({ onPlace }: { onPlace: (kind: TransformKind) => void }) {
   const t = useTranslations('Mapping.transforms')
   const heading = useId()
   const note = useId()
-  const [hidden, setHidden] = useStoredFlag('edi-bridge:mapping-editor:transforms-hidden')
+  const [hidden, setHidden] = useStoredFlag(transformsHiddenKey)
   const toggleRef = useRef<HTMLButtonElement>(null)
   const toggleLabel = hidden ? t('palette.show') : t('palette.hide')
 
@@ -104,26 +170,7 @@ export function TransformList({ onPlace }: { onPlace: (kind: TransformKind) => v
         {toggle}
         <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto border-t pt-1.5">
           {transformKinds.map((kind) => (
-            <li key={kind}>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      draggable
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={t('palette.add', { kind: t(`kinds.${kind}`) })}
-                      className="cursor-grab active:cursor-grabbing"
-                      data-place={kind}
-                      onClick={() => onPlace(kind)}
-                      onDragStart={onDragStart(kind)}
-                    />
-                  }>
-                  <HugeiconsIcon icon={transformIcons[kind]} strokeWidth={2} aria-hidden />
-                </TooltipTrigger>
-                <TooltipContent side="right">{t(`kinds.${kind}`)}</TooltipContent>
-              </Tooltip>
-            </li>
+            <TransformItem key={kind} kind={kind} rail onPlace={onPlace} />
           ))}
         </ul>
       </section>
@@ -146,33 +193,7 @@ export function TransformList({ onPlace }: { onPlace: (kind: TransformKind) => v
       </div>
       <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-1.5">
         {transformKinds.map((kind) => (
-          <li key={kind} className="flex flex-col gap-0.5 rounded-md px-1 py-1">
-            <button
-              draggable
-              type="button"
-              aria-describedby={`${heading}-${kind}`}
-              aria-label={t('palette.add', { kind: t(`kinds.${kind}`) })}
-              className="group/place hover:bg-muted focus-visible:ring-ring/50 flex min-h-8 w-full cursor-grab items-center gap-2.5 rounded-md px-1 text-start text-sm font-medium outline-none focus-visible:ring-3 active:cursor-grabbing"
-              data-place={kind}
-              onClick={() => onPlace(kind)}
-              onDragStart={onDragStart(kind)}>
-              <span className="bg-muted group-hover/place:bg-background flex size-7 shrink-0 items-center justify-center rounded-md border">
-                <HugeiconsIcon icon={transformIcons[kind]} strokeWidth={2} aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">{t(`kinds.${kind}`)}</span>
-              <HugeiconsIcon
-                icon={DragDropVerticalIcon}
-                strokeWidth={2}
-                aria-hidden
-                className="text-muted-foreground size-4 shrink-0 opacity-0 group-hover/place:opacity-100 group-focus-visible/place:opacity-100"
-              />
-            </button>
-            <p
-              id={`${heading}-${kind}`}
-              className="text-muted-foreground line-clamp-2 ps-11 pe-1 text-xs">
-              {t(`descriptions.${kind}`)}
-            </p>
-          </li>
+          <TransformItem key={kind} kind={kind} rail={false} onPlace={onPlace} />
         ))}
       </ul>
       <p id={note} className="text-muted-foreground border-t px-3 py-2 text-xs">

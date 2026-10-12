@@ -43,7 +43,6 @@ function subscribe(onChange: () => void) {
   }
 }
 
-// A per-viewer yes or no, remembered in this browser; false until it is read.
 export function useStoredFlag(key: string) {
   const value = useSyncExternalStore(
     subscribe,

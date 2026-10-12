@@ -5,6 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
   detailsPanel,
+  openDetails,
   findSaveStatus,
   inReview,
   liveStatus,
@@ -121,7 +122,7 @@ export const RejectLink = meta.story({
 
     await userEvent.click(row!)
 
-    const panel = await detailsPanel(canvasElement)
+    const panel = await openDetails(canvasElement)
 
     await expect(panel.getByText('AI-proposed')).toBeVisible()
 
@@ -296,6 +297,6 @@ export const Dark = meta.story({
     const [row] = await canvas.findAllByRole('button', { name: proposedRow })
 
     await userEvent.click(row!)
-    await expect((await detailsPanel(canvasElement)).getByText('AI-proposed')).toBeVisible()
+    await expect((await openDetails(canvasElement)).getByText('AI-proposed')).toBeVisible()
   },
 })

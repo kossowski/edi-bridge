@@ -6,12 +6,15 @@ import {
   expectTransformCount,
   findRow,
   findSaveStatus,
+  liveStatus,
   openDetails,
   page,
+  pressOn,
   seeded,
   source,
   findSheet,
 } from '@/components/mappings/mapping-canvas-story-helpers'
+import { transformsHiddenKey } from '@/components/mappings/transform-list'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
@@ -23,12 +26,10 @@ const outbound = seeded('Hansemarkt: ERP JSON to DESADV')
 
 const withoutLinks = seeded('Rheinkauf: ERP JSON to INVOIC')
 
-const hiddenKey = 'edi-bridge:mapping-editor:transforms-hidden'
-
 function forgetHiddenList() {
-  window.localStorage.removeItem(hiddenKey)
+  window.localStorage.removeItem(transformsHiddenKey)
 
-  return () => window.localStorage.removeItem(hiddenKey)
+  return () => window.localStorage.removeItem(transformsHiddenKey)
 }
 
 const meta = preview.meta({
@@ -77,6 +78,13 @@ export const DetailsFromToolbar = meta.story({
     await expect(details.getByText('Outbound: Document Structure to Message Type')).toBeVisible()
     await waitFor(() => expect(details.getByRole('group', { name: 'Details' })).toHaveFocus())
 
+    // The details open inside the canvas's frame, below the toolbar, whose buttons stay in reach.
+    const panel = page(canvasElement).getByRole('dialog', { name: 'Details' })
+
+    await expect(panel.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      trigger.getBoundingClientRect().bottom,
+    )
+
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
     await waitFor(() => expect(trigger).toHaveFocus())
@@ -84,22 +92,41 @@ export const DetailsFromToolbar = meta.story({
   },
 })
 
-export const DetailsFollowSelection = meta.story({
+export const DetailsToggle = meta.story({
+  async play({ canvas, canvasElement }) {
+    await canvas.findByText('despatchNumber')
+
+    const trigger = canvas.getByRole('button', { name: 'Details' })
+
+    await openDetails(canvasElement)
+    await userEvent.click(trigger)
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  },
+})
+
+export const DetailsShowSelection = meta.story({
   async play({ canvasElement }) {
     const row = await findRow(canvasElement, source('despatchNumber'))
 
+    // A selected row leaves the details closed, so they never cover the target tree unasked.
     await userEvent.click(row)
+    await expect(row).toHaveFocus()
+    await expect(page(canvasElement).queryByRole('dialog')).toBeNull()
 
-    const details = await findSheet(canvasElement, 'Details')
+    const details = await openDetails(canvasElement)
 
     await expect(details.getByText('Source')).toBeVisible()
-    await expect(row).toHaveFocus()
+  },
+})
 
-    // The sheet keeps the canvas usable: Escape on the canvas clears the selection, and the sheet
-    // that showed it goes.
-    await userEvent.keyboard('{Escape}')
-    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
-    await expect(row).toHaveFocus()
+export const PendingLinkKeepsDetailsClosed = meta.story({
+  async play({ canvasElement }) {
+    await pressOn(await findRow(canvasElement, source('despatchNumber')), 'l')
+    await waitFor(() =>
+      expect(liveStatus(canvasElement)).toHaveTextContent('Linking from despatchNumber.'),
+    )
+    await expect(page(canvasElement).queryByRole('dialog')).toBeNull()
   },
 })
 
@@ -112,7 +139,7 @@ export const HideTransforms = meta.story({
 
     await waitFor(() => expect(show).toHaveFocus())
     await expect(show).toHaveAttribute('aria-expanded', 'false')
-    await expect(window.localStorage.getItem(hiddenKey)).toBe('true')
+    await expect(window.localStorage.getItem(transformsHiddenKey)).toBe('true')
     await expect(canvas.queryByText('Click to add, or drag onto the canvas.')).toBeNull()
 
     await userEvent.click(canvas.getByRole('button', { name: 'Add Date format' }))
@@ -123,13 +150,13 @@ export const HideTransforms = meta.story({
 
     await userEvent.click(show)
     await expect(await canvas.findByText('Click to add, or drag onto the canvas.')).toBeVisible()
-    await expect(window.localStorage.getItem(hiddenKey)).toBe('false')
+    await expect(window.localStorage.getItem(transformsHiddenKey)).toBe('false')
   },
 })
 
 export const TransformsRemainHidden = meta.story({
   beforeEach() {
-    window.localStorage.setItem(hiddenKey, 'true')
+    window.localStorage.setItem(transformsHiddenKey, 'true')
   },
   async play({ canvas }) {
     await expect(await canvas.findByRole('button', { name: 'Show the Transforms' })).toBeVisible()

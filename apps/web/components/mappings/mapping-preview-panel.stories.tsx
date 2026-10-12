@@ -77,7 +77,7 @@ function targetDocument(sheet: SheetQueries, sample: string, timeout = 1000) {
 }
 
 async function showSample(sheet: SheetQueries) {
-  await userEvent.click(await sheet.findByRole('button', { name: 'Sample Document' }))
+  await userEvent.click(await sheet.findByRole('button', { name: 'Example document' }))
 }
 
 const meta = preview.meta({
@@ -104,12 +104,12 @@ export const SampleChosen = meta.story({
     await waitFor(() => expect(target).toHaveTextContent(/BGM\+351\+DN-2026-\d{5}'/))
     await showSample(canvas)
     await expect(
-      canvas.getByRole('region', { name: `Sample Document ${firstSample!.name}` }),
+      canvas.getByRole('region', { name: `Example document ${firstSample!.name}` }),
     ).toHaveTextContent('"despatchNumber"')
     await expect(canvas.getByText('2 targets left empty')).toBeVisible()
     await expect(canvas.getByText('Lookup Table 1 has an invalid configuration.')).toBeVisible()
 
-    await userEvent.click(canvas.getByRole('combobox', { name: 'Sample Document' }))
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Example document' }))
     await userEvent.click(await screen.findByRole('option', { name: secondSample!.name }))
 
     await userEvent.click(canvas.getByRole('button', { name: 'Target Document' }))
@@ -126,7 +126,7 @@ export const SampleChosen = meta.story({
     const reopened = await openPreview(canvasElement)
 
     await expect(
-      await reopened.findByRole('combobox', { name: 'Sample Document' }),
+      await reopened.findByRole('combobox', { name: 'Example document' }),
     ).toHaveTextContent(secondSample!.name)
   },
 })
@@ -141,12 +141,12 @@ export const InboundSample = meta.story({
     ).toHaveTextContent('"orderNumber"')
     await expect(
       await canvas.findByText(
-        'JSONata expression 1 is not previewed on EDIFACT Sample Documents yet.',
+        'JSONata expression 1 is not previewed on EDIFACT example documents yet.',
       ),
     ).toBeVisible()
     await showSample(canvas)
     await expect(
-      await canvas.findByRole('region', { name: /^Sample Document po-2026-\d{5}\.edi$/ }),
+      await canvas.findByRole('region', { name: /^Example document po-2026-\d{5}\.edi$/ }),
     ).toHaveTextContent(/UNH\+\d+\+ORDERS:D:96A:UN'/)
   },
 })
@@ -156,8 +156,8 @@ export const EmptySamples = meta.story({
   async play({ canvasElement }) {
     const canvas = await openPreview(canvasElement)
 
-    await expect(await canvas.findByText('No Sample Documents yet')).toBeVisible()
-    await expect(canvas.queryByRole('combobox', { name: 'Sample Document' })).toBeNull()
+    await expect(await canvas.findByText('No example documents yet')).toBeVisible()
+    await expect(canvas.queryByRole('combobox', { name: 'Example document' })).toBeNull()
   },
 })
 
@@ -172,7 +172,7 @@ export const LoadingSamples = meta.story({
   async play({ canvasElement }) {
     const canvas = await openPreview(canvasElement)
 
-    await expect(await canvas.findByText('Loading the Sample Documents')).toBeInTheDocument()
+    await expect(await canvas.findByText('Loading the example documents')).toBeInTheDocument()
   },
 })
 
@@ -190,7 +190,7 @@ export const BuildingPreview = meta.story({
     await expect(await canvas.findByText('Building the preview')).toBeInTheDocument()
     await showSample(canvas)
     await expect(
-      canvas.getByRole('region', { name: `Sample Document ${firstSample!.name}` }),
+      canvas.getByRole('region', { name: `Example document ${firstSample!.name}` }),
     ).toBeVisible()
   },
 })
@@ -203,7 +203,7 @@ export const SamplesUnavailable = meta.story({
     const canvas = await openPreview(canvasElement)
 
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The Sample Documents could not be loaded.',
+      'The example documents could not be loaded.',
     )
     await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
   },

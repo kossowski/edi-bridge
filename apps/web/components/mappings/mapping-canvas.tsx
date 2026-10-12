@@ -3,6 +3,8 @@
 import '@xyflow/react/dist/style.css'
 import './mapping-canvas.css'
 
+import { Cancel01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Background,
@@ -22,6 +24,7 @@ import {
   type Ref,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -38,6 +41,7 @@ import {
 import {
   detailsShown,
   LinkableRowsContext,
+  useCanvasRefs,
   useCanvasViewOnly,
   useCanvasStore,
   useCanvasStoreApi,
@@ -133,13 +137,6 @@ import { whenRendered } from '@/components/mappings/when-rendered'
 import { lookupTablesQuery } from '@/lib/api/queries'
 import { transformPorts } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@edi-bridge/ui/components/sheet'
 import { Tooltip, TooltipContent } from '@edi-bridge/ui/components/tooltip'
 
 import type { GraphSave } from '@/components/mappings/use-save-graph'
@@ -168,8 +165,8 @@ const viewportPadding = 24
 // A dropped transform hangs from the pointer by its header.
 const dropOffset = 20
 
-// Below this the part labels shrink under a readable size; the user pans to the rest instead.
-const minInitialZoom = 0.85
+// Below this a row's toggle falls under the 24px target size; the user pans to the rest instead.
+const minInitialZoom = 0.82
 
 // React Flow announces every node as one to select, move or delete; these nodes are none of that.
 const plainNode = { 'aria-roledescription': undefined, 'aria-describedby': undefined }
@@ -198,8 +195,7 @@ type MappingCanvasProps = {
   source: CanvasSide
   target: CanvasSide
   onChange: (save: GraphSave) => void
-  facts?: ReactNode
-  aside?: ReactNode
+  detailsFacts?: ReactNode
 }
 
 // Mounted only while the tooltip shows a row, so that row's button can point at the tooltip.
@@ -238,7 +234,7 @@ function MeaningTooltip() {
   )
 }
 
-function DetailsSheet({
+function DetailsPanel({
   itemOf,
   graph,
   issues,
@@ -249,7 +245,6 @@ function DetailsSheet({
   transformActions,
   facts,
   onClose,
-  onEscape,
   ref,
 }: {
   itemOf: (row: RowRef) => TreeItem | undefined
@@ -262,16 +257,22 @@ function DetailsSheet({
   transformActions: TransformDetailsActions
   facts: ReactNode
   onClose: () => void
-  onEscape: (event: Event) => void
   ref: Ref<HTMLDivElement>
 }) {
   const t = useTranslations('Mapping')
+  const titleId = useId()
+  const descriptionId = useId()
+  const { detailsBody } = useCanvasRefs()
   const viewOnly = useCanvasViewOnly()
   const open = useCanvasStore(detailsShown)
   const selected = useCanvasStore((state) => state.selected)
   const selectedTransform = useCanvasStore((state) => state.selectedTransform)
   const item = selected && itemOf(selected)
   const transform = selectedTransform ? transformById(graph, selectedTransform) : undefined
+
+  if (!open) {
+    return null
+  }
 
   const content = () => {
     if (transform) {
@@ -318,56 +319,44 @@ function DetailsSheet({
     )
   }
 
-  // Not modal: the canvas stays in use beside it, and its selection decides what the sheet shows.
-  // Only its close button and Escape close it; Escape goes back one step at a time.
+  // Not modal and inside the canvas's frame: the toolbar and the canvas stay in use beside it, and
+  // the canvas's selection decides what it shows.
   return (
-    <Sheet
-      disablePointerDismissal
-      modal={false}
-      open={open}
-      onOpenChange={(next, details) => {
-        if (next) {
-          return
-        }
-
-        if (details.reason === 'close-press') {
-          onClose()
-        } else if (details.reason === 'escape-key') {
-          // Not handled for the sheet alone: an open tooltip or the canvas may still need it.
-          details.cancel()
-          details.allowPropagation()
-          onEscape(details.event)
-        }
-      }}>
-      <SheetContent
-        closeLabel={t('details.close')}
-        finalFocus={false}
-        initialFocus={false}
-        overlay={false}
-        className="w-full gap-0 data-[side=right]:top-14 data-[side=right]:h-[calc(100svh-3.5rem)] data-[side=right]:sm:max-w-md">
-        <SheetHeader className="border-b pe-12">
-          <SheetTitle className="text-lg">{t('details.title')}</SheetTitle>
-          <SheetDescription>{t('details.description')}</SheetDescription>
-        </SheetHeader>
-        <div
-          ref={ref}
-          role="group"
-          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll long details
-          tabIndex={0}
-          aria-label={t('details.title')}
-          className="focus-visible:ring-ring/50 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 outline-none focus-visible:ring-3 focus-visible:ring-inset"
-          data-mapping-details>
-          {(item || transform) && (
-            <Button size="sm" variant="outline" className="self-start" onClick={actions.clear}>
-              {t('details.clear')}
-            </Button>
-          )}
-          <PendingLink text={text} onCancel={actions.cancel} />
-          {content()}
-          {!viewOnly && <p className="text-muted-foreground text-xs">{t('links.shortcut')}</p>}
-        </div>
-      </SheetContent>
-    </Sheet>
+    <div
+      ref={ref}
+      role="dialog"
+      aria-describedby={descriptionId}
+      aria-labelledby={titleId}
+      className="bg-popover text-popover-foreground absolute inset-y-0 end-0 z-10 flex w-full max-w-md flex-col border-s text-sm shadow-lg">
+      <div className="relative flex flex-col gap-0.5 border-b p-4 pe-12">
+        <h2 id={titleId} className="font-heading text-foreground text-lg font-medium">
+          {t('details.title')}
+        </h2>
+        <p id={descriptionId} className="text-muted-foreground text-sm">
+          {t('details.description')}
+        </p>
+        <Button size="icon-sm" variant="ghost" className="absolute end-3 top-3" onClick={onClose}>
+          <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} aria-hidden />
+          <span className="sr-only">{t('details.close')}</span>
+        </Button>
+      </div>
+      <div
+        ref={detailsBody}
+        role="group"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll long details
+        tabIndex={0}
+        aria-label={t('details.title')}
+        className="focus-visible:ring-ring/50 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 outline-none focus-visible:ring-3 focus-visible:ring-inset">
+        {(item || transform) && (
+          <Button size="sm" variant="outline" className="self-start" onClick={actions.clear}>
+            {t('details.clear')}
+          </Button>
+        )}
+        <PendingLink text={text} onCancel={actions.cancel} />
+        {content()}
+        {!viewOnly && <p className="text-muted-foreground text-xs">{t('links.shortcut')}</p>}
+      </div>
+    </div>
   )
 }
 
@@ -460,16 +449,15 @@ export function MappingCanvas({
   source,
   target,
   onChange,
-  facts,
-  aside,
+  detailsFacts,
 }: MappingCanvasProps) {
   const t = useTranslations('Mapping.canvas')
   const tAi = useTranslations('Mapping.aiReview')
   const tLinks = useTranslations('Mapping.links')
   const tTransforms = useTranslations('Mapping.transforms')
-  const root = useRef<HTMLDivElement>(null)
+  const { canvas: root, detailsBody, detailsTrigger } = useCanvasRefs()
   const container = useRef<HTMLDivElement>(null)
-  const panel = useRef<HTMLDivElement>(null)
+  const detailsPanel = useRef<HTMLDivElement>(null)
   const store = useCanvasStoreApi()
   const viewOnly = useCanvasViewOnly()
   const collapsed = useCanvasStore((state) => state.collapsed)
@@ -933,7 +921,7 @@ export function MappingCanvas({
         },
       )
     },
-    [graph, save, store, transformButton],
+    [graph, root, save, store, transformButton],
   )
 
   const place = useCallback(
@@ -1003,11 +991,11 @@ export function MappingCanvas({
   )
 
   const removeButtons = useCallback(
-    () => panel.current?.querySelectorAll<HTMLElement>('[data-remove-link]') ?? [],
-    [],
+    () => detailsBody.current?.querySelectorAll<HTMLElement>('[data-remove-link]') ?? [],
+    [detailsBody],
   )
 
-  // A panel button that goes away takes the focus with it, so a removal moves it to the next one.
+  // A details button that goes away takes the focus with it, so a removal moves it to the next one.
   const focusAfterRemoval = useCallback(
     (index: number, before: number, fallback: () => void) => {
       whenRendered(
@@ -1027,7 +1015,7 @@ export function MappingCanvas({
     [removeButtons],
   )
 
-  const panelActions = useMemo((): PanelActions => {
+  const rowDetailsActions = useMemo((): PanelActions => {
     const selectedRow = () => store.getState().selected
 
     return {
@@ -1090,7 +1078,7 @@ export function MappingCanvas({
     transformButton,
   ])
 
-  const detailsActions = useMemo(
+  const transformDetailsActions = useMemo(
     (): TransformDetailsActions => ({
       configure: (transform, config) => {
         store.getState().setProblem(null)
@@ -1129,7 +1117,10 @@ export function MappingCanvas({
       removeTransformLink: (removed) => removeRowLink({ kind: 'transformLink', link: removed }),
       show: (edge) => {
         store.getState().select(rowListingLinks(edge))
-        const removeButton = () => panel.current?.querySelector<HTMLElement>('[data-remove-link]')
+        store.getState().openDetails()
+
+        const removeButton = () =>
+          detailsBody.current?.querySelector<HTMLElement>('[data-remove-link]')
 
         whenRendered(
           () => Boolean(removeButton()),
@@ -1137,7 +1128,7 @@ export function MappingCanvas({
         )
       },
     }),
-    [removeRowLink, store],
+    [detailsBody, removeRowLink, store],
   )
 
   // A taken target or input is no valid drop, so the drag does not mark it as one.
@@ -1237,7 +1228,7 @@ export function MappingCanvas({
   const tooltip = useMeaningTooltip()
   const area = useRef<HTMLDivElement>(null)
 
-  // Closing the sheet takes its focus back to what it showed, or to the button that opened it.
+  // Closing the details takes the focus back to what they showed, or to the button that opened them.
   const closeDetails = useCallback(() => {
     const { selected, selectedTransform, linkFrom } = store.getState()
 
@@ -1252,17 +1243,15 @@ export function MappingCanvas({
     } else if (linkFrom?.kind === 'source') {
       focusRow({ side: 'source', path: linkFrom.path })
     } else {
-      afterRender(() =>
-        root.current?.ownerDocument.querySelector<HTMLElement>('[data-details-trigger]')?.focus(),
-      )
+      afterRender(() => detailsTrigger.current?.focus())
     }
-  }, [focusRow, store, transformButton])
+  }, [detailsTrigger, focusRow, store, transformButton])
 
   // The first Escape closes an open tooltip (WCAG 1.4.13) or takes back what was typed in a
   // settings field, the next a pending link, and only the one after that clears the selection.
-  // In the Details sheet, whose content goes with them, the focus moves back to the canvas.
+  // In the details, whose content goes with them, the focus moves back to the canvas.
   const escape = useCallback(
-    (event: Event, inPanel: boolean) => {
+    (event: Event, inDetails: boolean) => {
       if (tooltip.handle.isOpen || event.defaultPrevented) {
         return
       }
@@ -1270,40 +1259,25 @@ export function MappingCanvas({
       const state = store.getState()
 
       if (state.linkFrom) {
-        if (inPanel) {
-          panelActions.cancel()
+        if (inDetails) {
+          rowDetailsActions.cancel()
         } else {
           cancel()
         }
       } else if (state.selected || state.selectedTransform) {
-        if (inPanel) {
-          panelActions.clear()
+        if (inDetails) {
+          rowDetailsActions.clear()
         } else {
           clearSelection()
         }
-      } else if (inPanel) {
+      } else if (inDetails) {
         closeDetails()
       }
     },
-    [cancel, clearSelection, closeDetails, panelActions, store, tooltip],
+    [cancel, clearSelection, closeDetails, rowDetailsActions, store, tooltip],
   )
 
-  // The sheet hears every Escape on the page; the canvas's own are handled where they happen.
-  const sheetEscape = useCallback(
-    (event: Event) => {
-      const sheet = panel.current?.closest('[data-slot="sheet-content"]')
-
-      // The sheet reports one key press twice, from the popup and from the document; the first
-      // takes it.
-      if (event.target instanceof Node && sheet?.contains(event.target)) {
-        escape(event, true)
-        event.preventDefault()
-      }
-    },
-    [escape],
-  )
-
-  // Listened to natively: the area holds the canvas and the panel but is no control of its own.
+  // Listened to natively: the area holds the canvas and the details but is no control of its own.
   useEffect(() => {
     const element = area.current
 
@@ -1385,7 +1359,10 @@ export function MappingCanvas({
 
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
-        escape(event, false)
+        escape(
+          event,
+          event.target instanceof Node && Boolean(detailsPanel.current?.contains(event.target)),
+        )
 
         return
       }
@@ -1436,9 +1413,9 @@ export function MappingCanvas({
   ])
 
   return (
-    <div ref={root} className="flex min-h-0 flex-1 flex-col" data-mapping-canvas>
-      <div ref={area} className="flex min-h-0 flex-1 gap-3">
-        <div className="flex min-h-80 min-w-0 flex-1 overflow-clip rounded-lg border">
+    <div ref={root} className="flex min-h-0 flex-1 flex-col">
+      <div ref={area} className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-80 min-w-0 flex-1 overflow-clip rounded-lg border">
           {!viewOnly && <TransformList onPlace={place} />}
           <div
             ref={container}
@@ -1511,25 +1488,23 @@ export function MappingCanvas({
               </LinkActionsContext>
             </div>
           </div>
+          <DetailsPanel
+            actions={rowDetailsActions}
+            facts={detailsFacts}
+            graph={graph}
+            issues={issues}
+            itemOf={itemOf}
+            ref={detailsPanel}
+            rows={rows}
+            sourceFields={sourceFields}
+            text={text}
+            transformActions={transformDetailsActions}
+            onClose={closeDetails}
+          />
         </div>
-        {aside}
       </div>
       <MeaningTooltip />
       <LinkHints text={text} />
-      <DetailsSheet
-        actions={panelActions}
-        facts={facts}
-        graph={graph}
-        issues={issues}
-        itemOf={itemOf}
-        ref={panel}
-        rows={rows}
-        sourceFields={sourceFields}
-        text={text}
-        transformActions={detailsActions}
-        onClose={closeDetails}
-        onEscape={sheetEscape}
-      />
     </div>
   )
 }

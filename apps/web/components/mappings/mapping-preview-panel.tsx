@@ -7,8 +7,10 @@ import { useTranslations } from 'next-intl'
 import { useId, useState } from 'react'
 
 import { Loading } from '@/components/detail-parts'
+import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { useGraphText } from '@/components/mappings/graph-text'
 import { documentSize, documentText } from '@/components/mappings/mapping-preview'
+import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useDraftPreview } from '@/components/mappings/use-draft-preview'
 import { mappingSamplesQuery } from '@/lib/api/queries'
 import {
@@ -28,14 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@edi-bridge/ui/components/select'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@edi-bridge/ui/components/sheet'
+import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 const views = ['target', 'source'] as const
@@ -292,7 +287,7 @@ export function MappingPreviewSheet({
 }) {
   const t = useTranslations('Mapping.preview')
   // Held here, not in the content, which unmounts while the sheet is closed. An AI review that
-  // opens shows its Sample Document, which the Admin may then change.
+  // opens shows its example document, which the Admin may then change.
   const [chosen, setChosen] = useState<string | null>(reviewSampleId)
   const [review, setReview] = useState(reviewSampleId)
 
@@ -306,19 +301,19 @@ export function MappingPreviewSheet({
 
   return (
     <Sheet>
-      <SheetTrigger render={<Button variant="outline" />}>
-        <HugeiconsIcon icon={ViewIcon} strokeWidth={2} aria-hidden data-icon="inline-start" />
-        {t('title')}
-      </SheetTrigger>
-      <SheetContent closeLabel={t('close')} className="w-full gap-0 data-[side=right]:sm:max-w-2xl">
-        <SheetHeader className="border-b pe-12">
-          <SheetTitle className="text-lg">{t('title')}</SheetTitle>
-          <SheetDescription>{t('description')}</SheetDescription>
-        </SheetHeader>
-        <div className="@container flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
-          <PreviewContent chosen={chosen} draft={draft} onChoose={setChosen} />
-        </div>
-      </SheetContent>
+      <ToolbarAction
+        icon={<HugeiconsIcon icon={ViewIcon} strokeWidth={2} aria-hidden />}
+        label={t('title')}
+        render={<SheetTrigger render={<Button variant="outline" />} />}
+      />
+      <EditorSheetContent
+        bodyClassName="@container"
+        closeLabel={t('close')}
+        description={t('description')}
+        title={t('title')}
+        className="data-[side=right]:sm:max-w-2xl">
+        <PreviewContent chosen={chosen} draft={draft} onChoose={setChosen} />
+      </EditorSheetContent>
     </Sheet>
   )
 }

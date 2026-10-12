@@ -8,6 +8,7 @@ import {
   findSaveStatus,
   inReview,
   inReviewWith,
+  page,
   reviewing,
   seeded,
   target,
@@ -37,8 +38,21 @@ const previewUrl = `${apiUrl}${mappingPreviewEndpoint.path}`
 
 const wait = { timeout: 5000 }
 
-async function findPanel(canvasElement: HTMLElement, name = 'AI review') {
-  return within(canvasElement).findByRole('region', { name }, wait)
+async function findShowButton(canvasElement: HTMLElement, name = 'What needs attention') {
+  return within(canvasElement).findByRole('button', { name }, wait)
+}
+
+async function findPanel(
+  canvasElement: HTMLElement,
+  { name = 'AI review', button = 'What needs attention' } = {},
+) {
+  await userEvent.click(await findShowButton(canvasElement, button))
+
+  const sheet = await page(canvasElement).findByRole('dialog', { name }, wait)
+
+  await waitFor(() => expect(sheet).toBeVisible())
+
+  return sheet
 }
 
 function heading(title: string, count?: number) {
@@ -176,7 +190,9 @@ export const LargeVolume = meta.story({
       expect(itemsUnder(region, /^Other AI-proposed links$/).length).toBe(countOf(other)),
     )
 
-    const body = region.lastElementChild!
+    const body = within(region)
+      .getByRole('heading', { name: unmappedHeading })
+      .closest<HTMLElement>('.overflow-y-auto')!
 
     await expect(body.scrollHeight).toBeGreaterThan(body.clientHeight)
   },
@@ -194,7 +210,14 @@ export const ItemShowsOnCanvas = meta.story({
       (await detailsPanel(canvasElement)).getByText('This part has no links yet.'),
     ).toBeVisible()
 
-    const [chain] = itemsUnder(region, heading('AI-proposed links through Transforms'))
+    await waitFor(() =>
+      expect(page(canvasElement).queryByRole('dialog', { name: 'AI review' })).toBeNull(),
+    )
+
+    const [chain] = itemsUnder(
+      await findPanel(canvasElement),
+      heading('AI-proposed links through Transforms'),
+    )
 
     await userEvent.click(chain!)
     await waitFor(() =>
@@ -227,31 +250,47 @@ export const RejectUpdatesList = meta.story({
       }),
     )
 
-    await waitFor(() => expect(countOf(otherLinks(region))).toBe(before - 1))
-    await expect(itemsUnder(region, /^Other AI-proposed links$/).map(pathOf)).not.toContain(path)
     await expect(await findSaveStatus(canvasElement, 'Saved')).toBeVisible()
+
+    const reopened = await findPanel(canvasElement)
+
+    await waitFor(() => expect(countOf(otherLinks(reopened))).toBe(before - 1))
+    await userEvent.click(otherLinks(reopened))
+    await expect(itemsUnder(reopened, /^Other AI-proposed links$/).map(pathOf)).not.toContain(path)
   },
 })
 
-export const HeaderShowsPanel = meta.story({
-  async play({ canvas, canvasElement }) {
+export const SheetLeavesCanvasFullWidth = meta.story({
+  async play({ canvasElement }) {
+    const show = await findShowButton(canvasElement)
+
+    const frame = await waitFor(
+      () => canvasElement.querySelector('.mapping-canvas')!.parentElement!,
+    )
+
+    await expect(page(canvasElement).queryByRole('dialog', { name: 'AI review' })).toBeNull()
+    await expect(frame.getBoundingClientRect().right).toBeGreaterThan(
+      canvasElement.ownerDocument.documentElement.clientWidth - 40,
+    )
+
     const region = await findPanel(canvasElement)
 
-    await userEvent.click(canvas.getByRole('button', { name: 'What needs attention' }))
-    await waitFor(() => expect(region).toHaveFocus())
     await expect(within(region).getByRole('heading', { name: unmappedHeading })).toBeVisible()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(show).toHaveFocus())
   },
 })
 
 export const PreviewShowsReviewSample = meta.story({
   async play({ canvas, canvasElement }) {
-    await findPanel(canvasElement)
+    await findShowButton(canvasElement)
 
     await userEvent.click(canvas.getByRole('button', { name: 'Preview' }))
 
     const preview = await findSheet(canvasElement, 'Preview')
 
-    await expect(await preview.findByRole('combobox', { name: 'Sample Document' })).toBeVisible()
+    await expect(await preview.findByRole('combobox', { name: 'Example document' })).toBeVisible()
     await expect(
       await preview.findByRole('region', { name: /^Target Document for / }, wait),
     ).toBeVisible()
@@ -260,14 +299,13 @@ export const PreviewShowsReviewSample = meta.story({
 
 export const AcceptRemovesPanel = meta.story({
   async play({ canvas, canvasElement }) {
-    await findPanel(canvasElement)
+    await findShowButton(canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: 'Accept draft' }))
     await canvas.findByText(
       'AI draft accepted. The Draft stays editable and can be published now.',
       {},
       wait,
     )
-    await expect(canvas.queryByRole('region', { name: 'AI review' })).toBeNull()
     await expect(canvas.queryByRole('button', { name: 'What needs attention' })).toBeNull()
   },
 })
@@ -280,8 +318,13 @@ export const German = meta.story({
       </NextIntlClientProvider>
     ),
   ],
-  async play({ canvas, canvasElement }) {
-    const panel = within(await findPanel(canvasElement, 'Durchsicht des KI-Entwurfs'))
+  async play({ canvasElement }) {
+    const panel = within(
+      await findPanel(canvasElement, {
+        name: 'Durchsicht des KI-Entwurfs',
+        button: 'Was zu prüfen ist',
+      }),
+    )
 
     await expect(
       countOf(
@@ -294,7 +337,6 @@ export const German = meta.story({
     await expect(
       panel.getByRole('button', { name: /^Weitere KI-Verknüpfungen\s*7$/ }),
     ).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Was zu prüfen ist' })).toBeVisible()
   },
 })
 
@@ -322,7 +364,6 @@ export const Viewer = meta.story({
       await expect(
         (await canvas.findAllByRole('img', { name: /^Link from/ })).length,
       ).toBeGreaterThan(0)
-      await expect(canvas.queryByRole('region', { name: 'AI review' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: 'What needs attention' })).toBeNull()
       await expect(canvas.getByRole('button', { name: 'Preview' })).toBeVisible()
     },

@@ -5,6 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
   detailsPanel,
+  openDetails,
   dragLink,
   findRow,
   findSaveStatus,
@@ -120,7 +121,7 @@ export const TransformNodes = meta.story({
     await userEvent.keyboard('{Escape}')
     await pressOn(filled, '{Enter}')
     await expect(
-      (await detailsPanel(canvasElement)).getByText('Date format 1 (Result) to DTM+137/C507/2380'),
+      (await openDetails(canvasElement)).getByText('Date format 1 (Result) to DTM+137/C507/2380'),
     ).toBeVisible()
   },
 })
@@ -232,7 +233,7 @@ export const ConnectByKeyboard = meta.story({
     await pressOn(output, 'l')
     await expect(output).toHaveAttribute('aria-pressed', 'true')
     await expect(
-      (await detailsPanel(canvasElement)).getByText('Linking from Date format 1 (Result).', {
+      (await openDetails(canvasElement)).getByText('Linking from Date format 1 (Result).', {
         exact: false,
       }),
     ).toBeVisible()
@@ -374,23 +375,28 @@ export const EscapeInSettings = meta.story({
     await expect(separator).toHaveFocus()
     await expect(header).toHaveAttribute('aria-pressed', 'true')
 
-    // The next clears the selection and takes the focus back to the Transform.
+    // The next clears the selection, and with it the Transform's details, and takes the focus back
+    // to the Transform.
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(header).toHaveFocus())
     await expect(header).toHaveAttribute('aria-pressed', 'false')
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
 
     // From a link's remove button, the focus goes back to the selected part.
     const filled = target('DTM+137/C507/2380')
 
     await pressOn(await findRow(canvasElement, filled), '{Enter}')
-    panel
+
+    const rowDetails = await openDetails(canvasElement)
+
+    rowDetails
       .getByRole('button', {
         name: 'Remove link from Date format 1 (Result) to DTM+137/C507/2380',
       })
       .focus()
     await userEvent.keyboard('{Escape}')
     await waitFor(async () => expect(await findRow(canvasElement, filled)).toHaveFocus())
-    await expect(panel.getByText(/Select a part/)).toBeVisible()
+    await expect(rowDetails.getByText(/Select a part/)).toBeVisible()
   },
 })
 
@@ -725,9 +731,12 @@ export const Viewer = meta.story({
       await expect(panel.getByText('The syntax is valid.')).toBeVisible()
 
       await pressOn(await findRow(canvasElement, source('invoiceNumber')), '{Enter}')
-      await expect(panel.getByRole('heading', { name: 'Links' })).toBeVisible()
-      await expect(panel.queryByRole('button', { name: 'Link from here' })).toBeNull()
-      await userEvent.keyboard('{Escape}')
+
+      const rowDetails = await openDetails(canvasElement)
+
+      await expect(rowDetails.getByRole('heading', { name: 'Links' })).toBeVisible()
+      await expect(rowDetails.queryByRole('button', { name: 'Link from here' })).toBeNull()
+      await userEvent.click(rowDetails.getByRole('button', { name: 'Close details' }))
       await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
     },
   }),

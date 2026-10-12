@@ -2333,6 +2333,7 @@
       "panel": {
         "title": "Durchsicht des KI-Entwurfs",
         "description": "Was vor dem Übernehmen des KI-Entwurfs Aufmerksamkeit braucht. Wählen Sie einen Eintrag, um ihn auf der Zeichenfläche zu zeigen.",
+        "close": "Durchsicht schließen",
         "unmapped": {
           "title": "Pflicht-Zielelemente ohne Verknüpfung",
           "detail": "Pflichtfeld, noch nichts verknüpft.",
@@ -2739,24 +2740,24 @@
     },
     "preview": {
       "title": "Vorschau",
-      "sample": "Beispiel-Document",
-      "source": "Beispiel-Document",
+      "sample": "Beispielbeleg",
+      "source": "Beispielbeleg",
       "target": "Ziel-Document",
       "shown": "Angezeigtes Document",
-      "sourceLabel": "Beispiel-Document {name}",
+      "sourceLabel": "Beispielbeleg {name}",
       "targetLabel": "Ziel-Document für {name}",
       "size": "{format}, {count, plural, one {# Zeile} other {# Zeilen}}",
-      "loading": "Beispiel-Documents werden geladen",
+      "loading": "Beispielbelege werden geladen",
       "building": "Vorschau wird erstellt",
       "updating": "Wird aktualisiert …",
       "upToDate": "Aktuell",
       "updated": "Vorschau für {name} aktualisiert",
       "empty": {
-        "title": "Noch keine Beispiel-Documents",
-        "description": "Die Vorschau zeigt das Ziel-Document für ein Beispiel-Document der Quelle. Dieses Mapping hat noch keine Beispiel-Documents."
+        "title": "Noch keine Beispielbelege",
+        "description": "Die Vorschau zeigt das Ziel-Document für einen Beispielbeleg der Quelle. Dieses Mapping hat noch keine Beispielbelege."
       },
       "error": {
-        "samples": "Die Beispiel-Documents konnten nicht geladen werden.",
+        "samples": "Die Beispielbelege konnten nicht geladen werden.",
         "preview": "Die Vorschau konnte nicht erstellt werden.",
         "retry": "Erneut versuchen"
       },
@@ -2764,11 +2765,11 @@
         "title": "{count, plural, one {# Ziel bleibt leer} other {# Ziele bleiben leer}}",
         "invalidTransform": "{transform} ist ungültig konfiguriert.",
         "noLookupMatch": "{transform} hat in seiner Lookup Table keinen Treffer gefunden.",
-        "expressionFailed": "{transform} ist bei diesem Beispiel-Document fehlgeschlagen.",
-        "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispiel-Documents noch nicht in der Vorschau berechnet.",
+        "expressionFailed": "{transform} ist bei diesem Beispielbeleg fehlgeschlagen.",
+        "expressionNotPreviewed": "{transform} wird bei EDIFACT-Beispielbelegen noch nicht in der Vorschau berechnet.",
         "brokenLink": "Eine Verknüpfung hier führt zu einem Feld oder Element, das ihre Seite nicht hat; die Vorschau überspringt sie."
       },
-      "description": "Das Ziel-Document, das dieses Mapping aus einem Beispiel-Document macht, mit den Verknüpfungen in ihrem aktuellen Stand.",
+      "description": "Das Ziel-Document, das dieses Mapping aus einem Beispielbeleg macht, mit den Verknüpfungen in ihrem aktuellen Stand.",
       "close": "Vorschau schließen"
     }
   },

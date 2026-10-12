@@ -9,13 +9,14 @@ import { useId } from 'react'
 import { AppPage } from '@/components/app-page'
 import { Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
-import { AiReviewPanel } from '@/components/mappings/ai-review-panel'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
+import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { GraphSaveStatus } from '@/components/mappings/graph-save-status'
 import { MappingCanvas } from '@/components/mappings/mapping-canvas'
 import {
   detailsShown,
   MappingCanvasProvider,
+  useCanvasRefs,
   useCanvasStore,
   useCanvasStoreApi,
 } from '@/components/mappings/mapping-canvas-store'
@@ -26,6 +27,7 @@ import {
   MappingVersionsLink,
   PublishDraft,
 } from '@/components/mappings/publish-draft'
+import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { whenRendered } from '@/components/mappings/when-rendered'
@@ -41,17 +43,10 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@edi-bridge/ui/components/empty'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@edi-bridge/ui/components/sheet'
+import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { AiReview, MappingDraft } from '@edi-bridge/contracts'
+import type { MappingDraft } from '@edi-bridge/contracts'
 
 function CanvasLoading() {
   const t = useTranslations('Mapping.canvas')
@@ -73,15 +68,7 @@ function CanvasLoading() {
   )
 }
 
-function Canvas({
-  draft,
-  aiReview,
-  reviewPanelId,
-}: {
-  draft: MappingDraft
-  aiReview: AiReview | null
-  reviewPanelId: string
-}) {
+function Canvas({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping.canvas')
   const source = useSide(draft.source)
   const target = useSide(draft.target)
@@ -106,17 +93,7 @@ function Canvas({
 
   return (
     <MappingCanvas
-      aside={
-        aiReview && (
-          <AiReviewPanel
-            id={reviewPanelId}
-            draft={draft}
-            review={aiReview}
-            targetItems={target.items}
-          />
-        )
-      }
-      facts={<MappingFacts draft={draft} />}
+      detailsFacts={<MappingFacts draft={draft} />}
       graph={draft}
       label={t('label', { source: source.title, target: target.title })}
       source={{ title: source.title, items: source.items }}
@@ -161,39 +138,33 @@ function MappingFacts({ draft }: { draft: MappingDraft }) {
   )
 }
 
-// On a computer the Details sheet belongs to the canvas, which also shows a selection in it; on a
-// small screen, without the canvas, it shows the facts alone.
+// On a computer the details belong to the canvas, which also shows a selection in them; on a
+// small screen, without the canvas, a sheet shows the facts alone.
 function DetailsAction({ draft }: { draft: MappingDraft }) {
   const t = useTranslations('Mapping.details')
   const desktop = useDesktop()
   const store = useCanvasStoreApi()
+  const { detailsBody, detailsTrigger } = useCanvasRefs()
   const open = useCanvasStore(detailsShown)
-
-  const label = (
-    <>
-      <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} aria-hidden />
-      {t('title')}
-    </>
-  )
+  const icon = <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} aria-hidden />
 
   if (!desktop) {
     return (
       <Sheet>
-        <SheetTrigger render={<Button variant="outline" />}>{label}</SheetTrigger>
-        <SheetContent closeLabel={t('close')} className="w-full gap-0">
-          <SheetHeader className="border-b pe-12">
-            <SheetTitle className="text-lg">{t('title')}</SheetTitle>
-            <SheetDescription>{t('description')}</SheetDescription>
-          </SheetHeader>
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
-            <MappingFacts draft={draft} />
-          </div>
-        </SheetContent>
+        <ToolbarAction
+          icon={icon}
+          label={t('title')}
+          render={<SheetTrigger render={<Button variant="outline" />} />}
+        />
+        <EditorSheetContent
+          closeLabel={t('close')}
+          description={t('description')}
+          title={t('title')}>
+          <MappingFacts draft={draft} />
+        </EditorSheetContent>
       </Sheet>
     )
   }
-
-  const details = () => document.querySelector<HTMLElement>('[data-mapping-details]')
 
   const toggle = () => {
     if (open) {
@@ -201,21 +172,26 @@ function DetailsAction({ draft }: { draft: MappingDraft }) {
     } else {
       store.getState().openDetails()
       whenRendered(
-        () => Boolean(details()),
-        () => details()?.focus(),
+        () => Boolean(detailsBody.current),
+        () => detailsBody.current?.focus(),
       )
     }
   }
 
   return (
-    <Button
-      variant="outline"
-      aria-expanded={open}
-      aria-haspopup="dialog"
-      data-details-trigger
-      onClick={toggle}>
-      {label}
-    </Button>
+    <ToolbarAction
+      icon={icon}
+      label={t('title')}
+      render={
+        <Button
+          ref={detailsTrigger}
+          variant="outline"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          onClick={toggle}
+        />
+      }
+    />
   )
 }
 
@@ -239,7 +215,6 @@ export function MappingCanvasScreen({ id }: { id: string }) {
   const stateId = useId()
   const reviewSummaryId = useId()
   const publishHintId = useId()
-  const reviewPanelId = useId()
   const aiDraft = useAiDraftRun(id)
   const draft = session.isPending ? undefined : data
   const canChange = session.canChange
@@ -282,16 +257,14 @@ export function MappingCanvasScreen({ id }: { id: string }) {
               <AiReviewState
                 draft={draft}
                 publishHintId={publishHintId}
-                reviewPanelId={desktop ? reviewPanelId : null}
+                showReview={desktop}
                 summaryId={reviewSummaryId}
               />
             )}
             <DesktopOnlyNotice />
             {/* The canvas only mounts on desktop: React Flow cannot measure a hidden container. */}
             <div className="hidden min-h-0 flex-1 flex-col lg:flex">
-              {desktop && (
-                <Canvas aiReview={aiReview} draft={draft} reviewPanelId={reviewPanelId} />
-              )}
+              {desktop && <Canvas draft={draft} />}
             </div>
           </>
         ) : isPending || session.isPending ? (
