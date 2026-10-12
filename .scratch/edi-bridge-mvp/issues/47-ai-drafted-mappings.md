@@ -15,4 +15,4 @@
 - [ ] Viewers cannot call AI endpoints
 - [ ] If this area's Zod contract doesn't exist yet, this ticket defines it in the contracts package; if it exists, the implementation conforms to it (or extends it, updating the MSW handlers alongside)
 - [ ] With mock mode off, this area's screen (if it already exists) works against the real API without UI code changes; the area's MSW handlers stay in the mocks package and keep working against the same contract
-- [ ] Accepting a single AI-proposed link clears its mark and those of its Transform Links; the review stays open until no proposed link is left (ticket 66)
+- [ ] `acceptAiProposedPartsEndpoint` (`POST /mappings/:id/ai-draft/accept-parts`) clears marks by the shared rule `acceptedAiReview`, rejects keys the review does not mark with 409, and closes the review once no proposed part (link, Transform or Transform Link) is left (ticket 66)
