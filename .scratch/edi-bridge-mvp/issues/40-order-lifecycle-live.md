@@ -16,3 +16,4 @@
 ## Comments
 
 - The Order Lifecycle contract from ticket 17 also lists outbound Runs that failed before an EDIFACT Message existed (for example at mapping, with `interchange: null`). For those Runs, take the Business Reference from the source Document, because there is no BGM or RFF+ON to extract it from.
+- The contracts give receipt confirmations no arrival time and Documents no sent time, so the screens count waiting time from when the Document was received. A sent dispatch advice or invoice without a transmission reference stays "in progress". Add these times and the reference, or keep this behaviour on purpose (ticket 61).

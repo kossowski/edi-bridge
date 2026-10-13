@@ -12,3 +12,4 @@
 - [ ] Switching to production is only possible explicitly
 - [ ] With mock mode off, this area's screen (if it already exists) works against the real API without UI code changes; the area's MSW handlers stay in the mocks package and keep working against the same contract
 - [ ] Sending a test Document to a partner in Test Mode produces an Interchange with the test indicator and moves the checklist forward (ticket 62)
+- [ ] The partner page checks for a receipt confirmation at an interval the real api can carry (the mocks poll every 3 s), or receives it as a live update from ticket 41 (ticket 62)
