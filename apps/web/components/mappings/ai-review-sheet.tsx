@@ -10,7 +10,15 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { type ReactNode, type RefObject, useId, useLayoutEffect, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import { Loading } from '@/components/detail-parts'
 import { acceptMessages } from '@/components/mappings/ai-review-accept'
@@ -447,10 +455,12 @@ export function AiReviewSheet({
   draft,
   targetItems,
   state,
+  triggerRef,
 }: {
   draft: MappingDraft
   targetItems: ReadonlyArray<TreeItem> | undefined
   state: ReviewState
+  triggerRef?: Ref<HTMLButtonElement>
 }) {
   const t = useTranslations('Mapping.aiReview')
   const tCanvas = useTranslations('Mapping.canvas')
@@ -479,6 +489,7 @@ export function AiReviewSheet({
       <SheetTrigger
         render={
           <Button
+            ref={triggerRef}
             variant="outline"
             aria-busy={state.updating}
             className={cn(

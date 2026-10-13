@@ -2367,7 +2367,7 @@
           "description": "Sie haben den KI-Entwurf gestoppt. Es wurden keine Verknüpfungen hinzugefügt. Versuchen Sie es erneut."
         }
       },
-      "closeKeepsRunning": "Der KI-Entwurf läuft weiter, wenn Sie diesen Dialog schließen. Stoppen beendet ihn.",
+      "staysOpen": "Dieser Dialog bleibt offen, bis der KI-Entwurf fertig ist. Stoppen beendet ihn vorzeitig.",
       "running": "KI entwirft: {step}",
       "ended": "KI-Entwurf beendet",
       "stepShort": {

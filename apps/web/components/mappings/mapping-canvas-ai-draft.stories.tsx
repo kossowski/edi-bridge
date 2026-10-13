@@ -1,10 +1,13 @@
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { http, HttpResponse } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
+import type { ReactElement } from 'react'
 import type { BeforeEach } from 'storybook/internal/csf'
 
+import { aiDraftStartQuery } from '@/components/mappings/ai-draft-run'
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
   expectSavedLinkCount,
@@ -16,6 +19,7 @@ import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import {
+  aiBudgetEndpoint,
   aiBudgetExhaustedStatus,
   aiReviewOpenStatus,
   requestAiDraftEndpoint,
@@ -43,6 +47,38 @@ const inReview = withAiProposal(
 )
 
 const requestPath = `${apiUrl}${requestAiDraftEndpoint.path}`
+
+function findAttentionButton(canvasElement: HTMLElement) {
+  return within(canvasElement).findByRole('button', { name: /need attention$/ }, { timeout: 5000 })
+}
+
+function countAiDraftRequests(): BeforeEach<ReactRenderer> & { count: () => number } {
+  let requests = 0
+
+  const counting: BeforeEach<ReactRenderer> = ({ msw }: StoryContext) => {
+    requests = 0
+    msw.use(
+      http.post(requestPath, () => {
+        requests += 1
+      }),
+    )
+  }
+
+  return Object.assign(counting, { count: () => requests })
+}
+
+const startLink = (id: string) => ({
+  args: { id, aiDraftRequested: true },
+  parameters: {
+    nextjs: { navigation: { pathname: `/mappings/${id}`, query: aiDraftStartQuery } },
+  },
+})
+
+async function expectStartLinkRemoved(id: string) {
+  await waitFor(() =>
+    expect(getRouter().replace).toHaveBeenCalledWith(`/mappings/${id}`, { scroll: false }),
+  )
+}
 
 function aiDraft(
   state: AiDraftState,
@@ -135,8 +171,8 @@ export const InProgress = meta.story({
   async play({ canvasElement }) {
     const dialog = await startAiDraft(canvasElement)
 
-    await expect(dialog.getByRole('button', { name: 'Close' })).toHaveFocus()
-    await expect(dialog.getByRole('button', { name: 'Stop' })).toBeVisible()
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Stop' })).toHaveFocus())
+    await expect(dialog.queryByRole('button', { name: /^Close/ })).toBeNull()
 
     const current = await (await findProgress(dialog)).findByText(/^Looking up segments:/)
 
@@ -147,50 +183,32 @@ export const InProgress = meta.story({
     )
     await expect(dialog.getByRole('status')).toHaveTextContent(/^Looking up segments:/)
     await expect(
-      dialog.getByText('The AI draft keeps going when you close this dialog. Stop ends it.'),
+      dialog.getByText('This dialog stays open until the AI draft is done. Stop ends it early.'),
     ).toBeVisible()
     await expectSavedLinkCount(withoutLinks.id, 0)
   },
 })
 
-export const CloseKeepsDraftGoing = meta.story({
+export const RunningDialogStaysOpen = meta.story({
   beforeEach: aiDraft('proposing', { stepDelayMs: 400 }),
   async play({ canvas, canvasElement }) {
     const dialog = await startAiDraft(canvasElement)
 
     await (await findProgress(dialog)).findByText('Reading the Sample Document')
     await userEvent.keyboard('{Escape}')
-    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
-
-    await expect(canvas.getByRole('button', { name: /^AI drafting: / })).toHaveFocus()
-
-    const reopened = await openAiDraft(canvasElement, /^AI drafting: /)
-
-    await expect(await reopened.findByRole('list', { name: 'Progress' })).toBeVisible()
-    await waitFor(() => expect(reopened.getByRole('button', { name: 'Close' })).toHaveFocus())
-    await userEvent.click(reopened.getByRole('button', { name: 'Close' }))
-    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
-
-    const announcement = await canvas.findByText(
-      /passed the check against the Sample Document/,
-      {},
-      { timeout: 6000 },
+    await userEvent.click(
+      canvasElement.ownerDocument.querySelector<HTMLElement>('[data-slot="dialog-overlay"]')!,
     )
+    await expect(page(canvasElement).getByRole('dialog', { name: 'Draft with AI' })).toBeVisible()
+    await expect(dialog.queryByRole('button', { name: /^Close/ })).toBeNull()
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Stop' })).toHaveFocus())
 
-    await expect(announcement).toHaveAttribute('role', 'status')
+    await findOutcome(dialog, 'Links added to the canvas')
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
+    await expect(canvas.queryByRole('button', { name: 'Draft with AI' })).toBeNull()
     await waitFor(() =>
-      expect(canvasElement.querySelectorAll('.react-flow__edge').length).toBeGreaterThan(0),
-    )
-
-    const ended = await openAiDraft(canvasElement, 'AI draft ended')
-
-    await findOutcome(ended, 'Links added to the canvas')
-    await userEvent.click(ended.getByRole('button', { name: 'Close' }))
-    await waitFor(() =>
-      expect(canvas.getByRole('button', { name: 'Draft with AI' })).toHaveAttribute(
-        'aria-disabled',
-        'true',
-      ),
+      expect(canvas.getByRole('button', { name: /need attention$/ })).toHaveFocus(),
     )
   },
 })
@@ -236,11 +254,8 @@ export const Drafted = meta.story({
     )
 
     await userEvent.click(dialog.getByRole('button', { name: 'Close' }))
-
-    const action = await canvas.findByRole('button', { name: 'Draft with AI' })
-
-    await expect(action).toHaveAttribute('aria-disabled', 'true')
-    await expect(action).toHaveAccessibleDescription(/AI proposals? to review$/)
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
+    await expect(canvas.queryByRole('button', { name: 'Draft with AI' })).toBeNull()
   },
 })
 
@@ -365,11 +380,112 @@ export const LargeVolume = meta.story({
 export const ReviewOpen = meta.story({
   args: { id: inReview.id },
   beforeEach: aiDraft('proposing', { mappingDrafts: [inReview] }),
-  async play({ canvas }) {
-    const action = await canvas.findByRole('button', { name: 'Draft with AI' })
+  async play({ canvas, canvasElement }) {
+    await expect(await findAttentionButton(canvasElement)).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Draft with AI' })).toBeNull()
+  },
+})
 
-    await expect(action).toHaveAttribute('aria-disabled', 'true')
-    await expect(action).toHaveAccessibleDescription(/^AI review open \d+ AI proposals to review$/)
+const startLinkRequests = countAiDraftRequests()
+
+export const StartLink = meta.story({
+  ...startLink(withoutLinks.id),
+  beforeEach: [aiDraft('loading'), startLinkRequests],
+  async play({ canvas, canvasElement }) {
+    const dialog = await findSheet(canvasElement, 'Draft with AI')
+
+    await expectStartLinkRemoved(withoutLinks.id)
+    await (await findProgress(dialog)).findByText(/^Looking up segments:/)
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Stop' })).toHaveFocus())
+    await userEvent.click(dialog.getByRole('button', { name: 'Stop' }))
+    await findOutcome(dialog, 'AI draft stopped')
+    await userEvent.click(dialog.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
+    await expect(canvas.getByRole('button', { name: 'Draft with AI' })).toHaveFocus()
+    await expect(startLinkRequests.count()).toBe(1)
+  },
+})
+
+const manualStartRequests = countAiDraftRequests()
+
+function holdBudget(): BeforeEach<ReactRenderer> & { release: () => void } {
+  let release = () => {}
+
+  const holding: BeforeEach<ReactRenderer> = ({ msw }: StoryContext) => {
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    msw.use(
+      http.get(`${apiUrl}${aiBudgetEndpoint.path}`, async () => {
+        await held
+      }),
+    )
+  }
+
+  return Object.assign(holding, { release: () => release() })
+}
+
+const heldBudget = holdBudget()
+
+export const StartLinkStartedByHand = meta.story({
+  ...startLink(withoutLinks.id),
+  beforeEach: [aiDraft('loading'), manualStartRequests, heldBudget],
+  async play({ canvasElement }) {
+    const dialog = await findSheet(canvasElement, 'Draft with AI')
+
+    await dialog.findByRole('combobox', { name: 'Sample Document' })
+    await userEvent.click(dialog.getByRole('button', { name: 'Start the AI draft' }))
+    await (await findProgress(dialog)).findByText(/^Looking up segments:/)
+    heldBudget.release()
+    await userEvent.click(dialog.getByRole('button', { name: 'Stop' }))
+    await findOutcome(dialog, 'AI draft stopped')
+    await userEvent.click(dialog.getByRole('button', { name: 'Try again' }))
+    await expect(await dialog.findByText(/tokens left today/)).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Start the AI draft' })).toBeVisible()
+    await expect(manualStartRequests.count()).toBe(1)
+  },
+})
+
+export const StartLinkBudgetUsedUp = meta.story({
+  ...startLink(withoutLinks.id),
+  beforeEach: [aiDraft('budgetExhausted'), startLinkRequests],
+  async play({ canvasElement }) {
+    const dialog = await findSheet(canvasElement, 'Draft with AI')
+
+    await expect(
+      await dialog.findByText(
+        "Today's AI token budget is used up. AI drafts are available again tomorrow.",
+      ),
+    ).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Start the AI draft' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
+    await expect(startLinkRequests.count()).toBe(0)
+  },
+})
+
+export const StartLinkDuringReview = meta.story({
+  ...startLink(inReview.id),
+  beforeEach: [aiDraft('proposing', { mappingDrafts: [inReview] }), startLinkRequests],
+  async play({ canvasElement }) {
+    await expect(await findAttentionButton(canvasElement)).toBeVisible()
+    await expectStartLinkRemoved(inReview.id)
+    await expect(page(canvasElement).queryByRole('dialog')).toBeNull()
+    await expect(startLinkRequests.count()).toBe(0)
+  },
+})
+
+export const StartLinkSmallScreen = meta.story({
+  ...startLink(withoutLinks.id),
+  globals: { viewport: { value: 'tablet', isRotated: false } },
+  beforeEach: [aiDraft('proposing'), startLinkRequests],
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText('The Mapping canvas needs a larger screen')).toBeVisible()
+    await expectStartLinkRemoved(withoutLinks.id)
+    await expect(page(canvasElement).queryByRole('dialog')).toBeNull()
+    await expect(startLinkRequests.count()).toBe(0)
   },
 })
 
@@ -413,6 +529,46 @@ export const Viewer = meta.story({
   }),
 })
 
+export const StartLinkViewer = meta.story({
+  ...startLink(withoutLinks.id),
+  ...viewerStory({
+    beforeEach: startLinkRequests,
+    async play({ canvas, canvasElement }) {
+      await expect(
+        await canvas.findByRole('heading', { level: 1, name: withoutLinks.name }),
+      ).toBeInTheDocument()
+      await expectStartLinkRemoved(withoutLinks.id)
+      await expect(page(canvasElement).queryByRole('dialog')).toBeNull()
+      await expect(startLinkRequests.count()).toBe(0)
+    },
+  }),
+})
+
+function german(Story: () => ReactElement) {
+  return (
+    <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+      <Story />
+    </NextIntlClientProvider>
+  )
+}
+
+export const GermanRunning = meta.story({
+  ...startLink(withoutLinks.id),
+  decorators: [german],
+  beforeEach: aiDraft('loading'),
+  async play({ canvasElement }) {
+    const dialog = await findSheet(canvasElement, 'Mit KI entwerfen')
+
+    await expect(
+      await dialog.findByText(
+        'Dieser Dialog bleibt offen, bis der KI-Entwurf fertig ist. Stoppen beendet ihn vorzeitig.',
+      ),
+    ).toBeVisible()
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Stoppen' })).toHaveFocus())
+    await expect(dialog.queryByRole('button', { name: 'Dialog schließen' })).toBeNull()
+  },
+})
+
 export const German = meta.story({
   decorators: [
     (Story) => (
@@ -450,6 +606,17 @@ export const Dark = meta.story({
     const dialog = await startAiDraft(canvasElement)
 
     await findOutcome(dialog, 'Links added to the canvas')
+  },
+})
+
+export const DarkRunning = meta.story({
+  ...startLink(withoutLinks.id),
+  beforeEach: [aiDraft('loading'), darkMode],
+  async play({ canvasElement }) {
+    const dialog = await findSheet(canvasElement, 'Draft with AI')
+
+    await (await findProgress(dialog)).findByText(/^Looking up segments:/)
+    await expect(dialog.getByRole('button', { name: 'Stop' })).toBeVisible()
   },
 })
 

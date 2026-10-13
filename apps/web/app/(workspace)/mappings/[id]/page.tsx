@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import type { Metadata } from 'next'
 
+import { aiDraftRequestedIn } from '@/components/mappings/ai-draft-run'
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import { firstSearchParam } from '@/lib/search-params'
 
@@ -12,7 +13,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Page({ params, searchParams }: PageProps<'/mappings/[id]'>) {
-  const [{ id }, { field }] = await Promise.all([params, searchParams])
+  const [{ id }, query] = await Promise.all([params, searchParams])
 
-  return <MappingCanvasScreen id={id} field={firstSearchParam(field)} />
+  return (
+    <MappingCanvasScreen
+      id={id}
+      aiDraftRequested={aiDraftRequestedIn(query)}
+      field={firstSearchParam(query.field)}
+    />
+  )
 }

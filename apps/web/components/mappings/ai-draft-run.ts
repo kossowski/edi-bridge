@@ -1,3 +1,4 @@
+import { firstSearchParam } from '@/lib/search-params'
 import {
   type AiBudget,
   aiBudgetExhausted,
@@ -19,7 +20,40 @@ export type EndedAiDraftRun = Extract<AiDraftRun, { status: 'drafted' | 'empty' 
 
 export type AiDraftOutcome = 'drafted' | 'empty' | AiDraftProblem
 
-export const aiDraftStartHref = (mappingId: string) => `/mappings/${mappingId}?ai-draft=start`
+const aiDraftParam = 'ai-draft'
+
+export const aiDraftStartQuery = { [aiDraftParam]: 'start' } as const
+
+export const aiDraftStartHref = (mappingId: string) =>
+  `/mappings/${mappingId}?${new URLSearchParams(aiDraftStartQuery)}`
+
+export function aiDraftRequestedIn(
+  searchParams: Readonly<Record<string, string | string[] | undefined>>,
+) {
+  return firstSearchParam(searchParams[aiDraftParam]) === aiDraftStartQuery[aiDraftParam]
+}
+
+export function hrefWithoutAiDraftStart(pathname: string, params: URLSearchParams, hash = '') {
+  const kept = new URLSearchParams(params)
+
+  kept.delete(aiDraftParam)
+
+  const search = kept.toString()
+
+  return `${pathname}${search ? `?${search}` : ''}${hash}`
+}
+
+export function isAiDraftAvailable({
+  canChange,
+  desktop,
+  reviewOpen,
+}: {
+  canChange: boolean
+  desktop: boolean
+  reviewOpen: boolean
+}) {
+  return canChange && desktop && !reviewOpen
+}
 
 export const idleRun: AiDraftRun = { status: 'idle' }
 
@@ -143,4 +177,11 @@ export function chosenSampleId(
   samples: ReadonlyArray<{ id: string }> | undefined,
 ) {
   return chosen ?? samples?.[0]?.id ?? null
+}
+
+export function autoStartSampleId(
+  samples: ReadonlyArray<{ id: string }> | undefined,
+  budget: AiBudget | undefined,
+) {
+  return budget && !budgetBlocksStart(budget) ? chosenSampleId(null, samples) : null
 }
