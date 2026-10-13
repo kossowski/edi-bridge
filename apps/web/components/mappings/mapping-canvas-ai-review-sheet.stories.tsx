@@ -383,7 +383,7 @@ export const AcceptChain = meta.story({
     await waitFor(
       () =>
         expect(
-          within(sheet).getByRole('heading', { name: heading('Links that change the value', 1) }),
+          within(sheet).getByRole('heading', { name: heading('Links that change the value', 2) }),
         ).toBeVisible(),
       wait,
     )

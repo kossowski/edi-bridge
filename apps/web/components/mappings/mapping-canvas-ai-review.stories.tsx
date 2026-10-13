@@ -288,7 +288,7 @@ export const AcceptLinkFromMenu = meta.story({
     await userEvent.click(menu.getByRole('menuitem', { name: 'Accept link' }))
 
     await expectToast(canvasElement, 'AI-proposed link accepted.')
-    await expect(summary).toHaveTextContent('15 AI proposals to review')
+    await expect(summary).toHaveTextContent('18 AI proposals to review')
     await expect(canvas.getByRole('group', { name: plainName })).toHaveFocus()
     await expect(canvas.queryByRole('group', { name })).toBeNull()
   },
@@ -310,7 +310,7 @@ export const AcceptChainFromMenu = meta.story({
       ),
     )
     await expect(canvas.queryByRole('group', { name })).toBeNull()
-    await expect(summary).not.toHaveTextContent('16 AI proposals to review')
+    await expect(summary).not.toHaveTextContent('19 AI proposals to review')
   },
 })
 
@@ -362,7 +362,7 @@ export const AcceptFromMenuFailed = meta.story({
 
     await expectToast(canvasElement, 'The AI proposal could not be accepted. Try again.')
     await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
-    await expect(summary).toHaveTextContent('16 AI proposals to review')
+    await expect(summary).toHaveTextContent('19 AI proposals to review')
   },
 })
 
