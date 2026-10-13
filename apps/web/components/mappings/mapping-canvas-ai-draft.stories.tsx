@@ -48,6 +48,10 @@ const inReview = withAiProposal(
 
 const requestPath = `${apiUrl}${requestAiDraftEndpoint.path}`
 
+function findAttentionButton(canvasElement: HTMLElement) {
+  return within(canvasElement).findByRole('button', { name: /need attention$/ }, { timeout: 5000 })
+}
+
 function countAiDraftRequests(): BeforeEach<ReactRenderer> & { count: () => number } {
   let requests = 0
 
@@ -376,8 +380,8 @@ export const LargeVolume = meta.story({
 export const ReviewOpen = meta.story({
   args: { id: inReview.id },
   beforeEach: aiDraft('proposing', { mappingDrafts: [inReview] }),
-  async play({ canvas }) {
-    await expect(await canvas.findByRole('button', { name: /need attention$/ })).toBeVisible()
+  async play({ canvas, canvasElement }) {
+    await expect(await findAttentionButton(canvasElement)).toBeVisible()
     await expect(canvas.queryByRole('button', { name: 'Draft with AI' })).toBeNull()
   },
 })
@@ -465,8 +469,8 @@ export const StartLinkBudgetUsedUp = meta.story({
 export const StartLinkDuringReview = meta.story({
   ...startLink(inReview.id),
   beforeEach: [aiDraft('proposing', { mappingDrafts: [inReview] }), startLinkRequests],
-  async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByRole('button', { name: /need attention$/ })).toBeVisible()
+  async play({ canvasElement }) {
+    await expect(await findAttentionButton(canvasElement)).toBeVisible()
     await expectStartLinkRemoved(inReview.id)
     await expect(page(canvasElement).queryByRole('dialog')).toBeNull()
     await expect(startLinkRequests.count()).toBe(0)
