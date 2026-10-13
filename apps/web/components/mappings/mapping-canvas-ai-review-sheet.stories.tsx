@@ -105,7 +105,7 @@ export const AllGroups = meta.story({
 
     const counts = [
       countOf(groups.getByRole('heading', { name: unmapped })),
-      countOf(groups.getByRole('heading', { name: heading('Links that change the value', 2) })),
+      countOf(groups.getByRole('heading', { name: heading('Links that change the value', 3) })),
       countOf(await groups.findByRole('heading', { name: warnings }, wait)),
     ]
 
@@ -175,7 +175,7 @@ export const PreviewError = meta.story({
       await expect(sheet.getByRole('button', { name: 'Try again' })).toBeVisible()
     }, wait)
     await expect(
-      sheet.getByRole('heading', { name: heading('Links that change the value', 2) }),
+      sheet.getByRole('heading', { name: heading('Links that change the value', 3) }),
     ).toBeVisible()
   },
 })
@@ -358,7 +358,7 @@ export const German = meta.story({
 
     await expect(countOf(groups.getByRole('heading', { name: fields }))).toBeGreaterThan(0)
     await expect(
-      groups.getByRole('heading', { name: heading('Verknüpfungen, die den Wert ändern', 2) }),
+      groups.getByRole('heading', { name: heading('Verknüpfungen, die den Wert ändern', 3) }),
     ).toBeVisible()
     await expect(
       groups.getByRole('heading', { name: heading('Weitere Verknüpfungen der KI', 7) }),
