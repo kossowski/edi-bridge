@@ -24,6 +24,7 @@ import { firstStepsHandler } from './first-steps'
 import { createHandlers } from './index'
 import { seedMappingDrafts } from './mapping'
 import { publishDraft } from './publish-request'
+import { seedRunsBeforeAll } from './test-helpers'
 import { createWorkspace } from './workspace'
 
 const apiUrl = 'http://api.test'
@@ -31,6 +32,8 @@ const apiUrl = 'http://api.test'
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 afterEach(() => server.resetHandlers())
 

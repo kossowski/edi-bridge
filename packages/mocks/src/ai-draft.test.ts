@@ -28,6 +28,7 @@ import { seedMappingSamples } from './mapping-sample'
 import { mappingVersionHandlers } from './mapping-version'
 import { publishDraft } from './publish-request'
 import { showcaseViewerSession } from './session'
+import { seedRunsBeforeAll } from './test-helpers'
 import { createWorkspaceSettings, createWorkspaceSettingsStore } from './workspace-settings'
 
 const apiUrl = 'http://api.test'
@@ -37,6 +38,8 @@ const server = setupServer()
 let streams: AbortController
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 beforeEach(() => {
   streams = new AbortController()

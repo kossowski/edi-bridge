@@ -24,6 +24,7 @@ import {
 import { createHandlers } from './index'
 import { seedRuns } from './run'
 import { interchangeIdOf } from './run-store'
+import { seedRunsBeforeAll } from './test-helpers'
 import {
   createTradingPartner,
   createTradingPartners,
@@ -38,6 +39,8 @@ const apiUrl = 'http://api.test'
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 afterEach(() => {
   server.resetHandlers()

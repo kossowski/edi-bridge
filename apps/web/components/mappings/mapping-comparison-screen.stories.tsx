@@ -249,8 +249,14 @@ export const Unavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Mapping differences unavailable')).toBeVisible()
-    await expect(await canvas.findByText('Outputs unavailable')).toBeVisible()
+    // The comparison is asked for only once the Mapping and its versions have loaded, a chain of
+    // requests that a busy CI runner answers later than the default second.
+    await expect(
+      await canvas.findByText('Mapping differences unavailable', {}, { timeout: 5000 }),
+    ).toBeVisible()
+    await expect(
+      await canvas.findByText('Outputs unavailable', {}, { timeout: 5000 }),
+    ).toBeVisible()
   },
 })
 

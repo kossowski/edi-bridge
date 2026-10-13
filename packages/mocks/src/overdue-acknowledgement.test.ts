@@ -6,6 +6,7 @@ import { interchangeEndpoint, toPath } from '@edi-bridge/contracts'
 import { seedOverdueAcknowledgements } from './overdue-acknowledgement'
 import { seedRuns } from './run'
 import { runDetailHandlers } from './run-detail'
+import { seedRunsBeforeAll } from './test-helpers'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -13,6 +14,8 @@ const apiUrl = 'http://api.test'
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 afterEach(() => {
   server.resetHandlers()

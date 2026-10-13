@@ -15,6 +15,7 @@ import { seedFlows, seedMappings } from './flow'
 import { createRun, createRuns, runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
+import { seedRunsBeforeAll } from './test-helpers'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -22,6 +23,8 @@ const apiUrl = 'http://api.test'
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 afterEach(() => server.resetHandlers())
 

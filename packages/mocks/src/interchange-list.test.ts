@@ -14,12 +14,15 @@ import { interchangesHandler } from './interchange-list'
 import { createRun, createRuns, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
+import { seedRunsBeforeAll } from './test-helpers'
 
 const apiUrl = 'http://api.test'
 
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 afterEach(() => server.resetHandlers())
 

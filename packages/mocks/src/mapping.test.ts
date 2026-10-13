@@ -40,6 +40,7 @@ import {
 import { edifactLeaves, messageTypeStructureHandler } from './message-type-structure'
 import { day } from './overdue'
 import { createRun } from './run'
+import { seedRunsBeforeAll } from './test-helpers'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -47,6 +48,8 @@ const apiUrl = 'http://api.test'
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 afterEach(() => server.resetHandlers())
 

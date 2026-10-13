@@ -162,15 +162,27 @@ function pressedValues(canvasElement: HTMLElement) {
   return [...canvasElement.querySelectorAll('[data-sample-value][aria-pressed=true]')]
 }
 
+// The Mapping link waits for the list request, whose mock handler adds a random delay; the detail
+// has none. On a busy CI runner the cold first story needs more than the default second.
+const firstRender = { timeout: 5000 }
+
 export const Default = meta.story({
   async play({ canvas, canvasElement }) {
-    const values = await canvas.findByRole('group', { name: 'Values in order-4711.json' })
+    const values = await canvas.findByRole(
+      'group',
+      { name: 'Values in order-4711.json' },
+      firstRender,
+    )
 
     await expect(canvasElement.querySelector('li [aria-expanded=true]')).toBe(
       canvasElement.querySelector('li [data-path]'),
     )
 
-    const [mapping] = await canvas.findAllByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON' })
+    const [mapping] = await canvas.findAllByRole(
+      'link',
+      { name: 'Hansemarkt: ORDERS to ERP JSON' },
+      firstRender,
+    )
 
     await expect(mapping).toBeVisible()
     await selectField(canvasElement, 'Order number')

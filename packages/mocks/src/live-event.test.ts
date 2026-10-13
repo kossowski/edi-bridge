@@ -19,6 +19,7 @@ import { createHandlers } from './index'
 import { liveEventsHandler, type LiveEventsOptions } from './live-event'
 import { createRuns, runsHandler } from './run'
 import { createRunStore } from './run-store'
+import { seedRunsBeforeAll } from './test-helpers'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -28,6 +29,8 @@ const server = setupServer()
 let streams: AbortController
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 beforeEach(() => {
   streams = new AbortController()

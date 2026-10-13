@@ -88,12 +88,15 @@ import {
 } from './index'
 import { day } from './overdue'
 import { publishDraft } from './publish-request'
+import { seedRunsBeforeAll } from './test-helpers'
 
 const apiUrl = 'http://api.test'
 
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll()
 
 afterEach(() => server.resetHandlers())
 

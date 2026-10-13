@@ -7,6 +7,7 @@ import { createOverdueAcknowledgement } from './overdue-acknowledgement'
 import { createRun } from './run'
 import { createRunStore } from './run-store'
 import { tasksHandler } from './task'
+import { seedRunsBeforeAll } from './test-helpers'
 import { createTradingPartner } from './trading-partner'
 import { emptyWorkspaceActivity, type WorkspaceActivity } from './workspace-activity'
 
@@ -17,6 +18,8 @@ const now = new Date('2026-10-10T12:20:00.000Z')
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+seedRunsBeforeAll({ at: now, largeWorkspaceActivity: true })
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
