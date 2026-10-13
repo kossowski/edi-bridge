@@ -13,3 +13,4 @@
 - [ ] Viewers cannot call these endpoints
 - [ ] If this area's Zod contract doesn't exist yet, this ticket defines it in the contracts package; if it exists, the implementation conforms to it (or extends it, updating the MSW handlers alongside)
 - [ ] With mock mode off, this area's screen (if it already exists) works against the real API without UI code changes; the area's MSW handlers stay in the mocks package and keep working against the same contract
+- [ ] Code meanings, suggested or stored, are returned per language, so German pages show German meanings (ticket 67)
