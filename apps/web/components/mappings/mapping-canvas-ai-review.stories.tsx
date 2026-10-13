@@ -30,7 +30,9 @@ const large = inReview('Bodensee: ERP JSON to INVOIC', 'large')
 
 const proposedRow = /AI-proposed link$/
 
-const proposedEdge = /, AI-proposed$/
+const proposedEdge = /, AI-proposed(, needs attention)?$/
+
+const attentionEdge = /, needs attention$/
 
 function aiMarks(canvasElement: HTMLElement) {
   return canvasElement.querySelectorAll('[data-ai-proposed]')
@@ -86,6 +88,30 @@ export const ReviewOpen = meta.story({
     await expect(publish).toHaveAccessibleDescription(/Accept the draft before publishing\.$/)
     await expect(canvas.getByText('Accept the draft before publishing.')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Accept draft' })).toBeVisible()
+  },
+})
+
+export const AttentionMarks = meta.story({
+  async play({ canvas, canvasElement }) {
+    await findSummary(canvasElement)
+
+    const proposed = await canvas.findAllByRole('group', { name: proposedEdge })
+    const attention = await canvas.findAllByRole('group', { name: attentionEdge })
+
+    await expect(attention.length).toBeGreaterThan(0)
+    await expect(attention.length).toBeLessThan(proposed.length)
+
+    const strokeOf = (edge: HTMLElement) =>
+      edge.querySelector<SVGPathElement>('.react-flow__edge-path')!.style
+
+    for (const edge of attention) {
+      await expect(strokeOf(edge).stroke).toBe('var(--ai-attention)')
+      await expect(strokeOf(edge).strokeDasharray).not.toBe('6 3')
+    }
+
+    for (const edge of proposed.filter((own) => !attention.includes(own))) {
+      await expect(strokeOf(edge).stroke).toBe('var(--ai-proposed)')
+    }
   },
 })
 

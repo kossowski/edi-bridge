@@ -2394,40 +2394,48 @@
       "proposedStatus": "AI-proposed.",
       "edgeLabel": "{label}, AI-proposed",
       "edgeLabelSome": "{label}, {count} of {total} AI-proposed",
+      "edgeLabelAttention": "{label}, needs attention",
       "reject": "Reject",
       "rejectLinkLabel": "Reject the AI-proposed link from {source} to {target}",
       "rejectTransform": "Reject {name}",
       "rejectTransformLabel": "Reject the AI-proposed {name}",
       "rejectedLink": "AI-proposed link from {source} to {target} rejected.",
       "rejectedTransform": "AI-proposed {name} rejected.",
-      "showPanel": "What needs attention",
+      "attention": "{count, plural, =0 {Nothing needs attention} one {# needs attention} other {# need attention}}",
       "panel": {
-        "title": "AI review",
-        "description": "What needs attention before you accept the draft. Choose an entry to show it on the canvas.",
+        "title": "What needs attention",
+        "description": "Check these before you accept the AI draft. Choose an entry to see what to do.",
         "close": "Close AI review",
+        "back": "Back to the list",
+        "whatToDo": "What to do",
+        "show": "Show on canvas",
         "unmapped": {
-          "title": "Required target elements left unmapped",
-          "detail": "Required, nothing is mapped to it yet.",
-          "empty": "Every required target element is mapped."
+          "title": "Fields with nothing linked",
+          "detail": "Required. Nothing is linked to it yet.",
+          "empty": "Every required field has a link.",
+          "explain": "The trading partner needs this field, but nothing in your data is linked to it. Link a field of your data to it, or ask your EDI contact what belongs here."
         },
         "transforms": {
-          "title": "AI-proposed links through Transforms",
-          "empty": "No AI-proposed link runs through a Transform or Lookup Table."
+          "title": "Links that change the value",
+          "empty": "No link the AI proposed changes a value on its way.",
+          "explain": "The AI added steps that change the value on its way, for example a date format or a code translation. Check that the result is what the trading partner expects."
         },
         "through": "From {sources} through {transforms}",
         "throughOnly": "Through {transforms}",
-        "fillsNothing": "{transforms} fills no target element yet.",
+        "fillsNothing": "{transforms} fills no field yet.",
         "lookupTable": "{name} ({table})",
         "warnings": {
-          "title": "Warnings on the Sample Document",
-          "empty": "The preview shows no warnings on {name}.",
-          "emptyUnnamed": "The preview shows no warnings on the Sample Document.",
-          "loading": "Checking the Draft against the Sample Document",
-          "error": "The warnings could not be loaded."
+          "title": "Warnings on the example document",
+          "empty": "Trying the Draft on {name} gave no warnings.",
+          "emptyUnnamed": "Trying the Draft on the example document gave no warnings.",
+          "loading": "Trying the Draft on the example document",
+          "error": "The warnings could not be loaded.",
+          "explain": "We tried the Draft on the example document, and this field came out wrong or empty. Fix the link before you accept the Draft."
         },
         "plain": {
-          "title": "Other AI-proposed links",
-          "detail": "From {source}"
+          "title": "Other links the AI proposed",
+          "detail": "From {source}",
+          "explain": "The AI linked these two fields directly. Usually there is nothing to do, but have a look."
         }
       }
     },

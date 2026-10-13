@@ -9,6 +9,7 @@ import { type RefObject, useId, useRef, useState } from 'react'
 import { AppPage } from '@/components/app-page'
 import { Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
+import { AiReviewSheet } from '@/components/mappings/ai-review-sheet'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
 import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { type FailingField } from '@/components/mappings/failing-field'
@@ -29,6 +30,7 @@ import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-dra
 import { StartHere } from '@/components/mappings/start-here'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
+import { type ReviewState, useReviewAttention } from '@/components/mappings/use-review-attention'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { VersionsSheet } from '@/components/mappings/versions-sheet'
 import { whenRendered } from '@/components/mappings/when-rendered'
@@ -48,7 +50,7 @@ import { Sheet, SheetTrigger } from '@edi-bridge/ui/components/sheet'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
 import type { SideQuery } from '@/components/mappings/mapping-side'
-import type { MappingDraft } from '@edi-bridge/contracts'
+import type { AiReview, MappingDraft } from '@edi-bridge/contracts'
 
 function CanvasLoading() {
   const t = useTranslations('Mapping.canvas')
@@ -75,12 +77,14 @@ function Canvas({
   source,
   target,
   failingField,
+  review,
   ref,
 }: {
   draft: MappingDraft
   source: SideQuery
   target: SideQuery
   failingField: FailingField | null
+  review: ReviewState
   ref: RefObject<MappingCanvasHandle | null>
 }) {
   const t = useTranslations('Mapping.canvas')
@@ -105,6 +109,7 @@ function Canvas({
 
   return (
     <MappingCanvas
+      aiAttention={review.onCanvas}
       detailsFacts={<MappingFacts draft={draft} />}
       failingField={failingField}
       graph={draft}
@@ -211,6 +216,9 @@ function DetailsAction({ draft, withoutCanvas }: { draft: MappingDraft; withoutC
 
 function EditorBody({
   draft,
+  source,
+  target,
+  review,
   field,
   canChange,
   startHere,
@@ -218,6 +226,9 @@ function EditorBody({
   onLinkYourself,
 }: {
   draft: MappingDraft
+  source: SideQuery
+  target: SideQuery
+  review: ReviewState
   field: string | undefined
   canChange: boolean
   startHere: boolean
@@ -226,8 +237,6 @@ function EditorBody({
 }) {
   const desktop = useDesktop()
   const canvas = useRef<MappingCanvasHandle>(null)
-  const source = useSide(draft.source)
-  const target = useSide(draft.target)
   const lookup = useFailingField(field, source, target)
   const failingField = lookup.status === 'found' ? lookup.field : null
 
@@ -271,6 +280,7 @@ function EditorBody({
               draft={draft}
               failingField={failingField}
               ref={canvas}
+              review={review}
               source={source}
               target={target}
             />
@@ -294,92 +304,119 @@ function MappingLoading() {
   )
 }
 
-export function MappingCanvasScreen({ id, field }: { id: string; field?: string | undefined }) {
-  const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
-  const session = useSession()
+function MappingEditor({
+  id,
+  draft,
+  field,
+  canChange,
+  aiReview,
+}: {
+  id: string
+  draft: MappingDraft
+  field: string | undefined
+  canChange: boolean
+  aiReview: AiReview | null
+}) {
   const desktop = useDesktop()
   const stateId = useId()
   const reviewSummaryId = useId()
   const publishHintId = useId()
   const aiDraft = useAiDraftRun(id)
-  const draft = session.isPending ? undefined : data
-  const canChange = session.canChange
-  const aiReview = canChange ? (draft?.aiReview ?? null) : null
+  const source = useSide(draft.source)
+  const target = useSide(draft.target)
+  const review = useReviewAttention(draft, target.items, desktop)
   const [aiDraftOpen, setAiDraftOpen] = useState(false)
   // Per visit: once the Mapping has links, or the user chose to link the fields, the editor stays.
   const [started, setStarted] = useState(false)
 
-  if (draft && !started && !isEmptyGraph(draft)) {
+  if (!started && !isEmptyGraph(draft)) {
     setStarted(true)
   }
 
-  const startHere = Boolean(draft) && canChange && !started
+  const startHere = canChange && !started
+
+  return (
+    // On desktop the editor fills the viewport below the header: a thin toolbar, then the canvas at
+    // full height without page scrolling.
+    <AppPage
+      actions={
+        <>
+          {aiReview && desktop && (
+            <AiReviewSheet draft={draft} state={review} targetItems={target.items} />
+          )}
+          {canChange && desktop && (
+            <AiDraftAction
+              aiDraft={aiDraft}
+              draft={draft}
+              open={aiDraftOpen}
+              reviewSummaryId={reviewSummaryId}
+              onOpenChange={setAiDraftOpen}
+            />
+          )}
+          <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
+          <DetailsAction draft={draft} withoutCanvas={startHere} />
+          <VersionsSheet draft={draft} />
+          {canChange && (
+            <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
+          )}
+        </>
+      }
+      meta={
+        <>
+          <DraftStateLabel id={stateId} draft={draft} />
+          {canChange && <GraphSaveStatus mappingId={id} />}
+        </>
+      }
+      name={draft.name}
+      className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
+      {canChange && (
+        <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={reviewSummaryId} />
+      )}
+      <EditorBody
+        canChange={canChange}
+        draft={draft}
+        field={field}
+        review={review}
+        source={source}
+        startHere={startHere}
+        target={target}
+        onAiDraft={() => setAiDraftOpen(true)}
+        onLinkYourself={() => setStarted(true)}
+      />
+    </AppPage>
+  )
+}
+
+export function MappingCanvasScreen({ id, field }: { id: string; field?: string | undefined }) {
+  const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
+  const session = useSession()
+  const draft = session.isPending ? undefined : data
+  const canChange = session.canChange
+  const aiReview = canChange ? (draft?.aiReview ?? null) : null
 
   return (
     <MappingCanvasProvider aiReview={aiReview} viewOnly={!canChange}>
-      {/* On desktop the editor fills the viewport below the header: a thin toolbar, then the canvas
-          at full height without page scrolling. */}
-      <AppPage
-        actions={
-          draft && (
-            <>
-              {canChange && desktop && (
-                <AiDraftAction
-                  aiDraft={aiDraft}
-                  draft={draft}
-                  open={aiDraftOpen}
-                  reviewSummaryId={reviewSummaryId}
-                  onOpenChange={setAiDraftOpen}
-                />
-              )}
-              <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
-              <DetailsAction draft={draft} withoutCanvas={startHere} />
-              <VersionsSheet draft={draft} />
-              {canChange && (
-                <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
-              )}
-            </>
-          )
-        }
-        meta={
-          draft && (
-            <>
-              <DraftStateLabel id={stateId} draft={draft} />
-              {canChange && <GraphSaveStatus mappingId={id} />}
-            </>
-          )
-        }
-        name={draft?.name}
-        className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
-        {draft ? (
-          <>
-            {canChange && (
-              <AiReviewState
-                draft={draft}
-                publishHintId={publishHintId}
-                showReview={desktop}
-                summaryId={reviewSummaryId}
-              />
-            )}
-            <EditorBody
-              canChange={canChange}
-              draft={draft}
-              field={field}
-              startHere={startHere}
-              onAiDraft={() => setAiDraftOpen(true)}
-              onLinkYourself={() => setStarted(true)}
+      {draft ? (
+        <MappingEditor
+          id={id}
+          aiReview={aiReview}
+          canChange={canChange}
+          draft={draft}
+          field={field}
+        />
+      ) : (
+        <AppPage className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
+          {isPending || session.isPending ? (
+            <MappingLoading />
+          ) : (
+            <LoadFailure
+              namespace="Mapping"
+              notFound={error instanceof ApiError && error.status === 404}
+              onRetry={() => void refetch()}
             />
-          </>
-        ) : isPending || session.isPending ? (
-          <MappingLoading />
-        ) : (
-          <LoadFailure
-            namespace="Mapping"
-            notFound={error instanceof ApiError && error.status === 404}
-            onRetry={() => void refetch()}
-          />
-        )}
-      </AppPage>
+          )}
+        </AppPage>
+      )}
     </MappingCanvasProvider>
   )
 }

@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import type { Graph } from '@/components/mappings/mapping-graph'
 import type { TreeItem } from '@/components/mappings/mapping-tree'
-import type { AiReview, MappingTransform, PreviewNote } from '@edi-bridge/contracts'
+import type { AiReview, MappingTransform, PreviewNote, TransformLink } from '@edi-bridge/contracts'
 
 import { aiMarks } from './ai-marks'
 import {
   ancestorPaths,
+  attentionCount,
+  attentionMarks,
   plainProposedLinks,
   proposedChains,
   reviewAttention,
@@ -232,5 +234,89 @@ describe('reviewAttention', () => {
     expect(attention.warnings).toBeUndefined()
     expect(attention.chains).toEqual([])
     expect(attention.plain).toEqual([])
+  })
+})
+
+describe('attentionCount', () => {
+  it('counts unmapped fields, chains and warnings, but not the other proposed links', () => {
+    const attention = reviewAttention({
+      graph,
+      marks: aiMarks(review({ proposedLinks: ['BGM/1004'], proposedTransforms: [dateId] })),
+      targetItems: target,
+      notes: [{ targetPath: 'NAD+BY/3036', transformId: null, code: 'brokenLink' }],
+    })
+
+    expect(attentionCount(attention)).toBe(3)
+  })
+
+  it('counts no warnings while the preview is not there', () => {
+    const attention = reviewAttention({
+      graph,
+      marks: aiMarks(review({})),
+      targetItems: target,
+      notes: undefined,
+    })
+
+    expect(attentionCount(attention)).toBe(1)
+  })
+})
+
+describe('attentionMarks', () => {
+  const intoDate: TransformLink = {
+    from: { kind: 'source', path: 'date' },
+    to: { kind: 'transform', transformId: dateId, input: 'value' },
+  }
+
+  const intoLookup: TransformLink = {
+    from: { kind: 'transform', transformId: dateId, output: 'value' },
+    to: { kind: 'transform', transformId: lookupId, input: 'value' },
+  }
+
+  const intoTarget: TransformLink = {
+    from: { kind: 'transform', transformId: lookupId, output: 'value' },
+    to: { kind: 'target', path: 'DTM+137/2380' },
+  }
+
+  it('marks the proposed links of a chain through Transforms', () => {
+    const marks = aiMarks(
+      review({ proposedTransformLinks: [`input:${lookupId}/value`, 'target:DTM+137/2380'] }),
+    )
+
+    const attention = attentionMarks(marks, {
+      chains: proposedChains(graph, marks),
+      warnings: undefined,
+    })
+
+    expect(attention.transformLink(intoLookup)).toBe(true)
+    expect(attention.transformLink(intoTarget)).toBe(true)
+    expect(attention.transformLink(intoDate)).toBe(false)
+  })
+
+  it('marks a plain proposed link only when a warning names its field', () => {
+    const marks = aiMarks(review({ proposedLinks: ['BGM/1004', 'NAD+BY/3039'] }))
+    const chains = proposedChains(graph, marks)
+
+    const attention = attentionMarks(marks, {
+      chains,
+      warnings: [{ targetPath: 'NAD+BY/3039', transformId: null, code: 'brokenLink' }],
+    })
+
+    expect(attention.link({ targetPath: 'NAD+BY/3039' })).toBe(true)
+    expect(attention.link({ targetPath: 'BGM/1004' })).toBe(false)
+    expect(
+      attentionMarks(marks, { chains, warnings: undefined }).link({ targetPath: 'NAD+BY/3039' }),
+    ).toBe(false)
+  })
+
+  it('leaves links the Admin made alone, even in a warned chain', () => {
+    const marks = aiMarks(review({}))
+
+    const attention = attentionMarks(marks, {
+      chains: [],
+      warnings: [{ targetPath: 'DTM+137/2380', transformId: lookupId, code: 'noLookupMatch' }],
+    })
+
+    expect(attention.transformLink(intoTarget)).toBe(false)
+    expect(attention.link({ targetPath: 'DTM+137/2380' })).toBe(false)
   })
 })
