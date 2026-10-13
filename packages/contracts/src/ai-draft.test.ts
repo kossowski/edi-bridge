@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  acceptAiProposedPartsEndpoint,
   aiBudgetExhausted,
   aiBudgetExhaustedProblemSchema,
   aiDraftEventSchema,
@@ -49,6 +50,32 @@ describe('requestAiDraftEndpoint', () => {
     expect(requestAiDraftEndpoint.method).toBe('POST')
     expect(requestAiDraftEndpoint.body.parse({ sampleId })).toEqual({ sampleId })
     expect(requestAiDraftEndpoint.body.safeParse({}).success).toBe(false)
+  })
+})
+
+describe('acceptAiProposedPartsEndpoint', () => {
+  const transformId = '0000000a-0000-4000-8000-000000000001'
+
+  it('accepts single AI-proposed parts by their review keys and returns the Draft', () => {
+    const parts = {
+      links: ['BGM/1004'],
+      transforms: [transformId],
+      transformLinks: [`input:${transformId}/value`],
+    }
+
+    expect(acceptAiProposedPartsEndpoint.method).toBe('POST')
+    expect(acceptAiProposedPartsEndpoint.body.parse(parts)).toEqual(parts)
+    expect(acceptAiProposedPartsEndpoint.response.parse(draft)).toEqual(draft)
+  })
+
+  it('rejects a request that accepts nothing', () => {
+    expect(
+      acceptAiProposedPartsEndpoint.body.safeParse({
+        links: [],
+        transforms: [],
+        transformLinks: [],
+      }).success,
+    ).toBe(false)
   })
 })
 

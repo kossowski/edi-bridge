@@ -104,3 +104,55 @@ export function remainingAiReview(review: AiReview, before: GraphParts, after: G
     ),
   }
 }
+
+export const aiReviewPartsSchema = z.object({
+  links: z.array(z.string().min(1)),
+  transforms: z.array(z.uuid()),
+  transformLinks: z.array(z.string().min(1)),
+})
+
+export type AiReviewParts = z.infer<typeof aiReviewPartsSchema>
+
+export function aiReviewPartsSize({ links, transforms, transformLinks }: AiReviewParts) {
+  return links.length + transforms.length + transformLinks.length
+}
+
+const proposedParts = (review: AiReview): AiReviewParts => ({
+  links: review.proposedLinks,
+  transforms: review.proposedTransforms,
+  transformLinks: review.proposedTransformLinks,
+})
+
+export function markedAiReviewParts(review: AiReview, parts: AiReviewParts): AiReviewParts {
+  const proposed = proposedParts(review)
+
+  const marked = (keys: ReadonlyArray<string>, marks: ReadonlyArray<string>) =>
+    keys.filter((key) => marks.includes(key))
+
+  return {
+    links: marked(parts.links, proposed.links),
+    transforms: marked(parts.transforms, proposed.transforms),
+    transformLinks: marked(parts.transformLinks, proposed.transformLinks),
+  }
+}
+
+export function marksAll(review: AiReview, parts: AiReviewParts) {
+  return aiReviewPartsSize(markedAiReviewParts(review, parts)) === aiReviewPartsSize(parts)
+}
+
+export function acceptedAiReview(review: AiReview, accepted: AiReviewParts): AiReview | null {
+  const without = (marked: ReadonlyArray<string>, keys: ReadonlyArray<string>) => {
+    const gone = new Set(keys)
+
+    return marked.filter((key) => !gone.has(key))
+  }
+
+  const remaining = {
+    ...review,
+    proposedLinks: without(review.proposedLinks, accepted.links),
+    proposedTransforms: without(review.proposedTransforms, accepted.transforms),
+    proposedTransformLinks: without(review.proposedTransformLinks, accepted.transformLinks),
+  }
+
+  return aiReviewPartsSize(proposedParts(remaining)) === 0 ? null : remaining
+}

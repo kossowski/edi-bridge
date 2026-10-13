@@ -1,5 +1,7 @@
 import {
   acceptAiDraftEndpoint,
+  type AcceptAiProposedPartsBody,
+  acceptAiProposedPartsEndpoint,
   aiBudgetEndpoint,
   type AiBudgetExhaustedProblem,
   aiBudgetExhaustedProblemSchema,
@@ -372,6 +374,13 @@ export function restoreMappingVersion(mappingId: string, versionId: string) {
 
 export function acceptAiDraft(id: string) {
   return request(acceptAiDraftEndpoint, { path: toPath(acceptAiDraftEndpoint.path, { id }) })
+}
+
+export function acceptAiProposedParts(id: string, body: AcceptAiProposedPartsBody) {
+  return request(acceptAiProposedPartsEndpoint, {
+    path: toPath(acceptAiProposedPartsEndpoint.path, { id }),
+    body,
+  })
 }
 
 export function getAiBudget() {

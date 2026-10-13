@@ -1,20 +1,27 @@
-import { QueryClient } from '@tanstack/react-query'
-import { describe, expect, it } from 'vitest'
+import { MutationObserver, QueryClient } from '@tanstack/react-query'
+import { setupServer } from 'msw/node'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { type Task } from '@edi-bridge/contracts'
 import {
+  aiDraftHandlers,
+  aiProposalFor,
   createTradingPartner,
   publishedVersionsOf,
   seedDocumentStructures,
   seedLookupTables,
   seedMappingDrafts,
+  seedMappingSamples,
   seedTradingPartners,
   toLookupTable,
   toMappingDraft,
   toMappingSummary,
+  withAiProposal,
 } from '@edi-bridge/mocks'
 
+import { apiUrl } from './config'
 import {
+  acceptAiProposedPartsMutation,
   documentStructureQuery,
   documentStructuresQuery,
   forgetDeletedLookupTable,
@@ -196,5 +203,44 @@ describe('newestTasksFirst', () => {
 
     expect(sorted.tasks.map((task) => task.id)).toEqual(['newest', 'middle', 'older'])
     expect(sorted.counts).toBe(counts)
+  })
+})
+
+describe('acceptAiProposedPartsMutation', () => {
+  const server = setupServer()
+
+  beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+  afterEach(() => server.resetHandlers())
+
+  afterAll(() => server.close())
+
+  const record = seedMappingDrafts.find(
+    ({ id, links }) =>
+      links.length === 0 && seedMappingSamples.some(({ mappingId }) => mappingId === id),
+  )!
+
+  const sample = seedMappingSamples.find(({ mappingId }) => mappingId === record.id)!
+  const reviewed = withAiProposal(record, sample.id, aiProposalFor(record, seedDocumentStructures))
+  const review = reviewed.aiReview!
+
+  it('caches the Draft and closes its AI review once nothing proposed is left', async () => {
+    server.use(...aiDraftHandlers(apiUrl, { mappings: [reviewed] }))
+
+    const queryClient = new QueryClient()
+    const { queryKey } = mappingDraftQuery(reviewed.id)
+
+    queryClient.setQueryData(queryKey, toMappingDraft(reviewed, seedDocumentStructures))
+
+    await new MutationObserver(
+      queryClient,
+      acceptAiProposedPartsMutation(queryClient, reviewed.id),
+    ).mutate({
+      links: review.proposedLinks,
+      transforms: review.proposedTransforms,
+      transformLinks: review.proposedTransformLinks,
+    })
+
+    expect(queryClient.getQueryData(queryKey)).toMatchObject({ aiReview: null })
   })
 })

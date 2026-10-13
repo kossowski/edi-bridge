@@ -11,6 +11,9 @@ export {
 
 export {
   acceptAiDraftEndpoint,
+  type AcceptAiProposedPartsBody,
+  acceptAiProposedPartsBodySchema,
+  acceptAiProposedPartsEndpoint,
   type AiBudget,
   aiBudgetEndpoint,
   aiBudgetExhausted,
@@ -41,10 +44,16 @@ export {
 } from './ai-draft'
 
 export {
+  acceptedAiReview,
   aiReviewKeys,
   type AiReview,
+  type AiReviewParts,
+  aiReviewPartsSchema,
+  aiReviewPartsSize,
   aiReviewSchema,
   linkEndKey,
+  markedAiReviewParts,
+  marksAll,
   remainingAiReview,
   transformLinkKey,
 } from './ai-review'

@@ -2,6 +2,8 @@ import { delay, http, HttpResponse } from 'msw'
 
 import {
   acceptAiDraftEndpoint,
+  acceptAiProposedPartsEndpoint,
+  acceptedAiReview,
   type AiBudget,
   aiBudgetEndpoint,
   aiBudgetExhausted,
@@ -12,6 +14,7 @@ import {
   aiReviewKeys,
   type DocumentStructure,
   type MappingLink,
+  marksAll,
   requestAiDraftEndpoint,
   type Session,
   type TransformLink,
@@ -501,6 +504,42 @@ export function aiDraftHandlers(
         }
 
         const accepted = { ...record, aiReview: null, updatedAt: new Date().toISOString() }
+        store.set(accepted)
+
+        return HttpResponse.json(toMappingDraft(accepted, structures.all()))
+      }),
+    ),
+    http.post<{ id: string }>(
+      `${apiUrl}${acceptAiProposedPartsEndpoint.path}`,
+      adminOnly(sessionStore, async ({ params, request }) => {
+        const record = store.get(params.id)
+
+        await delay()
+
+        if (!record) {
+          return notFound()
+        }
+
+        const body = acceptAiProposedPartsEndpoint.body.safeParse(await request.json())
+
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
+
+        if (!record.aiReview) {
+          return conflict('The Draft has no open AI review.')
+        }
+
+        if (!marksAll(record.aiReview, body.data)) {
+          return conflict('The AI review does not mark every part to accept.')
+        }
+
+        const accepted = {
+          ...record,
+          aiReview: acceptedAiReview(record.aiReview, body.data),
+          updatedAt: new Date().toISOString(),
+        }
+
         store.set(accepted)
 
         return HttpResponse.json(toMappingDraft(accepted, structures.all()))

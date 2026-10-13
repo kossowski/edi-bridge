@@ -4,6 +4,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { mappingVersionSummarySchema } from '@edi-bridge/contracts'
 import {
+  aiDraftHandlers,
+  aiProposalFor,
   channelHandlers,
   createRun,
   createTradingPartner as buildTradingPartner,
@@ -14,7 +16,9 @@ import {
   lookupTableListHandler,
   mappingHandlers,
   mappingVersionHandlers,
+  seedDocumentStructures,
   seedMappingDrafts,
+  seedMappingSamples,
   seedUnusedDocumentStructures,
   runDetailHandlers,
   runsHandler,
@@ -22,10 +26,12 @@ import {
   seedLookupTables,
   seedTradingPartners,
   tradingPartnerHandlers,
+  withAiProposal,
   workspaceHandlers,
 } from '@edi-bridge/mocks'
 
 import {
+  acceptAiProposedParts,
   ApiError,
   createChannel,
   createLookupTable,
@@ -278,6 +284,39 @@ describe('saveMappingDraft', () => {
         transformLinks,
       }),
     ).rejects.toMatchObject({ status: 422 })
+  })
+})
+
+describe('acceptAiProposedParts', () => {
+  const record = seedMappingDrafts.find(
+    ({ id, links }) =>
+      links.length === 0 && seedMappingSamples.some(({ mappingId }) => mappingId === id),
+  )!
+
+  const sample = seedMappingSamples.find(({ mappingId }) => mappingId === record.id)!
+  const reviewed = withAiProposal(record, sample.id, aiProposalFor(record, seedDocumentStructures))
+  const review = reviewed.aiReview!
+
+  it('drops the marks of the accepted parts and returns the Draft', async () => {
+    server.use(...aiDraftHandlers(apiUrl, { mappings: [reviewed] }))
+
+    const [first, ...others] = review.proposedLinks
+
+    await expect(
+      acceptAiProposedParts(reviewed.id, { links: [first!], transforms: [], transformLinks: [] }),
+    ).resolves.toMatchObject({ aiReview: { ...review, proposedLinks: others } })
+  })
+
+  it('rejects with 409 for a part the AI review does not mark', async () => {
+    server.use(...aiDraftHandlers(apiUrl, { mappings: [reviewed] }))
+
+    await expect(
+      acceptAiProposedParts(reviewed.id, {
+        links: ['UNH/0062'],
+        transforms: [],
+        transformLinks: [],
+      }),
+    ).rejects.toMatchObject({ status: 409 })
   })
 })
 

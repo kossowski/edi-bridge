@@ -3,6 +3,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import {
   acceptAiDraftEndpoint,
+  type AcceptAiProposedPartsBody,
+  acceptAiProposedPartsEndpoint,
   aiBudgetEndpoint,
   aiBudgetExhaustedProblemSchema,
   type AiDraftEvent,
@@ -103,6 +105,14 @@ async function draftedEvent(mappingId: string) {
 function accept(mappingId: string) {
   return fetch(`${apiUrl}${toPath(acceptAiDraftEndpoint.path, { id: mappingId })}`, {
     method: 'POST',
+  })
+}
+
+function acceptParts(mappingId: string, body: Partial<AcceptAiProposedPartsBody>) {
+  return fetch(`${apiUrl}${toPath(acceptAiProposedPartsEndpoint.path, { id: mappingId })}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ links: [], transforms: [], transformLinks: [], ...body }),
   })
 }
 
@@ -405,6 +415,7 @@ describe('POST /mappings/:id/ai-draft rejections', () => {
     expect((await requestAiDraft(withoutLinks.id)).status).toBe(403)
     expect((await getBudget()).status).toBe(403)
     expect((await accept(withoutLinks.id)).status).toBe(403)
+    expect((await acceptParts(withoutLinks.id, { links: ['BGM/1004'] })).status).toBe(403)
   })
 })
 
@@ -463,6 +474,74 @@ describe('POST /mappings/:id/ai-draft/accept', () => {
     use()
 
     expect((await accept(withoutLinks.id)).status).toBe(409)
+  })
+})
+
+describe('POST /mappings/:id/ai-draft/accept-parts', () => {
+  it('drops the marks of the accepted parts and keeps the review open', async () => {
+    use()
+    const { draft } = await draftedEvent(withoutLinks.id)
+    const [first, ...others] = draft.aiReview!.proposedLinks
+
+    const response = await acceptParts(withoutLinks.id, { links: [first!] })
+    const accepted = acceptAiProposedPartsEndpoint.response.parse(await response.json())
+
+    expect(response.status).toBe(200)
+    expect(accepted.aiReview).toEqual({ ...draft.aiReview, proposedLinks: others })
+    expect(partsOf(accepted)).toEqual(partsOf(draft))
+    await expect(getDraft(withoutLinks.id)).resolves.toEqual(accepted)
+    expect((await publishDraft(apiUrl, draft.mappingId)).status).toBe(423)
+  })
+
+  it('closes the review once nothing proposed is left', async () => {
+    use()
+    const { draft } = await draftedEvent(withoutLinks.id)
+    const review = draft.aiReview!
+
+    const response = await acceptParts(withoutLinks.id, {
+      links: review.proposedLinks,
+      transforms: review.proposedTransforms,
+      transformLinks: review.proposedTransformLinks,
+    })
+
+    const accepted = acceptAiProposedPartsEndpoint.response.parse(await response.json())
+
+    expect(accepted.aiReview).toBeNull()
+    expect(partsOf(accepted)).toEqual(partsOf(draft))
+    expect((await publishDraft(apiUrl, draft.mappingId)).status).toBe(201)
+  })
+
+  it('answers 409 for a part the review does not mark', async () => {
+    use()
+    const { draft } = await draftedEvent(withoutLinks.id)
+
+    const response = await acceptParts(withoutLinks.id, { links: ['UNH/0062'] })
+
+    expect(response.status).toBe(409)
+    await expect(getDraft(withoutLinks.id)).resolves.toEqual(draft)
+  })
+
+  it('answers 409 for a Draft without an open AI review', async () => {
+    use()
+
+    expect((await acceptParts(withoutLinks.id, { links: ['BGM/1004'] })).status).toBe(409)
+  })
+
+  it('answers 400 when nothing is accepted', async () => {
+    use()
+    await draftedEvent(withoutLinks.id)
+
+    expect((await acceptParts(withoutLinks.id, {})).status).toBe(400)
+  })
+
+  it('answers 404 for an unknown Mapping', async () => {
+    use()
+
+    const response = await acceptParts('00000000-0000-4000-8000-00000000ffff', {
+      links: ['BGM/1004'],
+    })
+
+    expect(response.status).toBe(404)
   })
 })
 
