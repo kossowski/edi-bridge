@@ -25,11 +25,13 @@ import {
   documentStructureQuery,
   documentStructuresQuery,
   forgetDeletedLookupTable,
+  graphChangeScope,
   lookupTableMissingCodesQuery,
   lookupTableQuery,
   lookupTablesQuery,
   lookupTableSuggestionsQuery,
   mappingDraftQuery,
+  mappingKeys,
   mappingsQuery,
   mappingVersionsQuery,
   newestTasksFirst,
@@ -242,5 +244,74 @@ describe('acceptAiProposedPartsMutation', () => {
     })
 
     expect(queryClient.getQueryData(queryKey)).toMatchObject({ aiReview: null })
+  })
+
+  const firstLink = { links: review.proposedLinks.slice(0, 1), transforms: [], transformLinks: [] }
+
+  function graphSave(queryClient: QueryClient, mutationFn: () => Promise<void>) {
+    return new MutationObserver(queryClient, {
+      mutationKey: mappingKeys.graph(reviewed.id),
+      scope: graphChangeScope(reviewed.id),
+      mutationFn,
+    }).mutate()
+  }
+
+  it('waits for the graph save before it to settle', async () => {
+    server.use(...aiDraftHandlers(apiUrl, { mappings: [reviewed] }))
+
+    const queryClient = new QueryClient()
+    const order: string[] = []
+    const { promise: saving, resolve: finishSave } = Promise.withResolvers<void>()
+
+    queryClient.setQueryData(
+      mappingDraftQuery(reviewed.id).queryKey,
+      toMappingDraft(reviewed, seedDocumentStructures),
+    )
+    server.events.on('request:start', () => order.push('accept sent'))
+
+    const saved = graphSave(queryClient, () => saving).then(() => order.push('save settled'))
+
+    const accepted = new MutationObserver(
+      queryClient,
+      acceptAiProposedPartsMutation(queryClient, reviewed.id),
+    ).mutate(firstLink)
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    finishSave()
+    await Promise.all([saved, accepted])
+    server.events.removeAllListeners()
+
+    expect(order).toEqual(['save settled', 'accept sent'])
+  })
+
+  it('keeps the change of a save waiting behind it and takes only the review', async () => {
+    server.use(...aiDraftHandlers(apiUrl, { mappings: [reviewed] }))
+
+    const queryClient = new QueryClient()
+    const { queryKey } = mappingDraftQuery(reviewed.id)
+    const draft = toMappingDraft(reviewed, seedDocumentStructures)
+    const added = { sourcePath: 'note', targetPath: 'FTX/4440' }
+    const { promise: saving, resolve: finishSave } = Promise.withResolvers<void>()
+
+    queryClient.setQueryData(queryKey, draft)
+
+    const accepted = new MutationObserver(
+      queryClient,
+      acceptAiProposedPartsMutation(queryClient, reviewed.id),
+    ).mutate(firstLink)
+
+    queryClient.setQueryData(queryKey, { ...draft, links: [...draft.links, added] })
+
+    const saved = graphSave(queryClient, () => saving)
+
+    await accepted
+
+    expect(queryClient.getQueryData(queryKey)).toMatchObject({
+      links: [...draft.links, added],
+      aiReview: { proposedLinks: review.proposedLinks.slice(1) },
+    })
+
+    finishSave()
+    await saved
   })
 })

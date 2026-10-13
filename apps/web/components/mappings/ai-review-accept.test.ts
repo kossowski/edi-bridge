@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest'
 import type { Graph } from '@/components/mappings/mapping-graph'
 import type { AiReview, MappingTransform, TransformLink } from '@edi-bridge/contracts'
 
-import { partsAcceptedWith, reviewAfterAccepting } from './ai-review-accept'
+import {
+  acceptMessages,
+  partsAcceptedAt,
+  partsAcceptedWith,
+  partsAcceptedWithChain,
+  reviewAfterAccepting,
+} from './ai-review-accept'
 
 const dateId = '1c9e6e2f-8a5f-4e7c-8b4a-3b9a5d2a6f32'
 
@@ -131,6 +137,83 @@ describe('partsAcceptedWith', () => {
         { kind: 'link', link: added },
       ),
     ).toEqual({ links: [], transforms: [], transformLinks: [] })
+  })
+})
+
+describe('partsAcceptedAt', () => {
+  it('accepts the link into a target, with its chain when it runs through Transforms', () => {
+    expect(partsAcceptedAt(review, graph, 'NAD+BY/3039')).toEqual({
+      links: ['NAD+BY/3039'],
+      transforms: [],
+      transformLinks: [],
+    })
+    expect(partsAcceptedAt(review, graph, 'BGM/C002/1001')).toEqual({
+      links: [],
+      transforms: [constantId],
+      transformLinks: ['target:BGM/C002/1001'],
+    })
+  })
+
+  it('accepts nothing for a target without a link', () => {
+    expect(partsAcceptedAt(review, graph, 'FTX/4440')).toEqual({
+      links: [],
+      transforms: [],
+      transformLinks: [],
+    })
+  })
+})
+
+describe('partsAcceptedWithChain', () => {
+  it('accepts the chain that fills a target', () => {
+    expect(
+      partsAcceptedWithChain(review, graph, {
+        targetPath: 'DTM+137/2380',
+        transformIds: [lookupId, dateId],
+        sourcePaths: ['date'],
+      }),
+    ).toEqual(partsAcceptedWith(review, graph, { kind: 'transformLink', link: outOfLookup }))
+  })
+
+  it('accepts a proposed Transform that fills nothing, with the links into it', () => {
+    const unusedId = '3e1a8b4c-0c7b-4a9e-8d6c-5dbc7f4c8b54'
+
+    const intoUnused: TransformLink = {
+      from: { kind: 'source', path: 'note' },
+      to: { kind: 'transform', transformId: unusedId, input: 'value' },
+    }
+
+    const withUnused = {
+      ...graph,
+      transforms: [...graph.transforms, transform(unusedId)],
+      transformLinks: [...graph.transformLinks, intoUnused],
+    }
+
+    const marked = {
+      ...review,
+      proposedTransforms: [...review.proposedTransforms, unusedId],
+      proposedTransformLinks: [...review.proposedTransformLinks, `input:${unusedId}/value`],
+    }
+
+    expect(
+      partsAcceptedWithChain(marked, withUnused, {
+        targetPath: null,
+        transformIds: [unusedId],
+        sourcePaths: [],
+      }),
+    ).toEqual({ links: [], transforms: [unusedId], transformLinks: [`input:${unusedId}/value`] })
+  })
+})
+
+describe('acceptMessages', () => {
+  it('words a plain link alone and a Transform Link as its chain', () => {
+    expect(acceptMessages(partsAcceptedAt(review, graph, 'BGM/1004'))).toEqual({
+      accept: 'acceptLink',
+      accepted: 'acceptedLink',
+    })
+    expect(acceptMessages(partsAcceptedAt(review, graph, 'DTM+137/2380'))).toEqual({
+      accept: 'acceptChain',
+      accepted: 'acceptedChain',
+    })
   })
 })
 

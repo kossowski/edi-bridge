@@ -29,6 +29,7 @@ import { useSide, useSideTitle } from '@/components/mappings/mapping-side'
 import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
 import { StartHere } from '@/components/mappings/start-here'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
+import { AiAcceptContext, useAiAccept } from '@/components/mappings/use-ai-accept'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { type ReviewState, useReviewAttention } from '@/components/mappings/use-review-attention'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
@@ -325,6 +326,7 @@ function MappingEditor({
   const source = useSide(draft.source)
   const target = useSide(draft.target)
   const review = useReviewAttention(draft, target.items, desktop)
+  const aiAccept = useAiAccept(draft)
   const [aiDraftOpen, setAiDraftOpen] = useState(false)
   // Per visit: once the Mapping has links, or the user chose to link the fields, the editor stays.
   const [started, setStarted] = useState(false)
@@ -338,52 +340,59 @@ function MappingEditor({
   return (
     // On desktop the editor fills the viewport below the header: a thin toolbar, then the canvas at
     // full height without page scrolling.
-    <AppPage
-      actions={
-        <>
-          {aiReview && desktop && (
-            <AiReviewSheet draft={draft} state={review} targetItems={target.items} />
-          )}
-          {canChange && desktop && (
-            <AiDraftAction
-              aiDraft={aiDraft}
-              draft={draft}
-              open={aiDraftOpen}
-              reviewSummaryId={reviewSummaryId}
-              onOpenChange={setAiDraftOpen}
-            />
-          )}
-          <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
-          <DetailsAction draft={draft} withoutCanvas={startHere} />
-          <VersionsSheet draft={draft} />
-          {canChange && (
-            <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
-          )}
-        </>
-      }
-      meta={
-        <>
-          <DraftStateLabel id={stateId} draft={draft} />
-          {canChange && <GraphSaveStatus mappingId={id} />}
-        </>
-      }
-      name={draft.name}
-      className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
-      {canChange && (
-        <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={reviewSummaryId} />
-      )}
-      <EditorBody
-        canChange={canChange}
-        draft={draft}
-        field={field}
-        review={review}
-        source={source}
-        startHere={startHere}
-        target={target}
-        onAiDraft={() => setAiDraftOpen(true)}
-        onLinkYourself={() => setStarted(true)}
-      />
-    </AppPage>
+    <AiAcceptContext value={aiAccept}>
+      <AppPage
+        actions={
+          <>
+            {aiReview && desktop && (
+              <AiReviewSheet draft={draft} state={review} targetItems={target.items} />
+            )}
+            {canChange && desktop && (
+              <AiDraftAction
+                aiDraft={aiDraft}
+                draft={draft}
+                open={aiDraftOpen}
+                reviewSummaryId={reviewSummaryId}
+                onOpenChange={setAiDraftOpen}
+              />
+            )}
+            <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
+            <DetailsAction draft={draft} withoutCanvas={startHere} />
+            <VersionsSheet draft={draft} />
+            {canChange && (
+              <PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />
+            )}
+          </>
+        }
+        meta={
+          <>
+            <DraftStateLabel id={stateId} draft={draft} />
+            {canChange && <GraphSaveStatus mappingId={id} />}
+          </>
+        }
+        name={draft.name}
+        className="lg:gap-3 lg:px-4 lg:py-3 lg:contain-size">
+        {canChange && (
+          <AiReviewState
+            closedReview={aiAccept.closedReview}
+            draft={draft}
+            publishHintId={publishHintId}
+            summaryId={reviewSummaryId}
+          />
+        )}
+        <EditorBody
+          canChange={canChange}
+          draft={draft}
+          field={field}
+          review={review}
+          source={source}
+          startHere={startHere}
+          target={target}
+          onAiDraft={() => setAiDraftOpen(true)}
+          onLinkYourself={() => setStarted(true)}
+        />
+      </AppPage>
+    </AiAcceptContext>
   )
 }
 

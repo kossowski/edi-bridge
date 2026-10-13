@@ -19,7 +19,7 @@ import { findRowButton } from '@/components/mappings/tree-node'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { mappingPreviewEndpoint } from '@edi-bridge/contracts'
+import { acceptAiProposedPartsEndpoint, mappingPreviewEndpoint } from '@edi-bridge/contracts'
 import { aiProposalFor, seedDocumentStructures } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -34,6 +34,14 @@ const outbound = inReviewWith(outboundName, { ...drafted, links: drafted.links.s
 const quiet = inReview('Alpenfrisch: CONTRL to ERP JSON')
 
 const large = inReview('Bodensee: ERP JSON to INVOIC', 'large')
+
+const oneLinkLeft = inReviewWith(outboundName, {
+  links: drafted.links.slice(0, 1),
+  transforms: [],
+  transformLinks: [],
+})
+
+const acceptPartsUrl = `${apiUrl}${acceptAiProposedPartsEndpoint.path}`
 
 const previewUrl = `${apiUrl}${mappingPreviewEndpoint.path}`
 
@@ -339,6 +347,130 @@ export const AcceptRemovesButton = meta.story({
   },
 })
 
+export const AcceptLink = meta.story({
+  async play({ canvas, canvasElement }) {
+    const summary = await canvas.findByText(/AI proposals? to review$/)
+    const proposals = countOf(summary)
+    const sheet = await openSheet(canvasElement)
+    const before = countOf(within(sheet).getByRole('heading', { name: other }))
+    const [entry, next] = entriesUnder(sheet, other)
+    const path = pathOf(entry!)
+
+    await userEvent.click(entry!)
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Accept link' }))
+
+    await waitFor(
+      () => expect(countOf(within(sheet).getByRole('heading', { name: other }))).toBe(before - 1),
+      wait,
+    )
+    await expect(entriesUnder(sheet, other).map(pathOf)).not.toContain(path)
+    await waitFor(() => expect(entriesUnder(sheet, other)[0]).toHaveFocus())
+    await expect(pathOf(entriesUnder(sheet, other)[0]!)).toBe(pathOf(next!))
+    await expect(countOf(summary)).toBe(proposals - 1)
+  },
+})
+
+export const AcceptChain = meta.story({
+  async play({ canvasElement }) {
+    const sheet = await openSheet(canvasElement)
+    const [chain] = entriesUnder(sheet, changing)
+
+    await userEvent.click(chain!)
+    await userEvent.click(
+      within(sheet).getByRole('button', { name: 'Accept links and Transforms' }),
+    )
+
+    await waitFor(
+      () =>
+        expect(
+          within(sheet).getByRole('heading', { name: heading('Links that change the value', 2) }),
+        ).toBeVisible(),
+      wait,
+    )
+    await waitFor(() => expect(entriesUnder(sheet, changing)[0]).toHaveFocus())
+    await expect(page(canvasElement).queryByRole('dialog', { name: sheetName })).not.toBeNull()
+  },
+})
+
+export const AcceptPending = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(acceptPartsUrl, async () => {
+        await delay('infinite')
+
+        return HttpResponse.json({})
+      }),
+    )
+  },
+  async play({ canvasElement }) {
+    const sheet = await openSheet(canvasElement)
+
+    await userEvent.click(entriesUnder(sheet, other)[0]!)
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Accept link' }))
+
+    const pending = await within(sheet).findByRole('button', { name: 'Accepting…' })
+
+    await expect(pending).toHaveAttribute('aria-disabled', 'true')
+    await expect(within(sheet).getByRole('heading', { name: 'What to do' })).toBeVisible()
+  },
+})
+
+export const AcceptFailed = meta.story({
+  beforeEach({ msw }) {
+    msw.use(
+      http.post(acceptPartsUrl, () => HttpResponse.json({ message: 'Down' }, { status: 500 })),
+    )
+  },
+  async play({ canvasElement }) {
+    const sheet = await openSheet(canvasElement)
+
+    await userEvent.click(entriesUnder(sheet, other)[0]!)
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Accept link' }))
+
+    await expect(
+      await within(sheet).findByText('The AI proposal could not be accepted. Try again.', {}, wait),
+    ).toHaveAttribute('role', 'alert')
+    await expect(within(sheet).getByRole('button', { name: 'Accept link' })).toBeEnabled()
+    await expect(within(sheet).getByRole('heading', { name: 'What to do' })).toBeVisible()
+  },
+})
+
+export const AcceptLastLink = meta.story({
+  args: { id: oneLinkLeft.id },
+  beforeEach: reviewing(oneLinkLeft),
+  async play({ canvas, canvasElement }) {
+    const sheet = await openSheet(canvasElement)
+    const [entry] = entriesUnder(sheet, other)
+
+    await userEvent.click(entry!)
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Accept link' }))
+
+    const done = await canvas.findByText(
+      'AI draft accepted. The Draft stays editable and can be published now.',
+      {},
+      wait,
+    )
+
+    await waitFor(() => expect(done.closest('[role="status"]')).toHaveFocus())
+    await expect(page(canvasElement).queryByRole('dialog', { name: sheetName })).toBeNull()
+    await expect(canvas.queryByRole('button', { name: countButton })).toBeNull()
+    await expect(canvas.getByRole('button', { name: 'Publish' })).toBeEnabled()
+  },
+})
+
+// A warning asks to fix the link first, so it offers no way to accept it.
+export const WarningWithoutAccept = meta.story({
+  async play({ canvasElement }) {
+    const sheet = await openSheet(canvasElement)
+
+    await within(sheet).findByRole('heading', { name: warnings }, wait)
+    await userEvent.click(entriesUnder(sheet, warnings)[0]!)
+
+    await expect(within(sheet).getByRole('heading', { name: 'What to do' })).toBeVisible()
+    await expect(within(sheet).queryByRole('button', { name: /^Accept/ })).toBeNull()
+  },
+})
+
 export const German = meta.story({
   decorators: [
     (Story) => (
@@ -367,6 +499,10 @@ export const German = meta.story({
     await userEvent.click(entriesUnder(sheet, fields)[0]!)
     await expect(groups.getByRole('button', { name: 'Zurück zur Liste' })).toBeVisible()
     await expect(groups.getByRole('button', { name: 'Auf der Zeichenfläche zeigen' })).toBeVisible()
+
+    await userEvent.click(groups.getByRole('button', { name: 'Zurück zur Liste' }))
+    await userEvent.click(entriesUnder(sheet, heading('Weitere Verknüpfungen der KI'))[0]!)
+    await expect(groups.getByRole('button', { name: 'Verknüpfung übernehmen' })).toBeVisible()
   },
 })
 
@@ -384,6 +520,9 @@ export const Dark = meta.story({
     await expect(await within(sheet).findByRole('heading', { name: warnings }, wait)).toBeVisible()
     await userEvent.click(entriesUnder(sheet, changing)[0]!)
     await expect(within(sheet).getByRole('heading', { name: 'What to do' })).toBeVisible()
+    await expect(
+      within(sheet).getByRole('button', { name: 'Accept links and Transforms' }),
+    ).toBeVisible()
   },
 })
 

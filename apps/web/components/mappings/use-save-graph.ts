@@ -10,7 +10,12 @@ import {
 import { useCanvasStoreApi } from '@/components/mappings/mapping-canvas-store'
 import { applyChange, type GraphChange, revertChange } from '@/components/mappings/mapping-graph'
 import { saveMappingDraft } from '@/lib/api/client'
-import { mappingDraftQuery, mappingKeys } from '@/lib/api/queries'
+import {
+  graphChangeScope,
+  isLastGraphChange,
+  mappingDraftQuery,
+  mappingKeys,
+} from '@/lib/api/queries'
 import { type AiReview, type MappingDraft, remainingAiReview } from '@edi-bridge/contracts'
 
 // The canvas words the messages, since it still knows the names of what a change removes.
@@ -25,9 +30,9 @@ const saveStates = {
   error: 'failed',
 } as const satisfies Record<MutationStatus, GraphSaveState | null>
 
-// Each save sends the whole graph as the cache holds it, so the saves of one Mapping run one after
-// another: a save reads the cache only once the one before it has settled, and so never sends a
-// change that a failed save before it has taken back. Each change still shows at once.
+// Each save sends the whole graph as the cache holds it, so the saves and accepts of one Mapping run
+// one after another: a save reads the cache only once the one before it has settled, and so never
+// sends a change that a failed save before it has taken back. Each change still shows at once.
 export function useSaveGraph(mappingId: string) {
   const queryClient = useQueryClient()
   const store = useCanvasStoreApi()
@@ -36,7 +41,7 @@ export function useSaveGraph(mappingId: string) {
 
   // Only the last of several quick changes may write the server's answer into the cache;
   // an earlier answer would drop the changes made after it.
-  const isLast = () => queryClient.isMutating({ mutationKey }) === 1
+  const isLast = () => isLastGraphChange(queryClient, mappingId)
 
   const save = useMutation<
     MappingDraft,
@@ -45,7 +50,7 @@ export function useSaveGraph(mappingId: string) {
     { unpublishedChanges: boolean | undefined; aiReview: AiReview | null | undefined }
   >({
     mutationKey,
-    scope: { id: mutationKey.join('/') },
+    scope: graphChangeScope(mappingId),
     mutationFn: () => {
       const draft = queryClient.getQueryData<MappingDraft>(queryKey)
 
