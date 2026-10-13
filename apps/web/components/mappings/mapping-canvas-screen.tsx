@@ -9,6 +9,7 @@ import { type RefObject, useId, useRef, useState } from 'react'
 import { AppPage } from '@/components/app-page'
 import { Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
+import { startsAiDraftOnOpening } from '@/components/mappings/ai-draft-run'
 import { AiReviewSheet } from '@/components/mappings/ai-review-sheet'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
 import { EditorSheetContent } from '@/components/mappings/editor-sheet'
@@ -30,6 +31,7 @@ import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-dra
 import { StartHere } from '@/components/mappings/start-here'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { AiAcceptContext, useAiAccept } from '@/components/mappings/use-ai-accept'
+import { useAiDraftDialog, useAiDraftStartLink } from '@/components/mappings/use-ai-draft-dialog'
 import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { type ReviewState, useReviewAttention } from '@/components/mappings/use-review-attention'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
@@ -311,23 +313,33 @@ function MappingEditor({
   field,
   canChange,
   aiReview,
+  aiDraftStart,
 }: {
   id: string
   draft: MappingDraft
   field: string | undefined
   canChange: boolean
   aiReview: AiReview | null
+  aiDraftStart: boolean
 }) {
   const desktop = useDesktop()
   const stateId = useId()
   const reviewSummaryId = useId()
   const publishHintId = useId()
+  const reviewTriggerRef = useRef<HTMLButtonElement>(null)
   const aiDraft = useAiDraftRun(id)
   const source = useSide(draft.source)
   const target = useSide(draft.target)
   const review = useReviewAttention(draft, target.items, desktop)
   const aiAccept = useAiAccept(draft)
-  const [aiDraftOpen, setAiDraftOpen] = useState(false)
+
+  const aiDraftDialog = useAiDraftDialog({
+    mappingId: id,
+    startLink: aiDraftStart,
+    startAllowed: startsAiDraftOnOpening({ canChange, desktop, reviewOpen: aiReview !== null }),
+    start: aiDraft.start,
+  })
+
   // Per visit: once the Mapping has links, or the user chose to link the fields, the editor stays.
   const [started, setStarted] = useState(false)
 
@@ -345,15 +357,20 @@ function MappingEditor({
         actions={
           <>
             {aiReview && desktop && (
-              <AiReviewSheet draft={draft} state={review} targetItems={target.items} />
+              <AiReviewSheet
+                draft={draft}
+                state={review}
+                targetItems={target.items}
+                triggerRef={reviewTriggerRef}
+              />
             )}
             {canChange && desktop && (
               <AiDraftAction
                 aiDraft={aiDraft}
                 draft={draft}
-                open={aiDraftOpen}
-                reviewSummaryId={reviewSummaryId}
-                onOpenChange={setAiDraftOpen}
+                open={aiDraftDialog.open}
+                reviewTriggerRef={reviewTriggerRef}
+                onOpenChange={aiDraftDialog.onOpenChange}
               />
             )}
             <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
@@ -388,7 +405,7 @@ function MappingEditor({
           source={source}
           startHere={startHere}
           target={target}
-          onAiDraft={() => setAiDraftOpen(true)}
+          onAiDraft={() => aiDraftDialog.onOpenChange(true)}
           onLinkYourself={() => setStarted(true)}
         />
       </AppPage>
@@ -396,9 +413,18 @@ function MappingEditor({
   )
 }
 
-export function MappingCanvasScreen({ id, field }: { id: string; field?: string | undefined }) {
+export function MappingCanvasScreen({
+  id,
+  field,
+  aiDraftStart = false,
+}: {
+  id: string
+  field?: string | undefined
+  aiDraftStart?: boolean
+}) {
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
   const session = useSession()
+  const startLink = useAiDraftStartLink(aiDraftStart)
   const draft = session.isPending ? undefined : data
   const canChange = session.canChange
   const aiReview = canChange ? (draft?.aiReview ?? null) : null
@@ -408,6 +434,7 @@ export function MappingCanvasScreen({ id, field }: { id: string; field?: string 
       {draft ? (
         <MappingEditor
           id={id}
+          aiDraftStart={startLink}
           aiReview={aiReview}
           canChange={canChange}
           draft={draft}

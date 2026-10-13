@@ -12,11 +12,15 @@ import {
 import type { AiDraftEvent, AiDraftStep, AiProposal } from '@edi-bridge/contracts'
 
 import {
+  aiDraftStartHref,
   type AiDraftRun,
+  autoStartSampleId,
   budgetBlocksStart,
   canRetry,
   chosenSampleId,
+  hrefWithoutAiDraftStart,
   idleRun,
+  isAiDraftStart,
   isEnded,
   lastRound,
   outcomeKey,
@@ -25,6 +29,7 @@ import {
   runAfterProblem,
   shownSegmentTags,
   startedRun,
+  startsAiDraftOnOpening,
 } from './ai-draft-run'
 
 const record = seedMappingDrafts.find(
@@ -228,5 +233,49 @@ describe('shownSegmentTags', () => {
       shown: ['BGM', 'DTM'],
       more: 2,
     })
+  })
+})
+
+describe('the AI draft start link', () => {
+  it('asks the Mapping editor to start the AI draft', () => {
+    const href = new URL(aiDraftStartHref('m-1'), 'https://edi.example')
+
+    expect(href.pathname).toBe('/mappings/m-1')
+    expect(isAiDraftStart(href.searchParams.get('ai-draft') ?? undefined)).toBe(true)
+    expect(isAiDraftStart(undefined)).toBe(false)
+    expect(isAiDraftStart('stop')).toBe(false)
+  })
+
+  it('leaves the other search parameters when it is removed', () => {
+    expect(
+      hrefWithoutAiDraftStart('/mappings/m-1', new URLSearchParams('ai-draft=start&field=a.b')),
+    ).toBe('/mappings/m-1?field=a.b')
+    expect(hrefWithoutAiDraftStart('/mappings/m-1', new URLSearchParams('ai-draft=start'))).toBe(
+      '/mappings/m-1',
+    )
+  })
+
+  it('starts the AI draft only for a user who can change the Mapping on a large screen', () => {
+    const allowed = { canChange: true, desktop: true, reviewOpen: false }
+
+    expect(startsAiDraftOnOpening(allowed)).toBe(true)
+    expect(startsAiDraftOnOpening({ ...allowed, canChange: false })).toBe(false)
+    expect(startsAiDraftOnOpening({ ...allowed, desktop: false })).toBe(false)
+    expect(startsAiDraftOnOpening({ ...allowed, reviewOpen: true })).toBe(false)
+  })
+})
+
+describe('autoStartSampleId', () => {
+  const samples = [{ id: 'first' }, { id: 'second' }]
+  const resetsAt = '2026-10-12T00:00:00.000Z'
+
+  it('starts with the first Sample Document while tokens are left', () => {
+    expect(autoStartSampleId(samples, { dailyLimit: 1000, usedToday: 10, resetsAt })).toBe('first')
+  })
+
+  it('does not start without a Sample Document, a known budget or tokens left', () => {
+    expect(autoStartSampleId([], { dailyLimit: 1000, usedToday: 10, resetsAt })).toBeNull()
+    expect(autoStartSampleId(samples, undefined)).toBeNull()
+    expect(autoStartSampleId(samples, { dailyLimit: 1000, usedToday: 1000, resetsAt })).toBeNull()
   })
 })

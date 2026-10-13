@@ -19,7 +19,34 @@ export type EndedAiDraftRun = Extract<AiDraftRun, { status: 'drafted' | 'empty' 
 
 export type AiDraftOutcome = 'drafted' | 'empty' | AiDraftProblem
 
-export const aiDraftStartHref = (mappingId: string) => `/mappings/${mappingId}?ai-draft=start`
+const aiDraftParam = 'ai-draft'
+
+export const aiDraftStartHref = (mappingId: string) =>
+  `/mappings/${mappingId}?${aiDraftParam}=start`
+
+export const isAiDraftStart = (value: string | undefined) => value === 'start'
+
+export function hrefWithoutAiDraftStart(pathname: string, params: URLSearchParams) {
+  const kept = new URLSearchParams(params)
+
+  kept.delete(aiDraftParam)
+
+  const search = kept.toString()
+
+  return search ? `${pathname}?${search}` : pathname
+}
+
+export function startsAiDraftOnOpening({
+  canChange,
+  desktop,
+  reviewOpen,
+}: {
+  canChange: boolean
+  desktop: boolean
+  reviewOpen: boolean
+}) {
+  return canChange && desktop && !reviewOpen
+}
 
 export const idleRun: AiDraftRun = { status: 'idle' }
 
@@ -143,4 +170,11 @@ export function chosenSampleId(
   samples: ReadonlyArray<{ id: string }> | undefined,
 ) {
   return chosen ?? samples?.[0]?.id ?? null
+}
+
+export function autoStartSampleId(
+  samples: ReadonlyArray<{ id: string }> | undefined,
+  budget: AiBudget | undefined,
+) {
+  return budget && !budgetBlocksStart(budget) ? chosenSampleId(null, samples) : null
 }

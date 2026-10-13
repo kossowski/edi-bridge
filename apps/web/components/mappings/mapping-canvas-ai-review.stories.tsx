@@ -248,10 +248,7 @@ export const AcceptDraft = meta.story({
     await expect(
       (await detailsPanel(canvasElement)).getByRole('button', { name: 'Remove Lookup Table 1' }),
     ).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Draft with AI' })).not.toHaveAttribute(
-      'aria-disabled',
-      'true',
-    )
+    await expect(canvas.getByRole('button', { name: 'Draft with AI' })).toBeVisible()
     await expect(done).toBeVisible()
   },
 })

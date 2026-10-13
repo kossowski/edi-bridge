@@ -2367,7 +2367,7 @@
           "description": "You stopped the AI draft, so no links were added. Try again."
         }
       },
-      "closeKeepsRunning": "The AI draft keeps going when you close this dialog. Stop ends it.",
+      "staysOpen": "This dialog stays open until the AI draft is done. Stop ends it early.",
       "running": "AI drafting: {step}",
       "ended": "AI draft ended",
       "stepShort": {

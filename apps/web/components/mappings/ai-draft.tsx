@@ -4,7 +4,7 @@ import { AiMagicIcon, RefreshIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { type RefObject, useEffect, useId, useRef, useState } from 'react'
+import { type ComponentProps, type RefObject, useEffect, useId, useRef, useState } from 'react'
 
 import { AiDraftBudget } from '@/components/mappings/ai-draft-budget'
 import { AiDraftProgress, StepIcon, useStepText } from '@/components/mappings/ai-draft-progress'
@@ -104,14 +104,14 @@ function AiDraftDialogBody({
   draft,
   aiDraft: { run, start, stop, reset },
   sampleRef,
-  closeRef,
+  stopRef,
   outcomeRef,
   onClose,
 }: {
   draft: MappingDraft
   aiDraft: AiDraftRunControls
   sampleRef: RefObject<HTMLButtonElement | null>
-  closeRef: RefObject<HTMLButtonElement | null>
+  stopRef: RefObject<HTMLButtonElement | null>
   outcomeRef: RefObject<HTMLHeadingElement | null>
   onClose: () => void
 }) {
@@ -132,10 +132,10 @@ function AiDraftDialogBody({
 
     previousPhase.current = phase
 
-    const focusTarget = { choosing: sampleRef, running: closeRef, ended: outcomeRef }[phase]
+    const focusTarget = { choosing: sampleRef, running: stopRef, ended: outcomeRef }[phase]
 
     focusTarget.current?.focus()
-  }, [phase, sampleRef, closeRef, outcomeRef])
+  }, [phase, sampleRef, stopRef, outcomeRef])
 
   return (
     <>
@@ -169,11 +169,10 @@ function AiDraftDialogBody({
           {isEnded(run) ? (
             <Outcome headingRef={outcomeRef} run={run} />
           ) : (
-            <p className="text-muted-foreground">{t('closeKeepsRunning')}</p>
+            <p className="text-muted-foreground">{t('staysOpen')}</p>
           )}
         </div>
       )}
-      {/* Each slot keeps its button across the phases, so focus never drops out of the dialog. */}
       <DialogFooter>
         {phase === 'choosing' && (
           <Button variant="outline" onClick={onClose}>
@@ -181,7 +180,7 @@ function AiDraftDialogBody({
           </Button>
         )}
         {phase === 'running' && (
-          <Button variant="outline" onClick={stop}>
+          <Button ref={stopRef} variant="outline" onClick={stop}>
             {t('stop')}
           </Button>
         )}
@@ -203,14 +202,14 @@ function AiDraftDialogBody({
             {t('start')}
           </Button>
         ) : (
-          <Button ref={closeRef} onClick={onClose}>
-            {t('close')}
-          </Button>
+          phase === 'ended' && <Button onClick={onClose}>{t('close')}</Button>
         )}
       </DialogFooter>
     </>
   )
 }
+
+type OpenChangeDetails = Parameters<NonNullable<ComponentProps<typeof Dialog>['onOpenChange']>>[1]
 
 function useActionLabel(run: AiDraftRun) {
   const t = useTranslations('Mapping.aiDraft')
@@ -230,31 +229,40 @@ function useActionLabel(run: AiDraftRun) {
   }
 }
 
-// The dialog's open state belongs to the editor, which also opens it from "Start here".
+// The dialog's open state belongs to the editor, which also opens it from "Start here" and the
+// start link. Without the action, which an open review hides, focus goes back to the review.
 export function AiDraftAction({
   draft,
   aiDraft,
-  reviewSummaryId,
+  reviewTriggerRef,
   open,
   onOpenChange,
 }: {
   draft: MappingDraft
   aiDraft: AiDraftRunControls
-  reviewSummaryId?: string
+  reviewTriggerRef: RefObject<HTMLButtonElement | null>
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
   const t = useTranslations('Mapping.aiDraft')
   const [seenRun, setSeenRun] = useState<AiDraftRun | null>(null)
   const outcomeDescription = useOutcomeDescription()
+  const actionRef = useRef<HTMLButtonElement>(null)
   const sampleRef = useRef<HTMLButtonElement>(null)
-  const closeRef = useRef<HTMLButtonElement>(null)
+  const stopRef = useRef<HTMLButtonElement>(null)
   const outcomeRef = useRef<HTMLHeadingElement>(null)
   const { run } = aiDraft
   const { phase } = runPresentation(run)
+  const running = phase === 'running'
   const action = useActionLabel(run)
 
-  function changeOpen(next: boolean) {
+  function changeOpen(next: boolean, details?: OpenChangeDetails) {
+    if (!next && running) {
+      details?.cancel()
+
+      return
+    }
+
     if (!next) {
       setSeenRun(run)
     }
@@ -268,37 +276,37 @@ export function AiDraftAction({
     }
   }
 
-  const reviewBlocks = phase === 'choosing' && draft.aiReview !== null
+  const reviewOpen = draft.aiReview !== null
 
   return (
     <div className="flex items-center gap-2">
       <p role="status" className="sr-only">
         {!open && isEnded(run) && run !== seenRun ? outcomeDescription(run) : ''}
       </p>
-      <ToolbarAction
-        icon={action.icon}
-        label={action.label}
-        render={
-          <Button
-            disabled={reviewBlocks}
-            focusableWhenDisabled
-            variant="outline"
-            aria-describedby={reviewBlocks ? reviewSummaryId : undefined}
-            onClick={() => changeOpen(true)}
-          />
-        }
-      />
-      <Dialog open={open} onOpenChange={changeOpen} onOpenChangeComplete={afterOpenChange}>
+      {!(phase === 'choosing' && reviewOpen) && (
+        <ToolbarAction
+          icon={action.icon}
+          label={action.label}
+          render={<Button ref={actionRef} variant="outline" onClick={() => changeOpen(true)} />}
+        />
+      )}
+      <Dialog
+        disablePointerDismissal={running}
+        open={open}
+        onOpenChange={changeOpen}
+        onOpenChangeComplete={afterOpenChange}>
         <DialogContent
           closeLabel={t('closeDialog')}
-          initialFocus={{ choosing: true, running: closeRef, ended: outcomeRef }[phase]}
+          finalFocus={() => (reviewOpen ? reviewTriggerRef.current : actionRef.current)}
+          initialFocus={{ choosing: true, running: stopRef, ended: outcomeRef }[phase]}
+          showCloseButton={!running}
           className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-lg">
           <AiDraftDialogBody
             aiDraft={aiDraft}
-            closeRef={closeRef}
             draft={draft}
             outcomeRef={outcomeRef}
             sampleRef={sampleRef}
+            stopRef={stopRef}
             onClose={() => changeOpen(false)}
           />
         </DialogContent>
