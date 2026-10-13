@@ -9,7 +9,7 @@ import { type RefObject, useId, useRef, useState } from 'react'
 import { AppPage } from '@/components/app-page'
 import { Fact, LoadFailure } from '@/components/detail-parts'
 import { AiDraftAction } from '@/components/mappings/ai-draft'
-import { startsAiDraftOnOpening } from '@/components/mappings/ai-draft-run'
+import { isAiDraftAvailable } from '@/components/mappings/ai-draft-run'
 import { AiReviewSheet } from '@/components/mappings/ai-review-sheet'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
 import { EditorSheetContent } from '@/components/mappings/editor-sheet'
@@ -31,8 +31,8 @@ import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-dra
 import { StartHere } from '@/components/mappings/start-here'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { AiAcceptContext, useAiAccept } from '@/components/mappings/use-ai-accept'
-import { useAiDraftDialog, useAiDraftStartLink } from '@/components/mappings/use-ai-draft-dialog'
-import { useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
+import { useAiDraftDialog } from '@/components/mappings/use-ai-draft-dialog'
+import { type AiDraftRunControls, useAiDraftRun } from '@/components/mappings/use-ai-draft-run'
 import { type ReviewState, useReviewAttention } from '@/components/mappings/use-review-attention'
 import { useSaveGraph } from '@/components/mappings/use-save-graph'
 import { VersionsSheet } from '@/components/mappings/versions-sheet'
@@ -313,32 +313,27 @@ function MappingEditor({
   field,
   canChange,
   aiReview,
-  aiDraftStart,
+  aiDraft,
+  aiDraftAvailable,
+  aiDraftDialog,
 }: {
   id: string
   draft: MappingDraft
   field: string | undefined
   canChange: boolean
   aiReview: AiReview | null
-  aiDraftStart: boolean
+  aiDraft: AiDraftRunControls
+  aiDraftAvailable: boolean
+  aiDraftDialog: ReturnType<typeof useAiDraftDialog>
 }) {
   const desktop = useDesktop()
   const stateId = useId()
-  const reviewSummaryId = useId()
   const publishHintId = useId()
   const reviewTriggerRef = useRef<HTMLButtonElement>(null)
-  const aiDraft = useAiDraftRun(id)
   const source = useSide(draft.source)
   const target = useSide(draft.target)
   const review = useReviewAttention(draft, target.items, desktop)
   const aiAccept = useAiAccept(draft)
-
-  const aiDraftDialog = useAiDraftDialog({
-    mappingId: id,
-    startLink: aiDraftStart,
-    startAllowed: startsAiDraftOnOpening({ canChange, desktop, reviewOpen: aiReview !== null }),
-    start: aiDraft.start,
-  })
 
   // Per visit: once the Mapping has links, or the user chose to link the fields, the editor stays.
   const [started, setStarted] = useState(false)
@@ -364,15 +359,14 @@ function MappingEditor({
                 triggerRef={reviewTriggerRef}
               />
             )}
-            {canChange && desktop && (
-              <AiDraftAction
-                aiDraft={aiDraft}
-                draft={draft}
-                open={aiDraftDialog.open}
-                reviewTriggerRef={reviewTriggerRef}
-                onOpenChange={aiDraftDialog.onOpenChange}
-              />
-            )}
+            <AiDraftAction
+              aiDraft={aiDraft}
+              available={aiDraftAvailable}
+              draft={draft}
+              open={aiDraftDialog.open}
+              reviewTriggerRef={reviewTriggerRef}
+              onOpenChange={aiDraftDialog.onOpenChange}
+            />
             <MappingPreviewSheet draft={draft} reviewSampleId={aiReview?.sampleId ?? null} />
             <DetailsAction draft={draft} withoutCanvas={startHere} />
             <VersionsSheet draft={draft} />
@@ -394,7 +388,6 @@ function MappingEditor({
             closedReview={aiAccept.closedReview}
             draft={draft}
             publishHintId={publishHintId}
-            summaryId={reviewSummaryId}
           />
         )}
         <EditorBody
@@ -416,25 +409,37 @@ function MappingEditor({
 export function MappingCanvasScreen({
   id,
   field,
-  aiDraftStart = false,
+  aiDraftRequested = false,
 }: {
   id: string
   field?: string | undefined
-  aiDraftStart?: boolean
+  aiDraftRequested?: boolean
 }) {
   const { data, error, isPending, refetch } = useQuery(mappingDraftQuery(id))
   const session = useSession()
-  const startLink = useAiDraftStartLink(aiDraftStart)
+  const desktop = useDesktop()
   const draft = session.isPending ? undefined : data
   const canChange = session.canChange
   const aiReview = canChange ? (draft?.aiReview ?? null) : null
+  const aiDraft = useAiDraftRun(id)
+  const aiDraftAvailable = isAiDraftAvailable({ canChange, desktop, reviewOpen: aiReview !== null })
+
+  const aiDraftDialog = useAiDraftDialog({
+    mappingId: id,
+    aiDraftRequested,
+    decidable: draft !== undefined,
+    available: aiDraftAvailable,
+    aiDraft,
+  })
 
   return (
     <MappingCanvasProvider aiReview={aiReview} viewOnly={!canChange}>
       {draft ? (
         <MappingEditor
           id={id}
-          aiDraftStart={startLink}
+          aiDraft={aiDraft}
+          aiDraftAvailable={aiDraftAvailable}
+          aiDraftDialog={aiDraftDialog}
           aiReview={aiReview}
           canChange={canChange}
           draft={draft}

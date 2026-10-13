@@ -12,7 +12,9 @@ import {
 import type { AiDraftEvent, AiDraftStep, AiProposal } from '@edi-bridge/contracts'
 
 import {
+  aiDraftRequestedIn,
   aiDraftStartHref,
+  aiDraftStartQuery,
   type AiDraftRun,
   autoStartSampleId,
   budgetBlocksStart,
@@ -20,7 +22,7 @@ import {
   chosenSampleId,
   hrefWithoutAiDraftStart,
   idleRun,
-  isAiDraftStart,
+  isAiDraftAvailable,
   isEnded,
   lastRound,
   outcomeKey,
@@ -29,7 +31,6 @@ import {
   runAfterProblem,
   shownSegmentTags,
   startedRun,
-  startsAiDraftOnOpening,
 } from './ai-draft-run'
 
 const record = seedMappingDrafts.find(
@@ -241,27 +242,39 @@ describe('the AI draft start link', () => {
     const href = new URL(aiDraftStartHref('m-1'), 'https://edi.example')
 
     expect(href.pathname).toBe('/mappings/m-1')
-    expect(isAiDraftStart(href.searchParams.get('ai-draft') ?? undefined)).toBe(true)
-    expect(isAiDraftStart(undefined)).toBe(false)
-    expect(isAiDraftStart('stop')).toBe(false)
+    expect(aiDraftRequestedIn(Object.fromEntries(href.searchParams))).toBe(true)
+    expect(aiDraftRequestedIn(aiDraftStartQuery)).toBe(true)
+    expect(aiDraftRequestedIn({})).toBe(false)
+    expect(aiDraftRequestedIn({ 'ai-draft': 'stop' })).toBe(false)
+    expect(aiDraftRequestedIn({ 'ai-draft': ['start', 'stop'] })).toBe(true)
   })
 
-  it('leaves the other search parameters when it is removed', () => {
+  it('leaves the other search parameters and the fragment when it is removed', () => {
     expect(
       hrefWithoutAiDraftStart('/mappings/m-1', new URLSearchParams('ai-draft=start&field=a.b')),
     ).toBe('/mappings/m-1?field=a.b')
     expect(hrefWithoutAiDraftStart('/mappings/m-1', new URLSearchParams('ai-draft=start'))).toBe(
       '/mappings/m-1',
     )
+    expect(
+      hrefWithoutAiDraftStart(
+        '/mappings/m-1',
+        new URLSearchParams('field=a.b&ai-draft=start'),
+        '#canvas',
+      ),
+    ).toBe('/mappings/m-1?field=a.b#canvas')
+    expect(
+      hrefWithoutAiDraftStart('/mappings/m-1', new URLSearchParams('ai-draft=start'), '#canvas'),
+    ).toBe('/mappings/m-1#canvas')
   })
 
-  it('starts the AI draft only for a user who can change the Mapping on a large screen', () => {
+  it('offers the AI draft only to a user who can change the Mapping on a large screen', () => {
     const allowed = { canChange: true, desktop: true, reviewOpen: false }
 
-    expect(startsAiDraftOnOpening(allowed)).toBe(true)
-    expect(startsAiDraftOnOpening({ ...allowed, canChange: false })).toBe(false)
-    expect(startsAiDraftOnOpening({ ...allowed, desktop: false })).toBe(false)
-    expect(startsAiDraftOnOpening({ ...allowed, reviewOpen: true })).toBe(false)
+    expect(isAiDraftAvailable(allowed)).toBe(true)
+    expect(isAiDraftAvailable({ ...allowed, canChange: false })).toBe(false)
+    expect(isAiDraftAvailable({ ...allowed, desktop: false })).toBe(false)
+    expect(isAiDraftAvailable({ ...allowed, reviewOpen: true })).toBe(false)
   })
 })
 

@@ -7,6 +7,7 @@ import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
 import type { ReactElement } from 'react'
 import type { BeforeEach } from 'storybook/internal/csf'
 
+import { aiDraftStartQuery } from '@/components/mappings/ai-draft-run'
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
   expectSavedLinkCount,
@@ -18,6 +19,7 @@ import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import {
+  aiBudgetEndpoint,
   aiBudgetExhaustedStatus,
   aiReviewOpenStatus,
   requestAiDraftEndpoint,
@@ -62,9 +64,9 @@ function countAiDraftRequests(): BeforeEach<ReactRenderer> & { count: () => numb
 }
 
 const startLink = (id: string) => ({
-  args: { id, aiDraftStart: true },
+  args: { id, aiDraftRequested: true },
   parameters: {
-    nextjs: { navigation: { pathname: `/mappings/${id}`, query: { 'ai-draft': 'start' } } },
+    nextjs: { navigation: { pathname: `/mappings/${id}`, query: aiDraftStartQuery } },
   },
 })
 
@@ -195,7 +197,7 @@ export const RunningDialogStaysOpen = meta.story({
     )
     await expect(page(canvasElement).getByRole('dialog', { name: 'Draft with AI' })).toBeVisible()
     await expect(dialog.queryByRole('button', { name: /^Close/ })).toBeNull()
-    await expect(dialog.getByRole('button', { name: 'Stop' })).toBeEnabled()
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Stop' })).toHaveFocus())
 
     await findOutcome(dialog, 'Links added to the canvas')
     await userEvent.keyboard('{Escape}')
@@ -397,6 +399,47 @@ export const StartLink = meta.story({
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
     await expect(canvas.getByRole('button', { name: 'Draft with AI' })).toHaveFocus()
     await expect(startLinkRequests.count()).toBe(1)
+  },
+})
+
+const manualStartRequests = countAiDraftRequests()
+
+function holdBudget(): BeforeEach<ReactRenderer> & { release: () => void } {
+  let release = () => {}
+
+  const holding: BeforeEach<ReactRenderer> = ({ msw }: StoryContext) => {
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    msw.use(
+      http.get(`${apiUrl}${aiBudgetEndpoint.path}`, async () => {
+        await held
+      }),
+    )
+  }
+
+  return Object.assign(holding, { release: () => release() })
+}
+
+const heldBudget = holdBudget()
+
+export const StartLinkStartedByHand = meta.story({
+  ...startLink(withoutLinks.id),
+  beforeEach: [aiDraft('loading'), manualStartRequests, heldBudget],
+  async play({ canvasElement }) {
+    const dialog = await findSheet(canvasElement, 'Draft with AI')
+
+    await dialog.findByRole('combobox', { name: 'Sample Document' })
+    await userEvent.click(dialog.getByRole('button', { name: 'Start the AI draft' }))
+    await (await findProgress(dialog)).findByText(/^Looking up segments:/)
+    heldBudget.release()
+    await userEvent.click(dialog.getByRole('button', { name: 'Stop' }))
+    await findOutcome(dialog, 'AI draft stopped')
+    await userEvent.click(dialog.getByRole('button', { name: 'Try again' }))
+    await expect(await dialog.findByText(/tokens left today/)).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Start the AI draft' })).toBeVisible()
+    await expect(manualStartRequests.count()).toBe(1)
   },
 })
 

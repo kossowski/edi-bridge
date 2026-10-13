@@ -17,13 +17,11 @@ import type { MappingDraft } from '@edi-bridge/contracts'
 
 export function AiReviewState({
   draft,
-  summaryId,
   publishHintId,
   closedReview = false,
 }: {
   draft: MappingDraft
   closedReview?: boolean
-  summaryId: string
   publishHintId: string
 }) {
   const t = useTranslations('Mapping.aiReview')
@@ -70,7 +68,7 @@ export function AiReviewState({
       </p>
       {review && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-          <span id={summaryId} className="inline-flex flex-wrap items-center gap-2">
+          <span className="inline-flex flex-wrap items-center gap-2">
             <AiBadge label={t('open')} />
             {t('openSummary', { count: aiProposedCount(review) })}
           </span>

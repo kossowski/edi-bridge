@@ -1,3 +1,4 @@
+import { firstSearchParam } from '@/lib/search-params'
 import {
   type AiBudget,
   aiBudgetExhausted,
@@ -21,22 +22,28 @@ export type AiDraftOutcome = 'drafted' | 'empty' | AiDraftProblem
 
 const aiDraftParam = 'ai-draft'
 
+export const aiDraftStartQuery = { [aiDraftParam]: 'start' } as const
+
 export const aiDraftStartHref = (mappingId: string) =>
-  `/mappings/${mappingId}?${aiDraftParam}=start`
+  `/mappings/${mappingId}?${new URLSearchParams(aiDraftStartQuery)}`
 
-export const isAiDraftStart = (value: string | undefined) => value === 'start'
+export function aiDraftRequestedIn(
+  searchParams: Readonly<Record<string, string | string[] | undefined>>,
+) {
+  return firstSearchParam(searchParams[aiDraftParam]) === aiDraftStartQuery[aiDraftParam]
+}
 
-export function hrefWithoutAiDraftStart(pathname: string, params: URLSearchParams) {
+export function hrefWithoutAiDraftStart(pathname: string, params: URLSearchParams, hash = '') {
   const kept = new URLSearchParams(params)
 
   kept.delete(aiDraftParam)
 
   const search = kept.toString()
 
-  return search ? `${pathname}?${search}` : pathname
+  return `${pathname}${search ? `?${search}` : ''}${hash}`
 }
 
-export function startsAiDraftOnOpening({
+export function isAiDraftAvailable({
   canChange,
   desktop,
   reviewOpen,

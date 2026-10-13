@@ -229,17 +229,20 @@ function useActionLabel(run: AiDraftRun) {
   }
 }
 
-// The dialog's open state belongs to the editor, which also opens it from "Start here" and the
-// start link. Without the action, which an open review hides, focus goes back to the review.
+// The dialog's open state belongs to the screen, which also opens it from "Start here" and the
+// start link. The action is there only while an AI draft is available; without it, as after a
+// draft that opened a review, focus goes back to the review.
 export function AiDraftAction({
   draft,
   aiDraft,
+  available,
   reviewTriggerRef,
   open,
   onOpenChange,
 }: {
   draft: MappingDraft
   aiDraft: AiDraftRunControls
+  available: boolean
   reviewTriggerRef: RefObject<HTMLButtonElement | null>
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -257,13 +260,14 @@ export function AiDraftAction({
   const action = useActionLabel(run)
 
   function changeOpen(next: boolean, details?: OpenChangeDetails) {
-    if (!next && running) {
-      details?.cancel()
-
-      return
-    }
-
     if (!next) {
+      if (running) {
+        details?.cancel()
+        stopRef.current?.focus()
+
+        return
+      }
+
       setSeenRun(run)
     }
 
@@ -276,14 +280,12 @@ export function AiDraftAction({
     }
   }
 
-  const reviewOpen = draft.aiReview !== null
-
   return (
-    <div className="flex items-center gap-2">
+    <>
       <p role="status" className="sr-only">
         {!open && isEnded(run) && run !== seenRun ? outcomeDescription(run) : ''}
       </p>
-      {!(phase === 'choosing' && reviewOpen) && (
+      {available && (
         <ToolbarAction
           icon={action.icon}
           label={action.label}
@@ -297,10 +299,11 @@ export function AiDraftAction({
         onOpenChangeComplete={afterOpenChange}>
         <DialogContent
           closeLabel={t('closeDialog')}
-          finalFocus={() => (reviewOpen ? reviewTriggerRef.current : actionRef.current)}
+          finalFocus={() => actionRef.current ?? reviewTriggerRef.current}
           initialFocus={{ choosing: true, running: stopRef, ended: outcomeRef }[phase]}
           showCloseButton={!running}
-          className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-lg">
+          className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-lg"
+          onBlur={(event) => running && event.relatedTarget === null && stopRef.current?.focus()}>
           <AiDraftDialogBody
             aiDraft={aiDraft}
             draft={draft}
@@ -311,6 +314,6 @@ export function AiDraftAction({
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }

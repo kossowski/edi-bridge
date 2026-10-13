@@ -5,52 +5,62 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useEffectEvent, useState } from 'react'
 
 import { autoStartSampleId, hrefWithoutAiDraftStart } from '@/components/mappings/ai-draft-run'
+import { type AiDraftRunControls } from '@/components/mappings/use-ai-draft-run'
 import { aiBudgetQuery, mappingSamplesQuery } from '@/lib/api/queries'
 
 import type { AiBudget, MappingSample } from '@edi-bridge/contracts'
 
-// The link takes itself out of the address without a history entry, so a reload or going back does
-// not start another AI draft; the screen keeps the request it opened with.
-export function useAiDraftStartLink(requested: boolean) {
+// The start link takes itself out of the address without a history entry, so a reload or going
+// back does not start another AI draft.
+function useRemoveStartLink(aiDraftRequested: boolean) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [startLink] = useState(requested)
 
   useEffect(() => {
-    if (requested) {
-      router.replace(hrefWithoutAiDraftStart(pathname, searchParams), { scroll: false })
+    if (aiDraftRequested) {
+      router.replace(hrefWithoutAiDraftStart(pathname, searchParams, window.location.hash), {
+        scroll: false,
+      })
     }
-  }, [requested, pathname, router, searchParams])
-
-  return startLink
+  }, [aiDraftRequested, pathname, router, searchParams])
 }
 
-// The start link opens the dialog on the first render that can decide, and starts the AI draft
-// once its Sample Documents and budget are in, unless the user closed the dialog meanwhile.
+// The start link opens the dialog once the editor can decide, and starts the AI draft once its
+// Sample Documents and budget are in, unless the user closed the dialog or started one meanwhile.
+// The screen holds this state, so a remounted editor does not start again.
 export function useAiDraftDialog({
   mappingId,
-  startLink,
-  startAllowed,
-  start,
+  aiDraftRequested,
+  decidable,
+  available,
+  aiDraft,
 }: {
   mappingId: string
-  startLink: boolean
-  startAllowed: boolean
-  start: (sampleId: string) => void
+  aiDraftRequested: boolean
+  decidable: boolean
+  available: boolean
+  aiDraft: AiDraftRunControls
 }) {
   const queryClient = useQueryClient()
+  const [requestPending, setRequestPending] = useState(aiDraftRequested)
   const [open, setOpen] = useState(false)
-  const [startLinkHandled, setStartLinkHandled] = useState(!startLink)
   const [autoStart, setAutoStart] = useState(false)
+  const idle = aiDraft.run.status === 'idle'
 
-  if (!startLinkHandled) {
-    setStartLinkHandled(true)
+  useRemoveStartLink(aiDraftRequested)
 
-    if (startAllowed) {
+  if (requestPending && decidable) {
+    setRequestPending(false)
+
+    if (available) {
       setOpen(true)
       setAutoStart(true)
     }
+  }
+
+  if (autoStart && !idle) {
+    setAutoStart(false)
   }
 
   const startWhenReady = useEffectEvent(
@@ -59,13 +69,13 @@ export function useAiDraftDialog({
 
       const sampleId = autoStartSampleId(samples, budget)
 
-      if (sampleId !== null) {
-        start(sampleId)
+      if (sampleId !== null && aiDraft.run.status === 'idle') {
+        aiDraft.start(sampleId)
       }
     },
   )
 
-  const waiting = open && autoStart
+  const waiting = open && autoStart && idle
 
   useEffect(() => {
     if (!waiting) {

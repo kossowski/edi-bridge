@@ -150,7 +150,6 @@ function recordPublish(versions: ReadonlyArray<MappingVersionEntry>) {
 function DraftHeader({ id }: { id: string }) {
   const { data: draft } = useQuery(mappingDraftQuery(id))
   const stateId = useId()
-  const summaryId = useId()
   const publishHintId = useId()
 
   return draft ? (
@@ -158,7 +157,7 @@ function DraftHeader({ id }: { id: string }) {
       actions={<PublishDraft draft={draft} reviewHintId={publishHintId} stateId={stateId} />}
       meta={<DraftStateLabel id={stateId} draft={draft} />}
       name={draft.name}>
-      <AiReviewState draft={draft} publishHintId={publishHintId} summaryId={summaryId} />
+      <AiReviewState draft={draft} publishHintId={publishHintId} />
     </AppPage>
   ) : null
 }
