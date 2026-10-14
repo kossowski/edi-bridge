@@ -10,7 +10,7 @@ import {
 } from '@edi-bridge/contracts'
 import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
-import { Db, type Transaction } from './db.js'
+import { Db, type Database, type Transaction } from './db.js'
 import { NotFound, Unprocessable } from './errors.js'
 import { byName, exactlyOne, rejectingDuplicate, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
@@ -85,6 +85,18 @@ export const loadTradingPartner = (id: string) =>
     return row ? toTradingPartner(row) : yield* new NotFound()
   })
 
+const selectTradingPartnerId = (
+  db: Database | Transaction,
+  workspaceId: string,
+  tradingPartnerId: string,
+) =>
+  db
+    .select({ id: tradingPartners.id })
+    .from(tradingPartners)
+    .where(inWorkspace(workspaceId, byId(tradingPartnerId)))
+
+const unknownTradingPartner = () => new Unprocessable({ message: 'Unknown Trading Partner' })
+
 export const assertTradingPartnerIn = async (
   tx: Transaction,
   workspaceId: string,
@@ -94,16 +106,26 @@ export const assertTradingPartnerIn = async (
     return
   }
 
-  const [found] = await tx
-    .select({ id: tradingPartners.id })
-    .from(tradingPartners)
-    .where(inWorkspace(workspaceId, byId(tradingPartnerId)))
-    .for('share')
+  const [found] = await selectTradingPartnerId(tx, workspaceId, tradingPartnerId).for('share')
 
   if (!found) {
-    throw new Unprocessable({ message: 'Unknown Trading Partner' })
+    throw unknownTradingPartner()
   }
 }
+
+export const rejectingUnknownTradingPartner = (tradingPartnerId: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const [found] = yield* Effect.promise(() =>
+      selectTradingPartnerId(db, workspace.id, tradingPartnerId),
+    )
+
+    if (!found) {
+      return yield* unknownTradingPartner()
+    }
+  })
 
 export const createTradingPartner = (input: TradingPartnerInput) =>
   Effect.gen(function* () {

@@ -13,6 +13,8 @@ import {
   importLookupTableEndpoint,
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
+  lookupTableMissingCodesEndpoint,
+  lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
   maxLookupTableCsvLength,
   sessionEndpoint,
@@ -31,9 +33,11 @@ import {
   createLookupTable,
   deleteLookupTable,
   importLookupTable,
+  listLookupTableMissingCodes,
   listLookupTables,
   loadLookupTable,
   previewLookupTableImport,
+  suggestLookupTableEntries,
   updateLookupTable,
 } from './lookup-table.js'
 import { parse, type ValidationError } from './parse.js'
@@ -197,8 +201,23 @@ export function buildApp({
 
   app.get(lookupTablesEndpoint.path, (request, reply) => respond(request, reply, listLookupTables))
 
+  app.get(lookupTableSuggestionsEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(
+        parse(lookupTableSuggestionsEndpoint.query, request.query),
+        suggestLookupTableEntries,
+      ),
+    ),
+  )
+
   app.get<{ Params: { id: string } }>(lookupTableEndpoint.path, (request, reply) =>
     respond(request, reply, loadLookupTable(request.params.id)),
+  )
+
+  app.get<{ Params: { id: string } }>(lookupTableMissingCodesEndpoint.path, (request, reply) =>
+    respond(request, reply, listLookupTableMissingCodes(request.params.id)),
   )
 
   app.post(createLookupTableEndpoint.path, (request, reply) =>

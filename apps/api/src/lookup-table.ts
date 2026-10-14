@@ -11,7 +11,10 @@ import {
   type LookupTableInput,
   type LookupTableScope,
   type LookupTableScopeInput,
+  type LookupTableSuggestions,
+  type LookupTableSuggestionsQuery,
   type LookupTableSummary,
+  type MissingCode,
 } from '@edi-bridge/contracts'
 import {
   lookupTableEntries,
@@ -24,7 +27,7 @@ import {
 import { Db, type Database, type Transaction } from './db.js'
 import { NotFound, Unprocessable } from './errors.js'
 import { byName, rejectingDuplicate, rejectingInvalidId } from './rows.js'
-import { assertTradingPartnerIn } from './trading-partner.js'
+import { assertTradingPartnerIn, rejectingUnknownTradingPartner } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
@@ -99,7 +102,7 @@ const selectLookupTable = async (
   return {
     ...toSummary(row),
     entries: await selectEntries(db, row.id),
-    // Until code meanings are served (#181).
+    // Until code meanings are served (#228).
     codeMeanings: [],
   }
 }
@@ -117,6 +120,43 @@ export const loadLookupTable = (id: string) =>
     return yield* foundOrNotFound(
       yield* Effect.promise(() => selectLookupTable(db, workspace.id, id)),
     )
+  })
+
+const rejectingUnknownLookupTable = (id: string) =>
+  Effect.gen(function* () {
+    yield* rejectingInvalidId(id)
+
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const [found] = yield* Effect.promise(() =>
+      db
+        .select({ id: lookupTables.id })
+        .from(lookupTables)
+        .where(inWorkspace(workspace.id, eq(lookupTables.id, id))),
+    )
+
+    if (!found) {
+      return yield* new NotFound()
+    }
+  })
+
+export const listLookupTableMissingCodes = (id: string) =>
+  Effect.gen(function* () {
+    yield* rejectingUnknownLookupTable(id)
+
+    // Until Mappings (#185) and Runs (#187) exist.
+    return [] satisfies MissingCode[]
+  })
+
+export const suggestLookupTableEntries = ({ tradingPartnerId }: LookupTableSuggestionsQuery) =>
+  Effect.gen(function* () {
+    if (tradingPartnerId !== undefined) {
+      yield* rejectingUnknownTradingPartner(tradingPartnerId)
+    }
+
+    // Until suggested code values exist (#228).
+    return { entries: [] } satisfies LookupTableSuggestions
   })
 
 const tradingPartnerIdOf = (scope: LookupTableScopeInput) =>
