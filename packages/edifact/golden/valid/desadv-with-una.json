@@ -54,5 +54,33 @@
       "trailer": { "tag": "UNT", "elements": [["21"], ["564535"]] }
     }
   ],
-  "trailer": { "tag": "UNZ", "elements": [["1"], ["964775"]] }
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["964775"]] },
+  "whitespace": {
+    "lineBreaks": [
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n",
+      "\n"
+    ],
+    "trailingText": "\n"
+  }
 }
