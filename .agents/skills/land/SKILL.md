@@ -8,7 +8,7 @@ The user gives you a ticket number `<NN>`. `/ticket-lead` built its PRs as a **s
 
 Run every command from the repo root, the main checkout, on `main`. Reach a worktree with `git -C <worktree>`. Paths in this skill are relative to the repo root.
 
-Running `/land` is the user's go to merge the whole stack. GitHub merges it in one all-or-nothing operation: every PR lands, or none does.
+Running `/land` is the go of the user, or of the engineering lead, to merge the whole stack. GitHub merges it in one all-or-nothing operation: every PR lands, or none does.
 
 ## 1. Check the stack
 
@@ -89,3 +89,5 @@ Pass every landed PR number. Add the deleted paths and the space freed to the re
 - **Stopped at**: <check and reason>, or "nothing, stack complete"
 - **/tmp**: <space freed and deleted paths>, or "nothing to clean"
 ```
+
+When an engineering lead prompted `/land`, also send it the report with `SendMessage`.

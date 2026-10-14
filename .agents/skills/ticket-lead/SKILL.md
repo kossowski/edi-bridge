@@ -14,6 +14,8 @@ Run every command from the repo root, the main checkout, and keep it on `main`. 
 
 Communicate with subagents through **context pointers**: the ticket, the spec, the stack file, the parent branch. Don't paste what a pointer already reaches.
 
+When an engineering lead started you, its prompt names its session. Your questions and reports go to it with `SendMessage`; end your turn after sending, and its answer arrives as your next prompt. Otherwise they go to the user.
+
 ## Names
 
 - **Ticket**: the GitHub issue `#<NN>`. `<NN>` below is its issue number.
@@ -27,7 +29,7 @@ Communicate with subagents through **context pointers**: the ticket, the spec, t
 
 ### 1. Read
 
-Read the ticket, its spec (the parent issue), and the `GLOSSARY.md` entries and ADRs for the area. Every blocker of the ticket is closed: `issue_dependencies_summary.blocked_by` is `0`. If one is open, tell the user and stop.
+Read the ticket, its spec (the parent issue), and the `GLOSSARY.md` entries and ADRs for the area. Every blocker of the ticket is closed: `issue_dependencies_summary.blocked_by` is `0`. If one is open, tell whoever started you and stop.
 
 ### 2. Plan the stack
 
@@ -80,7 +82,7 @@ Call the Skill tool with `developer`.
 
 A fix subagent, for review findings or a red CI, gets the same brief with the findings or the failed run as GOAL.
 
-Answer a developer's questions yourself, unless the answer is a product decision. Ask the user for those, and record the other answers for the report.
+Answer a developer's questions yourself, unless the answer is a product decision. Take those to whoever started you, and record the other answers for the report.
 
 **c. Review.** Call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part changes what renders (components, routes, styles or i18n messages in `apps/web` or `packages/ui`), run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree, starts its dev server through `.agents/skills/developer/scripts/test-slot.sh`, and keeps the screenshots in its own context. Give all findings you accept to one fresh developer subagent in the same worktree.
 
@@ -131,13 +133,13 @@ git -C <worktree> rebase <parent>
 git -C <worktree> push --force-with-lease
 ```
 
-Resolve conflicts yourself; take a product decision to the user. Then run `pnpm -C <top worktree> check:fast` through `.agents/skills/developer/scripts/test-slot.sh`, and wait for CI on every PR as in step 3e. The step is done when `origin/main` is an ancestor of part 1's branch and every PR is green.
+Resolve conflicts yourself; take a product decision to whoever started you. Then run `pnpm -C <top worktree> check:fast` through `.agents/skills/developer/scripts/test-slot.sh`, and wait for CI on every PR as in step 3e. The step is done when `origin/main` is an ancestor of part 1's branch and every PR is green.
 
 ### 6. Report
 
 Stop every background shell, monitor and subagent you started, and delete the screenshots in your scratchpad. Keep all worktrees until `/land` has merged the stack.
 
-When another agent started you, such as a lead session, also send it the report with `SendMessage`, so it needs no polling.
+When an engineering lead started you, send it the report with `SendMessage` and end your turn. It answers what is open and tells you when to land by prompting `/land <NN>` into your session.
 
 ```markdown
 **<NN> — <ticket title>**: stack of <n> PRs on `main` <short commit>, ready for `/land`
