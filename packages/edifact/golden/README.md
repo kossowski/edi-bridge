@@ -15,3 +15,55 @@ The expected `.json` files are written by hand from the `.edi` files, never from
 | `invoic-with-custom-delimiters.edi`       | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 1 to 13            | UNA changed to `UNA\|^,! ~` and every delimiter replaced to match. PRI uses the decimal comma (`36,1`). The colon in `(1994:200)` is plain text under these delimiters, so it has no release. 12 of the 82 examples, UNT `12`. No line breaks. |
 
 The GS1 Germany CCG recommendations for EANCOM 1997 ([ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), [DESADV](https://events.gs1.de/common/downloads/gs1_tech/2071_1997_desadv.pdf), [INVOIC](https://events.gs1.de/common/downloads/gs1_tech/2072_1997_invoic.pdf), section 9) give full message examples without UNA, UNB or UNZ, so they are not the base.
+
+## ORDERS definition
+
+`src/definitions/orders.ts` is the UN D.96A ORDERS segment table, adjusted to EANCOM 1997 values where a public GS1 source gives them. This deviates from the ticket, which asks for the EANCOM D.96A ORDERS definition. The full EANCOM 1997 table is only in the licensed EANCOM manual.
+
+The UN D.96A table comes from the copy of ["UN/EDIFACT D96A Message ORDERS - Purchase order message"](https://www.stylusstudio.com/edifact/D96A/ORDERS.htm) on stylusstudio.com, because unece.org was not reachable.
+
+The public EANCOM source is the [GS1 Germany CCG recommendation for EANCOM 1997 ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), section 3, printed pages 8 and 9 (PDF pages 9 and 10). It lists only the segments of the CCG Food/Nonfood profile. Each of them has the same status and maximum repetitions in `orders.ts`. Each segment group starts with its trigger segment at `M 1`.
+
+| Entry                   | Status and maximum repetitions | Printed page |
+| ----------------------- | ------------------------------ | ------------ |
+| BGM                     | M 1                            | 8            |
+| DTM (header)            | M 35                           | 8            |
+| ALI (header)            | C 5                            | 8            |
+| Segment group 1 (RFF)   | C 10                           | 8            |
+| Segment group 2 (NAD)   | C 99                           | 8            |
+| Segment group 3 (RFF)   | C 10                           | 8            |
+| Segment group 5 (CTA)   | C 5                            | 8            |
+| COM in segment group 5  | C 5                            | 8            |
+| Segment group 7 (CUX)   | C 5                            | 8            |
+| Segment group 8 (PAT)   | C 10                           | 8            |
+| DTM in segment group 8  | C 5                            | 8            |
+| Segment group 25 (LIN)  | C 200000                       | 8            |
+| PIA in segment group 25 | C 25                           | 8            |
+| IMD in segment group 25 | C 99                           | 8            |
+| MEA in segment group 25 | C 5                            | 8            |
+| QTY in segment group 25 | C 10                           | 8            |
+| DTM in segment group 25 | C 35                           | 8            |
+| Segment group 28 (PRI)  | C 25                           | 8            |
+| Segment group 29 (RFF)  | C 10                           | 8            |
+| Segment group 30 (PAC)  | C 10                           | 8            |
+| Segment group 32 (PCI)  | C 5                            | 8            |
+| Segment group 39 (ALC)  | C 99                           | 9            |
+| Segment group 41 (PCD)  | C 1                            | 9            |
+| Segment group 42 (MOA)  | C 2                            | 9            |
+| UNS                     | M 1                            | 9            |
+| CNT                     | C 10                           | 9            |
+
+One CCG value differs from UN D.96A: segment group 25 (LIN) is `C 20000` in UN D.96A and `C 200000` in the CCG recommendation. Every other entry in the table matches UN D.96A, and every other entry in `orders.ts` keeps its UN D.96A value. Known gap: EANCOM drops some segments and segment groups that UN D.96A allows, and the CCG profile does not show which. Validation of an outbound Message therefore does not flag such a segment.
+
+## Invalid Interchanges
+
+Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change. Each change breaks a limit from the CCG table in [ORDERS definition](#orders-definition): BGM `M 1`, header DTM `M 35` before segment group 2, segment group 7 `C 5` or UNS `M 1`.
+
+| Golden file                                        | Base                                | Change                                                                       |
+| -------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| `orders-without-beginning-of-message.edi`          | `orders-without-una.edi`            | BGM removed, UNT `13`.                                                       |
+| `orders-with-repeated-beginning-of-message.edi`    | `orders-without-una.edi`            | BGM repeated, UNT `15`.                                                      |
+| `orders-with-too-many-currency-groups.edi`         | `orders-without-una.edi`            | Six `CUX+2:SEK:9` after the last NAD; segment group 7 allows five. UNT `20`. |
+| `orders-without-section-control.edi`               | `orders-without-una.edi`            | UNS removed, UNT `13`.                                                       |
+| `orders-of-unsupported-directory.edi`              | `orders-without-una.edi`            | UNH identifies `ORDERS:D:01B:UN:EAN010`.                                     |
+| `orders-with-misplaced-date-in-second-message.edi` | `orders-with-multiple-messages.edi` | Message 2: `DTM+2:20221201:102` after the last NAD, UNT `11`.                |

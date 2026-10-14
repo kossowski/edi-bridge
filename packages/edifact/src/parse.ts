@@ -1,5 +1,10 @@
 import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
-import { describePosition, type Position } from './position'
+import {
+  describePosition,
+  interchangeSegmentPosition,
+  messageEnvelopeSegments,
+  type Position,
+} from './position'
 
 import type { Delimiters, Element, Interchange, Message, Segment } from './model'
 
@@ -34,7 +39,7 @@ const serviceStringAdviceTag = 'UNA'
 
 const serviceStringAdviceLength = 9
 
-const segmentPosition = (indexInText: number): Position => ({ segment: indexInText + 1 })
+const serviceStringAdvicePosition: Position = { segment: 1 }
 
 type PositionOf = (index: number) => Position
 
@@ -133,7 +138,7 @@ const readDelimiters = (advice: string): Delimiters => {
   const separators = serviceCharacters(delimiters)
 
   if (advice.length < serviceStringAdviceLength || new Set(separators).size < separators.length) {
-    throw new ParseError('invalid-service-string-advice', segmentPosition(0))
+    throw new ParseError('invalid-service-string-advice', serviceStringAdvicePosition)
   }
 
   return delimiters
@@ -146,8 +151,6 @@ const messageReferenceElement = 1
 const trailerCountElement = 1
 
 const trailerControlReferenceElement = 2
-
-const messageEnvelopeSegments = 2
 
 const controlValue = (segment: Segment, element: number) => segment.elements[element - 1]?.[0]
 
@@ -189,8 +192,7 @@ export const parse = (text: string): Interchange => {
     ? readDelimiters(text.slice(0, serviceStringAdviceLength))
     : defaultDelimiters
 
-  const segmentsBefore = hasServiceStringAdvice ? 1 : 0
-  const position = (index: number) => segmentPosition(segmentsBefore + index)
+  const position = interchangeSegmentPosition(hasServiceStringAdvice)
 
   const { segments, lineBreaks, trailingText } = tokenize(
     hasServiceStringAdvice ? text.slice(serviceStringAdviceLength) : text,

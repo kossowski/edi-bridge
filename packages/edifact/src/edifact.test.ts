@@ -8,6 +8,8 @@ import {
   ParseError,
   serialize,
   SerializeError,
+  validate,
+  ValidationError,
 } from './index'
 
 const goldenDirectory = (kind: string) => new URL(`../golden/${kind}/`, import.meta.url)
@@ -20,14 +22,14 @@ const goldenNames = (kind: string) =>
 const readGolden = (kind: string, name: string, extension: string) =>
   readFileSync(new URL(`${name}.${extension}`, goldenDirectory(kind)), 'latin1')
 
-const thrownBy = (text: string) => {
+const thrownBy = (action: () => void) => {
   try {
-    parse(text)
+    action()
   } catch (error) {
     return error
   }
 
-  throw new Error('The Interchange was parsed without an error')
+  throw new Error('The action finished without an error')
 }
 
 describe('parse', () => {
@@ -38,7 +40,7 @@ describe('parse', () => {
   })
 
   it.each(goldenNames('broken'))('reports the error in the broken Interchange %s', (name) => {
-    const error = thrownBy(readGolden('broken', name, 'edi'))
+    const error = thrownBy(() => parse(readGolden('broken', name, 'edi')))
 
     expect(error).toBeInstanceOf(ParseError)
     expect(error).toMatchObject(JSON.parse(readGolden('broken', name, 'json')))
@@ -68,6 +70,22 @@ describe('parse', () => {
 
     expect(interchange.header.elements[1]).toEqual(['A B'])
     expect(interchange.messages[0]?.segments[0]?.elements[3]).toEqual(['O K'])
+  })
+})
+
+describe('validate', () => {
+  const ordersGoldenNames = goldenNames('valid').filter((name) => name.startsWith('orders-'))
+
+  it.each(ordersGoldenNames)('accepts the valid Interchange %s', (name) => {
+    expect(() => validate(parse(readGolden('valid', name, 'edi')))).not.toThrow()
+  })
+
+  it.each(goldenNames('invalid'))('reports the error in the invalid Interchange %s', (name) => {
+    const interchange = parse(readGolden('invalid', name, 'edi'))
+    const error = thrownBy(() => validate(interchange))
+
+    expect(error).toBeInstanceOf(ValidationError)
+    expect(error).toMatchObject(JSON.parse(readGolden('invalid', name, 'json')))
   })
 })
 
