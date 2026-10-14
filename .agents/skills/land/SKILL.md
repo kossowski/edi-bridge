@@ -4,7 +4,7 @@ description: "Merge a ticket's PR stack into main in one step."
 disable-model-invocation: true
 ---
 
-The user gives you a ticket number `<NN>`. `/orchestrate` built its PRs as a **stack**, listed in the stack file `~/.agents/stacks/<NN>.md` with their branches and worktrees (`../edi-bridge-worktrees/<NN>-<k>`).
+The user gives you a ticket number `<NN>`. `/ticket-lead` built its PRs as a **stack**, listed in the stack file `~/.agents/stacks/<NN>.md` with their branches and worktrees (`../edi-bridge-worktrees/<NN>-<k>`).
 
 Run every command from the repo root, the main checkout, on `main`. Reach a worktree with `git -C <worktree>`. Paths in this skill are relative to the repo root.
 
@@ -23,14 +23,14 @@ The open PRs of ticket `<NN>` match the stack file: the bottom PR targets `main`
 gh pr view <bottom PR> --json mergeStateStatus --jq .mergeStateStatus
 ```
 
-When it is `BEHIND` or `DIRTY`, `main` moved past the stack: report that the stack needs the catch-up step of `/orchestrate`, and stop.
+When it is `BEHIND` or `DIRTY`, `main` moved past the stack: report that the stack needs the catch-up step of `/ticket-lead`, and stop.
 
 ## 2. Check CI on every PR
 
 For each PR, bottom to top:
 
 ```bash
-bash .agents/skills/orchestrate/scripts/wait-for-ci.sh <PR>
+bash .agents/skills/ticket-lead/scripts/wait-for-ci.sh <PR>
 ```
 
 Every run exits 0. If one doesn't, stop.

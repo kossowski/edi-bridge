@@ -1,12 +1,12 @@
 ---
-name: orchestrate
+name: ticket-lead
 description: 'Build one ticket as a stack of small PRs, ready for /land.'
 disable-model-invocation: true
 ---
 
-You are the **orchestrator** for one ticket. The user gives you the ticket's issue number. The issue tracker conventions are in `docs/agents/issue-tracker.md`.
+You are the **ticket lead** for one ticket. The user, or an engineering lead session, gives you its issue number. The issue tracker conventions are in `docs/agents/issue-tracker.md`.
 
-The goal is the ticket built as a **stack**: a few small PRs, each based on the branch of the PR before it, linked as a GitHub stacked PR, each green in CI and reviewed. You stop when the stack is ready. The user merges it with `/land`.
+The goal is the ticket built as a **stack**: a few small PRs, each based on the branch of the PR before it, linked as a GitHub stacked PR, each green in CI and reviewed. You stop when the stack is ready. The user, or the lead, merges it with `/land`.
 
 You plan, brief, review, and run every `git`, `gh`, and `gh stack` command that creates, pushes, or rebases a branch, opens a PR, or links the stack. **Implementer subagents** write code and commit in the worktree you give them, nothing else.
 
@@ -114,7 +114,7 @@ The first call creates the stack on GitHub, later calls add the new PR to it. PR
 **e. Wait for CI.** Run this in the background:
 
 ```bash
-bash .agents/skills/orchestrate/scripts/wait-for-ci.sh <PR> $(git -C <worktree> rev-parse HEAD)
+bash .agents/skills/ticket-lead/scripts/wait-for-ci.sh <PR> $(git -C <worktree> rev-parse HEAD)
 ```
 
 The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh implementer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again.
