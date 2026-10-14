@@ -147,7 +147,7 @@ export const updateDocumentStructure = (
     const body = yield* input
 
     const adjusted = yield* rejectingDocumentStructureProblem(() =>
-      adjustDocumentStructure(existing, body),
+      documentStructureSchema.parse(adjustDocumentStructure(existing, body)),
     )
 
     const db = yield* Db
