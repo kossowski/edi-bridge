@@ -1,3 +1,4 @@
+import cors from '@fastify/cors'
 import { Effect } from 'effect'
 import Fastify from 'fastify'
 
@@ -38,6 +39,7 @@ export interface AppDependencies {
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
   resolveWorkspace?: WorkspaceResolver
+  webOrigin?: string
 }
 
 type Failure = Conflict | NotFound | Unprocessable | ValidationError
@@ -70,8 +72,15 @@ export function buildApp({
   probes,
   probeTimeoutMs = 2000,
   resolveWorkspace = resolveDevelopmentWorkspace,
+  webOrigin,
 }: AppDependencies): FastifyInstance {
   const app = Fastify({ logger })
+
+  void app.register(cors, {
+    origin: webOrigin ? [webOrigin] : false,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  })
 
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
