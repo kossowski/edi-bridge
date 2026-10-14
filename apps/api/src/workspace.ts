@@ -18,7 +18,7 @@ export async function seedDevelopmentWorkspace(database: Database) {
   await database.insert(workspaces).values(developmentWorkspace).onConflictDoNothing()
 }
 
-const single = (rows: Workspace[]) => Effect.orDie(Effect.fromNullishOr(rows[0]))
+const exactlyOne = (rows: Workspace[]) => Effect.orDie(Effect.fromNullishOr(rows[0]))
 
 export const currentWorkspace = Effect.gen(function* () {
   const db = yield* Db
@@ -27,7 +27,7 @@ export const currentWorkspace = Effect.gen(function* () {
     db.select(columns).from(workspaces).where(eq(workspaces.id, developmentWorkspace.id)),
   )
 
-  return yield* single(rows)
+  return yield* exactlyOne(rows)
 })
 
 export const updateCompanyIdentity = ({ gln }: CompanyIdentityInput) =>
@@ -42,5 +42,5 @@ export const updateCompanyIdentity = ({ gln }: CompanyIdentityInput) =>
         .returning(columns),
     )
 
-    return yield* single(rows)
+    return yield* exactlyOne(rows)
   })
