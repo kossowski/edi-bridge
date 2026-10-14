@@ -16,7 +16,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
-Commits and PRs before the move to GitHub reference tickets by their old local number, `edi-bridge-issue#<NN>`. `docs/agents/ticket-numbers.md` maps each old number to its issue.
+Commits and PRs before the move to GitHub reference tickets by their old local number, `edi-bridge-issue#<NN>`. Find that issue with `gh issue list --state all --search '"Migrated from ticket <NN>" in:body'`.
 
 ## Project board
 
