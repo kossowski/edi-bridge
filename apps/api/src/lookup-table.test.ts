@@ -408,12 +408,25 @@ describe('DELETE /lookup-tables/:id', () => {
   })
 })
 
-const previewImport = (id: string, csv: string | number, target = app) =>
-  target.inject({
-    method: 'POST',
-    url: lookupTableImportPreviewEndpoint.path.replace(':id', id),
-    body: { csv },
-  })
+const postCsv = (endpoint: { path: string }, id: string, csv: string | number, target = app) =>
+  target.inject({ method: 'POST', url: endpoint.path.replace(':id', id), body: { csv } })
+
+const previewImport = (id: string, csv: string | number) =>
+  postCsv(lookupTableImportPreviewEndpoint, id, csv)
+
+const importCsv = (id: string, csv: string | number, target = app) =>
+  postCsv(importLookupTableEndpoint, id, csv, target)
+
+const notFoundCases = [
+  ['an unknown id', () => Promise.resolve(unknownId)],
+  ['an id that is no uuid', () => Promise.resolve('units')],
+  ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+] as const
+
+const invalidCsvCases = [
+  ['no text', 42],
+  ['a CSV beyond the maximum length', 'KG;KGM\n'.padEnd(maxLookupTableCsvLength + 1, '\n')],
+] as const
 
 describe('POST /lookup-tables/:id/import-preview', () => {
   it('classifies each row against the entries and reports the reasons of each invalid row', async () => {
@@ -453,11 +466,7 @@ describe('POST /lookup-tables/:id/import-preview', () => {
     expect(read.json()).toEqual(created)
   })
 
-  it.each([
-    ['an unknown id', () => Promise.resolve(unknownId)],
-    ['an id that is no uuid', () => Promise.resolve('units')],
-    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
-  ])('answers 404 for %s', async (_case, id) => {
+  it.each(notFoundCases)('answers 404 for %s', async (_case, id) => {
     const response = await previewImport(await id(), 'ST;PCE')
 
     expect(response.statusCode).toBe(404)
@@ -470,10 +479,7 @@ describe('POST /lookup-tables/:id/import-preview', () => {
     expect(response.statusCode).toBe(404)
   })
 
-  it.each([
-    ['no text', 42],
-    ['a CSV beyond the maximum length', 'ST;PCE\n'.padEnd(maxLookupTableCsvLength + 1, '\n')],
-  ])('answers 400 for %s', async (_case, csv) => {
+  it.each(invalidCsvCases)('answers 400 for %s', async (_case, csv) => {
     const created = await posted(units)
 
     const response = await previewImport(created.id, csv)
@@ -496,13 +502,6 @@ describe('POST /lookup-tables/:id/import-preview', () => {
     })
   })
 })
-
-const importCsv = (id: string, csv: string | number, target = app) =>
-  target.inject({
-    method: 'POST',
-    url: importLookupTableEndpoint.path.replace(':id', id),
-    body: { csv },
-  })
 
 describe('POST /lookup-tables/:id/import', () => {
   it('adds and changes the valid rows and keeps the other entries in order', async () => {
@@ -547,11 +546,7 @@ describe('POST /lookup-tables/:id/import', () => {
     expect(imported.entries.at(-1)).toEqual({ sourceCode: 'C19999', targetCode: 'X' })
   })
 
-  it.each([
-    ['an unknown id', () => Promise.resolve(unknownId)],
-    ['an id that is no uuid', () => Promise.resolve('units')],
-    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
-  ])('answers 404 for %s', async (_case, id) => {
+  it.each(notFoundCases)('answers 404 for %s', async (_case, id) => {
     const response = await importCsv(await id(), 'ST;PCE')
 
     expect(response.statusCode).toBe(404)
@@ -564,10 +559,7 @@ describe('POST /lookup-tables/:id/import', () => {
     expect(response.statusCode).toBe(404)
   })
 
-  it.each([
-    ['no text', 42],
-    ['a CSV beyond the maximum length', 'KG;KGM\n'.padEnd(maxLookupTableCsvLength + 1, '\n')],
-  ])('answers 400 for %s and keeps the entries', async (_case, csv) => {
+  it.each(invalidCsvCases)('answers 400 for %s and keeps the entries', async (_case, csv) => {
     const created = await posted(units)
 
     const response = await importCsv(created.id, csv)
