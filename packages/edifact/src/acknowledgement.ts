@@ -23,7 +23,7 @@ export type InterchangeAction = 'accepted' | 'rejected' | 'received'
 export interface AcknowledgedInterchange {
   controlReference: string
   sender: InterchangeParty
-  recipient: InterchangeParty
+  receiver: InterchangeParty
   action: InterchangeAction
 }
 
@@ -63,7 +63,7 @@ export const readAcknowledgedInterchange = (message: Message): AcknowledgedInter
     throw new ReadAcknowledgementError('missing-interchange-response')
   }
 
-  const [controlReference, sender, recipient, actionCode] = interchangeResponse.elements
+  const [controlReference, sender, receiver, actionCode] = interchangeResponse.elements
   const action = interchangeActions.get(requiredValue(actionCode))
 
   if (action === undefined) {
@@ -73,7 +73,7 @@ export const readAcknowledgedInterchange = (message: Message): AcknowledgedInter
   return {
     controlReference: requiredValue(controlReference),
     sender: partyOf(sender),
-    recipient: partyOf(recipient),
+    receiver: partyOf(receiver),
     action,
   }
 }

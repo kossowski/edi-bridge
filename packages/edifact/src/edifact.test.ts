@@ -217,7 +217,7 @@ describe('readAcknowledgedInterchange', () => {
     ).toEqual({
       controlReference: 'CTL1',
       sender: { identification: '4012345000016', qualifier: '14' },
-      recipient: { identification: '5412345000013', qualifier: '14' },
+      receiver: { identification: '5412345000013', qualifier: '14' },
       action: 'accepted',
     })
   })
@@ -252,7 +252,7 @@ describe('readAcknowledgedInterchange', () => {
       contrlMessage("UCI++4012345000016:14+5412345000013:14+7'"),
     ],
     ['missing-element', 'a UCI without sender', contrlMessage("UCI+CTL1++5412345000013:14+7'")],
-    ['missing-element', 'a UCI without recipient', contrlMessage("UCI+CTL1+4012345000016:14++7'")],
+    ['missing-element', 'a UCI without receiver', contrlMessage("UCI+CTL1+4012345000016:14++7'")],
     [
       'missing-element',
       'a UCI without action',
