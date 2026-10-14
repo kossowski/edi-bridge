@@ -1,15 +1,17 @@
-import { and, DrizzleQueryError, eq, type SQL } from 'drizzle-orm'
+import { and, DrizzleQueryError, eq, isNull, type SQL } from 'drizzle-orm'
 import { Effect } from 'effect'
 import postgres from 'postgres'
 import { z } from 'zod'
 
-import { glnRequired, type TradingPartner, type TradingPartnerInput } from '@edi-bridge/contracts'
+import { type TradingPartner, type TradingPartnerInput } from '@edi-bridge/contracts'
 import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
 import { Db } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { exactlyOne } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
+
+import type { ValidationError } from './parse.js'
 
 type Row = typeof tradingPartners.$inferSelect
 
@@ -26,10 +28,16 @@ const toTradingPartner = (row: Row): TradingPartner => ({
   },
 })
 
-const inWorkspace = (workspaceId: string, ...conditions: SQL[]) =>
+const inWorkspace = (workspaceId: string, ...conditions: (SQL | undefined)[]) =>
   and(eq(tradingPartners.workspaceId, workspaceId), ...conditions)
 
 const byId = (id: string) => eq(tradingPartners.id, id)
+
+// glnRequired negated in SQL, so the update checks it atomically
+const glnRemovable = and(
+  eq(tradingPartners.testMode, true),
+  isNull(tradingPartners.testInterchangeSentAt),
+)
 
 const nameCollator = new Intl.Collator('de')
 
@@ -91,13 +99,13 @@ export const createTradingPartner = (input: TradingPartnerInput) =>
     return toTradingPartner(yield* exactlyOne(rows))
   })
 
-export const updateTradingPartner = (existing: TradingPartner, input: TradingPartnerInput) =>
+export const updateTradingPartner = (
+  id: string,
+  input: Effect.Effect<TradingPartnerInput, ValidationError>,
+) =>
   Effect.gen(function* () {
-    if (input.gln === null && glnRequired(existing)) {
-      return yield* new Unprocessable({
-        message: 'The Trading Partner needs its GLN once Interchanges were exchanged',
-      })
-    }
+    yield* loadTradingPartner(id)
+    const changes = yield* input
 
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
@@ -105,10 +113,18 @@ export const updateTradingPartner = (existing: TradingPartner, input: TradingPar
     const [row] = yield* rejectingDuplicateGln(() =>
       db
         .update(tradingPartners)
-        .set(input)
-        .where(inWorkspace(workspace.id, byId(existing.id)))
+        .set(changes)
+        .where(inWorkspace(workspace.id, byId(id), changes.gln === null ? glnRemovable : undefined))
         .returning(),
     )
 
-    return row ? toTradingPartner(row) : yield* new NotFound()
+    if (row) {
+      return toTradingPartner(row)
+    }
+
+    yield* loadTradingPartner(id)
+
+    return yield* new Unprocessable({
+      message: 'The Trading Partner needs its GLN once Interchanges were exchanged',
+    })
   })

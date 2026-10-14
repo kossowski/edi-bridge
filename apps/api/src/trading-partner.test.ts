@@ -209,6 +209,12 @@ describe('PUT /trading-partners/:id', () => {
     expect(response.statusCode).toBe(404)
     expect(response.json()).toEqual({ message: 'Not found' })
   })
+
+  it('answers 404 before it checks the Trading Partner', async () => {
+    const response = await update(unknownId, { ...changes, name: '' })
+
+    expect(response.statusCode).toBe(404)
+  })
 })
 
 describe('a Trading Partner of another Workspace', () => {

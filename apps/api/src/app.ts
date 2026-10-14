@@ -139,12 +139,10 @@ export function buildApp({
     respond(
       request,
       reply,
-      Effect.gen(function* () {
-        const existing = yield* loadTradingPartner(request.params.id)
-        const input = yield* parse(updateTradingPartnerEndpoint.body, request.body)
-
-        return yield* updateTradingPartner(existing, input)
-      }),
+      updateTradingPartner(
+        request.params.id,
+        parse(updateTradingPartnerEndpoint.body, request.body),
+      ),
     ),
   )
 
