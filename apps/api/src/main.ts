@@ -1,8 +1,17 @@
 import { Redis } from 'ioredis'
 import postgres from 'postgres'
 
+import { connect, migrate } from '@edi-bridge/db'
+
 import { buildApp } from './app.js'
 import { config } from './config.js'
+import { seedDevelopmentWorkspace } from './workspace.js'
+
+await migrate(config.databaseUrl)
+
+const connection = connect(config.databaseUrl)
+
+await seedDevelopmentWorkspace(connection.db)
 
 const sql = postgres(config.databaseUrl, { connect_timeout: 2, max: 5 })
 
@@ -11,6 +20,7 @@ const sql = postgres(config.databaseUrl, { connect_timeout: 2, max: 5 })
 const redis = new Redis(config.redisUrl, { enableOfflineQueue: false, maxRetriesPerRequest: 1 })
 
 const app = buildApp({
+  database: connection.db,
   logger: true,
   probes: {
     postgres: async () => {
@@ -28,6 +38,7 @@ redis.on('error', (error: Error) => {
 
 async function shutdown(): Promise<void> {
   await app.close()
+  await connection.close()
   await sql.end({ timeout: 5 })
   redis.disconnect()
 }

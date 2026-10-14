@@ -1,7 +1,9 @@
 import { z } from 'zod'
 
+import { localDatabaseUrl } from '@edi-bridge/db'
+
 const envSchema = z.object({
-  DATABASE_URL: z.url().default('postgres://edi_bridge:edi_bridge@localhost:5432/edi_bridge'),
+  DATABASE_URL: z.url().default(localDatabaseUrl),
   REDIS_URL: z.url().default('redis://localhost:6379'),
   API_PORT: z.coerce.number().int().min(0).max(65_535).default(3001),
 })
