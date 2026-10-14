@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import {
+  aiReviewKeys,
   aiReviewMarks,
   aiReviewPartsSchema,
   aiReviewPartsSize,
@@ -43,11 +44,14 @@ export const aiProposalSchema = mappingGraphSchema
 
 export type AiProposal = z.infer<typeof aiProposalSchema>
 
-// The marks do not depend on the Sample Document, so a Draft without a review needs none.
 function marksProposal(proposal: AiProposal, { aiReview }: MappingDraft) {
-  const proposed = proposedAiReview(aiReview?.sampleId ?? '', proposal)
+  if (aiReview === null) {
+    return aiReviewPartsSize(aiReviewKeys(proposal)) === 0
+  }
 
-  return proposed === null || (aiReview !== null && marksAll(aiReview, aiReviewMarks(proposed)))
+  const proposed = proposedAiReview(aiReview.sampleId, proposal)
+
+  return proposed === null || marksAll(aiReview, aiReviewMarks(proposed))
 }
 
 export const aiDraftedEventSchema = z
