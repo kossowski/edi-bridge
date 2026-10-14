@@ -36,6 +36,7 @@ export interface Interchange {
 
 export type ParseErrorCode =
   | 'control-reference-mismatch'
+  | 'inconsistent-line-breaks'
   | 'invalid-segment-tag'
   | 'invalid-service-string-advice'
   | 'message-count-mismatch'
@@ -313,13 +314,24 @@ export const parse = (text: string): Interchange => {
         controlReference: controlValue(header, interchangeControlReferenceElement),
       })
 
+      const lineBreak = lineBreaksBefore[1] ?? ''
+      const lineBreakBeforeHeader = hasServiceStringAdvice ? lineBreak : ''
+
+      const inconsistent = lineBreaksBefore.findIndex(
+        (before, beforeIndex) => before !== (beforeIndex === 0 ? lineBreakBeforeHeader : lineBreak),
+      )
+
+      if (inconsistent !== -1) {
+        throw new ParseError('inconsistent-line-breaks', position(inconsistent))
+      }
+
       return {
         hasServiceStringAdvice,
         delimiters,
         header,
         messages,
         trailer: segment,
-        layout: { lineBreak: lineBreaksBefore[1] ?? '', trailingText },
+        layout: { lineBreak, trailingText },
       }
     } else {
       throw new ParseError('unexpected-segment', position(index))
