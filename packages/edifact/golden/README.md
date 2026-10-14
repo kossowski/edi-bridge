@@ -55,9 +55,15 @@ The public EANCOM source is the [GS1 Germany CCG recommendation for EANCOM 1997 
 
 One CCG value differs from UN D.96A: segment group 25 (LIN) is `C 20000` in UN D.96A and `C 200000` in the CCG recommendation. Every other entry in the table matches UN D.96A, and every other entry in `orders.ts` keeps its UN D.96A value. Known gap: EANCOM drops some segments and segment groups that UN D.96A allows, and the CCG profile does not show which. Validation of an outbound Message therefore does not flag such a segment.
 
+## Segment definitions
+
+`src/definitions/segments.ts`, `composites.ts` and `data-elements.ts` hold the data elements and composites of each segment in the ORDERS definition: their order, status (`M` or `C`) and format (`a`, `n` or `an`, with the maximum length). They come from the UN D.96A segment pages on stylusstudio.com, linked from the ORDERS page above (for example [BGM](https://www.stylusstudio.com/edifact/D96A/BGM_.htm)). UNS comes from the [UNS page](https://www.stylusstudio.com/edifact/40100/UNS_.htm) of the syntax directory that the ORDERS page links.
+
+The length of a numeric value counts its digits only, without a minus sign or decimal mark.
+
 ## Invalid Interchanges
 
-Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change. Each change breaks a limit from the CCG table in [ORDERS definition](#orders-definition): BGM `M 1`, header DTM `M 35` before segment group 2, segment group 7 `C 5` or UNS `M 1`.
+Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change. A change to the segment structure breaks a limit from the CCG table in [ORDERS definition](#orders-definition): BGM `M 1`, header DTM `M 35` before segment group 2, segment group 7 `C 5` or UNS `M 1`. A change to an element breaks a rule from [Segment definitions](#segment-definitions).
 
 | Golden file                                        | Base                                | Change                                                                       |
 | -------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
@@ -67,3 +73,4 @@ Each file in `invalid/` parses without an error and fails validation. The expect
 | `orders-without-section-control.edi`               | `orders-without-una.edi`            | UNS removed, UNT `13`.                                                       |
 | `orders-of-unsupported-directory.edi`              | `orders-without-una.edi`            | UNH identifies `ORDERS:D:01B:UN:EAN010`.                                     |
 | `orders-with-misplaced-date-in-second-message.edi` | `orders-with-multiple-messages.edi` | Message 2: `DTM+2:20221201:102` after the last NAD, UNT `11`.                |
+| `orders-with-too-long-order-number.edi`            | `orders-without-una.edi`            | BGM order number with 36 characters; data element 1004 allows `an..35`.      |
