@@ -1,9 +1,14 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate as applyMigrations } from 'drizzle-orm/postgres-js/migrator'
-import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
+import path from 'node:path'
 import postgres from 'postgres'
 
-const migrationsFolder = fileURLToPath(new URL('../migrations', import.meta.url))
+// Resolved through the package, so it still works when the api bundles this file.
+const migrationsFolder = path.join(
+  path.dirname(createRequire(import.meta.url).resolve('@edi-bridge/db/package.json')),
+  'migrations',
+)
 
 export async function migrate(url: string) {
   const sql = postgres(url, { max: 1, onnotice: () => {} })

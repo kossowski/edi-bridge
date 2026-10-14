@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsdown",
     "start": "node --env-file-if-exists=../../.env dist/main.js",
     "lint": "oxlint && eslint",
     "lint:fix": "oxlint --fix && eslint --fix",
@@ -14,6 +14,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@edi-bridge/db": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.5",
     "ioredis": "^6.0.0",
     "postgres": "^3.4.9",
@@ -27,6 +29,7 @@
     "@types/node": "^24",
     "eslint": "^10.12.0",
     "oxlint": "1.87.0",
+    "tsdown": "^0.23.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "vitest": "^5.0.3"
