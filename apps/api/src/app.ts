@@ -10,6 +10,7 @@ import {
   currentWorkspaceEndpoint,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
+  tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
   tradingPartnersEndpoint,
   updateCompanyIdentityEndpoint,
@@ -25,6 +26,7 @@ import {
   listTradingPartnerActivities,
   listTradingPartners,
   loadTradingPartner,
+  loadTradingPartnerActivity,
   updateTradingPartner,
 } from './trading-partner.js'
 import {
@@ -145,6 +147,10 @@ export function buildApp({
 
   app.get<{ Params: { id: string } }>(tradingPartnerEndpoint.path, (request, reply) =>
     respond(request, reply, loadTradingPartner(request.params.id)),
+  )
+
+  app.get<{ Params: { id: string } }>(tradingPartnerActivityEndpoint.path, (request, reply) =>
+    respond(request, reply, loadTradingPartnerActivity(request.params.id)),
   )
 
   app.post(createTradingPartnerEndpoint.path, (request, reply) =>

@@ -1,11 +1,12 @@
 import { eq } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FastifyInstance } from 'fastify'
 
 import {
   createTradingPartnerEndpoint,
   tradingPartnerActivitiesEndpoint,
+  tradingPartnerActivityEndpoint,
   type TradingPartnerInput,
   tradingPartnerEndpoint,
   tradingPartnerSchema,
@@ -348,5 +349,56 @@ describe('GET /trading-partners/activity', () => {
 
     expect(response.statusCode).toBe(200)
     expect(tradingPartnerActivitiesEndpoint.response.parse(response.json())).toEqual([])
+  })
+})
+
+describe('GET /trading-partners/:id/activity', () => {
+  const getActivity = (id: string, target = app) =>
+    target.inject({ method: 'GET', url: tradingPartnerActivityEndpoint.path.replace(':id', id) })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('answers no activity over the last seven days until Runs exist', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-14T23:30:00.000Z') })
+    const created = await postedTradingPartner(hansemarkt)
+
+    const response = await getActivity(created.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(tradingPartnerActivityEndpoint.response.parse(response.json())).toEqual({
+      tradingPartnerId: created.id,
+      runsToday: 0,
+      openProblems: 0,
+      lastActivityAt: null,
+      channelCount: 0,
+      flowCount: 0,
+      days: ['08', '09', '10', '11', '12', '13', '14'].map((day) => ({
+        date: `2026-10-${day}`,
+        runs: 0,
+        failed: 0,
+      })),
+      flows: [],
+      problems: [],
+    })
+  })
+
+  it.each([
+    ['an unknown id', unknownId],
+    ['an id that is no uuid', 'hansemarkt'],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await getActivity(id)
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
+  })
+
+  it('answers 404 for a Trading Partner of another Workspace', async () => {
+    const created = await postedTradingPartner(hansemarkt)
+
+    const response = await getActivity(created.id, otherApp)
+
+    expect(response.statusCode).toBe(404)
   })
 })
