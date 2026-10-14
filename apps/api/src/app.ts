@@ -10,6 +10,7 @@ import {
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   deleteLookupTableEndpoint,
+  importLookupTableEndpoint,
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
   lookupTablesEndpoint,
@@ -29,6 +30,7 @@ import { type Database, Db } from './db.js'
 import {
   createLookupTable,
   deleteLookupTable,
+  importLookupTable,
   listLookupTables,
   loadLookupTable,
   previewLookupTableImport,
@@ -231,6 +233,17 @@ export function buildApp({
           request.params.id,
           parse(lookupTableImportPreviewEndpoint.body, request.body),
         ),
+      ),
+  )
+
+  app.post<{ Params: { id: string } }>(
+    importLookupTableEndpoint.path,
+    { bodyLimit: lookupTableImportBodyLimit },
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        importLookupTable(request.params.id, parse(importLookupTableEndpoint.body, request.body)),
       ),
   )
 

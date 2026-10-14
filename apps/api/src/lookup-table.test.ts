@@ -6,6 +6,7 @@ import {
   createLookupTableEndpoint,
   createTradingPartnerEndpoint,
   deleteLookupTableEndpoint,
+  importLookupTableEndpoint,
   type LookupTable,
   type LookupTableInput,
   lookupTableEndpoint,
@@ -493,5 +494,107 @@ describe('POST /lookup-tables/:id/import-preview', () => {
     expect(response.json()).toEqual({
       rows: [{ line: 1, status: 'added', sourceCode: 'KG', targetCode: 'KGM' }],
     })
+  })
+})
+
+const importCsv = (id: string, csv: string | number, target = app) =>
+  target.inject({
+    method: 'POST',
+    url: importLookupTableEndpoint.path.replace(':id', id),
+    body: { csv },
+  })
+
+describe('POST /lookup-tables/:id/import', () => {
+  it('adds and changes the valid rows and keeps the other entries in order', async () => {
+    const created = await posted({
+      ...units,
+      entries: [...units.entries, { sourceCode: 'L', targetCode: 'LTR' }],
+    })
+
+    const response = await importCsv(created.id, 'KG;KGM\nKAR;BX\n;BX\nST;PCE')
+
+    expect(response.statusCode).toBe(200)
+
+    const imported = lookupTableSchema.parse(response.json())
+
+    expect(imported).toEqual({
+      ...created,
+      entryCount: 4,
+      entries: [
+        { sourceCode: 'ST', targetCode: 'PCE' },
+        { sourceCode: 'KAR', targetCode: 'BX' },
+        { sourceCode: 'L', targetCode: 'LTR' },
+        { sourceCode: 'KG', targetCode: 'KGM' },
+      ],
+      updatedAt: imported.updatedAt,
+    })
+    expect(Date.parse(imported.updatedAt)).toBeGreaterThan(Date.parse(created.updatedAt))
+
+    const read = await get(created.id)
+
+    expect(read.json()).toEqual(imported)
+  })
+
+  it('imports more entries than one insert statement takes', async () => {
+    const created = await posted(units)
+    const sourceCodes = Array.from({ length: 20_000 }, (_, index) => `C${index}`)
+
+    const response = await importCsv(created.id, sourceCodes.map((code) => `${code};X`).join('\n'))
+
+    const imported = lookupTableSchema.parse(response.json())
+
+    expect(imported.entryCount).toBe(20_002)
+    expect(imported.entries.at(-1)).toEqual({ sourceCode: 'C19999', targetCode: 'X' })
+  })
+
+  it.each([
+    ['an unknown id', () => Promise.resolve(unknownId)],
+    ['an id that is no uuid', () => Promise.resolve('units')],
+    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await importCsv(await id(), 'ST;PCE')
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
+  })
+
+  it('answers 404 before it checks the CSV', async () => {
+    const response = await importCsv(unknownId, 42)
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  it.each([
+    ['no text', 42],
+    ['a CSV beyond the maximum length', 'KG;KGM\n'.padEnd(maxLookupTableCsvLength + 1, '\n')],
+  ])('answers 400 for %s and keeps the entries', async (_case, csv) => {
+    const created = await posted(units)
+
+    const response = await importCsv(created.id, csv)
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toHaveProperty('message')
+
+    const read = await get(created.id)
+
+    expect(read.json()).toEqual(created)
+  })
+
+  it('accepts a CSV up to the maximum length', async () => {
+    const created = await posted(units)
+
+    const response = await importCsv(created.id, 'KG;KGM\n'.padEnd(maxLookupTableCsvLength, '\n'))
+
+    expect(response.statusCode).toBe(200)
+  })
+
+  it('leaves a Lookup Table of another Workspace unchanged', async () => {
+    const foreign = await posted(units, otherApp)
+
+    await importCsv(foreign.id, 'KG;KGM')
+
+    const read = await get(foreign.id, otherApp)
+
+    expect(read.json()).toEqual(foreign)
   })
 })

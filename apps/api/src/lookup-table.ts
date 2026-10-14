@@ -2,6 +2,7 @@ import { and, asc, eq, getTableColumns, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
+  applyLookupTableImport,
   classifyLookupTableImport,
   type LookupTable,
   type LookupTableEntry,
@@ -65,7 +66,7 @@ const toSummary = (row: Row): LookupTableSummary => ({
 const inWorkspace = (workspaceId: string, ...conditions: (SQL | undefined)[]) =>
   and(eq(lookupTables.workspaceId, workspaceId), ...conditions)
 
-const selectEntries = (db: Database, lookupTableId: string) =>
+const selectEntries = (db: Database | Transaction, lookupTableId: string) =>
   db
     .select({
       sourceCode: lookupTableEntries.sourceCode,
@@ -112,15 +113,18 @@ export const loadLookupTable = (id: string) =>
 const tradingPartnerIdOf = (scope: LookupTableScopeInput) =>
   scope.kind === 'tradingPartner' ? scope.tradingPartnerId : null
 
+// Postgres takes at most 65,535 parameters per statement, four per entry.
+const entryInsertChunkSize = 10_000
+
 const insertEntries = async (
   tx: Transaction,
   lookupTableId: string,
   entries: LookupTableEntry[],
 ) => {
-  if (entries.length > 0) {
-    await tx
-      .insert(lookupTableEntries)
-      .values(entries.map((entry, position) => ({ ...entry, lookupTableId, position })))
+  const rows = entries.map((entry, position) => ({ ...entry, lookupTableId, position }))
+
+  for (let start = 0; start < rows.length; start += entryInsertChunkSize) {
+    await tx.insert(lookupTableEntries).values(rows.slice(start, start + entryInsertChunkSize))
   }
 }
 
@@ -232,4 +236,49 @@ export const previewLookupTableImport = (
     const { csv } = yield* body
 
     return { rows: classifyLookupTableImport(entries, csv) } satisfies LookupTableImportPreview
+  })
+
+export const importLookupTable = (
+  id: string,
+  body: Effect.Effect<LookupTableImportBody, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    yield* loadLookupTable(id)
+    const { csv } = yield* body
+
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const imported = yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        const locked = await tx
+          .select({ id: lookupTables.id })
+          .from(lookupTables)
+          .where(inWorkspace(workspace.id, eq(lookupTables.id, id)))
+          .for('update')
+
+        if (locked.length === 0) {
+          return false
+        }
+
+        const entries = await selectEntries(tx, id)
+        const rows = classifyLookupTableImport(entries, csv)
+
+        await tx
+          .update(lookupTables)
+          .set({ updatedAt: sql`now()` })
+          .where(eq(lookupTables.id, id))
+        await tx.delete(lookupTableEntries).where(eq(lookupTableEntries.lookupTableId, id))
+        await insertEntries(tx, id, applyLookupTableImport(entries, rows))
+
+        return true
+      }),
+    )
+
+    // A DELETE between loadLookupTable and this transaction leaves no row to import into.
+    if (!imported) {
+      return yield* new NotFound()
+    }
+
+    return yield* loadLookupTable(id).pipe(Effect.orDie)
   })
