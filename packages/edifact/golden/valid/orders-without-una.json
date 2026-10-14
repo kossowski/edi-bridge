@@ -1,0 +1,41 @@
+{
+  "serviceStringAdvice": false,
+  "delimiters": {
+    "component": ":",
+    "element": "+",
+    "decimal": ".",
+    "release": "?",
+    "repetition": " ",
+    "segment": "'"
+  },
+  "header": {
+    "tag": "UNB",
+    "elements": [
+      ["UNOA", "3"],
+      ["4012345000016", "14"],
+      ["5412345000013", "14"],
+      ["261014", "0930"],
+      ["CTL00017"]
+    ]
+  },
+  "messages": [
+    {
+      "header": {
+        "tag": "UNH",
+        "elements": [["ME000001"], ["ORDERS", "D", "96A", "UN", "EAN008"]]
+      },
+      "segments": [
+        { "tag": "BGM", "elements": [["220"], ["PO4711"], ["9"]] },
+        { "tag": "DTM", "elements": [["137", "20261014", "102"]] },
+        { "tag": "NAD", "elements": [["BY"], ["5412345000013", "", "9"]] },
+        { "tag": "NAD", "elements": [["SU"], ["4012345000016", "", "9"]] },
+        { "tag": "LIN", "elements": [["1"], [""], ["4000862141404", "SRS"]] },
+        { "tag": "QTY", "elements": [["21", "48"]] },
+        { "tag": "UNS", "elements": [["S"]] },
+        { "tag": "CNT", "elements": [["2", "1"]] }
+      ],
+      "trailer": { "tag": "UNT", "elements": [["10"], ["ME000001"]] }
+    }
+  ],
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["CTL00017"]] }
+}

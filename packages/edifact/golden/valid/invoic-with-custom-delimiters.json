@@ -1,0 +1,39 @@
+{
+  "serviceStringAdvice": true,
+  "delimiters": {
+    "component": "|",
+    "element": "^",
+    "decimal": ",",
+    "release": "!",
+    "repetition": " ",
+    "segment": "~"
+  },
+  "header": {
+    "tag": "UNB",
+    "elements": [
+      ["UNOC", "3"],
+      ["4012345000016", "14"],
+      ["5412345000013", "14"],
+      ["261018", "1015"],
+      ["CTL00021"]
+    ]
+  },
+  "messages": [
+    {
+      "header": {
+        "tag": "UNH",
+        "elements": [["ME000001"], ["INVOIC", "D", "96A", "UN", "EAN008"]]
+      },
+      "segments": [
+        { "tag": "BGM", "elements": [["380"], ["INV2026^0816"], ["9"]] },
+        { "tag": "MOA", "elements": [["77", "99,95"]] },
+        {
+          "tag": "FTX",
+          "elements": [["AAI"], [""], [""], ["O'NEIL + SON?", "NOTE| USE ~ AND !"]]
+        }
+      ],
+      "trailer": { "tag": "UNT", "elements": [["5"], ["ME000001"]] }
+    }
+  ],
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["CTL00021"]] }
+}
