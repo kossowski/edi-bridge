@@ -10,6 +10,7 @@
     "lint:fix": "turbo run lint:fix",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
+    "test:stories": "turbo run test:stories",
     "test:watch": "turbo run test:watch",
     "test:e2e": "turbo run test:e2e",
     "check:fast": "turbo run lint check-types test test:stories",
