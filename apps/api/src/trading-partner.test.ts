@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify'
 
 import {
   createTradingPartnerEndpoint,
+  tradingPartnerActivitiesEndpoint,
   type TradingPartnerInput,
   tradingPartnerEndpoint,
   tradingPartnerSchema,
@@ -157,7 +158,7 @@ describe('GET /trading-partners', () => {
 describe('GET /trading-partners/:id', () => {
   it.each([
     ['an unknown id', unknownId],
-    ['an id that is no uuid', 'activity'],
+    ['an id that is no uuid', 'hansemarkt'],
   ])('answers 404 for %s', async (_case, id) => {
     const response = await get(id)
 
@@ -202,7 +203,7 @@ describe('PUT /trading-partners/:id', () => {
 
   it.each([
     ['an unknown id', unknownId],
-    ['an id that is no uuid', 'activity'],
+    ['an id that is no uuid', 'hansemarkt'],
   ])('answers 404 for %s', async (_case, id) => {
     const response = await update(id, changes)
 
@@ -336,5 +337,16 @@ describe('the GLN of a Trading Partner', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ ...created, gln: null })
+  })
+})
+
+describe('GET /trading-partners/activity', () => {
+  it('lists no activity until Runs exist, instead of looking up a Trading Partner', async () => {
+    await post(hansemarkt)
+
+    const response = await app.inject({ method: 'GET', url: tradingPartnerActivitiesEndpoint.path })
+
+    expect(response.statusCode).toBe(200)
+    expect(tradingPartnerActivitiesEndpoint.response.parse(response.json())).toEqual([])
   })
 })

@@ -3,7 +3,11 @@ import { Effect } from 'effect'
 import postgres from 'postgres'
 import { z } from 'zod'
 
-import { type TradingPartner, type TradingPartnerInput } from '@edi-bridge/contracts'
+import {
+  type TradingPartner,
+  type TradingPartnerActivity,
+  type TradingPartnerInput,
+} from '@edi-bridge/contracts'
 import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
 import { Db } from './db.js'
@@ -51,6 +55,11 @@ export const listTradingPartners = Effect.gen(function* () {
 
   return rows.map(toTradingPartner).toSorted((a, b) => nameCollator.compare(a.name, b.name))
 })
+
+// No Runs exist yet, so no Trading Partner has activity.
+export const listTradingPartnerActivities: Effect.Effect<TradingPartnerActivity[]> = Effect.succeed(
+  [],
+)
 
 const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
   Effect.promise(query).pipe(

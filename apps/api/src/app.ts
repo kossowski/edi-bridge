@@ -8,6 +8,7 @@ import {
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   sessionEndpoint,
+  tradingPartnerActivitiesEndpoint,
   tradingPartnerEndpoint,
   tradingPartnersEndpoint,
   updateCompanyIdentityEndpoint,
@@ -19,6 +20,7 @@ import { parse, type ValidationError } from './parse.js'
 import { loadDevelopmentSession } from './session.js'
 import {
   createTradingPartner,
+  listTradingPartnerActivities,
   listTradingPartners,
   loadTradingPartner,
   updateTradingPartner,
@@ -133,6 +135,10 @@ export function buildApp({
 
   app.get(tradingPartnersEndpoint.path, (request, reply) =>
     respond(request, reply, listTradingPartners),
+  )
+
+  app.get(tradingPartnerActivitiesEndpoint.path, (request, reply) =>
+    respond(request, reply, listTradingPartnerActivities),
   )
 
   app.get<{ Params: { id: string } }>(tradingPartnerEndpoint.path, (request, reply) =>
