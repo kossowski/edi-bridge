@@ -20,12 +20,18 @@ export interface Message {
   trailer: Segment
 }
 
+export interface Layout {
+  lineBreak: string
+  trailingText: string
+}
+
 export interface Interchange {
   hasServiceStringAdvice: boolean
   delimiters: Delimiters
   header: Segment
   messages: Message[]
   trailer: Segment
+  layout: Layout
 }
 
 export type ParseErrorCode =
@@ -79,7 +85,7 @@ const defaultDelimiters: Delimiters = {
 
 const noReleaseCharacter = ' '
 
-const lineBreak = /[\n\r]/
+const lineBreakCharacter = /[\n\r]/
 
 const segmentTag = /^[A-Z0-9]{3}$/
 
@@ -91,14 +97,26 @@ const segmentPosition = (indexInText: number): Position => ({ segment: indexInTe
 
 type PositionOf = (index: number) => Position
 
-const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf): Segment[] => {
+interface Tokens {
+  segments: Segment[]
+  lineBreaksBefore: string[]
+  trailingText: string
+}
+
+const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf): Tokens => {
   const segments: Segment[] = []
+  const lineBreaksBefore: string[] = []
+  let lineBreak = ''
+  let offset = 0
+  let trailingFrom = 0
   let elements: Element[] = []
   let components: string[] = []
   let value = ''
   let released = false
 
   for (const character of text) {
+    offset += character.length
+
     if (released) {
       value += character
       released = false
@@ -120,13 +138,18 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
       }
 
       segments.push({ tag, elements: rest })
+      lineBreaksBefore.push(lineBreak)
+      lineBreak = ''
+      trailingFrom = offset
       elements = []
       components = []
       value = ''
     } else {
       const atSegmentStart = elements.length === 0 && components.length === 0 && value === ''
 
-      if (!(atSegmentStart && lineBreak.test(character))) {
+      if (atSegmentStart && lineBreakCharacter.test(character)) {
+        lineBreak += character
+      } else {
         value += character
       }
     }
@@ -147,7 +170,7 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
     )
   }
 
-  return segments
+  return { segments, lineBreaksBefore, trailingText: text.slice(trailingFrom) }
 }
 
 const readDelimiters = (advice: string): Delimiters => {
@@ -220,7 +243,7 @@ export const parse = (text: string): Interchange => {
   const segmentsBefore = hasServiceStringAdvice ? 1 : 0
   const position = (index: number) => segmentPosition(segmentsBefore + index)
 
-  const segments = tokenize(
+  const { segments, lineBreaksBefore, trailingText } = tokenize(
     hasServiceStringAdvice ? text.slice(serviceStringAdviceLength) : text,
     delimiters,
     position,
@@ -276,7 +299,14 @@ export const parse = (text: string): Interchange => {
         controlReference: controlValue(header, interchangeControlReferenceElement),
       })
 
-      return { hasServiceStringAdvice, delimiters, header, messages, trailer: segment }
+      return {
+        hasServiceStringAdvice,
+        delimiters,
+        header,
+        messages,
+        trailer: segment,
+        layout: { lineBreak: lineBreaksBefore[1] ?? '', trailingText },
+      }
     } else {
       throw new ParseError('unexpected-segment', position(index))
     }

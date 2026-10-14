@@ -64,5 +64,6 @@
       "trailer": { "tag": "UNT", "elements": [["21"], ["14245"]] }
     }
   ],
-  "trailer": { "tag": "UNZ", "elements": [["1"], ["654321"]] }
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["654321"]] },
+  "layout": { "lineBreak": "\n", "trailingText": "\n" }
 }

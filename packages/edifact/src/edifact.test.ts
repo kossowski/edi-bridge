@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { parse, ParseError } from './index'
+import { parse, ParseError, serialize } from './index'
 
 const goldenDirectory = (kind: string) => new URL(`../golden/${kind}/`, import.meta.url)
 
@@ -61,5 +61,13 @@ describe('parse', () => {
 
     expect(interchange.header.elements[1]).toEqual(['A B'])
     expect(interchange.messages[0]?.segments[0]?.elements[3]).toEqual(['O K'])
+  })
+})
+
+describe('serialize', () => {
+  it.each(goldenNames('valid'))('reproduces the valid Interchange %s byte for byte', (name) => {
+    const text = readGolden('valid', name, 'edi')
+
+    expect(serialize(parse(text))).toBe(text)
   })
 })
