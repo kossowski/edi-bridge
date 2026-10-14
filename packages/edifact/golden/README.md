@@ -16,9 +16,46 @@ The expected `.json` files are written by hand from the `.edi` files, never from
 
 The GS1 Germany CCG recommendations for EANCOM 1997 ([ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), [DESADV](https://events.gs1.de/common/downloads/gs1_tech/2071_1997_desadv.pdf), [INVOIC](https://events.gs1.de/common/downloads/gs1_tech/2072_1997_invoic.pdf), section 9) give full message examples without UNA, UNB or UNZ, so they are not the base.
 
+## ORDERS definition
+
+`src/definitions/orders.ts` is the UN D.96A ORDERS segment table, narrowed to EANCOM 1997 values where a public GS1 source gives them. This deviates from the ticket, which asks for the EANCOM D.96A ORDERS definition. The full EANCOM 1997 table is only in the licensed EANCOM manual.
+
+The public source is the [GS1 Germany CCG recommendation for EANCOM 1997 ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), section 3, printed pages 8 and 9 (PDF pages 9 and 10). It lists only the segments of the CCG Food/Nonfood profile. Each of them has the same status and maximum repetitions in `orders.ts`. Each segment group starts with its trigger segment at `M 1`.
+
+| Entry                   | Status and maximum repetitions | Printed page |
+| ----------------------- | ------------------------------ | ------------ |
+| BGM                     | M 1                            | 8            |
+| DTM (header)            | M 35                           | 8            |
+| ALI (header)            | C 5                            | 8            |
+| Segment group 1 (RFF)   | C 10                           | 8            |
+| Segment group 2 (NAD)   | C 99                           | 8            |
+| Segment group 3 (RFF)   | C 10                           | 8            |
+| Segment group 5 (CTA)   | C 5                            | 8            |
+| COM in segment group 5  | C 5                            | 8            |
+| Segment group 7 (CUX)   | C 5                            | 8            |
+| Segment group 8 (PAT)   | C 10                           | 8            |
+| DTM in segment group 8  | C 5                            | 8            |
+| Segment group 25 (LIN)  | C 200000                       | 8            |
+| PIA in segment group 25 | C 25                           | 8            |
+| IMD in segment group 25 | C 99                           | 8            |
+| MEA in segment group 25 | C 5                            | 8            |
+| QTY in segment group 25 | C 10                           | 8            |
+| DTM in segment group 25 | C 35                           | 8            |
+| Segment group 28 (PRI)  | C 25                           | 8            |
+| Segment group 29 (RFF)  | C 10                           | 8            |
+| Segment group 30 (PAC)  | C 10                           | 8            |
+| Segment group 32 (PCI)  | C 5                            | 8            |
+| Segment group 39 (ALC)  | C 99                           | 9            |
+| Segment group 41 (PCD)  | C 1                            | 9            |
+| Segment group 42 (MOA)  | C 2                            | 9            |
+| UNS                     | M 1                            | 9            |
+| CNT                     | C 10                           | 9            |
+
+Every other entry keeps its UN D.96A value. Known gap: EANCOM drops some segments and segment groups that UN D.96A allows, and the CCG profile does not show which. Validation of an outbound Message therefore does not flag such a segment.
+
 ## Invalid Interchanges
 
-Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change. The structural limits each change breaks come from the message structure in the [GS1 Germany CCG recommendation for EANCOM 1997 ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), section 3: BGM `M 1`, header DTM `M 35` before segment group 2, and segment group 7 `C 5` on printed page 8 (PDF page 9), UNS `M 1` on printed page 9 (PDF page 10).
+Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change. Each change breaks a limit from the CCG table in [ORDERS definition](#orders-definition): BGM `M 1`, header DTM `M 35` before segment group 2, segment group 7 `C 5` or UNS `M 1`.
 
 | Golden file                                        | Base                                | Change                                                                       |
 | -------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
