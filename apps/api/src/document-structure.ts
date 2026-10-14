@@ -1,7 +1,8 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
+  adjustDocumentStructure,
   applyLabels,
   type CreateDocumentStructureBody,
   type DocumentStructure,
@@ -14,13 +15,16 @@ import {
   type InferredDocumentStructure,
   samplePreview,
   summaryFieldLabelCount,
+  type UpdateDocumentStructureBody,
 } from '@edi-bridge/contracts'
 import { documentStructures } from '@edi-bridge/db'
 
 import { Db } from './db.js'
-import { DocumentStructureRejected, NotFound } from './errors.js'
-import { byName, exactlyOne, inWorkspace, rejectingInvalidId } from './rows.js'
+import { DocumentStructureRejected } from './errors.js'
+import { byName, exactlyOne, foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
+
+import type { ValidationError } from './parse.js'
 
 type Row = typeof documentStructures.$inferSelect
 
@@ -36,7 +40,7 @@ const rejectingDocumentStructureProblem = <A>(infer: () => A) =>
 export const inferDocumentStructureOrReject = (origin: DocumentStructureOrigin) =>
   rejectingDocumentStructureProblem(() => inferDocumentStructure(origin))
 
-const toRowValues = (structure: InferredDocumentStructure) => ({
+const toRowValues = (structure: DocumentStructure | InferredDocumentStructure) => ({
   format: structure.format,
   jsonRoot: structure.format === 'json' ? structure.root : null,
   csv: structure.format === 'csv' ? structure.csv : null,
@@ -108,7 +112,7 @@ export const loadDocumentStructure = (id: string) =>
         .where(inWorkspace(documentStructures, workspace.id, eq(documentStructures.id, id))),
     )
 
-    return row ? toDocumentStructure(row) : yield* new NotFound()
+    return toDocumentStructure(yield* foundOrNotFound(row))
   })
 
 export const createDocumentStructure = ({
@@ -132,4 +136,30 @@ export const createDocumentStructure = ({
     )
 
     return toDocumentStructure(yield* exactlyOne(rows))
+  })
+
+export const updateDocumentStructure = (
+  id: string,
+  input: Effect.Effect<UpdateDocumentStructureBody, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    const existing = yield* loadDocumentStructure(id)
+    const body = yield* input
+
+    const adjusted = yield* rejectingDocumentStructureProblem(() =>
+      documentStructureSchema.parse(adjustDocumentStructure(existing, body)),
+    )
+
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const [row] = yield* Effect.promise(() =>
+      db
+        .update(documentStructures)
+        .set({ name: adjusted.name, ...toRowValues(adjusted), updatedAt: sql`now()` })
+        .where(inWorkspace(documentStructures, workspace.id, eq(documentStructures.id, id)))
+        .returning(),
+    )
+
+    return toDocumentStructure(yield* foundOrNotFound(row))
   })

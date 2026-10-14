@@ -29,6 +29,7 @@ import {
   tradingPartnersEndpoint,
   updateLookupTableEndpoint,
   updateCompanyIdentityEndpoint,
+  updateDocumentStructureEndpoint,
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
@@ -39,6 +40,7 @@ import {
   inferDocumentStructureOrReject,
   listDocumentStructures,
   loadDocumentStructure,
+  updateDocumentStructure,
 } from './document-structure.js'
 import {
   createLookupTable,
@@ -321,6 +323,20 @@ export function buildApp({
 
   app.get<{ Params: { id: string } }>(documentStructureEndpoint.path, (request, reply) =>
     respond(request, reply, loadDocumentStructure(request.params.id)),
+  )
+
+  app.put<{ Params: { id: string } }>(
+    updateDocumentStructureEndpoint.path,
+    { bodyLimit: documentStructureBodyLimit },
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        updateDocumentStructure(
+          request.params.id,
+          parse(updateDocumentStructureEndpoint.body, request.body),
+        ),
+      ),
   )
 
   return app
