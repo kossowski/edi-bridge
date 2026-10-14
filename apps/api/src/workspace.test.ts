@@ -12,6 +12,7 @@ import { connect, type Connection, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
 import { buildApp } from './app.js'
+import { otherWorkspace } from './testing.js'
 import { seedDevelopmentWorkspace } from './workspace.js'
 
 const up = () => Promise.resolve()
@@ -62,12 +63,6 @@ describe('GET /workspaces/current', () => {
   })
 
   it('returns the Workspace the resolver picks for the request', async () => {
-    const otherWorkspace = {
-      id: '8b2d6e14-3f9a-4c57-a0d8-71e5b9c4f236',
-      name: 'Sudhafen Logistik AG',
-      gln: null,
-    }
-
     await connection.db.insert(workspaces).values(otherWorkspace)
 
     const otherApp = buildApp({

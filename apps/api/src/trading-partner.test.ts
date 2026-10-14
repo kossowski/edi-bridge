@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { FastifyInstance } from 'fastify'
 
 import {
   createTradingPartnerEndpoint,
+  tradingPartnerActivitiesEndpoint,
+  tradingPartnerActivityEndpoint,
   type TradingPartnerInput,
   tradingPartnerEndpoint,
   tradingPartnerSchema,
@@ -16,6 +18,7 @@ import { connect, type Connection, tradingPartners, workspaces } from '@edi-brid
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
 import { buildApp } from './app.js'
+import { otherWorkspace } from './testing.js'
 import { seedDevelopmentWorkspace } from './workspace.js'
 
 const up = () => Promise.resolve()
@@ -42,12 +45,6 @@ let connection: Connection
 let app: FastifyInstance
 
 let otherApp: FastifyInstance
-
-const otherWorkspace = {
-  id: '8b2d6e14-3f9a-4c57-a0d8-71e5b9c4f236',
-  name: 'Sudhafen Logistik AG',
-  gln: null,
-}
 
 beforeAll(async () => {
   testDatabase = await startTestDatabase()
@@ -157,7 +154,7 @@ describe('GET /trading-partners', () => {
 describe('GET /trading-partners/:id', () => {
   it.each([
     ['an unknown id', unknownId],
-    ['an id that is no uuid', 'activity'],
+    ['an id that is no uuid', 'hansemarkt'],
   ])('answers 404 for %s', async (_case, id) => {
     const response = await get(id)
 
@@ -202,7 +199,7 @@ describe('PUT /trading-partners/:id', () => {
 
   it.each([
     ['an unknown id', unknownId],
-    ['an id that is no uuid', 'activity'],
+    ['an id that is no uuid', 'hansemarkt'],
   ])('answers 404 for %s', async (_case, id) => {
     const response = await update(id, changes)
 
@@ -336,5 +333,67 @@ describe('the GLN of a Trading Partner', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ ...created, gln: null })
+  })
+})
+
+describe('GET /trading-partners/activity', () => {
+  it('lists no activity until Runs exist, instead of looking up a Trading Partner', async () => {
+    await post(hansemarkt)
+
+    const response = await app.inject({ method: 'GET', url: tradingPartnerActivitiesEndpoint.path })
+
+    expect(response.statusCode).toBe(200)
+    expect(tradingPartnerActivitiesEndpoint.response.parse(response.json())).toEqual([])
+  })
+})
+
+describe('GET /trading-partners/:id/activity', () => {
+  const getActivity = (id: string, target = app) =>
+    target.inject({ method: 'GET', url: tradingPartnerActivityEndpoint.path.replace(':id', id) })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('answers no activity over the last seven days until Runs exist', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-14T23:30:00.000Z') })
+    const created = await postedTradingPartner(hansemarkt)
+
+    const response = await getActivity(created.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(tradingPartnerActivityEndpoint.response.parse(response.json())).toEqual({
+      tradingPartnerId: created.id,
+      runsToday: 0,
+      openProblems: 0,
+      lastActivityAt: null,
+      channelCount: 0,
+      flowCount: 0,
+      days: ['08', '09', '10', '11', '12', '13', '14'].map((day) => ({
+        date: `2026-10-${day}`,
+        runs: 0,
+        failed: 0,
+      })),
+      flows: [],
+      problems: [],
+    })
+  })
+
+  it.each([
+    ['an unknown id', unknownId],
+    ['an id that is no uuid', 'hansemarkt'],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await getActivity(id)
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
+  })
+
+  it('answers 404 for a Trading Partner of another Workspace', async () => {
+    const created = await postedTradingPartner(hansemarkt)
+
+    const response = await getActivity(created.id, otherApp)
+
+    expect(response.statusCode).toBe(404)
   })
 })

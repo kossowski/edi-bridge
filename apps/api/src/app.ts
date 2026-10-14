@@ -1,23 +1,32 @@
+import cors from '@fastify/cors'
 import { Effect } from 'effect'
 import Fastify from 'fastify'
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
+  channelsEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
+  sessionEndpoint,
+  tradingPartnerActivitiesEndpoint,
+  tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
   tradingPartnersEndpoint,
   updateCompanyIdentityEndpoint,
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
+import { listChannels } from './channel.js'
 import { type Database, Db } from './db.js'
 import { parse, type ValidationError } from './parse.js'
+import { loadDevelopmentSession } from './session.js'
 import {
   createTradingPartner,
+  listTradingPartnerActivities,
   listTradingPartners,
   loadTradingPartner,
+  loadTradingPartnerActivity,
   updateTradingPartner,
 } from './trading-partner.js'
 import {
@@ -38,6 +47,7 @@ export interface AppDependencies {
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
   resolveWorkspace?: WorkspaceResolver
+  webOrigin?: string
 }
 
 type Failure = Conflict | NotFound | Unprocessable | ValidationError
@@ -70,8 +80,15 @@ export function buildApp({
   probes,
   probeTimeoutMs = 2000,
   resolveWorkspace = resolveDevelopmentWorkspace,
+  webOrigin,
 }: AppDependencies): FastifyInstance {
   const app = Fastify({ logger })
+
+  void app.register(cors, {
+    origin: webOrigin ? [webOrigin] : false,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  })
 
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
@@ -103,6 +120,8 @@ export function buildApp({
       ),
     )
 
+  app.get(sessionEndpoint.path, (request, reply) => respond(request, reply, loadDevelopmentSession))
+
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>
     respond(request, reply, loadCurrentWorkspace),
   )
@@ -122,8 +141,16 @@ export function buildApp({
     respond(request, reply, listTradingPartners),
   )
 
+  app.get(tradingPartnerActivitiesEndpoint.path, (request, reply) =>
+    respond(request, reply, listTradingPartnerActivities),
+  )
+
   app.get<{ Params: { id: string } }>(tradingPartnerEndpoint.path, (request, reply) =>
     respond(request, reply, loadTradingPartner(request.params.id)),
+  )
+
+  app.get<{ Params: { id: string } }>(tradingPartnerActivityEndpoint.path, (request, reply) =>
+    respond(request, reply, loadTradingPartnerActivity(request.params.id)),
   )
 
   app.post(createTradingPartnerEndpoint.path, (request, reply) =>
@@ -145,6 +172,8 @@ export function buildApp({
       ),
     ),
   )
+
+  app.get(channelsEndpoint.path, (request, reply) => respond(request, reply, listChannels))
 
   return app
 }

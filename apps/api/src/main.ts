@@ -30,6 +30,7 @@ const app = buildApp({
       await redis.ping()
     },
   },
+  webOrigin: config.webOrigin,
 })
 
 redis.on('error', (error: Error) => {

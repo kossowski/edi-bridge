@@ -3,7 +3,13 @@ import { Effect } from 'effect'
 import postgres from 'postgres'
 import { z } from 'zod'
 
-import { type TradingPartner, type TradingPartnerInput } from '@edi-bridge/contracts'
+import {
+  activityDays,
+  type TradingPartner,
+  type TradingPartnerActivity,
+  type TradingPartnerActivityDetail,
+  type TradingPartnerInput,
+} from '@edi-bridge/contracts'
 import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
 import { Db } from './db.js'
@@ -52,6 +58,11 @@ export const listTradingPartners = Effect.gen(function* () {
   return rows.map(toTradingPartner).toSorted((a, b) => nameCollator.compare(a.name, b.name))
 })
 
+// Until Runs exist (#187).
+export const listTradingPartnerActivities: Effect.Effect<TradingPartnerActivity[]> = Effect.succeed(
+  [],
+)
+
 const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
   Effect.promise(query).pipe(
     Effect.catchDefect((defect) =>
@@ -97,6 +108,34 @@ export const createTradingPartner = (input: TradingPartnerInput) =>
     )
 
     return toTradingPartner(yield* exactlyOne(rows))
+  })
+
+const dayMs = 24 * 60 * 60 * 1000
+
+const lastUtcDays = (now: number) =>
+  Array.from({ length: activityDays }, (_, index) => ({
+    date: new Date(now - (activityDays - 1 - index) * dayMs).toISOString().slice(0, 10),
+    runs: 0,
+    failed: 0,
+  }))
+
+// Until Runs exist (#187).
+export const loadTradingPartnerActivity = (id: string) =>
+  Effect.gen(function* () {
+    const { id: tradingPartnerId } = yield* loadTradingPartner(id)
+    const now = yield* Effect.sync(() => Date.now())
+
+    return {
+      tradingPartnerId,
+      runsToday: 0,
+      openProblems: 0,
+      lastActivityAt: null,
+      channelCount: 0,
+      flowCount: 0,
+      days: lastUtcDays(now),
+      flows: [],
+      problems: [],
+    } satisfies TradingPartnerActivityDetail
   })
 
 export const updateTradingPartner = (
