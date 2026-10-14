@@ -10,12 +10,16 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `pnpm check:fast` runs lint, type check and unit tests only; `pnpm check` runs its tasks one at a time, so `next build` and Chromium never run together locally
-- [ ] `check-types` in `apps/web` passes when `.next/dev/types` holds types of a removed route
-- [ ] The orchestrate skill has implementers run `pnpm check:fast` before `pnpm check` and stop the dev servers they start
-- [ ] The orchestrate skill catches a stack up with `main` before reporting, names the `main` commit in the report, cleans up its background work, and sends the report to the session that started it
-- [ ] The land skill stops when the bottom PR is behind or in conflict with `main`, and its tmp cleanup also removes Node's compile cache
-- [ ] A local vitest run fails when a single test or story takes longer than 3 s, without changing the test timeout
-- [ ] `CODING_STANDARDS.md` holds the repo's judgement rules for the Standards axis of the code review
+- [x] `pnpm check:fast` runs lint, type check and unit tests only; `pnpm check` runs its tasks one at a time, so `next build` and Chromium never run together locally
+- [x] `check-types` in `apps/web` passes when `.next/dev/types` holds types of a removed route
+- [x] The orchestrate skill has implementers run `pnpm check:fast` before `pnpm check` and stop the dev servers they start
+- [x] The orchestrate skill catches a stack up with `main` before reporting, names the `main` commit in the report, cleans up its background work, and sends the report to the session that started it
+- [x] The land skill stops when the bottom PR is behind or in conflict with `main`, and its tmp cleanup also removes Node's compile cache
+- [x] A local vitest run fails when a single test or story takes longer than 3 s, without changing the test timeout
+- [x] `CODING_STANDARDS.md` holds the repo's judgement rules for the Standards axis of the code review
+
+## Comments
+
+Resolved in #154.
