@@ -3,6 +3,7 @@ import { compositeDirectory } from './definitions/composites'
 import { dataElementFormats } from './definitions/data-elements'
 import { messageDefinitions } from './definitions/message-definitions'
 import { segmentDirectory } from './definitions/segments'
+import { hasMessageIdentifier, messageIdentifierElement } from './message-identifier'
 import {
   describePosition,
   interchangeSegmentPosition,
@@ -40,20 +41,8 @@ export class ValidationError extends Error {
   }
 }
 
-const messageIdentifierElement = 2
-
-const findDefinition = (header: Segment) => {
-  const [type, version, release, controllingAgency] =
-    header.elements[messageIdentifierElement - 1] ?? []
-
-  return messageDefinitions.find(
-    ({ identifier }) =>
-      identifier.type === type &&
-      identifier.version === version &&
-      identifier.release === release &&
-      identifier.controllingAgency === controllingAgency,
-  )
-}
+const findDefinition = (header: Segment) =>
+  messageDefinitions.find(({ identifier }) => hasMessageIdentifier(header, identifier))
 
 const formatPattern = /^(an|a|n)(?:\.\.)?(\d+)$/
 

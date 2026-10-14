@@ -1,3 +1,5 @@
+import { hasMessageIdentifier } from './message-identifier'
+
 import type { Element, Message } from './model'
 
 export type ReadAcknowledgementErrorCode =
@@ -25,19 +27,13 @@ export interface AcknowledgedInterchange {
   action: InterchangeAction
 }
 
-const contrlIdentifier = ['CONTRL', 'D', '3', 'UN']
+const contrlIdentifier = { type: 'CONTRL', version: 'D', release: '3', controllingAgency: 'UN' }
 
 const interchangeActions = new Map<string, InterchangeAction>([
   ['4', 'rejected'],
   ['7', 'accepted'],
   ['8', 'received'],
 ])
-
-const isContrl = ({ header }: Message) => {
-  const identifier = header.elements[1] ?? []
-
-  return contrlIdentifier.every((value, index) => identifier[index] === value)
-}
 
 const requiredValue = (element: Element | undefined) => {
   const value = element?.[0]
@@ -57,7 +53,7 @@ const partyOf = (element: Element | undefined): InterchangeParty => {
 }
 
 export const readAcknowledgedInterchange = (message: Message): AcknowledgedInterchange => {
-  if (!isContrl(message)) {
+  if (!hasMessageIdentifier(message.header, contrlIdentifier)) {
     throw new ReadAcknowledgementError('unsupported-message-type')
   }
 
