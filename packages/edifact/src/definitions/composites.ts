@@ -207,4 +207,16 @@ export const compositeDirectory: ElementRefDirectory = {
     element('7110', 'C'),
   ],
   C960: [element('4295', 'C'), element('1131', 'C'), element('3055', 'C'), element('4294', 'C')],
+  S002: [element('0004', 'M'), element('0007', 'C'), element('0008', 'C')],
+  S003: [element('0010', 'M'), element('0007', 'C'), element('0014', 'C')],
+  S006: [element('0040', 'M'), element('0007', 'C')],
+  S007: [element('0044', 'M'), element('0007', 'C')],
+  S009: [
+    element('0065', 'M'),
+    element('0052', 'M'),
+    element('0054', 'M'),
+    element('0051', 'M'),
+    element('0057', 'C'),
+  ],
+  S011: [element('0098', 'M'), element('0104', 'C')],
 }
