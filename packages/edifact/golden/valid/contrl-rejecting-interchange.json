@@ -22,7 +22,7 @@
     {
       "header": {
         "tag": "UNH",
-        "elements": [["ME000001"], ["CONTRL", "D", "3", "UN", "EAN004"]]
+        "elements": [["ME004321"], ["CONTRL", "D", "3", "UN", "EAN004"]]
       },
       "segments": [
         {
@@ -38,7 +38,7 @@
           ]
         }
       ],
-      "trailer": { "tag": "UNT", "elements": [["3"], ["ME000001"]] }
+      "trailer": { "tag": "UNT", "elements": [["3"], ["ME004321"]] }
     }
   ],
   "trailer": { "tag": "UNZ", "elements": [["1"], ["C0000003"]] },
