@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "oxlint && eslint",
     "lint:fix": "oxlint --fix && eslint --fix",
-    "check-types": "next typegen && tsc --noEmit",
+    "check-types": "rm -rf .next/dev/types && next typegen && tsc --noEmit",
     "test": "vitest run --project unit --project storybook",
     "test:canvas": "vitest run --project storybook-canvas",
     "test:watch": "vitest",
