@@ -122,22 +122,20 @@ Resolve the ticket as `docs/agents/issue-tracker.md` describes. The step is done
 ### 5. Catch up with main
 
 ```bash
-git fetch origin
-git merge-base --is-ancestor origin/main <branch of part 1>
+bash .agents/skills/ticket-lead/scripts/catch-up.sh <NN>
 ```
 
-When the check fails, `main` moved since part 1 branched. Rebase each part onto its parent, bottom to top:
-
-```bash
-git -C <worktree> rebase <parent>
-git -C <worktree> push --force-with-lease
-```
-
-Resolve conflicts yourself; take a product decision to whoever started you. Then run `pnpm -C <top worktree> check:fast` through `.agents/skills/developer/scripts/test-slot.sh`, and wait for CI on every PR as in step 3e. The step is done when `origin/main` is an ancestor of part 1's branch and every PR is green.
+It rebases each part onto its parent, bottom to top, and pushes with lease; a part already on its parent is skipped. At a conflict it names the worktree and the files: resolve them, `git -C <worktree> rebase --continue`, and run it again. Take a product decision to whoever started you. Then run `pnpm -C <top worktree> check:fast` through `.agents/skills/developer/scripts/test-slot.sh`, and wait for CI on every PR as in step 3e. The step is done when the script reports the stack on `origin/main` and every PR is green.
 
 ### 6. Report
 
-Stop every background shell, monitor and subagent you started, and delete the screenshots in your scratchpad. Keep all worktrees until `/land` has merged the stack.
+Stop every background shell, monitor and subagent you started, run `bash .agents/skills/developer/scripts/stop-leftovers.sh` for the servers a developer forgot, and delete the screenshots in your scratchpad. Keep all worktrees until `/land` has merged the stack.
+
+```bash
+bash .agents/skills/ticket-lead/scripts/stack-status.sh <NN>
+```
+
+The report goes out when it prints `ready for /land`. Otherwise fix what it lists first.
 
 When an engineering lead started you, send it the report with `SendMessage` and end your turn. It answers what is open and tells you when to land by prompting `/land <NN>` into your session.
 
@@ -159,11 +157,6 @@ When a finding belongs to the code of an earlier part, fix it there, not in the 
 
 1. A fresh developer subagent fixes and commits in the lower part's worktree.
 2. `git -C <lower worktree> push`
-3. For each higher part in order, bottom to top:
-
-```bash
-git -C <worktree> rebase <branch of the part below>
-git -C <worktree> push --force-with-lease
-```
+3. `bash .agents/skills/ticket-lead/scripts/catch-up.sh <NN> --from <k+1>`, where `<k>` is the fixed part: it rebases every part above onto the one below it and pushes with lease.
 
 Wait for CI on every PR you pushed, as in step 3e. The stack on GitHub needs no change: its PRs and bases stay the same.

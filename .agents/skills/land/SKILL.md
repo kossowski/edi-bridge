@@ -13,17 +13,10 @@ Running `/land` is the go of the user, or of the engineering lead, to merge the 
 ## 1. Check the stack
 
 ```bash
-gh pr list --state open --json number,title,headRefName,baseRefName,isDraft \
-  --jq '.[] | "#\(.number) \(.headRefName) → \(.baseRefName) draft=\(.isDraft)"'
+bash .agents/skills/ticket-lead/scripts/stack-status.sh <NN>
 ```
 
-The open PRs of ticket `<NN>` match the stack file: the bottom PR targets `main`, each PR above it targets the branch of the one below, and none is a draft. If they don't match, report the difference and stop.
-
-```bash
-gh pr view <bottom PR> --json mergeStateStatus --jq .mergeStateStatus
-```
-
-When it is `BEHIND` or `DIRTY`, `main` moved past the stack: report that the stack needs the catch-up step of `/ticket-lead`, and stop.
+It checks every PR of the stack file: open, no draft, based on the part below (part 1 on `main`), merge state `CLEAN`, CI green, worktree pushed, and part 1 contains `origin/main`. When it prints `not ready`, report its list and stop. A stack behind `main` needs the catch-up step of `/ticket-lead`.
 
 ## 2. Check CI on every PR
 
