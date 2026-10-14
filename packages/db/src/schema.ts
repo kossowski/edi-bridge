@@ -17,7 +17,7 @@ export const workspaces = pgTable('workspaces', {
   id: uuid().primaryKey().defaultRandom(),
   name: text().notNull(),
   gln: text(),
-  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 })
 
 export const characterSet = pgEnum('character_set', characterSets)
@@ -34,9 +34,9 @@ export const tradingPartners = pgTable(
     characterSet: characterSet().notNull(),
     acknowledgementTimeLimitHours: integer().notNull(),
     testMode: boolean().notNull().default(true),
-    testInterchangeSentAt: timestamp({ withTimezone: true, mode: 'string' }),
-    contrlReceivedAt: timestamp({ withTimezone: true, mode: 'string' }),
-    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    testInterchangeSentAt: timestamp({ withTimezone: true, mode: 'date' }),
+    contrlReceivedAt: timestamp({ withTimezone: true, mode: 'date' }),
+    createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
   (table) => [
     index().on(table.workspaceId),

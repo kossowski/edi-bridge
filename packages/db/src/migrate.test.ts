@@ -65,6 +65,18 @@ describe('schema', () => {
     })
   })
 
+  it('returns an onboarding timestamp as the same instant', async () => {
+    const workspace = await insertWorkspace()
+    const sentAt = new Date('2026-10-14T12:00:00.123Z')
+
+    const [stored] = await connection.db
+      .insert(tradingPartners)
+      .values({ ...tradingPartner, workspaceId: workspace.id, testInterchangeSentAt: sentAt })
+      .returning()
+
+    expect(stored?.testInterchangeSentAt).toEqual(sentAt)
+  })
+
   it('rejects a Trading Partner without an existing Workspace', async () => {
     await expect(
       connection.db
