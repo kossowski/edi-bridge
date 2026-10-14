@@ -215,16 +215,23 @@ describe('readAcknowledgedInterchange', () => {
     return message
   }
 
-  it('reads the acknowledged Interchange and the accepted action', () => {
-    expect(
-      readAcknowledgedInterchange(messageOf(3, "UCI+CTL1+4012345000016:14+5412345000013:14+7'")),
-    ).toEqual({
-      controlReference: 'CTL1',
-      sender: { identification: '4012345000016', qualifier: '14' },
-      receiver: { identification: '5412345000013', qualifier: '14' },
-      action: 'accepted',
-    })
-  })
+  it.each([
+    ['contrl-accepting-interchange', '88776655', '7350000001266', '7300015200048', 'accepted'],
+    ['contrl-rejecting-message', '654321', '7300015200048', '7350000001266', 'rejected'],
+    ['contrl-rejecting-interchange', 'CTL00021', '4012345000016', '5412345000013', 'rejected'],
+  ])(
+    'reads the acknowledged Interchange of the valid Interchange %s',
+    (name, controlReference, sender, receiver, action) => {
+      const [message] = parse(readGolden('valid', name, 'edi')).messages
+
+      expect(message && readAcknowledgedInterchange(message)).toEqual({
+        controlReference,
+        sender: { identification: sender, qualifier: '14' },
+        receiver: { identification: receiver, qualifier: '14' },
+        action,
+      })
+    },
+  )
 
   it.each([
     ['7', '4', 'rejected'],
@@ -246,8 +253,6 @@ describe('readAcknowledgedInterchange', () => {
 
   it.each([
     ['4', 'rejected'],
-    ['6', 'rejected'],
-    ['7', 'accepted'],
     ['8', 'received'],
   ])('reads the action code %s as %s', (code, action) => {
     expect(
