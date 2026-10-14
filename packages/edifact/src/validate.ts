@@ -19,6 +19,7 @@ export type ValidationErrorCode =
   | 'too-many-repetitions'
   | 'unexpected-segment'
   | 'unsupported-message-type'
+  | 'wrong-format'
 
 export class ValidationError extends Error {
   override readonly name = 'ValidationError'
@@ -50,11 +51,24 @@ const findDefinition = (header: Segment) => {
 
 const formatPattern = /^(an|a|n)(?:\.\.)?(\d+)$/
 
+const digits = /^\d+$/
+
+const isNumeric = (value: string, decimal: string) => {
+  const [integer = '', fraction, ...rest] = value.replace(/^-/, '').split(decimal)
+
+  return (
+    rest.length === 0 && digits.test(integer) && (fraction === undefined || digits.test(fraction))
+  )
+}
+
 const checkValue = (id: string, value: string, position: Position, delimiters: Delimiters) => {
   const [, type, maxLength] = formatPattern.exec(dataElementFormats[id] ?? '') ?? []
 
-  const length =
-    type === 'n' ? value.replace('-', '').replace(delimiters.decimal, '').length : value.length
+  if (type === 'n' && !isNumeric(value, delimiters.decimal)) {
+    throw new ValidationError('wrong-format', position)
+  }
+
+  const length = type === 'n' ? value.replaceAll(/\D/g, '').length : value.length
 
   if (length > Number(maxLength)) {
     throw new ValidationError('too-long-element', position)

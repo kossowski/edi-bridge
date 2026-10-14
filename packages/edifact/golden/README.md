@@ -59,7 +59,7 @@ One CCG value differs from UN D.96A: segment group 25 (LIN) is `C 20000` in UN D
 
 `src/definitions/segments.ts`, `composites.ts` and `data-elements.ts` hold the data elements and composites of each segment in the ORDERS definition: their order, status (`M` or `C`) and format (`a`, `n` or `an`, with the maximum length). They come from the UN D.96A segment pages on stylusstudio.com, linked from the ORDERS page above (for example [BGM](https://www.stylusstudio.com/edifact/D96A/BGM_.htm)). UNS comes from the [UNS page](https://www.stylusstudio.com/edifact/40100/UNS_.htm) of the syntax directory that the ORDERS page links.
 
-The length of a numeric value counts its digits only, without a minus sign or decimal mark.
+A numeric (`n`) value holds digits, an optional leading minus sign and at most one decimal mark of the Interchange, with a digit on each side. Its length counts the digits only.
 
 ## Invalid Interchanges
 
@@ -76,3 +76,4 @@ Each file in `invalid/` parses without an error and fails validation. The expect
 | `orders-with-too-long-order-number.edi`            | `orders-without-una.edi`            | BGM order number with 36 characters; data element 1004 allows `an..35`.                   |
 | `orders-without-party-qualifier.edi`               | `orders-without-una.edi`            | First NAD without its party qualifier: `NAD++7300015200000::9`. Data element 3035 is `M`. |
 | `orders-without-ordered-quantity.edi`              | `orders-without-una.edi`            | QTY without its quantity: `QTY+21::GRM`. Data element 6060 is `M` in composite C186.      |
+| `orders-with-unit-in-quantity.edi`                 | `orders-without-una.edi`            | QTY with a unit in its quantity: `QTY+21:2000kg:GRM`. Data element 6060 is `n..15`.       |
