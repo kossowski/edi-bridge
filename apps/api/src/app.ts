@@ -6,19 +6,31 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   channelsEndpoint,
+  createLookupTableEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
+  deleteLookupTableEndpoint,
+  lookupTableEndpoint,
+  lookupTablesEndpoint,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
   tradingPartnersEndpoint,
+  updateLookupTableEndpoint,
   updateCompanyIdentityEndpoint,
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
 import { listChannels } from './channel.js'
 import { type Database, Db } from './db.js'
+import {
+  createLookupTable,
+  deleteLookupTable,
+  listLookupTables,
+  loadLookupTable,
+  updateLookupTable,
+} from './lookup-table.js'
 import { parse, type ValidationError } from './parse.js'
 import { loadDevelopmentSession } from './session.js'
 import {
@@ -174,6 +186,33 @@ export function buildApp({
   )
 
   app.get(channelsEndpoint.path, (request, reply) => respond(request, reply, listChannels))
+
+  app.get(lookupTablesEndpoint.path, (request, reply) => respond(request, reply, listLookupTables))
+
+  app.get<{ Params: { id: string } }>(lookupTableEndpoint.path, (request, reply) =>
+    respond(request, reply, loadLookupTable(request.params.id)),
+  )
+
+  app.post(createLookupTableEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(createLookupTableEndpoint.body, request.body), createLookupTable),
+      201,
+    ),
+  )
+
+  app.put<{ Params: { id: string } }>(updateLookupTableEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      updateLookupTable(request.params.id, parse(updateLookupTableEndpoint.body, request.body)),
+    ),
+  )
+
+  app.delete<{ Params: { id: string } }>(deleteLookupTableEndpoint.path, (request, reply) =>
+    respond(request, reply, deleteLookupTable(request.params.id), 204),
+  )
 
   return app
 }
