@@ -4,7 +4,7 @@ import postgres from 'postgres'
 import { z } from 'zod'
 
 import { glnRequired, type TradingPartner, type TradingPartnerInput } from '@edi-bridge/contracts'
-import { tradingPartners } from '@edi-bridge/db'
+import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
 import { Db } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
@@ -38,14 +38,12 @@ export const listTradingPartners = Effect.gen(function* () {
   return rows.map(toTradingPartner).toSorted((a, b) => byName.compare(a.name, b.name))
 })
 
-const glnUnique = 'trading_partners_workspace_id_gln_unique'
-
 const write = <A>(query: () => Promise<A>) =>
   Effect.promise(query).pipe(
     Effect.catchDefect((defect) =>
       defect instanceof DrizzleQueryError &&
       defect.cause instanceof postgres.PostgresError &&
-      defect.cause.constraint_name === glnUnique
+      defect.cause.constraint_name === tradingPartnerGlnUnique
         ? Effect.fail(new Conflict({ message: 'Another Trading Partner already uses this GLN' }))
         : Effect.die(defect),
     ),
