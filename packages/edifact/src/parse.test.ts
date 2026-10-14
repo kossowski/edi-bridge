@@ -13,7 +13,7 @@ const goldenNames = (kind: string) =>
 const readGolden = (kind: string, name: string, extension: string) =>
   readFileSync(new URL(`${name}.${extension}`, goldenDirectory(kind)), 'latin1')
 
-const parseError = (text: string) => {
+const thrownBy = (text: string) => {
   try {
     parse(text)
   } catch (error) {
@@ -31,7 +31,7 @@ describe('parse', () => {
   })
 
   it.each(goldenNames('broken'))('reports the error in the broken Interchange %s', (name) => {
-    const error = parseError(readGolden('broken', name, 'edi'))
+    const error = thrownBy(readGolden('broken', name, 'edi'))
 
     expect(error).toBeInstanceOf(ParseError)
     expect(error).toMatchObject(JSON.parse(readGolden('broken', name, 'json')))
