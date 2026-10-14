@@ -20,7 +20,9 @@ The GS1 Germany CCG recommendations for EANCOM 1997 ([ORDERS](https://events.gs1
 
 `src/definitions/orders.ts` is the UN D.96A ORDERS segment table, narrowed to EANCOM 1997 values where a public GS1 source gives them. This deviates from the ticket, which asks for the EANCOM D.96A ORDERS definition. The full EANCOM 1997 table is only in the licensed EANCOM manual.
 
-The public source is the [GS1 Germany CCG recommendation for EANCOM 1997 ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), section 3, printed pages 8 and 9 (PDF pages 9 and 10). It lists only the segments of the CCG Food/Nonfood profile. Each of them has the same status and maximum repetitions in `orders.ts`. Each segment group starts with its trigger segment at `M 1`.
+The UN D.96A table comes from the copy of "UN/EDIFACT D96A Message ORDERS - Purchase order message" on stylusstudio.com, because unece.org was not reachable.
+
+The public EANCOM source is the [GS1 Germany CCG recommendation for EANCOM 1997 ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), section 3, printed pages 8 and 9 (PDF pages 9 and 10). It lists only the segments of the CCG Food/Nonfood profile. Each of them has the same status and maximum repetitions in `orders.ts`. Each segment group starts with its trigger segment at `M 1`.
 
 | Entry                   | Status and maximum repetitions | Printed page |
 | ----------------------- | ------------------------------ | ------------ |
@@ -51,7 +53,7 @@ The public source is the [GS1 Germany CCG recommendation for EANCOM 1997 ORDERS]
 | UNS                     | M 1                            | 9            |
 | CNT                     | C 10                           | 9            |
 
-Every other entry keeps its UN D.96A value. Known gap: EANCOM drops some segments and segment groups that UN D.96A allows, and the CCG profile does not show which. Validation of an outbound Message therefore does not flag such a segment.
+One CCG value differs from UN D.96A: segment group 25 (LIN) is `C 20000` in UN D.96A and `C 200000` in the CCG recommendation. Every other entry in the table matches UN D.96A, and every other entry in `orders.ts` keeps its UN D.96A value. Known gap: EANCOM drops some segments and segment groups that UN D.96A allows, and the CCG profile does not show which. Validation of an outbound Message therefore does not flag such a segment.
 
 ## Invalid Interchanges
 
