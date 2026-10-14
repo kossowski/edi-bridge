@@ -59,6 +59,8 @@ One CCG value differs from UN D.96A: segment group 25 (LIN) is `C 20000` in UN D
 
 `src/definitions/segments.ts`, `composites.ts` and `data-elements.ts` hold the data elements and composites of each segment in the ORDERS definition: their order, status (`M` or `C`) and format (`a`, `n` or `an`, with the maximum length). They come from the UN D.96A segment pages on stylusstudio.com, linked from the ORDERS page above (for example [BGM](https://www.stylusstudio.com/edifact/D96A/BGM_.htm)). UNS comes from the [UNS page](https://www.stylusstudio.com/edifact/40100/UNS_.htm) of the syntax directory that the ORDERS page links.
 
+A value after the last data element of a segment or after the last component of an element is unexpected. Empty values there are allowed.
+
 A numeric (`n`) value holds digits, an optional leading minus sign and at most one decimal mark of the Interchange, with a digit on each side. Its length counts the digits only.
 
 ### Code lists
@@ -99,3 +101,5 @@ Each file in `invalid/` parses without an error and fails validation. The expect
 | `orders-without-ordered-quantity.edi`              | `orders-without-una.edi`            | QTY without its quantity: `QTY+21::GRM`. Data element 6060 is `M` in composite C186.                       |
 | `orders-with-unit-in-quantity.edi`                 | `orders-without-una.edi`            | QTY with a unit in its quantity: `QTY+21:2000kg:GRM`. Data element 6060 is `n..15`.                        |
 | `orders-with-unknown-date-format.edi`              | `orders-without-una.edi`            | First DTM with date format `104`: `DTM+137:20221125:104`. The code list of data element 2379 has no `104`. |
+| `orders-with-extra-element-in-control-total.edi`   | `orders-without-una.edi`            | Last CNT with a second element: `CNT+2:1+5`. CNT has one element.                                          |
+| `orders-with-extra-component-in-item-number.edi`   | `orders-without-una.edi`            | PIA with a fifth component in its item number: `PIA+1+1254:SA::9:5`. Composite C212 has four components.   |

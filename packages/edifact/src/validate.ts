@@ -18,6 +18,7 @@ export type ValidationErrorCode =
   | 'missing-segment'
   | 'too-long-element'
   | 'too-many-repetitions'
+  | 'unexpected-element'
   | 'unexpected-segment'
   | 'unknown-code'
   | 'unsupported-message-type'
@@ -87,11 +88,30 @@ const checkPresence = (entry: ElementEntry, value: string | undefined, position:
   }
 }
 
+const checkExtraValues = (
+  values: string[],
+  allowed: number,
+  positionOf: (index: number) => Position,
+) => {
+  const extra = values.findIndex((value, index) => index >= allowed && value !== '')
+
+  if (extra !== -1) {
+    throw new ValidationError('unexpected-element', positionOf(extra))
+  }
+}
+
 const checkElements = (segment: Segment, position: Position, delimiters: Delimiters) => {
-  for (const [index, entry] of (segmentDirectory[segment.tag] ?? []).entries()) {
+  const entries = segmentDirectory[segment.tag] ?? []
+
+  for (const [index, entry] of entries.entries()) {
     const values = segment.elements[index] ?? []
-    const elementPosition = { ...position, element: index + 1 }
     const components = compositeDirectory[entry.id]
+    const elementPosition = { ...position, element: index + 1 }
+
+    const componentPosition = (componentIndex: number) => ({
+      ...elementPosition,
+      component: componentIndex + 1,
+    })
 
     if (!components) {
       checkPresence(entry, values[0], elementPosition)
@@ -99,6 +119,8 @@ const checkElements = (segment: Segment, position: Position, delimiters: Delimit
       if (values[0]) {
         checkValue(entry.id, values[0], elementPosition, delimiters)
       }
+
+      checkExtraValues(values, 1, componentPosition)
 
       continue
     }
@@ -111,15 +133,22 @@ const checkElements = (segment: Segment, position: Position, delimiters: Delimit
 
     for (const [componentIndex, component] of components.entries()) {
       const value = values[componentIndex]
-      const componentPosition = { ...elementPosition, component: componentIndex + 1 }
 
-      checkPresence(component, value, componentPosition)
+      checkPresence(component, value, componentPosition(componentIndex))
 
       if (value) {
-        checkValue(component.id, value, componentPosition, delimiters)
+        checkValue(component.id, value, componentPosition(componentIndex), delimiters)
       }
     }
+
+    checkExtraValues(values, components.length, componentPosition)
   }
+
+  checkExtraValues(
+    segment.elements.map((values) => values.join('')),
+    entries.length,
+    (index) => ({ ...position, element: index + 1 }),
+  )
 }
 
 interface Cursor {
