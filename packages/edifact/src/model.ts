@@ -20,11 +20,9 @@ export interface Message {
   trailer: Segment
 }
 
-export type LineBreak = '' | '\n' | '\r' | '\r\n'
-
-// lineBreaks holds the break before each segment from UNB to UNZ, so the first one follows the UNA.
+// lineBreaks holds the run of CR and LF characters before each segment from UNB to UNZ.
 export interface Whitespace {
-  lineBreaks: LineBreak[]
+  lineBreaks: string[]
   trailingText: string
 }
 

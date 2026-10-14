@@ -1,7 +1,7 @@
 import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
 import { describePosition, type Position } from './position'
 
-import type { Delimiters, Element, Interchange, LineBreak, Message, Segment } from './model'
+import type { Delimiters, Element, Interchange, Message, Segment } from './model'
 
 export type ParseErrorCode =
   | 'control-reference-mismatch'
@@ -40,31 +40,16 @@ type PositionOf = (index: number) => Position
 
 interface Tokens {
   segments: Segment[]
-  lineBreaks: LineBreak[]
+  lineBreaks: string[]
   trailingText: string
 }
 
-const continueLineBreak = (lineBreak: LineBreak, character: string): LineBreak | undefined => {
-  if (character === '\r' && lineBreak === '') {
-    return '\r'
-  }
+const isLineBreak = (character: string) => character === '\r' || character === '\n'
 
-  if (character === '\n' && (lineBreak === '' || lineBreak === '\r')) {
-    return `${lineBreak}\n`
-  }
-
-  return undefined
-}
-
-const tokenize = (
-  text: string,
-  delimiters: Delimiters,
-  positionOf: PositionOf,
-  lineBreakBeforeFirstSegment: boolean,
-): Tokens => {
+const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf): Tokens => {
   const segments: Segment[] = []
-  const lineBreaks: LineBreak[] = []
-  let lineBreak: LineBreak = ''
+  const lineBreaks: string[] = []
+  let lineBreak = ''
   let offset = 0
   let trailingFrom = 0
   let elements: Element[] = []
@@ -117,22 +102,15 @@ const tokenize = (
       elements = []
       components = []
       value = ''
+    } else if (
+      isLineBreak(character) &&
+      elements.length === 0 &&
+      components.length === 0 &&
+      value === ''
+    ) {
+      lineBreak += character
     } else {
-      const atGap =
-        (segments.length > 0 || lineBreakBeforeFirstSegment) &&
-        elements.length === 0 &&
-        components.length === 0 &&
-        value === ''
-
-      const longerLineBreak: LineBreak | undefined = atGap
-        ? continueLineBreak(lineBreak, character)
-        : undefined
-
-      if (longerLineBreak !== undefined) {
-        lineBreak = longerLineBreak
-      } else {
-        value += character
-      }
+      value += character
     }
   }
 
@@ -218,7 +196,6 @@ export const parse = (text: string): Interchange => {
     hasServiceStringAdvice ? text.slice(serviceStringAdviceLength) : text,
     delimiters,
     position,
-    hasServiceStringAdvice,
   )
 
   const header = segments[0]
