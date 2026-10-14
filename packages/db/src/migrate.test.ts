@@ -5,7 +5,13 @@ import { withCheckDigit } from '@edi-bridge/contracts'
 
 import { connect, type Connection } from './client.js'
 import { migrate } from './migrate.js'
-import { lookupTableEntries, lookupTables, tradingPartners, workspaces } from './schema.js'
+import {
+  documentStructures,
+  lookupTableEntries,
+  lookupTables,
+  tradingPartners,
+  workspaces,
+} from './schema.js'
 import { startTestDatabase, type TestDatabase } from './testing.js'
 
 const tradingPartner = {
@@ -140,5 +146,67 @@ describe('a Lookup Table', () => {
       connection.db.select().from(lookupTables).where(eq(lookupTables.id, lookupTable.id)),
     ).resolves.toEqual([])
     await expect(entriesOf(lookupTable.id)).resolves.toEqual([])
+  })
+})
+
+describe('a Document Structure', () => {
+  const ordersStructure = {
+    name: 'ERP orders',
+    format: 'json',
+    jsonRoot: 'object',
+    children: [
+      {
+        kind: 'field',
+        path: 'orderNumber',
+        name: 'orderNumber',
+        label: 'Order number',
+        labelReason: null,
+        labelUnsure: false,
+        required: true,
+        type: 'string',
+      },
+    ],
+  } satisfies Omit<typeof documentStructures.$inferInsert, 'workspaceId'>
+
+  it('is deleted with its Workspace', async () => {
+    const workspace = await insertWorkspace()
+
+    await connection.db
+      .insert(documentStructures)
+      .values({ ...ordersStructure, workspaceId: workspace.id })
+
+    await connection.db.delete(workspaces).where(eq(workspaces.id, workspace.id))
+
+    await expect(
+      connection.db
+        .select()
+        .from(documentStructures)
+        .where(eq(documentStructures.workspaceId, workspace.id)),
+    ).resolves.toEqual([])
+  })
+
+  it('rejects CSV settings on a JSON Document Structure', async () => {
+    const workspace = await insertWorkspace()
+
+    await expect(
+      connection.db.insert(documentStructures).values({
+        ...ordersStructure,
+        workspaceId: workspace.id,
+        csv: { delimiter: ';', headerRow: true, encoding: 'utf-8' },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('rejects a sample without its text', async () => {
+    const workspace = await insertWorkspace()
+
+    await expect(
+      connection.db.insert(documentStructures).values({
+        ...ordersStructure,
+        workspaceId: workspace.id,
+        sampleFileName: 'order.json',
+        sampleTakenAt: new Date('2026-10-14T12:00:00.000Z'),
+      }),
+    ).rejects.toThrow()
   })
 })
