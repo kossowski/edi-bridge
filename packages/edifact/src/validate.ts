@@ -9,10 +9,11 @@ import {
   type Position,
 } from './position'
 
-import type { MessageDefinition, StructureEntry } from './definitions/definition'
+import type { ElementEntry, MessageDefinition, StructureEntry } from './definitions/definition'
 import type { Delimiters, Interchange, Segment } from './model'
 
 export type ValidationErrorCode =
+  | 'missing-element'
   | 'missing-segment'
   | 'too-long-element'
   | 'too-many-repetitions'
@@ -60,27 +61,43 @@ const checkValue = (id: string, value: string, position: Position, delimiters: D
   }
 }
 
+const checkPresence = (entry: ElementEntry, value: string | undefined, position: Position) => {
+  if (!value && entry.status === 'M') {
+    throw new ValidationError('missing-element', position)
+  }
+}
+
 const checkElements = (segment: Segment, position: Position, delimiters: Delimiters) => {
   for (const [index, entry] of (segmentDirectory[segment.tag] ?? []).entries()) {
     const values = segment.elements[index] ?? []
     const elementPosition = { ...position, element: index + 1 }
     const components = compositeDirectory[entry.id]
 
-    if (components) {
-      for (const [componentIndex, component] of components.entries()) {
-        const value = values[componentIndex]
+    if (!components) {
+      checkPresence(entry, values[0], elementPosition)
 
-        if (value) {
-          checkValue(
-            component.id,
-            value,
-            { ...elementPosition, component: componentIndex + 1 },
-            delimiters,
-          )
-        }
+      if (values[0]) {
+        checkValue(entry.id, values[0], elementPosition, delimiters)
       }
-    } else if (values[0]) {
-      checkValue(entry.id, values[0], elementPosition, delimiters)
+
+      continue
+    }
+
+    checkPresence(entry, values.join(''), elementPosition)
+
+    if (!values.some(Boolean)) {
+      continue
+    }
+
+    for (const [componentIndex, component] of components.entries()) {
+      const value = values[componentIndex]
+      const componentPosition = { ...elementPosition, component: componentIndex + 1 }
+
+      checkPresence(component, value, componentPosition)
+
+      if (value) {
+        checkValue(component.id, value, componentPosition, delimiters)
+      }
     }
   }
 }

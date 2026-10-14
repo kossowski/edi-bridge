@@ -65,12 +65,14 @@ The length of a numeric value counts its digits only, without a minus sign or de
 
 Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change. A change to the segment structure breaks a limit from the CCG table in [ORDERS definition](#orders-definition): BGM `M 1`, header DTM `M 35` before segment group 2, segment group 7 `C 5` or UNS `M 1`. A change to an element breaks a rule from [Segment definitions](#segment-definitions).
 
-| Golden file                                        | Base                                | Change                                                                       |
-| -------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
-| `orders-without-beginning-of-message.edi`          | `orders-without-una.edi`            | BGM removed, UNT `13`.                                                       |
-| `orders-with-repeated-beginning-of-message.edi`    | `orders-without-una.edi`            | BGM repeated, UNT `15`.                                                      |
-| `orders-with-too-many-currency-groups.edi`         | `orders-without-una.edi`            | Six `CUX+2:SEK:9` after the last NAD; segment group 7 allows five. UNT `20`. |
-| `orders-without-section-control.edi`               | `orders-without-una.edi`            | UNS removed, UNT `13`.                                                       |
-| `orders-of-unsupported-directory.edi`              | `orders-without-una.edi`            | UNH identifies `ORDERS:D:01B:UN:EAN010`.                                     |
-| `orders-with-misplaced-date-in-second-message.edi` | `orders-with-multiple-messages.edi` | Message 2: `DTM+2:20221201:102` after the last NAD, UNT `11`.                |
-| `orders-with-too-long-order-number.edi`            | `orders-without-una.edi`            | BGM order number with 36 characters; data element 1004 allows `an..35`.      |
+| Golden file                                        | Base                                | Change                                                                                    |
+| -------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| `orders-without-beginning-of-message.edi`          | `orders-without-una.edi`            | BGM removed, UNT `13`.                                                                    |
+| `orders-with-repeated-beginning-of-message.edi`    | `orders-without-una.edi`            | BGM repeated, UNT `15`.                                                                   |
+| `orders-with-too-many-currency-groups.edi`         | `orders-without-una.edi`            | Six `CUX+2:SEK:9` after the last NAD; segment group 7 allows five. UNT `20`.              |
+| `orders-without-section-control.edi`               | `orders-without-una.edi`            | UNS removed, UNT `13`.                                                                    |
+| `orders-of-unsupported-directory.edi`              | `orders-without-una.edi`            | UNH identifies `ORDERS:D:01B:UN:EAN010`.                                                  |
+| `orders-with-misplaced-date-in-second-message.edi` | `orders-with-multiple-messages.edi` | Message 2: `DTM+2:20221201:102` after the last NAD, UNT `11`.                             |
+| `orders-with-too-long-order-number.edi`            | `orders-without-una.edi`            | BGM order number with 36 characters; data element 1004 allows `an..35`.                   |
+| `orders-without-party-qualifier.edi`               | `orders-without-una.edi`            | First NAD without its party qualifier: `NAD++7300015200000::9`. Data element 3035 is `M`. |
+| `orders-without-ordered-quantity.edi`              | `orders-without-una.edi`            | QTY without its quantity: `QTY+21::GRM`. Data element 6060 is `M` in composite C186.      |
