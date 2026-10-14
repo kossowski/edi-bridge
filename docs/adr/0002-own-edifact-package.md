@@ -13,4 +13,4 @@ EDIFACT syntax is small enough to implement ourselves. Most of the work is in th
 The decision has these consequences:
 
 - We cross-checked correctness once against `node-edifact` and EDIFlow during development. We passed the same sample Interchanges to each implementation and compared the results. Neither library is a dependency or part of the test suite.
-- Each new Message Type requires a definition written by hand.
+- Each new Message Type requires our own static definition, transcribed from the UN directory. No library provides it, and nothing is downloaded at build or run time.
