@@ -1,0 +1,59 @@
+{
+  "hasServiceStringAdvice": true,
+  "delimiters": {
+    "component": "|",
+    "element": "^",
+    "decimal": ",",
+    "release": "!",
+    "repetition": " ",
+    "segment": "~"
+  },
+  "header": {
+    "tag": "UNB",
+    "elements": [
+      ["UNOC", "3"],
+      ["7300015200048", "14"],
+      ["7350000001266", "14"],
+      ["180327", "1000"],
+      ["654321"],
+      [""],
+      [""],
+      [""],
+      [""],
+      [""],
+      ["1"]
+    ]
+  },
+  "messages": [
+    {
+      "header": {
+        "tag": "UNH",
+        "elements": [["14245"], ["INVOIC", "D", "96A", "UN", "EAN009"]]
+      },
+      "segments": [
+        { "tag": "BGM", "elements": [["380"], ["73000152015571234"], ["9"]] },
+        { "tag": "DTM", "elements": [["137", "20221202", "102"]] },
+        { "tag": "NAD", "elements": [["SU"], ["7300015200000", "", "9"]] },
+        { "tag": "NAD", "elements": [["BY"], ["7350000001204", "", "9"]] },
+        { "tag": "LIN", "elements": [["9"], [""], ["07300015200154", "SRV"]] },
+        { "tag": "QTY", "elements": [["47", "1500", "GRM"]] },
+        {
+          "tag": "FTX",
+          "elements": [
+            ["BAQ"],
+            ["1"],
+            [""],
+            [
+              "Returenhet - ej moms p.g.a. att tillhandah\u00e5llandet inte betraktas som oms\u00e4ttning enligt 2 kap. 1 \u00a7 merv\u00e4rdesskattelagen (1994:200)."
+            ]
+          ]
+        },
+        { "tag": "PRI", "elements": [["AAA", "36,1", "CT", "", "1", "GRM"]] },
+        { "tag": "UNS", "elements": [["S"]] },
+        { "tag": "MOA", "elements": [["9", "54150"]] }
+      ],
+      "trailer": { "tag": "UNT", "elements": [["12"], ["14245"]] }
+    }
+  ],
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["654321"]] }
+}

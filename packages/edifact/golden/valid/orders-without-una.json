@@ -1,0 +1,51 @@
+{
+  "hasServiceStringAdvice": false,
+  "delimiters": {
+    "component": ":",
+    "element": "+",
+    "decimal": ".",
+    "release": "?",
+    "repetition": " ",
+    "segment": "'"
+  },
+  "header": {
+    "tag": "UNB",
+    "elements": [
+      ["UNOC", "3"],
+      ["7350000001266", "14"],
+      ["7300015200048", "14"],
+      ["221125", "1600"],
+      ["88776655"],
+      [""],
+      [""],
+      [""],
+      [""],
+      [""],
+      ["1"]
+    ]
+  },
+  "messages": [
+    {
+      "header": {
+        "tag": "UNH",
+        "elements": [["234567"], ["ORDERS", "D", "96A", "UN", "EAN009"]]
+      },
+      "segments": [
+        { "tag": "BGM", "elements": [["220"], ["73000152012297654"], ["9"]] },
+        { "tag": "DTM", "elements": [["137", "20221125", "102"]] },
+        { "tag": "DTM", "elements": [["2", "20221201", "102"]] },
+        { "tag": "NAD", "elements": [["SU"], ["7300015200000", "", "9"]] },
+        { "tag": "NAD", "elements": [["BY"], ["7350000001204", "", "9"]] },
+        { "tag": "NAD", "elements": [["DP"], ["7350000001228", "", "9"]] },
+        { "tag": "LIN", "elements": [["1"], [""], ["07300015200154", "SRV"]] },
+        { "tag": "PIA", "elements": [["1"], ["1254", "SA"]] },
+        { "tag": "QTY", "elements": [["21", "2000", "GRM"]] },
+        { "tag": "UNS", "elements": [["S"]] },
+        { "tag": "CNT", "elements": [["1", "2000"]] },
+        { "tag": "CNT", "elements": [["2", "1"]] }
+      ],
+      "trailer": { "tag": "UNT", "elements": [["14"], ["234567"]] }
+    }
+  ],
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["88776655"]] }
+}

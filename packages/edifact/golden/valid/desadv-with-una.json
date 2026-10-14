@@ -1,0 +1,58 @@
+{
+  "hasServiceStringAdvice": true,
+  "delimiters": {
+    "component": ":",
+    "element": "+",
+    "decimal": ".",
+    "release": "?",
+    "repetition": " ",
+    "segment": "'"
+  },
+  "header": {
+    "tag": "UNB",
+    "elements": [
+      ["UNOC", "3"],
+      ["7300015200048", "14"],
+      ["7350000001266", "14"],
+      ["221201", "0430"],
+      ["964775"],
+      [""],
+      [""],
+      [""],
+      [""],
+      [""],
+      ["1"]
+    ]
+  },
+  "messages": [
+    {
+      "header": {
+        "tag": "UNH",
+        "elements": [["564535"], ["DESADV", "D", "96A", "UN", "EAN006"]]
+      },
+      "segments": [
+        { "tag": "BGM", "elements": [["351"], ["73000152018851234"], ["9"]] },
+        { "tag": "DTM", "elements": [["137", "20221201", "102"]] },
+        { "tag": "DTM", "elements": [["11", "202212010610", "203"]] },
+        { "tag": "DTM", "elements": [["17", "202212010800", "203"]] },
+        { "tag": "RFF", "elements": [["ON", "73500010009921111"]] },
+        { "tag": "NAD", "elements": [["SU"], ["7300015200000", "", "9"]] },
+        { "tag": "NAD", "elements": [["BY"], ["7350000001204", "", "9"]] },
+        { "tag": "NAD", "elements": [["DP"], ["7350000001228", "", "9"]] },
+        { "tag": "TDT", "elements": [["20"], [""], ["30"]] },
+        { "tag": "CPS", "elements": [["1"]] },
+        { "tag": "PAC", "elements": [["3"]] },
+        { "tag": "CPS", "elements": [["2"], ["1"]] },
+        { "tag": "PAC", "elements": [[""], [""], ["O9"]] },
+        { "tag": "MEA", "elements": [["PD"], ["AAD"], ["KGM", "500"]] },
+        { "tag": "PCI", "elements": [["39"]] },
+        { "tag": "GIN", "elements": [["BJ"], ["373000152000023055"]] },
+        { "tag": "LIN", "elements": [["1"], [""], ["07300015200154", "SRV"]] },
+        { "tag": "PIA", "elements": [["1"], ["1250", "SA"]] },
+        { "tag": "QTY", "elements": [["12", "1500", "GRM"]] }
+      ],
+      "trailer": { "tag": "UNT", "elements": [["21"], ["564535"]] }
+    }
+  ],
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["964775"]] }
+}

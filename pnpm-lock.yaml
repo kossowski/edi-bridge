@@ -435,6 +435,36 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@26.6.4)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(msw@3.0.2(@types/node@26.6.4)(typescript@6.0.3)(vite@8.3.3(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.3(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/edifact:
+    devDependencies:
+      '@edi-bridge/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@edi-bridge/oxlint-config':
+        specifier: workspace:*
+        version: link:../oxlint-config
+      '@edi-bridge/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@types/node':
+        specifier: ^24
+        version: 24.19.1
+      eslint:
+        specifier: ^10.12.0
+        version: 10.12.0(jiti@2.7.0)
+      oxlint:
+        specifier: 1.87.0
+        version: 1.87.0
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.1)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/eslint-config:
     devDependencies:
       '@edi-bridge/oxlint-config':
