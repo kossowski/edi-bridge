@@ -7,9 +7,11 @@ export interface Delimiters {
   segment: string
 }
 
+export type Element = string[]
+
 export interface Segment {
   tag: string
-  elements: string[][]
+  elements: Element[]
 }
 
 export interface Message {
@@ -19,7 +21,7 @@ export interface Message {
 }
 
 export interface Interchange {
-  serviceStringAdvice: boolean
+  hasServiceStringAdvice: boolean
   delimiters: Delimiters
   header: Segment
   messages: Message[]
@@ -35,11 +37,13 @@ const defaultDelimiters: Delimiters = {
   segment: "'",
 }
 
+const noReleaseCharacter = ' '
+
 const lineBreak = /[\n\r]/
 
 const tokenize = (text: string, delimiters: Delimiters): Segment[] => {
   const segments: Segment[] = []
-  let elements: string[][] = []
+  let elements: Element[] = []
   let components: string[] = []
   let value = ''
   let released = false
@@ -48,7 +52,7 @@ const tokenize = (text: string, delimiters: Delimiters): Segment[] => {
     if (released) {
       value += character
       released = false
-    } else if (character === delimiters.release) {
+    } else if (character === delimiters.release && character !== noReleaseCharacter) {
       released = true
     } else if (character === delimiters.component) {
       components.push(value)
@@ -72,6 +76,10 @@ const tokenize = (text: string, delimiters: Delimiters): Segment[] => {
     }
   }
 
+  if (released || elements.length > 0 || components.length > 0 || value.trim() !== '') {
+    throw new Error('An Interchange ends with a segment terminator')
+  }
+
   return segments
 }
 
@@ -87,14 +95,14 @@ const readDelimiters = (advice: string): Delimiters => ({
 })
 
 export const parse = (text: string): Interchange => {
-  const serviceStringAdvice = text.startsWith('UNA')
+  const hasServiceStringAdvice = text.startsWith('UNA')
 
-  const delimiters = serviceStringAdvice
+  const delimiters = hasServiceStringAdvice
     ? readDelimiters(text.slice(0, serviceStringAdviceLength))
     : defaultDelimiters
 
   const segments = tokenize(
-    serviceStringAdvice ? text.slice(serviceStringAdviceLength) : text,
+    hasServiceStringAdvice ? text.slice(serviceStringAdviceLength) : text,
     delimiters,
   )
 
@@ -106,24 +114,25 @@ export const parse = (text: string): Interchange => {
   }
 
   const messages: Message[] = []
-  let open: Omit<Message, 'trailer'> | undefined
+  let openMessage: Omit<Message, 'trailer'> | undefined
 
-  for (const [index, segment] of segments.slice(1, -1).entries()) {
-    if (segment.tag === 'UNH' && !open) {
-      open = { header: segment, segments: [] }
-    } else if (segment.tag === 'UNT' && open) {
-      messages.push({ ...open, trailer: segment })
-      open = undefined
-    } else if (open && segment.tag !== 'UNH') {
-      open.segments.push(segment)
+  for (const segment of segments.slice(1, -1)) {
+    if (segment.tag === 'UNH' && !openMessage) {
+      openMessage = { header: segment, segments: [] }
+    } else if (segment.tag === 'UNT' && openMessage) {
+      messages.push({ ...openMessage, trailer: segment })
+      openMessage = undefined
+    } else if (openMessage && segment.tag !== 'UNH') {
+      openMessage.segments.push(segment)
     } else {
-      throw new Error(`Unexpected ${segment.tag} segment at segment ${index + 2}`)
+      const position = segments.indexOf(segment) + 1
+      throw new Error(`Unexpected ${segment.tag} segment at segment ${position}`)
     }
   }
 
-  if (open) {
+  if (openMessage) {
     throw new Error('A Message ends with UNT')
   }
 
-  return { serviceStringAdvice, delimiters, header, messages, trailer }
+  return { hasServiceStringAdvice, delimiters, header, messages, trailer }
 }

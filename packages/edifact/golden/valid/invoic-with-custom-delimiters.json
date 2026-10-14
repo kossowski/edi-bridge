@@ -1,5 +1,5 @@
 {
-  "serviceStringAdvice": true,
+  "hasServiceStringAdvice": true,
   "delimiters": {
     "component": "|",
     "element": "^",

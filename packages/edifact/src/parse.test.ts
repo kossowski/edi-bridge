@@ -31,7 +31,24 @@ describe('parse', () => {
       'a Message trailer without its header',
       "UNB+UNOC:3+A+B+261014:0930+1'BGM+220+1'UNT+2+1'UNZ+1+1'",
     ],
+    [
+      'a final segment without its terminator',
+      "UNB+UNOC:3+A+B+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'UNT+2+1'UNZ+1+1'UNH+2",
+    ],
+    [
+      'text after the last segment terminator',
+      "UNB+UNOC:3+A+B+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'UNT+2+1'UNZ+1+1'\r\nEND",
+    ],
   ])('rejects %s', (_case, text) => {
     expect(() => parse(text)).toThrow()
+  })
+
+  it('treats a space in the UNA release position as no release character', () => {
+    const interchange = parse(
+      "UNA:+.  'UNB+UNOC:3+A B+C+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'FTX+AAI+++O K'UNT+3+1'UNZ+1+1'",
+    )
+
+    expect(interchange.header.elements[1]).toEqual(['A B'])
+    expect(interchange.messages[0]?.segments[0]?.elements[3]).toEqual(['O K'])
   })
 })
