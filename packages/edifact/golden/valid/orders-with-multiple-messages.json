@@ -1,5 +1,5 @@
 {
-  "hasServiceStringAdvice": false,
+  "hasServiceStringAdvice": true,
   "delimiters": {
     "component": ":",
     "element": "+",
@@ -12,41 +12,57 @@
     "tag": "UNB",
     "elements": [
       ["UNOC", "3"],
-      ["5412345000013", "14"],
-      ["4012345000016", "14"],
-      ["261017", "0800"],
-      ["CTL00020"]
+      ["7350000001266", "14"],
+      ["7300015200048", "14"],
+      ["221125", "1600"],
+      ["88776655"],
+      [""],
+      [""],
+      [""],
+      [""],
+      [""],
+      ["1"]
     ]
   },
   "messages": [
     {
       "header": {
         "tag": "UNH",
-        "elements": [["ME000001"], ["ORDERS", "D", "96A", "UN", "EAN008"]]
+        "elements": [["234567"], ["ORDERS", "D", "96A", "UN", "EAN009"]]
       },
       "segments": [
-        { "tag": "BGM", "elements": [["220"], ["PO4712"], ["9"]] },
-        { "tag": "DTM", "elements": [["137", "20261017", "102"]] },
-        { "tag": "LIN", "elements": [["1"], [""], ["4000862141404", "SRS"]] },
-        { "tag": "QTY", "elements": [["21", "24"]] },
-        { "tag": "UNS", "elements": [["S"]] }
+        { "tag": "BGM", "elements": [["220"], ["73000152012297654"], ["9"]] },
+        { "tag": "DTM", "elements": [["137", "202211251600", "203"]] },
+        { "tag": "DTM", "elements": [["2", "202212010800", "203"]] },
+        { "tag": "RFF", "elements": [["CT", "2052"]] },
+        { "tag": "NAD", "elements": [["SU"], ["7300015200000", "", "9"]] },
+        { "tag": "NAD", "elements": [["BY"], ["7350000001204", "", "9"]] },
+        { "tag": "NAD", "elements": [["DP"], ["7350000001228", "", "9"]] },
+        { "tag": "LIN", "elements": [["1"], [""], ["07300015200154", "SRV"]] },
+        { "tag": "QTY", "elements": [["21", "2000", "GRM"]] },
+        { "tag": "PRI", "elements": [["AAE", "100", "", "RTP", "1", "KGM"]] },
+        { "tag": "UNS", "elements": [["S"]] },
+        { "tag": "CNT", "elements": [["2", "1"]] }
       ],
-      "trailer": { "tag": "UNT", "elements": [["7"], ["ME000001"]] }
+      "trailer": { "tag": "UNT", "elements": [["14"], ["234567"]] }
     },
     {
       "header": {
         "tag": "UNH",
-        "elements": [["ME000002"], ["ORDERS", "D", "96A", "UN", "EAN008"]]
+        "elements": [["234568"], ["ORDERS", "D", "96A", "UN", "EAN009"]]
       },
       "segments": [
-        { "tag": "BGM", "elements": [["220"], ["PO4713"], ["9"]] },
-        { "tag": "DTM", "elements": [["137", "20261017", "102"]] },
-        { "tag": "LIN", "elements": [["1"], [""], ["4000862141411", "SRS"]] },
-        { "tag": "QTY", "elements": [["21", "12"]] },
-        { "tag": "UNS", "elements": [["S"]] }
+        { "tag": "BGM", "elements": [["220"], ["73000152012297655"], ["9"]] },
+        { "tag": "DTM", "elements": [["137", "20221125", "102"]] },
+        { "tag": "NAD", "elements": [["SU"], ["7300015200000", "", "9"]] },
+        { "tag": "NAD", "elements": [["BY"], ["7350000001204", "", "9"]] },
+        { "tag": "LIN", "elements": [["1"], [""], ["07300015200154", "SRV"]] },
+        { "tag": "QTY", "elements": [["21", "2000", "GRM"]] },
+        { "tag": "UNS", "elements": [["S"]] },
+        { "tag": "CNT", "elements": [["2", "1"]] }
       ],
-      "trailer": { "tag": "UNT", "elements": [["7"], ["ME000002"]] }
+      "trailer": { "tag": "UNT", "elements": [["10"], ["234568"]] }
     }
   ],
-  "trailer": { "tag": "UNZ", "elements": [["2"], ["CTL00020"]] }
+  "trailer": { "tag": "UNZ", "elements": [["2"], ["88776655"]] }
 }

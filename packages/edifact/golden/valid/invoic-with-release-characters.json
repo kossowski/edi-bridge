@@ -12,38 +12,57 @@
     "tag": "UNB",
     "elements": [
       ["UNOC", "3"],
-      ["4012345000016", "14"],
-      ["5412345000013", "14"],
-      ["261016", "1200"],
-      ["CTL00019"]
+      ["7300015200048", "14"],
+      ["7350000001266", "14"],
+      ["180327", "1000"],
+      ["654321"],
+      [""],
+      [""],
+      [""],
+      [""],
+      [""],
+      ["1"]
     ]
   },
   "messages": [
     {
       "header": {
         "tag": "UNH",
-        "elements": [["ME000001"], ["INVOIC", "D", "96A", "UN", "EAN008"]]
+        "elements": [["14245"], ["INVOIC", "D", "96A", "UN", "EAN009"]]
       },
       "segments": [
-        { "tag": "BGM", "elements": [["380"], ["INV2026+0815"], ["9"]] },
-        { "tag": "DTM", "elements": [["137", "20261016", "102"]] },
+        { "tag": "BGM", "elements": [["380"], ["73000152015571234"], ["9"]] },
+        { "tag": "DTM", "elements": [["137", "20221202", "102"]] },
+        { "tag": "DTM", "elements": [["35", "20221201", "102"]] },
+        { "tag": "RFF", "elements": [["ON", "73500010009921111"]] },
+        { "tag": "NAD", "elements": [["SU"], ["7300015200000", "", "9"]] },
+        { "tag": "RFF", "elements": [["VA", "SE559752588001"]] },
+        { "tag": "NAD", "elements": [["BY"], ["7350000001204", "", "9"]] },
+        { "tag": "RFF", "elements": [["VA", "SE553157515801"]] },
+        { "tag": "PAT", "elements": [["3"], [""], ["66", "1"]] },
+        { "tag": "DTM", "elements": [["13", "20221212", "102"]] },
+        { "tag": "LIN", "elements": [["9"], [""], ["07300015200154", "SRV"]] },
+        { "tag": "QTY", "elements": [["47", "1500", "GRM"]] },
         {
           "tag": "FTX",
           "elements": [
-            ["AAI"],
+            ["BAQ"],
+            ["1"],
             [""],
-            [""],
-            ["PAYMENT TERMS: 30 DAYS NET", "SKONTO 2? WITHIN 10 DAYS"]
+            [
+              "Returenhet - ej moms p.g.a. att tillhandah\u00e5llandet inte betraktas som oms\u00e4ttning enligt 2 kap. 1 \u00a7 merv\u00e4rdesskattelagen (1994:200)."
+            ]
           ]
         },
-        {
-          "tag": "NAD",
-          "elements": [["BY"], ["5412345000013", "", "9"], [""], ["M+M FOODS'S MARKET"]]
-        },
-        { "tag": "MOA", "elements": [["77", "1234.56"]] }
+        { "tag": "MOA", "elements": [["203", "54150"]] },
+        { "tag": "PRI", "elements": [["AAA", "36.1", "CT", "", "1", "GRM"]] },
+        { "tag": "UNS", "elements": [["S"]] },
+        { "tag": "CNT", "elements": [["2", "1"]] },
+        { "tag": "MOA", "elements": [["9", "54150"]] },
+        { "tag": "MOA", "elements": [["79", "54150"]] }
       ],
-      "trailer": { "tag": "UNT", "elements": [["7"], ["ME000001"]] }
+      "trailer": { "tag": "UNT", "elements": [["21"], ["14245"]] }
     }
   ],
-  "trailer": { "tag": "UNZ", "elements": [["1"], ["CTL00019"]] }
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["654321"]] }
 }
