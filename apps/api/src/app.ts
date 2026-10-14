@@ -33,6 +33,7 @@ import {
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
+import { type AuthSettings, createAuth, mountAuth } from './auth.js'
 import { listChannels } from './channel.js'
 import { type Database, Db } from './db.js'
 import {
@@ -54,7 +55,7 @@ import {
   updateLookupTable,
 } from './lookup-table.js'
 import { parse, type ValidationError } from './parse.js'
-import { loadDevelopmentSession } from './session.js'
+import { CurrentMember, loadSession, resolveMember } from './session.js'
 import {
   createTradingPartner,
   listTradingPartnerActivities,
@@ -63,24 +64,18 @@ import {
   loadTradingPartnerActivity,
   updateTradingPartner,
 } from './trading-partner.js'
-import {
-  CurrentWorkspace,
-  loadCurrentWorkspace,
-  resolveDevelopmentWorkspace,
-  updateCompanyIdentity,
-  type WorkspaceResolver,
-} from './workspace.js'
+import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
 
 import type { Conflict, DocumentStructureRejected, NotFound, Unprocessable } from './errors.js'
 
 export type Probe = () => Promise<void>
 
 export interface AppDependencies {
+  auth: AuthSettings
   database: Database
   logger?: boolean
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
-  resolveWorkspace?: WorkspaceResolver
   webOrigin?: string
 }
 
@@ -121,11 +116,11 @@ const check = (probe: Probe, timeoutMs: number): Promise<CheckStatus> =>
   )
 
 export function buildApp({
+  auth: authSettings,
   database,
   logger = false,
   probes,
   probeTimeoutMs = 2000,
-  resolveWorkspace = resolveDevelopmentWorkspace,
   webOrigin,
 }: AppDependencies): FastifyInstance {
   const app = Fastify({ logger })
@@ -149,24 +144,36 @@ export function buildApp({
       .send({ status: healthy ? 'healthy' : 'unhealthy', checks: { postgres, redis } })
   })
 
-  const respond = <A>(
+  const auth = createAuth(database, authSettings)
+
+  mountAuth(app, auth, authSettings.baseUrl)
+
+  const respond = async <A>(
     request: FastifyRequest,
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, CurrentWorkspace | Db>,
+    effect: Effect.Effect<A, Failure, CurrentMember | CurrentWorkspace | Db>,
     status = 200,
-  ) =>
-    Effect.runPromise(
+  ) => {
+    const member = await resolveMember(auth, database, request)
+
+    if (member === undefined) {
+      return reply.code(401).send({ message: 'Unauthorized' })
+    }
+
+    return Effect.runPromise(
       effect.pipe(
         Effect.map((body) => reply.code(status).send(body)),
         Effect.catch((error) =>
           Effect.sync(() => reply.code(statusOf[error._tag]).send(bodyOf(error))),
         ),
         Effect.provideService(Db, database),
-        Effect.provideService(CurrentWorkspace, { id: resolveWorkspace(request) }),
+        Effect.provideService(CurrentMember, member),
+        Effect.provideService(CurrentWorkspace, { id: member.workspaceId }),
       ),
     )
+  }
 
-  app.get(sessionEndpoint.path, (request, reply) => respond(request, reply, loadDevelopmentSession))
+  app.get(sessionEndpoint.path, (request, reply) => respond(request, reply, loadSession))
 
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>
     respond(request, reply, loadCurrentWorkspace),

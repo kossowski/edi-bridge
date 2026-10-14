@@ -1,8 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { FastifyInstance } from 'fastify'
-
 import {
   createTradingPartnerEndpoint,
   tradingPartnerActivitiesEndpoint,
@@ -14,14 +12,9 @@ import {
   updateTradingPartnerEndpoint,
   withCheckDigit,
 } from '@edi-bridge/contracts'
-import { connect, type Connection, tradingPartners, workspaces } from '@edi-bridge/db'
-import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
+import { type Connection, tradingPartners } from '@edi-bridge/db'
 
-import { buildApp } from './app.js'
-import { otherWorkspace } from './testing.js'
-import { seedDevelopmentWorkspace } from './workspace.js'
-
-const up = () => Promise.resolve()
+import { type Client, startTestApi, type TestApi } from './testing.js'
 
 type TradingPartnerBody = Omit<
   TradingPartnerInput,
@@ -38,50 +31,39 @@ const hansemarkt: TradingPartnerInput = {
   acknowledgementTimeLimitHours: 24,
 }
 
-let testDatabase: TestDatabase
+let api: TestApi
 
 let connection: Connection
 
-let app: FastifyInstance
+let admin: Client
 
-let otherApp: FastifyInstance
+let otherAdmin: Client
 
 beforeAll(async () => {
-  testDatabase = await startTestDatabase()
-  connection = connect(testDatabase.url)
-  await seedDevelopmentWorkspace(connection.db)
-  await connection.db.insert(workspaces).values(otherWorkspace)
-  app = buildApp({ database: connection.db, probes: { postgres: up, redis: up } })
-  otherApp = buildApp({
-    database: connection.db,
-    probes: { postgres: up, redis: up },
-    resolveWorkspace: () => otherWorkspace.id,
-  })
+  api = await startTestApi()
+  ;({ connection, admin, otherAdmin } = api)
 }, 60_000)
 
 afterAll(async () => {
-  await app.close()
-  await otherApp.close()
-  await connection.close()
-  await testDatabase.stop()
+  await api.stop()
 })
 
 beforeEach(async () => {
   await connection.db.delete(tradingPartners)
 })
 
-const post = (body: TradingPartnerBody, target = app) =>
+const post = (body: TradingPartnerBody, target = admin) =>
   target.inject({ method: 'POST', url: createTradingPartnerEndpoint.path, body })
 
-const postedTradingPartner = async (body: TradingPartnerBody, target = app) =>
+const postedTradingPartner = async (body: TradingPartnerBody, target = admin) =>
   tradingPartnerSchema.parse((await post(body, target)).json())
 
-const list = (target = app) => target.inject({ method: 'GET', url: tradingPartnersEndpoint.path })
+const list = (target = admin) => target.inject({ method: 'GET', url: tradingPartnersEndpoint.path })
 
-const get = (id: string, target = app) =>
+const get = (id: string, target = admin) =>
   target.inject({ method: 'GET', url: tradingPartnerEndpoint.path.replace(':id', id) })
 
-const update = (id: string, body: TradingPartnerBody, target = app) =>
+const update = (id: string, body: TradingPartnerBody, target = admin) =>
   target.inject({
     method: 'PUT',
     url: updateTradingPartnerEndpoint.path.replace(':id', id),
@@ -220,7 +202,7 @@ describe('a Trading Partner of another Workspace', () => {
 
     const foreign = await postedTradingPartner(
       { ...hansemarkt, name: 'Elbtal Warenhaus KG' },
-      otherApp,
+      otherAdmin,
     )
 
     const listed = await list()
@@ -235,7 +217,7 @@ describe('a Trading Partner of another Workspace', () => {
 
     expect(updated.statusCode).toBe(404)
 
-    const unchanged = await get(foreign.id, otherApp)
+    const unchanged = await get(foreign.id, otherAdmin)
 
     expect(unchanged.json()).toEqual(foreign)
   })
@@ -281,7 +263,7 @@ describe('the GLN of a Trading Partner', () => {
 
   it('may be used by Trading Partners without a GLN and in another Workspace', async () => {
     await postedTradingPartner({ ...hansemarkt, gln: null })
-    await postedTradingPartner(hansemarkt, otherApp)
+    await postedTradingPartner(hansemarkt, otherAdmin)
 
     const second = await post({ ...hansemarkt, name: 'Rheinkauf eG', gln: null })
     const own = await post(hansemarkt)
@@ -340,7 +322,10 @@ describe('GET /trading-partners/activity', () => {
   it('lists no activity until Runs exist, instead of looking up a Trading Partner', async () => {
     await post(hansemarkt)
 
-    const response = await app.inject({ method: 'GET', url: tradingPartnerActivitiesEndpoint.path })
+    const response = await admin.inject({
+      method: 'GET',
+      url: tradingPartnerActivitiesEndpoint.path,
+    })
 
     expect(response.statusCode).toBe(200)
     expect(tradingPartnerActivitiesEndpoint.response.parse(response.json())).toEqual([])
@@ -348,7 +333,7 @@ describe('GET /trading-partners/activity', () => {
 })
 
 describe('GET /trading-partners/:id/activity', () => {
-  const getActivity = (id: string, target = app) =>
+  const getActivity = (id: string, target = admin) =>
     target.inject({ method: 'GET', url: tradingPartnerActivityEndpoint.path.replace(':id', id) })
 
   afterEach(() => {
@@ -392,7 +377,7 @@ describe('GET /trading-partners/:id/activity', () => {
   it('answers 404 for a Trading Partner of another Workspace', async () => {
     const created = await postedTradingPartner(hansemarkt)
 
-    const response = await getActivity(created.id, otherApp)
+    const response = await getActivity(created.id, otherAdmin)
 
     expect(response.statusCode).toBe(404)
   })

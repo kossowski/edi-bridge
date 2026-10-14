@@ -42,7 +42,16 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": ["DATABASE_URL", "REDIS_URL", "API_PORT", "WEB_ORIGIN", "WORKER_HEALTH_PORT"]
+      "env": [
+        "DATABASE_URL",
+        "REDIS_URL",
+        "API_PORT",
+        "WEB_ORIGIN",
+        "WORKER_HEALTH_PORT",
+        "BETTER_AUTH_URL",
+        "BETTER_AUTH_SECRET",
+        "NODE_ENV"
+      ]
     },
     "test:e2e": {
       "dependsOn": ["transit"],

@@ -21,16 +21,12 @@ import {
   tradingPartnerSchema,
   updateLookupTableEndpoint,
 } from '@edi-bridge/contracts'
-import { connect, type Connection, lookupTables, tradingPartners, workspaces } from '@edi-bridge/db'
-import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
+import { connect, type Connection, lookupTables, tradingPartners } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
-import { otherWorkspace } from './testing.js'
-import { seedDevelopmentWorkspace } from './workspace.js'
+import { type Client, ownAdmin, signIn, startTestApi, type TestApi, testAuth } from './testing.js'
 
 import type { Transaction } from './db.js'
-
-const up = () => Promise.resolve()
 
 type LookupTableBody = Omit<LookupTableInput, 'kind'> & { kind: string }
 
@@ -44,32 +40,23 @@ const units: LookupTableInput = {
   ],
 }
 
-let testDatabase: TestDatabase
+const up = () => Promise.resolve()
+
+let api: TestApi
 
 let connection: Connection
 
-let app: FastifyInstance
+let admin: Client
 
-let otherApp: FastifyInstance
+let otherAdmin: Client
 
 beforeAll(async () => {
-  testDatabase = await startTestDatabase()
-  connection = connect(testDatabase.url)
-  await seedDevelopmentWorkspace(connection.db)
-  await connection.db.insert(workspaces).values(otherWorkspace)
-  app = buildApp({ database: connection.db, probes: { postgres: up, redis: up } })
-  otherApp = buildApp({
-    database: connection.db,
-    probes: { postgres: up, redis: up },
-    resolveWorkspace: () => otherWorkspace.id,
-  })
+  api = await startTestApi()
+  ;({ connection, admin, otherAdmin } = api)
 }, 60_000)
 
 afterAll(async () => {
-  await app.close()
-  await otherApp.close()
-  await connection.close()
-  await testDatabase.stop()
+  await api.stop()
 })
 
 beforeEach(async () => {
@@ -77,28 +64,28 @@ beforeEach(async () => {
   await connection.db.delete(tradingPartners)
 })
 
-const post = (body: LookupTableBody, target = app) =>
+const post = (body: LookupTableBody, target = admin) =>
   target.inject({ method: 'POST', url: createLookupTableEndpoint.path, body })
 
-const get = (id: string, target = app) =>
+const get = (id: string, target = admin) =>
   target.inject({ method: 'GET', url: lookupTableEndpoint.path.replace(':id', id) })
 
-const posted = async (body: LookupTableBody, target = app) =>
+const posted = async (body: LookupTableBody, target = admin) =>
   lookupTableSchema.parse((await post(body, target)).json())
 
-const update = (id: string, body: LookupTableBody, target = app) =>
+const update = (id: string, body: LookupTableBody, target = admin) =>
   target.inject({ method: 'PUT', url: updateLookupTableEndpoint.path.replace(':id', id), body })
 
-const remove = (id: string, target = app) =>
+const remove = (id: string, target = admin) =>
   target.inject({ method: 'DELETE', url: deleteLookupTableEndpoint.path.replace(':id', id) })
 
-const list = (target = app) => target.inject({ method: 'GET', url: lookupTablesEndpoint.path })
+const list = (target = admin) => target.inject({ method: 'GET', url: lookupTablesEndpoint.path })
 
 const summaryOf = (table: LookupTable) => lookupTableSummarySchema.parse(table)
 
 const unknownId = '0b6f1a7e-2c4d-4e8f-9a1b-3c5d7e9f1a2b'
 
-const postTradingPartner = async (name: string, target = app) =>
+const postTradingPartner = async (name: string, target = admin) =>
   tradingPartnerSchema.parse(
     (
       await target.inject({
@@ -161,7 +148,7 @@ describe('POST /lookup-tables with a Trading Partner scope', () => {
     ['an unknown Trading Partner', () => Promise.resolve(unknownId)],
     [
       'a Trading Partner of another Workspace',
-      async () => (await postTradingPartner('Elbtal Warenhaus KG', otherApp)).id,
+      async () => (await postTradingPartner('Elbtal Warenhaus KG', otherAdmin)).id,
     ],
   ])('answers 422 for %s', async (_case, tradingPartnerId) => {
     const response = await post({
@@ -205,7 +192,7 @@ describe('the name of a Lookup Table', () => {
     const responses = [
       await post({ ...units, scope: { kind: 'tradingPartner', tradingPartnerId: hansemarkt.id } }),
       await post({ ...units, scope: { kind: 'tradingPartner', tradingPartnerId: rheinkauf.id } }),
-      await post(units, otherApp),
+      await post(units, otherAdmin),
     ]
 
     expect(responses.map(({ statusCode }) => statusCode)).toEqual([201, 201, 201])
@@ -243,7 +230,7 @@ describe('GET /lookup-tables', () => {
     const customs = await posted({ ...units, name: 'Zollcodes' })
     const countries = await posted({ ...units, name: 'Ländercodes' })
     const addresses = await posted({ ...units, name: 'Adressen' })
-    await post(units, otherApp)
+    await post(units, otherAdmin)
 
     const response = await list()
 
@@ -265,7 +252,7 @@ describe('GET /lookup-tables/:id', () => {
   it.each([
     ['an unknown id', () => Promise.resolve(unknownId)],
     ['an id that is no uuid', () => Promise.resolve('units')],
-    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+    ['a Lookup Table of another Workspace', async () => (await posted(units, otherAdmin)).id],
   ])('answers 404 for %s', async (_case, id) => {
     const response = await get(await id())
 
@@ -275,7 +262,7 @@ describe('GET /lookup-tables/:id', () => {
 })
 
 describe('GET /lookup-tables/:id/missing-codes', () => {
-  const missingCodes = (id: string, target = app) =>
+  const missingCodes = (id: string, target = admin) =>
     target.inject({
       method: 'GET',
       url: lookupTableMissingCodesEndpoint.path.replace(':id', id),
@@ -293,7 +280,7 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
   it.each([
     ['an unknown id', () => Promise.resolve(unknownId)],
     ['an id that is no uuid', () => Promise.resolve('units')],
-    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+    ['a Lookup Table of another Workspace', async () => (await posted(units, otherAdmin)).id],
   ])('answers 404 for %s', async (_case, id) => {
     const response = await missingCodes(await id())
 
@@ -303,7 +290,7 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
 })
 
 describe('GET /lookup-table-suggestions', () => {
-  const suggestions = (query: Record<string, string>, target = app) =>
+  const suggestions = (query: Record<string, string>, target = admin) =>
     target.inject({ method: 'GET', url: lookupTableSuggestionsEndpoint.path, query })
 
   it('suggests no entries for the Workspace until suggested code values exist', async () => {
@@ -339,7 +326,7 @@ describe('GET /lookup-table-suggestions', () => {
     ['an unknown Trading Partner', () => Promise.resolve(unknownId)],
     [
       'a Trading Partner of another Workspace',
-      async () => (await postTradingPartner('Nordkontor GmbH', otherApp)).id,
+      async () => (await postTradingPartner('Nordkontor GmbH', otherAdmin)).id,
     ],
   ])('answers 422 for %s', async (_case, tradingPartnerId) => {
     const response = await suggestions({
@@ -424,7 +411,7 @@ describe('PUT /lookup-tables/:id', () => {
   it.each([
     ['an unknown id', () => Promise.resolve(unknownId)],
     ['an id that is no uuid', () => Promise.resolve('units')],
-    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+    ['a Lookup Table of another Workspace', async () => (await posted(units, otherAdmin)).id],
   ])('answers 404 for %s', async (_case, id) => {
     const response = await update(await id(), units)
 
@@ -439,11 +426,11 @@ describe('PUT /lookup-tables/:id', () => {
   })
 
   it('leaves a Lookup Table of another Workspace unchanged', async () => {
-    const foreign = await posted(units, otherApp)
+    const foreign = await posted(units, otherAdmin)
 
     await update(foreign.id, { ...units, name: 'Taken over' })
 
-    const read = await get(foreign.id, otherApp)
+    const read = await get(foreign.id, otherAdmin)
 
     expect(read.json()).toEqual(foreign)
   })
@@ -471,7 +458,7 @@ describe('DELETE /lookup-tables/:id', () => {
   it.each([
     ['an unknown id', () => Promise.resolve(unknownId)],
     ['an id that is no uuid', () => Promise.resolve('units')],
-    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+    ['a Lookup Table of another Workspace', async () => (await posted(units, otherAdmin)).id],
   ])('answers 404 for %s', async (_case, id) => {
     const response = await remove(await id())
 
@@ -480,29 +467,29 @@ describe('DELETE /lookup-tables/:id', () => {
   })
 
   it('leaves a Lookup Table of another Workspace in place', async () => {
-    const foreign = await posted(units, otherApp)
+    const foreign = await posted(units, otherAdmin)
 
     await remove(foreign.id)
 
-    const read = await get(foreign.id, otherApp)
+    const read = await get(foreign.id, otherAdmin)
 
     expect(read.json()).toEqual(foreign)
   })
 })
 
-const postCsv = (endpoint: { path: string }, id: string, csv: string | number, target = app) =>
+const postCsv = (endpoint: { path: string }, id: string, csv: string | number, target = admin) =>
   target.inject({ method: 'POST', url: endpoint.path.replace(':id', id), body: { csv } })
 
 const previewImport = (id: string, csv: string | number) =>
   postCsv(lookupTableImportPreviewEndpoint, id, csv)
 
-const importCsv = (id: string, csv: string | number, target = app) =>
+const importCsv = (id: string, csv: string | number, target = admin) =>
   postCsv(importLookupTableEndpoint, id, csv, target)
 
 const notFoundCases = [
   ['an unknown id', () => Promise.resolve(unknownId)],
   ['an id that is no uuid', () => Promise.resolve('units')],
-  ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+  ['a Lookup Table of another Workspace', async () => (await posted(units, otherAdmin)).id],
 ] as const
 
 const invalidCsvCases = [
@@ -663,11 +650,11 @@ describe('POST /lookup-tables/:id/import', () => {
   })
 
   it('leaves a Lookup Table of another Workspace unchanged', async () => {
-    const foreign = await posted(units, otherApp)
+    const foreign = await posted(units, otherAdmin)
 
     await importCsv(foreign.id, 'KG;KGM')
 
-    const read = await get(foreign.id, otherApp)
+    const read = await get(foreign.id, otherAdmin)
 
     expect(read.json()).toEqual(foreign)
   })
@@ -678,8 +665,10 @@ describe('a Lookup Table deleted right after a write', () => {
 
   let deletingApp: FastifyInstance
 
-  beforeAll(() => {
-    deleting = connect(testDatabase.url)
+  let deletingAdmin: Client
+
+  beforeAll(async () => {
+    deleting = connect(api.databaseUrl)
 
     const transaction = deleting.db.transaction.bind(deleting.db)
 
@@ -691,7 +680,12 @@ describe('a Lookup Table deleted right after a write', () => {
       return result
     }
 
-    deletingApp = buildApp({ database: deleting.db, probes: { postgres: up, redis: up } })
+    deletingApp = buildApp({
+      auth: testAuth,
+      database: deleting.db,
+      probes: { postgres: up, redis: up },
+    })
+    deletingAdmin = await signIn(deletingApp, ownAdmin)
   })
 
   afterAll(async () => {
@@ -700,7 +694,7 @@ describe('a Lookup Table deleted right after a write', () => {
   })
 
   it('answers the created Lookup Table', async () => {
-    const response = await post(units, deletingApp)
+    const response = await post(units, deletingAdmin)
 
     expect(response.statusCode).toBe(201)
     expect(lookupTableSchema.parse(response.json()).entries).toEqual(units.entries)
@@ -709,7 +703,7 @@ describe('a Lookup Table deleted right after a write', () => {
   it('answers the updated Lookup Table', async () => {
     const created = await posted(units)
 
-    const response = await update(created.id, { ...units, name: 'Einheiten' }, deletingApp)
+    const response = await update(created.id, { ...units, name: 'Einheiten' }, deletingAdmin)
 
     expect(response.statusCode).toBe(200)
     expect(lookupTableSchema.parse(response.json()).name).toBe('Einheiten')
@@ -718,7 +712,7 @@ describe('a Lookup Table deleted right after a write', () => {
   it('answers the imported Lookup Table', async () => {
     const created = await posted(units)
 
-    const response = await importCsv(created.id, 'KG;KGM', deletingApp)
+    const response = await importCsv(created.id, 'KG;KGM', deletingAdmin)
 
     expect(response.statusCode).toBe(200)
     expect(lookupTableSchema.parse(response.json()).entryCount).toBe(3)

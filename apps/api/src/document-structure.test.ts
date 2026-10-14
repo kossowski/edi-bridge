@@ -1,8 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import type { FastifyInstance } from 'fastify'
-
 import {
   type CreateDocumentStructureBody,
   createDocumentStructureEndpoint,
@@ -22,41 +20,25 @@ import {
   updateDocumentStructureEndpoint,
   windows1252CsvSettings,
 } from '@edi-bridge/contracts'
-import { connect, type Connection, documentStructures, workspaces } from '@edi-bridge/db'
-import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
+import { type Connection, documentStructures } from '@edi-bridge/db'
 
-import { buildApp } from './app.js'
-import { otherWorkspace } from './testing.js'
-import { seedDevelopmentWorkspace } from './workspace.js'
+import { type Client, startTestApi, type TestApi } from './testing.js'
 
-const up = () => Promise.resolve()
-
-let testDatabase: TestDatabase
+let api: TestApi
 
 let connection: Connection
 
-let app: FastifyInstance
+let admin: Client
 
-let otherApp: FastifyInstance
+let otherAdmin: Client
 
 beforeAll(async () => {
-  testDatabase = await startTestDatabase()
-  connection = connect(testDatabase.url)
-  await seedDevelopmentWorkspace(connection.db)
-  await connection.db.insert(workspaces).values(otherWorkspace)
-  app = buildApp({ database: connection.db, probes: { postgres: up, redis: up } })
-  otherApp = buildApp({
-    database: connection.db,
-    probes: { postgres: up, redis: up },
-    resolveWorkspace: () => otherWorkspace.id,
-  })
+  api = await startTestApi()
+  ;({ connection, admin, otherAdmin } = api)
 }, 60_000)
 
 afterAll(async () => {
-  await app.close()
-  await otherApp.close()
-  await connection.close()
-  await testDatabase.stop()
+  await api.stop()
 })
 
 beforeEach(async () => {
@@ -64,7 +46,7 @@ beforeEach(async () => {
 })
 
 const infer = (body: DocumentStructureOrigin) =>
-  app.inject({ method: 'POST', url: inferDocumentStructureEndpoint.path, body })
+  admin.inject({ method: 'POST', url: inferDocumentStructureEndpoint.path, body })
 
 const inferred = async (body: DocumentStructureOrigin) => {
   const response = await infer(body)
@@ -167,7 +149,7 @@ describe('POST /document-structures/inference', () => {
   })
 
   it('refuses an origin that does not match the contract', async () => {
-    const response = await app.inject({
+    const response = await admin.inject({
       method: 'POST',
       url: inferDocumentStructureEndpoint.path,
       body: { kind: 'xmlDocument' },
@@ -177,10 +159,10 @@ describe('POST /document-structures/inference', () => {
   })
 })
 
-const create = (body: CreateDocumentStructureBody, target = app) =>
+const create = (body: CreateDocumentStructureBody, target = admin) =>
   target.inject({ method: 'POST', url: createDocumentStructureEndpoint.path, body })
 
-const created = async (body: CreateDocumentStructureBody, target = app) => {
+const created = async (body: CreateDocumentStructureBody, target = admin) => {
   const response = await create(body, target)
 
   expect(response.statusCode).toBe(201)
@@ -188,10 +170,10 @@ const created = async (body: CreateDocumentStructureBody, target = app) => {
   return documentStructureSchema.parse(response.json())
 }
 
-const get = (id: string, target = app) =>
+const get = (id: string, target = admin) =>
   target.inject({ method: 'GET', url: documentStructureEndpoint.path.replace(':id', id) })
 
-const list = async (target = app) => {
+const list = async (target = admin) => {
   const response = await target.inject({ method: 'GET', url: documentStructuresEndpoint.path })
 
   expect(response.statusCode).toBe(200)
@@ -292,7 +274,7 @@ describe('POST /document-structures', () => {
   })
 
   it('refuses a body that does not match the contract', async () => {
-    const response = await app.inject({
+    const response = await admin.inject({
       method: 'POST',
       url: createDocumentStructureEndpoint.path,
       body: { name: '', origin: documentStructureOrigins.jsonDocument },
@@ -351,7 +333,7 @@ describe('GET /document-structures', () => {
   it('lists no Document Structures of another Workspace', async () => {
     await created({ name: 'ERP orders', origin: documentStructureOrigins.jsonDocument })
 
-    await expect(list(otherApp)).resolves.toEqual([])
+    await expect(list(otherAdmin)).resolves.toEqual([])
   })
 })
 
@@ -362,7 +344,7 @@ describe('GET /document-structures/:id', () => {
       origin: documentStructureOrigins.jsonDocument,
     })
 
-    expect((await get(structure.id, otherApp)).statusCode).toBe(404)
+    expect((await get(structure.id, otherAdmin)).statusCode).toBe(404)
   })
 
   it('answers 404 for an unknown or malformed id', async () => {
@@ -372,7 +354,7 @@ describe('GET /document-structures/:id', () => {
 })
 
 describe('PUT /document-structures/:id', () => {
-  const update = (id: string, body: UpdateDocumentStructureBody, target = app) =>
+  const update = (id: string, body: UpdateDocumentStructureBody, target = admin) =>
     target.inject({
       method: 'PUT',
       url: updateDocumentStructureEndpoint.path.replace(':id', id),
@@ -481,7 +463,7 @@ describe('PUT /document-structures/:id', () => {
   it('refuses a body that does not match the contract', async () => {
     const structure = await orders()
 
-    const response = await app.inject({
+    const response = await admin.inject({
       method: 'PUT',
       url: updateDocumentStructureEndpoint.path.replace(':id', structure.id),
       body: { name: 'ERP orders', adjustments: [{ path: 'buyer' }] },
@@ -495,7 +477,7 @@ describe('PUT /document-structures/:id', () => {
     ['an id that is no uuid', () => Promise.resolve('orders')],
     ['a Document Structure of another Workspace', async () => (await orders()).id],
   ])('answers 404 for %s', async (_case, id) => {
-    const response = await update(await id(), { name: 'ERP orders', adjustments: [] }, otherApp)
+    const response = await update(await id(), { name: 'ERP orders', adjustments: [] }, otherAdmin)
 
     expect(response.statusCode).toBe(404)
     expect(response.json()).toEqual({ message: 'Not found' })

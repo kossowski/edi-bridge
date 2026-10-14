@@ -1,33 +1,18 @@
 import { eq } from 'drizzle-orm'
 import { Context, Effect } from 'effect'
 
-import type { FastifyRequest } from 'fastify'
-
-import { type CompanyIdentityInput, type Workspace, withCheckDigit } from '@edi-bridge/contracts'
 import { workspaces } from '@edi-bridge/db'
 
-import { type Database, Db } from './db.js'
-import { exactlyOne } from './rows.js'
+import type { CompanyIdentityInput } from '@edi-bridge/contracts'
 
-const developmentWorkspace: Workspace = {
-  id: '5f0c3a52-7d1e-4b8a-9c61-2e4f8d9a1b07',
-  name: 'Nordwind Handel GmbH',
-  gln: withCheckDigit('021234500000'),
-}
+import { Db } from './db.js'
+import { exactlyOne } from './rows.js'
 
 export class CurrentWorkspace extends Context.Service<CurrentWorkspace, { readonly id: string }>()(
   'CurrentWorkspace',
 ) {}
 
-export type WorkspaceResolver = (request: FastifyRequest) => string
-
-export const resolveDevelopmentWorkspace: WorkspaceResolver = () => developmentWorkspace.id
-
 const columns = { id: workspaces.id, name: workspaces.name, gln: workspaces.gln }
-
-export async function seedDevelopmentWorkspace(database: Database) {
-  await database.insert(workspaces).values(developmentWorkspace).onConflictDoNothing()
-}
 
 export const loadCurrentWorkspace = Effect.gen(function* () {
   const db = yield* Db
