@@ -9,8 +9,11 @@ import {
   type LookupTable,
   type LookupTableInput,
   lookupTableEndpoint,
+  lookupTableImportPreviewEndpoint,
+  lookupTableImportPreviewSchema,
   lookupTableSchema,
   lookupTablesEndpoint,
+  maxLookupTableCsvLength,
   lookupTableSummarySchema,
   tradingPartnerSchema,
   updateLookupTableEndpoint,
@@ -401,5 +404,94 @@ describe('DELETE /lookup-tables/:id', () => {
     const read = await get(foreign.id, otherApp)
 
     expect(read.json()).toEqual(foreign)
+  })
+})
+
+const previewImport = (id: string, csv: string | number, target = app) =>
+  target.inject({
+    method: 'POST',
+    url: lookupTableImportPreviewEndpoint.path.replace(':id', id),
+    body: { csv },
+  })
+
+describe('POST /lookup-tables/:id/import-preview', () => {
+  it('classifies each row against the entries and reports the reasons of each invalid row', async () => {
+    const created = await posted(units)
+
+    const response = await previewImport(
+      created.id,
+      'Quelle;Ziel\nST;PCE\nKAR;BX\nKG;KGM\n;BX\nKG;KGS\nA;B;C',
+    )
+
+    expect(response.statusCode).toBe(200)
+    expect(lookupTableImportPreviewSchema.parse(response.json())).toEqual({
+      rows: [
+        { line: 2, status: 'unchanged', sourceCode: 'ST', targetCode: 'PCE' },
+        {
+          line: 3,
+          status: 'changed',
+          sourceCode: 'KAR',
+          targetCode: 'BX',
+          previousTargetCode: 'CT',
+        },
+        { line: 4, status: 'added', sourceCode: 'KG', targetCode: 'KGM' },
+        { line: 5, status: 'invalid', cells: ['', 'BX'], reasons: ['sourceCodeMissing'] },
+        { line: 6, status: 'invalid', cells: ['KG', 'KGS'], reasons: ['duplicateSourceCode'] },
+        { line: 7, status: 'invalid', cells: ['A', 'B', 'C'], reasons: ['columnCount'] },
+      ],
+    })
+  })
+
+  it('leaves the entries unchanged', async () => {
+    const created = await posted(units)
+
+    await previewImport(created.id, 'KAR;BX\nKG;KGM')
+
+    const read = await get(created.id)
+
+    expect(read.json()).toEqual(created)
+  })
+
+  it.each([
+    ['an unknown id', () => Promise.resolve(unknownId)],
+    ['an id that is no uuid', () => Promise.resolve('units')],
+    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await previewImport(await id(), 'ST;PCE')
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
+  })
+
+  it('answers 404 before it checks the CSV', async () => {
+    const response = await previewImport(unknownId, 42)
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  it.each([
+    ['no text', 42],
+    ['a CSV beyond the maximum length', 'ST;PCE\n'.padEnd(maxLookupTableCsvLength + 1, '\n')],
+  ])('answers 400 for %s', async (_case, csv) => {
+    const created = await posted(units)
+
+    const response = await previewImport(created.id, csv)
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toHaveProperty('message')
+  })
+
+  it('accepts a CSV up to the maximum length', async () => {
+    const created = await posted(units)
+
+    const response = await previewImport(
+      created.id,
+      'KG;KGM\n'.padEnd(maxLookupTableCsvLength, '\n'),
+    )
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({
+      rows: [{ line: 1, status: 'added', sourceCode: 'KG', targetCode: 'KGM' }],
+    })
   })
 })

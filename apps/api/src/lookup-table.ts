@@ -2,21 +2,23 @@ import { and, asc, eq, getTableColumns, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
+  classifyLookupTableImport,
+  type LookupTable,
+  type LookupTableEntry,
+  type LookupTableImportBody,
+  type LookupTableImportPreview,
+  type LookupTableInput,
+  type LookupTableScope,
+  type LookupTableScopeInput,
+  type LookupTableSummary,
+} from '@edi-bridge/contracts'
+import {
   lookupTableEntries,
   lookupTables,
   lookupTableTradingPartnerNameUnique,
   lookupTableWorkspaceNameUnique,
   tradingPartners,
 } from '@edi-bridge/db'
-
-import type {
-  LookupTable,
-  LookupTableEntry,
-  LookupTableInput,
-  LookupTableScope,
-  LookupTableScopeInput,
-  LookupTableSummary,
-} from '@edi-bridge/contracts'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { NotFound, Unprocessable } from './errors.js'
@@ -219,4 +221,15 @@ export const deleteLookupTable = (id: string) =>
     if (deleted.length === 0) {
       return yield* new NotFound()
     }
+  })
+
+export const previewLookupTableImport = (
+  id: string,
+  body: Effect.Effect<LookupTableImportBody, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    const { entries } = yield* loadLookupTable(id)
+    const { csv } = yield* body
+
+    return { rows: classifyLookupTableImport(entries, csv) } satisfies LookupTableImportPreview
   })
