@@ -61,6 +61,14 @@ describe('inviteStatus', () => {
     expect(inviteStatus(pending, new Date(expiresAt.getTime() - 1))).toEqual({ status: 'pending' })
     expect(inviteStatus(pending, expiresAt)).toEqual({ status: 'expired', on: pending.expiresAt })
   })
+
+  it('shows the seeded invites as accepted, pending and expired today', () => {
+    const today = new Date()
+
+    expect(new Set(seedInvites.map((seed) => inviteStatus(seed, today).status))).toEqual(
+      new Set(['accepted', 'pending', 'expired']),
+    )
+  })
 })
 
 describe('sameWorkspaceName', () => {
