@@ -73,7 +73,7 @@ function reasonsOf(cells: ReadonlyArray<string>): LookupTableImportReason[] {
   ]
 }
 
-export function classifyImport(
+export function classifyLookupTableImport(
   entries: ReadonlyArray<LookupTableEntry>,
   csv: string,
 ): LookupTableImportRow[] {
@@ -120,7 +120,7 @@ export function classifyImport(
   })
 }
 
-export function applyImport(
+export function applyLookupTableImport(
   entries: ReadonlyArray<LookupTableEntry>,
   rows: ReadonlyArray<LookupTableImportRow>,
 ): LookupTableEntry[] {

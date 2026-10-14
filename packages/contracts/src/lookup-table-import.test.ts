@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { applyImport, classifyImport } from './lookup-table-import'
+import { applyLookupTableImport, classifyLookupTableImport } from './lookup-table-import'
 
 import type { LookupTableEntry } from './lookup-table'
 
@@ -11,7 +11,7 @@ const units: LookupTableEntry[] = [
   { sourceCode: 'L', targetCode: 'LTR' },
 ]
 
-describe('classifyImport', () => {
+describe('classifyLookupTableImport', () => {
   it('classifies each row against the entries', () => {
     const csv = [
       'Source code;Target code',
@@ -26,7 +26,7 @@ describe('classifyImport', () => {
       'L;',
     ].join('\r\n')
 
-    expect(classifyImport(units, csv)).toEqual([
+    expect(classifyLookupTableImport(units, csv)).toEqual([
       { line: 2, status: 'unchanged', sourceCode: 'ST', targetCode: 'PCE' },
       {
         line: 3,
@@ -45,20 +45,20 @@ describe('classifyImport', () => {
   })
 
   it('reads comma-separated rows without a header', () => {
-    expect(classifyImport(units, 'STK,PCE\n"BX ""large""",BX\n')).toEqual([
+    expect(classifyLookupTableImport(units, 'STK,PCE\n"BX ""large""",BX\n')).toEqual([
       { line: 1, status: 'unchanged', sourceCode: 'STK', targetCode: 'PCE' },
       { line: 2, status: 'added', sourceCode: 'BX "large"', targetCode: 'BX' },
     ])
   })
 
   it('reads tab-separated rows under a German header', () => {
-    expect(classifyImport(units, 'Quellcode\tZielcode\nKAR\tCT')).toEqual([
+    expect(classifyLookupTableImport(units, 'Quellcode\tZielcode\nKAR\tCT')).toEqual([
       { line: 2, status: 'added', sourceCode: 'KAR', targetCode: 'CT' },
     ])
   })
 
   it('matches the first row of a file that starts with a byte order mark', () => {
-    expect(classifyImport(units, '﻿ST;PCE\r\nKG;KGM')).toEqual([
+    expect(classifyLookupTableImport(units, '﻿ST;PCE\r\nKG;KGM')).toEqual([
       { line: 1, status: 'unchanged', sourceCode: 'ST', targetCode: 'PCE' },
       { line: 2, status: 'unchanged', sourceCode: 'KG', targetCode: 'KGM' },
     ])
@@ -67,7 +67,7 @@ describe('classifyImport', () => {
   it('rejects codes longer than the limit', () => {
     const long = 'X'.repeat(71)
 
-    expect(classifyImport(units, `${long};${long}`)).toEqual([
+    expect(classifyLookupTableImport(units, `${long};${long}`)).toEqual([
       {
         line: 1,
         status: 'invalid',
@@ -78,15 +78,15 @@ describe('classifyImport', () => {
   })
 
   it('finds no rows in an empty file', () => {
-    expect(classifyImport(units, '')).toEqual([])
+    expect(classifyLookupTableImport(units, '')).toEqual([])
   })
 })
 
-describe('applyImport', () => {
+describe('applyLookupTableImport', () => {
   it('adds and changes the valid rows and keeps the other entries', () => {
-    const rows = classifyImport(units, 'KG;KGS\nKAR;CT\n;BX\nST;PCE')
+    const rows = classifyLookupTableImport(units, 'KG;KGS\nKAR;CT\n;BX\nST;PCE')
 
-    expect(applyImport(units, rows)).toEqual([
+    expect(applyLookupTableImport(units, rows)).toEqual([
       { sourceCode: 'ST', targetCode: 'PCE' },
       { sourceCode: 'STK', targetCode: 'PCE' },
       { sourceCode: 'KG', targetCode: 'KGS' },

@@ -1,8 +1,8 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
-  applyImport,
-  classifyImport,
+  applyLookupTableImport,
+  classifyLookupTableImport,
   createLookupTableEndpoint,
   deleteLookupTableEndpoint,
   directionOf,
@@ -435,7 +435,7 @@ export function lookupTableHandlers(
     const body = lookupTableImportPreviewEndpoint.body.safeParse(await request.json())
 
     return body.success
-      ? { table, rows: classifyImport(table.entries, body.data.csv) }
+      ? { table, rows: classifyLookupTableImport(table.entries, body.data.csv) }
       : { response: badRequest(body.error.message) }
   }
 
@@ -543,7 +543,7 @@ export function lookupTableHandlers(
 
         const imported: LookupTableRecord = {
           ...parsed.table,
-          entries: applyImport(parsed.table.entries, parsed.rows),
+          entries: applyLookupTableImport(parsed.table.entries, parsed.rows),
           updatedAt: new Date().toISOString(),
         }
 

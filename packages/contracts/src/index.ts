@@ -384,7 +384,7 @@ export {
   updateLookupTableEndpoint,
 } from './lookup-table'
 
-export { applyImport, classifyImport } from './lookup-table-import'
+export { applyLookupTableImport, classifyLookupTableImport } from './lookup-table-import'
 
 export {
   type ComparisonOutputs,
