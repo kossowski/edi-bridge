@@ -77,6 +77,8 @@ pnpm --filter @edi-bridge/web exec playwright install chromium
 
 Tests never depend on the local Compose services.
 
+`pnpm check:fast` runs lint, type check and tests together. `pnpm check` adds the canvas stories, the e2e tests, the builds and Storybook, one task at a time to stay within the memory of a small machine.
+
 ## Full stack in Docker
 
 Each app has its own Dockerfile, built from the repository root. The `full-stack` Compose profile runs the infrastructure plus the production images of all three apps:
