@@ -274,6 +274,39 @@ describe('decodeText', () => {
   })
 })
 
+describe('the common tree', () => {
+  it('gives a JSON Document and a CSV Document of the same records the same tree', () => {
+    const json = inferFromJson(
+      JSON.stringify([
+        { deliveryNote: 'LS-1', deliveryDate: '2026-10-03', quantity: 24, remark: 'Kühlware' },
+        { deliveryNote: 'LS-2', deliveryDate: '2026-10-04', quantity: 6 },
+      ]),
+    )
+
+    const csv = inferFromCsv(
+      'deliveryNote;deliveryDate;quantity;remark\r\nLS-1;03.10.2026;24;Kühlware\r\nLS-2;04.10.2026;6;\r\n',
+      defaultCsvSettings,
+    )
+
+    const records = {
+      kind: 'array',
+      required: true,
+      items: {
+        kind: 'object',
+        children: [
+          { kind: 'field', name: 'deliveryNote', type: 'string', required: true },
+          { kind: 'field', name: 'deliveryDate', type: 'date', required: true },
+          { kind: 'field', name: 'quantity', type: 'integer', required: true },
+          { kind: 'field', name: 'remark', type: 'string', required: false },
+        ],
+      },
+    }
+
+    expect(json.children).toMatchObject([records])
+    expect(csv.children).toMatchObject([records])
+  })
+})
+
 describe('parseCsv', () => {
   it('keeps delimiters, quotes and line breaks inside quoted cells', () => {
     const rows = parseCsv('a;b\r\n"x;y";"say ""hi""\nagain"\r\n\r\nlast;row', ';')
