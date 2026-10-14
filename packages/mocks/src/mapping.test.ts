@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import {
   createMappingEndpoint,
   documentStructureEndpoint,
+  documentStructureLeaves,
   lookupTablesEndpoint,
   type MappingDraft,
   mappingDraftEndpoint,
@@ -24,7 +25,6 @@ import {
   seedDocumentStructureOf,
   seedDocumentStructures,
 } from './document-structure'
-import { documentStructureLeaves } from './document-structure-inference'
 import { seedFlows, seedMappings } from './flow'
 import { createLookupTables, lookupTableListHandler, seedLookupTables } from './lookup-table'
 import {

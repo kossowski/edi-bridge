@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { mappingVersionSummarySchema } from '@edi-bridge/contracts'
+import { documentStructureOrigins, mappingVersionSummarySchema } from '@edi-bridge/contracts'
 import {
   aiDraftHandlers,
   aiProposalFor,
@@ -11,7 +11,6 @@ import {
   createTradingPartner as buildTradingPartner,
   createWorkspace,
   documentStructureHandlers,
-  documentStructureOrigins,
   lookupTableHandlers,
   lookupTableListHandler,
   mappingHandlers,

@@ -14,11 +14,12 @@ import {
   csvRowsPath,
   defaultCsvSettings,
   type DocumentField,
+  documentStructureOrigins,
   type FieldLabelChoice,
   inferDocumentStructureEndpoint,
   type InferredDocumentStructure,
 } from '@edi-bridge/contracts'
-import { createHandlers, documentStructureOrigins } from '@edi-bridge/mocks'
+import { createHandlers } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 

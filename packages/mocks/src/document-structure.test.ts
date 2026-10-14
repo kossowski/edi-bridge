@@ -6,11 +6,14 @@ import {
   createDocumentStructureEndpoint,
   type DocumentStructure,
   documentStructureEndpoint,
+  documentStructureLeaves,
+  documentStructureOrigins,
   type DocumentStructureNode,
   documentStructureProblemSchema,
   documentStructuresEndpoint,
   type DocumentStructureOrigin,
   inferDocumentStructureEndpoint,
+  toEncodedFile,
   toPath,
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
@@ -25,8 +28,6 @@ import {
   seedDocumentStructures,
   seedUnusedDocumentStructures,
 } from './document-structure'
-import { documentStructureLeaves } from './document-structure-inference'
-import { documentStructureOrigins, toEncodedFile } from './document-structure-origin'
 import { createMappingDraftStore, seedMappingDrafts } from './mapping'
 import {
   createMappingVersionStore,

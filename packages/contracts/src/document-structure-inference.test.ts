@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  type CharacterEncoding,
   type CsvSettings,
   defaultCsvSettings,
   type DocumentStructure,
   type DocumentStructureNode,
   type DocumentStructureProblem,
   documentStructureSchema,
-} from '@edi-bridge/contracts'
-
-import { seedDocumentStructureOf } from './document-structure'
+} from './document-structure'
 import {
   adjustDocumentStructure,
   decodeText,
@@ -21,11 +20,35 @@ import {
   inferFromJsonSchema,
   parseCsv,
 } from './document-structure-inference'
-import {
-  createCsvDocument,
-  documentStructureOrigins,
-  toEncodedFile,
-} from './document-structure-origin'
+import { documentStructureOrigins, encodeText, toEncodedFile } from './document-structure-origins'
+
+function createCsvDocument({
+  rowCount,
+  encoding = 'utf-8',
+}: {
+  rowCount: number
+  encoding?: CharacterEncoding
+}) {
+  const cities = ['München', 'Köln', 'Düsseldorf', 'Nürnberg', 'Lübeck']
+
+  const rows = Array.from({ length: rowCount }, (_, index) =>
+    [
+      `LS-${90_000 + Math.floor(index / 8)}`,
+      `${String((index % 28) + 1).padStart(2, '0')}.10.2026`,
+      `Kunde ${index % 97}`,
+      cities[index % cities.length],
+      `0${String(4_012_345_000_000 + index)}`,
+      String((index % 500) + 1),
+      index % 5 === 0 ? 'Kühlware' : '',
+    ].join(';'),
+  )
+
+  return toEncodedFile(
+    `lieferscheine-${rowCount}.csv`,
+    ['Lieferscheinnummer;Lieferdatum;Kunde;Ort;GTIN;Menge;Bemerkung', ...rows].join('\r\n'),
+    encoding,
+  )
+}
 
 function problemOf(run: () => void): DocumentStructureProblem {
   try {
@@ -220,6 +243,18 @@ describe('reading facts and sample file', () => {
   })
 })
 
+describe('encodeText', () => {
+  it('writes the euro sign as its Windows-1252 byte', () => {
+    const bytes = encodeText('5 €', 'windows-1252')
+
+    expect([...bytes]).toEqual([0x35, 0x20, 0x80])
+  })
+
+  it('refuses a character that has no Windows-1252 byte', () => {
+    expect(() => encodeText('→', 'windows-1252')).toThrow('→')
+  })
+})
+
 describe('decodeText', () => {
   it('reads umlauts from a Windows-1252 Document when that encoding is chosen', () => {
     const { content } = documentStructureOrigins.windows1252CsvDocument.document
@@ -236,6 +271,39 @@ describe('decodeText', () => {
 
   it('drops a UTF-8 byte order mark', () => {
     expect(decodeText(toEncodedFile('bom.csv', '﻿a;b').content, 'utf-8')).toBe('a;b')
+  })
+})
+
+describe('the common tree', () => {
+  it('gives a JSON Document and a CSV Document of the same records the same tree', () => {
+    const json = inferFromJson(
+      JSON.stringify([
+        { deliveryNote: 'LS-1', deliveryDate: '2026-10-03', quantity: 24, remark: 'Kühlware' },
+        { deliveryNote: 'LS-2', deliveryDate: '2026-10-04', quantity: 6 },
+      ]),
+    )
+
+    const csv = inferFromCsv(
+      'deliveryNote;deliveryDate;quantity;remark\r\nLS-1;03.10.2026;24;Kühlware\r\nLS-2;04.10.2026;6;\r\n',
+      defaultCsvSettings,
+    )
+
+    const records = {
+      kind: 'array',
+      required: true,
+      items: {
+        kind: 'object',
+        children: [
+          { kind: 'field', name: 'deliveryNote', type: 'string', required: true },
+          { kind: 'field', name: 'deliveryDate', type: 'date', required: true },
+          { kind: 'field', name: 'quantity', type: 'integer', required: true },
+          { kind: 'field', name: 'remark', type: 'string', required: false },
+        ],
+      },
+    }
+
+    expect(json.children).toMatchObject([records])
+    expect(csv.children).toMatchObject([records])
   })
 })
 
@@ -426,7 +494,11 @@ describe('inferFromJsonSchema', () => {
 })
 
 describe('adjustDocumentStructure', () => {
-  const order = seedDocumentStructureOf.ORDERS
+  const order = documentStructureSchema.parse({
+    id: crypto.randomUUID(),
+    name: 'ERP purchase order',
+    ...inferDocumentStructure(documentStructureOrigins.jsonDocument),
+  })
 
   function adjust(adjustments: Parameters<typeof adjustDocumentStructure>[1]['adjustments']) {
     return adjustDocumentStructure(order, { name: order.name, adjustments })

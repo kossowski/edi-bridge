@@ -2,6 +2,8 @@ import { en, Faker } from '@faker-js/faker'
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  adjustDocumentStructure,
+  applyLabels,
   arrayPath,
   childPath,
   createDocumentStructureEndpoint,
@@ -10,38 +12,35 @@ import {
   documentFieldTypes,
   type DocumentStructure,
   documentStructureEndpoint,
+  documentStructureLeaves,
   type DocumentStructureNode,
+  documentStructureOrigins,
   type DocumentStructureProblem,
+  DocumentStructureProblemError,
   documentStructureSchema,
   documentStructuresEndpoint,
   type DocumentStructureSummary,
   documentStructureSummarySchema,
   samplePreview,
+  findNode,
   type GraphParts,
+  inferDocumentStructure,
   inferDocumentStructureEndpoint,
   type InferredDocumentStructure,
   type JsonContent,
+  knownFieldNames,
   type MappingVersionSummary,
   mappingVersionSummarySchema,
   type MessageType,
   messageTypes,
+  plainNameOf,
+  sameCsvSettings,
   summaryFieldLabelCount,
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
+  visitedNode,
 } from '@edi-bridge/contracts'
 
-import {
-  adjustDocumentStructure,
-  applyLabels,
-  documentStructureLeaves,
-  DocumentStructureProblemError,
-  findNode,
-  inferDocumentStructure,
-  sameCsvSettings,
-  visitedNode,
-} from './document-structure-inference'
-import { documentStructureOrigins } from './document-structure-origin'
-import { knownFieldNames, plainNameOf } from './field-label'
 import { byNameAndNewest } from './flow'
 import { containerOf } from './paths'
 import { badRequest, notFound, serverError } from './responses'

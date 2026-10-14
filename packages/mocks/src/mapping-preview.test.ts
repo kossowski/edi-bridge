@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 import {
+  documentStructureLeaves,
   glnIssue,
   type DocumentContent,
   type JsonContent,
@@ -15,7 +16,6 @@ import {
 } from '@edi-bridge/contracts'
 
 import { seedDocumentStructureOf } from './document-structure'
-import { documentStructureLeaves } from './document-structure-inference'
 import { seedLookupTableNamed } from './lookup-table'
 import { seedMappingDrafts } from './mapping'
 import { mappingPreviewHandlers } from './mapping-preview'

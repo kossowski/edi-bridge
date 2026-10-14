@@ -1,4 +1,4 @@
-import { type DocumentField, maxFieldLabelLength } from '@edi-bridge/contracts'
+import { type DocumentField, maxFieldLabelLength } from './document-structure'
 
 export type PlainName = Pick<DocumentField, 'label' | 'labelReason' | 'labelUnsure'>
 

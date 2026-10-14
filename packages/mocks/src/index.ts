@@ -154,9 +154,7 @@ export {
   toDocumentStructureStore,
 } from './document-structure'
 
-export { documentStructureLeaves } from './document-structure-inference'
-
-export { createCsvDocument, documentStructureOrigins } from './document-structure-origin'
+export { createCsvDocument } from './document-structure-origin'
 
 export { dayMs } from './duration'
 
