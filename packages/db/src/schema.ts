@@ -4,6 +4,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -17,6 +18,10 @@ import {
 import {
   acknowledgementTimeLimitHours,
   characterSets,
+  type CsvSettings,
+  documentFormats,
+  type DocumentStructureNode,
+  jsonRoots,
   lookupTableKinds,
   maxLookupCodeLength,
 } from '@edi-bridge/contracts'
@@ -109,5 +114,40 @@ export const lookupTableEntries = pgTable(
     unique('lookup_table_entries_source_code_unique').on(table.lookupTableId, table.sourceCode),
     codeLength('source_code_length', sql`${table.sourceCode}`),
     codeLength('target_code_length', sql`${table.targetCode}`),
+  ],
+)
+
+export const documentFormat = pgEnum('document_format', documentFormats)
+
+export const jsonRoot = pgEnum('json_root', jsonRoots)
+
+export const documentStructures = pgTable(
+  'document_structures',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    format: documentFormat().notNull(),
+    jsonRoot: jsonRoot(),
+    csv: jsonb().$type<CsvSettings>(),
+    sampleFileName: text(),
+    sampleText: text(),
+    sampleTakenAt: timestamp({ withTimezone: true, mode: 'date' }),
+    children: jsonb().$type<DocumentStructureNode[]>().notNull(),
+    createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    index().on(table.workspaceId),
+    check(
+      'document_structures_format_settings',
+      sql`(${table.format} = 'json') = (${table.jsonRoot} is not null) and (${table.format} = 'csv') = (${table.csv} is not null)`,
+    ),
+    check(
+      'document_structures_sample_complete',
+      sql`num_nonnulls(${table.sampleFileName}, ${table.sampleText}, ${table.sampleTakenAt}) in (0, 3)`,
+    ),
   ],
 )

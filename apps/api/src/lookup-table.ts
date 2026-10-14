@@ -1,4 +1,4 @@
-import { and, asc, eq, getTableColumns, type SQL, sql } from 'drizzle-orm'
+import { asc, eq, getTableColumns, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
@@ -26,7 +26,7 @@ import {
 
 import { Db, type Database, type Transaction } from './db.js'
 import { NotFound, Unprocessable } from './errors.js'
-import { byName, rejectingDuplicate, rejectingInvalidId } from './rows.js'
+import { byName, inWorkspace, rejectingDuplicate, rejectingInvalidId } from './rows.js'
 import { assertTradingPartnerIn, rejectingUnknownTradingPartner } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
@@ -66,9 +66,6 @@ const toSummary = (row: Row): LookupTableSummary => ({
   updatedAt: row.updatedAt.toISOString(),
 })
 
-const inWorkspace = (workspaceId: string, ...conditions: (SQL | undefined)[]) =>
-  and(eq(lookupTables.workspaceId, workspaceId), ...conditions)
-
 const selectEntries = (db: Database | Transaction, lookupTableId: string) =>
   db
     .select({
@@ -83,7 +80,7 @@ export const listLookupTables = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
-  const rows = yield* Effect.promise(() => selectRows(db, inWorkspace(workspace.id)))
+  const rows = yield* Effect.promise(() => selectRows(db, inWorkspace(lookupTables, workspace.id)))
 
   return rows.map(toSummary).toSorted(byName)
 })
@@ -93,7 +90,10 @@ const selectLookupTable = async (
   workspaceId: string,
   id: string,
 ): Promise<LookupTable | undefined> => {
-  const [row] = await selectRows(db, inWorkspace(workspaceId, eq(lookupTables.id, id)))
+  const [row] = await selectRows(
+    db,
+    inWorkspace(lookupTables, workspaceId, eq(lookupTables.id, id)),
+  )
 
   if (!row) {
     return undefined
@@ -133,7 +133,7 @@ const rejectingUnknownLookupTable = (id: string) =>
       db
         .select({ id: lookupTables.id })
         .from(lookupTables)
-        .where(inWorkspace(workspace.id, eq(lookupTables.id, id))),
+        .where(inWorkspace(lookupTables, workspace.id, eq(lookupTables.id, id))),
     )
 
     if (!found) {
@@ -187,7 +187,7 @@ const rewriteLookupTable = async (
   const locked = await tx
     .update(lookupTables)
     .set({ ...set, updatedAt: sql`now()` })
-    .where(inWorkspace(workspaceId, eq(lookupTables.id, id)))
+    .where(inWorkspace(lookupTables, workspaceId, eq(lookupTables.id, id)))
     .returning({ id: lookupTables.id })
 
   // A DELETE between loadLookupTable and the rewrite leaves no row to write.
@@ -277,7 +277,7 @@ export const deleteLookupTable = (id: string) =>
     const deleted = yield* Effect.promise(() =>
       db
         .delete(lookupTables)
-        .where(inWorkspace(workspace.id, eq(lookupTables.id, id)))
+        .where(inWorkspace(lookupTables, workspace.id, eq(lookupTables.id, id)))
         .returning({ id: lookupTables.id }),
     )
 

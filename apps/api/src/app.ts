@@ -1,21 +1,26 @@
 import cors from '@fastify/cors'
-import { Effect } from 'effect'
+import { Effect, Predicate } from 'effect'
 import Fastify from 'fastify'
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   channelsEndpoint,
+  createDocumentStructureEndpoint,
   createLookupTableEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   deleteLookupTableEndpoint,
+  documentStructureEndpoint,
+  documentStructuresEndpoint,
+  inferDocumentStructureEndpoint,
   importLookupTableEndpoint,
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
+  maxEncodedFileBytes,
   maxLookupTableCsvLength,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
@@ -29,6 +34,12 @@ import {
 
 import { listChannels } from './channel.js'
 import { type Database, Db } from './db.js'
+import {
+  createDocumentStructure,
+  inferDocumentStructureOrReject,
+  listDocumentStructures,
+  loadDocumentStructure,
+} from './document-structure.js'
 import {
   createLookupTable,
   deleteLookupTable,
@@ -58,7 +69,7 @@ import {
   type WorkspaceResolver,
 } from './workspace.js'
 
-import type { Conflict, NotFound, Unprocessable } from './errors.js'
+import type { Conflict, DocumentStructureRejected, NotFound, Unprocessable } from './errors.js'
 
 export type Probe = () => Promise<void>
 
@@ -71,17 +82,26 @@ export interface AppDependencies {
   webOrigin?: string
 }
 
-type Failure = Conflict | NotFound | Unprocessable | ValidationError
+type Failure = Conflict | DocumentStructureRejected | NotFound | Unprocessable | ValidationError
 
 const statusOf: Record<Failure['_tag'], number> = {
   ValidationError: 400,
   NotFound: 404,
   Conflict: 409,
   Unprocessable: 422,
+  DocumentStructureRejected: 422,
 }
+
+const bodyOf = (error: Failure) =>
+  Predicate.isTagged(error, 'DocumentStructureRejected')
+    ? error.problem
+    : { message: error.message }
 
 // JSON escapes a control character in six bytes, the worst case for a CSV of the maximum length.
 const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
+
+// Base64 takes 4 characters per 3 bytes; 1 MiB covers the name, labels and JSON around the Document.
+const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
 
 type CheckStatus = 'down' | 'up'
 
@@ -137,7 +157,7 @@ export function buildApp({
       effect.pipe(
         Effect.map((body) => reply.code(status).send(body)),
         Effect.catch((error) =>
-          Effect.sync(() => reply.code(statusOf[error._tag]).send({ message: error.message })),
+          Effect.sync(() => reply.code(statusOf[error._tag]).send(bodyOf(error))),
         ),
         Effect.provideService(Db, database),
         Effect.provideService(CurrentWorkspace, { id: resolveWorkspace(request) }),
@@ -264,6 +284,43 @@ export function buildApp({
         reply,
         importLookupTable(request.params.id, parse(importLookupTableEndpoint.body, request.body)),
       ),
+  )
+
+  app.post(
+    inferDocumentStructureEndpoint.path,
+    { bodyLimit: documentStructureBodyLimit },
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        Effect.flatMap(
+          parse(inferDocumentStructureEndpoint.body, request.body),
+          inferDocumentStructureOrReject,
+        ),
+      ),
+  )
+
+  app.post(
+    createDocumentStructureEndpoint.path,
+    { bodyLimit: documentStructureBodyLimit },
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        Effect.flatMap(
+          parse(createDocumentStructureEndpoint.body, request.body),
+          createDocumentStructure,
+        ),
+        201,
+      ),
+  )
+
+  app.get(documentStructuresEndpoint.path, (request, reply) =>
+    respond(request, reply, listDocumentStructures),
+  )
+
+  app.get<{ Params: { id: string } }>(documentStructureEndpoint.path, (request, reply) =>
+    respond(request, reply, loadDocumentStructure(request.params.id)),
   )
 
   return app

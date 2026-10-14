@@ -1,4 +1,4 @@
-import { DrizzleQueryError } from 'drizzle-orm'
+import { and, type AnyColumn, DrizzleQueryError, eq, type SQL } from 'drizzle-orm'
 import { Effect } from 'effect'
 import postgres from 'postgres'
 import { z } from 'zod'
@@ -9,6 +9,12 @@ export const exactlyOne = <A>(rows: A[]) => Effect.orDie(Effect.fromNullishOr(ro
 
 export const rejectingInvalidId = (id: string) =>
   z.uuid().safeParse(id).success ? Effect.void : Effect.fail(new NotFound())
+
+export const inWorkspace = (
+  table: { workspaceId: AnyColumn },
+  workspaceId: string,
+  ...conditions: (SQL | undefined)[]
+) => and(eq(table.workspaceId, workspaceId), ...conditions)
 
 const nameCollator = new Intl.Collator('de')
 
