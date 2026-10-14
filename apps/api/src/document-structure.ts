@@ -1,4 +1,4 @@
-import { and, eq, type SQL } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
@@ -11,6 +11,7 @@ import {
   documentStructureSchema,
   type DocumentStructureSummary,
   inferDocumentStructure,
+  type InferredDocumentStructure,
   samplePreview,
   summaryFieldLabelCount,
 } from '@edi-bridge/contracts'
@@ -18,24 +19,32 @@ import { documentStructures } from '@edi-bridge/db'
 
 import { Db } from './db.js'
 import { DocumentStructureRejected, NotFound } from './errors.js'
-import { byName, exactlyOne, rejectingInvalidId } from './rows.js'
+import { byName, exactlyOne, inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
 type Row = typeof documentStructures.$inferSelect
 
-const attempt = <A>(run: () => A) =>
-  Effect.suspend(() => {
-    try {
-      return Effect.succeed(run())
-    } catch (error) {
-      return error instanceof DocumentStructureProblemError
-        ? Effect.fail(new DocumentStructureRejected({ problem: error.problem }))
-        : Effect.die(error)
-    }
-  })
+const rejectingDocumentStructureProblem = <A>(infer: () => A) =>
+  Effect.sync(infer).pipe(
+    Effect.catchDefect((defect) =>
+      defect instanceof DocumentStructureProblemError
+        ? Effect.fail(new DocumentStructureRejected({ problem: defect.problem }))
+        : Effect.die(defect),
+    ),
+  )
 
-export const inferDocumentStructureFrom = (origin: DocumentStructureOrigin) =>
-  attempt(() => inferDocumentStructure(origin))
+export const inferDocumentStructureOrReject = (origin: DocumentStructureOrigin) =>
+  rejectingDocumentStructureProblem(() => inferDocumentStructure(origin))
+
+const toRowValues = (structure: InferredDocumentStructure) => ({
+  format: structure.format,
+  jsonRoot: structure.format === 'json' ? structure.root : null,
+  csv: structure.format === 'csv' ? structure.csv : null,
+  sampleFileName: structure.sample?.fileName ?? null,
+  sampleText: structure.sample?.text ?? null,
+  sampleTakenAt: structure.sample ? new Date(structure.sample.takenAt) : null,
+  children: structure.children,
+})
 
 const toDocumentStructure = (row: Row): DocumentStructure =>
   documentStructureSchema.parse({
@@ -74,15 +83,12 @@ const toSummary = (structure: DocumentStructure): DocumentStructureSummary => {
   }
 }
 
-const inWorkspace = (workspaceId: string, ...conditions: (SQL | undefined)[]) =>
-  and(eq(documentStructures.workspaceId, workspaceId), ...conditions)
-
 export const listDocumentStructures = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
   const rows = yield* Effect.promise(() =>
-    db.select().from(documentStructures).where(inWorkspace(workspace.id)),
+    db.select().from(documentStructures).where(inWorkspace(documentStructures, workspace.id)),
   )
 
   return rows.map((row) => toSummary(toDocumentStructure(row))).toSorted(byName)
@@ -99,7 +105,7 @@ export const loadDocumentStructure = (id: string) =>
       db
         .select()
         .from(documentStructures)
-        .where(inWorkspace(workspace.id, eq(documentStructures.id, id))),
+        .where(inWorkspace(documentStructures, workspace.id, eq(documentStructures.id, id))),
     )
 
     return row ? toDocumentStructure(row) : yield* new NotFound()
@@ -111,7 +117,9 @@ export const createDocumentStructure = ({
   labels = [],
 }: CreateDocumentStructureBody) =>
   Effect.gen(function* () {
-    const inferred = yield* attempt(() => applyLabels(inferDocumentStructure(origin), labels))
+    const inferred = yield* rejectingDocumentStructureProblem(() =>
+      applyLabels(inferDocumentStructure(origin), labels),
+    )
 
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
@@ -119,17 +127,7 @@ export const createDocumentStructure = ({
     const rows = yield* Effect.promise(() =>
       db
         .insert(documentStructures)
-        .values({
-          workspaceId: workspace.id,
-          name,
-          format: inferred.format,
-          jsonRoot: inferred.format === 'json' ? inferred.root : null,
-          csv: inferred.format === 'csv' ? inferred.csv : null,
-          sampleFileName: inferred.sample?.fileName ?? null,
-          sampleText: inferred.sample?.text ?? null,
-          sampleTakenAt: inferred.sample ? new Date(inferred.sample.takenAt) : null,
-          children: inferred.children,
-        })
+        .values({ workspaceId: workspace.id, name, ...toRowValues(inferred) })
         .returning(),
     )
 

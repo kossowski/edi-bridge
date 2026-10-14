@@ -36,7 +36,7 @@ import { listChannels } from './channel.js'
 import { type Database, Db } from './db.js'
 import {
   createDocumentStructure,
-  inferDocumentStructureFrom,
+  inferDocumentStructureOrReject,
   listDocumentStructures,
   loadDocumentStructure,
 } from './document-structure.js'
@@ -100,7 +100,7 @@ const bodyOf = (error: Failure) =>
 // JSON escapes a control character in six bytes, the worst case for a CSV of the maximum length.
 const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 
-// Base64 makes four characters of three bytes; the rest leaves room for the plain names chosen.
+// Base64 takes 4 characters per 3 bytes; 1 MiB covers the name, labels and JSON around the Document.
 const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
 
 type CheckStatus = 'down' | 'up'
@@ -295,7 +295,7 @@ export function buildApp({
         reply,
         Effect.flatMap(
           parse(inferDocumentStructureEndpoint.body, request.body),
-          inferDocumentStructureFrom,
+          inferDocumentStructureOrReject,
         ),
       ),
   )
