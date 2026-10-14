@@ -18,7 +18,7 @@ The GS1 Germany CCG recommendations for EANCOM 1997 ([ORDERS](https://events.gs1
 
 ## Invalid Interchanges
 
-Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change.
+Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change. The structural limits each change breaks come from the message structure in the [GS1 Germany CCG recommendation for EANCOM 1997 ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), section 3: BGM `M 1`, header DTM `M 35` before segment group 2, and segment group 7 `C 5` on printed page 8 (PDF page 9), UNS `M 1` on printed page 9 (PDF page 10).
 
 | Golden file                                        | Base                                | Change                                                                       |
 | -------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
