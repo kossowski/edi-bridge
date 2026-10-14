@@ -5,6 +5,7 @@ import Fastify from 'fastify'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
+  channelsEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   sessionEndpoint,
@@ -15,6 +16,7 @@ import {
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
+import { listChannels } from './channel.js'
 import { type Database, Db } from './db.js'
 import { parse, type ValidationError } from './parse.js'
 import { loadDevelopmentSession } from './session.js'
@@ -164,6 +166,8 @@ export function buildApp({
       ),
     ),
   )
+
+  app.get(channelsEndpoint.path, (request, reply) => respond(request, reply, listChannels))
 
   return app
 }
