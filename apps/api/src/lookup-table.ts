@@ -122,9 +122,28 @@ export const loadLookupTable = (id: string) =>
     )
   })
 
+const rejectingUnknownLookupTable = (id: string) =>
+  Effect.gen(function* () {
+    yield* rejectingInvalidId(id)
+
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const [found] = yield* Effect.promise(() =>
+      db
+        .select({ id: lookupTables.id })
+        .from(lookupTables)
+        .where(inWorkspace(workspace.id, eq(lookupTables.id, id))),
+    )
+
+    if (!found) {
+      return yield* new NotFound()
+    }
+  })
+
 export const listLookupTableMissingCodes = (id: string) =>
   Effect.gen(function* () {
-    yield* loadLookupTable(id)
+    yield* rejectingUnknownLookupTable(id)
 
     // Until Mappings (#185) and Runs (#187) exist.
     return [] satisfies MissingCode[]
