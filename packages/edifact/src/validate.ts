@@ -1,7 +1,7 @@
 import { codeLists } from './definitions/code-lists'
 import { compositeDirectory } from './definitions/composites'
 import { dataElementFormats } from './definitions/data-elements'
-import { orders } from './definitions/orders'
+import { messageDefinitions } from './definitions/message-definitions'
 import { segmentDirectory } from './definitions/segments'
 import {
   describePosition,
@@ -40,15 +40,13 @@ export class ValidationError extends Error {
   }
 }
 
-const definitions = [orders]
-
 const messageIdentifierElement = 2
 
 const findDefinition = (header: Segment) => {
   const [type, version, release, controllingAgency] =
     header.elements[messageIdentifierElement - 1] ?? []
 
-  return definitions.find(
+  return messageDefinitions.find(
     ({ identifier }) =>
       identifier.type === type &&
       identifier.version === version &&

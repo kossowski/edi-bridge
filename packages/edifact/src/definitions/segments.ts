@@ -1,6 +1,7 @@
 import { element, type ElementRefDirectory } from './definition'
 
 export const segmentDirectory: ElementRefDirectory = {
+  AJT: [element('4465', 'M'), element('1082', 'C')],
   ALC: [
     element('5463', 'M'),
     element('C552', 'C'),
@@ -67,6 +68,7 @@ export const segmentDirectory: ElementRefDirectory = {
   ],
   HAN: [element('C524', 'C'), element('C218', 'C')],
   IMD: [element('7077', 'C'), element('7081', 'C'), element('C273', 'C'), element('7383', 'C')],
+  INP: [element('C849', 'C'), element('C522', 'C'), element('C850', 'C'), element('1229', 'C')],
   LIN: [
     element('1082', 'C'),
     element('1229', 'C'),

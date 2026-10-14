@@ -167,6 +167,13 @@ export const compositeDirectory: ElementRefDirectory = {
   ],
   C517: [element('3225', 'C'), element('1131', 'C'), element('3055', 'C'), element('3224', 'C')],
   C519: [element('3223', 'C'), element('1131', 'C'), element('3055', 'C'), element('3222', 'C')],
+  C522: [
+    element('4403', 'M'),
+    element('4401', 'C'),
+    element('1131', 'C'),
+    element('3055', 'C'),
+    element('4400', 'C'),
+  ],
   C524: [element('4079', 'C'), element('1131', 'C'), element('3055', 'C'), element('4078', 'C')],
   C531: [element('7075', 'C'), element('7233', 'C'), element('7073', 'C')],
   C532: [element('8395', 'C'), element('8393', 'C')],
@@ -184,6 +191,8 @@ export const compositeDirectory: ElementRefDirectory = {
   C553: [element('3233', 'C'), element('1131', 'C'), element('3055', 'C'), element('3232', 'C')],
   C827: [element('7511', 'M'), element('1131', 'C'), element('3055', 'C')],
   C829: [element('5495', 'C'), element('1082', 'C')],
+  C849: [element('3301', 'M'), element('3285', 'C')],
+  C850: [element('4405', 'M'), element('3036', 'C')],
   C889: [
     element('7111', 'C'),
     element('1131', 'C'),

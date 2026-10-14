@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+import { messageDefinitions } from './definitions/message-definitions'
 import {
   type Delimiters,
   type Interchange,
@@ -74,9 +75,15 @@ describe('parse', () => {
 })
 
 describe('validate', () => {
-  const ordersGoldenNames = goldenNames('valid').filter((name) => name.startsWith('orders-'))
+  const definedMessageTypePrefixes = messageDefinitions.map(
+    ({ identifier }) => `${identifier.type.toLowerCase()}-`,
+  )
 
-  it.each(ordersGoldenNames)('accepts the valid Interchange %s', (name) => {
+  const validGoldenNamesWithDefinition = goldenNames('valid').filter((name) =>
+    definedMessageTypePrefixes.some((prefix) => name.startsWith(prefix)),
+  )
+
+  it.each(validGoldenNamesWithDefinition)('accepts the valid Interchange %s', (name) => {
     expect(() => validate(parse(readGolden('valid', name, 'edi')))).not.toThrow()
   })
 
