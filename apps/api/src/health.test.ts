@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 
 import { connect, localDatabaseUrl } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
 
-const { db: database } = connect(localDatabaseUrl)
+const connection = connect(localDatabaseUrl)
+
+const database = connection.db
+
+afterAll(async () => {
+  await connection.close()
+})
 
 const up = () => Promise.resolve()
 
