@@ -117,14 +117,27 @@ export function aiReviewPartsSize({ links, transforms, transformLinks }: AiRevie
   return links.length + transforms.length + transformLinks.length
 }
 
-const proposedParts = (review: AiReview): AiReviewParts => ({
+export const aiReviewMarks = (review: AiReview): AiReviewParts => ({
   links: review.proposedLinks,
   transforms: review.proposedTransforms,
   transformLinks: review.proposedTransformLinks,
 })
 
+export function proposedAiReview(sampleId: string, proposal: GraphParts): AiReview | null {
+  const keys = aiReviewKeys(proposal)
+
+  return aiReviewPartsSize(keys) === 0
+    ? null
+    : {
+        sampleId,
+        proposedLinks: keys.links,
+        proposedTransforms: keys.transforms,
+        proposedTransformLinks: keys.transformLinks,
+      }
+}
+
 export function markedAiReviewParts(review: AiReview, parts: AiReviewParts): AiReviewParts {
-  const proposed = proposedParts(review)
+  const proposed = aiReviewMarks(review)
 
   const marked = (keys: ReadonlyArray<string>, marks: ReadonlyArray<string>) =>
     keys.filter((key) => marks.includes(key))
@@ -154,5 +167,5 @@ export function acceptedAiReview(review: AiReview, accepted: AiReviewParts): AiR
     proposedTransformLinks: without(review.proposedTransformLinks, accepted.transformLinks),
   }
 
-  return aiReviewPartsSize(proposedParts(remaining)) === 0 ? null : remaining
+  return aiReviewPartsSize(aiReviewMarks(remaining)) === 0 ? null : remaining
 }

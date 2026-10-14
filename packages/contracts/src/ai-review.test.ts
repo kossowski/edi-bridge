@@ -5,6 +5,7 @@ import {
   aiReviewKeys,
   type AiReview,
   marksAll,
+  proposedAiReview,
   remainingAiReview,
   transformLinkKey,
 } from './ai-review'
@@ -159,5 +160,17 @@ describe('marksAll', () => {
     expect(
       marksAll(review, { links: ['BGM/1004', 'FTX/4440'], transforms: [], transformLinks: [] }),
     ).toBe(false)
+  })
+})
+
+describe('proposedAiReview', () => {
+  it('marks every link, transform and transform link of the proposal', () => {
+    expect(proposedAiReview(review.sampleId, proposed)).toEqual(review)
+  })
+
+  it('opens no review for an empty proposal', () => {
+    expect(
+      proposedAiReview(review.sampleId, { links: [], transforms: [], transformLinks: [] }),
+    ).toBeNull()
   })
 })
