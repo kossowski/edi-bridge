@@ -1,46 +1,40 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { parse } from './index'
+import { parse, ParseError } from './index'
 
-const validDirectory = new URL('../golden/valid/', import.meta.url)
+const goldenDirectory = (kind: string) => new URL(`../golden/${kind}/`, import.meta.url)
 
-const validInterchanges = readdirSync(validDirectory)
-  .filter((file) => file.endsWith('.edi'))
-  .map((file) => file.slice(0, -'.edi'.length))
+const goldenNames = (kind: string) =>
+  readdirSync(goldenDirectory(kind))
+    .filter((file) => file.endsWith('.edi'))
+    .map((file) => file.slice(0, -'.edi'.length))
 
-const readGolden = (name: string, extension: string) =>
-  readFileSync(new URL(`${name}.${extension}`, validDirectory), 'latin1')
+const readGolden = (kind: string, name: string, extension: string) =>
+  readFileSync(new URL(`${name}.${extension}`, goldenDirectory(kind)), 'latin1')
+
+const parseError = (text: string) => {
+  try {
+    parse(text)
+  } catch (error) {
+    return error
+  }
+
+  throw new Error('The Interchange was parsed without an error')
+}
 
 describe('parse', () => {
-  it.each(validInterchanges)('parses the valid Interchange %s', (name) => {
-    expect(parse(readGolden(name, 'edi'))).toEqual(JSON.parse(readGolden(name, 'json')))
+  it.each(goldenNames('valid'))('parses the valid Interchange %s', (name) => {
+    expect(parse(readGolden('valid', name, 'edi'))).toEqual(
+      JSON.parse(readGolden('valid', name, 'json')),
+    )
   })
 
-  it.each([
-    ['text without an Interchange header', "UNH+1+ORDERS:D:96A:UN:EAN008'UNT+2+1'"],
-    [
-      'an Interchange without its trailer',
-      "UNB+UNOC:3+A+B+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'UNT+2+1'",
-    ],
-    [
-      'a Message without its trailer',
-      "UNB+UNOC:3+A+B+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'BGM+220+1'UNZ+1+1'",
-    ],
-    [
-      'a Message trailer without its header',
-      "UNB+UNOC:3+A+B+261014:0930+1'BGM+220+1'UNT+2+1'UNZ+1+1'",
-    ],
-    [
-      'a final segment without its terminator',
-      "UNB+UNOC:3+A+B+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'UNT+2+1'UNZ+1+1'UNH+2",
-    ],
-    [
-      'text after the last segment terminator',
-      "UNB+UNOC:3+A+B+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'UNT+2+1'UNZ+1+1'\r\nEND",
-    ],
-  ])('rejects %s', (_case, text) => {
-    expect(() => parse(text)).toThrow()
+  it.each(goldenNames('broken'))('reports the error in the broken Interchange %s', (name) => {
+    const error = parseError(readGolden('broken', name, 'edi'))
+
+    expect(error).toBeInstanceOf(ParseError)
+    expect(error).toMatchObject(JSON.parse(readGolden('broken', name, 'json')))
   })
 
   it.each([
