@@ -7,6 +7,8 @@ import {
   type Interchange,
   parse,
   ParseError,
+  readAcknowledgedInterchange,
+  ReadAcknowledgementError,
   serialize,
   SerializeError,
   validate,
@@ -193,5 +195,111 @@ describe('serialize without a release character', () => {
         position: { segment: 4, element: 4, component: 2 },
       }),
     )
+  })
+})
+
+describe('readAcknowledgedInterchange', () => {
+  const messageOf = (
+    segmentCount: number,
+    segments: string,
+    identifier = 'CONTRL:D:3:UN:EAN002',
+  ) => {
+    const [message] = parse(
+      `UNB+UNOC:3+5412345000013:14+4012345000016:14+261015:0800+ACK1'UNH+1+${identifier}'${segments}UNT+${segmentCount}+1'UNZ+1+ACK1'`,
+    ).messages
+
+    if (message === undefined) {
+      throw new Error('The Interchange has no Message')
+    }
+
+    return message
+  }
+
+  it.each([
+    ['contrl-accepting-interchange', '88776655', '7350000001266', '7300015200048', 'accepted'],
+    ['contrl-rejecting-message', '654321', '7300015200048', '7350000001266', 'rejected'],
+    ['contrl-rejecting-interchange', 'CTL00021', '4012345000016', '5412345000013', 'rejected'],
+  ])(
+    'reads the acknowledged Interchange of the valid Interchange %s',
+    (name, controlReference, sender, receiver, action) => {
+      const [message] = parse(readGolden('valid', name, 'edi')).messages
+
+      expect(message && readAcknowledgedInterchange(message)).toEqual({
+        controlReference,
+        sender: { identification: sender, qualifier: '14' },
+        receiver: { identification: receiver, qualifier: '14' },
+        action,
+      })
+    },
+  )
+
+  it.each([
+    ['7', '4', 'rejected'],
+    ['7', '7', 'accepted'],
+    ['4', '7', 'rejected'],
+  ])(
+    'reads the action code %s with a Message action code %s as %s',
+    (interchangeCode, messageCode, action) => {
+      expect(
+        readAcknowledgedInterchange(
+          messageOf(
+            5,
+            `UCI+CTL1+4012345000016:14+5412345000013:14+${interchangeCode}'UCM+1+ORDERS:D:96A:UN:EAN008+7'UCM+2+ORDERS:D:96A:UN:EAN008+${messageCode}'`,
+          ),
+        ),
+      ).toMatchObject({ action })
+    },
+  )
+
+  it.each([
+    ['4', 'rejected'],
+    ['8', 'received'],
+  ])('reads the action code %s as %s', (code, action) => {
+    expect(
+      readAcknowledgedInterchange(
+        messageOf(3, `UCI+CTL1+4012345000016:14+5412345000013:14+${code}'`),
+      ),
+    ).toMatchObject({ action })
+  })
+
+  it.each([
+    [
+      'unsupported-message-type',
+      'an ORDERS Message',
+      messageOf(3, "BGM+220+PO1+9'", 'ORDERS:D:96A:UN:EAN008'),
+    ],
+    [
+      'unsupported-message-type',
+      'a CONTRL of syntax version 4',
+      messageOf(3, "UCI+CTL1+4012345000016:14+5412345000013:14+7'", 'CONTRL:4:1:UN'),
+    ],
+    ['missing-interchange-response', 'a CONTRL without UCI', messageOf(2, '')],
+    [
+      'missing-element',
+      'a UCI without control reference',
+      messageOf(3, "UCI++4012345000016:14+5412345000013:14+7'"),
+    ],
+    ['missing-element', 'a UCI without sender', messageOf(3, "UCI+CTL1++5412345000013:14+7'")],
+    ['missing-element', 'a UCI without receiver', messageOf(3, "UCI+CTL1+4012345000016:14++7'")],
+    [
+      'missing-element',
+      'a UCI without action',
+      messageOf(3, "UCI+CTL1+4012345000016:14+5412345000013:14'"),
+    ],
+    [
+      'missing-element',
+      'a UCM without action',
+      messageOf(4, "UCI+CTL1+4012345000016:14+5412345000013:14+7'UCM+1+ORDERS:D:96A:UN:EAN008'"),
+    ],
+    [
+      'unknown-code',
+      'a UCI with an action outside syntax version 3 and EANCOM',
+      messageOf(3, "UCI+CTL1+4012345000016:14+5412345000013:14+5'"),
+    ],
+  ])('reports %s for %s', (code, _case, message) => {
+    const error = thrownBy(() => readAcknowledgedInterchange(message))
+
+    expect(error).toBeInstanceOf(ReadAcknowledgementError)
+    expect(error).toMatchObject({ code })
   })
 })
