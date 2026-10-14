@@ -1,6 +1,6 @@
-import { element, type ElementDirectory } from './definition'
+import { element, type ElementRefDirectory } from './definition'
 
-export const compositeDirectory: ElementDirectory = {
+export const compositeDirectory: ElementRefDirectory = {
   C002: [element('1001', 'C'), element('1131', 'C'), element('3055', 'C'), element('1000', 'C')],
   C040: [element('3127', 'C'), element('1131', 'C'), element('3055', 'C'), element('3128', 'C')],
   C056: [element('3413', 'C'), element('3412', 'C')],

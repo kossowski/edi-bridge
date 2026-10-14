@@ -10,7 +10,7 @@ import {
   type Position,
 } from './position'
 
-import type { ElementEntry, MessageDefinition, StructureEntry } from './definitions/definition'
+import type { ElementRef, MessageDefinition, StructureEntry } from './definitions/definition'
 import type { Delimiters, Interchange, Segment } from './model'
 
 export type ValidationErrorCode =
@@ -82,7 +82,7 @@ const checkValue = (id: string, value: string, position: Position, delimiters: D
   }
 }
 
-const checkPresence = (entry: ElementEntry, value: string | undefined, position: Position) => {
+const checkPresence = (entry: ElementRef, value: string | undefined, position: Position) => {
   if (!value && entry.status === 'M') {
     throw new ValidationError('missing-element', position)
   }

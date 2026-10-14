@@ -1,6 +1,6 @@
-import { element, type ElementDirectory } from './definition'
+import { element, type ElementRefDirectory } from './definition'
 
-export const segmentDirectory: ElementDirectory = {
+export const segmentDirectory: ElementRefDirectory = {
   ALC: [
     element('5463', 'M'),
     element('C552', 'C'),

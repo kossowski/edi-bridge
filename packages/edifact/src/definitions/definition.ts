@@ -47,15 +47,15 @@ export const group = (
 
 export type Format = `${'a' | 'an' | 'n'}${'' | '..'}${number}`
 
-export interface ElementEntry {
+export interface ElementRef {
   id: string
   status: Status
 }
 
-export const element = (id: string, status: Status): ElementEntry => ({ id, status })
+export const element = (id: string, status: Status): ElementRef => ({ id, status })
 
-export interface ElementDirectory {
-  [id: string]: ElementEntry[]
+export interface ElementRefDirectory {
+  [id: string]: ElementRef[]
 }
 
 export interface FormatDirectory {
