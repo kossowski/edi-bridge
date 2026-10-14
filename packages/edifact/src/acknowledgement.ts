@@ -31,6 +31,7 @@ const contrlIdentifier = { type: 'CONTRL', version: 'D', release: '3', controlli
 
 const interchangeActions = new Map<string, InterchangeAction>([
   ['4', 'rejected'],
+  ['6', 'rejected'],
   ['7', 'accepted'],
   ['8', 'received'],
 ])

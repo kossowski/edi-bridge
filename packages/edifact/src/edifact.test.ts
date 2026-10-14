@@ -246,6 +246,7 @@ describe('readAcknowledgedInterchange', () => {
 
   it.each([
     ['4', 'rejected'],
+    ['6', 'rejected'],
     ['7', 'accepted'],
     ['8', 'received'],
   ])('reads the action code %s as %s', (code, action) => {
@@ -287,8 +288,8 @@ describe('readAcknowledgedInterchange', () => {
     ],
     [
       'unknown-code',
-      'a UCI with an action outside syntax version 3',
-      messageOf(3, "UCI+CTL1+4012345000016:14+5412345000013:14+6'"),
+      'a UCI with an action outside syntax version 3 and EANCOM',
+      messageOf(3, "UCI+CTL1+4012345000016:14+5412345000013:14+5'"),
     ],
   ])('reports %s for %s', (code, _case, message) => {
     const error = thrownBy(() => readAcknowledgedInterchange(message))
