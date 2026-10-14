@@ -11,7 +11,10 @@ import {
   type LookupTableInput,
   type LookupTableScope,
   type LookupTableScopeInput,
+  type LookupTableSuggestions,
+  type LookupTableSuggestionsQuery,
   type LookupTableSummary,
+  type MissingCode,
 } from '@edi-bridge/contracts'
 import {
   lookupTableEntries,
@@ -99,7 +102,7 @@ const selectLookupTable = async (
   return {
     ...toSummary(row),
     entries: await selectEntries(db, row.id),
-    // Until code meanings are served (#181).
+    // Until code meanings are served (#228).
     codeMeanings: [],
   }
 }
@@ -117,6 +120,36 @@ export const loadLookupTable = (id: string) =>
     return yield* foundOrNotFound(
       yield* Effect.promise(() => selectLookupTable(db, workspace.id, id)),
     )
+  })
+
+export const listLookupTableMissingCodes = (id: string) =>
+  Effect.gen(function* () {
+    yield* loadLookupTable(id)
+
+    // Until Mappings (#185) and Runs (#187) exist.
+    return [] satisfies MissingCode[]
+  })
+
+const rejectingUnprocessable = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  effect.pipe(
+    Effect.catchDefect((defect) =>
+      defect instanceof Unprocessable ? Effect.fail(defect) : Effect.die(defect),
+    ),
+  )
+
+export const suggestLookupTableEntries = ({ tradingPartnerId }: LookupTableSuggestionsQuery) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    yield* rejectingUnprocessable(
+      Effect.promise(() =>
+        db.transaction((tx) => assertTradingPartnerIn(tx, workspace.id, tradingPartnerId ?? null)),
+      ),
+    )
+
+    // Until suggested code values exist (#228).
+    return { entries: [] } satisfies LookupTableSuggestions
   })
 
 const tradingPartnerIdOf = (scope: LookupTableScopeInput) =>
@@ -173,11 +206,7 @@ const writeInTransaction = <A>(write: (tx: Transaction) => Promise<A>) =>
       () => db.transaction(write),
       nameUniqueConstraints,
       'Another Lookup Table of this scope already uses this name',
-    ).pipe(
-      Effect.catchDefect((defect) =>
-        defect instanceof Unprocessable ? Effect.fail(defect) : Effect.die(defect),
-      ),
-    )
+    ).pipe(rejectingUnprocessable)
   })
 
 export const createLookupTable = ({ name, kind, scope, entries }: LookupTableInput) =>

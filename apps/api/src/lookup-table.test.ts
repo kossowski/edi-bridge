@@ -12,6 +12,8 @@ import {
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
   lookupTableImportPreviewSchema,
+  lookupTableMissingCodesEndpoint,
+  lookupTableSuggestionsEndpoint,
   lookupTableSchema,
   lookupTablesEndpoint,
   maxLookupTableCsvLength,
@@ -269,6 +271,84 @@ describe('GET /lookup-tables/:id', () => {
 
     expect(response.statusCode).toBe(404)
     expect(response.json()).toEqual({ message: 'Not found' })
+  })
+})
+
+describe('GET /lookup-tables/:id/missing-codes', () => {
+  const missingCodes = (id: string, target = app) =>
+    target.inject({
+      method: 'GET',
+      url: lookupTableMissingCodesEndpoint.path.replace(':id', id),
+    })
+
+  it('lists no missing codes until Mappings and Runs exist', async () => {
+    const { id } = await posted(units)
+
+    const response = await missingCodes(id)
+
+    expect(response.statusCode).toBe(200)
+    expect(lookupTableMissingCodesEndpoint.response.parse(response.json())).toEqual([])
+  })
+
+  it.each([
+    ['an unknown id', () => Promise.resolve(unknownId)],
+    ['an id that is no uuid', () => Promise.resolve('units')],
+    ['a Lookup Table of another Workspace', async () => (await posted(units, otherApp)).id],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await missingCodes(await id())
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
+  })
+})
+
+describe('GET /lookup-table-suggestions', () => {
+  const suggestions = (query: Record<string, string>, target = app) =>
+    target.inject({ method: 'GET', url: lookupTableSuggestionsEndpoint.path, query })
+
+  it('suggests no entries for the Workspace until suggested code values exist', async () => {
+    const response = await suggestions({ kind: 'units' })
+
+    expect(response.statusCode).toBe(200)
+    expect(lookupTableSuggestionsEndpoint.response.parse(response.json())).toEqual({
+      entries: [],
+    })
+  })
+
+  it('suggests no entries for a Trading Partner until suggested code values exist', async () => {
+    const { id } = await postTradingPartner('Nordkontor GmbH')
+
+    const response = await suggestions({ kind: 'countries', tradingPartnerId: id })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ entries: [] })
+  })
+
+  it.each([
+    ['without a kind', {}],
+    ['for an unknown kind', { kind: 'currencies' }],
+    ['for a Trading Partner id that is no uuid', { kind: 'units', tradingPartnerId: 'nord' }],
+  ])('answers 400 %s', async (_case, query) => {
+    const response = await suggestions(query)
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toHaveProperty('message')
+  })
+
+  it.each([
+    ['an unknown Trading Partner', () => Promise.resolve(unknownId)],
+    [
+      'a Trading Partner of another Workspace',
+      async () => (await postTradingPartner('Nordkontor GmbH', otherApp)).id,
+    ],
+  ])('answers 422 for %s', async (_case, tradingPartnerId) => {
+    const response = await suggestions({
+      kind: 'units',
+      tradingPartnerId: await tradingPartnerId(),
+    })
+
+    expect(response.statusCode).toBe(422)
+    expect(response.json()).toEqual({ message: 'Unknown Trading Partner' })
   })
 })
 
