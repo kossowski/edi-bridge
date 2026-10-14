@@ -1,0 +1,44 @@
+{
+  "hasServiceStringAdvice": false,
+  "delimiters": {
+    "component": ":",
+    "element": "+",
+    "decimal": ".",
+    "release": "?",
+    "repetition": " ",
+    "segment": "'"
+  },
+  "header": {
+    "tag": "UNB",
+    "elements": [
+      ["UNOC", "3"],
+      ["7350000001266", "14"],
+      ["7300015200048", "14"],
+      ["180327", "1015"],
+      ["C0000002"]
+    ]
+  },
+  "messages": [
+    {
+      "header": {
+        "tag": "UNH",
+        "elements": [["ME000231"], ["CONTRL", "D", "3", "UN", "EAN004"]]
+      },
+      "segments": [
+        {
+          "tag": "UCI",
+          "elements": [["654321"], ["7300015200048", "14"], ["7350000001266", "14"], ["7"]]
+        },
+        { "tag": "UCM", "elements": [["14245"], ["INVOIC", "D", "96A", "UN", "EAN009"], ["4"]] },
+        { "tag": "UCS", "elements": [["2"]] },
+        { "tag": "UCD", "elements": [["39"], ["2"]] }
+      ],
+      "trailer": { "tag": "UNT", "elements": [["6"], ["ME000231"]] }
+    }
+  ],
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["C0000002"]] },
+  "whitespace": {
+    "lineBreaks": ["", "", "", "", "", "", "", ""],
+    "trailingText": ""
+  }
+}
