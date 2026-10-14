@@ -1,18 +1,20 @@
 ---
-name: orchestrate
+name: ticket-lead
 description: 'Build one ticket as a stack of small PRs, ready for /land.'
 disable-model-invocation: true
 ---
 
-You are the **orchestrator** for one ticket. The user gives you the ticket's issue number. The issue tracker conventions are in `docs/agents/issue-tracker.md`.
+You are the **ticket lead** for one ticket. The user, or an engineering lead session, gives you its issue number. The issue tracker conventions are in `docs/agents/issue-tracker.md`.
 
-The goal is the ticket built as a **stack**: a few small PRs, each based on the branch of the PR before it, linked as a GitHub stacked PR, each green in CI and reviewed. You stop when the stack is ready. The user merges it with `/land`.
+The goal is the ticket built as a **stack**: a few small PRs, each based on the branch of the PR before it, linked as a GitHub stacked PR, each green in CI and reviewed. You stop when the stack is ready. The user, or the lead, merges it with `/land`.
 
-You plan, brief, review, and run every `git`, `gh`, and `gh stack` command that creates, pushes, or rebases a branch, opens a PR, or links the stack. **Implementer subagents** write code and commit in the worktree you give them, nothing else.
+You plan, brief, review, and run every `git`, `gh`, and `gh stack` command that creates, pushes, or rebases a branch, opens a PR, or links the stack. **Developer subagents** write code and commit in the worktree you give them, nothing else; each one follows the `developer` skill. The **reviewers** are the `code-review` and `browser-check` skills.
 
 Run every command from the repo root, the main checkout, and keep it on `main`. Reach a worktree with `git -C <worktree>` and `pnpm -C <worktree>`, and give subagents its absolute path. Paths in this skill are relative to the repo root.
 
 Communicate with subagents through **context pointers**: the ticket, the spec, the stack file, the parent branch. Don't paste what a pointer already reaches.
+
+When an engineering lead started you, its prompt names its session. Your questions and reports go to it with `SendMessage`; end your turn after sending, and its answer arrives as your next prompt. Otherwise they go to the user.
 
 ## Names
 
@@ -27,7 +29,7 @@ Communicate with subagents through **context pointers**: the ticket, the spec, t
 
 ### 1. Read
 
-Read the ticket, its spec (the parent issue), and the `GLOSSARY.md` entries and ADRs for the area. Every blocker of the ticket is closed: `issue_dependencies_summary.blocked_by` is `0`. If one is open, tell the user and stop.
+Read the ticket, its spec (the parent issue), and the `GLOSSARY.md` entries and ADRs for the area. Every blocker of the ticket is closed: `issue_dependencies_summary.blocked_by` is `0`. If one is open, tell whoever started you and stop.
 
 ### 2. Plan the stack
 
@@ -68,27 +70,21 @@ git worktree add -b <branch> ../edi-bridge-worktrees/<NN>-<k> <parent>
 pnpm -C ../edi-bridge-worktrees/<NN>-<k> install --frozen-lockfile
 ```
 
-**b. Implement.** Spawn a fresh implementer subagent with this brief:
+**b. Implement.** Spawn a fresh developer subagent with this brief:
 
 ```text
-GOAL       Part <k> of ticket <NN>: <part title>.
-WORKTREE   <absolute worktree path>, branch <branch>. Work and commit only here.
-CONTEXT    Ticket #<NN>, spec #<parent>, stack file <path>. Parts below are already on this branch.
-SCOPE      The scope of part <k> in the stack file. Later parts build what it leaves out.
-BUILD      Call the Skill tool with `tdd`, unless the ticket sets another testing rule.
-VERIFY     pnpm check:fast first, then pnpm check, both green in the worktree.
-CLEANUP    Stop every dev server and Storybook you started before you report.
-COMMITS    Conventional Commits per AGENTS.md, footer `refs: #<NN>`.
-REPORT     STATUS: done | blocked
-           COMMITS: <git log --oneline <parent>..HEAD>
-           CHECKS: <each command> → pass/fail
-           QUESTIONS: <numbered, only if blocked>
-           NOTES: <tradeoffs, skipped edge cases>
+GOAL      Part <k> of ticket <NN>: <part title>.
+WORKTREE  <absolute worktree path>, branch <branch>, parent <parent>.
+CONTEXT   Ticket #<NN>, spec #<parent issue>, stack file <path>.
+SCOPE     Part <k> in the stack file.
+Call the Skill tool with `developer`.
 ```
 
-Answer a subagent's questions yourself, unless the answer is a product decision. Ask the user for those, and record the other answers for the report.
+A fix subagent, for review findings or a red CI, gets the same brief with the findings or the failed run as GOAL.
 
-**c. Review.** Call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part changes what renders (components, routes, styles or i18n messages in `apps/web` or `packages/ui`), run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree and keeps the screenshots in its own context. Give all findings you accept to one fresh implementer subagent in the same worktree.
+Answer a developer's questions yourself, unless the answer is a product decision. Take those to whoever started you, and record the other answers for the report.
+
+**c. Review.** Call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part changes what renders (components, routes, styles or i18n messages in `apps/web` or `packages/ui`), run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree, starts its dev server through `.agents/skills/developer/scripts/test-slot.sh`, and keeps the screenshots in its own context. Give all findings you accept to one fresh developer subagent in the same worktree.
 
 **d. Open the PR and link the stack.**
 
@@ -114,10 +110,10 @@ The first call creates the stack on GitHub, later calls add the new PR to it. PR
 **e. Wait for CI.** Run this in the background:
 
 ```bash
-bash .agents/skills/orchestrate/scripts/wait-for-ci.sh <PR> $(git -C <worktree> rev-parse HEAD)
+bash .agents/skills/ticket-lead/scripts/wait-for-ci.sh <PR> $(git -C <worktree> rev-parse HEAD)
 ```
 
-The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh implementer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again.
+The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh developer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again.
 
 ### 4. Resolve the ticket
 
@@ -126,24 +122,22 @@ Resolve the ticket as `docs/agents/issue-tracker.md` describes. The step is done
 ### 5. Catch up with main
 
 ```bash
-git fetch origin
-git merge-base --is-ancestor origin/main <branch of part 1>
+bash .agents/skills/ticket-lead/scripts/catch-up.sh <NN>
 ```
 
-When the check fails, `main` moved since part 1 branched. Rebase each part onto its parent, bottom to top:
-
-```bash
-git -C <worktree> rebase <parent>
-git -C <worktree> push --force-with-lease
-```
-
-Resolve conflicts yourself; take a product decision to the user. Then run `pnpm -C <top worktree> check:fast` and wait for CI on every PR as in step 3e. The step is done when `origin/main` is an ancestor of part 1's branch and every PR is green.
+It rebases each part onto its parent, bottom to top, and pushes with lease; a part already on its parent is skipped. At a conflict it names the worktree and the files: resolve them, `git -C <worktree> rebase --continue`, and run it again. Take a product decision to whoever started you. Then run `pnpm -C <top worktree> check:fast` through `.agents/skills/developer/scripts/test-slot.sh`, and wait for CI on every PR as in step 3e. The step is done when the script reports the stack on `origin/main` and every PR is green.
 
 ### 6. Report
 
-Stop every background shell, monitor and subagent you started, and delete the screenshots in your scratchpad. Keep all worktrees until `/land` has merged the stack.
+Stop every background shell, monitor and subagent you started, run `bash .agents/skills/developer/scripts/stop-leftovers.sh` for the servers a developer forgot, and delete the screenshots in your scratchpad. Keep all worktrees until `/land` has merged the stack.
 
-When another agent started you, such as a lead session, also send it the report with `SendMessage`, so it needs no polling.
+```bash
+bash .agents/skills/ticket-lead/scripts/stack-status.sh <NN>
+```
+
+The report goes out when it prints `ready for /land`. Otherwise fix what it lists first.
+
+When an engineering lead started you, send it the report with `SendMessage` and end your turn. It answers what is open and tells you when to land by prompting `/land <NN>` into your session.
 
 ```markdown
 **<NN> — <ticket title>**: stack of <n> PRs on `main` <short commit>, ready for `/land`
@@ -161,13 +155,8 @@ When another agent started you, such as a lead session, also send it the report 
 
 When a finding belongs to the code of an earlier part, fix it there, not in the part you are working on:
 
-1. A fresh implementer subagent fixes and commits in the lower part's worktree.
+1. A fresh developer subagent fixes and commits in the lower part's worktree.
 2. `git -C <lower worktree> push`
-3. For each higher part in order, bottom to top:
-
-```bash
-git -C <worktree> rebase <branch of the part below>
-git -C <worktree> push --force-with-lease
-```
+3. `bash .agents/skills/ticket-lead/scripts/catch-up.sh <NN> --from <k+1>`, where `<k>` is the fixed part: it rebases every part above onto the one below it and pushes with lease.
 
 Wait for CI on every PR you pushed, as in step 3e. The stack on GitHub needs no change: its PRs and bases stay the same.
