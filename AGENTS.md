@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live as local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+Tickets are GitHub issues, and a spec is their parent issue. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -16,7 +16,7 @@ Conventional Commits, enforced by commitlint in the `commit-msg` hook. Fix the m
 - English only, all lowercase, header at most 72 characters, imperative mood ("add", not "added").
 - Use the vocabulary from `GLOSSARY.md` (e.g. "reprocess", not "rerun").
 - A body is required: a short summary of what was done and why.
-- Reference the ticket in a footer as `refs: edi-bridge-issue#<NN>` (the ticket number in `.scratch/<feature>/issues/`).
+- Reference the ticket in a footer as `refs: #<NN>`, its issue number.
 
 ### Coding standards
 

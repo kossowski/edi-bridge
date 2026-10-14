@@ -27,5 +27,5 @@ Judgement rules for writing and reviewing code in this repo. Lint, type check an
 
 ## Tickets and texts
 
-- **Closing a ticket adds only `Resolved in #<PR>, ...`** under `## Comments`. Findings and measurements go in the commit body or the PR description.
+- **Findings and measurements go in the commit body or the PR description.** Resolving a ticket only checks its acceptance criteria; its linked PRs show where it was resolved.
 - **Never write the user's name** in code, docs, tickets, commits or PRs. Record a decision by its content, not by who made it.
