@@ -8,8 +8,11 @@
 # it waits for that commit's runs instead. Right after a push, GitHub can
 # still report the previous head for a while; pass the pushed commit to wait
 # until the head has moved to it. Prints each job's result. Exits 0 when every
-# run succeeded, 1 when one failed, 2 after 10 minutes.
+# run succeeded, 1 when one failed, 2 after 10 minutes. A cancelled run does not
+# count when a run of the same workflow on the same commit succeeded: GitHub
+# cancels the duplicate run per PR after a stack push.
 set -euo pipefail
+source "$(dirname "$0")/stack-lib.sh"
 
 pr=${1:?Usage: scripts/wait-for-ci.sh <PR> [<pushed commit>]}
 pushed=${2:+$(git rev-parse --verify "$2^{commit}")}
@@ -24,19 +27,17 @@ while ((SECONDS < deadline)); do
   fi
   pushed=
   runs=$(gh api "repos/$repo/actions/runs?head_sha=$sha&event=pull_request&per_page=100" \
-    --jq '[.workflow_runs[] | {id, status, conclusion}]')
+    --jq '[.workflow_runs[] | {id, workflow_id, status, conclusion}]')
 
-  total=$(jq length <<<"$runs")
-  pending=$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")
+  state=$(ci_classify "$runs")
 
-  if ((total > 0 && pending == 0)); then
+  if [[ $state == green || $state == red ]]; then
     echo "CI on #$pr at ${sha:0:7}:"
     for id in $(jq -r '.[].id' <<<"$runs"); do
       gh api "repos/$repo/actions/runs/$id/jobs?per_page=100" \
         --jq '.jobs[] | "  \(.name): \(.conclusion)"'
     done
-    failed=$(jq '[.[] | select(.conclusion != "success")] | length' <<<"$runs")
-    ((failed == 0)) && exit 0
+    [[ $state == green ]] && exit 0
     echo "Failed runs: gh run view <id> --log-failed ($(jq -r '[.[] | select(.conclusion != "success") | .id] | join(", ")' <<<"$runs"))" >&2
     exit 1
   fi
