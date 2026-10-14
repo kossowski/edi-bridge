@@ -67,11 +67,12 @@ Storybook opens at http://localhost:6006. Each push to `main` publishes it to Gi
 pnpm lint
 pnpm check-types
 pnpm test
+pnpm test:stories
 pnpm test:e2e
 pnpm build
 ```
 
-`pnpm test` also runs every story as a test in Chromium, with accessibility checks. `pnpm test:e2e` runs Playwright against web in mock mode. Both need the Playwright browser once:
+`pnpm test:stories` runs every story as a test in Chromium, with accessibility checks. `pnpm test:e2e` runs Playwright against web in mock mode. Both need the Playwright browser once:
 
 ```sh
 pnpm --filter @edi-bridge/web exec playwright install chromium
@@ -79,7 +80,7 @@ pnpm --filter @edi-bridge/web exec playwright install chromium
 
 Tests never depend on the local Compose services.
 
-`pnpm check:fast` runs lint, type check and tests together. `pnpm check` adds the canvas stories, the e2e tests, the builds and Storybook, one task at a time to stay within the memory of a small machine.
+`pnpm check:fast` runs lint, type check, the tests and the stories together. `pnpm check` adds the canvas stories, the e2e tests, the builds and Storybook, one task at a time to stay within the memory of a small machine.
 
 ## Full stack in Docker
 
@@ -99,7 +100,7 @@ docker build -f apps/api/Dockerfile .
 
 ## CI
 
-GitHub Actions runs lint, check-types, test, the Playwright tests, build and the Storybook build on every pull request. Turborepo's `--affected` flag limits the run to the packages changed on the branch and the packages that depend on them. A job whose tasks are all unaffected is skipped before it installs dependencies.
+GitHub Actions runs lint, check-types, test, the stories, the canvas stories in three shards, the Playwright tests, build and the Storybook build on every pull request. Turborepo's `--affected` flag limits the run to the packages changed on the branch and the packages that depend on them. A job whose tasks are all unaffected is skipped before it installs dependencies.
 
 ## Deployment
 

@@ -10,10 +10,11 @@
     "lint:fix": "turbo run lint:fix",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
+    "test:stories": "turbo run test:stories",
     "test:watch": "turbo run test:watch",
     "test:e2e": "turbo run test:e2e",
-    "check:fast": "turbo run lint check-types test",
-    "check": "turbo run lint check-types test test:canvas test:e2e build build-storybook --concurrency=1",
+    "check:fast": "turbo run lint check-types test test:stories",
+    "check": "turbo run lint check-types test test:stories test:canvas test:e2e build build-storybook --concurrency=1",
     "storybook": "turbo run storybook",
     "format": "prettier --write .",
     "prepare": "husky"
