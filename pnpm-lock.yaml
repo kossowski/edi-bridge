@@ -196,12 +196,18 @@ importers:
 
   apps/api:
     dependencies:
+      '@edi-bridge/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@edi-bridge/db':
         specifier: workspace:*
         version: link:../../packages/db
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(postgres@3.4.9)
+      effect:
+        specifier: ^4.0.4
+        version: 4.0.4
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
@@ -4390,6 +4396,9 @@ packages:
 
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
+
+  effect@4.0.4:
+    resolution: {integrity: sha512-Sr50OeVSC3M5UkoUYUhFf3EULryhGaZZUf6OzDHTvaznOw7HRlxOKdF3/4nvQXHL22StOyMG3Cvo8Bt7xUp+Ng==}
 
   electron-to-chromium@1.5.446:
     resolution: {integrity: sha512-kWlGMPHzuitCKx0O+MbY1ZGvQmP14JtckrnGjD4JsusTxh2cX9wu4bb4rOYZqLSvENjFFrHzlqY8kXhseucR/w==}
@@ -10438,6 +10447,8 @@ snapshots:
   eastasianwidth@0.2.0: {}
 
   ee-first@1.1.1: {}
+
+  effect@4.0.4: {}
 
   electron-to-chromium@1.5.446: {}
 
