@@ -4,7 +4,7 @@ import type { Session, SessionUser } from '@edi-bridge/contracts'
 
 import { loadCurrentWorkspace } from './workspace.js'
 
-// Until login (#201), every request is the development user, Admin of the resolved Workspace.
+// Until login (#201).
 const developmentUser: SessionUser = {
   id: 'development-user',
   name: 'Development User',
