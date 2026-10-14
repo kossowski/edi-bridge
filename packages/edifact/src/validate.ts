@@ -10,7 +10,12 @@ import {
   type Position,
 } from './position'
 
-import type { ElementRef, MessageDefinition, StructureEntry } from './definitions/definition'
+import type {
+  ElementRef,
+  MessageDefinition,
+  Status,
+  StructureEntry,
+} from './definitions/definition'
 import type { Delimiters, Interchange, Segment } from './model'
 
 export type ValidationErrorCode =
@@ -54,6 +59,40 @@ const findDefinition = (header: Segment) => {
 
 const formatPattern = /^(an|a|n)(?:\.\.)?(\d+)$/
 
+interface ValueRule {
+  status: Status
+  numeric: boolean
+  maxLength: number
+  codes: ReadonlySet<string> | undefined
+}
+
+interface CompositeRule {
+  status: Status
+  components: ValueRule[]
+}
+
+const valueRuleOf = ({ id, status }: ElementRef): ValueRule => {
+  const [, type, maxLength] = formatPattern.exec(dataElementFormats[id] ?? '') ?? []
+
+  if (type === undefined || maxLength === undefined) {
+    throw new Error(`Data element ${id} has no format`)
+  }
+
+  return { status, numeric: type === 'n', maxLength: Number(maxLength), codes: codeLists[id] }
+}
+
+const elementRuleOf = (ref: ElementRef): ValueRule | CompositeRule => {
+  const components = compositeDirectory[ref.id]
+
+  return components
+    ? { status: ref.status, components: components.map(valueRuleOf) }
+    : valueRuleOf(ref)
+}
+
+const segmentRules = new Map(
+  Object.entries(segmentDirectory).map(([tag, refs]) => [tag, refs.map(elementRuleOf)]),
+)
+
 const digits = /^\d+$/
 
 const isNumeric = (value: string, decimal: string) => {
@@ -62,30 +101,6 @@ const isNumeric = (value: string, decimal: string) => {
   return (
     rest.length === 0 && digits.test(integer) && (fraction === undefined || digits.test(fraction))
   )
-}
-
-const checkValue = (id: string, value: string, position: Position, delimiters: Delimiters) => {
-  const [, type, maxLength] = formatPattern.exec(dataElementFormats[id] ?? '') ?? []
-
-  if (type === 'n' && !isNumeric(value, delimiters.decimal)) {
-    throw new ValidationError('wrong-format', position)
-  }
-
-  const length = type === 'n' ? value.replaceAll(/\D/g, '').length : value.length
-
-  if (length > Number(maxLength)) {
-    throw new ValidationError('too-long-element', position)
-  }
-
-  if (codeLists[id]?.has(value) === false) {
-    throw new ValidationError('unknown-code', position)
-  }
-}
-
-const checkPresence = (entry: ElementRef, value: string | undefined, position: Position) => {
-  if (!value && entry.status === 'M') {
-    throw new ValidationError('missing-element', position)
-  }
 }
 
 const checkExtraValues = (
@@ -100,62 +115,80 @@ const checkExtraValues = (
   }
 }
 
-const checkElements = (segment: Segment, position: Position, delimiters: Delimiters) => {
-  const entries = segmentDirectory[segment.tag] ?? []
-
-  for (const [index, entry] of entries.entries()) {
-    const values = segment.elements[index] ?? []
-    const components = compositeDirectory[entry.id]
-    const elementPosition = { ...position, element: index + 1 }
-
-    const componentPosition = (componentIndex: number) => ({
-      ...elementPosition,
-      component: componentIndex + 1,
-    })
-
-    if (!components) {
-      checkPresence(entry, values[0], elementPosition)
-
-      if (values[0]) {
-        checkValue(entry.id, values[0], elementPosition, delimiters)
+const segmentChecker = ({ decimal }: Delimiters) => {
+  const checkValue = (rule: ValueRule, value: string | undefined, position: Position) => {
+    if (!value) {
+      if (rule.status === 'M') {
+        throw new ValidationError('missing-element', position)
       }
 
-      checkExtraValues(values, 1, componentPosition)
-
-      continue
+      return
     }
 
-    checkPresence(entry, values.join(''), elementPosition)
-
-    if (!values.some(Boolean)) {
-      continue
+    if (rule.numeric && !isNumeric(value, decimal)) {
+      throw new ValidationError('wrong-format', position)
     }
 
-    for (const [componentIndex, component] of components.entries()) {
-      const value = values[componentIndex]
+    const length = rule.numeric ? value.replaceAll(/\D/g, '').length : value.length
 
-      checkPresence(component, value, componentPosition(componentIndex))
-
-      if (value) {
-        checkValue(component.id, value, componentPosition(componentIndex), delimiters)
-      }
+    if (length > rule.maxLength) {
+      throw new ValidationError('too-long-element', position)
     }
 
-    checkExtraValues(values, components.length, componentPosition)
+    if (rule.codes?.has(value) === false) {
+      throw new ValidationError('unknown-code', position)
+    }
   }
 
-  checkExtraValues(
-    segment.elements.map((values) => values.join('')),
-    entries.length,
-    (index) => ({ ...position, element: index + 1 }),
-  )
+  return (segment: Segment, position: Position) => {
+    const rules = segmentRules.get(segment.tag) ?? []
+
+    for (const [index, rule] of rules.entries()) {
+      const values = segment.elements[index] ?? []
+      const elementPosition = { ...position, element: index + 1 }
+
+      const componentPosition = (componentIndex: number) => ({
+        ...elementPosition,
+        component: componentIndex + 1,
+      })
+
+      if (!('components' in rule)) {
+        checkValue(rule, values[0], elementPosition)
+        checkExtraValues(values, 1, componentPosition)
+
+        continue
+      }
+
+      if (!values.some(Boolean)) {
+        if (rule.status === 'M') {
+          throw new ValidationError('missing-element', elementPosition)
+        }
+
+        continue
+      }
+
+      for (const [componentIndex, component] of rule.components.entries()) {
+        checkValue(component, values[componentIndex], componentPosition(componentIndex))
+      }
+
+      checkExtraValues(values, rule.components.length, componentPosition)
+    }
+
+    checkExtraValues(
+      segment.elements.map((values) => values.join('')),
+      rules.length,
+      (index) => ({ ...position, element: index + 1 }),
+    )
+  }
 }
+
+type SegmentCheck = ReturnType<typeof segmentChecker>
 
 interface Cursor {
   segments: Segment[]
   index: number
   positionOf: (index: number) => Position
-  delimiters: Delimiters
+  checkSegment: SegmentCheck
 }
 
 const triggerOf = (entry: StructureEntry) => (entry.kind === 'segment' ? entry.tag : entry.trigger)
@@ -176,7 +209,7 @@ const matchEntries = (entries: StructureEntry[], cursor: Cursor, followingTags: 
         throw new ValidationError('too-many-repetitions', cursor.positionOf(cursor.index))
       }
 
-      checkElements(current, cursor.positionOf(cursor.index), cursor.delimiters)
+      cursor.checkSegment(current, cursor.positionOf(cursor.index))
       cursor.index += 1
 
       if (entry.kind === 'group') {
@@ -201,9 +234,9 @@ const validateMessage = (
   definition: MessageDefinition,
   segments: Segment[],
   positionOf: (index: number) => Position,
-  delimiters: Delimiters,
+  checkSegment: SegmentCheck,
 ) => {
-  const cursor: Cursor = { segments, index: 0, positionOf, delimiters }
+  const cursor: Cursor = { segments, index: 0, positionOf, checkSegment }
 
   matchEntries(definition.segments, cursor, new Set())
 
@@ -214,6 +247,7 @@ const validateMessage = (
 
 export const validate = (interchange: Interchange) => {
   const positionOf = interchangeSegmentPosition(interchange.hasServiceStringAdvice)
+  const checkSegment = segmentChecker(interchange.delimiters)
   let headerIndex = 1
 
   for (const message of interchange.messages) {
@@ -232,7 +266,7 @@ export const validate = (interchange: Interchange) => {
       definition,
       message.segments,
       (index) => positionOf(firstIndex + index),
-      interchange.delimiters,
+      checkSegment,
     )
 
     headerIndex += message.segments.length + messageEnvelopeSegments
