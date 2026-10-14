@@ -168,7 +168,7 @@ The GS1 Sweden sources for CONTRL are [MS 11 Syntaxkvittens](https://gs1.se/wp-c
 
 - MS 11 makes 0007 in S002 and S003 mandatory with the value `14` (EAN). UN syntax version 3 has 0007 conditional, and the definitions keep that.
 - AT 0.1.1 and AT 0.1.2 give 0004 and 0010 as `n13`, an EAN location number. This restricts the UN format `an..35`, which the definitions keep.
-- AT 0.1.1 gives code `6` (interchange rejected) for 0083. Code list 0083 has no code `6`; code `4` rejects a level and all lower levels. The code list keeps `4` `7` `8` only, so a UCI with `6` fails validation.
+- AT 0.1.1 gives code `6` (interchange rejected) for 0083. The syntax version 3 code list 0083 has no code `6`; code `4` rejects a level and all lower levels. Validation accepts `6` as an EANCOM addition, listed in [Code lists](#code-lists).
 - MS 11 identifies the Message as `CONTRL:D:96A:EN:EAN002`.
 
 A value after the last data element of a segment or after the last component of an element is unexpected. Empty values there are allowed.
@@ -179,40 +179,41 @@ A numeric (`n`) value holds digits, an optional leading minus sign and at most o
 
 `src/definitions/code-lists.ts` holds a code list for each coded data element that the segment pages link to a UN D.96A code list, such as [1225](https://www.stylusstudio.com/edifact/D96A/1225.htm), and for 0081 from the [syntax directory](https://www.stylusstudio.com/edifact/40100/0081.htm). The data elements of the CONTRL service segments take their code lists from the syntax version 3 service code lists on stylusstudio.com, revision 2003B: [0007](https://www.stylusstudio.com/edifact/30000/0007.htm), [0013](https://www.stylusstudio.com/edifact/30000/0013.htm), [0051](https://www.stylusstudio.com/edifact/30000/0051.htm), [0052](https://www.stylusstudio.com/edifact/30000/0052.htm), [0054](https://www.stylusstudio.com/edifact/30000/0054.htm), [0065](https://www.stylusstudio.com/edifact/30000/0065.htm), [0083](https://www.stylusstudio.com/edifact/30000/0083.htm) and [0085](https://www.stylusstudio.com/edifact/30000/0085.htm). Codes marked for deletion stay in the list, because D.96A still allows them. Data elements without a linked code list, such as 6345 (currency), 3207 (country) and 6411 (unit of measure), take any value of their format.
 
-EANCOM adds codes to some UN code lists. The table lists each added code that a public GS1 source uses in an ORDERS, DESADV or INVOIC message. Each data element has one code list for every Message Type, so a code added for INVOIC is also accepted in ORDERS. The CCG source for ORDERS is section 8 of the CCG recommendation for EANCOM 1997 ORDERS linked above. The CCG INVOIC source is the recommendation for EANCOM 1997 INVOIC linked above, sections 7 and 8. The CCG DESADV source is section 8 of the recommendation for EANCOM 1997 DESADV linked above. Known gap: EANCOM also restricts the UN code lists, and the full restrictions are only in the licensed EANCOM manual. Validation therefore accepts every UN D.96A code.
+EANCOM adds codes to some UN code lists. The table lists each added code that a public GS1 source uses in an ORDERS, DESADV, INVOIC or CONTRL message. Each data element has one code list for every Message Type, so a code added for INVOIC is also accepted in ORDERS. The CCG source for ORDERS is section 8 of the CCG recommendation for EANCOM 1997 ORDERS linked above. The CCG INVOIC source is the recommendation for EANCOM 1997 INVOIC linked above, sections 7 and 8. The CCG DESADV source is section 8 of the recommendation for EANCOM 1997 DESADV linked above. Known gap: EANCOM also restricts the UN code lists, and the full restrictions are only in the licensed EANCOM manual. Validation therefore accepts every UN D.96A code.
 
-| Data element | Added codes       | Source                                                                                                   |
-| ------------ | ----------------- | -------------------------------------------------------------------------------------------------------- |
-| 1001         | `22E` `23B` `50E` | CCG ORDERS, printed page 160                                                                             |
-| 1001         | `YA5` `YA6` `YA7` | CCG DESADV, printed page 216                                                                             |
-| 1131         | `SKB`             | CCG ORDERS, printed page 160                                                                             |
-| 1131         | `997` `E`         | CCG INVOIC, printed page 244                                                                             |
-| 1153         | `API`             | CCG ORDERS, printed page 160                                                                             |
-| 1153         | `CDN` `PDR`       | CCG INVOIC, printed page 427                                                                             |
-| 1153         | `ASH`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 3             |
-| 3035         | `DGB`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4               |
-| 3035         | `LSP`             | CCG DESADV, printed page 217                                                                             |
-| 3035         | `DEQ`             | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 2 |
-| 3055         | `246`             | CCG ORDERS, printed page 161                                                                             |
-| 3055         | `9SE`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10     |
-| 4183         | `X5`              | CCG ORDERS, printed page 162                                                                             |
-| 4183         | `60E`             | CCG INVOIC, printed page 430                                                                             |
-| 4183         | `140`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10     |
-| 4233         | `33E`             | CCG DESADV, printed page 218                                                                             |
-| 4233         | `39`              | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 4 |
-| 4451         | `BAQ`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10     |
-| 5025         | `11E` `XB5`       | CCG INVOIC, printed page 431                                                                             |
-| 5125         | `1E`              | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 11            |
-| 5305         | `M`               | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 13            |
-| 5387         | `LIU`             | CCG ORDERS, printed page 162                                                                             |
-| 6063         | `45E`             | CCG INVOIC, printed page 433                                                                             |
-| 6313         | `LAY` `ULY`       | CCG ORDERS, printed page 162                                                                             |
-| 6343         | `18`              | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 5             |
-| 7073         | `LAB`             | CCG ORDERS, printed page 163                                                                             |
-| 7081         | `SGR`             | CCG ORDERS, printed page 163                                                                             |
-| 7143         | `EWC`             | CCG ORDERS, printed page 163                                                                             |
-| 7143         | `SRV`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4               |
-| 7405         | `SRV`             | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 4 |
+| Data element | Added codes       | Source                                                                                                         |
+| ------------ | ----------------- | -------------------------------------------------------------------------------------------------------------- |
+| 0083         | `6`               | [AT 0.1.1 Överföringskvittens](https://gs1.se/wp-content/uploads/sites/2/2020/07/at000101_se200-1.pdf), page 1 |
+| 1001         | `22E` `23B` `50E` | CCG ORDERS, printed page 160                                                                                   |
+| 1001         | `YA5` `YA6` `YA7` | CCG DESADV, printed page 216                                                                                   |
+| 1131         | `SKB`             | CCG ORDERS, printed page 160                                                                                   |
+| 1131         | `997` `E`         | CCG INVOIC, printed page 244                                                                                   |
+| 1153         | `API`             | CCG ORDERS, printed page 160                                                                                   |
+| 1153         | `CDN` `PDR`       | CCG INVOIC, printed page 427                                                                                   |
+| 1153         | `ASH`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 3                   |
+| 3035         | `DGB`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4                     |
+| 3035         | `LSP`             | CCG DESADV, printed page 217                                                                                   |
+| 3035         | `DEQ`             | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 2       |
+| 3055         | `246`             | CCG ORDERS, printed page 161                                                                                   |
+| 3055         | `9SE`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10           |
+| 4183         | `X5`              | CCG ORDERS, printed page 162                                                                                   |
+| 4183         | `60E`             | CCG INVOIC, printed page 430                                                                                   |
+| 4183         | `140`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10           |
+| 4233         | `33E`             | CCG DESADV, printed page 218                                                                                   |
+| 4233         | `39`              | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 4       |
+| 4451         | `BAQ`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10           |
+| 5025         | `11E` `XB5`       | CCG INVOIC, printed page 431                                                                                   |
+| 5125         | `1E`              | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 11                  |
+| 5305         | `M`               | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 13                  |
+| 5387         | `LIU`             | CCG ORDERS, printed page 162                                                                                   |
+| 6063         | `45E`             | CCG INVOIC, printed page 433                                                                                   |
+| 6313         | `LAY` `ULY`       | CCG ORDERS, printed page 162                                                                                   |
+| 6343         | `18`              | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 5                   |
+| 7073         | `LAB`             | CCG ORDERS, printed page 163                                                                                   |
+| 7081         | `SGR`             | CCG ORDERS, printed page 163                                                                                   |
+| 7143         | `EWC`             | CCG ORDERS, printed page 163                                                                                   |
+| 7143         | `SRV`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4                     |
+| 7405         | `SRV`             | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 4       |
 
 In the CCG recommendation for INVOIC, data element 1131 in FTX carries a reporting code of the Deutsche Bundesbank, with `997` and `E` given as examples. Known gap: other codes of that list fail validation.
 
