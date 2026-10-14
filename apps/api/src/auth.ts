@@ -16,7 +16,7 @@ export interface AuthSettings {
 
 const basePath = '/auth'
 
-export function createAuth(database: Database, { secret, baseUrl, trustedOrigins }: AuthSettings) {
+function createAuth(database: Database, { secret, baseUrl, trustedOrigins }: AuthSettings) {
   return betterAuth({
     secret,
     baseURL: baseUrl,
@@ -39,7 +39,9 @@ export type Auth = ReturnType<typeof createAuth>
 
 export const headersOf = (request: FastifyRequest) => fromNodeHeaders(request.headers)
 
-export function mountAuth(app: FastifyInstance, auth: Auth, baseUrl: string) {
+export function mountAuth(app: FastifyInstance, database: Database, settings: AuthSettings) {
+  const auth = createAuth(database, settings)
+
   app.route({
     method: ['GET', 'POST'],
     url: `${basePath}/*`,
@@ -50,7 +52,7 @@ export function mountAuth(app: FastifyInstance, auth: Auth, baseUrl: string) {
       headers.delete('content-length')
 
       const response = await auth.handler(
-        new Request(new URL(request.url, baseUrl), {
+        new Request(new URL(request.url, settings.baseUrl), {
           method: request.method,
           headers,
           ...(request.body !== undefined && { body: JSON.stringify(request.body) }),
@@ -72,4 +74,6 @@ export function mountAuth(app: FastifyInstance, auth: Auth, baseUrl: string) {
       return reply.code(response.status).send(response.body ? await response.text() : null)
     },
   })
+
+  return auth
 }

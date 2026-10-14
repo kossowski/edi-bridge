@@ -33,7 +33,7 @@ import {
   updateTradingPartnerEndpoint,
 } from '@edi-bridge/contracts'
 
-import { type AuthSettings, createAuth, mountAuth } from './auth.js'
+import { type AuthSettings, mountAuth } from './auth.js'
 import { listChannels } from './channel.js'
 import { type Database, Db } from './db.js'
 import {
@@ -144,9 +144,7 @@ export function buildApp({
       .send({ status: healthy ? 'healthy' : 'unhealthy', checks: { postgres, redis } })
   })
 
-  const auth = createAuth(database, authSettings)
-
-  mountAuth(app, auth, authSettings.baseUrl)
+  const auth = mountAuth(app, database, authSettings)
 
   const respond = async <A>(
     request: FastifyRequest,
