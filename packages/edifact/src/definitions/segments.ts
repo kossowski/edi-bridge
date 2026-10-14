@@ -167,15 +167,6 @@ export const segmentDirectory: ElementRefDirectory = {
   ],
   TOD: [element('4055', 'C'), element('4215', 'C'), element('C100', 'C')],
   UCD: [element('0085', 'M'), element('S011', 'M')],
-  UCF: [
-    element('0048', 'M'),
-    element('S006', 'M'),
-    element('S007', 'M'),
-    element('0083', 'M'),
-    element('0085', 'C'),
-    element('0013', 'C'),
-    element('S011', 'C'),
-  ],
   UCI: [
     element('0020', 'M'),
     element('S002', 'M'),

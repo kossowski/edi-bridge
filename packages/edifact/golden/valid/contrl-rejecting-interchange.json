@@ -1,0 +1,49 @@
+{
+  "hasServiceStringAdvice": true,
+  "delimiters": {
+    "component": "|",
+    "element": "^",
+    "decimal": ",",
+    "release": "!",
+    "repetition": " ",
+    "segment": "~"
+  },
+  "header": {
+    "tag": "UNB",
+    "elements": [
+      ["UNOC", "3"],
+      ["5412345000013", "14"],
+      ["4012345000016", "14"],
+      ["261018", "1020"],
+      ["C0000003"]
+    ]
+  },
+  "messages": [
+    {
+      "header": {
+        "tag": "UNH",
+        "elements": [["ME000001"], ["CONTRL", "D", "3", "UN", "EAN004"]]
+      },
+      "segments": [
+        {
+          "tag": "UCI",
+          "elements": [
+            ["CTL00021"],
+            ["4012345000016", "14"],
+            ["5412345000013", "14"],
+            ["6"],
+            ["28"],
+            ["UNZ"],
+            ["2"]
+          ]
+        }
+      ],
+      "trailer": { "tag": "UNT", "elements": [["3"], ["ME000001"]] }
+    }
+  ],
+  "trailer": { "tag": "UNZ", "elements": [["1"], ["C0000003"]] },
+  "whitespace": {
+    "lineBreaks": ["", "", "", "", ""],
+    "trailingText": ""
+  }
+}

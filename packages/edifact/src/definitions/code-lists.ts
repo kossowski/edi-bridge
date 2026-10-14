@@ -165,6 +165,7 @@ const unCodes: CodeDirectory = {
 
 const eancomCodes: CodeDirectory = {
   '0083': '6',
+  '0085': '1 3 6 9 11',
   '1001': '22E 23B 50E YA5 YA6 YA7',
   '1131': 'SKB 997 E',
   '1153': 'API ASH CDN PDR',
