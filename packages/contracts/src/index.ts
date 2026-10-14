@@ -183,6 +183,20 @@ export {
 } from './document-structure'
 
 export {
+  adjustDocumentStructure,
+  applyLabels,
+  documentStructureLeaves,
+  DocumentStructureProblemError,
+  encodeBase64,
+  findNode,
+  inferDocumentStructure,
+  sameCsvSettings,
+  visitedNode,
+} from './document-structure-inference'
+
+export { knownFieldNames, type PlainName, plainNameOf } from './field-label'
+
+export {
   controlReferenceSchema,
   type EdifactCode,
   edifactCodeSchema,

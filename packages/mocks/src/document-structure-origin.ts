@@ -3,10 +3,10 @@ import {
   type CsvSettings,
   defaultCsvSettings,
   type DocumentStructureOrigin,
+  encodeBase64,
   type EncodedFile,
 } from '@edi-bridge/contracts'
 
-import { encodeBase64 } from './document-structure-inference'
 import { seededFaker } from './seeded-faker'
 
 const windows1252Extras = new Map([

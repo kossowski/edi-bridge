@@ -6,6 +6,7 @@ import {
   createMappingEndpoint,
   directionOf,
   type DocumentStructure,
+  documentStructureLeaves,
   type MappingDraft,
   mappingDraftEndpoint,
   mappingDraftSchema,
@@ -42,7 +43,6 @@ import {
   seedInvoiceExportDocumentStructure,
   toDocumentStructureStore,
 } from './document-structure'
-import { documentStructureLeaves } from './document-structure-inference'
 import {
   createFlows,
   type FlowRecord,

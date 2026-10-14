@@ -1,19 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  type CharacterEncoding,
   type CsvSettings,
   defaultCsvSettings,
   type DocumentStructure,
   type DocumentStructureNode,
+  type DocumentStructureOrigin,
   type DocumentStructureProblem,
   documentStructureSchema,
-} from '@edi-bridge/contracts'
-
-import { seedDocumentStructureOf } from './document-structure'
+  type EncodedFile,
+} from './document-structure'
 import {
   adjustDocumentStructure,
   decodeText,
   DocumentStructureProblemError,
+  encodeBase64,
   findNode,
   inferDocumentStructure,
   inferFromCsv,
@@ -21,11 +23,165 @@ import {
   inferFromJsonSchema,
   parseCsv,
 } from './document-structure-inference'
-import {
-  createCsvDocument,
-  documentStructureOrigins,
-  toEncodedFile,
-} from './document-structure-origin'
+
+const windows1252Extras = new Map([
+  ['„', 0x84],
+  ['“', 0x93],
+])
+
+function encodeText(text: string, encoding: CharacterEncoding) {
+  if (encoding === 'utf-8') {
+    return new TextEncoder().encode(text)
+  }
+
+  return Uint8Array.from(text, (character) => {
+    const code = character.codePointAt(0)!
+
+    return code <= 0xff ? code : windows1252Extras.get(character)!
+  })
+}
+
+function toEncodedFile(
+  fileName: string,
+  text: string,
+  encoding: CharacterEncoding = 'utf-8',
+): EncodedFile {
+  return { fileName, content: encodeBase64(encodeText(text, encoding)) }
+}
+
+const orderJson = JSON.stringify({
+  orderNumber: 'PO-2026-10417',
+  orderDate: '2026-10-02',
+  currency: 'EUR',
+  note: null,
+  buyer: { gln: '4012345000016', name: 'Hansemarkt GmbH', city: 'Lübeck' },
+  lines: [
+    { lineNumber: 1, gtin: '04012345123456', quantity: 24, netPrice: 1.89, promotion: true },
+    { lineNumber: 2, gtin: '04012345654321', quantity: 12.5, netPrice: 3 },
+  ],
+  tags: ['express'],
+})
+
+const orderListJson = JSON.stringify([
+  { orderNumber: 'PO-2026-10417', orderDate: '2026-10-02', total: 45.36 },
+  { orderNumber: 'PO-2026-10418', orderDate: '2026-10-03', total: 120, note: 'Rampe 2' },
+])
+
+const dispatchCsv = [
+  'Lieferscheinnummer;Lieferdatum;Kunde;Straße;Ort;GTIN;Menge;Bemerkung',
+  'LS-88121;03.10.2026;Hansemarkt GmbH;Königstraße 12;Lübeck;04012345123456;24;',
+  'LS-88121;03.10.2026;Hansemarkt GmbH;Königstraße 12;Lübeck;04012345654321;12,5;"Kühlware; „bitte zügig“"',
+  'LS-88122;04.10.2026;Alpenfrisch Märkte AG;Maximilianstraße 3;München;04012345777777;6;Größe XL',
+].join('\r\n')
+
+const invoiceCsv = [
+  'RechNr;RechDatum;AuftrNr;KdNr;ArtNr;Bezeichnung;Menge;ME;EPreis;Netto;MwSt;Whg',
+  'R-2026-1188;08.10.2026;4711;K-20931;4006381333931;Haferdrink 1 l;24;KRT;4,20;100,80;19;EUR',
+  'R-2026-1188;08.10.2026;4711;K-20931;4006381333948;Haferdrink Barista 1 l;12;KRT;4,60;55,20;19;EUR',
+  'R-2026-1189;08.10.2026;4712;K-11872;4006381333955;Dinkeldrink 1 l;6;ST;2,10;12,60;7;EUR',
+].join('\r\n')
+
+const articleSchema = JSON.stringify({
+  type: 'object',
+  required: ['articleNumber', 'gtin', 'description', 'prices'],
+  properties: {
+    articleNumber: { type: 'string' },
+    gtin: { type: 'string', pattern: '^\\d{14}$' },
+    description: { type: 'string' },
+    validFrom: { type: 'string', format: 'date' },
+    discontinued: { type: ['boolean', 'null'] },
+    unit: { enum: ['PCE', 'KGM', 'LTR'] },
+    supplier: { $ref: '#/$defs/party' },
+    prices: { type: 'array', items: { $ref: '#/$defs/price' } },
+    keywords: { type: 'array', items: { type: 'string' } },
+  },
+  $defs: {
+    party: {
+      type: 'object',
+      required: ['gln'],
+      properties: { gln: { type: 'string' }, name: { type: 'string' } },
+    },
+    price: {
+      type: 'object',
+      required: ['amount', 'currency'],
+      properties: {
+        amount: { type: 'number' },
+        currency: { type: 'string' },
+        minimumQuantity: { type: 'integer' },
+      },
+    },
+  },
+})
+
+const windows1252CsvSettings: CsvSettings = { ...defaultCsvSettings, encoding: 'windows-1252' }
+
+const documentStructureOrigins = {
+  jsonDocument: { kind: 'jsonDocument', document: toEncodedFile('order.json', orderJson) },
+  jsonListDocument: {
+    kind: 'jsonDocument',
+    document: toEncodedFile('orders.json', orderListJson),
+  },
+  csvDocument: {
+    kind: 'csvDocument',
+    document: toEncodedFile('lieferscheine.csv', dispatchCsv),
+    csv: defaultCsvSettings,
+  },
+  invoiceCsvDocument: {
+    kind: 'csvDocument',
+    document: toEncodedFile('Rechnungsexport_2026-10-08.csv', invoiceCsv),
+    csv: defaultCsvSettings,
+  },
+  windows1252CsvDocument: {
+    kind: 'csvDocument',
+    document: toEncodedFile('lieferscheine-ansi.csv', dispatchCsv, 'windows-1252'),
+    csv: windows1252CsvSettings,
+  },
+  jsonSchema: {
+    kind: 'jsonSchema',
+    jsonSchema: toEncodedFile('article.schema.json', articleSchema),
+  },
+  invalidJsonDocument: {
+    kind: 'jsonDocument',
+    document: toEncodedFile('broken.json', '{ "orderNumber": "PO-1", '),
+  },
+  emptyCsvDocument: {
+    kind: 'csvDocument',
+    document: toEncodedFile('empty.csv', '\r\n'),
+    csv: defaultCsvSettings,
+  },
+  invalidJsonSchema: {
+    kind: 'jsonSchema',
+    jsonSchema: toEncodedFile('broken.schema.json', '{ "type": "object", "properties": [] }'),
+  },
+} as const satisfies Record<string, DocumentStructureOrigin>
+
+function createCsvDocument({
+  rowCount,
+  encoding = 'utf-8',
+}: {
+  rowCount: number
+  encoding?: CharacterEncoding
+}) {
+  const cities = ['München', 'Köln', 'Düsseldorf', 'Nürnberg', 'Lübeck']
+
+  const rows = Array.from({ length: rowCount }, (_, index) =>
+    [
+      `LS-${90_000 + Math.floor(index / 8)}`,
+      `${String((index % 28) + 1).padStart(2, '0')}.10.2026`,
+      `Kunde ${index % 97}`,
+      cities[index % cities.length],
+      `0${String(4_012_345_000_000 + index)}`,
+      String((index % 500) + 1),
+      index % 5 === 0 ? 'Kühlware' : '',
+    ].join(';'),
+  )
+
+  return toEncodedFile(
+    `lieferscheine-${rowCount}.csv`,
+    ['Lieferscheinnummer;Lieferdatum;Kunde;Ort;GTIN;Menge;Bemerkung', ...rows].join('\r\n'),
+    encoding,
+  )
+}
 
 function problemOf(run: () => void): DocumentStructureProblem {
   try {
@@ -426,7 +582,11 @@ describe('inferFromJsonSchema', () => {
 })
 
 describe('adjustDocumentStructure', () => {
-  const order = seedDocumentStructureOf.ORDERS
+  const order = documentStructureSchema.parse({
+    id: crypto.randomUUID(),
+    name: 'ERP purchase order',
+    ...inferDocumentStructure(documentStructureOrigins.jsonDocument),
+  })
 
   function adjust(adjustments: Parameters<typeof adjustDocumentStructure>[1]['adjustments']) {
     return adjustDocumentStructure(order, { name: order.name, adjustments })

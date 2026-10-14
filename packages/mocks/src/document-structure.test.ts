@@ -6,6 +6,7 @@ import {
   createDocumentStructureEndpoint,
   type DocumentStructure,
   documentStructureEndpoint,
+  documentStructureLeaves,
   type DocumentStructureNode,
   documentStructureProblemSchema,
   documentStructuresEndpoint,
@@ -25,7 +26,6 @@ import {
   seedDocumentStructures,
   seedUnusedDocumentStructures,
 } from './document-structure'
-import { documentStructureLeaves } from './document-structure-inference'
 import { documentStructureOrigins, toEncodedFile } from './document-structure-origin'
 import { createMappingDraftStore, seedMappingDrafts } from './mapping'
 import {

@@ -26,8 +26,7 @@ import {
   type JsonRoot,
   nodeContent,
   type UpdateDocumentStructureBody,
-} from '@edi-bridge/contracts'
-
+} from './document-structure'
 import { type PlainName, plainNameOf } from './field-label'
 
 export class DocumentStructureProblemError extends Error {
