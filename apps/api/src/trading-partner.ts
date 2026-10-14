@@ -1,4 +1,4 @@
-import { and, DrizzleQueryError, eq } from 'drizzle-orm'
+import { and, DrizzleQueryError, eq, type SQL } from 'drizzle-orm'
 import { Effect } from 'effect'
 import postgres from 'postgres'
 import { z } from 'zod'
@@ -8,6 +8,7 @@ import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
 import { Db } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { exactlyOne } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
 type Row = typeof tradingPartners.$inferSelect
@@ -25,20 +26,25 @@ const toTradingPartner = (row: Row): TradingPartner => ({
   },
 })
 
-const byName = new Intl.Collator('de')
+const inWorkspace = (workspaceId: string, ...conditions: SQL[]) =>
+  and(eq(tradingPartners.workspaceId, workspaceId), ...conditions)
+
+const byId = (id: string) => eq(tradingPartners.id, id)
+
+const nameCollator = new Intl.Collator('de')
 
 export const listTradingPartners = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
   const rows = yield* Effect.promise(() =>
-    db.select().from(tradingPartners).where(eq(tradingPartners.workspaceId, workspace.id)),
+    db.select().from(tradingPartners).where(inWorkspace(workspace.id)),
   )
 
-  return rows.map(toTradingPartner).toSorted((a, b) => byName.compare(a.name, b.name))
+  return rows.map(toTradingPartner).toSorted((a, b) => nameCollator.compare(a.name, b.name))
 })
 
-const write = <A>(query: () => Promise<A>) =>
+const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
   Effect.promise(query).pipe(
     Effect.catchDefect((defect) =>
       defect instanceof DrizzleQueryError &&
@@ -62,7 +68,7 @@ export const loadTradingPartner = (id: string) =>
       db
         .select()
         .from(tradingPartners)
-        .where(and(eq(tradingPartners.workspaceId, workspace.id), eq(tradingPartners.id, id))),
+        .where(inWorkspace(workspace.id, byId(id))),
     )
 
     const row = rows[0]
@@ -75,14 +81,14 @@ export const createTradingPartner = (input: TradingPartnerInput) =>
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const [row] = yield* write(() =>
+    const rows = yield* rejectingDuplicateGln(() =>
       db
         .insert(tradingPartners)
         .values({ ...input, workspaceId: workspace.id })
         .returning(),
     )
 
-    return toTradingPartner(yield* Effect.orDie(Effect.fromNullishOr(row)))
+    return toTradingPartner(yield* exactlyOne(rows))
   })
 
 export const updateTradingPartner = (existing: TradingPartner, input: TradingPartnerInput) =>
@@ -96,13 +102,11 @@ export const updateTradingPartner = (existing: TradingPartner, input: TradingPar
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const [row] = yield* write(() =>
+    const [row] = yield* rejectingDuplicateGln(() =>
       db
         .update(tradingPartners)
         .set(input)
-        .where(
-          and(eq(tradingPartners.workspaceId, workspace.id), eq(tradingPartners.id, existing.id)),
-        )
+        .where(inWorkspace(workspace.id, byId(existing.id)))
         .returning(),
     )
 

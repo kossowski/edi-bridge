@@ -7,6 +7,7 @@ import { type CompanyIdentityInput, type Workspace, withCheckDigit } from '@edi-
 import { workspaces } from '@edi-bridge/db'
 
 import { type Database, Db } from './db.js'
+import { exactlyOne } from './rows.js'
 
 const developmentWorkspace: Workspace = {
   id: '5f0c3a52-7d1e-4b8a-9c61-2e4f8d9a1b07',
@@ -27,8 +28,6 @@ const columns = { id: workspaces.id, name: workspaces.name, gln: workspaces.gln 
 export async function seedDevelopmentWorkspace(database: Database) {
   await database.insert(workspaces).values(developmentWorkspace).onConflictDoNothing()
 }
-
-const exactlyOne = (rows: Workspace[]) => Effect.orDie(Effect.fromNullishOr(rows[0]))
 
 export const loadCurrentWorkspace = Effect.gen(function* () {
   const db = yield* Db
