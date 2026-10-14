@@ -1,7 +1,5 @@
-import { and, DrizzleQueryError, eq, isNull, type SQL } from 'drizzle-orm'
+import { and, eq, isNull, type SQL } from 'drizzle-orm'
 import { Effect } from 'effect'
-import postgres from 'postgres'
-import { z } from 'zod'
 
 import {
   activityDays,
@@ -12,9 +10,9 @@ import {
 } from '@edi-bridge/contracts'
 import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
-import { Db } from './db.js'
-import { Conflict, NotFound, Unprocessable } from './errors.js'
-import { exactlyOne } from './rows.js'
+import { Db, type Transaction } from './db.js'
+import { NotFound, Unprocessable } from './errors.js'
+import { byName, exactlyOne, rejectingDuplicate, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
@@ -45,8 +43,6 @@ const glnRemovable = and(
   isNull(tradingPartners.testInterchangeSentAt),
 )
 
-const nameCollator = new Intl.Collator('de')
-
 export const listTradingPartners = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
@@ -55,7 +51,7 @@ export const listTradingPartners = Effect.gen(function* () {
     db.select().from(tradingPartners).where(inWorkspace(workspace.id)),
   )
 
-  return rows.map(toTradingPartner).toSorted((a, b) => nameCollator.compare(a.name, b.name))
+  return rows.map(toTradingPartner).toSorted(byName)
 })
 
 // Until Runs exist (#187).
@@ -64,21 +60,15 @@ export const listTradingPartnerActivities: Effect.Effect<TradingPartnerActivity[
 )
 
 const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
-  Effect.promise(query).pipe(
-    Effect.catchDefect((defect) =>
-      defect instanceof DrizzleQueryError &&
-      defect.cause instanceof postgres.PostgresError &&
-      defect.cause.constraint_name === tradingPartnerGlnUnique
-        ? Effect.fail(new Conflict({ message: 'Another Trading Partner already uses this GLN' }))
-        : Effect.die(defect),
-    ),
+  rejectingDuplicate(
+    query,
+    [tradingPartnerGlnUnique],
+    'Another Trading Partner already uses this GLN',
   )
 
 export const loadTradingPartner = (id: string) =>
   Effect.gen(function* () {
-    if (!z.uuid().safeParse(id).success) {
-      return yield* new NotFound()
-    }
+    yield* rejectingInvalidId(id)
 
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
@@ -94,6 +84,26 @@ export const loadTradingPartner = (id: string) =>
 
     return row ? toTradingPartner(row) : yield* new NotFound()
   })
+
+export const assertTradingPartnerIn = async (
+  tx: Transaction,
+  workspaceId: string,
+  tradingPartnerId: string | null,
+) => {
+  if (tradingPartnerId === null) {
+    return
+  }
+
+  const [found] = await tx
+    .select({ id: tradingPartners.id })
+    .from(tradingPartners)
+    .where(inWorkspace(workspaceId, byId(tradingPartnerId)))
+    .for('share')
+
+  if (!found) {
+    throw new Unprocessable({ message: 'Unknown Trading Partner' })
+  }
+}
 
 export const createTradingPartner = (input: TradingPartnerInput) =>
   Effect.gen(function* () {

@@ -1,7 +1,5 @@
-import { and, asc, DrizzleQueryError, eq, getTableColumns, type SQL, sql } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
-import postgres from 'postgres'
-import { z } from 'zod'
 
 import {
   lookupTableEntries,
@@ -20,13 +18,13 @@ import type {
   LookupTableSummary,
 } from '@edi-bridge/contracts'
 
-import { Db, type Database } from './db.js'
-import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { Db, type Database, type Transaction } from './db.js'
+import { NotFound, Unprocessable } from './errors.js'
+import { byName, exactlyOne, rejectingDuplicate, rejectingInvalidId } from './rows.js'
+import { assertTradingPartnerIn } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
-
-type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0]
 
 const selectRows = (db: Database, where: SQL | undefined) =>
   db
@@ -75,18 +73,13 @@ const selectEntries = (db: Database, lookupTableId: string) =>
     .where(eq(lookupTableEntries.lookupTableId, lookupTableId))
     .orderBy(asc(lookupTableEntries.position))
 
-const rejectingInvalidId = (id: string) =>
-  z.uuid().safeParse(id).success ? Effect.void : Effect.fail(new NotFound())
-
-const nameCollator = new Intl.Collator('de')
-
 export const listLookupTables = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
   const rows = yield* Effect.promise(() => selectRows(db, inWorkspace(workspace.id)))
 
-  return rows.map(toSummary).toSorted((a, b) => nameCollator.compare(a.name, b.name))
+  return rows.map(toSummary).toSorted(byName)
 })
 
 export const loadLookupTable = (id: string) =>
@@ -117,28 +110,6 @@ export const loadLookupTable = (id: string) =>
 const tradingPartnerIdOf = (scope: LookupTableScopeInput) =>
   scope.kind === 'tradingPartner' ? scope.tradingPartnerId : null
 
-const assertTradingPartnerIn = async (
-  tx: Transaction,
-  workspaceId: string,
-  tradingPartnerId: string | null,
-) => {
-  if (tradingPartnerId === null) {
-    return
-  }
-
-  const [found] = await tx
-    .select({ id: tradingPartners.id })
-    .from(tradingPartners)
-    .where(
-      and(eq(tradingPartners.workspaceId, workspaceId), eq(tradingPartners.id, tradingPartnerId)),
-    )
-    .for('share')
-
-  if (!found) {
-    throw new Unprocessable({ message: 'Unknown Trading Partner' })
-  }
-}
-
 const insertEntries = async (
   tx: Transaction,
   lookupTableId: string,
@@ -151,31 +122,21 @@ const insertEntries = async (
   }
 }
 
-const uniqueNames = new Set([lookupTableWorkspaceNameUnique, lookupTableTradingPartnerNameUnique])
+const nameUniqueConstraints = [lookupTableWorkspaceNameUnique, lookupTableTradingPartnerNameUnique]
 
-const storing = (store: (db: Database) => Promise<string>) =>
+const writeInTransaction = <A>(write: (tx: Transaction) => Promise<A>) =>
   Effect.gen(function* () {
     const db = yield* Db
 
-    const id = yield* Effect.promise(() => store(db)).pipe(
-      Effect.catchDefect((defect): Effect.Effect<never, Conflict | NotFound | Unprocessable> => {
-        if (defect instanceof NotFound || defect instanceof Unprocessable) {
-          return Effect.fail(defect)
-        }
-
-        return defect instanceof DrizzleQueryError &&
-          defect.cause instanceof postgres.PostgresError &&
-          uniqueNames.has(defect.cause.constraint_name ?? '')
-          ? Effect.fail(
-              new Conflict({
-                message: 'Another Lookup Table of this scope already uses this name',
-              }),
-            )
-          : Effect.die(defect)
-      }),
+    return yield* rejectingDuplicate(
+      () => db.transaction(write),
+      nameUniqueConstraints,
+      'Another Lookup Table of this scope already uses this name',
+    ).pipe(
+      Effect.catchDefect((defect) =>
+        defect instanceof Unprocessable ? Effect.fail(defect) : Effect.die(defect),
+      ),
     )
-
-    return yield* loadLookupTable(id).pipe(Effect.orDie)
   })
 
 export const createLookupTable = ({ name, kind, scope, entries }: LookupTableInput) =>
@@ -183,24 +144,26 @@ export const createLookupTable = ({ name, kind, scope, entries }: LookupTableInp
     const workspace = yield* CurrentWorkspace
     const tradingPartnerId = tradingPartnerIdOf(scope)
 
-    return yield* storing((db) =>
-      db.transaction(async (tx) => {
-        await assertTradingPartnerIn(tx, workspace.id, tradingPartnerId)
+    const rows = yield* writeInTransaction(async (tx) => {
+      await assertTradingPartnerIn(tx, workspace.id, tradingPartnerId)
 
-        const [created] = await tx
-          .insert(lookupTables)
-          .values({ workspaceId: workspace.id, tradingPartnerId, name, kind })
-          .returning({ id: lookupTables.id })
+      const created = await tx
+        .insert(lookupTables)
+        .values({ workspaceId: workspace.id, tradingPartnerId, name, kind })
+        .returning({ id: lookupTables.id })
 
-        if (!created) {
-          throw new Error('Lookup Table insert returned no row')
-        }
+      const [row] = created
 
-        await insertEntries(tx, created.id, entries)
+      if (row) {
+        await insertEntries(tx, row.id, entries)
+      }
 
-        return created.id
-      }),
-    )
+      return created
+    })
+
+    const { id } = yield* exactlyOne(rows)
+
+    return yield* loadLookupTable(id).pipe(Effect.orDie)
   })
 
 export const updateLookupTable = (
@@ -214,26 +177,29 @@ export const updateLookupTable = (
     const workspace = yield* CurrentWorkspace
     const tradingPartnerId = tradingPartnerIdOf(scope)
 
-    return yield* storing((db) =>
-      db.transaction(async (tx) => {
-        await assertTradingPartnerIn(tx, workspace.id, tradingPartnerId)
+    const updated = yield* writeInTransaction(async (tx) => {
+      await assertTradingPartnerIn(tx, workspace.id, tradingPartnerId)
 
-        const [updated] = await tx
-          .update(lookupTables)
-          .set({ tradingPartnerId, name, kind, updatedAt: sql`now()` })
-          .where(inWorkspace(workspace.id, eq(lookupTables.id, id)))
-          .returning({ id: lookupTables.id })
+      const rows = await tx
+        .update(lookupTables)
+        .set({ tradingPartnerId, name, kind, updatedAt: sql`now()` })
+        .where(inWorkspace(workspace.id, eq(lookupTables.id, id)))
+        .returning({ id: lookupTables.id })
 
-        if (!updated) {
-          throw new NotFound()
-        }
-
+      if (rows.length > 0) {
         await tx.delete(lookupTableEntries).where(eq(lookupTableEntries.lookupTableId, id))
         await insertEntries(tx, id, entries)
+      }
 
-        return id
-      }),
-    )
+      return rows
+    })
+
+    // A DELETE between loadLookupTable and this transaction leaves no row to update.
+    if (updated.length === 0) {
+      return yield* new NotFound()
+    }
+
+    return yield* loadLookupTable(id).pipe(Effect.orDie)
   })
 
 export const deleteLookupTable = (id: string) =>
