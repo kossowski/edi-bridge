@@ -14,6 +14,7 @@ import {
   documentStructureEndpoint,
   documentStructureLeaves,
   type DocumentStructureNode,
+  documentStructureOrigins,
   type DocumentStructureProblem,
   DocumentStructureProblemError,
   documentStructureSchema,
@@ -40,7 +41,6 @@ import {
   visitedNode,
 } from '@edi-bridge/contracts'
 
-import { documentStructureOrigins } from './document-structure-origin'
 import { byNameAndNewest } from './flow'
 import { containerOf } from './paths'
 import { badRequest, notFound, serverError } from './responses'

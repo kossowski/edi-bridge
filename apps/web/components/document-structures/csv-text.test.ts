@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { createCsvDocument, documentStructureOrigins } from '@edi-bridge/mocks'
-
-import type { DocumentStructureNode } from '@edi-bridge/contracts'
+import { type DocumentStructureNode, documentStructureOrigins } from '@edi-bridge/contracts'
+import { createCsvDocument } from '@edi-bridge/mocks'
 
 import {
   csvColumnNames,

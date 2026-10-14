@@ -194,6 +194,13 @@ export {
   visitedNode,
 } from './document-structure-inference'
 
+export {
+  documentStructureOrigins,
+  encodeText,
+  toEncodedFile,
+  windows1252CsvSettings,
+} from './document-structure-origins'
+
 export { knownFieldNames, type PlainName, plainNameOf } from './field-label'
 
 export {

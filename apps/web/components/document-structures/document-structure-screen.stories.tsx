@@ -15,6 +15,7 @@ import {
 import { apiUrl } from '@/lib/api/config'
 import {
   documentStructureEndpoint,
+  documentStructureOrigins,
   type DocumentStructureProblem,
   documentStructuresEndpoint,
   inferDocumentStructureEndpoint,
@@ -24,7 +25,6 @@ import {
 import {
   createDocumentStructure,
   createHandlers,
-  documentStructureOrigins,
   seedDocumentStructureOf,
   seedDocumentStructures,
   seedMappingDrafts,
