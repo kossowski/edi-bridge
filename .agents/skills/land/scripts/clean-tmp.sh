@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Deletes the /tmp leftovers that reviews and browser checks left for landed PRs.
+# Deletes the /tmp leftovers that reviews and browser checks left for landed PRs,
+# and Node's compile cache in /tmp/node-compile-cache, which Node rebuilds.
 #
 # Usage: scripts/clean-tmp.sh <PR> [<PR> ...]
 #
@@ -20,6 +21,7 @@ for pr in "$@"; do
     [[ -e $path && $path != /tmp/claude-* ]] && paths+=("$path")
   done
 done
+[[ -e /tmp/node-compile-cache ]] && paths+=(/tmp/node-compile-cache)
 
 if ((${#paths[@]} == 0)); then
   echo "Nothing to clean in /tmp."

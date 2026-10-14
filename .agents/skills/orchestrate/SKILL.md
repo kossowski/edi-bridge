@@ -75,7 +75,8 @@ WORKTREE   <absolute worktree path>, branch <branch>. Work and commit only here.
 CONTEXT    Ticket <path>, stack file <path>, spec <path>. Parts below are already on this branch.
 SCOPE      The scope of part <k> in the stack file. Later parts build what it leaves out.
 BUILD      Call the Skill tool with `tdd`, unless the ticket sets another testing rule.
-VERIFY     pnpm check, all green in the worktree.
+VERIFY     pnpm check:fast first, then pnpm check, both green in the worktree.
+CLEANUP    Stop every dev server and Storybook you started before you report.
 COMMITS    Conventional Commits per AGENTS.md, footer `refs: edi-bridge-issue#<NN>`.
 REPORT     STATUS: done | blocked
            COMMITS: <git log --oneline <parent>..HEAD>
@@ -121,12 +122,30 @@ The commit makes the script wait until GitHub shows the push. Without it, the sc
 
 In the top worktree, resolve the ticket as `docs/agents/issue-tracker.md` describes, listing every PR of the stack. Commit, push, and wait for CI as in step 3e.
 
-### 5. Report
+### 5. Catch up with main
 
-Keep all worktrees until `/land` has merged the stack.
+```bash
+git fetch origin
+git merge-base --is-ancestor origin/main <branch of part 1>
+```
+
+When the check fails, `main` moved since part 1 branched. Rebase each part onto its parent, bottom to top:
+
+```bash
+git -C <worktree> rebase <parent>
+git -C <worktree> push --force-with-lease
+```
+
+Resolve conflicts yourself; take a product decision to the user. Then run `pnpm -C <top worktree> check:fast` and wait for CI on every PR as in step 3e. The step is done when `origin/main` is an ancestor of part 1's branch and every PR is green.
+
+### 6. Report
+
+Stop every background shell, monitor and subagent you started, and delete the screenshots in your scratchpad. Keep all worktrees until `/land` has merged the stack.
+
+When another agent started you, such as a lead session, also send it the report with `SendMessage`, so it needs no polling.
 
 ```markdown
-**<NN> — <ticket title>**: stack of <n> PRs, ready for `/land`
+**<NN> — <ticket title>**: stack of <n> PRs on `main` <short commit>, ready for `/land`
 
 | Part | PR | Lines | CI | Review |
 |---|---|---|---|---|

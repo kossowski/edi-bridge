@@ -19,6 +19,12 @@ gh pr list --state open --json number,title,headRefName,baseRefName,isDraft \
 
 The open PRs of ticket `<NN>` match the stack file: the bottom PR targets `main`, each PR above it targets the branch of the one below, and none is a draft. If they don't match, report the difference and stop.
 
+```bash
+gh pr view <bottom PR> --json mergeStateStatus --jq .mergeStateStatus
+```
+
+When it is `BEHIND` or `DIRTY`, `main` moved past the stack: report that the stack needs the catch-up step of `/orchestrate`, and stop.
+
 ## 2. Check CI on every PR
 
 For each PR, bottom to top:
@@ -66,7 +72,7 @@ git pull --ff-only
 
 Skip `unstack` for a single PR. Take the stack number from `gh stack view --short` or the PR page. Delete the stack file.
 
-Last, free the RAM that reviews and browser checks of these PRs left in `/tmp`, a tmpfs here:
+Last, free the RAM in `/tmp`, a tmpfs here: the leftovers of the reviews and browser checks of these PRs, and Node's compile cache, which Node rebuilds on its own:
 
 ```bash
 bash .agents/skills/land/scripts/clean-tmp.sh <PR> ...
