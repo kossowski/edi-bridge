@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "trading_partners_workspace_id_gln_unique" ON "trading_partners" USING btree ("workspace_id","gln");

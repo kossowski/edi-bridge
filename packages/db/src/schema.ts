@@ -8,6 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
 
@@ -40,6 +41,7 @@ export const tradingPartners = pgTable(
   },
   (table) => [
     index().on(table.workspaceId),
+    uniqueIndex('trading_partners_workspace_id_gln_unique').on(table.workspaceId, table.gln),
     check(
       'acknowledgement_time_limit_hours_range',
       sql`${table.acknowledgementTimeLimitHours} between ${sql.raw(String(acknowledgementTimeLimitHours.min))} and ${sql.raw(String(acknowledgementTimeLimitHours.max))}`,
