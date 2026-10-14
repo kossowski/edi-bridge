@@ -128,6 +128,35 @@ const insertEntries = async (
   }
 }
 
+const rewriteLookupTable = async (
+  tx: Transaction,
+  workspaceId: string,
+  id: string,
+  set: Partial<typeof lookupTables.$inferInsert>,
+  entriesOf: () => Promise<LookupTableEntry[]>,
+) => {
+  const locked = await tx
+    .update(lookupTables)
+    .set({ ...set, updatedAt: sql`now()` })
+    .where(inWorkspace(workspaceId, eq(lookupTables.id, id)))
+    .returning({ id: lookupTables.id })
+
+  if (locked.length === 0) {
+    return false
+  }
+
+  const entries = await entriesOf()
+
+  await tx.delete(lookupTableEntries).where(eq(lookupTableEntries.lookupTableId, id))
+  await insertEntries(tx, id, entries)
+
+  return true
+}
+
+// A DELETE between loadLookupTable and the rewrite leaves no row to write.
+const reloadRewritten = (id: string, rewritten: boolean) =>
+  rewritten ? loadLookupTable(id).pipe(Effect.orDie) : Effect.fail(new NotFound())
+
 const nameUniqueConstraints = [lookupTableWorkspaceNameUnique, lookupTableTradingPartnerNameUnique]
 
 const writeInTransaction = <A>(write: (tx: Transaction) => Promise<A>) =>
@@ -183,29 +212,15 @@ export const updateLookupTable = (
     const workspace = yield* CurrentWorkspace
     const tradingPartnerId = tradingPartnerIdOf(scope)
 
-    const updated = yield* writeInTransaction(async (tx) => {
+    const rewritten = yield* writeInTransaction(async (tx) => {
       await assertTradingPartnerIn(tx, workspace.id, tradingPartnerId)
 
-      const rows = await tx
-        .update(lookupTables)
-        .set({ tradingPartnerId, name, kind, updatedAt: sql`now()` })
-        .where(inWorkspace(workspace.id, eq(lookupTables.id, id)))
-        .returning({ id: lookupTables.id })
-
-      if (rows.length > 0) {
-        await tx.delete(lookupTableEntries).where(eq(lookupTableEntries.lookupTableId, id))
-        await insertEntries(tx, id, entries)
-      }
-
-      return rows
+      return rewriteLookupTable(tx, workspace.id, id, { tradingPartnerId, name, kind }, () =>
+        Promise.resolve(entries),
+      )
     })
 
-    // A DELETE between loadLookupTable and this transaction leaves no row to update.
-    if (updated.length === 0) {
-      return yield* new NotFound()
-    }
-
-    return yield* loadLookupTable(id).pipe(Effect.orDie)
+    return yield* reloadRewritten(id, rewritten)
   })
 
 export const deleteLookupTable = (id: string) =>
@@ -249,36 +264,15 @@ export const importLookupTable = (
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const imported = yield* Effect.promise(() =>
-      db.transaction(async (tx) => {
-        const locked = await tx
-          .select({ id: lookupTables.id })
-          .from(lookupTables)
-          .where(inWorkspace(workspace.id, eq(lookupTables.id, id)))
-          .for('update')
+    const rewritten = yield* Effect.promise(() =>
+      db.transaction((tx) =>
+        rewriteLookupTable(tx, workspace.id, id, {}, async () => {
+          const entries = await selectEntries(tx, id)
 
-        if (locked.length === 0) {
-          return false
-        }
-
-        const entries = await selectEntries(tx, id)
-        const rows = classifyLookupTableImport(entries, csv)
-
-        await tx
-          .update(lookupTables)
-          .set({ updatedAt: sql`now()` })
-          .where(eq(lookupTables.id, id))
-        await tx.delete(lookupTableEntries).where(eq(lookupTableEntries.lookupTableId, id))
-        await insertEntries(tx, id, applyLookupTableImport(entries, rows))
-
-        return true
-      }),
+          return applyLookupTableImport(entries, classifyLookupTableImport(entries, csv))
+        }),
+      ),
     )
 
-    // A DELETE between loadLookupTable and this transaction leaves no row to import into.
-    if (!imported) {
-      return yield* new NotFound()
-    }
-
-    return yield* loadLookupTable(id).pipe(Effect.orDie)
+    return yield* reloadRewritten(id, rewritten)
   })
