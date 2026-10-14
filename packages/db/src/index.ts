@@ -1,4 +1,4 @@
-export { connect, type Database } from './client.js'
+export { connect, type Database, localDatabaseUrl } from './client.js'
 
 export { migrate } from './migrate.js'
 

@@ -1,10 +1,11 @@
 import { z } from 'zod'
 
+import { localDatabaseUrl } from './client.js'
 import { migrate } from './migrate.js'
 
 const env = z
   .object({
-    DATABASE_URL: z.url().default('postgres://edi_bridge:edi_bridge@localhost:5432/edi_bridge'),
+    DATABASE_URL: z.url().default(localDatabaseUrl),
   })
   .safeParse(process.env)
 

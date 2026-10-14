@@ -3,6 +3,8 @@ import postgres from 'postgres'
 
 import * as schema from './schema.js'
 
+export const localDatabaseUrl = 'postgres://edi_bridge:edi_bridge@localhost:5432/edi_bridge'
+
 export function connect(url: string) {
   const sql = postgres(url, { max: 5 })
   const db = drizzle({ client: sql, schema, casing: 'snake_case' })
