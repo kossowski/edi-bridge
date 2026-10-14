@@ -227,6 +227,24 @@ describe('readAcknowledgedInterchange', () => {
   })
 
   it.each([
+    ['7', '4', 'rejected'],
+    ['7', '7', 'accepted'],
+    ['4', '7', 'rejected'],
+  ])(
+    'reads the action code %s with a Message action code %s as %s',
+    (interchangeCode, messageCode, action) => {
+      expect(
+        readAcknowledgedInterchange(
+          messageOf(
+            5,
+            `UCI+CTL1+4012345000016:14+5412345000013:14+${interchangeCode}'UCM+1+ORDERS:D:96A:UN:EAN008+7'UCM+2+ORDERS:D:96A:UN:EAN008+${messageCode}'`,
+          ),
+        ),
+      ).toMatchObject({ action })
+    },
+  )
+
+  it.each([
     ['4', 'rejected'],
     ['7', 'accepted'],
     ['8', 'received'],
@@ -261,6 +279,11 @@ describe('readAcknowledgedInterchange', () => {
       'missing-element',
       'a UCI without action',
       messageOf(3, "UCI+CTL1+4012345000016:14+5412345000013:14'"),
+    ],
+    [
+      'missing-element',
+      'a UCM without action',
+      messageOf(4, "UCI+CTL1+4012345000016:14+5412345000013:14+7'UCM+1+ORDERS:D:96A:UN:EAN008'"),
     ],
     [
       'unknown-code',

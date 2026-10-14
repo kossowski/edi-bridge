@@ -52,6 +52,14 @@ const partyOf = (element: Element | undefined): InterchangeParty => {
   return qualifier ? { identification, qualifier } : { identification }
 }
 
+const messageActionElement = 3
+
+const hasRejectedMessage = ({ segments }: Message) =>
+  segments.some(
+    ({ tag, elements }) =>
+      tag === 'UCM' && requiredValue(elements[messageActionElement - 1]) === '4',
+  )
+
 export const readAcknowledgedInterchange = (message: Message): AcknowledgedInterchange => {
   if (!hasMessageIdentifier(message.header, contrlIdentifier)) {
     throw new ReadAcknowledgementError('unsupported-message-type')
@@ -64,9 +72,9 @@ export const readAcknowledgedInterchange = (message: Message): AcknowledgedInter
   }
 
   const [controlReference, sender, receiver, actionCode] = interchangeResponse.elements
-  const action = interchangeActions.get(requiredValue(actionCode))
+  const interchangeAction = interchangeActions.get(requiredValue(actionCode))
 
-  if (action === undefined) {
+  if (interchangeAction === undefined) {
     throw new ReadAcknowledgementError('unknown-code')
   }
 
@@ -74,6 +82,9 @@ export const readAcknowledgedInterchange = (message: Message): AcknowledgedInter
     controlReference: requiredValue(controlReference),
     sender: partyOf(sender),
     receiver: partyOf(receiver),
-    action,
+    action:
+      interchangeAction === 'accepted' && hasRejectedMessage(message)
+        ? 'rejected'
+        : interchangeAction,
   }
 }
