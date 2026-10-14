@@ -34,5 +34,5 @@ export interface Interchange {
   header: Segment
   messages: Message[]
   trailer: Segment
-  whitespace: Whitespace
+  whitespace?: Whitespace
 }

@@ -1,6 +1,6 @@
-import { hasReleaseCharacter, serviceCharacters } from './delimiters'
+import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
 
-import type { Delimiters, Interchange, Segment } from './model'
+import type { Delimiters, Interchange, Segment, Whitespace } from './model'
 
 const releaseServiceCharacters = (value: string, delimiters: Delimiters) => {
   if (!hasReleaseCharacter(delimiters)) {
@@ -33,14 +33,22 @@ const serviceStringAdvice = ({
   segment,
 }: Delimiters) => `UNA${component}${element}${decimal}${release}${repetition}${segment}`
 
+const hasDefaultDelimiters = (delimiters: Delimiters) =>
+  serviceStringAdvice(delimiters) === serviceStringAdvice(defaultDelimiters)
+
+const noWhitespace: Whitespace = { lineBreaks: [], trailingText: '' }
+
 export const serialize = ({
   hasServiceStringAdvice,
   delimiters,
   header,
   messages,
   trailer,
-  whitespace,
+  whitespace = noWhitespace,
 }: Interchange): string => {
+  // Parse reads default delimiters when there is no UNA, so other delimiters need one to round-trip.
+  const writesServiceStringAdvice = hasServiceStringAdvice || !hasDefaultDelimiters(delimiters)
+
   const segments = [
     header,
     ...messages.flatMap((message) => [message.header, ...message.segments, message.trailer]),
@@ -51,7 +59,7 @@ export const serialize = ({
   )
 
   return (
-    (hasServiceStringAdvice ? serviceStringAdvice(delimiters) : '') +
+    (writesServiceStringAdvice ? serviceStringAdvice(delimiters) : '') +
     segments.join('') +
     whitespace.trailingText
   )

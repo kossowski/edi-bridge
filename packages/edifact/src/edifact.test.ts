@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { parse, ParseError, serialize } from './index'
+import { type Delimiters, type Interchange, parse, ParseError, serialize } from './index'
 
 const goldenDirectory = (kind: string) => new URL(`../golden/${kind}/`, import.meta.url)
 
@@ -69,5 +69,64 @@ describe('serialize', () => {
     const text = readGolden('valid', name, 'edi')
 
     expect(serialize(parse(text))).toBe(text)
+  })
+})
+
+describe('serialize an Interchange built by hand', () => {
+  const builtInterchange = (delimiters: Delimiters): Interchange => ({
+    hasServiceStringAdvice: false,
+    delimiters,
+    header: {
+      tag: 'UNB',
+      elements: [
+        ['UNOC', '3'],
+        ['4012345000016', '14'],
+        ['5412345000013', '14'],
+        ['261014', '0930'],
+        ['CTL1'],
+      ],
+    },
+    messages: [
+      {
+        header: { tag: 'UNH', elements: [['ME1'], ['ORDERS', 'D', '96A', 'UN', 'EAN008']] },
+        segments: [{ tag: 'FTX', elements: [['AAI'], [], [], ["O'NEIL + SON: 50% OFF"]] }],
+        trailer: { tag: 'UNT', elements: [['3'], ['ME1']] },
+      },
+    ],
+    trailer: { tag: 'UNZ', elements: [['1'], ['CTL1']] },
+  })
+
+  it('writes no line breaks and no UNA for default delimiters', () => {
+    expect(
+      serialize(
+        builtInterchange({
+          component: ':',
+          element: '+',
+          decimal: '.',
+          release: '?',
+          repetition: ' ',
+          segment: "'",
+        }),
+      ),
+    ).toBe(
+      "UNB+UNOC:3+4012345000016:14+5412345000013:14+261014:0930+CTL1'UNH+ME1+ORDERS:D:96A:UN:EAN008'FTX+AAI+++O?'NEIL ?+ SON?: 50% OFF'UNT+3+ME1'UNZ+1+CTL1'",
+    )
+  })
+
+  it('writes a UNA for delimiters that differ from the defaults', () => {
+    expect(
+      serialize(
+        builtInterchange({
+          component: '|',
+          element: '^',
+          decimal: ',',
+          release: '!',
+          repetition: ' ',
+          segment: '~',
+        }),
+      ),
+    ).toBe(
+      "UNA|^,! ~UNB^UNOC|3^4012345000016|14^5412345000013|14^261014|0930^CTL1~UNH^ME1^ORDERS|D|96A|UN|EAN008~FTX^AAI^^^O'NEIL + SON: 50% OFF~UNT^3^ME1~UNZ^1^CTL1~",
+    )
   })
 })
