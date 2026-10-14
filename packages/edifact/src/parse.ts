@@ -1,38 +1,6 @@
-export interface Delimiters {
-  component: string
-  element: string
-  decimal: string
-  release: string
-  repetition: string
-  segment: string
-}
+import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
 
-export type Element = string[]
-
-export interface Segment {
-  tag: string
-  elements: Element[]
-}
-
-export interface Message {
-  header: Segment
-  segments: Segment[]
-  trailer: Segment
-}
-
-export interface Layout {
-  lineBreak: string
-  trailingText: string
-}
-
-export interface Interchange {
-  hasServiceStringAdvice: boolean
-  delimiters: Delimiters
-  header: Segment
-  messages: Message[]
-  trailer: Segment
-  layout: Layout
-}
+import type { Delimiters, Element, Interchange, Message, Segment } from './model'
 
 export type ParseErrorCode =
   | 'control-reference-mismatch'
@@ -76,17 +44,6 @@ export class ParseError extends Error {
   }
 }
 
-const defaultDelimiters: Delimiters = {
-  component: ':',
-  element: '+',
-  decimal: '.',
-  release: '?',
-  repetition: ' ',
-  segment: "'",
-}
-
-const noReleaseCharacter = ' '
-
 const lineBreakCharacter = /[\n\r]/
 
 const segmentTag = /^[A-Z0-9]{3}$/
@@ -114,14 +71,10 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
   let elements: Element[] = []
   let components: string[] = []
   let value = ''
-  let released = false
+  let releasing = false
 
-  const serviceCharacters = new Set([
-    delimiters.component,
-    delimiters.element,
-    delimiters.release,
-    delimiters.segment,
-  ])
+  const released = new Set(serviceCharacters(delimiters))
+  const releaseCharacter = hasReleaseCharacter(delimiters) ? delimiters.release : undefined
 
   const currentPosition = () => {
     const position = positionOf(segments.length)
@@ -134,16 +87,15 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
   for (const character of text) {
     offset += character.length
 
-    if (released) {
-      // Serialize releases exactly the service characters, so any other released character could not round-trip.
-      if (!serviceCharacters.has(character)) {
+    if (releasing) {
+      if (!released.has(character)) {
         throw new ParseError('unneeded-release-character', currentPosition())
       }
 
       value += character
-      released = false
-    } else if (character === delimiters.release && character !== noReleaseCharacter) {
-      released = true
+      releasing = false
+    } else if (character === releaseCharacter) {
+      releasing = true
     } else if (character === delimiters.component) {
       components.push(value)
       value = ''
@@ -177,7 +129,7 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
     }
   }
 
-  if (released || elements.length > 0 || components.length > 0 || value.trim() !== '') {
+  if (releasing || elements.length > 0 || components.length > 0 || value.trim() !== '') {
     if (segments.at(-1)?.tag === 'UNZ') {
       throw new ParseError('text-after-interchange-trailer', positionOf(segments.length))
     }
@@ -192,17 +144,14 @@ const readDelimiters = (advice: string): Delimiters => {
   const [component = '', element = '', decimal = '', release = '', repetition = '', segment = ''] =
     advice.slice(serviceStringAdviceTag.length)
 
-  const separators = [component, element, segment]
-
-  if (release !== noReleaseCharacter) {
-    separators.push(release)
-  }
+  const delimiters = { component, element, decimal, release, repetition, segment }
+  const separators = serviceCharacters(delimiters)
 
   if (advice.length < serviceStringAdviceLength || new Set(separators).size < separators.length) {
     throw new ParseError('invalid-service-string-advice', segmentPosition(0))
   }
 
-  return { component, element, decimal, release, repetition, segment }
+  return delimiters
 }
 
 const interchangeControlReferenceElement = 5

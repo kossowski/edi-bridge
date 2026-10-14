@@ -1,18 +1,16 @@
-import type { Delimiters, Interchange, Segment } from './parse'
+import { hasReleaseCharacter, serviceCharacters } from './delimiters'
 
-const noReleaseCharacter = ' '
+import type { Delimiters, Interchange, Segment } from './model'
 
 const releaseServiceCharacters = (value: string, delimiters: Delimiters) => {
-  const { component, element, release, segment } = delimiters
-
-  if (release === noReleaseCharacter) {
+  if (!hasReleaseCharacter(delimiters)) {
     return value
   }
 
-  const serviceCharacters = new Set([component, element, release, segment])
+  const released = new Set(serviceCharacters(delimiters))
 
   return [...value]
-    .map((character) => (serviceCharacters.has(character) ? release + character : character))
+    .map((character) => (released.has(character) ? delimiters.release + character : character))
     .join('')
 }
 
