@@ -190,7 +190,7 @@ export const InProgress = meta.story({
 })
 
 export const RunningDialogStaysOpen = meta.story({
-  beforeEach: aiDraft('proposing', { stepDelayMs: 400 }),
+  beforeEach: aiDraft('proposing', { stepDelayMs: 150 }),
   async play({ canvas, canvasElement }) {
     const dialog = await startAiDraft(canvasElement)
 

@@ -23,6 +23,7 @@
     "@edi-bridge/eslint-config": "workspace:*",
     "@edi-bridge/oxlint-config": "workspace:*",
     "@edi-bridge/typescript-config": "workspace:*",
+    "@edi-bridge/vitest-config": "workspace:*",
     "@types/node": "^24",
     "eslint": "^10.12.0",
     "oxlint": "1.87.0",

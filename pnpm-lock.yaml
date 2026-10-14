@@ -218,6 +218,9 @@ importers:
       '@edi-bridge/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
       '@types/node':
         specifier: ^24
         version: 24.19.1
@@ -300,6 +303,9 @@ importers:
       '@edi-bridge/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
       '@playwright/test':
         specifier: ^1.64.0
         version: 1.64.0
@@ -373,6 +379,9 @@ importers:
       '@edi-bridge/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
       '@types/node':
         specifier: ^24
         version: 24.19.1
@@ -410,6 +419,9 @@ importers:
       '@edi-bridge/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)
@@ -495,6 +507,9 @@ importers:
       '@edi-bridge/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)
@@ -594,6 +609,33 @@ importers:
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+
+  packages/vitest-config:
+    devDependencies:
+      '@edi-bridge/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@edi-bridge/oxlint-config':
+        specifier: workspace:*
+        version: link:../oxlint-config
+      '@edi-bridge/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24
+        version: 24.19.1
+      eslint:
+        specifier: ^10.12.0
+        version: 10.12.0(jiti@2.7.0)
+      oxlint:
+        specifier: 1.87.0
+        version: 1.87.0
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.1)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
 packages:
 

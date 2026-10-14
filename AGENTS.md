@@ -18,6 +18,10 @@ Conventional Commits, enforced by commitlint in the `commit-msg` hook. Fix the m
 - A body is required: a short summary of what was done and why.
 - Reference the ticket in a footer as `refs: edi-bridge-issue#<NN>` (the ticket number in `.scratch/<feature>/issues/`).
 
+### Coding standards
+
+Read `CODING_STANDARDS.md` before writing or reviewing code.
+
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
