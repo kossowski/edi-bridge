@@ -44,3 +44,28 @@ export const group = (
   trigger: string,
   entries: StructureEntry[],
 ): GroupEntry => ({ kind: 'group', group, status, maxRepetitions, trigger, entries })
+
+export type Format = `${'a' | 'an' | 'n'}${'' | '..'}${number}`
+
+export interface ElementRef {
+  id: string
+  status: Status
+}
+
+export const element = (id: string, status: Status): ElementRef => ({ id, status })
+
+export interface ElementRefDirectory {
+  [id: string]: ElementRef[]
+}
+
+export interface FormatDirectory {
+  [id: string]: Format
+}
+
+export interface CodeDirectory {
+  [id: string]: string
+}
+
+export interface CodeListDirectory {
+  [id: string]: ReadonlySet<string>
+}
