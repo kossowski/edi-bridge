@@ -2,6 +2,18 @@ import { and, asc, eq, getTableColumns, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
+  applyLookupTableImport,
+  classifyLookupTableImport,
+  type LookupTable,
+  type LookupTableEntry,
+  type LookupTableImportBody,
+  type LookupTableImportPreview,
+  type LookupTableInput,
+  type LookupTableScope,
+  type LookupTableScopeInput,
+  type LookupTableSummary,
+} from '@edi-bridge/contracts'
+import {
   lookupTableEntries,
   lookupTables,
   lookupTableTradingPartnerNameUnique,
@@ -9,24 +21,15 @@ import {
   tradingPartners,
 } from '@edi-bridge/db'
 
-import type {
-  LookupTable,
-  LookupTableEntry,
-  LookupTableInput,
-  LookupTableScope,
-  LookupTableScopeInput,
-  LookupTableSummary,
-} from '@edi-bridge/contracts'
-
 import { Db, type Database, type Transaction } from './db.js'
 import { NotFound, Unprocessable } from './errors.js'
-import { byName, exactlyOne, rejectingDuplicate, rejectingInvalidId } from './rows.js'
+import { byName, rejectingDuplicate, rejectingInvalidId } from './rows.js'
 import { assertTradingPartnerIn } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
 
-const selectRows = (db: Database, where: SQL | undefined) =>
+const selectRows = (db: Database | Transaction, where: SQL | undefined) =>
   db
     .select({
       ...getTableColumns(lookupTables),
@@ -63,7 +66,7 @@ const toSummary = (row: Row): LookupTableSummary => ({
 const inWorkspace = (workspaceId: string, ...conditions: (SQL | undefined)[]) =>
   and(eq(lookupTables.workspaceId, workspaceId), ...conditions)
 
-const selectEntries = (db: Database, lookupTableId: string) =>
+const selectEntries = (db: Database | Transaction, lookupTableId: string) =>
   db
     .select({
       sourceCode: lookupTableEntries.sourceCode,
@@ -82,6 +85,28 @@ export const listLookupTables = Effect.gen(function* () {
   return rows.map(toSummary).toSorted(byName)
 })
 
+const selectLookupTable = async (
+  db: Database | Transaction,
+  workspaceId: string,
+  id: string,
+): Promise<LookupTable | undefined> => {
+  const [row] = await selectRows(db, inWorkspace(workspaceId, eq(lookupTables.id, id)))
+
+  if (!row) {
+    return undefined
+  }
+
+  return {
+    ...toSummary(row),
+    entries: await selectEntries(db, row.id),
+    // Until code meanings are served (#181).
+    codeMeanings: [],
+  }
+}
+
+const foundOrNotFound = (table: LookupTable | undefined) =>
+  table ? Effect.succeed(table) : Effect.fail(new NotFound())
+
 export const loadLookupTable = (id: string) =>
   Effect.gen(function* () {
     yield* rejectingInvalidId(id)
@@ -89,37 +114,53 @@ export const loadLookupTable = (id: string) =>
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const [row] = yield* Effect.promise(() =>
-      selectRows(db, inWorkspace(workspace.id, eq(lookupTables.id, id))),
+    return yield* foundOrNotFound(
+      yield* Effect.promise(() => selectLookupTable(db, workspace.id, id)),
     )
-
-    if (!row) {
-      return yield* new NotFound()
-    }
-
-    const entries = yield* Effect.promise(() => selectEntries(db, row.id))
-
-    return {
-      ...toSummary(row),
-      entries,
-      // Until code meanings are served (#181).
-      codeMeanings: [],
-    } satisfies LookupTable
   })
 
 const tradingPartnerIdOf = (scope: LookupTableScopeInput) =>
   scope.kind === 'tradingPartner' ? scope.tradingPartnerId : null
+
+// Postgres takes at most 65,535 parameters per statement, four per entry.
+const entryInsertChunkSize = 10_000
 
 const insertEntries = async (
   tx: Transaction,
   lookupTableId: string,
   entries: LookupTableEntry[],
 ) => {
-  if (entries.length > 0) {
-    await tx
-      .insert(lookupTableEntries)
-      .values(entries.map((entry, position) => ({ ...entry, lookupTableId, position })))
+  const rows = entries.map((entry, position) => ({ ...entry, lookupTableId, position }))
+
+  for (let start = 0; start < rows.length; start += entryInsertChunkSize) {
+    await tx.insert(lookupTableEntries).values(rows.slice(start, start + entryInsertChunkSize))
   }
+}
+
+const rewriteLookupTable = async (
+  tx: Transaction,
+  workspaceId: string,
+  id: string,
+  set: Partial<typeof lookupTables.$inferInsert>,
+  entriesOf: () => Promise<LookupTableEntry[]>,
+) => {
+  const locked = await tx
+    .update(lookupTables)
+    .set({ ...set, updatedAt: sql`now()` })
+    .where(inWorkspace(workspaceId, eq(lookupTables.id, id)))
+    .returning({ id: lookupTables.id })
+
+  // A DELETE between loadLookupTable and the rewrite leaves no row to write.
+  if (locked.length === 0) {
+    return undefined
+  }
+
+  const entries = await entriesOf()
+
+  await tx.delete(lookupTableEntries).where(eq(lookupTableEntries.lookupTableId, id))
+  await insertEntries(tx, id, entries)
+
+  return selectLookupTable(tx, workspaceId, id)
 }
 
 const nameUniqueConstraints = [lookupTableWorkspaceNameUnique, lookupTableTradingPartnerNameUnique]
@@ -144,26 +185,24 @@ export const createLookupTable = ({ name, kind, scope, entries }: LookupTableInp
     const workspace = yield* CurrentWorkspace
     const tradingPartnerId = tradingPartnerIdOf(scope)
 
-    const rows = yield* writeInTransaction(async (tx) => {
+    const created = yield* writeInTransaction(async (tx) => {
       await assertTradingPartnerIn(tx, workspace.id, tradingPartnerId)
 
-      const created = await tx
+      const [row] = await tx
         .insert(lookupTables)
         .values({ workspaceId: workspace.id, tradingPartnerId, name, kind })
         .returning({ id: lookupTables.id })
 
-      const [row] = created
-
-      if (row) {
-        await insertEntries(tx, row.id, entries)
+      if (!row) {
+        return undefined
       }
 
-      return created
+      await insertEntries(tx, row.id, entries)
+
+      return selectLookupTable(tx, workspace.id, row.id)
     })
 
-    const { id } = yield* exactlyOne(rows)
-
-    return yield* loadLookupTable(id).pipe(Effect.orDie)
+    return yield* Effect.orDie(Effect.fromNullishOr(created))
   })
 
 export const updateLookupTable = (
@@ -177,29 +216,15 @@ export const updateLookupTable = (
     const workspace = yield* CurrentWorkspace
     const tradingPartnerId = tradingPartnerIdOf(scope)
 
-    const updated = yield* writeInTransaction(async (tx) => {
+    const rewritten = yield* writeInTransaction(async (tx) => {
       await assertTradingPartnerIn(tx, workspace.id, tradingPartnerId)
 
-      const rows = await tx
-        .update(lookupTables)
-        .set({ tradingPartnerId, name, kind, updatedAt: sql`now()` })
-        .where(inWorkspace(workspace.id, eq(lookupTables.id, id)))
-        .returning({ id: lookupTables.id })
-
-      if (rows.length > 0) {
-        await tx.delete(lookupTableEntries).where(eq(lookupTableEntries.lookupTableId, id))
-        await insertEntries(tx, id, entries)
-      }
-
-      return rows
+      return rewriteLookupTable(tx, workspace.id, id, { tradingPartnerId, name, kind }, () =>
+        Promise.resolve(entries),
+      )
     })
 
-    // A DELETE between loadLookupTable and this transaction leaves no row to update.
-    if (updated.length === 0) {
-      return yield* new NotFound()
-    }
-
-    return yield* loadLookupTable(id).pipe(Effect.orDie)
+    return yield* foundOrNotFound(rewritten)
   })
 
 export const deleteLookupTable = (id: string) =>
@@ -219,4 +244,39 @@ export const deleteLookupTable = (id: string) =>
     if (deleted.length === 0) {
       return yield* new NotFound()
     }
+  })
+
+export const previewLookupTableImport = (
+  id: string,
+  body: Effect.Effect<LookupTableImportBody, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    const { entries } = yield* loadLookupTable(id)
+    const { csv } = yield* body
+
+    return { rows: classifyLookupTableImport(entries, csv) } satisfies LookupTableImportPreview
+  })
+
+export const importLookupTable = (
+  id: string,
+  body: Effect.Effect<LookupTableImportBody, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    yield* loadLookupTable(id)
+    const { csv } = yield* body
+
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const rewritten = yield* Effect.promise(() =>
+      db.transaction((tx) =>
+        rewriteLookupTable(tx, workspace.id, id, {}, async () => {
+          const entries = await selectEntries(tx, id)
+
+          return applyLookupTableImport(entries, classifyLookupTableImport(entries, csv))
+        }),
+      ),
+    )
+
+    return yield* foundOrNotFound(rewritten)
   })

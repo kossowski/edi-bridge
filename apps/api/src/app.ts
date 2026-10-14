@@ -10,8 +10,11 @@ import {
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   deleteLookupTableEndpoint,
+  importLookupTableEndpoint,
   lookupTableEndpoint,
+  lookupTableImportPreviewEndpoint,
   lookupTablesEndpoint,
+  maxLookupTableCsvLength,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -27,8 +30,10 @@ import { type Database, Db } from './db.js'
 import {
   createLookupTable,
   deleteLookupTable,
+  importLookupTable,
   listLookupTables,
   loadLookupTable,
+  previewLookupTableImport,
   updateLookupTable,
 } from './lookup-table.js'
 import { parse, type ValidationError } from './parse.js'
@@ -70,6 +75,9 @@ const statusOf: Record<Failure['_tag'], number> = {
   Conflict: 409,
   Unprocessable: 422,
 }
+
+// JSON escapes a control character in six bytes, the worst case for a CSV of the maximum length.
+const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 
 type CheckStatus = 'down' | 'up'
 
@@ -212,6 +220,31 @@ export function buildApp({
 
   app.delete<{ Params: { id: string } }>(deleteLookupTableEndpoint.path, (request, reply) =>
     respond(request, reply, deleteLookupTable(request.params.id), 204),
+  )
+
+  app.post<{ Params: { id: string } }>(
+    lookupTableImportPreviewEndpoint.path,
+    { bodyLimit: lookupTableImportBodyLimit },
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        previewLookupTableImport(
+          request.params.id,
+          parse(lookupTableImportPreviewEndpoint.body, request.body),
+        ),
+      ),
+  )
+
+  app.post<{ Params: { id: string } }>(
+    importLookupTableEndpoint.path,
+    { bodyLimit: lookupTableImportBodyLimit },
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        importLookupTable(request.params.id, parse(importLookupTableEndpoint.body, request.body)),
+      ),
   )
 
   return app
