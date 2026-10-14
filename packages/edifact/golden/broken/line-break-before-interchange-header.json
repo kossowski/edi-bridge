@@ -1,4 +1,1 @@
-{
-  "code": "inconsistent-line-breaks",
-  "position": { "segment": 1 }
-}
+{ "code": "invalid-segment-tag", "position": { "segment": 1 } }

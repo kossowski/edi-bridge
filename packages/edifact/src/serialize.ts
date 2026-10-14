@@ -39,17 +39,20 @@ export const serialize = ({
   header,
   messages,
   trailer,
-  layout,
+  whitespace,
 }: Interchange): string => {
   const segments = [
     header,
     ...messages.flatMap((message) => [message.header, ...message.segments, message.trailer]),
     trailer,
-  ].map((segment) => serializeSegment(segment, delimiters))
+  ].map(
+    (segment, index) =>
+      (whitespace.lineBreaks[index] ?? '') + serializeSegment(segment, delimiters),
+  )
 
   return (
-    [...(hasServiceStringAdvice ? [serviceStringAdvice(delimiters)] : []), ...segments].join(
-      layout.lineBreak,
-    ) + layout.trailingText
+    (hasServiceStringAdvice ? serviceStringAdvice(delimiters) : '') +
+    segments.join('') +
+    whitespace.trailingText
   )
 }

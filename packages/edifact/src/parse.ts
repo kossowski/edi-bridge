@@ -1,10 +1,9 @@
 import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
 
-import type { Delimiters, Element, Interchange, Message, Segment } from './model'
+import type { Delimiters, Element, Interchange, LineBreak, Message, Segment } from './model'
 
 export type ParseErrorCode =
   | 'control-reference-mismatch'
-  | 'inconsistent-line-breaks'
   | 'invalid-segment-tag'
   | 'invalid-service-string-advice'
   | 'message-count-mismatch'
@@ -44,8 +43,6 @@ export class ParseError extends Error {
   }
 }
 
-const lineBreakCharacter = /[\n\r]/
-
 const segmentTag = /^[A-Z0-9]{3}$/
 
 const serviceStringAdviceTag = 'UNA'
@@ -58,14 +55,31 @@ type PositionOf = (index: number) => Position
 
 interface Tokens {
   segments: Segment[]
-  lineBreaksBefore: string[]
+  lineBreaks: LineBreak[]
   trailingText: string
 }
 
-const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf): Tokens => {
+const continueLineBreak = (lineBreak: LineBreak, character: string): LineBreak | undefined => {
+  if (character === '\r' && lineBreak === '') {
+    return '\r'
+  }
+
+  if (character === '\n' && (lineBreak === '' || lineBreak === '\r')) {
+    return `${lineBreak}\n`
+  }
+
+  return undefined
+}
+
+const tokenize = (
+  text: string,
+  delimiters: Delimiters,
+  positionOf: PositionOf,
+  lineBreakBeforeFirstSegment: boolean,
+): Tokens => {
   const segments: Segment[] = []
-  const lineBreaksBefore: string[] = []
-  let lineBreak = ''
+  const lineBreaks: LineBreak[] = []
+  let lineBreak: LineBreak = ''
   let offset = 0
   let trailingFrom = 0
   let elements: Element[] = []
@@ -112,17 +126,25 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
       }
 
       segments.push({ tag, elements: rest })
-      lineBreaksBefore.push(lineBreak)
+      lineBreaks.push(lineBreak)
       lineBreak = ''
       trailingFrom = offset
       elements = []
       components = []
       value = ''
     } else {
-      const atSegmentStart = elements.length === 0 && components.length === 0 && value === ''
+      const atGap =
+        (segments.length > 0 || lineBreakBeforeFirstSegment) &&
+        elements.length === 0 &&
+        components.length === 0 &&
+        value === ''
 
-      if (atSegmentStart && lineBreakCharacter.test(character)) {
-        lineBreak += character
+      const longerLineBreak: LineBreak | undefined = atGap
+        ? continueLineBreak(lineBreak, character)
+        : undefined
+
+      if (longerLineBreak !== undefined) {
+        lineBreak = longerLineBreak
       } else {
         value += character
       }
@@ -137,7 +159,7 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
     throw new ParseError('unterminated-segment', currentPosition())
   }
 
-  return { segments, lineBreaksBefore, trailingText: text.slice(trailingFrom) }
+  return { segments, lineBreaks, trailingText: text.slice(trailingFrom) }
 }
 
 const readDelimiters = (advice: string): Delimiters => {
@@ -207,10 +229,11 @@ export const parse = (text: string): Interchange => {
   const segmentsBefore = hasServiceStringAdvice ? 1 : 0
   const position = (index: number) => segmentPosition(segmentsBefore + index)
 
-  const { segments, lineBreaksBefore, trailingText } = tokenize(
+  const { segments, lineBreaks, trailingText } = tokenize(
     hasServiceStringAdvice ? text.slice(serviceStringAdviceLength) : text,
     delimiters,
     position,
+    hasServiceStringAdvice,
   )
 
   const header = segments[0]
@@ -263,24 +286,13 @@ export const parse = (text: string): Interchange => {
         controlReference: controlValue(header, interchangeControlReferenceElement),
       })
 
-      const lineBreak = lineBreaksBefore[1] ?? ''
-      const lineBreakBeforeHeader = hasServiceStringAdvice ? lineBreak : ''
-
-      const inconsistent = lineBreaksBefore.findIndex(
-        (before, beforeIndex) => before !== (beforeIndex === 0 ? lineBreakBeforeHeader : lineBreak),
-      )
-
-      if (inconsistent !== -1) {
-        throw new ParseError('inconsistent-line-breaks', position(inconsistent))
-      }
-
       return {
         hasServiceStringAdvice,
         delimiters,
         header,
         messages,
         trailer: segment,
-        layout: { lineBreak, trailingText },
+        whitespace: { lineBreaks, trailingText },
       }
     } else {
       throw new ParseError('unexpected-segment', position(index))

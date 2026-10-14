@@ -20,8 +20,11 @@ export interface Message {
   trailer: Segment
 }
 
-export interface Layout {
-  lineBreak: string
+export type LineBreak = '' | '\n' | '\r' | '\r\n'
+
+// lineBreaks holds the break before each segment from UNB to UNZ, so the first one follows the UNA.
+export interface Whitespace {
+  lineBreaks: LineBreak[]
   trailingText: string
 }
 
@@ -31,5 +34,5 @@ export interface Interchange {
   header: Segment
   messages: Message[]
   trailer: Segment
-  layout: Layout
+  whitespace: Whitespace
 }

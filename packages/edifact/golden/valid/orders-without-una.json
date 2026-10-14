@@ -48,5 +48,8 @@
     }
   ],
   "trailer": { "tag": "UNZ", "elements": [["1"], ["88776655"]] },
-  "layout": { "lineBreak": "", "trailingText": "" }
+  "whitespace": {
+    "lineBreaks": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    "trailingText": ""
+  }
 }
