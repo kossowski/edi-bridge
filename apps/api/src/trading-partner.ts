@@ -1,13 +1,13 @@
-import { and, eq } from 'drizzle-orm'
+import { and, DrizzleQueryError, eq } from 'drizzle-orm'
 import { Effect } from 'effect'
+import postgres from 'postgres'
 import { z } from 'zod'
 
+import { glnRequired, type TradingPartner, type TradingPartnerInput } from '@edi-bridge/contracts'
 import { tradingPartners } from '@edi-bridge/db'
 
-import type { TradingPartner, TradingPartnerInput } from '@edi-bridge/contracts'
-
 import { Db } from './db.js'
-import { NotFound } from './errors.js'
+import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { CurrentWorkspace } from './workspace.js'
 
 type Row = typeof tradingPartners.$inferSelect
@@ -38,6 +38,19 @@ export const listTradingPartners = Effect.gen(function* () {
   return rows.map(toTradingPartner).toSorted((a, b) => byName.compare(a.name, b.name))
 })
 
+const glnUnique = 'trading_partners_workspace_id_gln_unique'
+
+const write = <A>(query: () => Promise<A>) =>
+  Effect.promise(query).pipe(
+    Effect.catchDefect((defect) =>
+      defect instanceof DrizzleQueryError &&
+      defect.cause instanceof postgres.PostgresError &&
+      defect.cause.constraint_name === glnUnique
+        ? Effect.fail(new Conflict({ message: 'Another Trading Partner already uses this GLN' }))
+        : Effect.die(defect),
+    ),
+  )
+
 export const loadTradingPartner = (id: string) =>
   Effect.gen(function* () {
     if (!z.uuid().safeParse(id).success) {
@@ -64,7 +77,7 @@ export const createTradingPartner = (input: TradingPartnerInput) =>
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const [row] = yield* Effect.promise(() =>
+    const [row] = yield* write(() =>
       db
         .insert(tradingPartners)
         .values({ ...input, workspaceId: workspace.id })
@@ -76,10 +89,16 @@ export const createTradingPartner = (input: TradingPartnerInput) =>
 
 export const updateTradingPartner = (existing: TradingPartner, input: TradingPartnerInput) =>
   Effect.gen(function* () {
+    if (input.gln === null && glnRequired(existing)) {
+      return yield* new Unprocessable({
+        message: 'The Trading Partner needs its GLN once Interchanges were exchanged',
+      })
+    }
+
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const [row] = yield* Effect.promise(() =>
+    const [row] = yield* write(() =>
       db
         .update(tradingPartners)
         .set(input)

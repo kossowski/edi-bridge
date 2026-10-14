@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { FastifyInstance } from 'fastify'
@@ -230,5 +231,100 @@ describe('a Trading Partner of another Workspace', () => {
     const unchanged = await get(foreign.id, otherApp)
 
     expect(unchanged.json()).toEqual(foreign)
+  })
+})
+
+describe('the GLN of a Trading Partner', () => {
+  const glnConflict = { message: 'Another Trading Partner already uses this GLN' }
+
+  it('is unique within the Workspace on create', async () => {
+    await add(hansemarkt)
+
+    const response = await create({ ...hansemarkt, name: 'Rheinkauf eG' })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual(glnConflict)
+
+    const listed = await list()
+
+    expect(listed.json()).toHaveLength(1)
+  })
+
+  it('is unique within the Workspace on update', async () => {
+    await add(hansemarkt)
+    const other = await add({ ...hansemarkt, name: 'Rheinkauf eG', gln: null })
+
+    const response = await update(other.id, { ...hansemarkt, name: 'Rheinkauf eG' })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual(glnConflict)
+
+    const read = await get(other.id)
+
+    expect(read.json()).toEqual(other)
+  })
+
+  it('stays with the Trading Partner that updates itself', async () => {
+    const created = await add(hansemarkt)
+
+    const response = await update(created.id, { ...hansemarkt, acknowledgementTimeLimitHours: 4 })
+
+    expect(response.statusCode).toBe(200)
+  })
+
+  it('may be used by Trading Partners without a GLN and in another Workspace', async () => {
+    await add({ ...hansemarkt, gln: null })
+    await add(hansemarkt, otherApp)
+
+    const second = await create({ ...hansemarkt, name: 'Rheinkauf eG', gln: null })
+    const own = await create(hansemarkt)
+
+    expect(second.statusCode).toBe(201)
+    expect(own.statusCode).toBe(201)
+  })
+
+  it('stays once Interchanges were exchanged', async () => {
+    const created = await add(hansemarkt)
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ testInterchangeSentAt: new Date('2026-10-06T14:03:00.000Z') })
+      .where(eq(tradingPartners.id, created.id))
+
+    const response = await update(created.id, { ...hansemarkt, gln: null })
+
+    expect(response.statusCode).toBe(422)
+    expect(response.json()).toEqual({
+      message: 'The Trading Partner needs its GLN once Interchanges were exchanged',
+    })
+
+    const read = await get(created.id)
+
+    expect(read.json()).toEqual({
+      ...created,
+      onboarding: { testInterchangeSentAt: '2026-10-06T14:03:00.000Z', contrlReceivedAt: null },
+    })
+  })
+
+  it('stays once the Trading Partner is in production', async () => {
+    const created = await add(hansemarkt)
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ testMode: false })
+      .where(eq(tradingPartners.id, created.id))
+
+    const response = await update(created.id, { ...hansemarkt, gln: null })
+
+    expect(response.statusCode).toBe(422)
+  })
+
+  it('may be removed during Test Mode before the test Interchange', async () => {
+    const created = await add(hansemarkt)
+
+    const response = await update(created.id, { ...hansemarkt, gln: null })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ ...created, gln: null })
   })
 })

@@ -28,7 +28,7 @@ import {
   type WorkspaceResolver,
 } from './workspace.js'
 
-import type { NotFound } from './errors.js'
+import type { Conflict, NotFound, Unprocessable } from './errors.js'
 
 export type Probe = () => Promise<void>
 
@@ -80,16 +80,23 @@ export function buildApp({
   const respond = <A>(
     request: FastifyRequest,
     reply: FastifyReply,
-    effect: Effect.Effect<A, NotFound | ValidationError, CurrentWorkspace | Db>,
+    effect: Effect.Effect<
+      A,
+      Conflict | NotFound | Unprocessable | ValidationError,
+      CurrentWorkspace | Db
+    >,
     status = 200,
   ) =>
     Effect.runPromise(
       effect.pipe(
         Effect.map((body) => reply.code(status).send(body)),
         Effect.catchTags({
+          Conflict: (error) => Effect.sync(() => reply.code(409).send({ message: error.message })),
           NotFound: (error) => Effect.sync(() => reply.code(404).send({ message: error.message })),
           ValidationError: (error) =>
             Effect.sync(() => reply.code(400).send({ message: error.message })),
+          Unprocessable: (error) =>
+            Effect.sync(() => reply.code(422).send({ message: error.message })),
         }),
         Effect.provideService(Db, database),
         Effect.provideService(CurrentWorkspace, { id: resolveWorkspace(request) }),
