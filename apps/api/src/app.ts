@@ -3,10 +3,23 @@ import Fastify from 'fastify'
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
-import { currentWorkspaceEndpoint, updateCompanyIdentityEndpoint } from '@edi-bridge/contracts'
+import {
+  createTradingPartnerEndpoint,
+  currentWorkspaceEndpoint,
+  tradingPartnerEndpoint,
+  tradingPartnersEndpoint,
+  updateCompanyIdentityEndpoint,
+  updateTradingPartnerEndpoint,
+} from '@edi-bridge/contracts'
 
 import { type Database, Db } from './db.js'
 import { parse, type ValidationError } from './parse.js'
+import {
+  createTradingPartner,
+  listTradingPartners,
+  loadTradingPartner,
+  updateTradingPartner,
+} from './trading-partner.js'
 import {
   CurrentWorkspace,
   loadCurrentWorkspace,
@@ -14,6 +27,8 @@ import {
   updateCompanyIdentity,
   type WorkspaceResolver,
 } from './workspace.js'
+
+import type { Conflict, NotFound, Unprocessable } from './errors.js'
 
 export type Probe = () => Promise<void>
 
@@ -23,6 +38,15 @@ export interface AppDependencies {
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
   resolveWorkspace?: WorkspaceResolver
+}
+
+type Failure = Conflict | NotFound | Unprocessable | ValidationError
+
+const statusOf: Record<Failure['_tag'], number> = {
+  ValidationError: 400,
+  NotFound: 404,
+  Conflict: 409,
+  Unprocessable: 422,
 }
 
 type CheckStatus = 'down' | 'up'
@@ -65,13 +89,14 @@ export function buildApp({
   const respond = <A>(
     request: FastifyRequest,
     reply: FastifyReply,
-    effect: Effect.Effect<A, ValidationError, CurrentWorkspace | Db>,
+    effect: Effect.Effect<A, Failure, CurrentWorkspace | Db>,
+    status = 200,
   ) =>
     Effect.runPromise(
       effect.pipe(
-        Effect.map((body) => reply.send(body)),
-        Effect.catchTag('ValidationError', (error) =>
-          Effect.sync(() => reply.code(400).send({ message: error.message })),
+        Effect.map((body) => reply.code(status).send(body)),
+        Effect.catch((error) =>
+          Effect.sync(() => reply.code(statusOf[error._tag]).send({ message: error.message })),
         ),
         Effect.provideService(Db, database),
         Effect.provideService(CurrentWorkspace, { id: resolveWorkspace(request) }),
@@ -89,6 +114,34 @@ export function buildApp({
       Effect.flatMap(
         parse(updateCompanyIdentityEndpoint.body, request.body),
         updateCompanyIdentity,
+      ),
+    ),
+  )
+
+  app.get(tradingPartnersEndpoint.path, (request, reply) =>
+    respond(request, reply, listTradingPartners),
+  )
+
+  app.get<{ Params: { id: string } }>(tradingPartnerEndpoint.path, (request, reply) =>
+    respond(request, reply, loadTradingPartner(request.params.id)),
+  )
+
+  app.post(createTradingPartnerEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(createTradingPartnerEndpoint.body, request.body), createTradingPartner),
+      201,
+    ),
+  )
+
+  app.put<{ Params: { id: string } }>(updateTradingPartnerEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      updateTradingPartner(
+        request.params.id,
+        parse(updateTradingPartnerEndpoint.body, request.body),
       ),
     ),
   )
