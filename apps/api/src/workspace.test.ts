@@ -2,7 +2,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { FastifyInstance } from 'fastify'
 
-import { type CompanyIdentityInput, withCheckDigit } from '@edi-bridge/contracts'
+import {
+  type CompanyIdentityInput,
+  currentWorkspaceEndpoint,
+  updateCompanyIdentityEndpoint,
+  withCheckDigit,
+} from '@edi-bridge/contracts'
 import { connect, type Connection } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
@@ -38,8 +43,10 @@ afterAll(async () => {
   await testDatabase.stop()
 })
 
+const getCurrentWorkspace = () => app.inject({ method: 'GET', url: currentWorkspaceEndpoint.path })
+
 const updateIdentity = (body: Partial<CompanyIdentityInput>) =>
-  app.inject({ method: 'PUT', url: '/workspaces/current/identity', body })
+  app.inject({ method: 'PUT', url: updateCompanyIdentityEndpoint.path, body })
 
 beforeEach(async () => {
   await updateIdentity({ gln: developmentWorkspace.gln })
@@ -47,7 +54,7 @@ beforeEach(async () => {
 
 describe('GET /workspaces/current', () => {
   it('returns the fixed development Workspace', async () => {
-    const response = await app.inject({ method: 'GET', url: '/workspaces/current' })
+    const response = await getCurrentWorkspace()
 
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual(developmentWorkspace)
@@ -61,7 +68,7 @@ describe('PUT /workspaces/current/identity', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ ...developmentWorkspace, gln: otherGln })
 
-    const current = await app.inject({ method: 'GET', url: '/workspaces/current' })
+    const current = await getCurrentWorkspace()
 
     expect(current.json()).toEqual({ ...developmentWorkspace, gln: otherGln })
   })
@@ -76,7 +83,7 @@ describe('PUT /workspaces/current/identity', () => {
     expect(response.statusCode).toBe(400)
     expect(response.json()).toHaveProperty('message')
 
-    const current = await app.inject({ method: 'GET', url: '/workspaces/current' })
+    const current = await getCurrentWorkspace()
 
     expect(current.json()).toEqual(developmentWorkspace)
   })
@@ -88,7 +95,7 @@ describe('seedDevelopmentWorkspace', () => {
 
     await seedDevelopmentWorkspace(connection.db)
 
-    const current = await app.inject({ method: 'GET', url: '/workspaces/current' })
+    const current = await getCurrentWorkspace()
 
     expect(current.json()).toEqual({ ...developmentWorkspace, gln: otherGln })
   })
