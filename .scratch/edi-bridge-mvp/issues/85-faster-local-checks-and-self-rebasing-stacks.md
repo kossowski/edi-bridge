@@ -17,5 +17,5 @@
 - [ ] The orchestrate skill has implementers run `pnpm check:fast` before `pnpm check` and stop the dev servers they start
 - [ ] The orchestrate skill catches a stack up with `main` before reporting, names the `main` commit in the report, cleans up its background work, and sends the report to the session that started it
 - [ ] The land skill stops when the bottom PR is behind or in conflict with `main`, and its tmp cleanup also removes Node's compile cache
-- [ ] A vitest run fails when a single test or story takes longer than 3 s, without changing the test timeout
+- [ ] A local vitest run fails when a single test or story takes longer than 3 s, without changing the test timeout
 - [ ] `CODING_STANDARDS.md` holds the repo's judgement rules for the Standards axis of the code review

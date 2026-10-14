@@ -22,7 +22,7 @@ Judgement rules for writing and reviewing code in this repo. Lint, type check an
 
 ## Tests and stories
 
-- **The first assertion waits for the data it depends on**, with `findBy…` or `waitFor`, never a fixed sleep. Each test and story stays well under the 5 s timeout; a vitest run fails above 3 s. Why: tests near the timeout flake under load.
+- **The first assertion waits for the data it depends on**, with `findBy…` or `waitFor`, never a fixed sleep. Each test and story stays well under its timeout (5 s for unit tests, 15 s for stories); a local vitest run fails above 3 s. Why: tests near the timeout flake under load.
 - **MSW mocks serve the real API URLs** from the contracts, and cover the empty, loading, error and large-volume states in English and German. Why: a story shows what the app does against the real API, in every state a user can meet.
 
 ## Tickets and texts

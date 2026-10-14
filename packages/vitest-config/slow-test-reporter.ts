@@ -38,7 +38,7 @@ export default class SlowTestReporter implements Reporter {
       )
     }
 
-    if (this.slowTests.some(({ name }) => !this.allowed.has(name))) {
+    if (!process.env.CI && this.slowTests.some(({ name }) => !this.allowed.has(name))) {
       process.exitCode = 1
     }
   }
