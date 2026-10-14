@@ -61,3 +61,11 @@ export interface ElementDirectory {
 export interface FormatDirectory {
   [id: string]: Format
 }
+
+export interface CodeDirectory {
+  [id: string]: string
+}
+
+export interface CodeListDirectory {
+  [id: string]: ReadonlySet<string>
+}

@@ -61,19 +61,41 @@ One CCG value differs from UN D.96A: segment group 25 (LIN) is `C 20000` in UN D
 
 A numeric (`n`) value holds digits, an optional leading minus sign and at most one decimal mark of the Interchange, with a digit on each side. Its length counts the digits only.
 
+### Code lists
+
+`src/definitions/code-lists.ts` holds a code list for each coded data element that the segment pages link to a UN D.96A code list, such as [1225](https://www.stylusstudio.com/edifact/D96A/1225.htm), and for 0081 from the [syntax directory](https://www.stylusstudio.com/edifact/40100/0081.htm). Codes marked for deletion stay in the list, because D.96A still allows them. Data elements without a linked code list, such as 6345 (currency), 3207 (country) and 6411 (unit of measure), take any value of their format.
+
+EANCOM adds codes to some UN code lists. The table lists each added code that a public GS1 source uses in an ORDERS message. The CCG source is section 8 of the CCG recommendation for EANCOM 1997 ORDERS linked above. Known gap: EANCOM also restricts the UN code lists, and the full restrictions are only in the licensed EANCOM manual. Validation therefore accepts every UN D.96A code.
+
+| Data element | Added codes       | Source                                                                                     |
+| ------------ | ----------------- | ------------------------------------------------------------------------------------------ |
+| 1001         | `22E` `23B` `50E` | CCG, printed page 160                                                                      |
+| 1131         | `SKB`             | CCG, printed page 160                                                                      |
+| 1153         | `API`             | CCG, printed page 160                                                                      |
+| 3035         | `DGB`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4 |
+| 3055         | `246`             | CCG, printed page 161                                                                      |
+| 4183         | `X5`              | CCG, printed page 162                                                                      |
+| 5387         | `LIU`             | CCG, printed page 162                                                                      |
+| 6313         | `LAY` `ULY`       | CCG, printed page 162                                                                      |
+| 7073         | `LAB`             | CCG, printed page 163                                                                      |
+| 7081         | `SGR`             | CCG, printed page 163                                                                      |
+| 7143         | `EWC`             | CCG, printed page 163                                                                      |
+| 7143         | `SRV`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4 |
+
 ## Invalid Interchanges
 
 Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS golden file with one change. A change to the segment structure breaks a limit from the CCG table in [ORDERS definition](#orders-definition): BGM `M 1`, header DTM `M 35` before segment group 2, segment group 7 `C 5` or UNS `M 1`. A change to an element breaks a rule from [Segment definitions](#segment-definitions).
 
-| Golden file                                        | Base                                | Change                                                                                    |
-| -------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------- |
-| `orders-without-beginning-of-message.edi`          | `orders-without-una.edi`            | BGM removed, UNT `13`.                                                                    |
-| `orders-with-repeated-beginning-of-message.edi`    | `orders-without-una.edi`            | BGM repeated, UNT `15`.                                                                   |
-| `orders-with-too-many-currency-groups.edi`         | `orders-without-una.edi`            | Six `CUX+2:SEK:9` after the last NAD; segment group 7 allows five. UNT `20`.              |
-| `orders-without-section-control.edi`               | `orders-without-una.edi`            | UNS removed, UNT `13`.                                                                    |
-| `orders-of-unsupported-directory.edi`              | `orders-without-una.edi`            | UNH identifies `ORDERS:D:01B:UN:EAN010`.                                                  |
-| `orders-with-misplaced-date-in-second-message.edi` | `orders-with-multiple-messages.edi` | Message 2: `DTM+2:20221201:102` after the last NAD, UNT `11`.                             |
-| `orders-with-too-long-order-number.edi`            | `orders-without-una.edi`            | BGM order number with 36 characters; data element 1004 allows `an..35`.                   |
-| `orders-without-party-qualifier.edi`               | `orders-without-una.edi`            | First NAD without its party qualifier: `NAD++7300015200000::9`. Data element 3035 is `M`. |
-| `orders-without-ordered-quantity.edi`              | `orders-without-una.edi`            | QTY without its quantity: `QTY+21::GRM`. Data element 6060 is `M` in composite C186.      |
-| `orders-with-unit-in-quantity.edi`                 | `orders-without-una.edi`            | QTY with a unit in its quantity: `QTY+21:2000kg:GRM`. Data element 6060 is `n..15`.       |
+| Golden file                                        | Base                                | Change                                                                                                     |
+| -------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `orders-without-beginning-of-message.edi`          | `orders-without-una.edi`            | BGM removed, UNT `13`.                                                                                     |
+| `orders-with-repeated-beginning-of-message.edi`    | `orders-without-una.edi`            | BGM repeated, UNT `15`.                                                                                    |
+| `orders-with-too-many-currency-groups.edi`         | `orders-without-una.edi`            | Six `CUX+2:SEK:9` after the last NAD; segment group 7 allows five. UNT `20`.                               |
+| `orders-without-section-control.edi`               | `orders-without-una.edi`            | UNS removed, UNT `13`.                                                                                     |
+| `orders-of-unsupported-directory.edi`              | `orders-without-una.edi`            | UNH identifies `ORDERS:D:01B:UN:EAN010`.                                                                   |
+| `orders-with-misplaced-date-in-second-message.edi` | `orders-with-multiple-messages.edi` | Message 2: `DTM+2:20221201:102` after the last NAD, UNT `11`.                                              |
+| `orders-with-too-long-order-number.edi`            | `orders-without-una.edi`            | BGM order number with 36 characters; data element 1004 allows `an..35`.                                    |
+| `orders-without-party-qualifier.edi`               | `orders-without-una.edi`            | First NAD without its party qualifier: `NAD++7300015200000::9`. Data element 3035 is `M`.                  |
+| `orders-without-ordered-quantity.edi`              | `orders-without-una.edi`            | QTY without its quantity: `QTY+21::GRM`. Data element 6060 is `M` in composite C186.                       |
+| `orders-with-unit-in-quantity.edi`                 | `orders-without-una.edi`            | QTY with a unit in its quantity: `QTY+21:2000kg:GRM`. Data element 6060 is `n..15`.                        |
+| `orders-with-unknown-date-format.edi`              | `orders-without-una.edi`            | First DTM with date format `104`: `DTM+137:20221125:104`. The code list of data element 2379 has no `104`. |

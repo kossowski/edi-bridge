@@ -1,3 +1,4 @@
+import { codeLists } from './definitions/code-lists'
 import { compositeDirectory } from './definitions/composites'
 import { dataElementFormats } from './definitions/data-elements'
 import { orders } from './definitions/orders'
@@ -18,6 +19,7 @@ export type ValidationErrorCode =
   | 'too-long-element'
   | 'too-many-repetitions'
   | 'unexpected-segment'
+  | 'unknown-code'
   | 'unsupported-message-type'
   | 'wrong-format'
 
@@ -72,6 +74,10 @@ const checkValue = (id: string, value: string, position: Position, delimiters: D
 
   if (length > Number(maxLength)) {
     throw new ValidationError('too-long-element', position)
+  }
+
+  if (codeLists[id]?.has(value) === false) {
+    throw new ValidationError('unknown-code', position)
   }
 }
 
