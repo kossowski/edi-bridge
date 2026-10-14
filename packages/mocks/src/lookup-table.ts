@@ -1,6 +1,8 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  applyImport,
+  classifyImport,
   createLookupTableEndpoint,
   deleteLookupTableEndpoint,
   directionOf,
@@ -32,7 +34,6 @@ import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } f
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
 import { lookupTableFailureOf } from './interchange'
 import { codeMeaningsOf, firstValuesOf, hintFor } from './lookup-table-codes'
-import { applyImport, classifyImport } from './lookup-table-import'
 import {
   type LookupTableRecord,
   type LookupTableStore,

@@ -3,7 +3,7 @@ import {
   type LookupTableImportReason,
   type LookupTableImportRow,
   maxLookupCodeLength,
-} from '@edi-bridge/contracts'
+} from './lookup-table'
 
 const delimiters = [';', ',', '\t'] as const
 

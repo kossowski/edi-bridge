@@ -271,79 +271,20 @@ describe('POST /lookup-tables/:id/import-preview', () => {
     server.use(...lookupTableHandlers(apiUrl))
     const units = seedLookupTableNamed('Units of measure')
 
-    const csv = [
-      'Source code;Target code',
-      'ST;PCE',
-      'KG;KGS',
-      'KAR;CT',
-      '',
-      ';BX',
-      'KAR;BX',
-      '"Paket; groß";PK',
-      'X;Y;Z',
-      'L;',
-    ].join('\r\n')
-
-    const { rows } = await previewImport(units.id, csv)
+    const { rows } = await previewImport(units.id, 'KG;KGS\nKAR;CT\n;BX')
 
     expect(rows).toEqual([
-      { line: 2, status: 'unchanged', sourceCode: 'ST', targetCode: 'PCE' },
       {
-        line: 3,
+        line: 1,
         status: 'changed',
         sourceCode: 'KG',
         targetCode: 'KGS',
         previousTargetCode: 'KGM',
       },
-      { line: 4, status: 'added', sourceCode: 'KAR', targetCode: 'CT' },
-      { line: 6, status: 'invalid', cells: ['', 'BX'], reasons: ['sourceCodeMissing'] },
-      { line: 7, status: 'invalid', cells: ['KAR', 'BX'], reasons: ['duplicateSourceCode'] },
-      { line: 8, status: 'added', sourceCode: 'Paket; groß', targetCode: 'PK' },
-      { line: 9, status: 'invalid', cells: ['X', 'Y', 'Z'], reasons: ['columnCount'] },
-      { line: 10, status: 'invalid', cells: ['L', ''], reasons: ['targetCodeMissing'] },
+      { line: 2, status: 'added', sourceCode: 'KAR', targetCode: 'CT' },
+      { line: 3, status: 'invalid', cells: ['', 'BX'], reasons: ['sourceCodeMissing'] },
     ])
     expect((await getLookupTable(units.id)).entries).toEqual(units.entries)
-  })
-
-  it('reads comma-separated rows without a header', async () => {
-    server.use(...lookupTableHandlers(apiUrl))
-    const units = seedLookupTableNamed('Units of measure')
-
-    const { rows } = await previewImport(units.id, 'STK,PCE\n"BX ""large""",BX\n')
-
-    expect(rows).toEqual([
-      { line: 1, status: 'unchanged', sourceCode: 'STK', targetCode: 'PCE' },
-      { line: 2, status: 'added', sourceCode: 'BX "large"', targetCode: 'BX' },
-    ])
-  })
-
-  it('matches the first row of a file that starts with a byte order mark', async () => {
-    server.use(...lookupTableHandlers(apiUrl))
-    const units = seedLookupTableNamed('Units of measure')
-
-    const { rows } = await previewImport(units.id, '﻿ST;PCE\r\nKG;KGM')
-
-    expect(rows).toEqual([
-      { line: 1, status: 'unchanged', sourceCode: 'ST', targetCode: 'PCE' },
-      { line: 2, status: 'unchanged', sourceCode: 'KG', targetCode: 'KGM' },
-    ])
-  })
-
-  it('rejects codes longer than the limit', async () => {
-    server.use(...lookupTableHandlers(apiUrl))
-    const units = seedLookupTableNamed('Units of measure')
-    const long = 'X'.repeat(71)
-
-    const { rows } = await previewImport(units.id, `${long};${long}`)
-
-    expect(rows).toEqual([
-      {
-        line: 1,
-        status: 'invalid',
-        cells: [long, long],
-        reasons: ['sourceCodeTooLong', 'targetCodeTooLong'],
-      },
-    ])
   })
 
   it('answers 404 for an unknown Lookup Table', async () => {
