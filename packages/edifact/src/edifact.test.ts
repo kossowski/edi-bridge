@@ -7,6 +7,8 @@ import {
   type Interchange,
   parse,
   ParseError,
+  readAcknowledgedInterchange,
+  ReadAcknowledgementError,
   serialize,
   SerializeError,
   validate,
@@ -193,5 +195,78 @@ describe('serialize without a release character', () => {
         position: { segment: 4, element: 4, component: 2 },
       }),
     )
+  })
+})
+
+describe('readAcknowledgedInterchange', () => {
+  const contrlMessage = (segments: string, identifier = 'CONTRL:D:3:UN:EAN002') => {
+    const [message] = parse(
+      `UNB+UNOC:3+5412345000013:14+4012345000016:14+261015:0800+ACK1'UNH+1+${identifier}'${segments}UNT+${segments.split("'").length + 1}+1'UNZ+1+ACK1'`,
+    ).messages
+
+    if (message === undefined) {
+      throw new Error('The Interchange has no Message')
+    }
+
+    return message
+  }
+
+  it('reads the acknowledged Interchange and the accepted action', () => {
+    expect(
+      readAcknowledgedInterchange(contrlMessage("UCI+CTL1+4012345000016:14+5412345000013:14+7'")),
+    ).toEqual({
+      controlReference: 'CTL1',
+      sender: { identification: '4012345000016', qualifier: '14' },
+      recipient: { identification: '5412345000013', qualifier: '14' },
+      action: 'accepted',
+    })
+  })
+
+  it.each([
+    ['4', 'rejected'],
+    ['7', 'accepted'],
+    ['8', 'received'],
+  ])('reads the action code %s as %s', (code, action) => {
+    expect(
+      readAcknowledgedInterchange(
+        contrlMessage(`UCI+CTL1+4012345000016:14+5412345000013:14+${code}'`),
+      ),
+    ).toMatchObject({ action })
+  })
+
+  it.each([
+    [
+      'unsupported-message-type',
+      'an ORDERS Message',
+      contrlMessage("BGM+220+PO1+9'", 'ORDERS:D:96A:UN:EAN008'),
+    ],
+    [
+      'unsupported-message-type',
+      'a CONTRL of syntax version 4',
+      contrlMessage("UCI+CTL1+4012345000016:14+5412345000013:14+7'", 'CONTRL:4:1:UN'),
+    ],
+    ['missing-interchange-response', 'a CONTRL without UCI', contrlMessage('')],
+    [
+      'missing-element',
+      'a UCI without control reference',
+      contrlMessage("UCI++4012345000016:14+5412345000013:14+7'"),
+    ],
+    ['missing-element', 'a UCI without sender', contrlMessage("UCI+CTL1++5412345000013:14+7'")],
+    ['missing-element', 'a UCI without recipient', contrlMessage("UCI+CTL1+4012345000016:14++7'")],
+    [
+      'missing-element',
+      'a UCI without action',
+      contrlMessage("UCI+CTL1+4012345000016:14+5412345000013:14'"),
+    ],
+    [
+      'unknown-code',
+      'a UCI with an action outside syntax version 3',
+      contrlMessage("UCI+CTL1+4012345000016:14+5412345000013:14+6'"),
+    ],
+  ])('reports %s for %s', (code, _case, message) => {
+    const error = thrownBy(() => readAcknowledgedInterchange(message))
+
+    expect(error).toBeInstanceOf(ReadAcknowledgementError)
+    expect(error).toMatchObject({ code })
   })
 })
