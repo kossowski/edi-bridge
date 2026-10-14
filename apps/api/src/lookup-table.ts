@@ -26,7 +26,13 @@ import {
 
 import { Db, type Database, type Transaction } from './db.js'
 import { NotFound, Unprocessable } from './errors.js'
-import { byName, inWorkspace, rejectingDuplicate, rejectingInvalidId } from './rows.js'
+import {
+  byName,
+  foundOrNotFound,
+  inWorkspace,
+  rejectingDuplicate,
+  rejectingInvalidId,
+} from './rows.js'
 import { assertTradingPartnerIn, rejectingUnknownTradingPartner } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
@@ -106,9 +112,6 @@ const selectLookupTable = async (
     codeMeanings: [],
   }
 }
-
-const foundOrNotFound = (table: LookupTable | undefined) =>
-  table ? Effect.succeed(table) : Effect.fail(new NotFound())
 
 export const loadLookupTable = (id: string) =>
   Effect.gen(function* () {

@@ -7,6 +7,9 @@ import { Conflict, NotFound } from './errors.js'
 
 export const exactlyOne = <A>(rows: A[]) => Effect.orDie(Effect.fromNullishOr(rows[0]))
 
+export const foundOrNotFound = <A>(row: A | undefined) =>
+  row === undefined ? Effect.fail(new NotFound()) : Effect.succeed(row)
+
 export const rejectingInvalidId = (id: string) =>
   z.uuid().safeParse(id).success ? Effect.void : Effect.fail(new NotFound())
 

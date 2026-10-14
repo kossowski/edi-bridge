@@ -20,8 +20,8 @@ import {
 import { documentStructures } from '@edi-bridge/db'
 
 import { Db } from './db.js'
-import { DocumentStructureRejected, NotFound } from './errors.js'
-import { byName, exactlyOne, inWorkspace, rejectingInvalidId } from './rows.js'
+import { DocumentStructureRejected } from './errors.js'
+import { byName, exactlyOne, foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
@@ -112,7 +112,7 @@ export const loadDocumentStructure = (id: string) =>
         .where(inWorkspace(documentStructures, workspace.id, eq(documentStructures.id, id))),
     )
 
-    return row ? toDocumentStructure(row) : yield* new NotFound()
+    return toDocumentStructure(yield* foundOrNotFound(row))
   })
 
 export const createDocumentStructure = ({
@@ -161,5 +161,5 @@ export const updateDocumentStructure = (
         .returning(),
     )
 
-    return row ? toDocumentStructure(row) : yield* new NotFound()
+    return toDocumentStructure(yield* foundOrNotFound(row))
   })
