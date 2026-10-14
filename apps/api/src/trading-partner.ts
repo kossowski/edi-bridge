@@ -1,4 +1,4 @@
-import { and, eq, isNull, type SQL } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
@@ -12,7 +12,7 @@ import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { NotFound, Unprocessable } from './errors.js'
-import { byName, exactlyOne, rejectingDuplicate, rejectingInvalidId } from './rows.js'
+import { byName, exactlyOne, inWorkspace, rejectingDuplicate, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
@@ -32,9 +32,6 @@ const toTradingPartner = (row: Row): TradingPartner => ({
   },
 })
 
-const inWorkspace = (workspaceId: string, ...conditions: (SQL | undefined)[]) =>
-  and(eq(tradingPartners.workspaceId, workspaceId), ...conditions)
-
 const byId = (id: string) => eq(tradingPartners.id, id)
 
 // glnRequired negated in SQL, so the update checks it atomically
@@ -48,7 +45,7 @@ export const listTradingPartners = Effect.gen(function* () {
   const workspace = yield* CurrentWorkspace
 
   const rows = yield* Effect.promise(() =>
-    db.select().from(tradingPartners).where(inWorkspace(workspace.id)),
+    db.select().from(tradingPartners).where(inWorkspace(tradingPartners, workspace.id)),
   )
 
   return rows.map(toTradingPartner).toSorted(byName)
@@ -77,7 +74,7 @@ export const loadTradingPartner = (id: string) =>
       db
         .select()
         .from(tradingPartners)
-        .where(inWorkspace(workspace.id, byId(id))),
+        .where(inWorkspace(tradingPartners, workspace.id, byId(id))),
     )
 
     const row = rows[0]
@@ -93,7 +90,7 @@ const selectTradingPartnerId = (
   db
     .select({ id: tradingPartners.id })
     .from(tradingPartners)
-    .where(inWorkspace(workspaceId, byId(tradingPartnerId)))
+    .where(inWorkspace(tradingPartners, workspaceId, byId(tradingPartnerId)))
 
 const unknownTradingPartner = () => new Unprocessable({ message: 'Unknown Trading Partner' })
 
@@ -185,7 +182,14 @@ export const updateTradingPartner = (
       db
         .update(tradingPartners)
         .set(changes)
-        .where(inWorkspace(workspace.id, byId(id), changes.gln === null ? glnRemovable : undefined))
+        .where(
+          inWorkspace(
+            tradingPartners,
+            workspace.id,
+            byId(id),
+            changes.gln === null ? glnRemovable : undefined,
+          ),
+        )
         .returning(),
     )
 
