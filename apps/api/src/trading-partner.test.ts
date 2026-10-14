@@ -18,6 +18,7 @@ import { connect, type Connection, tradingPartners, workspaces } from '@edi-brid
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
 import { buildApp } from './app.js'
+import { otherWorkspace } from './testing.js'
 import { seedDevelopmentWorkspace } from './workspace.js'
 
 const up = () => Promise.resolve()
@@ -44,12 +45,6 @@ let connection: Connection
 let app: FastifyInstance
 
 let otherApp: FastifyInstance
-
-const otherWorkspace = {
-  id: '8b2d6e14-3f9a-4c57-a0d8-71e5b9c4f236',
-  name: 'Sudhafen Logistik AG',
-  gln: null,
-}
 
 beforeAll(async () => {
   testDatabase = await startTestDatabase()
