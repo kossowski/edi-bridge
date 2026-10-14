@@ -1,9 +1,10 @@
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
   createInviteEndpoint,
   createWorkspaceEndpoint,
+  type Invite,
   type InviteInput,
   inviteSchema,
   inviteValidityDays,
@@ -37,9 +38,16 @@ const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers()
+  vi.useRealTimers()
+})
 
 afterAll(() => server.close())
+
+function isUnansweredSeedInvite({ workspaceId, acceptedAt }: Invite) {
+  return workspaceId === seedWorkspace.id && acceptedAt === null
+}
 
 async function post(path: string, body?: Partial<WorkspaceInput> | Partial<InviteInput>) {
   return fetch(`${apiUrl}${path}`, {
@@ -332,6 +340,28 @@ describe('GET /operator/workspaces/:workspaceId/invites', () => {
     expect(own.some(({ acceptedAt }) => acceptedAt !== null)).toBe(true)
   })
 
+  it.each(['2026-10-20T08:00:00.000Z', '2027-06-01T08:00:00.000Z'])(
+    'seeds one open and one expired invite when loaded on %s',
+    async (today) => {
+      vi.useFakeTimers({ now: new Date(today), toFake: ['Date'] })
+      vi.resetModules()
+
+      const { createOperatorStore, seedInvites } = await import('./operator')
+
+      const unanswered = seedInvites.filter(isUnansweredSeedInvite)
+
+      const expired = unanswered.filter(({ expiresAt }) => Date.parse(expiresAt) <= Date.now())
+
+      const pendingCount = createOperatorStore()
+        .workspaces()
+        .find(({ id }) => id === seedWorkspace.id)?.pendingInviteCount
+
+      expect(unanswered).toHaveLength(2)
+      expect(expired).toHaveLength(1)
+      expect(pendingCount).toBe(1)
+    },
+  )
+
   it('lists no invites for a Workspace without any', async () => {
     server.use(...operatorHandlers(apiUrl, { invites: [] }))
 
@@ -420,9 +450,7 @@ function pendingInviteCountOf(workspaces: ReadonlyArray<WorkspaceSummary>, id: s
 }
 
 describe('DELETE /operator/workspaces/:workspaceId/invites/:inviteId', () => {
-  const pending = seedInvites.find(
-    ({ workspaceId, acceptedAt }) => workspaceId === seedWorkspace.id && acceptedAt === null,
-  )!
+  const pending = seedInvites.find(isUnansweredSeedInvite)!
 
   const accepted = seedInvites.find(
     ({ workspaceId, acceptedAt }) => workspaceId === seedWorkspace.id && acceptedAt !== null,
@@ -434,7 +462,7 @@ describe('DELETE /operator/workspaces/:workspaceId/invites/:inviteId', () => {
     })
 
   it('revokes a pending invite, drops it from the list and the pending count', async () => {
-    server.use(...operatorHandlers(apiUrl, { now: () => new Date('2026-10-12T08:00:00.000Z') }))
+    server.use(...operatorHandlers(apiUrl))
     const before = Date.now()
 
     const response = await revoke(seedWorkspace.id, pending.id)
@@ -494,12 +522,12 @@ describe('DELETE /operator/workspaces/:workspaceId/invites/:inviteId', () => {
 })
 
 describe('pending invite count', () => {
-  const beforeSeedExpiry = new Date('2026-10-12T08:00:00.000Z')
-  const afterSeedExpiry = new Date('2026-10-16T08:00:00.000Z')
-
   const pending = seedInvites.find(
-    ({ workspaceId, acceptedAt }) => workspaceId === seedWorkspace.id && acceptedAt === null,
+    (invite) => isUnansweredSeedInvite(invite) && Date.parse(invite.expiresAt) > Date.now(),
   )!
+
+  const beforeSeedExpiry = new Date(Date.parse(pending.expiresAt) - 1)
+  const afterSeedExpiry = new Date(pending.expiresAt)
 
   it('counts the pending invites of each seed Workspace', async () => {
     server.use(...operatorHandlers(apiUrl, { now: () => beforeSeedExpiry }))

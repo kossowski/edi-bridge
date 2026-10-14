@@ -51,12 +51,8 @@ import preview from '../../.storybook/preview'
 
 const pendingEmail = 'jan.petersen@nordwind-handel.example'
 
-const invitesWithPending = seedInvites.map((invite) =>
-  invite.email === pendingEmail ? pendingSince(invite, 1) : invite,
-)
-
 function operatorMocks({
-  invites = invitesWithPending,
+  invites = seedInvites,
   members,
   session = seedSession,
   settings,
@@ -302,7 +298,7 @@ export const MembersAndInvites = meta.story({
     await expect(canvas.getByText('1 open invite')).toBeVisible()
     await expect(canvas.getAllByRole('button', { name: 'Copy link' })).toHaveLength(1)
     await expect(canvas.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1)
-    await expect(canvas.getByText('3 earlier invites')).toBeVisible()
+    await expect(canvas.getByText('4 earlier invites')).toBeVisible()
     await expect(canvas.getByText(/The link is valid for 7 days/)).toBeVisible()
     await expect(canvas.getByRole('radio', { name: 'Viewer' })).toBeChecked()
     await expect(canvas.getByRole('radio', { name: 'Admin' })).toHaveAccessibleDescription(
@@ -314,23 +310,9 @@ export const MembersAndInvites = meta.story({
 
 export const EarlierInvites = meta.story({
   ...membersTab,
-  beforeEach({ msw }) {
-    msw.use(
-      ...operatorMocks({
-        invites: [
-          ...invitesWithPending,
-          {
-            ...pendingSince(seedInvites[3]!, 9),
-            id: crypto.randomUUID(),
-            email: 'old.invite@nordwind-handel.example',
-          },
-        ],
-      }),
-    )
-  },
   async play({ canvas }) {
     await userEvent.click(await canvas.findByText('4 earlier invites'))
-    await expect(canvas.getByText('old.invite@nordwind-handel.example')).toBeVisible()
+    await expect(canvas.getByText('frieda.lange@nordwind-handel.example')).toBeVisible()
     await expect(canvas.getByText(/^Expired on /)).toBeVisible()
     await expect(canvas.getAllByText(/^Accepted on /)).toHaveLength(3)
     await expect(canvas.getAllByRole('button', { name: 'Revoke' })).toHaveLength(1)
@@ -505,7 +487,7 @@ export const CopyPendingLink = meta.story({
   async play({ canvas }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Copy link' }))
     await expect(writeText).toHaveBeenCalledWith(
-      invitesWithPending.find((invite) => invite.email === pendingEmail)?.link,
+      seedInvites.find((invite) => invite.email === pendingEmail)?.link,
     )
   },
 })

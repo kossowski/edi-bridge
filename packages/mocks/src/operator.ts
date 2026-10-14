@@ -156,6 +156,12 @@ function toInvite(
   })
 }
 
+const seedLoadedAt = Date.now()
+
+function daysBeforeSeedLoad(days: number) {
+  return new Date(seedLoadedAt - days * dayMs).toISOString()
+}
+
 const inviteSeeds: ReadonlyArray<
   Pick<Invite, 'workspaceId' | 'email' | 'role' | 'createdAt' | 'acceptedAt'>
 > = [
@@ -184,7 +190,7 @@ const inviteSeeds: ReadonlyArray<
     workspaceId: seedWorkspace.id,
     email: 'jan.petersen@nordwind-handel.example',
     role: 'viewer',
-    createdAt: '2026-10-08T15:30:00.000Z',
+    createdAt: daysBeforeSeedLoad(1),
     acceptedAt: null,
   },
   {
@@ -200,6 +206,13 @@ const inviteSeeds: ReadonlyArray<
     role: 'admin',
     createdAt: '2026-02-02T08:06:00.000Z',
     acceptedAt: '2026-02-02T08:07:00.000Z',
+  },
+  {
+    workspaceId: seedWorkspace.id,
+    email: 'frieda.lange@nordwind-handel.example',
+    role: 'viewer',
+    createdAt: daysBeforeSeedLoad(inviteValidityDays + 3),
+    acceptedAt: null,
   },
 ]
 
