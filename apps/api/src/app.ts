@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import {
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
+  sessionEndpoint,
   tradingPartnerEndpoint,
   tradingPartnersEndpoint,
   updateCompanyIdentityEndpoint,
@@ -15,6 +16,7 @@ import {
 
 import { type Database, Db } from './db.js'
 import { parse, type ValidationError } from './parse.js'
+import { loadDevelopmentSession } from './session.js'
 import {
   createTradingPartner,
   listTradingPartners,
@@ -111,6 +113,8 @@ export function buildApp({
         Effect.provideService(CurrentWorkspace, { id: resolveWorkspace(request) }),
       ),
     )
+
+  app.get(sessionEndpoint.path, (request, reply) => respond(request, reply, loadDevelopmentSession))
 
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>
     respond(request, reply, loadCurrentWorkspace),
