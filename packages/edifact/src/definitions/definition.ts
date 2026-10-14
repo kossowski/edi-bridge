@@ -1,17 +1,19 @@
 export type Status = 'M' | 'C'
 
 export interface SegmentEntry {
-  segment: string
+  kind: 'segment'
+  tag: string
   status: Status
   maxRepetitions: number
 }
 
-// The first entry of a segment group is its trigger segment.
 export interface GroupEntry {
+  kind: 'group'
   group: number
   status: Status
   maxRepetitions: number
-  entries: [SegmentEntry, ...StructureEntry[]]
+  trigger: string
+  entries: StructureEntry[]
 }
 
 export type StructureEntry = SegmentEntry | GroupEntry
@@ -23,14 +25,14 @@ export interface MessageIdentifier {
   controllingAgency: string
 }
 
-// The structure lists the segments between UNH and UNT, which parse already checks.
 export interface MessageDefinition {
   identifier: MessageIdentifier
-  structure: StructureEntry[]
+  segments: StructureEntry[]
 }
 
-export const segment = (segment: string, status: Status, maxRepetitions: number): SegmentEntry => ({
-  segment,
+export const segment = (tag: string, status: Status, maxRepetitions: number): SegmentEntry => ({
+  kind: 'segment',
+  tag,
   status,
   maxRepetitions,
 })
@@ -39,5 +41,6 @@ export const group = (
   group: number,
   status: Status,
   maxRepetitions: number,
-  entries: [SegmentEntry, ...StructureEntry[]],
-): GroupEntry => ({ group, status, maxRepetitions, entries })
+  trigger: string,
+  entries: StructureEntry[],
+): GroupEntry => ({ kind: 'group', group, status, maxRepetitions, trigger, entries })

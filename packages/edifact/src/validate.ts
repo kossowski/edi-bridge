@@ -1,5 +1,10 @@
 import { orders } from './definitions/orders'
-import { describePosition, type Position } from './position'
+import {
+  describePosition,
+  interchangeSegmentPosition,
+  messageEnvelopeSegments,
+  type Position,
+} from './position'
 
 import type { MessageDefinition, StructureEntry } from './definitions/definition'
 import type { Interchange, Segment } from './model'
@@ -41,13 +46,13 @@ interface Cursor {
   positionOf: (index: number) => Position
 }
 
-const triggerOf = (entry: StructureEntry) =>
-  'segment' in entry ? entry.segment : entry.entries[0].segment
+const triggerOf = (entry: StructureEntry) => (entry.kind === 'segment' ? entry.tag : entry.trigger)
 
-// A segment that fits a later entry means the mandatory entry is missing; any other segment is out of place.
-const matchEntries = (entries: StructureEntry[], cursor: Cursor, laterTags: Set<string>) => {
+const matchEntries = (entries: StructureEntry[], cursor: Cursor, followingTags: Set<string>) => {
   for (const [index, entry] of entries.entries()) {
     const trigger = triggerOf(entry)
+    const laterTags = new Set([...entries.slice(index + 1).map(triggerOf), ...followingTags])
+    const tagsAfterGroupEntries = new Set([trigger, ...laterTags])
     let repetitions = 0
 
     while (cursor.segments[cursor.index]?.tag === trigger) {
@@ -59,25 +64,18 @@ const matchEntries = (entries: StructureEntry[], cursor: Cursor, laterTags: Set<
 
       cursor.index += 1
 
-      if (!('segment' in entry)) {
-        matchEntries(
-          entry.entries.slice(1),
-          cursor,
-          new Set([...entries.slice(index).map(triggerOf), ...laterTags]),
-        )
+      if (entry.kind === 'group') {
+        matchEntries(entry.entries, cursor, tagsAfterGroupEntries)
       }
     }
 
     const current = cursor.segments[cursor.index]
 
     if (repetitions === 0 && entry.status === 'M') {
-      const fitsLater =
-        current === undefined ||
-        entries.slice(index + 1).some((later) => triggerOf(later) === current.tag) ||
-        laterTags.has(current.tag)
-
       throw new ValidationError(
-        fitsLater ? 'missing-segment' : 'unexpected-segment',
+        current === undefined || laterTags.has(current.tag)
+          ? 'missing-segment'
+          : 'unexpected-segment',
         cursor.positionOf(cursor.index),
       )
     }
@@ -87,15 +85,11 @@ const matchEntries = (entries: StructureEntry[], cursor: Cursor, laterTags: Set<
 const validateMessage = (
   definition: MessageDefinition,
   segments: Segment[],
-  firstSegment: number,
+  positionOf: (index: number) => Position,
 ) => {
-  const cursor: Cursor = {
-    segments,
-    index: 0,
-    positionOf: (index) => ({ segment: firstSegment + index }),
-  }
+  const cursor: Cursor = { segments, index: 0, positionOf }
 
-  matchEntries(definition.structure, cursor, new Set())
+  matchEntries(definition.segments, cursor, new Set())
 
   if (cursor.index < segments.length) {
     throw new ValidationError('unexpected-segment', cursor.positionOf(cursor.index))
@@ -103,20 +97,23 @@ const validateMessage = (
 }
 
 export const validate = (interchange: Interchange) => {
-  let headerSegment = (interchange.hasServiceStringAdvice ? 1 : 0) + 2
+  const positionOf = interchangeSegmentPosition(interchange.hasServiceStringAdvice)
+  let headerIndex = 1
 
   for (const message of interchange.messages) {
     const definition = findDefinition(message.header)
 
     if (!definition) {
       throw new ValidationError('unsupported-message-type', {
-        segment: headerSegment,
+        ...positionOf(headerIndex),
         element: messageIdentifierElement,
       })
     }
 
-    validateMessage(definition, message.segments, headerSegment + 1)
+    const firstIndex = headerIndex + 1
 
-    headerSegment += message.segments.length + 2
+    validateMessage(definition, message.segments, (index) => positionOf(firstIndex + index))
+
+    headerIndex += message.segments.length + messageEnvelopeSegments
   }
 }

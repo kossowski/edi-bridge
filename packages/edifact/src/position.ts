@@ -13,3 +13,9 @@ export const describePosition = ({ segment, element, component }: Position) =>
   ]
     .filter(Boolean)
     .join(', ')
+
+export const messageEnvelopeSegments = 2
+
+export const interchangeSegmentPosition =
+  (hasServiceStringAdvice: boolean) =>
+  (index: number): Position => ({ segment: (hasServiceStringAdvice ? 1 : 0) + index + 1 })
