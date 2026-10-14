@@ -12,6 +12,34 @@ Set the runtime variables in Dokploy:
 
 Keep production passwords in Dokploy. Do not commit passwords. Do not put these runtime variables in Docker build arguments.
 
+## Create the Operator
+
+A fresh installation has no users. Create the Operator once, after the first deployment of the API:
+
+1. Open a terminal in the running API container, either through the Dokploy terminal of the API application or with `docker exec`:
+
+   ```sh
+   docker exec -it <api-container> sh
+   ```
+
+2. Run the command and enter the password at the prompt:
+
+   ```sh
+   node dist/create-operator.js --email <operator-email> --name "<operator-name>" --workspace "<workspace-name>"
+   ```
+
+   To pass the password without a prompt, set `OPERATOR_PASSWORD` for this one command only. Do not add it to the application's **Environment** settings.
+
+   ```sh
+   OPERATOR_PASSWORD='<password>' node dist/create-operator.js --email <operator-email> --name "<operator-name>" --workspace "<workspace-name>"
+   ```
+
+3. Confirm that the output reports the user, the Workspace, the Operator role and the Admin role.
+
+The command creates the Workspace if no Workspace has that name, and makes the user Operator and Admin of it. The password needs at least 8 characters. The command never prints the password.
+
+Running the command again is safe. An existing user keeps their password and roles; the command grants only a missing Operator or Admin role. To replace the password of an existing user, add `--reset-password`.
+
 ## Deploy a change
 
 Deploy changes through the GitHub integration:

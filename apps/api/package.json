@@ -4,9 +4,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "dev": "tsx --env-file-if-exists=../../.env src/seed-development.ts && tsx watch --env-file-if-exists=../../.env src/main.ts",
     "build": "tsdown",
     "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "create-operator": "tsx --env-file-if-exists=../../.env src/create-operator.ts",
     "lint": "oxlint && eslint",
     "lint:fix": "oxlint --fix && eslint --fix",
     "check-types": "tsc --noEmit",
