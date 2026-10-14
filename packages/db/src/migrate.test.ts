@@ -1,9 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { withCheckDigit } from '@edi-bridge/contracts'
+
 import { connect, type Connection } from './client.js'
 import { migrate } from './migrate.js'
 import { tradingPartners, workspaces } from './schema.js'
 import { startTestDatabase, type TestDatabase } from './testing.js'
+
+const tradingPartner = {
+  name: 'Hanse Retail',
+  gln: withCheckDigit('020000000002'),
+  characterSet: 'UNOC',
+  acknowledgementTimeLimitHours: 24,
+} satisfies Omit<typeof tradingPartners.$inferInsert, 'workspaceId'>
 
 let testDatabase: TestDatabase
 
@@ -19,30 +28,37 @@ afterAll(async () => {
   await testDatabase.stop()
 })
 
+async function insertWorkspace() {
+  const [workspace] = await connection.db
+    .insert(workspaces)
+    .values({ name: 'Nordwind Foods', gln: withCheckDigit('020000000001') })
+    .returning()
+
+  if (workspace === undefined) {
+    throw new Error('Workspace insert returned no row')
+  }
+
+  return workspace
+}
+
 describe('migrate', () => {
-  it('stores a Workspace and a Trading Partner in the migrated schema', async () => {
-    const [workspace] = await connection.db
-      .insert(workspaces)
-      .values({ name: 'Nordwind Foods', gln: '4006381333931' })
-      .returning()
+  it('applies again without changes to an up-to-date database', async () => {
+    await expect(migrate(testDatabase.url)).resolves.toBeUndefined()
+  })
+})
 
-    const [tradingPartner] = await connection.db
+describe('schema', () => {
+  it('stores a Trading Partner in Test Mode with empty onboarding', async () => {
+    const workspace = await insertWorkspace()
+
+    const [stored] = await connection.db
       .insert(tradingPartners)
-      .values({
-        workspaceId: workspace!.id,
-        name: 'Hanse Retail',
-        gln: null,
-        characterSet: 'UNOC',
-        acknowledgementTimeLimitHours: 24,
-      })
+      .values({ ...tradingPartner, workspaceId: workspace.id })
       .returning()
 
-    expect(tradingPartner).toMatchObject({
-      workspaceId: workspace!.id,
-      name: 'Hanse Retail',
-      gln: null,
-      characterSet: 'UNOC',
-      acknowledgementTimeLimitHours: 24,
+    expect(stored).toMatchObject({
+      ...tradingPartner,
+      workspaceId: workspace.id,
       testMode: true,
       testInterchangeSentAt: null,
       contrlReceivedAt: null,
@@ -51,17 +67,9 @@ describe('migrate', () => {
 
   it('rejects a Trading Partner without an existing Workspace', async () => {
     await expect(
-      connection.db.insert(tradingPartners).values({
-        workspaceId: '00000000-0000-4000-8000-000000000000',
-        name: 'Hanse Retail',
-        gln: null,
-        characterSet: 'UNOC',
-        acknowledgementTimeLimitHours: 24,
-      }),
+      connection.db
+        .insert(tradingPartners)
+        .values({ ...tradingPartner, workspaceId: '00000000-0000-4000-8000-000000000000' }),
     ).rejects.toThrow()
-  })
-
-  it('applies again without changes to an up-to-date database', async () => {
-    await expect(migrate(testDatabase.url)).resolves.toBeUndefined()
   })
 })
