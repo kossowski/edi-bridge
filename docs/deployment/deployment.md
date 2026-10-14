@@ -68,11 +68,14 @@ Each application's Dokploy **Environment** settings contain values with the form
 | api         | `NODE_ENV`           | `production`                                                                   |
 | api         | `API_PORT`           | `3001`                                                                         |
 | api         | `DATABASE_URL`       | `postgres://edi_bridge:<postgres-password>@<postgres-service>:5432/edi_bridge` |
+| api         | `WEB_ORIGIN`         | Not set; see below                                                             |
 | api, worker | `REDIS_URL`          | `redis://:<redis-password>@<redis-service>:6379`                               |
 | worker      | `NODE_ENV`           | `production`                                                                   |
 | worker      | `WORKER_HEALTH_PORT` | `3002`                                                                         |
 
 These runtime variables require neither Docker build arguments nor a repository `.env` file.
+
+`WEB_ORIGIN` is the web origin that the API allows for cross-origin (CORS) requests. Its default is `http://localhost:3000`. This deployment does not need it, because web and API share one origin through the `/api` prefix.
 
 ## API URL of the web application
 

@@ -49,6 +49,8 @@ pnpm dev:mock
 
 Without mock mode, web calls the API at `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`). The web Docker image sets it to `/api` instead, the same-origin API path of the deployment. Both variables are read at build time, so restart `next dev` or rebuild after you change them.
 
+The API allows cross-origin requests from `WEB_ORIGIN` (default `http://localhost:3000`). Set it in `.env` when web runs on another origin. Same-origin requests through `/api` do not need it.
+
 ## Storybook
 
 Storybook lives in `apps/web` and also shows the stories of `packages/ui`. It uses the same MSW handlers as mock mode:
