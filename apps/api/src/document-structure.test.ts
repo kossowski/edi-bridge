@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { FastifyInstance } from 'fastify'
@@ -17,6 +18,8 @@ import {
   inferDocumentStructureEndpoint,
   inferredDocumentStructureSchema,
   toEncodedFile,
+  type UpdateDocumentStructureBody,
+  updateDocumentStructureEndpoint,
   windows1252CsvSettings,
 } from '@edi-bridge/contracts'
 import { connect, type Connection, documentStructures, workspaces } from '@edi-bridge/db'
@@ -365,5 +368,136 @@ describe('GET /document-structures/:id', () => {
   it('answers 404 for an unknown or malformed id', async () => {
     expect((await get(unknownId)).statusCode).toBe(404)
     expect((await get('not-an-id')).statusCode).toBe(404)
+  })
+})
+
+describe('PUT /document-structures/:id', () => {
+  const update = (id: string, body: UpdateDocumentStructureBody, target = app) =>
+    target.inject({
+      method: 'PUT',
+      url: updateDocumentStructureEndpoint.path.replace(':id', id),
+      body,
+    })
+
+  const orders = () =>
+    created({ name: 'ERP orders', origin: documentStructureOrigins.jsonDocument })
+
+  const stored = async (id: string) => documentStructureSchema.parse((await get(id)).json())
+
+  it('adjusts the nodes of a JSON Document Structure and keeps the adjustments', async () => {
+    const structure = await orders()
+
+    const response = await update(structure.id, {
+      name: 'ERP purchase orders',
+      adjustments: [
+        { path: 'buyer', repeating: true },
+        { path: 'buyer.city', required: false, label: 'Ort des Käufers' },
+        { path: 'lines[].gtin', type: 'integer' },
+      ],
+    })
+
+    expect(response.statusCode).toBe(200)
+
+    const updated = documentStructureSchema.parse(response.json())
+
+    expect(updated).toMatchObject({ id: structure.id, name: 'ERP purchase orders' })
+    expect(findNode(updated.children, 'buyer[]')).toMatchObject({ kind: 'array' })
+    expect(findNode(updated.children, 'buyer[].city')).toMatchObject({
+      required: false,
+      label: 'Ort des Käufers',
+    })
+    expect(findNode(updated.children, 'lines[].gtin')).toMatchObject({ type: 'integer' })
+    await expect(stored(structure.id)).resolves.toEqual(updated)
+  })
+
+  it('marks the stored row as updated', async () => {
+    const structure = await orders()
+
+    await update(structure.id, { name: 'ERP purchase orders', adjustments: [] })
+
+    const [row] = await connection.db
+      .select()
+      .from(documentStructures)
+      .where(eq(documentStructures.id, structure.id))
+
+    expect(row?.updatedAt.getTime()).toBeGreaterThan(row?.createdAt.getTime() ?? Infinity)
+  })
+
+  it('reads a new CSV Document with new CSV settings and keeps the umlauts', async () => {
+    const structure = await created({
+      name: 'Lieferscheine',
+      origin: documentStructureOrigins.csvDocument,
+    })
+
+    const response = await update(structure.id, {
+      name: 'Lieferscheine',
+      csv: windows1252CsvSettings,
+      document: documentStructureOrigins.windows1252CsvDocument.document,
+      adjustments: [{ path: 'rows[].Menge', type: 'number' }],
+    })
+
+    expect(response.statusCode).toBe(200)
+
+    const read = await stored(structure.id)
+
+    expect(read).toMatchObject({
+      format: 'csv',
+      csv: windows1252CsvSettings,
+      sample: { fileName: 'lieferscheine-ansi.csv' },
+    })
+    expect(read.sample?.text).toContain('Alpenfrisch Märkte AG;Maximilianstraße 3;München')
+    expect(findNode(read.children, 'rows[].Menge')).toMatchObject({ type: 'number' })
+  })
+
+  it.each([
+    [
+      'csvDocumentRequired for new CSV settings without a CSV Document',
+      { csv: windows1252CsvSettings, adjustments: [] },
+      { code: 'csvDocumentRequired' },
+    ],
+    [
+      'unknownPath for a node the structure does not have',
+      { adjustments: [{ path: 'rows[].Lager', required: false }] },
+      { code: 'unknownPath', path: 'rows[].Lager' },
+    ],
+    [
+      'notAdjustable for a CSV column that repeats',
+      { adjustments: [{ path: 'rows[].Ort', repeating: true }] },
+      { code: 'notAdjustable', path: 'rows[].Ort' },
+    ],
+  ])('answers %s and changes nothing', async (_case, changes, problem) => {
+    const structure = await created({
+      name: 'Lieferscheine',
+      origin: documentStructureOrigins.csvDocument,
+    })
+
+    const response = await update(structure.id, { name: 'Renamed', ...changes })
+
+    expect(response.statusCode).toBe(422)
+    expect(documentStructureProblemSchema.parse(response.json())).toMatchObject(problem)
+    await expect(stored(structure.id)).resolves.toEqual(structure)
+  })
+
+  it('refuses a body that does not match the contract', async () => {
+    const structure = await orders()
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: updateDocumentStructureEndpoint.path.replace(':id', structure.id),
+      body: { name: 'ERP orders', adjustments: [{ path: 'buyer' }] },
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it.each([
+    ['an unknown id', () => Promise.resolve(unknownId)],
+    ['an id that is no uuid', () => Promise.resolve('orders')],
+    ['a Document Structure of another Workspace', async () => (await orders()).id],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await update(await id(), { name: 'ERP orders', adjustments: [] }, otherApp)
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
   })
 })
