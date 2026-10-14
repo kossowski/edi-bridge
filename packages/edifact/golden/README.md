@@ -112,14 +112,55 @@ The public EANCOM source is the [GS1 Germany CCG recommendation for EANCOM 1997 
 
 One CCG value differs from UN D.96A: segment group 25 (LIN) is `C 99999` in UN D.96A and `C 9999999` in the CCG recommendation. Every other entry in the table matches UN D.96A, and every other entry in `invoic.ts` keeps its UN D.96A value. Segment group 48 (MOA) is `M 100` in both, so an INVOIC message without a total amount is invalid. The same known gap as for ORDERS applies: validation of an outbound Message does not flag a segment that EANCOM drops but UN D.96A allows.
 
+## DESADV definition
+
+`src/definitions/desadv.ts` is the UN D.96A DESADV segment table, adjusted to EANCOM 1997 values where a public GS1 source gives them, in the same way as the ORDERS definition.
+
+The UN D.96A table comes from the copy of ["UN/EDIFACT D96A Message DESADV - Despatch advice message"](https://www.stylusstudio.com/edifact/D96A/DESADV.htm) on stylusstudio.com. It is a transcription of the segment table on that page, compared entry by entry against it with a one-off script.
+
+The public EANCOM source is the [GS1 Germany CCG recommendation for EANCOM 1997 DESADV](https://events.gs1.de/common/downloads/gs1_tech/2071_1997_desadv.pdf), section 3, printed pages 17 and 18 (PDF pages 18 and 19). It lists only the segments of the CCG Food/Nonfood profile. Each of them has the same status and maximum repetitions in `desadv.ts`. Each segment group starts with its trigger segment at `M 1`.
+
+| Entry                   | Status and maximum repetitions | Printed page |
+| ----------------------- | ------------------------------ | ------------ |
+| BGM                     | M 1                            | 17           |
+| DTM (header)            | C 10                           | 17           |
+| Segment group 1 (RFF)   | C 10                           | 17           |
+| DTM in segment group 1  | C 1                            | 17           |
+| Segment group 2 (NAD)   | C 10                           | 17           |
+| Segment group 3 (RFF)   | C 10                           | 17           |
+| Segment group 4 (CTA)   | C 10                           | 17           |
+| Segment group 8 (EQD)   | C 10                           | 17           |
+| MEA in segment group 8  | C 5                            | 17           |
+| SEL in segment group 8  | C 25                           | 17           |
+| Segment group 10 (CPS)  | C 9999                         | 17           |
+| Segment group 11 (PAC)  | C 9999                         | 17           |
+| MEA in segment group 11 | C 10                           | 17           |
+| Segment group 13 (PCI)  | C 1000                         | 17           |
+| Segment group 14 (GIN)  | C 99                           | 17           |
+| Segment group 15 (LIN)  | C 9999                         | 17           |
+| PIA in segment group 15 | C 10                           | 17           |
+| IMD in segment group 15 | C 25                           | 17           |
+| MEA in segment group 15 | C 10                           | 17           |
+| QTY in segment group 15 | C 10                           | 17           |
+| Segment group 16 (RFF)  | C 10                           | 17           |
+| Segment group 20 (PCI)  | C 9999                         | 17           |
+| DTM in segment group 20 | C 5                            | 18           |
+| Segment group 21 (GIN)  | C 10                           | 18           |
+| Segment group 23 (QVR)  | C 10                           | 18           |
+| CNT                     | C 5                            | 18           |
+
+Every entry in the table matches UN D.96A, so `desadv.ts` keeps the UN D.96A values throughout. DESADV has no UNS. The header DTM is `C 10` in both, so a DESADV message without a date is valid. The same known gap as for ORDERS applies: validation of an outbound Message does not flag a segment that EANCOM drops but UN D.96A allows, such as TDT in segment group 6, which `desadv-with-una.edi` uses.
+
 ## Segment definitions
 
-`src/definitions/segments.ts`, `composites.ts` and `data-elements.ts` hold the data elements and composites of each segment in the ORDERS and INVOIC definitions: their order, status (`M` or `C`) and format (`a`, `n` or `an`, with the maximum length). They come from the UN D.96A segment pages on stylusstudio.com, linked from the ORDERS and INVOIC pages above (for example [BGM](https://www.stylusstudio.com/edifact/D96A/BGM_.htm) and [AJT](https://www.stylusstudio.com/edifact/D96A/AJT_.htm)). UNS comes from the [UNS page](https://www.stylusstudio.com/edifact/40100/UNS_.htm) of the syntax directory that the ORDERS page links.
+`src/definitions/segments.ts`, `composites.ts` and `data-elements.ts` hold the data elements and composites of each segment in the ORDERS, INVOIC and DESADV definitions: their order, status (`M` or `C`) and format (`a`, `n` or `an`, with the maximum length). They come from the UN D.96A segment pages on stylusstudio.com, linked from the ORDERS, INVOIC and DESADV pages above (for example [BGM](https://www.stylusstudio.com/edifact/D96A/BGM_.htm), [AJT](https://www.stylusstudio.com/edifact/D96A/AJT_.htm) and [CPS](https://www.stylusstudio.com/edifact/D96A/CPS_.htm)). UNS comes from the [UNS page](https://www.stylusstudio.com/edifact/40100/UNS_.htm) of the syntax directory that the ORDERS page links.
 
 The definitions in these files and in `code-lists.ts` are a one-off scripted transcription of the UN D.96A segment, composite, data element and code list pages on stylusstudio.com, spot-checked against those pages. The script is not part of the repository. Two checks are independent of the transcription: every segment example in section 9 of the CCG recommendation for EANCOM 1997 ORDERS and in MS30 Order passes validation, and the invalid golden files are written by hand. For INVOIC, every segment example in section 9 of the CCG recommendation for EANCOM 1997 INVOIC and in [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf) passes the element checks, and the section 9 example passes as one Message, with two exceptions. Both break a limit their own source gives:
 
 - The first LIN of the CCG example has 12 IMD segments. Section 3 of the same recommendation allows 10 (printed page 14), so the example passes only without two of them.
 - The FTX example on MS35 page 10 holds about 130 characters in data element 4440, which MS35 gives as `an..70`. The INVOIC golden files split this text into two components.
+
+For DESADV, every segment example in section 9 of the CCG recommendation for EANCOM 1997 DESADV and in [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf) passes the element checks. The section 9 example passes as one Message once its UNT count is corrected: it gives `88`, but the example has 90 segments from UNH to UNT.
 
 A value after the last data element of a segment or after the last component of an element is unexpected. Empty values there are allowed.
 
@@ -129,64 +170,79 @@ A numeric (`n`) value holds digits, an optional leading minus sign and at most o
 
 `src/definitions/code-lists.ts` holds a code list for each coded data element that the segment pages link to a UN D.96A code list, such as [1225](https://www.stylusstudio.com/edifact/D96A/1225.htm), and for 0081 from the [syntax directory](https://www.stylusstudio.com/edifact/40100/0081.htm). Codes marked for deletion stay in the list, because D.96A still allows them. Data elements without a linked code list, such as 6345 (currency), 3207 (country) and 6411 (unit of measure), take any value of their format.
 
-EANCOM adds codes to some UN code lists. The table lists each added code that a public GS1 source uses in an ORDERS or INVOIC message. Each data element has one code list for every Message Type, so a code added for INVOIC is also accepted in ORDERS. The CCG source for ORDERS is section 8 of the CCG recommendation for EANCOM 1997 ORDERS linked above. The CCG INVOIC source is the recommendation for EANCOM 1997 INVOIC linked above, sections 7 and 8. Known gap: EANCOM also restricts the UN code lists, and the full restrictions are only in the licensed EANCOM manual. Validation therefore accepts every UN D.96A code.
+EANCOM adds codes to some UN code lists. The table lists each added code that a public GS1 source uses in an ORDERS, DESADV or INVOIC message. Each data element has one code list for every Message Type, so a code added for INVOIC is also accepted in ORDERS. The CCG source for ORDERS is section 8 of the CCG recommendation for EANCOM 1997 ORDERS linked above. The CCG INVOIC source is the recommendation for EANCOM 1997 INVOIC linked above, sections 7 and 8. The CCG DESADV source is section 8 of the recommendation for EANCOM 1997 DESADV linked above. Known gap: EANCOM also restricts the UN code lists, and the full restrictions are only in the licensed EANCOM manual. Validation therefore accepts every UN D.96A code.
 
-| Data element | Added codes       | Source                                                                                               |
-| ------------ | ----------------- | ---------------------------------------------------------------------------------------------------- |
-| 1001         | `22E` `23B` `50E` | CCG ORDERS, printed page 160                                                                         |
-| 1131         | `SKB`             | CCG ORDERS, printed page 160                                                                         |
-| 1131         | `997` `E`         | CCG INVOIC, printed page 244                                                                         |
-| 1153         | `API`             | CCG ORDERS, printed page 160                                                                         |
-| 1153         | `CDN` `PDR`       | CCG INVOIC, printed page 427                                                                         |
-| 1153         | `ASH`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 3         |
-| 3035         | `DGB`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4           |
-| 3055         | `246`             | CCG ORDERS, printed page 161                                                                         |
-| 3055         | `9SE`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10 |
-| 4183         | `X5`              | CCG ORDERS, printed page 162                                                                         |
-| 4183         | `60E`             | CCG INVOIC, printed page 430                                                                         |
-| 4183         | `140`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10 |
-| 4451         | `BAQ`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10 |
-| 5025         | `11E` `XB5`       | CCG INVOIC, printed page 431                                                                         |
-| 5125         | `1E`              | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 11        |
-| 5305         | `M`               | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 13        |
-| 5387         | `LIU`             | CCG ORDERS, printed page 162                                                                         |
-| 6063         | `45E`             | CCG INVOIC, printed page 433                                                                         |
-| 6313         | `LAY` `ULY`       | CCG ORDERS, printed page 162                                                                         |
-| 6343         | `18`              | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 5         |
-| 7073         | `LAB`             | CCG ORDERS, printed page 163                                                                         |
-| 7081         | `SGR`             | CCG ORDERS, printed page 163                                                                         |
-| 7143         | `EWC`             | CCG ORDERS, printed page 163                                                                         |
-| 7143         | `SRV`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4           |
+| Data element | Added codes       | Source                                                                                                   |
+| ------------ | ----------------- | -------------------------------------------------------------------------------------------------------- |
+| 1001         | `22E` `23B` `50E` | CCG ORDERS, printed page 160                                                                             |
+| 1001         | `YA5` `YA6` `YA7` | CCG DESADV, printed page 216                                                                             |
+| 1131         | `SKB`             | CCG ORDERS, printed page 160                                                                             |
+| 1131         | `997` `E`         | CCG INVOIC, printed page 244                                                                             |
+| 1153         | `API`             | CCG ORDERS, printed page 160                                                                             |
+| 1153         | `CDN` `PDR`       | CCG INVOIC, printed page 427                                                                             |
+| 1153         | `ASH`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 3             |
+| 3035         | `DGB`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4               |
+| 3035         | `LSP`             | CCG DESADV, printed page 217                                                                             |
+| 3035         | `DEQ`             | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 2 |
+| 3055         | `246`             | CCG ORDERS, printed page 161                                                                             |
+| 3055         | `9SE`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10     |
+| 4183         | `X5`              | CCG ORDERS, printed page 162                                                                             |
+| 4183         | `60E`             | CCG INVOIC, printed page 430                                                                             |
+| 4183         | `140`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10     |
+| 4233         | `33E`             | CCG DESADV, printed page 218                                                                             |
+| 4233         | `39`              | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 4 |
+| 4451         | `BAQ`             | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), pages 2 and 10     |
+| 5025         | `11E` `XB5`       | CCG INVOIC, printed page 431                                                                             |
+| 5125         | `1E`              | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 11            |
+| 5305         | `M`               | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 13            |
+| 5387         | `LIU`             | CCG ORDERS, printed page 162                                                                             |
+| 6063         | `45E`             | CCG INVOIC, printed page 433                                                                             |
+| 6313         | `LAY` `ULY`       | CCG ORDERS, printed page 162                                                                             |
+| 6343         | `18`              | [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf), page 5             |
+| 7073         | `LAB`             | CCG ORDERS, printed page 163                                                                             |
+| 7081         | `SGR`             | CCG ORDERS, printed page 163                                                                             |
+| 7143         | `EWC`             | CCG ORDERS, printed page 163                                                                             |
+| 7143         | `SRV`             | [MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), page 4               |
+| 7405         | `SRV`             | [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), page 4 |
 
 In the CCG recommendation for INVOIC, data element 1131 in FTX carries a reporting code of the Deutsche Bundesbank, with `997` and `E` given as examples. Known gap: other codes of that list fail validation.
 
 ## Invalid Interchanges
 
-Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS or INVOIC golden file with one change. A change to the segment structure of ORDERS breaks a limit from the CCG table in [ORDERS definition](#orders-definition): BGM `M 1`, header DTM `M 35` before segment group 2, segment group 7 `C 5` or UNS `M 1`. A change to the segment structure of INVOIC breaks a limit or the order from the CCG table in [INVOIC definition](#invoic-definition): header ALI `C 5`, segment group 48 `M 100`, or segment group 28 (PRI) inside segment group 25 (LIN). A change to an element breaks a rule from [Segment definitions](#segment-definitions).
+Each file in `invalid/` parses without an error and fails validation. The expected `.json` file holds the code and position of the `ValidationError`, written by hand. Each file is a valid ORDERS, DESADV or INVOIC golden file with one change. A change to the segment structure of ORDERS breaks a limit from the CCG table in [ORDERS definition](#orders-definition): BGM `M 1`, header DTM `M 35` before segment group 2, segment group 7 `C 5` or UNS `M 1`. A change to the segment structure of INVOIC breaks a limit or the order from the CCG table in [INVOIC definition](#invoic-definition): header ALI `C 5`, segment group 48 `M 100`, or segment group 28 (PRI) inside segment group 25 (LIN). A change to the segment structure of DESADV breaks a limit or the order from the CCG table in [DESADV definition](#desadv-definition): BGM `M 1`, header DTM `C 10`, or segment group 15 (LIN) inside segment group 10 (CPS). A change to an element breaks a rule from [Segment definitions](#segment-definitions).
 
-| Golden file                                         | Base                                 | Change                                                                                                     |
-| --------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `orders-without-beginning-of-message.edi`           | `orders-without-una.edi`             | BGM removed, UNT `13`.                                                                                     |
-| `orders-with-repeated-beginning-of-message.edi`     | `orders-without-una.edi`             | BGM repeated, UNT `15`.                                                                                    |
-| `orders-with-too-many-currency-groups.edi`          | `orders-without-una.edi`             | Six `CUX+2:SEK:9` after the last NAD; segment group 7 allows five. UNT `20`.                               |
-| `orders-without-section-control.edi`                | `orders-without-una.edi`             | UNS removed, UNT `13`.                                                                                     |
-| `orders-of-unsupported-directory.edi`               | `orders-without-una.edi`             | UNH identifies `ORDERS:D:01B:UN:EAN010`.                                                                   |
-| `orders-with-misplaced-date-in-second-message.edi`  | `orders-with-multiple-messages.edi`  | Message 2: `DTM+2:20221201:102` after the last NAD, UNT `11`.                                              |
-| `orders-with-too-long-order-number.edi`             | `orders-without-una.edi`             | BGM order number with 36 characters; data element 1004 allows `an..35`.                                    |
-| `orders-without-party-qualifier.edi`                | `orders-without-una.edi`             | First NAD without its party qualifier: `NAD++7300015200000::9`. Data element 3035 is `M`.                  |
-| `orders-without-ordered-quantity.edi`               | `orders-without-una.edi`             | QTY without its quantity: `QTY+21::GRM`. Data element 6060 is `M` in composite C186.                       |
-| `orders-with-unit-in-quantity.edi`                  | `orders-without-una.edi`             | QTY with a unit in its quantity: `QTY+21:2000kg:GRM`. Data element 6060 is `n..15`.                        |
-| `orders-with-unknown-date-format.edi`               | `orders-without-una.edi`             | First DTM with date format `104`: `DTM+137:20221125:104`. The code list of data element 2379 has no `104`. |
-| `orders-with-extra-element-in-control-total.edi`    | `orders-without-una.edi`             | Last CNT with a second element: `CNT+2:1+5`. CNT has one element.                                          |
-| `orders-with-extra-component-in-item-number.edi`    | `orders-without-una.edi`             | PIA with a fifth component in its item number: `PIA+1+1254:SA::9:5`. Composite C212 has four components.   |
-| `invoic-with-too-many-additional-information.edi`   | `invoic-with-release-characters.edi` | Six `ALI+++140` after the last header DTM; the header allows five ALI. UNT `27`.                           |
-| `invoic-without-total-amount.edi`                   | `invoic-with-release-characters.edi` | Both MOA after CNT removed, so segment group 48 is missing. UNT `19`.                                      |
-| `invoic-with-price-before-line-item.edi`            | `invoic-with-release-characters.edi` | PRI moved before LIN, out of segment group 25.                                                             |
-| `invoic-without-payment-terms-type.edi`             | `invoic-with-release-characters.edi` | PAT without its type: `PAT+++66:1`. Data element 4279 is `M`.                                              |
-| `invoic-with-too-long-invoice-number.edi`           | `invoic-with-release-characters.edi` | BGM invoice number with 36 characters; data element 1004 allows `an..35`.                                  |
-| `invoic-with-currency-in-amount.edi`                | `invoic-with-release-characters.edi` | Last MOA with a currency in its amount: `MOA+79:54150SEK`. Data element 5004 is `n..18`.                   |
-| `invoic-with-decimal-point-under-decimal-comma.edi` | `invoic-with-custom-delimiters.edi`  | PRI with a decimal point: `36.1`. The UNA sets the decimal comma.                                          |
-| `invoic-with-unknown-document-type.edi`             | `invoic-with-release-characters.edi` | BGM with document type `999`. The code list of data element 1001 has no `999`.                             |
-| `invoic-with-extra-component-in-quantity.edi`       | `invoic-with-release-characters.edi` | QTY with a fourth component: `QTY+47:1500:GRM:9`. Composite C186 has three components.                     |
-| `invoic-with-unknown-adjustment-reason.edi`         | `invoic-with-release-characters.edi` | `AJT+99` added after the DTM of segment group 8. The code list of data element 4465 has no `99`. UNT `22`. |
-| `invoic-without-instruction-party.edi`              | `invoic-with-release-characters.edi` | `INP+:2` added after the DTM of segment group 8. Data element 3301 is `M` in composite C849. UNT `22`.     |
+| Golden file                                                | Base                                 | Change                                                                                                                                        |
+| ---------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `orders-without-beginning-of-message.edi`                  | `orders-without-una.edi`             | BGM removed, UNT `13`.                                                                                                                        |
+| `orders-with-repeated-beginning-of-message.edi`            | `orders-without-una.edi`             | BGM repeated, UNT `15`.                                                                                                                       |
+| `orders-with-too-many-currency-groups.edi`                 | `orders-without-una.edi`             | Six `CUX+2:SEK:9` after the last NAD; segment group 7 allows five. UNT `20`.                                                                  |
+| `orders-without-section-control.edi`                       | `orders-without-una.edi`             | UNS removed, UNT `13`.                                                                                                                        |
+| `orders-of-unsupported-directory.edi`                      | `orders-without-una.edi`             | UNH identifies `ORDERS:D:01B:UN:EAN010`.                                                                                                      |
+| `orders-with-misplaced-date-in-second-message.edi`         | `orders-with-multiple-messages.edi`  | Message 2: `DTM+2:20221201:102` after the last NAD, UNT `11`.                                                                                 |
+| `orders-with-too-long-order-number.edi`                    | `orders-without-una.edi`             | BGM order number with 36 characters; data element 1004 allows `an..35`.                                                                       |
+| `orders-without-party-qualifier.edi`                       | `orders-without-una.edi`             | First NAD without its party qualifier: `NAD++7300015200000::9`. Data element 3035 is `M`.                                                     |
+| `orders-without-ordered-quantity.edi`                      | `orders-without-una.edi`             | QTY without its quantity: `QTY+21::GRM`. Data element 6060 is `M` in composite C186.                                                          |
+| `orders-with-unit-in-quantity.edi`                         | `orders-without-una.edi`             | QTY with a unit in its quantity: `QTY+21:2000kg:GRM`. Data element 6060 is `n..15`.                                                           |
+| `orders-with-unknown-date-format.edi`                      | `orders-without-una.edi`             | First DTM with date format `104`: `DTM+137:20221125:104`. The code list of data element 2379 has no `104`.                                    |
+| `orders-with-extra-element-in-control-total.edi`           | `orders-without-una.edi`             | Last CNT with a second element: `CNT+2:1+5`. CNT has one element.                                                                             |
+| `orders-with-extra-component-in-item-number.edi`           | `orders-without-una.edi`             | PIA with a fifth component in its item number: `PIA+1+1254:SA::9:5`. Composite C212 has four components.                                      |
+| `invoic-with-too-many-additional-information.edi`          | `invoic-with-release-characters.edi` | Six `ALI+++140` after the last header DTM; the header allows five ALI. UNT `27`.                                                              |
+| `invoic-without-total-amount.edi`                          | `invoic-with-release-characters.edi` | Both MOA after CNT removed, so segment group 48 is missing. UNT `19`.                                                                         |
+| `invoic-with-price-before-line-item.edi`                   | `invoic-with-release-characters.edi` | PRI moved before LIN, out of segment group 25.                                                                                                |
+| `invoic-without-payment-terms-type.edi`                    | `invoic-with-release-characters.edi` | PAT without its type: `PAT+++66:1`. Data element 4279 is `M`.                                                                                 |
+| `invoic-with-too-long-invoice-number.edi`                  | `invoic-with-release-characters.edi` | BGM invoice number with 36 characters; data element 1004 allows `an..35`.                                                                     |
+| `invoic-with-currency-in-amount.edi`                       | `invoic-with-release-characters.edi` | Last MOA with a currency in its amount: `MOA+79:54150SEK`. Data element 5004 is `n..18`.                                                      |
+| `invoic-with-decimal-point-under-decimal-comma.edi`        | `invoic-with-custom-delimiters.edi`  | PRI with a decimal point: `36.1`. The UNA sets the decimal comma.                                                                             |
+| `invoic-with-unknown-document-type.edi`                    | `invoic-with-release-characters.edi` | BGM with document type `999`. The code list of data element 1001 has no `999`.                                                                |
+| `invoic-with-extra-component-in-quantity.edi`              | `invoic-with-release-characters.edi` | QTY with a fourth component: `QTY+47:1500:GRM:9`. Composite C186 has three components.                                                        |
+| `invoic-with-unknown-adjustment-reason.edi`                | `invoic-with-release-characters.edi` | `AJT+99` added after the DTM of segment group 8. The code list of data element 4465 has no `99`. UNT `22`.                                    |
+| `invoic-without-instruction-party.edi`                     | `invoic-with-release-characters.edi` | `INP+:2` added after the DTM of segment group 8. Data element 3301 is `M` in composite C849. UNT `22`.                                        |
+| `desadv-without-beginning-of-message.edi`                  | `desadv-with-una.edi`                | BGM removed, UNT `20`.                                                                                                                        |
+| `desadv-with-too-many-dates.edi`                           | `desadv-with-una.edi`                | Eight `DTM+11:202212010610:203` after the last header DTM; the header allows ten DTM. UNT `29`.                                               |
+| `desadv-with-line-item-before-packing-sequence.edi`        | `desadv-with-una.edi`                | LIN moved before the first CPS, out of segment group 10.                                                                                      |
+| `desadv-of-unsupported-directory.edi`                      | `desadv-with-una.edi`                | UNH identifies `DESADV:D:01B:UN:EAN007`.                                                                                                      |
+| `desadv-without-hierarchical-id.edi`                       | `desadv-with-una.edi`                | Second CPS without its hierarchical ID: `CPS++1`. Data element 7164 is `M`.                                                                   |
+| `desadv-with-too-long-hierarchical-id.edi`                 | `desadv-with-una.edi`                | First CPS with a hierarchical ID of 13 characters: `CPS+1234567890123`. Data element 7164 allows `an..12`.                                    |
+| `desadv-with-unit-in-measurement.edi`                      | `desadv-with-una.edi`                | MEA with a unit in its measurement value: `MEA+PD+AAD+KGM:500kg`. Data element 6314 is `n..18`.                                               |
+| `desadv-with-unknown-packaging-level.edi`                  | `desadv-with-una.edi`                | Second CPS with packaging level `5`: `CPS+2+1+5`. The code list of data element 7075 has no `5`.                                              |
+| `desadv-with-extra-component-in-identity-number-range.edi` | `desadv-with-una.edi`                | GIN with a third component in its identity number range: `GIN+BJ+373000152000023055:373000152000023056:1`. Composite C208 has two components. |
