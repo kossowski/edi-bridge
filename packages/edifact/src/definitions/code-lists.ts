@@ -144,6 +144,7 @@ const eancomCodes: CodeDirectory = {
   '3035': 'DGB',
   '3055': '246',
   '4183': 'X5',
+  '4451': 'BAQ',
   '5387': 'LIU',
   '6313': 'LAY ULY',
   '7073': 'LAB',

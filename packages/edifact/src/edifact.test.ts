@@ -74,9 +74,11 @@ describe('parse', () => {
 })
 
 describe('validate', () => {
-  const ordersGoldenNames = goldenNames('valid').filter((name) => name.startsWith('orders-'))
+  const validatedGoldenNames = goldenNames('valid').filter(
+    (name) => name.startsWith('orders-') || name.startsWith('invoic-'),
+  )
 
-  it.each(ordersGoldenNames)('accepts the valid Interchange %s', (name) => {
+  it.each(validatedGoldenNames)('accepts the valid Interchange %s', (name) => {
     expect(() => validate(parse(readGolden('valid', name, 'edi')))).not.toThrow()
   })
 

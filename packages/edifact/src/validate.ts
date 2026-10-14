@@ -1,6 +1,7 @@
 import { codeLists } from './definitions/code-lists'
 import { compositeDirectory } from './definitions/composites'
 import { dataElementFormats } from './definitions/data-elements'
+import { invoic } from './definitions/invoic'
 import { orders } from './definitions/orders'
 import { segmentDirectory } from './definitions/segments'
 import {
@@ -40,7 +41,7 @@ export class ValidationError extends Error {
   }
 }
 
-const definitions = [orders]
+const definitions = [orders, invoic]
 
 const messageIdentifierElement = 2
 
