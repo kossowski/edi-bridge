@@ -27,7 +27,7 @@ import {
 import { Db, type Database, type Transaction } from './db.js'
 import { NotFound, Unprocessable } from './errors.js'
 import { byName, rejectingDuplicate, rejectingInvalidId } from './rows.js'
-import { assertTradingPartnerIn } from './trading-partner.js'
+import { assertTradingPartnerIn, rejectingUnknownTradingPartner } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
@@ -130,23 +130,11 @@ export const listLookupTableMissingCodes = (id: string) =>
     return [] satisfies MissingCode[]
   })
 
-const rejectingUnprocessable = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  effect.pipe(
-    Effect.catchDefect((defect) =>
-      defect instanceof Unprocessable ? Effect.fail(defect) : Effect.die(defect),
-    ),
-  )
-
 export const suggestLookupTableEntries = ({ tradingPartnerId }: LookupTableSuggestionsQuery) =>
   Effect.gen(function* () {
-    const db = yield* Db
-    const workspace = yield* CurrentWorkspace
-
-    yield* rejectingUnprocessable(
-      Effect.promise(() =>
-        db.transaction((tx) => assertTradingPartnerIn(tx, workspace.id, tradingPartnerId ?? null)),
-      ),
-    )
+    if (tradingPartnerId !== undefined) {
+      yield* rejectingUnknownTradingPartner(tradingPartnerId)
+    }
 
     // Until suggested code values exist (#228).
     return { entries: [] } satisfies LookupTableSuggestions
@@ -206,7 +194,11 @@ const writeInTransaction = <A>(write: (tx: Transaction) => Promise<A>) =>
       () => db.transaction(write),
       nameUniqueConstraints,
       'Another Lookup Table of this scope already uses this name',
-    ).pipe(rejectingUnprocessable)
+    ).pipe(
+      Effect.catchDefect((defect) =>
+        defect instanceof Unprocessable ? Effect.fail(defect) : Effect.die(defect),
+      ),
+    )
   })
 
 export const createLookupTable = ({ name, kind, scope, entries }: LookupTableInput) =>
