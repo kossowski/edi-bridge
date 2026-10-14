@@ -4,7 +4,7 @@ description: 'Build one ticket as a stack of small PRs, ready for /land.'
 disable-model-invocation: true
 ---
 
-You are the **orchestrator** for one ticket. The user gives you the ticket path or number. The issue tracker conventions are in `docs/agents/issue-tracker.md`.
+You are the **orchestrator** for one ticket. The user gives you the ticket's issue number. The issue tracker conventions are in `docs/agents/issue-tracker.md`.
 
 The goal is the ticket built as a **stack**: a few small PRs, each based on the branch of the PR before it, linked as a GitHub stacked PR, each green in CI and reviewed. You stop when the stack is ready. The user merges it with `/land`.
 
@@ -16,6 +16,7 @@ Communicate with subagents through **context pointers**: the ticket, the spec, t
 
 ## Names
 
+- **Ticket**: the GitHub issue `#<NN>`. `<NN>` below is its issue number.
 - **Part**: one PR of the stack, numbered `1` to `n` from the bottom.
 - **Branch**: `<type>/<NN>-<k>-<part-slug>`, where `<type>` is the commit type of the part and `<k>` the part number. Example: `feat/11-1-source-and-target-trees`.
 - **Parent**: the branch of part `k-1`. The parent of part 1 is `origin/main`.
@@ -26,7 +27,7 @@ Communicate with subagents through **context pointers**: the ticket, the spec, t
 
 ### 1. Read
 
-Read the ticket, its spec (`.scratch/<feature>/spec.md`), and the `GLOSSARY.md` entries and ADRs for the area. Every ticket in **Blocked by** has `Status: done`. If one does not, tell the user and stop.
+Read the ticket, its spec (the parent issue), and the `GLOSSARY.md` entries and ADRs for the area. Every blocker of the ticket is closed: `issue_dependencies_summary.blocked_by` is `0`. If one is open, tell the user and stop.
 
 ### 2. Plan the stack
 
@@ -72,12 +73,12 @@ pnpm -C ../edi-bridge-worktrees/<NN>-<k> install --frozen-lockfile
 ```text
 GOAL       Part <k> of ticket <NN>: <part title>.
 WORKTREE   <absolute worktree path>, branch <branch>. Work and commit only here.
-CONTEXT    Ticket <path>, stack file <path>, spec <path>. Parts below are already on this branch.
+CONTEXT    Ticket #<NN>, spec #<parent>, stack file <path>. Parts below are already on this branch.
 SCOPE      The scope of part <k> in the stack file. Later parts build what it leaves out.
 BUILD      Call the Skill tool with `tdd`, unless the ticket sets another testing rule.
 VERIFY     pnpm check:fast first, then pnpm check, both green in the worktree.
 CLEANUP    Stop every dev server and Storybook you started before you report.
-COMMITS    Conventional Commits per AGENTS.md, footer `refs: edi-bridge-issue#<NN>`.
+COMMITS    Conventional Commits per AGENTS.md, footer `refs: #<NN>`.
 REPORT     STATUS: done | blocked
            COMMITS: <git log --oneline <parent>..HEAD>
            CHECKS: <each command> → pass/fail
@@ -98,7 +99,7 @@ gh pr create --base <parent branch name, `main` for part 1> --head <branch> \
 ```
 
 - The title follows the commit header rules in `AGENTS.md`. It becomes the squash commit header.
-- Write the body with the `pr` skill into a file in your scratchpad. It starts with `Part <k> of <n> of ticket <NN>` and ends with `refs: edi-bridge-issue#<NN>`.
+- Write the body with the `pr` skill into a file in your scratchpad. It starts with `Part <k> of <n> of #<NN>`. The body of part 1 also carries `Closes #<NN>`, so merging the stack closes the ticket.
 - Open the PR ready for review, not as a draft. `gh stack merge` does not merge drafts.
 - Write the PR number into the stack file.
 
@@ -118,9 +119,9 @@ bash .agents/skills/orchestrate/scripts/wait-for-ci.sh <PR> $(git -C <worktree> 
 
 The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh implementer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again.
 
-### 4. Resolve the ticket on the top part
+### 4. Resolve the ticket
 
-In the top worktree, resolve the ticket as `docs/agents/issue-tracker.md` describes, listing every PR of the stack. Commit, push, and wait for CI as in step 3e.
+Resolve the ticket as `docs/agents/issue-tracker.md` describes. The step is done when every acceptance criterion the stack fulfils is checked in the issue body.
 
 ### 5. Catch up with main
 
