@@ -59,9 +59,11 @@ One CCG value differs from UN D.96A: segment group 25 (LIN) is `C 20000` in UN D
 
 `src/definitions/segments.ts`, `composites.ts` and `data-elements.ts` hold the data elements and composites of each segment in the ORDERS definition: their order, status (`M` or `C`) and format (`a`, `n` or `an`, with the maximum length). They come from the UN D.96A segment pages on stylusstudio.com, linked from the ORDERS page above (for example [BGM](https://www.stylusstudio.com/edifact/D96A/BGM_.htm)). UNS comes from the [UNS page](https://www.stylusstudio.com/edifact/40100/UNS_.htm) of the syntax directory that the ORDERS page links.
 
+The definitions in these files and in `code-lists.ts` are a one-off scripted transcription of the UN D.96A segment, composite, data element and code list pages on stylusstudio.com, spot-checked against those pages. The script is not part of the repository. Two checks are independent of the transcription: every segment example in section 9 of the CCG recommendation for EANCOM 1997 ORDERS and in MS30 Order passes validation, and the invalid golden files are written by hand.
+
 A value after the last data element of a segment or after the last component of an element is unexpected. Empty values there are allowed.
 
-A numeric (`n`) value holds digits, an optional leading minus sign and at most one decimal mark of the Interchange, with a digit on each side. Its length counts the digits only.
+A numeric (`n`) value holds digits, an optional leading minus sign and at most one decimal mark of the Interchange, with a digit on each side. Its length counts the digits only. This follows ISO 9735, where the sign and the decimal mark do not count toward the length; no fetched source confirms it.
 
 ### Code lists
 
