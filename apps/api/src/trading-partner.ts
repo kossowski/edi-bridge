@@ -58,7 +58,7 @@ export const listTradingPartners = Effect.gen(function* () {
   return rows.map(toTradingPartner).toSorted((a, b) => nameCollator.compare(a.name, b.name))
 })
 
-// No Runs exist yet, so no Trading Partner has activity.
+// Until Runs exist (#187).
 export const listTradingPartnerActivities: Effect.Effect<TradingPartnerActivity[]> = Effect.succeed(
   [],
 )
@@ -112,32 +112,30 @@ export const createTradingPartner = (input: TradingPartnerInput) =>
 
 const dayMs = 24 * 60 * 60 * 1000
 
-const lastDays = (now: number) =>
+const lastUtcDays = (now: number) =>
   Array.from({ length: activityDays }, (_, index) => ({
     date: new Date(now - (activityDays - 1 - index) * dayMs).toISOString().slice(0, 10),
     runs: 0,
     failed: 0,
   }))
 
-// No Runs exist yet, so a Trading Partner has no activity in any day.
+// Until Runs exist (#187).
 export const loadTradingPartnerActivity = (id: string) =>
   Effect.gen(function* () {
     const { id: tradingPartnerId } = yield* loadTradingPartner(id)
     const now = yield* Effect.sync(() => Date.now())
 
-    const activity: TradingPartnerActivityDetail = {
+    return {
       tradingPartnerId,
       runsToday: 0,
       openProblems: 0,
       lastActivityAt: null,
       channelCount: 0,
       flowCount: 0,
-      days: lastDays(now),
+      days: lastUtcDays(now),
       flows: [],
       problems: [],
-    }
-
-    return activity
+    } satisfies TradingPartnerActivityDetail
   })
 
 export const updateTradingPartner = (
