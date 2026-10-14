@@ -45,6 +45,7 @@ export type ParseErrorCode =
   | 'segment-count-mismatch'
   | 'text-after-interchange-trailer'
   | 'unexpected-segment'
+  | 'unneeded-release-character'
   | 'unterminated-segment'
 
 // Consumers highlight the raw Interchange with it: indexes start at 1, a UNA is segment 1, element 1 follows the tag.
@@ -114,10 +115,30 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
   let value = ''
   let released = false
 
+  const serviceCharacters = new Set([
+    delimiters.component,
+    delimiters.element,
+    delimiters.release,
+    delimiters.segment,
+  ])
+
+  const currentPosition = () => {
+    const position = positionOf(segments.length)
+
+    return elements.length === 0
+      ? position
+      : { ...position, element: elements.length, component: components.length + 1 }
+  }
+
   for (const character of text) {
     offset += character.length
 
     if (released) {
+      // Serialize releases exactly the service characters, so any other released character could not round-trip.
+      if (!serviceCharacters.has(character)) {
+        throw new ParseError('unneeded-release-character', currentPosition())
+      }
+
       value += character
       released = false
     } else if (character === delimiters.release && character !== noReleaseCharacter) {
@@ -156,18 +177,11 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
   }
 
   if (released || elements.length > 0 || components.length > 0 || value.trim() !== '') {
-    const position = positionOf(segments.length)
-
     if (segments.at(-1)?.tag === 'UNZ') {
-      throw new ParseError('text-after-interchange-trailer', position)
+      throw new ParseError('text-after-interchange-trailer', positionOf(segments.length))
     }
 
-    throw new ParseError(
-      'unterminated-segment',
-      elements.length === 0
-        ? position
-        : { ...position, element: elements.length, component: components.length + 1 },
-    )
+    throw new ParseError('unterminated-segment', currentPosition())
   }
 
   return { segments, lineBreaksBefore, trailingText: text.slice(trailingFrom) }
