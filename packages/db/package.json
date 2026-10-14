@@ -1,0 +1,39 @@
+{
+  "name": "@edi-bridge/db",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx --env-file-if-exists=../../.env src/migrate-cli.ts",
+    "lint": "oxlint && eslint",
+    "lint:fix": "oxlint --fix && eslint --fix",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "dependencies": {
+    "@edi-bridge/contracts": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "postgres": "^3.4.9",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@edi-bridge/eslint-config": "workspace:*",
+    "@edi-bridge/oxlint-config": "workspace:*",
+    "@edi-bridge/typescript-config": "workspace:*",
+    "@edi-bridge/vitest-config": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.1",
+    "@types/node": "^24",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^10.12.0",
+    "oxlint": "1.87.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  }
+}

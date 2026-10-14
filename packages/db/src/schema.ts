@@ -1,0 +1,48 @@
+import { sql } from 'drizzle-orm'
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core'
+
+import { acknowledgementTimeLimitHours, characterSets } from '@edi-bridge/contracts'
+
+export const workspaces = pgTable('workspaces', {
+  id: uuid().primaryKey().defaultRandom(),
+  name: text().notNull(),
+  gln: text(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+})
+
+export const characterSet = pgEnum('character_set', characterSets)
+
+export const tradingPartners = pgTable(
+  'trading_partners',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    gln: text(),
+    characterSet: characterSet().notNull(),
+    acknowledgementTimeLimitHours: integer().notNull(),
+    testMode: boolean().notNull().default(true),
+    testInterchangeSentAt: timestamp({ withTimezone: true, mode: 'string' }),
+    contrlReceivedAt: timestamp({ withTimezone: true, mode: 'string' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index().on(table.workspaceId),
+    check(
+      'acknowledgement_time_limit_hours_range',
+      sql`${table.acknowledgementTimeLimitHours} between ${sql.raw(String(acknowledgementTimeLimitHours.min))} and ${sql.raw(String(acknowledgementTimeLimitHours.max))}`,
+    ),
+  ],
+)

@@ -25,7 +25,7 @@
     },
     "test": {
       "dependsOn": ["transit"],
-      "passThroughEnv": ["CI"]
+      "passThroughEnv": ["CI", "DOCKER_HOST", "TESTCONTAINERS_*"]
     },
     "test:canvas": {
       "dependsOn": ["transit"],
