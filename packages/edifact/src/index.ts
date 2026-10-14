@@ -1,6 +1,6 @@
 export { parse, ParseError } from './parse'
 
-export { serialize } from './serialize'
+export { serialize, SerializeError } from './serialize'
 
 export type {
   Delimiters,
@@ -12,4 +12,8 @@ export type {
   Whitespace,
 } from './model'
 
-export type { ParseErrorCode, Position } from './parse'
+export type { ParseErrorCode } from './parse'
+
+export type { Position } from './position'
+
+export type { SerializeErrorCode } from './serialize'

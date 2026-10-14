@@ -1,7 +1,14 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-import { type Delimiters, type Interchange, parse, ParseError, serialize } from './index'
+import {
+  type Delimiters,
+  type Interchange,
+  parse,
+  ParseError,
+  serialize,
+  SerializeError,
+} from './index'
 
 const goldenDirectory = (kind: string) => new URL(`../golden/${kind}/`, import.meta.url)
 
@@ -127,6 +134,39 @@ describe('serialize an Interchange built by hand', () => {
       ),
     ).toBe(
       "UNA|^,! ~UNB^UNOC|3^4012345000016|14^5412345000013|14^261014|0930^CTL1~UNH^ME1^ORDERS|D|96A|UN|EAN008~FTX^AAI^^^O'NEIL + SON: 50% OFF~UNT^3^ME1~UNZ^1^CTL1~",
+    )
+  })
+})
+
+describe('serialize without a release character', () => {
+  it('rejects a value that contains a service character', () => {
+    const interchange: Interchange = {
+      hasServiceStringAdvice: true,
+      delimiters: {
+        component: ':',
+        element: '+',
+        decimal: '.',
+        release: ' ',
+        repetition: ' ',
+        segment: "'",
+      },
+      header: { tag: 'UNB', elements: [['UNOC', '3'], ['A'], ['B'], ['261014', '0930'], ['1']] },
+      messages: [
+        {
+          header: { tag: 'UNH', elements: [['1'], ['ORDERS', 'D', '96A', 'UN', 'EAN008']] },
+          segments: [{ tag: 'FTX', elements: [['AAI'], [''], [''], ['OK', "O'NEIL"]] }],
+          trailer: { tag: 'UNT', elements: [['3'], ['1']] },
+        },
+      ],
+      trailer: { tag: 'UNZ', elements: [['1'], ['1']] },
+    }
+
+    expect(() => serialize(interchange)).toThrow(SerializeError)
+    expect(() => serialize(interchange)).toThrow(
+      expect.objectContaining({
+        code: 'unreleasable-service-character',
+        position: { segment: 4, element: 4, component: 2 },
+      }),
     )
   })
 })

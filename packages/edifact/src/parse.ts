@@ -1,4 +1,5 @@
 import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
+import { describePosition, type Position } from './position'
 
 import type { Delimiters, Element, Interchange, LineBreak, Message, Segment } from './model'
 
@@ -15,22 +16,6 @@ export type ParseErrorCode =
   | 'unexpected-segment'
   | 'unneeded-release-character'
   | 'unterminated-segment'
-
-// Consumers highlight the raw Interchange with it: indexes start at 1, a UNA is segment 1, element 1 follows the tag.
-export interface Position {
-  segment: number
-  element?: number
-  component?: number
-}
-
-const describePosition = ({ segment, element, component }: Position) =>
-  [
-    `segment ${segment}`,
-    element === undefined ? undefined : `element ${element}`,
-    component === undefined ? undefined : `component ${component}`,
-  ]
-    .filter(Boolean)
-    .join(', ')
 
 export class ParseError extends Error {
   override readonly name = 'ParseError'
