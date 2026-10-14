@@ -73,11 +73,11 @@ beforeEach(async () => {
   await connection.db.delete(tradingPartners)
 })
 
-const create = (body: TradingPartnerBody, target = app) =>
+const post = (body: TradingPartnerBody, target = app) =>
   target.inject({ method: 'POST', url: createTradingPartnerEndpoint.path, body })
 
-const add = async (body: TradingPartnerBody, target = app) =>
-  tradingPartnerSchema.parse((await create(body, target)).json())
+const postedTradingPartner = async (body: TradingPartnerBody, target = app) =>
+  tradingPartnerSchema.parse((await post(body, target)).json())
 
 const list = (target = app) => target.inject({ method: 'GET', url: tradingPartnersEndpoint.path })
 
@@ -95,7 +95,7 @@ const unknownId = '0b6f1a7e-2c4d-4e8f-9a1b-3c5d7e9f1a2b'
 
 describe('POST /trading-partners', () => {
   it('creates a Trading Partner in Test Mode with no onboarding yet', async () => {
-    const response = await create(hansemarkt)
+    const response = await post(hansemarkt)
 
     expect(response.statusCode).toBe(201)
 
@@ -121,7 +121,7 @@ describe('POST /trading-partners', () => {
     ['a time limit above a week', { ...hansemarkt, acknowledgementTimeLimitHours: 169 }],
     ['no time limit', { ...hansemarkt, acknowledgementTimeLimitHours: undefined }],
   ])('rejects %s', async (_case, body) => {
-    const response = await create(body)
+    const response = await post(body)
 
     expect(response.statusCode).toBe(400)
     expect(response.json()).toHaveProperty('message')
@@ -137,7 +137,7 @@ describe('GET /trading-partners', () => {
     const created = []
 
     for (const name of ['Rheinkauf eG', 'Alpenfrisch Märkte AG', 'Ölmühle Ost GmbH']) {
-      created.push(await add({ ...hansemarkt, name, gln: null }))
+      created.push(await postedTradingPartner({ ...hansemarkt, name, gln: null }))
     }
 
     const response = await list()
@@ -175,7 +175,7 @@ describe('PUT /trading-partners/:id', () => {
   }
 
   it('stores the changed Trading Partner and keeps its onboarding', async () => {
-    const created = await add(hansemarkt)
+    const created = await postedTradingPartner(hansemarkt)
 
     const response = await update(created.id, changes)
 
@@ -188,7 +188,7 @@ describe('PUT /trading-partners/:id', () => {
   })
 
   it('rejects an invalid Trading Partner and keeps the stored one', async () => {
-    const created = await add(hansemarkt)
+    const created = await postedTradingPartner(hansemarkt)
 
     const response = await update(created.id, { ...changes, name: '' })
 
@@ -213,8 +213,12 @@ describe('PUT /trading-partners/:id', () => {
 
 describe('a Trading Partner of another Workspace', () => {
   it('is neither listed, read nor updated', async () => {
-    const own = await add(hansemarkt)
-    const foreign = await add({ ...hansemarkt, name: 'Elbtal Warenhaus KG' }, otherApp)
+    const own = await postedTradingPartner(hansemarkt)
+
+    const foreign = await postedTradingPartner(
+      { ...hansemarkt, name: 'Elbtal Warenhaus KG' },
+      otherApp,
+    )
 
     const listed = await list()
 
@@ -238,9 +242,9 @@ describe('the GLN of a Trading Partner', () => {
   const glnConflict = { message: 'Another Trading Partner already uses this GLN' }
 
   it('is unique within the Workspace on create', async () => {
-    await add(hansemarkt)
+    await postedTradingPartner(hansemarkt)
 
-    const response = await create({ ...hansemarkt, name: 'Rheinkauf eG' })
+    const response = await post({ ...hansemarkt, name: 'Rheinkauf eG' })
 
     expect(response.statusCode).toBe(409)
     expect(response.json()).toEqual(glnConflict)
@@ -251,8 +255,8 @@ describe('the GLN of a Trading Partner', () => {
   })
 
   it('is unique within the Workspace on update', async () => {
-    await add(hansemarkt)
-    const other = await add({ ...hansemarkt, name: 'Rheinkauf eG', gln: null })
+    await postedTradingPartner(hansemarkt)
+    const other = await postedTradingPartner({ ...hansemarkt, name: 'Rheinkauf eG', gln: null })
 
     const response = await update(other.id, { ...hansemarkt, name: 'Rheinkauf eG' })
 
@@ -265,7 +269,7 @@ describe('the GLN of a Trading Partner', () => {
   })
 
   it('stays with the Trading Partner that updates itself', async () => {
-    const created = await add(hansemarkt)
+    const created = await postedTradingPartner(hansemarkt)
 
     const response = await update(created.id, { ...hansemarkt, acknowledgementTimeLimitHours: 4 })
 
@@ -273,18 +277,18 @@ describe('the GLN of a Trading Partner', () => {
   })
 
   it('may be used by Trading Partners without a GLN and in another Workspace', async () => {
-    await add({ ...hansemarkt, gln: null })
-    await add(hansemarkt, otherApp)
+    await postedTradingPartner({ ...hansemarkt, gln: null })
+    await postedTradingPartner(hansemarkt, otherApp)
 
-    const second = await create({ ...hansemarkt, name: 'Rheinkauf eG', gln: null })
-    const own = await create(hansemarkt)
+    const second = await post({ ...hansemarkt, name: 'Rheinkauf eG', gln: null })
+    const own = await post(hansemarkt)
 
     expect(second.statusCode).toBe(201)
     expect(own.statusCode).toBe(201)
   })
 
   it('stays once Interchanges were exchanged', async () => {
-    const created = await add(hansemarkt)
+    const created = await postedTradingPartner(hansemarkt)
 
     await connection.db
       .update(tradingPartners)
@@ -307,7 +311,7 @@ describe('the GLN of a Trading Partner', () => {
   })
 
   it('stays once the Trading Partner is in production', async () => {
-    const created = await add(hansemarkt)
+    const created = await postedTradingPartner(hansemarkt)
 
     await connection.db
       .update(tradingPartners)
@@ -320,7 +324,7 @@ describe('the GLN of a Trading Partner', () => {
   })
 
   it('may be removed during Test Mode before the test Interchange', async () => {
-    const created = await add(hansemarkt)
+    const created = await postedTradingPartner(hansemarkt)
 
     const response = await update(created.id, { ...hansemarkt, gln: null })
 
