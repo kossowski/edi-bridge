@@ -74,6 +74,10 @@ The kind of business document per the EDIFACT standard: ORDERS (purchase order),
 _Avoid_: Document type, format
 _On screen_: ORDERS → Purchase order (DE: Bestellung), DESADV → Dispatch advice (DE: Lieferavis), INVOIC → Invoice (DE: Rechnung), CONTRL → Receipt confirmation (DE: Empfangsbestätigung)
 
+**Code List**:
+The set of codes the EDIFACT directory allows for one coded data element, e.g. `220` (order) for the document name code. Validation rejects any other code. Unlike a Lookup Table, it is part of the standard and translates nothing.
+_Avoid_: Code table, enumeration, Lookup Table
+
 **Acknowledgement**:
 A Message returned by the receiver confirming syntactic receipt (CONTRL) or business acceptance/rejection (APERAK) of a previously sent Interchange or Message.
 _Avoid_: Receipt, ack, confirmation
@@ -130,7 +134,7 @@ _Avoid_: Edge, wire, connection
 
 **Lookup Table**:
 A maintained list of code translations, belonging to a Workspace or a single Trading Partner, used by Mappings, e.g. unit `ST` → `PCE`.
-_Avoid_: Code list, dictionary, translation table
+_Avoid_: Dictionary, translation table
 _On screen_: Code translation (DE: Code-Übersetzung)
 
 **Mapping Version**:
