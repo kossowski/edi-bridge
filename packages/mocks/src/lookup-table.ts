@@ -1,6 +1,8 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  applyLookupTableImport,
+  classifyLookupTableImport,
   createLookupTableEndpoint,
   deleteLookupTableEndpoint,
   directionOf,
@@ -32,7 +34,6 @@ import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } f
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
 import { lookupTableFailureOf } from './interchange'
 import { codeMeaningsOf, firstValuesOf, hintFor } from './lookup-table-codes'
-import { applyImport, classifyImport } from './lookup-table-import'
 import {
   type LookupTableRecord,
   type LookupTableStore,
@@ -434,7 +435,7 @@ export function lookupTableHandlers(
     const body = lookupTableImportPreviewEndpoint.body.safeParse(await request.json())
 
     return body.success
-      ? { table, rows: classifyImport(table.entries, body.data.csv) }
+      ? { table, rows: classifyLookupTableImport(table.entries, body.data.csv) }
       : { response: badRequest(body.error.message) }
   }
 
@@ -542,7 +543,7 @@ export function lookupTableHandlers(
 
         const imported: LookupTableRecord = {
           ...parsed.table,
-          entries: applyImport(parsed.table.entries, parsed.rows),
+          entries: applyLookupTableImport(parsed.table.entries, parsed.rows),
           updatedAt: new Date().toISOString(),
         }
 
