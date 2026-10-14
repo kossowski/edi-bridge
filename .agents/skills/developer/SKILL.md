@@ -17,7 +17,7 @@ You are the **developer** for one brief. It names a GOAL, a WORKTREE with its br
 
   The slot script is the machine's RAM budget: a full check peaks near 6 GB on an 11 GB VM, so two heavy commands run at once at most, and the second only when enough RAM is free. Every heavy command goes through it: check, test, lint, type check, build, vitest, Storybook, Playwright, and a dev server for a browser check. `pnpm install` does not.
 
-- **Stop what you started**: every dev server, Storybook and background shell is gone before you report. Start and stop a dev server inside one slot command, so the slot frees itself when the check ends.
+- **Stop what you started**: every dev server, Storybook and background shell is gone before you report. Start and stop a dev server inside one slot command, so the slot frees itself when the check ends. `bash .agents/skills/developer/scripts/stop-leftovers.sh <worktree>` stops what still runs from your worktree and prints it.
 - **Commit** per `AGENTS.md`: one commit per concern, footer `refs: #<NN>`. Fix the message when the hook rejects it.
 - **Questions**: answer technical ones from the code and the docs, and record the answer in NOTES. A product decision, or anything that blocks you, goes into QUESTIONS, and you stop with STATUS blocked.
 
