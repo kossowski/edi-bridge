@@ -1,0 +1,10 @@
+{
+  "extends": "@edi-bridge/typescript-config/node-app.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": ["."],
+  "exclude": ["node_modules", "dist"]
+}
