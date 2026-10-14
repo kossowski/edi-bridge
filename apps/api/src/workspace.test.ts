@@ -8,7 +8,7 @@ import {
   updateCompanyIdentityEndpoint,
   withCheckDigit,
 } from '@edi-bridge/contracts'
-import { connect, type Connection } from '@edi-bridge/db'
+import { connect, type Connection, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
 import { buildApp } from './app.js'
@@ -43,7 +43,8 @@ afterAll(async () => {
   await testDatabase.stop()
 })
 
-const getCurrentWorkspace = () => app.inject({ method: 'GET', url: currentWorkspaceEndpoint.path })
+const getCurrentWorkspace = (target = app) =>
+  target.inject({ method: 'GET', url: currentWorkspaceEndpoint.path })
 
 const updateIdentity = (body: Partial<CompanyIdentityInput>) =>
   app.inject({ method: 'PUT', url: updateCompanyIdentityEndpoint.path, body })
@@ -58,6 +59,29 @@ describe('GET /workspaces/current', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual(developmentWorkspace)
+  })
+
+  it('returns the Workspace the resolver picks for the request', async () => {
+    const otherWorkspace = {
+      id: '8b2d6e14-3f9a-4c57-a0d8-71e5b9c4f236',
+      name: 'Sudhafen Logistik AG',
+      gln: null,
+    }
+
+    await connection.db.insert(workspaces).values(otherWorkspace)
+
+    const otherApp = buildApp({
+      database: connection.db,
+      probes: { postgres: up, redis: up },
+      resolveWorkspace: () => otherWorkspace.id,
+    })
+
+    const response = await getCurrentWorkspace(otherApp)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual(otherWorkspace)
+
+    await otherApp.close()
   })
 })
 

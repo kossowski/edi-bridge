@@ -1,5 +1,7 @@
 import { eq } from 'drizzle-orm'
-import { Effect } from 'effect'
+import { Context, Effect } from 'effect'
+
+import type { FastifyRequest } from 'fastify'
 
 import { type CompanyIdentityInput, type Workspace, withCheckDigit } from '@edi-bridge/contracts'
 import { workspaces } from '@edi-bridge/db'
@@ -12,6 +14,14 @@ const developmentWorkspace: Workspace = {
   gln: withCheckDigit('021234500000'),
 }
 
+export class CurrentWorkspace extends Context.Service<CurrentWorkspace, { readonly id: string }>()(
+  'CurrentWorkspace',
+) {}
+
+export type WorkspaceResolver = (request: FastifyRequest) => string
+
+export const resolveDevelopmentWorkspace: WorkspaceResolver = () => developmentWorkspace.id
+
 const columns = { id: workspaces.id, name: workspaces.name, gln: workspaces.gln }
 
 export async function seedDevelopmentWorkspace(database: Database) {
@@ -20,11 +30,12 @@ export async function seedDevelopmentWorkspace(database: Database) {
 
 const exactlyOne = (rows: Workspace[]) => Effect.orDie(Effect.fromNullishOr(rows[0]))
 
-export const currentWorkspace = Effect.gen(function* () {
+export const loadCurrentWorkspace = Effect.gen(function* () {
   const db = yield* Db
+  const { id } = yield* CurrentWorkspace
 
   const rows = yield* Effect.promise(() =>
-    db.select(columns).from(workspaces).where(eq(workspaces.id, developmentWorkspace.id)),
+    db.select(columns).from(workspaces).where(eq(workspaces.id, id)),
   )
 
   return yield* exactlyOne(rows)
@@ -33,13 +44,10 @@ export const currentWorkspace = Effect.gen(function* () {
 export const updateCompanyIdentity = ({ gln }: CompanyIdentityInput) =>
   Effect.gen(function* () {
     const db = yield* Db
+    const { id } = yield* CurrentWorkspace
 
     const rows = yield* Effect.promise(() =>
-      db
-        .update(workspaces)
-        .set({ gln })
-        .where(eq(workspaces.id, developmentWorkspace.id))
-        .returning(columns),
+      db.update(workspaces).set({ gln }).where(eq(workspaces.id, id)).returning(columns),
     )
 
     return yield* exactlyOne(rows)
