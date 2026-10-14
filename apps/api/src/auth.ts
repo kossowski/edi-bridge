@@ -29,7 +29,8 @@ export function createAuth(database: Database, { secret, baseUrl, trustedOrigins
     }),
     emailAndPassword: { enabled: true, disableSignUp: true },
     disabledPaths: ['/sign-up/email'],
-    advanced: { database: { generateId: 'uuid' } },
+    // better-auth skips the origin check under NODE_ENV=test; tests must meet the real check.
+    advanced: { database: { generateId: 'uuid' }, disableOriginCheck: false },
     telemetry: { enabled: false },
   })
 }

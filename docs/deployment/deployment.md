@@ -79,7 +79,7 @@ These runtime variables require neither Docker build arguments nor a repository 
 
 `BETTER_AUTH_URL` is the public origin of the installation, without the `/api` prefix. The API rejects sign-in requests from other origins and sets secure session cookies when the origin uses HTTPS. `<auth-secret>` is a random value of at least 32 characters, stored in Dokploy, that signs the session cookies. Generate it once, for example with `openssl rand -base64 32`. Changing it signs out every user. The API does not start in production without both variables.
 
-`WEB_ORIGIN` is the web origin that the API allows for cross-origin (CORS) requests. Its default is `http://localhost:3000`. This deployment does not need it, because web and API share one origin through the `/api` prefix.
+`WEB_ORIGIN` is the web origin that the API allows for cross-origin (CORS) requests and trusts for sign-in. In development, its default is `http://localhost:3000`. In production, it has no default, and the API trusts only the origin of `BETTER_AUTH_URL`. This deployment does not need it, because web and API share one origin through the `/api` prefix.
 
 ## API URL of the web application
 

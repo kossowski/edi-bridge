@@ -76,7 +76,7 @@ export interface AppDependencies {
   logger?: boolean
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
-  webOrigin?: string
+  webOrigin?: string | undefined
 }
 
 type Failure = Conflict | DocumentStructureRejected | NotFound | Unprocessable | ValidationError

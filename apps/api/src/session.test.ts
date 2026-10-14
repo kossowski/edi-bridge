@@ -7,6 +7,8 @@ import {
   signOutEndpoint,
 } from '@edi-bridge/contracts'
 
+import { buildApp } from './app.js'
+import { loadConfig } from './config.js'
 import {
   addMember,
   type Client,
@@ -17,6 +19,7 @@ import {
   signIn,
   signInRequest,
   startTestApi,
+  testAuth,
   type TestApi,
   webOrigin,
 } from './testing.js'
@@ -64,6 +67,41 @@ describe('POST /auth/sign-in/email', () => {
 
     expect(response.statusCode).toBe(401)
     expect(response.cookies).toEqual([])
+  })
+})
+
+describe('POST /auth/sign-in/email in production', () => {
+  const productionApp = (env: NodeJS.ProcessEnv) =>
+    buildApp({
+      auth: loadConfig({
+        NODE_ENV: 'production',
+        BETTER_AUTH_URL: testAuth.baseUrl,
+        BETTER_AUTH_SECRET: testAuth.secret,
+        ...env,
+      }).auth,
+      database: api.connection.db,
+      probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
+    })
+
+  it('does not trust the local web origin unless WEB_ORIGIN names it', async () => {
+    const app = productionApp({})
+
+    const response = await app.inject(signInRequest(ownAdmin))
+
+    expect(response.statusCode).toBe(403)
+    expect(response.cookies).toEqual([])
+
+    await app.close()
+  })
+
+  it('trusts the web origin that WEB_ORIGIN names', async () => {
+    const app = productionApp({ WEB_ORIGIN: webOrigin })
+
+    const response = await app.inject(signInRequest(ownAdmin))
+
+    expect(response.statusCode).toBe(200)
+
+    await app.close()
   })
 })
 
