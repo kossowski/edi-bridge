@@ -127,7 +127,7 @@ describe('POST /lookup-tables', () => {
     const read = await get(created.id)
 
     expect(read.statusCode).toBe(200)
-    expect(read.json()).toEqual(created)
+    expect(lookupTableSchema.parse(read.json())).toEqual(created)
   })
 })
 
@@ -240,7 +240,9 @@ describe('GET /lookup-tables', () => {
     const response = await list()
 
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual([addresses, countries, customs].map(summaryOf))
+    expect(lookupTableSummarySchema.array().parse(response.json())).toEqual(
+      [addresses, countries, customs].map(summaryOf),
+    )
   })
 
   it('lists nothing for a Workspace without Lookup Tables', async () => {
@@ -300,7 +302,7 @@ describe('PUT /lookup-tables/:id', () => {
 
     const read = await get(created.id)
 
-    expect(read.json()).toEqual(updated)
+    expect(lookupTableSchema.parse(read.json())).toEqual(updated)
   })
 
   it('keeps its own name in a new spelling', async () => {
