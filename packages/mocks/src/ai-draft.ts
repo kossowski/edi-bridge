@@ -10,11 +10,10 @@ import {
   type AiDraftFailureReason,
   type AiDraftStep,
   type AiProposal,
-  type AiReview,
-  aiReviewKeys,
   type DocumentStructure,
   type MappingLink,
   marksAll,
+  proposedAiReview,
   requestAiDraftEndpoint,
   type Session,
   type TransformLink,
@@ -204,27 +203,13 @@ export function aiProposalFor(
   return { links, ...transforms }
 }
 
-function reviewOf(sampleId: string, proposal: AiProposal): AiReview | null {
-  const keys = aiReviewKeys(proposal)
-  const empty = keys.links.length + keys.transforms.length + keys.transformLinks.length === 0
-
-  return empty
-    ? null
-    : {
-        sampleId,
-        proposedLinks: keys.links,
-        proposedTransforms: keys.transforms,
-        proposedTransformLinks: keys.transformLinks,
-      }
-}
-
 // Stories use it to start from a Draft whose AI review is open.
 export function withAiProposal(
   record: MappingDraftRecord,
   sampleId: string,
   proposal: AiProposal,
 ): MappingDraftRecord {
-  const review = reviewOf(sampleId, proposal)
+  const review = proposedAiReview(sampleId, proposal)
 
   return review
     ? {

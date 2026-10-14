@@ -54,6 +54,7 @@ export {
   linkEndKey,
   markedAiReviewParts,
   marksAll,
+  proposedAiReview,
   remainingAiReview,
   transformLinkKey,
 } from './ai-review'

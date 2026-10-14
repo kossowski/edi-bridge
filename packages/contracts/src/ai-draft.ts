@@ -1,6 +1,13 @@
 import { z } from 'zod'
 
-import { aiReviewKeys, aiReviewPartsSchema, aiReviewPartsSize } from './ai-review'
+import {
+  aiReviewKeys,
+  aiReviewMarks,
+  aiReviewPartsSchema,
+  aiReviewPartsSize,
+  marksAll,
+  proposedAiReview,
+} from './ai-review'
 import { type Endpoint, type EventStreamEndpoint, parseStreamEvent } from './endpoint'
 import { type MappingDraft, mappingDraftSchema, mappingGraphSchema } from './mapping'
 import { aiTokenBudgetSchema } from './workspace-settings'
@@ -38,16 +45,13 @@ export const aiProposalSchema = mappingGraphSchema
 export type AiProposal = z.infer<typeof aiProposalSchema>
 
 function marksProposal(proposal: AiProposal, { aiReview }: MappingDraft) {
-  const keys = aiReviewKeys(proposal)
+  if (aiReview === null) {
+    return aiReviewPartsSize(aiReviewKeys(proposal)) === 0
+  }
 
-  const allMarked = (marked: ReadonlyArray<string> | undefined, present: ReadonlyArray<string>) =>
-    present.every((key) => marked?.includes(key) ?? false)
+  const proposed = proposedAiReview(aiReview.sampleId, proposal)
 
-  return (
-    allMarked(aiReview?.proposedLinks, keys.links) &&
-    allMarked(aiReview?.proposedTransforms, keys.transforms) &&
-    allMarked(aiReview?.proposedTransformLinks, keys.transformLinks)
-  )
+  return proposed === null || marksAll(aiReview, aiReviewMarks(proposed))
 }
 
 export const aiDraftedEventSchema = z
