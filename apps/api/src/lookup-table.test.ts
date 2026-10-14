@@ -26,6 +26,8 @@ import { buildApp } from './app.js'
 import { otherWorkspace } from './testing.js'
 import { seedDevelopmentWorkspace } from './workspace.js'
 
+import type { Transaction } from './db.js'
+
 const up = () => Promise.resolve()
 
 type LookupTableBody = Omit<LookupTableInput, 'kind'> & { kind: string }
@@ -588,5 +590,57 @@ describe('POST /lookup-tables/:id/import', () => {
     const read = await get(foreign.id, otherApp)
 
     expect(read.json()).toEqual(foreign)
+  })
+})
+
+describe('a Lookup Table deleted right after a write', () => {
+  let deleting: Connection
+
+  let deletingApp: FastifyInstance
+
+  beforeAll(() => {
+    deleting = connect(testDatabase.url)
+
+    const transaction = deleting.db.transaction.bind(deleting.db)
+
+    deleting.db.transaction = async <T>(write: (tx: Transaction) => Promise<T>) => {
+      const result = await transaction(write)
+
+      await deleting.db.delete(lookupTables)
+
+      return result
+    }
+
+    deletingApp = buildApp({ database: deleting.db, probes: { postgres: up, redis: up } })
+  })
+
+  afterAll(async () => {
+    await deletingApp.close()
+    await deleting.close()
+  })
+
+  it('answers the created Lookup Table', async () => {
+    const response = await post(units, deletingApp)
+
+    expect(response.statusCode).toBe(201)
+    expect(lookupTableSchema.parse(response.json()).entries).toEqual(units.entries)
+  })
+
+  it('answers the updated Lookup Table', async () => {
+    const created = await posted(units)
+
+    const response = await update(created.id, { ...units, name: 'Einheiten' }, deletingApp)
+
+    expect(response.statusCode).toBe(200)
+    expect(lookupTableSchema.parse(response.json()).name).toBe('Einheiten')
+  })
+
+  it('answers the imported Lookup Table', async () => {
+    const created = await posted(units)
+
+    const response = await importCsv(created.id, 'KG;KGM', deletingApp)
+
+    expect(response.statusCode).toBe(200)
+    expect(lookupTableSchema.parse(response.json()).entryCount).toBe(3)
   })
 })
