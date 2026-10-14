@@ -1,0 +1,24 @@
+{
+  "name": "@edi-bridge/vitest-config",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "oxlint && eslint",
+    "lint:fix": "oxlint --fix && eslint --fix",
+    "check-types": "tsc --noEmit"
+  },
+  "exports": {
+    "./slow-test-reporter": "./slow-test-reporter.ts"
+  },
+  "devDependencies": {
+    "@edi-bridge/eslint-config": "workspace:*",
+    "@edi-bridge/oxlint-config": "workspace:*",
+    "@edi-bridge/typescript-config": "workspace:*",
+    "@types/node": "^24",
+    "eslint": "^10.12.0",
+    "oxlint": "1.87.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  }
+}

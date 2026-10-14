@@ -2,10 +2,13 @@ import { storybookTest } from '@storybook/addon-vitest/vitest-plugin'
 import { playwright } from '@vitest/browser-playwright'
 import { fileURLToPath } from 'node:url'
 import {
+  configDefaults,
   defineConfig,
   type TestProjectInlineConfiguration,
   type TestUserConfig,
 } from 'vitest/config'
+
+import SlowTestReporter from '@edi-bridge/vitest-config/slow-test-reporter'
 
 function storybookProject(
   name: string,
@@ -28,6 +31,13 @@ function storybookProject(
 }
 
 const testConfig: TestUserConfig = {
+  reporters: [
+    ...configDefaults.reporters,
+    new SlowTestReporter([
+      'components/trading-partners/partner-screen.stories.tsx > Confirmation Arrives',
+      'components/document-structures/new-document-structure-screen.stories.tsx > Csv Settings Keep Choices',
+    ]),
+  ],
   projects: [
     {
       resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },

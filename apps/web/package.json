@@ -41,6 +41,7 @@
     "@edi-bridge/eslint-config": "workspace:*",
     "@edi-bridge/oxlint-config": "workspace:*",
     "@edi-bridge/typescript-config": "workspace:*",
+    "@edi-bridge/vitest-config": "workspace:*",
     "@playwright/test": "^1.64.0",
     "@storybook/addon-a11y": "^10.6.1",
     "@storybook/addon-vitest": "^10.6.1",
