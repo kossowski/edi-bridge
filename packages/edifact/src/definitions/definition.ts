@@ -69,12 +69,3 @@ export interface CodeDirectory {
 export interface CodeListDirectory {
   [id: string]: ReadonlySet<string>
 }
-
-export interface OpenCodeList {
-  tag: string
-  qualifier: string
-  element: number
-  component: number
-  agencyComponent: number
-  agency: string
-}

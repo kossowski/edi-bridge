@@ -1,4 +1,4 @@
-import { codeLists, openCodeLists } from './definitions/code-lists'
+import { codeLists } from './definitions/code-lists'
 import { compositeDirectory } from './definitions/composites'
 import { dataElementFormats } from './definitions/data-elements'
 import { messageDefinitions } from './definitions/message-definitions'
@@ -102,18 +102,20 @@ const checkExtraValues = (
   }
 }
 
-const hasOpenCodeList = (segment: Segment, element: number, component: number) =>
-  openCodeLists.some(
-    (list) =>
-      list.tag === segment.tag &&
-      list.element === element &&
-      list.component === component &&
-      segment.elements[0]?.[0] === list.qualifier &&
-      segment.elements[element - 1]?.[list.agencyComponent - 1] === list.agency,
-  )
+const isBundesbankReportingCode = (segment: Segment, { element, component }: Position) =>
+  segment.tag === 'FTX' &&
+  segment.elements[0]?.[0] === 'REG' &&
+  element === 3 &&
+  component === 2 &&
+  segment.elements[2]?.[2] === '131'
 
 const segmentChecker = ({ decimal }: Delimiters) => {
-  const checkValue = (rule: ValueRule, value: string | undefined, position: Position) => {
+  const checkValue = (
+    rule: ValueRule,
+    value: string | undefined,
+    position: Position,
+    checkCode = true,
+  ) => {
     if (!value) {
       if (rule.status === 'M') {
         throw new ValidationError('missing-element', position)
@@ -132,7 +134,7 @@ const segmentChecker = ({ decimal }: Delimiters) => {
       throw new ValidationError('too-long-element', position)
     }
 
-    if (rule.codes?.has(value) === false) {
+    if (checkCode && rule.codes?.has(value) === false) {
       throw new ValidationError('unknown-code', position)
     }
   }
@@ -167,13 +169,9 @@ const segmentChecker = ({ decimal }: Delimiters) => {
       for (const [componentIndex, component] of rule.components.entries()) {
         const valuePosition = componentPosition(componentIndex)
 
-        checkValue(
-          hasOpenCodeList(segment, valuePosition.element, valuePosition.component)
-            ? { ...component, codes: undefined }
-            : component,
-          values[componentIndex],
-          valuePosition,
-        )
+        const checkCode = !isBundesbankReportingCode(segment, valuePosition)
+
+        checkValue(component, values[componentIndex], valuePosition, checkCode)
       }
 
       checkExtraValues(values, rule.components.length, componentPosition)

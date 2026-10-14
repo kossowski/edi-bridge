@@ -1,4 +1,4 @@
-import type { CodeDirectory, CodeListDirectory, OpenCodeList } from './definition'
+import type { CodeDirectory, CodeListDirectory } from './definition'
 
 const unCodes: CodeDirectory = {
   '0007':
@@ -193,7 +193,3 @@ export const codeLists: CodeListDirectory = Object.fromEntries(
     new Set(`${codes} ${eancomCodes[id] ?? ''}`.trim().split(' ')),
   ]),
 )
-
-export const openCodeLists: OpenCodeList[] = [
-  { tag: 'FTX', qualifier: 'REG', element: 3, component: 2, agencyComponent: 3, agency: '131' },
-]
