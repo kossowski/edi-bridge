@@ -235,26 +235,6 @@
         "requireStringLiterals": false
       }
     ],
-    "perfectionist/sort-imports": [
-      "error",
-      {
-        "groups": [
-          ["value-builtin", "value-external"],
-          ["type-builtin", "type-external"],
-          "value-internal",
-          "type-internal",
-          ["value-parent", "value-sibling", "value-index"],
-          ["type-parent", "type-sibling", "type-index"],
-          "value-side-effect",
-          "value-side-effect-style",
-          "unknown"
-        ],
-        "internalPattern": ["^@edi-bridge/.+", "^@/.+", "^~/.+"],
-        "newlinesBetween": 1,
-        "order": "asc",
-        "type": "natural"
-      }
-    ],
     "perfectionist/sort-jsx-props": [
       "error",
       {
