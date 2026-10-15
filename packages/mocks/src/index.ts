@@ -472,7 +472,7 @@ export function createHandlers(
       flows,
       channels: channelStore,
     }),
-    ...channelHandlers(apiUrl, { channels: channelStore, connectionFailures }),
+    ...channelHandlers(apiUrl, { channels: channelStore, flows, connectionFailures }),
     ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings: mappingVersionStore }),
     publishedMappingVersionsHandler(apiUrl, mappingVersionStore),
     runsHandler(apiUrl, runs, { flows, mappings: mappingVersionStore }),

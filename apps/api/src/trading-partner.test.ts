@@ -319,8 +319,9 @@ describe('the GLN of a Trading Partner', () => {
 })
 
 describe('GET /trading-partners/activity', () => {
-  it('lists no activity until Runs exist, instead of looking up a Trading Partner', async () => {
-    await post(hansemarkt)
+  it('lists each Trading Partner of the Workspace with no Runs until Runs exist', async () => {
+    const created = await postedTradingPartner(hansemarkt)
+    await postedTradingPartner({ ...hansemarkt, gln: null }, otherAdmin)
 
     const response = await admin.inject({
       method: 'GET',
@@ -328,7 +329,16 @@ describe('GET /trading-partners/activity', () => {
     })
 
     expect(response.statusCode).toBe(200)
-    expect(tradingPartnerActivitiesEndpoint.response.parse(response.json())).toEqual([])
+    expect(tradingPartnerActivitiesEndpoint.response.parse(response.json())).toEqual([
+      {
+        tradingPartnerId: created.id,
+        runsToday: 0,
+        openProblems: 0,
+        lastActivityAt: null,
+        channelCount: 0,
+        flowCount: 0,
+      },
+    ])
   })
 })
 

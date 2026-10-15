@@ -23,6 +23,7 @@ import {
   seedConnectionFailures,
   toChannel,
 } from './channel'
+import { seedFlows } from './flow'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -284,6 +285,33 @@ describe('channelHandlers', () => {
     })
     expect(updateChannelEndpoint.response.parse(await removed.json())).toMatchObject({
       authorization: null,
+    })
+  })
+
+  it('refuses to change the Trading Partner of a Channel a Flow uses', async () => {
+    const [flow] = seedFlows
+    const used = seedChannels.find(({ id }) => id === flow?.inboundChannelId)
+    const other = seedTradingPartners.find(({ id }) => id !== used?.tradingPartnerId)
+
+    if (!used || !other) {
+      throw new Error('The seed has no Channel a Flow uses')
+    }
+
+    const store = createChannelStore()
+    server.use(...channelHandlers(apiUrl, { channels: store, flows: seedFlows }))
+    const path = toPath(updateChannelEndpoint.path, used)
+
+    const moved = await send('PUT', path, { ...used, tradingPartnerId: other.id })
+    const renamed = await send('PUT', path, { ...used, name: 'Renamed inbox' })
+
+    expect(moved.status).toBe(409)
+    expect(await moved.json()).toEqual({
+      message: 'The Trading Partner of a Channel cannot change while a Flow uses it',
+    })
+    expect(renamed.status).toBe(200)
+    expect(store.get(used.id)).toMatchObject({
+      tradingPartnerId: used.tradingPartnerId,
+      name: 'Renamed inbox',
     })
   })
 

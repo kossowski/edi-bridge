@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, or } from 'drizzle-orm'
 import { Context, Effect } from 'effect'
 import { randomInt, randomUUID } from 'node:crypto'
 
@@ -14,7 +14,7 @@ import {
   webhookPath,
   webhookTokenSchema,
 } from '@edi-bridge/contracts'
-import { channels } from '@edi-bridge/db'
+import { channels, flows } from '@edi-bridge/db'
 
 import { Db, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
@@ -269,17 +269,50 @@ const rejectingUnchangeable = (existing: Row, changes: ChannelUpdate) => {
   return Effect.void
 }
 
+const tradingPartnerFixed = () =>
+  new Conflict({ message: 'The Trading Partner of a Channel cannot change while a Flow uses it' })
+
+// The lock waits for a Flow being created with this Channel, so the check below sees it.
+const assertTradingPartnerChangeable = async (
+  tx: Transaction,
+  workspaceId: string,
+  id: string,
+  tradingPartnerId: string | null,
+) => {
+  const [locked] = await tx
+    .select({ tradingPartnerId: channels.tradingPartnerId })
+    .from(channels)
+    .where(inWorkspace(channels, workspaceId, byId(id)))
+    .for('update')
+
+  if (!locked || locked.tradingPartnerId === tradingPartnerId) {
+    return
+  }
+
+  const [used] = await tx
+    .select({ id: flows.id })
+    .from(flows)
+    .where(or(eq(flows.inboundChannelId, id), eq(flows.destinationChannelId, id)))
+    .limit(1)
+
+  if (used) {
+    throw tradingPartnerFixed()
+  }
+}
+
 const updatingRow = (id: string, values: Partial<Values>, tradingPartnerId: string | null) =>
   Effect.gen(function* () {
     const { apiPublicUrl } = yield* ChannelEnvironment
 
-    const [row] = yield* writingWithTradingPartner(tradingPartnerId, (tx, workspaceId) =>
-      tx
+    const [row] = yield* writingWithTradingPartner(tradingPartnerId, async (tx, workspaceId) => {
+      await assertTradingPartnerChangeable(tx, workspaceId, id, tradingPartnerId)
+
+      return tx
         .update(channels)
         .set(values)
         .where(inWorkspace(channels, workspaceId, byId(id)))
-        .returning(),
-    )
+        .returning()
+    })
 
     return row ? toChannel(row, apiPublicUrl) : yield* new NotFound()
   })

@@ -18,10 +18,11 @@ import {
   transformIssues,
   unknownPathMessage,
 } from '@edi-bridge/contracts'
-import { documentStructures, mappings, mappingVersions, users } from '@edi-bridge/db'
+import { documentStructures, flows, mappings, mappingVersions, users } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { selectPinnedFlows } from './flow-use.js'
 import { compareOutputs } from './mapping-preview.js'
 import { loadMappingDraft, loadRow, sidesOf } from './mapping.js'
 import { exactlyOne, foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
@@ -65,8 +66,11 @@ export const selectVersionsOfDocumentStructure = async (
   return rows.map((row) => ({ ...toHeader(row), ...row.graph }))
 }
 
-const selectEntries = (db: Database, where: SQL | undefined) =>
-  selectVersions(db, {
+const selectEntries = async (
+  db: Database,
+  where: SQL | undefined,
+): Promise<MappingVersionEntry[]> => {
+  const rows = await selectVersions(db, {
     changeNote: mappingVersions.changeNote,
     publisherId: users.id,
     publisherName: users.name,
@@ -75,15 +79,18 @@ const selectEntries = (db: Database, where: SQL | undefined) =>
     .where(where)
     .orderBy(desc(mappingVersions.version))
 
-type EntryRow = Awaited<ReturnType<typeof selectEntries>>[number]
+  const flowsOf = await selectPinnedFlows(
+    db,
+    rows.map(({ id }) => id),
+  )
 
-const toEntry = (row: EntryRow): MappingVersionEntry => ({
-  ...toHeader(row),
-  changeNote: row.changeNote,
-  publishedBy: { id: row.publisherId, name: row.publisherName },
-  // Until Flows (#186) exist.
-  flows: [],
-})
+  return rows.map((row) => ({
+    ...toHeader(row),
+    changeNote: row.changeNote,
+    publishedBy: { id: row.publisherId, name: row.publisherName },
+    flows: flowsOf(row.id),
+  }))
+}
 
 export const listMappingVersions = (mappingId: string) =>
   Effect.gen(function* () {
@@ -91,11 +98,7 @@ export const listMappingVersions = (mappingId: string) =>
 
     const db = yield* Db
 
-    const rows = yield* Effect.promise(() =>
-      selectEntries(db, eq(mappingVersions.mappingId, mappingId)),
-    )
-
-    return rows.map(toEntry)
+    return yield* Effect.promise(() => selectEntries(db, eq(mappingVersions.mappingId, mappingId)))
   })
 
 export const loadMappingVersion = (mappingId: string, versionId: string) =>
@@ -213,7 +216,6 @@ const noChanges = () =>
 const unconfiguredTransform = () =>
   new Unprocessable({ message: 'Every transform is configured and connected before publishing.' })
 
-// Until Flows (#186) exist, no Flow uses a Mapping.
 const unknownFlows = () =>
   new Unprocessable({ message: 'Only Flows that use this Mapping move to the new version.' })
 
@@ -254,7 +256,17 @@ const publishInTransaction = async (
     return unconfiguredTransform()
   }
 
-  if (moveFlowIds.length > 0) {
+  const moving =
+    moveFlowIds.length === 0
+      ? []
+      : await tx
+          .select({ id: flows.id })
+          .from(flows)
+          .innerJoin(mappingVersions, eq(flows.mappingVersionId, mappingVersions.id))
+          .where(and(inArray(flows.id, moveFlowIds), eq(mappingVersions.mappingId, mappingId)))
+          .for('update', { of: flows })
+
+  if (moving.length !== moveFlowIds.length) {
     return unknownFlows()
   }
 
@@ -274,6 +286,15 @@ const publishInTransaction = async (
     .returning({ id: mappingVersions.id })
 
   await tx.update(mappings).set({ unpublishedChanges: false }).where(eq(mappings.id, mappingId))
+
+  const [published] = inserted
+
+  if (published && moveFlowIds.length > 0) {
+    await tx
+      .update(flows)
+      .set({ mappingVersionId: published.id })
+      .where(inArray(flows.id, moveFlowIds))
+  }
 
   return inserted
 }
@@ -304,9 +325,9 @@ export const publishMappingDraft = (
 
     const { id } = yield* exactlyOne(outcome)
 
-    const rows = yield* Effect.promise(() => selectEntries(db, eq(mappingVersions.id, id)))
+    const entries = yield* Effect.promise(() => selectEntries(db, eq(mappingVersions.id, id)))
 
-    return toEntry(yield* exactlyOne(rows))
+    return yield* exactlyOne(entries)
   })
 
 export const listPublishedMappingVersions = ({ messageType }: PublishedMappingVersionsQuery) =>

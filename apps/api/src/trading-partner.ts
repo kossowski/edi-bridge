@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, count, eq, isNull, type SQL } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
@@ -8,7 +8,7 @@ import {
   type TradingPartnerActivityDetail,
   type TradingPartnerInput,
 } from '@edi-bridge/contracts'
-import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
+import { channels, flows, tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { dayMs } from './duration.js'
@@ -52,10 +52,72 @@ export const listTradingPartners = Effect.gen(function* () {
   return rows.map(toTradingPartner).toSorted(byName)
 })
 
+const countsByTradingPartner = async (
+  db: Database,
+  table: typeof channels | typeof flows,
+  where: SQL | undefined,
+) => {
+  const rows = await db
+    .select({ tradingPartnerId: table.tradingPartnerId, count: count() })
+    .from(table)
+    .where(where)
+    .groupBy(table.tradingPartnerId)
+
+  const byTradingPartner = new Map(rows.map((row) => [row.tradingPartnerId, row.count]))
+
+  return (tradingPartnerId: string) => byTradingPartner.get(tradingPartnerId) ?? 0
+}
+
+const ofTradingPartner = (
+  table: typeof channels | typeof flows,
+  workspaceId: string,
+  tradingPartnerId?: string,
+) =>
+  inWorkspace(
+    table,
+    workspaceId,
+    tradingPartnerId === undefined ? undefined : eq(table.tradingPartnerId, tradingPartnerId),
+  )
+
+const selectChannelAndFlowCounts = async (
+  db: Database,
+  workspaceId: string,
+  tradingPartnerId?: string,
+) => {
+  const [channelCountOf, flowCountOf] = await Promise.all([
+    countsByTradingPartner(db, channels, ofTradingPartner(channels, workspaceId, tradingPartnerId)),
+    countsByTradingPartner(db, flows, ofTradingPartner(flows, workspaceId, tradingPartnerId)),
+  ])
+
+  return (id: string) => ({ channelCount: channelCountOf(id), flowCount: flowCountOf(id) })
+}
+
 // Until Runs exist (#187).
-export const listTradingPartnerActivities: Effect.Effect<TradingPartnerActivity[]> = Effect.succeed(
-  [],
-)
+const noRuns = (tradingPartnerId: string) => ({
+  tradingPartnerId,
+  runsToday: 0,
+  openProblems: 0,
+  lastActivityAt: null,
+})
+
+export const listTradingPartnerActivities = Effect.gen(function* () {
+  const db = yield* Db
+  const workspace = yield* CurrentWorkspace
+
+  const [rows, countsOf] = yield* Effect.promise(() =>
+    Promise.all([
+      db
+        .select({ id: tradingPartners.id, name: tradingPartners.name })
+        .from(tradingPartners)
+        .where(inWorkspace(tradingPartners, workspace.id)),
+      selectChannelAndFlowCounts(db, workspace.id),
+    ]),
+  )
+
+  return rows
+    .toSorted(byName)
+    .map(({ id }): TradingPartnerActivity => ({ ...noRuns(id), ...countsOf(id) }))
+})
 
 const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
   rejectingDuplicate(
@@ -147,21 +209,29 @@ const lastUtcDays = (now: number) =>
     failed: 0,
   }))
 
-// Until Runs exist (#187).
 export const loadTradingPartnerActivity = (id: string) =>
   Effect.gen(function* () {
     const { id: tradingPartnerId } = yield* loadTradingPartner(id)
     const now = yield* Effect.sync(() => Date.now())
 
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const [countsOf, flowsOfPartner] = yield* Effect.promise(() =>
+      Promise.all([
+        selectChannelAndFlowCounts(db, workspace.id, tradingPartnerId),
+        db
+          .select({ id: flows.id, name: flows.name })
+          .from(flows)
+          .where(ofTradingPartner(flows, workspace.id, tradingPartnerId)),
+      ]),
+    )
+
     return {
-      tradingPartnerId,
-      runsToday: 0,
-      openProblems: 0,
-      lastActivityAt: null,
-      channelCount: 0,
-      flowCount: 0,
+      ...noRuns(tradingPartnerId),
+      ...countsOf(tradingPartnerId),
       days: lastUtcDays(now),
-      flows: [],
+      flows: flowsOfPartner.toSorted(byName).map((flow) => ({ flow, runs: 0 })),
       problems: [],
     } satisfies TradingPartnerActivityDetail
   })

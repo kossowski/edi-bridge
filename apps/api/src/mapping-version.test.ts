@@ -353,7 +353,7 @@ describe('POST /mappings/:mappingId/versions', () => {
     expect(await versionsOf(mapping.id)).toEqual([])
   })
 
-  it('answers 422 for a Flow to move, since no Flow uses the Mapping yet', async () => {
+  it('answers 422 and publishes nothing for an unknown Flow to move', async () => {
     const mapping = await createdMapping()
 
     const response = await publish(mapping.id, { changeNote: '', moveFlowIds: [unknownId] })

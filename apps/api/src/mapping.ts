@@ -13,6 +13,7 @@ import {
   type MessageTypeSide,
   oriented,
   type SaveMappingDraftBody,
+  type TradingPartnerSummary,
   unknownPathMessage,
 } from '@edi-bridge/contracts'
 import {
@@ -25,6 +26,7 @@ import {
 
 import { Db, type Database } from './db.js'
 import { Unprocessable } from './errors.js'
+import { selectTradingPartnersByMapping } from './flow-use.js'
 import {
   byName,
   exactlyOne,
@@ -63,7 +65,7 @@ const selectRows = (db: Database, where: SQL | undefined) => {
 
 type Row = Awaited<ReturnType<typeof selectRows>>[number]
 
-const toSummary = (row: Row): MappingSummary => ({
+const toSummary = (row: Row, partners: TradingPartnerSummary[]): MappingSummary => ({
   id: row.id,
   name: row.name,
   direction: directionOf(row),
@@ -74,8 +76,8 @@ const toSummary = (row: Row): MappingSummary => ({
   latestVersionPublishedAt: row.latestVersionPublishedAt?.toISOString() ?? null,
   unpublishedChanges: row.unpublishedChanges,
   draftUpdatedAt: row.draftUpdatedAt.toISOString(),
-  // Until Flows (#186) and Runs (#187) exist.
-  partners: [],
+  partners,
+  // Until Runs (#187) exist.
   documentsLast7Days: 0,
   failedRunsLast7Days: 0,
 })
@@ -84,9 +86,14 @@ export const listMappings = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
-  const rows = yield* Effect.promise(() => selectRows(db, inWorkspace(mappings, workspace.id)))
+  const [rows, partnersOf] = yield* Effect.promise(() =>
+    Promise.all([
+      selectRows(db, inWorkspace(mappings, workspace.id)),
+      selectTradingPartnersByMapping(db, workspace.id),
+    ]),
+  )
 
-  return rows.map(toSummary).toSorted(byName)
+  return rows.map((row) => toSummary(row, partnersOf(row.id))).toSorted(byName)
 })
 
 const nameOf = (messageType: MessageType, documentStructureName: string) => {
@@ -186,7 +193,7 @@ export const createMapping = ({ messageType }: CreateMappingBody) =>
       selectRows(db, inWorkspace(mappings, workspace.id, eq(mappings.id, id))),
     )
 
-    return toSummary(yield* exactlyOne(rows))
+    return toSummary(yield* exactlyOne(rows), [])
   })
 
 export const sidesOf = ({
