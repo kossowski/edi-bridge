@@ -32,7 +32,6 @@ function dateParts(value: string, pattern: string): Partial<Record<DateToken, st
 
 const pad = (value: number, length: number) => String(value).padStart(length, '0')
 
-// A two-digit year falls in this century.
 export function reformatDate(value: string, from: string, to: string): string | undefined {
   const parts = dateParts(value, from)
 
@@ -89,6 +88,7 @@ export function reformatNumber(
   separator: string,
 ): string | undefined {
   const number = z.number().safeParse(value)
+
   const match = /^(-?)(\d+)(?:[.,](\d+))?$/.exec(
     number.success ? decimalOf(number.data) : String(value),
   )

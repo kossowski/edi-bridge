@@ -72,7 +72,6 @@ type TransformTarget = { path: string; from: LinkStart & { kind: 'transform' } }
 
 type LookupTables = ReadonlyMap<string, ReadonlyMap<string, string>>
 
-// An expression without a result is missing from its map.
 type Expressions = ReadonlyMap<string, string>
 
 type Graph = {
