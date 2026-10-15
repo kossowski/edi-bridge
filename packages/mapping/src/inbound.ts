@@ -21,7 +21,7 @@ import type { Message, Segment } from '@edi-bridge/edifact'
 import { elementPaths } from './elements'
 import { MappingError } from './errors'
 import { hasValueBeneath, isBeneath, isRequiredOrFilled, setFilled, type Values } from './values'
-import { type Loop, type Wiring, wiringOf } from './wiring'
+import { type Graph, type Loop, type Wiring, wiringOf } from './wiring'
 
 export type InboundMappingVersion = Extract<MappingVersion, { direction: 'inbound' }>
 
@@ -120,10 +120,10 @@ function componentOf(child: SegmentChild, path: string): number {
   return child.path === path ? 0 : -1
 }
 
-type Located = { occurrences: Occurrences; nodes: ReadonlyArray<EdifactStructureNode> }
+type PlacedPart = { occurrences: Occurrences; nodes: ReadonlyArray<EdifactStructureNode> }
 
 // Outside the scope of a loop, a plain link reads the first repetition of a segment or group.
-function valueAt({ occurrences, nodes }: Located, path: string): string | undefined {
+function valueAt({ occurrences, nodes }: PlacedPart, path: string): string | undefined {
   for (const node of nodes) {
     if (node.kind === 'segmentGroup') {
       const [first] = occurrences.groups.get(node.path) ?? []
@@ -150,7 +150,7 @@ function valueAt({ occurrences, nodes }: Located, path: string): string | undefi
   return undefined
 }
 
-function repetitionsOf({ occurrences, nodes }: Located, path: string): Occurrences[] {
+function repetitionsOf({ occurrences, nodes }: PlacedPart, path: string): Occurrences[] {
   for (const node of nodes) {
     if (node.kind !== 'segmentGroup' || !isBeneath(path, node.path)) {
       continue
@@ -175,25 +175,28 @@ function groupsOf(nodes: ReadonlyArray<EdifactStructureNode>): EdifactSegmentGro
   )
 }
 
-type Scope = {
+type RepetitionScope = {
   repetitions: ReadonlyMap<string, Occurrences>
   counters: ReadonlyMap<string, string>
   loopTargets: ReadonlySet<string>
 }
 
 type Reading = {
-  message: Located
+  message: PlacedPart
   groups: ReadonlyMap<string, EdifactSegmentGroup>
   links: InboundMappingVersion['links']
-  graph: Wiring['graph']
+  graph: Graph
   loops: ReadonlyMap<string, Loop>
-  numbered: Map<Loop, number>
-  scope: Scope
+  itemCounts: Map<Loop, number>
+  scope: RepetitionScope
 }
 
 type Context = Reading & { values: Values }
 
-function located({ message, groups, scope }: Reading, path: string): Located {
+const repetitionsIn = (reading: Reading, sourcePart: string) =>
+  repetitionsOf(enclosingPart(reading, sourcePart), sourcePart)
+
+function enclosingPart({ message, groups, scope }: Reading, path: string): PlacedPart {
   const part = [...scope.repetitions.keys()]
     .filter((group) => group !== path && isBeneath(path, group))
     .reduce<string | undefined>(
@@ -218,7 +221,7 @@ function valuesIn(reading: Reading): Effect.Effect<Values, MappingError> {
 
   for (const { sourcePath, targetPath } of reading.links) {
     if (isInScope(reading, targetPath)) {
-      setFilled(values, targetPath, valueAt(located(reading, sourcePath), sourcePath))
+      setFilled(values, targetPath, valueAt(enclosingPart(reading, sourcePath), sourcePath))
     }
   }
 
@@ -241,19 +244,19 @@ function valuesIn(reading: Reading): Effect.Effect<Values, MappingError> {
   return Effect.succeed(values)
 }
 
-function within(
+function enterRepetition(
   context: Context,
   loop: Loop,
   targetPart: string,
   repetition: Occurrences,
 ): Effect.Effect<Context, MappingError> {
-  const numbered = context.numbered.get(loop) ?? 0
+  const itemCount = context.itemCounts.get(loop) ?? 0
 
-  context.numbered.set(loop, numbered + 1)
+  context.itemCounts.set(loop, itemCount + 1)
 
   const scope = {
     repetitions: new Map(context.scope.repetitions).set(loop.sourcePart, repetition),
-    counters: new Map(context.scope.counters).set(loop.id, String(loop.counterStart + numbered)),
+    counters: new Map(context.scope.counters).set(loop.id, String(loop.counterStart + itemCount)),
     loopTargets: new Set(context.scope.loopTargets).add(targetPart),
   }
 
@@ -278,37 +281,51 @@ function fieldValue(field: DocumentField, value: string): Effect.Effect<JsonCont
     : Effect.fail(new MappingError({ code: 'invalidNumber', targetPath: field.path }))
 }
 
-type Entries = Effect.Effect<Array<[string, JsonContent]>, MappingError>
+type MappedEntries = Effect.Effect<Array<[string, JsonContent]>, MappingError>
 
-function fieldEntry(field: DocumentField, values: Values): Entries {
+function fieldContent(
+  field: DocumentField,
+  values: Values,
+): Effect.Effect<JsonContent | undefined, MappingError> {
   const value = values.get(field.path)
 
   if (value === undefined) {
     return field.required
       ? Effect.fail(new MappingError({ code: 'missingRequiredValue', targetPath: field.path }))
-      : Effect.succeed([])
+      : Effect.succeed(undefined)
   }
 
-  return Effect.map(fieldValue(field, value), (content) => [[field.name, content]])
+  return fieldValue(field, value)
 }
+
+const fieldEntry = (field: DocumentField, values: Values): MappedEntries =>
+  Effect.map(fieldContent(field, values), (content) =>
+    content === undefined ? [] : [[field.name, content]],
+  )
 
 function itemOf(
   content: DocumentField | DocumentObject,
   context: Context,
 ): Effect.Effect<JsonContent, MappingError> {
   return content.kind === 'field'
-    ? Effect.map(fieldEntry(content, context.values), (entries) => entries[0]?.[1] ?? null)
+    ? Effect.map(fieldContent(content, context.values), (item) => item ?? null)
     : documentOf(content.children, context)
 }
 
-function arrayEntry(node: DocumentArray, context: Context): Entries {
+const hasItemsBeneath = (path: string, context: Context) =>
+  [...context.loops].some(
+    ([targetPart, { sourcePart }]) =>
+      isBeneath(targetPart, path, '.') && repetitionsIn(context, sourcePart).length > 0,
+  )
+
+function arrayEntry(node: DocumentArray, context: Context): MappedEntries {
   const loop = context.loops.get(node.path)
-  const repetitions = loop ? repetitionsOf(located(context, loop.sourcePart), loop.sourcePart) : []
+  const repetitions = loop ? repetitionsIn(context, loop.sourcePart) : []
 
   if (loop && repetitions.length > 0) {
     return Effect.map(
       Effect.forEach(repetitions, (repetition) =>
-        Effect.flatMap(within(context, loop, node.path, repetition), (inner) =>
+        Effect.flatMap(enterRepetition(context, loop, node.path, repetition), (inner) =>
           itemOf(node.items, inner),
         ),
       ),
@@ -324,25 +341,19 @@ function arrayEntry(node: DocumentArray, context: Context): Entries {
   return Effect.succeed(node.required ? [[node.name, []]] : [])
 }
 
-const hasItemsBeneath = (part: DocumentObject, context: Context) =>
-  [...context.loops].some(
-    ([targetPart, { sourcePart }]) =>
-      isBeneath(targetPart, part.path, '.') &&
-      repetitionsOf(located(context, sourcePart), sourcePart).length > 0,
-  )
-
 // Only an object that is required or holds a value needs its required fields.
 function documentOf(
   nodes: ReadonlyArray<DocumentStructureNode>,
   context: Context,
 ): Effect.Effect<JsonObject, MappingError> {
   return Effect.map(
-    Effect.forEach(nodes, (node): Entries => {
+    Effect.forEach(nodes, (node): MappedEntries => {
       switch (node.kind) {
         case 'field':
           return fieldEntry(node, context.values)
         case 'object':
-          return isRequiredOrFilled(node, context.values, '.') || hasItemsBeneath(node, context)
+          return isRequiredOrFilled(node, context.values, '.') ||
+            hasItemsBeneath(node.path, context)
             ? Effect.map(documentOf(node.children, context), (content) => [[node.name, content]])
             : Effect.succeed([])
         case 'array':
@@ -353,10 +364,13 @@ function documentOf(
   )
 }
 
-type Read = { sourcePath: string; targetPath: string }
+type SourceRead = { sourcePath: string; targetPath: string }
+
+const loopReads = (loops: ReadonlyMap<string, Loop>): SourceRead[] =>
+  [...loops].map(([targetPath, { sourcePart }]) => ({ sourcePath: sourcePart, targetPath }))
 
 function unknownRead(
-  links: ReadonlyArray<Read>,
+  links: ReadonlyArray<SourceRead>,
   { graph, loops, loopTargets }: Wiring,
   nodes: ReadonlyArray<EdifactStructureNode>,
   structure: DocumentStructure,
@@ -376,11 +390,7 @@ function unknownRead(
 
   const unknownSource = [
     ...links.map((read) => ({ ...read, known: elements })),
-    ...[...loops].map(([targetPath, { sourcePart }]) => ({
-      sourcePath: sourcePart,
-      targetPath,
-      known: groups,
-    })),
+    ...loopReads(loops).map((read) => ({ ...read, known: groups })),
   ].find(({ sourcePath, known }) => !known.has(sourcePath))
 
   if (unknownSource) {
@@ -402,21 +412,13 @@ function unknownRead(
 
 // A loop over a nested segment group reads it from the repetition of its parent's loop.
 function outsideLoop(
-  links: ReadonlyArray<Read>,
+  links: ReadonlyArray<SourceRead>,
   loops: ReadonlyMap<string, Loop>,
   groups: ReadonlyArray<EdifactSegmentGroup>,
 ): string | undefined {
   const repeating = groups.flatMap(({ maxRepeat, path }) => (maxRepeat > 1 ? [path] : []))
 
-  const reads = [
-    ...links,
-    ...[...loops].map(([targetPart, { sourcePart }]) => ({
-      sourcePath: sourcePart,
-      targetPath: targetPart,
-    })),
-  ]
-
-  return reads.find(({ sourcePath, targetPath }) =>
+  return [...links, ...loopReads(loops)].find(({ sourcePath, targetPath }) =>
     repeating.some(
       (part) =>
         part !== sourcePath &&
@@ -469,7 +471,7 @@ export function applyInboundMappingVersion(
     links: version.links,
     graph,
     loops,
-    numbered: new Map(),
+    itemCounts: new Map(),
     scope: { repetitions: new Map(), counters: new Map(), loopTargets: new Set() },
   }
 

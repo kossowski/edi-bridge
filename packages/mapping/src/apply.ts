@@ -26,18 +26,15 @@ import { MappingError, type MappingErrorCode } from './errors'
 import { reformatDate, reformatNumber } from './formats'
 import { jsonListSchema, jsonObjectSchema } from './json'
 import { isBeneath, isRequiredOrFilled, setFilled, type Values } from './values'
-import {
-  type Expressions,
-  type Graph,
-  type LookupTables,
-  type Loop,
-  type Wiring,
-  wiringOf,
-} from './wiring'
+import { type Graph, type LookupTables, type Loop, type Wiring, wiringOf } from './wiring'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
 
 const scalarSchema = z.union([z.string(), z.number(), z.boolean()])
+
+type Expressions = ReadonlyMap<string, string>
+
+type EvaluatedGraph = Graph & { expressions: Expressions }
 
 type Scope = {
   items: ReadonlyMap<string, JsonContent>
@@ -47,9 +44,9 @@ type Scope = {
 type Context = {
   document: JsonContent
   links: OutboundMappingVersion['links']
-  graph: Graph
+  graph: EvaluatedGraph
   loops: ReadonlyMap<string, Loop>
-  numbered: Map<Loop, number>
+  itemCounts: Map<Loop, number>
   scope: Scope
   values: Values
 }
@@ -149,7 +146,7 @@ function lookedUp(
 function applied(
   transform: Exclude<MappingTransform, { kind: 'loop' | 'conditional' }>,
   args: Readonly<Record<string, Value>>,
-  { expressions, lookupTables }: Graph,
+  { expressions, lookupTables }: EvaluatedGraph,
   fail: (code: MappingErrorCode) => MappingError,
 ): Effect.Effect<string, MappingError> {
   const value = String(args.value ?? '')
@@ -424,13 +421,13 @@ function within(
   loop: Loop,
   item: JsonContent,
 ): Effect.Effect<Context, MappingError> {
-  const numbered = context.numbered.get(loop) ?? 0
+  const itemCount = context.itemCounts.get(loop) ?? 0
 
-  context.numbered.set(loop, numbered + 1)
+  context.itemCounts.set(loop, itemCount + 1)
 
   const scope = {
     items: new Map(context.scope.items).set(loop.sourcePart, item),
-    counters: new Map(context.scope.counters).set(loop.id, String(loop.counterStart + numbered)),
+    counters: new Map(context.scope.counters).set(loop.id, String(loop.counterStart + itemCount)),
   }
 
   return Effect.map(valuesIn({ ...context, scope }), (values) => ({ ...context, scope, values }))
@@ -567,7 +564,7 @@ export function applyMappingVersion(
       links: version.links,
       graph: { ...graph, expressions },
       loops,
-      numbered: new Map(),
+      itemCounts: new Map(),
       scope: { items: new Map(), counters: new Map() },
     }
 

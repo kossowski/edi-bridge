@@ -17,10 +17,7 @@ export type TransformTarget = { path: string; from: LinkStart & { kind: 'transfo
 
 export type LookupTables = ReadonlyMap<string, ReadonlyMap<string, string>>
 
-export type Expressions = ReadonlyMap<string, string>
-
 export type Graph = {
-  expressions: Expressions
   lookupTables: LookupTables
   transforms: ReadonlyMap<string, MappingTransform>
   feeding: ReadonlyMap<string, LinkStart>
@@ -28,10 +25,10 @@ export type Graph = {
   targets: ReadonlyArray<TransformTarget>
 }
 
-type LoopDraft = Omit<Loop, 'sourcePart'> & { sourcePart?: string }
+type PartialLoop = Omit<Loop, 'sourcePart'> & { sourcePart?: string }
 
 export type Wiring = {
-  graph: Omit<Graph, 'expressions'>
+  graph: Graph
   loops: ReadonlyMap<string, Loop>
   loopTargets: ReadonlyArray<string>
 }
@@ -41,11 +38,11 @@ export function wiringOf(
   lookupTables: ReadonlyMap<string, ReadonlyArray<LookupTableEntry>> = new Map(),
 ): Wiring {
   const { transforms, transformLinks } = version
-  const drafts = new Map<string, LoopDraft>()
+  const partials = new Map<string, PartialLoop>()
 
   for (const transform of transforms) {
     if (transform.kind === 'loop') {
-      drafts.set(transform.id, {
+      partials.set(transform.id, {
         id: transform.id,
         targetParts: [],
         counterStart: transform.config.counterStart,
@@ -59,10 +56,10 @@ export function wiringOf(
 
   for (const { from, to } of transformLinks) {
     if (to.kind === 'transform') {
-      const draft = drafts.get(to.transformId)
+      const partial = partials.get(to.transformId)
 
-      if (draft && to.input === 'items' && from.kind === 'source') {
-        draft.sourcePart = from.path
+      if (partial && to.input === 'items' && from.kind === 'source') {
+        partial.sourcePart = from.path
       }
 
       feeding.set(`${to.transformId}/${to.input}`, from)
@@ -71,7 +68,7 @@ export function wiringOf(
 
     if (from.kind === 'transform' && from.output === 'items') {
       loopTargets.push(to.path)
-      drafts.get(from.transformId)?.targetParts.push(to.path)
+      partials.get(from.transformId)?.targetParts.push(to.path)
       continue
     }
 
@@ -82,9 +79,9 @@ export function wiringOf(
 
   const loops = new Map<string, Loop>()
 
-  for (const { sourcePart, ...draft } of drafts.values()) {
+  for (const { sourcePart, ...partial } of partials.values()) {
     if (sourcePart !== undefined) {
-      const loop = { sourcePart, ...draft }
+      const loop = { sourcePart, ...partial }
 
       for (const targetPart of loop.targetParts) {
         loops.set(targetPart, loop)
@@ -94,7 +91,7 @@ export function wiringOf(
 
   const issues = transformIssues(version)
 
-  const graph: Wiring['graph'] = {
+  const graph: Graph = {
     lookupTables: new Map(
       [...lookupTables].map(([id, entries]) => [
         id,
