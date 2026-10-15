@@ -1,8 +1,15 @@
-import { NextIntlClientProvider } from 'next-intl'
-import { expect, fn, screen, waitFor } from 'storybook/test'
+import { http, HttpResponse } from 'msw'
+import { expect, fn, screen, userEvent, waitFor } from 'storybook/test'
 
 import { DeleteLookupTableDialog } from '@/components/lookup-tables/delete-lookup-table-dialog'
-import messagesDe from '@/messages/de.json'
+import { german } from '@/components/story-helpers'
+import { apiUrl } from '@/lib/api/config'
+import {
+  deleteLookupTableEndpoint,
+  lookupTableInUseMessage,
+  lookupTableInUseStatus,
+  toPath,
+} from '@edi-bridge/contracts'
 import { seedLookupTableNamed, seedTradingPartners, toLookupTableSummary } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -43,14 +50,52 @@ export const Default = meta.story({
   },
 })
 
-export const German = meta.story({
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
+const refuseInUse = http.delete(
+  `${apiUrl}${toPath(deleteLookupTableEndpoint.path, { id: units.id })}`,
+  () =>
+    HttpResponse.json(
+      { status: lookupTableInUseStatus, message: lookupTableInUseMessage },
+      { status: lookupTableInUseStatus },
     ),
-  ],
+)
+
+export const InUse = meta.story({
+  beforeEach({ msw }) {
+    msw.use(refuseInUse)
+  },
+  async play({ args }) {
+    await dialog()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete list' }))
+
+    await expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A draft or a published version of a mapping uses this list, so it cannot be deleted.',
+    )
+    await expect(screen.queryByText(/Try again/)).toBeNull()
+    const confirm = screen.getByRole('button', { name: 'Delete list' })
+
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    await expect(confirm).toHaveFocus()
+    await expect(args.onDeleted).not.toHaveBeenCalled()
+  },
+})
+
+export const GermanInUse = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(refuseInUse)
+  },
+  async play() {
+    await dialog()
+    await userEvent.click(screen.getByRole('button', { name: 'Liste löschen' }))
+
+    await expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Liste, deshalb kann sie nicht gelöscht werden.',
+    )
+  },
+})
+
+export const German = meta.story({
+  decorators: [german],
   async play() {
     await dialog()
     await expect(screen.getByRole('button', { name: 'Liste löschen' })).toBeVisible()

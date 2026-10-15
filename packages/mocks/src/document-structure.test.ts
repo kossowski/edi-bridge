@@ -580,7 +580,7 @@ describe('PUT /document-structures/:id', () => {
     expect(response.status).toBe(200)
   })
 
-  it('refuses to turn a node a Mapping Draft links into a list', async () => {
+  it('refuses to turn a node a Draft links into a list', async () => {
     useHandlers({ versions: [] })
 
     const problem = await problemOf(

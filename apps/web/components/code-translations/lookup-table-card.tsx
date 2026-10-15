@@ -19,6 +19,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@edi-bridge/ui/compon
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@edi-bridge/ui/components/dropdown-menu'
@@ -36,6 +37,16 @@ const namedCodes = 2
 
 export function hasBlockingCodes(table: Pick<LookupTableSummary, 'blockingCodes'>) {
   return table.blockingCodes.length > 0
+}
+
+function useShortList() {
+  const format = useFormatter()
+
+  return (names: ReadonlyArray<string>, shown: number, more: (count: number) => string) => {
+    const hidden = names.length - shown
+
+    return format.list(hidden > 0 ? [...names.slice(0, shown), more(hidden)] : names)
+  }
 }
 
 function useUseSentence() {
@@ -97,16 +108,14 @@ export function UsesList({
 
 function BlockingBadge({ codes }: { codes: ReadonlyArray<string> }) {
   const t = useTranslations('CodeTranslations')
-  const format = useFormatter()
-  const hidden = codes.length - namedCodes
-  const named = codes.slice(0, namedCodes)
+  const shortList = useShortList()
 
   return (
     <Badge variant="outline" className="bg-red-500/10 text-red-800 dark:text-red-300">
       <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} aria-hidden />
       {t('missing', {
         count: codes.length,
-        codes: format.list(hidden > 0 ? [...named, t('moreCodes', { count: hidden })] : named),
+        codes: shortList(codes, namedCodes, (count) => t('moreCodes', { count })),
       })}
     </Badge>
   )
@@ -114,7 +123,15 @@ function BlockingBadge({ codes }: { codes: ReadonlyArray<string> }) {
 
 function ActionsMenu({ table, actions }: { table: LookupTableSummary; actions: CardActions }) {
   const t = useTranslations('CodeTranslations.actions')
+  const shortList = useShortList()
+  const sentence = useUseSentence()
   const trigger = useRef<HTMLButtonElement>(null)
+  const reasonId = useId()
+  const inUse = table.uses.length > 0
+
+  const mappings = shortList(table.uses.map(sentence), shownUses, (count) =>
+    t('moreMappings', { count }),
+  )
 
   return (
     <DropdownMenu>
@@ -130,12 +147,21 @@ function ActionsMenu({ table, actions }: { table: LookupTableSummary; actions: C
           <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
           {t('edit')}
         </DropdownMenuItem>
-        <DropdownMenuItem
-          variant="destructive"
-          onClick={() => actions.onDelete(table, trigger.current)}>
-          <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
-          {t('delete')}
-        </DropdownMenuItem>
+        <DropdownMenuGroup>
+          <DropdownMenuItem
+            disabled={inUse}
+            variant="destructive"
+            aria-describedby={inUse ? reasonId : undefined}
+            onClick={() => actions.onDelete(table, trigger.current)}>
+            <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
+            {t('delete')}
+          </DropdownMenuItem>
+          {inUse && (
+            <p id={reasonId} className="text-muted-foreground max-w-64 px-1.5 pb-1 text-xs">
+              {t('inUse', { mappings })}
+            </p>
+          )}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -3322,8 +3322,8 @@
     "typeLabel": "Typ von {path}",
     "changed": "Geändert",
     "marks": {
-      "usedByMappingVersion": "Von veröffentlichten Mapping Versions verwendet",
-      "linkedByMapping": "Von einem Mapping-Draft verknüpft",
+      "usedByMappingVersion": "Von veröffentlichten Versionen verwendet",
+      "linkedByMapping": "Von einem Entwurf verknüpft",
       "other": "Abgelehnt"
     },
     "expand": "{path} öffnen",
@@ -3360,7 +3360,7 @@
     "path": "Bei <code>{path}</code>",
     "details": "Details (auf Englisch)",
     "showInTree": "{path} im Baum zeigen",
-    "versionsTitle": "Veröffentlichte Mapping Versions, die es verwenden:",
+    "versionsTitle": "Veröffentlichte Versionen, die es verwenden:",
     "version": "{mappingName}, Version {version}",
     "mappingsTitle": "Mappings, die dieses Datenformat lesen:",
     "codes": {
@@ -3375,10 +3375,10 @@
       "unknownPath": "Das Datenformat hat sich inzwischen geändert. Laden Sie die Seite neu und passen Sie es erneut an.",
       "notAdjustable": "Dieser Teil des Datenformats lässt sich so nicht ändern.",
       "csvDocumentRequired": "Für andere CSV-Einstellungen braucht es ein CSV-Document, das EDI Bridge mit den neuen Einstellungen erneut liest.",
-      "linkedByMapping": "Ein Mapping-Draft verknüpft ein Feld, das diese Änderung entfernen würde. Entfernen Sie zuerst die Verknüpfung auf dem Mapping-Canvas oder machen Sie die Änderung rückgängig.",
-      "usedByMappingVersion": "Veröffentlichte Mapping Versions verwenden diesen Teil, und eine veröffentlichte Mapping Version ändert sich nie. Machen Sie die Änderung rückgängig oder erstellen Sie ein neues Datenformat für die neue Form."
+      "linkedByMapping": "Ein Entwurf eines Mappings verknüpft ein Feld, das diese Änderung entfernen würde. Entfernen Sie zuerst die Verknüpfung auf dem Mapping-Canvas oder machen Sie die Änderung rückgängig.",
+      "usedByMappingVersion": "Veröffentlichte Versionen von Mappings verwenden diesen Teil, und eine veröffentlichte Version ändert sich nie. Machen Sie die Änderung rückgängig oder erstellen Sie ein neues Datenformat für die neue Form."
     },
-    "csvSettingsUsedByMappingVersion": "Veröffentlichte Mapping Versions lesen CSV-Documents mit diesen Einstellungen, und eine veröffentlichte Mapping Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie ein neues Datenformat mit den neuen."
+    "csvSettingsUsedByMappingVersion": "Veröffentlichte Versionen von Mappings lesen CSV-Documents mit diesen Einstellungen, und eine veröffentlichte Version ändert sich nie. Behalten Sie die gespeicherten CSV-Einstellungen oder erstellen Sie ein neues Datenformat mit den neuen."
   },
   "CodeTranslation": {
     "title": "Code-Übersetzung",
@@ -3572,7 +3572,9 @@
     "actions": {
       "label": "Aktionen für {name}",
       "edit": "Name und Empfänger bearbeiten",
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "inUse": "Verwendet für {mappings}.",
+      "moreMappings": "{count} weitere"
     },
     "announcements": {
       "saved": "{name} gespeichert.",
@@ -3638,7 +3640,8 @@
       "cancel": "Abbrechen",
       "confirm": "Liste löschen",
       "pending": "Wird gelöscht…",
-      "failed": "Die Liste konnte nicht gelöscht werden. Versuchen Sie es erneut."
+      "failed": "Die Liste konnte nicht gelöscht werden. Versuchen Sie es erneut.",
+      "inUse": "Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Liste, deshalb kann sie nicht gelöscht werden."
     }
   },
   "LookupTable": {

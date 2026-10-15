@@ -560,7 +560,7 @@ describe('documentStructureProblemSchema', () => {
   it('names Mapping Versions only for usedByMappingVersion', () => {
     const problem = {
       code: 'linkedByMapping',
-      message: 'A Mapping Draft links lines[].gtin',
+      message: 'A Draft links lines[].gtin',
       path: 'lines[]',
       line: null,
       mappingVersions: [version],

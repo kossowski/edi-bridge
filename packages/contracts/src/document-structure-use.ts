@@ -147,7 +147,7 @@ export function linkChangeProblem(
 
   return {
     code: 'linkedByMapping',
-    message: `A Mapping Draft links ${broken}, which the change at ${path} would remove`,
+    message: `A Draft links ${broken}, which the change at ${path} would remove`,
     path,
     line: null,
     mappingVersions: null,
