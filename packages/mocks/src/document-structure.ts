@@ -40,10 +40,10 @@ import {
   updateDocumentStructureEndpoint,
   visitedNode,
   type Session,
+  containerOf,
 } from '@edi-bridge/contracts'
 
 import { byNameAndNewest } from './flow'
-import { containerOf } from './paths'
 import { badRequest, notFound, serverError } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'

@@ -1,11 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 import {
-  type EdifactComposite,
-  type EdifactElement,
-  type EdifactStructureNode,
   messageTypeSchema,
-  type MessageTypeStructure,
   messageTypeStructureEndpoint,
   messageTypeStructures,
 } from '@edi-bridge/contracts'
@@ -23,12 +19,4 @@ export function messageTypeStructureHandler(apiUrl: string) {
         : notFound()
     },
   )
-}
-
-export function edifactLeaves(structure: Pick<MessageTypeStructure, 'children'>): EdifactElement[] {
-  const visit = (
-    node: EdifactStructureNode | EdifactComposite | EdifactElement,
-  ): EdifactElement[] => (node.kind === 'element' ? [node] : node.children.flatMap(visit))
-
-  return structure.children.flatMap(visit)
 }

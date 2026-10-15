@@ -469,6 +469,16 @@ export {
 export { messageTypeStructures } from './eancom/structures'
 
 export {
+  containerOf,
+  edifactLeaves,
+  mappingSideLeaves,
+  oriented,
+  type SideLeaves,
+  unknownPathMessage,
+  unknownPaths,
+} from './mapping-paths'
+
+export {
   type AcknowledgementState,
   acknowledgementStates,
   acknowledgementStateSchema,

@@ -7,12 +7,13 @@ import {
   directionOf,
   type DocumentStructure,
   documentStructureLeaves,
+  edifactLeaves,
   type MappingDraft,
   mappingDraftEndpoint,
   mappingDraftSchema,
+  mappingSideLeaves,
   type MappingGraph,
   type MappingLink,
-  type MappingSide,
   mappingsEndpoint,
   type MappingSummary,
   mappingSummarySchema,
@@ -23,9 +24,11 @@ import {
   type MessageType,
   messageTypes,
   messageTypeStructures,
+  oriented,
   remainingAiReview,
   type RunStatus,
   type RunSummary,
+  type SideLeaves,
   saveMappingDraftEndpoint,
   type TradingPartner,
   type TradingPartnerSummary,
@@ -35,6 +38,7 @@ import {
   type TransformLink,
   transformLinkTargets,
   transformPorts,
+  unknownPathMessage,
 } from '@edi-bridge/contracts'
 
 import {
@@ -52,10 +56,14 @@ import {
   seedMappings,
   toFlowStore,
 } from './flow'
-import { seedLookupTableNamed } from './lookup-table-seed'
-import { edifactLeaves } from './message-type-structure'
+import {
+  type LookupTableRecord,
+  type LookupTableStore,
+  seedLookupTableNamed,
+  seedLookupTables,
+  toLookupTableStore,
+} from './lookup-table-seed'
 import { day } from './overdue'
-import { containerOf } from './paths'
 import { badRequest, notFound, serverError, unprocessable } from './responses'
 import { seedRuns, toRunSummary } from './run'
 import { type RunStore, toRunStore } from './run-store'
@@ -177,16 +185,6 @@ export const linkTemplates: Readonly<
     ['messages[].segmentErrors[].position', 'SG1/SG2/UCS/0096'],
     ['messages[].segmentErrors[].syntaxError', 'SG1/SG2/UCS/0085'],
   ],
-}
-
-// Inbound Mappings read the Message Type and write the Document, outbound ones the other way.
-export function oriented<Side>(
-  messageType: MessageType,
-  { document, edifact }: { document: Side; edifact: Side },
-): { source: Side; target: Side } {
-  return directionOf({ messageType }) === 'inbound'
-    ? { source: edifact, target: document }
-    : { source: document, target: edifact }
 }
 
 export function link(
@@ -524,21 +522,6 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
   },
 ]
 
-export function sideLeaves(
-  record: MappingDraftRecord,
-  documentStructures: DocumentStructures,
-): { source: Set<string>; target: Set<string> } {
-  const document = new Set(
-    documentStructureLeaves(structureOf(record, documentStructures)).map(({ path }) => path),
-  )
-
-  const edifact = new Set(
-    edifactLeaves(messageTypeStructures[record.messageType]).map(({ path }) => path),
-  )
-
-  return oriented(record.messageType, { document, edifact })
-}
-
 function randomLinks(
   faker: Faker,
   record: Pick<MappingDraftRecord, 'messageType'>,
@@ -573,13 +556,14 @@ function randomGraph(
 ): TransformGraph {
   const faker = seededFaker(`transforms:${record.id}`)
 
-  const { source, target } = oriented(record.messageType, {
-    document: documentStructureLeaves(documentStructure).map(({ path }) => path),
-    edifact: edifactLeaves(messageTypeStructures[record.messageType]).map(({ path }) => path),
-  })
+  const leaves = mappingSideLeaves(record.messageType, documentStructure)
+  const source = [...leaves.source]
 
   const linked = new Set(links.map(({ targetPath }) => targetPath))
-  const unlinkedTargets = faker.helpers.shuffle(target.filter((path) => !linked.has(path)))
+
+  const unlinkedTargets = faker.helpers.shuffle(
+    [...leaves.target].filter((path) => !linked.has(path)),
+  )
 
   const transforms = Array.from({ length: 30 }, (_, index) =>
     transformOnGrid(faker.string.uuid(), index, faker.helpers.arrayElement(generatedConfigs)),
@@ -893,7 +877,6 @@ export function toMappingDraft(
   return mappingDraftSchema.parse({
     mappingId: record.id,
     name: record.name,
-    direction: directionOf(record),
     links: record.links,
     transforms: record.transforms,
     transformLinks: record.transformLinks,
@@ -901,7 +884,7 @@ export function toMappingDraft(
     latestVersion: record.latestVersion,
     unpublishedChanges: record.unpublishedChanges,
     aiReview: record.aiReview ?? null,
-    ...oriented<MappingSide>(record.messageType, {
+    ...oriented(record.messageType, {
       document: {
         kind: 'documentStructure',
         documentStructureId: record.documentStructureId,
@@ -938,67 +921,10 @@ export function toMappingDraftStore(
   return 'get' in mappings ? mappings : createMappingDraftStore(mappings)
 }
 
-type LinkedPath = { path: string; wholePart: boolean }
+export function linkProblem(graph: MappingGraph, leaves: SideLeaves) {
+  const message = unknownPathMessage(graph, leaves)
 
-export function unknownPaths(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
-  const loops = new Set(graph.transforms.flatMap(({ id, kind }) => (kind === 'loop' ? [id] : [])))
-
-  // A loop takes a whole repeated part and fills one; every other link ends at a field or element.
-  const sourcePaths: LinkedPath[] = [
-    ...graph.links.map(({ sourcePath }) => ({ path: sourcePath, wholePart: false })),
-    ...graph.transformLinks.flatMap(({ from, to }) =>
-      from.kind === 'source'
-        ? [
-            {
-              path: from.path,
-              wholePart:
-                to.kind === 'transform' && loops.has(to.transformId) && to.input === 'items',
-            },
-          ]
-        : [],
-    ),
-  ]
-
-  const targetPaths: LinkedPath[] = [
-    ...graph.links.map(({ targetPath }) => ({ path: targetPath, wholePart: false })),
-    ...graph.transformLinks.flatMap(({ from, to }) =>
-      to.kind === 'target'
-        ? [
-            {
-              path: to.path,
-              wholePart:
-                from.kind === 'transform' && loops.has(from.transformId) && from.output === 'items',
-            },
-          ]
-        : [],
-    ),
-  ]
-
-  const missing = (side: ReadonlySet<string>) => (linked: LinkedPath) =>
-    !side.has(linked.path) && !(linked.wholePart && containerOf(side, linked.path))
-      ? [linked.path]
-      : []
-
-  return {
-    source: new Set(sourcePaths.flatMap(missing(leaves.source))),
-    target: new Set(targetPaths.flatMap(missing(leaves.target))),
-  }
-}
-
-export function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
-  const unknown = unknownPaths(graph, leaves)
-  const [unknownSource] = unknown.source
-  const [unknownTarget] = unknown.target
-
-  if (unknownSource !== undefined) {
-    return unprocessable(`The source has no field or element at ${unknownSource}`)
-  }
-
-  if (unknownTarget !== undefined) {
-    return unprocessable(`The target has no field or element at ${unknownTarget}`)
-  }
-
-  return null
+  return message === null ? null : unprocessable(message)
 }
 
 function documentStructureForNew(
@@ -1006,13 +932,28 @@ function documentStructureForNew(
   mappings: ReadonlyArray<MappingDraftRecord>,
   documentStructures: DocumentStructures,
 ) {
-  const used = new Set(
+  const structureIdsOfMessageType = new Set(
     mappings.flatMap((mapping) =>
       mapping.messageType === messageType ? [mapping.documentStructureId] : [],
     ),
   )
 
-  return documentStructures.find(({ id }) => used.has(id)) ?? documentStructures[0]
+  const structuresByName = documentStructures.toSorted((a, b) => a.name.localeCompare(b.name, 'de'))
+
+  return structuresByName.find(({ id }) => structureIdsOfMessageType.has(id)) ?? structuresByName[0]
+}
+
+function unknownLookupTable({ transforms }: MappingGraph, lookupTables: LookupTableStore) {
+  const unknown = transforms.find(
+    (transform) =>
+      transform.kind === 'lookupTable' &&
+      transform.config.lookupTableId !== null &&
+      !lookupTables.get(transform.config.lookupTableId),
+  )
+
+  return unknown?.kind === 'lookupTable'
+    ? unprocessable(`The Workspace has no Lookup Table ${unknown.config.lookupTableId}.`)
+    : null
 }
 
 function uniqueName(name: string, mappings: ReadonlyArray<MappingDraftRecord>) {
@@ -1061,6 +1002,7 @@ export function mappingHandlers(
     flows = seedFlows,
     runs,
     tradingPartners = seedTradingPartners,
+    lookupTables = seedLookupTables,
     versions,
   }: {
     mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore | MappingsState
@@ -1068,6 +1010,7 @@ export function mappingHandlers(
     flows?: ReadonlyArray<FlowRecord> | FlowStore
     runs?: ReadonlyArray<RunSummary> | RunStore
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
+    lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore
     versions?: PublishedVersions
   } = {},
 ) {
@@ -1090,6 +1033,7 @@ export function mappingHandlers(
   const structures = toDocumentStructureStore(documentStructures)
   const flowStore = toFlowStore(flows)
   const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
+  const lookupTableStore = toLookupTableStore(lookupTables)
   let runStore: RunStore | undefined
 
   const summaries = () => {
@@ -1157,10 +1101,19 @@ export function mappingHandlers(
           return badRequest(body.error.message)
         }
 
-        const invalidLink = linkProblem(body.data, sideLeaves(existing, structures.all()))
+        const invalidLink = linkProblem(
+          body.data,
+          mappingSideLeaves(existing.messageType, structureOf(existing, structures.all())),
+        )
 
         if (invalidLink) {
           return invalidLink
+        }
+
+        const invalidLookupTable = unknownLookupTable(body.data, lookupTableStore)
+
+        if (invalidLookupTable) {
+          return invalidLookupTable
         }
 
         const record = {

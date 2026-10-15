@@ -207,7 +207,7 @@ export {
   toMappingSample,
 } from './mapping-sample'
 
-export { edifactLeaves, messageTypeStructureHandler } from './message-type-structure'
+export { messageTypeStructureHandler } from './message-type-structure'
 
 export {
   createMappingVersions,
@@ -516,6 +516,7 @@ export function createHandlers(
       flows,
       runs,
       tradingPartners: tradingPartnerStore,
+      lookupTables: lookupTableStore,
       versions: mappingVersionStore,
     }),
     ...aiDraftHandlers(apiUrl, {

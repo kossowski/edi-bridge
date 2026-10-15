@@ -1,7 +1,6 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
-  directionOf,
   type DocumentStructure,
   fromSearchParams,
   type GraphParts,
@@ -12,7 +11,7 @@ import {
   type MappingDifference,
   type MappingGraph,
   type MappingLink,
-  type MappingSide,
+  mappingSideLeaves,
   type MappingTransform,
   type MappingVersion,
   mappingVersionEndpoint,
@@ -22,6 +21,7 @@ import {
   mappingVersionsEndpoint,
   type MappingVersionSummary,
   type MessageType,
+  oriented,
   type OutputDifference,
   type PinnedFlow,
   publishedMappingVersionsEndpoint,
@@ -59,10 +59,8 @@ import {
   linkProblem,
   type MappingDraftRecord,
   type MappingDraftStore,
-  oriented,
   publishedVersionsOf,
   seedMappingDrafts,
-  sideLeaves,
   structureOf,
   toMappingDraft,
   toMappingDraftStore,
@@ -325,9 +323,8 @@ export function toMappingVersion(
 ): MappingVersion {
   return mappingVersionSchema.parse({
     ...toMappingVersionSummary(record),
-    direction: directionOf(draft),
     ...toGraph(record),
-    ...oriented<MappingSide>(draft.messageType, {
+    ...oriented(draft.messageType, {
       document: {
         kind: 'documentStructure',
         documentStructureId: record.documentStructureId,
@@ -542,7 +539,10 @@ export function mappingVersionHandlers(
           return conflict('The Draft has no changes since its latest version.')
         }
 
-        const invalidLink = linkProblem(toGraph(draft), sideLeaves(draft, structures.all()))
+        const invalidLink = linkProblem(
+          toGraph(draft),
+          mappingSideLeaves(draft.messageType, structureOf(draft, structures.all())),
+        )
 
         if (invalidLink) {
           return invalidLink

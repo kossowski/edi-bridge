@@ -23,7 +23,9 @@ import {
   type DocumentStructureNode,
   jsonRoots,
   lookupTableKinds,
+  type MappingGraph,
   maxLookupCodeLength,
+  messageTypes,
   workspaceRoles,
 } from '@edi-bridge/contracts'
 
@@ -261,5 +263,54 @@ export const documentStructures = pgTable(
       'document_structures_sample_complete',
       sql`num_nonnulls(${table.sampleFileName}, ${table.sampleText}, ${table.sampleTakenAt}) in (0, 3)`,
     ),
+  ],
+)
+
+export const messageType = pgEnum('message_type', messageTypes)
+
+export const mappingNameUnique = 'mappings_workspace_id_name_unique'
+
+export const mappings = pgTable(
+  'mappings',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    documentStructureId: uuid()
+      .notNull()
+      .references(() => documentStructures.id),
+    messageType: messageType().notNull(),
+    name: text().notNull(),
+    draft: jsonb().$type<MappingGraph>().notNull(),
+    unpublishedChanges: boolean().notNull().default(true),
+    draftUpdatedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index().on(table.workspaceId),
+    index().on(table.documentStructureId),
+    unique(mappingNameUnique).on(table.workspaceId, table.name),
+  ],
+)
+
+export const mappingVersions = pgTable(
+  'mapping_versions',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    mappingId: uuid()
+      .notNull()
+      .references(() => mappings.id, { onDelete: 'cascade' }),
+    version: integer().notNull(),
+    graph: jsonb().$type<MappingGraph>().notNull(),
+    changeNote: text(),
+    publishedBy: uuid()
+      .notNull()
+      .references(() => users.id),
+    publishedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('mapping_versions_mapping_id_version_unique').on(table.mappingId, table.version),
+    check('mapping_versions_version_positive', sql`${table.version} >= 1`),
   ],
 )
