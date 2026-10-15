@@ -1,8 +1,5 @@
 'use client'
 
-import '@xyflow/react/dist/style.css'
-import './mapping-canvas.css'
-
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
@@ -159,6 +156,9 @@ import type {
   TransformKind,
   TransformLink,
 } from '@edi-bridge/contracts'
+
+import '@xyflow/react/dist/style.css'
+import './mapping-canvas.css'
 
 type CanvasNode = TreeFlowNode | HeadingFlowNode | TransformFlowNode
 

@@ -78,17 +78,35 @@ jobs:
         if: ${{ !matrix.skip }}
         run: pnpm turbo run ${{ matrix.tasks }} ${{ github.event_name == 'pull_request' && '--affected' || '' }} ${{ matrix.args }}
 
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Set up
+        uses: ./.github/actions/setup
+        with:
+          job: format
+
+      - name: Check formatting
+        run: pnpm format:check
+
   checks:
     name: CI passed
     if: always()
-    needs: [plan, tasks]
+    needs: [plan, tasks, format]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - name: Require every planned task job to pass
+      - name: Require the plan, task and format jobs to pass
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           TASKS_RESULT: ${{ needs.tasks.result }}
+          FORMAT_RESULT: ${{ needs.format.result }}
         run: |
           test "$PLAN_RESULT" = success
+          test "$FORMAT_RESULT" = success
           test "$TASKS_RESULT" = success || test "$TASKS_RESULT" = skipped
