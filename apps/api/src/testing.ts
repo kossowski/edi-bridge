@@ -92,6 +92,14 @@ export const ownAdmin: NewMember = {
   role: 'admin',
 }
 
+export const ownViewer: NewMember = {
+  name: 'Nordwind Viewer',
+  email: 'viewer@nordwind.example',
+  password: 'nordwind-viewer-password',
+  workspaceId: ownWorkspace.id,
+  role: 'viewer',
+}
+
 export const otherAdmin: NewMember = {
   name: 'Sudhafen Admin',
   email: 'admin@sudhafen.example',
@@ -106,6 +114,7 @@ export async function startTestApi() {
 
   await connection.db.insert(workspaces).values([ownWorkspace, otherWorkspace])
   await addMember(connection.db, ownAdmin)
+  await addMember(connection.db, ownViewer)
   await addMember(connection.db, otherAdmin)
 
   const app = buildApp({
@@ -119,6 +128,7 @@ export async function startTestApi() {
     connection,
     databaseUrl: testDatabase.url,
     admin: await signIn(app, ownAdmin),
+    viewer: await signIn(app, ownViewer),
     otherAdmin: await signIn(app, otherAdmin),
     stop: async () => {
       await app.close()

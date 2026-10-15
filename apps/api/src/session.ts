@@ -8,6 +8,7 @@ import { members, users } from '@edi-bridge/db'
 import type { Session, SessionUser, WorkspaceRole } from '@edi-bridge/contracts'
 
 import { type Auth, headersOf } from './auth.js'
+import { Forbidden } from './errors.js'
 import { loadCurrentWorkspace } from './workspace.js'
 
 import type { Database } from './db.js'
@@ -59,4 +60,12 @@ export const loadSession = Effect.gen(function* () {
   const { id, name } = yield* loadCurrentWorkspace
 
   return { user, operator, workspace: { id, name, kind: 'standard' }, role } satisfies Session
+})
+
+export const requireAdmin = Effect.gen(function* () {
+  const { operator, role } = yield* CurrentMember
+
+  if (!operator && role !== 'admin') {
+    return yield* new Forbidden()
+  }
 })

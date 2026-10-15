@@ -55,7 +55,7 @@ import {
   updateLookupTable,
 } from './lookup-table.js'
 import { parse, type ValidationError } from './parse.js'
-import { CurrentMember, loadSession, resolveMember } from './session.js'
+import { CurrentMember, loadSession, requireAdmin, resolveMember } from './session.js'
 import {
   createTradingPartner,
   listTradingPartnerActivities,
@@ -66,7 +66,13 @@ import {
 } from './trading-partner.js'
 import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
 
-import type { Conflict, DocumentStructureRejected, NotFound, Unprocessable } from './errors.js'
+import type {
+  Conflict,
+  DocumentStructureRejected,
+  Forbidden,
+  NotFound,
+  Unprocessable,
+} from './errors.js'
 
 export type Probe = () => Promise<void>
 
@@ -79,10 +85,12 @@ export interface AppDependencies {
   webOrigin?: string | undefined
 }
 
-type Failure = Conflict | DocumentStructureRejected | NotFound | Unprocessable | ValidationError
+type Failure =
+  Conflict | DocumentStructureRejected | Forbidden | NotFound | Unprocessable | ValidationError
 
 const statusOf: Record<Failure['_tag'], number> = {
   ValidationError: 400,
+  Forbidden: 403,
   NotFound: 404,
   Conflict: 409,
   Unprocessable: 422,
@@ -171,6 +179,13 @@ export function buildApp({
     )
   }
 
+  const respondToChange = <A>(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    effect: Effect.Effect<A, Failure, CurrentMember | CurrentWorkspace | Db>,
+    status = 200,
+  ) => respond(request, reply, Effect.andThen(requireAdmin, effect), status)
+
   app.get(sessionEndpoint.path, (request, reply) => respond(request, reply, loadSession))
 
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>
@@ -178,7 +193,7 @@ export function buildApp({
   )
 
   app.put(updateCompanyIdentityEndpoint.path, (request, reply) =>
-    respond(
+    respondToChange(
       request,
       reply,
       Effect.flatMap(
@@ -205,7 +220,7 @@ export function buildApp({
   )
 
   app.post(createTradingPartnerEndpoint.path, (request, reply) =>
-    respond(
+    respondToChange(
       request,
       reply,
       Effect.flatMap(parse(createTradingPartnerEndpoint.body, request.body), createTradingPartner),
@@ -214,7 +229,7 @@ export function buildApp({
   )
 
   app.put<{ Params: { id: string } }>(updateTradingPartnerEndpoint.path, (request, reply) =>
-    respond(
+    respondToChange(
       request,
       reply,
       updateTradingPartner(
@@ -248,7 +263,7 @@ export function buildApp({
   )
 
   app.post(createLookupTableEndpoint.path, (request, reply) =>
-    respond(
+    respondToChange(
       request,
       reply,
       Effect.flatMap(parse(createLookupTableEndpoint.body, request.body), createLookupTable),
@@ -257,7 +272,7 @@ export function buildApp({
   )
 
   app.put<{ Params: { id: string } }>(updateLookupTableEndpoint.path, (request, reply) =>
-    respond(
+    respondToChange(
       request,
       reply,
       updateLookupTable(request.params.id, parse(updateLookupTableEndpoint.body, request.body)),
@@ -265,14 +280,14 @@ export function buildApp({
   )
 
   app.delete<{ Params: { id: string } }>(deleteLookupTableEndpoint.path, (request, reply) =>
-    respond(request, reply, deleteLookupTable(request.params.id), 204),
+    respondToChange(request, reply, deleteLookupTable(request.params.id), 204),
   )
 
   app.post<{ Params: { id: string } }>(
     lookupTableImportPreviewEndpoint.path,
     { bodyLimit: lookupTableImportBodyLimit },
     (request, reply) =>
-      respond(
+      respondToChange(
         request,
         reply,
         previewLookupTableImport(
@@ -286,7 +301,7 @@ export function buildApp({
     importLookupTableEndpoint.path,
     { bodyLimit: lookupTableImportBodyLimit },
     (request, reply) =>
-      respond(
+      respondToChange(
         request,
         reply,
         importLookupTable(request.params.id, parse(importLookupTableEndpoint.body, request.body)),
@@ -297,7 +312,7 @@ export function buildApp({
     inferDocumentStructureEndpoint.path,
     { bodyLimit: documentStructureBodyLimit },
     (request, reply) =>
-      respond(
+      respondToChange(
         request,
         reply,
         Effect.flatMap(
@@ -311,7 +326,7 @@ export function buildApp({
     createDocumentStructureEndpoint.path,
     { bodyLimit: documentStructureBodyLimit },
     (request, reply) =>
-      respond(
+      respondToChange(
         request,
         reply,
         Effect.flatMap(
@@ -334,7 +349,7 @@ export function buildApp({
     updateDocumentStructureEndpoint.path,
     { bodyLimit: documentStructureBodyLimit },
     (request, reply) =>
-      respond(
+      respondToChange(
         request,
         reply,
         updateDocumentStructure(
