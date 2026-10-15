@@ -26,6 +26,7 @@ import {
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
   maxEncodedFileBytes,
+  mappingComparisonEndpoint,
   mappingDraftEndpoint,
   mappingsEndpoint,
   maxLookupTableCsvLength,
@@ -74,6 +75,7 @@ import {
   updateLookupTable,
 } from './lookup-table.js'
 import {
+  compareMappingVersions,
   listMappingVersions,
   listPublishedMappingVersions,
   loadMappingVersion,
@@ -500,6 +502,17 @@ function registerRoutes(
         reply,
         loadMappingVersion(request.params.mappingId, request.params.versionId),
       ),
+  )
+
+  app.get<{ Params: { mappingId: string } }>(mappingComparisonEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      compareMappingVersions(
+        request.params.mappingId,
+        parse(mappingComparisonEndpoint.query, request.query),
+      ),
+    ),
   )
 
   app.post<{ Params: { mappingId: string } }>(publishMappingDraftEndpoint.path, (request, reply) =>

@@ -23,6 +23,7 @@ import {
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
+  mappingComparisonEndpoint,
   mappingDraftEndpoint,
   mappingVersionEndpoint,
   mappingVersionsEndpoint,
@@ -91,6 +92,7 @@ interface Ids {
   documentStructure: string
   mapping: string
   mappingVersion: string
+  laterMappingVersion: string
 }
 
 let api: TestApi
@@ -123,13 +125,27 @@ beforeAll(async () => {
 
   const mapping = await createdId(createMappingEndpoint.path, { messageType: 'ORDERS' })
   const versionsPath = toPath(publishMappingDraftEndpoint.path, { mappingId: mapping })
+  const mappingVersion = await createdId(versionsPath, { changeNote: '' })
+
+  const saved = await api.admin.inject({
+    method: 'PUT',
+    url: withId(saveMappingDraftEndpoint.path, mapping),
+    body: {
+      links: [{ sourcePath: 'BGM/1004', targetPath: 'orderNumber' }],
+      transforms: [],
+      transformLinks: [],
+    },
+  })
+
+  expect(saved.statusCode).toBe(200)
 
   ids = {
     tradingPartner: await createdId(createTradingPartnerEndpoint.path, tradingPartner),
     lookupTable: await createdId(createLookupTableEndpoint.path, lookupTable),
     documentStructure: documentStructureId,
     mapping,
-    mappingVersion: await createdId(versionsPath, { changeNote: '' }),
+    mappingVersion,
+    laterMappingVersion: await createdId(versionsPath, { changeNote: '' }),
   }
 }, 60_000)
 
@@ -154,6 +170,7 @@ const workspaceReads = (): string[] => [
   withId(mappingDraftEndpoint.path, ids.mapping),
   toPath(mappingVersionsEndpoint.path, { mappingId: ids.mapping }),
   toPath(mappingVersionEndpoint.path, { mappingId: ids.mapping, versionId: ids.mappingVersion }),
+  `${toPath(mappingComparisonEndpoint.path, { mappingId: ids.mapping })}?from=${ids.mappingVersion}&to=${ids.laterMappingVersion}`,
   publishedMappingVersionsEndpoint.path,
 ]
 
