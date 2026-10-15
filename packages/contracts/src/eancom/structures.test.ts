@@ -131,6 +131,15 @@ describe('messageTypeStructures', () => {
     },
   )
 
+  it.each(['SG25/SG33/TAX+7/5305', 'SG50/TAX+7/5305'])(
+    'offers the standard, exempt and outside scope tax categories in INVOIC %s',
+    (path) => {
+      expect(nodeAt(messageTypeStructures.INVOIC.children, path)).toMatchObject({
+        codes: [{ code: 'S' }, { code: 'E' }, { code: 'O' }],
+      })
+    },
+  )
+
   it.each(messageTypes)('gives every node of %s a unique path', (messageType) => {
     const paths = flatten(messageTypeStructures[messageType].children).map(({ path }) => path)
 

@@ -854,7 +854,7 @@ describe('createHandlers', () => {
     const taxLines = lines.filter((line) => line.startsWith('TAX+7+'))
 
     expect(taxLines).not.toHaveLength(0)
-    expect(taxLines.every((line) => line.startsWith('TAX+7+E+'))).toBe(true)
+    expect(new Set(taxLines)).toEqual(new Set(["TAX+7+E'"]))
     expect(preview.notes).toEqual([])
   })
 

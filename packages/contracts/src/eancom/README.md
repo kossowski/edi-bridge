@@ -54,4 +54,12 @@ The UN D.96A TAX segment is 5283, C241, C533 (5289, 1131, 3055), 5286, C243 (527
 | CCG INVOIC printed page 353 | `TAX+7+VAT:::+::++:::16:::+'` |
 | MS35 page 6                 | `TAX+7+VAT+++:::25+S'`        |
 
-MS35 marks 1131 and 3055 in C243 as not used (`N`). CCG INVOIC leaves them optional (`O`), and its example leaves them empty. The TAX uses therefore leave 3055 without a code. 5305 keeps its one code `S` (standard rate) and fills itself, as in MS35, where 5305 is required (`R`). CCG INVOIC uses 5305 only for an exempt invoice (`D`).
+MS35 marks 1131 and 3055 in C243 as not used (`N`). CCG INVOIC leaves them optional (`O`), and its example leaves them empty. The TAX uses therefore leave 3055 without a code. 5305 is dependent (`D`) in CCG INVOIC and required (`R`) in MS35. The TAX uses of SG33 (printed page 352) and SG50 (printed page 418) keep the codes both sources give, so 5305 has no single code and does not fill itself:
+
+| Code | Meaning                       | Source                                                              |
+| ---- | ----------------------------- | ------------------------------------------------------------------- |
+| `S`  | Standard rate                 | MS35 page 6, `TAX+7+VAT+++:::25+S'`                                 |
+| `E`  | Exempt from tax               | CCG INVOIC printed pages 352 and 418, code list on printed page 432 |
+| `O`  | Services outside scope of tax | CCG INVOIC printed pages 352 and 418, code list on printed page 432 |
+
+CCG INVOIC uses 5305 only for an exempt invoice, and then leaves 5278 empty (note on DE 5305, printed page 298). Its example leaves 5305 empty in each TAX. MS35 refers to the Swedish code list T0197 and gives `S` in its example.

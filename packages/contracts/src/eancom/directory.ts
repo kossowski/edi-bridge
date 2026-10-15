@@ -320,7 +320,11 @@ const elements = {
   '5305': {
     name: text('Duty/tax/fee category, coded', 'Steuerkategorie, codiert'),
     format: 'an..3',
-    codes: { S: text('Standard rate', 'Normalsatz') },
+    codes: {
+      S: text('Standard rate', 'Normalsatz'),
+      E: text('Exempt from tax', 'Steuerbefreit'),
+      O: text('Services outside scope of tax', 'Nicht steuerbar'),
+    },
   },
   '6060': { name: text('Quantity', 'Menge'), format: 'n..15' },
   '6063': {
