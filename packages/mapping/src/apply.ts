@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import {
   arrayBasePath,
+  type ConditionOperator,
   type EdifactComposite,
   type EdifactElement,
   type EdifactSegment,
@@ -129,6 +130,21 @@ type Evaluation = Reading & { targetPath: string; visiting: ReadonlySet<string> 
 const failedTransform = (code: MappingErrorCode, { targetPath }: Evaluation, transformId: string) =>
   new MappingError({ code, targetPath, transformId })
 
+function holds(operator: ConditionOperator, value: string, compareTo: string) {
+  switch (operator) {
+    case 'equals':
+      return value === compareTo
+    case 'notEquals':
+      return value !== compareTo
+    case 'contains':
+      return value.includes(compareTo)
+    case 'isEmpty':
+      return value === ''
+    case 'isNotEmpty':
+      return value !== ''
+  }
+}
+
 function lookedUp(
   { config: { lookupTableId, fallback } }: Extract<MappingTransform, { kind: 'lookupTable' }>,
   value: string,
@@ -201,6 +217,12 @@ function applied(
       )
     case 'lookupTable':
       return lookedUp(transform, value, lookupTables, fail)
+    case 'conditional':
+      return Effect.succeed(
+        holds(transform.config.operator, value, transform.config.compareTo)
+          ? (args.then ?? '')
+          : (args.else ?? ''),
+      )
     default:
       return Effect.succeed(value)
   }

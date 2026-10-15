@@ -2,6 +2,7 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import type {
+  ConditionOperator,
   JsonContent,
   MappingLink,
   MappingTransform,
@@ -871,6 +872,48 @@ describe('applyMappingVersion', () => {
       code: 'unknownLookupTable',
       targetPath: 'SG25/QTY+21/C186/6411',
       transformId,
+    })
+  })
+
+  const conditionalVia = (operator: ConditionOperator, compareTo: string, links: TransformLink[]) =>
+    orderVia({ kind: 'conditional', config: { operator, compareTo } }, [
+      fromSource('orderType'),
+      fromSource('rushNumber', 'then'),
+      ...links,
+      intoTarget('BGM/1004'),
+    ])
+
+  const rushOrder = (orderType: string) => ({
+    ...orderWithLine,
+    orderType,
+    rushNumber: 'RUSH-1',
+    orderNumber: 'PO-4711',
+  })
+
+  it.each<[ConditionOperator, string, string, string]>([
+    ['equals', 'rush', 'rush', 'RUSH-1'],
+    ['equals', 'rush', 'rushed', 'PO-4711'],
+    ['notEquals', 'rush', 'normal', 'RUSH-1'],
+    ['notEquals', 'rush', 'rush', 'PO-4711'],
+    ['contains', 'rush', 'urgent-rush', 'RUSH-1'],
+    ['contains', 'rush', 'Rush', 'PO-4711'],
+    ['isEmpty', '', '', 'RUSH-1'],
+    ['isEmpty', '', 'rush', 'PO-4711'],
+    ['isNotEmpty', '', 'rush', 'RUSH-1'],
+    ['isNotEmpty', '', '', 'PO-4711'],
+  ])('conditional %s %j on %j writes %s', (operator, compareTo, orderType, expected) => {
+    const version = conditionalVia(operator, compareTo, [fromSource('orderNumber', 'else')])
+
+    expect(orderNumberOf(version, rushOrder(orderType))).toEqual({
+      tag: 'BGM',
+      elements: [['220'], [expected]],
+    })
+  })
+
+  it('conditional leaves its target empty when the condition does not hold and it has no else', () => {
+    expect(orderNumberOf(conditionalVia('equals', 'rush', []), rushOrder('normal'))).toEqual({
+      tag: 'BGM',
+      elements: [['220']],
     })
   })
 })
