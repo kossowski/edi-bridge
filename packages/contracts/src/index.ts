@@ -421,6 +421,7 @@ export {
   mappingComparisonQuerySchema,
   mappingComparisonSchema,
   type MappingDifference,
+  mappingDifferences,
   mappingDifferenceSchema,
   type MappingVersion,
   mappingVersionEndpoint,

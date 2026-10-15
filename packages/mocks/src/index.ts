@@ -213,7 +213,6 @@ export {
   createMappingVersions,
   createMappingVersionStore,
   deriveMappingVersions,
-  mappingDifferences,
   mappingVersionHandlers,
   type MappingVersionRecord,
   type MappingVersionStore,
