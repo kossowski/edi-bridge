@@ -1038,6 +1038,51 @@ describe('applyMappingVersion', () => {
     ])
   })
 
+  it('JSONata reads the whole Document once rather than each line', async () => {
+    const version = expressionVia('$sum(lines.quantity)', 'SG25/PIA+1/C212/7140')
+
+    expect((await apply(version, twoLines)).segments.filter(({ tag }) => tag === 'PIA')).toEqual([
+      { tag: 'PIA', elements: [['1'], ['17']] },
+      { tag: 'PIA', elements: [['1'], ['17']] },
+    ])
+  })
+
+  const packedQuantityVia = (
+    transform: Pick<MappingTransform, 'kind' | 'config'>,
+    transformLinks: TransformLink[],
+  ) =>
+    outboundVersion(
+      'DESADV',
+      [...despatchHeader, { sourcePath: 'lines[].gtin', targetPath: 'SG10/SG17/LIN/C212/7140' }],
+      {
+        transforms: [loop, transformOf(transformId, transform)],
+        transformLinks: [
+          ...looped('lines[]', 'SG10/SG17', 'SG10/SG17/LIN/1082'),
+          ...transformLinks,
+          intoTarget('SG10/SG17/QTY+12/C186/6060'),
+        ],
+      },
+    )
+
+  it.each<[string, Pick<MappingTransform, 'kind' | 'config'>, TransformLink[], string]>([
+    [
+      'a lookup table the engine lacks',
+      { kind: 'lookupTable', config: { lookupTableId: unitTableId, fallback: 'keepValue' } },
+      [fromSource('lines[].quantity')],
+      'unknownLookupTable',
+    ],
+    [
+      'an expression that fails to evaluate',
+      { kind: 'jsonata', config: { expression: "$number('twelve')" } },
+      [],
+      'expressionFailed',
+    ],
+  ])('fails for %s beneath a loop without lines', async (_, transform, transformLinks, code) => {
+    expect(
+      await failure(packedQuantityVia(transform, transformLinks), { ...despatch, lines: [] }),
+    ).toMatchObject({ code, targetPath: 'SG10/SG17/QTY+12/C186/6060', transformId })
+  })
+
   it.each([
     ['gives a list', 'lines.gtin'],
     ['gives an object', 'buyer'],
