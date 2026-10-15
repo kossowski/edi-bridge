@@ -463,6 +463,8 @@ export {
   releases,
 } from './message-type'
 
+export { messageTypeStructures } from './eancom/structures'
+
 export {
   type AcknowledgementState,
   acknowledgementStates,

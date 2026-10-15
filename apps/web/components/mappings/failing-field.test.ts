@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { messageTypeStructures, seedDocumentStructureOf } from '@edi-bridge/mocks'
+import { messageTypeStructures } from '@edi-bridge/contracts'
+import { seedDocumentStructureOf } from '@edi-bridge/mocks'
 
 import { failingFieldName, findFailingField, repetitionFree } from './failing-field'
 import { documentTree, edifactTree } from './mapping-tree'

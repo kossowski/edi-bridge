@@ -7,6 +7,7 @@ import {
   type DocumentStructureNode,
   type MappingSample,
   type MessageType,
+  messageTypeStructures,
   withCheckDigit,
 } from '@edi-bridge/contracts'
 
@@ -26,7 +27,6 @@ import {
   seedMappingDrafts,
   unpublishedDraftId,
 } from './mapping'
-import { messageTypeStructures } from './message-type-structure'
 import { stableUuid } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { seedTradingPartners } from './trading-partner'

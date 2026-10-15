@@ -22,6 +22,7 @@ import {
   mappingVersionSummarySchema,
   type MessageType,
   messageTypes,
+  messageTypeStructures,
   remainingAiReview,
   type RunStatus,
   type RunSummary,
@@ -52,7 +53,7 @@ import {
   toFlowStore,
 } from './flow'
 import { seedLookupTableNamed } from './lookup-table-seed'
-import { edifactLeaves, messageTypeStructures } from './message-type-structure'
+import { edifactLeaves } from './message-type-structure'
 import { day } from './overdue'
 import { containerOf } from './paths'
 import { badRequest, notFound, serverError, unprocessable } from './responses'

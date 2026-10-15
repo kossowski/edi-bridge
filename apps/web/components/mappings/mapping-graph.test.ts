@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { messageTypeStructures, seedDocumentStructureOf } from '@edi-bridge/mocks'
-
-import type { MappingTransform, TransformLink } from '@edi-bridge/contracts'
+import {
+  type MappingTransform,
+  messageTypeStructures,
+  type TransformLink,
+} from '@edi-bridge/contracts'
+import { seedDocumentStructureOf } from '@edi-bridge/mocks'
 
 import {
   applyChange,
