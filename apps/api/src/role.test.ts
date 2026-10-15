@@ -29,6 +29,7 @@ import {
   mappingsEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
+  restoreMappingVersionEndpoint,
   removeWorkspaceMemberEndpoint,
   revokeInviteEndpoint,
   saveMappingDraftEndpoint,
@@ -253,6 +254,16 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
       method: 'POST',
       url: toPath(publishMappingDraftEndpoint.path, { mappingId: ids.mapping }),
       body: { changeNote: 'Order number mapped' },
+    }),
+  ],
+  [
+    'restore a Mapping Version into the Draft',
+    () => ({
+      method: 'POST',
+      url: toPath(restoreMappingVersionEndpoint.path, {
+        mappingId: ids.mapping,
+        versionId: ids.mappingVersion,
+      }),
     }),
   ],
   [

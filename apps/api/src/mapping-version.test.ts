@@ -19,6 +19,7 @@ import {
   mappingVersionSummarySchema,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
+  restoreMappingVersionEndpoint,
   saveMappingDraftEndpoint,
   sessionEndpoint,
   sessionSchema,
@@ -177,6 +178,12 @@ const lookupWithoutTable: MappingGraph = {
 }
 
 const unknownId = '0b6f1a7e-2c4d-4e8f-9a1b-3c5d7e9f1a2b'
+
+const restore = (mappingId: string, versionId: string, target = admin) =>
+  target.inject({
+    method: 'POST',
+    url: toPath(restoreMappingVersionEndpoint.path, { mappingId, versionId }),
+  })
 
 const created = async (messageType: string) => {
   const response = await admin.inject({
@@ -419,6 +426,69 @@ describe('GET /mappings/:mappingId/versions/:versionId', () => {
     const response = await admin.inject({ method: 'GET', url: versionUrl(mapping.id, versionId) })
 
     expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
+  it('copies an older version into the Draft and leaves every version unchanged', async () => {
+    const mapping = await createdMapping()
+    await save(mapping.id, orderNumber)
+    const first = await published(mapping.id)
+    await save(mapping.id, buyerGln)
+    await published(mapping.id)
+    const before = await versionsOf(mapping.id)
+
+    const response = await restore(mapping.id, first.id)
+
+    expect(response.statusCode).toBe(200)
+
+    const restored = mappingDraftSchema.parse(response.json())
+
+    expect(restored).toMatchObject({ ...orderNumber, latestVersion: 2, unpublishedChanges: true })
+    expect(await draftOf(mapping.id)).toEqual(restored)
+    expect(await versionsOf(mapping.id)).toEqual(before)
+    expect(await versionOf(mapping.id, first.id)).toMatchObject(orderNumber)
+  })
+
+  it('leaves no unpublished changes after restoring the latest version', async () => {
+    const mapping = await createdMapping()
+    await save(mapping.id, orderNumber)
+    const latest = await published(mapping.id)
+    await save(mapping.id, buyerGln)
+
+    const response = await restore(mapping.id, latest.id)
+
+    expect(mappingDraftSchema.parse(response.json())).toMatchObject({
+      ...orderNumber,
+      unpublishedChanges: false,
+    })
+    expect((await publish(mapping.id, { changeNote: '' })).statusCode).toBe(409)
+  })
+
+  it('answers 404 and keeps the Draft for a version of another Mapping', async () => {
+    const mapping = await createdMapping()
+    const version = await published(mapping.id)
+    const other = await created('DESADV')
+    const before = await draftOf(other.id)
+
+    expect((await restore(other.id, version.id)).statusCode).toBe(404)
+    expect(await draftOf(other.id)).toEqual(before)
+  })
+
+  it.each([
+    ['an unknown version', unknownId],
+    ['an id that is no uuid', 'not-a-uuid'],
+  ])('answers 404 for %s', async (_, versionId) => {
+    const mapping = await createdMapping()
+
+    expect((await restore(mapping.id, versionId)).statusCode).toBe(404)
+  })
+
+  it('answers 404 for a Mapping of another Workspace', async () => {
+    const foreign = await createdMapping(otherAdmin)
+    const version = await published(foreign.id, '', otherAdmin)
+
+    expect((await restore(foreign.id, version.id)).statusCode).toBe(404)
   })
 })
 

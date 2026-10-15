@@ -1,7 +1,6 @@
-import { and, desc, eq, max, type SQL } from 'drizzle-orm'
+import { and, desc, eq, max, type SQL, sql } from 'drizzle-orm'
+import { alias, type SelectedFields } from 'drizzle-orm/pg-core'
 import { Effect } from 'effect'
-
-import type { SelectedFields } from 'drizzle-orm/pg-core'
 
 import {
   type MappingVersion,
@@ -17,7 +16,7 @@ import { documentStructures, mappings, mappingVersions, users } from '@edi-bridg
 
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, Unprocessable } from './errors.js'
-import { loadRow, sidesOf } from './mapping.js'
+import { loadMappingDraft, loadRow, sidesOf } from './mapping.js'
 import {
   exactlyOne,
   foundOrNotFound,
@@ -87,7 +86,7 @@ export const listMappingVersions = (mappingId: string) =>
     return rows.map(toEntry)
   })
 
-export const loadMappingVersion = (mappingId: string, versionId: string) =>
+const loadVersionRow = (mappingId: string, versionId: string) =>
   Effect.gen(function* () {
     const mapping = yield* loadRow(mappingId)
     yield* rejectingInvalidId(versionId)
@@ -100,13 +99,59 @@ export const loadMappingVersion = (mappingId: string, versionId: string) =>
       ),
     )
 
-    const version = yield* foundOrNotFound(row)
+    return { mapping, version: yield* foundOrNotFound(row) }
+  })
 
-    return {
-      ...toHeader(version),
-      ...version.graph,
-      ...sidesOf(mapping),
-    } satisfies MappingVersion
+export const loadMappingVersion = (mappingId: string, versionId: string) =>
+  Effect.map(
+    loadVersionRow(mappingId, versionId),
+    ({ mapping, version }) =>
+      ({
+        ...toHeader(version),
+        ...version.graph,
+        ...sidesOf(mapping),
+      }) satisfies MappingVersion,
+  )
+
+const restoreInTransaction = async (tx: Transaction, mappingId: string, versionId: string) => {
+  // Waits for a publish under way, so the comparison sees the version it adds.
+  await tx
+    .select({ id: mappings.id })
+    .from(mappings)
+    .where(eq(mappings.id, mappingId))
+    .for('update')
+
+  const latest = alias(mappingVersions, 'latest')
+
+  const latestGraph = tx
+    .select({ graph: latest.graph })
+    .from(latest)
+    .where(eq(latest.mappingId, mappingId))
+    .orderBy(desc(latest.version))
+    .limit(1)
+
+  await tx
+    .update(mappings)
+    .set({
+      draft: sql`${mappingVersions.graph}`,
+      unpublishedChanges: sql`${mappingVersions.graph} is distinct from (${latestGraph})`,
+      draftUpdatedAt: sql`now()`,
+    })
+    .from(mappingVersions)
+    .where(and(eq(mappings.id, mappingId), eq(mappingVersions.id, versionId)))
+}
+
+export const restoreMappingVersion = (mappingId: string, versionId: string) =>
+  Effect.gen(function* () {
+    yield* loadVersionRow(mappingId, versionId)
+
+    const db = yield* Db
+
+    yield* Effect.promise(() =>
+      db.transaction((tx) => restoreInTransaction(tx, mappingId, versionId)),
+    )
+
+    return yield* loadMappingDraft(mappingId)
   })
 
 const noChanges = () =>

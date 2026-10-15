@@ -35,6 +35,7 @@ import {
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   removeWorkspaceMemberEndpoint,
+  restoreMappingVersionEndpoint,
   revokeInviteEndpoint,
   saveMappingDraftEndpoint,
   sessionEndpoint,
@@ -77,6 +78,7 @@ import {
   listPublishedMappingVersions,
   loadMappingVersion,
   publishMappingDraft,
+  restoreMappingVersion,
 } from './mapping-version.js'
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { parse, type ValidationError } from './parse.js'
@@ -510,6 +512,16 @@ function registerRoutes(
       ),
       201,
     ),
+  )
+
+  app.post<{ Params: { mappingId: string; versionId: string } }>(
+    restoreMappingVersionEndpoint.path,
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        restoreMappingVersion(request.params.mappingId, request.params.versionId),
+      ),
   )
 
   app.get<{ Params: { workspaceId: string } }>(
