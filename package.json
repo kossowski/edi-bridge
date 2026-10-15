@@ -17,6 +17,7 @@
     "check": "turbo run lint check-types test test:stories test:canvas test:e2e build build-storybook --concurrency=1",
     "storybook": "turbo run storybook",
     "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "prepare": "husky"
   },
   "devDependencies": {
