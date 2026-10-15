@@ -24,6 +24,7 @@ import {
   jsonRoots,
   lookupTableKinds,
   maxLookupCodeLength,
+  workspaceRoles,
 } from '@edi-bridge/contracts'
 
 export const workspaces = pgTable('workspaces', {
@@ -32,6 +33,96 @@ export const workspaces = pgTable('workspaces', {
   gln: text(),
   createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 })
+
+const createdAt = () => timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow()
+
+const updatedAt = () =>
+  timestamp({ withTimezone: true, mode: 'date' })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date())
+
+export const users = pgTable('users', {
+  id: uuid().primaryKey().defaultRandom(),
+  name: text().notNull(),
+  email: text().notNull().unique(),
+  emailVerified: boolean().notNull().default(false),
+  image: text(),
+  operator: boolean().notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+})
+
+const userId = () =>
+  uuid()
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' })
+
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    expiresAt: timestamp({ withTimezone: true, mode: 'date' }).notNull(),
+    token: text().notNull().unique(),
+    ipAddress: text(),
+    userAgent: text(),
+    userId: userId(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index().on(table.userId)],
+)
+
+export const accounts = pgTable(
+  'accounts',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    accountId: text().notNull(),
+    providerId: text().notNull(),
+    userId: userId(),
+    accessToken: text(),
+    refreshToken: text(),
+    idToken: text(),
+    accessTokenExpiresAt: timestamp({ withTimezone: true, mode: 'date' }),
+    refreshTokenExpiresAt: timestamp({ withTimezone: true, mode: 'date' }),
+    scope: text(),
+    password: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index().on(table.userId)],
+)
+
+export const verifications = pgTable(
+  'verifications',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    identifier: text().notNull(),
+    value: text().notNull(),
+    expiresAt: timestamp({ withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index().on(table.identifier)],
+)
+
+export const workspaceRole = pgEnum('workspace_role', workspaceRoles)
+
+export const members = pgTable(
+  'members',
+  {
+    userId: userId(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    role: workspaceRole().notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.workspaceId] }),
+    index().on(table.workspaceId),
+  ],
+)
 
 export const characterSet = pgEnum('character_set', characterSets)
 

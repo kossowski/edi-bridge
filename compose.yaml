@@ -54,6 +54,8 @@ services:
       DATABASE_URL: postgres://edi_bridge:edi_bridge@postgres:5432/edi_bridge
       REDIS_URL: redis://redis:6379
       API_PORT: 3001
+      BETTER_AUTH_URL: http://localhost:${API_PORT:-3001}
+      BETTER_AUTH_SECRET: edi-bridge-local-full-stack-secret-not-for-production
     ports:
       - '127.0.0.1:${API_PORT:-3001}:3001'
     depends_on:

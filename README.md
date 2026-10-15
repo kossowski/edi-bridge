@@ -35,6 +35,8 @@ pnpm dev
 | api    | http://localhost:3001/health |
 | worker | http://localhost:3002/health |
 
+Before the api starts, `pnpm dev` seeds a development Workspace and its Operator. Sign in as `operator@edi-bridge.example` with the password `edi-bridge-operator`. The production image never runs this seed; see [Create the Operator](docs/deployment/deployment-operations.md#create-the-operator) for a deployment.
+
 The host ports of the infrastructure services can be changed in `.env` (`POSTGRES_PORT`, `REDIS_PORT`, `SFTP_PORT`). Compose binds all published ports to `127.0.0.1`. The bundled credentials are for local development only.
 
 Stop the infrastructure with `docker compose down`; add `-v` to also delete its data.
@@ -49,7 +51,7 @@ pnpm dev:mock
 
 Without mock mode, web calls the API at `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`). The web Docker image sets it to `/api` instead, the same-origin API path of the deployment. Both variables are read at build time, so restart `next dev` or rebuild after you change them.
 
-The API allows cross-origin requests from `WEB_ORIGIN` (default `http://localhost:3000`). Set it in `.env` when web runs on another origin. Same-origin requests through `/api` do not need it.
+The API allows cross-origin requests from `WEB_ORIGIN` and trusts it for sign-in (default `http://localhost:3000` in development, none in production). Set it in `.env` when web runs on another origin. Same-origin requests through `/api` do not need it.
 
 ## Storybook
 
@@ -91,6 +93,14 @@ docker compose --profile full-stack up -d --build --wait
 ```
 
 `--wait` returns once every health check passes. The apps listen on the same ports as in local development (`WEB_PORT`, `API_PORT` and `WORKER_HEALTH_PORT` change the host ports), so stop `pnpm dev` first. Stop the stack with `docker compose --profile full-stack down`.
+
+The stack runs the production images, so it has no development seed and no user. Create the Operator once in the running api container, and enter the password at the prompt:
+
+```sh
+docker compose exec api node dist/create-operator.js --email <operator-email> --name "<operator-name>" --workspace "<workspace-name>"
+```
+
+See [Create the Operator](docs/deployment/deployment-operations.md#create-the-operator) for the options.
 
 A single image builds with:
 
