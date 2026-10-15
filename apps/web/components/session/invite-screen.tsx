@@ -84,7 +84,7 @@ export function InviteScreen({ token }: { token: string }) {
 
   const refusal = acceptInviteRefusalOf(enter.error)
 
-  if (refusal !== null && refusal !== 'existingAccount') {
+  if (refusal !== null && refusal !== 'existingUser') {
     return (
       <Outcome text={t(`outcome.${refusal}.text`, limits)} title={t(`outcome.${refusal}.title`)} />
     )
@@ -97,7 +97,7 @@ export function InviteScreen({ token }: { token: string }) {
     submitted && errors.password ? t(`errors.password.${errors.password}`, limits) : null
 
   const requestError = enter.isError
-    ? t(refusal === 'existingAccount' ? 'errors.existingAccount' : 'errors.failed')
+    ? t(refusal === 'existingUser' ? 'errors.existingUser' : 'errors.failed')
     : null
 
   function change(field: keyof typeof values, value: string) {

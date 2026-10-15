@@ -40,6 +40,8 @@ import {
   inferDocumentStructureEndpoint,
   inviteUnusableProblemSchema,
   type InviteUnusableReason,
+  invitePasswordMismatchStatus,
+  inviteUnknownStatus,
   inviteUnusableStatus,
   type InviteInput,
   type FlowUpdate,
@@ -281,19 +283,19 @@ export function acceptInvite(body: AcceptInviteInput) {
   return request(acceptInviteEndpoint, { body })
 }
 
-export type AcceptInviteRefusal = InviteUnusableReason | 'unknown' | 'existingAccount'
+export type AcceptInviteRefusal = InviteUnusableReason | 'unknown' | 'existingUser'
 
 export function acceptInviteRefusalOf(error: Error | null): AcceptInviteRefusal | null {
   if (!(error instanceof ApiError)) {
     return null
   }
 
-  if (error.status === 404) {
+  if (error.status === inviteUnknownStatus) {
     return 'unknown'
   }
 
-  if (error.status === 403) {
-    return 'existingAccount'
+  if (error.status === invitePasswordMismatchStatus) {
+    return 'existingUser'
   }
 
   if (error.status !== inviteUnusableStatus) {

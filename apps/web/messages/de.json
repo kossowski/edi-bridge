@@ -212,7 +212,7 @@
         "tooShort": "Verwenden Sie mindestens {min} Zeichen.",
         "tooLong": "Verwenden Sie höchstens {max} Zeichen."
       },
-      "existingAccount": "Zu dieser E-Mail-Adresse gibt es schon ein Konto. Geben Sie dessen aktuelles Passwort ein, um dem Arbeitsbereich beizutreten.",
+      "existingUser": "Zu dieser E-Mail-Adresse gibt es schon ein Konto. Geben Sie dessen aktuelles Passwort ein, um dem Arbeitsbereich beizutreten.",
       "failed": "Das Passwort konnte nicht festgelegt werden. Versuchen Sie es gleich noch einmal."
     },
     "outcome": {

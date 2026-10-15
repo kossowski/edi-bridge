@@ -50,7 +50,7 @@ const invites = [
     createdAt: new Date(Date.now() - 8 * day).toISOString(),
     expiresAt: new Date(Date.now() - day).toISOString(),
   }),
-  invite('existing-account', { email: mockCredentials.sandboxAdmin.email }),
+  invite('existing-user', { email: mockCredentials.sandboxAdmin.email }),
 ]
 
 const meta = preview.meta({
@@ -187,8 +187,8 @@ export const UnknownLink = unusable(
   /copied the whole link/,
 )
 
-export const ExistingAccountWrongPassword = meta.story({
-  args: { token: 'existing-account' },
+export const ExistingUserWrongPassword = meta.story({
+  args: { token: 'existing-user' },
   async play({ canvas }) {
     await setPassword(canvas, { password: 'not-the-password' })
     await userEvent.click(submitButton(canvas))
@@ -199,8 +199,8 @@ export const ExistingAccountWrongPassword = meta.story({
   },
 })
 
-export const ExistingAccountJoins = meta.story({
-  args: { token: 'existing-account' },
+export const ExistingUserJoins = meta.story({
+  args: { token: 'existing-user' },
   async play({ canvas }) {
     await setPassword(canvas, { password: mockCredentials.sandboxAdmin.password })
     await userEvent.click(submitButton(canvas))
@@ -291,8 +291,8 @@ export const Dark = meta.story({
   },
 })
 
-export const DarkExistingAccount = meta.story({
-  args: { token: 'existing-account' },
+export const DarkExistingUser = meta.story({
+  args: { token: 'existing-user' },
   beforeEach: darkMode,
   async play({ canvas }) {
     await setPassword(canvas, { password: 'not-the-password' })

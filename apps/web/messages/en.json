@@ -212,7 +212,7 @@
         "tooShort": "Use at least {min} characters.",
         "tooLong": "Use at most {max} characters."
       },
-      "existingAccount": "An account with this email address already exists. Enter its current password to join the Workspace.",
+      "existingUser": "An account with this email address already exists. Enter its current password to join the Workspace.",
       "failed": "The password could not be set. Try again in a moment."
     },
     "outcome": {
