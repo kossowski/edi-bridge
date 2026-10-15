@@ -4,8 +4,8 @@ import { sessionEndpoint, sessionSchema } from '@edi-bridge/contracts'
 
 import { ensureOperator } from './operator.js'
 import {
-  addMember,
   type Credentials,
+  ownViewer,
   ownWorkspace,
   signIn,
   signInRequest,
@@ -90,32 +90,22 @@ describe('ensureOperator', () => {
   })
 
   it('grants only the missing Operator flag and Admin role to an existing Viewer', async () => {
-    const viewer = {
-      name: 'Nordwind Viewer',
-      email: 'viewer@nordwind.example',
-      password: 'viewer-password',
-      workspaceId: ownWorkspace.id,
-      role: 'viewer' as const,
-    }
-
-    await addMember(api.connection.db, viewer)
-
     const outcome = await ensureOperator(
       api.connection.db,
-      { email: viewer.email, name: 'Ignored Name', workspaceName: ownWorkspace.name },
+      { email: ownViewer.email, name: 'Ignored Name', workspaceName: ownWorkspace.name },
       passwordOf('ignored-password'),
     )
 
     expect(outcome).toEqual({
-      email: viewer.email,
+      email: ownViewer.email,
       user: 'found',
       workspace: 'found',
       operatorGranted: true,
       adminGranted: true,
       passwordReset: false,
     })
-    expect(await sessionOf(viewer)).toMatchObject({
-      user: { name: viewer.name },
+    expect(await sessionOf(ownViewer)).toMatchObject({
+      user: { name: ownViewer.name },
       operator: true,
       workspace: { id: ownWorkspace.id },
       role: 'admin',

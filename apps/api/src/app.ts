@@ -55,7 +55,7 @@ import {
   updateLookupTable,
 } from './lookup-table.js'
 import { parse, type ValidationError } from './parse.js'
-import { CurrentMember, loadSession, resolveMember } from './session.js'
+import { CurrentMember, loadSession, requireChangeRight, resolveMember } from './session.js'
 import {
   createTradingPartner,
   listTradingPartnerActivities,
@@ -66,7 +66,13 @@ import {
 } from './trading-partner.js'
 import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
 
-import type { Conflict, DocumentStructureRejected, NotFound, Unprocessable } from './errors.js'
+import type {
+  Conflict,
+  DocumentStructureRejected,
+  Forbidden,
+  NotFound,
+  Unprocessable,
+} from './errors.js'
 
 export type Probe = () => Promise<void>
 
@@ -79,10 +85,12 @@ export interface AppDependencies {
   webOrigin?: string | undefined
 }
 
-type Failure = Conflict | DocumentStructureRejected | NotFound | Unprocessable | ValidationError
+type Failure =
+  Conflict | DocumentStructureRejected | Forbidden | NotFound | Unprocessable | ValidationError
 
 const statusOf: Record<Failure['_tag'], number> = {
   ValidationError: 400,
+  Forbidden: 403,
   NotFound: 404,
   Conflict: 409,
   Unprocessable: 422,
@@ -100,6 +108,8 @@ const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 // Base64 takes 4 characters per 3 bytes; 1 MiB covers the name, labels and JSON around the Document.
 const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
 
+const readMethods = new Set(['GET', 'HEAD'])
+
 type CheckStatus = 'down' | 'up'
 
 const check = (probe: Probe, timeoutMs: number): Promise<CheckStatus> =>
@@ -115,22 +125,27 @@ const check = (probe: Probe, timeoutMs: number): Promise<CheckStatus> =>
     () => 'down',
   )
 
-export function buildApp({
-  auth: authSettings,
-  database,
-  logger = false,
-  probes,
-  probeTimeoutMs = 2000,
-  webOrigin,
-}: AppDependencies): FastifyInstance {
-  const app = Fastify({ logger })
+export function buildApp(dependencies: AppDependencies): FastifyInstance {
+  const app = Fastify({ logger: dependencies.logger ?? false })
 
   void app.register(cors, {
-    origin: webOrigin ? [webOrigin] : false,
+    origin: dependencies.webOrigin ? [dependencies.webOrigin] : false,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
   })
 
+  void app.register((scope, _options, done) => {
+    registerRoutes(scope, dependencies)
+    done()
+  })
+
+  return app
+}
+
+function registerRoutes(
+  app: FastifyInstance,
+  { auth: authSettings, database, probes, probeTimeoutMs = 2000 }: AppDependencies,
+) {
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
       check(probes.postgres, probeTimeoutMs),
@@ -158,8 +173,12 @@ export function buildApp({
       return reply.code(401).send({ message: 'Unauthorized' })
     }
 
+    const guarded = readMethods.has(request.method)
+      ? effect
+      : Effect.andThen(requireChangeRight, effect)
+
     return Effect.runPromise(
-      effect.pipe(
+      guarded.pipe(
         Effect.map((body) => reply.code(status).send(body)),
         Effect.catch((error) =>
           Effect.sync(() => reply.code(statusOf[error._tag]).send(bodyOf(error))),
@@ -343,6 +362,4 @@ export function buildApp({
         ),
       ),
   )
-
-  return app
 }

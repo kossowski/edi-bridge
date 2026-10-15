@@ -28,6 +28,7 @@ import {
   type TradingPartner,
   type TradingPartnerSummary,
   updateLookupTableEndpoint,
+  type Session,
 } from '@edi-bridge/contracts'
 
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
@@ -52,6 +53,8 @@ import { badRequest, conflict, notFound, serverError, unprocessable } from './re
 import { seedRuns } from './run'
 import { problemOf } from './run-problem'
 import { type Reprocessed, type RunStore, toRunStore } from './run-store'
+import { seedSession, toSessionStore } from './session'
+import { adminOnly, type SessionStore } from './session-access'
 import {
   seedTradingPartners,
   toTradingPartnerStore,
@@ -373,10 +376,12 @@ export function lookupTableHandlers(
   {
     lookupTables = seedLookupTables,
     tradingPartners = seedTradingPartners,
+    session = seedSession,
     ...world
   }: {
     lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore | LookupTablesState
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
+    session?: Session | null | SessionStore
   } & LookupTableWorld = {},
 ) {
   if (lookupTables === 'loading' || lookupTables === 'error') {
@@ -386,6 +391,7 @@ export function lookupTableHandlers(
   const store = toLookupTableStore(lookupTables)
   const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
   const usageOf = createLookupTableUsage(store, tradingPartnerStore, world)
+  const sessionStore = toSessionStore(session)
 
   function nameTaken(name: string, scope: LookupTableScopeInput, ownId?: string) {
     return store
@@ -472,26 +478,29 @@ export function lookupTableHandlers(
 
       return table ? HttpResponse.json(usageOf(table).missingCodes) : notFound()
     }),
-    http.post(`${apiUrl}${createLookupTableEndpoint.path}`, async ({ request }) => {
-      const parsed = await parseInput(request)
+    http.post(
+      `${apiUrl}${createLookupTableEndpoint.path}`,
+      adminOnly(sessionStore, async ({ request }) => {
+        const parsed = await parseInput(request)
 
-      if ('response' in parsed) {
-        return parsed.response
-      }
+        if ('response' in parsed) {
+          return parsed.response
+        }
 
-      const created: LookupTableRecord = {
-        ...parsed.table,
-        id: crypto.randomUUID(),
-        updatedAt: new Date().toISOString(),
-      }
+        const created: LookupTableRecord = {
+          ...parsed.table,
+          id: crypto.randomUUID(),
+          updatedAt: new Date().toISOString(),
+        }
 
-      store.set(created)
+        store.set(created)
 
-      return serve(created, { status: 201 })
-    }),
+        return serve(created, { status: 201 })
+      }),
+    ),
     http.put<{ id: string }>(
       `${apiUrl}${updateLookupTableEndpoint.path}`,
-      async ({ params, request }) => {
+      adminOnly(sessionStore, async ({ params, request }) => {
         const existing = store.get(params.id)
 
         if (!existing) {
@@ -513,28 +522,31 @@ export function lookupTableHandlers(
         store.set(updated)
 
         return serve(updated)
-      },
+      }),
     ),
-    http.delete<{ id: string }>(`${apiUrl}${deleteLookupTableEndpoint.path}`, ({ params }) => {
-      if (!store.get(params.id)) {
-        return notFound()
-      }
+    http.delete<{ id: string }>(
+      `${apiUrl}${deleteLookupTableEndpoint.path}`,
+      adminOnly(sessionStore, ({ params }) => {
+        if (!store.get(params.id)) {
+          return notFound()
+        }
 
-      store.delete(params.id)
+        store.delete(params.id)
 
-      return new HttpResponse(null, { status: 204 })
-    }),
+        return new HttpResponse(null, { status: 204 })
+      }),
+    ),
     http.post<{ id: string }>(
       `${apiUrl}${lookupTableImportPreviewEndpoint.path}`,
-      async ({ params, request }) => {
+      adminOnly(sessionStore, async ({ params, request }) => {
         const parsed = await parseImport(params.id, request)
 
         return 'response' in parsed ? parsed.response : HttpResponse.json({ rows: parsed.rows })
-      },
+      }),
     ),
     http.post<{ id: string }>(
       `${apiUrl}${importLookupTableEndpoint.path}`,
-      async ({ params, request }) => {
+      adminOnly(sessionStore, async ({ params, request }) => {
         const parsed = await parseImport(params.id, request)
 
         if ('response' in parsed) {
@@ -550,7 +562,7 @@ export function lookupTableHandlers(
         store.set(imported)
 
         return serve(imported)
-      },
+      }),
     ),
   ]
 }

@@ -21,3 +21,9 @@ export class DocumentStructureRejected extends Data.TaggedError('DocumentStructu
     return this.problem.message
   }
 }
+
+export class Forbidden extends Data.TaggedError('Forbidden') {
+  override get message() {
+    return 'Forbidden'
+  }
+}

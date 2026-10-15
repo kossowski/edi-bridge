@@ -24,6 +24,7 @@ import {
 import { createHandlers } from './index'
 import { seedRuns } from './run'
 import { interchangeIdOf } from './run-store'
+import { sandboxAdminSession, showcaseViewerSession } from './session'
 import { seedRunsBeforeAll } from './test-helpers'
 import {
   createTradingPartner,
@@ -445,5 +446,34 @@ describe('createHandlers', () => {
     for (const { id } of seedTradingPartners.filter(hasTraffic)) {
       expect(channels.filter(({ tradingPartnerId }) => tradingPartnerId === id)).not.toHaveLength(0)
     }
+  })
+})
+
+describe('tradingPartnerHandlers for a Viewer', () => {
+  const path = (endpoint: { path: string }) => toPath(endpoint.path, awaitingProduction)
+
+  it.each([
+    ['create a Trading Partner', () => send('POST', createTradingPartnerEndpoint.path, input)],
+    ['update a Trading Partner', () => send('PUT', path(updateTradingPartnerEndpoint), input)],
+    ['switch to production', () => send('POST', path(switchToProductionEndpoint))],
+    ['send a test Interchange', () => send('POST', path(sendTestInterchangeEndpoint))],
+  ])('answers 403 to %s and changes nothing', async (_, request) => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [awaitingProduction],
+        session: showcaseViewerSession,
+      }),
+    )
+
+    expect((await request()).status).toBe(403)
+    expect(await listTradingPartners()).toEqual([awaitingProduction])
+  })
+
+  it('lets an Admin create a Trading Partner', async () => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, { tradingPartners: [], session: sandboxAdminSession }),
+    )
+
+    expect((await send('POST', createTradingPartnerEndpoint.path, input)).status).toBe(201)
   })
 })

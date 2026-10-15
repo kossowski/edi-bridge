@@ -18,12 +18,15 @@ import {
   tradingPartnersEndpoint,
   updateTradingPartnerEndpoint,
   type Workspace,
+  type Session,
 } from '@edi-bridge/contracts'
 
 import { randomGln } from './gln'
 import { conflict, unprocessable } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
+import { seedSession, toSessionStore } from './session'
+import { adminOnly, type SessionStore } from './session-access'
 import { seedWorkspace, toWorkspaceStore, type WorkspaceStore } from './workspace'
 
 export function seedGln(tradingPartnerId: string) {
@@ -228,13 +231,16 @@ export function tradingPartnerHandlers(
     tradingPartners = seedTradingPartners,
     workspace = seedWorkspace,
     testInterchange: { contrlDelayMs = 5000 } = {},
+    session = seedSession,
   }: {
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
     workspace?: Workspace | WorkspaceStore
     testInterchange?: TestInterchangeOptions
+    session?: Session | null | SessionStore
   } = {},
 ) {
   const store = toTradingPartnerStore(tradingPartners)
+  const sessionStore = toSessionStore(session)
   const workspaceStore = toWorkspaceStore(workspace)
   const contrlDueAt = new Map<string, number>()
 
@@ -298,31 +304,34 @@ export function tradingPartnerHandlers(
 
       return tradingPartner ? HttpResponse.json(tradingPartner) : notFound()
     }),
-    http.post(`${apiUrl}${createTradingPartnerEndpoint.path}`, async ({ request }) => {
-      const parsed = await parseInput(request)
+    http.post(
+      `${apiUrl}${createTradingPartnerEndpoint.path}`,
+      adminOnly(sessionStore, async ({ request }) => {
+        const parsed = await parseInput(request)
 
-      if ('response' in parsed) {
-        return parsed.response
-      }
+        if ('response' in parsed) {
+          return parsed.response
+        }
 
-      if (glnTaken(parsed.input.gln)) {
-        return glnConflict()
-      }
+        if (glnTaken(parsed.input.gln)) {
+          return glnConflict()
+        }
 
-      const created: TradingPartner = {
-        ...parsed.input,
-        id: crypto.randomUUID(),
-        testMode: true,
-        onboarding: notStarted,
-      }
+        const created: TradingPartner = {
+          ...parsed.input,
+          id: crypto.randomUUID(),
+          testMode: true,
+          onboarding: notStarted,
+        }
 
-      store.set(created)
+        store.set(created)
 
-      return HttpResponse.json(created, { status: 201 })
-    }),
+        return HttpResponse.json(created, { status: 201 })
+      }),
+    ),
     http.put<{ id: string }>(
       `${apiUrl}${updateTradingPartnerEndpoint.path}`,
-      async ({ params, request }) => {
+      adminOnly(sessionStore, async ({ params, request }) => {
         const existing = store.get(params.id)
 
         if (!existing) {
@@ -347,56 +356,62 @@ export function tradingPartnerHandlers(
         store.set(updated)
 
         return HttpResponse.json(updated)
-      },
+      }),
     ),
-    http.post<{ id: string }>(`${apiUrl}${switchToProductionEndpoint.path}`, ({ params }) => {
-      receiveDueContrls()
-      const existing = store.get(params.id)
+    http.post<{ id: string }>(
+      `${apiUrl}${switchToProductionEndpoint.path}`,
+      adminOnly(sessionStore, ({ params }) => {
+        receiveDueContrls()
+        const existing = store.get(params.id)
 
-      if (!existing) {
-        return notFound()
-      }
+        if (!existing) {
+          return notFound()
+        }
 
-      if (!canSwitchToProduction(existing, workspaceStore.get().gln)) {
-        return HttpResponse.json({ message: 'Onboarding is not complete' }, { status: 409 })
-      }
+        if (!canSwitchToProduction(existing, workspaceStore.get().gln)) {
+          return HttpResponse.json({ message: 'Onboarding is not complete' }, { status: 409 })
+        }
 
-      const updated = { ...existing, testMode: false }
-      store.set(updated)
+        const updated = { ...existing, testMode: false }
+        store.set(updated)
 
-      return HttpResponse.json(updated)
-    }),
-    http.post<{ id: string }>(`${apiUrl}${sendTestInterchangeEndpoint.path}`, ({ params }) => {
-      receiveDueContrls()
-      const existing = store.get(params.id)
+        return HttpResponse.json(updated)
+      }),
+    ),
+    http.post<{ id: string }>(
+      `${apiUrl}${sendTestInterchangeEndpoint.path}`,
+      adminOnly(sessionStore, ({ params }) => {
+        receiveDueContrls()
+        const existing = store.get(params.id)
 
-      if (!existing) {
-        return notFound()
-      }
+        if (!existing) {
+          return notFound()
+        }
 
-      if (!canSendTestInterchange(existing, workspaceStore.get().gln)) {
-        return conflict('The Trading Partner does not await a test Interchange')
-      }
+        if (!canSendTestInterchange(existing, workspaceStore.get().gln)) {
+          return conflict('The Trading Partner does not await a test Interchange')
+        }
 
-      const sentAt = Date.now()
+        const sentAt = Date.now()
 
-      const updated: TradingPartner = {
-        ...existing,
-        onboarding: {
-          testInterchangeSentAt: new Date(sentAt).toISOString(),
-          contrlReceivedAt: null,
-        },
-      }
+        const updated: TradingPartner = {
+          ...existing,
+          onboarding: {
+            testInterchangeSentAt: new Date(sentAt).toISOString(),
+            contrlReceivedAt: null,
+          },
+        }
 
-      store.set(updated)
+        store.set(updated)
 
-      if (contrlDelayMs === null) {
-        contrlDueAt.delete(existing.id)
-      } else {
-        contrlDueAt.set(existing.id, sentAt + contrlDelayMs)
-      }
+        if (contrlDelayMs === null) {
+          contrlDueAt.delete(existing.id)
+        } else {
+          contrlDueAt.set(existing.id, sentAt + contrlDelayMs)
+        }
 
-      return HttpResponse.json(updated)
-    }),
+        return HttpResponse.json(updated)
+      }),
+    ),
   ]
 }
