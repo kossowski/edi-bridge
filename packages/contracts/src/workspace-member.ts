@@ -28,3 +28,14 @@ export const operatorWorkspaceMembersEndpoint: Endpoint<
   path: '/operator/workspaces/:workspaceId/members',
   response: z.array(workspaceMemberSchema),
 }
+
+export const removeWorkspaceMemberEndpoint: Endpoint<
+  undefined,
+  undefined,
+  undefined,
+  '/operator/workspaces/:workspaceId/members/:userId'
+> = {
+  method: 'DELETE',
+  path: '/operator/workspaces/:workspaceId/members/:userId',
+  response: z.undefined(),
+}

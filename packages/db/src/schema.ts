@@ -118,6 +118,7 @@ export const members = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     role: workspaceRole().notNull(),
+    lastActivityAt: timestamp({ withTimezone: true, mode: 'date' }),
     createdAt: createdAt(),
   },
   (table) => [

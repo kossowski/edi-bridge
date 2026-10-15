@@ -10,6 +10,7 @@ import {
   inviteUnusableReason,
   inviteValidityDays,
   operatorWorkspaceMembersEndpoint,
+  removeWorkspaceMemberEndpoint,
   resetSandboxWorkspaceEndpoint,
   revokeInviteEndpoint,
   workspaceInvitesEndpoint,
@@ -419,6 +420,15 @@ export function operatorHandlers(
   const isMember = (workspaceId: string, email: string) =>
     memberStore.get(workspaceId).some((member) => member.email === email)
 
+  // Seeded and generated summaries keep their own count until their member list changes.
+  const countMembers = (workspaceId: string) => {
+    const workspace = store.workspace(workspaceId)
+
+    if (workspace) {
+      store.setWorkspace({ ...workspace, memberCount: memberStore.get(workspaceId).length })
+    }
+  }
+
   return [
     http.get(
       `${apiUrl}${operatorWorkspacesEndpoint.path}`,
@@ -462,6 +472,25 @@ export function operatorHandlers(
           ? HttpResponse.json(memberStore.get(params.workspaceId))
           : notFound(),
       ),
+    ),
+    http.delete<{ workspaceId: string; userId: string }>(
+      `${apiUrl}${removeWorkspaceMemberEndpoint.path}`,
+      operatorOnly(sessionStore, ({ params }) => {
+        if (params.userId === sessionStore.get()?.user.id) {
+          return conflict('The Operator cannot remove themselves')
+        }
+
+        if (
+          !store.workspace(params.workspaceId) ||
+          !memberStore.remove(params.workspaceId, params.userId)
+        ) {
+          return notFound()
+        }
+
+        countMembers(params.workspaceId)
+
+        return new HttpResponse(null, { status: 204 })
+      }),
     ),
     http.get<{ workspaceId: string }>(
       `${apiUrl}${workspaceInvitesEndpoint.path}`,
@@ -567,11 +596,7 @@ export function operatorHandlers(
           }),
         )
 
-        const workspace = store.workspace(invite.workspaceId)
-
-        if (workspace) {
-          store.setWorkspace({ ...workspace, memberCount: workspace.memberCount + 1 })
-        }
+        countMembers(invite.workspaceId)
       }
 
       passwords.set(invite.email, password)

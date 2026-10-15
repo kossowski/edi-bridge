@@ -765,6 +765,7 @@ export {
 
 export {
   operatorWorkspaceMembersEndpoint,
+  removeWorkspaceMemberEndpoint,
   type WorkspaceMember,
   workspaceMemberSchema,
   workspaceMembersEndpoint,

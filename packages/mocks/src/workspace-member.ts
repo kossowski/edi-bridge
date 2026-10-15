@@ -33,6 +33,7 @@ export type WorkspaceMembers =
 export type WorkspaceMemberStore = {
   get: (workspaceId: string) => ReadonlyArray<WorkspaceMember>
   add: (workspaceId: string, member: WorkspaceMember) => void
+  remove: (workspaceId: string, userId: string) => boolean
   byEmail: (email: string) => WorkspaceMember | undefined
 }
 
@@ -141,21 +142,48 @@ export function createWorkspaceMemberStore(
   members: WorkspaceMembers = seedWorkspaceMembers,
 ): WorkspaceMemberStore {
   const added = new Map<string, WorkspaceMember[]>()
+  const hidden = new Set<string>()
+
+  const memberKey = (workspaceId: string, userId: string) => `${workspaceId}:${userId}`
 
   const seeded = (workspaceId: string) =>
-    'get' in members ? (members.get(workspaceId) ?? []) : members
+    ('get' in members ? (members.get(workspaceId) ?? []) : members).filter(
+      ({ id }) => !hidden.has(memberKey(workspaceId, id)),
+    )
 
-  const all = () => [
-    ...('get' in members ? [...members.values()].flat() : members),
-    ...[...added.values()].flat(),
-  ]
+  const addedTo = (workspaceId: string) => added.get(workspaceId) ?? []
+
+  const get = (workspaceId: string) => [...seeded(workspaceId), ...addedTo(workspaceId)]
+
+  const drop = (workspaceId: string, userId: string) => {
+    added.set(
+      workspaceId,
+      addedTo(workspaceId).filter(({ id }) => id !== userId),
+    )
+    hidden.add(memberKey(workspaceId, userId))
+  }
+
+  const current = () =>
+    'get' in members
+      ? [...new Set([...members.keys(), ...added.keys()])].flatMap(get)
+      : [...members, ...[...added.values()].flat()]
 
   return {
-    get: (workspaceId) => [...seeded(workspaceId), ...(added.get(workspaceId) ?? [])],
+    get,
     add: (workspaceId, member) => {
-      added.set(workspaceId, [...(added.get(workspaceId) ?? []), member])
+      drop(workspaceId, member.id)
+      added.set(workspaceId, [...addedTo(workspaceId), member])
     },
-    byEmail: (email) => all().find((member) => member.email === email),
+    remove: (workspaceId, userId) => {
+      if (!get(workspaceId).some(({ id }) => id === userId)) {
+        return false
+      }
+
+      drop(workspaceId, userId)
+
+      return true
+    },
+    byEmail: (email) => current().find((member) => member.email === email),
   }
 }
 
