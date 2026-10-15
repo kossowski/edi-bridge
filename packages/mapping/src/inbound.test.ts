@@ -495,25 +495,79 @@ describe('applyInboundMappingVersion', () => {
     })
   })
 
+  it('reads the first repetition of a repeating segment group that no loop repeats', async () => {
+    const version = inboundVersion(
+      [
+        { sourcePath: 'SG7/CUX/C504/6345', targetPath: 'currency' },
+        { sourcePath: 'SG25/LIN/C212/7140', targetPath: 'lines[].gtin' },
+      ],
+      lineLoop(),
+    )
+
+    const structure = structureOf([
+      field('currency'),
+      array('lines[]', (path) => object(path, [field(`${path}.gtin`)])),
+    ])
+
+    const message = messageOf([
+      { tag: 'BGM', elements: [['220'], ['PO-4711'], ['9']] },
+      { tag: 'CUX', elements: [['2', 'EUR', '9']] },
+      { tag: 'CUX', elements: [['3', 'USD', '4']] },
+      { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+    ])
+
+    expect(await apply(version, structure, message)).toEqual({
+      currency: 'EUR',
+      lines: [{ gtin: '4000862141404' }],
+    })
+  })
+
+  it('loops over a nested segment group in the first repetition of its unlooped parent', async () => {
+    const version = inboundVersion(
+      [{ sourcePath: 'SG25/SG28/PRI+AAA/C509/5118', targetPath: 'prices[]' }],
+      {
+        transforms: [loopOf(priceLoopId)],
+        transformLinks: looped('SG25/SG28', 'prices[]', undefined, priceLoopId),
+      },
+    )
+
+    const structure = structureOf([array('prices[]', (path) => field(path, { type: 'number' }))])
+
+    expect(await apply(version, structure, twoLines)).toEqual({ prices: [1.2, 1.1] })
+  })
+
   it.each([
-    ['no loop repeats the line item group', 'SG25/LIN/C212/7140', 'gtin', []],
     [
-      'only the line loop encloses it, not one over the prices',
+      'a loop repeats the line item group into another array',
+      'SG25/LIN/C212/7140',
+      'gtin',
+      looped('SG25', 'lines[]'),
+    ],
+    [
+      'only the line loop encloses it, not the one over the prices',
       'SG25/SG28/PRI+AAA/C509/5118',
       'lines[].price',
-      looped('SG25', 'lines[]'),
+      [
+        ...looped('SG25', 'lines[]'),
+        ...looped('SG25/SG28', 'lines[].prices[]', undefined, priceLoopId),
+      ],
     ],
   ])(
     'fails on a link from a repeating segment group when %s',
     async (_, sourcePath, targetPath, transformLinks) => {
       const version = inboundVersion([{ sourcePath, targetPath }], {
-        transforms: [loopOf(lineLoopId)],
+        transforms: [loopOf(lineLoopId), loopOf(priceLoopId)],
         transformLinks,
       })
 
       const structure = structureOf([
         field('gtin'),
-        array('lines[]', (path) => object(path, [field(`${path}.price`)])),
+        array('lines[]', (path) =>
+          object(path, [
+            field(`${path}.price`),
+            array(`${path}.prices[]`, (prices) => field(prices)),
+          ]),
+        ),
       ])
 
       expect(await failure(version, structure, twoLines)).toEqual(
@@ -522,13 +576,19 @@ describe('applyInboundMappingVersion', () => {
     },
   )
 
-  it('fails on a loop over a nested segment group when no loop repeats its parent', async () => {
+  it('fails on a loop over a nested segment group outside the loop over its parent', async () => {
     const version = inboundVersion([], {
-      transforms: [loopOf(priceLoopId)],
-      transformLinks: looped('SG25/SG28', 'prices[]', undefined, priceLoopId),
+      transforms: [loopOf(lineLoopId), loopOf(priceLoopId)],
+      transformLinks: [
+        ...looped('SG25', 'lines[]'),
+        ...looped('SG25/SG28', 'prices[]', undefined, priceLoopId),
+      ],
     })
 
-    const structure = structureOf([array('prices[]', (path) => field(path))])
+    const structure = structureOf([
+      array('lines[]', (path) => field(path)),
+      array('prices[]', (path) => field(path)),
+    ])
 
     expect(await failure(version, structure, twoLines)).toEqual(
       new MappingError({ code: 'outsideLoop', targetPath: 'prices[]' }),

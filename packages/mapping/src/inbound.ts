@@ -410,22 +410,21 @@ function unknownRead(
     : new MappingError({ code: 'unknownTarget', targetPath })
 }
 
-// A loop over a nested segment group reads it from the repetition of its parent's loop.
+// A read from a looped segment group outside that loop has no repetition to read from.
 function outsideLoop(
   links: ReadonlyArray<SourceRead>,
   loops: ReadonlyMap<string, Loop>,
-  groups: ReadonlyArray<EdifactSegmentGroup>,
 ): string | undefined {
-  const repeating = groups.flatMap(({ maxRepeat, path }) => (maxRepeat > 1 ? [path] : []))
+  const looped = [...loops]
 
   return [...links, ...loopReads(loops)].find(({ sourcePath, targetPath }) =>
-    repeating.some(
-      (part) =>
-        part !== sourcePath &&
-        isBeneath(sourcePath, part) &&
-        ![...loops].some(
+    looped.some(
+      ([, { sourcePart }]) =>
+        sourcePart !== sourcePath &&
+        isBeneath(sourcePath, sourcePart) &&
+        !looped.some(
           ([targetPart, loop]) =>
-            loop.sourcePart === part && isBeneath(targetPath, targetPart, '.'),
+            loop.sourcePart === sourcePart && isBeneath(targetPath, targetPart, '.'),
         ),
     ),
   )?.targetPath
@@ -447,7 +446,7 @@ export function applyInboundMappingVersion(
     return Effect.fail(unknown)
   }
 
-  const outside = outsideLoop(version.links, loops, groups)
+  const outside = outsideLoop(version.links, loops)
 
   if (outside !== undefined) {
     return Effect.fail(new MappingError({ code: 'outsideLoop', targetPath: outside }))
