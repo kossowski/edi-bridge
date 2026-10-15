@@ -1,5 +1,5 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
-  "extends": ["./node_modules/@edi-bridge/oxlint-config/base.json"],
+  "extends": ["./node_modules/@edi-bridge/oxlint-config/next.json"],
   "ignorePatterns": ["public/mockServiceWorker.js"]
 }

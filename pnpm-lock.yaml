@@ -692,6 +692,9 @@ importers:
 
   packages/oxlint-config:
     devDependencies:
+      '@next/eslint-plugin-next':
+        specifier: ^16.3.8
+        version: 16.3.8(eslint@10.12.0(jiti@2.6.1))
       '@oxlint/plugins':
         specifier: 1.87.0
         version: 1.87.0
@@ -701,9 +704,15 @@ importers:
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.6.1)
+      eslint-plugin-jsx-a11y:
+        specifier: ^6.10.2
+        version: 6.10.2(eslint@10.12.0(jiti@2.6.1))
       eslint-plugin-perfectionist:
         specifier: ^5.12.1
         version: 5.12.1(eslint@10.12.0(jiti@2.6.1))(typescript@6.0.3)
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@10.12.0(jiti@2.6.1))
       eslint-plugin-turbo:
         specifier: ^2.11.7
         version: 2.11.7(eslint@10.12.0(jiti@2.6.1))(turbo@2.11.7)
