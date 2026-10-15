@@ -467,7 +467,7 @@ const composites = {
   C108: { name: text('Text literal', 'Freier Text'), elements: [['4440', true]] },
   C110: { name: text('Payment terms', 'Zahlungsbedingungen'), elements: [['4277', true]] },
   C112: {
-    name: text('Terms/time information', 'Zahlungsfrist'),
+    name: text('Terms/time information', 'Bedingungs-/Zeitangaben'),
     elements: [
       ['2475', true],
       ['2009', false],
