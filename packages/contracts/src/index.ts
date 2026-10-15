@@ -200,6 +200,7 @@ export {
   documentStructureOrigins,
   encodeText,
   toEncodedFile,
+  windows1252Byte,
   windows1252CsvSettings,
 } from './document-structure-origins'
 

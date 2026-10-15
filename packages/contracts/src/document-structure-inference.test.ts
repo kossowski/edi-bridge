@@ -250,6 +250,12 @@ describe('encodeText', () => {
     expect([...bytes]).toEqual([0x35, 0x20, 0x80])
   })
 
+  it('writes the dashes, quotes and letters of Windows-1252 as their bytes', () => {
+    const bytes = encodeText('– ’Š', 'windows-1252')
+
+    expect([...bytes]).toEqual([0x96, 0x20, 0x92, 0x8a])
+  })
+
   it('refuses a character that has no Windows-1252 byte', () => {
     expect(() => encodeText('→', 'windows-1252')).toThrow('→')
   })

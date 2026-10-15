@@ -7,11 +7,13 @@ import {
 } from './document-structure'
 import { encodeBase64 } from './document-structure-inference'
 
-const windows1252Extras = new Map([
-  ['€', 0x80],
-  ['„', 0x84],
-  ['“', 0x93],
-])
+const windows1252Decoder = new TextDecoder('windows-1252')
+
+const windows1252Bytes = new Map(
+  Array.from({ length: 256 }, (_, byte) => [windows1252Decoder.decode(Uint8Array.of(byte)), byte]),
+)
+
+export const windows1252Byte = (character: string) => windows1252Bytes.get(character)
 
 export function encodeText(text: string, encoding: CharacterEncoding): Uint8Array {
   if (encoding === 'utf-8') {
@@ -19,10 +21,7 @@ export function encodeText(text: string, encoding: CharacterEncoding): Uint8Arra
   }
 
   return Uint8Array.from(text, (character) => {
-    const code = character.codePointAt(0)!
-
-    const byte =
-      code < 0x80 || (code >= 0xa0 && code <= 0xff) ? code : windows1252Extras.get(character)
+    const byte = windows1252Byte(character)
 
     if (byte === undefined) {
       throw new Error(`${character} has no Windows-1252 byte`)
