@@ -1,16 +1,29 @@
 import { Data, Effect } from 'effect'
+import { z } from 'zod'
 
 import {
   arrayBasePath,
+  type CharacterEncoding,
   type DocumentStructure,
   DocumentStructureProblemError,
+  encodeText,
   type InferredDocumentStructure,
   type JsonContent,
   parseCsv,
   rootListPath,
+  windows1252Byte,
 } from '@edi-bridge/contracts'
 
 import { jsonListSchema, jsonObjectSchema } from './json'
+
+export const documentWriteErrorCodes = ['unencodableCharacter'] as const
+
+export type DocumentWriteErrorCode = (typeof documentWriteErrorCodes)[number]
+
+export class DocumentWriteError extends Data.TaggedError('DocumentWriteError')<{
+  readonly code: DocumentWriteErrorCode
+  readonly line: number
+}> {}
 
 export const documentReadErrorCodes = ['invalidJson', 'invalidCsv', 'unexpectedRoot'] as const
 
@@ -100,4 +113,70 @@ export function readDocument(
   text: string,
 ): Effect.Effect<JsonContent, DocumentReadError> {
   return structure.format === 'csv' ? readCsv(structure, text) : readJson(structure.root, text)
+}
+
+const csvLineBreak = '\r\n'
+
+const csvRowSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+
+type CsvCell = z.infer<typeof csvRowSchema>[string] | undefined
+
+function csvCell(value: CsvCell, delimiter: string): string {
+  const text = String(value ?? '')
+
+  return [delimiter, '"', '\n', '\r'].some((character) => text.includes(character))
+    ? `"${text.replaceAll('"', '""')}"`
+    : text
+}
+
+// A row holds its cells under the names that the mapping engine writes, so the header row shows them.
+function writeCsv(
+  structure: Extract<ReadStructure, { format: 'csv' }>,
+  content: JsonContent,
+): string {
+  const { delimiter, headerRow } = structure.csv
+  const [rows] = structure.children
+  const fields = rows?.kind === 'array' && rows.items.kind === 'object' ? rows.items.children : []
+  const columns = fields.map(({ name }) => name)
+  const items = jsonObjectSchema.parse(content)[arrayBasePath(rootListPath(structure))] ?? []
+
+  const line = (cells: ReadonlyArray<CsvCell>) =>
+    `${cells.map((cell) => csvCell(cell, delimiter)).join(delimiter)}${csvLineBreak}`
+
+  const lines = jsonListSchema.parse(items).map((item) => {
+    const cells = csvRowSchema.parse(item)
+
+    return line(columns.map((column) => cells[column]))
+  })
+
+  return [...(headerRow ? [line(columns)] : []), ...lines].join('')
+}
+
+function encoded(
+  text: string,
+  encoding: CharacterEncoding,
+): Effect.Effect<Uint8Array, DocumentWriteError> {
+  const characters = [...text]
+
+  const unencodable =
+    encoding === 'windows-1252'
+      ? characters.findIndex((character) => windows1252Byte(character) === undefined)
+      : -1
+
+  if (unencodable === -1) {
+    return Effect.succeed(encodeText(text, encoding))
+  }
+
+  const line = characters.slice(0, unencodable).filter((character) => character === '\n').length
+
+  return Effect.fail(new DocumentWriteError({ code: 'unencodableCharacter', line: line + 1 }))
+}
+
+export function writeDocument(
+  structure: ReadStructure,
+  content: JsonContent,
+): Effect.Effect<Uint8Array, DocumentWriteError> {
+  return structure.format === 'csv'
+    ? encoded(writeCsv(structure, content), structure.csv.encoding)
+    : encoded(`${JSON.stringify(content, null, 2)}\n`, 'utf-8')
 }

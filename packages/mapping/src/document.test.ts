@@ -8,7 +8,7 @@ import {
   toEncodedFile,
 } from '@edi-bridge/contracts'
 
-import { readDocument } from './index'
+import { readDocument, writeDocument } from './index'
 
 const csvStructure = (sample: string, csv: Partial<CsvSettings> = {}) =>
   inferDocumentStructure({
@@ -127,5 +127,61 @@ describe('readDocument', () => {
     expect(
       await failure(jsonStructure('{ "orderNumber": "PO-4711" }'), '{ "orderNumber": '),
     ).toMatchObject({ code: 'invalidJson', line: null })
+  })
+})
+
+const written = async (...args: Parameters<typeof writeDocument>) =>
+  new TextDecoder().decode(await Effect.runPromise(writeDocument(...args)))
+
+describe('writeDocument', () => {
+  it('writes a JSON Document as UTF-8, indented by two spaces and ending in a line break', async () => {
+    const structure = jsonStructure('{ "orderNumber": "PO-4711", "lines": [{ "gtin": "1" }] }')
+
+    expect(
+      await written(structure, { orderNumber: 'PO-4712', lines: [{ gtin: '4000862141404' }] }),
+    ).toBe(
+      '{\n  "orderNumber": "PO-4712",\n  "lines": [\n    {\n      "gtin": "4000862141404"\n    }\n  ]\n}\n',
+    )
+  })
+
+  it('writes a CSV Document as one row per item under a header row of its columns', async () => {
+    expect(
+      await written(csvStructure(lineSample), {
+        rows: [{ gtin: '4000862141404', quantity: 12.5 }, { gtin: '4000862141411' }],
+      }),
+    ).toBe('gtin;quantity\r\n4000862141404;12.5\r\n4000862141411;\r\n')
+  })
+
+  it('writes a CSV Document without a header row in the delimiter of its structure', async () => {
+    const structure = csvStructure('4000862141404,12\n', { delimiter: ',', headerRow: false })
+
+    expect(await written(structure, { rows: [{ column1: '4000862141411', column2: 5 }] })).toBe(
+      '4000862141411,5\r\n',
+    )
+  })
+
+  it('quotes the CSV cells that hold the delimiter, a quote or a line break', async () => {
+    expect(
+      await written(csvStructure(lineSample), {
+        rows: [{ gtin: '4000862141404', quantity: '12;5 "approx."\nper box' }],
+      }),
+    ).toBe('gtin;quantity\r\n4000862141404;"12;5 ""approx.""\nper box"\r\n')
+  })
+
+  it('writes a CSV Document in Windows-1252 when its structure asks for it', async () => {
+    const structure = csvStructure('city\nKöln\n', { encoding: 'windows-1252' })
+    const bytes = await Effect.runPromise(writeDocument(structure, { rows: [{ city: 'Lübeck' }] }))
+
+    expect(Buffer.from(bytes).toString('latin1')).toBe('city\r\nLübeck\r\n')
+  })
+
+  it('fails naming the line of a character that Windows-1252 has no byte for', async () => {
+    const structure = csvStructure('city\nKöln\n', { encoding: 'windows-1252' })
+
+    expect(
+      await Effect.runPromise(
+        Effect.flip(writeDocument(structure, { rows: [{ city: 'Köln' }, { city: 'Łódź' }] })),
+      ),
+    ).toMatchObject({ code: 'unencodableCharacter', line: 3 })
   })
 })
