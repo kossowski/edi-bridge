@@ -19,6 +19,7 @@ import {
   type TransformLink,
   transformLinkTargets,
   type WorkspaceSettings,
+  unknownPaths,
 } from '@edi-bridge/contracts'
 
 import {
@@ -37,7 +38,6 @@ import {
   toMappingDraft,
   toMappingDraftStore,
   type TransformGraph,
-  unknownPaths,
   withoutInvalidTransforms,
 } from './mapping'
 import { type MappingSampleRecord, seedMappingSamples } from './mapping-sample'

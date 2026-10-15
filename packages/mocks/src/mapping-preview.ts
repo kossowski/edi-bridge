@@ -10,6 +10,7 @@ import {
   messageTypeStructures,
   type PreviewNote,
   previewNoteKey,
+  unknownPaths,
 } from '@edi-bridge/contracts'
 
 import {
@@ -30,7 +31,6 @@ import {
   oriented,
   sideLeaves,
   toMappingDraftStore,
-  unknownPaths,
 } from './mapping'
 import { type MappingSampleRecord, seedMappingSamples, toMappingSample } from './mapping-sample'
 import { evaluateExpressions, type LookUp, previewEntries } from './preview-engine'

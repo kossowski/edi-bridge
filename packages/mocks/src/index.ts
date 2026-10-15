@@ -207,7 +207,7 @@ export {
   toMappingSample,
 } from './mapping-sample'
 
-export { edifactLeaves, messageTypeStructureHandler } from './message-type-structure'
+export { messageTypeStructureHandler } from './message-type-structure'
 
 export {
   createMappingVersions,

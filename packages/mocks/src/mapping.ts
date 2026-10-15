@@ -7,9 +7,11 @@ import {
   directionOf,
   type DocumentStructure,
   documentStructureLeaves,
+  edifactLeaves,
   type MappingDraft,
   mappingDraftEndpoint,
   mappingDraftSchema,
+  mappingSideLeaves,
   type MappingGraph,
   type MappingLink,
   type MappingSide,
@@ -26,6 +28,7 @@ import {
   remainingAiReview,
   type RunStatus,
   type RunSummary,
+  type SideLeaves,
   saveMappingDraftEndpoint,
   type TradingPartner,
   type TradingPartnerSummary,
@@ -35,6 +38,7 @@ import {
   type TransformLink,
   transformLinkTargets,
   transformPorts,
+  unknownPathMessage,
 } from '@edi-bridge/contracts'
 
 import {
@@ -53,9 +57,7 @@ import {
   toFlowStore,
 } from './flow'
 import { seedLookupTableNamed } from './lookup-table-seed'
-import { edifactLeaves } from './message-type-structure'
 import { day } from './overdue'
-import { containerOf } from './paths'
 import { badRequest, notFound, serverError, unprocessable } from './responses'
 import { seedRuns, toRunSummary } from './run'
 import { type RunStore, toRunStore } from './run-store'
@@ -527,16 +529,8 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
 export function sideLeaves(
   record: MappingDraftRecord,
   documentStructures: DocumentStructures,
-): { source: Set<string>; target: Set<string> } {
-  const document = new Set(
-    documentStructureLeaves(structureOf(record, documentStructures)).map(({ path }) => path),
-  )
-
-  const edifact = new Set(
-    edifactLeaves(messageTypeStructures[record.messageType]).map(({ path }) => path),
-  )
-
-  return oriented(record.messageType, { document, edifact })
+): SideLeaves {
+  return mappingSideLeaves(record.messageType, structureOf(record, documentStructures))
 }
 
 function randomLinks(
@@ -938,67 +932,10 @@ export function toMappingDraftStore(
   return 'get' in mappings ? mappings : createMappingDraftStore(mappings)
 }
 
-type LinkedPath = { path: string; wholePart: boolean }
+export function linkProblem(graph: MappingGraph, leaves: SideLeaves) {
+  const message = unknownPathMessage(graph, leaves)
 
-export function unknownPaths(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
-  const loops = new Set(graph.transforms.flatMap(({ id, kind }) => (kind === 'loop' ? [id] : [])))
-
-  // A loop takes a whole repeated part and fills one; every other link ends at a field or element.
-  const sourcePaths: LinkedPath[] = [
-    ...graph.links.map(({ sourcePath }) => ({ path: sourcePath, wholePart: false })),
-    ...graph.transformLinks.flatMap(({ from, to }) =>
-      from.kind === 'source'
-        ? [
-            {
-              path: from.path,
-              wholePart:
-                to.kind === 'transform' && loops.has(to.transformId) && to.input === 'items',
-            },
-          ]
-        : [],
-    ),
-  ]
-
-  const targetPaths: LinkedPath[] = [
-    ...graph.links.map(({ targetPath }) => ({ path: targetPath, wholePart: false })),
-    ...graph.transformLinks.flatMap(({ from, to }) =>
-      to.kind === 'target'
-        ? [
-            {
-              path: to.path,
-              wholePart:
-                from.kind === 'transform' && loops.has(from.transformId) && from.output === 'items',
-            },
-          ]
-        : [],
-    ),
-  ]
-
-  const missing = (side: ReadonlySet<string>) => (linked: LinkedPath) =>
-    !side.has(linked.path) && !(linked.wholePart && containerOf(side, linked.path))
-      ? [linked.path]
-      : []
-
-  return {
-    source: new Set(sourcePaths.flatMap(missing(leaves.source))),
-    target: new Set(targetPaths.flatMap(missing(leaves.target))),
-  }
-}
-
-export function linkProblem(graph: MappingGraph, leaves: ReturnType<typeof sideLeaves>) {
-  const unknown = unknownPaths(graph, leaves)
-  const [unknownSource] = unknown.source
-  const [unknownTarget] = unknown.target
-
-  if (unknownSource !== undefined) {
-    return unprocessable(`The source has no field or element at ${unknownSource}`)
-  }
-
-  if (unknownTarget !== undefined) {
-    return unprocessable(`The target has no field or element at ${unknownTarget}`)
-  }
-
-  return null
+  return message === null ? null : unprocessable(message)
 }
 
 function documentStructureForNew(

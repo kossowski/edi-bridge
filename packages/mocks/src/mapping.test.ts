@@ -16,6 +16,7 @@ import {
   transformConfigIssues,
   type TransformLink,
   transformPorts,
+  edifactLeaves,
 } from '@edi-bridge/contracts'
 
 import {
@@ -37,7 +38,7 @@ import {
   toMappingSummary,
   unpublishedDraftId,
 } from './mapping'
-import { edifactLeaves, messageTypeStructureHandler } from './message-type-structure'
+import { messageTypeStructureHandler } from './message-type-structure'
 import { day } from './overdue'
 import { createRun } from './run'
 import { seedRunsBeforeAll } from './test-helpers'
