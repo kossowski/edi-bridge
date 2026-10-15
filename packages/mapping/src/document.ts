@@ -66,14 +66,14 @@ function readJson(
     : failed('unexpectedRoot')
 }
 
-function columnsOf(structure: ReadStructure, listPath: string): string[] {
+function rowFields(structure: ReadStructure) {
   const [rows] = structure.children
 
-  if (rows?.kind !== 'array' || rows.items.kind !== 'object') {
-    return []
-  }
+  return rows?.kind === 'array' && rows.items.kind === 'object' ? rows.items.children : []
+}
 
-  return rows.items.children.map(({ path }) => path.slice(listPath.length + 1))
+function columnsOf(structure: ReadStructure, listPath: string): string[] {
+  return rowFields(structure).map(({ path }) => path.slice(listPath.length + 1))
 }
 
 function readCsv(
@@ -129,15 +129,13 @@ function csvCell(value: CsvCell, delimiter: string): string {
     : text
 }
 
-// A row holds its cells under the names that the mapping engine writes, so the header row shows them.
 function writeCsv(
   structure: Extract<ReadStructure, { format: 'csv' }>,
   content: JsonContent,
 ): string {
   const { delimiter, headerRow } = structure.csv
-  const [rows] = structure.children
-  const fields = rows?.kind === 'array' && rows.items.kind === 'object' ? rows.items.children : []
-  const columns = fields.map(({ name }) => name)
+  // Names, not path segments: they key the cells the engine writes and keep the sample's header.
+  const columns = rowFields(structure).map(({ name }) => name)
   const items = jsonObjectSchema.parse(content)[arrayBasePath(rootListPath(structure))] ?? []
 
   const line = (cells: ReadonlyArray<CsvCell>) =>
