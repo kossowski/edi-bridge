@@ -7,48 +7,22 @@ import {
   Wrench01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
 import { type FormEvent, useId, useRef, useState } from 'react'
 
 import { PasswordField, TextField } from '@/components/form-field'
-import { focusMainContentOnNextPage } from '@/components/main-content-focus'
 import { isUnauthorized, signIn, signInToShowcase } from '@/lib/api/client'
-import { sessionQuery } from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@edi-bridge/ui/components/card'
 
-import type { SignedIn } from '@edi-bridge/contracts'
-
 import { type SignInValues, signInFieldErrors, toSignInBody } from './sign-in-values'
+import { isEntering, useEnterWorkspace } from './use-enter-workspace'
 
 const points = [
   { key: 'erp', icon: CheckmarkCircle02Icon },
   { key: 'nextStep', icon: Wrench01Icon },
   { key: 'orders', icon: Clock01Icon },
 ] as const
-
-function useEnterWorkspace<Variables>(signInWith: (variables: Variables) => Promise<SignedIn>) {
-  const queryClient = useQueryClient()
-  const router = useRouter()
-
-  return useMutation({
-    mutationFn: async (variables: Variables) => {
-      await signInWith(variables)
-      queryClient.clear()
-      await queryClient.prefetchQuery(sessionQuery)
-    },
-    onSuccess: () => {
-      focusMainContentOnNextPage()
-      router.replace('/')
-    },
-  })
-}
-
-function isEntering(mutation: { isPending: boolean; isSuccess: boolean }) {
-  return mutation.isPending || mutation.isSuccess
-}
 
 export function LoginScreen() {
   const t = useTranslations('Login')

@@ -192,6 +192,52 @@
       }
     }
   },
+  "Invite": {
+    "metaTitle": "Set your password",
+    "title": "Set your password",
+    "description": "You were invited to EDI Bridge. Enter your name and choose a password. You then sign in with the email address the invite is for.",
+    "name": "Your name",
+    "password": "Password",
+    "passwordHint": "At least {min} characters.",
+    "submit": "Set password and sign in",
+    "submitting": "Setting password…",
+    "signIn": "Go to sign in",
+    "errors": {
+      "name": {
+        "required": "Enter your name.",
+        "tooLong": "Use at most {max} characters."
+      },
+      "password": {
+        "required": "Enter a password.",
+        "tooShort": "Use at least {min} characters.",
+        "tooLong": "Use at most {max} characters."
+      },
+      "existingUser": "An account with this email address already exists. Enter its current password to join the Workspace.",
+      "failed": "The password could not be set. Try again in a moment."
+    },
+    "outcome": {
+      "revoked": {
+        "title": "This invite was revoked",
+        "text": "The link no longer works. Ask the Operator for a new invite."
+      },
+      "expired": {
+        "title": "This invite has expired",
+        "text": "Invite links are valid for {days} days. Ask the Operator for a new invite."
+      },
+      "used": {
+        "title": "This invite was already used",
+        "text": "Your password is already set. Sign in with your email address and password."
+      },
+      "unknown": {
+        "title": "This invite link does not work",
+        "text": "Check that you copied the whole link. If it still does not work, ask the Operator for a new invite."
+      },
+      "signInFailed": {
+        "title": "Your password is set",
+        "text": "Signing in did not work this time. Sign in with {email} and your new password."
+      }
+    }
+  },
   "Home": {
     "loading": "Loading Home",
     "setup": {
@@ -3938,6 +3984,18 @@
       "first": {
         "title": "Invite the first member",
         "description": "Nobody can sign in to this Workspace yet. Create an invite link below and pass it on."
+      },
+      "remove": {
+        "trigger": "Remove",
+        "title": "Remove {name} from this Workspace?",
+        "description": "This person loses access at once and is signed out. You can invite them again at any time.",
+        "cancel": "Cancel",
+        "confirm": "Remove member",
+        "removing": "Removing…",
+        "failed": "The member could not be removed. Try again.",
+        "gone": "{name} is no longer in this Workspace. The list now shows the current members.",
+        "close": "Close",
+        "done": "{name} removed."
       }
     },
     "invites": {

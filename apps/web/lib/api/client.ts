@@ -1,4 +1,6 @@
 import {
+  type AcceptInviteInput,
+  acceptInviteEndpoint,
   acceptAiDraftEndpoint,
   type AcceptAiProposedPartsBody,
   acceptAiProposedPartsEndpoint,
@@ -36,6 +38,11 @@ import {
   type FlowInput,
   flowsEndpoint,
   inferDocumentStructureEndpoint,
+  inviteUnusableProblemSchema,
+  type InviteUnusableReason,
+  invitePasswordMismatchStatus,
+  inviteUnknownStatus,
+  inviteUnusableStatus,
   type InviteInput,
   type FlowUpdate,
   homeEndpoint,
@@ -65,6 +72,7 @@ import {
   messageTypeStructureEndpoint,
   type MoveFlowMappingVersionBody,
   operatorWorkspaceMembersEndpoint,
+  removeWorkspaceMemberEndpoint,
   operatorWorkspaceSettingsEndpoint,
   parseAiDraftEvent,
   operatorWorkspacesEndpoint,
@@ -271,9 +279,47 @@ export function revokeInvite(workspaceId: string, inviteId: string) {
   })
 }
 
+export function acceptInvite(body: AcceptInviteInput) {
+  return request(acceptInviteEndpoint, { body })
+}
+
+export type AcceptInviteRefusal = InviteUnusableReason | 'unknown' | 'existingUser'
+
+export function acceptInviteRefusalOf(error: Error | null): AcceptInviteRefusal | null {
+  if (!(error instanceof ApiError)) {
+    return null
+  }
+
+  if (error.status === inviteUnknownStatus) {
+    return 'unknown'
+  }
+
+  if (error.status === invitePasswordMismatchStatus) {
+    return 'existingUser'
+  }
+
+  if (error.status !== inviteUnusableStatus) {
+    return null
+  }
+
+  try {
+    const parsed = inviteUnusableProblemSchema.safeParse(JSON.parse(error.body))
+
+    return parsed.success ? parsed.data.reason : null
+  } catch {
+    return null
+  }
+}
+
 export function listOperatorWorkspaceMembers(workspaceId: string) {
   return request(operatorWorkspaceMembersEndpoint, {
     path: toPath(operatorWorkspaceMembersEndpoint.path, { workspaceId }),
+  })
+}
+
+export function removeWorkspaceMember(workspaceId: string, userId: string) {
+  return request(removeWorkspaceMemberEndpoint, {
+    path: toPath(removeWorkspaceMemberEndpoint.path, { workspaceId, userId }),
   })
 }
 

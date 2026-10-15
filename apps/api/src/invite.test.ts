@@ -6,7 +6,9 @@ import {
   acceptInviteEndpoint,
   createInviteEndpoint,
   type InviteInput,
+  invitePasswordMismatchStatus,
   inviteSchema,
+  inviteUnknownStatus,
   inviteUnusableMessages,
   inviteUnusableStatus,
   inviteValidityDays,
@@ -335,7 +337,8 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(invite.link, { name: 'Nina Vogt', password: 'nina-password' })
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ email: 'nina.vogt@sudhafen.example' })
 
     const client = await signIn(api.app, {
       email: 'nina.vogt@sudhafen.example',
@@ -402,7 +405,7 @@ describe('POST /invites/accept', () => {
 
     vi.useRealTimers()
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
   })
 
   it('answers 404 for an unknown token', async () => {
@@ -411,7 +414,7 @@ describe('POST /invites/accept', () => {
       password: 'nobody-password',
     })
 
-    expect(response.statusCode).toBe(404)
+    expect(response.statusCode).toBe(inviteUnknownStatus)
   })
 
   it('answers 400 for a password shorter than 8 characters and keeps the link open', async () => {
@@ -420,7 +423,7 @@ describe('POST /invites/accept', () => {
     const short = await accept(invite.link, { name: 'Short', password: 'short' })
     const valid = await accept(invite.link, { name: 'Short', password: 'long-enough' })
 
-    expect([short.statusCode, valid.statusCode]).toEqual([400, 204])
+    expect([short.statusCode, valid.statusCode]).toEqual([400, 200])
   })
 
   it('adds an existing user to the Workspace when their password matches', async () => {
@@ -428,7 +431,7 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(invite.link, { name: 'Ignored', password: ownAdmin.password })
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
     expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toEqual(
       expect.any(String),
     )
@@ -449,7 +452,7 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(invite.link, { name: 'Takeover', password: 'takeover-password' })
 
-    expect(response.statusCode).toBe(403)
+    expect(response.statusCode).toBe(invitePasswordMismatchStatus)
     expect(await signInStatus({ email: existing.email, password: 'takeover-password' })).toBe(401)
     expect(await signInStatus(existing)).toBe(200)
     expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toBeNull()
@@ -471,7 +474,7 @@ describe('POST /invites/accept', () => {
     const client = await signIn(api.app, member)
     const session = await client.inject({ method: 'GET', url: sessionEndpoint.path })
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
     expect(sessionSchema.parse(session.json()).role).toBe('admin')
     expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toEqual(
       expect.any(String),

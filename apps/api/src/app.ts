@@ -482,6 +482,6 @@ function registerRoutes(
   )
 
   app.post(acceptInviteEndpoint.path, (request, reply) =>
-    run(reply, acceptInvite(parse(acceptInviteEndpoint.body, request.body)), 204),
+    run(reply, acceptInvite(parse(acceptInviteEndpoint.body, request.body)), 200),
   )
 }

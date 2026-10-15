@@ -35,6 +35,7 @@ export type WorkspaceMemberStore = {
   add: (workspaceId: string, member: WorkspaceMember) => void
   remove: (workspaceId: string, userId: string) => boolean
   byEmail: (email: string) => WorkspaceMember | undefined
+  removedFromAll: (email: string) => boolean
 }
 
 export const seedWorkspaceMembers: WorkspaceMembers = new Map([
@@ -143,6 +144,7 @@ export function createWorkspaceMemberStore(
 ): WorkspaceMemberStore {
   const added = new Map<string, WorkspaceMember[]>()
   const hidden = new Set<string>()
+  const removedEmails = new Set<string>()
 
   const memberKey = (workspaceId: string, userId: string) => `${workspaceId}:${userId}`
 
@@ -168,6 +170,8 @@ export function createWorkspaceMemberStore(
       ? [...new Set([...members.keys(), ...added.keys()])].flatMap(get)
       : [...members, ...[...added.values()].flat()]
 
+  const byEmail = (email: string) => current().find((member) => member.email === email)
+
   return {
     get,
     add: (workspaceId, member) => {
@@ -175,15 +179,19 @@ export function createWorkspaceMemberStore(
       added.set(workspaceId, [...addedTo(workspaceId), member])
     },
     remove: (workspaceId, userId) => {
-      if (!get(workspaceId).some(({ id }) => id === userId)) {
+      const member = get(workspaceId).find(({ id }) => id === userId)
+
+      if (!member) {
         return false
       }
 
       drop(workspaceId, userId)
+      removedEmails.add(member.email)
 
       return true
     },
-    byEmail: (email) => current().find((member) => member.email === email),
+    byEmail,
+    removedFromAll: (email) => removedEmails.has(email) && byEmail(email) === undefined,
   }
 }
 

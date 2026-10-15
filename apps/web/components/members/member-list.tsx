@@ -1,10 +1,11 @@
 'use client'
 
 import { useFormatter, useLocale, useNow, useTranslations } from 'next-intl'
-import { type ReactNode, useId, useMemo, useState } from 'react'
+import { type ReactNode, type Ref, useId, useMemo, useState } from 'react'
 
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { Input } from '@edi-bridge/ui/components/input'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { WorkspaceMember } from '@edi-bridge/contracts'
 
@@ -25,22 +26,35 @@ function LastActivity({ at, now }: { at: string | null; now: Date }) {
   )
 }
 
+export type MemberAction = (member: WorkspaceMember, nameId: string) => ReactNode
+
 function MemberRow({
   member,
   isCurrentUser,
   now,
+  action,
 }: {
   member: WorkspaceMember
   isCurrentUser: boolean
   now: Date
+  action: MemberAction | undefined
 }) {
   const t = useTranslations('Members')
+  const nameId = useId()
 
   return (
-    <li className="grid gap-x-4 gap-y-1.5 py-3 @2xl:grid-cols-[minmax(0,1fr)_5rem_8rem] @2xl:items-center">
+    <li
+      className={cn(
+        'grid gap-x-4 gap-y-1.5 py-3 @2xl:items-center',
+        action
+          ? '@2xl:grid-cols-[minmax(0,1fr)_5rem_8rem_6rem]'
+          : '@2xl:grid-cols-[minmax(0,1fr)_5rem_8rem]',
+      )}>
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
-          <span className="wrap-break-word">{member.name}</span>
+          <span id={nameId} className="wrap-break-word">
+            {member.name}
+          </span>
           {isCurrentUser && <Badge variant="outline">{t('you')}</Badge>}
         </p>
         <p className="text-muted-foreground text-sm wrap-break-word">{member.email}</p>
@@ -50,23 +64,41 @@ function MemberRow({
           {t(`roles.${member.role}`)}
         </Badge>
         <LastActivity at={member.lastActivityAt} now={now} />
+        {action && <div className="ml-auto @2xl:justify-self-end">{action(member, nameId)}</div>}
       </div>
     </li>
   )
 }
 
-export function ListNote({ children }: { children: ReactNode }) {
-  return <p className="text-muted-foreground rounded-lg border p-3 text-sm">{children}</p>
+export function ListNote({
+  children,
+  ref,
+}: {
+  children: ReactNode
+  ref?: Ref<HTMLParagraphElement> | undefined
+}) {
+  return (
+    <p
+      ref={ref}
+      tabIndex={ref ? -1 : undefined}
+      className="text-muted-foreground rounded-lg border p-3 text-sm outline-none">
+      {children}
+    </p>
+  )
 }
 
 export function MemberList({
   members,
   empty,
   currentUserId,
+  action,
+  countRef,
 }: {
   members: readonly WorkspaceMember[]
   empty: string
   currentUserId?: string | undefined
+  action?: MemberAction
+  countRef?: Ref<HTMLParagraphElement>
 }) {
   const t = useTranslations('Members')
   const locale = useLocale()
@@ -84,7 +116,7 @@ export function MemberList({
   }, [members, locale])
 
   if (members.length === 0) {
-    return <ListNote>{empty}</ListNote>
+    return <ListNote ref={countRef}>{empty}</ListNote>
   }
 
   const term = search.trim().toLocaleLowerCase(locale)
@@ -115,7 +147,11 @@ export function MemberList({
             />
           </search>
         )}
-        <p aria-live="polite" className="text-muted-foreground text-sm">
+        <p
+          ref={countRef}
+          tabIndex={countRef ? -1 : undefined}
+          aria-live="polite"
+          className="text-muted-foreground text-sm outline-none">
           {term === ''
             ? t('count', { count: members.length })
             : t('filteredCount', { count: shown.length, total: members.length })}
@@ -128,6 +164,7 @@ export function MemberList({
           {shown.map((member) => (
             <MemberRow
               key={member.id}
+              action={action}
               isCurrentUser={currentUserId !== undefined && member.id === currentUserId}
               member={member}
               now={now}
