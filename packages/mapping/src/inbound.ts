@@ -15,13 +15,15 @@ import {
 
 import type { Message, Segment } from '@edi-bridge/edifact'
 
-import { elementPaths, MappingError } from './apply'
+import { elementPaths } from './elements'
+import { MappingError } from './errors'
+import { isRequiredOrFilled, setFilled, type Values } from './values'
 
 export type InboundMappingVersion = Extract<MappingVersion, { direction: 'inbound' }>
 
-type Placement = {
+type Occurrences = {
   segments: Map<string, Segment[]>
-  groups: Map<string, Placement[]>
+  groups: Map<string, Occurrences[]>
 }
 
 // Every qualifier of the EANCOM directory is the first value of its segment.
@@ -43,25 +45,24 @@ function segmentNodes(nodes: ReadonlyArray<EdifactStructureNode>): EdifactSegmen
   return nodes.flatMap((node) => (node.kind === 'segment' ? [node] : segmentNodes(node.children)))
 }
 
-type Placing = {
+type MessageSegments = {
   segments: ReadonlyArray<Segment>
-  known: (segment: Segment) => boolean
+  isInStructure: (segment: Segment) => boolean
 }
 
-type Placed = { placement: Placement; next: number }
+type PlaceResult = { occurrences: Occurrences; next: number }
 
-const occurrencesOf = (placement: Placement, node: EdifactStructureNode) =>
-  (node.kind === 'segment' ? placement.segments : placement.groups).get(node.path)?.length ?? 0
+const countOf = (occurrences: Occurrences, node: EdifactStructureNode) =>
+  (node.kind === 'segment' ? occurrences.segments : occurrences.groups).get(node.path)?.length ?? 0
 
-// A segment the structure does not know is skipped where it stands, one the structure places
-// elsewhere closes the open segment groups until a level ahead takes it.
+// A segment placed at a higher level closes the open segment groups instead of being skipped.
 function place(
   nodes: ReadonlyArray<EdifactStructureNode>,
-  { segments, known }: Placing,
+  { segments, isInStructure }: MessageSegments,
   start: number,
   outermost = false,
-): Placed {
-  const placement: Placement = { segments: new Map(), groups: new Map() }
+): PlaceResult {
+  const occurrences: Occurrences = { segments: new Map(), groups: new Map() }
   let index = start
   let position = 0
 
@@ -71,12 +72,12 @@ function place(
     const found = nodes.findIndex(
       (node, at) =>
         at >= position &&
-        occurrencesOf(placement, node) < node.maxRepeat &&
+        countOf(occurrences, node) < node.maxRepeat &&
         matches(entryOf(node), segment),
     )
 
     if (found === -1) {
-      if (outermost || !known(segment)) {
+      if (outermost || !isInStructure(segment)) {
         index += 1
         continue
       }
@@ -88,18 +89,21 @@ function place(
     const node = nodes[found]!
 
     if (node.kind === 'segment') {
-      placement.segments.set(node.path, [...(placement.segments.get(node.path) ?? []), segment])
+      occurrences.segments.set(node.path, [...(occurrences.segments.get(node.path) ?? []), segment])
       index += 1
       continue
     }
 
-    const inner = place(node.children, { segments, known }, index)
+    const inner = place(node.children, { segments, isInStructure }, index)
 
-    placement.groups.set(node.path, [...(placement.groups.get(node.path) ?? []), inner.placement])
+    occurrences.groups.set(node.path, [
+      ...(occurrences.groups.get(node.path) ?? []),
+      inner.occurrences,
+    ])
     index = inner.next
   }
 
-  return { placement, next: index }
+  return { occurrences, next: index }
 }
 
 type SegmentChild = EdifactSegment['children'][number]
@@ -114,13 +118,13 @@ function componentOf(child: SegmentChild, path: string): number {
 
 // A plain link reads the first repetition of a segment or segment group.
 function valueAt(
-  placement: Placement,
+  occurrences: Occurrences,
   nodes: ReadonlyArray<EdifactStructureNode>,
   path: string,
 ): string | undefined {
   for (const node of nodes) {
     if (node.kind === 'segmentGroup') {
-      const [first] = placement.groups.get(node.path) ?? []
+      const [first] = occurrences.groups.get(node.path) ?? []
       const found = first && valueAt(first, node.children, path)
 
       if (found !== undefined) {
@@ -130,7 +134,7 @@ function valueAt(
       continue
     }
 
-    const [segment] = placement.segments.get(node.path) ?? []
+    const [segment] = occurrences.segments.get(node.path) ?? []
 
     for (const [index, child] of node.children.entries()) {
       const component = componentOf(child, path)
@@ -143,8 +147,6 @@ function valueAt(
 
   return undefined
 }
-
-type Values = ReadonlyMap<string, string>
 
 type JsonObject = Record<string, JsonContent>
 
@@ -161,9 +163,6 @@ function fieldValue(field: DocumentField, value: string): Effect.Effect<JsonCont
     ? Effect.succeed(number)
     : Effect.fail(new MappingError({ code: 'invalidNumber', targetPath: field.path }))
 }
-
-const hasValueBeneath = ({ path }: DocumentStructureNode, values: Values) =>
-  [...values.keys()].some((target) => target.startsWith(`${path}.`))
 
 // Only an object that is required or holds a value needs its required fields.
 function documentOf(
@@ -184,7 +183,7 @@ function documentOf(
         return Effect.map(fieldValue(node, value), (content) => [[node.name, content]])
       }
 
-      if (node.kind === 'object' && (node.required || hasValueBeneath(node, values))) {
+      if (node.kind === 'object' && isRequiredOrFilled(node, values, '.')) {
         return Effect.map(documentOf(node.children, values), (content) => [[node.name, content]])
       }
 
@@ -219,13 +218,13 @@ export function applyInboundMappingVersion(
     }
   }
 
-  const known = segmentNodes(children)
+  const structureSegments = segmentNodes(children)
 
-  const { placement } = place(
+  const { occurrences } = place(
     children,
     {
       segments: [message.header, ...message.segments, message.trailer],
-      known: (segment) => known.some((node) => matches(node, segment)),
+      isInStructure: (segment) => structureSegments.some((node) => matches(node, segment)),
     },
     0,
     true,
@@ -234,11 +233,7 @@ export function applyInboundMappingVersion(
   const values = new Map<string, string>()
 
   for (const { sourcePath, targetPath } of version.links) {
-    const value = valueAt(placement, children, sourcePath)
-
-    if (value !== undefined && value !== '') {
-      values.set(targetPath, value)
-    }
+    setFilled(values, targetPath, valueAt(occurrences, children, sourcePath))
   }
 
   return documentOf(structure.children, values)
