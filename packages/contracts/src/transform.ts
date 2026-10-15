@@ -34,6 +34,10 @@ export type ConditionOperator = (typeof conditionOperators)[number]
 
 export const decimalPlaces = { min: 0, max: 6 } as const
 
+export const dateTokens = ['yyyy', 'yy', 'MM', 'dd', 'HH', 'mm', 'ss'] as const
+
+export type DateToken = (typeof dateTokens)[number]
+
 export const transformIssueCodes = [
   'required',
   'outOfRange',
@@ -76,14 +80,13 @@ const required = (field: string, value: string): TransformConfigIssue | false =>
 const atLeast = (field: string, value: number | null, min: number): TransformConfigIssue | false =>
   value !== null && value < min && { field, code: 'outOfRange' }
 
-// Date patterns use the tokens yyyy, yy, MM, dd, HH, mm and ss, e.g. `yyyyMMdd` for EDIFACT's
-// format 102, and need at least a year, a month and a day.
+// A date pattern such as `yyyyMMdd` for EDIFACT's format 102 needs a year, a month and a day.
 function datePattern(field: string, pattern: string): TransformConfigIssue | false {
   if (blank(pattern)) {
     return { field, code: 'required' }
   }
 
-  const known = /^(yyyy|yy|MM|dd|HH|mm|ss|[-./: T])+$/.test(pattern)
+  const known = new RegExp(`^(${dateTokens.join('|')}|[-./: T])+$`).test(pattern)
   const complete = ['yy', 'MM', 'dd'].every((token) => pattern.includes(token))
 
   return !(known && complete) && { field, code: 'invalidPattern' }

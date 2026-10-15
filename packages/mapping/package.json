@@ -17,6 +17,7 @@
     "@edi-bridge/contracts": "workspace:*",
     "@edi-bridge/edifact": "workspace:*",
     "effect": "^4.0.4",
+    "jsonata": "^2.2.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {

@@ -615,6 +615,8 @@ export {
   type ConditionOperator,
   conditionOperators,
   concatenateInputs,
+  type DateToken,
+  dateTokens,
   decimalPlaces,
   decimalSeparators,
   type ExpressionSyntaxError,
