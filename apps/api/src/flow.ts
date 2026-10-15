@@ -1,4 +1,4 @@
-import { and, eq, inArray, type SQL } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
@@ -8,13 +8,13 @@ import {
   flowChannelFields,
   type FlowInput,
   type FlowUpdate,
-  type MappingVersionSummary,
   type MoveFlowMappingVersionBody,
 } from '@edi-bridge/contracts'
 import { channels, flows, mappings, mappingVersions } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { selectVersions, toHeader } from './mapping-version.js'
 import { byName, exactlyOne, inWorkspace, rejectingInvalidId } from './rows.js'
 import { assertTradingPartnerIn } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
@@ -23,28 +23,6 @@ import type { ValidationError } from './parse.js'
 
 type Row = typeof flows.$inferSelect
 
-const versionHeader = {
-  id: mappingVersions.id,
-  mappingId: mappingVersions.mappingId,
-  mappingName: mappings.name,
-  version: mappingVersions.version,
-  publishedAt: mappingVersions.publishedAt,
-}
-
-const selectVersions = (db: Database | Transaction, where: SQL | undefined) =>
-  db
-    .select(versionHeader)
-    .from(mappingVersions)
-    .innerJoin(mappings, eq(mappingVersions.mappingId, mappings.id))
-    .where(where)
-
-type VersionRow = Awaited<ReturnType<typeof selectVersions>>[number]
-
-const toVersion = (row: VersionRow): MappingVersionSummary => ({
-  ...row,
-  publishedAt: row.publishedAt.toISOString(),
-})
-
 const toFlows = async (db: Database, rows: Row[]): Promise<Flow[]> => {
   if (rows.length === 0) {
     return []
@@ -52,8 +30,7 @@ const toFlows = async (db: Database, rows: Row[]): Promise<Flow[]> => {
 
   const pinned = new Map(
     (
-      await selectVersions(
-        db,
+      await selectVersions(db, {}).where(
         inArray(
           mappingVersions.id,
           rows.map(({ mappingVersionId }) => mappingVersionId),
@@ -62,8 +39,7 @@ const toFlows = async (db: Database, rows: Row[]): Promise<Flow[]> => {
     ).map((version) => [version.id, version]),
   )
 
-  const siblings = await selectVersions(
-    db,
+  const siblings = await selectVersions(db, {}).where(
     inArray(
       mappingVersions.mappingId,
       [...pinned.values()].map(({ mappingId }) => mappingId),
@@ -84,14 +60,14 @@ const toFlows = async (db: Database, rows: Row[]): Promise<Flow[]> => {
       messageType: row.messageType,
       inboundChannelId: row.inboundChannelId,
       destinationChannelId: row.destinationChannelId,
-      mappingVersion: toVersion(version),
+      mappingVersion: toHeader(version),
       newerMappingVersions: siblings
         .filter(
           (candidate) =>
             candidate.mappingId === version.mappingId && candidate.version > version.version,
         )
         .toSorted((a, b) => b.version - a.version)
-        .map(toVersion),
+        .map(toHeader),
     }
   })
 }
