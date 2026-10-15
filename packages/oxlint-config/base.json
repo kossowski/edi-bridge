@@ -198,7 +198,19 @@
     ],
     "eslint/no-unused-labels": "error",
     "eslint/no-unused-private-class-members": "error",
-    "eslint/no-unused-vars": "error",
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "args": "after-used",
+        "caughtErrors": "all",
+        "ignoreClassWithStaticInitBlock": false,
+        "ignoreRestSiblings": false,
+        "ignoreUsingDeclarations": false,
+        "reportUsedIgnorePattern": false,
+        "reportVarsOnlyUsedAsTypes": true,
+        "vars": "all"
+      }
+    ],
     "eslint/no-useless-assignment": "error",
     "eslint/no-useless-backreference": "error",
     "eslint/no-useless-catch": "error",
