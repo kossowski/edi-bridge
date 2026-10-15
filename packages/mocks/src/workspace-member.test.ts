@@ -4,8 +4,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { workspaceMembersEndpoint } from '@edi-bridge/contracts'
 
 import { seedWorkspaceSummaries } from './operator'
+import { seedId } from './seed-id'
 import { seedSession, showcaseViewerSession } from './session'
 import {
+  createWorkspaceMember,
   createWorkspaceMembers,
   seedWorkspaceMembers,
   toWorkspaceMemberStore,
@@ -96,6 +98,41 @@ describe('toWorkspaceMemberStore', () => {
 
   it('serves no members for a Workspace missing from the map', () => {
     expect(toWorkspaceMemberStore(new Map()).get(seedSession.workspace.id)).toEqual([])
+  })
+
+  it('finds no removed member by email', () => {
+    const store = toWorkspaceMemberStore(seedWorkspaceMembers)
+    const [, leaving] = store.get(showcaseViewerSession.workspace.id)
+
+    store.remove(showcaseViewerSession.workspace.id, leaving!.id)
+
+    expect(store.byEmail(leaving!.email)).toBeUndefined()
+  })
+
+  it.each([
+    ['a seeded member', 'seeded'],
+    ['an added member', 'added'],
+  ] as const)('lists %s added again after a removal once', (_, origin) => {
+    const workspaceId = showcaseViewerSession.workspace.id
+    const store = toWorkspaceMemberStore(seedWorkspaceMembers)
+    const [, seeded] = store.get(workspaceId)
+
+    const member =
+      origin === 'seeded'
+        ? seeded!
+        : createWorkspaceMember({ id: seedId(11, 90), name: 'Ida Berg' })
+
+    if (origin === 'added') {
+      store.add(workspaceId, member)
+    }
+
+    store.remove(workspaceId, member.id)
+    store.add(workspaceId, { ...member, role: 'admin' })
+
+    expect(store.get(workspaceId).filter(({ id }) => id === member.id)).toEqual([
+      { ...member, role: 'admin' },
+    ])
+    expect(store.byEmail(member.email)).toEqual({ ...member, role: 'admin' })
   })
 })
 

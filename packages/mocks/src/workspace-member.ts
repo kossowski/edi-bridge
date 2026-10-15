@@ -142,39 +142,48 @@ export function createWorkspaceMemberStore(
   members: WorkspaceMembers = seedWorkspaceMembers,
 ): WorkspaceMemberStore {
   const added = new Map<string, WorkspaceMember[]>()
-  const removed = new Set<string>()
+  const hidden = new Set<string>()
 
-  const removalKey = (workspaceId: string, userId: string) => `${workspaceId}:${userId}`
+  const memberKey = (workspaceId: string, userId: string) => `${workspaceId}:${userId}`
 
   const seeded = (workspaceId: string) =>
-    'get' in members ? (members.get(workspaceId) ?? []) : members
-
-  const all = () => [
-    ...('get' in members ? [...members.values()].flat() : members),
-    ...[...added.values()].flat(),
-  ]
-
-  const get = (workspaceId: string) =>
-    [...seeded(workspaceId), ...(added.get(workspaceId) ?? [])].filter(
-      ({ id }) => !removed.has(removalKey(workspaceId, id)),
+    ('get' in members ? (members.get(workspaceId) ?? []) : members).filter(
+      ({ id }) => !hidden.has(memberKey(workspaceId, id)),
     )
+
+  const addedTo = (workspaceId: string) => added.get(workspaceId) ?? []
+
+  const get = (workspaceId: string) => [...seeded(workspaceId), ...addedTo(workspaceId)]
+
+  const drop = (workspaceId: string, userId: string) => {
+    added.set(
+      workspaceId,
+      addedTo(workspaceId).filter(({ id }) => id !== userId),
+    )
+    hidden.add(memberKey(workspaceId, userId))
+  }
+
+  const current = () =>
+    'get' in members
+      ? [...new Set([...members.keys(), ...added.keys()])].flatMap(get)
+      : [...members, ...[...added.values()].flat()]
 
   return {
     get,
     add: (workspaceId, member) => {
-      removed.delete(removalKey(workspaceId, member.id))
-      added.set(workspaceId, [...(added.get(workspaceId) ?? []), member])
+      drop(workspaceId, member.id)
+      added.set(workspaceId, [...addedTo(workspaceId), member])
     },
     remove: (workspaceId, userId) => {
       if (!get(workspaceId).some(({ id }) => id === userId)) {
         return false
       }
 
-      removed.add(removalKey(workspaceId, userId))
+      drop(workspaceId, userId)
 
       return true
     },
-    byEmail: (email) => all().find((member) => member.email === email),
+    byEmail: (email) => current().find((member) => member.email === email),
   }
 }
 
