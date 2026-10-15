@@ -190,6 +190,8 @@ export {
   encodeBase64,
   findNode,
   inferDocumentStructure,
+  parseCsv,
+  rootListPath,
   sameCsvSettings,
   visitedNode,
 } from './document-structure-inference'

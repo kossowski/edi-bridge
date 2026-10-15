@@ -882,6 +882,12 @@ export function findNode(nodes: ReadonlyArray<DocumentStructureNode>, path: stri
   return visitedNode(nodes, path)?.node
 }
 
+export function rootListPath(structure: { format: 'csv' }): string
+
+export function rootListPath(
+  structure: { format: 'csv' } | { format: 'json'; root: JsonRoot },
+): string | undefined
+
 export function rootListPath(structure: { format: 'csv' } | { format: 'json'; root: JsonRoot }) {
   if (structure.format === 'csv') {
     return csvRowsPath
