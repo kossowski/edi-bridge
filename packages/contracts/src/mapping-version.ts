@@ -202,7 +202,6 @@ export const outputDifferenceSchema = z
 
 export type OutputDifference = z.infer<typeof outputDifferenceSchema>
 
-// A value of an output Document at a structure path, in the repetitions of its repeating parts.
 export type OutputEntry = { path: string; at: ReadonlyArray<number>; value: string }
 
 export function outputDifferences(

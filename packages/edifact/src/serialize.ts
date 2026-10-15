@@ -92,7 +92,7 @@ export const serialize = ({
   )
 }
 
-// One segment per line, from UNH to UNT, for a reader rather than a Channel.
+// For a person to read, not for a Channel.
 export const serializeMessage = ({ header, segments, trailer }: Message): string =>
   [header, ...segments, trailer]
     .map((segment, index) => serializeSegment(segment, defaultDelimiters, index + 1))
