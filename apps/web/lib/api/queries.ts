@@ -23,6 +23,7 @@ import type {
   Invite,
   LookupTable,
   LookupTableSuggestionsQuery,
+  LookupTableSummary,
   MappingComparisonQuery,
   MappingDraft,
   MappingGraph,
@@ -561,6 +562,9 @@ export function storeSavedLookupTable(queryClient: QueryClient, saved: LookupTab
 export function forgetDeletedLookupTable(queryClient: QueryClient, id: string) {
   queryClient.removeQueries({ queryKey: lookupTableKeys.detail(id) })
   queryClient.removeQueries({ queryKey: lookupTableKeys.missingCodes(id) })
+  queryClient.setQueryData<LookupTableSummary[]>(lookupTablesQuery.queryKey, (tables) =>
+    tables?.filter((table) => table.id !== id),
+  )
   void queryClient.invalidateQueries({ queryKey: lookupTableKeys.list() })
 }
 

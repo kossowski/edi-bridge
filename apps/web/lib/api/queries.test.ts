@@ -147,16 +147,19 @@ describe('forgetDeletedLookupTable', () => {
   it('drops the deleted Lookup Table and marks the list as stale', () => {
     const queryClient = new QueryClient()
 
-    const deleted = toLookupTable(seedLookupTables[0]!, {
-      get: (id) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
-    })
+    const tradingPartners = {
+      get: (id: string) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
+    }
 
-    queryClient.setQueryData(lookupTablesQuery.queryKey, [])
-    queryClient.setQueryData(lookupTableQuery(deleted.id).queryKey, deleted)
+    const [deleted, kept] = seedLookupTables.map((table) => toLookupTable(table, tradingPartners))
 
-    forgetDeletedLookupTable(queryClient, deleted.id)
+    queryClient.setQueryData(lookupTablesQuery.queryKey, [deleted!, kept!])
+    queryClient.setQueryData(lookupTableQuery(deleted!.id).queryKey, deleted)
 
-    expect(queryClient.getQueryState(lookupTableQuery(deleted.id).queryKey)).toBeUndefined()
+    forgetDeletedLookupTable(queryClient, deleted!.id)
+
+    expect(queryClient.getQueryState(lookupTableQuery(deleted!.id).queryKey)).toBeUndefined()
+    expect(queryClient.getQueryData(lookupTablesQuery.queryKey)).toEqual([kept])
     expect(queryClient.getQueryState(lookupTablesQuery.queryKey)?.isInvalidated).toBe(true)
   })
 })
