@@ -14,7 +14,6 @@ import {
   mappingSideLeaves,
   type MappingGraph,
   type MappingLink,
-  type MappingSide,
   mappingsEndpoint,
   type MappingSummary,
   mappingSummarySchema,
@@ -25,6 +24,7 @@ import {
   type MessageType,
   messageTypes,
   messageTypeStructures,
+  oriented,
   remainingAiReview,
   type RunStatus,
   type RunSummary,
@@ -179,16 +179,6 @@ export const linkTemplates: Readonly<
     ['messages[].segmentErrors[].position', 'SG1/SG2/UCS/0096'],
     ['messages[].segmentErrors[].syntaxError', 'SG1/SG2/UCS/0085'],
   ],
-}
-
-// Inbound Mappings read the Message Type and write the Document, outbound ones the other way.
-export function oriented<Side>(
-  messageType: MessageType,
-  { document, edifact }: { document: Side; edifact: Side },
-): { source: Side; target: Side } {
-  return directionOf({ messageType }) === 'inbound'
-    ? { source: edifact, target: document }
-    : { source: document, target: edifact }
 }
 
 export function link(
@@ -526,13 +516,6 @@ export const seedMappingDrafts: ReadonlyArray<MappingDraftRecord> = [
   },
 ]
 
-export function sideLeaves(
-  record: MappingDraftRecord,
-  documentStructures: DocumentStructures,
-): SideLeaves {
-  return mappingSideLeaves(record.messageType, structureOf(record, documentStructures))
-}
-
 function randomLinks(
   faker: Faker,
   record: Pick<MappingDraftRecord, 'messageType'>,
@@ -567,13 +550,14 @@ function randomGraph(
 ): TransformGraph {
   const faker = seededFaker(`transforms:${record.id}`)
 
-  const { source, target } = oriented(record.messageType, {
-    document: documentStructureLeaves(documentStructure).map(({ path }) => path),
-    edifact: edifactLeaves(messageTypeStructures[record.messageType]).map(({ path }) => path),
-  })
+  const leaves = mappingSideLeaves(record.messageType, documentStructure)
+  const source = [...leaves.source]
 
   const linked = new Set(links.map(({ targetPath }) => targetPath))
-  const unlinkedTargets = faker.helpers.shuffle(target.filter((path) => !linked.has(path)))
+
+  const unlinkedTargets = faker.helpers.shuffle(
+    [...leaves.target].filter((path) => !linked.has(path)),
+  )
 
   const transforms = Array.from({ length: 30 }, (_, index) =>
     transformOnGrid(faker.string.uuid(), index, faker.helpers.arrayElement(generatedConfigs)),
@@ -887,7 +871,6 @@ export function toMappingDraft(
   return mappingDraftSchema.parse({
     mappingId: record.id,
     name: record.name,
-    direction: directionOf(record),
     links: record.links,
     transforms: record.transforms,
     transformLinks: record.transformLinks,
@@ -895,7 +878,7 @@ export function toMappingDraft(
     latestVersion: record.latestVersion,
     unpublishedChanges: record.unpublishedChanges,
     aiReview: record.aiReview ?? null,
-    ...oriented<MappingSide>(record.messageType, {
+    ...oriented(record.messageType, {
       document: {
         kind: 'documentStructure',
         documentStructureId: record.documentStructureId,
@@ -1094,7 +1077,10 @@ export function mappingHandlers(
           return badRequest(body.error.message)
         }
 
-        const invalidLink = linkProblem(body.data, sideLeaves(existing, structures.all()))
+        const invalidLink = linkProblem(
+          body.data,
+          mappingSideLeaves(existing.messageType, structureOf(existing, structures.all())),
+        )
 
         if (invalidLink) {
           return invalidLink

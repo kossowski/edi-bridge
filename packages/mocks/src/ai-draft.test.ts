@@ -10,6 +10,7 @@ import {
   type AiDraftEvent,
   type MappingDraft,
   mappingDraftEndpoint,
+  mappingSideLeaves,
   parseAiDraftEvent,
   type RequestAiDraftBody,
   requestAiDraftEndpoint,
@@ -24,7 +25,7 @@ import {
   linkProblem,
   mappingHandlers,
   seedMappingDrafts,
-  sideLeaves,
+  structureOf,
 } from './mapping'
 import { seedMappingSamples } from './mapping-sample'
 import { mappingVersionHandlers } from './mapping-version'
@@ -240,7 +241,12 @@ describe('POST /mappings/:id/ai-draft proposals', () => {
 
       const { draft: drafted } = await draftedEvent(draft.id)
 
-      expect(linkProblem(partsOf(drafted), sideLeaves(draft, seedDocumentStructures))).toBeNull()
+      expect(
+        linkProblem(
+          partsOf(drafted),
+          mappingSideLeaves(draft.messageType, structureOf(draft, seedDocumentStructures)),
+        ),
+      ).toBeNull()
     },
   )
 

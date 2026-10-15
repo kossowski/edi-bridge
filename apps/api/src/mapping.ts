@@ -11,6 +11,7 @@ import {
   type MappingSummary,
   type MessageType,
   type MessageTypeSide,
+  oriented,
   type SaveMappingDraftBody,
   unknownPathMessage,
 } from '@edi-bridge/contracts'
@@ -59,10 +60,14 @@ export const listMappings = Effect.gen(function* () {
   return rows.map(toSummary).toSorted(byName)
 })
 
-const nameOf = (messageType: MessageType, documentStructureName: string) =>
-  directionOf({ messageType }) === 'inbound'
-    ? `${messageType} to ${documentStructureName}`
-    : `${documentStructureName} to ${messageType}`
+const nameOf = (messageType: MessageType, documentStructureName: string) => {
+  const { source, target } = oriented(messageType, {
+    document: documentStructureName,
+    edifact: messageType,
+  })
+
+  return `${source} to ${target}`
+}
 
 const uniqueName = (name: string, taken: ReadonlySet<string>) => {
   let count = 1
@@ -160,9 +165,7 @@ const toDraft = (row: Row): MappingDraft => {
 
   const edifact: MessageTypeSide = { kind: 'messageType', messageType: row.messageType }
 
-  return directionOf(row) === 'inbound'
-    ? { ...fields, direction: 'inbound', source: edifact, target: document }
-    : { ...fields, direction: 'outbound', source: document, target: edifact }
+  return { ...fields, ...oriented(row.messageType, { document, edifact }) }
 }
 
 const loadRow = (id: string) =>

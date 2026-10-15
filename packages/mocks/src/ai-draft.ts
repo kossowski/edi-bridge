@@ -12,10 +12,12 @@ import {
   type AiProposal,
   type DocumentStructure,
   type MappingLink,
+  mappingSideLeaves,
   marksAll,
   proposedAiReview,
   requestAiDraftEndpoint,
   type Session,
+  type SideLeaves,
   type TransformLink,
   transformLinkTargets,
   type WorkspaceSettings,
@@ -33,7 +35,7 @@ import {
   linkTemplates,
   type MappingDraftRecord,
   type MappingDraftStore,
-  sideLeaves,
+  structureOf,
   templateGraph,
   toMappingDraft,
   toMappingDraftStore,
@@ -116,7 +118,7 @@ function withoutTransforms(graph: TransformGraph, ids: ReadonlySet<string>): Tra
 // can leave a transform that fed it without any use, so this repeats until nothing changes.
 function fittingTransforms(
   record: MappingDraftRecord,
-  leaves: ReturnType<typeof sideLeaves>,
+  leaves: SideLeaves,
   taken: ReadonlySet<string>,
 ): TransformGraph {
   let graph = withoutInvalidTransforms(templateGraph(record.id, record.messageType, 1, 'ai'))
@@ -152,7 +154,7 @@ function fittingTransforms(
 
 function generatedLinks(
   record: MappingDraftRecord,
-  leaves: ReturnType<typeof sideLeaves>,
+  leaves: SideLeaves,
   taken: ReadonlySet<string>,
 ): MappingLink[] {
   const faker = seededFaker(`ai-draft:${record.id}`)
@@ -165,7 +167,7 @@ function generatedLinks(
 
 function templateLinksFor(
   record: MappingDraftRecord,
-  leaves: ReturnType<typeof sideLeaves>,
+  leaves: SideLeaves,
   taken: ReadonlySet<string>,
 ): MappingLink[] {
   return linkTemplates[record.messageType]
@@ -185,7 +187,7 @@ export function aiProposalFor(
     return { links: [], transforms: [], transformLinks: [] }
   }
 
-  const leaves = sideLeaves(record, documentStructures)
+  const leaves = mappingSideLeaves(record.messageType, structureOf(record, documentStructures))
 
   const linked = new Set([
     ...record.links.map(({ targetPath }) => targetPath),

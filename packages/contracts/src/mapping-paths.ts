@@ -18,18 +18,30 @@ export function containerOf(paths: Iterable<string>, path: string) {
   return [...paths].some((inner) => inner.startsWith(`${path}/`) || inner.startsWith(`${path}.`))
 }
 
+// Inbound Mappings read the Message Type and write the Document, outbound ones the other way.
+export function oriented<Document, Edifact>(
+  messageType: MessageType,
+  { document, edifact }: { document: Document; edifact: Edifact },
+):
+  | { direction: 'inbound'; source: Edifact; target: Document }
+  | { direction: 'outbound'; source: Document; target: Edifact } {
+  return directionOf({ messageType }) === 'inbound'
+    ? { direction: 'inbound', source: edifact, target: document }
+    : { direction: 'outbound', source: document, target: edifact }
+}
+
 export type SideLeaves = { source: ReadonlySet<string>; target: ReadonlySet<string> }
 
 export function mappingSideLeaves(
   messageType: MessageType,
   documentStructure: Pick<DocumentStructure, 'children'>,
 ): SideLeaves {
-  const document = new Set(documentStructureLeaves(documentStructure).map(({ path }) => path))
-  const edifact = new Set(edifactLeaves(messageTypeStructures[messageType]).map(({ path }) => path))
+  const { source, target } = oriented(messageType, {
+    document: new Set(documentStructureLeaves(documentStructure).map(({ path }) => path)),
+    edifact: new Set(edifactLeaves(messageTypeStructures[messageType]).map(({ path }) => path)),
+  })
 
-  return directionOf({ messageType }) === 'inbound'
-    ? { source: edifact, target: document }
-    : { source: document, target: edifact }
+  return { source, target }
 }
 
 type LinkedPath = { path: string; wholePart: boolean }

@@ -8,6 +8,7 @@ import {
   type MappingSample,
   type MessageType,
   messageTypeStructures,
+  oriented,
   withCheckDigit,
 } from '@edi-bridge/contracts'
 
@@ -23,7 +24,6 @@ import { randomGln } from './gln'
 import {
   linkTemplates,
   type MappingDraftRecord,
-  oriented,
   seedMappingDrafts,
   unpublishedDraftId,
 } from './mapping'

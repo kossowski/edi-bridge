@@ -472,6 +472,7 @@ export {
   containerOf,
   edifactLeaves,
   mappingSideLeaves,
+  oriented,
   type SideLeaves,
   unknownPathMessage,
   unknownPaths,

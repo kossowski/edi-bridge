@@ -4,10 +4,12 @@ import {
   type DocumentContent,
   type DocumentStructure,
   type MappingGraph,
+  mappingSideLeaves,
   type MappingPreview,
   mappingPreviewEndpoint,
   mappingSamplesEndpoint,
   messageTypeStructures,
+  oriented,
   type PreviewNote,
   previewNoteKey,
   unknownPaths,
@@ -28,8 +30,7 @@ import {
 import {
   type MappingDraftRecord,
   type MappingDraftStore,
-  oriented,
-  sideLeaves,
+  structureOf,
   toMappingDraftStore,
 } from './mapping'
 import { type MappingSampleRecord, seedMappingSamples, toMappingSample } from './mapping-sample'
@@ -70,7 +71,10 @@ export async function previewOutput({
   )
 
   const { entries, notes } = previewEntries(graph, documentValues(sample.entries), expressions, {
-    unknown: unknownPaths(graph, sideLeaves(mapping, documentStructures)),
+    unknown: unknownPaths(
+      graph,
+      mappingSideLeaves(mapping.messageType, structureOf(mapping, documentStructures)),
+    ),
     lookUp,
   })
 
@@ -78,7 +82,7 @@ export async function previewOutput({
 
   const documentStructure = documentStructures.find(({ id }) => id === mapping.documentStructureId)
 
-  const document = oriented<() => DocumentContent>(mapping.messageType, {
+  const document = oriented<() => DocumentContent, () => DocumentContent>(mapping.messageType, {
     document: () => ({
       format: 'json',
       content: documentStructure ? renderJson(documentStructure, values) : {},
