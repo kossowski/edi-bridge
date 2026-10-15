@@ -36,7 +36,7 @@ A fresh installation has no users. Create the Operator once, after the first dep
 
 3. Confirm that the output reports the user, the Workspace, the Operator role and the Admin role.
 
-The command creates the Workspace if no Workspace has that name, and makes the user Operator and Admin of it. The password needs at least 8 characters. The command never prints the password.
+The command creates the Workspace if no Workspace has that name, and makes the user Operator and Admin of it. `--workspace` matches the exact Workspace name. A misspelt name creates a new Workspace, so copy the name of an existing Workspace exactly. The password needs at least 8 characters. The command never prints the password.
 
 Running the command again is safe. An existing user keeps their password and roles; the command grants only a missing Operator or Admin role. To replace the password of an existing user, add `--reset-password`.
 

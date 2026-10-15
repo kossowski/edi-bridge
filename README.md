@@ -94,6 +94,14 @@ docker compose --profile full-stack up -d --build --wait
 
 `--wait` returns once every health check passes. The apps listen on the same ports as in local development (`WEB_PORT`, `API_PORT` and `WORKER_HEALTH_PORT` change the host ports), so stop `pnpm dev` first. Stop the stack with `docker compose --profile full-stack down`.
 
+The stack runs the production images, so it has no development seed and no user. Create the Operator once in the running api container, and enter the password at the prompt:
+
+```sh
+docker compose exec api node dist/create-operator.js --email <operator-email> --name "<operator-name>" --workspace "<workspace-name>"
+```
+
+See [Create the Operator](docs/deployment/deployment-operations.md#create-the-operator) for the options.
+
 A single image builds with:
 
 ```sh
