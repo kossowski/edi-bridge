@@ -42,10 +42,12 @@ const updatedAt = () =>
     .defaultNow()
     .$onUpdate(() => new Date())
 
+export const userEmailUnique = 'users_email_unique'
+
 export const users = pgTable('users', {
   id: uuid().primaryKey().defaultRandom(),
   name: text().notNull(),
-  email: text().notNull().unique(),
+  email: text().notNull().unique(userEmailUnique),
   emailVerified: boolean().notNull().default(false),
   image: text(),
   operator: boolean().notNull().default(false),
@@ -122,6 +124,24 @@ export const members = pgTable(
     primaryKey({ columns: [table.userId, table.workspaceId] }),
     index().on(table.workspaceId),
   ],
+)
+
+export const invites = pgTable(
+  'invites',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    email: text().notNull(),
+    role: workspaceRole().notNull(),
+    token: text().notNull().unique(),
+    createdAt: createdAt(),
+    expiresAt: timestamp({ withTimezone: true, mode: 'date' }).notNull(),
+    acceptedAt: timestamp({ withTimezone: true, mode: 'date' }),
+    revokedAt: timestamp({ withTimezone: true, mode: 'date' }),
+  },
+  (table) => [index().on(table.workspaceId)],
 )
 
 export const characterSet = pgEnum('character_set', characterSets)

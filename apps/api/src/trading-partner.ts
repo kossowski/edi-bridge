@@ -11,6 +11,7 @@ import {
 import { tradingPartnerGlnUnique, tradingPartners } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
+import { dayMs } from './duration.js'
 import { NotFound, Unprocessable } from './errors.js'
 import { byName, exactlyOne, inWorkspace, rejectingDuplicate, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
@@ -138,8 +139,6 @@ export const createTradingPartner = (input: TradingPartnerInput) =>
 
     return toTradingPartner(yield* exactlyOne(rows))
   })
-
-const dayMs = 24 * 60 * 60 * 1000
 
 const lastUtcDays = (now: number) =>
   Array.from({ length: activityDays }, (_, index) => ({

@@ -1,6 +1,8 @@
 import { and, eq } from 'drizzle-orm'
 
-import { accounts, users } from '@edi-bridge/db'
+import { accounts, members, users } from '@edi-bridge/db'
+
+import type { WorkspaceRole } from '@edi-bridge/contracts'
 
 import type { Database, Transaction } from './db.js'
 
@@ -47,4 +49,34 @@ export async function storePassword(
       password: passwordHash,
     })
   }
+}
+
+export async function findUserWithPassword(database: Database | Transaction, email: string) {
+  const [found] = await database
+    .select({ id: users.id, passwordHash: accounts.password })
+    .from(users)
+    .leftJoin(
+      accounts,
+      and(eq(accounts.userId, users.id), eq(accounts.providerId, credentialProvider)),
+    )
+    .where(eq(users.email, email))
+
+  return found
+}
+
+export async function grantRole(
+  database: Database | Transaction,
+  { userId, workspaceId, role }: { userId: string; workspaceId: string; role: WorkspaceRole },
+) {
+  await database
+    .insert(members)
+    .values({ userId, workspaceId, role })
+    .onConflictDoUpdate({ target: [members.userId, members.workspaceId], set: { role } })
+}
+
+export async function addMembership(
+  database: Database | Transaction,
+  { userId, workspaceId, role }: { userId: string; workspaceId: string; role: WorkspaceRole },
+) {
+  await database.insert(members).values({ userId, workspaceId, role }).onConflictDoNothing()
 }

@@ -2,9 +2,10 @@ import { hashPassword } from 'better-auth/crypto'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
+import { minPasswordLength } from '@edi-bridge/contracts'
 import { members, users, workspaces } from '@edi-bridge/db'
 
-import { addUser, storePassword } from './user.js'
+import { addUser, grantRole, storePassword } from './user.js'
 
 import type { Database, Transaction } from './db.js'
 
@@ -23,8 +24,6 @@ export interface OperatorOutcome {
   adminGranted: boolean
   passwordReset: boolean
 }
-
-const minPasswordLength = 8
 
 async function hashedPassword(askPassword: () => Promise<string>) {
   const password = await askPassword()
@@ -71,13 +70,7 @@ async function grantAdmin(tx: Transaction, userId: string, workspaceId: string) 
     return false
   }
 
-  await tx
-    .insert(members)
-    .values({ userId, workspaceId, role: 'admin' })
-    .onConflictDoUpdate({
-      target: [members.userId, members.workspaceId],
-      set: { role: 'admin' },
-    })
+  await grantRole(tx, { userId, workspaceId, role: 'admin' })
 
   return true
 }

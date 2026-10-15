@@ -121,6 +121,7 @@ export async function startTestApi() {
     auth: testAuth,
     database: connection.db,
     probes: { postgres: up, redis: up },
+    webOrigin,
   })
 
   return {

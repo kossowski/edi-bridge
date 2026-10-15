@@ -2,11 +2,14 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
+  acceptInviteEndpoint,
   createInviteEndpoint,
   createWorkspaceEndpoint,
   type Invite,
   type InviteInput,
   inviteSchema,
+  inviteUnusableProblem,
+  inviteUnusableStatus,
   inviteValidityDays,
   operatorWorkspaceMembersEndpoint,
   resetSandboxWorkspaceEndpoint,
@@ -23,12 +26,13 @@ import {
 import { dayMs } from './duration'
 import {
   createInvites,
+  createOperatorStore,
   createWorkspaceSummaries,
   operatorHandlers,
   seedInvites,
   seedWorkspaceSummaries,
 } from './operator'
-import { sandboxAdminSession, showcaseViewerSession } from './session'
+import { mockCredentials, sandboxAdminSession, showcaseViewerSession } from './session'
 import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
 import { createWorkspaceMembers } from './workspace-member'
 
@@ -422,6 +426,17 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
     expect(response.status).toBe(400)
   })
 
+  it('answers 409 for someone who is already a Member of the Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const response = await post(
+      toPath(createInviteEndpoint.path, { workspaceId: seedWorkspace.id }),
+      { email: 'Mara.Olsen@nordwind-handel.example', role: 'viewer' },
+    )
+
+    expect(response.status).toBe(409)
+  })
+
   it('answers 404 for an unknown Workspace', async () => {
     server.use(...operatorHandlers(apiUrl))
 
@@ -579,6 +594,161 @@ describe('pending invite count', () => {
     expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(
       unansweredInLastWeek.length,
     )
+  })
+})
+
+describe('POST /invites/accept', () => {
+  const pending = seedInvites.find(
+    (invite) => isUnansweredSeedInvite(invite) && Date.parse(invite.expiresAt) > Date.now(),
+  )!
+
+  const expired = seedInvites.find(
+    (invite) => isUnansweredSeedInvite(invite) && Date.parse(invite.expiresAt) <= Date.now(),
+  )!
+
+  const accepted = seedInvites.find(({ acceptedAt }) => acceptedAt !== null)!
+
+  const tokenOf = ({ link }: Invite) => new URL(link).pathname.split('/').at(-1)!
+
+  const accept = (token: string, password = 'invited-password') =>
+    fetch(`${apiUrl}${acceptInviteEndpoint.path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, name: 'Jan Petersen', password }),
+    })
+
+  const createInvite = async (workspaceId: string, body: InviteInput) =>
+    inviteSchema.parse(
+      await (await post(toPath(createInviteEndpoint.path, { workspaceId }), body)).json(),
+    )
+
+  const membersOf = async (workspaceId: string) =>
+    operatorWorkspaceMembersEndpoint.response.parse(await (await listMembers(workspaceId)).json())
+
+  it('accepts a pending invite without a session and marks it accepted', async () => {
+    const store = createOperatorStore()
+    server.use(...operatorHandlers(apiUrl, { workspaces: store, session: null }))
+
+    const response = await accept(tokenOf(pending))
+
+    expect(response.status).toBe(204)
+    expect(store.invite(seedWorkspace.id, pending.id)?.acceptedAt).toEqual(expect.any(String))
+  })
+
+  it.each([
+    ['a used', accepted, 'used'],
+    ['an expired', expired, 'expired'],
+  ] as const)('answers %s link with the unusable status', async (_, invite, reason) => {
+    server.use(...operatorHandlers(apiUrl, { session: null }))
+
+    const response = await accept(tokenOf(invite))
+
+    expect(response.status).toBe(inviteUnusableStatus)
+    expect(await response.json()).toEqual(inviteUnusableProblem(reason))
+  })
+
+  it('answers a revoked link with the unusable status', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    await fetch(
+      `${apiUrl}${toPath(revokeInviteEndpoint.path, { workspaceId: seedWorkspace.id, inviteId: pending.id })}`,
+      { method: 'DELETE' },
+    )
+
+    const response = await accept(tokenOf(pending))
+
+    expect(response.status).toBe(inviteUnusableStatus)
+    expect(await response.json()).toEqual(inviteUnusableProblem('revoked'))
+  })
+
+  it('adds a new user as a Member with the role of the invite', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const invite = await createInvite(seedSandboxWorkspace.id, {
+      email: 'jonas.weber@havelland.example',
+      role: 'viewer',
+    })
+
+    const response = await accept(tokenOf(invite))
+    const workspace = (await listWorkspaces()).find(({ id }) => id === seedSandboxWorkspace.id)
+
+    expect(response.status).toBe(204)
+    expect(
+      (await membersOf(seedSandboxWorkspace.id)).map(({ email, role }) => ({ email, role })),
+    ).toEqual([
+      { email: mockCredentials.sandboxAdmin.email, role: 'admin' },
+      { email: 'jonas.weber@havelland.example', role: 'viewer' },
+    ])
+    expect(workspace?.memberCount).toBe(2)
+  })
+
+  it('adds an existing user to the Workspace when their password matches', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    const invite = await createInvite(seedWorkspace.id, {
+      email: mockCredentials.sandboxAdmin.email,
+      role: 'viewer',
+    })
+
+    const response = await accept(tokenOf(invite), mockCredentials.sandboxAdmin.password)
+
+    expect(response.status).toBe(204)
+    expect((await membersOf(seedWorkspace.id)).map(({ email }) => email)).toContain(
+      mockCredentials.sandboxAdmin.email,
+    )
+  })
+
+  it.each([
+    ['an account with a known password', mockCredentials.sandboxAdmin.email],
+    ['a Member of another Workspace', 'clara.weidner@lindenhof-feinkost.example'],
+  ])('answers 403 to %s on a wrong password and keeps the link open', async (_, email) => {
+    const store = createOperatorStore()
+    server.use(...operatorHandlers(apiUrl, { workspaces: store }))
+
+    const invite = await createInvite(seedWorkspace.id, { email, role: 'admin' })
+
+    const response = await accept(tokenOf(invite), 'takeover-password')
+
+    expect(response.status).toBe(403)
+    expect(store.invite(seedWorkspace.id, invite.id)?.acceptedAt).toBeNull()
+    expect((await membersOf(seedWorkspace.id)).map((member) => member.email)).not.toContain(email)
+  })
+
+  it('keeps the role of someone who became a Member after the invite was created', async () => {
+    const invite = inviteSchema.parse({
+      id: '5d0f3c1e-8a4b-4e6f-9b2d-1c7a3e5f9d09',
+      workspaceId: seedSandboxWorkspace.id,
+      email: mockCredentials.sandboxAdmin.email,
+      role: 'viewer',
+      link: 'http://localhost:3000/invite/became-admin',
+      createdAt: new Date(Date.now() - dayMs).toISOString(),
+      expiresAt: new Date(Date.now() + dayMs).toISOString(),
+      acceptedAt: null,
+      revokedAt: null,
+    })
+
+    const store = createOperatorStore({ invites: [invite] })
+    server.use(...operatorHandlers(apiUrl, { workspaces: store }))
+
+    const response = await accept('became-admin', mockCredentials.sandboxAdmin.password)
+
+    expect(response.status).toBe(204)
+    expect(store.invite(seedSandboxWorkspace.id, invite.id)?.acceptedAt).toEqual(expect.any(String))
+    expect(
+      (await membersOf(seedSandboxWorkspace.id)).map(({ email, role }) => ({ email, role })),
+    ).toEqual([{ email: mockCredentials.sandboxAdmin.email, role: 'admin' }])
+  })
+
+  it('answers 404 for an unknown token', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: null }))
+
+    expect((await accept('unknown-token')).status).toBe(404)
+  })
+
+  it('answers 400 for a password shorter than 8 characters', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: null }))
+
+    expect((await accept(tokenOf(pending), 'short')).status).toBe(400)
   })
 })
 

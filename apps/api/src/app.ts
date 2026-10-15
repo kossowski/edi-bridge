@@ -5,8 +5,10 @@ import Fastify from 'fastify'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
+  acceptInviteEndpoint,
   channelsEndpoint,
   createDocumentStructureEndpoint,
+  createInviteEndpoint,
   createLookupTableEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
@@ -15,6 +17,8 @@ import {
   documentStructuresEndpoint,
   inferDocumentStructureEndpoint,
   importLookupTableEndpoint,
+  inviteUnusableProblem,
+  inviteUnusableStatus,
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
   lookupTableMissingCodesEndpoint,
@@ -22,6 +26,7 @@ import {
   lookupTablesEndpoint,
   maxEncodedFileBytes,
   maxLookupTableCsvLength,
+  revokeInviteEndpoint,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -31,6 +36,7 @@ import {
   updateCompanyIdentityEndpoint,
   updateDocumentStructureEndpoint,
   updateTradingPartnerEndpoint,
+  workspaceInvitesEndpoint,
 } from '@edi-bridge/contracts'
 
 import { type AuthSettings, mountAuth } from './auth.js'
@@ -43,6 +49,7 @@ import {
   loadDocumentStructure,
   updateDocumentStructure,
 } from './document-structure.js'
+import { acceptInvite, createInvite, listInvites, revokeInvite } from './invite.js'
 import {
   createLookupTable,
   deleteLookupTable,
@@ -55,7 +62,15 @@ import {
   updateLookupTable,
 } from './lookup-table.js'
 import { parse, type ValidationError } from './parse.js'
-import { CurrentMember, loadSession, requireChangeRight, resolveMember } from './session.js'
+import {
+  CurrentMember,
+  CurrentUser,
+  loadSession,
+  requireChangeRight,
+  requireOperator,
+  resolveMember,
+  resolveUser,
+} from './session.js'
 import {
   createTradingPartner,
   listTradingPartnerActivities,
@@ -70,6 +85,7 @@ import type {
   Conflict,
   DocumentStructureRejected,
   Forbidden,
+  InviteUnusable,
   NotFound,
   Unprocessable,
 } from './errors.js'
@@ -86,21 +102,33 @@ export interface AppDependencies {
 }
 
 type Failure =
-  Conflict | DocumentStructureRejected | Forbidden | NotFound | Unprocessable | ValidationError
+  | Conflict
+  | DocumentStructureRejected
+  | Forbidden
+  | InviteUnusable
+  | NotFound
+  | Unprocessable
+  | ValidationError
 
 const statusOf: Record<Failure['_tag'], number> = {
   ValidationError: 400,
   Forbidden: 403,
   NotFound: 404,
   Conflict: 409,
+  InviteUnusable: inviteUnusableStatus,
   Unprocessable: 422,
   DocumentStructureRejected: 422,
 }
 
-const bodyOf = (error: Failure) =>
-  Predicate.isTagged(error, 'DocumentStructureRejected')
-    ? error.problem
+const bodyOf = (error: Failure) => {
+  if (Predicate.isTagged(error, 'DocumentStructureRejected')) {
+    return error.problem
+  }
+
+  return Predicate.isTagged(error, 'InviteUnusable')
+    ? inviteUnusableProblem(error.reason)
     : { message: error.message }
+}
 
 // JSON escapes a control character in six bytes, the worst case for a CSV of the maximum length.
 const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
@@ -144,8 +172,10 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
 
 function registerRoutes(
   app: FastifyInstance,
-  { auth: authSettings, database, probes, probeTimeoutMs = 2000 }: AppDependencies,
+  { auth: authSettings, database, probes, probeTimeoutMs = 2000, webOrigin }: AppDependencies,
 ) {
+  const inviteOrigin = webOrigin ?? new URL(authSettings.baseUrl).origin
+
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
       check(probes.postgres, probeTimeoutMs),
@@ -161,6 +191,19 @@ function registerRoutes(
 
   const auth = mountAuth(app, database, authSettings)
 
+  const run = <A>(reply: FastifyReply, effect: Effect.Effect<A, Failure, Db>, status: number) =>
+    Effect.runPromise(
+      effect.pipe(
+        Effect.map((body) => reply.code(status).send(body)),
+        Effect.catch((error) =>
+          Effect.sync(() => reply.code(statusOf[error._tag]).send(bodyOf(error))),
+        ),
+        Effect.provideService(Db, database),
+      ),
+    )
+
+  const unauthorized = (reply: FastifyReply) => reply.code(401).send({ message: 'Unauthorized' })
+
   const respond = async <A>(
     request: FastifyRequest,
     reply: FastifyReply,
@@ -170,23 +213,39 @@ function registerRoutes(
     const member = await resolveMember(auth, database, request)
 
     if (member === undefined) {
-      return reply.code(401).send({ message: 'Unauthorized' })
+      return unauthorized(reply)
     }
 
     const guarded = readMethods.has(request.method)
       ? effect
       : Effect.andThen(requireChangeRight, effect)
 
-    return Effect.runPromise(
+    return run(
+      reply,
       guarded.pipe(
-        Effect.map((body) => reply.code(status).send(body)),
-        Effect.catch((error) =>
-          Effect.sync(() => reply.code(statusOf[error._tag]).send(bodyOf(error))),
-        ),
-        Effect.provideService(Db, database),
         Effect.provideService(CurrentMember, member),
         Effect.provideService(CurrentWorkspace, { id: member.workspaceId }),
       ),
+      status,
+    )
+  }
+
+  const respondToOperator = async <A>(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    effect: Effect.Effect<A, Failure, Db>,
+    status = 200,
+  ) => {
+    const user = await resolveUser(auth, database, request)
+
+    if (user === undefined) {
+      return unauthorized(reply)
+    }
+
+    return run(
+      reply,
+      Effect.andThen(requireOperator, effect).pipe(Effect.provideService(CurrentUser, user)),
+      status,
     )
   }
 
@@ -361,5 +420,36 @@ function registerRoutes(
           parse(updateDocumentStructureEndpoint.body, request.body),
         ),
       ),
+  )
+
+  app.get<{ Params: { workspaceId: string } }>(workspaceInvitesEndpoint.path, (request, reply) =>
+    respondToOperator(request, reply, listInvites(request.params.workspaceId, inviteOrigin)),
+  )
+
+  app.post<{ Params: { workspaceId: string } }>(createInviteEndpoint.path, (request, reply) =>
+    respondToOperator(
+      request,
+      reply,
+      createInvite(
+        request.params.workspaceId,
+        parse(createInviteEndpoint.body, request.body),
+        inviteOrigin,
+      ),
+      201,
+    ),
+  )
+
+  app.delete<{ Params: { workspaceId: string; inviteId: string } }>(
+    revokeInviteEndpoint.path,
+    (request, reply) =>
+      respondToOperator(
+        request,
+        reply,
+        revokeInvite(request.params.workspaceId, request.params.inviteId, inviteOrigin),
+      ),
+  )
+
+  app.post(acceptInviteEndpoint.path, (request, reply) =>
+    run(reply, acceptInvite(parse(acceptInviteEndpoint.body, request.body)), 204),
   )
 }

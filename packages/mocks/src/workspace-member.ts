@@ -32,6 +32,8 @@ export type WorkspaceMembers =
 
 export type WorkspaceMemberStore = {
   get: (workspaceId: string) => ReadonlyArray<WorkspaceMember>
+  add: (workspaceId: string, member: WorkspaceMember) => void
+  byEmail: (email: string) => WorkspaceMember | undefined
 }
 
 export const seedWorkspaceMembers: WorkspaceMembers = new Map([
@@ -135,12 +137,32 @@ export function createWorkspaceMembers({
   return [...byEmail.values()]
 }
 
-export function toWorkspaceMemberStore(
+export function createWorkspaceMemberStore(
   members: WorkspaceMembers = seedWorkspaceMembers,
 ): WorkspaceMemberStore {
+  const added = new Map<string, WorkspaceMember[]>()
+
+  const seeded = (workspaceId: string) =>
+    'get' in members ? (members.get(workspaceId) ?? []) : members
+
+  const all = () => [
+    ...('get' in members ? [...members.values()].flat() : members),
+    ...[...added.values()].flat(),
+  ]
+
   return {
-    get: (workspaceId) => ('get' in members ? (members.get(workspaceId) ?? []) : members),
+    get: (workspaceId) => [...seeded(workspaceId), ...(added.get(workspaceId) ?? [])],
+    add: (workspaceId, member) => {
+      added.set(workspaceId, [...(added.get(workspaceId) ?? []), member])
+    },
+    byEmail: (email) => all().find((member) => member.email === email),
   }
+}
+
+export function toWorkspaceMemberStore(
+  members: WorkspaceMembers | WorkspaceMemberStore = seedWorkspaceMembers,
+): WorkspaceMemberStore {
+  return 'add' in members ? members : createWorkspaceMemberStore(members)
 }
 
 export function workspaceMemberHandlers(
@@ -149,7 +171,7 @@ export function workspaceMemberHandlers(
     members = seedWorkspaceMembers,
     session = seedSession,
   }: {
-    members?: WorkspaceMembers
+    members?: WorkspaceMembers | WorkspaceMemberStore
     session?: Session | null | SessionStore
   } = {},
 ) {

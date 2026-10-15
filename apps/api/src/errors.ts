@@ -1,6 +1,10 @@
 import { Data } from 'effect'
 
-import type { DocumentStructureProblem } from '@edi-bridge/contracts'
+import {
+  type DocumentStructureProblem,
+  type InviteUnusableReason,
+  inviteUnusableMessages,
+} from '@edi-bridge/contracts'
 
 export class NotFound extends Data.TaggedError('NotFound') {
   override get message() {
@@ -25,5 +29,13 @@ export class DocumentStructureRejected extends Data.TaggedError('DocumentStructu
 export class Forbidden extends Data.TaggedError('Forbidden') {
   override get message() {
     return 'Forbidden'
+  }
+}
+
+export class InviteUnusable extends Data.TaggedError('InviteUnusable')<{
+  readonly reason: InviteUnusableReason
+}> {
+  override get message() {
+    return inviteUnusableMessages[this.reason]
   }
 }

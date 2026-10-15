@@ -5,6 +5,9 @@ import {
   type AiBudgetExhaustedProblem,
   aiBudgetExhaustedStatus,
   aiReviewOpenStatus,
+  inviteUnusableProblem,
+  type InviteUnusableReason,
+  inviteUnusableStatus,
 } from '@edi-bridge/contracts'
 
 function problem(status: number, message: string) {
@@ -20,6 +23,9 @@ export const forbidden = () => problem(403, 'Forbidden')
 export const notFound = () => problem(404, 'Not found')
 
 export const conflict = (message: string) => problem(409, message)
+
+export const inviteUnusable = (reason: InviteUnusableReason) =>
+  HttpResponse.json(inviteUnusableProblem(reason), { status: inviteUnusableStatus })
 
 export const aiReviewOpen = () =>
   problem(aiReviewOpenStatus, 'The AI review of the Draft is still open.')

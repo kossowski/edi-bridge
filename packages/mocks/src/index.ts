@@ -85,6 +85,7 @@ import { tradingPartnerActivityHandlers } from './trading-partner-activity'
 import { seedWorkspace, workspaceHandlers } from './workspace'
 import { seedWorkspaceActivity } from './workspace-activity'
 import {
+  createWorkspaceMemberStore,
   seedWorkspaceMembers,
   workspaceMemberHandlers,
   type WorkspaceMembers,
@@ -324,6 +325,7 @@ export {
 export {
   createWorkspaceMember,
   createWorkspaceMembers,
+  createWorkspaceMemberStore,
   seedWorkspaceMembers,
   toWorkspaceMemberStore,
   workspaceMemberHandlers,
@@ -393,6 +395,7 @@ export function createHandlers(
 
   const ownWorkspace = workspace ?? seedWorkspace
   const operatorStore = createOperatorStore({ workspaces: operatorWorkspaces, invites })
+  const workspaceMemberStore = createWorkspaceMemberStore(workspaceMembers)
 
   if (workspace && !operatorStore.workspace(workspace.id)) {
     operatorStore.setWorkspace(newWorkspaceSummary(workspace, { memberCount: 1, seeded: false }))
@@ -443,10 +446,10 @@ export function createHandlers(
       session: sessionStore,
       workspaces: operatorStore,
     }),
-    ...workspaceMemberHandlers(apiUrl, { members: workspaceMembers, session: sessionStore }),
+    ...workspaceMemberHandlers(apiUrl, { members: workspaceMemberStore, session: sessionStore }),
     ...operatorHandlers(apiUrl, {
       workspaces: operatorStore,
-      members: workspaceMembers,
+      members: workspaceMemberStore,
       session: sessionStore,
     }),
     ...tradingPartnerHandlers(apiUrl, {
