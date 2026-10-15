@@ -90,8 +90,8 @@ describe('toWorkspaceMemberStore', () => {
     const members = createWorkspaceMembers({ count: 2 })
     const store = toWorkspaceMemberStore(members)
 
-    expect(store.get(seedSession.workspace.id)).toBe(members)
-    expect(store.get(showcaseViewerSession.workspace.id)).toBe(members)
+    expect(store.get(seedSession.workspace.id)).toEqual(members)
+    expect(store.get(showcaseViewerSession.workspace.id)).toEqual(members)
   })
 
   it('serves no members for a Workspace missing from the map', () => {

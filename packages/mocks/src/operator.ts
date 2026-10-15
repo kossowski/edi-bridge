@@ -7,6 +7,7 @@ import {
   createWorkspaceEndpoint,
   type Invite,
   inviteSchema,
+  inviteUnusableReason,
   inviteValidityDays,
   operatorWorkspaceMembersEndpoint,
   resetSandboxWorkspaceEndpoint,
@@ -22,7 +23,7 @@ import {
 
 import { dayMs } from './duration'
 import { randomGln } from './gln'
-import { badRequest, conflict, inviteUnusable, notFound } from './responses'
+import { badRequest, conflict, forbidden, inviteUnusable, notFound } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { mockCredentials, seedSession, showcaseViewerSession, toSessionStore } from './session'
@@ -35,9 +36,11 @@ import {
   type WorkspaceStore,
 } from './workspace'
 import {
+  createWorkspaceMember,
   seedWorkspaceMembers,
   toWorkspaceMemberStore,
   type WorkspaceMembers,
+  type WorkspaceMemberStore,
 } from './workspace-member'
 
 export type WorkspaceSummaryRecord = Omit<WorkspaceSummary, 'pendingInviteCount'>
@@ -136,8 +139,12 @@ export function newWorkspaceSummary(
 
 const defaultAppUrl = 'http://localhost:3000'
 
+function invitePath(token: string) {
+  return `/invite/${token}`
+}
+
 function inviteLink(appUrl: string, token: string) {
-  return `${appUrl}/invite/${token}`
+  return `${appUrl}${invitePath(token)}`
 }
 
 function toInvite(
@@ -340,9 +347,7 @@ export function createOperatorStore({
       invitesById.set(invite.id, invite)
     },
     inviteByToken: (token) =>
-      [...invitesById.values()].find(
-        ({ link }) => new URL(link).pathname === inviteLink('', token),
-      ),
+      [...invitesById.values()].find(({ link }) => new URL(link).pathname === invitePath(token)),
     now,
   }
 }
@@ -397,7 +402,7 @@ export function operatorHandlers(
   }: {
     workspaces?: ReadonlyArray<WorkspaceSummaryRecord> | OperatorStore
     invites?: ReadonlyArray<Invite>
-    members?: WorkspaceMembers
+    members?: WorkspaceMembers | WorkspaceMemberStore
     session?: Session | null | SessionStore
     appUrl?: string
     now?: () => Date
@@ -406,6 +411,13 @@ export function operatorHandlers(
   const store = toOperatorStore(workspaces, invites, now)
   const memberStore = toWorkspaceMemberStore(members)
   const sessionStore = toSessionStore(session)
+
+  const passwords = new Map<string, string>(
+    Object.values(mockCredentials).map(({ email, password }) => [email, password]),
+  )
+
+  const isMember = (workspaceId: string, email: string) =>
+    memberStore.get(workspaceId).some((member) => member.email === email)
 
   return [
     http.get(
@@ -472,9 +484,16 @@ export function operatorHandlers(
           return badRequest(body.error.message)
         }
 
+        const email = body.data.email.trim().toLowerCase()
+
+        if (isMember(params.workspaceId, email)) {
+          return conflict('This person is already a Member of the Workspace')
+        }
+
         const invite = toInvite(
           {
             ...body.data,
+            email,
             id: crypto.randomUUID(),
             workspaceId: params.workspaceId,
             createdAt: new Date().toISOString(),
@@ -508,40 +527,58 @@ export function operatorHandlers(
         return HttpResponse.json(revoked)
       }),
     ),
-    http.post<{ token: string }>(
-      `${apiUrl}${acceptInviteEndpoint.path}`,
-      async ({ params, request }) => {
-        const body = acceptInviteEndpoint.body.safeParse(await request.json())
+    http.post(`${apiUrl}${acceptInviteEndpoint.path}`, async ({ request }) => {
+      const body = acceptInviteEndpoint.body.safeParse(await request.json())
 
-        if (!body.success) {
-          return badRequest(body.error.message)
+      if (!body.success) {
+        return badRequest(body.error.message)
+      }
+
+      const { token, name, password } = body.data
+      const invite = store.inviteByToken(token)
+
+      if (!invite) {
+        return notFound()
+      }
+
+      const now = store.now()
+      const reason = inviteUnusableReason(invite, now)
+
+      if (reason) {
+        return inviteUnusable(reason)
+      }
+
+      const existing = memberStore.byEmail(invite.email)
+      const known = existing !== undefined || passwords.has(invite.email)
+
+      if (known && passwords.get(invite.email) !== password) {
+        return forbidden()
+      }
+
+      if (!isMember(invite.workspaceId, invite.email)) {
+        memberStore.add(
+          invite.workspaceId,
+          createWorkspaceMember({
+            id: existing?.id ?? crypto.randomUUID(),
+            name: existing?.name ?? name,
+            email: invite.email,
+            role: invite.role,
+            lastActivityAt: null,
+          }),
+        )
+
+        const workspace = store.workspace(invite.workspaceId)
+
+        if (workspace) {
+          store.setWorkspace({ ...workspace, memberCount: workspace.memberCount + 1 })
         }
+      }
 
-        const invite = store.inviteByToken(params.token)
+      passwords.set(invite.email, password)
+      store.setInvite({ ...invite, acceptedAt: now.toISOString() })
 
-        if (!invite) {
-          return notFound()
-        }
-
-        const now = store.now()
-
-        if (invite.revokedAt !== null) {
-          return inviteUnusable('This invite was revoked.')
-        }
-
-        if (invite.acceptedAt !== null) {
-          return inviteUnusable('This invite was already used.')
-        }
-
-        if (Date.parse(invite.expiresAt) <= now.getTime()) {
-          return inviteUnusable('This invite has expired.')
-        }
-
-        store.setInvite({ ...invite, acceptedAt: now.toISOString() })
-
-        return new HttpResponse(null, { status: 204 })
-      },
-    ),
+      return new HttpResponse(null, { status: 204 })
+    }),
     http.post<{ workspaceId: string }>(
       `${apiUrl}${resetSandboxWorkspaceEndpoint.path}`,
       operatorOnly(sessionStore, ({ params }) => {
