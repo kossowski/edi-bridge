@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { InjectOptions } from 'fastify'
@@ -25,7 +26,11 @@ import {
 } from '@edi-bridge/contracts'
 import { type Connection, documentStructures, lookupTables, mappings } from '@edi-bridge/db'
 
-import { type Client, startTestApi, type TestApi } from './testing.js'
+import { Db } from './db.js'
+import { Unprocessable } from './errors.js'
+import { compareOutputsWith, previewWith } from './mapping-preview.js'
+import { type Client, ownWorkspace, startTestApi, type TestApi } from './testing.js'
+import { CurrentWorkspace } from './workspace.js'
 
 let api: TestApi
 
@@ -256,6 +261,19 @@ describe('POST /mappings/:id/preview', () => {
     })
   })
 
+  it('answers no match for an empty Lookup Table of the Workspace', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    const response = await preview(mapping.id, {
+      sampleId: structure.id,
+      graph: withOrderNumberLookup(await postLookupTable([])),
+    })
+
+    expect(mappingPreviewSchema.parse(response.json()).notes).toEqual([
+      { targetPath: 'BGM/1004', transformId: lookupTransformId, code: 'noLookupMatch' },
+    ])
+  })
+
   it.each([
     [
       'a required value nobody links',
@@ -425,6 +443,22 @@ describe('GET /mappings/:mappingId/comparison with a Sample Document', () => {
     ])
   })
 
+  it('answers no match for an empty Lookup Table of the Workspace', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+    const from = await published(mapping.id, invoice)
+    const to = await published(mapping.id, withOrderNumberLookup(await postLookupTable([])))
+
+    const response = await admin.inject({
+      method: 'GET',
+      url: toPath(mappingComparisonEndpoint.path, { mappingId: mapping.id }),
+      query: { from, to, sampleId: structure.id },
+    })
+
+    expect(mappingComparisonSchema.parse(response.json()).outputs?.to.notes).toEqual([
+      { targetPath: 'BGM/1004', transformId: lookupTransformId, code: 'noLookupMatch' },
+    ])
+  })
+
   it('answers 404 for a Sample Document the Mapping does not have', async () => {
     const { mapping } = await createdMapping('INVOIC')
     const from = await published(mapping.id, invoice)
@@ -438,4 +472,102 @@ describe('GET /mappings/:mappingId/comparison with a Sample Document', () => {
 
     expect(response.statusCode).toBe(404)
   })
+})
+
+describe('an inbound Sample Document, which no route serves until Runs (#187)', () => {
+  const ordersText = [
+    "UNB+UNOC:3+4012345000016:14+4398765000004:14+261002:1200+1'",
+    "UNH+1+ORDERS:D:96A:UN:EAN008'",
+    "BGM+220+PO-2026-10417+9'",
+    "DTM+137:20261002:102'",
+    "UNT+4+1'",
+    "UNZ+1+1'",
+  ].join('\n')
+
+  const orders: MappingGraph = {
+    links: [{ sourcePath: 'BGM/1004', targetPath: 'orderNumber' }],
+    transforms: [],
+    transformLinks: [],
+  }
+
+  const sampleId = '2d4f6a8c-1e3b-4d5f-8a7c-9e1b3d5f7a9c'
+
+  const inbound = (content: string) => ({
+    mapping: { messageType: 'ORDERS' as const },
+    structure: {
+      id: sampleId,
+      name: 'ERP orders',
+      format: 'json' as const,
+      root: 'object' as const,
+      sample: null,
+      children: [
+        {
+          path: 'orderNumber',
+          name: 'orderNumber',
+          label: 'Order number',
+          labelReason: null,
+          labelUnsure: false,
+          required: true,
+          kind: 'field' as const,
+          type: 'string' as const,
+        },
+      ],
+    },
+    samples: [
+      { id: sampleId, name: 'orders.edi', document: { format: 'edifact' as const, content } },
+    ],
+  })
+
+  const run = <A, E>(effect: Effect.Effect<A, E, Db | CurrentWorkspace>) =>
+    Effect.runPromise(
+      effect.pipe(
+        Effect.provideService(Db, connection.db),
+        Effect.provideService(CurrentWorkspace, { id: ownWorkspace.id }),
+      ),
+    )
+
+  it('previews the Document the engine writes from the Message', async () => {
+    expect(await run(previewWith(inbound(ordersText), { sampleId, graph: orders }))).toEqual({
+      sampleId,
+      document: { format: 'json', content: { orderNumber: 'PO-2026-10417' } },
+      notes: [],
+    })
+  })
+
+  it('compares the Documents of two versions', async () => {
+    const after = {
+      ...orders,
+      links: [{ sourcePath: 'DTM+137/C507/2380', targetPath: 'orderNumber' }],
+    }
+
+    const outputs = await run(compareOutputsWith(inbound(ordersText), sampleId, orders, after))
+
+    expect(outputs.differences).toEqual([
+      { path: 'orderNumber', repetitions: [], before: 'PO-2026-10417', after: '20261002' },
+    ])
+  })
+
+  it('leaves the Document empty with a note when the engine stops', async () => {
+    const broken = { ...orders, links: [{ sourcePath: 'BGM/9999', targetPath: 'orderNumber' }] }
+
+    expect(await run(previewWith(inbound(ordersText), { sampleId, graph: broken }))).toEqual({
+      sampleId,
+      document: { format: 'json', content: {} },
+      notes: [{ targetPath: 'orderNumber', transformId: null, code: 'brokenLink' }],
+    })
+  })
+
+  it.each(['', "UNB+UNOC:3+4012345000016:14+4398765000004:14+261002:1200+1'UNZ+0+1'"])(
+    'refuses a Sample Document that holds no Message: %j',
+    async (content) => {
+      const loaded = inbound(content)
+
+      expect(
+        await run(Effect.flip(previewWith(loaded, { sampleId, graph: orders }))),
+      ).toBeInstanceOf(Unprocessable)
+      expect(
+        await run(Effect.flip(compareOutputsWith(loaded, sampleId, orders, orders))),
+      ).toBeInstanceOf(Unprocessable)
+    },
+  )
 })

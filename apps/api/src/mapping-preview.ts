@@ -1,4 +1,3 @@
-import { asc, eq, inArray } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
@@ -15,9 +14,7 @@ import {
   type OutputEntry,
   type PreviewMappingBody,
   type PreviewNote,
-  type VersionOutput,
 } from '@edi-bridge/contracts'
-import { lookupTableEntries, lookupTables } from '@edi-bridge/db'
 import { parse, serializeMessage } from '@edi-bridge/edifact'
 import {
   applyInboundMappingVersion,
@@ -29,17 +26,14 @@ import {
   readDocument,
 } from '@edi-bridge/mapping'
 
-import { Db } from './db.js'
 import { loadDocumentStructure } from './document-structure.js'
-import { NotFound } from './errors.js'
+import { NotFound, Unprocessable } from './errors.js'
+import { loadLookupTableEntries } from './lookup-table.js'
 import { chosenLookupTableIds, loadRow } from './mapping.js'
-import { inWorkspace } from './rows.js'
-import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
 
-// Until Runs (#187) keep inbound Documents, only an outbound Mapping has a Sample Document: the
-// one its Document Structure was read from, under the structure's id.
+// Until Runs (#187), only an outbound Mapping has a Sample Document: its structure's sample.
 const samplesOfStructure = (structure: DocumentStructure): Effect.Effect<MappingSample[]> => {
   const { sample } = structure
 
@@ -49,6 +43,7 @@ const samplesOfStructure = (structure: DocumentStructure): Effect.Effect<Mapping
 
   return readDocument(structure, sample.text).pipe(
     Effect.match({
+      // An unreadable sample leaves the editor in its no-sample state instead of failing it.
       onFailure: () => [],
       onSuccess: (content) => [
         { id: structure.id, name: sample.fileName, document: { format: 'json', content } },
@@ -70,33 +65,6 @@ const loadSamples = (id: string) =>
 export const listMappingSamples = (id: string) =>
   Effect.map(loadSamples(id), ({ samples }) => samples)
 
-const loadLookupTables = (graphs: ReadonlyArray<MappingGraph>) =>
-  Effect.gen(function* () {
-    const chosen = [...new Set(graphs.flatMap(chosenLookupTableIds))]
-
-    if (chosen.length === 0) {
-      return new Map<string, LookupTableEntry[]>()
-    }
-
-    const db = yield* Db
-    const workspace = yield* CurrentWorkspace
-
-    const rows = yield* Effect.promise(() =>
-      db
-        .select({
-          lookupTableId: lookupTableEntries.lookupTableId,
-          sourceCode: lookupTableEntries.sourceCode,
-          targetCode: lookupTableEntries.targetCode,
-        })
-        .from(lookupTableEntries)
-        .innerJoin(lookupTables, eq(lookupTableEntries.lookupTableId, lookupTables.id))
-        .where(inWorkspace(lookupTables, workspace.id, inArray(lookupTables.id, chosen)))
-        .orderBy(asc(lookupTableEntries.position)),
-    )
-
-    return Map.groupBy(rows, ({ lookupTableId }) => lookupTableId)
-  })
-
 const noteCodes: Record<MappingErrorCode, PreviewNote['code']> = {
   missingRequiredValue: 'missingRequiredValue',
   outsideLoop: 'outsideLoop',
@@ -116,74 +84,82 @@ const noteOf = ({ code, targetPath, transformId }: MappingError): PreviewNote =>
   code: noteCodes[code],
 })
 
-type Sides = { messageType: MessageType; structure: DocumentStructure }
+type Written = { document: DocumentContent; entries: OutputEntry[] }
 
-type Run = Sides & {
-  lookupTables: ReadonlyMap<string, ReadonlyArray<LookupTableEntry>>
-  source: DocumentContent
+type Engine = {
+  empty: DocumentContent
+  run: (graph: MappingGraph) => Effect.Effect<Written, MappingError>
 }
 
-type Output = VersionOutput & { entries: OutputEntry[] }
+const sampleWithoutMessage = new Unprocessable({
+  message: 'The Sample Document holds no readable Message.',
+})
 
-function messageOf(text: string) {
-  const [message] = parse(text).messages
+const messageOf = (text: string) =>
+  Effect.try({ try: () => parse(text).messages[0], catch: () => sampleWithoutMessage }).pipe(
+    Effect.flatMap((message) =>
+      message === undefined ? Effect.fail(sampleWithoutMessage) : Effect.succeed(message),
+    ),
+  )
 
-  if (!message) {
-    throw new Error('The Sample Document holds no Message')
+const engineOf = (
+  messageType: MessageType,
+  structure: DocumentStructure,
+  source: DocumentContent,
+  lookupTables: ReadonlyMap<string, ReadonlyArray<LookupTableEntry>>,
+): Effect.Effect<Engine, Unprocessable> => {
+  const options = { lookupTables }
+
+  if (source.format === 'json') {
+    return Effect.succeed({
+      empty: { format: 'edifact', content: '' },
+      run: (graph) =>
+        Effect.map(
+          applyMappingVersion(
+            { ...graph, target: { kind: 'messageType', messageType } },
+            source.content,
+            options,
+          ),
+          (message) => ({
+            document: { format: 'edifact', content: serializeMessage(message) },
+            entries: messageEntries(messageType, message),
+          }),
+        ),
+    })
   }
 
-  return message
-}
-
-const written = (
-  { messageType, structure, lookupTables: tables, source }: Run,
-  graph: MappingGraph,
-): Effect.Effect<Omit<Output, 'notes'>, MappingError> => {
-  const options = { lookupTables: tables }
-
-  return source.format === 'json'
-    ? Effect.map(
-        applyMappingVersion(
-          { ...graph, target: { kind: 'messageType', messageType } },
-          source.content,
-          options,
-        ),
-        (message) => ({
-          document: { format: 'edifact', content: serializeMessage(message) },
-          entries: messageEntries(messageType, message),
-        }),
-      )
-    : Effect.map(
+  return Effect.map(messageOf(source.content), (message) => ({
+    empty: { format: 'json', content: {} },
+    run: (graph) =>
+      Effect.map(
         applyInboundMappingVersion(
           { ...graph, source: { kind: 'messageType', messageType } },
           structure,
-          messageOf(source.content),
+          message,
           options,
         ),
         (content) => ({
           document: { format: 'json', content },
           entries: documentEntries(structure, content),
         }),
-      )
+      ),
+  }))
 }
 
 // The engine stops at its first error, so a failed run leaves the whole target empty.
-const outputOf = (run: Run, graph: MappingGraph): Effect.Effect<Output> =>
-  Effect.match(written(run, graph), {
-    onFailure: (error) => ({
-      document:
-        run.source.format === 'json'
-          ? { format: 'edifact', content: '' }
-          : { format: 'json', content: {} },
-      notes: [noteOf(error)],
-      entries: [],
-    }),
-    onSuccess: (output) => ({ ...output, notes: [] }),
+const outputOf = (engine: Engine, graph: MappingGraph) =>
+  Effect.match(engine.run(graph), {
+    onFailure: (error) => ({ document: engine.empty, notes: [noteOf(error)], entries: [] }),
+    onSuccess: (written) => ({ ...written, notes: [] }),
   })
 
-type Loaded = Effect.Success<ReturnType<typeof loadSamples>>
+type Loaded = {
+  mapping: { messageType: MessageType }
+  structure: DocumentStructure
+  samples: ReadonlyArray<MappingSample>
+}
 
-const prepareRun = (
+const startEngine = (
   { mapping, structure, samples }: Loaded,
   sampleId: string,
   graphs: ReadonlyArray<MappingGraph>,
@@ -195,37 +171,31 @@ const prepareRun = (
       return yield* Effect.fail(new NotFound())
     }
 
-    return {
-      messageType: mapping.messageType,
-      structure,
-      lookupTables: yield* loadLookupTables(graphs),
-      source: sample.document,
-    } satisfies Run
+    const lookupTables = yield* loadLookupTableEntries(graphs.flatMap(chosenLookupTableIds))
+
+    return yield* engineOf(mapping.messageType, structure, sample.document, lookupTables)
   })
 
-export const previewMapping = (
-  id: string,
-  input: Effect.Effect<PreviewMappingBody, ValidationError>,
-) =>
+export const previewWith = (loaded: Loaded, { sampleId, graph }: PreviewMappingBody) =>
   Effect.gen(function* () {
-    const loaded = yield* loadSamples(id)
-    const { sampleId, graph } = yield* input
-
-    const { document, notes } = yield* outputOf(yield* prepareRun(loaded, sampleId, [graph]), graph)
+    const { document, notes } = yield* outputOf(
+      yield* startEngine(loaded, sampleId, [graph]),
+      graph,
+    )
 
     return { sampleId, document, notes } satisfies MappingPreview
   })
 
-export const compareOutputs = (
-  mappingId: string,
+export const compareOutputsWith = (
+  loaded: Loaded,
   sampleId: string,
   before: MappingGraph,
   after: MappingGraph,
 ) =>
   Effect.gen(function* () {
-    const run = yield* prepareRun(yield* loadSamples(mappingId), sampleId, [before, after])
-    const from = yield* outputOf(run, before)
-    const to = yield* outputOf(run, after)
+    const engine = yield* startEngine(loaded, sampleId, [before, after])
+    const from = yield* outputOf(engine, before)
+    const to = yield* outputOf(engine, after)
 
     return {
       sampleId,
@@ -234,3 +204,23 @@ export const compareOutputs = (
       differences: outputDifferences(from.entries, to.entries),
     } satisfies ComparisonOutputs
   })
+
+export const previewMapping = (
+  id: string,
+  input: Effect.Effect<PreviewMappingBody, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    const loaded = yield* loadSamples(id)
+
+    return yield* previewWith(loaded, yield* input)
+  })
+
+export const compareOutputs = (
+  mappingId: string,
+  sampleId: string,
+  before: MappingGraph,
+  after: MappingGraph,
+) =>
+  Effect.flatMap(loadSamples(mappingId), (loaded) =>
+    compareOutputsWith(loaded, sampleId, before, after),
+  )
