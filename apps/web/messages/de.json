@@ -3640,7 +3640,8 @@
       "cancel": "Abbrechen",
       "confirm": "Liste löschen",
       "pending": "Wird gelöscht…",
-      "failed": "Die Liste konnte nicht gelöscht werden. Versuchen Sie es erneut."
+      "failed": "Die Liste konnte nicht gelöscht werden. Versuchen Sie es erneut.",
+      "inUse": "Ein Mapping oder eine seiner veröffentlichten Versionen verwendet diese Liste, deshalb kann sie nicht gelöscht werden."
     }
   },
   "LookupTable": {

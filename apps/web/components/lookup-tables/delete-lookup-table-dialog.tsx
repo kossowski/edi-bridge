@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl'
 import type { RefObject } from 'react'
 
 import { ApiError, deleteLookupTable } from '@/lib/api/client'
-import { forgetDeletedLookupTable } from '@/lib/api/queries'
+import { forgetDeletedLookupTable, lookupTableKeys } from '@/lib/api/queries'
+import { lookupTableInUseStatus, type LookupTableSummary } from '@edi-bridge/contracts'
 import { Button } from '@edi-bridge/ui/components/button'
 import {
   Dialog,
@@ -18,7 +19,9 @@ import {
   DialogTitle,
 } from '@edi-bridge/ui/components/dialog'
 
-import type { LookupTableSummary } from '@edi-bridge/contracts'
+function isInUse(error: Error | null) {
+  return error instanceof ApiError && error.status === lookupTableInUseStatus
+}
 
 function DeleteConfirmation({
   table,
@@ -44,20 +47,31 @@ function DeleteConfirmation({
       forgetDeletedLookupTable(queryClient, table.id)
       onDeleted(table)
     },
+    onError: (error) => {
+      if (isInUse(error)) {
+        void queryClient.invalidateQueries({ queryKey: lookupTableKeys.list() })
+      }
+    },
   })
+
+  const inUse = isInUse(remove.error)
 
   return (
     <>
       {remove.isError && (
         <p role="alert" className="text-sm text-red-800 dark:text-red-300">
-          {t('failed')}
+          {inUse ? t('inUse') : t('failed')}
         </p>
       )}
       <DialogFooter>
         <DialogClose disabled={remove.isPending} render={<Button variant="outline" />}>
           {t('cancel')}
         </DialogClose>
-        <Button disabled={remove.isPending} variant="destructive" onClick={() => remove.mutate()}>
+        <Button
+          disabled={remove.isPending || inUse}
+          focusableWhenDisabled
+          variant="destructive"
+          onClick={() => remove.mutate()}>
           {remove.isPending ? t('pending') : t('confirm')}
         </Button>
       </DialogFooter>

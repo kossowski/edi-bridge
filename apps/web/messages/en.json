@@ -3640,7 +3640,8 @@
       "cancel": "Cancel",
       "confirm": "Delete list",
       "pending": "Deleting…",
-      "failed": "The list could not be deleted. Try again."
+      "failed": "The list could not be deleted. Try again.",
+      "inUse": "A mapping or one of its published versions uses this list, so it cannot be deleted."
     }
   },
   "LookupTable": {
