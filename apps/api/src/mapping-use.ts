@@ -8,14 +8,13 @@ import { byName, inWorkspace } from './rows.js'
 
 import type { Database, Transaction } from './db.js'
 
-const lookupTableIdsPath =
-  '$.transforms[*] ? (@.kind == "lookupTable").config.lookupTableId ? (@ != null)'
+const lookupTableIdsPath = '$.transforms[*] ? (@.kind == "lookupTable").config.lookupTableId'
 
 const lookupTableIdsOf = (graph: AnyColumn) =>
-  sql<string>`jsonb_path_query(${graph}, ${lookupTableIdsPath}) #>> '{}'`
+  sql<string>`jsonb_path_query(${graph}, ${`${lookupTableIdsPath} ? (@ != null)`}) #>> '{}'`
 
 const readsLookupTable = (graph: AnyColumn, lookupTableId: string) =>
-  sql`jsonb_path_exists(${graph}, '$.transforms[*] ? (@.kind == "lookupTable" && @.config.lookupTableId == $id)', jsonb_build_object('id', ${lookupTableId}::text))`
+  sql`jsonb_path_exists(${graph}, ${`${lookupTableIdsPath} ? (@ == $id)`}, jsonb_build_object('id', ${lookupTableId}::text))`
 
 export const selectDocumentStructureUses = async (
   db: Database,
