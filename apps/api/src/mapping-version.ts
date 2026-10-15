@@ -1,4 +1,4 @@
-import { and, desc, eq, max, type SQL } from 'drizzle-orm'
+import { and, desc, eq, max, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import type { SelectedFields } from 'drizzle-orm/pg-core'
@@ -9,6 +9,7 @@ import {
   type MappingVersionSummary,
   type PublishMappingDraftBody,
   type PublishedMappingVersionsQuery,
+  mappingDifferences,
   mappingSideLeaves,
   transformIssues,
   unknownPathMessage,
@@ -16,8 +17,8 @@ import {
 import { documentStructures, mappings, mappingVersions, users } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
-import { Conflict, Unprocessable } from './errors.js'
-import { loadRow, sidesOf } from './mapping.js'
+import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { loadMappingDraft, loadRow, sidesOf } from './mapping.js'
 import {
   exactlyOne,
   foundOrNotFound,
@@ -107,6 +108,62 @@ export const loadMappingVersion = (mappingId: string, versionId: string) =>
       ...version.graph,
       ...sidesOf(mapping),
     } satisfies MappingVersion
+  })
+
+const restoreInTransaction = async (
+  tx: Transaction,
+  mappingId: string,
+  versionId: string,
+): Promise<NotFound | undefined> => {
+  // Waits for a publish under way, so the comparison sees the version it adds.
+  await tx
+    .select({ id: mappings.id })
+    .from(mappings)
+    .where(eq(mappings.id, mappingId))
+    .for('update')
+
+  const [restored] = await tx
+    .select({ graph: mappingVersions.graph })
+    .from(mappingVersions)
+    .where(and(eq(mappingVersions.id, versionId), eq(mappingVersions.mappingId, mappingId)))
+
+  if (!restored) {
+    return new NotFound()
+  }
+
+  const [latest] = await tx
+    .select({ graph: mappingVersions.graph })
+    .from(mappingVersions)
+    .where(eq(mappingVersions.mappingId, mappingId))
+    .orderBy(desc(mappingVersions.version))
+    .limit(1)
+
+  await tx
+    .update(mappings)
+    .set({
+      draft: restored.graph,
+      unpublishedChanges: !latest || mappingDifferences(latest.graph, restored.graph).length > 0,
+      draftUpdatedAt: sql`now()`,
+    })
+    .where(eq(mappings.id, mappingId))
+}
+
+export const restoreMappingVersion = (mappingId: string, versionId: string) =>
+  Effect.gen(function* () {
+    yield* loadRow(mappingId)
+    yield* rejectingInvalidId(versionId)
+
+    const db = yield* Db
+
+    const refusal = yield* Effect.promise(() =>
+      db.transaction((tx) => restoreInTransaction(tx, mappingId, versionId)),
+    )
+
+    if (refusal) {
+      return yield* Effect.fail(refusal)
+    }
+
+    return yield* loadMappingDraft(mappingId)
   })
 
 const noChanges = () =>

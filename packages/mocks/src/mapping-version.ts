@@ -4,11 +4,9 @@ import {
   type DocumentStructure,
   fromSearchParams,
   type GraphParts,
-  type LinkEnd,
-  type LinkStart,
   type MappingComparison,
   mappingComparisonEndpoint,
-  type MappingDifference,
+  mappingDifferences,
   type MappingGraph,
   type MappingLink,
   mappingSideLeaves,
@@ -29,7 +27,6 @@ import {
   restoreMappingVersionEndpoint,
   type Session,
   type TradingPartner,
-  type TransformLink,
   transformIssues,
 } from '@edi-bridge/contracts'
 
@@ -333,69 +330,6 @@ export function toMappingVersion(
       edifact: { kind: 'messageType', messageType: draft.messageType },
     }),
   })
-}
-
-type Change<Part> = Pick<MappingDifference, 'change'> & { before: Part | null; after: Part | null }
-
-function changes<Part>(
-  before: ReadonlyArray<Part>,
-  after: ReadonlyArray<Part>,
-  keyOf: (part: Part) => string,
-  same: (a: Part, b: Part) => boolean,
-): Change<Part>[] {
-  const earlier = new Map(before.map((part) => [keyOf(part), part]))
-  const later = new Map(after.map((part) => [keyOf(part), part]))
-
-  return [
-    ...[...earlier].flatMap(([key, part]): Change<Part>[] => {
-      const next = later.get(key)
-
-      if (next === undefined) {
-        return [{ change: 'removed', before: part, after: null }]
-      }
-
-      return same(part, next) ? [] : [{ change: 'changed', before: part, after: next }]
-    }),
-    ...[...later].flatMap(([key, part]): Change<Part>[] =>
-      earlier.has(key) ? [] : [{ change: 'added', before: null, after: part }],
-    ),
-  ]
-}
-
-function configKey(transform: MappingTransform) {
-  return `${transform.kind}:${JSON.stringify(transform.config, Object.keys(transform.config).sort())}`
-}
-
-function endKey(end: LinkStart | LinkEnd) {
-  switch (end.kind) {
-    case 'source':
-    case 'target':
-      return `${end.kind}:${end.path}`
-    case 'transform':
-      return `transform:${end.transformId}/${'output' in end ? end.output : end.input}`
-  }
-}
-
-const transformLinkKey = ({ from, to }: TransformLink) => `${endKey(from)}>${endKey(to)}`
-
-export function mappingDifferences(before: GraphParts, after: GraphParts): MappingDifference[] {
-  return [
-    ...changes(
-      before.links,
-      after.links,
-      ({ targetPath }) => targetPath,
-      (a, b) => a.sourcePath === b.sourcePath,
-    ).map((change): MappingDifference => ({ kind: 'link', ...change })),
-    ...changes(
-      before.transforms,
-      after.transforms,
-      ({ id }) => id,
-      (a, b) => configKey(a) === configKey(b),
-    ).map((change): MappingDifference => ({ kind: 'transform', ...change })),
-    ...changes(before.transformLinks, after.transformLinks, transformLinkKey, () => true).map(
-      (change): MappingDifference => ({ kind: 'transformLink', ...change }),
-    ),
-  ]
 }
 
 export function outputDifferences(

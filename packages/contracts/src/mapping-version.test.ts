@@ -5,6 +5,7 @@ import {
   mappingComparisonQuerySchema,
   mappingComparisonSchema,
   type MappingDifference,
+  mappingDifferences,
   mappingDifferenceSchema,
   type MappingVersion,
   mappingVersionSchema,
@@ -115,6 +116,43 @@ describe('mappingDifferenceSchema', () => {
     }
 
     expect(mappingDifferenceSchema.safeParse(difference).success).toBe(false)
+  })
+})
+
+describe('mappingDifferences', () => {
+  const otherLink = { sourcePath: 'orderNumber', targetPath: 'BGM/1225' }
+
+  const graph = {
+    links: [link, otherLink],
+    transforms: [substring],
+    transformLinks: [transformLink],
+  }
+
+  it('finds no difference in moved transforms or reordered parts', () => {
+    const moved = {
+      links: [otherLink, link],
+      transforms: [{ ...substring, position: { x: 240, y: 120 } }],
+      transformLinks: [transformLink],
+    }
+
+    expect(mappingDifferences(graph, moved)).toEqual([])
+  })
+
+  it('lists added, removed and changed parts', () => {
+    const shorter = { ...substring, config: { start: 0, length: 30 } }
+
+    const after = {
+      links: [{ ...link, sourcePath: 'orderNumber' }],
+      transforms: [shorter],
+      transformLinks: [],
+    }
+
+    expect(mappingDifferences(graph, after)).toEqual([
+      { kind: 'link', change: 'changed', before: link, after: after.links[0] },
+      { kind: 'link', change: 'removed', before: otherLink, after: null },
+      { kind: 'transform', change: 'changed', before: substring, after: shorter },
+      { kind: 'transformLink', change: 'removed', before: transformLink, after: null },
+    ])
   })
 })
 
