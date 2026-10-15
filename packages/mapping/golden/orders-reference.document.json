@@ -1,0 +1,44 @@
+{
+  "orderNumber": "128576",
+  "orderDate": "2000-03-24",
+  "deliveryDate": "1998-10-28",
+  "currency": "EUR",
+  "buyer": {
+    "gln": "4398765000004",
+    "contact": "Claus Früh",
+    "email": "kölsch@früh.de"
+  },
+  "supplier": {
+    "gln": "4012345000009"
+  },
+  "deliveryParty": {
+    "gln": "4399899175941",
+    "name": "EDI-LAND",
+    "street": "Bussardweg 5",
+    "city": "Leopardshöhle",
+    "postalCode": "33818",
+    "country": "DE"
+  },
+  "invoicee": {
+    "gln": "4012345000009"
+  },
+  "lines": [
+    {
+      "lineNumber": 1,
+      "gtin": "4000004000035",
+      "supplierArticleNumber": "1230815",
+      "quantity": 20,
+      "unit": "ST",
+      "deliveryDate": "1998-10-28",
+      "netPrice": 10
+    },
+    {
+      "lineNumber": 2,
+      "gtin": "4056786542381",
+      "supplierArticleNumber": "ABC5343",
+      "quantity": 12,
+      "unit": "ST"
+    }
+  ],
+  "lineCount": 2
+}

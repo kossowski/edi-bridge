@@ -1,0 +1,275 @@
+{
+  "id": "2f6a9c3e-8d1b-4e7f-a5c2-9b0d3e6f1a48",
+  "mappingId": "9c4e7a2b-1d8f-4b3e-a6c5-0e2f4d6b8a17",
+  "mappingName": "Reference order: ORDERS to ERP JSON",
+  "version": 1,
+  "publishedAt": "2026-10-15T08:00:00.000Z",
+  "direction": "inbound",
+  "source": {
+    "kind": "messageType",
+    "messageType": "ORDERS"
+  },
+  "target": {
+    "kind": "documentStructure",
+    "documentStructureId": "3a7d0e5c-9b2f-4c8a-b1e6-7f3d5a9c2e04",
+    "name": "ERP order"
+  },
+  "links": [
+    {
+      "sourcePath": "BGM/1004",
+      "targetPath": "orderNumber"
+    },
+    {
+      "sourcePath": "SG7/CUX/C504/6345",
+      "targetPath": "currency"
+    },
+    {
+      "sourcePath": "SG2+BY/NAD+BY/C082/3039",
+      "targetPath": "buyer.gln"
+    },
+    {
+      "sourcePath": "SG2+BY/SG5/CTA+OC/C056/3413",
+      "targetPath": "buyer.contact"
+    },
+    {
+      "sourcePath": "SG2+BY/SG5/COM/C076/3148",
+      "targetPath": "buyer.email"
+    },
+    {
+      "sourcePath": "SG2+SU/NAD+SU/C082/3039",
+      "targetPath": "supplier.gln"
+    },
+    {
+      "sourcePath": "SG2+DP/NAD+DP/C082/3039",
+      "targetPath": "deliveryParty.gln"
+    },
+    {
+      "sourcePath": "SG2+DP/NAD+DP/C080/3036",
+      "targetPath": "deliveryParty.name"
+    },
+    {
+      "sourcePath": "SG2+DP/NAD+DP/C059/3042",
+      "targetPath": "deliveryParty.street"
+    },
+    {
+      "sourcePath": "SG2+DP/NAD+DP/3164",
+      "targetPath": "deliveryParty.city"
+    },
+    {
+      "sourcePath": "SG2+DP/NAD+DP/3251",
+      "targetPath": "deliveryParty.postalCode"
+    },
+    {
+      "sourcePath": "SG2+DP/NAD+DP/3207",
+      "targetPath": "deliveryParty.country"
+    },
+    {
+      "sourcePath": "SG2+IV/NAD+IV/C082/3039",
+      "targetPath": "invoicee.gln"
+    },
+    {
+      "sourcePath": "SG25/LIN/C212/7140",
+      "targetPath": "lines[].gtin"
+    },
+    {
+      "sourcePath": "SG25/PIA+1/C212/7140",
+      "targetPath": "lines[].supplierArticleNumber"
+    },
+    {
+      "sourcePath": "SG25/QTY+21/C186/6060",
+      "targetPath": "lines[].quantity"
+    },
+    {
+      "sourcePath": "SG25/SG28/PRI+AAA/C509/5118",
+      "targetPath": "lines[].netPrice"
+    },
+    {
+      "sourcePath": "CNT+2/C270/6066",
+      "targetPath": "lineCount"
+    }
+  ],
+  "transforms": [
+    {
+      "id": "5b8e1f20-7c3d-4e9a-8b6f-000000000001",
+      "kind": "loop",
+      "position": {
+        "x": 0,
+        "y": 80
+      },
+      "config": {
+        "counterStart": 1
+      }
+    },
+    {
+      "id": "5b8e1f20-7c3d-4e9a-8b6f-000000000002",
+      "kind": "dateFormat",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "config": {
+        "from": "yyyyMMdd",
+        "to": "yyyy-MM-dd"
+      }
+    },
+    {
+      "id": "5b8e1f20-7c3d-4e9a-8b6f-000000000003",
+      "kind": "dateFormat",
+      "position": {
+        "x": 0,
+        "y": 240
+      },
+      "config": {
+        "from": "yyyyMMdd",
+        "to": "yyyy-MM-dd"
+      }
+    },
+    {
+      "id": "5b8e1f20-7c3d-4e9a-8b6f-000000000004",
+      "kind": "dateFormat",
+      "position": {
+        "x": 0,
+        "y": 320
+      },
+      "config": {
+        "from": "yyyyMMdd",
+        "to": "yyyy-MM-dd"
+      }
+    },
+    {
+      "id": "5b8e1f20-7c3d-4e9a-8b6f-000000000005",
+      "kind": "lookupTable",
+      "position": {
+        "x": 0,
+        "y": 400
+      },
+      "config": {
+        "lookupTableId": "6d2e8f41-3b5c-4a7d-9e1f-2c4b6a8d0e13",
+        "fallback": "fail"
+      }
+    }
+  ],
+  "transformLinks": [
+    {
+      "from": {
+        "kind": "source",
+        "path": "SG25"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000001",
+        "input": "items"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000001",
+        "output": "items"
+      },
+      "to": {
+        "kind": "target",
+        "path": "lines[]"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000001",
+        "output": "counter"
+      },
+      "to": {
+        "kind": "target",
+        "path": "lines[].lineNumber"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "DTM+137/C507/2380"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000002",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000002",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "orderDate"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "DTM+2/C507/2380"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000003",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000003",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "deliveryDate"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "SG25/DTM+2/C507/2380"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000004",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000004",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "lines[].deliveryDate"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "SG25/QTY+21/C186/6411"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000005",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "5b8e1f20-7c3d-4e9a-8b6f-000000000005",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "lines[].unit"
+      }
+    }
+  ]
+}
