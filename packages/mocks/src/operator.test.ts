@@ -2,11 +2,13 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
+  acceptInviteEndpoint,
   createInviteEndpoint,
   createWorkspaceEndpoint,
   type Invite,
   type InviteInput,
   inviteSchema,
+  inviteUnusableStatus,
   inviteValidityDays,
   operatorWorkspaceMembersEndpoint,
   resetSandboxWorkspaceEndpoint,
@@ -23,6 +25,7 @@ import {
 import { dayMs } from './duration'
 import {
   createInvites,
+  createOperatorStore,
   createWorkspaceSummaries,
   operatorHandlers,
   seedInvites,
@@ -579,6 +582,69 @@ describe('pending invite count', () => {
     expect(pendingInviteCountOf(await listWorkspaces(), seedWorkspace.id)).toBe(
       unansweredInLastWeek.length,
     )
+  })
+})
+
+describe('POST /invites/:token/accept', () => {
+  const pending = seedInvites.find(
+    (invite) => isUnansweredSeedInvite(invite) && Date.parse(invite.expiresAt) > Date.now(),
+  )!
+
+  const expired = seedInvites.find(
+    (invite) => isUnansweredSeedInvite(invite) && Date.parse(invite.expiresAt) <= Date.now(),
+  )!
+
+  const accepted = seedInvites.find(({ acceptedAt }) => acceptedAt !== null)!
+
+  const tokenOf = ({ link }: Invite) => new URL(link).pathname.split('/').at(-1)!
+
+  const accept = (token: string, password = 'invited-password') =>
+    fetch(`${apiUrl}${toPath(acceptInviteEndpoint.path, { token })}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Jan Petersen', password }),
+    })
+
+  it('accepts a pending invite without a session and marks it accepted', async () => {
+    const store = createOperatorStore()
+    server.use(...operatorHandlers(apiUrl, { workspaces: store, session: null }))
+
+    const response = await accept(tokenOf(pending))
+
+    expect(response.status).toBe(204)
+    expect(store.invite(seedWorkspace.id, pending.id)?.acceptedAt).toEqual(expect.any(String))
+  })
+
+  it.each([
+    ['a used', accepted],
+    ['an expired', expired],
+  ])('answers %s link with the unusable status', async (_, invite) => {
+    server.use(...operatorHandlers(apiUrl, { session: null }))
+
+    expect((await accept(tokenOf(invite))).status).toBe(inviteUnusableStatus)
+  })
+
+  it('answers a revoked link with the unusable status', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    await fetch(
+      `${apiUrl}${toPath(revokeInviteEndpoint.path, { workspaceId: seedWorkspace.id, inviteId: pending.id })}`,
+      { method: 'DELETE' },
+    )
+
+    expect((await accept(tokenOf(pending))).status).toBe(inviteUnusableStatus)
+  })
+
+  it('answers 404 for an unknown token', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: null }))
+
+    expect((await accept('unknown-token')).status).toBe(404)
+  })
+
+  it('answers 400 for a password shorter than 8 characters', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: null }))
+
+    expect((await accept(tokenOf(pending), 'short')).status).toBe(400)
   })
 })
 

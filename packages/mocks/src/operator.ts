@@ -2,6 +2,7 @@ import { en, Faker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
 import {
+  acceptInviteEndpoint,
   createInviteEndpoint,
   createWorkspaceEndpoint,
   type Invite,
@@ -21,7 +22,7 @@ import {
 
 import { dayMs } from './duration'
 import { randomGln } from './gln'
-import { badRequest, conflict, notFound } from './responses'
+import { badRequest, conflict, inviteUnusable, notFound } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { mockCredentials, seedSession, showcaseViewerSession, toSessionStore } from './session'
@@ -281,6 +282,8 @@ export type OperatorStore = {
   invites: (workspaceId: string) => readonly Invite[]
   invite: (workspaceId: string, inviteId: string) => Invite | undefined
   setInvite: (invite: Invite) => void
+  inviteByToken: (token: string) => Invite | undefined
+  now: () => Date
 }
 
 export function createOperatorStore({
@@ -336,6 +339,11 @@ export function createOperatorStore({
     setInvite: (invite) => {
       invitesById.set(invite.id, invite)
     },
+    inviteByToken: (token) =>
+      [...invitesById.values()].find(
+        ({ link }) => new URL(link).pathname === inviteLink('', token),
+      ),
+    now,
   }
 }
 
@@ -499,6 +507,40 @@ export function operatorHandlers(
 
         return HttpResponse.json(revoked)
       }),
+    ),
+    http.post<{ token: string }>(
+      `${apiUrl}${acceptInviteEndpoint.path}`,
+      async ({ params, request }) => {
+        const body = acceptInviteEndpoint.body.safeParse(await request.json())
+
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
+
+        const invite = store.inviteByToken(params.token)
+
+        if (!invite) {
+          return notFound()
+        }
+
+        const now = store.now()
+
+        if (invite.revokedAt !== null) {
+          return inviteUnusable('This invite was revoked.')
+        }
+
+        if (invite.acceptedAt !== null) {
+          return inviteUnusable('This invite was already used.')
+        }
+
+        if (Date.parse(invite.expiresAt) <= now.getTime()) {
+          return inviteUnusable('This invite has expired.')
+        }
+
+        store.setInvite({ ...invite, acceptedAt: now.toISOString() })
+
+        return new HttpResponse(null, { status: 204 })
+      },
     ),
     http.post<{ workspaceId: string }>(
       `${apiUrl}${resetSandboxWorkspaceEndpoint.path}`,
