@@ -131,6 +131,8 @@ export const revokeInvite = (workspaceId: string, inviteId: string, webOrigin: s
 
 type Refusal = NotFound | InviteUnusable | Forbidden
 
+type Accepted = { email: string }
+
 const passwordMatches = async (hash: string | null, password: string) =>
   hash !== null && (await verifyPassword({ hash, password }))
 
@@ -148,7 +150,7 @@ async function acceptInTransaction(
   tx: Transaction,
   { token, name, password }: AcceptInviteInput,
   now: Date,
-): Promise<Refusal | undefined> {
+): Promise<Refusal | Accepted> {
   const [invite] = await tx.select().from(invites).where(eq(invites.token, token)).for('update')
 
   if (invite === undefined) {
@@ -172,7 +174,7 @@ async function acceptInTransaction(
   await addMembership(tx, { userId, workspaceId: invite.workspaceId, role: invite.role })
   await tx.update(invites).set({ acceptedAt: now }).where(eq(invites.id, invite.id))
 
-  return undefined
+  return { email: invite.email }
 }
 
 export const acceptInvite = (input: Effect.Effect<AcceptInviteInput, ValidationError>) =>
@@ -181,13 +183,15 @@ export const acceptInvite = (input: Effect.Effect<AcceptInviteInput, ValidationE
     const db = yield* Db
     const now = new Date()
 
-    const refusal = yield* rejectingDuplicate(
+    const outcome = yield* rejectingDuplicate(
       () => db.transaction((tx) => acceptInTransaction(tx, accepted, now)),
       [userEmailUnique],
       'An account with this email was created meanwhile',
     )
 
-    if (refusal !== undefined) {
-      return yield* Effect.fail(refusal)
+    if ('_tag' in outcome) {
+      return yield* Effect.fail(outcome)
     }
+
+    return outcome
   })

@@ -160,8 +160,12 @@ export const inviteUnusableProblem = (reason: InviteUnusableReason): InviteUnusa
   message: inviteUnusableMessages[reason],
 })
 
+export const acceptedInviteSchema = z.object({ email: z.email() })
+
+export type AcceptedInvite = z.infer<typeof acceptedInviteSchema>
+
 export const acceptInviteEndpoint: Endpoint<
-  undefined,
+  AcceptedInvite,
   undefined,
   AcceptInviteInput,
   '/invites/accept'
@@ -169,7 +173,7 @@ export const acceptInviteEndpoint: Endpoint<
   method: 'POST',
   path: '/invites/accept',
   body: acceptInviteInputSchema,
-  response: z.undefined(),
+  response: acceptedInviteSchema,
 }
 
 export const resetSandboxWorkspaceEndpoint: Endpoint<

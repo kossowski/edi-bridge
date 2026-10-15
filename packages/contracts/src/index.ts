@@ -700,6 +700,8 @@ export {
   type AcceptInviteInput,
   acceptInviteEndpoint,
   acceptInviteInputSchema,
+  type AcceptedInvite,
+  acceptedInviteSchema,
   createInviteEndpoint,
   createWorkspaceEndpoint,
   type Invite,

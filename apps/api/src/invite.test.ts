@@ -335,7 +335,8 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(invite.link, { name: 'Nina Vogt', password: 'nina-password' })
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ email: 'nina.vogt@sudhafen.example' })
 
     const client = await signIn(api.app, {
       email: 'nina.vogt@sudhafen.example',
@@ -402,7 +403,7 @@ describe('POST /invites/accept', () => {
 
     vi.useRealTimers()
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
   })
 
   it('answers 404 for an unknown token', async () => {
@@ -420,7 +421,7 @@ describe('POST /invites/accept', () => {
     const short = await accept(invite.link, { name: 'Short', password: 'short' })
     const valid = await accept(invite.link, { name: 'Short', password: 'long-enough' })
 
-    expect([short.statusCode, valid.statusCode]).toEqual([400, 204])
+    expect([short.statusCode, valid.statusCode]).toEqual([400, 200])
   })
 
   it('adds an existing user to the Workspace when their password matches', async () => {
@@ -428,7 +429,7 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(invite.link, { name: 'Ignored', password: ownAdmin.password })
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
     expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toEqual(
       expect.any(String),
     )
@@ -471,7 +472,7 @@ describe('POST /invites/accept', () => {
     const client = await signIn(api.app, member)
     const session = await client.inject({ method: 'GET', url: sessionEndpoint.path })
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
     expect(sessionSchema.parse(session.json()).role).toBe('admin')
     expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toEqual(
       expect.any(String),
