@@ -14,7 +14,13 @@ import type {
 import { transformGap } from './mapping-graph'
 
 export type TreeItemKind =
-  'field' | 'object' | 'array' | 'segmentGroup' | 'segment' | 'composite' | 'element'
+  | 'field'
+  | 'object'
+  | 'array'
+  | 'segmentGroup'
+  | 'segment'
+  | 'composite'
+  | 'element'
 
 export type Repeat = 'unbounded' | number | null
 

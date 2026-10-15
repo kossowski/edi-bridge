@@ -55,7 +55,9 @@ import type { ScopeKind } from '@/components/lookup-tables/lookup-table-form-val
 const scopeKinds = ['workspace', 'tradingPartner'] as const satisfies ReadonlyArray<ScopeKind>
 
 type AddRow =
-  { status: 'initial' } | { status: 'closed' } | { status: 'open'; key: number; focus: boolean }
+  | { status: 'initial' }
+  | { status: 'closed' }
+  | { status: 'open'; key: number; focus: boolean }
 
 function suggestionsQueryOf(
   kind: LookupTableKind,

@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": false,
+  "printWidth": 100,
+  "singleQuote": true,
+  "bracketSameLine": true,
+  "sortPackageJson": false,
+  "sortTailwindcss": {
+    "functions": ["cn", "clsx", "cva"]
+  },
+  "ignorePatterns": [
+    "pnpm-lock.yaml",
+    ".agents/",
+    ".claude/",
+    "packages/oxlint-config/anti-slop/",
+    ".local/",
+    "apps/web/public/mockServiceWorker.js",
+    "packages/db/migrations/",
+    "packages/mapping/golden/*",
+    "!packages/mapping/golden/README.md"
+  ]
+}

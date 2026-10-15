@@ -27,7 +27,8 @@ export type FlowField = keyof FlowFormValues
 export type FlowFieldError = 'required' | 'tooLong'
 
 export type FlowFormResult<Input> =
-  { input: Input } | { errors: Partial<Record<FlowField, FlowFieldError>> }
+  | { input: Input }
+  | { errors: Partial<Record<FlowField, FlowFieldError>> }
 
 const fields = [
   'name',

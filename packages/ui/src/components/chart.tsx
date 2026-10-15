@@ -16,7 +16,8 @@ const INITIAL_DIMENSION = { width: 320, height: 200 } as const
 export type ChartConfig = Record<
   string,
   { label?: React.ReactNode } & (
-    { color?: string; theme?: never } | { color?: never; theme: Record<Theme, string> }
+    | { color?: string; theme?: never }
+    | { color?: never; theme: Record<Theme, string> }
   )
 >
 

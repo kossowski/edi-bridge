@@ -3,7 +3,10 @@ import { hasMessageIdentifier } from './message-identifier'
 import type { Element, Message } from './model'
 
 export type ReadAcknowledgementErrorCode =
-  'missing-element' | 'missing-interchange-response' | 'unknown-code' | 'unsupported-message-type'
+  | 'missing-element'
+  | 'missing-interchange-response'
+  | 'unknown-code'
+  | 'unsupported-message-type'
 
 export class ReadAcknowledgementError extends Error {
   override readonly name = 'ReadAcknowledgementError'

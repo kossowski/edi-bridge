@@ -39,7 +39,8 @@ export type WorkspaceSettingsValues = Record<WorkspaceSettingsField, string>
 export type WorkspaceSettingsErrors = Partial<Record<WorkspaceSettingsField, WholeNumberError>>
 
 export type WorkspaceSettingsResult =
-  { input: WorkspaceSettingsInput } | { errors: WorkspaceSettingsErrors }
+  | { input: WorkspaceSettingsInput }
+  | { errors: WorkspaceSettingsErrors }
 
 export function groupSeparatorOf(locale: string) {
   return new Intl.NumberFormat(locale).formatToParts(1000).find((part) => part.type === 'group')
@@ -120,7 +121,8 @@ export function toWorkspaceSettingsValues(
 }
 
 export type BudgetUsage =
-  { turnedOff: true } | { turnedOff: false; exhausted: boolean; share: number; filled: number }
+  | { turnedOff: true }
+  | { turnedOff: false; exhausted: boolean; share: number; filled: number }
 
 export function budgetUsage({ dailyLimit, usedToday }: AiTokenBudget): BudgetUsage {
   if (dailyLimit === 0) {

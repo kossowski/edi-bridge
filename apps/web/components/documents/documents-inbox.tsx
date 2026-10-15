@@ -147,7 +147,11 @@ function StatusGroupFilter({
 }
 
 type EmptyKind =
-  'noDocuments' | 'nothingNeedsAttention' | 'nothingMatches' | 'emptyGroup' | 'pageOutOfRange'
+  | 'noDocuments'
+  | 'nothingNeedsAttention'
+  | 'nothingMatches'
+  | 'emptyGroup'
+  | 'pageOutOfRange'
 
 const emptyIcons: Record<EmptyKind, IconSvgElement> = {
   noDocuments: File02Icon,

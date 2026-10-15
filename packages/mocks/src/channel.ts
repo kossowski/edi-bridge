@@ -37,7 +37,8 @@ type WebhookInput = Extract<ChannelInput, { type: 'webhook' }>
 
 // What the server stores: the plaintext secrets stay here and only leave masked, via toChannel.
 export type ChannelRecord = { id: string } & (
-  Exclude<ChannelInput, { type: 'webhook' }> | (WebhookInput & { token: string })
+  | Exclude<ChannelInput, { type: 'webhook' }>
+  | (WebhookInput & { token: string })
 )
 
 type SftpConnection = Omit<

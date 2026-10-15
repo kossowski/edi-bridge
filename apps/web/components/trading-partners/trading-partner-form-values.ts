@@ -24,7 +24,8 @@ export type TradingPartnerField = keyof TradingPartnerFormValues
 export type FieldError = 'required' | 'tooLong' | 'range' | 'stillNeeded' | GlnError
 
 export type TradingPartnerFormResult =
-  { input: TradingPartnerInput } | { errors: Partial<Record<TradingPartnerField, FieldError>> }
+  | { input: TradingPartnerInput }
+  | { errors: Partial<Record<TradingPartnerField, FieldError>> }
 
 const fields = [
   'name',

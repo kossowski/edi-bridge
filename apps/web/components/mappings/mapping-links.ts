@@ -59,7 +59,8 @@ export function isWholePart(rows: LinkableRows, { side, path }: RowRef) {
 }
 
 export type RowLink =
-  { kind: 'link'; link: MappingLink } | { kind: 'transformLink'; link: TransformLink }
+  | { kind: 'link'; link: MappingLink }
+  | { kind: 'transformLink'; link: TransformLink }
 
 // A loop links whole parts, so a part's own path counts as well as its leaves.
 function pathsOf(item: TreeItem) {
