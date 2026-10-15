@@ -11,7 +11,7 @@ import {
   type JsonContent,
   parseCsv,
   rootListPath,
-  windows1252Byte,
+  UnencodableCharacterError,
 } from '@edi-bridge/contracts'
 
 import { jsonListSchema, jsonObjectSchema } from './json'
@@ -156,20 +156,17 @@ function encoded(
   text: string,
   encoding: CharacterEncoding,
 ): Effect.Effect<Uint8Array, DocumentWriteError> {
-  const characters = [...text]
-
-  const unencodable =
-    encoding === 'windows-1252'
-      ? characters.findIndex((character) => windows1252Byte(character) === undefined)
-      : -1
-
-  if (unencodable === -1) {
+  try {
     return Effect.succeed(encodeText(text, encoding))
+  } catch (error) {
+    if (error instanceof UnencodableCharacterError) {
+      const line = text.slice(0, error.index).split('\n').length
+
+      return Effect.fail(new DocumentWriteError({ code: 'unencodableCharacter', line }))
+    }
+
+    throw error
   }
-
-  const line = characters.slice(0, unencodable).filter((character) => character === '\n').length
-
-  return Effect.fail(new DocumentWriteError({ code: 'unencodableCharacter', line: line + 1 }))
 }
 
 export function writeDocument(
