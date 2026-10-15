@@ -267,7 +267,7 @@ describe('channelHandlers', () => {
       authentication: 'privateKey',
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(422)
   })
 
   it('removes the HTTP Authorization header on update with null', async () => {

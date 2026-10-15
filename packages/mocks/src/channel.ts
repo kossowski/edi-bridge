@@ -25,7 +25,7 @@ import {
   webhookTokenSchema,
 } from '@edi-bridge/contracts'
 
-import { badRequest, conflict, notFound } from './responses'
+import { badRequest, conflict, notFound, unprocessable } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { hasTraffic, seedTradingPartners } from './trading-partner'
@@ -316,7 +316,9 @@ function applyUpdate(
   if (update.type === 'sftp' && existing.type === 'sftp') {
     if (update.credential === undefined && update.authentication !== existing.authentication) {
       return {
-        response: badRequest('A new credential is required when the authentication method changes'),
+        response: unprocessable(
+          'A new credential is required when the authentication method changes',
+        ),
       }
     }
 
