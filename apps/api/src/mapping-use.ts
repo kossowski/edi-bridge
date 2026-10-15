@@ -8,6 +8,7 @@ import {
 } from '@edi-bridge/contracts'
 import { mappings, mappingVersions } from '@edi-bridge/db'
 
+import { selectTradingPartnersByMapping } from './flow-use.js'
 import { selectVersionsOfDocumentStructure } from './mapping-version.js'
 import { byName, inWorkspace } from './rows.js'
 
@@ -69,7 +70,7 @@ const selectUsesByLookupTable = async (
   workspaceId: string,
   reading: (graph: AnyColumn) => SQL | undefined,
 ) => {
-  const [inDrafts, inVersions] = await Promise.all([
+  const [inDrafts, inVersions, tradingPartnersOf] = await Promise.all([
     db
       .selectDistinct({ ...useFields, lookupTableId: lookupTableIdsOf(mappings.draft) })
       .from(mappings)
@@ -79,6 +80,7 @@ const selectUsesByLookupTable = async (
       .from(mappingVersions)
       .innerJoin(mappings, eq(mappingVersions.mappingId, mappings.id))
       .where(inWorkspace(mappings, workspaceId, reading(mappingVersions.graph))),
+    selectTradingPartnersByMapping(db, workspaceId),
   ])
 
   const byLookupTable = new Map<string, Map<string, LookupTableUse>>()
@@ -91,8 +93,7 @@ const selectUsesByLookupTable = async (
       name,
       messageType,
       direction: directionOf({ messageType }),
-      // Until Flows (#186) exist.
-      tradingPartners: [],
+      tradingPartners: tradingPartnersOf(mappingId),
     })
     byLookupTable.set(lookupTableId, uses)
   }
