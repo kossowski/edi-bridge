@@ -6,6 +6,8 @@ import {
   removeWorkspaceMemberEndpoint,
   sessionEndpoint,
   toPath,
+  updateCompanyIdentityEndpoint,
+  withCheckDigit,
   workspaceMemberSchema,
   workspaceMembersEndpoint,
 } from '@edi-bridge/contracts'
@@ -78,10 +80,10 @@ describe('GET /workspaces/current/members', () => {
     ])
   })
 
-  it('records the last activity of a Member on an authenticated request', async () => {
+  const signInQuietMember = async (email: string) => {
     const quiet: NewMember = {
       name: 'Sudhafen Quiet',
-      email: 'quiet@sudhafen.example',
+      email,
       password: 'sudhafen-quiet-password',
       workspaceId: otherWorkspace.id,
       role: 'viewer',
@@ -91,20 +93,51 @@ describe('GET /workspaces/current/members', () => {
 
     const client = await signIn(api.app, quiet)
 
-    const lastActivityOfQuiet = async () =>
-      (await currentMembers(api.otherAdmin)).find(({ email }) => email === quiet.email)
+    const lastActivity = async () =>
+      (await currentMembers(api.otherAdmin)).find((member) => member.email === email)
         ?.lastActivityAt
 
-    expect(await lastActivityOfQuiet()).toBeNull()
+    return { client, lastActivity }
+  }
+
+  it('records the last activity of a Member on an authenticated request', async () => {
+    const { client, lastActivity } = await signInQuietMember('quiet@sudhafen.example')
+
+    expect(await lastActivity()).toBeNull()
 
     const before = Date.now()
     await client.inject({ method: 'GET', url: sessionEndpoint.path })
     const after = Date.now()
 
-    const recorded = Date.parse((await lastActivityOfQuiet()) ?? '')
+    const recorded = Date.parse((await lastActivity()) ?? '')
 
     expect(recorded).toBeGreaterThanOrEqual(before)
     expect(recorded).toBeLessThanOrEqual(after)
+  })
+
+  it('keeps the last activity of a Member for a minute', async () => {
+    const { client, lastActivity } = await signInQuietMember('steady@sudhafen.example')
+
+    await client.inject({ method: 'GET', url: sessionEndpoint.path })
+    const recorded = await lastActivity()
+
+    await client.inject({ method: 'GET', url: sessionEndpoint.path })
+
+    expect(recorded).not.toBeNull()
+    expect(await lastActivity()).toBe(recorded)
+  })
+
+  it('records no activity for a change the Member may not make', async () => {
+    const { client, lastActivity } = await signInQuietMember('refused@sudhafen.example')
+
+    const response = await client.inject({
+      method: 'PUT',
+      url: updateCompanyIdentityEndpoint.path,
+      body: { gln: withCheckDigit('021234500000') },
+    })
+
+    expect(response.statusCode).toBe(403)
+    expect(await lastActivity()).toBeNull()
   })
 
   it('answers 401 without a session', async () => {

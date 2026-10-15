@@ -225,11 +225,11 @@ function registerRoutes(
       return unauthorized(reply)
     }
 
-    await recordActivity(database, member)
+    const active = Effect.andThen(recordActivity, effect)
 
     const guarded = readMethods.has(request.method)
-      ? effect
-      : Effect.andThen(requireChangeRight, effect)
+      ? active
+      : Effect.andThen(requireChangeRight, active)
 
     return run(
       reply,

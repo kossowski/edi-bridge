@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, lt, or } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { Context, Effect } from 'effect'
 
 import type { FastifyRequest } from 'fastify'
@@ -8,16 +8,16 @@ import { members, users } from '@edi-bridge/db'
 import type { Session, SessionUser, WorkspaceRole } from '@edi-bridge/contracts'
 
 import { type Auth, headersOf } from './auth.js'
+import { type Database, Db } from './db.js'
 import { Forbidden } from './errors.js'
 import { loadCurrentWorkspace } from './workspace.js'
-
-import type { Database } from './db.js'
 
 export interface Member {
   readonly user: SessionUser
   readonly operator: boolean
   readonly workspaceId: string
   readonly role: WorkspaceRole
+  readonly lastActivityAt: Date | null
 }
 
 export interface SignedInUser {
@@ -79,6 +79,7 @@ export async function resolveMember(
       operator: users.operator,
       workspaceId: members.workspaceId,
       role: members.role,
+      lastActivityAt: members.lastActivityAt,
     })
     .from(members)
     .innerJoin(users, eq(users.id, members.userId))
@@ -98,23 +99,23 @@ export async function resolveMember(
 const activityInterval = 60_000
 
 // Writes at most once a minute per Member, so a burst of requests costs one update.
-export async function recordActivity(database: Database, { user, workspaceId }: Member) {
+export const recordActivity = Effect.gen(function* () {
+  const { user, workspaceId, lastActivityAt } = yield* CurrentMember
   const now = new Date()
 
-  await database
-    .update(members)
-    .set({ lastActivityAt: now })
-    .where(
-      and(
-        eq(members.userId, user.id),
-        eq(members.workspaceId, workspaceId),
-        or(
-          isNull(members.lastActivityAt),
-          lt(members.lastActivityAt, new Date(now.getTime() - activityInterval)),
-        ),
-      ),
-    )
-}
+  if (lastActivityAt !== null && now.getTime() - lastActivityAt.getTime() < activityInterval) {
+    return
+  }
+
+  const db = yield* Db
+
+  yield* Effect.promise(() =>
+    db
+      .update(members)
+      .set({ lastActivityAt: now })
+      .where(and(eq(members.userId, user.id), eq(members.workspaceId, workspaceId))),
+  )
+})
 
 export const loadSession = Effect.gen(function* () {
   const { user, operator, role } = yield* CurrentMember
