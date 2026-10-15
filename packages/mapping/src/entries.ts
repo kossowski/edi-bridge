@@ -79,13 +79,13 @@ function nodeEntries(
       case 'object':
         return nodeEntries(node.children, value, at)
       case 'array': {
-        const items = jsonListSchema.safeParse(value)
-        const { items: item } = node
+        const list = jsonListSchema.safeParse(value)
+        const { items } = node
 
-        return (items.success ? items.data : []).flatMap((entry, index) =>
-          item.kind === 'field'
-            ? scalarEntries(item.path, entry, [...at, index])
-            : nodeEntries(item.children, entry, [...at, index]),
+        return (list.success ? list.data : []).flatMap((element, index) =>
+          items.kind === 'field'
+            ? scalarEntries(items.path, element, [...at, index])
+            : nodeEntries(items.children, element, [...at, index]),
         )
       }
     }
