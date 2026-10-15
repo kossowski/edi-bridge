@@ -289,7 +289,7 @@ function PreviewTable({
   return (
     <div
       role="region"
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long preview
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long preview
       tabIndex={0}
       aria-labelledby={captionId}
       className="focus-visible:ring-ring/50 max-h-[40vh] overflow-auto rounded-lg border outline-none focus-visible:ring-3">

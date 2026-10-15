@@ -74,7 +74,7 @@ export function MessageTree({ message }: { message: ParsedMessage }) {
       </p>
       <div
         role="region"
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Message
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Message
         tabIndex={0}
         aria-label={t('label')}
         className="focus-visible:ring-ring/50 max-h-[32rem] overflow-auto rounded-lg border p-1 outline-none focus-visible:ring-3">

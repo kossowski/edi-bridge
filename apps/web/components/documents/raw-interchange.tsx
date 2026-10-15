@@ -60,7 +60,7 @@ export function RawInterchange({ raw, position }: { raw: string; position: Error
       <div
         ref={container}
         role="region"
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Interchange
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Interchange
         tabIndex={0}
         aria-label={t('label')}
         className="bg-muted/40 focus-visible:ring-ring/50 relative max-h-96 overflow-auto rounded-lg border font-mono text-xs leading-5 outline-none focus-visible:ring-3">

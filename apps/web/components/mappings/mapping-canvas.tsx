@@ -368,7 +368,7 @@ function DetailsPanel({
       <div
         ref={detailsBody}
         role="group"
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll long details
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll long details
         tabIndex={0}
         aria-label={t('details.title')}
         className="focus-visible:ring-ring/50 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 outline-none focus-visible:ring-3 focus-visible:ring-inset">

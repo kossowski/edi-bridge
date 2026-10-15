@@ -300,7 +300,7 @@ function TableRegion({ label, children }: { label: string; children: ReactNode }
   return (
     <div
       role="region"
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a wide table
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a wide table
       tabIndex={0}
       aria-label={label}
       className="focus-visible:ring-ring/50 overflow-x-auto rounded-lg border outline-none focus-visible:ring-3 [&>[data-slot=table-container]]:overflow-visible">

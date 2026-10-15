@@ -8,8 +8,8 @@
     "dev:mock": "NEXT_PUBLIC_API_MOCKING=enabled next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "oxlint && eslint",
-    "lint:fix": "oxlint --fix && eslint --fix",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
     "check-types": "rm -rf .next/dev/types && next typegen && tsc --noEmit",
     "test": "vitest run --project unit",
     "test:stories": "vitest run --project storybook",
@@ -39,7 +39,6 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@edi-bridge/eslint-config": "workspace:*",
     "@edi-bridge/oxlint-config": "workspace:*",
     "@edi-bridge/typescript-config": "workspace:*",
     "@edi-bridge/vitest-config": "workspace:*",
@@ -53,7 +52,6 @@
     "@types/react-dom": "^19",
     "@vitest/browser": "^5.0.3",
     "@vitest/browser-playwright": "^5.0.3",
-    "eslint": "^10.12.0",
     "msw-storybook-addon": "^3.0.3",
     "oxlint": "1.87.0",
     "playwright": "^1.64.0",

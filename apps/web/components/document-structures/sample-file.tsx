@@ -254,7 +254,7 @@ export function SampleFile({
       {content.kind === 'text' ? (
         <pre
           role="region"
-          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll the file
+          // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll the file
           tabIndex={0}
           aria-label={t('valuesLabel', { fileName: sample.fileName })}
           className="focus-visible:ring-ring/50 max-h-[32rem] overflow-auto p-3 font-mono text-xs leading-6 [overflow-wrap:anywhere] whitespace-pre-wrap outline-none focus-visible:ring-3 focus-visible:ring-inset">

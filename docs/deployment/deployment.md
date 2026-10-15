@@ -32,7 +32,7 @@ All three applications also watch these shared build inputs:
 
 ```text
 packages/typescript-config/**
-packages/eslint-config/**
+packages/oxlint-config/**
 package.json
 pnpm-lock.yaml
 pnpm-workspace.yaml
