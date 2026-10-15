@@ -6,7 +6,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   acceptInviteEndpoint,
+  channelEndpoint,
   channelsEndpoint,
+  createChannelEndpoint,
+  regenerateWebhookTokenEndpoint,
+  updateChannelEndpoint,
   createDocumentStructureEndpoint,
   createInviteEndpoint,
   createLookupTableEndpoint,
@@ -56,7 +60,15 @@ import {
 } from '@edi-bridge/contracts'
 
 import { type AuthSettings, mountAuth } from './auth.js'
-import { listChannels } from './channel.js'
+import {
+  ChannelEnvironment,
+  type ChannelSettings,
+  createChannel,
+  listChannels,
+  loadChannel,
+  regenerateWebhookToken,
+  updateChannel,
+} from './channel.js'
 import { type Database, Db } from './db.js'
 import {
   createDocumentStructure,
@@ -89,6 +101,7 @@ import {
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
 import { parse, type ValidationError } from './parse.js'
+import { secretBox } from './secret.js'
 import {
   CurrentMember,
   CurrentUser,
@@ -127,6 +140,7 @@ export type Probe = () => Promise<void>
 
 export interface AppDependencies {
   auth: AuthSettings
+  channels: ChannelSettings
   database: Database
   logger?: boolean
   probes: { postgres: Probe; redis: Probe }
@@ -208,9 +222,21 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
 
 function registerRoutes(
   app: FastifyInstance,
-  { auth: authSettings, database, probes, probeTimeoutMs = 2000, webOrigin }: AppDependencies,
+  {
+    auth: authSettings,
+    channels: channelSettings,
+    database,
+    probes,
+    probeTimeoutMs = 2000,
+    webOrigin,
+  }: AppDependencies,
 ) {
   const inviteOrigin = webOrigin ?? new URL(authSettings.baseUrl).origin
+
+  const channelEnvironment = {
+    secrets: secretBox(channelSettings.secretKey),
+    apiPublicUrl: channelSettings.apiPublicUrl,
+  }
 
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
@@ -227,7 +253,11 @@ function registerRoutes(
 
   const auth = mountAuth(app, database, authSettings)
 
-  const run = <A>(reply: FastifyReply, effect: Effect.Effect<A, Failure, Db>, status: number) =>
+  const run = <A>(
+    reply: FastifyReply,
+    effect: Effect.Effect<A, Failure, ChannelEnvironment | Db>,
+    status: number,
+  ) =>
     Effect.runPromise(
       effect.pipe(
         Effect.map((body) => reply.code(status).send(body)),
@@ -235,6 +265,7 @@ function registerRoutes(
           Effect.sync(() => reply.code(statusOf[error._tag]).send(bodyOf(error))),
         ),
         Effect.provideService(Db, database),
+        Effect.provideService(ChannelEnvironment, channelEnvironment),
       ),
     )
 
@@ -243,7 +274,7 @@ function registerRoutes(
   const respond = async <A>(
     request: FastifyRequest,
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, CurrentMember | CurrentWorkspace | Db>,
+    effect: Effect.Effect<A, Failure, ChannelEnvironment | CurrentMember | CurrentWorkspace | Db>,
     status = 200,
   ) => {
     const member = await resolveMember(auth, database, request)
@@ -346,6 +377,31 @@ function registerRoutes(
   )
 
   app.get(channelsEndpoint.path, (request, reply) => respond(request, reply, listChannels))
+
+  app.get<{ Params: { id: string } }>(channelEndpoint.path, (request, reply) =>
+    respond(request, reply, loadChannel(request.params.id)),
+  )
+
+  app.post(createChannelEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(createChannelEndpoint.body, request.body), createChannel),
+      201,
+    ),
+  )
+
+  app.put<{ Params: { id: string } }>(updateChannelEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      updateChannel(request.params.id, parse(updateChannelEndpoint.body, request.body)),
+    ),
+  )
+
+  app.post<{ Params: { id: string } }>(regenerateWebhookTokenEndpoint.path, (request, reply) =>
+    respond(request, reply, regenerateWebhookToken(request.params.id)),
+  )
 
   app.get(lookupTablesEndpoint.path, (request, reply) => respond(request, reply, listLookupTables))
 

@@ -3,7 +3,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { connect, localDatabaseUrl } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
-import { testAuth } from './testing.js'
+import { testAuth, testChannels } from './testing.js'
 
 const connection = connect(localDatabaseUrl)
 
@@ -19,7 +19,12 @@ const down = () => Promise.reject(new Error('connection refused'))
 
 describe('GET /health', () => {
   it('reports healthy when Postgres and Redis are reachable', async () => {
-    const app = buildApp({ auth: testAuth, database, probes: { postgres: up, redis: up } })
+    const app = buildApp({
+      auth: testAuth,
+      channels: testChannels,
+      database,
+      probes: { postgres: up, redis: up },
+    })
 
     const response = await app.inject({ method: 'GET', url: '/health' })
 
@@ -31,7 +36,12 @@ describe('GET /health', () => {
   })
 
   it('reports unhealthy when Postgres is unreachable', async () => {
-    const app = buildApp({ auth: testAuth, database, probes: { postgres: down, redis: up } })
+    const app = buildApp({
+      auth: testAuth,
+      channels: testChannels,
+      database,
+      probes: { postgres: down, redis: up },
+    })
 
     const response = await app.inject({ method: 'GET', url: '/health' })
 
@@ -43,7 +53,12 @@ describe('GET /health', () => {
   })
 
   it('reports unhealthy when Redis is unreachable', async () => {
-    const app = buildApp({ auth: testAuth, database, probes: { postgres: up, redis: down } })
+    const app = buildApp({
+      auth: testAuth,
+      channels: testChannels,
+      database,
+      probes: { postgres: up, redis: down },
+    })
 
     const response = await app.inject({ method: 'GET', url: '/health' })
 
@@ -59,6 +74,7 @@ describe('GET /health', () => {
 
     const app = buildApp({
       auth: testAuth,
+      channels: testChannels,
       database,
       probes: { postgres: hangs, redis: up },
       probeTimeoutMs: 20,

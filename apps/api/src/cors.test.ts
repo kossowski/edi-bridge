@@ -4,7 +4,7 @@ import { createTradingPartnerEndpoint } from '@edi-bridge/contracts'
 import { connect, localDatabaseUrl } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
-import { testAuth } from './testing.js'
+import { testAuth, testChannels } from './testing.js'
 
 const connection = connect(localDatabaseUrl)
 
@@ -12,6 +12,7 @@ const webOrigin = 'http://localhost:3000'
 
 const app = buildApp({
   auth: testAuth,
+  channels: testChannels,
   database: connection.db,
   probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
   webOrigin,

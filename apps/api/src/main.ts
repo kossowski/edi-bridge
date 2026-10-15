@@ -18,6 +18,7 @@ const redis = new Redis(config.redisUrl, { enableOfflineQueue: false, maxRetries
 
 const app = buildApp({
   auth: config.auth,
+  channels: config.channels,
   database: connection.db,
   logger: true,
   probes: {

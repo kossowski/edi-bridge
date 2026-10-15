@@ -8,9 +8,11 @@ import { startTestDatabase } from '@edi-bridge/db/testing'
 
 import { buildApp } from './app.js'
 import { developmentWorkspace } from './development-workspace.js'
+import { secretKeyBytes } from './secret.js'
 import { addUser, storePassword } from './user.js'
 
 import type { AuthSettings } from './auth.js'
+import type { ChannelSettings } from './channel.js'
 import type { Database } from './db.js'
 
 export const ownWorkspace = { ...developmentWorkspace, gln: null }
@@ -27,6 +29,11 @@ export const testAuth: AuthSettings = {
   secret: 'test-secret-that-is-at-least-32-characters-long',
   baseUrl: 'http://localhost:3001',
   trustedOrigins: [webOrigin],
+}
+
+export const testChannels: ChannelSettings = {
+  secretKey: Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'),
+  apiPublicUrl: 'http://localhost:3001',
 }
 
 const up = () => Promise.resolve()
@@ -119,6 +126,7 @@ export async function startTestApi() {
 
   const app = buildApp({
     auth: testAuth,
+    channels: testChannels,
     database: connection.db,
     probes: { postgres: up, redis: up },
     webOrigin,

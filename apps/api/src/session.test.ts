@@ -20,6 +20,7 @@ import {
   signInRequest,
   startTestApi,
   testAuth,
+  testChannels,
   type TestApi,
   webOrigin,
 } from './testing.js'
@@ -77,8 +78,10 @@ describe('POST /auth/sign-in/email in production', () => {
         NODE_ENV: 'production',
         BETTER_AUTH_URL: testAuth.baseUrl,
         BETTER_AUTH_SECRET: testAuth.secret,
+        CHANNEL_SECRET_KEY: testChannels.secretKey.toString('base64'),
         ...env,
       }).auth,
+      channels: testChannels,
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
     })

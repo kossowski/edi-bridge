@@ -34,6 +34,7 @@ import {
   startTestApi,
   type TestApi,
   testAuth,
+  testChannels,
   webOrigin,
 } from './testing.js'
 import { addUser } from './user.js'
@@ -153,6 +154,7 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
   it('links to the origin of BETTER_AUTH_URL when no web origin is set', async () => {
     const sameOrigin = buildApp({
       auth: testAuth,
+      channels: testChannels,
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
     })

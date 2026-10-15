@@ -5,7 +5,9 @@ import type { InjectOptions } from 'fastify'
 
 import {
   acceptInviteEndpoint,
+  channelEndpoint,
   channelsEndpoint,
+  createChannelEndpoint,
   createDocumentStructureEndpoint,
   createInviteEndpoint,
   createLookupTableEndpoint,
@@ -32,6 +34,7 @@ import {
   messageTypeStructureEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
+  regenerateWebhookTokenEndpoint,
   removeWorkspaceMemberEndpoint,
   restoreMappingVersionEndpoint,
   revokeInviteEndpoint,
@@ -43,6 +46,7 @@ import {
   tradingPartnerSchema,
   toPath,
   tradingPartnersEndpoint,
+  updateChannelEndpoint,
   updateCompanyIdentityEndpoint,
   updateDocumentStructureEndpoint,
   updateLookupTableEndpoint,
@@ -61,6 +65,7 @@ import {
   startTestApi,
   type TestApi,
   testAuth,
+  testChannels,
 } from './testing.js'
 
 const operatorAsViewer: NewMember = {
@@ -86,10 +91,19 @@ const lookupTable = {
   entries: [{ sourceCode: 'ST', targetCode: 'PCE' }],
 }
 
+const channel = {
+  type: 'webhook',
+  direction: 'inbound',
+  name: 'ERP webhook',
+  tradingPartnerId: null,
+  rateLimitPerMinute: 60,
+}
+
 const documentStructure = { name: 'ERP orders', origin: documentStructureOrigins.jsonDocument }
 
 interface Ids {
   tradingPartner: string
+  channel: string
   lookupTable: string
   documentStructure: string
   mapping: string
@@ -107,12 +121,26 @@ const withId = (path: string, id: string) => path.replace(':id', id)
 
 const createdSchema = z.object({ id: z.uuid() })
 
+const createdChannelIdSchema = z.object({ channel: createdSchema })
+
 async function createdId(url: string, body: NonNullable<InjectOptions['body']>) {
   const response = await api.admin.inject({ method: 'POST', url, body })
 
   expect(response.statusCode).toBe(201)
 
   return createdSchema.parse(response.json()).id
+}
+
+async function createdChannelId() {
+  const response = await api.admin.inject({
+    method: 'POST',
+    url: createChannelEndpoint.path,
+    body: channel,
+  })
+
+  expect(response.statusCode).toBe(201)
+
+  return createdChannelIdSchema.parse(response.json()).channel.id
 }
 
 beforeAll(async () => {
@@ -143,6 +171,7 @@ beforeAll(async () => {
 
   ids = {
     tradingPartner: await createdId(createTradingPartnerEndpoint.path, tradingPartner),
+    channel: await createdChannelId(),
     lookupTable: await createdId(createLookupTableEndpoint.path, lookupTable),
     documentStructure: documentStructureId,
     mapping,
@@ -162,6 +191,7 @@ const workspaceReads = (): string[] => [
   withId(tradingPartnerEndpoint.path, ids.tradingPartner),
   withId(tradingPartnerActivityEndpoint.path, ids.tradingPartner),
   channelsEndpoint.path,
+  withId(channelEndpoint.path, ids.channel),
   lookupTablesEndpoint.path,
   `${lookupTableSuggestionsEndpoint.path}?kind=units`,
   withId(lookupTableEndpoint.path, ids.lookupTable),
@@ -200,6 +230,19 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
       url: withId(updateTradingPartnerEndpoint.path, ids.tradingPartner),
       body: { ...tradingPartner, name: 'Hansemarkt AG' },
     }),
+  ],
+  ['create a Channel', () => ({ method: 'POST', url: createChannelEndpoint.path, body: channel })],
+  [
+    'update a Channel',
+    () => ({
+      method: 'PUT',
+      url: withId(updateChannelEndpoint.path, ids.channel),
+      body: { ...channel, name: 'ERP orders webhook' },
+    }),
+  ],
+  [
+    'regenerate a webhook token',
+    () => ({ method: 'POST', url: withId(regenerateWebhookTokenEndpoint.path, ids.channel) }),
   ],
   [
     'create a Lookup Table',
@@ -365,6 +408,7 @@ describe('the changes', () => {
 
     const app = buildApp({
       auth: testAuth,
+      channels: testChannels,
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
     })
