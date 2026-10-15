@@ -34,6 +34,7 @@ import {
   maxLookupTableCsvLength,
   mappingVersionEndpoint,
   mappingVersionsEndpoint,
+  messageTypeStructureEndpoint,
   operatorWorkspaceMembersEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
@@ -86,6 +87,7 @@ import {
   restoreMappingVersion,
 } from './mapping-version.js'
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
+import { loadMessageTypeStructure } from './message-type.js'
 import { parse, type ValidationError } from './parse.js'
 import {
   CurrentMember,
@@ -461,6 +463,12 @@ function registerRoutes(
           parse(updateDocumentStructureEndpoint.body, request.body),
         ),
       ),
+  )
+
+  app.get<{ Params: { messageType: string } }>(
+    messageTypeStructureEndpoint.path,
+    (request, reply) =>
+      respond(request, reply, loadMessageTypeStructure(request.params.messageType)),
   )
 
   app.get(mappingsEndpoint.path, (request, reply) => respond(request, reply, listMappings))
