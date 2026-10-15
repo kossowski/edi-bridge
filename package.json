@@ -16,7 +16,7 @@
     "check:fast": "turbo run lint check-types test test:stories",
     "check": "turbo run lint check-types test test:stories test:canvas test:e2e build build-storybook --concurrency=1",
     "storybook": "turbo run storybook",
-    "format": "prettier --write .",
+    "format": "oxfmt",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -24,10 +24,9 @@
     "@commitlint/config-conventional": "^21.2.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
+    "oxfmt": "0.73.0",
     "oxlint": "1.87.0",
     "oxlint-tsgolint": "7.0.2004",
-    "prettier": "^3.9.9",
-    "prettier-plugin-tailwindcss": "^0.8.1",
     "turbo": "2.11.7"
   },
   "engines": {

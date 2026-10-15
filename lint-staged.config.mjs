@@ -4,7 +4,7 @@
  */
 const config = {
   '{apps,packages/!(oxlint-config)}/**/*.{js,mjs,ts,tsx}': 'oxlint --fix',
-  '*': 'prettier --write --ignore-unknown',
+  '*': 'oxfmt --no-error-on-unmatched-pattern',
 }
 
 export default config
