@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "extends": ["./react.json"],
-  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "nextjs"],
+  "plugins": ["nextjs"],
   "jsPlugins": [
     {
       "name": "next-js",

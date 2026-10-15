@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "extends": ["./base.json"],
-  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y"],
+  "plugins": ["react", "jsx-a11y"],
   "jsPlugins": [
     {
       "name": "react-hooks-js",
