@@ -38,11 +38,13 @@ function outboundVersion(
   }
 }
 
-const apply = (version: OutboundMappingVersion, document: JsonContent) =>
-  Effect.runSync(applyMappingVersion(version, document))
+type Options = Parameters<typeof applyMappingVersion>[2]
 
-const failure = (version: OutboundMappingVersion, document: JsonContent) =>
-  Effect.runSync(Effect.flip(applyMappingVersion(version, document)))
+const apply = (version: OutboundMappingVersion, document: JsonContent, options?: Options) =>
+  Effect.runSync(applyMappingVersion(version, document, options))
+
+const failure = (version: OutboundMappingVersion, document: JsonContent, options?: Options) =>
+  Effect.runSync(Effect.flip(applyMappingVersion(version, document, options)))
 
 const orderHeader: MappingLink[] = [
   { sourcePath: 'orderNumber', targetPath: 'BGM/1004' },
@@ -815,4 +817,60 @@ describe('applyMappingVersion', () => {
       })
     },
   )
+
+  const unitTableId = '8b9c0d1e-2f3a-4b4c-8d5e-6f7a8b9c0d1e'
+
+  const lookupTables = new Map([
+    [
+      unitTableId,
+      [
+        { sourceCode: 'ST', targetCode: 'PCE' },
+        { sourceCode: 'KG', targetCode: 'KGM' },
+      ],
+    ],
+  ])
+
+  const unitsVia = (fallback: 'keepValue' | 'empty' | 'fail') =>
+    orderVia({ kind: 'lookupTable', config: { lookupTableId: unitTableId, fallback } }, [
+      fromSource('lines[].unit'),
+      intoTarget('SG25/QTY+21/C186/6411'),
+    ])
+
+  const unitLines = (...units: string[]) => ({
+    ...order,
+    lines: units.map((unit, index) => ({ gtin: `400086214140${index}`, quantity: 12, unit })),
+  })
+
+  const quantities = (version: OutboundMappingVersion, document: JsonContent) =>
+    apply(version, document, { lookupTables }).segments.filter(({ tag }) => tag === 'QTY')
+
+  it('lookup table translates the code of each line', () => {
+    expect(quantities(unitsVia('fail'), unitLines('ST', 'KG'))).toEqual([
+      { tag: 'QTY', elements: [['21', '12', 'PCE']] },
+      { tag: 'QTY', elements: [['21', '12', 'KGM']] },
+    ])
+  })
+
+  it.each([
+    ['keepValue', [['21', '12', 'PCE']]],
+    ['empty', [['21', '12']]],
+  ] as const)('lookup table with the %s fallback handles a code it lacks', (fallback, elements) => {
+    expect(quantities(unitsVia(fallback), unitLines('PCE'))).toEqual([{ tag: 'QTY', elements }])
+  })
+
+  it('lookup table with the fail fallback fails naming the target element for a code it lacks', () => {
+    expect(failure(unitsVia('fail'), unitLines('ST', 'PCE'), { lookupTables })).toMatchObject({
+      code: 'noLookupMatch',
+      targetPath: 'SG25/QTY+21/C186/6411',
+      transformId,
+    })
+  })
+
+  it('lookup table fails naming the target element when the engine lacks its table', () => {
+    expect(failure(unitsVia('keepValue'), unitLines('ST'))).toMatchObject({
+      code: 'unknownLookupTable',
+      targetPath: 'SG25/QTY+21/C186/6411',
+      transformId,
+    })
+  })
 })

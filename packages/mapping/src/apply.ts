@@ -11,6 +11,7 @@ import {
   type JsonContent,
   jsonContentSchema,
   type LinkStart,
+  type LookupTableEntry,
   type MappingTransform,
   type MappingVersion,
   type MessageTypeStructure,
@@ -32,6 +33,8 @@ export const mappingErrorCodes = [
   'invalidTransform',
   'invalidDate',
   'invalidNumber',
+  'unknownLookupTable',
+  'noLookupMatch',
 ] as const
 
 export type MappingErrorCode = (typeof mappingErrorCodes)[number]
@@ -64,7 +67,10 @@ type Scope = {
 
 type TransformTarget = { path: string; from: LinkStart & { kind: 'transform' } }
 
+type LookupTables = ReadonlyMap<string, ReadonlyMap<string, string>>
+
 type Graph = {
+  lookupTables: LookupTables
   transforms: ReadonlyMap<string, MappingTransform>
   feeding: ReadonlyMap<string, LinkStart>
   valid: ReadonlySet<string>
@@ -123,9 +129,38 @@ type Evaluation = Reading & { targetPath: string; visiting: ReadonlySet<string> 
 const failedTransform = (code: MappingErrorCode, { targetPath }: Evaluation, transformId: string) =>
   new MappingError({ code, targetPath, transformId })
 
+function lookedUp(
+  { config: { lookupTableId, fallback } }: Extract<MappingTransform, { kind: 'lookupTable' }>,
+  value: string,
+  lookupTables: LookupTables,
+  fail: (code: MappingErrorCode) => MappingError,
+): Effect.Effect<string, MappingError> {
+  const table = lookupTableId === null ? undefined : lookupTables.get(lookupTableId)
+
+  if (table === undefined) {
+    return Effect.fail(fail('unknownLookupTable'))
+  }
+
+  const found = table.get(value)
+
+  if (value === '' || found !== undefined) {
+    return Effect.succeed(found ?? '')
+  }
+
+  switch (fallback) {
+    case 'keepValue':
+      return Effect.succeed(value)
+    case 'empty':
+      return Effect.succeed('')
+    case 'fail':
+      return Effect.fail(fail('noLookupMatch'))
+  }
+}
+
 function applied(
   transform: MappingTransform,
   args: Readonly<Record<string, string>>,
+  lookupTables: LookupTables,
   fail: (code: MappingErrorCode) => MappingError,
 ): Effect.Effect<string, MappingError> {
   const value = args.value ?? ''
@@ -164,6 +199,8 @@ function applied(
           reformatNumber(value, transform.config.decimalPlaces, transform.config.decimalSeparator),
         'invalidNumber',
       )
+    case 'lookupTable':
+      return lookedUp(transform, value, lookupTables, fail)
     default:
       return Effect.succeed(value)
   }
@@ -197,7 +234,7 @@ function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<strin
       )
     }),
     (args) =>
-      applied(transform, Object.fromEntries(args), (code) =>
+      applied(transform, Object.fromEntries(args), graph.lookupTables, (code) =>
         failedTransform(code, evaluation, transform.id),
       ),
   )
@@ -276,7 +313,7 @@ function groupPaths(nodes: ReadonlyArray<EdifactStructureNode>): string[] {
 
 type LoopDraft = Omit<Loop, 'sourcePart'> & { sourcePart?: string }
 
-function wiringOf(version: OutboundMappingVersion) {
+function wiringOf(version: OutboundMappingVersion, { lookupTables = new Map() }: ApplyOptions) {
   const { transforms, transformLinks } = version
   const drafts = new Map<string, LoopDraft>()
 
@@ -332,6 +369,12 @@ function wiringOf(version: OutboundMappingVersion) {
   const issues = transformIssues(version)
 
   const graph: Graph = {
+    lookupTables: new Map(
+      [...lookupTables].map(([id, entries]) => [
+        id,
+        new Map(entries.map(({ sourceCode, targetCode }) => [sourceCode, targetCode])),
+      ]),
+    ),
     transforms: new Map(transforms.map((transform) => [transform.id, transform])),
     feeding,
     valid: new Set(transforms.flatMap(({ id }) => (issues[id]?.length ? [] : [id]))),
@@ -537,13 +580,18 @@ function framed({ messageType, children }: MessageTypeStructure) {
 
 const messageReference = '1'
 
+export type ApplyOptions = {
+  lookupTables?: ReadonlyMap<string, ReadonlyArray<LookupTableEntry>>
+}
+
 export function applyMappingVersion(
   version: OutboundMappingVersion,
   document: JsonContent,
+  options: ApplyOptions = {},
 ): Effect.Effect<Message, MappingError> {
   const structure = messageTypeStructures[version.target.messageType]
   const { header, body } = framed(structure)
-  const wiring = wiringOf(version)
+  const wiring = wiringOf(version, options)
   const { graph, loops } = wiring
   const unknown = unknownTarget(version.links, wiring, body)
 
