@@ -329,16 +329,39 @@ describe('POST /mappings', () => {
     })
   })
 
-  it('falls back to the first Document Structure of the Workspace', async () => {
-    const documentStructures = createDocumentStructures({ count: 2 })
+  it('falls back to the first Document Structure of the Workspace by name', async () => {
+    const [first, second] = createDocumentStructures({ count: 2 }).toSorted((a, b) =>
+      a.name.localeCompare(b.name, 'de'),
+    )
 
-    server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures }))
+    server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [second!, first!] }))
 
     const created = createMappingEndpoint.response.parse(
       await (await createMapping({ messageType: 'DESADV' })).json(),
     )
 
-    expect(created.documentStructureId).toBe(documentStructures[0]!.id)
+    expect(created.documentStructureId).toBe(first!.id)
+  })
+
+  it('takes the first by name of the Document Structures the Message Type uses', async () => {
+    const [first, second] = createDocumentStructures({ count: 2 }).toSorted((a, b) =>
+      a.name.localeCompare(b.name, 'de'),
+    )
+
+    const mappings = createMappingDrafts({ count: 1, documentStructures: [first!] }).flatMap(
+      (mapping) => [
+        { ...mapping, id: crypto.randomUUID(), documentStructureId: second!.id },
+        mapping,
+      ],
+    )
+
+    server.use(...mappingHandlers(apiUrl, { mappings, documentStructures: [second!, first!] }))
+
+    const created = createMappingEndpoint.response.parse(
+      await (await createMapping({ messageType: mappings[0]!.messageType })).json(),
+    )
+
+    expect(created.documentStructureId).toBe(first!.id)
   })
 
   it('opens the created Mapping with an empty Draft and lists it', async () => {
@@ -517,7 +540,7 @@ describe('GET /mappings/:id/draft', () => {
     }
   })
 
-  it('picks Lookup Tables for its Lookup Table nodes from the listed ones', async () => {
+  it('picks Lookup Tables for its Lookup Table Transforms from the listed ones', async () => {
     server.use(...mappingHandlers(apiUrl), lookupTableListHandler(apiUrl))
     const drafts = await Promise.all(seedMappingDrafts.map(({ id }) => getDraft(id)))
 
@@ -786,6 +809,43 @@ describe('PUT /mappings/:id/draft', () => {
     server.use(...mappingHandlers(apiUrl))
 
     expect((await saveDraft(crypto.randomUUID(), { links })).status).toBe(404)
+  })
+
+  const lookupTable = (lookupTableId: string | null) =>
+    ({
+      id: '0000000a-0000-4000-8000-000000000003',
+      kind: 'lookupTable',
+      position: { x: 40, y: 320 },
+      config: { lookupTableId, fallback: 'keepValue' },
+    }) as const
+
+  it.each([
+    ['a Lookup Table of the Workspace', seedLookupTables[0]!.id],
+    ['no Lookup Table chosen yet', null],
+  ])('saves a Lookup Table Transform with %s', async (_, lookupTableId) => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+
+    const response = await saveDraft(hansemarktOrders.id, {
+      transforms: [lookupTable(lookupTableId)],
+    })
+
+    expect(response.status).toBe(200)
+  })
+
+  it('rejects a Lookup Table Transform whose Lookup Table is not in the Workspace', async () => {
+    const theirs = crypto.randomUUID()
+
+    server.use(
+      ...mappingHandlers(apiUrl, { mappings: createMappingDraftStore(), lookupTables: [] }),
+    )
+
+    const response = await saveDraft(hansemarktOrders.id, { transforms: [lookupTable(theirs)] })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({
+      message: `The Workspace has no Lookup Table ${theirs}.`,
+    })
+    expect((await getDraft(hansemarktOrders.id)).transforms).toEqual(hansemarktOrders.transforms)
   })
 })
 

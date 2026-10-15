@@ -216,7 +216,7 @@ const rejectingUnknownLookupTables = (graph: MappingGraph) =>
     const unknown = chosen.find((id) => !known.has(id))
 
     if (unknown !== undefined) {
-      return yield* new Unprocessable({ message: `The Workspace has no Lookup Table ${unknown}` })
+      return yield* new Unprocessable({ message: `The Workspace has no Lookup Table ${unknown}.` })
     }
   })
 

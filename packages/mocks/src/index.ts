@@ -516,6 +516,7 @@ export function createHandlers(
       flows,
       runs,
       tradingPartners: tradingPartnerStore,
+      lookupTables: lookupTableStore,
       versions: mappingVersionStore,
     }),
     ...aiDraftHandlers(apiUrl, {

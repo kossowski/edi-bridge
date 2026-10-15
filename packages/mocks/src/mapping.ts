@@ -56,7 +56,13 @@ import {
   seedMappings,
   toFlowStore,
 } from './flow'
-import { seedLookupTableNamed } from './lookup-table-seed'
+import {
+  type LookupTableRecord,
+  type LookupTableStore,
+  seedLookupTableNamed,
+  seedLookupTables,
+  toLookupTableStore,
+} from './lookup-table-seed'
 import { day } from './overdue'
 import { badRequest, notFound, serverError, unprocessable } from './responses'
 import { seedRuns, toRunSummary } from './run'
@@ -926,13 +932,28 @@ function documentStructureForNew(
   mappings: ReadonlyArray<MappingDraftRecord>,
   documentStructures: DocumentStructures,
 ) {
-  const used = new Set(
+  const structureIdsOfMessageType = new Set(
     mappings.flatMap((mapping) =>
       mapping.messageType === messageType ? [mapping.documentStructureId] : [],
     ),
   )
 
-  return documentStructures.find(({ id }) => used.has(id)) ?? documentStructures[0]
+  const structuresByName = documentStructures.toSorted((a, b) => a.name.localeCompare(b.name, 'de'))
+
+  return structuresByName.find(({ id }) => structureIdsOfMessageType.has(id)) ?? structuresByName[0]
+}
+
+function unknownLookupTable({ transforms }: MappingGraph, lookupTables: LookupTableStore) {
+  const unknown = transforms.find(
+    (transform) =>
+      transform.kind === 'lookupTable' &&
+      transform.config.lookupTableId !== null &&
+      !lookupTables.get(transform.config.lookupTableId),
+  )
+
+  return unknown?.kind === 'lookupTable'
+    ? unprocessable(`The Workspace has no Lookup Table ${unknown.config.lookupTableId}.`)
+    : null
 }
 
 function uniqueName(name: string, mappings: ReadonlyArray<MappingDraftRecord>) {
@@ -981,6 +1002,7 @@ export function mappingHandlers(
     flows = seedFlows,
     runs,
     tradingPartners = seedTradingPartners,
+    lookupTables = seedLookupTables,
     versions,
   }: {
     mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore | MappingsState
@@ -988,6 +1010,7 @@ export function mappingHandlers(
     flows?: ReadonlyArray<FlowRecord> | FlowStore
     runs?: ReadonlyArray<RunSummary> | RunStore
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
+    lookupTables?: ReadonlyArray<LookupTableRecord> | LookupTableStore
     versions?: PublishedVersions
   } = {},
 ) {
@@ -1010,6 +1033,7 @@ export function mappingHandlers(
   const structures = toDocumentStructureStore(documentStructures)
   const flowStore = toFlowStore(flows)
   const tradingPartnerStore = toTradingPartnerStore(tradingPartners)
+  const lookupTableStore = toLookupTableStore(lookupTables)
   let runStore: RunStore | undefined
 
   const summaries = () => {
@@ -1084,6 +1108,12 @@ export function mappingHandlers(
 
         if (invalidLink) {
           return invalidLink
+        }
+
+        const invalidLookupTable = unknownLookupTable(body.data, lookupTableStore)
+
+        if (invalidLookupTable) {
+          return invalidLookupTable
         }
 
         const record = {

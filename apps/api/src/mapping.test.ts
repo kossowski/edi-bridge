@@ -287,7 +287,7 @@ describe('PUT /mappings/:id/draft', () => {
     })
   })
 
-  it('saves a Lookup Table node that has no Lookup Table chosen yet', async () => {
+  it('saves a Lookup Table Transform that has no Lookup Table chosen yet', async () => {
     await postDocumentStructure('ERP orders')
     const mapping = await created('ORDERS')
 
@@ -339,7 +339,7 @@ describe('PUT /mappings/:id/draft', () => {
     expect(response.json()).toEqual({ message })
   })
 
-  it('answers 422 for a Lookup Table node with a Lookup Table outside the Workspace', async () => {
+  it('answers 422 for a Lookup Table Transform with a Lookup Table outside the Workspace', async () => {
     await postDocumentStructure('ERP orders')
     const mapping = await created('ORDERS')
     const theirs = await postLookupTable(otherAdmin)
@@ -347,7 +347,7 @@ describe('PUT /mappings/:id/draft', () => {
     const response = await save(mapping.id, graphWithLookup(theirs))
 
     expect(response.statusCode).toBe(422)
-    expect(response.json()).toEqual({ message: `The Workspace has no Lookup Table ${theirs}` })
+    expect(response.json()).toEqual({ message: `The Workspace has no Lookup Table ${theirs}.` })
     expect(graphOf(await draftOf(mapping.id)).transforms).toEqual([])
   })
 
