@@ -21,7 +21,7 @@ import {
   type MappingVersionSummary,
   type MessageType,
   oriented,
-  type OutputDifference,
+  outputDifferences,
   type PinnedFlow,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
@@ -81,8 +81,6 @@ import {
   toTradingPartnerStore,
 } from './trading-partner'
 import { seedWorkspaceMembers } from './workspace-member'
-
-import type { Entry } from './document-values'
 
 function toGraph({ links, transforms, transformLinks }: GraphParts): MappingGraph {
   return { links: [...links], transforms: [...transforms], transformLinks: [...transformLinks] }
@@ -329,24 +327,6 @@ export function toMappingVersion(
       },
       edifact: { kind: 'messageType', messageType: draft.messageType },
     }),
-  })
-}
-
-export function outputDifferences(
-  before: ReadonlyArray<Entry>,
-  after: ReadonlyArray<Entry>,
-): OutputDifference[] {
-  const keyOf = ({ path, at }: Entry) => `${path}|${at.join('/')}`
-  const earlier = new Map(before.map((entry) => [keyOf(entry), entry]))
-  const later = new Map(after.map((entry) => [keyOf(entry), entry]))
-
-  return [...new Set([...earlier.keys(), ...later.keys()])].flatMap((key) => {
-    const from = earlier.get(key)
-    const to = later.get(key)
-    const { path, at } = (to ?? from)!
-    const values = { before: from?.value ?? null, after: to?.value ?? null }
-
-    return values.before === values.after ? [] : [{ path, repetitions: [...at], ...values }]
   })
 }
 

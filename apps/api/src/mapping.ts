@@ -236,7 +236,7 @@ export const loadRow = (id: string) =>
 
 export const loadMappingDraft = (id: string) => Effect.map(loadRow(id), toDraft)
 
-const chosenLookupTableIds = ({ transforms }: MappingGraph) => [
+export const chosenLookupTableIds = ({ transforms }: MappingGraph) => [
   ...new Set(
     transforms.flatMap((transform) =>
       transform.kind === 'lookupTable' && transform.config.lookupTableId !== null

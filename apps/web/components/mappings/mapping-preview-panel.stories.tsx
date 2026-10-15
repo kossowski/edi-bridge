@@ -216,6 +216,55 @@ export const PreviewUnavailable = meta.story({
   },
 })
 
+const engineStopped = {
+  sampleId: firstSample!.id,
+  document: { format: 'edifact', content: '' },
+  notes: [
+    { targetPath: 'SG2+SU/NAD+SU/C082/3039', transformId: null, code: 'missingRequiredValue' },
+  ],
+}
+
+const germanMessages = (Story: () => React.ReactNode) => (
+  <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+    <Story />
+  </NextIntlClientProvider>
+)
+
+export const EngineStopped = meta.story({
+  beforeEach({ msw }) {
+    msw.use(http.post(previewUrl, () => HttpResponse.json(engineStopped)))
+  },
+  async play({ canvasElement }) {
+    const canvas = await openPreview(canvasElement)
+
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'The preview stopped and built no target Document',
+      }),
+    ).toBeVisible()
+    await expect(canvas.queryByText('1 target left empty')).not.toBeInTheDocument()
+    await expect(canvas.getByText('This required value is not filled.')).toBeVisible()
+    await expect(canvas.getByText('SG2+SU/NAD+SU/C082/3039')).toBeVisible()
+  },
+})
+
+export const EngineStoppedGerman = meta.story({
+  decorators: [germanMessages],
+  beforeEach({ msw }) {
+    msw.use(http.post(previewUrl, () => HttpResponse.json(engineStopped)))
+  },
+  async play({ canvasElement }) {
+    const canvas = await openPreview(canvasElement, 'Vorschau')
+
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Die Vorschau hat angehalten und kein Ziel-Document erstellt',
+      }),
+    ).toBeVisible()
+    await expect(canvas.getByText('Dieser Pflichtwert ist nicht gefüllt.')).toBeVisible()
+  },
+})
+
 export const LargeVolume = meta.story({
   beforeEach({ msw }) {
     msw.use(...createHandlers(apiUrl, { mappingSamples: [largeSample] }))
@@ -234,13 +283,7 @@ export const LargeVolume = meta.story({
 })
 
 export const German = meta.story({
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
-    ),
-  ],
+  decorators: [germanMessages],
   async play({ canvasElement }) {
     const canvas = await openPreview(canvasElement, 'Vorschau')
 

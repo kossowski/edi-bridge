@@ -9,17 +9,12 @@ import {
   type MessageType,
   messageTypeStructures,
   oriented,
+  type OutputEntry,
   withCheckDigit,
 } from '@edi-bridge/contracts'
 
 import { seedDocumentStructures } from './document-structure'
-import {
-  documentValues,
-  type DocumentValues,
-  type Entry,
-  renderEdifact,
-  renderJson,
-} from './document-values'
+import { documentValues, type DocumentValues, renderEdifact, renderJson } from './document-values'
 import { randomGln } from './gln'
 import {
   linkTemplates,
@@ -36,7 +31,7 @@ import { seedWorkspace } from './workspace'
 // instead of parsing the Document again.
 export type MappingSampleRecord = MappingSample & {
   mappingId: string
-  entries: ReadonlyArray<Entry>
+  entries: ReadonlyArray<OutputEntry>
 }
 
 type Party = { name: string; gln: string }
@@ -222,7 +217,7 @@ function nodeEntries(
   context: Context,
   at: ReadonlyArray<number>,
   index: number,
-): Entry[] {
+): OutputEntry[] {
   switch (node.kind) {
     case 'field':
       return [{ path: node.path, at, value: String(fieldValue(node, context, index)) }]
@@ -239,10 +234,12 @@ const cents = (value: number) => Math.round(value * 100) / 100
 
 const sum = (values: ReadonlyArray<number>) => values.reduce((total, value) => total + value, 0)
 
-const single = (path: string, value: number): Entry[] => [{ path, at: [], value: String(value) }]
+const single = (path: string, value: number): OutputEntry[] => [
+  { path, at: [], value: String(value) },
+]
 
 // Amounts and counts follow from the lines, so a sample invoice adds up.
-function withTotals(entries: ReadonlyArray<Entry>) {
+function withTotals(entries: ReadonlyArray<OutputEntry>) {
   const values = documentValues(entries)
   const has = (path: string) => values.entries(path).length > 0
 
@@ -252,7 +249,7 @@ function withTotals(entries: ReadonlyArray<Entry>) {
     rate: Number(values.get('lines[].vatRate', at) ?? 0),
   }))
 
-  const derived = new Map<string, Entry[]>()
+  const derived = new Map<string, OutputEntry[]>()
 
   if (has('lines[].lineAmount')) {
     derived.set(
@@ -303,7 +300,10 @@ const edifactDate = (value: string) =>
 
 // Places the values of an ERP Document where the Trading Partner's EDIFACT carries them, by the
 // same field and element pairs the seed Mappings link.
-function edifactEntries(messageType: MessageType, entries: ReadonlyArray<Entry>): Entry[] {
+function edifactEntries(
+  messageType: MessageType,
+  entries: ReadonlyArray<OutputEntry>,
+): OutputEntry[] {
   const elementOf = new Map(linkTemplates[messageType])
 
   return entries.flatMap(({ path, at, value }) => {

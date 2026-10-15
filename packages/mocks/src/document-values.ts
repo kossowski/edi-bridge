@@ -4,9 +4,8 @@ import type {
   EdifactStructureNode,
   JsonContent,
   MessageTypeStructure,
+  OutputEntry,
 } from '@edi-bridge/contracts'
-
-export type Entry = { path: string; at: ReadonlyArray<number>; value: string }
 
 // Repetitions match when the shorter index list starts the longer one, so a header value also
 // reaches every line, and a value from a repeating group also fills a single field.
@@ -26,8 +25,8 @@ const atKey = (at: ReadonlyArray<number>) => at.join('/')
 
 export type DocumentValues = {
   get: (path: string, at: ReadonlyArray<number>) => string | undefined
-  entries: (path: string) => ReadonlyArray<Entry>
-  beneath: (part: string) => ReadonlyArray<Entry>
+  entries: (path: string) => ReadonlyArray<OutputEntry>
+  beneath: (part: string) => ReadonlyArray<OutputEntry>
   repetitions: (path: string, at: ReadonlyArray<number>) => number[]
 }
 
@@ -35,8 +34,8 @@ function isBeneath(path: string, part: string) {
   return path === part || path.startsWith(`${part}/`) || path.startsWith(`${part}.`)
 }
 
-export function documentValues(entries: ReadonlyArray<Entry>): DocumentValues {
-  const byPath = new Map<string, { list: Entry[]; exact: Map<string, string> }>()
+export function documentValues(entries: ReadonlyArray<OutputEntry>): DocumentValues {
+  const byPath = new Map<string, { list: OutputEntry[]; exact: Map<string, string> }>()
 
   for (const entry of entries) {
     const known = byPath.get(entry.path) ?? { list: [], exact: new Map<string, string>() }
@@ -46,7 +45,7 @@ export function documentValues(entries: ReadonlyArray<Entry>): DocumentValues {
     byPath.set(entry.path, known)
   }
 
-  const beneath = new Map<string, Entry[]>()
+  const beneath = new Map<string, OutputEntry[]>()
 
   const entriesBeneath = (part: string) => {
     const cached = beneath.get(part)

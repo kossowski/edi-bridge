@@ -7,6 +7,7 @@ import {
   type EdifactSegmentGroup,
   type EdifactStructureNode,
   type JsonContent,
+  type MappingGraph,
   type MappingVersion,
   type MessageTypeStructure,
   messageTypeStructures,
@@ -31,6 +32,8 @@ import { type Loop, type Wiring, wiringOf } from './wiring'
 import type { ApplyOptions } from './options'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
+
+type OutboundGraph = Pick<OutboundMappingVersion, keyof MappingGraph | 'target'>
 
 type Scope = {
   items: ReadonlyMap<string, JsonContent>
@@ -304,7 +307,7 @@ function framed({ messageType, children }: MessageTypeStructure) {
 const messageReference = '1'
 
 export function applyMappingVersion(
-  version: OutboundMappingVersion,
+  version: OutboundGraph,
   document: JsonContent,
   options: ApplyOptions = {},
 ): Effect.Effect<Message, MappingError> {

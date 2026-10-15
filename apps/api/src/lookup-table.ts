@@ -1,4 +1,4 @@
-import { asc, eq, getTableColumns, type SQL, sql } from 'drizzle-orm'
+import { asc, eq, getTableColumns, inArray, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
@@ -75,15 +75,43 @@ const toSummary = (row: Row, uses: LookupTableUse[]): LookupTableSummary => ({
   updatedAt: row.updatedAt.toISOString(),
 })
 
+const entryColumns = {
+  sourceCode: lookupTableEntries.sourceCode,
+  targetCode: lookupTableEntries.targetCode,
+}
+
 const selectEntries = (db: Database | Transaction, lookupTableId: string) =>
   db
-    .select({
-      sourceCode: lookupTableEntries.sourceCode,
-      targetCode: lookupTableEntries.targetCode,
-    })
+    .select(entryColumns)
     .from(lookupTableEntries)
     .where(eq(lookupTableEntries.lookupTableId, lookupTableId))
     .orderBy(asc(lookupTableEntries.position))
+
+export const loadLookupTableEntries = (ids: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    if (ids.length === 0) {
+      return new Map<string, LookupTableEntry[]>()
+    }
+
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const rows = yield* Effect.promise(() =>
+      db
+        .select({ lookupTableId: lookupTables.id, entry: entryColumns })
+        .from(lookupTables)
+        .leftJoin(lookupTableEntries, eq(lookupTableEntries.lookupTableId, lookupTables.id))
+        .where(inWorkspace(lookupTables, workspace.id, inArray(lookupTables.id, [...ids])))
+        .orderBy(asc(lookupTableEntries.position)),
+    )
+
+    return new Map(
+      [...Map.groupBy(rows, ({ lookupTableId }) => lookupTableId)].map(([id, entries]) => [
+        id,
+        entries.flatMap(({ entry }) => (entry ? [entry] : [])),
+      ]),
+    )
+  })
 
 export const listLookupTables = Effect.gen(function* () {
   const db = yield* Db

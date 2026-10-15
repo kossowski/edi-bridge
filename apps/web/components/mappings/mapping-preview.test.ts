@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { documentSize, documentText, lineCount, previewGraph } from './mapping-preview'
+import type { DocumentContent } from '@edi-bridge/contracts'
+
+import {
+  documentSize,
+  documentText,
+  isEmptyDocument,
+  lineCount,
+  previewGraph,
+} from './mapping-preview'
 
 const transformId = '0000000b-0000-4000-8000-000000000001'
 
@@ -66,5 +74,17 @@ describe('documentSize', () => {
       format: 'JSON',
       count: 3,
     })
+  })
+})
+
+describe('isEmptyDocument', () => {
+  it.each<[DocumentContent, boolean]>([
+    [{ format: 'edifact', content: '' }, true],
+    [{ format: 'json', content: {} }, true],
+    [{ format: 'edifact', content: "UNH+1+INVOIC:D:96A:UN'" }, false],
+    [{ format: 'json', content: { orderNumber: 'PO-1' } }, false],
+    [{ format: 'json', content: [] }, false],
+  ])('tells whether %j holds nothing the engine built', (document, empty) => {
+    expect(isEmptyDocument(document)).toBe(empty)
   })
 })

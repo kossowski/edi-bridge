@@ -15,6 +15,12 @@ export function documentText(document: DocumentContent) {
   return document.format === 'json' ? JSON.stringify(document.content, null, 2) : document.content
 }
 
+export function isEmptyDocument(document: DocumentContent) {
+  return document.format === 'json'
+    ? JSON.stringify(document.content) === '{}'
+    : document.content === ''
+}
+
 export function lineCount(text: string) {
   return text === '' ? 0 : text.split('\n').length
 }

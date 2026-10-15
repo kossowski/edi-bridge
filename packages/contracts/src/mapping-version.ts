@@ -202,6 +202,26 @@ export const outputDifferenceSchema = z
 
 export type OutputDifference = z.infer<typeof outputDifferenceSchema>
 
+export type OutputEntry = { path: string; at: ReadonlyArray<number>; value: string }
+
+export function outputDifferences(
+  before: ReadonlyArray<OutputEntry>,
+  after: ReadonlyArray<OutputEntry>,
+): OutputDifference[] {
+  const keyOf = ({ path, at }: OutputEntry) => `${path}|${at.join('/')}`
+  const earlier = new Map(before.map((entry) => [keyOf(entry), entry]))
+  const later = new Map(after.map((entry) => [keyOf(entry), entry]))
+
+  return [...new Set([...earlier.keys(), ...later.keys()])].flatMap((key) => {
+    const from = earlier.get(key)
+    const to = later.get(key)
+    const { path, at } = (to ?? from)!
+    const values = { before: from?.value ?? null, after: to?.value ?? null }
+
+    return values.before === values.after ? [] : [{ path, repetitions: [...at], ...values }]
+  })
+}
+
 export const versionOutputSchema = z.object({
   document: documentContentSchema,
   notes: z.array(previewNoteSchema),

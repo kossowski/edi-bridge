@@ -9,7 +9,7 @@ import { useId, useState } from 'react'
 import { Loading } from '@/components/detail-parts'
 import { EditorSheetContent } from '@/components/mappings/editor-sheet'
 import { useGraphText } from '@/components/mappings/graph-text'
-import { documentSize, documentText } from '@/components/mappings/mapping-preview'
+import { documentSize, documentText, isEmptyDocument } from '@/components/mappings/mapping-preview'
 import { ToolbarAction } from '@/components/mappings/toolbar-action'
 import { useDraftPreview } from '@/components/mappings/use-draft-preview'
 import { mappingSamplesQuery } from '@/lib/api/queries'
@@ -100,10 +100,12 @@ function DocumentView({
 
 export function PreviewNotes({
   transforms,
+  document,
   notes,
   heading: Heading = 'h3',
 }: {
   transforms: ReadonlyArray<MappingTransform>
+  document: DocumentContent
   notes: ReadonlyArray<PreviewNote>
   heading?: 'h3' | 'h5'
 }) {
@@ -118,7 +120,7 @@ export function PreviewNotes({
   return (
     <div className="flex flex-col gap-1.5">
       <Heading id={headingId} className="text-sm font-medium">
-        {t('title', { count: notes.length })}
+        {isEmptyDocument(document) ? t('stopped') : t('title', { count: notes.length })}
       </Heading>
       <ul aria-labelledby={headingId} className="flex flex-col gap-1 text-sm">
         {notes.map((note) => (
@@ -233,7 +235,13 @@ function SamplePreview({
           ) : undefined}
         </DocumentView>
       )}
-      {preview.data && <PreviewNotes notes={preview.data.notes} transforms={draft.transforms} />}
+      {preview.data && (
+        <PreviewNotes
+          document={preview.data.document}
+          notes={preview.data.notes}
+          transforms={draft.transforms}
+        />
+      )}
       <p role="status" className="sr-only">
         {announcement}
       </p>
