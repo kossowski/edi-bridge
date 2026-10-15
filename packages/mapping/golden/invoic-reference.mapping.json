@@ -1,0 +1,446 @@
+{
+  "id": "4c9d8e7f-6a5b-4c3d-8e2f-1a0b9c8d7e6f",
+  "mappingId": "1e2d3c4b-5a69-4788-9a6b-5c4d3e2f1a0b",
+  "mappingName": "Reference invoice: ERP JSON to INVOIC",
+  "version": 1,
+  "publishedAt": "2026-10-15T08:00:00.000Z",
+  "direction": "outbound",
+  "source": {
+    "kind": "documentStructure",
+    "documentStructureId": "7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d",
+    "name": "ERP invoice"
+  },
+  "target": {
+    "kind": "messageType",
+    "messageType": "INVOIC"
+  },
+  "links": [
+    {
+      "sourcePath": "invoiceNumber",
+      "targetPath": "BGM/1004"
+    },
+    {
+      "sourcePath": "order.number",
+      "targetPath": "SG1+ON/RFF+ON/C506/1154"
+    },
+    {
+      "sourcePath": "deliveryNote.number",
+      "targetPath": "SG1+DQ/RFF+DQ/C506/1154"
+    },
+    {
+      "sourcePath": "buyer.gln",
+      "targetPath": "SG2+BY/NAD+BY/C082/3039"
+    },
+    {
+      "sourcePath": "buyer.vatId",
+      "targetPath": "SG2+BY/SG3/RFF+VA/C506/1154"
+    },
+    {
+      "sourcePath": "supplier.gln",
+      "targetPath": "SG2+SU/NAD+SU/C082/3039"
+    },
+    {
+      "sourcePath": "supplier.vatId",
+      "targetPath": "SG2+SU/SG3/RFF+VA/C506/1154"
+    },
+    {
+      "sourcePath": "invoicee.gln",
+      "targetPath": "SG2+IV/NAD+IV/C082/3039"
+    },
+    {
+      "sourcePath": "deliveryParty.gln",
+      "targetPath": "SG2+DP/NAD+DP/C082/3039"
+    },
+    {
+      "sourcePath": "currency",
+      "targetPath": "SG7/CUX/C504/6345"
+    },
+    {
+      "sourcePath": "lines[].gtin",
+      "targetPath": "SG25/LIN/C212/7140"
+    },
+    {
+      "sourcePath": "lines[].description",
+      "targetPath": "SG25/IMD+A/C273/7008"
+    },
+    {
+      "sourcePath": "lines[].quantity",
+      "targetPath": "SG25/QTY+47/C186/6060"
+    },
+    {
+      "sourcePath": "lines[].vatRate",
+      "targetPath": "SG25/SG33/TAX+7/C243/5278"
+    },
+    {
+      "sourcePath": "totals.invoiceAmount",
+      "targetPath": "SG48/MOA+77/C516/5004"
+    },
+    {
+      "sourcePath": "totals.lineAmount",
+      "targetPath": "SG48/MOA+79/C516/5004"
+    },
+    {
+      "sourcePath": "totals.taxableAmount",
+      "targetPath": "SG48/MOA+125/C516/5004"
+    },
+    {
+      "sourcePath": "totals.vatRate",
+      "targetPath": "SG50/TAX+7/C243/5278"
+    },
+    {
+      "sourcePath": "totals.vatAmount",
+      "targetPath": "SG50/MOA+124/C516/5004"
+    }
+  ],
+  "transforms": [
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000001",
+      "kind": "loop",
+      "position": {
+        "x": 0,
+        "y": 80
+      },
+      "config": {
+        "counterStart": 1
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000002",
+      "kind": "constant",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "config": {
+        "value": "380"
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000003",
+      "kind": "constant",
+      "position": {
+        "x": 0,
+        "y": 240
+      },
+      "config": {
+        "value": "9"
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000004",
+      "kind": "constant",
+      "position": {
+        "x": 0,
+        "y": 320
+      },
+      "config": {
+        "value": "102"
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000005",
+      "kind": "dateFormat",
+      "position": {
+        "x": 0,
+        "y": 400
+      },
+      "config": {
+        "from": "dd.MM.yyyy",
+        "to": "yyyyMMdd"
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000006",
+      "kind": "dateFormat",
+      "position": {
+        "x": 0,
+        "y": 480
+      },
+      "config": {
+        "from": "dd.MM.yyyy",
+        "to": "yyyyMMdd"
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000007",
+      "kind": "dateFormat",
+      "position": {
+        "x": 0,
+        "y": 560
+      },
+      "config": {
+        "from": "dd.MM.yyyy",
+        "to": "yyyyMMdd"
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000008",
+      "kind": "dateFormat",
+      "position": {
+        "x": 0,
+        "y": 640
+      },
+      "config": {
+        "from": "dd.MM.yyyy",
+        "to": "yyyyMMdd"
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000009",
+      "kind": "lookupTable",
+      "position": {
+        "x": 0,
+        "y": 720
+      },
+      "config": {
+        "lookupTableId": "2b7c4e91-5d3a-4f8e-b6c2-9a1d0e3f4b57",
+        "fallback": "fail"
+      }
+    },
+    {
+      "id": "8f3e2d1c-0b9a-4c8d-9e7f-000000000010",
+      "kind": "numberFormat",
+      "position": {
+        "x": 0,
+        "y": 800
+      },
+      "config": {
+        "decimalPlaces": 2,
+        "decimalSeparator": "."
+      }
+    }
+  ],
+  "transformLinks": [
+    {
+      "from": {
+        "kind": "source",
+        "path": "lines[]"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000001",
+        "input": "items"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000001",
+        "output": "items"
+      },
+      "to": {
+        "kind": "target",
+        "path": "SG25"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000001",
+        "output": "counter"
+      },
+      "to": {
+        "kind": "target",
+        "path": "SG25/LIN/1082"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000002",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "BGM/C002/1001"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000003",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "BGM/1225"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000004",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "DTM+137/C507/2379"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000004",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "DTM+35/C507/2379"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000004",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "SG1+ON/DTM+171/C507/2379"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000004",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "SG1+DQ/DTM+171/C507/2379"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "invoiceDate"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000005",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000005",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "DTM+137/C507/2380"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "deliveryDate"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000006",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000006",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "DTM+35/C507/2380"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "order.date"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000007",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000007",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "SG1+ON/DTM+171/C507/2380"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "deliveryNote.date"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000008",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000008",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "SG1+DQ/DTM+171/C507/2380"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "lines[].unit"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000009",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000009",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "SG25/QTY+47/C186/6411"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "lines[].netAmount"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000010",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "8f3e2d1c-0b9a-4c8d-9e7f-000000000010",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "SG25/SG26/MOA+203/C516/5004"
+      }
+    }
+  ]
+}
