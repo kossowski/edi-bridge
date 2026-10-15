@@ -20,8 +20,7 @@ type SegmentDefinition = {
 
 const text = (en: string, de: string): LocalizedText => ({ en, de })
 
-// Names and code meanings follow the EANCOM 1997 (D.96A) and syntax version 3 service segment
-// directories. Only the elements and codes the retail Mappings use are listed.
+// Elements in front of the used ones are listed so that each element keeps its UN D.96A position.
 const elements = {
   '0004': { name: text('Sender identification', 'Absenderbezeichnung'), format: 'an..35' },
   '0007': {
@@ -234,6 +233,7 @@ const elements = {
       ),
     },
   },
+  '3124': { name: text('Name and address line', 'Zeile für Name und Anschrift'), format: 'an..35' },
   '3139': {
     name: text('Contact function, coded', 'Funktion des Ansprechpartners, codiert'),
     format: 'an..3',
@@ -247,8 +247,19 @@ const elements = {
   },
   '3164': { name: text('City name', 'Ort'), format: 'an..35' },
   '3207': { name: text('Country, coded', 'Land, codiert'), format: 'an..3' },
+  '3229': {
+    name: text('Country sub-entity identification', 'Region, Identifikation'),
+    format: 'an..9',
+  },
   '3251': { name: text('Postcode identification', 'Postleitzahl'), format: 'an..9' },
   '3412': { name: text('Department or employee', 'Abteilung oder Mitarbeiter'), format: 'an..35' },
+  '3413': {
+    name: text(
+      'Department or employee identification',
+      'Abteilung oder Mitarbeiter, Identifikation',
+    ),
+    format: 'an..17',
+  },
   '4233': {
     name: text('Marking instructions, coded', 'Markierungsanweisungen, codiert'),
     format: 'an..3',
@@ -258,6 +269,10 @@ const elements = {
         'Mit Nummer der Versandeinheit (EAN 128) gekennzeichnet',
       ),
     },
+  },
+  '4277': {
+    name: text('Terms of payment identification', 'Zahlungsbedingungen, Identifikation'),
+    format: 'an..17',
   },
   '4279': {
     name: text('Payment terms type qualifier', 'Zahlungsbedingungen, Qualifier'),
@@ -270,11 +285,13 @@ const elements = {
     codes: { '1': text('Additional identification', 'Zusätzliche Identifikation') },
   },
   '4440': { name: text('Free text', 'Freier Text'), format: 'an..70' },
+  '4441': { name: text('Free text, coded', 'Freier Text, codiert'), format: 'an..3' },
   '4451': {
     name: text('Text subject qualifier', 'Textbezug, Qualifier'),
     format: 'an..3',
     codes: { AAI: text('General information', 'Allgemeine Information') },
   },
+  '4453': { name: text('Text function, coded', 'Textfunktion, codiert'), format: 'an..3' },
   '5004': { name: text('Monetary amount', 'Geldbetrag'), format: 'n..18' },
   '5025': {
     name: text('Monetary amount type qualifier', 'Geldbetragsart, Qualifier'),
@@ -377,6 +394,7 @@ const elements = {
     format: 'an..17',
     codes: { PX: text('Pallet', 'Palette'), CT: text('Carton', 'Karton') },
   },
+  '7075': { name: text('Packaging level, coded', 'Verpackungsebene, codiert'), format: 'an..3' },
   '7077': {
     name: text('Item description type, coded', 'Art der Produktbeschreibung, codiert'),
     format: 'an..3',
@@ -422,8 +440,12 @@ const composites = {
   },
   C056: {
     name: text('Department or employee details', 'Abteilung oder Mitarbeiter'),
-    elements: [['3412', false]],
+    elements: [
+      ['3413', false],
+      ['3412', false],
+    ],
   },
+  C058: { name: text('Name and address', 'Name und Anschrift'), elements: [['3124', true]] },
   C059: { name: text('Street', 'Straße'), elements: [['3042', true]] },
   C076: {
     name: text('Communication contact', 'Kommunikationsverbindung'),
@@ -441,9 +463,11 @@ const composites = {
       ['3055', false],
     ],
   },
+  C107: { name: text('Text reference', 'Textreferenz'), elements: [['4441', true]] },
   C108: { name: text('Text literal', 'Freier Text'), elements: [['4440', true]] },
-  C110: {
-    name: text('Payment terms', 'Zahlungsbedingungen'),
+  C110: { name: text('Payment terms', 'Zahlungsbedingungen'), elements: [['4277', true]] },
+  C112: {
+    name: text('Terms/time information', 'Bedingungs-/Zeitangaben'),
     elements: [
       ['2475', true],
       ['2009', false],
@@ -534,6 +558,7 @@ const composites = {
       ['5004', false],
     ],
   },
+  C531: { name: text('Packaging details', 'Verpackungsdetails'), elements: [['7075', false]] },
   C533: {
     name: text('Duty/tax/fee account detail', 'Verrechnungseinzelheiten der Steuer'),
     elements: [
@@ -611,6 +636,8 @@ const segments = {
     name: text('Free text', 'Freier Text'),
     children: [
       ['4451', true],
+      ['4453', false],
+      ['C107', false],
       ['C108', false],
     ],
     qualifiedBy: '4451',
@@ -650,9 +677,11 @@ const segments = {
     children: [
       ['3035', true],
       ['C082', false],
+      ['C058', false],
       ['C080', false],
       ['C059', false],
       ['3164', false],
+      ['3229', false],
       ['3251', false],
       ['3207', false],
     ],
@@ -662,6 +691,7 @@ const segments = {
     name: text('Package', 'Packstück'),
     children: [
       ['7224', false],
+      ['C531', false],
       ['C202', false],
     ],
   },
@@ -670,6 +700,7 @@ const segments = {
     children: [
       ['4279', true],
       ['C110', false],
+      ['C112', false],
     ],
     qualifiedBy: '4279',
   },
