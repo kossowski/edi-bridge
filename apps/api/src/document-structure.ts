@@ -108,12 +108,7 @@ export const listDocumentStructures = Effect.gen(function* () {
   )
 
   return rows
-    .map((row) =>
-      toSummary(
-        toDocumentStructure(row),
-        (mappingsByStructure.get(row.id) ?? []).map(({ id, name }) => ({ id, name })),
-      ),
-    )
+    .map((row) => toSummary(toDocumentStructure(row), mappingsByStructure.get(row.id) ?? []))
     .toSorted(byName)
 })
 

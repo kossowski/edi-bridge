@@ -1,6 +1,11 @@
 import { and, type AnyColumn, eq, type SQL, sql } from 'drizzle-orm'
 
-import { directionOf, type DocumentStructureUses, type LookupTableUse } from '@edi-bridge/contracts'
+import {
+  directionOf,
+  type DocumentStructureSummary,
+  type DocumentStructureUses,
+  type LookupTableUse,
+} from '@edi-bridge/contracts'
 import { mappings, mappingVersions } from '@edi-bridge/db'
 
 import { selectVersionsOfDocumentStructure } from './mapping-version.js'
@@ -41,7 +46,16 @@ export const selectMappingsByDocumentStructure = async (db: Database, workspaceI
     .from(mappings)
     .where(inWorkspace(mappings, workspaceId))
 
-  return Map.groupBy(rows.toSorted(byName), ({ documentStructureId }) => documentStructureId)
+  const byStructure = new Map<string, DocumentStructureSummary['mappings']>()
+
+  for (const { id, name, documentStructureId } of rows.toSorted(byName)) {
+    byStructure.set(documentStructureId, [
+      ...(byStructure.get(documentStructureId) ?? []),
+      { id, name },
+    ])
+  }
+
+  return byStructure
 }
 
 const useFields = {
