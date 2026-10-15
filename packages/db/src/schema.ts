@@ -268,6 +268,8 @@ export const documentStructures = pgTable(
 
 export const messageType = pgEnum('message_type', messageTypes)
 
+export const mappingNameUnique = 'mappings_workspace_id_name_unique'
+
 export const mappings = pgTable(
   'mappings',
   {
@@ -285,7 +287,11 @@ export const mappings = pgTable(
     draftUpdatedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     createdAt: createdAt(),
   },
-  (table) => [index().on(table.workspaceId), index().on(table.documentStructureId)],
+  (table) => [
+    index().on(table.workspaceId),
+    index().on(table.documentStructureId),
+    unique(mappingNameUnique).on(table.workspaceId, table.name),
+  ],
 )
 
 export const mappingVersions = pgTable(

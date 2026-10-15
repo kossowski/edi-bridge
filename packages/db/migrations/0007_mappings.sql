@@ -20,7 +20,8 @@ CREATE TABLE "mappings" (
 	"draft" jsonb NOT NULL,
 	"unpublished_changes" boolean DEFAULT true NOT NULL,
 	"draft_updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "mappings_workspace_id_name_unique" UNIQUE("workspace_id","name")
 );
 --> statement-breakpoint
 ALTER TABLE "mapping_versions" ADD CONSTRAINT "mapping_versions_mapping_id_mappings_id_fk" FOREIGN KEY ("mapping_id") REFERENCES "public"."mappings"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

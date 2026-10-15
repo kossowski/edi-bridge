@@ -117,6 +117,18 @@ describe('POST /mappings', () => {
     expect((await created('ORDERS')).name).toBe('ORDERS to ERP orders 2')
   })
 
+  it('numbers the names of Mappings created at the same time', async () => {
+    await postDocumentStructure('ERP orders')
+
+    const names = await Promise.all([created('ORDERS'), created('ORDERS'), created('ORDERS')])
+
+    expect(names.map(({ name }) => name).toSorted()).toEqual([
+      'ORDERS to ERP orders',
+      'ORDERS to ERP orders 2',
+      'ORDERS to ERP orders 3',
+    ])
+  })
+
   it('takes the Document Structure another Mapping of the Message Type already uses', async () => {
     await postDocumentStructure('A orders')
     const first = await created('ORDERS')
