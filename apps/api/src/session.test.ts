@@ -12,7 +12,7 @@ import { loadConfig } from './config.js'
 import {
   addMember,
   type Client,
-  type Member,
+  type NewMember,
   otherWorkspace,
   ownAdmin,
   ownWorkspace,
@@ -24,7 +24,7 @@ import {
   webOrigin,
 } from './testing.js'
 
-const operator: Member = {
+const operator: NewMember = {
   name: 'Platform Operator',
   email: 'operator@platform.example',
   password: 'operator-password',

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { sessionEndpoint, sessionSchema } from '@edi-bridge/contracts'
 
-import { createOperator } from './operator.js'
+import { ensureOperator } from './operator.js'
 import {
   addMember,
   type Credentials,
@@ -35,13 +35,13 @@ const sessionOf = async (credentials: Credentials) => {
 const signInStatus = async (credentials: Credentials) =>
   (await api.app.inject(signInRequest(credentials))).statusCode
 
-describe('createOperator', () => {
+describe('ensureOperator', () => {
   it('creates the Operator and their Workspace on a fresh installation', async () => {
     const credentials = { email: 'operator@hafenkontor.example', password: 'first-password' }
 
-    const outcome = await createOperator(
+    const outcome = await ensureOperator(
       api.connection.db,
-      { email: credentials.email, name: 'Hafen Operator', workspace: 'Hafenkontor AG' },
+      { email: credentials.email, name: 'Hafen Operator', workspaceName: 'Hafenkontor AG' },
       passwordOf(credentials.password),
     )
 
@@ -63,13 +63,18 @@ describe('createOperator', () => {
 
   it('keeps the password and roles of an existing Operator', async () => {
     const credentials = { email: 'operator@elbufer.example', password: 'elbufer-password' }
-    const input = { email: credentials.email, name: 'Elbufer Operator', workspace: 'Elbufer KG' }
 
-    await createOperator(api.connection.db, input, passwordOf(credentials.password))
+    const input = {
+      email: credentials.email,
+      name: 'Elbufer Operator',
+      workspaceName: 'Elbufer KG',
+    }
+
+    await ensureOperator(api.connection.db, input, passwordOf(credentials.password))
 
     const otherPassword = passwordOf('another-password')
 
-    const outcome = await createOperator(api.connection.db, input, otherPassword)
+    const outcome = await ensureOperator(api.connection.db, input, otherPassword)
 
     expect(outcome).toEqual({
       email: credentials.email,
@@ -95,9 +100,9 @@ describe('createOperator', () => {
 
     await addMember(api.connection.db, viewer)
 
-    const outcome = await createOperator(
+    const outcome = await ensureOperator(
       api.connection.db,
-      { email: viewer.email, name: 'Ignored Name', workspace: ownWorkspace.name },
+      { email: viewer.email, name: 'Ignored Name', workspaceName: ownWorkspace.name },
       passwordOf('ignored-password'),
     )
 
@@ -119,11 +124,11 @@ describe('createOperator', () => {
 
   it('overwrites the password only when asked to reset it', async () => {
     const credentials = { email: 'operator@alsterhaus.example', password: 'old-password' }
-    const input = { email: credentials.email, name: 'Alster Operator', workspace: 'Alsterhaus' }
+    const input = { email: credentials.email, name: 'Alster Operator', workspaceName: 'Alsterhaus' }
 
-    await createOperator(api.connection.db, input, passwordOf(credentials.password))
+    await ensureOperator(api.connection.db, input, passwordOf(credentials.password))
 
-    const outcome = await createOperator(
+    const outcome = await ensureOperator(
       api.connection.db,
       { ...input, resetPassword: true },
       passwordOf('new-password'),
@@ -138,9 +143,9 @@ describe('createOperator', () => {
     const credentials = { email: 'operator@kurz.example', password: 'short' }
 
     await expect(
-      createOperator(
+      ensureOperator(
         api.connection.db,
-        { email: credentials.email, name: 'Kurz Operator', workspace: 'Kurz GmbH' },
+        { email: credentials.email, name: 'Kurz Operator', workspaceName: 'Kurz GmbH' },
         passwordOf(credentials.password),
       ),
     ).rejects.toThrow('at least 8 characters')

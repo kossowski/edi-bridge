@@ -2,14 +2,16 @@ import { hashPassword } from 'better-auth/crypto'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { accounts, members, users, workspaces } from '@edi-bridge/db'
+import { members, users, workspaces } from '@edi-bridge/db'
+
+import { addUser, storePassword } from './user.js'
 
 import type { Database, Transaction } from './db.js'
 
 export interface OperatorInput {
   email: string
   name: string
-  workspace: string
+  workspaceName: string
   resetPassword?: boolean
 }
 
@@ -23,8 +25,6 @@ export interface OperatorOutcome {
 }
 
 const minPasswordLength = 8
-
-const credentialProvider = 'credential'
 
 async function hashedPassword(askPassword: () => Promise<string>) {
   const password = await askPassword()
@@ -82,23 +82,9 @@ async function grantAdmin(tx: Transaction, userId: string, workspaceId: string) 
   return true
 }
 
-async function storePassword(tx: Transaction, userId: string, password: string) {
-  const updated = await tx
-    .update(accounts)
-    .set({ password })
-    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, credentialProvider)))
-    .returning({ id: accounts.id })
-
-  if (updated.length === 0) {
-    await tx
-      .insert(accounts)
-      .values({ userId, accountId: userId, providerId: credentialProvider, password })
-  }
-}
-
-export async function createOperator(
+export async function ensureOperator(
   database: Database,
-  { email: rawEmail, name, workspace, resetPassword = false }: OperatorInput,
+  { email: rawEmail, name, workspaceName, resetPassword = false }: OperatorInput,
   askPassword: () => Promise<string>,
 ): Promise<OperatorOutcome> {
   const email = z.email().parse(rawEmail.trim().toLowerCase())
@@ -108,34 +94,23 @@ export async function createOperator(
     .from(users)
     .where(eq(users.email, email))
 
-  const password =
+  const passwordHash =
     existing === undefined || resetPassword ? await hashedPassword(askPassword) : undefined
 
   return database.transaction(async (tx) => {
     const { id: workspaceId, outcome: workspaceOutcome } = await findOrCreateWorkspace(
       tx,
-      workspace,
+      workspaceName,
     )
 
-    let userId = existing?.id
+    const userId = existing?.id ?? (await addUser(tx, { name, email, operator: true }))
 
-    if (userId === undefined) {
-      const [created] = await tx
-        .insert(users)
-        .values({ name, email, emailVerified: true, operator: true })
-        .returning({ id: users.id })
-
-      if (created === undefined) {
-        throw new Error('User insert returned no row')
-      }
-
-      userId = created.id
-    } else if (!existing?.operator) {
+    if (existing !== undefined && !existing.operator) {
       await tx.update(users).set({ operator: true }).where(eq(users.id, userId))
     }
 
-    if (password !== undefined) {
-      await storePassword(tx, userId, password)
+    if (passwordHash !== undefined) {
+      await storePassword(tx, userId, passwordHash)
     }
 
     return {
@@ -144,7 +119,7 @@ export async function createOperator(
       workspace: workspaceOutcome,
       operatorGranted: !existing?.operator,
       adminGranted: await grantAdmin(tx, userId, workspaceId),
-      passwordReset: existing !== undefined && password !== undefined,
+      passwordReset: existing !== undefined && passwordHash !== undefined,
     }
   })
 }

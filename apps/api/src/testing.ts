@@ -3,19 +3,17 @@ import { hashPassword } from 'better-auth/crypto'
 import type { InjectOptions, LightMyRequestResponse } from 'fastify'
 
 import { signInEndpoint, type WorkspaceRole } from '@edi-bridge/contracts'
-import { accounts, connect, members, users, workspaces } from '@edi-bridge/db'
+import { connect, members, workspaces } from '@edi-bridge/db'
 import { startTestDatabase } from '@edi-bridge/db/testing'
 
 import { buildApp } from './app.js'
+import { developmentWorkspace } from './development-workspace.js'
+import { addUser, storePassword } from './user.js'
 
 import type { AuthSettings } from './auth.js'
 import type { Database } from './db.js'
 
-export const ownWorkspace = {
-  id: '5f0c3a52-7d1e-4b8a-9c61-2e4f8d9a1b07',
-  name: 'Nordwind Handel GmbH',
-  gln: null,
-}
+export const ownWorkspace = { ...developmentWorkspace, gln: null }
 
 export const otherWorkspace = {
   id: '8b2d6e14-3f9a-4c57-a0d8-71e5b9c4f236',
@@ -42,40 +40,26 @@ export interface Client {
   inject: (options: InjectOptions) => Promise<LightMyRequestResponse>
 }
 
-export interface Member extends Credentials {
+export interface NewMember extends Credentials {
   name: string
   workspaceId: string
   role: WorkspaceRole
   operator?: boolean
 }
 
-export async function addMember(database: Database, member: Member) {
-  const [user] = await database
-    .insert(users)
-    .values({
-      name: member.name,
-      email: member.email,
-      emailVerified: true,
-      operator: member.operator ?? false,
-    })
-    .returning({ id: users.id })
-
-  if (user === undefined) {
-    throw new Error('User insert returned no row')
-  }
-
-  await database.insert(accounts).values({
-    userId: user.id,
-    accountId: user.id,
-    providerId: 'credential',
-    password: await hashPassword(member.password),
+export async function addMember(database: Database, member: NewMember) {
+  const userId = await addUser(database, {
+    name: member.name,
+    email: member.email,
+    operator: member.operator ?? false,
   })
 
+  await storePassword(database, userId, await hashPassword(member.password))
   await database
     .insert(members)
-    .values({ userId: user.id, workspaceId: member.workspaceId, role: member.role })
+    .values({ userId, workspaceId: member.workspaceId, role: member.role })
 
-  return user
+  return userId
 }
 
 export const signInRequest = ({ email, password }: Credentials): InjectOptions => ({
@@ -100,7 +84,7 @@ export async function signIn(app: Client, credentials: Credentials): Promise<Cli
   }
 }
 
-export const ownAdmin: Member = {
+export const ownAdmin: NewMember = {
   name: 'Nordwind Admin',
   email: 'admin@nordwind.example',
   password: 'nordwind-admin-password',
@@ -108,7 +92,7 @@ export const ownAdmin: Member = {
   role: 'admin',
 }
 
-export const otherAdmin: Member = {
+export const otherAdmin: NewMember = {
   name: 'Sudhafen Admin',
   email: 'admin@sudhafen.example',
   password: 'sudhafen-admin-password',

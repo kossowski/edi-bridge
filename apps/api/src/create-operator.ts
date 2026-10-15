@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import { connect, localDatabaseUrl, migrate } from '@edi-bridge/db'
 
-import { createOperator, type OperatorOutcome } from './operator.js'
+import { ensureOperator, type OperatorOutcome } from './operator.js'
 
 const usage =
   'Usage: create-operator --email <email> --name <name> --workspace <Workspace name> [--reset-password]'
@@ -84,9 +84,9 @@ const connection = connect(env.data.DATABASE_URL)
 try {
   const password = env.data.OPERATOR_PASSWORD
 
-  const outcome = await createOperator(
+  const outcome = await ensureOperator(
     connection.db,
-    { email, name, workspace, resetPassword: values['reset-password'] },
+    { email, name, workspaceName: workspace, resetPassword: values['reset-password'] },
     () => (password === undefined ? promptPassword() : Promise.resolve(password)),
   )
 
