@@ -15,6 +15,9 @@ import {
   removeWorkspaceMemberEndpoint,
   resetSandboxWorkspaceEndpoint,
   revokeInviteEndpoint,
+  sessionEndpoint,
+  sessionSchema,
+  signInEndpoint,
   toPath,
   workspaceInvitesEndpoint,
   glnIssue,
@@ -34,7 +37,15 @@ import {
   seedWorkspaceSummaries,
 } from './operator'
 import { seedId } from './seed-id'
-import { mockCredentials, sandboxAdminSession, seedSession, showcaseViewerSession } from './session'
+import {
+  createAccountStore,
+  createSessionStore,
+  mockCredentials,
+  sandboxAdminSession,
+  seedSession,
+  sessionHandlers,
+  showcaseViewerSession,
+} from './session'
 import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
 import { createWorkspaceMembers } from './workspace-member'
 
@@ -710,7 +721,7 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(tokenOf(pending))
 
-    expect(response.status).toBe(204)
+    expect(response.status).toBe(200)
     expect(store.invite(seedWorkspace.id, pending.id)?.acceptedAt).toEqual(expect.any(String))
   })
 
@@ -751,7 +762,8 @@ describe('POST /invites/accept', () => {
     const response = await accept(tokenOf(invite))
     const workspace = (await listWorkspaces()).find(({ id }) => id === seedSandboxWorkspace.id)
 
-    expect(response.status).toBe(204)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ email: 'jonas.weber@havelland.example' })
     expect(
       (await membersOf(seedSandboxWorkspace.id)).map(({ email, role }) => ({ email, role })),
     ).toEqual([
@@ -759,6 +771,39 @@ describe('POST /invites/accept', () => {
       { email: 'jonas.weber@havelland.example', role: 'viewer' },
     ])
     expect(workspace?.memberCount).toBe(2)
+  })
+
+  it('lets a new user sign in with the password set through the invite', async () => {
+    const session = createSessionStore()
+    const accounts = createAccountStore()
+
+    server.use(
+      ...sessionHandlers(apiUrl, session, accounts),
+      ...operatorHandlers(apiUrl, { session, accounts }),
+    )
+
+    const invite = await createInvite(seedSandboxWorkspace.id, {
+      email: 'jonas.weber@havelland.example',
+      role: 'viewer',
+    })
+
+    await accept(tokenOf(invite), 'jonas-password')
+
+    const signIn = await fetch(`${apiUrl}${signInEndpoint.path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'jonas.weber@havelland.example', password: 'jonas-password' }),
+    })
+
+    expect(signIn.status).toBe(200)
+    expect(
+      sessionSchema.parse(await (await fetch(`${apiUrl}${sessionEndpoint.path}`)).json()),
+    ).toMatchObject({
+      user: { name: 'Jan Petersen', email: 'jonas.weber@havelland.example' },
+      operator: false,
+      workspace: { id: seedSandboxWorkspace.id, name: seedSandboxWorkspace.name, kind: 'sandbox' },
+      role: 'viewer',
+    })
   })
 
   it('counts the Members from the member list after an accept', async () => {
@@ -790,7 +835,7 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(tokenOf(invite), mockCredentials.sandboxAdmin.password)
 
-    expect(response.status).toBe(204)
+    expect(response.status).toBe(200)
     expect((await membersOf(seedWorkspace.id)).map(({ email }) => email)).toContain(
       mockCredentials.sandboxAdmin.email,
     )
@@ -830,7 +875,7 @@ describe('POST /invites/accept', () => {
 
     const response = await accept('became-admin', mockCredentials.sandboxAdmin.password)
 
-    expect(response.status).toBe(204)
+    expect(response.status).toBe(200)
     expect(store.invite(seedSandboxWorkspace.id, invite.id)?.acceptedAt).toEqual(expect.any(String))
     expect(
       (await membersOf(seedSandboxWorkspace.id)).map(({ email, role }) => ({ email, role })),

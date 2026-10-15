@@ -2,7 +2,10 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  acceptInviteEndpoint,
   type ChannelInput,
+  createInviteEndpoint,
+  inviteSchema,
   channelsEndpoint,
   createChannelEndpoint,
   createFlowEndpoint,
@@ -148,6 +151,43 @@ describe('createHandlers', () => {
     const members = workspaceMembersEndpoint.response.parse(await response.json())
 
     expect(members.map(({ email }) => email)).toContain(mockCredentials.operator.email)
+  })
+
+  it('signs in a user who set their password through an invite', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const json = { 'content-type': 'application/json' }
+
+    const invite = inviteSchema.parse(
+      await (
+        await fetch(
+          `${apiUrl}${toPath(createInviteEndpoint.path, { workspaceId: seedWorkspace.id })}`,
+          {
+            method: 'POST',
+            headers: json,
+            body: JSON.stringify({ email: 'ana.berg@nordwind-handel.example', role: 'viewer' }),
+          },
+        )
+      ).json(),
+    )
+
+    await fetch(`${apiUrl}${acceptInviteEndpoint.path}`, {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({
+        token: new URL(invite.link).pathname.split('/').at(-1),
+        name: 'Ana Berg',
+        password: 'ana-password',
+      }),
+    })
+
+    const signIn = await fetch(`${apiUrl}${signInEndpoint.path}`, {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ email: invite.email, password: 'ana-password' }),
+    })
+
+    expect(signIn.status).toBe(200)
   })
 
   it('serves the given Workspace members', async () => {

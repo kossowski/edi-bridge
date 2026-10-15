@@ -40,10 +40,28 @@ export const showcaseViewerSession: Session = sessionSchema.parse({
   role: 'viewer',
 })
 
-const accounts = [
+export type Account = { email: string; password: string; session: Session }
+
+export type AccountStore = {
+  find: (email: string) => Account | undefined
+  set: (account: Account) => void
+}
+
+const seedAccounts: ReadonlyArray<Account> = [
   { ...mockCredentials.operator, session: seedSession },
   { ...mockCredentials.sandboxAdmin, session: sandboxAdminSession },
 ]
+
+export function createAccountStore(accounts: ReadonlyArray<Account> = seedAccounts): AccountStore {
+  const byEmail = new Map(accounts.map((account) => [account.email, account]))
+
+  return {
+    find: (email) => byEmail.get(email),
+    set: (account) => {
+      byEmail.set(account.email, account)
+    },
+  }
+}
 
 export function createSessionStore(session: Session | null = seedSession) {
   return sessionStoreOf(session)
@@ -56,6 +74,7 @@ export function toSessionStore(session: Session | null | SessionStore = seedSess
 export function sessionHandlers(
   apiUrl: string,
   session: Session | null | SessionStore = seedSession,
+  accounts: AccountStore = createAccountStore(),
 ) {
   const store = toSessionStore(session)
 
@@ -78,11 +97,9 @@ export function sessionHandlers(
         return badRequest(body.error.message)
       }
 
-      const account = accounts.find(
-        ({ email, password }) => email === body.data.email && password === body.data.password,
-      )
+      const account = accounts.find(body.data.email)
 
-      if (!account) {
+      if (account?.password !== body.data.password) {
         return unauthorized('Invalid email or password')
       }
 

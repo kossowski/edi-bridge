@@ -27,7 +27,14 @@ import { randomGln } from './gln'
 import { badRequest, conflict, forbidden, inviteUnusable, notFound } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
-import { mockCredentials, seedSession, showcaseViewerSession, toSessionStore } from './session'
+import {
+  type AccountStore,
+  createAccountStore,
+  mockCredentials,
+  seedSession,
+  showcaseViewerSession,
+  toSessionStore,
+} from './session'
 import { operatorOnly, type SessionStore } from './session-access'
 import {
   createWorkspaceStore,
@@ -398,6 +405,7 @@ export function operatorHandlers(
     invites = seedInvites,
     members = seedWorkspaceMembers,
     session = seedSession,
+    accounts = createAccountStore(),
     appUrl = globalThis.location?.origin ?? defaultAppUrl,
     now,
   }: {
@@ -405,6 +413,7 @@ export function operatorHandlers(
     invites?: ReadonlyArray<Invite>
     members?: WorkspaceMembers | WorkspaceMemberStore
     session?: Session | null | SessionStore
+    accounts?: AccountStore
     appUrl?: string
     now?: () => Date
   } = {},
@@ -412,10 +421,6 @@ export function operatorHandlers(
   const store = toOperatorStore(workspaces, invites, now)
   const memberStore = toWorkspaceMemberStore(members)
   const sessionStore = toSessionStore(session)
-
-  const passwords = new Map<string, string>(
-    Object.values(mockCredentials).map(({ email, password }) => [email, password]),
-  )
 
   const isMember = (workspaceId: string, email: string) =>
     memberStore.get(workspaceId).some((member) => member.email === email)
@@ -578,31 +583,45 @@ export function operatorHandlers(
       }
 
       const existing = memberStore.byEmail(invite.email)
-      const known = existing !== undefined || passwords.has(invite.email)
+      const account = accounts.find(invite.email)
 
-      if (known && passwords.get(invite.email) !== password) {
+      if ((existing !== undefined || account !== undefined) && account?.password !== password) {
         return forbidden()
+      }
+
+      const user = {
+        id: account?.session.user.id ?? existing?.id ?? crypto.randomUUID(),
+        name: account?.session.user.name ?? existing?.name ?? name,
+        email: invite.email,
       }
 
       if (!isMember(invite.workspaceId, invite.email)) {
         memberStore.add(
           invite.workspaceId,
-          createWorkspaceMember({
-            id: existing?.id ?? crypto.randomUUID(),
-            name: existing?.name ?? name,
-            email: invite.email,
-            role: invite.role,
-            lastActivityAt: null,
-          }),
+          createWorkspaceMember({ ...user, role: invite.role, lastActivityAt: null }),
         )
 
         countMembers(invite.workspaceId)
       }
 
-      passwords.set(invite.email, password)
+      const workspace = store.workspace(invite.workspaceId)
+
+      if (!account && workspace) {
+        accounts.set({
+          email: invite.email,
+          password,
+          session: {
+            user,
+            operator: false,
+            workspace: { id: workspace.id, name: workspace.name, kind: workspace.kind },
+            role: invite.role,
+          },
+        })
+      }
+
       store.setInvite({ ...invite, acceptedAt: now.toISOString() })
 
-      return new HttpResponse(null, { status: 204 })
+      return HttpResponse.json({ email: invite.email })
     }),
     http.post<{ workspaceId: string }>(
       `${apiUrl}${resetSandboxWorkspaceEndpoint.path}`,
