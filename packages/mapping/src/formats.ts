@@ -63,3 +63,30 @@ export function reformatDate(value: string, from: string, to: string): string | 
         .join('')
     : undefined
 }
+
+// Rounds half away from zero on the decimal digits, since binary floats round 1.005 down.
+export function reformatNumber(
+  value: string,
+  places: number | null,
+  separator: string,
+): string | undefined {
+  const match = /^(-?)(\d+)(?:[.,](\d+))?$/.exec(value)
+
+  if (!match) {
+    return undefined
+  }
+
+  const [, sign = '', whole = '', fraction = ''] = match
+
+  if (places === null) {
+    return `${sign}${whole}${fraction === '' ? '' : `${separator}${fraction}`}`
+  }
+
+  const roundsUp = (fraction[places] ?? '0') >= '5'
+  const scaled = BigInt(`${whole}${fraction.padEnd(places, '0').slice(0, places)}`)
+  const digits = String(scaled + (roundsUp ? 1n : 0n)).padStart(places + 1, '0')
+  const integer = digits.slice(0, digits.length - places)
+  const decimals = places === 0 ? '' : `${separator}${digits.slice(-places)}`
+
+  return `${/^0+$/.test(digits) ? '' : sign}${integer}${decimals}`
+}

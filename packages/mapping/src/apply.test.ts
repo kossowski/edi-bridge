@@ -773,4 +773,46 @@ describe('applyMappingVersion', () => {
       transformId,
     })
   })
+
+  const pricing = (decimalPlaces: number | null, decimalSeparator: '.' | ',') =>
+    orderVia({ kind: 'numberFormat', config: { decimalPlaces, decimalSeparator } }, [
+      fromSource('lines[].price'),
+      intoTarget('SG25/SG28/PRI+AAA/C509/5118'),
+    ])
+
+  const pricedLine = (price: JsonContent) => ({
+    ...order,
+    lines: [{ gtin: '4000862141404', quantity: 12, price }],
+  })
+
+  it.each<[number | null, '.' | ',', JsonContent, string]>([
+    [2, ',', '12.5', '12,50'],
+    [2, '.', '12,5', '12.50'],
+    [2, '.', '1.005', '1.01'],
+    [2, '.', '9.999', '10.00'],
+    [0, '.', '2.5', '3'],
+    [0, '.', '-2.5', '-3'],
+    [1, '.', 19.99, '20.0'],
+    [null, ',', '12.50', '12,50'],
+    [null, ',', 7, '7'],
+  ])(
+    'number format with %s decimal places and separator %s writes %s as %s',
+    (places, separator, price, expected) => {
+      expect(apply(pricing(places, separator), pricedLine(price)).segments.at(-2)).toEqual({
+        tag: 'PRI',
+        elements: [['AAA', expected]],
+      })
+    },
+  )
+
+  it.each(['1.234,50', 'twelve', '12.', ' 12'])(
+    'number format fails naming the target element for %s',
+    (price) => {
+      expect(failure(pricing(2, '.'), pricedLine(price))).toMatchObject({
+        code: 'invalidNumber',
+        targetPath: 'SG25/SG28/PRI+AAA/C509/5118',
+        transformId,
+      })
+    },
+  )
 })

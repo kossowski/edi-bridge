@@ -21,12 +21,20 @@ import {
 
 import type { Element, Message, Segment } from '@edi-bridge/edifact'
 
-import { reformatDate } from './formats'
+import { reformatDate, reformatNumber } from './formats'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
 
-export type MappingErrorCode =
-  'missingRequiredValue' | 'outsideLoop' | 'unknownTarget' | 'invalidTransform' | 'invalidDate'
+export const mappingErrorCodes = [
+  'missingRequiredValue',
+  'outsideLoop',
+  'unknownTarget',
+  'invalidTransform',
+  'invalidDate',
+  'invalidNumber',
+] as const
+
+export type MappingErrorCode = (typeof mappingErrorCodes)[number]
 
 export class MappingError extends Data.TaggedError('MappingError')<{
   readonly code: MappingErrorCode
@@ -149,6 +157,12 @@ function applied(
       return formatted(
         () => reformatDate(value, transform.config.from, transform.config.to),
         'invalidDate',
+      )
+    case 'numberFormat':
+      return formatted(
+        () =>
+          reformatNumber(value, transform.config.decimalPlaces, transform.config.decimalSeparator),
+        'invalidNumber',
       )
     default:
       return Effect.succeed(value)
