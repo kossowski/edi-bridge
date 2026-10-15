@@ -216,6 +216,50 @@ export const PreviewUnavailable = meta.story({
   },
 })
 
+const engineStopped = {
+  sampleId: firstSample!.id,
+  document: { format: 'edifact', content: '' },
+  notes: [
+    { targetPath: 'SG2+SU/NAD+SU/C082/3039', transformId: null, code: 'missingRequiredValue' },
+  ],
+}
+
+const germanMessages = (Story: () => React.ReactNode) => (
+  <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+    <Story />
+  </NextIntlClientProvider>
+)
+
+export const EngineStopped = meta.story({
+  beforeEach({ msw }) {
+    msw.use(http.post(previewUrl, () => HttpResponse.json(engineStopped)))
+  },
+  async play({ canvasElement }) {
+    const canvas = await openPreview(canvasElement)
+
+    await expect(await canvas.findByText('1 target left empty')).toBeVisible()
+    await expect(
+      canvas.getByText('This required value is not filled, so no target Document is built.'),
+    ).toBeVisible()
+    await expect(canvas.getByText('SG2+SU/NAD+SU/C082/3039')).toBeVisible()
+  },
+})
+
+export const EngineStoppedGerman = meta.story({
+  decorators: [germanMessages],
+  beforeEach({ msw }) {
+    msw.use(http.post(previewUrl, () => HttpResponse.json(engineStopped)))
+  },
+  async play({ canvasElement }) {
+    const canvas = await openPreview(canvasElement, 'Vorschau')
+
+    await expect(await canvas.findByText('1 Ziel bleibt leer')).toBeVisible()
+    await expect(
+      canvas.getByText('Dieser Pflichtwert ist nicht gefüllt, daher entsteht kein Ziel-Document.'),
+    ).toBeVisible()
+  },
+})
+
 export const LargeVolume = meta.story({
   beforeEach({ msw }) {
     msw.use(...createHandlers(apiUrl, { mappingSamples: [largeSample] }))
@@ -234,13 +278,7 @@ export const LargeVolume = meta.story({
 })
 
 export const German = meta.story({
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
-    ),
-  ],
+  decorators: [germanMessages],
   async play({ canvasElement }) {
     const canvas = await openPreview(canvasElement, 'Vorschau')
 
