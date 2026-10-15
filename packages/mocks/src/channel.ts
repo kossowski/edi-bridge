@@ -30,6 +30,8 @@ import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { hasTraffic, seedTradingPartners } from './trading-partner'
 
+import type { FlowRecord, FlowStore } from './flow'
+
 type WebhookInput = Extract<ChannelInput, { type: 'webhook' }>
 
 // What the server stores: the plaintext secrets stay here and only leave masked, via toChannel.
@@ -359,13 +361,24 @@ export const seedConnectionFailures: ReadonlyMap<string, ChannelTestFailureReaso
   rejectedLogin ? [[rejectedLogin.id, 'loginRejected']] : [],
 )
 
+function usedByFlow(flows: ReadonlyArray<FlowRecord> | FlowStore, channelId: string) {
+  const all = 'all' in flows ? flows.all() : flows
+
+  return all.some(
+    ({ inboundChannelId, destinationChannelId }) =>
+      inboundChannelId === channelId || destinationChannelId === channelId,
+  )
+}
+
 export function channelHandlers(
   apiUrl: string,
   {
     channels = seedChannels,
+    flows = [],
     connectionFailures = seedConnectionFailures,
   }: {
     channels?: ReadonlyArray<ChannelRecord> | ChannelStore
+    flows?: ReadonlyArray<FlowRecord> | FlowStore
     connectionFailures?: ReadonlyMap<string, ChannelTestFailureReason>
   } = {},
 ) {
@@ -422,6 +435,13 @@ export function channelHandlers(
 
         if (!body.success) {
           return badRequest(body.error.message)
+        }
+
+        if (
+          body.data.tradingPartnerId !== existing.tradingPartnerId &&
+          usedByFlow(flows, existing.id)
+        ) {
+          return conflict('The Trading Partner of a Channel cannot change while a Flow uses it')
         }
 
         const updated = applyUpdate(existing, body.data)

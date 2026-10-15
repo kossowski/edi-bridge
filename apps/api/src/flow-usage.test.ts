@@ -6,6 +6,7 @@ import {
   type ChannelInput,
   createChannelEndpoint,
   createdChannelSchema,
+  channelEndpoint,
   createDocumentStructureEndpoint,
   createFlowEndpoint,
   createLookupTableEndpoint,
@@ -26,6 +27,7 @@ import {
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
   tradingPartnerSchema,
+  updateChannelEndpoint,
 } from '@edi-bridge/contracts'
 import {
   channels,
@@ -411,5 +413,58 @@ describe('the activity of a Trading Partner', () => {
       { flow: { id: filialen.id, name: filialen.name }, runs: 0 },
       { flow: { id: zentral.id, name: zentral.name }, runs: 0 },
     ])
+  })
+})
+
+describe('PUT /channels/:id for a Channel a Flow uses', () => {
+  const flowSetup = async () => {
+    const hansemarkt = await createdTradingPartner('Hansemarkt GmbH')
+    const alpenfrisch = await createdTradingPartner('Alpenfrisch Märkte AG')
+    const { destination } = await ownSystem()
+    const mapping = await createdMapping()
+    const first = await published(mapping.id)
+    const flow = await createdFlow('Filialen', hansemarkt.id, first.id, destination.id)
+
+    return { hansemarkt, alpenfrisch, flow }
+  }
+
+  const put = (id: string, body: ChannelInput) =>
+    admin.inject({ method: 'PUT', url: toPath(updateChannelEndpoint.path, { id }), body })
+
+  const read = async (id: string) =>
+    channelEndpoint.response.parse(
+      await sent({ method: 'GET', url: toPath(channelEndpoint.path, { id }) }, 200),
+    )
+
+  it('answers 409 and keeps the Channel when its Trading Partner changes', async () => {
+    const { alpenfrisch, hansemarkt, flow } = await flowSetup()
+
+    const response = await put(flow.inboundChannelId, sftpInbox(alpenfrisch.id))
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({
+      message: 'The Trading Partner of a Channel cannot change while a Flow uses it',
+    })
+    expect((await read(flow.inboundChannelId)).tradingPartnerId).toBe(hansemarkt.id)
+  })
+
+  it('answers 409 when the destination Channel of a Flow gets a Trading Partner', async () => {
+    const { alpenfrisch, flow } = await flowSetup()
+
+    const response = await put(flow.destinationChannelId, httpDelivery(alpenfrisch.id))
+
+    expect(response.statusCode).toBe(409)
+  })
+
+  it('stores other changes', async () => {
+    const { hansemarkt, flow } = await flowSetup()
+
+    const response = await put(flow.inboundChannelId, {
+      ...sftpInbox(hansemarkt.id),
+      name: 'Hansemarkt inbox',
+    })
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect((await read(flow.inboundChannelId)).name).toBe('Hansemarkt inbox')
   })
 })
