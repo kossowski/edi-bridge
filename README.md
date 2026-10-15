@@ -10,7 +10,6 @@ A Turborepo monorepo with three apps and shared packages:
 | `apps/api`                   | Fastify HTTP API            |
 | `apps/worker`                | Background worker           |
 | `packages/ui`                | Shared shadcn/ui components |
-| `packages/eslint-config`     | Shared ESLint configs       |
 | `packages/oxlint-config`     | Shared Oxlint configs       |
 | `packages/typescript-config` | Shared TypeScript configs   |
 
