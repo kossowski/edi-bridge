@@ -18,7 +18,7 @@ import { channels } from '@edi-bridge/db'
 
 import { Db, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
-import { byName, exactlyOne, inWorkspace, rejectingInvalidId } from './rows.js'
+import { byName, exactlyOne, inWorkspace, rejectingInvalidId, writingInWorkspace } from './rows.js'
 import { assertTradingPartnerIn } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
@@ -219,21 +219,10 @@ const writingWithTradingPartner = <A>(
   tradingPartnerId: string | null,
   write: (tx: Transaction, workspaceId: string) => Promise<A>,
 ) =>
-  Effect.gen(function* () {
-    const db = yield* Db
-    const workspace = yield* CurrentWorkspace
+  writingInWorkspace(async (tx, workspaceId) => {
+    await assertTradingPartnerIn(tx, workspaceId, tradingPartnerId)
 
-    return yield* Effect.promise(() =>
-      db.transaction(async (tx) => {
-        await assertTradingPartnerIn(tx, workspace.id, tradingPartnerId)
-
-        return write(tx, workspace.id)
-      }),
-    ).pipe(
-      Effect.catchDefect((defect) =>
-        defect instanceof Unprocessable ? Effect.fail(defect) : Effect.die(defect),
-      ),
-    )
+    return write(tx, workspaceId)
   })
 
 export const createChannel = (input: ChannelInput) =>

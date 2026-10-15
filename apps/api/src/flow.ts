@@ -15,7 +15,7 @@ import { channels, flows, mappings, mappingVersions } from '@edi-bridge/db'
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { selectVersions, toHeader } from './mapping-version.js'
-import { byName, exactlyOne, inWorkspace, rejectingInvalidId } from './rows.js'
+import { byName, exactlyOne, inWorkspace, rejectingInvalidId, writingInWorkspace } from './rows.js'
 import { assertTradingPartnerIn } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
@@ -175,23 +175,9 @@ const pinnable = async (
   }
 }
 
-const writing = <A>(write: (tx: Transaction, workspaceId: string) => Promise<A>) =>
-  Effect.gen(function* () {
-    const db = yield* Db
-    const workspace = yield* CurrentWorkspace
-
-    return yield* Effect.promise(() => db.transaction((tx) => write(tx, workspace.id))).pipe(
-      Effect.catchDefect((defect) =>
-        defect instanceof Unprocessable || defect instanceof Conflict
-          ? Effect.fail(defect)
-          : Effect.die(defect),
-      ),
-    )
-  })
-
 export const createFlow = (input: FlowInput) =>
   Effect.gen(function* () {
-    const rows = yield* writing(async (tx, workspaceId) => {
+    const rows = yield* writingInWorkspace(async (tx, workspaceId) => {
       await assertTradingPartnerIn(tx, workspaceId, input.tradingPartnerId)
       await pinnable(tx, workspaceId, input)
       await assertChannelsFit(tx, workspaceId, input)
@@ -210,7 +196,7 @@ export const updateFlow = (id: string, input: Effect.Effect<FlowUpdate, Validati
     const existing = yield* loadRow(id)
     const changes = yield* input
 
-    const [row] = yield* writing(async (tx, workspaceId) => {
+    const [row] = yield* writingInWorkspace(async (tx, workspaceId) => {
       await assertChannelsFit(tx, workspaceId, { ...existing, ...changes })
 
       return tx
@@ -271,7 +257,9 @@ export const moveFlowMappingVersion = (
     yield* loadRow(id)
     const body = yield* input
 
-    const [row] = yield* writing((tx, workspaceId) => moveInTransaction(tx, workspaceId, id, body))
+    const [row] = yield* writingInWorkspace((tx, workspaceId) =>
+      moveInTransaction(tx, workspaceId, id, body),
+    )
 
     return yield* toFlow(row ?? (yield* new NotFound()))
   })

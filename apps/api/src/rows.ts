@@ -3,7 +3,9 @@ import { Effect } from 'effect'
 import postgres from 'postgres'
 import { z } from 'zod'
 
-import { Conflict, NotFound } from './errors.js'
+import { Db, type Transaction } from './db.js'
+import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { CurrentWorkspace } from './workspace.js'
 
 export const exactlyOne = <A>(rows: A[]) => Effect.orDie(Effect.fromNullishOr(rows[0]))
 
@@ -24,17 +26,37 @@ export const nameCollator = new Intl.Collator('de')
 export const byName = (a: { name: string }, b: { name: string }) =>
   nameCollator.compare(a.name, b.name)
 
+export const failingOnDuplicate =
+  (constraints: readonly string[], message: string) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    effect.pipe(
+      Effect.catchDefect((defect) =>
+        defect instanceof DrizzleQueryError &&
+        defect.cause instanceof postgres.PostgresError &&
+        constraints.includes(defect.cause.constraint_name ?? '')
+          ? Effect.fail(new Conflict({ message }))
+          : Effect.die(defect),
+      ),
+    )
+
 export const rejectingDuplicate = <A>(
   query: () => Promise<A>,
   constraints: readonly string[],
   message: string,
+) => Effect.promise(query).pipe(failingOnDuplicate(constraints, message))
+
+export const writingInWorkspace = <A>(
+  write: (tx: Transaction, workspaceId: string) => Promise<A>,
 ) =>
-  Effect.promise(query).pipe(
-    Effect.catchDefect((defect) =>
-      defect instanceof DrizzleQueryError &&
-      defect.cause instanceof postgres.PostgresError &&
-      constraints.includes(defect.cause.constraint_name ?? '')
-        ? Effect.fail(new Conflict({ message }))
-        : Effect.die(defect),
-    ),
-  )
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    return yield* Effect.promise(() => db.transaction((tx) => write(tx, workspace.id))).pipe(
+      Effect.catchDefect((defect) =>
+        defect instanceof Unprocessable || defect instanceof Conflict
+          ? Effect.fail(defect)
+          : Effect.die(defect),
+      ),
+    )
+  })
