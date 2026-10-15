@@ -11,6 +11,7 @@ import {
   type EdifactSegmentGroup,
   type EdifactStructureNode,
   type JsonContent,
+  type MappingGraph,
   type MappingVersion,
   messageTypeStructures,
   nodeContent,
@@ -33,6 +34,8 @@ import { type Loop, type Wiring, wiringOf } from './wiring'
 import type { ApplyOptions } from './options'
 
 export type InboundMappingVersion = Extract<MappingVersion, { direction: 'inbound' }>
+
+type InboundGraph = Pick<InboundMappingVersion, keyof MappingGraph | 'source'>
 
 type JsonObject = Record<string, JsonContent>
 
@@ -475,7 +478,7 @@ function outsideLoop(
 }
 
 export function applyInboundMappingVersion(
-  version: InboundMappingVersion,
+  version: InboundGraph,
   structure: DocumentStructure,
   message: Message,
   options: ApplyOptions = {},
