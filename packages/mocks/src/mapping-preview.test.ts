@@ -115,7 +115,7 @@ describe('GET /mappings/:id/samples', () => {
     const lines = edifactText(sample!.document).split('\n')
 
     expect(lines[0]).toBe("UNA:+.? '")
-    expect(lines).toContainEqual(expect.stringMatching(/^UNH\+\d+\+ORDERS:D:96A:UN'$/))
+    expect(lines).toContainEqual(expect.stringMatching(/^UNH\+\d+\+ORDERS:D:96A:UN:EAN008'$/))
     expect(lines).toContainEqual(expect.stringMatching(/^BGM\+220\+PO-2026-\d{5}'$/))
     expect(lines.filter((line) => line.startsWith('LIN+'))).toHaveLength(3)
     expect(lines.every((line) => line.endsWith("'"))).toBe(true)
@@ -174,7 +174,7 @@ describe('POST /mappings/:id/preview', () => {
 
     expect(preview.sampleId).toBe(sample!.id)
     expect(edifactLines(preview)).toEqual([
-      "UNH+1+DESADV:D:96A:UN'",
+      "UNH+1+DESADV:D:96A:UN:EAN005'",
       `BGM+351+${despatchNumber}'`,
       "UNT+3+1'",
     ])

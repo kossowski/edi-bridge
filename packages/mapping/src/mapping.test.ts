@@ -50,7 +50,7 @@ describe('applyMappingVersion', () => {
     }
 
     expect(apply(version, document)).toEqual({
-      header: { tag: 'UNH', elements: [['1'], ['INVOIC', 'D', '96A', 'UN']] },
+      header: { tag: 'UNH', elements: [['1'], ['INVOIC', 'D', '96A', 'UN', 'EAN008']] },
       segments: [
         { tag: 'BGM', elements: [['380'], ['INV-2026-0042']] },
         { tag: 'DTM', elements: [['137', '20261014']] },
@@ -84,7 +84,7 @@ describe('applyMappingVersion', () => {
     ])
 
     expect(apply(version, { despatchNumber: 'DES-0815' })).toEqual({
-      header: { tag: 'UNH', elements: [['1'], ['DESADV', 'D', '96A', 'UN']] },
+      header: { tag: 'UNH', elements: [['1'], ['DESADV', 'D', '96A', 'UN', 'EAN005']] },
       segments: [{ tag: 'BGM', elements: [['351'], ['DES-0815']] }],
       trailer: { tag: 'UNT', elements: [['3'], ['1']] },
     })

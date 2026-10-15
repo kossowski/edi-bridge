@@ -45,7 +45,7 @@ export const UpdatesAfterChange = meta.story({
     const panel = await findSheet(canvasElement, 'Preview')
     const document = await panel.findByRole('region', { name: /^Target Document for / })
 
-    await waitFor(() => expect(document).toHaveTextContent("UNH+1+INVOIC:D:96A:UN'"))
+    await waitFor(() => expect(document).toHaveTextContent("UNH+1+INVOIC:D:96A:UN:EAN008'"))
     await expect(document).not.toHaveTextContent('BGM')
 
     await userEvent.click(panel.getByRole('button', { name: 'Close preview' }))

@@ -179,10 +179,15 @@ const text = (en: string, de: string): LocalizedText => ({ en, de })
 
 const m = { required: true } as const
 
-function header(messageType: MessageType, release = '96A', version = 'D') {
+function header(messageType: MessageType, association: string | null, release = '96A') {
   return segment('UNH', {
     ...m,
-    codes: { '0065': [messageType], '0052': [version], '0054': [release] },
+    codes: {
+      '0065': [messageType],
+      '0052': ['D'],
+      '0054': [release],
+      '0057': association ? [association] : [],
+    },
   })
 }
 
@@ -229,7 +234,7 @@ const orders: StructureDefinition = {
   release: 'D.96A',
   name: text('Purchase order', 'Bestellung'),
   uses: [
-    header('ORDERS'),
+    header('ORDERS', 'EAN008'),
     segment('BGM', { ...m, codes: { '1001': ['220'] } }),
     segment('DTM+137', m),
     segment('DTM+2'),
@@ -266,7 +271,7 @@ const desadv: StructureDefinition = {
   release: 'D.96A',
   name: text('Despatch advice', 'Liefermeldung'),
   uses: [
-    header('DESADV'),
+    header('DESADV', 'EAN005'),
     segment('BGM', { ...m, codes: { '1001': ['351'] } }),
     segment('DTM+137', m),
     segment('DTM+11'),
@@ -315,7 +320,7 @@ const invoic: StructureDefinition = {
   release: 'D.96A',
   name: text('Invoice', 'Rechnung'),
   uses: [
-    header('INVOIC'),
+    header('INVOIC', 'EAN008'),
     segment('BGM', { ...m, codes: { '1001': ['380', '381'] } }),
     segment('DTM+137', m),
     segment('DTM+35'),
@@ -363,10 +368,10 @@ const contrl: StructureDefinition = {
   release: 'D.3',
   name: text('Syntax and service report', 'Syntax- und Servicebericht'),
   uses: [
-    header('CONTRL', '3'),
+    header('CONTRL', null, '3'),
     segment('UCI', { ...m, codes: { '0007': ['14'] } }),
     group('SG1', text('Message response', 'Antwort auf Nachricht'), { maxRepeat: 999_999 }, [
-      segment('UCM', m),
+      segment('UCM', { ...m, codes: { '0057': [] } }),
       group('SG2', text('Segment error', 'Segmentfehler'), { maxRepeat: 999 }, [segment('UCS', m)]),
     ]),
     trailer,

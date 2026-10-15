@@ -62,6 +62,10 @@ const elements = {
   '0057': {
     name: text('Association assigned code', 'Vom Verband vergebener Code'),
     format: 'an..6',
+    codes: {
+      EAN005: text('EAN version control number 005', 'EAN-Versionsnummer 005'),
+      EAN008: text('EAN version control number 008', 'EAN-Versionsnummer 008'),
+    },
   },
   '0062': { name: text('Message reference number', 'Nachrichtenreferenznummer'), format: 'an..14' },
   '0065': {

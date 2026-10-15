@@ -94,6 +94,17 @@ describe('messageTypeStructures', () => {
     })
   })
 
+  it.each([
+    ['ORDERS', [{ code: 'EAN008' }]],
+    ['DESADV', [{ code: 'EAN005' }]],
+    ['INVOIC', [{ code: 'EAN008' }]],
+    ['CONTRL', []],
+  ] as const)('gives the %s header its association assigned code', (messageType, codes) => {
+    expect(nodeAt(messageTypeStructures[messageType].children, 'UNH/S009/0057')).toMatchObject({
+      codes,
+    })
+  })
+
   it.each(messageTypes)('gives every node of %s a unique path', (messageType) => {
     const paths = flatten(messageTypeStructures[messageType].children).map(({ path }) => path)
 

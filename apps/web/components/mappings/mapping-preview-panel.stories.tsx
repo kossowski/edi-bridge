@@ -141,7 +141,7 @@ export const InboundSample = meta.story({
     await showSample(canvas)
     await expect(
       await canvas.findByRole('region', { name: /^Example document po-2026-\d{5}\.edi$/ }),
-    ).toHaveTextContent(/UNH\+\d+\+ORDERS:D:96A:UN'/)
+    ).toHaveTextContent(/UNH\+\d+\+ORDERS:D:96A:UN:EAN008'/)
   },
 })
 

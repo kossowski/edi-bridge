@@ -20,3 +20,15 @@ UN D.96A leaves these composites conditional (`C`). The segment uses mark them a
 The CCG recommendations give other statuses for two of them. C082 is `A` (advised) in CCG ORDERS printed page 105, CCG DESADV printed page 138 and CCG INVOIC printed page 267, each for NAD+BY. C212 is `D` (dependent) in CCG ORDERS printed page 129, CCG DESADV printed page 182 and CCG INVOIC printed page 315. The structures follow the ESAP status `R`.
 
 The key composites of RFF (C506), DTM (C507), QTY (C186) and MOA (C516) are mandatory (`M`) in the UN D.96A segments already, and `M` in the CCG recommendations, for example C507 of DTM+137 in CCG INVOIC printed page 233. The segment uses do not need to mark them.
+
+## Association assigned code
+
+UNH S009 0057 is conditional in UN syntax version 3 and required (`R`) in EANCOM. The header of each structure narrows it to the EAN version control number of the CCG recommendation for EANCOM 1997:
+
+| Message Type | 0057     | Source                      | Example in the source                  |
+| ------------ | -------- | --------------------------- | -------------------------------------- |
+| ORDERS       | `EAN008` | CCG ORDERS printed page 90  | `UNH+ME0001+ORDERS:D:96A:UN:EAN008'`   |
+| DESADV       | `EAN005` | CCG DESADV printed page 122 | `UNH+ME000001+DESADV:D:96A:UN:EAN005'` |
+| INVOIC       | `EAN008` | CCG INVOIC printed page 230 | `UNH+ME000001+INVOIC:D:96A:UN:EAN008'` |
+
+The ESAP 20 specifications give later subset versions: `EAN009` in MS30 page 1 and MS35 page 1, `EAN006` in MS34 page 1. CONTRL keeps 0057 without a code list, in UNH and in UCM; see the CONTRL definition in the golden files README for `EAN002` and `EAN004`.
