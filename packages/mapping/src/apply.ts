@@ -189,7 +189,7 @@ function lookedUp(
 }
 
 function applied(
-  transform: Exclude<MappingTransform, { kind: 'conditional' }>,
+  transform: Exclude<MappingTransform, { kind: 'loop' | 'conditional' }>,
   args: Readonly<Record<string, Value>>,
   { expressions, lookupTables }: Graph,
   fail: (code: MappingErrorCode) => MappingError,
@@ -242,9 +242,6 @@ function applied(
 
       return result === undefined ? Effect.fail(fail('expressionFailed')) : Effect.succeed(result)
     }
-
-    case 'loop':
-      return Effect.succeed('')
   }
 }
 
