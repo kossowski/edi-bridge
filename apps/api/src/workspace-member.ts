@@ -63,11 +63,13 @@ export const removeWorkspaceMember = (workspaceId: string, userId: string) =>
           .where(and(eq(members.workspaceId, workspaceId), eq(members.userId, userId)))
           .returning({ userId: members.userId })
 
-        if (rows.length > 0) {
+        const found = rows.length > 0
+
+        if (found) {
           await tx.delete(sessions).where(eq(sessions.userId, userId))
         }
 
-        return rows.length > 0
+        return found
       }),
     )
 
