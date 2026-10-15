@@ -12,7 +12,7 @@ import {
   signInEndpoint,
 } from '@edi-bridge/contracts'
 import {
-  createAccountStore,
+  createCredentialStore,
   createOperatorStore,
   createSessionStore,
   mockCredentials,
@@ -60,14 +60,14 @@ const meta = preview.meta({
   parameters: { layout: 'padded' },
   beforeEach({ msw }) {
     const session = createSessionStore(null)
-    const accounts = createAccountStore()
+    const credentials = createCredentialStore()
 
     msw.use(
-      ...sessionHandlers(apiUrl, session, accounts),
+      ...sessionHandlers(apiUrl, session, credentials),
       ...operatorHandlers(apiUrl, {
         workspaces: createOperatorStore({ invites }),
         session,
-        accounts,
+        credentials,
       }),
     )
   },

@@ -7,7 +7,9 @@ import {
   createWorkspaceEndpoint,
   type Invite,
   type InviteInput,
+  invitePasswordMismatchStatus,
   inviteSchema,
+  inviteUnknownStatus,
   inviteUnusableProblem,
   inviteUnusableStatus,
   inviteValidityDays,
@@ -38,7 +40,7 @@ import {
 } from './operator'
 import { seedId } from './seed-id'
 import {
-  createAccountStore,
+  createCredentialStore,
   createSessionStore,
   mockCredentials,
   sandboxAdminSession,
@@ -47,7 +49,7 @@ import {
   showcaseViewerSession,
 } from './session'
 import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
-import { createWorkspaceMembers } from './workspace-member'
+import { createWorkspaceMembers, createWorkspaceMemberStore } from './workspace-member'
 
 const apiUrl = 'http://api.test'
 
@@ -700,11 +702,11 @@ describe('POST /invites/accept', () => {
 
   const tokenOf = ({ link }: Invite) => new URL(link).pathname.split('/').at(-1)!
 
-  const accept = (token: string, password = 'invited-password') =>
+  const accept = (token: string, password = 'invited-password', name = 'Jan Petersen') =>
     fetch(`${apiUrl}${acceptInviteEndpoint.path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token, name: 'Jan Petersen', password }),
+      body: JSON.stringify({ token, name, password }),
     })
 
   const createInvite = async (workspaceId: string, body: InviteInput) =>
@@ -773,37 +775,92 @@ describe('POST /invites/accept', () => {
     expect(workspace?.memberCount).toBe(2)
   })
 
-  it('lets a new user sign in with the password set through the invite', async () => {
+  const signIn = (email: string, password: string) =>
+    fetch(`${apiUrl}${signInEndpoint.path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+
+  const currentSession = () => fetch(`${apiUrl}${sessionEndpoint.path}`)
+
+  const jonas = { email: 'jonas.weber@havelland.example', password: 'jonas-password' }
+
+  function signInSetup() {
     const session = createSessionStore()
-    const accounts = createAccountStore()
+    const credentials = createCredentialStore()
+    const members = createWorkspaceMemberStore()
 
     server.use(
-      ...sessionHandlers(apiUrl, session, accounts),
-      ...operatorHandlers(apiUrl, { session, accounts }),
+      ...sessionHandlers(apiUrl, session, credentials, members),
+      ...operatorHandlers(apiUrl, { session, credentials, members }),
     )
 
+    return { session, members }
+  }
+
+  async function acceptAsJonas() {
     const invite = await createInvite(seedSandboxWorkspace.id, {
-      email: 'jonas.weber@havelland.example',
+      email: jonas.email,
       role: 'viewer',
     })
 
-    await accept(tokenOf(invite), 'jonas-password')
+    await accept(tokenOf(invite), jonas.password, 'Jonas Weber')
 
-    const signIn = await fetch(`${apiUrl}${signInEndpoint.path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'jonas.weber@havelland.example', password: 'jonas-password' }),
-    })
+    return membersOf(seedSandboxWorkspace.id)
+  }
 
-    expect(signIn.status).toBe(200)
-    expect(
-      sessionSchema.parse(await (await fetch(`${apiUrl}${sessionEndpoint.path}`)).json()),
-    ).toMatchObject({
-      user: { name: 'Jan Petersen', email: 'jonas.weber@havelland.example' },
+  it('lets a new user sign in with the password set through the invite', async () => {
+    signInSetup()
+    await acceptAsJonas()
+
+    expect((await signIn(jonas.email, jonas.password)).status).toBe(200)
+    expect(sessionSchema.parse(await (await currentSession()).json())).toMatchObject({
+      user: { name: 'Jonas Weber', email: jonas.email },
       operator: false,
       workspace: { id: seedSandboxWorkspace.id, name: seedSandboxWorkspace.name, kind: 'sandbox' },
       role: 'viewer',
     })
+  })
+
+  it('refuses sign-in to a user who is no longer a Member of any Workspace', async () => {
+    const { session } = signInSetup()
+    const members = await acceptAsJonas()
+    const id = members.find(({ email }) => email === jonas.email)!.id
+
+    await fetch(
+      `${apiUrl}${toPath(removeWorkspaceMemberEndpoint.path, { workspaceId: seedSandboxWorkspace.id, userId: id })}`,
+      { method: 'DELETE' },
+    )
+
+    expect((await signIn(jonas.email, jonas.password)).status).toBe(401)
+    expect(session.get()).toEqual(seedSession)
+  })
+
+  it('signs out a user whose last membership was removed', async () => {
+    const { session, members } = signInSetup()
+    const id = (await acceptAsJonas()).find(({ email }) => email === jonas.email)!.id
+
+    await signIn(jonas.email, jonas.password)
+    members.remove(seedSandboxWorkspace.id, id)
+
+    expect((await currentSession()).status).toBe(401)
+    expect(session.get()).toBeNull()
+  })
+
+  it('lets a removed user sign in again after accepting a new invite', async () => {
+    signInSetup()
+    const members = await acceptAsJonas()
+    const id = members.find(({ email }) => email === jonas.email)!.id
+
+    await fetch(
+      `${apiUrl}${toPath(removeWorkspaceMemberEndpoint.path, { workspaceId: seedSandboxWorkspace.id, userId: id })}`,
+      { method: 'DELETE' },
+    )
+
+    await acceptAsJonas()
+
+    expect((await signIn(jonas.email, jonas.password)).status).toBe(200)
   })
 
   it('counts the Members from the member list after an accept', async () => {
@@ -852,7 +909,7 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(tokenOf(invite), 'takeover-password')
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(invitePasswordMismatchStatus)
     expect(store.invite(seedWorkspace.id, invite.id)?.acceptedAt).toBeNull()
     expect((await membersOf(seedWorkspace.id)).map((member) => member.email)).not.toContain(email)
   })
@@ -885,7 +942,24 @@ describe('POST /invites/accept', () => {
   it('answers 404 for an unknown token', async () => {
     server.use(...operatorHandlers(apiUrl, { session: null }))
 
-    expect((await accept('unknown-token')).status).toBe(404)
+    expect((await accept('unknown-token')).status).toBe(inviteUnknownStatus)
+  })
+
+  it('answers an invite of a Workspace that no longer exists as unknown', async () => {
+    const credentials = createCredentialStore()
+    const members = createWorkspaceMemberStore()
+
+    const store = createOperatorStore({
+      workspaces: seedWorkspaceSummaries.filter(({ id }) => id !== seedWorkspace.id),
+    })
+
+    server.use(...operatorHandlers(apiUrl, { workspaces: store, credentials, members }))
+
+    const response = await accept(tokenOf(pending))
+
+    expect(response.status).toBe(inviteUnknownStatus)
+    expect(members.byEmail(pending.email)).toBeUndefined()
+    expect(credentials.find(pending.email)).toBeUndefined()
   })
 
   it('answers 400 for a password shorter than 8 characters', async () => {

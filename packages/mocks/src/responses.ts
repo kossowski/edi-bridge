@@ -5,6 +5,8 @@ import {
   type AiBudgetExhaustedProblem,
   aiBudgetExhaustedStatus,
   aiReviewOpenStatus,
+  invitePasswordMismatchStatus,
+  inviteUnknownStatus,
   inviteUnusableProblem,
   type InviteUnusableReason,
   inviteUnusableStatus,
@@ -23,6 +25,10 @@ export const forbidden = () => problem(403, 'Forbidden')
 export const notFound = () => problem(404, 'Not found')
 
 export const conflict = (message: string) => problem(409, message)
+
+export const inviteUnknown = () => problem(inviteUnknownStatus, 'Not found')
+
+export const invitePasswordMismatch = () => problem(invitePasswordMismatchStatus, 'Forbidden')
 
 export const inviteUnusable = (reason: InviteUnusableReason) =>
   HttpResponse.json(inviteUnusableProblem(reason), { status: inviteUnusableStatus })

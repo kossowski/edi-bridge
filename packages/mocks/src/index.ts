@@ -73,7 +73,7 @@ import { seedOverdueAcknowledgements } from './overdue-acknowledgement'
 import { runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
-import { createAccountStore, createSessionStore, seedSession, sessionHandlers } from './session'
+import { createCredentialStore, createSessionStore, seedSession, sessionHandlers } from './session'
 import { tasksHandler } from './task'
 import {
   createTradingPartnerStore,
@@ -313,10 +313,10 @@ export {
 export { type SessionStore } from './session-access'
 
 export {
-  type Account,
-  type AccountStore,
-  createAccountStore,
+  createCredentialStore,
   createSessionStore,
+  type Credentials,
+  type CredentialStore,
   mockCredentials,
   seedSession,
   sessionHandlers,
@@ -413,7 +413,7 @@ export function createHandlers(
       : session,
   )
 
-  const accountStore = createAccountStore()
+  const credentialStore = createCredentialStore()
 
   const workspaceStore = sessionWorkspaceStore({
     workspaces: operatorStore,
@@ -434,7 +434,7 @@ export function createHandlers(
   )
 
   return [
-    ...sessionHandlers(apiUrl, sessionStore, accountStore),
+    ...sessionHandlers(apiUrl, sessionStore, credentialStore, workspaceMemberStore),
     ...workspaceHandlers(apiUrl, workspaceStore, sessionStore),
     firstStepsHandler(
       apiUrl,
@@ -456,7 +456,7 @@ export function createHandlers(
       workspaces: operatorStore,
       members: workspaceMemberStore,
       session: sessionStore,
-      accounts: accountStore,
+      credentials: credentialStore,
     }),
     ...tradingPartnerHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,

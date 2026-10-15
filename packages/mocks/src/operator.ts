@@ -24,12 +24,19 @@ import {
 
 import { dayMs } from './duration'
 import { randomGln } from './gln'
-import { badRequest, conflict, forbidden, inviteUnusable, notFound } from './responses'
+import {
+  badRequest,
+  conflict,
+  invitePasswordMismatch,
+  inviteUnknown,
+  inviteUnusable,
+  notFound,
+} from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import {
-  type AccountStore,
-  createAccountStore,
+  createCredentialStore,
+  type CredentialStore,
   mockCredentials,
   seedSession,
   showcaseViewerSession,
@@ -405,7 +412,7 @@ export function operatorHandlers(
     invites = seedInvites,
     members = seedWorkspaceMembers,
     session = seedSession,
-    accounts = createAccountStore(),
+    credentials = createCredentialStore(),
     appUrl = globalThis.location?.origin ?? defaultAppUrl,
     now,
   }: {
@@ -413,7 +420,7 @@ export function operatorHandlers(
     invites?: ReadonlyArray<Invite>
     members?: WorkspaceMembers | WorkspaceMemberStore
     session?: Session | null | SessionStore
-    accounts?: AccountStore
+    credentials?: CredentialStore
     appUrl?: string
     now?: () => Date
   } = {},
@@ -570,9 +577,10 @@ export function operatorHandlers(
 
       const { token, name, password } = body.data
       const invite = store.inviteByToken(token)
+      const workspace = invite && store.workspace(invite.workspaceId)
 
-      if (!invite) {
-        return notFound()
+      if (!invite || !workspace) {
+        return inviteUnknown()
       }
 
       const now = store.now()
@@ -583,15 +591,15 @@ export function operatorHandlers(
       }
 
       const existing = memberStore.byEmail(invite.email)
-      const account = accounts.find(invite.email)
+      const known = credentials.find(invite.email)
 
-      if ((existing !== undefined || account !== undefined) && account?.password !== password) {
-        return forbidden()
+      if ((existing !== undefined || known !== undefined) && known?.password !== password) {
+        return invitePasswordMismatch()
       }
 
       const user = {
-        id: account?.session.user.id ?? existing?.id ?? crypto.randomUUID(),
-        name: account?.session.user.name ?? existing?.name ?? name,
+        id: known?.session.user.id ?? existing?.id ?? crypto.randomUUID(),
+        name: known?.session.user.name ?? existing?.name ?? name,
         email: invite.email,
       }
 
@@ -604,10 +612,8 @@ export function operatorHandlers(
         countMembers(invite.workspaceId)
       }
 
-      const workspace = store.workspace(invite.workspaceId)
-
-      if (!account && workspace) {
-        accounts.set({
+      if (!known) {
+        credentials.set({
           email: invite.email,
           password,
           session: {

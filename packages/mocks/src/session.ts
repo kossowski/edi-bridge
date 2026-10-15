@@ -14,6 +14,8 @@ import { seedId } from './seed-id'
 import { type SessionStore, sessionStoreOf } from './session-access'
 import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
 
+import type { WorkspaceMemberStore } from './workspace-member'
+
 export const mockCredentials = {
   operator: { email: 'operator@edi-bridge.example', password: 'edi-bridge-operator' },
   sandboxAdmin: { email: 'showcase-admin@edi-bridge.example', password: 'edi-bridge-sandbox' },
@@ -40,25 +42,27 @@ export const showcaseViewerSession: Session = sessionSchema.parse({
   role: 'viewer',
 })
 
-export type Account = { email: string; password: string; session: Session }
+export type Credentials = { email: string; password: string; session: Session }
 
-export type AccountStore = {
-  find: (email: string) => Account | undefined
-  set: (account: Account) => void
+export type CredentialStore = {
+  find: (email: string) => Credentials | undefined
+  set: (credentials: Credentials) => void
 }
 
-const seedAccounts: ReadonlyArray<Account> = [
+const seedCredentials: ReadonlyArray<Credentials> = [
   { ...mockCredentials.operator, session: seedSession },
   { ...mockCredentials.sandboxAdmin, session: sandboxAdminSession },
 ]
 
-export function createAccountStore(accounts: ReadonlyArray<Account> = seedAccounts): AccountStore {
-  const byEmail = new Map(accounts.map((account) => [account.email, account]))
+export function createCredentialStore(
+  credentials: ReadonlyArray<Credentials> = seedCredentials,
+): CredentialStore {
+  const byEmail = new Map(credentials.map((entry) => [entry.email, entry]))
 
   return {
     find: (email) => byEmail.get(email),
-    set: (account) => {
-      byEmail.set(account.email, account)
+    set: (entry) => {
+      byEmail.set(entry.email, entry)
     },
   }
 }
@@ -74,9 +78,11 @@ export function toSessionStore(session: Session | null | SessionStore = seedSess
 export function sessionHandlers(
   apiUrl: string,
   session: Session | null | SessionStore = seedSession,
-  accounts: AccountStore = createAccountStore(),
+  credentials: CredentialStore = createCredentialStore(),
+  members?: Pick<WorkspaceMemberStore, 'removedFromAll'>,
 ) {
   const store = toSessionStore(session)
+  const signedOut = (email: string) => members?.removedFromAll(email) ?? false
 
   function signIn(next: Session) {
     store.set(next)
@@ -88,7 +94,13 @@ export function sessionHandlers(
     http.get(`${apiUrl}${sessionEndpoint.path}`, () => {
       const current = store.get()
 
-      return current ? HttpResponse.json(current) : unauthorized()
+      if (!current || signedOut(current.user.email)) {
+        store.set(null)
+
+        return unauthorized()
+      }
+
+      return HttpResponse.json(current)
     }),
     http.post(`${apiUrl}${signInEndpoint.path}`, async ({ request }) => {
       const body = signInEndpoint.body.safeParse(await request.json())
@@ -97,13 +109,13 @@ export function sessionHandlers(
         return badRequest(body.error.message)
       }
 
-      const account = accounts.find(body.data.email)
+      const known = credentials.find(body.data.email)
 
-      if (account?.password !== body.data.password) {
+      if (known?.password !== body.data.password || signedOut(known.email)) {
         return unauthorized('Invalid email or password')
       }
 
-      return signIn(account.session)
+      return signIn(known.session)
     }),
     http.post(`${apiUrl}${showcaseSignInEndpoint.path}`, () => signIn(showcaseViewerSession)),
     http.post(`${apiUrl}${signOutEndpoint.path}`, () => {
