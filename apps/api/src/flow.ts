@@ -111,7 +111,7 @@ const toFlow = (row: Row) =>
 
 export const loadFlow = (id: string) => Effect.flatMap(loadRow(id), toFlow)
 
-const roles = {
+const channelRoleLabels = {
   inboundChannelId: 'inbound Channel',
   destinationChannelId: 'destination Channel',
 } as const satisfies Record<FlowChannelField, string>
@@ -144,18 +144,18 @@ const assertChannelsFit = async (
     const channel = found.find(({ id }) => id === flow[field])
 
     if (!channel) {
-      throw new Unprocessable({ message: `The ${roles[field]} does not exist` })
+      throw new Unprocessable({ message: `The ${channelRoleLabels[field]} does not exist` })
     }
 
     if (!fitsFlow(channel, field, flow)) {
       throw new Unprocessable({
-        message: `The ${roles[field]} does not fit the Message Type and Trading Partner of the Flow`,
+        message: `The ${channelRoleLabels[field]} does not fit the Message Type and Trading Partner of the Flow`,
       })
     }
   }
 }
 
-const pinnable = async (
+const assertPinnable = async (
   tx: Transaction,
   workspaceId: string,
   { mappingVersionId, messageType }: Pick<FlowInput, 'mappingVersionId' | 'messageType'>,
@@ -179,7 +179,7 @@ export const createFlow = (input: FlowInput) =>
   Effect.gen(function* () {
     const rows = yield* writingInWorkspace(async (tx, workspaceId) => {
       await assertTradingPartnerIn(tx, workspaceId, input.tradingPartnerId)
-      await pinnable(tx, workspaceId, input)
+      await assertPinnable(tx, workspaceId, input)
       await assertChannelsFit(tx, workspaceId, input)
 
       return tx
@@ -215,14 +215,14 @@ const moveInTransaction = async (
   id: string,
   { mappingVersionId }: MoveFlowMappingVersionBody,
 ) => {
-  const [locked] = await tx
+  const [pinnedVersion] = await tx
     .select({ mappingId: mappingVersions.mappingId, version: mappingVersions.version })
     .from(flows)
     .innerJoin(mappingVersions, eq(flows.mappingVersionId, mappingVersions.id))
     .where(inWorkspace(flows, workspaceId, byId(id)))
     .for('update', { of: flows })
 
-  if (!locked) {
+  if (!pinnedVersion) {
     return []
   }
 
@@ -232,7 +232,7 @@ const moveInTransaction = async (
     .where(
       and(
         eq(mappingVersions.id, mappingVersionId),
-        eq(mappingVersions.mappingId, locked.mappingId),
+        eq(mappingVersions.mappingId, pinnedVersion.mappingId),
       ),
     )
 
@@ -242,7 +242,7 @@ const moveInTransaction = async (
     })
   }
 
-  if (target.version <= locked.version) {
+  if (target.version <= pinnedVersion.version) {
     throw new Conflict({ message: 'A Flow only moves to a newer Mapping Version' })
   }
 
