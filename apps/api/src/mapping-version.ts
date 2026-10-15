@@ -102,12 +102,14 @@ const unconfiguredTransform = () =>
 const unknownFlows = () =>
   new Unprocessable({ message: 'Only Flows that use this Mapping move to the new version.' })
 
+type Refusal = Conflict | Unprocessable
+
 const publishInTransaction = async (
   tx: Transaction,
   mappingId: string,
   moveFlowIds: readonly string[],
   publication: { changeNote: string | null; publishedBy: string },
-) => {
+): Promise<Refusal | { id: string }[]> => {
   const [locked] = await tx
     .select({ draft: mappings.draft, unpublishedChanges: mappings.unpublishedChanges })
     .from(mappings)
@@ -115,15 +117,15 @@ const publishInTransaction = async (
     .for('update')
 
   if (!locked?.unpublishedChanges) {
-    throw noChanges()
+    return noChanges()
   }
 
   if (Object.values(transformIssues(locked.draft)).some((issues) => issues.length > 0)) {
-    throw unconfiguredTransform()
+    return unconfiguredTransform()
   }
 
   if (moveFlowIds.length > 0) {
-    throw unknownFlows()
+    return unknownFlows()
   }
 
   const [latest] = await tx
@@ -157,22 +159,20 @@ export const publishMappingDraft = (
     const db = yield* Db
     const { user } = yield* CurrentMember
 
-    const inserted = yield* Effect.promise(() =>
+    const outcome = yield* Effect.promise(() =>
       db.transaction((tx) =>
         publishInTransaction(tx, mappingId, moveFlowIds, {
           changeNote: changeNote === '' ? null : changeNote,
           publishedBy: user.id,
         }),
       ),
-    ).pipe(
-      Effect.catchDefect((defect) =>
-        defect instanceof Conflict || defect instanceof Unprocessable
-          ? Effect.fail(defect)
-          : Effect.die(defect),
-      ),
     )
 
-    const { id } = yield* exactlyOne(inserted)
+    if ('_tag' in outcome) {
+      return yield* Effect.fail(outcome)
+    }
+
+    const { id } = yield* exactlyOne(outcome)
 
     const rows = yield* Effect.promise(() => selectEntries(db, eq(mappingVersions.id, id)))
 
