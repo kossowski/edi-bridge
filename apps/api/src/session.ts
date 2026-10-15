@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq, isNull, lt, or } from 'drizzle-orm'
 import { Context, Effect } from 'effect'
 
 import type { FastifyRequest } from 'fastify'
@@ -93,6 +93,27 @@ export async function resolveMember(
   const { id, name, email } = signedIn.user
 
   return { user: { id, name, email }, ...found }
+}
+
+const activityInterval = 60_000
+
+// Writes at most once a minute per Member, so a burst of requests costs one update.
+export async function recordActivity(database: Database, { user, workspaceId }: Member) {
+  const now = new Date()
+
+  await database
+    .update(members)
+    .set({ lastActivityAt: now })
+    .where(
+      and(
+        eq(members.userId, user.id),
+        eq(members.workspaceId, workspaceId),
+        or(
+          isNull(members.lastActivityAt),
+          lt(members.lastActivityAt, new Date(now.getTime() - activityInterval)),
+        ),
+      ),
+    )
 }
 
 export const loadSession = Effect.gen(function* () {

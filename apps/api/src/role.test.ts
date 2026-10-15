@@ -22,6 +22,7 @@ import {
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
+  removeWorkspaceMemberEndpoint,
   revokeInviteEndpoint,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
@@ -35,6 +36,7 @@ import {
   updateLookupTableEndpoint,
   updateTradingPartnerEndpoint,
   withCheckDigit,
+  workspaceMembersEndpoint,
 } from '@edi-bridge/contracts'
 
 import { buildApp } from './app.js'
@@ -129,7 +131,7 @@ const workspaceReads = (): string[] => [
   withId(documentStructureEndpoint.path, ids.documentStructure),
 ]
 
-const reads = () => [sessionEndpoint.path, ...workspaceReads()]
+const reads = () => [sessionEndpoint.path, workspaceMembersEndpoint.path, ...workspaceReads()]
 
 const changes: [string, () => InjectOptions & { url: string }][] = [
   [
@@ -219,6 +221,16 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
       url: toPath(revokeInviteEndpoint.path, {
         workspaceId: ownWorkspace.id,
         inviteId: '5d0f3c1e-8a4b-4e6f-9b2d-1c7a3e5f9d08',
+      }),
+    }),
+  ],
+  [
+    'remove a Member',
+    () => ({
+      method: 'DELETE',
+      url: toPath(removeWorkspaceMemberEndpoint.path, {
+        workspaceId: ownWorkspace.id,
+        userId: '2b7e4c9a-1d3f-4a68-b5e0-9c8d7f6a5b43',
       }),
     }),
   ],

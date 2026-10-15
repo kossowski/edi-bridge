@@ -26,6 +26,8 @@ import {
   lookupTablesEndpoint,
   maxEncodedFileBytes,
   maxLookupTableCsvLength,
+  operatorWorkspaceMembersEndpoint,
+  removeWorkspaceMemberEndpoint,
   revokeInviteEndpoint,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
@@ -37,6 +39,7 @@ import {
   updateDocumentStructureEndpoint,
   updateTradingPartnerEndpoint,
   workspaceInvitesEndpoint,
+  workspaceMembersEndpoint,
 } from '@edi-bridge/contracts'
 
 import { type AuthSettings, mountAuth } from './auth.js'
@@ -66,6 +69,7 @@ import {
   CurrentMember,
   CurrentUser,
   loadSession,
+  recordActivity,
   requireChangeRight,
   requireOperator,
   resolveMember,
@@ -79,6 +83,11 @@ import {
   loadTradingPartnerActivity,
   updateTradingPartner,
 } from './trading-partner.js'
+import {
+  listCurrentMembers,
+  listWorkspaceMembers,
+  removeWorkspaceMember,
+} from './workspace-member.js'
 import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
 
 import type {
@@ -216,6 +225,8 @@ function registerRoutes(
       return unauthorized(reply)
     }
 
+    await recordActivity(database, member)
+
     const guarded = readMethods.has(request.method)
       ? effect
       : Effect.andThen(requireChangeRight, effect)
@@ -233,7 +244,7 @@ function registerRoutes(
   const respondToOperator = async <A>(
     request: FastifyRequest,
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, Db>,
+    effect: Effect.Effect<A, Failure, CurrentUser | Db>,
     status = 200,
   ) => {
     const user = await resolveUser(auth, database, request)
@@ -264,6 +275,10 @@ function registerRoutes(
         updateCompanyIdentity,
       ),
     ),
+  )
+
+  app.get(workspaceMembersEndpoint.path, (request, reply) =>
+    respond(request, reply, listCurrentMembers),
   )
 
   app.get(tradingPartnersEndpoint.path, (request, reply) =>
@@ -419,6 +434,23 @@ function registerRoutes(
           request.params.id,
           parse(updateDocumentStructureEndpoint.body, request.body),
         ),
+      ),
+  )
+
+  app.get<{ Params: { workspaceId: string } }>(
+    operatorWorkspaceMembersEndpoint.path,
+    (request, reply) =>
+      respondToOperator(request, reply, listWorkspaceMembers(request.params.workspaceId)),
+  )
+
+  app.delete<{ Params: { workspaceId: string; userId: string } }>(
+    removeWorkspaceMemberEndpoint.path,
+    (request, reply) =>
+      respondToOperator(
+        request,
+        reply,
+        removeWorkspaceMember(request.params.workspaceId, request.params.userId),
+        204,
       ),
   )
 

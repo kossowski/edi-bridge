@@ -10,13 +10,14 @@ import {
   inviteUnusableReason,
   inviteValidityDays,
 } from '@edi-bridge/contracts'
-import { invites, members, userEmailUnique, users, workspaces } from '@edi-bridge/db'
+import { invites, members, userEmailUnique, users } from '@edi-bridge/db'
 
 import { Db, type Transaction } from './db.js'
 import { dayMs } from './duration.js'
 import { Conflict, Forbidden, InviteUnusable, NotFound } from './errors.js'
 import { exactlyOne, foundOrNotFound, rejectingDuplicate, rejectingInvalidId } from './rows.js'
 import { addMembership, addUser, findUserWithPassword, storePassword } from './user.js'
+import { requireWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
 
@@ -33,19 +34,6 @@ const toInvite = (row: InviteRow, webOrigin: string): Invite => ({
   acceptedAt: row.acceptedAt?.toISOString() ?? null,
   revokedAt: row.revokedAt?.toISOString() ?? null,
 })
-
-const requireWorkspace = (workspaceId: string) =>
-  Effect.gen(function* () {
-    yield* rejectingInvalidId(workspaceId)
-
-    const db = yield* Db
-
-    const rows = yield* Effect.promise(() =>
-      db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, workspaceId)),
-    )
-
-    yield* foundOrNotFound(rows[0])
-  })
 
 export const listInvites = (workspaceId: string, webOrigin: string) =>
   Effect.gen(function* () {

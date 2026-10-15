@@ -6,7 +6,7 @@ import { workspaces } from '@edi-bridge/db'
 import type { CompanyIdentityInput } from '@edi-bridge/contracts'
 
 import { Db } from './db.js'
-import { exactlyOne } from './rows.js'
+import { exactlyOne, foundOrNotFound, rejectingInvalidId } from './rows.js'
 
 export class CurrentWorkspace extends Context.Service<CurrentWorkspace, { readonly id: string }>()(
   'CurrentWorkspace',
@@ -35,4 +35,17 @@ export const updateCompanyIdentity = ({ gln }: CompanyIdentityInput) =>
     )
 
     return yield* exactlyOne(rows)
+  })
+
+export const requireWorkspace = (workspaceId: string) =>
+  Effect.gen(function* () {
+    yield* rejectingInvalidId(workspaceId)
+
+    const db = yield* Db
+
+    const rows = yield* Effect.promise(() =>
+      db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, workspaceId)),
+    )
+
+    yield* foundOrNotFound(rows[0])
   })
