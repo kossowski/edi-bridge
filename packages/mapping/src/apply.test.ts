@@ -42,10 +42,10 @@ function outboundVersion(
 type Options = Parameters<typeof applyMappingVersion>[2]
 
 const apply = (version: OutboundMappingVersion, document: JsonContent, options?: Options) =>
-  Effect.runSync(applyMappingVersion(version, document, options))
+  Effect.runPromise(applyMappingVersion(version, document, options))
 
 const failure = (version: OutboundMappingVersion, document: JsonContent, options?: Options) =>
-  Effect.runSync(Effect.flip(applyMappingVersion(version, document, options)))
+  Effect.runPromise(Effect.flip(applyMappingVersion(version, document, options)))
 
 const orderHeader: MappingLink[] = [
   { sourcePath: 'orderNumber', targetPath: 'BGM/1004' },
@@ -168,11 +168,13 @@ function orderVia(
 
 const orderWithLine = { ...order, lines: [{ gtin: '4000862141404', quantity: 12 }] }
 
-const orderNumberOf = (version: OutboundMappingVersion, document: JsonContent = orderWithLine) =>
-  apply(version, document).segments[0]
+const orderNumberOf = async (
+  version: OutboundMappingVersion,
+  document: JsonContent = orderWithLine,
+) => (await apply(version, document)).segments[0]
 
 describe('applyMappingVersion', () => {
-  it('places plain links in the order of the Message Type, with qualifiers and positions', () => {
+  it('places plain links in the order of the Message Type, with qualifiers and positions', async () => {
     const version = outboundVersion('INVOIC', [
       { sourcePath: 'total', targetPath: 'SG48/MOA+77/C516/5004' },
       { sourcePath: 'currency', targetPath: 'SG7/CUX/C504/6345' },
@@ -195,7 +197,7 @@ describe('applyMappingVersion', () => {
       total: '119.00',
     }
 
-    expect(apply(version, document)).toEqual({
+    expect(await apply(version, document)).toEqual({
       header: { tag: 'UNH', elements: [['1'], ['INVOIC', 'D', '96A', 'UN', 'EAN008']] },
       segments: [
         { tag: 'BGM', elements: [['380'], ['INV-2026-0042']] },
@@ -216,14 +218,14 @@ describe('applyMappingVersion', () => {
       'nothing links to it',
       orderHeader.filter(({ targetPath }) => targetPath !== 'SG2+BY/NAD+BY/C082/3039'),
     ],
-  ])('fails naming the buyer GLN when %s', (_, links) => {
+  ])('fails naming the buyer GLN when %s', async (_, links) => {
     const version = outboundVersion('ORDERS', [
       ...links,
       { sourcePath: 'line.gtin', targetPath: 'SG25/LIN/C212/7140' },
       { sourcePath: 'line.quantity', targetPath: 'SG25/QTY+21/C186/6060' },
     ])
 
-    const error = failure(version, {
+    const error = await failure(version, {
       ...order,
       buyer: { name: 'Retail GmbH' },
       line: { gtin: '4000862141404', quantity: 12 },
@@ -236,26 +238,26 @@ describe('applyMappingVersion', () => {
     })
   })
 
-  it('fails naming the target element when a required source value is missing', () => {
+  it('fails naming the target element when a required source value is missing', async () => {
     const version = outboundVersion('ORDERS', [
       ...orderHeader,
       { sourcePath: 'line.gtin', targetPath: 'SG25/LIN/C212/7140' },
       { sourcePath: 'line.quantity', targetPath: 'SG25/QTY+21/C186/6060' },
     ])
 
-    expect(failure(version, { ...order, line: { gtin: '4000862141404' } })).toMatchObject({
+    expect(await failure(version, { ...order, line: { gtin: '4000862141404' } })).toMatchObject({
       code: 'missingRequiredValue',
       targetPath: 'SG25/QTY+21/C186/6060',
     })
   })
 
-  it('leaves out an optional segment group whose source values are all missing', () => {
+  it('leaves out an optional segment group whose source values are all missing', async () => {
     const version = outboundVersion('DESADV', [
       ...despatchHeader,
       { sourcePath: 'sscc', targetPath: 'SG10/SG11/SG13/SG15/GIN+BJ/C208/7402' },
     ])
 
-    expect(apply(version, despatch)).toEqual({
+    expect(await apply(version, despatch)).toEqual({
       header: { tag: 'UNH', elements: [['1'], ['DESADV', 'D', '96A', 'UN', 'EAN005']] },
       segments: [
         { tag: 'BGM', elements: [['351'], ['DES-0815']] },
@@ -269,44 +271,48 @@ describe('applyMappingVersion', () => {
     })
   })
 
-  it('fails when an optional segment group is filled but misses a required value', () => {
+  it('fails when an optional segment group is filled but misses a required value', async () => {
     const version = outboundVersion('DESADV', [
       ...despatchHeader,
       { sourcePath: 'gtin', targetPath: 'SG10/SG17/LIN/C212/7140' },
       { sourcePath: 'quantity', targetPath: 'SG10/SG17/QTY+12/C186/6060' },
     ])
 
-    expect(failure(version, { ...despatch, gtin: '4000862141404', quantity: '' })).toMatchObject({
+    expect(
+      await failure(version, { ...despatch, gtin: '4000862141404', quantity: '' }),
+    ).toMatchObject({
       code: 'missingRequiredValue',
       targetPath: 'SG10/SG17/QTY+12/C186/6060',
     })
   })
 
-  it('fails naming a target that is no element of the Message Type', () => {
+  it('fails naming a target that is no element of the Message Type', async () => {
     const version = outboundVersion('INVOIC', [
       { sourcePath: 'invoiceNumber', targetPath: 'BGM/1004' },
       { sourcePath: 'orderNumber', targetPath: 'SG1+ON/RFF+ON' },
     ])
 
-    expect(failure(version, { invoiceNumber: 'INV-1', orderNumber: 'PO-4711' })).toMatchObject({
+    expect(
+      await failure(version, { invoiceNumber: 'INV-1', orderNumber: 'PO-4711' }),
+    ).toMatchObject({
       code: 'unknownTarget',
       targetPath: 'SG1+ON/RFF+ON',
     })
   })
 
-  it('fails naming a link into the message header, which the engine writes itself', () => {
+  it('fails naming a link into the message header, which the engine writes itself', async () => {
     const version = outboundVersion('ORDERS', [
       ...orderHeader,
       { sourcePath: 'reference', targetPath: 'UNH/0062' },
     ])
 
-    expect(failure(version, { ...order, reference: '4711' })).toMatchObject({
+    expect(await failure(version, { ...order, reference: '4711' })).toMatchObject({
       code: 'unknownTarget',
       targetPath: 'UNH/0062',
     })
   })
 
-  it('writes a number from the Document as it reads in JSON', () => {
+  it('writes a number from the Document as it reads in JSON', async () => {
     const version = outboundVersion('ORDERS', [
       ...orderHeader,
       { sourcePath: 'line.number', targetPath: 'SG25/LIN/1082' },
@@ -316,7 +322,7 @@ describe('applyMappingVersion', () => {
 
     const document = { ...order, line: { number: 1, gtin: '4000862141404', quantity: 12.5 } }
 
-    expect(apply(version, document).segments).toEqual([
+    expect((await apply(version, document)).segments).toEqual([
       { tag: 'BGM', elements: [['220'], ['PO-4711']] },
       { tag: 'DTM', elements: [['137', '20261014', '102']] },
       { tag: 'NAD', elements: [['BY'], ['4012345000009', '', '9']] },
@@ -327,7 +333,7 @@ describe('applyMappingVersion', () => {
     ])
   })
 
-  it('repeats the line item group once per line, numbering the lines with the counter', () => {
+  it('repeats the line item group once per line, numbering the lines with the counter', async () => {
     const version = outboundVersion('ORDERS', [...orderHeader, ...orderLines], orderLoop)
 
     const document = {
@@ -338,7 +344,7 @@ describe('applyMappingVersion', () => {
       ],
     }
 
-    expect(apply(version, document)).toEqual({
+    expect(await apply(version, document)).toEqual({
       header: { tag: 'UNH', elements: [['1'], ['ORDERS', 'D', '96A', 'UN', 'EAN008']] },
       segments: [
         { tag: 'BGM', elements: [['220'], ['PO-4711']] },
@@ -355,7 +361,7 @@ describe('applyMappingVersion', () => {
     })
   })
 
-  it('repeats a header field linked beneath the loop in every line', () => {
+  it('repeats a header field linked beneath the loop in every line', async () => {
     const version = outboundVersion(
       'ORDERS',
       [
@@ -376,7 +382,7 @@ describe('applyMappingVersion', () => {
       ],
     }
 
-    expect(apply(version, document).segments.slice(4, -1)).toEqual([
+    expect((await apply(version, document)).segments.slice(4, -1)).toEqual([
       { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
       { tag: 'QTY', elements: [['21', '12']] },
       { tag: 'DTM', elements: [['2', '20261020', '102']] },
@@ -386,7 +392,7 @@ describe('applyMappingVersion', () => {
     ])
   })
 
-  it('fails naming the target element when one line misses a required value', () => {
+  it('fails naming the target element when one line misses a required value', async () => {
     const version = outboundVersion('ORDERS', [...orderHeader, ...orderLines], orderLoop)
 
     const document = {
@@ -394,7 +400,7 @@ describe('applyMappingVersion', () => {
       lines: [{ gtin: '4000862141404', quantity: 12 }, { gtin: '4000862141411' }],
     }
 
-    expect(failure(version, document)).toMatchObject({
+    expect(await failure(version, document)).toMatchObject({
       code: 'missingRequiredValue',
       targetPath: 'SG25/QTY+21/C186/6060',
     })
@@ -403,16 +409,19 @@ describe('applyMappingVersion', () => {
   it.each([
     ['an empty list', { ...order, lines: [] }],
     ['no list', order],
-  ])('fails naming the line quantity when the required line item group gets %s', (_, document) => {
-    const version = outboundVersion('ORDERS', [...orderHeader, ...orderLines], orderLoop)
+  ])(
+    'fails naming the line quantity when the required line item group gets %s',
+    async (_, document) => {
+      const version = outboundVersion('ORDERS', [...orderHeader, ...orderLines], orderLoop)
 
-    expect(failure(version, document)).toMatchObject({
-      code: 'missingRequiredValue',
-      targetPath: 'SG25/QTY+21/C186/6060',
-    })
-  })
+      expect(await failure(version, document)).toMatchObject({
+        code: 'missingRequiredValue',
+        targetPath: 'SG25/QTY+21/C186/6060',
+      })
+    },
+  )
 
-  it('fails naming the line quantity when the required line item group gets no lines, though header fields fill it', () => {
+  it('fails naming the line quantity when the required line item group gets no lines, though header fields fill it', async () => {
     const version = outboundVersion(
       'ORDERS',
       [
@@ -425,13 +434,13 @@ describe('applyMappingVersion', () => {
 
     const document = { ...order, gtin: '4000862141404', quantity: 12, lines: [] }
 
-    expect(failure(version, document)).toMatchObject({
+    expect(await failure(version, document)).toMatchObject({
       code: 'missingRequiredValue',
       targetPath: 'SG25/QTY+21/C186/6060',
     })
   })
 
-  it('repeats an optional line item group inside its enclosing group, and leaves it out without lines', () => {
+  it('repeats an optional line item group inside its enclosing group, and leaves it out without lines', async () => {
     const version = outboundVersion(
       'DESADV',
       [
@@ -447,19 +456,19 @@ describe('applyMappingVersion', () => {
       { gtin: '4000862141411', quantity: 5 },
     ]
 
-    expect(apply(version, { ...despatch, lines }).segments.slice(5)).toEqual([
+    expect((await apply(version, { ...despatch, lines })).segments.slice(5)).toEqual([
       { tag: 'CPS', elements: [['1']] },
       { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
       { tag: 'QTY', elements: [['12', '12']] },
       { tag: 'LIN', elements: [['2'], [''], ['4000862141411', 'EN']] },
       { tag: 'QTY', elements: [['12', '5']] },
     ])
-    expect(apply(version, { ...despatch, lines: [] }).segments.slice(5)).toEqual([
+    expect((await apply(version, { ...despatch, lines: [] })).segments.slice(5)).toEqual([
       { tag: 'CPS', elements: [['1']] },
     ])
   })
 
-  it('reads the lines of the current package and numbers them across the whole message', () => {
+  it('reads the lines of the current package and numbers them across the whole message', async () => {
     const version = outboundVersion(
       'DESADV',
       [
@@ -489,7 +498,7 @@ describe('applyMappingVersion', () => {
       ],
     }
 
-    const message = apply(version, document)
+    const message = await apply(version, document)
 
     expect(message.segments.slice(5)).toEqual([
       { tag: 'CPS', elements: [['1']] },
@@ -536,7 +545,7 @@ describe('applyMappingVersion', () => {
     ],
   ])(
     'fails naming a target that reads a repeating part when %s',
-    (_, messageType, links, loops, target) => {
+    async (_, messageType, links, loops, target) => {
       const version = outboundVersion(messageType, links, loops)
 
       const document = {
@@ -546,7 +555,10 @@ describe('applyMappingVersion', () => {
         packages: [{ lines: [{ gtin: '4000862141404', quantity: 12 }] }],
       }
 
-      expect(failure(version, document)).toMatchObject({ code: 'outsideLoop', targetPath: target })
+      expect(await failure(version, document)).toMatchObject({
+        code: 'outsideLoop',
+        targetPath: target,
+      })
     },
   )
 
@@ -555,26 +567,29 @@ describe('applyMappingVersion', () => {
     ['the loop items into a segment group the message type lacks', 'SG99', 'SG25/LIN/1082', 'SG99'],
     ['the counter into a segment group', 'SG25', 'SG25', 'SG25'],
     ['the counter into the message header', 'SG25', 'UNH/0062', 'UNH/0062'],
-  ])('fails naming a target when a mapping links %s', (_, targetPart, counterTarget, unknown) => {
-    const version = outboundVersion('ORDERS', [...orderHeader, ...orderLines], {
-      transforms: [loop],
-      transformLinks: looped('lines[]', targetPart, counterTarget),
-    })
+  ])(
+    'fails naming a target when a mapping links %s',
+    async (_, targetPart, counterTarget, unknown) => {
+      const version = outboundVersion('ORDERS', [...orderHeader, ...orderLines], {
+        transforms: [loop],
+        transformLinks: looped('lines[]', targetPart, counterTarget),
+      })
 
-    const document = { ...order, lines: [{ gtin: '4000862141404', quantity: 12 }] }
+      const document = { ...order, lines: [{ gtin: '4000862141404', quantity: 12 }] }
 
-    expect(failure(version, document)).toMatchObject({
-      code: 'unknownTarget',
-      targetPath: unknown,
-    })
-  })
+      expect(await failure(version, document)).toMatchObject({
+        code: 'unknownTarget',
+        targetPath: unknown,
+      })
+    },
+  )
 
-  it('writes a constant into its target element', () => {
+  it('writes a constant into its target element', async () => {
     const version = orderVia({ kind: 'constant', config: { value: 'PO-0001' } }, [
       intoTarget('BGM/1004'),
     ])
 
-    expect(orderNumberOf(version)).toEqual({ tag: 'BGM', elements: [['220'], ['PO-0001']] })
+    expect(await orderNumberOf(version)).toEqual({ tag: 'BGM', elements: [['220'], ['PO-0001']] })
   })
 
   const missingTransformId = '0f1e2d3c-4b5a-4968-8776-5544332211aa'
@@ -595,6 +610,13 @@ describe('applyMappingVersion', () => {
       transformId,
     ],
     [
+      'its expression does not parse',
+      { kind: 'jsonata', config: { expression: "orderNumber & '-'  &" } },
+      intoTarget('BGM/1004'),
+      'BGM/1004',
+      transformId,
+    ],
+    [
       'a link starts at a transform the mapping lacks',
       { kind: 'constant', config: { value: 'PO-0001' } },
       intoTarget('BGM/1004', missingTransformId),
@@ -603,10 +625,10 @@ describe('applyMappingVersion', () => {
     ],
   ])(
     'fails naming the target element and the transform when %s',
-    (_, transform, link, targetPath, failedId) => {
+    async (_, transform, link, targetPath, failedId) => {
       const version = orderVia(transform, [link])
 
-      expect(failure(version, orderWithLine)).toMatchObject({
+      expect(await failure(version, orderWithLine)).toMatchObject({
         code: 'invalidTransform',
         targetPath,
         transformId: failedId,
@@ -617,20 +639,20 @@ describe('applyMappingVersion', () => {
   it.each([
     ['joins its parts with the separator', { prefix: 'PO', number: '4711' }, 'PO-4711'],
     ['leaves out an empty part with its separator', { prefix: 'PO', number: '' }, 'PO'],
-  ])('concatenate %s', (_, fields, expected) => {
+  ])('concatenate %s', async (_, fields, expected) => {
     const version = orderVia({ kind: 'concatenate', config: { inputCount: 2, separator: '-' } }, [
       fromSource('prefix', 'part1'),
       fromSource('number', 'part2'),
       intoTarget('BGM/1004'),
     ])
 
-    expect(orderNumberOf(version, { ...orderWithLine, ...fields })).toEqual({
+    expect(await orderNumberOf(version, { ...orderWithLine, ...fields })).toEqual({
       tag: 'BGM',
       elements: [['220'], [expected]],
     })
   })
 
-  it('split takes the part at its index from the value of each line', () => {
+  it('split takes the part at its index from the value of each line', async () => {
     const version = orderVia({ kind: 'split', config: { separator: '/', index: 0 } }, [
       fromSource('lines[].sku'),
       intoTarget('SG25/PIA+1/C212/7140'),
@@ -644,7 +666,7 @@ describe('applyMappingVersion', () => {
       ],
     }
 
-    expect(apply(version, document).segments.slice(4, -1)).toEqual([
+    expect((await apply(version, document)).segments.slice(4, -1)).toEqual([
       { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
       { tag: 'PIA', elements: [['1'], ['ART-100']] },
       { tag: 'QTY', elements: [['21', '12']] },
@@ -657,13 +679,13 @@ describe('applyMappingVersion', () => {
   it.each([
     ['the second part', 1, [['220'], ['4711']]],
     ['nothing when the value has fewer parts than its index', 2, [['220']]],
-  ])('split takes %s', (_, index, elements) => {
+  ])('split takes %s', async (_, index, elements) => {
     const version = orderVia({ kind: 'split', config: { separator: '/', index } }, [
       fromSource('reference'),
       intoTarget('BGM/1004'),
     ])
 
-    expect(orderNumberOf(version, { ...orderWithLine, reference: 'PO/4711' })).toEqual({
+    expect(await orderNumberOf(version, { ...orderWithLine, reference: 'PO/4711' })).toEqual({
       tag: 'BGM',
       elements,
     })
@@ -674,19 +696,19 @@ describe('applyMappingVersion', () => {
     ['as many characters as its length', 6, 2, [['220'], ['PO']]],
     ['what remains when the length runs past the end', 9, 10, [['220'], ['4711']]],
     ['nothing when the start lies past the end', 20, null, [['220']]],
-  ])('substring takes %s', (_, start, length, elements) => {
+  ])('substring takes %s', async (_, start, length, elements) => {
     const version = orderVia({ kind: 'substring', config: { start, length } }, [
       fromSource('reference'),
       intoTarget('BGM/1004'),
     ])
 
-    expect(orderNumberOf(version, { ...orderWithLine, reference: 'ORDER-PO-4711' })).toEqual({
+    expect(await orderNumberOf(version, { ...orderWithLine, reference: 'ORDER-PO-4711' })).toEqual({
       tag: 'BGM',
       elements,
     })
   })
 
-  it('fails naming a target that reads a line field through a transform outside its loop', () => {
+  it('fails naming a target that reads a line field through a transform outside its loop', async () => {
     const version = orderVia({ kind: 'split', config: { separator: '/', index: 0 } }, [
       fromSource('lines[].sku'),
       intoTarget('BGM/1004'),
@@ -694,13 +716,13 @@ describe('applyMappingVersion', () => {
 
     const document = { ...order, lines: [{ gtin: '4000862141404', quantity: 12, sku: 'A/B' }] }
 
-    expect(failure(version, document)).toMatchObject({
+    expect(await failure(version, document)).toMatchObject({
       code: 'outsideLoop',
       targetPath: 'BGM/1004',
     })
   })
 
-  it('fails naming the target element when transforms feed each other in a circle', () => {
+  it('fails naming the target element when transforms feed each other in a circle', async () => {
     const otherId = '6e7f8091-2b3c-4d4e-9f50-6b7c8d9e0f1a'
     const concatenate = { kind: 'concatenate', config: { inputCount: 2, separator: '' } } as const
 
@@ -722,7 +744,7 @@ describe('applyMappingVersion', () => {
       ],
     })
 
-    expect(failure(version, { ...orderWithLine, prefix: 'PO' })).toMatchObject({
+    expect(await failure(version, { ...orderWithLine, prefix: 'PO' })).toMatchObject({
       code: 'invalidTransform',
       targetPath: 'BGM/1004',
       transformId,
@@ -735,25 +757,25 @@ describe('applyMappingVersion', () => {
     ['yyyy-MM-ddTHH:mm:ss', 'yyyyMMddHHmm', '2026-10-14T09:30:00', '202610140930'],
     ['yyyyMMdd', 'yyyyMMddHHmm', '20261014', '202610140000'],
     ['yyyyMMdd', 'dd/MM/yyyy', '20240229', '29/02/2024'],
-  ])('date format reads %s and writes %s', (from, to, date, expected) => {
+  ])('date format reads %s and writes %s', async (from, to, date, expected) => {
     const version = orderVia({ kind: 'dateFormat', config: { from, to } }, [
       fromSource('orderDate'),
       intoTarget('DTM+137/C507/2380'),
     ])
 
-    expect(apply(version, { ...orderWithLine, orderDate: date }).segments[1]).toEqual({
+    expect((await apply(version, { ...orderWithLine, orderDate: date })).segments[1]).toEqual({
       tag: 'DTM',
       elements: [['137', expected, '102']],
     })
   })
 
-  it('date format leaves an empty date empty', () => {
+  it('date format leaves an empty date empty', async () => {
     const version = orderVia(
       { kind: 'dateFormat', config: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' } },
       [fromSource('orderDate'), intoTarget('DTM+137/C507/2380')],
     )
 
-    expect(apply(version, { ...orderWithLine, orderDate: '' }).segments[1]).toEqual({
+    expect((await apply(version, { ...orderWithLine, orderDate: '' })).segments[1]).toEqual({
       tag: 'DTM',
       elements: [['137', '', '102']],
     })
@@ -764,13 +786,13 @@ describe('applyMappingVersion', () => {
     ['with a day the month lacks', '2026-02-29'],
     ['with a month past December', '2026-13-01'],
     ['with characters after the pattern', '2026-10-14 09:30'],
-  ])('date format fails naming the target element for a date %s', (_, date) => {
+  ])('date format fails naming the target element for a date %s', async (_, date) => {
     const version = orderVia(
       { kind: 'dateFormat', config: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' } },
       [fromSource('orderDate'), intoTarget('DTM+137/C507/2380')],
     )
 
-    expect(failure(version, { ...orderWithLine, orderDate: date })).toMatchObject({
+    expect(await failure(version, { ...orderWithLine, orderDate: date })).toMatchObject({
       code: 'invalidDate',
       targetPath: 'DTM+137/C507/2380',
       transformId,
@@ -800,8 +822,8 @@ describe('applyMappingVersion', () => {
     [null, ',', 7, '7'],
   ])(
     'number format with %s decimal places and separator %s writes %s as %s',
-    (places, separator, price, expected) => {
-      expect(apply(pricing(places, separator), pricedLine(price)).segments.at(-2)).toEqual({
+    async (places, separator, price, expected) => {
+      expect((await apply(pricing(places, separator), pricedLine(price))).segments.at(-2)).toEqual({
         tag: 'PRI',
         elements: [['AAA', expected]],
       })
@@ -810,8 +832,8 @@ describe('applyMappingVersion', () => {
 
   it.each(['1.234,50', 'twelve', '12.', ' 12'])(
     'number format fails naming the target element for %s',
-    (price) => {
-      expect(failure(pricing(2, '.'), pricedLine(price))).toMatchObject({
+    async (price) => {
+      expect(await failure(pricing(2, '.'), pricedLine(price))).toMatchObject({
         code: 'invalidNumber',
         targetPath: 'SG25/SG28/PRI+AAA/C509/5118',
         transformId,
@@ -842,11 +864,11 @@ describe('applyMappingVersion', () => {
     lines: units.map((unit, index) => ({ gtin: `400086214140${index}`, quantity: 12, unit })),
   })
 
-  const quantities = (version: OutboundMappingVersion, document: JsonContent) =>
-    apply(version, document, { lookupTables }).segments.filter(({ tag }) => tag === 'QTY')
+  const quantities = async (version: OutboundMappingVersion, document: JsonContent) =>
+    (await apply(version, document, { lookupTables })).segments.filter(({ tag }) => tag === 'QTY')
 
-  it('lookup table translates the code of each line', () => {
-    expect(quantities(unitsVia('fail'), unitLines('ST', 'KG'))).toEqual([
+  it('lookup table translates the code of each line', async () => {
+    expect(await quantities(unitsVia('fail'), unitLines('ST', 'KG'))).toEqual([
       { tag: 'QTY', elements: [['21', '12', 'PCE']] },
       { tag: 'QTY', elements: [['21', '12', 'KGM']] },
     ])
@@ -855,20 +877,27 @@ describe('applyMappingVersion', () => {
   it.each([
     ['keepValue', [['21', '12', 'PCE']]],
     ['empty', [['21', '12']]],
-  ] as const)('lookup table with the %s fallback handles a code it lacks', (fallback, elements) => {
-    expect(quantities(unitsVia(fallback), unitLines('PCE'))).toEqual([{ tag: 'QTY', elements }])
+  ] as const)(
+    'lookup table with the %s fallback handles a code it lacks',
+    async (fallback, elements) => {
+      expect(await quantities(unitsVia(fallback), unitLines('PCE'))).toEqual([
+        { tag: 'QTY', elements },
+      ])
+    },
+  )
+
+  it('lookup table with the fail fallback fails naming the target element for a code it lacks', async () => {
+    expect(await failure(unitsVia('fail'), unitLines('ST', 'PCE'), { lookupTables })).toMatchObject(
+      {
+        code: 'noLookupMatch',
+        targetPath: 'SG25/QTY+21/C186/6411',
+        transformId,
+      },
+    )
   })
 
-  it('lookup table with the fail fallback fails naming the target element for a code it lacks', () => {
-    expect(failure(unitsVia('fail'), unitLines('ST', 'PCE'), { lookupTables })).toMatchObject({
-      code: 'noLookupMatch',
-      targetPath: 'SG25/QTY+21/C186/6411',
-      transformId,
-    })
-  })
-
-  it('lookup table fails naming the target element when the engine lacks its table', () => {
-    expect(failure(unitsVia('keepValue'), unitLines('ST'))).toMatchObject({
+  it('lookup table fails naming the target element when the engine lacks its table', async () => {
+    expect(await failure(unitsVia('keepValue'), unitLines('ST'))).toMatchObject({
       code: 'unknownLookupTable',
       targetPath: 'SG25/QTY+21/C186/6411',
       transformId,
@@ -901,19 +930,62 @@ describe('applyMappingVersion', () => {
     ['isEmpty', '', 'rush', 'PO-4711'],
     ['isNotEmpty', '', 'rush', 'RUSH-1'],
     ['isNotEmpty', '', '', 'PO-4711'],
-  ])('conditional %s %j on %j writes %s', (operator, compareTo, orderType, expected) => {
+  ])('conditional %s %j on %j writes %s', async (operator, compareTo, orderType, expected) => {
     const version = conditionalVia(operator, compareTo, [fromSource('orderNumber', 'else')])
 
-    expect(orderNumberOf(version, rushOrder(orderType))).toEqual({
+    expect(await orderNumberOf(version, rushOrder(orderType))).toEqual({
       tag: 'BGM',
       elements: [['220'], [expected]],
     })
   })
 
-  it('conditional leaves its target empty when the condition does not hold and it has no else', () => {
-    expect(orderNumberOf(conditionalVia('equals', 'rush', []), rushOrder('normal'))).toEqual({
+  it('conditional leaves its target empty when the condition does not hold and it has no else', async () => {
+    expect(await orderNumberOf(conditionalVia('equals', 'rush', []), rushOrder('normal'))).toEqual({
       tag: 'BGM',
       elements: [['220']],
+    })
+  })
+
+  const expressionVia = (expression: string, target = 'BGM/1004') =>
+    orderVia({ kind: 'jsonata', config: { expression } }, [intoTarget(target)])
+
+  const twoLines = {
+    ...order,
+    lines: [
+      { gtin: '4000862141404', quantity: 12 },
+      { gtin: '4000862141411', quantity: 5 },
+    ],
+  }
+
+  it.each([
+    ['a text', "orderNumber & '/' & $string($count(lines))", [['220'], ['PO-4711/2']]],
+    ['a number', '$sum(lines.quantity)', [['220'], ['17']]],
+    ['nothing when it matches nothing', 'invoiceNumber', [['220']]],
+  ])('JSONata writes %s', async (_, expression, elements) => {
+    expect(await orderNumberOf(expressionVia(expression), twoLines)).toEqual({
+      tag: 'BGM',
+      elements,
+    })
+  })
+
+  it('JSONata reads the whole Document beneath a loop too', async () => {
+    const version = expressionVia('orderNumber', 'SG25/PIA+1/C212/7140')
+
+    expect((await apply(version, twoLines)).segments.filter(({ tag }) => tag === 'PIA')).toEqual([
+      { tag: 'PIA', elements: [['1'], ['PO-4711']] },
+      { tag: 'PIA', elements: [['1'], ['PO-4711']] },
+    ])
+  })
+
+  it.each([
+    ['gives a list', 'lines.gtin'],
+    ['gives an object', 'buyer'],
+    ['fails to evaluate', "$number('twelve')"],
+  ])('JSONata fails naming the target element when its expression %s', async (_, expression) => {
+    expect(await failure(expressionVia(expression), twoLines)).toMatchObject({
+      code: 'expressionFailed',
+      targetPath: 'BGM/1004',
+      transformId,
     })
   })
 })
