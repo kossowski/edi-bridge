@@ -55,7 +55,7 @@ import {
   updateLookupTable,
 } from './lookup-table.js'
 import { parse, type ValidationError } from './parse.js'
-import { CurrentMember, loadSession, requireAdmin, resolveMember } from './session.js'
+import { CurrentMember, loadSession, requireChangeRight, resolveMember } from './session.js'
 import {
   createTradingPartner,
   listTradingPartnerActivities,
@@ -108,6 +108,8 @@ const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 // Base64 takes 4 characters per 3 bytes; 1 MiB covers the name, labels and JSON around the Document.
 const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
 
+const readMethods = new Set(['GET', 'HEAD'])
+
 type CheckStatus = 'down' | 'up'
 
 const check = (probe: Probe, timeoutMs: number): Promise<CheckStatus> =>
@@ -123,22 +125,27 @@ const check = (probe: Probe, timeoutMs: number): Promise<CheckStatus> =>
     () => 'down',
   )
 
-export function buildApp({
-  auth: authSettings,
-  database,
-  logger = false,
-  probes,
-  probeTimeoutMs = 2000,
-  webOrigin,
-}: AppDependencies): FastifyInstance {
-  const app = Fastify({ logger })
+export function buildApp(dependencies: AppDependencies): FastifyInstance {
+  const app = Fastify({ logger: dependencies.logger ?? false })
 
   void app.register(cors, {
-    origin: webOrigin ? [webOrigin] : false,
+    origin: dependencies.webOrigin ? [dependencies.webOrigin] : false,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
   })
 
+  void app.register((scope, _options, done) => {
+    registerRoutes(scope, dependencies)
+    done()
+  })
+
+  return app
+}
+
+function registerRoutes(
+  app: FastifyInstance,
+  { auth: authSettings, database, probes, probeTimeoutMs = 2000 }: AppDependencies,
+) {
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
       check(probes.postgres, probeTimeoutMs),
@@ -166,8 +173,12 @@ export function buildApp({
       return reply.code(401).send({ message: 'Unauthorized' })
     }
 
+    const guarded = readMethods.has(request.method)
+      ? effect
+      : Effect.andThen(requireChangeRight, effect)
+
     return Effect.runPromise(
-      effect.pipe(
+      guarded.pipe(
         Effect.map((body) => reply.code(status).send(body)),
         Effect.catch((error) =>
           Effect.sync(() => reply.code(statusOf[error._tag]).send(bodyOf(error))),
@@ -179,13 +190,6 @@ export function buildApp({
     )
   }
 
-  const respondToChange = <A>(
-    request: FastifyRequest,
-    reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, CurrentMember | CurrentWorkspace | Db>,
-    status = 200,
-  ) => respond(request, reply, Effect.andThen(requireAdmin, effect), status)
-
   app.get(sessionEndpoint.path, (request, reply) => respond(request, reply, loadSession))
 
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>
@@ -193,7 +197,7 @@ export function buildApp({
   )
 
   app.put(updateCompanyIdentityEndpoint.path, (request, reply) =>
-    respondToChange(
+    respond(
       request,
       reply,
       Effect.flatMap(
@@ -220,7 +224,7 @@ export function buildApp({
   )
 
   app.post(createTradingPartnerEndpoint.path, (request, reply) =>
-    respondToChange(
+    respond(
       request,
       reply,
       Effect.flatMap(parse(createTradingPartnerEndpoint.body, request.body), createTradingPartner),
@@ -229,7 +233,7 @@ export function buildApp({
   )
 
   app.put<{ Params: { id: string } }>(updateTradingPartnerEndpoint.path, (request, reply) =>
-    respondToChange(
+    respond(
       request,
       reply,
       updateTradingPartner(
@@ -263,7 +267,7 @@ export function buildApp({
   )
 
   app.post(createLookupTableEndpoint.path, (request, reply) =>
-    respondToChange(
+    respond(
       request,
       reply,
       Effect.flatMap(parse(createLookupTableEndpoint.body, request.body), createLookupTable),
@@ -272,7 +276,7 @@ export function buildApp({
   )
 
   app.put<{ Params: { id: string } }>(updateLookupTableEndpoint.path, (request, reply) =>
-    respondToChange(
+    respond(
       request,
       reply,
       updateLookupTable(request.params.id, parse(updateLookupTableEndpoint.body, request.body)),
@@ -280,14 +284,14 @@ export function buildApp({
   )
 
   app.delete<{ Params: { id: string } }>(deleteLookupTableEndpoint.path, (request, reply) =>
-    respondToChange(request, reply, deleteLookupTable(request.params.id), 204),
+    respond(request, reply, deleteLookupTable(request.params.id), 204),
   )
 
   app.post<{ Params: { id: string } }>(
     lookupTableImportPreviewEndpoint.path,
     { bodyLimit: lookupTableImportBodyLimit },
     (request, reply) =>
-      respondToChange(
+      respond(
         request,
         reply,
         previewLookupTableImport(
@@ -301,7 +305,7 @@ export function buildApp({
     importLookupTableEndpoint.path,
     { bodyLimit: lookupTableImportBodyLimit },
     (request, reply) =>
-      respondToChange(
+      respond(
         request,
         reply,
         importLookupTable(request.params.id, parse(importLookupTableEndpoint.body, request.body)),
@@ -312,7 +316,7 @@ export function buildApp({
     inferDocumentStructureEndpoint.path,
     { bodyLimit: documentStructureBodyLimit },
     (request, reply) =>
-      respondToChange(
+      respond(
         request,
         reply,
         Effect.flatMap(
@@ -326,7 +330,7 @@ export function buildApp({
     createDocumentStructureEndpoint.path,
     { bodyLimit: documentStructureBodyLimit },
     (request, reply) =>
-      respondToChange(
+      respond(
         request,
         reply,
         Effect.flatMap(
@@ -349,7 +353,7 @@ export function buildApp({
     updateDocumentStructureEndpoint.path,
     { bodyLimit: documentStructureBodyLimit },
     (request, reply) =>
-      respondToChange(
+      respond(
         request,
         reply,
         updateDocumentStructure(
@@ -358,6 +362,4 @@ export function buildApp({
         ),
       ),
   )
-
-  return app
 }

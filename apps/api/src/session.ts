@@ -62,7 +62,7 @@ export const loadSession = Effect.gen(function* () {
   return { user, operator, workspace: { id, name, kind: 'standard' }, role } satisfies Session
 })
 
-export const requireAdmin = Effect.gen(function* () {
+export const requireChangeRight = Effect.gen(function* () {
   const { operator, role } = yield* CurrentMember
 
   if (!operator && role !== 'admin') {

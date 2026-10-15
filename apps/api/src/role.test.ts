@@ -33,6 +33,7 @@ import {
   withCheckDigit,
 } from '@edi-bridge/contracts'
 
+import { buildApp } from './app.js'
 import {
   addMember,
   type Client,
@@ -41,6 +42,7 @@ import {
   signIn,
   startTestApi,
   type TestApi,
+  testAuth,
 } from './testing.js'
 
 const operatorAsViewer: NewMember = {
@@ -108,8 +110,7 @@ afterAll(async () => {
   await api.stop()
 })
 
-const reads = (): string[] => [
-  sessionEndpoint.path,
+const workspaceReads = (): string[] => [
   currentWorkspaceEndpoint.path,
   tradingPartnersEndpoint.path,
   tradingPartnerActivitiesEndpoint.path,
@@ -124,7 +125,9 @@ const reads = (): string[] => [
   withId(documentStructureEndpoint.path, ids.documentStructure),
 ]
 
-const changes: [string, () => InjectOptions][] = [
+const reads = () => [sessionEndpoint.path, ...workspaceReads()]
+
+const changes: [string, () => InjectOptions & { url: string }][] = [
   [
     'update the company identity',
     () => ({
@@ -201,9 +204,9 @@ const changes: [string, () => InjectOptions][] = [
 
 const snapshot = async (target: Client) =>
   Promise.all(
-    reads()
-      .filter((url) => url !== sessionEndpoint.path)
-      .map(async (url) => (await target.inject({ method: 'GET', url })).json<unknown>()),
+    workspaceReads().map(async (url) =>
+      (await target.inject({ method: 'GET', url })).json<unknown>(),
+    ),
   )
 
 describe('a Viewer', () => {
@@ -236,6 +239,43 @@ describe('a Viewer', () => {
     })
 
     expect(response.statusCode).toBe(403)
+  })
+})
+
+describe('the changes', () => {
+  it('cover every changing route', async () => {
+    const registered: { method: string; url: string }[] = []
+
+    const app = buildApp({
+      auth: testAuth,
+      database: api.connection.db,
+      probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
+    })
+
+    app.addHook('onRoute', ({ method, url }) => {
+      registered.push(...[method].flat().map((one) => ({ method: one, url })))
+    })
+    await app.ready()
+    await app.close()
+
+    const matches = (url: string, path: string) =>
+      new RegExp(`^${url.replaceAll(/:[^/]+/g, '[^/]+')}$`).test(path)
+
+    const uncovered = registered
+      .filter(
+        ({ method, url }) =>
+          !['GET', 'HEAD', 'OPTIONS'].includes(method) && !url.startsWith('/auth/'),
+      )
+      .filter(({ method, url }) =>
+        changes.every(([, request]) => {
+          const change = request()
+
+          return change.method !== method || !matches(url, change.url)
+        }),
+      )
+
+    expect(registered).not.toEqual([])
+    expect(uncovered).toEqual([])
   })
 })
 
