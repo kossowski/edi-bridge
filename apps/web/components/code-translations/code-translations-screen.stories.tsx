@@ -1,4 +1,4 @@
-import { expect, userEvent, within } from 'storybook/test'
+import { expect, screen, userEvent, within } from 'storybook/test'
 
 import { CodeTranslationsScreen } from '@/components/code-translations/code-translations-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
@@ -126,6 +126,57 @@ export const ManyUsesAndCodes = meta.story({
     await expect(units.getByRole('link', { name: /^Add [\w-]+$/ })).toHaveAttribute(
       'href',
       expect.stringMatching(/\?add=[\w-]+$/),
+    )
+  },
+})
+
+async function openActions(name: string) {
+  const title = await screen.findByRole('link', { name })
+
+  await userEvent.click(card(title).getByRole('button', { name: `Actions for ${name}` }))
+
+  return screen.findByRole('menuitem', { name: 'Delete' })
+}
+
+export const DeleteInUse = meta.story({
+  async play() {
+    const remove = await openActions('Units of measure')
+
+    await expect(remove).toHaveAttribute('aria-disabled', 'true')
+    await expect(remove).toHaveAccessibleDescription(
+      /^In use by [^,]+, [^,]+, [^,]+, and 1 more\. Remove the list there to delete it\.$/,
+    )
+    remove.focus()
+    await userEvent.keyboard('{Enter}')
+    await expect(screen.queryByRole('dialog')).toBeNull()
+  },
+})
+
+export const DeleteUnused = meta.story({
+  async play({ canvas }) {
+    const remove = await openActions('Hansemarkt store numbers')
+
+    await expect(remove).not.toHaveAttribute('aria-disabled')
+    await expect(remove).not.toHaveAccessibleDescription()
+    await userEvent.click(remove)
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete list' }))
+    await expect(await canvas.findByText('Hansemarkt store numbers deleted.')).toBeInTheDocument()
+    await expect(canvas.queryByRole('link', { name: 'Hansemarkt store numbers' })).toBeNull()
+  },
+})
+
+export const GermanDeleteInUse = meta.story({
+  decorators: [german],
+  async play() {
+    const title = await screen.findByRole('link', { name: 'Units of measure' })
+
+    await userEvent.click(
+      card(title).getByRole('button', { name: 'Aktionen für Units of measure' }),
+    )
+    const remove = await screen.findByRole('menuitem', { name: 'Löschen' })
+
+    await expect(remove).toHaveAccessibleDescription(
+      /^Verwendet von [^,]+, [^,]+, [^,]+ und 1 weitere\. Entfernen Sie die Liste dort, um sie zu löschen\.$/,
     )
   },
 })

@@ -3572,7 +3572,9 @@
     "actions": {
       "label": "Aktionen für {name}",
       "edit": "Name und Empfänger bearbeiten",
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "inUse": "Verwendet von {mappings}. Entfernen Sie die Liste dort, um sie zu löschen.",
+      "moreMappings": "{count} weitere"
     },
     "announcements": {
       "saved": "{name} gespeichert.",

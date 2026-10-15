@@ -19,6 +19,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@edi-bridge/ui/compon
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@edi-bridge/ui/components/dropdown-menu'
@@ -114,7 +115,17 @@ function BlockingBadge({ codes }: { codes: ReadonlyArray<string> }) {
 
 function ActionsMenu({ table, actions }: { table: LookupTableSummary; actions: CardActions }) {
   const t = useTranslations('CodeTranslations.actions')
+  const format = useFormatter()
   const trigger = useRef<HTMLButtonElement>(null)
+  const reasonId = useId()
+  const inUse = table.uses.length > 0
+
+  function mappingNames(uses: ReadonlyArray<LookupTableUse>) {
+    const named = uses.slice(0, shownUses).map(({ name }) => name)
+    const hidden = uses.length - named.length
+
+    return format.list(hidden > 0 ? [...named, t('moreMappings', { count: hidden })] : named)
+  }
 
   return (
     <DropdownMenu>
@@ -130,12 +141,21 @@ function ActionsMenu({ table, actions }: { table: LookupTableSummary; actions: C
           <HugeiconsIcon icon={PencilEdit02Icon} strokeWidth={2} aria-hidden />
           {t('edit')}
         </DropdownMenuItem>
-        <DropdownMenuItem
-          variant="destructive"
-          onClick={() => actions.onDelete(table, trigger.current)}>
-          <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
-          {t('delete')}
-        </DropdownMenuItem>
+        <DropdownMenuGroup>
+          <DropdownMenuItem
+            disabled={inUse}
+            variant="destructive"
+            aria-describedby={inUse ? reasonId : undefined}
+            onClick={() => actions.onDelete(table, trigger.current)}>
+            <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} aria-hidden />
+            {t('delete')}
+          </DropdownMenuItem>
+          {inUse && (
+            <p id={reasonId} className="text-muted-foreground max-w-64 px-1.5 pb-1 text-xs">
+              {t('inUse', { mappings: mappingNames(table.uses) })}
+            </p>
+          )}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )
