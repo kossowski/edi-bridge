@@ -41,7 +41,6 @@ type Loop = {
   counterTargets: string[]
 }
 
-// The item each enclosing loop is on, by its source part, and the counter values it writes.
 type Scope = {
   items: ReadonlyMap<string, JsonContent>
   counters: ReadonlyMap<string, string>
@@ -55,12 +54,14 @@ type Context = {
   values: Values
 }
 
-const isBeneath = (path: string, part: string) => path === part || path.startsWith(`${part}.`)
+type Reading = Omit<Context, 'values'>
 
-// A path through a repeating part reads only inside a loop over that part.
-function read(document: JsonContent, scope: Scope, path: string): JsonContent | undefined {
+const isBeneath = (path: string, part: string, separator = '/') =>
+  path === part || path.startsWith(`${part}${separator}`)
+
+function read({ document, scope }: Reading, path: string): JsonContent | undefined {
   const bound = [...scope.items.keys()]
-    .filter((part) => isBeneath(path, part))
+    .filter((part) => isBeneath(path, part, '.'))
     .reduce<string | undefined>(
       (longest, part) => (longest === undefined || part.length > longest.length ? part : longest),
       undefined,
@@ -78,27 +79,23 @@ function read(document: JsonContent, scope: Scope, path: string): JsonContent | 
   return value
 }
 
-function sourceValue(document: JsonContent, scope: Scope, path: string): string | undefined {
-  const scalar = scalarSchema.safeParse(read(document, scope, path))
+function sourceValue(context: Reading, path: string): string | undefined {
+  const scalar = scalarSchema.safeParse(read(context, path))
 
   return scalar.success ? String(scalar.data) : undefined
 }
 
-function itemsOf(document: JsonContent, scope: Scope, sourcePart: string): JsonContent[] {
-  const items = itemsSchema.safeParse(read(document, scope, arrayBasePath(sourcePart)))
+function itemsOf(context: Reading, sourcePart: string): JsonContent[] {
+  const items = itemsSchema.safeParse(read(context, arrayBasePath(sourcePart)))
 
   return items.success ? items.data : []
 }
 
-function valuesIn(
-  document: JsonContent,
-  links: OutboundMappingVersion['links'],
-  scope: Scope,
-): Values {
-  const values = new Map(scope.counters)
+function valuesIn(context: Reading): Values {
+  const values = new Map(context.scope.counters)
 
-  for (const { sourcePath, targetPath } of links) {
-    const value = sourceValue(document, scope, sourcePath)
+  for (const { sourcePath, targetPath } of context.links) {
+    const value = sourceValue(context, sourcePath)
 
     if (value !== undefined && value !== '') {
       values.set(targetPath, value)
@@ -156,33 +153,80 @@ function groupPaths(nodes: ReadonlyArray<EdifactStructureNode>): string[] {
   )
 }
 
-// A loop's items output fills a segment group, every other link an element.
+type TransformTarget = { path: string; group: boolean }
+
+type LoopDraft = Omit<Loop, 'sourcePart'> & { sourcePart?: string }
+
+function wiringOf({ transforms, transformLinks }: OutboundMappingVersion) {
+  const drafts = new Map<string, LoopDraft>()
+
+  for (const transform of transforms) {
+    if (transform.kind === 'loop') {
+      drafts.set(transform.id, {
+        targetParts: [],
+        counterStart: transform.config.counterStart,
+        counterTargets: [],
+      })
+    }
+  }
+
+  const targets: TransformTarget[] = []
+
+  for (const { from, to } of transformLinks) {
+    if (to.kind === 'transform') {
+      const draft = drafts.get(to.transformId)
+
+      if (draft && to.input === 'items' && from.kind === 'source') {
+        draft.sourcePart = from.path
+      }
+
+      continue
+    }
+
+    const output = from.kind === 'transform' ? from.output : undefined
+    const draft = from.kind === 'transform' ? drafts.get(from.transformId) : undefined
+
+    targets.push({ path: to.path, group: output === 'items' })
+
+    if (output === 'items') {
+      draft?.targetParts.push(to.path)
+    }
+
+    if (output === 'counter') {
+      draft?.counterTargets.push(to.path)
+    }
+  }
+
+  const loops = new Map<string, Loop>()
+
+  for (const { sourcePart, ...draft } of drafts.values()) {
+    if (sourcePart !== undefined) {
+      const loop = { sourcePart, ...draft }
+
+      for (const targetPart of loop.targetParts) {
+        loops.set(targetPart, loop)
+      }
+    }
+  }
+
+  return { loops, targets }
+}
+
 function unknownTarget(
-  { links, transformLinks }: OutboundMappingVersion,
+  links: OutboundMappingVersion['links'],
+  targets: ReadonlyArray<TransformTarget>,
   body: ReadonlyArray<EdifactStructureNode>,
 ): string | undefined {
   const elements = new Set(elementPaths(body))
   const groups = new Set(groupPaths(body))
 
-  const targets = [
-    ...links.map(({ targetPath }) => ({ path: targetPath, known: elements })),
-    ...transformLinks.flatMap(({ from, to }) =>
-      to.kind === 'target'
-        ? [
-            {
-              path: to.path,
-              known: from.kind === 'transform' && from.output === 'items' ? groups : elements,
-            },
-          ]
-        : [],
-    ),
-  ]
-
-  return targets.find(({ path, known }) => !known.has(path))?.path
+  return [...links.map(({ targetPath }) => ({ path: targetPath, group: false })), ...targets].find(
+    ({ path, group }) => !(group ? groups : elements).has(path),
+  )?.path
 }
 
 const hasValueBeneath = (part: StructurePart, values: Values) =>
-  [...values.keys()].some((path) => path.startsWith(`${part.path}/`))
+  [...values.keys()].some((path) => isBeneath(path, part.path))
 
 const isRequiredOrFilled = (part: StructurePart, values: Values) =>
   part.required || hasValueBeneath(part, values)
@@ -218,8 +262,7 @@ const missing = (targetPath: string) =>
 const hasItemsBeneath = (part: StructurePart, context: Context) =>
   [...context.loops].some(
     ([targetPart, { sourcePart }]) =>
-      targetPart.startsWith(`${part.path}/`) &&
-      itemsOf(context.document, context.scope, sourcePart).length > 0,
+      isBeneath(targetPart, part.path) && itemsOf(context, sourcePart).length > 0,
   )
 
 // An empty optional segment group is left out rather than failing.
@@ -237,7 +280,7 @@ function within(context: Context, loop: Loop, item: JsonContent, index: number):
     ]),
   }
 
-  return { ...context, scope, values: valuesIn(context.document, context.links, scope) }
+  return { ...context, scope, values: valuesIn({ ...context, scope }) }
 }
 
 function loopSegments(
@@ -245,7 +288,7 @@ function loopSegments(
   loop: Loop,
   context: Context,
 ): Effect.Effect<Segment[], MappingError> {
-  const items = itemsOf(context.document, context.scope, loop.sourcePart)
+  const items = itemsOf(context, loop.sourcePart)
 
   // A required group without items fails as one without values does.
   if (items.length === 0) {
@@ -292,48 +335,6 @@ function segmentsOf(
   )
 }
 
-function loopsOf({ transforms, transformLinks }: OutboundMappingVersion): Map<string, Loop> {
-  const loops = new Map<string, Loop>()
-
-  for (const transform of transforms) {
-    if (transform.kind !== 'loop') {
-      continue
-    }
-
-    const sourcePart = transformLinks.find(
-      ({ to }) =>
-        to.kind === 'transform' && to.transformId === transform.id && to.input === 'items',
-    )?.from
-
-    if (sourcePart?.kind !== 'source') {
-      continue
-    }
-
-    const targets = (output: string) =>
-      transformLinks.flatMap(({ from, to }) =>
-        from.kind === 'transform' &&
-        from.transformId === transform.id &&
-        from.output === output &&
-        to.kind === 'target'
-          ? [to.path]
-          : [],
-      )
-
-    const loop = {
-      sourcePart: sourcePart.path,
-      targetParts: targets('items'),
-      counterStart: transform.config.counterStart,
-      counterTargets: targets('counter'),
-    }
-
-    for (const targetPart of loop.targetParts) {
-      loops.set(targetPart, loop)
-    }
-  }
-
-  return loops
-}
-
 function framed({ messageType, children }: MessageTypeStructure) {
   const [header, ...body] = children
   const trailer = body.pop()
@@ -358,22 +359,21 @@ export function applyMappingVersion(
 ): Effect.Effect<Message, MappingError> {
   const structure = messageTypeStructures[version.target.messageType]
   const { header, body } = framed(structure)
-  const unknown = unknownTarget(version, body)
+  const { loops, targets } = wiringOf(version)
+  const unknown = unknownTarget(version.links, targets, body)
 
   if (unknown !== undefined) {
     return Effect.fail(new MappingError({ code: 'unknownTarget', targetPath: unknown }))
   }
 
-  const scope: Scope = { items: new Map(), counters: new Map() }
-  const { links } = version
-
-  const context: Context = {
+  const reading: Reading = {
     document,
-    links,
-    loops: loopsOf(version),
-    scope,
-    values: valuesIn(document, links, scope),
+    links: version.links,
+    loops,
+    scope: { items: new Map(), counters: new Map() },
   }
+
+  const context: Context = { ...reading, values: valuesIn(reading) }
 
   return Effect.map(segmentsOf(body, context), (segments) => ({
     header: segmentOf(header, new Map([[`${header.path}/0062`, messageReference]])),
