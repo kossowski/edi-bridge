@@ -82,28 +82,37 @@ const despatch = {
 
 const loopId = '3e8c1a27-5b4d-4f6e-8a9b-1c2d3e4f5a6b'
 
-const loop: MappingTransform = {
-  id: loopId,
+const loopOf = (id: string): MappingTransform => ({
+  id,
   kind: 'loop',
   position: { x: 0, y: 0 },
   config: { counterStart: 1 },
-}
+})
 
-function looped(sourcePart: string, targetPart: string, counterTarget?: string): TransformLink[] {
+const loop = loopOf(loopId)
+
+const packageLoopId = '9a4b2c1d-6e7f-4a8b-9c0d-1e2f3a4b5c6d'
+
+function looped(
+  sourcePart: string,
+  targetPart: string,
+  counterTarget?: string,
+  transformId = loopId,
+): TransformLink[] {
   return [
     {
       from: { kind: 'source', path: sourcePart },
-      to: { kind: 'transform', transformId: loopId, input: 'items' },
+      to: { kind: 'transform', transformId, input: 'items' },
     },
     {
-      from: { kind: 'transform', transformId: loopId, output: 'items' },
+      from: { kind: 'transform', transformId, output: 'items' },
       to: { kind: 'target', path: targetPart },
     },
     ...(counterTarget === undefined
       ? []
       : [
           {
-            from: { kind: 'transform', transformId: loopId, output: 'counter' },
+            from: { kind: 'transform', transformId, output: 'counter' },
             to: { kind: 'target', path: counterTarget },
           } as const,
         ]),
@@ -384,6 +393,51 @@ describe('applyMappingVersion', () => {
     expect(apply(version, { ...despatch, lines: [] }).segments.slice(5)).toEqual([
       { tag: 'CPS', elements: [['1']] },
     ])
+  })
+
+  it('reads the lines of the current package and numbers them across the whole message', () => {
+    const version = outboundVersion(
+      'DESADV',
+      [
+        ...despatchHeader.filter(({ targetPath }) => targetPath !== 'SG10/CPS/7164'),
+        { sourcePath: 'packages[].lines[].gtin', targetPath: 'SG10/SG17/LIN/C212/7140' },
+        { sourcePath: 'packages[].lines[].quantity', targetPath: 'SG10/SG17/QTY+12/C186/6060' },
+      ],
+      {
+        transforms: [loopOf(packageLoopId), loop],
+        transformLinks: [
+          ...looped('packages[]', 'SG10', 'SG10/CPS/7164', packageLoopId),
+          ...looped('packages[].lines[]', 'SG10/SG17', 'SG10/SG17/LIN/1082'),
+        ],
+      },
+    )
+
+    const document = {
+      ...despatch,
+      packages: [
+        {
+          lines: [
+            { gtin: '4000862141404', quantity: 12 },
+            { gtin: '4000862141411', quantity: 5 },
+          ],
+        },
+        { lines: [{ gtin: '4000862141428', quantity: 7 }] },
+      ],
+    }
+
+    const message = apply(version, document)
+
+    expect(message.segments.slice(5)).toEqual([
+      { tag: 'CPS', elements: [['1']] },
+      { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+      { tag: 'QTY', elements: [['12', '12']] },
+      { tag: 'LIN', elements: [['2'], [''], ['4000862141411', 'EN']] },
+      { tag: 'QTY', elements: [['12', '5']] },
+      { tag: 'CPS', elements: [['2']] },
+      { tag: 'LIN', elements: [['3'], [''], ['4000862141428', 'EN']] },
+      { tag: 'QTY', elements: [['12', '7']] },
+    ])
+    expect(message.trailer).toEqual({ tag: 'UNT', elements: [['15'], ['1']] })
   })
 
   it.each([

@@ -50,6 +50,7 @@ type Context = {
   document: JsonContent
   links: OutboundMappingVersion['links']
   loops: ReadonlyMap<string, Loop>
+  numbered: Map<Loop, number>
   scope: Scope
   values: Values
 }
@@ -269,8 +270,11 @@ const hasItemsBeneath = (part: StructurePart, context: Context) =>
 const isPresent = (part: StructurePart, context: Context) =>
   isRequiredOrFilled(part, context.values) || hasItemsBeneath(part, context)
 
-function within(context: Context, loop: Loop, item: JsonContent, index: number): Context {
-  const counter = String(loop.counterStart + index)
+function within(context: Context, loop: Loop, item: JsonContent): Context {
+  const numbered = context.numbered.get(loop) ?? 0
+  const counter = String(loop.counterStart + numbered)
+
+  context.numbered.set(loop, numbered + 1)
 
   const scope = {
     items: new Map(context.scope.items).set(loop.sourcePart, item),
@@ -298,9 +302,7 @@ function loopSegments(
   }
 
   return Effect.map(
-    Effect.forEach(items, (item, index) =>
-      segmentsOf(group.children, within(context, loop, item, index)),
-    ),
+    Effect.forEach(items, (item) => segmentsOf(group.children, within(context, loop, item))),
     (repetitions) => repetitions.flat(),
   )
 }
@@ -370,6 +372,7 @@ export function applyMappingVersion(
     document,
     links: version.links,
     loops,
+    numbered: new Map(),
     scope: { items: new Map(), counters: new Map() },
   }
 
