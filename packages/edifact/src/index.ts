@@ -2,7 +2,7 @@ export { readAcknowledgedInterchange, ReadAcknowledgementError } from './acknowl
 
 export { parse, ParseError } from './parse'
 
-export { serialize, SerializeError } from './serialize'
+export { serialize, SerializeError, serializeMessage } from './serialize'
 
 export { validate, ValidationError } from './validate'
 

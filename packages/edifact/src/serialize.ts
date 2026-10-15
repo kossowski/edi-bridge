@@ -1,7 +1,7 @@
 import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
 import { describePosition, type Position } from './position'
 
-import type { Delimiters, Interchange, Segment, Whitespace } from './model'
+import type { Delimiters, Interchange, Message, Segment, Whitespace } from './model'
 
 export type SerializeErrorCode = 'unreleasable-service-character'
 
@@ -91,3 +91,9 @@ export const serialize = ({
     whitespace.trailingText
   )
 }
+
+// One segment per line, from UNH to UNT, for a reader rather than a Channel.
+export const serializeMessage = ({ header, segments, trailer }: Message): string =>
+  [header, ...segments, trailer]
+    .map((segment, index) => serializeSegment(segment, defaultDelimiters, index + 1))
+    .join('\n')
