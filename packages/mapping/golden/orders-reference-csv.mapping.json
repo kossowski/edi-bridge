@@ -1,0 +1,201 @@
+{
+  "id": "7e1b4d9a-2c6f-4a3e-8d5b-1f9a7c3e6b20",
+  "mappingId": "4a8f2c6e-0b3d-4e9f-b7a1-5c2e8d4f0a63",
+  "mappingName": "Reference order: ORDERS to ERP CSV",
+  "version": 1,
+  "publishedAt": "2026-10-15T08:00:00.000Z",
+  "direction": "inbound",
+  "source": {
+    "kind": "messageType",
+    "messageType": "ORDERS"
+  },
+  "target": {
+    "kind": "documentStructure",
+    "documentStructureId": "8c2f6a0d-4e9b-4d1a-a3c7-6b0e2f8d4a95",
+    "name": "ERP order lines"
+  },
+  "links": [
+    {
+      "sourcePath": "BGM/1004",
+      "targetPath": "rows[].Bestellnummer"
+    },
+    {
+      "sourcePath": "SG2+BY/NAD+BY/C082/3039",
+      "targetPath": "rows[].Käufer"
+    },
+    {
+      "sourcePath": "SG2+BY/SG5/CTA+OC/C056/3413",
+      "targetPath": "rows[].Ansprechpartner"
+    },
+    {
+      "sourcePath": "SG2+DP/NAD+DP/C082/3039",
+      "targetPath": "rows[].Warenempfänger"
+    },
+    {
+      "sourcePath": "SG2+DP/NAD+DP/3164",
+      "targetPath": "rows[].Ort"
+    },
+    {
+      "sourcePath": "SG25/LIN/C212/7140",
+      "targetPath": "rows[].EAN"
+    },
+    {
+      "sourcePath": "SG25/PIA+1/C212/7140",
+      "targetPath": "rows[].Artikelnummer"
+    },
+    {
+      "sourcePath": "SG25/QTY+21/C186/6060",
+      "targetPath": "rows[].Menge"
+    }
+  ],
+  "transforms": [
+    {
+      "id": "0d4c8b3a-6e2f-4a1d-9c7b-000000000001",
+      "kind": "loop",
+      "position": {
+        "x": 0,
+        "y": 80
+      },
+      "config": {
+        "counterStart": 1
+      }
+    },
+    {
+      "id": "0d4c8b3a-6e2f-4a1d-9c7b-000000000002",
+      "kind": "dateFormat",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "config": {
+        "from": "yyyyMMdd",
+        "to": "dd.MM.yyyy"
+      }
+    },
+    {
+      "id": "0d4c8b3a-6e2f-4a1d-9c7b-000000000003",
+      "kind": "lookupTable",
+      "position": {
+        "x": 0,
+        "y": 240
+      },
+      "config": {
+        "lookupTableId": "6d2e8f41-3b5c-4a7d-9e1f-2c4b6a8d0e13",
+        "fallback": "fail"
+      }
+    },
+    {
+      "id": "0d4c8b3a-6e2f-4a1d-9c7b-000000000004",
+      "kind": "numberFormat",
+      "position": {
+        "x": 0,
+        "y": 320
+      },
+      "config": {
+        "decimalPlaces": 2,
+        "decimalSeparator": ","
+      }
+    }
+  ],
+  "transformLinks": [
+    {
+      "from": {
+        "kind": "source",
+        "path": "SG25"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000001",
+        "input": "items"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000001",
+        "output": "items"
+      },
+      "to": {
+        "kind": "target",
+        "path": "rows[]"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000001",
+        "output": "counter"
+      },
+      "to": {
+        "kind": "target",
+        "path": "rows[].Position"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "DTM+137/C507/2380"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000002",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000002",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "rows[].Bestelldatum"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "SG25/QTY+21/C186/6411"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000003",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000003",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "rows[].Einheit"
+      }
+    },
+    {
+      "from": {
+        "kind": "source",
+        "path": "SG25/SG28/PRI+AAA/C509/5118"
+      },
+      "to": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000004",
+        "input": "value"
+      }
+    },
+    {
+      "from": {
+        "kind": "transform",
+        "transformId": "0d4c8b3a-6e2f-4a1d-9c7b-000000000004",
+        "output": "value"
+      },
+      "to": {
+        "kind": "target",
+        "path": "rows[].Preis"
+      }
+    }
+  ]
+}

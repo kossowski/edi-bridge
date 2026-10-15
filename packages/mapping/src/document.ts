@@ -1,16 +1,29 @@
 import { Data, Effect } from 'effect'
+import { z } from 'zod'
 
 import {
   arrayBasePath,
+  type CharacterEncoding,
   type DocumentStructure,
   DocumentStructureProblemError,
+  encodeText,
   type InferredDocumentStructure,
   type JsonContent,
   parseCsv,
   rootListPath,
+  UnencodableCharacterError,
 } from '@edi-bridge/contracts'
 
 import { jsonListSchema, jsonObjectSchema } from './json'
+
+export const documentWriteErrorCodes = ['unencodableCharacter'] as const
+
+export type DocumentWriteErrorCode = (typeof documentWriteErrorCodes)[number]
+
+export class DocumentWriteError extends Data.TaggedError('DocumentWriteError')<{
+  readonly code: DocumentWriteErrorCode
+  readonly line: number
+}> {}
 
 export const documentReadErrorCodes = ['invalidJson', 'invalidCsv', 'unexpectedRoot'] as const
 
@@ -53,14 +66,14 @@ function readJson(
     : failed('unexpectedRoot')
 }
 
-function columnsOf(structure: ReadStructure, listPath: string): string[] {
+function rowFields(structure: ReadStructure) {
   const [rows] = structure.children
 
-  if (rows?.kind !== 'array' || rows.items.kind !== 'object') {
-    return []
-  }
+  return rows?.kind === 'array' && rows.items.kind === 'object' ? rows.items.children : []
+}
 
-  return rows.items.children.map(({ path }) => path.slice(listPath.length + 1))
+function columnsOf(structure: ReadStructure, listPath: string): string[] {
+  return rowFields(structure).map(({ path }) => path.slice(listPath.length + 1))
 }
 
 function readCsv(
@@ -100,4 +113,65 @@ export function readDocument(
   text: string,
 ): Effect.Effect<JsonContent, DocumentReadError> {
   return structure.format === 'csv' ? readCsv(structure, text) : readJson(structure.root, text)
+}
+
+const csvLineBreak = '\r\n'
+
+const csvRowSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+
+type CsvCell = z.infer<typeof csvRowSchema>[string] | undefined
+
+function csvCell(value: CsvCell, delimiter: string): string {
+  const text = String(value ?? '')
+
+  return [delimiter, '"', '\n', '\r'].some((character) => text.includes(character))
+    ? `"${text.replaceAll('"', '""')}"`
+    : text
+}
+
+function writeCsv(
+  structure: Extract<ReadStructure, { format: 'csv' }>,
+  content: JsonContent,
+): string {
+  const { delimiter, headerRow } = structure.csv
+  // Names, not path segments: they key the cells the engine writes and keep the sample's header.
+  const columns = rowFields(structure).map(({ name }) => name)
+  const items = jsonObjectSchema.parse(content)[arrayBasePath(rootListPath(structure))] ?? []
+
+  const line = (cells: ReadonlyArray<CsvCell>) =>
+    `${cells.map((cell) => csvCell(cell, delimiter)).join(delimiter)}${csvLineBreak}`
+
+  const lines = jsonListSchema.parse(items).map((item) => {
+    const cells = csvRowSchema.parse(item)
+
+    return line(columns.map((column) => cells[column]))
+  })
+
+  return [...(headerRow ? [line(columns)] : []), ...lines].join('')
+}
+
+function encoded(
+  text: string,
+  encoding: CharacterEncoding,
+): Effect.Effect<Uint8Array, DocumentWriteError> {
+  try {
+    return Effect.succeed(encodeText(text, encoding))
+  } catch (error) {
+    if (error instanceof UnencodableCharacterError) {
+      const line = text.slice(0, error.index).split('\n').length
+
+      return Effect.fail(new DocumentWriteError({ code: 'unencodableCharacter', line }))
+    }
+
+    throw error
+  }
+}
+
+export function writeDocument(
+  structure: ReadStructure,
+  content: JsonContent,
+): Effect.Effect<Uint8Array, DocumentWriteError> {
+  return structure.format === 'csv'
+    ? encoded(writeCsv(structure, content), structure.csv.encoding)
+    : encoded(`${JSON.stringify(content, null, 2)}\n`, 'utf-8')
 }

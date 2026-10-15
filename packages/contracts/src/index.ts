@@ -200,6 +200,7 @@ export {
   documentStructureOrigins,
   encodeText,
   toEncodedFile,
+  UnencodableCharacterError,
   windows1252CsvSettings,
 } from './document-structure-origins'
 

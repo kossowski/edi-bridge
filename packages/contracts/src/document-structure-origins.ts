@@ -7,29 +7,42 @@ import {
 } from './document-structure'
 import { encodeBase64 } from './document-structure-inference'
 
-const windows1252Extras = new Map([
-  ['€', 0x80],
-  ['„', 0x84],
-  ['“', 0x93],
-])
+const windows1252Decoder = new TextDecoder('windows-1252')
+
+const windows1252Bytes = new Map(
+  Array.from({ length: 256 }, (_, byte) => [windows1252Decoder.decode(Uint8Array.of(byte)), byte]),
+)
+
+export class UnencodableCharacterError extends Error {
+  constructor(
+    readonly character: string,
+    readonly index: number,
+  ) {
+    super(`${character} has no Windows-1252 byte`)
+    this.name = 'UnencodableCharacterError'
+  }
+}
 
 export function encodeText(text: string, encoding: CharacterEncoding): Uint8Array {
   if (encoding === 'utf-8') {
     return new TextEncoder().encode(text)
   }
 
-  return Uint8Array.from(text, (character) => {
-    const code = character.codePointAt(0)!
+  const bytes: number[] = []
+  let index = 0
 
-    const byte =
-      code < 0x80 || (code >= 0xa0 && code <= 0xff) ? code : windows1252Extras.get(character)
+  for (const character of text) {
+    const byte = windows1252Bytes.get(character)
 
     if (byte === undefined) {
-      throw new Error(`${character} has no Windows-1252 byte`)
+      throw new UnencodableCharacterError(character, index)
     }
 
-    return byte
-  })
+    bytes.push(byte)
+    index += character.length
+  }
+
+  return Uint8Array.from(bytes)
 }
 
 export function toEncodedFile(

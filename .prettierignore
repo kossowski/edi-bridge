@@ -5,3 +5,5 @@ packages/oxlint-config/anti-slop/
 .local/
 apps/web/public/mockServiceWorker.js
 packages/db/migrations/
+packages/mapping/golden/*
+!packages/mapping/golden/README.md

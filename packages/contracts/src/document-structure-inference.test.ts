@@ -20,7 +20,12 @@ import {
   inferFromJsonSchema,
   parseCsv,
 } from './document-structure-inference'
-import { documentStructureOrigins, encodeText, toEncodedFile } from './document-structure-origins'
+import {
+  documentStructureOrigins,
+  encodeText,
+  toEncodedFile,
+  UnencodableCharacterError,
+} from './document-structure-origins'
 
 function createCsvDocument({
   rowCount,
@@ -250,8 +255,17 @@ describe('encodeText', () => {
     expect([...bytes]).toEqual([0x35, 0x20, 0x80])
   })
 
-  it('refuses a character that has no Windows-1252 byte', () => {
-    expect(() => encodeText('→', 'windows-1252')).toThrow('→')
+  it('writes the dashes, quotes and letters of Windows-1252 as their bytes', () => {
+    const bytes = encodeText('– ’Š', 'windows-1252')
+
+    expect([...bytes]).toEqual([0x96, 0x20, 0x92, 0x8a])
+  })
+
+  it('refuses a character that has no Windows-1252 byte, naming it and its index', () => {
+    expect(() => encodeText('a\n→', 'windows-1252')).toThrow(
+      expect.objectContaining({ character: '→', index: 2 }),
+    )
+    expect(() => encodeText('a\n→', 'windows-1252')).toThrow(UnencodableCharacterError)
   })
 })
 
