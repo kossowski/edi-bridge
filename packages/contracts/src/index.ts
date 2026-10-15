@@ -197,6 +197,13 @@ export {
 } from './document-structure-inference'
 
 export {
+  csvSettingsChangeProblem,
+  type DocumentStructureUses,
+  linkChangeProblem,
+  type PublishedMappingUse,
+} from './document-structure-use'
+
+export {
   documentStructureOrigins,
   encodeText,
   toEncodedFile,
