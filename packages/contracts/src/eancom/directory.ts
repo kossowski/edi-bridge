@@ -300,10 +300,22 @@ const elements = {
     codes: { VAT: text('Value added tax', 'Umsatzsteuer') },
   },
   '5278': { name: text('Duty/tax/fee rate', 'Steuersatz'), format: 'an..17' },
+  '5279': {
+    name: text('Duty/tax/fee rate identification', 'Steuersatz, Identifikation'),
+    format: 'an..7',
+  },
   '5283': {
     name: text('Duty/tax/fee function qualifier', 'Funktion der Steuer, Qualifier'),
     format: 'an..3',
     codes: { '7': text('Tax', 'Steuer') },
+  },
+  '5286': {
+    name: text('Duty/tax/fee assessment basis', 'Veranlagungsbasis der Steuer'),
+    format: 'an..15',
+  },
+  '5289': {
+    name: text('Duty/tax/fee account identification', 'Verrechnungskennzeichen der Steuer'),
+    format: 'an..6',
   },
   '5305': {
     name: text('Duty/tax/fee category, coded', 'Steuerkategorie, codiert'),
@@ -459,8 +471,10 @@ const composites = {
   C243: {
     name: text('Duty/tax/fee detail', 'Steuerdetails'),
     elements: [
+      ['5279', false],
+      ['1131', false],
+      ['3055', false],
       ['5278', false],
-      ['5305', false],
     ],
   },
   C270: {
@@ -514,6 +528,14 @@ const composites = {
     elements: [
       ['5025', true],
       ['5004', false],
+    ],
+  },
+  C533: {
+    name: text('Duty/tax/fee account detail', 'Verrechnungseinzelheiten der Steuer'),
+    elements: [
+      ['5289', true],
+      ['1131', false],
+      ['3055', false],
     ],
   },
   S002: {
@@ -680,7 +702,10 @@ const segments = {
     children: [
       ['5283', true],
       ['C241', false],
+      ['C533', false],
+      ['5286', false],
       ['C243', false],
+      ['5305', false],
     ],
     qualifiedBy: '5283',
   },

@@ -229,6 +229,8 @@ const price = group('SG28', text('Price details', 'Preisangaben'), { maxRepeat: 
 
 const lineCount = segment('CNT+2', { maxRepeat: 10 })
 
+const tax = segment('TAX+7', { ...m, codes: { '3055': [] } })
+
 const orders: StructureDefinition = {
   messageType: 'ORDERS',
   release: 'D.96A',
@@ -345,7 +347,7 @@ const invoic: StructureDefinition = {
         segment('MOA+203', m),
       ]),
       price,
-      group('SG33', text('Line tax', 'Positionssteuer'), { maxRepeat: 5 }, [segment('TAX+7', m)]),
+      group('SG33', text('Line tax', 'Positionssteuer'), { maxRepeat: 5 }, [tax]),
     ]),
     segment('UNS', m),
     lineCount,
@@ -355,10 +357,7 @@ const invoic: StructureDefinition = {
       segment('MOA+125'),
       segment('MOA+176'),
     ]),
-    group('SG50', text('Tax totals', 'Steuersummen'), { maxRepeat: 10 }, [
-      segment('TAX+7', m),
-      segment('MOA+124'),
-    ]),
+    group('SG50', text('Tax totals', 'Steuersummen'), { maxRepeat: 10 }, [tax, segment('MOA+124')]),
     trailer,
   ],
 }

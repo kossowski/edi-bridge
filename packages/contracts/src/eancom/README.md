@@ -44,3 +44,14 @@ IMD describes a line item. The EDIFACT column of the CCG layout gives the UN D.9
 | ORDERS       | `IMD+A` | none                        | same use as INVOIC and DESADV |
 
 7077 `A` is the free-form long description. CCG INVOIC marks 7081, 7009, 1131 and 3055 as not used (`N`), so the IMD use leaves 3055 without a code and it does not fill itself. CCG ORDERS gives IMD only for colour and size (`IMD+B+SGR+:::XXL'`, printed page 133), so ORDERS keeps the same use as the others.
+
+## Tax details
+
+The UN D.96A TAX segment is 5283, C241, C533 (5289, 1131, 3055), 5286, C243 (5279, 1131, 3055, 5278) and 5305, as the EDIFACT column of CCG INVOIC printed page 352 and the TAX layout of MS35 page 6 show. The tax rate in 5278 is therefore the fourth component of the fifth element, and the tax category 5305 is the sixth element:
+
+| Source                      | Example in the source         |
+| --------------------------- | ----------------------------- |
+| CCG INVOIC printed page 353 | `TAX+7+VAT:::+::++:::16:::+'` |
+| MS35 page 6                 | `TAX+7+VAT+++:::25+S'`        |
+
+MS35 marks 1131 and 3055 in C243 as not used (`N`). CCG INVOIC leaves them optional (`O`), and its example leaves them empty. The TAX uses therefore leave 3055 without a code. 5305 keeps its one code `S` (standard rate) and fills itself, as in MS35, where 5305 is required (`R`). CCG INVOIC uses 5305 only for an exempt invoice (`D`).
