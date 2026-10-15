@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto'
 
 import {
   type AcceptInviteInput,
+  type AcceptedInvite,
   type Invite,
   type InviteInput,
   inviteUnusableReason,
@@ -131,8 +132,6 @@ export const revokeInvite = (workspaceId: string, inviteId: string, webOrigin: s
 
 type Refusal = NotFound | InviteUnusable | Forbidden
 
-type Accepted = { email: string }
-
 const passwordMatches = async (hash: string | null, password: string) =>
   hash !== null && (await verifyPassword({ hash, password }))
 
@@ -150,7 +149,7 @@ async function acceptInTransaction(
   tx: Transaction,
   { token, name, password }: AcceptInviteInput,
   now: Date,
-): Promise<Refusal | Accepted> {
+): Promise<Refusal | AcceptedInvite> {
   const [invite] = await tx.select().from(invites).where(eq(invites.token, token)).for('update')
 
   if (invite === undefined) {
