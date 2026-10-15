@@ -105,6 +105,28 @@ describe('messageTypeStructures', () => {
     })
   })
 
+  it.each([
+    ['ORDERS', 'SG25/IMD+A', ['7077', '7081', 'C273']],
+    ['DESADV', 'SG10/SG17/IMD+A', ['7077', '7081', 'C273']],
+    ['INVOIC', 'SG25/IMD+A', ['7077', '7081', 'C273']],
+    ['INVOIC', 'SG25/IMD+A/C273', ['7009', '1131', '3055', '7008']],
+  ] as const)(
+    'places the parts of %s %s at their UN D.96A positions',
+    (messageType, path, codes) => {
+      expect(
+        nodeAt(messageTypeStructures[messageType].children, path)?.children?.map((child) =>
+          child.path.split('/').at(-1),
+        ),
+      ).toEqual(codes)
+    },
+  )
+
+  it('leaves the code list agency of the IMD item description unfilled', () => {
+    expect(nodeAt(messageTypeStructures.INVOIC.children, 'SG25/IMD+A/C273/3055')).toMatchObject({
+      codes: [],
+    })
+  })
+
   it.each(messageTypes)('gives every node of %s a unique path', (messageType) => {
     const paths = flatten(messageTypeStructures[messageType].children).map(({ path }) => path)
 

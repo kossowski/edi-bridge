@@ -352,6 +352,10 @@ const elements = {
     codes: { PCE: text('Piece', 'Stück'), KGM: text('Kilogram', 'Kilogramm') },
   },
   '7008': { name: text('Item description', 'Produktbeschreibung'), format: 'an..35' },
+  '7009': {
+    name: text('Item description identification', 'Produktbeschreibung, Identifikation'),
+    format: 'an..17',
+  },
   '7065': {
     name: text('Type of packages identification', 'Packstückart, Identifikation'),
     format: 'an..17',
@@ -360,7 +364,11 @@ const elements = {
   '7077': {
     name: text('Item description type, coded', 'Art der Produktbeschreibung, codiert'),
     format: 'an..3',
-    codes: { F: text('Free-form', 'Freitext') },
+    codes: { A: text('Free-form long description', 'Freies Format - lange Beschreibung') },
+  },
+  '7081': {
+    name: text('Item characteristic, coded', 'Produkt-/Leistungsgruppe, codiert'),
+    format: 'an..3',
   },
   '7140': { name: text('Item number', 'Produktnummer'), format: 'an..35' },
   '7143': {
@@ -462,7 +470,15 @@ const composites = {
       ['6066', true],
     ],
   },
-  C273: { name: text('Item description', 'Produktbeschreibung'), elements: [['7008', false]] },
+  C273: {
+    name: text('Item description', 'Produktbeschreibung'),
+    elements: [
+      ['7009', false],
+      ['1131', false],
+      ['3055', false],
+      ['7008', false],
+    ],
+  },
   C504: {
     name: text('Currency details', 'Währungsdetails'),
     elements: [
@@ -585,6 +601,7 @@ const segments = {
     name: text('Item description', 'Produktbeschreibung'),
     children: [
       ['7077', false],
+      ['7081', false],
       ['C273', false],
     ],
     qualifiedBy: '7077',

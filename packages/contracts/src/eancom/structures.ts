@@ -218,7 +218,7 @@ function reference(qualifier: string, occurrence: Occurrence = { maxRepeat: 10 }
 
 const productIdentification = [
   segment('PIA+1', { maxRepeat: 25, codes: { '7143': ['SA', 'IN'] } }),
-  segment('IMD+F', { maxRepeat: 99 }),
+  segment('IMD+A', { maxRepeat: 99, codes: { '3055': [] } }),
 ]
 
 const lineItem = segment('LIN', { ...m, codes: { '7143': ['EN'] }, requires: ['C212'] })
