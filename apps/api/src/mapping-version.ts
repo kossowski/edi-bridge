@@ -7,9 +7,11 @@ import {
   type MappingVersionSummary,
   type PublishMappingDraftBody,
   type PublishedMappingVersionsQuery,
+  mappingSideLeaves,
   transformIssues,
+  unknownPathMessage,
 } from '@edi-bridge/contracts'
-import { mappings, mappingVersions, users } from '@edi-bridge/db'
+import { documentStructures, mappings, mappingVersions, users } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, Unprocessable } from './errors.js'
@@ -111,13 +113,28 @@ const publishInTransaction = async (
   publication: { changeNote: string | null; publishedBy: string },
 ): Promise<Refusal | { id: string }[]> => {
   const [locked] = await tx
-    .select({ draft: mappings.draft, unpublishedChanges: mappings.unpublishedChanges })
+    .select({
+      draft: mappings.draft,
+      unpublishedChanges: mappings.unpublishedChanges,
+      messageType: mappings.messageType,
+      children: documentStructures.children,
+    })
     .from(mappings)
+    .innerJoin(documentStructures, eq(mappings.documentStructureId, documentStructures.id))
     .where(eq(mappings.id, mappingId))
     .for('update')
 
   if (!locked?.unpublishedChanges) {
     return noChanges()
+  }
+
+  const unknownPath = unknownPathMessage(
+    locked.draft,
+    mappingSideLeaves(locked.messageType, locked),
+  )
+
+  if (unknownPath !== null) {
+    return new Unprocessable({ message: unknownPath })
   }
 
   if (Object.values(transformIssues(locked.draft)).some((issues) => issues.length > 0)) {

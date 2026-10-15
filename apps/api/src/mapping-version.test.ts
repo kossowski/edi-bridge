@@ -23,6 +23,7 @@ import {
   sessionEndpoint,
   sessionSchema,
   toPath,
+  updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 import { type Connection, documentStructures, mappings } from '@edi-bridge/db'
 
@@ -273,6 +274,27 @@ describe('POST /mappings/:mappingId/versions', () => {
 
     expect(statuses.toSorted()).toEqual([201, 409, 409])
     expect(await versionsOf(mapping.id)).toHaveLength(1)
+  })
+
+  it('answers 422 and publishes nothing while the Draft links a path its Document Structure no longer has', async () => {
+    const mapping = await createdMapping()
+    await save(mapping.id, buyerGln)
+
+    const changed = await admin.inject({
+      method: 'PUT',
+      url: toPath(updateDocumentStructureEndpoint.path, { id: mapping.documentStructureId }),
+      body: { name: 'ERP orders', adjustments: [{ path: 'buyer', repeating: true }] },
+    })
+
+    expect(changed.statusCode).toBe(200)
+
+    const response = await publish(mapping.id, { changeNote: '' })
+
+    expect(response.statusCode).toBe(422)
+    expect(response.json()).toEqual({
+      message: 'The target has no field or element at buyer.gln',
+    })
+    expect(await versionsOf(mapping.id)).toEqual([])
   })
 
   it('answers 422 and publishes nothing while a transform lacks its configuration', async () => {
