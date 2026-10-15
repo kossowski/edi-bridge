@@ -31,6 +31,11 @@ export const previewNoteCodes = [
   'expressionFailed',
   'expressionNotPreviewed',
   'brokenLink',
+  'missingRequiredValue',
+  'outsideLoop',
+  'invalidDate',
+  'invalidNumber',
+  'unknownLookupTable',
 ] as const
 
 export type PreviewNoteCode = (typeof previewNoteCodes)[number]
