@@ -117,11 +117,27 @@ function applied(
   transform: MappingTransform,
   args: Readonly<Record<string, string>>,
 ): Effect.Effect<string, MappingError> {
+  const value = args.value ?? ''
+
   switch (transform.kind) {
     case 'constant':
       return Effect.succeed(transform.config.value)
+    case 'concatenate':
+      return Effect.succeed(
+        transformPorts(transform)
+          .inputs.flatMap((input) => (args[input] ? [args[input]] : []))
+          .join(transform.config.separator),
+      )
+    case 'split':
+      return Effect.succeed(value.split(transform.config.separator)[transform.config.index] ?? '')
+    case 'substring': {
+      const { start, length } = transform.config
+
+      return Effect.succeed(value.slice(start, length === null ? undefined : start + length))
+    }
+
     default:
-      return Effect.succeed(args.value ?? '')
+      return Effect.succeed(value)
   }
 }
 
@@ -318,11 +334,38 @@ function repeatingParts(sourcePath: string): string[] {
   )
 }
 
+function sourcePathsOf(graph: Graph, start: LinkStart, visited = new Set<string>()): string[] {
+  if (start.kind === 'source') {
+    return [start.path]
+  }
+
+  const transform = graph.transforms.get(start.transformId)
+
+  if (!transform || transform.kind === 'loop' || visited.has(transform.id)) {
+    return []
+  }
+
+  visited.add(transform.id)
+
+  return transformPorts(transform).inputs.flatMap((input) => {
+    const from = graph.feeding.get(`${transform.id}/${input}`)
+
+    return from ? sourcePathsOf(graph, from, visited) : []
+  })
+}
+
 function outsideLoop(
   links: OutboundMappingVersion['links'],
-  loops: ReadonlyMap<string, Loop>,
+  { graph, loops }: ReturnType<typeof wiringOf>,
 ): string | undefined {
-  return links.find(({ sourcePath, targetPath }) =>
+  const reads = [
+    ...links,
+    ...graph.targets.flatMap(({ path, from }) =>
+      sourcePathsOf(graph, from).map((sourcePath) => ({ sourcePath, targetPath: path })),
+    ),
+  ]
+
+  return reads.find(({ sourcePath, targetPath }) =>
     repeatingParts(sourcePath).some(
       (part) =>
         ![...loops].some(
@@ -477,7 +520,7 @@ export function applyMappingVersion(
     return Effect.fail(new MappingError({ code: 'unknownTarget', targetPath: unknown }))
   }
 
-  const outside = outsideLoop(version.links, loops)
+  const outside = outsideLoop(version.links, wiring)
 
   if (outside !== undefined) {
     return Effect.fail(new MappingError({ code: 'outsideLoop', targetPath: outside }))

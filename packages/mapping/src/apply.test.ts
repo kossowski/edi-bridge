@@ -135,6 +135,11 @@ const transformOf = (
 
 const transformId = '5d6e7f80-1a2b-4c3d-8e4f-5a6b7c8d9e0f'
 
+const fromSource = (path: string, input = 'value', id = transformId): TransformLink => ({
+  from: { kind: 'source', path },
+  to: { kind: 'transform', transformId: id, input },
+})
+
 const intoTarget = (path: string, id = transformId, output = 'value'): TransformLink => ({
   from: { kind: 'transform', transformId: id, output },
   to: { kind: 'target', path },
@@ -142,7 +147,7 @@ const intoTarget = (path: string, id = transformId, output = 'value'): Transform
 
 const orderWithoutNumber = orderHeader.filter(({ targetPath }) => targetPath !== 'BGM/1004')
 
-const orderNumberVia = (
+const orderVia = (
   transform: Pick<MappingTransform, 'kind' | 'config'>,
   transformLinks: TransformLink[],
 ) =>
@@ -555,7 +560,7 @@ describe('applyMappingVersion', () => {
   })
 
   it('writes a constant into its target element', () => {
-    const version = orderNumberVia({ kind: 'constant', config: { value: 'PO-0001' } }, [
+    const version = orderVia({ kind: 'constant', config: { value: 'PO-0001' } }, [
       intoTarget('BGM/1004'),
     ])
 
@@ -589,7 +594,7 @@ describe('applyMappingVersion', () => {
   ])(
     'fails naming the target element and the transform when %s',
     (_, transform, link, targetPath, failedId) => {
-      const version = orderNumberVia(transform, [link])
+      const version = orderVia(transform, [link])
 
       expect(failure(version, orderWithLine)).toMatchObject({
         code: 'invalidTransform',
@@ -598,4 +603,119 @@ describe('applyMappingVersion', () => {
       })
     },
   )
+
+  it.each([
+    ['joins its parts with the separator', { prefix: 'PO', number: '4711' }, 'PO-4711'],
+    ['leaves out an empty part with its separator', { prefix: 'PO', number: '' }, 'PO'],
+  ])('concatenate %s', (_, fields, expected) => {
+    const version = orderVia({ kind: 'concatenate', config: { inputCount: 2, separator: '-' } }, [
+      fromSource('prefix', 'part1'),
+      fromSource('number', 'part2'),
+      intoTarget('BGM/1004'),
+    ])
+
+    expect(orderNumberOf(version, { ...orderWithLine, ...fields })).toEqual({
+      tag: 'BGM',
+      elements: [['220'], [expected]],
+    })
+  })
+
+  it('split takes the part at its index from the value of each line', () => {
+    const version = orderVia({ kind: 'split', config: { separator: '/', index: 0 } }, [
+      fromSource('lines[].sku'),
+      intoTarget('SG25/PIA+1/C212/7140'),
+    ])
+
+    const document = {
+      ...order,
+      lines: [
+        { gtin: '4000862141404', quantity: 12, sku: 'ART-100/EA' },
+        { gtin: '4000862141411', quantity: 5, sku: 'ART-200/KG' },
+      ],
+    }
+
+    expect(apply(version, document).segments.slice(4, -1)).toEqual([
+      { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+      { tag: 'PIA', elements: [['1'], ['ART-100']] },
+      { tag: 'QTY', elements: [['21', '12']] },
+      { tag: 'LIN', elements: [['2'], [''], ['4000862141411', 'EN']] },
+      { tag: 'PIA', elements: [['1'], ['ART-200']] },
+      { tag: 'QTY', elements: [['21', '5']] },
+    ])
+  })
+
+  it.each([
+    ['the second part', 1, [['220'], ['4711']]],
+    ['nothing when the value has fewer parts than its index', 2, [['220']]],
+  ])('split takes %s', (_, index, elements) => {
+    const version = orderVia({ kind: 'split', config: { separator: '/', index } }, [
+      fromSource('reference'),
+      intoTarget('BGM/1004'),
+    ])
+
+    expect(orderNumberOf(version, { ...orderWithLine, reference: 'PO/4711' })).toEqual({
+      tag: 'BGM',
+      elements,
+    })
+  })
+
+  it.each([
+    ['the rest from its start without a length', 6, null, [['220'], ['PO-4711']]],
+    ['as many characters as its length', 6, 2, [['220'], ['PO']]],
+    ['what remains when the length runs past the end', 9, 10, [['220'], ['4711']]],
+    ['nothing when the start lies past the end', 20, null, [['220']]],
+  ])('substring takes %s', (_, start, length, elements) => {
+    const version = orderVia({ kind: 'substring', config: { start, length } }, [
+      fromSource('reference'),
+      intoTarget('BGM/1004'),
+    ])
+
+    expect(orderNumberOf(version, { ...orderWithLine, reference: 'ORDER-PO-4711' })).toEqual({
+      tag: 'BGM',
+      elements,
+    })
+  })
+
+  it('fails naming a target that reads a line field through a transform outside its loop', () => {
+    const version = orderVia({ kind: 'split', config: { separator: '/', index: 0 } }, [
+      fromSource('lines[].sku'),
+      intoTarget('BGM/1004'),
+    ])
+
+    const document = { ...order, lines: [{ gtin: '4000862141404', quantity: 12, sku: 'A/B' }] }
+
+    expect(failure(version, document)).toMatchObject({
+      code: 'outsideLoop',
+      targetPath: 'BGM/1004',
+    })
+  })
+
+  it('fails naming the target element when transforms feed each other in a circle', () => {
+    const otherId = '6e7f8091-2b3c-4d4e-9f50-6b7c8d9e0f1a'
+    const concatenate = { kind: 'concatenate', config: { inputCount: 2, separator: '' } } as const
+
+    const version = outboundVersion('ORDERS', [...orderWithoutNumber, ...orderLines], {
+      transforms: [loop, transformOf(transformId, concatenate), transformOf(otherId, concatenate)],
+      transformLinks: [
+        ...looped('lines[]', 'SG25', 'SG25/LIN/1082'),
+        fromSource('prefix', 'part1'),
+        {
+          from: { kind: 'transform', transformId: otherId, output: 'value' },
+          to: { kind: 'transform', transformId, input: 'part2' },
+        },
+        fromSource('prefix', 'part1', otherId),
+        {
+          from: { kind: 'transform', transformId, output: 'value' },
+          to: { kind: 'transform', transformId: otherId, input: 'part2' },
+        },
+        intoTarget('BGM/1004'),
+      ],
+    })
+
+    expect(failure(version, { ...orderWithLine, prefix: 'PO' })).toMatchObject({
+      code: 'invalidTransform',
+      targetPath: 'BGM/1004',
+      transformId,
+    })
+  })
 })
