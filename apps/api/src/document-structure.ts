@@ -5,14 +5,17 @@ import {
   adjustDocumentStructure,
   applyLabels,
   type CreateDocumentStructureBody,
+  csvSettingsChangeProblem,
   type DocumentStructure,
   type DocumentStructureOrigin,
+  type DocumentStructureProblem,
   DocumentStructureProblemError,
   documentStructureLeaves,
   documentStructureSchema,
   type DocumentStructureSummary,
   inferDocumentStructure,
   type InferredDocumentStructure,
+  linkChangeProblem,
   samplePreview,
   summaryFieldLabelCount,
   type UpdateDocumentStructureBody,
@@ -21,6 +24,7 @@ import { documentStructures } from '@edi-bridge/db'
 
 import { Db } from './db.js'
 import { DocumentStructureRejected } from './errors.js'
+import { selectDocumentStructureUses, selectMappingsByDocumentStructure } from './mapping-use.js'
 import { byName, exactlyOne, foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
@@ -36,6 +40,9 @@ const rejectingDocumentStructureProblem = <A>(infer: () => A) =>
         : Effect.die(defect),
     ),
   )
+
+const rejectingProblem = (problem: DocumentStructureProblem | null) =>
+  problem === null ? Effect.void : Effect.fail(new DocumentStructureRejected({ problem }))
 
 export const inferDocumentStructureOrReject = (origin: DocumentStructureOrigin) =>
   rejectingDocumentStructureProblem(() => inferDocumentStructure(origin))
@@ -67,7 +74,10 @@ const toDocumentStructure = (row: Row): DocumentStructure =>
     children: row.children,
   })
 
-const toSummary = (structure: DocumentStructure): DocumentStructureSummary => {
+const toSummary = (
+  structure: DocumentStructure,
+  mappings: DocumentStructureSummary['mappings'],
+): DocumentStructureSummary => {
   const leaves = documentStructureLeaves(structure)
   const { sample } = structure
 
@@ -82,8 +92,7 @@ const toSummary = (structure: DocumentStructure): DocumentStructureSummary => {
       takenAt: sample.takenAt,
       preview: samplePreview(sample.text),
     },
-    // Until Mappings (#185) exist.
-    mappings: [],
+    mappings,
   }
 }
 
@@ -91,11 +100,16 @@ export const listDocumentStructures = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
-  const rows = yield* Effect.promise(() =>
-    db.select().from(documentStructures).where(inWorkspace(documentStructures, workspace.id)),
+  const [rows, mappingsByStructure] = yield* Effect.promise(() =>
+    Promise.all([
+      db.select().from(documentStructures).where(inWorkspace(documentStructures, workspace.id)),
+      selectMappingsByDocumentStructure(db, workspace.id),
+    ]),
   )
 
-  return rows.map((row) => toSummary(toDocumentStructure(row))).toSorted(byName)
+  return rows
+    .map((row) => toSummary(toDocumentStructure(row), mappingsByStructure.get(row.id) ?? []))
+    .toSorted(byName)
 })
 
 export const loadDocumentStructure = (id: string) =>
@@ -146,12 +160,18 @@ export const updateDocumentStructure = (
     const existing = yield* loadDocumentStructure(id)
     const body = yield* input
 
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const uses = yield* Effect.promise(() => selectDocumentStructureUses(db, id))
+
+    yield* rejectingProblem(csvSettingsChangeProblem(existing, body, uses.versions))
+
     const adjusted = yield* rejectingDocumentStructureProblem(() =>
       documentStructureSchema.parse(adjustDocumentStructure(existing, body)),
     )
 
-    const db = yield* Db
-    const workspace = yield* CurrentWorkspace
+    yield* rejectingProblem(linkChangeProblem(existing, adjusted, body, uses))
 
     const [row] = yield* Effect.promise(() =>
       db

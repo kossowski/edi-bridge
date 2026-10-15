@@ -33,6 +33,12 @@ export const mappingVersionSummarySchema = z.object({
 
 export type MappingVersionSummary = z.infer<typeof mappingVersionSummarySchema>
 
+const nameCollator = new Intl.Collator('de')
+
+export function byNameAndNewest(a: MappingVersionSummary, b: MappingVersionSummary) {
+  return nameCollator.compare(a.mappingName, b.mappingName) || b.version - a.version
+}
+
 export const publishedMappingVersionsQuerySchema = z.object({
   messageType: messageTypeSchema.optional(),
 })

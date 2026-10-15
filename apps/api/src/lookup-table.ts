@@ -13,7 +13,9 @@ import {
   type LookupTableScopeInput,
   type LookupTableSuggestions,
   type LookupTableSuggestionsQuery,
+  lookupTableInUseMessage,
   type LookupTableSummary,
+  type LookupTableUse,
   type MissingCode,
 } from '@edi-bridge/contracts'
 import {
@@ -25,7 +27,8 @@ import {
 } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
-import { NotFound, Unprocessable } from './errors.js'
+import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { lookupTableUnused, selectLookupTableUses, selectUsesOfLookupTable } from './mapping-use.js'
 import {
   byName,
   foundOrNotFound,
@@ -59,14 +62,14 @@ const scopeOf = ({ tradingPartnerId, tradingPartnerName }: Row): LookupTableScop
     ? { kind: 'tradingPartner', tradingPartner: { id: tradingPartnerId, name: tradingPartnerName } }
     : { kind: 'workspace' }
 
-const toSummary = (row: Row): LookupTableSummary => ({
+const toSummary = (row: Row, uses: LookupTableUse[]): LookupTableSummary => ({
   id: row.id,
   name: row.name,
   kind: row.kind,
   scope: scopeOf(row),
   entryCount: row.entryCount,
-  // Until Mappings (#185) and Runs (#187) exist.
-  uses: [],
+  uses,
+  // Until Runs (#187) exist.
   missingCodeCounts: { blocking: 0, upcoming: 0 },
   blockingCodes: [],
   updatedAt: row.updatedAt.toISOString(),
@@ -86,9 +89,14 @@ export const listLookupTables = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
-  const rows = yield* Effect.promise(() => selectRows(db, inWorkspace(lookupTables, workspace.id)))
+  const [rows, usesOf] = yield* Effect.promise(() =>
+    Promise.all([
+      selectRows(db, inWorkspace(lookupTables, workspace.id)),
+      selectLookupTableUses(db, workspace.id),
+    ]),
+  )
 
-  return rows.map(toSummary).toSorted(byName)
+  return rows.map((row) => toSummary(row, usesOf(row.id))).toSorted(byName)
 })
 
 const selectLookupTable = async (
@@ -106,7 +114,7 @@ const selectLookupTable = async (
   }
 
   return {
-    ...toSummary(row),
+    ...toSummary(row, await selectUsesOfLookupTable(db, workspaceId, row.id)),
     entries: await selectEntries(db, row.id),
     // Until code meanings are served (#228).
     codeMeanings: [],
@@ -280,12 +288,16 @@ export const deleteLookupTable = (id: string) =>
     const deleted = yield* Effect.promise(() =>
       db
         .delete(lookupTables)
-        .where(inWorkspace(lookupTables, workspace.id, eq(lookupTables.id, id)))
+        .where(
+          inWorkspace(lookupTables, workspace.id, eq(lookupTables.id, id), lookupTableUnused(id)),
+        )
         .returning({ id: lookupTables.id }),
     )
 
     if (deleted.length === 0) {
-      return yield* new NotFound()
+      yield* rejectingUnknownLookupTable(id)
+
+      return yield* new Conflict({ message: lookupTableInUseMessage })
     }
   })
 

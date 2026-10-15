@@ -7,6 +7,7 @@ import {
   arrayPath,
   childPath,
   createDocumentStructureEndpoint,
+  csvSettingsChangeProblem,
   type DocumentField,
   type DocumentFieldType,
   documentFieldTypes,
@@ -22,28 +23,20 @@ import {
   type DocumentStructureSummary,
   documentStructureSummarySchema,
   samplePreview,
-  findNode,
-  type GraphParts,
   inferDocumentStructure,
   inferDocumentStructureEndpoint,
   type InferredDocumentStructure,
   type JsonContent,
   knownFieldNames,
-  type MappingVersionSummary,
-  mappingVersionSummarySchema,
+  linkChangeProblem,
   type MessageType,
   messageTypes,
   plainNameOf,
-  sameCsvSettings,
   summaryFieldLabelCount,
-  type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
-  visitedNode,
   type Session,
-  containerOf,
 } from '@edi-bridge/contracts'
 
-import { byNameAndNewest } from './flow'
 import { badRequest, notFound, serverError } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
@@ -572,141 +565,13 @@ function toDocumentStructureSummary(
   })
 }
 
-function linkedPaths({ links, transformLinks }: GraphParts) {
-  return [
-    ...links.flatMap(({ sourcePath, targetPath }) => [sourcePath, targetPath]),
-    ...transformLinks.flatMap(({ from, to }) => [
-      ...(from.kind === 'source' ? [from.path] : []),
-      ...(to.kind === 'target' ? [to.path] : []),
-    ]),
-  ]
-}
-
-function publishedUses(documentStructureId: string, { versions }: MappingUse) {
-  return (versions?.all() ?? []).filter(
-    (version) => version.documentStructureId === documentStructureId,
-  )
-}
-
-function summaries(versions: ReadonlyArray<MappingVersionSummary>) {
-  return versions.map((version) => mappingVersionSummarySchema.parse(version)).sort(byNameAndNewest)
-}
-
-// Plain names only label a node, so a rename changes no shape a Mapping relies on.
-const linkedNodeKeys = ['path', 'name', 'kind', 'required', 'type', 'children', 'items']
-
-function fingerprintAt(nodes: ReadonlyArray<DocumentStructureNode>, path: string) {
-  const visited = visitedNode(nodes, path)
-
-  return (
-    visited &&
-    JSON.stringify(
-      [
-        ...visited.ancestors.map(({ path: ancestorPath, kind, required }) => ({
-          path: ancestorPath,
-          kind,
-          required,
-        })),
-        visited.node,
-      ],
-      linkedNodeKeys,
-    )
-  )
-}
-
-function related(a: string, b: string) {
-  return a === b || containerOf([a], b) || containerOf([b], a)
-}
-
-function adjustmentAt(linkedPath: string, body: UpdateDocumentStructureBody) {
-  return body.adjustments.find(({ path }) => related(path, linkedPath))?.path ?? linkedPath
-}
-
-function usedByMappingVersion(
-  versions: ReadonlyArray<MappingVersionSummary>,
-  message: string,
-  path: string | null,
-): DocumentStructureProblem {
-  const versionNames = versions.map(({ mappingName, version }) => `${mappingName} v${version}`)
+function usesOf(documentStructureId: string, { mappings, versions }: MappingUse) {
+  const ofStructure = <Use extends { documentStructureId: string }>(uses: ReadonlyArray<Use>) =>
+    uses.filter((use) => use.documentStructureId === documentStructureId)
 
   return {
-    code: 'usedByMappingVersion',
-    message: `${message}: ${versionNames.join(', ')}`,
-    path,
-    line: null,
-    mappingVersions: [...versions],
-  }
-}
-
-function settingsChange(
-  existing: DocumentStructure,
-  body: UpdateDocumentStructureBody,
-  use: MappingUse,
-): DocumentStructureProblem | null {
-  const published = publishedUses(existing.id, use)
-
-  if (
-    existing.format !== 'csv' ||
-    body.csv === undefined ||
-    sameCsvSettings(existing.csv, body.csv) ||
-    published.length === 0
-  ) {
-    return null
-  }
-
-  return usedByMappingVersion(
-    summaries(published),
-    'Published Mapping Versions read this Document Structure with its CSV settings',
-    null,
-  )
-}
-
-// Published Mapping Versions never change, so nothing they link may change shape. A Draft only
-// needs its links to keep pointing at a node.
-function linkChange(
-  existing: DocumentStructure,
-  updated: DocumentStructure,
-  body: UpdateDocumentStructureBody,
-  use: MappingUse,
-): DocumentStructureProblem | null {
-  const known = (path: string) => findNode(existing.children, path) !== undefined
-
-  const changed = (path: string) =>
-    known(path) && fingerprintAt(existing.children, path) !== fingerprintAt(updated.children, path)
-
-  const published = publishedUses(existing.id, use).filter((version) =>
-    linkedPaths(version).some(changed),
-  )
-
-  const [firstPublished] = published
-
-  if (firstPublished) {
-    const path = adjustmentAt(linkedPaths(firstPublished).find(changed)!, body)
-
-    return usedByMappingVersion(
-      summaries(published),
-      `Published Mapping Versions use ${path}, and a published Mapping Version never changes`,
-      path,
-    )
-  }
-
-  const broken = (use.mappings?.all() ?? [])
-    .filter(({ documentStructureId }) => documentStructureId === existing.id)
-    .flatMap(linkedPaths)
-    .find((path) => known(path) && findNode(updated.children, path) === undefined)
-
-  if (broken === undefined) {
-    return null
-  }
-
-  const path = adjustmentAt(broken, body)
-
-  return {
-    code: 'linkedByMapping',
-    message: `A Mapping Draft links ${broken}, which the change at ${path} would remove`,
-    path,
-    line: null,
-    mappingVersions: null,
+    drafts: ofStructure(mappings?.all() ?? []),
+    versions: ofStructure(versions?.all() ?? []),
   }
 }
 
@@ -845,7 +710,8 @@ export function documentStructureHandlers(
 
         await delay()
 
-        const refusedSettings = settingsChange(existing, body.data, use)
+        const uses = usesOf(existing.id, use)
+        const refusedSettings = csvSettingsChangeProblem(existing, body.data, uses.versions)
 
         if (refusedSettings) {
           return problemResponse(refusedSettings)
@@ -858,7 +724,7 @@ export function documentStructureHandlers(
         }
 
         const updated = documentStructureSchema.parse(adjusted.result)
-        const refusedLinks = linkChange(existing, updated, body.data, use)
+        const refusedLinks = linkChangeProblem(existing, updated, body.data, uses)
 
         if (refusedLinks) {
           return problemResponse(refusedLinks)

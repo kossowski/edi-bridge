@@ -197,6 +197,13 @@ export {
 } from './document-structure-inference'
 
 export {
+  csvSettingsChangeProblem,
+  type DocumentStructureUses,
+  linkChangeProblem,
+  type PublishedMappingUse,
+} from './document-structure-use'
+
+export {
   documentStructureOrigins,
   encodeText,
   toEncodedFile,
@@ -390,6 +397,8 @@ export {
   lookupTableSuggestionsSchema,
   type LookupTableSummary,
   lookupTableSummarySchema,
+  lookupTableInUseMessage,
+  lookupTableInUseStatus,
   type LookupTableUse,
   lookupTableUseSchema,
   lookupTablesEndpoint,
@@ -411,6 +420,7 @@ export {
 export { applyLookupTableImport, classifyLookupTableImport } from './lookup-table-import'
 
 export {
+  byNameAndNewest,
   type ComparisonOutputs,
   comparisonOutputsSchema,
   type DifferenceChange,

@@ -2,6 +2,7 @@ import { en, Faker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
 import {
+  byNameAndNewest,
   createFlowEndpoint,
   directionOf,
   fitsFlow,
@@ -100,10 +101,6 @@ export type MappingCatalogue = {
   find: (
     mappingVersionId: string,
   ) => { mapping: MappingRecord; version: MappingVersionSummary } | undefined
-}
-
-export function byNameAndNewest(a: MappingVersionSummary, b: MappingVersionSummary) {
-  return a.mappingName.localeCompare(b.mappingName, 'de') || b.version - a.version
 }
 
 export function createMappingCatalogue(mappings: ReadonlyArray<MappingRecord>): MappingCatalogue {
