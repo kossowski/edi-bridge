@@ -1,8 +1,6 @@
 import { z } from 'zod'
 
-const dateTokens = ['yyyy', 'yy', 'MM', 'dd', 'HH', 'mm', 'ss'] as const
-
-type DateToken = (typeof dateTokens)[number]
+import { type DateToken, dateTokens } from '@edi-bridge/contracts'
 
 const isDateToken = (part: string): part is DateToken => dateTokens.some((token) => token === part)
 
