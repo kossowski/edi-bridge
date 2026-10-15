@@ -6,6 +6,8 @@ import type {
   DocumentStructure,
   DocumentStructureNode,
   MappingLink,
+  MappingTransform,
+  TransformLink,
 } from '@edi-bridge/contracts'
 import type { Message, Segment } from '@edi-bridge/edifact'
 
@@ -13,7 +15,13 @@ import { applyInboundMappingVersion, type InboundMappingVersion, MappingError } 
 
 const documentStructureId = '5c2a8f61-1b3d-4e7a-9c0f-8d6e5b4a3f21'
 
-function inboundVersion(links: MappingLink[]): InboundMappingVersion {
+function inboundVersion(
+  links: MappingLink[],
+  {
+    transforms = [],
+    transformLinks = [],
+  }: Pick<Partial<InboundMappingVersion>, 'transforms' | 'transformLinks'> = {},
+): InboundMappingVersion {
   return {
     id: '7d1f3c52-3c1e-4c6b-9a43-2f0d1e8b5a10',
     mappingId: '0b9e6a4e-8d2f-4f5c-b1a7-6c3d2e1f0a98',
@@ -24,10 +32,52 @@ function inboundVersion(links: MappingLink[]): InboundMappingVersion {
     source: { kind: 'messageType', messageType: 'ORDERS' },
     target: { kind: 'documentStructure', documentStructureId, name: 'ERP order' },
     links,
-    transforms: [],
-    transformLinks: [],
+    transforms,
+    transformLinks,
   }
 }
+
+const lineLoopId = '3e8c1a27-5b4d-4f6e-8a9b-1c2d3e4f5a6b'
+
+const loopOf = (id: string, counterStart = 1): MappingTransform => ({
+  id,
+  kind: 'loop',
+  position: { x: 0, y: 0 },
+  config: { counterStart },
+})
+
+function looped(
+  sourcePart: string,
+  targetPart: string,
+  counterTarget?: string,
+  transformId = lineLoopId,
+): TransformLink[] {
+  return [
+    {
+      from: { kind: 'source', path: sourcePart },
+      to: { kind: 'transform', transformId, input: 'items' },
+    },
+    {
+      from: { kind: 'transform', transformId, output: 'items' },
+      to: { kind: 'target', path: targetPart },
+    },
+    ...(counterTarget === undefined
+      ? []
+      : [
+          {
+            from: { kind: 'transform', transformId, output: 'counter' },
+            to: { kind: 'target', path: counterTarget },
+          } as const,
+        ]),
+  ]
+}
+
+const priceLoopId = '9a4b2c1d-6e7f-4a8b-9c0d-1e2f3a4b5c6d'
+
+const lineLoop = (counterTarget?: string) => ({
+  transforms: [loopOf(lineLoopId)],
+  transformLinks: looped('SG25', 'lines[]', counterTarget),
+})
 
 const named = (path: string, required: boolean) => ({
   path,
@@ -48,6 +98,25 @@ const object = (
   children: DocumentStructureNode[],
   required = false,
 ): DocumentStructureNode => ({ ...named(path, required), kind: 'object', children })
+
+const array = (
+  path: string,
+  items: (path: string) => DocumentStructureNode,
+  required = false,
+): DocumentStructureNode => {
+  const content = items(path)
+
+  if (content.kind === 'array') {
+    throw new Error(`The items of ${path} cannot be an array`)
+  }
+
+  return {
+    ...named(path, required),
+    name: path.split('.').at(-1)!.slice(0, -2),
+    kind: 'array',
+    items: { ...content, required: true },
+  }
+}
 
 function structureOf(children: DocumentStructureNode[]): DocumentStructure {
   return {
@@ -81,6 +150,17 @@ const order = messageOf([
   { tag: 'QTY', elements: [['21', '12']] },
   { tag: 'UNS', elements: [['S']] },
   { tag: 'CNT', elements: [['2', '1']] },
+])
+
+const twoLines = messageOf([
+  { tag: 'BGM', elements: [['220'], ['PO-4711'], ['9']] },
+  { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+  { tag: 'QTY', elements: [['21', '12']] },
+  { tag: 'PRI', elements: [['AAA', '1.20']] },
+  { tag: 'PRI', elements: [['AAA', '1.10']] },
+  { tag: 'LIN', elements: [['2'], [''], ['4000862141411', 'EN']] },
+  { tag: 'QTY', elements: [['21', '6']] },
+  { tag: 'UNS', elements: [['S']] },
 ])
 
 const apply = (version: InboundMappingVersion, structure: DocumentStructure, message: Message) =>
@@ -257,6 +337,358 @@ describe('applyInboundMappingVersion', () => {
 
     expect(await failure(version, structure, order)).toEqual(
       new MappingError({ code: 'missingRequiredValue', targetPath: 'deliveryParty.gln' }),
+    )
+  })
+
+  it('maps each repetition of a looped segment group to an item of the array', async () => {
+    const version = inboundVersion(
+      [
+        { sourcePath: 'SG25/LIN/C212/7140', targetPath: 'lines[].gtin' },
+        { sourcePath: 'SG25/QTY+21/C186/6060', targetPath: 'lines[].quantity' },
+      ],
+      lineLoop(),
+    )
+
+    const structure = structureOf([
+      array('lines[]', (path) =>
+        object(path, [field(`${path}.gtin`), field(`${path}.quantity`, { type: 'number' })]),
+      ),
+    ])
+
+    expect(await apply(version, structure, twoLines)).toEqual({
+      lines: [
+        { gtin: '4000862141404', quantity: 12 },
+        { gtin: '4000862141411', quantity: 6 },
+      ],
+    })
+  })
+
+  it('numbers the items of the array with the counter of the loop', async () => {
+    const version = inboundVersion(
+      [{ sourcePath: 'SG25/LIN/C212/7140', targetPath: 'lines[].gtin' }],
+      lineLoop('lines[].position'),
+    )
+
+    const structure = structureOf([
+      array('lines[]', (path) =>
+        object(path, [field(`${path}.position`, { type: 'integer' }), field(`${path}.gtin`)]),
+      ),
+    ])
+
+    expect(await apply(version, structure, twoLines)).toEqual({
+      lines: [
+        { position: 1, gtin: '4000862141404' },
+        { position: 2, gtin: '4000862141411' },
+      ],
+    })
+  })
+
+  it('maps repetitions of a nested segment group to an array in each item', async () => {
+    const version = inboundVersion(
+      [
+        { sourcePath: 'SG25/LIN/C212/7140', targetPath: 'lines[].gtin' },
+        { sourcePath: 'SG25/SG28/PRI+AAA/C509/5118', targetPath: 'lines[].prices[]' },
+      ],
+      {
+        transforms: [loopOf(lineLoopId), loopOf(priceLoopId)],
+        transformLinks: [
+          ...looped('SG25', 'lines[]'),
+          ...looped('SG25/SG28', 'lines[].prices[]', undefined, priceLoopId),
+        ],
+      },
+    )
+
+    const structure = structureOf([
+      array('lines[]', (path) =>
+        object(path, [
+          field(`${path}.gtin`),
+          array(`${path}.prices[]`, (prices) => field(prices, { type: 'number' })),
+        ]),
+      ),
+    ])
+
+    const message = messageOf([
+      { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+      { tag: 'PRI', elements: [['AAA', '1.20']] },
+      { tag: 'PRI', elements: [['AAA', '1.10']] },
+      { tag: 'LIN', elements: [['2'], [''], ['4000862141411', 'EN']] },
+      { tag: 'PRI', elements: [['AAA', '2.40']] },
+    ])
+
+    expect(await apply(version, structure, message)).toEqual({
+      lines: [
+        { gtin: '4000862141404', prices: [1.2, 1.1] },
+        { gtin: '4000862141411', prices: [2.4] },
+      ],
+    })
+  })
+
+  it('repeats a header value linked beneath the loop in every row', async () => {
+    const version = inboundVersion(
+      [
+        { sourcePath: 'BGM/1004', targetPath: 'rows[].orderNumber' },
+        { sourcePath: 'SG25/LIN/C212/7140', targetPath: 'rows[].gtin' },
+      ],
+      { transforms: [loopOf(lineLoopId)], transformLinks: looped('SG25', 'rows[]') },
+    )
+
+    const structure = structureOf([
+      array('rows[]', (path) =>
+        object(path, [field(`${path}.orderNumber`), field(`${path}.gtin`)]),
+      ),
+    ])
+
+    expect(await apply(version, structure, twoLines)).toEqual({
+      rows: [
+        { orderNumber: 'PO-4711', gtin: '4000862141404' },
+        { orderNumber: 'PO-4711', gtin: '4000862141411' },
+      ],
+    })
+  })
+
+  it.each([
+    ['leaves out an optional array', false, {}],
+    ['writes a required array empty', true, { lines: [] }],
+  ])('%s when the looped segment group does not repeat', async (_, required, expected) => {
+    const version = inboundVersion(
+      [{ sourcePath: 'SG25/LIN/C212/7140', targetPath: 'lines[].gtin' }],
+      lineLoop(),
+    )
+
+    const structure = structureOf([
+      array('lines[]', (path) => object(path, [field(`${path}.gtin`)]), required),
+    ])
+
+    expect(await apply(version, structure, messageOf([]))).toEqual(expected)
+  })
+
+  it('writes plain links beneath an array without a loop into one item', async () => {
+    const version = inboundVersion([
+      { sourcePath: 'BGM/1004', targetPath: 'references[].number' },
+      { sourcePath: 'SG2+BY/NAD+BY/C082/3039', targetPath: 'parties[]' },
+    ])
+
+    const structure = structureOf([
+      array('references[]', (path) => object(path, [field(`${path}.number`)])),
+      array('parties[]', (path) => field(path)),
+      array('notes[]', (path) => field(path)),
+    ])
+
+    expect(await apply(version, structure, order)).toEqual({
+      references: [{ number: 'PO-4711' }],
+      parties: ['4012345000009'],
+    })
+  })
+
+  it('writes an optional object that holds only the items of a loop', async () => {
+    const version = inboundVersion(
+      [{ sourcePath: 'SG25/LIN/C212/7140', targetPath: 'order.lines[].gtin' }],
+      { transforms: [loopOf(lineLoopId)], transformLinks: looped('SG25', 'order.lines[]') },
+    )
+
+    const structure = structureOf([
+      object('order', [array('order.lines[]', (path) => object(path, [field(`${path}.gtin`)]))]),
+    ])
+
+    expect(await apply(version, structure, twoLines)).toEqual({
+      order: { lines: [{ gtin: '4000862141404' }, { gtin: '4000862141411' }] },
+    })
+  })
+
+  it('writes an array without a loop that holds only the items of a loop', async () => {
+    const version = inboundVersion(
+      [{ sourcePath: 'SG25/LIN/C212/7140', targetPath: 'orders[].lines[].gtin' }],
+      { transforms: [loopOf(lineLoopId)], transformLinks: looped('SG25', 'orders[].lines[]') },
+    )
+
+    const structure = structureOf([
+      array('orders[]', (path) =>
+        object(path, [
+          array(`${path}.lines[]`, (lines) => object(lines, [field(`${lines}.gtin`)])),
+        ]),
+      ),
+    ])
+
+    expect(await apply(version, structure, twoLines)).toEqual({
+      orders: [{ lines: [{ gtin: '4000862141404' }, { gtin: '4000862141411' }] }],
+    })
+  })
+
+  it('reads the first repetition of a repeating segment group that no loop repeats', async () => {
+    const version = inboundVersion(
+      [
+        { sourcePath: 'SG7/CUX/C504/6345', targetPath: 'currency' },
+        { sourcePath: 'SG25/LIN/C212/7140', targetPath: 'lines[].gtin' },
+      ],
+      lineLoop(),
+    )
+
+    const structure = structureOf([
+      field('currency'),
+      array('lines[]', (path) => object(path, [field(`${path}.gtin`)])),
+    ])
+
+    const message = messageOf([
+      { tag: 'BGM', elements: [['220'], ['PO-4711'], ['9']] },
+      { tag: 'CUX', elements: [['2', 'EUR', '9']] },
+      { tag: 'CUX', elements: [['3', 'USD', '4']] },
+      { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+    ])
+
+    expect(await apply(version, structure, message)).toEqual({
+      currency: 'EUR',
+      lines: [{ gtin: '4000862141404' }],
+    })
+  })
+
+  it('loops over a nested segment group in the first repetition of its unlooped parent', async () => {
+    const version = inboundVersion(
+      [{ sourcePath: 'SG25/SG28/PRI+AAA/C509/5118', targetPath: 'prices[]' }],
+      {
+        transforms: [loopOf(priceLoopId)],
+        transformLinks: looped('SG25/SG28', 'prices[]', undefined, priceLoopId),
+      },
+    )
+
+    const structure = structureOf([array('prices[]', (path) => field(path, { type: 'number' }))])
+
+    expect(await apply(version, structure, twoLines)).toEqual({ prices: [1.2, 1.1] })
+  })
+
+  it.each([
+    [
+      'a loop repeats the line item group into another array',
+      'SG25/LIN/C212/7140',
+      'gtin',
+      looped('SG25', 'lines[]'),
+    ],
+    [
+      'only the line loop encloses it, not the one over the prices',
+      'SG25/SG28/PRI+AAA/C509/5118',
+      'lines[].price',
+      [
+        ...looped('SG25', 'lines[]'),
+        ...looped('SG25/SG28', 'lines[].prices[]', undefined, priceLoopId),
+      ],
+    ],
+  ])(
+    'fails on a link from a repeating segment group when %s',
+    async (_, sourcePath, targetPath, transformLinks) => {
+      const version = inboundVersion([{ sourcePath, targetPath }], {
+        transforms: [loopOf(lineLoopId), loopOf(priceLoopId)],
+        transformLinks,
+      })
+
+      const structure = structureOf([
+        field('gtin'),
+        array('lines[]', (path) =>
+          object(path, [
+            field(`${path}.price`),
+            array(`${path}.prices[]`, (prices) => field(prices)),
+          ]),
+        ),
+      ])
+
+      expect(await failure(version, structure, twoLines)).toEqual(
+        new MappingError({ code: 'outsideLoop', targetPath }),
+      )
+    },
+  )
+
+  it('fails on a loop over a nested segment group outside the loop over its parent', async () => {
+    const version = inboundVersion([], {
+      transforms: [loopOf(lineLoopId), loopOf(priceLoopId)],
+      transformLinks: [
+        ...looped('SG25', 'lines[]'),
+        ...looped('SG25/SG28', 'prices[]', undefined, priceLoopId),
+      ],
+    })
+
+    const structure = structureOf([
+      array('lines[]', (path) => field(path)),
+      array('prices[]', (path) => field(path)),
+    ])
+
+    expect(await failure(version, structure, twoLines)).toEqual(
+      new MappingError({ code: 'outsideLoop', targetPath: 'prices[]' }),
+    )
+  })
+
+  it.each(['BGM', 'SG99'])(
+    'fails on a loop over %s, which is no segment group of the Message Type',
+    async (sourcePart) => {
+      const version = inboundVersion([], {
+        transforms: [loopOf(lineLoopId)],
+        transformLinks: looped(sourcePart, 'lines[]'),
+      })
+
+      const structure = structureOf([array('lines[]', (path) => field(path))])
+
+      expect(await failure(version, structure, twoLines)).toEqual(
+        new MappingError({ code: 'unknownSource', targetPath: 'lines[]', sourcePath: sourcePart }),
+      )
+    },
+  )
+
+  it.each([
+    ['the loop items into an object', 'buyer', undefined, 'buyer'],
+    ['the loop items into a field', 'buyer.gln', undefined, 'buyer.gln'],
+    ['the counter into an array', 'lines[]', 'lines[]', 'lines[]'],
+  ])('fails on a link of %s', async (_, targetPart, counterTarget, targetPath) => {
+    const version = inboundVersion([], {
+      transforms: [loopOf(lineLoopId)],
+      transformLinks: looped('SG25', targetPart, counterTarget),
+    })
+
+    const structure = structureOf([
+      object('buyer', [field('buyer.gln')]),
+      array('lines[]', (path) => object(path, [field(`${path}.gtin`)])),
+    ])
+
+    expect(await failure(version, structure, twoLines)).toEqual(
+      new MappingError({ code: 'unknownTarget', targetPath }),
+    )
+  })
+
+  it('fails on the counter of a loop that counts from below zero', async () => {
+    const version = inboundVersion([], {
+      transforms: [loopOf(lineLoopId, -1)],
+      transformLinks: looped('SG25', 'lines[]', 'lines[].position'),
+    })
+
+    const structure = structureOf([
+      array('lines[]', (path) => object(path, [field(`${path}.position`)])),
+    ])
+
+    expect(await failure(version, structure, twoLines)).toEqual(
+      new MappingError({
+        code: 'invalidTransform',
+        targetPath: 'lines[].position',
+        transformId: lineLoopId,
+      }),
+    )
+  })
+
+  it('fails when an item of the array gets no value for a required field', async () => {
+    const version = inboundVersion(
+      [{ sourcePath: 'SG25/QTY+21/C186/6060', targetPath: 'lines[].quantity' }],
+      lineLoop('lines[].position'),
+    )
+
+    const structure = structureOf([
+      array('lines[]', (path) =>
+        object(path, [field(`${path}.position`), field(`${path}.quantity`, { required: true })]),
+      ),
+    ])
+
+    const message = messageOf([
+      { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+      { tag: 'QTY', elements: [['21', '12']] },
+      { tag: 'LIN', elements: [['2'], [''], ['4000862141411', 'EN']] },
+    ])
+
+    expect(await failure(version, structure, message)).toEqual(
+      new MappingError({ code: 'missingRequiredValue', targetPath: 'lines[].quantity' }),
     )
   })
 })
