@@ -1,14 +1,14 @@
 import { http, HttpResponse } from 'msw'
-import { NextIntlClientProvider } from 'next-intl'
 import { expect, fn, screen, userEvent, waitFor } from 'storybook/test'
 
 import { DeleteLookupTableDialog } from '@/components/lookup-tables/delete-lookup-table-dialog'
+import { german } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import messagesDe from '@/messages/de.json'
 import {
   deleteLookupTableEndpoint,
   lookupTableInUseMessage,
   lookupTableInUseStatus,
+  toPath,
 } from '@edi-bridge/contracts'
 import { seedLookupTableNamed, seedTradingPartners, toLookupTableSummary } from '@edi-bridge/mocks'
 
@@ -51,7 +51,7 @@ export const Default = meta.story({
 })
 
 const refuseInUse = http.delete(
-  `${apiUrl}${deleteLookupTableEndpoint.path.replace(':id', units.id)}`,
+  `${apiUrl}${toPath(deleteLookupTableEndpoint.path, { id: units.id })}`,
   () =>
     HttpResponse.json(
       { status: lookupTableInUseStatus, message: lookupTableInUseMessage },
@@ -68,7 +68,7 @@ export const InUse = meta.story({
     await userEvent.click(screen.getByRole('button', { name: 'Delete list' }))
 
     await expect(await screen.findByRole('alert')).toHaveTextContent(
-      'A mapping or one of its published versions uses this list, so it cannot be deleted.',
+      'A draft or a published version of a mapping uses this list, so it cannot be deleted.',
     )
     await expect(screen.queryByText(/Try again/)).toBeNull()
     const confirm = screen.getByRole('button', { name: 'Delete list' })
@@ -80,13 +80,7 @@ export const InUse = meta.story({
 })
 
 export const GermanInUse = meta.story({
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
-    ),
-  ],
+  decorators: [german],
   beforeEach({ msw }) {
     msw.use(refuseInUse)
   },
@@ -95,19 +89,13 @@ export const GermanInUse = meta.story({
     await userEvent.click(screen.getByRole('button', { name: 'Liste löschen' }))
 
     await expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Ein Mapping oder eine seiner veröffentlichten Versionen verwendet diese Liste, deshalb kann sie nicht gelöscht werden.',
+      'Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Liste, deshalb kann sie nicht gelöscht werden.',
     )
   },
 })
 
 export const German = meta.story({
-  decorators: [
-    (Story) => (
-      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
-        <Story />
-      </NextIntlClientProvider>
-    ),
-  ],
+  decorators: [german],
   async play() {
     await dialog()
     await expect(screen.getByRole('button', { name: 'Liste löschen' })).toBeVisible()

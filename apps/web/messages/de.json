@@ -3573,7 +3573,7 @@
       "label": "Aktionen für {name}",
       "edit": "Name und Empfänger bearbeiten",
       "delete": "Löschen",
-      "inUse": "Verwendet von {mappings}. Entfernen Sie die Liste dort, um sie zu löschen.",
+      "inUse": "Verwendet für {mappings}.",
       "moreMappings": "{count} weitere"
     },
     "announcements": {
@@ -3641,7 +3641,7 @@
       "confirm": "Liste löschen",
       "pending": "Wird gelöscht…",
       "failed": "Die Liste konnte nicht gelöscht werden. Versuchen Sie es erneut.",
-      "inUse": "Ein Mapping oder eine seiner veröffentlichten Versionen verwendet diese Liste, deshalb kann sie nicht gelöscht werden."
+      "inUse": "Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Liste, deshalb kann sie nicht gelöscht werden."
     }
   },
   "LookupTable": {

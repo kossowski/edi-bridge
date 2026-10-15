@@ -130,12 +130,15 @@ export const ManyUsesAndCodes = meta.story({
   },
 })
 
-async function openActions(name: string) {
+async function openActions(
+  name: string,
+  labels = { actions: `Actions for ${name}`, delete: 'Delete' },
+) {
   const title = await screen.findByRole('link', { name })
 
-  await userEvent.click(card(title).getByRole('button', { name: `Actions for ${name}` }))
+  await userEvent.click(card(title).getByRole('button', { name: labels.actions }))
 
-  return screen.findByRole('menuitem', { name: 'Delete' })
+  return screen.findByRole('menuitem', { name: labels.delete })
 }
 
 export const DeleteInUse = meta.story({
@@ -144,7 +147,7 @@ export const DeleteInUse = meta.story({
 
     await expect(remove).toHaveAttribute('aria-disabled', 'true')
     await expect(remove).toHaveAccessibleDescription(
-      /^In use by [^,]+, [^,]+, [^,]+, and 1 more\. Remove the list there to delete it\.$/,
+      'Used for Dispatch advices to Elbtal Warenhaus KG, Invoices to Elbtal Warenhaus KG, Dispatch advices to Hansemarkt GmbH, and 1 more.',
     )
     remove.focus()
     await userEvent.keyboard('{Enter}')
@@ -168,15 +171,13 @@ export const DeleteUnused = meta.story({
 export const GermanDeleteInUse = meta.story({
   decorators: [german],
   async play() {
-    const title = await screen.findByRole('link', { name: 'Units of measure' })
-
-    await userEvent.click(
-      card(title).getByRole('button', { name: 'Aktionen für Units of measure' }),
-    )
-    const remove = await screen.findByRole('menuitem', { name: 'Löschen' })
+    const remove = await openActions('Units of measure', {
+      actions: 'Aktionen für Units of measure',
+      delete: 'Löschen',
+    })
 
     await expect(remove).toHaveAccessibleDescription(
-      /^Verwendet von [^,]+, [^,]+, [^,]+ und 1 weitere\. Entfernen Sie die Liste dort, um sie zu löschen\.$/,
+      'Verwendet für Lieferavise an Elbtal Warenhaus KG, Rechnungen an Elbtal Warenhaus KG, Lieferavise an Hansemarkt GmbH und 1 weitere.',
     )
   },
 })

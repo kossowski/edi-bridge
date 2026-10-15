@@ -39,6 +39,16 @@ export function hasBlockingCodes(table: Pick<LookupTableSummary, 'blockingCodes'
   return table.blockingCodes.length > 0
 }
 
+function useShortList() {
+  const format = useFormatter()
+
+  return (names: ReadonlyArray<string>, shown: number, more: (count: number) => string) => {
+    const hidden = names.length - shown
+
+    return format.list(hidden > 0 ? [...names.slice(0, shown), more(hidden)] : names)
+  }
+}
+
 function useUseSentence() {
   const t = useTranslations('CodeTranslations.uses')
   const format = useFormatter()
@@ -98,16 +108,14 @@ export function UsesList({
 
 function BlockingBadge({ codes }: { codes: ReadonlyArray<string> }) {
   const t = useTranslations('CodeTranslations')
-  const format = useFormatter()
-  const hidden = codes.length - namedCodes
-  const named = codes.slice(0, namedCodes)
+  const shortList = useShortList()
 
   return (
     <Badge variant="outline" className="bg-red-500/10 text-red-800 dark:text-red-300">
       <HugeiconsIcon icon={Alert02Icon} strokeWidth={2} aria-hidden />
       {t('missing', {
         count: codes.length,
-        codes: format.list(hidden > 0 ? [...named, t('moreCodes', { count: hidden })] : named),
+        codes: shortList(codes, namedCodes, (count) => t('moreCodes', { count })),
       })}
     </Badge>
   )
@@ -115,17 +123,15 @@ function BlockingBadge({ codes }: { codes: ReadonlyArray<string> }) {
 
 function ActionsMenu({ table, actions }: { table: LookupTableSummary; actions: CardActions }) {
   const t = useTranslations('CodeTranslations.actions')
-  const format = useFormatter()
+  const shortList = useShortList()
+  const sentence = useUseSentence()
   const trigger = useRef<HTMLButtonElement>(null)
   const reasonId = useId()
   const inUse = table.uses.length > 0
 
-  function mappingNames(uses: ReadonlyArray<LookupTableUse>) {
-    const named = uses.slice(0, shownUses).map(({ name }) => name)
-    const hidden = uses.length - named.length
-
-    return format.list(hidden > 0 ? [...named, t('moreMappings', { count: hidden })] : named)
-  }
+  const mappings = shortList(table.uses.map(sentence), shownUses, (count) =>
+    t('moreMappings', { count }),
+  )
 
   return (
     <DropdownMenu>
@@ -152,7 +158,7 @@ function ActionsMenu({ table, actions }: { table: LookupTableSummary; actions: C
           </DropdownMenuItem>
           {inUse && (
             <p id={reasonId} className="text-muted-foreground max-w-64 px-1.5 pb-1 text-xs">
-              {t('inUse', { mappings: mappingNames(table.uses) })}
+              {t('inUse', { mappings })}
             </p>
           )}
         </DropdownMenuGroup>

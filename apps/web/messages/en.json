@@ -3573,7 +3573,7 @@
       "label": "Actions for {name}",
       "edit": "Edit name and receiver",
       "delete": "Delete",
-      "inUse": "In use by {mappings}. Remove the list there to delete it.",
+      "inUse": "Used for {mappings}.",
       "moreMappings": "{count} more"
     },
     "announcements": {
@@ -3641,7 +3641,7 @@
       "confirm": "Delete list",
       "pending": "Deleting…",
       "failed": "The list could not be deleted. Try again.",
-      "inUse": "A mapping or one of its published versions uses this list, so it cannot be deleted."
+      "inUse": "A draft or a published version of a mapping uses this list, so it cannot be deleted."
     }
   },
   "LookupTable": {
