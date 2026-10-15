@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  byNameAndNewest,
   type DocumentStructure,
   fromSearchParams,
   type GraphParts,
@@ -36,7 +37,6 @@ import {
   toDocumentStructureStore,
 } from './document-structure'
 import {
-  byNameAndNewest,
   type FlowRecord,
   type FlowStore,
   type MappingCatalogue,

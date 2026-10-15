@@ -4,6 +4,7 @@ import { Effect } from 'effect'
 import type { SelectedFields } from 'drizzle-orm/pg-core'
 
 import {
+  byNameAndNewest,
   type MappingComparison,
   type MappingComparisonQuery,
   type MappingVersion,
@@ -21,13 +22,7 @@ import { documentStructures, mappings, mappingVersions, users } from '@edi-bridg
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { loadMappingDraft, loadRow, sidesOf } from './mapping.js'
-import {
-  exactlyOne,
-  foundOrNotFound,
-  inWorkspace,
-  nameCollator,
-  rejectingInvalidId,
-} from './rows.js'
+import { exactlyOne, foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentMember } from './session.js'
 import { CurrentWorkspace } from './workspace.js'
 
@@ -318,9 +313,5 @@ export const listPublishedMappingVersions = ({ messageType }: PublishedMappingVe
       ),
     )
 
-    return rows
-      .map(toHeader)
-      .toSorted(
-        (a, b) => nameCollator.compare(a.mappingName, b.mappingName) || b.version - a.version,
-      )
+    return rows.map(toHeader).toSorted(byNameAndNewest)
   })

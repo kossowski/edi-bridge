@@ -1,5 +1,6 @@
 import { findNode, sameCsvSettings, visitedNode } from './document-structure-inference'
 import { containerOf } from './mapping-paths'
+import { byNameAndNewest } from './mapping-version'
 
 import type {
   DocumentStructure,
@@ -27,8 +28,6 @@ function linkedPaths({ links, transformLinks }: GraphParts) {
   ]
 }
 
-const nameCollator = new Intl.Collator('de')
-
 function summaries(versions: ReadonlyArray<PublishedMappingUse>): MappingVersionSummary[] {
   return versions
     .map(({ id, mappingId, mappingName, version, publishedAt }) => ({
@@ -38,7 +37,7 @@ function summaries(versions: ReadonlyArray<PublishedMappingUse>): MappingVersion
       version,
       publishedAt,
     }))
-    .sort((a, b) => nameCollator.compare(a.mappingName, b.mappingName) || b.version - a.version)
+    .sort(byNameAndNewest)
 }
 
 // Plain names only label a node, so a rename changes no shape a Mapping relies on.

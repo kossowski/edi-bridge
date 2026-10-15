@@ -418,6 +418,7 @@ export {
 export { applyLookupTableImport, classifyLookupTableImport } from './lookup-table-import'
 
 export {
+  byNameAndNewest,
   type ComparisonOutputs,
   comparisonOutputsSchema,
   type DifferenceChange,

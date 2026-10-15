@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  byNameAndNewest,
   type MappingComparison,
   mappingComparisonQuerySchema,
   mappingComparisonSchema,
@@ -45,6 +46,20 @@ const version: MappingVersion = {
   transforms: [],
   transformLinks: [],
 }
+
+describe('byNameAndNewest', () => {
+  it('sorts by Mapping name in German order, then newest version first', () => {
+    const umlaut = { ...first, mappingName: 'Ölmühle: ERP JSON to ORDERS' }
+    const plain = { ...first, mappingName: 'Pfalzmarkt: ERP JSON to ORDERS' }
+
+    expect([plain, first, umlaut, second].toSorted(byNameAndNewest)).toEqual([
+      second,
+      first,
+      umlaut,
+      plain,
+    ])
+  })
+})
 
 describe('mappingVersionSchema', () => {
   it('accepts a published version with its sides and graph', () => {
