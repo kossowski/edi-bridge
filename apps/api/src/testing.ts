@@ -3,7 +3,7 @@ import { hashPassword } from 'better-auth/crypto'
 import type { InjectOptions, LightMyRequestResponse } from 'fastify'
 
 import { signInEndpoint, type WorkspaceRole } from '@edi-bridge/contracts'
-import { accounts, connect, memberships, users, workspaces } from '@edi-bridge/db'
+import { accounts, connect, members, users, workspaces } from '@edi-bridge/db'
 import { startTestDatabase } from '@edi-bridge/db/testing'
 
 import { buildApp } from './app.js'
@@ -72,7 +72,7 @@ export async function addMember(database: Database, member: Member) {
   })
 
   await database
-    .insert(memberships)
+    .insert(members)
     .values({ userId: user.id, workspaceId: member.workspaceId, role: member.role })
 
   return user

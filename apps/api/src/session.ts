@@ -3,7 +3,7 @@ import { Context, Effect } from 'effect'
 
 import type { FastifyRequest } from 'fastify'
 
-import { memberships, users } from '@edi-bridge/db'
+import { members, users } from '@edi-bridge/db'
 
 import type { Session, SessionUser, WorkspaceRole } from '@edi-bridge/contracts'
 
@@ -32,26 +32,26 @@ export async function resolveMember(
     return undefined
   }
 
-  // Until a session names its Workspace, a member enters the Workspace they joined first.
-  const [membership] = await database
+  // Until a session names its Workspace, a Member enters the Workspace they joined first.
+  const [found] = await database
     .select({
       operator: users.operator,
-      workspaceId: memberships.workspaceId,
-      role: memberships.role,
+      workspaceId: members.workspaceId,
+      role: members.role,
     })
-    .from(memberships)
-    .innerJoin(users, eq(users.id, memberships.userId))
-    .where(eq(memberships.userId, signedIn.user.id))
-    .orderBy(asc(memberships.createdAt))
+    .from(members)
+    .innerJoin(users, eq(users.id, members.userId))
+    .where(eq(members.userId, signedIn.user.id))
+    .orderBy(asc(members.createdAt))
     .limit(1)
 
-  if (membership === undefined) {
+  if (found === undefined) {
     return undefined
   }
 
   const { id, name, email } = signedIn.user
 
-  return { user: { id, name, email }, ...membership }
+  return { user: { id, name, email }, ...found }
 }
 
 export const loadSession = Effect.gen(function* () {

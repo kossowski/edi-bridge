@@ -2,7 +2,7 @@ import { hashPassword } from 'better-auth/crypto'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { accounts, memberships, users, workspaces } from '@edi-bridge/db'
+import { accounts, members, users, workspaces } from '@edi-bridge/db'
 
 import type { Database, Transaction } from './db.js'
 
@@ -62,20 +62,20 @@ async function findOrCreateWorkspace(tx: Transaction, name: string) {
 }
 
 async function grantAdmin(tx: Transaction, userId: string, workspaceId: string) {
-  const [membership] = await tx
-    .select({ role: memberships.role })
-    .from(memberships)
-    .where(and(eq(memberships.userId, userId), eq(memberships.workspaceId, workspaceId)))
+  const [member] = await tx
+    .select({ role: members.role })
+    .from(members)
+    .where(and(eq(members.userId, userId), eq(members.workspaceId, workspaceId)))
 
-  if (membership?.role === 'admin') {
+  if (member?.role === 'admin') {
     return false
   }
 
   await tx
-    .insert(memberships)
+    .insert(members)
     .values({ userId, workspaceId, role: 'admin' })
     .onConflictDoUpdate({
-      target: [memberships.userId, memberships.workspaceId],
+      target: [members.userId, members.workspaceId],
       set: { role: 'admin' },
     })
 

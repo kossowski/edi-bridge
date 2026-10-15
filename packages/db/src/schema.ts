@@ -108,8 +108,8 @@ export const verifications = pgTable(
 
 export const workspaceRole = pgEnum('workspace_role', workspaceRoles)
 
-export const memberships = pgTable(
-  'memberships',
+export const members = pgTable(
+  'members',
   {
     userId: userId(),
     workspaceId: uuid()

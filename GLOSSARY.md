@@ -32,6 +32,10 @@ _Avoid_: Playground, test workspace
 The person running the platform, above all Workspaces, who creates Workspaces and their users.
 _Avoid_: Superadmin, root, owner
 
+**Member**:
+A user with a role, Admin or Viewer, in one Workspace. A user can be a Member of several Workspaces.
+_Avoid_: Membership, team member, seat
+
 **Admin**:
 A user with full control inside one Workspace.
 _Avoid_: Owner, manager

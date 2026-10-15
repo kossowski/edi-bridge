@@ -500,8 +500,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.memberships": {
-      "name": "memberships",
+    "public.members": {
+      "name": "members",
       "schema": "",
       "columns": {
         "user_id": {
@@ -532,8 +532,8 @@
         }
       },
       "indexes": {
-        "memberships_workspace_id_index": {
-          "name": "memberships_workspace_id_index",
+        "members_workspace_id_index": {
+          "name": "members_workspace_id_index",
           "columns": [
             {
               "expression": "workspace_id",
@@ -549,9 +549,9 @@
         }
       },
       "foreignKeys": {
-        "memberships_user_id_users_id_fk": {
-          "name": "memberships_user_id_users_id_fk",
-          "tableFrom": "memberships",
+        "members_user_id_users_id_fk": {
+          "name": "members_user_id_users_id_fk",
+          "tableFrom": "members",
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
@@ -562,9 +562,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "memberships_workspace_id_workspaces_id_fk": {
-          "name": "memberships_workspace_id_workspaces_id_fk",
-          "tableFrom": "memberships",
+        "members_workspace_id_workspaces_id_fk": {
+          "name": "members_workspace_id_workspaces_id_fk",
+          "tableFrom": "members",
           "tableTo": "workspaces",
           "columnsFrom": [
             "workspace_id"
@@ -577,8 +577,8 @@
         }
       },
       "compositePrimaryKeys": {
-        "memberships_user_id_workspace_id_pk": {
-          "name": "memberships_user_id_workspace_id_pk",
+        "members_user_id_workspace_id_pk": {
+          "name": "members_user_id_workspace_id_pk",
           "columns": [
             "user_id",
             "workspace_id"
