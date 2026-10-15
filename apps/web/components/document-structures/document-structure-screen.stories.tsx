@@ -473,7 +473,9 @@ export const CsvUsedByMappingVersion = meta.story({
     await canvas.findByRole('treegrid')
     await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
     await expect(
-      await canvas.findByText(/^Published Mapping Versions read CSV Documents with these settings/),
+      await canvas.findByText(
+        /^Published versions of mappings read CSV Documents with these settings/,
+      ),
     ).toBeVisible()
     await expect(
       canvas.getByRole('link', { name: 'ERP dispatch to DESADV, version 1' }),
@@ -505,7 +507,7 @@ export const CsvLinkedByMapping = meta.story({
     await canvas.findByRole('treegrid')
     await userEvent.click(canvas.getByRole('button', { name: 'Save' }))
     await expect(
-      await canvas.findByText(/^A Mapping Draft links a field this change would remove/),
+      await canvas.findByText(/^A draft of a mapping links a field this change would remove/),
     ).toBeVisible()
     await expect(canvas.queryByRole('button', { name: /in the tree$/ })).toBeNull()
   },
@@ -558,7 +560,7 @@ export const RefusedByPublishedVersions = meta.story({
       canvas.getByRole('link', { name: 'Hansemarkt: ORDERS to ERP JSON, version 3' }),
     ).toBeVisible()
     await expect(within(alert).queryByText(/^Details/)).toBeNull()
-    await expect(canvas.getByText('Used by published Mapping Versions')).toBeVisible()
+    await expect(canvas.getByText('Used by published versions')).toBeVisible()
     await userEvent.click(
       canvas.getByRole('button', { name: 'Show buyer.contact.phone in the tree' }),
     )
@@ -579,7 +581,7 @@ export const TabletRefused = meta.story({
       save: 'Speichern',
     })
     await expect(await canvas.findByRole('alert')).toBeVisible()
-    await expect(canvas.getByText('Von veröffentlichten Mapping Versions verwendet')).toBeVisible()
+    await expect(canvas.getByText('Von veröffentlichten Versionen verwendet')).toBeVisible()
     await expectReadableColumns(canvasElement)
   },
 })
@@ -626,7 +628,7 @@ export const RefusedByDraftLink = meta.story({
   async play({ canvas, canvasElement }) {
     await changeAndSave(canvasElement)
     await expect(await canvas.findByRole('alert')).toBeVisible()
-    await expect(canvas.getByText('Linked by a Mapping Draft')).toBeVisible()
+    await expect(canvas.getByText('Linked by a draft')).toBeVisible()
   },
 })
 

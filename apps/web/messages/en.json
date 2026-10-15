@@ -3322,8 +3322,8 @@
     "typeLabel": "Type of {path}",
     "changed": "Changed",
     "marks": {
-      "usedByMappingVersion": "Used by published Mapping Versions",
-      "linkedByMapping": "Linked by a Mapping Draft",
+      "usedByMappingVersion": "Used by published versions",
+      "linkedByMapping": "Linked by a draft",
       "other": "Refused"
     },
     "expand": "Expand {path}",
@@ -3360,7 +3360,7 @@
     "path": "At <code>{path}</code>",
     "details": "Details",
     "showInTree": "Show {path} in the tree",
-    "versionsTitle": "Published Mapping Versions that use it:",
+    "versionsTitle": "Published versions that use it:",
     "version": "{mappingName}, version {version}",
     "mappingsTitle": "Mappings that read this data format:",
     "codes": {
@@ -3375,10 +3375,10 @@
       "unknownPath": "The data format has changed in the meantime. Reload the page and adjust it again.",
       "notAdjustable": "This part of the data format cannot change this way.",
       "csvDocumentRequired": "Changing the CSV settings needs a CSV Document, which EDI Bridge reads again with the new settings.",
-      "linkedByMapping": "A Mapping Draft links a field this change would remove. Remove the link on the mapping canvas first, or undo the change.",
-      "usedByMappingVersion": "Published Mapping Versions use this part, and a published Mapping Version never changes. Undo the change, or create a new data format for the new shape."
+      "linkedByMapping": "A draft of a mapping links a field this change would remove. Remove the link on the mapping canvas first, or undo the change.",
+      "usedByMappingVersion": "Published versions of mappings use this part, and a published version never changes. Undo the change, or create a new data format for the new shape."
     },
-    "csvSettingsUsedByMappingVersion": "Published Mapping Versions read CSV Documents with these settings, and a published Mapping Version never changes. Keep the saved CSV settings, or create a new data format with the new ones."
+    "csvSettingsUsedByMappingVersion": "Published versions of mappings read CSV Documents with these settings, and a published version never changes. Keep the saved CSV settings, or create a new data format with the new ones."
   },
   "CodeTranslation": {
     "title": "Code translation",
