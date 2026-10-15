@@ -6,6 +6,8 @@ import {
   createDocumentStructureEndpoint,
   createMappingEndpoint,
   documentStructureOrigins,
+  mappingComparisonEndpoint,
+  mappingComparisonSchema,
   type MappingGraph,
   mappingDraftEndpoint,
   mappingDraftSchema,
@@ -537,6 +539,106 @@ describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
     const version = await published(foreign.id, '', otherAdmin)
 
     expect((await restore(foreign.id, version.id)).statusCode).toBe(404)
+  })
+})
+
+describe('GET /mappings/:mappingId/comparison', () => {
+  const compare = (mappingId: string, query: Record<string, string>, target = admin) =>
+    target.inject({
+      method: 'GET',
+      url: toPath(mappingComparisonEndpoint.path, { mappingId }),
+      query,
+    })
+
+  const twoVersions = async (target = admin) => {
+    const mapping = await createdMapping(target)
+    await save(mapping.id, orderNumber, target)
+    const from = await published(mapping.id, 'Order number mapped', target)
+    await save(mapping.id, shortOrderNumber, target)
+    const to = await published(mapping.id, 'Order number shortened', target)
+
+    return { mapping, from, to }
+  }
+
+  it('answers the mapping differences between two versions without outputs', async () => {
+    const { mapping, from, to } = await twoVersions()
+
+    const response = await compare(mapping.id, { from: from.id, to: to.id })
+
+    expect(response.statusCode).toBe(200)
+    expect(mappingComparisonSchema.parse(response.json())).toEqual({
+      mappingId: mapping.id,
+      from: mappingVersionSummarySchema.parse(from),
+      to: mappingVersionSummarySchema.parse(to),
+      differences: [
+        { kind: 'link', change: 'removed', before: orderNumber.links[0], after: null },
+        {
+          kind: 'transform',
+          change: 'added',
+          before: null,
+          after: shortOrderNumber.transforms[0],
+        },
+        ...shortOrderNumber.transformLinks.map((link) => ({
+          kind: 'transformLink',
+          change: 'added',
+          before: null,
+          after: link,
+        })),
+      ],
+      outputs: null,
+    })
+  })
+
+  it('answers no differences when a later version only moves a transform', async () => {
+    const mapping = await createdMapping()
+    await save(mapping.id, shortOrderNumber)
+    const from = await published(mapping.id)
+    await save(mapping.id, movedShortOrderNumber)
+    const to = await published(mapping.id)
+
+    const response = await compare(mapping.id, { from: from.id, to: to.id })
+
+    expect(mappingComparisonSchema.parse(response.json()).differences).toEqual([])
+  })
+
+  it('answers 404 for a version of another Mapping', async () => {
+    const { from } = await twoVersions()
+    const other = await created('DESADV')
+    const otherVersion = await published(other.id)
+
+    const response = await compare(other.id, { from: from.id, to: otherVersion.id })
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  it('answers 404 for an unknown version', async () => {
+    const { mapping, from } = await twoVersions()
+
+    expect((await compare(mapping.id, { from: from.id, to: unknownId })).statusCode).toBe(404)
+  })
+
+  it('answers 404 for a sample, since the Mapping has none yet', async () => {
+    const { mapping, from, to } = await twoVersions()
+
+    const response = await compare(mapping.id, { from: from.id, to: to.id, sampleId: unknownId })
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  it.each([
+    ['the same version twice', (from: string) => ({ from, to: from })],
+    ['a version id that is no uuid', (from: string) => ({ from, to: 'not-a-uuid' })],
+    ['a missing version', (from: string) => ({ from })],
+  ])('answers 400 for %s', async (_, query) => {
+    const { mapping, from } = await twoVersions()
+
+    expect((await compare(mapping.id, query(from.id))).statusCode).toBe(400)
+  })
+
+  it('answers 404 for a Mapping of another Workspace', async () => {
+    const { mapping, from, to } = await twoVersions(otherAdmin)
+
+    expect((await compare(mapping.id, { from: from.id, to: to.id })).statusCode).toBe(404)
   })
 })
 

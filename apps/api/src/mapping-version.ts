@@ -1,9 +1,11 @@
-import { and, desc, eq, max, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, max, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import type { SelectedFields } from 'drizzle-orm/pg-core'
 
 import {
+  type MappingComparison,
+  type MappingComparisonQuery,
   type MappingVersion,
   type MappingVersionEntry,
   type MappingVersionSummary,
@@ -108,6 +110,39 @@ export const loadMappingVersion = (mappingId: string, versionId: string) =>
       ...version.graph,
       ...sidesOf(mapping),
     } satisfies MappingVersion
+  })
+
+export const compareMappingVersions = (
+  mappingId: string,
+  query: Effect.Effect<MappingComparisonQuery, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    yield* loadRow(mappingId)
+    const { from, to, sampleId } = yield* query
+
+    // Until Sample Documents and their outputs arrive with the preview (#185), every Sample Document is unknown.
+    if (sampleId !== undefined) {
+      return yield* Effect.fail(new NotFound())
+    }
+
+    const db = yield* Db
+
+    const rows = yield* Effect.promise(() =>
+      selectVersions(db, { graph: mappingVersions.graph }).where(
+        and(inArray(mappingVersions.id, [from, to]), eq(mappingVersions.mappingId, mappingId)),
+      ),
+    )
+
+    const before = yield* foundOrNotFound(rows.find(({ id }) => id === from))
+    const after = yield* foundOrNotFound(rows.find(({ id }) => id === to))
+
+    return {
+      mappingId,
+      from: toHeader(before),
+      to: toHeader(after),
+      differences: mappingDifferences(before.graph, after.graph),
+      outputs: null,
+    } satisfies MappingComparison
   })
 
 const restoreInTransaction = async (
