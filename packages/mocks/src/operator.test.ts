@@ -12,6 +12,7 @@ import {
   inviteUnusableStatus,
   inviteValidityDays,
   operatorWorkspaceMembersEndpoint,
+  removeWorkspaceMemberEndpoint,
   resetSandboxWorkspaceEndpoint,
   revokeInviteEndpoint,
   toPath,
@@ -32,7 +33,8 @@ import {
   seedInvites,
   seedWorkspaceSummaries,
 } from './operator'
-import { mockCredentials, sandboxAdminSession, showcaseViewerSession } from './session'
+import { seedId } from './seed-id'
+import { mockCredentials, sandboxAdminSession, seedSession, showcaseViewerSession } from './session'
 import { seedSandboxWorkspace, seedShowcaseWorkspace, seedWorkspace } from './workspace'
 import { createWorkspaceMembers } from './workspace-member'
 
@@ -302,6 +304,63 @@ describe('GET /operator/workspaces/:workspaceId/members', () => {
     server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
 
     expect((await listMembers(seedSandboxWorkspace.id)).status).toBe(403)
+  })
+})
+
+describe('DELETE /operator/workspaces/:workspaceId/members/:userId', () => {
+  const remove = (workspaceId: string, userId: string) =>
+    fetch(`${apiUrl}${toPath(removeWorkspaceMemberEndpoint.path, { workspaceId, userId })}`, {
+      method: 'DELETE',
+    })
+
+  const membersOf = async (workspaceId: string) =>
+    operatorWorkspaceMembersEndpoint.response.parse(await (await listMembers(workspaceId)).json())
+
+  const memberCountOf = async (workspaceId: string) =>
+    (await listWorkspaces()).find(({ id }) => id === workspaceId)?.memberCount
+
+  it('removes a Member from the list and the member count', async () => {
+    server.use(...operatorHandlers(apiUrl))
+    const [, leaving] = await membersOf(seedShowcaseWorkspace.id)
+
+    const response = await remove(seedShowcaseWorkspace.id, leaving!.id)
+
+    expect(response.status).toBe(204)
+    expect((await membersOf(seedShowcaseWorkspace.id)).map(({ id }) => id)).not.toContain(
+      leaving!.id,
+    )
+    expect(await memberCountOf(seedShowcaseWorkspace.id)).toBe(3)
+  })
+
+  it('answers 404 for a Member removed before', async () => {
+    server.use(...operatorHandlers(apiUrl))
+    const [, leaving] = await membersOf(seedShowcaseWorkspace.id)
+
+    await remove(seedShowcaseWorkspace.id, leaving!.id)
+
+    expect((await remove(seedShowcaseWorkspace.id, leaving!.id)).status).toBe(404)
+  })
+
+  it.each([
+    ['an unknown Member', seedWorkspace.id, unknownWorkspaceId],
+    ['a Member of another Workspace', seedSandboxWorkspace.id, seedId(11, 4)],
+    ['an unknown Workspace', unknownWorkspaceId, seedId(11, 4)],
+  ])('answers 404 for %s', async (_, workspaceId, userId) => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await remove(workspaceId, userId)).status).toBe(404)
+  })
+
+  it('refuses to remove the Operator themselves', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await remove(seedWorkspace.id, seedSession.user.id)).status).toBe(409)
+  })
+
+  it('answers 403 for an Admin who is not the Operator', async () => {
+    server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
+
+    expect((await remove(seedShowcaseWorkspace.id, seedId(11, 4))).status).toBe(403)
   })
 })
 

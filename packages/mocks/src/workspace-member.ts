@@ -33,6 +33,7 @@ export type WorkspaceMembers =
 export type WorkspaceMemberStore = {
   get: (workspaceId: string) => ReadonlyArray<WorkspaceMember>
   add: (workspaceId: string, member: WorkspaceMember) => void
+  remove: (workspaceId: string, userId: string) => boolean
   byEmail: (email: string) => WorkspaceMember | undefined
 }
 
@@ -141,6 +142,9 @@ export function createWorkspaceMemberStore(
   members: WorkspaceMembers = seedWorkspaceMembers,
 ): WorkspaceMemberStore {
   const added = new Map<string, WorkspaceMember[]>()
+  const removed = new Set<string>()
+
+  const removalKey = (workspaceId: string, userId: string) => `${workspaceId}:${userId}`
 
   const seeded = (workspaceId: string) =>
     'get' in members ? (members.get(workspaceId) ?? []) : members
@@ -150,10 +154,25 @@ export function createWorkspaceMemberStore(
     ...[...added.values()].flat(),
   ]
 
+  const get = (workspaceId: string) =>
+    [...seeded(workspaceId), ...(added.get(workspaceId) ?? [])].filter(
+      ({ id }) => !removed.has(removalKey(workspaceId, id)),
+    )
+
   return {
-    get: (workspaceId) => [...seeded(workspaceId), ...(added.get(workspaceId) ?? [])],
+    get,
     add: (workspaceId, member) => {
+      removed.delete(removalKey(workspaceId, member.id))
       added.set(workspaceId, [...(added.get(workspaceId) ?? []), member])
+    },
+    remove: (workspaceId, userId) => {
+      if (!get(workspaceId).some(({ id }) => id === userId)) {
+        return false
+      }
+
+      removed.add(removalKey(workspaceId, userId))
+
+      return true
     },
     byEmail: (email) => all().find((member) => member.email === email),
   }

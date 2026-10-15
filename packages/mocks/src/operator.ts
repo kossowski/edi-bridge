@@ -10,6 +10,7 @@ import {
   inviteUnusableReason,
   inviteValidityDays,
   operatorWorkspaceMembersEndpoint,
+  removeWorkspaceMemberEndpoint,
   resetSandboxWorkspaceEndpoint,
   revokeInviteEndpoint,
   workspaceInvitesEndpoint,
@@ -462,6 +463,28 @@ export function operatorHandlers(
           ? HttpResponse.json(memberStore.get(params.workspaceId))
           : notFound(),
       ),
+    ),
+    http.delete<{ workspaceId: string; userId: string }>(
+      `${apiUrl}${removeWorkspaceMemberEndpoint.path}`,
+      operatorOnly(sessionStore, ({ params }) => {
+        const workspace = store.workspace(params.workspaceId)
+
+        if (!workspace) {
+          return notFound()
+        }
+
+        if (params.userId === sessionStore.get()?.user.id) {
+          return conflict('The Operator cannot remove themselves')
+        }
+
+        if (!memberStore.remove(params.workspaceId, params.userId)) {
+          return notFound()
+        }
+
+        store.setWorkspace({ ...workspace, memberCount: workspace.memberCount - 1 })
+
+        return new HttpResponse(null, { status: 204 })
+      }),
     ),
     http.get<{ workspaceId: string }>(
       `${apiUrl}${workspaceInvitesEndpoint.path}`,
