@@ -1,40 +1,36 @@
 import { Effect } from 'effect'
-import jsonata from 'jsonata'
-import { z } from 'zod'
 
 import {
   arrayBasePath,
-  type ConditionOperator,
   type EdifactElement,
   type EdifactSegment,
   type EdifactSegmentGroup,
   type EdifactStructureNode,
   type JsonContent,
-  type LinkStart,
-  type LookupTableEntry,
-  type MappingTransform,
   type MappingVersion,
   type MessageTypeStructure,
   messageTypeStructures,
-  transformPorts,
 } from '@edi-bridge/contracts'
 
 import type { Element, Message, Segment } from '@edi-bridge/edifact'
 
 import { childrenOf, elementPaths, type StructurePart } from './elements'
-import { MappingError, type MappingErrorCode } from './errors'
-import { reformatDate, reformatNumber } from './formats'
+import { MappingError } from './errors'
+import {
+  type EvaluatedGraph,
+  evaluated,
+  targetValues,
+  transformReads,
+  type Value,
+  valueSchema,
+} from './evaluation'
 import { jsonListSchema, jsonObjectSchema } from './json'
 import { isBeneath, isRequiredOrFilled, setFilled, type Values } from './values'
-import { type Graph, type LookupTables, type Loop, type Wiring, wiringOf } from './wiring'
+import { type Loop, type Wiring, wiringOf } from './wiring'
+
+import type { ApplyOptions } from './options'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
-
-const scalarSchema = z.union([z.string(), z.number(), z.boolean()])
-
-type Expressions = ReadonlyMap<string, string>
-
-type EvaluatedGraph = Graph & { expressions: Expressions }
 
 type Scope = {
   items: ReadonlyMap<string, JsonContent>
@@ -73,10 +69,6 @@ function read({ document, scope }: Reading, path: string): JsonContent | undefin
   return value
 }
 
-const valueSchema = z.union([z.string(), z.number(), z.boolean().transform(String)])
-
-type Value = z.infer<typeof valueSchema>
-
 function scalarOf(context: Reading, path: string): Value | undefined {
   const scalar = valueSchema.safeParse(read(context, path))
 
@@ -95,169 +87,6 @@ function itemsOf(context: Reading, sourcePart: string): JsonContent[] {
   return items.success ? items.data : []
 }
 
-type Evaluation = Reading & { targetPath: string; visiting: ReadonlySet<string> }
-
-const failedTransform = (code: MappingErrorCode, { targetPath }: Evaluation, transformId: string) =>
-  new MappingError({ code, targetPath, transformId })
-
-function holds(operator: ConditionOperator, value: string, compareTo: string) {
-  switch (operator) {
-    case 'equals':
-      return value === compareTo
-    case 'notEquals':
-      return value !== compareTo
-    case 'contains':
-      return value.includes(compareTo)
-    case 'isEmpty':
-      return value === ''
-    case 'isNotEmpty':
-      return value !== ''
-  }
-}
-
-function lookedUp(
-  { config: { lookupTableId, fallback } }: Extract<MappingTransform, { kind: 'lookupTable' }>,
-  value: string,
-  lookupTables: LookupTables,
-  fail: (code: MappingErrorCode) => MappingError,
-): Effect.Effect<string, MappingError> {
-  const table = lookupTableId === null ? undefined : lookupTables.get(lookupTableId)
-
-  if (table === undefined) {
-    return Effect.fail(fail('unknownLookupTable'))
-  }
-
-  const found = table.get(value)
-
-  if (value === '' || found !== undefined) {
-    return Effect.succeed(found ?? '')
-  }
-
-  switch (fallback) {
-    case 'keepValue':
-      return Effect.succeed(value)
-    case 'empty':
-      return Effect.succeed('')
-    case 'fail':
-      return Effect.fail(fail('noLookupMatch'))
-  }
-}
-
-function applied(
-  transform: Exclude<MappingTransform, { kind: 'loop' | 'conditional' }>,
-  args: Readonly<Record<string, Value>>,
-  { expressions, lookupTables }: EvaluatedGraph,
-  fail: (code: MappingErrorCode) => MappingError,
-): Effect.Effect<string, MappingError> {
-  const value = String(args.value ?? '')
-
-  const formatted = (format: () => string | undefined, code: MappingErrorCode) => {
-    const result = value === '' ? '' : format()
-
-    return result === undefined ? Effect.fail(fail(code)) : Effect.succeed(result)
-  }
-
-  switch (transform.kind) {
-    case 'constant':
-      return Effect.succeed(transform.config.value)
-    case 'concatenate':
-      return Effect.succeed(
-        transformPorts(transform)
-          .inputs.map((input) => String(args[input] ?? ''))
-          .filter((part) => part !== '')
-          .join(transform.config.separator),
-      )
-    case 'split':
-      return Effect.succeed(value.split(transform.config.separator)[transform.config.index] ?? '')
-    case 'substring': {
-      const { start, length } = transform.config
-
-      return Effect.succeed(value.slice(start, length === null ? undefined : start + length))
-    }
-
-    case 'dateFormat':
-      return formatted(
-        () => reformatDate(value, transform.config.from, transform.config.to),
-        'invalidDate',
-      )
-    case 'numberFormat':
-      return formatted(
-        () =>
-          reformatNumber(
-            args.value ?? '',
-            transform.config.decimalPlaces,
-            transform.config.decimalSeparator,
-          ),
-        'invalidNumber',
-      )
-    case 'lookupTable':
-      return lookedUp(transform, value, lookupTables, fail)
-    case 'jsonata': {
-      const result = expressions.get(transform.id)
-
-      return result === undefined ? Effect.fail(fail('expressionFailed')) : Effect.succeed(result)
-    }
-  }
-}
-
-function feedsOf(
-  { feeding }: Pick<Graph, 'feeding'>,
-  transform: MappingTransform,
-): ReadonlyMap<string, LinkStart> {
-  return new Map(
-    transformPorts(transform).inputs.flatMap((input) => {
-      const from = feeding.get(`${transform.id}/${input}`)
-
-      return from ? [[input, from] as const] : []
-    }),
-  )
-}
-
-function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<Value, MappingError> {
-  if (start.kind === 'source') {
-    return Effect.succeed(scalarOf(evaluation, start.path) ?? '')
-  }
-
-  const { graph, scope, visiting } = evaluation
-  const transform = graph.transforms.get(start.transformId)
-
-  if (!transform || !graph.valid.has(transform.id) || visiting.has(transform.id)) {
-    return Effect.fail(failedTransform('invalidTransform', evaluation, start.transformId))
-  }
-
-  if (transform.kind === 'loop') {
-    return Effect.succeed(scope.counters.get(transform.id) ?? '')
-  }
-
-  const inner = { ...evaluation, visiting: new Set(visiting).add(transform.id) }
-
-  const feeds = feedsOf(graph, transform)
-
-  const inputOf = (input: string): Effect.Effect<Value, MappingError> => {
-    const from = feeds.get(input)
-
-    return from ? outputOf(inner, from) : Effect.succeed('')
-  }
-
-  if (transform.kind === 'conditional') {
-    const { operator, compareTo } = transform.config
-
-    return Effect.flatMap(inputOf('value'), (value) =>
-      inputOf(holds(operator, String(value), compareTo) ? 'then' : 'else'),
-    )
-  }
-
-  return Effect.flatMap(
-    Effect.forEach(feeds, ([input, from]) =>
-      Effect.map(outputOf(inner, from), (value): readonly [string, Value] => [input, value]),
-    ),
-    (args) =>
-      applied(transform, Object.fromEntries(args), graph, (code) =>
-        failedTransform(code, evaluation, transform.id),
-      ),
-  )
-}
-
 function valuesIn(context: Reading): Effect.Effect<Values, MappingError> {
   const values = new Map<string, string>()
 
@@ -265,12 +94,12 @@ function valuesIn(context: Reading): Effect.Effect<Values, MappingError> {
     setFilled(values, targetPath, sourceValue(context, sourcePath))
   }
 
-  return Effect.as(
-    Effect.forEach(context.graph.targets, ({ path, from }) =>
-      Effect.map(outputOf({ ...context, targetPath: path, visiting: new Set() }, from), (value) =>
-        setFilled(values, path, String(value)),
-      ),
-    ),
+  return targetValues(
+    {
+      graph: context.graph,
+      counters: context.scope.counters,
+      read: (sourcePath) => scalarOf(context, sourcePath),
+    },
     values,
   )
 }
@@ -335,40 +164,11 @@ function repeatingParts(sourcePath: string): string[] {
   )
 }
 
-function sourcePathsOf(
-  graph: Pick<Graph, 'transforms' | 'feeding'>,
-  start: LinkStart,
-  visited = new Set<string>(),
-): string[] {
-  if (start.kind === 'source') {
-    return [start.path]
-  }
-
-  const transform = graph.transforms.get(start.transformId)
-
-  if (!transform || transform.kind === 'loop' || visited.has(transform.id)) {
-    return []
-  }
-
-  visited.add(transform.id)
-
-  return [...feedsOf(graph, transform).values()].flatMap((from) =>
-    sourcePathsOf(graph, from, visited),
-  )
-}
-
 function outsideLoop(
   links: OutboundMappingVersion['links'],
   { graph, loops }: Wiring,
 ): string | undefined {
-  const reads = [
-    ...links,
-    ...graph.targets.flatMap(({ path, from }) =>
-      sourcePathsOf(graph, from).map((sourcePath) => ({ sourcePath, targetPath: path })),
-    ),
-  ]
-
-  return reads.find(({ sourcePath, targetPath }) =>
+  return [...links, ...transformReads(graph)].find(({ sourcePath, targetPath }) =>
     repeatingParts(sourcePath).some(
       (part) =>
         ![...loops].some(
@@ -501,41 +301,7 @@ function framed({ messageType, children }: MessageTypeStructure) {
   return { header, body }
 }
 
-const resultSchema = scalarSchema.optional()
-
-async function resultOf(expression: string, document: JsonContent): Promise<string | undefined> {
-  try {
-    const result = resultSchema.safeParse(await jsonata(expression).evaluate(document))
-
-    return result.success ? String(result.data ?? '') : undefined
-  } catch {
-    return undefined
-  }
-}
-
-// JSONata reads the whole Document, so each expression runs once, before the scopes of the loops.
-function expressionsOf(
-  transforms: ReadonlyArray<MappingTransform>,
-  document: JsonContent,
-): Effect.Effect<Expressions> {
-  return Effect.map(
-    Effect.forEach(transforms, (transform) =>
-      transform.kind === 'jsonata'
-        ? Effect.map(
-            Effect.promise(() => resultOf(transform.config.expression, document)),
-            (result) => (result === undefined ? [] : [[transform.id, result] as const]),
-          )
-        : Effect.succeed([]),
-    ),
-    (results) => new Map(results.flat()),
-  )
-}
-
 const messageReference = '1'
-
-export type ApplyOptions = {
-  lookupTables?: ReadonlyMap<string, ReadonlyArray<LookupTableEntry>>
-}
 
 export function applyMappingVersion(
   version: OutboundMappingVersion,
@@ -558,11 +324,11 @@ export function applyMappingVersion(
     return Effect.fail(new MappingError({ code: 'outsideLoop', targetPath: outside }))
   }
 
-  return Effect.flatMap(expressionsOf(version.transforms, document), (expressions) => {
+  return Effect.flatMap(evaluated(graph, document), (evaluatedGraph) => {
     const reading: Reading = {
       document,
       links: version.links,
-      graph: { ...graph, expressions },
+      graph: evaluatedGraph,
       loops,
       itemCounts: new Map(),
       scope: { items: new Map(), counters: new Map() },

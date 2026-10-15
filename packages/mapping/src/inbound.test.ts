@@ -2,16 +2,23 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import type {
+  ConditionOperator,
   DocumentFieldType,
   DocumentStructure,
   DocumentStructureNode,
+  JsonContent,
   MappingLink,
   MappingTransform,
   TransformLink,
 } from '@edi-bridge/contracts'
 import type { Message, Segment } from '@edi-bridge/edifact'
 
-import { applyInboundMappingVersion, type InboundMappingVersion, MappingError } from './index'
+import {
+  applyInboundMappingVersion,
+  type InboundMappingVersion,
+  MappingError,
+  type MappingErrorCode,
+} from './index'
 
 const documentStructureId = '5c2a8f61-1b3d-4e7a-9c0f-8d6e5b4a3f21'
 
@@ -689,6 +696,308 @@ describe('applyInboundMappingVersion', () => {
 
     expect(await failure(version, structure, message)).toEqual(
       new MappingError({ code: 'missingRequiredValue', targetPath: 'lines[].quantity' }),
+    )
+  })
+
+  const transformOf = (
+    id: string,
+    transform: Pick<MappingTransform, 'kind' | 'config'>,
+  ): MappingTransform =>
+    // SAFETY: each test passes a config that belongs to its kind.
+    ({ id, position: { x: 0, y: 0 }, ...transform }) as MappingTransform
+
+  const transformId = '5d6e7f80-1a2b-4c3d-8e4f-5a6b7c8d9e0f'
+
+  const fromSource = (path: string, input = 'value', id = transformId): TransformLink => ({
+    from: { kind: 'source', path },
+    to: { kind: 'transform', transformId: id, input },
+  })
+
+  const intoTarget = (path: string, id = transformId, output = 'value'): TransformLink => ({
+    from: { kind: 'transform', transformId: id, output },
+    to: { kind: 'target', path },
+  })
+
+  const via = (
+    transform: Pick<MappingTransform, 'kind' | 'config'>,
+    transformLinks: TransformLink[],
+    links: MappingLink[] = [],
+  ) =>
+    inboundVersion(links, {
+      transforms: [loopOf(lineLoopId), transformOf(transformId, transform)],
+      transformLinks: [...looped('SG25', 'lines[]'), ...transformLinks],
+    })
+
+  const orderStructure = structureOf([
+    field('orderNumber'),
+    field('orderDate'),
+    array('lines[]', (path) =>
+      object(path, [
+        field(`${path}.gtin`),
+        field(`${path}.unit`),
+        field(`${path}.price`, { type: 'number' }),
+      ]),
+    ),
+  ])
+
+  it('writes a constant into its target field', async () => {
+    const version = via({ kind: 'constant', config: { value: 'PO-0001' } }, [
+      intoTarget('orderNumber'),
+    ])
+
+    expect(await apply(version, orderStructure, messageOf([]))).toEqual({
+      orderNumber: 'PO-0001',
+    })
+  })
+
+  const pricedLines = messageOf([
+    { tag: 'DTM', elements: [['137', '20261014', '102']] },
+    { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+    { tag: 'QTY', elements: [['21', '12', 'PCE']] },
+    { tag: 'PRI', elements: [['AAA', '1,205']] },
+    { tag: 'LIN', elements: [['2'], [''], ['4000862141411', 'EN']] },
+    { tag: 'QTY', elements: [['21', '6', 'KGM']] },
+    { tag: 'PRI', elements: [['AAA', '2,4']] },
+  ])
+
+  it.each<[string, Pick<MappingTransform, 'kind' | 'config'>, TransformLink[], JsonContent]>([
+    [
+      'concatenate joins the values with its separator',
+      { kind: 'concatenate', config: { inputCount: 2, separator: '-' } },
+      [
+        fromSource('DTM+137/C507/2380', 'part1'),
+        fromSource('SG25/LIN/C212/7140', 'part2'),
+        intoTarget('lines[].gtin'),
+      ],
+      [{ gtin: '20261014-4000862141404' }, { gtin: '20261014-4000862141411' }],
+    ],
+    [
+      'split takes the part at its index',
+      { kind: 'split', config: { separator: '86', index: 1 } },
+      [fromSource('SG25/LIN/C212/7140'), intoTarget('lines[].gtin')],
+      [{ gtin: '2141404' }, { gtin: '2141411' }],
+    ],
+    [
+      'substring takes as many characters as its length',
+      { kind: 'substring', config: { start: 7, length: 6 } },
+      [fromSource('SG25/LIN/C212/7140'), intoTarget('lines[].gtin')],
+      [{ gtin: '141404' }, { gtin: '141411' }],
+    ],
+    [
+      'number format rounds an EDIFACT decimal for a number field',
+      { kind: 'numberFormat', config: { decimalPlaces: 2, decimalSeparator: '.' } },
+      [fromSource('SG25/SG28/PRI+AAA/C509/5118'), intoTarget('lines[].price')],
+      [{ price: 1.21 }, { price: 2.4 }],
+    ],
+  ])('%s in each item', async (_, transform, transformLinks, expected) => {
+    expect(await apply(via(transform, transformLinks), orderStructure, pricedLines)).toEqual({
+      lines: expected,
+    })
+  })
+
+  it('date format reads the date of the Message in the pattern of the Document', async () => {
+    const version = via({ kind: 'dateFormat', config: { from: 'yyyyMMdd', to: 'yyyy-MM-dd' } }, [
+      fromSource('DTM+137/C507/2380'),
+      intoTarget('orderDate'),
+    ])
+
+    expect(await apply(version, orderStructure, pricedLines)).toMatchObject({
+      orderDate: '2026-10-14',
+    })
+  })
+
+  const unitTableId = '8b9c0d1e-2f3a-4b4c-8d5e-6f7a8b9c0d1e'
+
+  const lookupTables = new Map([
+    [
+      unitTableId,
+      [
+        { sourceCode: 'PCE', targetCode: 'ST' },
+        { sourceCode: 'KGM', targetCode: 'KG' },
+      ],
+    ],
+  ])
+
+  const unitsVia = (fallback: 'keepValue' | 'empty' | 'fail') =>
+    via({ kind: 'lookupTable', config: { lookupTableId: unitTableId, fallback } }, [
+      fromSource('SG25/QTY+21/C186/6411'),
+      intoTarget('lines[].unit'),
+    ])
+
+  it('lookup table translates the code of each repetition', async () => {
+    const version = unitsVia('fail')
+
+    expect(
+      await Effect.runPromise(
+        applyInboundMappingVersion(version, orderStructure, pricedLines, { lookupTables }),
+      ),
+    ).toEqual({ lines: [{ unit: 'ST' }, { unit: 'KG' }] })
+  })
+
+  it.each([
+    ['keepValue', [{ unit: 'PCE' }]],
+    ['empty', [{}]],
+  ] as const)(
+    'lookup table with the %s fallback handles a code it lacks',
+    async (fallback, lines) => {
+      const message = messageOf([
+        { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+        { tag: 'QTY', elements: [['21', '12', 'PCE']] },
+      ])
+
+      expect(
+        await Effect.runPromise(
+          applyInboundMappingVersion(unitsVia(fallback), orderStructure, message, {
+            lookupTables: new Map([[unitTableId, []]]),
+          }),
+        ),
+      ).toEqual({ lines })
+    },
+  )
+
+  it.each<[ConditionOperator, string, JsonContent]>([
+    ['equals', '220', 'PO-4711'],
+    ['notEquals', '220', '9'],
+  ])('conditional %s %j picks its branch', async (operator, compareTo, expected) => {
+    const version = via({ kind: 'conditional', config: { operator, compareTo } }, [
+      fromSource('BGM/C002/1001'),
+      fromSource('BGM/1004', 'then'),
+      fromSource('BGM/1225', 'else'),
+      intoTarget('orderNumber'),
+    ])
+
+    expect(await apply(version, orderStructure, order)).toMatchObject({ orderNumber: expected })
+  })
+
+  it.each<[string, Pick<MappingTransform, 'kind' | 'config'>, TransformLink[], MappingErrorCode]>([
+    [
+      'an incomplete config',
+      { kind: 'constant', config: { value: '' } },
+      [intoTarget('orderDate')],
+      'invalidTransform',
+    ],
+    [
+      'a date in another pattern',
+      { kind: 'dateFormat', config: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' } },
+      [fromSource('DTM+137/C507/2380'), intoTarget('orderDate')],
+      'invalidDate',
+    ],
+    [
+      'a number it cannot read',
+      { kind: 'numberFormat', config: { decimalPlaces: 2, decimalSeparator: '.' } },
+      [fromSource('DTM+137/C507/2379'), intoTarget('orderDate')],
+      'invalidNumber',
+    ],
+    [
+      'a lookup table the engine lacks',
+      { kind: 'lookupTable', config: { lookupTableId: unitTableId, fallback: 'keepValue' } },
+      [fromSource('DTM+137/C507/2379'), intoTarget('orderDate')],
+      'unknownLookupTable',
+    ],
+    [
+      'a code the lookup table lacks with the fail fallback',
+      { kind: 'lookupTable', config: { lookupTableId: unitTableId, fallback: 'fail' } },
+      [fromSource('DTM+137/C507/2379'), intoTarget('orderDate')],
+      'noLookupMatch',
+    ],
+  ])(
+    'fails naming the target field and the transform for %s',
+    async (_, transform, transformLinks, code) => {
+      const message = messageOf([{ tag: 'DTM', elements: [['137', '20261014', 'X2']] }])
+
+      expect(
+        await Effect.runPromise(
+          Effect.flip(
+            applyInboundMappingVersion(via(transform, transformLinks), orderStructure, message, {
+              lookupTables: code === 'unknownLookupTable' ? new Map() : lookupTables,
+            }),
+          ),
+        ),
+      ).toEqual(new MappingError({ code, targetPath: 'orderDate', transformId }))
+    },
+  )
+
+  it('fails for a lookup table the engine lacks beneath a loop without repetitions', async () => {
+    expect(await failure(unitsVia('keepValue'), orderStructure, messageOf([]))).toEqual(
+      new MappingError({ code: 'unknownLookupTable', targetPath: 'lines[].unit', transformId }),
+    )
+  })
+
+  it('fails on a transform that reads from no element of the Message Type', async () => {
+    const version = via({ kind: 'substring', config: { start: 0, length: 2 } }, [
+      fromSource('BGM/9999'),
+      intoTarget('orderNumber'),
+    ])
+
+    expect(await failure(version, orderStructure, order)).toEqual(
+      new MappingError({
+        code: 'unknownSource',
+        targetPath: 'orderNumber',
+        sourcePath: 'BGM/9999',
+      }),
+    )
+  })
+
+  it('fails on a transform that reads the looped segment group outside its loop', async () => {
+    const version = via({ kind: 'substring', config: { start: 0, length: 2 } }, [
+      fromSource('SG25/LIN/C212/7140'),
+      intoTarget('orderNumber'),
+    ])
+
+    expect(await failure(version, orderStructure, twoLines)).toEqual(
+      new MappingError({ code: 'outsideLoop', targetPath: 'orderNumber' }),
+    )
+  })
+
+  const expressionVia = (expression: string, target = 'orderNumber') =>
+    via({ kind: 'jsonata', config: { expression } }, [intoTarget(target)])
+
+  it.each([
+    [
+      'an element by its structure path',
+      '`SG2+BY`.`NAD+BY`.C082.`3039`',
+      { orderNumber: '4012345000009' },
+    ],
+    [
+      'an element outside segment groups',
+      'BGM.`1004` & "/" & UNH.`0062`',
+      { orderNumber: 'PO-4711/1' },
+    ],
+    ['the repetitions of a segment group', '$string($count(SG25))', { orderNumber: '2' }],
+    [
+      'an element of every repetition',
+      '$string($sum(SG25.`QTY+21`.C186.$number(`6060`)))',
+      { orderNumber: '18' },
+    ],
+    ['nothing when it matches nothing', 'BGM.`1225`', {}],
+  ])('JSONata reads %s of the Message', async (_, expression, expected) => {
+    const message = messageOf([
+      { tag: 'BGM', elements: [['220'], ['PO-4711']] },
+      { tag: 'NAD', elements: [['BY'], ['4012345000009', '', '9']] },
+      ...twoLines.segments.slice(1),
+    ])
+
+    expect(await apply(expressionVia(expression), orderStructure, message)).toEqual({
+      ...expected,
+      lines: [{}, {}],
+    })
+  })
+
+  it('JSONata reads the whole Message once rather than each repetition', async () => {
+    const version = expressionVia('$string($count(SG25))', 'lines[].gtin')
+
+    expect(await apply(version, orderStructure, twoLines)).toEqual({
+      lines: [{ gtin: '2' }, { gtin: '2' }],
+    })
+  })
+
+  it.each([
+    ['gives a list', 'SG25.LIN.C212.`7140`'],
+    ['gives an object', 'BGM'],
+    ['fails to evaluate', "$number('twelve')"],
+  ])('JSONata fails naming the target field when its expression %s', async (_, expression) => {
+    expect(await failure(expressionVia(expression), orderStructure, twoLines)).toEqual(
+      new MappingError({ code: 'expressionFailed', targetPath: 'orderNumber', transformId }),
     )
   })
 })
