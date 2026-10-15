@@ -21,6 +21,8 @@ type SegmentUse = Occurrence & {
   qualifier: string | undefined
   // Narrows an element's code list to the codes this use allows, e.g. 1001 to 220 in ORDERS.
   codes?: Readonly<Record<string, ReadonlyArray<string>>>
+  // Composites that EANCOM requires in this use although the UN segment leaves them conditional.
+  requires?: ReadonlyArray<string>
 }
 
 type GroupUse = Occurrence & {
@@ -167,7 +169,7 @@ function build(uses: ReadonlyArray<Use>, parentPath: string): EdifactStructureNo
       name: definition.name,
       ...occurrence,
       children: definition.children.map(([code, required]) =>
-        segmentChild(code, required, path, narrowed),
+        segmentChild(code, required || (use.requires ?? []).includes(code), path, narrowed),
       ),
     }
   })
@@ -190,7 +192,7 @@ const parties = text('Name and address', 'Name und Anschrift')
 
 function party(qualifier: string, occurrence: Occurrence, children: ReadonlyArray<Use> = []) {
   return group(`SG2+${qualifier}`, parties, occurrence, [
-    segment(`NAD+${qualifier}`, m),
+    segment(`NAD+${qualifier}`, { ...m, requires: ['C082'] }),
     ...children,
   ])
 }
@@ -214,7 +216,11 @@ const productIdentification = [
   segment('IMD+F', { maxRepeat: 99 }),
 ]
 
-const lineItem = segment('LIN', { ...m, codes: { '7143': ['EN'] } })
+const lineItem = segment('LIN', { ...m, codes: { '7143': ['EN'] }, requires: ['C212'] })
+
+const price = group('SG28', text('Price details', 'Preisangaben'), { maxRepeat: 25 }, [
+  segment('PRI+AAA', { ...m, requires: ['C509'] }),
+])
 
 const lineCount = segment('CNT+2', { maxRepeat: 10 })
 
@@ -247,9 +253,7 @@ const orders: StructureDefinition = {
       ...productIdentification,
       segment('QTY+21', m),
       segment('DTM+2'),
-      group('SG28', text('Price details', 'Preisangaben'), { maxRepeat: 25 }, [
-        segment('PRI+AAA', m),
-      ]),
+      price,
     ]),
     segment('UNS', m),
     lineCount,
@@ -335,9 +339,7 @@ const invoic: StructureDefinition = {
       group('SG26', text('Line amount', 'Positionsbetrag'), { maxRepeat: 5 }, [
         segment('MOA+203', m),
       ]),
-      group('SG28', text('Price details', 'Preisangaben'), { maxRepeat: 25 }, [
-        segment('PRI+AAA', m),
-      ]),
+      price,
       group('SG33', text('Line tax', 'Positionssteuer'), { maxRepeat: 5 }, [segment('TAX+7', m)]),
     ]),
     segment('UNS', m),
