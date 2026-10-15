@@ -357,6 +357,26 @@ describe('DELETE /operator/workspaces/:workspaceId/members/:userId', () => {
     expect((await remove(seedWorkspace.id, seedSession.user.id)).status).toBe(409)
   })
 
+  it('refuses to remove the Operator themselves before looking up the Workspace', async () => {
+    server.use(...operatorHandlers(apiUrl))
+
+    expect((await remove(unknownWorkspaceId, seedSession.user.id)).status).toBe(409)
+  })
+
+  it('counts the Members from the member list', async () => {
+    const workspaces = seedWorkspaceSummaries.map((workspace) => ({
+      ...workspace,
+      memberCount: 40,
+    }))
+
+    server.use(...operatorHandlers(apiUrl, { workspaces }))
+    const [, leaving] = await membersOf(seedShowcaseWorkspace.id)
+
+    await remove(seedShowcaseWorkspace.id, leaving!.id)
+
+    expect(await memberCountOf(seedShowcaseWorkspace.id)).toBe(3)
+  })
+
   it('answers 403 for an Admin who is not the Operator', async () => {
     server.use(...operatorHandlers(apiUrl, { session: sandboxAdminSession }))
 
@@ -738,6 +758,25 @@ describe('POST /invites/accept', () => {
       { email: mockCredentials.sandboxAdmin.email, role: 'admin' },
       { email: 'jonas.weber@havelland.example', role: 'viewer' },
     ])
+    expect(workspace?.memberCount).toBe(2)
+  })
+
+  it('counts the Members from the member list after an accept', async () => {
+    const workspaces = seedWorkspaceSummaries.map((workspace) => ({
+      ...workspace,
+      memberCount: 40,
+    }))
+
+    server.use(...operatorHandlers(apiUrl, { workspaces }))
+
+    const invite = await createInvite(seedSandboxWorkspace.id, {
+      email: 'jonas.weber@havelland.example',
+      role: 'viewer',
+    })
+
+    await accept(tokenOf(invite))
+    const workspace = (await listWorkspaces()).find(({ id }) => id === seedSandboxWorkspace.id)
+
     expect(workspace?.memberCount).toBe(2)
   })
 
