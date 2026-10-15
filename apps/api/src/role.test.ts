@@ -49,6 +49,7 @@ import {
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
   tradingPartnerSchema,
+  testChannelEndpoint,
   toPath,
   tradingPartnersEndpoint,
   updateChannelEndpoint,
@@ -289,6 +290,10 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
   [
     'regenerate a webhook token',
     () => ({ method: 'POST', url: withId(regenerateWebhookTokenEndpoint.path, ids.channel) }),
+  ],
+  [
+    'test a Channel',
+    () => ({ method: 'POST', url: withId(testChannelEndpoint.path, ids.channel) }),
   ],
   ['create a Flow', () => ({ method: 'POST', url: createFlowEndpoint.path, body: flowInput })],
   [

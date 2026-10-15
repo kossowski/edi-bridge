@@ -6,6 +6,7 @@ import {
   type Channel,
   type ChannelInput,
   channelSchema,
+  type ChannelTestResult,
   type ChannelUpdate,
   type CreatedChannel,
   type MaskedSecret,
@@ -16,6 +17,7 @@ import {
 } from '@edi-bridge/contracts'
 import { channels, flows } from '@edi-bridge/db'
 
+import { ChannelConnections, type ChannelUnreachable } from './channel-connection.js'
 import { Db, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { byName, exactlyOne, inWorkspace, rejectingInvalidId, writingInWorkspace } from './rows.js'
@@ -28,6 +30,7 @@ import type { SecretBox } from './secret.js'
 export interface ChannelSettings {
   secretKey: Buffer
   apiPublicUrl: string
+  connectionTimeoutMs: number
 }
 
 export class ChannelEnvironment extends Context.Service<
@@ -83,6 +86,10 @@ interface KindHandling<K extends Kind> {
     id: string,
     input: OfKind<ChannelUpdate, K>,
   ) => Partial<Values>
+  reach: (
+    channel: OfKind<Channel, K>,
+    secret: (column: SecretColumn) => string | null,
+  ) => Effect.Effect<void, ChannelUnreachable, ChannelConnections>
 }
 
 type KindHandlings = { [K in Kind]: KindHandling<K> }
@@ -114,6 +121,15 @@ const kinds: KindHandlings = {
       input.credential === undefined
         ? {}
         : sealed(secrets, id, 'encryptedCredential', input.credential),
+    reach: (channel, secret) =>
+      Effect.gen(function* () {
+        const connections = yield* ChannelConnections
+
+        return yield* connections.reachSftp({
+          ...channel,
+          credential: secret('encryptedCredential') ?? '',
+        })
+      }),
   },
   webhook: {
     responseFields: (row, apiPublicUrl) => ({
@@ -128,6 +144,7 @@ const kinds: KindHandlings = {
       return { columns: sealedToken(secrets, id, webhookToken), webhookToken }
     },
     changedSecrets: () => ({}),
+    reach: () => Effect.void,
   },
   http: {
     responseFields: (row) => ({
@@ -151,6 +168,15 @@ const kinds: KindHandlings = {
         ? { encryptedAuthorization: null }
         : sealed(secrets, id, 'encryptedAuthorization', input.authorization)
     },
+    reach: (channel, secret) =>
+      Effect.gen(function* () {
+        const connections = yield* ChannelConnections
+
+        return yield* connections.reachHttp({
+          url: channel.url,
+          authorization: secret('encryptedAuthorization'),
+        })
+      }),
   },
 }
 
@@ -350,4 +376,32 @@ export const regenerateWebhookToken = (id: string) =>
     )
 
     return { channel, webhookToken } satisfies RegeneratedWebhookToken
+  })
+
+const secretOf =
+  (secrets: SecretBox, row: Row) =>
+  (column: SecretColumn): string | null => {
+    const sealedSecret = row[column]
+
+    return sealedSecret === null ? null : secrets.open(sealedSecret, secretContext(row.id, column))
+  }
+
+export const testChannel = (id: string) =>
+  Effect.gen(function* () {
+    const row = yield* loadRow(id)
+    const { secrets, apiPublicUrl } = yield* ChannelEnvironment
+    const channel = toChannel(row, apiPublicUrl)
+
+    const reason = yield* handlingOf(channel.type)
+      .reach(channel, secretOf(secrets, row))
+      .pipe(
+        Effect.as(null),
+        Effect.catchTag('ChannelUnreachable', (error) => Effect.succeed(error.reason)),
+      )
+
+    const testedAt = new Date().toISOString()
+
+    return (
+      reason === null ? { outcome: 'succeeded', testedAt } : { outcome: 'failed', reason, testedAt }
+    ) satisfies ChannelTestResult
   })
