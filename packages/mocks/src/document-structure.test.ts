@@ -34,7 +34,7 @@ import {
   type MappingVersionRecord,
   seedMappingVersions,
 } from './mapping-version'
-import { seedSession } from './session'
+import { sandboxAdminSession, seedSession, showcaseViewerSession } from './session'
 
 const apiUrl = 'http://api.test'
 
@@ -743,5 +743,44 @@ describe('Document Structure handler states', () => {
 describe('createDocumentStructures', () => {
   it('generates the same list for the same seed', () => {
     expect(createDocumentStructures({ count: 8 })).toEqual(createDocumentStructures({ count: 8 }))
+  })
+})
+
+describe('documentStructureHandlers for a Viewer', () => {
+  const origin = documentStructureOrigins.jsonDocument
+
+  it.each([
+    ['infer a Document Structure', () => post(inferDocumentStructureEndpoint.path, origin)],
+    [
+      'create a Document Structure',
+      () => post(createDocumentStructureEndpoint.path, { name: 'ERP export', origin }),
+    ],
+    [
+      'adjust a Document Structure',
+      () => put(purchaseOrder.id, { name: 'ERP purchase orders', adjustments: [] }),
+    ],
+  ])('answers 403 to %s and changes nothing', async (_, request) => {
+    const store = createDocumentStructureStore()
+    const before = store.all()
+    server.use(
+      ...documentStructureHandlers(apiUrl, {
+        documentStructures: store,
+        session: showcaseViewerSession,
+      }),
+    )
+
+    expect((await request()).status).toBe(403)
+    expect(store.all()).toEqual(before)
+  })
+
+  it('lets an Admin create a Document Structure', async () => {
+    server.use(...documentStructureHandlers(apiUrl, { session: sandboxAdminSession }))
+
+    const response = await post(createDocumentStructureEndpoint.path, {
+      name: 'ERP export',
+      origin,
+    })
+
+    expect(response.status).toBe(201)
   })
 })

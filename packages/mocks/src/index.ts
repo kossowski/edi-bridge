@@ -453,6 +453,7 @@ export function createHandlers(
       tradingPartners: tradingPartnerStore,
       workspace: workspaceStore,
       testInterchange,
+      session: sessionStore,
     }),
     ...tradingPartnerActivityHandlers(apiUrl, {
       tradingPartners: tradingPartnerStore,
@@ -528,6 +529,7 @@ export function createHandlers(
       versions: mappingVersionStore,
       state: documentStructuresState,
       inferenceState: documentStructureInferenceState,
+      session: sessionStore,
     }),
     messageTypeStructureHandler(apiUrl),
     ...lookupTableHandlers(apiUrl, {
@@ -537,6 +539,7 @@ export function createHandlers(
       flows,
       channels: channelStore,
       runs,
+      session: sessionStore,
     }),
   ]
 }

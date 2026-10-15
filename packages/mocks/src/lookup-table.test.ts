@@ -34,6 +34,7 @@ import {
 import { mappingHandlers } from './mapping'
 import { createRun, seedRuns } from './run'
 import { runDetailHandlers } from './run-detail'
+import { sandboxAdminSession, showcaseViewerSession } from './session'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -677,5 +678,32 @@ describe('lookupTableHandlers states', () => {
     server.use(...lookupTableHandlers(apiUrl, { lookupTables: 'error' }))
 
     expect((await send(method, path)).status).toBe(500)
+  })
+})
+
+describe('lookupTableHandlers for a Viewer', () => {
+  const path = (endpoint: { path: string }) =>
+    toPath(endpoint.path, { id: seedLookupTables[0]!.id })
+
+  const csv = { csv: 'KAR;CT\n' }
+
+  it.each([
+    ['create a Lookup Table', () => send('POST', createLookupTableEndpoint.path, input)],
+    ['update a Lookup Table', () => send('PUT', path(updateLookupTableEndpoint), input)],
+    ['delete a Lookup Table', () => send('DELETE', path(deleteLookupTableEndpoint))],
+    ['preview an import', () => send('POST', path(lookupTableImportPreviewEndpoint), csv)],
+    ['import a CSV', () => send('POST', path(importLookupTableEndpoint), csv)],
+  ])('answers 403 to %s and changes nothing', async (_, request) => {
+    server.use(...lookupTableHandlers(apiUrl, { session: showcaseViewerSession }))
+    const before = await listLookupTables()
+
+    expect((await request()).status).toBe(403)
+    expect(await listLookupTables()).toEqual(before)
+  })
+
+  it('lets an Admin create a Lookup Table', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { lookupTables: [], session: sandboxAdminSession }))
+
+    expect((await send('POST', createLookupTableEndpoint.path, input)).status).toBe(201)
   })
 })

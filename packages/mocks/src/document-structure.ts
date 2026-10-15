@@ -39,6 +39,7 @@ import {
   type UpdateDocumentStructureBody,
   updateDocumentStructureEndpoint,
   visitedNode,
+  type Session,
 } from '@edi-bridge/contracts'
 
 import { byNameAndNewest } from './flow'
@@ -46,6 +47,8 @@ import { containerOf } from './paths'
 import { badRequest, notFound, serverError } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
+import { seedSession, toSessionStore } from './session'
+import { adminOnly, type SessionStore } from './session-access'
 
 import type { MappingDraftStore } from './mapping'
 import type { MappingVersionStore } from './mapping-version'
@@ -741,10 +744,12 @@ export function documentStructureHandlers(
     versions,
     state,
     inferenceState,
+    session = seedSession,
   }: {
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     state?: DocumentStructuresState | undefined
     inferenceState?: DocumentStructuresState | undefined
+    session?: Session | null | SessionStore
   } & MappingUse = {},
 ) {
   if (state) {
@@ -760,6 +765,7 @@ export function documentStructureHandlers(
   }
 
   const store = toDocumentStructureStore(documentStructures)
+  const sessionStore = toSessionStore(session)
   const use = { mappings, versions }
 
   return [
@@ -773,44 +779,50 @@ export function documentStructureHandlers(
           .sort(byName),
       )
     }),
-    http.post(`${apiUrl}${inferDocumentStructureEndpoint.path}`, async ({ request }) => {
-      if (inferenceState) {
-        return respondIn(inferenceState)
-      }
+    http.post(
+      `${apiUrl}${inferDocumentStructureEndpoint.path}`,
+      adminOnly(sessionStore, async ({ request }) => {
+        if (inferenceState) {
+          return respondIn(inferenceState)
+        }
 
-      const body = inferDocumentStructureEndpoint.body.safeParse(await request.json())
+        const body = inferDocumentStructureEndpoint.body.safeParse(await request.json())
 
-      if (!body.success) {
-        return badRequest(body.error.message)
-      }
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
 
-      await delay()
+        await delay()
 
-      const inferred = attempt(() => inferDocumentStructure(body.data))
+        const inferred = attempt(() => inferDocumentStructure(body.data))
 
-      return 'response' in inferred ? inferred.response : HttpResponse.json(inferred.result)
-    }),
-    http.post(`${apiUrl}${createDocumentStructureEndpoint.path}`, async ({ request }) => {
-      const body = createDocumentStructureEndpoint.body.safeParse(await request.json())
+        return 'response' in inferred ? inferred.response : HttpResponse.json(inferred.result)
+      }),
+    ),
+    http.post(
+      `${apiUrl}${createDocumentStructureEndpoint.path}`,
+      adminOnly(sessionStore, async ({ request }) => {
+        const body = createDocumentStructureEndpoint.body.safeParse(await request.json())
 
-      if (!body.success) {
-        return badRequest(body.error.message)
-      }
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
 
-      await delay()
+        await delay()
 
-      const { origin, labels = [] } = body.data
-      const inferred = attempt(() => applyLabels(inferDocumentStructure(origin), labels))
+        const { origin, labels = [] } = body.data
+        const inferred = attempt(() => applyLabels(inferDocumentStructure(origin), labels))
 
-      if ('response' in inferred) {
-        return inferred.response
-      }
+        if ('response' in inferred) {
+          return inferred.response
+        }
 
-      const created = toDocumentStructure(crypto.randomUUID(), body.data.name, inferred.result)
-      store.set(created)
+        const created = toDocumentStructure(crypto.randomUUID(), body.data.name, inferred.result)
+        store.set(created)
 
-      return HttpResponse.json(created, { status: 201 })
-    }),
+        return HttpResponse.json(created, { status: 201 })
+      }),
+    ),
     http.get<{ id: string }>(`${apiUrl}${documentStructureEndpoint.path}`, ({ params }) => {
       const found = store.get(params.id)
 
@@ -818,7 +830,7 @@ export function documentStructureHandlers(
     }),
     http.put<{ id: string }>(
       `${apiUrl}${updateDocumentStructureEndpoint.path}`,
-      async ({ params, request }) => {
+      adminOnly(sessionStore, async ({ params, request }) => {
         const existing = store.get(params.id)
 
         if (!existing) {
@@ -855,7 +867,7 @@ export function documentStructureHandlers(
         store.set(updated)
 
         return HttpResponse.json(updated)
-      },
+      }),
     ),
   ]
 }

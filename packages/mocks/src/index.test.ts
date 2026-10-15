@@ -930,6 +930,21 @@ describe('createHandlers', () => {
     expect(response.status).toBe(403)
   })
 
+  it('keeps the Showcase Viewer from creating a Trading Partner', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    await fetch(`${apiUrl}${showcaseSignInEndpoint.path}`, { method: 'POST' })
+
+    const response = await send('POST', createTradingPartnerEndpoint.path, {
+      name: 'Kieler Kontor GmbH',
+      gln: null,
+      characterSet: 'UNOC',
+      acknowledgementTimeLimitHours: 12,
+    })
+
+    expect(response.status).toBe(403)
+  })
+
   it.each([
     ['the Showcase sign-in', 'showcase', seedShowcaseWorkspace],
     ['the sandbox-admin sign-in', 'sandbox', seedSandboxWorkspace],
