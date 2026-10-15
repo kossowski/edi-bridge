@@ -29,7 +29,11 @@ import {
   mappingDraftEndpoint,
   mappingsEndpoint,
   maxLookupTableCsvLength,
+  mappingVersionEndpoint,
+  mappingVersionsEndpoint,
   operatorWorkspaceMembersEndpoint,
+  publishedMappingVersionsEndpoint,
+  publishMappingDraftEndpoint,
   removeWorkspaceMemberEndpoint,
   revokeInviteEndpoint,
   saveMappingDraftEndpoint,
@@ -68,6 +72,12 @@ import {
   suggestLookupTableEntries,
   updateLookupTable,
 } from './lookup-table.js'
+import {
+  listMappingVersions,
+  listPublishedMappingVersions,
+  loadMappingVersion,
+  publishMappingDraft,
+} from './mapping-version.js'
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { parse, type ValidationError } from './parse.js'
 import {
@@ -462,6 +472,43 @@ function registerRoutes(
       request,
       reply,
       saveMappingDraft(request.params.id, parse(saveMappingDraftEndpoint.body, request.body)),
+    ),
+  )
+
+  app.get(publishedMappingVersionsEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(
+        parse(publishedMappingVersionsEndpoint.query, request.query),
+        listPublishedMappingVersions,
+      ),
+    ),
+  )
+
+  app.get<{ Params: { mappingId: string } }>(mappingVersionsEndpoint.path, (request, reply) =>
+    respond(request, reply, listMappingVersions(request.params.mappingId)),
+  )
+
+  app.get<{ Params: { mappingId: string; versionId: string } }>(
+    mappingVersionEndpoint.path,
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        loadMappingVersion(request.params.mappingId, request.params.versionId),
+      ),
+  )
+
+  app.post<{ Params: { mappingId: string } }>(publishMappingDraftEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      publishMappingDraft(
+        request.params.mappingId,
+        parse(publishMappingDraftEndpoint.body, request.body),
+      ),
+      201,
     ),
   )
 

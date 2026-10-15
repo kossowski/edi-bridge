@@ -24,7 +24,11 @@ import {
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
   mappingDraftEndpoint,
+  mappingVersionEndpoint,
+  mappingVersionsEndpoint,
   mappingsEndpoint,
+  publishedMappingVersionsEndpoint,
+  publishMappingDraftEndpoint,
   removeWorkspaceMemberEndpoint,
   revokeInviteEndpoint,
   saveMappingDraftEndpoint,
@@ -85,6 +89,7 @@ interface Ids {
   lookupTable: string
   documentStructure: string
   mapping: string
+  mappingVersion: string
 }
 
 let api: TestApi
@@ -110,11 +115,20 @@ beforeAll(async () => {
   await addMember(api.connection.db, operatorAsViewer)
   operator = await signIn(api.app, operatorAsViewer)
 
+  const documentStructureId = await createdId(
+    createDocumentStructureEndpoint.path,
+    documentStructure,
+  )
+
+  const mapping = await createdId(createMappingEndpoint.path, { messageType: 'ORDERS' })
+  const versionsPath = toPath(publishMappingDraftEndpoint.path, { mappingId: mapping })
+
   ids = {
     tradingPartner: await createdId(createTradingPartnerEndpoint.path, tradingPartner),
     lookupTable: await createdId(createLookupTableEndpoint.path, lookupTable),
-    documentStructure: await createdId(createDocumentStructureEndpoint.path, documentStructure),
-    mapping: await createdId(createMappingEndpoint.path, { messageType: 'ORDERS' }),
+    documentStructure: documentStructureId,
+    mapping,
+    mappingVersion: await createdId(versionsPath, { changeNote: '' }),
   }
 }, 60_000)
 
@@ -137,6 +151,9 @@ const workspaceReads = (): string[] => [
   withId(documentStructureEndpoint.path, ids.documentStructure),
   mappingsEndpoint.path,
   withId(mappingDraftEndpoint.path, ids.mapping),
+  toPath(mappingVersionsEndpoint.path, { mappingId: ids.mapping }),
+  toPath(mappingVersionEndpoint.path, { mappingId: ids.mapping, versionId: ids.mappingVersion }),
+  publishedMappingVersionsEndpoint.path,
 ]
 
 const reads = () => [sessionEndpoint.path, workspaceMembersEndpoint.path, ...workspaceReads()]
@@ -228,6 +245,14 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
         transforms: [],
         transformLinks: [],
       },
+    }),
+  ],
+  [
+    'publish the Draft of a Mapping',
+    () => ({
+      method: 'POST',
+      url: toPath(publishMappingDraftEndpoint.path, { mappingId: ids.mapping }),
+      body: { changeNote: 'Order number mapped' },
     }),
   ],
   [

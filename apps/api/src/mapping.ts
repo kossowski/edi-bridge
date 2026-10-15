@@ -1,4 +1,4 @@
-import { eq, getTableColumns, inArray, type SQL, sql } from 'drizzle-orm'
+import { desc, eq, getTableColumns, inArray, type SQL, sql } from 'drizzle-orm'
 import { Effect, Predicate } from 'effect'
 
 import {
@@ -15,7 +15,13 @@ import {
   type SaveMappingDraftBody,
   unknownPathMessage,
 } from '@edi-bridge/contracts'
-import { documentStructures, lookupTables, mappingNameUnique, mappings } from '@edi-bridge/db'
+import {
+  documentStructures,
+  lookupTables,
+  mappingNameUnique,
+  mappings,
+  mappingVersions,
+} from '@edi-bridge/db'
 
 import { Db, type Database } from './db.js'
 import { Unprocessable } from './errors.js'
@@ -31,12 +37,29 @@ import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
 
-const selectRows = (db: Database, where: SQL | undefined) =>
-  db
-    .select({ ...getTableColumns(mappings), documentStructureName: documentStructures.name })
+const selectRows = (db: Database, where: SQL | undefined) => {
+  const latest = db
+    .selectDistinctOn([mappingVersions.mappingId], {
+      mappingId: mappingVersions.mappingId,
+      version: mappingVersions.version,
+      publishedAt: mappingVersions.publishedAt,
+    })
+    .from(mappingVersions)
+    .orderBy(mappingVersions.mappingId, desc(mappingVersions.version))
+    .as('latest')
+
+  return db
+    .select({
+      ...getTableColumns(mappings),
+      documentStructureName: documentStructures.name,
+      latestVersion: latest.version,
+      latestVersionPublishedAt: latest.publishedAt,
+    })
     .from(mappings)
     .innerJoin(documentStructures, eq(mappings.documentStructureId, documentStructures.id))
+    .leftJoin(latest, eq(latest.mappingId, mappings.id))
     .where(where)
+}
 
 type Row = Awaited<ReturnType<typeof selectRows>>[number]
 
@@ -47,9 +70,8 @@ const toSummary = (row: Row): MappingSummary => ({
   messageType: row.messageType,
   documentStructureId: row.documentStructureId,
   documentStructureName: row.documentStructureName,
-  // Until Mapping Versions are published (#185).
-  latestVersion: null,
-  latestVersionPublishedAt: null,
+  latestVersion: row.latestVersion,
+  latestVersionPublishedAt: row.latestVersionPublishedAt?.toISOString() ?? null,
   unpublishedChanges: row.unpublishedChanges,
   draftUpdatedAt: row.draftUpdatedAt.toISOString(),
   // Until Flows (#186) and Runs (#187) exist.
@@ -167,19 +189,7 @@ export const createMapping = ({ messageType }: CreateMappingBody) =>
     return toSummary(yield* exactlyOne(rows))
   })
 
-const toDraft = (row: Row): MappingDraft => {
-  const fields = {
-    mappingId: row.id,
-    name: row.name,
-    ...row.draft,
-    updatedAt: row.draftUpdatedAt.toISOString(),
-    // Until Mapping Versions are published (#185).
-    latestVersion: null,
-    unpublishedChanges: row.unpublishedChanges,
-    // Until AI drafts are stored (#203).
-    aiReview: null,
-  }
-
+export const sidesOf = (row: Row) => {
   const document: DocumentStructureSide = {
     kind: 'documentStructure',
     documentStructureId: row.documentStructureId,
@@ -188,10 +198,25 @@ const toDraft = (row: Row): MappingDraft => {
 
   const edifact: MessageTypeSide = { kind: 'messageType', messageType: row.messageType }
 
-  return { ...fields, ...oriented(row.messageType, { document, edifact }) }
+  return oriented(row.messageType, { document, edifact })
 }
 
-const loadRow = (id: string) =>
+const toDraft = (row: Row): MappingDraft => {
+  const fields = {
+    mappingId: row.id,
+    name: row.name,
+    ...row.draft,
+    updatedAt: row.draftUpdatedAt.toISOString(),
+    latestVersion: row.latestVersion,
+    unpublishedChanges: row.unpublishedChanges,
+    // Until AI drafts are stored (#203).
+    aiReview: null,
+  }
+
+  return { ...fields, ...sidesOf(row) }
+}
+
+export const loadRow = (id: string) =>
   Effect.gen(function* () {
     yield* rejectingInvalidId(id)
 
