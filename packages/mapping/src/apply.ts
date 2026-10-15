@@ -9,6 +9,7 @@ import {
   type JsonContent,
   jsonContentSchema,
   type MappingVersion,
+  type MessageTypeStructure,
   messageTypeStructures,
 } from '@edi-bridge/contracts'
 
@@ -47,8 +48,10 @@ function trimmed<Part>(parts: ReadonlyArray<Part>, empty: (part: Part) => boolea
   return parts.slice(0, parts.findLastIndex((part) => !empty(part)) + 1)
 }
 
+const fillsItself = (element: EdifactElement) => element.codes.length === 1
+
 function valueOf(element: EdifactElement, values: Values) {
-  return values.get(element.path) ?? (element.codes.length === 1 ? element.codes[0]!.code : '')
+  return values.get(element.path) ?? (fillsItself(element) ? element.codes[0]!.code : '')
 }
 
 function segmentOf(segment: EdifactSegment, values: Values): Segment {
@@ -87,22 +90,24 @@ const hasValueBeneath = (part: StructurePart, values: Values) =>
   [...values.keys()].some((path) => path.startsWith(`${part.path}/`))
 
 // An empty optional segment group is left out rather than failing.
+const isPresent = (part: StructurePart, values: Values) =>
+  part.required || hasValueBeneath(part, values)
+
 function firstMissingRequired(
   parts: ReadonlyArray<StructurePart>,
   values: Values,
-  missing: ReadonlySet<string>,
 ): string | undefined {
   for (const part of parts) {
     if (part.kind === 'element') {
-      if (part.required && missing.has(part.path)) {
+      if (part.required && !values.has(part.path) && !fillsItself(part)) {
         return part.path
       }
 
       continue
     }
 
-    if (part.required || hasValueBeneath(part, values)) {
-      const found = firstMissingRequired(childrenOf(part), values, missing)
+    if (isPresent(part, values)) {
+      const found = firstMissingRequired(childrenOf(part), values)
 
       if (found !== undefined) {
         return found
@@ -113,18 +118,32 @@ function firstMissingRequired(
   return undefined
 }
 
-const framingTags = new Set(['UNH', 'UNS', 'UNT'])
-
 function segmentsOf(nodes: ReadonlyArray<EdifactStructureNode>, values: Values): Segment[] {
   return nodes.flatMap((node) => {
-    const filled = hasValueBeneath(node, values)
-
-    if (node.kind === 'segmentGroup') {
-      return filled ? segmentsOf(node.children, values) : []
+    if (!isPresent(node, values)) {
+      return []
     }
 
-    return filled || framingTags.has(node.tag) ? [segmentOf(node, values)] : []
+    return node.kind === 'segmentGroup'
+      ? segmentsOf(node.children, values)
+      : [segmentOf(node, values)]
   })
+}
+
+function framed({ messageType, children }: MessageTypeStructure) {
+  const [header, ...body] = children
+  const trailer = body.pop()
+
+  if (
+    header?.kind !== 'segment' ||
+    header.tag !== 'UNH' ||
+    trailer?.kind !== 'segment' ||
+    trailer.tag !== 'UNT'
+  ) {
+    throw new Error(`The ${messageType} structure does not run from UNH to UNT`)
+  }
+
+  return { header, body }
 }
 
 const messageReference = '1'
@@ -134,7 +153,8 @@ export function applyMappingVersion(
   document: JsonContent,
 ): Effect.Effect<Message, MappingError> {
   const structure = messageTypeStructures[version.target.messageType]
-  const targets = new Set(elementPaths(structure.children))
+  const { header, body } = framed(structure)
+  const targets = new Set(elementPaths(body))
   const unknown = version.links.find(({ targetPath }) => !targets.has(targetPath))
 
   if (unknown) {
@@ -142,19 +162,16 @@ export function applyMappingVersion(
   }
 
   const values = new Map<string, string>()
-  const missing = new Set<string>()
 
   for (const { sourcePath, targetPath } of version.links) {
     const value = sourceValue(document, sourcePath)
 
-    if (value === undefined || value === '') {
-      missing.add(targetPath)
-    } else {
+    if (value !== undefined && value !== '') {
       values.set(targetPath, value)
     }
   }
 
-  const missingTarget = firstMissingRequired(structure.children, values, missing)
+  const missingTarget = firstMissingRequired(body, values)
 
   if (missingTarget !== undefined) {
     return Effect.fail(
@@ -162,14 +179,10 @@ export function applyMappingVersion(
     )
   }
 
-  values.set('UNH/0062', messageReference)
-
-  // Every Message Type starts with UNH and ends with UNT, which counts the segments it encloses.
-  const [header, ...rest] = segmentsOf(structure.children, values)
-  const segments = rest.slice(0, -1)
+  const segments = segmentsOf(body, values)
 
   return Effect.succeed({
-    header: header!,
+    header: segmentOf(header, new Map([[`${header.path}/0062`, messageReference]])),
     segments,
     trailer: { tag: 'UNT', elements: [[String(segments.length + 2)], [messageReference]] },
   })
