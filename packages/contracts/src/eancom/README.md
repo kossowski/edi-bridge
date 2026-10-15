@@ -5,6 +5,20 @@
 - CCG ORDERS, CCG DESADV and CCG INVOIC: the GS1 Germany CCG recommendations for EANCOM 1997, update 2005 ([ORDERS](https://events.gs1.de/common/downloads/gs1_tech/2075_1997_orders.pdf), [DESADV](https://events.gs1.de/common/downloads/gs1_tech/2071_1997_desadv.pdf), [INVOIC](https://events.gs1.de/common/downloads/gs1_tech/2072_1997_invoic.pdf)), section 7, segment layout. Page numbers are printed page numbers; the PDF page is one higher.
 - MS30, MS34 and MS35: the GS1 Sweden ESAP 20 mapping specifications for EANCOM 1997 (D.96A), version 1.8.0, 2023-05-29 ([MS30 Order](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms30_orders_se.pdf), [MS34 Leveransavisering](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms34_desadv_se-1.pdf), [MS35 Faktura](https://gs1.se/wp-content/uploads/sites/2/2023/05/ms35_invoic_se.pdf)).
 
+## Segment layouts
+
+`directory.ts` lists the elements the retail Mappings use, and every element and composite in front of them in the UN D.96A segment, so that each element keeps its EDIFACT position when a Mapping reads or writes it. Elements behind the last listed one are left out; a Mapping cannot write them, and reading a Message skips them. The layouts follow the UNECE D.96A segment directory (UNTDID D.96A, TRSD), as do the segment and composite definitions that `packages/edifact` validates against in `src/definitions`. These segments hold parts that the retail Mappings do not use in front of parts they use:
+
+| Segment | Listed layout                                        | Parts in front of the used ones |
+| ------- | ---------------------------------------------------- | ------------------------------- |
+| NAD     | 3035, C082, C058, C080, C059, 3164, 3229, 3251, 3207 | C058 (3124), 3229               |
+| CTA     | 3139, C056 (3413, 3412)                              | 3413                            |
+| FTX     | 4451, 4453, C107 (4441), C108                        | 4453, C107                      |
+| PAC     | 7224, C531 (7075), C202                              | C531                            |
+| PAT     | 4279, C110 (4277), C112 (2475, 2009, 2151, 2152)     | C110                            |
+
+C112 holds the payment time reference, and C110 the coded terms of payment in front of it. A composite in front of the used parts lists its first component only: C058, C107, C110 and C531.
+
 ## Composites required in use
 
 UN D.96A leaves these composites conditional (`C`). The segment uses mark them as required, so a present segment without them fails. EANCOM marks a conditional entry as required (`R`), advised (`A`), dependent (`D`), optional (`O`) or not used (`N`).

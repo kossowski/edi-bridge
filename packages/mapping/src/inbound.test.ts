@@ -216,6 +216,63 @@ describe('applyInboundMappingVersion', () => {
     })
   })
 
+  it('reads name and address, contact and free text at their UN D.96A positions', async () => {
+    const version = inboundVersion([
+      { sourcePath: 'FTX+AAI/C108/4440', targetPath: 'note' },
+      { sourcePath: 'SG2+BY/NAD+BY/C080/3036', targetPath: 'buyer.name' },
+      { sourcePath: 'SG2+BY/NAD+BY/C059/3042', targetPath: 'buyer.street' },
+      { sourcePath: 'SG2+BY/NAD+BY/3164', targetPath: 'buyer.city' },
+      { sourcePath: 'SG2+BY/NAD+BY/3251', targetPath: 'buyer.postalCode' },
+      { sourcePath: 'SG2+BY/NAD+BY/3207', targetPath: 'buyer.country' },
+      { sourcePath: 'SG2+BY/SG5/CTA+OC/C056/3412', targetPath: 'buyer.contact' },
+    ])
+
+    const message = messageOf([
+      { tag: 'BGM', elements: [['220'], ['PO-4711'], ['9']] },
+      { tag: 'FTX', elements: [['AAI'], [''], [''], ['Deliver to gate 3']] },
+      {
+        tag: 'NAD',
+        elements: [
+          ['BY'],
+          ['4012345000009', '', '9'],
+          [''],
+          ['Retail GmbH'],
+          ['Hafenstr. 1'],
+          ['Hamburg'],
+          [''],
+          ['20457'],
+          ['DE'],
+        ],
+      },
+      { tag: 'CTA', elements: [['OC'], ['', 'Anna Meier']] },
+      { tag: 'NAD', elements: [['SU'], ['4000001000005', '', '9']] },
+    ])
+
+    const structure = structureOf([
+      field('note'),
+      object('buyer', [
+        field('buyer.name'),
+        field('buyer.street'),
+        field('buyer.city'),
+        field('buyer.postalCode'),
+        field('buyer.country'),
+        field('buyer.contact'),
+      ]),
+    ])
+
+    expect(await apply(version, structure, message)).toEqual({
+      note: 'Deliver to gate 3',
+      buyer: {
+        name: 'Retail GmbH',
+        street: 'Hafenstr. 1',
+        city: 'Hamburg',
+        postalCode: '20457',
+        country: 'DE',
+        contact: 'Anna Meier',
+      },
+    })
+  })
+
   it('reads segments behind repeated groups and segments the structure does not know', async () => {
     const version = inboundVersion([
       { sourcePath: 'UNH/0062', targetPath: 'messageReference' },

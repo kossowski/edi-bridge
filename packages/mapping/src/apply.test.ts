@@ -220,6 +220,101 @@ describe('applyMappingVersion', () => {
     })
   })
 
+  it('writes name and address, contact and free text at their UN D.96A positions', async () => {
+    const version = outboundVersion(
+      'ORDERS',
+      [
+        ...orderHeader,
+        ...orderLines,
+        { sourcePath: 'note', targetPath: 'FTX+AAI/C108/4440' },
+        { sourcePath: 'buyer.name', targetPath: 'SG2+BY/NAD+BY/C080/3036' },
+        { sourcePath: 'buyer.street', targetPath: 'SG2+BY/NAD+BY/C059/3042' },
+        { sourcePath: 'buyer.city', targetPath: 'SG2+BY/NAD+BY/3164' },
+        { sourcePath: 'buyer.postalCode', targetPath: 'SG2+BY/NAD+BY/3251' },
+        { sourcePath: 'buyer.country', targetPath: 'SG2+BY/NAD+BY/3207' },
+        { sourcePath: 'buyer.contact', targetPath: 'SG2+BY/SG5/CTA+OC/C056/3412' },
+      ],
+      orderLoop,
+    )
+
+    const document = {
+      ...orderWithLine,
+      note: 'Deliver to gate 3',
+      buyer: {
+        ...order.buyer,
+        name: 'Retail GmbH',
+        street: 'Hafenstr. 1',
+        city: 'Hamburg',
+        postalCode: '20457',
+        country: 'DE',
+        contact: 'Anna Meier',
+      },
+    }
+
+    const { segments } = await apply(version, document)
+
+    expect(segments.filter(({ tag }) => ['FTX', 'CTA'].includes(tag))).toEqual([
+      { tag: 'FTX', elements: [['AAI'], [''], [''], ['Deliver to gate 3']] },
+      { tag: 'CTA', elements: [['OC'], ['', 'Anna Meier']] },
+    ])
+    expect(segments.find(({ tag }) => tag === 'NAD')).toEqual({
+      tag: 'NAD',
+      elements: [
+        ['BY'],
+        ['4012345000009', '', '9'],
+        [''],
+        ['Retail GmbH'],
+        ['Hafenstr. 1'],
+        ['Hamburg'],
+        [''],
+        ['20457'],
+        ['DE'],
+      ],
+    })
+  })
+
+  it('writes the package type and the payment terms at their UN D.96A positions', async () => {
+    const despatchVersion = outboundVersion('DESADV', [
+      ...despatchHeader,
+      { sourcePath: 'packageCount', targetPath: 'SG10/SG11/PAC/7224' },
+      { sourcePath: 'packageType', targetPath: 'SG10/SG11/PAC/C202/7065' },
+    ])
+
+    const invoiceVersion = outboundVersion('INVOIC', [
+      { sourcePath: 'buyer.gln', targetPath: 'SG2+BY/NAD+BY/C082/3039' },
+      { sourcePath: 'supplier.gln', targetPath: 'SG2+SU/NAD+SU/C082/3039' },
+      { sourcePath: 'invoiceNumber', targetPath: 'BGM/1004' },
+      { sourcePath: 'invoiceDate', targetPath: 'DTM+137/C507/2380' },
+      { sourcePath: 'currency', targetPath: 'SG7/CUX/C504/6345' },
+      { sourcePath: 'total', targetPath: 'SG48/MOA+77/C516/5004' },
+      { sourcePath: 'paymentDays', targetPath: 'SG8/PAT+1/C112/2152' },
+    ])
+
+    const despatchMessage = await apply(despatchVersion, {
+      ...despatch,
+      packageCount: '3',
+      packageType: 'PX',
+    })
+
+    const invoice = await apply(invoiceVersion, {
+      ...order,
+      invoiceNumber: 'INV-2026-0042',
+      invoiceDate: '20261014',
+      currency: 'EUR',
+      total: '119.00',
+      paymentDays: '30',
+    })
+
+    expect(despatchMessage.segments.find(({ tag }) => tag === 'PAC')).toEqual({
+      tag: 'PAC',
+      elements: [['3'], [''], ['PX']],
+    })
+    expect(invoice.segments.find(({ tag }) => tag === 'PAT')).toEqual({
+      tag: 'PAT',
+      elements: [['1'], [''], ['5', '3', 'D', '30']],
+    })
+  })
+
   it.each([
     ['its source value is missing', orderHeader],
     [
