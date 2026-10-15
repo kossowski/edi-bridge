@@ -42,10 +42,12 @@ const updatedAt = () =>
     .defaultNow()
     .$onUpdate(() => new Date())
 
+export const userEmailUnique = 'users_email_unique'
+
 export const users = pgTable('users', {
   id: uuid().primaryKey().defaultRandom(),
   name: text().notNull(),
-  email: text().notNull().unique(),
+  email: text().notNull().unique(userEmailUnique),
   emailVerified: boolean().notNull().default(false),
   image: text(),
   operator: boolean().notNull().default(false),

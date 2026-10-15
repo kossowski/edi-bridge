@@ -37,7 +37,7 @@ A user with a role, Admin or Viewer, in one Workspace. A user can be a Member of
 _Avoid_: Membership, team member, seat
 
 **Invite**:
-A link the Operator creates for one email address, Workspace and role, and shares by hand. Through it, the invited user sets a password and becomes a Member. It is open for 7 days, until it is used or revoked.
+A link the Operator creates for one email address, Workspace and role, and shares by hand. Through it, the invited user sets a password and becomes a Member. It is open for 7 days, until it is used or revoked. An invite is not created for someone who is already a Member of the Workspace, and accepting one never changes the role of an existing Member.
 _Avoid_: Invitation, sign-up link
 
 **Admin**:

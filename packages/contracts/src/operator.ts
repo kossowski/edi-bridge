@@ -108,6 +108,7 @@ export const maxPasswordLength = 128
 export const maxUserNameLength = 100
 
 export const acceptInviteInputSchema = z.object({
+  token: z.string().min(1),
   name: z.string().trim().min(1).max(maxUserNameLength),
   password: z.string().min(minPasswordLength).max(maxPasswordLength),
 })
@@ -116,14 +117,57 @@ export type AcceptInviteInput = z.infer<typeof acceptInviteInputSchema>
 
 export const inviteUnusableStatus = 410
 
+export const inviteUnusableReasonSchema = z.enum(['revoked', 'used', 'expired'])
+
+export type InviteUnusableReason = z.infer<typeof inviteUnusableReasonSchema>
+
+export const inviteUnusableMessages: Record<InviteUnusableReason, string> = {
+  revoked: 'This invite was revoked.',
+  used: 'This invite was already used.',
+  expired: 'This invite has expired.',
+}
+
+type InviteTimes = {
+  revokedAt: Date | string | null
+  acceptedAt: Date | string | null
+  expiresAt: Date | string
+}
+
+export function inviteUnusableReason(
+  { revokedAt, acceptedAt, expiresAt }: InviteTimes,
+  now: Date,
+): InviteUnusableReason | undefined {
+  if (revokedAt !== null) {
+    return 'revoked'
+  }
+
+  if (acceptedAt !== null) {
+    return 'used'
+  }
+
+  return new Date(expiresAt) <= now ? 'expired' : undefined
+}
+
+export const inviteUnusableProblemSchema = z.object({
+  reason: inviteUnusableReasonSchema,
+  message: z.string().min(1),
+})
+
+export type InviteUnusableProblem = z.infer<typeof inviteUnusableProblemSchema>
+
+export const inviteUnusableProblem = (reason: InviteUnusableReason): InviteUnusableProblem => ({
+  reason,
+  message: inviteUnusableMessages[reason],
+})
+
 export const acceptInviteEndpoint: Endpoint<
   undefined,
   undefined,
   AcceptInviteInput,
-  '/invites/:token/accept'
+  '/invites/accept'
 > = {
   method: 'POST',
-  path: '/invites/:token/accept',
+  path: '/invites/accept',
   body: acceptInviteInputSchema,
   response: z.undefined(),
 }

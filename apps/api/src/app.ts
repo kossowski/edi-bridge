@@ -17,6 +17,7 @@ import {
   documentStructuresEndpoint,
   inferDocumentStructureEndpoint,
   importLookupTableEndpoint,
+  inviteUnusableProblem,
   inviteUnusableStatus,
   lookupTableEndpoint,
   lookupTableImportPreviewEndpoint,
@@ -119,10 +120,15 @@ const statusOf: Record<Failure['_tag'], number> = {
   DocumentStructureRejected: 422,
 }
 
-const bodyOf = (error: Failure) =>
-  Predicate.isTagged(error, 'DocumentStructureRejected')
-    ? error.problem
+const bodyOf = (error: Failure) => {
+  if (Predicate.isTagged(error, 'DocumentStructureRejected')) {
+    return error.problem
+  }
+
+  return Predicate.isTagged(error, 'InviteUnusable')
+    ? inviteUnusableProblem(error.reason)
     : { message: error.message }
+}
 
 // JSON escapes a control character in six bytes, the worst case for a CSV of the maximum length.
 const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
@@ -443,11 +449,7 @@ function registerRoutes(
       ),
   )
 
-  app.post<{ Params: { token: string } }>(acceptInviteEndpoint.path, (request, reply) =>
-    run(
-      reply,
-      acceptInvite(request.params.token, parse(acceptInviteEndpoint.body, request.body)),
-      204,
-    ),
+  app.post(acceptInviteEndpoint.path, (request, reply) =>
+    run(reply, acceptInvite(parse(acceptInviteEndpoint.body, request.body)), 204),
   )
 }

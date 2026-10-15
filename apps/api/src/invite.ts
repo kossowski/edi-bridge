@@ -1,5 +1,5 @@
 import { hashPassword, verifyPassword } from 'better-auth/crypto'
-import { and, desc, eq, gt, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { randomBytes } from 'node:crypto'
 
@@ -7,18 +7,18 @@ import {
   type AcceptInviteInput,
   type Invite,
   type InviteInput,
+  inviteUnusableReason,
   inviteValidityDays,
 } from '@edi-bridge/contracts'
-import { invites, workspaces } from '@edi-bridge/db'
+import { invites, members, userEmailUnique, users, workspaces } from '@edi-bridge/db'
 
-import { Db } from './db.js'
+import { Db, type Transaction } from './db.js'
+import { dayMs } from './duration.js'
 import { Conflict, Forbidden, InviteUnusable, NotFound } from './errors.js'
-import { exactlyOne, foundOrNotFound, rejectingInvalidId } from './rows.js'
-import { addUser, findUserWithPassword, grantRole, storePassword } from './user.js'
+import { exactlyOne, foundOrNotFound, rejectingDuplicate, rejectingInvalidId } from './rows.js'
+import { addMembership, addUser, findUserWithPassword, storePassword } from './user.js'
 
 import type { ValidationError } from './parse.js'
-
-const dayMs = 24 * 60 * 60 * 1000
 
 type InviteRow = typeof invites.$inferSelect
 
@@ -72,8 +72,22 @@ export const createInvite = (
   Effect.gen(function* () {
     yield* requireWorkspace(workspaceId)
 
-    const { email, role } = yield* input
+    const { email: rawEmail, role } = yield* input
+    const email = rawEmail.trim().toLowerCase()
     const db = yield* Db
+
+    const [member] = yield* Effect.promise(() =>
+      db
+        .select({ userId: members.userId })
+        .from(members)
+        .innerJoin(users, eq(users.id, members.userId))
+        .where(and(eq(members.workspaceId, workspaceId), eq(users.email, email))),
+    )
+
+    if (member !== undefined) {
+      return yield* new Conflict({ message: 'This person is already a Member of the Workspace' })
+    }
+
     const createdAt = new Date()
 
     const rows = yield* Effect.promise(() =>
@@ -81,7 +95,7 @@ export const createInvite = (
         .insert(invites)
         .values({
           workspaceId,
-          email: email.trim().toLowerCase(),
+          email,
           role,
           token: randomBytes(32).toString('base64url'),
           createdAt,
@@ -127,91 +141,65 @@ export const revokeInvite = (workspaceId: string, inviteId: string, webOrigin: s
     return toInvite(yield* foundOrNotFound(rows[0]), webOrigin)
   })
 
-function unusableReason({ acceptedAt, revokedAt, expiresAt }: InviteRow, now: Date) {
-  if (revokedAt !== null) {
-    return 'This invite was revoked.'
-  }
+type Refusal = NotFound | InviteUnusable | Forbidden
 
-  if (acceptedAt !== null) {
-    return 'This invite was already used.'
-  }
+const passwordMatches = async (hash: string | null, password: string) =>
+  hash !== null && (await verifyPassword({ hash, password }))
 
-  return expiresAt <= now ? 'This invite has expired.' : undefined
+async function addInvitedUser(
+  tx: Transaction,
+  { name, email, password }: { name: string; email: string; password: string },
+) {
+  const userId = await addUser(tx, { name, email, operator: false })
+  await storePassword(tx, userId, await hashPassword(password))
+
+  return userId
 }
 
-export const acceptInvite = (
-  token: string,
-  input: Effect.Effect<AcceptInviteInput, ValidationError>,
-) =>
+async function acceptInTransaction(
+  tx: Transaction,
+  { token, name, password }: AcceptInviteInput,
+  now: Date,
+): Promise<Refusal | undefined> {
+  const [invite] = await tx.select().from(invites).where(eq(invites.token, token)).for('update')
+
+  if (invite === undefined) {
+    return new NotFound()
+  }
+
+  const reason = inviteUnusableReason(invite, now)
+
+  if (reason !== undefined) {
+    return new InviteUnusable({ reason })
+  }
+
+  const existing = await findUserWithPassword(tx, invite.email)
+
+  if (existing !== undefined && !(await passwordMatches(existing.passwordHash, password))) {
+    return new Forbidden()
+  }
+
+  const userId = existing?.id ?? (await addInvitedUser(tx, { name, email: invite.email, password }))
+
+  await addMembership(tx, { userId, workspaceId: invite.workspaceId, role: invite.role })
+  await tx.update(invites).set({ acceptedAt: now }).where(eq(invites.id, invite.id))
+
+  return undefined
+}
+
+export const acceptInvite = (input: Effect.Effect<AcceptInviteInput, ValidationError>) =>
   Effect.gen(function* () {
-    const { name, password } = yield* input
+    const accepted = yield* input
     const db = yield* Db
     const now = new Date()
 
-    const [invite] = yield* Effect.promise(() =>
-      db.select().from(invites).where(eq(invites.token, token)),
+    const refusal = yield* rejectingDuplicate(
+      () => db.transaction((tx) => acceptInTransaction(tx, accepted, now)),
+      [userEmailUnique],
+      'An account with this email was created meanwhile',
     )
 
-    if (invite === undefined) {
-      return yield* new NotFound()
-    }
-
-    const reason = unusableReason(invite, now)
-
-    if (reason !== undefined) {
-      return yield* new InviteUnusable({ message: reason })
-    }
-
-    const existing = yield* Effect.promise(() => findUserWithPassword(db, invite.email))
-
-    if (existing !== undefined) {
-      const { passwordHash } = existing
-
-      const matches =
-        passwordHash !== null &&
-        (yield* Effect.promise(() => verifyPassword({ hash: passwordHash, password })))
-
-      if (!matches) {
-        return yield* new Forbidden()
-      }
-    }
-
-    const newPasswordHash =
-      existing === undefined ? yield* Effect.promise(() => hashPassword(password)) : undefined
-
-    const accepted = yield* Effect.promise(() =>
-      db.transaction(async (tx) => {
-        const claimed = await tx
-          .update(invites)
-          .set({ acceptedAt: now })
-          .where(
-            and(
-              eq(invites.id, invite.id),
-              isNull(invites.acceptedAt),
-              isNull(invites.revokedAt),
-              gt(invites.expiresAt, now),
-            ),
-          )
-          .returning({ id: invites.id })
-
-        if (claimed.length === 0) {
-          return false
-        }
-
-        const userId =
-          existing?.id ?? (await addUser(tx, { name, email: invite.email, operator: false }))
-
-        if (newPasswordHash !== undefined) {
-          await storePassword(tx, userId, newPasswordHash)
-        }
-
-        await grantRole(tx, { userId, workspaceId: invite.workspaceId, role: invite.role })
-
-        return true
-      }),
-    )
-
-    if (!accepted) {
-      return yield* new InviteUnusable({ message: 'This invite is no longer open.' })
+    if (refusal !== undefined) {
+      return yield* Effect.fail(refusal)
     }
   })

@@ -73,3 +73,10 @@ export async function grantRole(
     .values({ userId, workspaceId, role })
     .onConflictDoUpdate({ target: [members.userId, members.workspaceId], set: { role } })
 }
+
+export async function addMembership(
+  database: Database | Transaction,
+  { userId, workspaceId, role }: { userId: string; workspaceId: string; role: WorkspaceRole },
+) {
+  await database.insert(members).values({ userId, workspaceId, role }).onConflictDoNothing()
+}

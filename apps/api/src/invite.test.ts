@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
@@ -6,6 +7,7 @@ import {
   createInviteEndpoint,
   type InviteInput,
   inviteSchema,
+  inviteUnusableMessages,
   inviteUnusableStatus,
   inviteValidityDays,
   revokeInviteEndpoint,
@@ -16,6 +18,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { buildApp } from './app.js'
+import { dayMs } from './duration.js'
 import {
   addMember,
   type Client,
@@ -31,6 +34,7 @@ import {
   testAuth,
   webOrigin,
 } from './testing.js'
+import { addUser } from './user.js'
 
 const operatorOfOwnWorkspace: NewMember = {
   name: 'Invite Operator',
@@ -40,8 +44,6 @@ const operatorOfOwnWorkspace: NewMember = {
   role: 'viewer',
   operator: true,
 }
-
-const dayMs = 24 * 60 * 60 * 1000
 
 let api: TestApi
 
@@ -66,8 +68,6 @@ const invitesPath = (workspaceId: string) => toPath(workspaceInvitesEndpoint.pat
 const revokePath = (workspaceId: string, inviteId: string) =>
   toPath(revokeInviteEndpoint.path, { workspaceId, inviteId })
 
-const acceptPath = (token: string) => toPath(acceptInviteEndpoint.path, { token })
-
 async function createInvite(input: InviteInput, workspaceId = otherWorkspace.id) {
   const response = await operator.inject({
     method: createInviteEndpoint.method,
@@ -90,8 +90,36 @@ async function listInvites(workspaceId = otherWorkspace.id) {
 
 const tokenOf = (link: string) => new URL(link).pathname.split('/').at(-1) ?? ''
 
+const acceptToken = (token: string, body: { name: string; password: string }) =>
+  api.app.inject({
+    method: acceptInviteEndpoint.method,
+    url: acceptInviteEndpoint.path,
+    body: { token, ...body },
+  })
+
 const accept = (link: string, body: { name: string; password: string }) =>
-  api.app.inject({ method: acceptInviteEndpoint.method, url: acceptPath(tokenOf(link)), body })
+  acceptToken(tokenOf(link), body)
+
+const unusable = (reason: keyof typeof inviteUnusableMessages) => ({
+  reason,
+  message: inviteUnusableMessages[reason],
+})
+
+async function waitForBlockedQuery() {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const [row] = await api.connection.db.execute<{ blocked: number }>(
+      sql`select count(*)::int as blocked from pg_stat_activity where wait_event_type = 'Lock'`,
+    )
+
+    if ((row?.blocked ?? 0) > 0) {
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+
+  throw new Error('No query waited for a lock')
+}
 
 const signInStatus = async (credentials: Credentials) =>
   (await api.app.inject(signInRequest(credentials))).statusCode
@@ -150,6 +178,19 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
     })
 
     expect(response.statusCode).toBe(404)
+  })
+
+  it('answers 409 for someone who is already a Member of the Workspace', async () => {
+    const response = await operator.inject({
+      method: createInviteEndpoint.method,
+      url: invitesPath(ownWorkspace.id),
+      body: { email: 'Admin@Nordwind.example', role: 'viewer' },
+    })
+
+    expect(response.statusCode).toBe(409)
+    expect((await listInvites(ownWorkspace.id)).map(({ email }) => email)).not.toContain(
+      ownAdmin.email,
+    )
   })
 
   it('answers 400 for an invalid email', async () => {
@@ -288,7 +329,7 @@ describe('the Operator routes', () => {
   })
 })
 
-describe('POST /invites/:token/accept', () => {
+describe('POST /invites/accept', () => {
   it('sets the password of a new user who then signs in as a Member', async () => {
     const invite = await createInvite({ email: 'Nina.Vogt@Sudhafen.example', role: 'admin' })
 
@@ -321,6 +362,7 @@ describe('POST /invites/:token/accept', () => {
     const response = await accept(invite.link, { name: 'Used Link', password: 'second-password' })
 
     expect(response.statusCode).toBe(inviteUnusableStatus)
+    expect(response.json()).toEqual(unusable('used'))
     expect(await signInStatus({ email: invite.email, password: 'second-password' })).toBe(401)
   })
 
@@ -331,6 +373,7 @@ describe('POST /invites/:token/accept', () => {
     const response = await accept(invite.link, { name: 'Revoked', password: 'revoked-password' })
 
     expect(response.statusCode).toBe(inviteUnusableStatus)
+    expect(response.json()).toEqual(unusable('revoked'))
     expect(await signInStatus({ email: invite.email, password: 'revoked-password' })).toBe(401)
   })
 
@@ -345,6 +388,7 @@ describe('POST /invites/:token/accept', () => {
     vi.useRealTimers()
 
     expect(response.statusCode).toBe(inviteUnusableStatus)
+    expect(response.json()).toEqual(unusable('expired'))
     expect(await signInStatus({ email: invite.email, password: 'expired-password' })).toBe(401)
   })
 
@@ -362,10 +406,9 @@ describe('POST /invites/:token/accept', () => {
   })
 
   it('answers 404 for an unknown token', async () => {
-    const response = await api.app.inject({
-      method: 'POST',
-      url: acceptPath('unknown-token'),
-      body: { name: 'Nobody', password: 'nobody-password' },
+    const response = await acceptToken('unknown-token', {
+      name: 'Nobody',
+      password: 'nobody-password',
     })
 
     expect(response.statusCode).toBe(404)
@@ -409,6 +452,49 @@ describe('POST /invites/:token/accept', () => {
     expect(response.statusCode).toBe(403)
     expect(await signInStatus({ email: existing.email, password: 'takeover-password' })).toBe(401)
     expect(await signInStatus(existing)).toBe(200)
+    expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toBeNull()
+  })
+  it('keeps the role of someone who became a Member after the invite was created', async () => {
+    const invite = await createInvite({ email: 'became.admin@sudhafen.example', role: 'viewer' })
+
+    const member: NewMember = {
+      name: 'Became Admin',
+      email: invite.email,
+      password: 'became-admin-password',
+      workspaceId: otherWorkspace.id,
+      role: 'admin',
+    }
+
+    await addMember(api.connection.db, member)
+
+    const response = await accept(invite.link, { name: member.name, password: member.password })
+    const client = await signIn(api.app, member)
+    const session = await client.inject({ method: 'GET', url: sessionEndpoint.path })
+
+    expect(response.statusCode).toBe(204)
+    expect(sessionSchema.parse(session.json()).role).toBe('admin')
+    expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toEqual(
+      expect.any(String),
+    )
+  })
+
+  it('answers 409 when an account with the email is created while accepting', async () => {
+    const invite = await createInvite({ email: 'race@sudhafen.example', role: 'viewer' })
+    const db = api.connection.db
+
+    const { accepting } = await db.transaction(async (tx) => {
+      await addUser(tx, { name: 'Racing User', email: invite.email, operator: false })
+
+      const pending = accept(invite.link, { name: 'Race', password: 'race-password' })
+
+      await waitForBlockedQuery()
+
+      return { accepting: pending }
+    })
+
+    const response = await accepting
+
+    expect(response.statusCode).toBe(409)
     expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toBeNull()
   })
 })
