@@ -489,7 +489,7 @@ export const CsvLinkedByMapping = meta.story({
         {
           code: 'linkedByMapping',
           message:
-            'A Mapping Draft links rows[].Bemerkung, which the change at rows[].Bemerkung would remove',
+            'A Draft links rows[].Bemerkung, which the change at rows[].Bemerkung would remove',
           path: 'rows[].Bemerkung',
           line: null,
           mappingVersions: null,
@@ -616,7 +616,7 @@ export const RefusedByDraftLink = meta.story({
       refuseUpdate({
         code: 'linkedByMapping',
         message:
-          'A Mapping Draft links buyer.contact.phone, which the change at buyer.contact.phone would remove',
+          'A Draft links buyer.contact.phone, which the change at buyer.contact.phone would remove',
         path: 'buyer.contact.phone',
         line: null,
         mappingVersions: null,
