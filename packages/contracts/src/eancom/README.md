@@ -7,7 +7,7 @@
 
 ## Segment layouts
 
-`directory.ts` lists the elements the retail Mappings use, and every element and composite in front of them in the UN D.96A segment, so that each element keeps its EDIFACT position when a Mapping reads or writes it. Elements behind the last listed one are left out; a Mapping cannot write them, and reading a Message skips them. The layouts follow the UNECE D.96A segment directory (UNTDID D.96A, TRSD), as do the segment and composite definitions that `packages/edifact` validates against in `src/definitions`. These segments hold parts that the retail Mappings do not use in front of parts they use:
+`directory.ts` lists the elements the retail Mappings use, and every element and composite in front of them in the UN D.96A segment, so that each element keeps its EDIFACT position when a Mapping reads or writes it. Elements behind the last listed one are left out; a Mapping cannot write them, and reading a Message skips them. The layouts follow the UNECE D.96A directories (UNTDID D.96A, [segments, TRSD](https://service.unece.org/trade/untdid/d96a/trsd/trsdi1.htm), [composites, TRCD](https://service.unece.org/trade/untdid/d96a/trcd/trcdi1.htm)), as do the segment and composite definitions that `packages/edifact` validates against in `src/definitions`. These segments hold parts that the retail Mappings do not use in front of parts they use:
 
 | Segment | Listed layout                                        | Parts in front of the used ones |
 | ------- | ---------------------------------------------------- | ------------------------------- |
