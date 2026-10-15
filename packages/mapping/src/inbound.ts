@@ -20,10 +20,20 @@ import type { Message, Segment } from '@edi-bridge/edifact'
 
 import { elementPaths } from './elements'
 import { MappingError } from './errors'
+import {
+  type ApplyOptions,
+  type EvaluatedGraph,
+  evaluated,
+  outputOf,
+  type SourceRead,
+  transformReads,
+} from './evaluation'
 import { hasValueBeneath, isBeneath, isRequiredOrFilled, setFilled, type Values } from './values'
-import { type Graph, type Loop, type Wiring, wiringOf } from './wiring'
+import { type Loop, type Wiring, wiringOf } from './wiring'
 
 export type InboundMappingVersion = Extract<MappingVersion, { direction: 'inbound' }>
+
+type JsonObject = Record<string, JsonContent>
 
 type Occurrences = {
   segments: Map<string, Segment[]>
@@ -169,6 +179,52 @@ function repetitionsOf({ occurrences, nodes }: PlacedPart, path: string): Occurr
   return []
 }
 
+const stepOf = ({ path }: { path: string }) => path.split('/').at(-1)!
+
+function filled(entries: ReadonlyArray<readonly [string, JsonContent | undefined]>): JsonObject {
+  return Object.fromEntries(
+    entries.flatMap(([key, value]) => (value === undefined || value === '' ? [] : [[key, value]])),
+  )
+}
+
+function segmentContent(node: EdifactSegment, segment: Segment): JsonObject {
+  return filled(
+    node.children.map((child, index) => {
+      const element = segment.elements[index] ?? []
+
+      if (child.kind === 'element') {
+        return [stepOf(child), element[0]]
+      }
+
+      const components = filled(
+        child.children.map((component, at) => [stepOf(component), element[at]]),
+      )
+
+      return [stepOf(child), Object.keys(components).length === 0 ? undefined : components]
+    }),
+  )
+}
+
+// JSONata reads the Message as the web canvas writes its paths: one step per structure node.
+function messageContent({ occurrences, nodes }: PlacedPart): JsonObject {
+  return filled(
+    nodes.map((node) => {
+      const repetitions =
+        node.kind === 'segment'
+          ? (occurrences.segments.get(node.path) ?? []).map((segment) =>
+              segmentContent(node, segment),
+            )
+          : (occurrences.groups.get(node.path) ?? []).map((repetition) =>
+              messageContent({ occurrences: repetition, nodes: node.children }),
+            )
+
+      const [first] = repetitions
+
+      return [stepOf(node), node.maxRepeat > 1 && first ? repetitions : first]
+    }),
+  )
+}
+
 function groupsOf(nodes: ReadonlyArray<EdifactStructureNode>): EdifactSegmentGroup[] {
   return nodes.flatMap((node) =>
     node.kind === 'segmentGroup' ? [node, ...groupsOf(node.children)] : [],
@@ -185,7 +241,7 @@ type Reading = {
   message: PlacedPart
   groups: ReadonlyMap<string, EdifactSegmentGroup>
   links: InboundMappingVersion['links']
-  graph: Graph
+  graph: EvaluatedGraph
   loops: ReadonlyMap<string, Loop>
   itemCounts: Map<Loop, number>
   scope: RepetitionScope
@@ -218,30 +274,30 @@ const isInScope = ({ loops, scope }: Reading, targetPath: string) =>
 
 function valuesIn(reading: Reading): Effect.Effect<Values, MappingError> {
   const values = new Map<string, string>()
+  const read = (sourcePath: string) => valueAt(enclosingPart(reading, sourcePath), sourcePath)
 
   for (const { sourcePath, targetPath } of reading.links) {
     if (isInScope(reading, targetPath)) {
-      setFilled(values, targetPath, valueAt(enclosingPart(reading, sourcePath), sourcePath))
+      setFilled(values, targetPath, read(sourcePath))
     }
   }
 
-  for (const { path, from } of reading.graph.targets) {
-    const transform = reading.graph.transforms.get(from.transformId)
-
-    if (transform?.kind !== 'loop' || !isInScope(reading, path)) {
-      continue
-    }
-
-    if (!reading.graph.valid.has(transform.id)) {
-      return Effect.fail(
-        new MappingError({ code: 'invalidTransform', targetPath: path, transformId: transform.id }),
-      )
-    }
-
-    setFilled(values, path, reading.scope.counters.get(transform.id))
-  }
-
-  return Effect.succeed(values)
+  return Effect.as(
+    Effect.forEach(reading.graph.targets, ({ path, from }) =>
+      Effect.map(
+        outputOf(
+          { graph: reading.graph, counters: reading.scope.counters, read, targetPath: path },
+          from,
+        ),
+        (value) => {
+          if (isInScope(reading, path)) {
+            setFilled(values, path, String(value))
+          }
+        },
+      ),
+    ),
+    values,
+  )
 }
 
 function enterRepetition(
@@ -264,8 +320,6 @@ function enterRepetition(
 
   return Effect.map(valuesIn(reading), (values) => ({ ...reading, values }))
 }
-
-type JsonObject = Record<string, JsonContent>
 
 const numberPattern = /^-?\d+(?:[.,]\d+)?$/
 
@@ -364,8 +418,6 @@ function documentOf(
   )
 }
 
-type SourceRead = { sourcePath: string; targetPath: string }
-
 const loopReads = (loops: ReadonlyMap<string, Loop>): SourceRead[] =>
   [...loops].map(([targetPath, { sourcePart }]) => ({ sourcePath: sourcePart, targetPath }))
 
@@ -434,19 +486,21 @@ export function applyInboundMappingVersion(
   version: InboundMappingVersion,
   structure: DocumentStructure,
   message: Message,
+  options: ApplyOptions = {},
 ): Effect.Effect<JsonContent, MappingError> {
   const { children } = messageTypeStructures[version.source.messageType]
 
-  const wiring = wiringOf(version)
+  const wiring = wiringOf(version, options.lookupTables)
   const { graph, loops } = wiring
   const groups = groupsOf(children)
-  const unknown = unknownRead(version.links, wiring, children, structure)
+  const reads = [...version.links, ...transformReads(graph)]
+  const unknown = unknownRead(reads, wiring, children, structure)
 
   if (unknown) {
     return Effect.fail(unknown)
   }
 
-  const outside = outsideLoop(version.links, loops)
+  const outside = outsideLoop(reads, loops)
 
   if (outside !== undefined) {
     return Effect.fail(new MappingError({ code: 'outsideLoop', targetPath: outside }))
@@ -464,17 +518,21 @@ export function applyInboundMappingVersion(
     true,
   )
 
-  const reading: Reading = {
-    message: { occurrences, nodes: children },
-    groups: new Map(groups.map((group) => [group.path, group])),
-    links: version.links,
-    graph,
-    loops,
-    itemCounts: new Map(),
-    scope: { repetitions: new Map(), counters: new Map(), loopTargets: new Set() },
-  }
+  const placed = { occurrences, nodes: children }
 
-  return Effect.flatMap(valuesIn(reading), (values) =>
-    documentOf(structure.children, { ...reading, values }),
-  )
+  return Effect.flatMap(evaluated(graph, messageContent(placed)), (evaluatedGraph) => {
+    const reading: Reading = {
+      message: placed,
+      groups: new Map(groups.map((group) => [group.path, group])),
+      links: version.links,
+      graph: evaluatedGraph,
+      loops,
+      itemCounts: new Map(),
+      scope: { repetitions: new Map(), counters: new Map(), loopTargets: new Set() },
+    }
+
+    return Effect.flatMap(valuesIn(reading), (values) =>
+      documentOf(structure.children, { ...reading, values }),
+    )
+  })
 }
