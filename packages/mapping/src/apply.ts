@@ -245,6 +245,19 @@ function applied(
   }
 }
 
+function feedsOf(
+  { feeding }: Pick<Graph, 'feeding'>,
+  transform: MappingTransform,
+): ReadonlyMap<string, LinkStart> {
+  return new Map(
+    transformPorts(transform).inputs.flatMap((input) => {
+      const from = feeding.get(`${transform.id}/${input}`)
+
+      return from ? [[input, from] as const] : []
+    }),
+  )
+}
+
 function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<Value, MappingError> {
   if (start.kind === 'source') {
     return Effect.succeed(scalarOf(evaluation, start.path) ?? '')
@@ -263,8 +276,10 @@ function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<Value
 
   const inner = { ...evaluation, visiting: new Set(visiting).add(transform.id) }
 
+  const feeds = feedsOf(graph, transform)
+
   const inputOf = (input: string): Effect.Effect<Value, MappingError> => {
-    const from = graph.feeding.get(`${transform.id}/${input}`)
+    const from = feeds.get(input)
 
     return from ? outputOf(inner, from) : Effect.succeed('')
   }
@@ -278,8 +293,8 @@ function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<Value
   }
 
   return Effect.flatMap(
-    Effect.forEach(transformPorts(transform).inputs, (input) =>
-      Effect.map(inputOf(input), (value): readonly [string, Value] => [input, value]),
+    Effect.forEach(feeds, ([input, from]) =>
+      Effect.map(outputOf(inner, from), (value): readonly [string, Value] => [input, value]),
     ),
     (args) =>
       applied(transform, Object.fromEntries(args), graph, (code) =>
@@ -473,11 +488,9 @@ function sourcePathsOf(
 
   visited.add(transform.id)
 
-  return transformPorts(transform).inputs.flatMap((input) => {
-    const from = graph.feeding.get(`${transform.id}/${input}`)
-
-    return from ? sourcePathsOf(graph, from, visited) : []
-  })
+  return [...feedsOf(graph, transform).values()].flatMap((from) =>
+    sourcePathsOf(graph, from, visited),
+  )
 }
 
 function outsideLoop(
