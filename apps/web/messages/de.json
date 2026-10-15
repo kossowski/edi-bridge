@@ -195,7 +195,7 @@
   "Invite": {
     "metaTitle": "Passwort festlegen",
     "title": "Passwort festlegen",
-    "description": "Sie wurden zu EDI Bridge eingeladen. Geben Sie Ihren Namen ein und wählen Sie ein Passwort. Danach melden Sie sich mit der E-Mail-Adresse an, an die die Einladung ging.",
+    "description": "Sie wurden zu EDI Bridge eingeladen. Geben Sie Ihren Namen ein und wählen Sie ein Passwort. Danach melden Sie sich mit der E-Mail-Adresse an, für die die Einladung gilt.",
     "name": "Ihr Name",
     "password": "Passwort",
     "passwordHint": "Mindestens {min} Zeichen.",

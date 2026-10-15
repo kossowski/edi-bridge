@@ -195,7 +195,7 @@
   "Invite": {
     "metaTitle": "Set your password",
     "title": "Set your password",
-    "description": "You were invited to EDI Bridge. Enter your name and choose a password. You then sign in with the email address the invite was sent to.",
+    "description": "You were invited to EDI Bridge. Enter your name and choose a password. You then sign in with the email address the invite is for.",
     "name": "Your name",
     "password": "Password",
     "passwordHint": "At least {min} characters.",
