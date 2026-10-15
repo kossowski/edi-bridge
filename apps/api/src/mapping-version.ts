@@ -22,6 +22,7 @@ import { documentStructures, mappings, mappingVersions, users } from '@edi-bridg
 
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { compareOutputs } from './mapping-preview.js'
 import { loadMappingDraft, loadRow, sidesOf } from './mapping.js'
 import { exactlyOne, foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentMember } from './session.js'
@@ -127,11 +128,6 @@ export const compareMappingVersions = (
     yield* loadRow(mappingId)
     const { from, to, sampleId } = yield* query
 
-    // Until Sample Documents and their outputs arrive with the preview (#185), every Sample Document is unknown.
-    if (sampleId !== undefined) {
-      return yield* Effect.fail(new NotFound())
-    }
-
     const db = yield* Db
 
     const rows = yield* Effect.promise(() =>
@@ -148,7 +144,10 @@ export const compareMappingVersions = (
       from: toHeader(before),
       to: toHeader(after),
       differences: mappingDifferences(before.graph, after.graph),
-      outputs: null,
+      outputs:
+        sampleId === undefined
+          ? null
+          : yield* compareOutputs(mappingId, sampleId, before.graph, after.graph),
     } satisfies MappingComparison
   })
 

@@ -9,6 +9,8 @@ import {
   documentStructureOrigins,
   documentStructureSchema,
   lookupTableSchema,
+  mappingComparisonEndpoint,
+  mappingComparisonSchema,
   type LookupTableEntry,
   type MappingGraph,
   mappingPreviewEndpoint,
@@ -16,6 +18,9 @@ import {
   mappingSampleSchema,
   mappingSamplesEndpoint,
   mappingSummarySchema,
+  mappingVersionEntrySchema,
+  publishMappingDraftEndpoint,
+  saveMappingDraftEndpoint,
   toPath,
 } from '@edi-bridge/contracts'
 import { type Connection, documentStructures, lookupTables, mappings } from '@edi-bridge/db'
@@ -324,6 +329,112 @@ describe('POST /mappings/:id/preview', () => {
     const { mapping, structure } = await createdMapping('INVOIC', undefined, otherAdmin)
 
     const response = await preview(mapping.id, { sampleId: structure.id, graph: invoice })
+
+    expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('GET /mappings/:mappingId/comparison with a Sample Document', () => {
+  const published = async (mappingId: string, graph: MappingGraph) => {
+    const saved = await admin.inject({
+      method: 'PUT',
+      url: toPath(saveMappingDraftEndpoint.path, { id: mappingId }),
+      body: graph,
+    })
+
+    expect(saved.statusCode).toBe(200)
+
+    const response = await admin.inject({
+      method: 'POST',
+      url: toPath(publishMappingDraftEndpoint.path, { mappingId }),
+      body: { changeNote: '' },
+    })
+
+    expect(response.statusCode).toBe(201)
+
+    return mappingVersionEntrySchema.parse(response.json()).id
+  }
+
+  const currencyAsOrderNumber: MappingGraph = {
+    ...invoice,
+    links: invoice.links.map((link) =>
+      link.targetPath === 'BGM/1004' ? { ...link, sourcePath: 'currency' } : link,
+    ),
+  }
+
+  it('answers the outputs of both versions and how they differ', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+    const from = await published(mapping.id, invoice)
+    const to = await published(mapping.id, currencyAsOrderNumber)
+
+    const response = await admin.inject({
+      method: 'GET',
+      url: toPath(mappingComparisonEndpoint.path, { mappingId: mapping.id }),
+      query: { from, to, sampleId: structure.id },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(mappingComparisonSchema.parse(response.json()).outputs).toEqual({
+      sampleId: structure.id,
+      from: { document: { format: 'edifact', content: invoiceText }, notes: [] },
+      to: {
+        document: { format: 'edifact', content: invoiceText.replace('PO-2026-10417', 'EUR') },
+        notes: [],
+      },
+      differences: [{ path: 'BGM/1004', repetitions: [], before: 'PO-2026-10417', after: 'EUR' }],
+    })
+  })
+
+  const loopTransformId = '8f3e2d1c-0b9a-4c8d-9e7f-000000000001'
+
+  const linesFrom = (sourcePath: string): MappingGraph => ({
+    links: [
+      ...invoice.links,
+      { sourcePath, targetPath: 'SG25/LIN/C212/7140' },
+      { sourcePath: 'lines[].quantity', targetPath: 'SG25/QTY+47/C186/6060' },
+    ],
+    transforms: [
+      { id: loopTransformId, kind: 'loop', position: { x: 0, y: 80 }, config: { counterStart: 1 } },
+    ],
+    transformLinks: [
+      {
+        from: { kind: 'source', path: 'lines[]' },
+        to: { kind: 'transform', transformId: loopTransformId, input: 'items' },
+      },
+      {
+        from: { kind: 'transform', transformId: loopTransformId, output: 'items' },
+        to: { kind: 'target', path: 'SG25' },
+      },
+    ],
+  })
+
+  it('names the repetition of each differing value', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+    const from = await published(mapping.id, linesFrom('lines[].gtin'))
+    const to = await published(mapping.id, linesFrom('lines[].lineNumber'))
+
+    const response = await admin.inject({
+      method: 'GET',
+      url: toPath(mappingComparisonEndpoint.path, { mappingId: mapping.id }),
+      query: { from, to, sampleId: structure.id },
+    })
+
+    expect(mappingComparisonSchema.parse(response.json()).outputs?.differences).toEqual([
+      { path: 'SG25/LIN/C212/7140', repetitions: [0], before: '04012345123456', after: '1' },
+      { path: 'SG25/LIN/C212/7140', repetitions: [1], before: '04012345654321', after: '2' },
+    ])
+  })
+
+  it('answers 404 for a Sample Document the Mapping does not have', async () => {
+    const { mapping } = await createdMapping('INVOIC')
+    const from = await published(mapping.id, invoice)
+    const to = await published(mapping.id, currencyAsOrderNumber)
+
+    const response = await admin.inject({
+      method: 'GET',
+      url: toPath(mappingComparisonEndpoint.path, { mappingId: mapping.id }),
+      query: { from, to, sampleId: unknownId },
+    })
 
     expect(response.statusCode).toBe(404)
   })

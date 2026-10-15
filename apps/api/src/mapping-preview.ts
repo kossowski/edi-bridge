@@ -5,21 +5,27 @@ import {
   directionOf,
   type DocumentContent,
   type DocumentStructure,
+  type ComparisonOutputs,
   type LookupTableEntry,
   type MappingGraph,
   type MappingPreview,
   type MappingSample,
   type MessageType,
+  outputDifferences,
+  type OutputEntry,
   type PreviewMappingBody,
   type PreviewNote,
+  type VersionOutput,
 } from '@edi-bridge/contracts'
 import { lookupTableEntries, lookupTables } from '@edi-bridge/db'
 import { parse, serializeMessage } from '@edi-bridge/edifact'
 import {
   applyInboundMappingVersion,
   applyMappingVersion,
+  documentEntries,
   type MappingError,
   type MappingErrorCode,
+  messageEntries,
   readDocument,
 } from '@edi-bridge/mapping'
 
@@ -64,9 +70,9 @@ const loadSamples = (id: string) =>
 export const listMappingSamples = (id: string) =>
   Effect.map(loadSamples(id), ({ samples }) => samples)
 
-const loadLookupTables = (graph: MappingGraph) =>
+const loadLookupTables = (graphs: ReadonlyArray<MappingGraph>) =>
   Effect.gen(function* () {
-    const chosen = chosenLookupTableIds(graph)
+    const chosen = [...new Set(graphs.flatMap(chosenLookupTableIds))]
 
     if (chosen.length === 0) {
       return new Map<string, LookupTableEntry[]>()
@@ -110,12 +116,14 @@ const noteOf = ({ code, targetPath, transformId }: MappingError): PreviewNote =>
   code: noteCodes[code],
 })
 
-type Run = {
-  messageType: MessageType
-  structure: DocumentStructure
-  graph: MappingGraph
+type Sides = { messageType: MessageType; structure: DocumentStructure }
+
+type Run = Sides & {
   lookupTables: ReadonlyMap<string, ReadonlyArray<LookupTableEntry>>
+  source: DocumentContent
 }
+
+type Output = VersionOutput & { entries: OutputEntry[] }
 
 function messageOf(text: string) {
   const [message] = parse(text).messages
@@ -127,62 +135,102 @@ function messageOf(text: string) {
   return message
 }
 
-// The engine stops at its first error, so a failed run leaves the whole target empty.
-const outputOf = (
-  { messageType, structure, graph, lookupTables: tables }: Run,
-  source: DocumentContent,
-): Effect.Effect<Pick<MappingPreview, 'document' | 'notes'>> => {
+const written = (
+  { messageType, structure, lookupTables: tables, source }: Run,
+  graph: MappingGraph,
+): Effect.Effect<Omit<Output, 'notes'>, MappingError> => {
   const options = { lookupTables: tables }
 
-  const run: Effect.Effect<DocumentContent, MappingError> =
-    source.format === 'json'
-      ? Effect.map(
-          applyMappingVersion(
-            { ...graph, target: { kind: 'messageType', messageType } },
-            source.content,
-            options,
-          ),
-          (message) => ({ format: 'edifact', content: serializeMessage(message) }),
-        )
-      : Effect.map(
-          applyInboundMappingVersion(
-            { ...graph, source: { kind: 'messageType', messageType } },
-            structure,
-            messageOf(source.content),
-            options,
-          ),
-          (content) => ({ format: 'json', content }),
-        )
-
-  const empty: DocumentContent =
-    source.format === 'json' ? { format: 'edifact', content: '' } : { format: 'json', content: {} }
-
-  return Effect.match(run, {
-    onFailure: (error) => ({ document: empty, notes: [noteOf(error)] }),
-    onSuccess: (document) => ({ document, notes: [] }),
-  })
+  return source.format === 'json'
+    ? Effect.map(
+        applyMappingVersion(
+          { ...graph, target: { kind: 'messageType', messageType } },
+          source.content,
+          options,
+        ),
+        (message) => ({
+          document: { format: 'edifact', content: serializeMessage(message) },
+          entries: messageEntries(messageType, message),
+        }),
+      )
+    : Effect.map(
+        applyInboundMappingVersion(
+          { ...graph, source: { kind: 'messageType', messageType } },
+          structure,
+          messageOf(source.content),
+          options,
+        ),
+        (content) => ({
+          document: { format: 'json', content },
+          entries: documentEntries(structure, content),
+        }),
+      )
 }
 
-export const previewMapping = (
-  id: string,
-  input: Effect.Effect<PreviewMappingBody, ValidationError>,
+// The engine stops at its first error, so a failed run leaves the whole target empty.
+const outputOf = (run: Run, graph: MappingGraph): Effect.Effect<Output> =>
+  Effect.match(written(run, graph), {
+    onFailure: (error) => ({
+      document:
+        run.source.format === 'json'
+          ? { format: 'edifact', content: '' }
+          : { format: 'json', content: {} },
+      notes: [noteOf(error)],
+      entries: [],
+    }),
+    onSuccess: (output) => ({ ...output, notes: [] }),
+  })
+
+type Loaded = Effect.Success<ReturnType<typeof loadSamples>>
+
+const prepareRun = (
+  { mapping, structure, samples }: Loaded,
+  sampleId: string,
+  graphs: ReadonlyArray<MappingGraph>,
 ) =>
   Effect.gen(function* () {
-    const { mapping, structure, samples } = yield* loadSamples(id)
-    const { sampleId, graph } = yield* input
-
     const sample = samples.find((candidate) => candidate.id === sampleId)
 
     if (!sample) {
       return yield* Effect.fail(new NotFound())
     }
 
-    const run = {
+    return {
       messageType: mapping.messageType,
       structure,
-      graph,
-      lookupTables: yield* loadLookupTables(graph),
-    }
+      lookupTables: yield* loadLookupTables(graphs),
+      source: sample.document,
+    } satisfies Run
+  })
 
-    return { sampleId, ...(yield* outputOf(run, sample.document)) } satisfies MappingPreview
+export const previewMapping = (
+  id: string,
+  input: Effect.Effect<PreviewMappingBody, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    const loaded = yield* loadSamples(id)
+    const { sampleId, graph } = yield* input
+
+    const { document, notes } = yield* outputOf(yield* prepareRun(loaded, sampleId, [graph]), graph)
+
+    return { sampleId, document, notes } satisfies MappingPreview
+  })
+
+export const compareOutputs = (
+  mappingId: string,
+  sampleId: string,
+  before: MappingGraph,
+  after: MappingGraph,
+) =>
+  Effect.gen(function* () {
+    const run = yield* prepareRun(yield* loadSamples(mappingId), sampleId, [before, after])
+    const from = yield* outputOf(run, before)
+    const to = yield* outputOf(run, after)
+
+    return {
+      sampleId,
+      from: { document: from.document, notes: from.notes },
+      to: { document: to.document, notes: to.notes },
+      differences: outputDifferences(from.entries, to.entries),
+    } satisfies ComparisonOutputs
   })
