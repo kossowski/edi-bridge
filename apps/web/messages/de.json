@@ -3993,6 +3993,8 @@
         "confirm": "Mitglied entfernen",
         "removing": "Wird entfernt…",
         "failed": "Das Mitglied konnte nicht entfernt werden. Versuchen Sie es erneut.",
+        "gone": "{name} ist nicht mehr in diesem Arbeitsbereich. Die Liste zeigt jetzt die aktuellen Mitglieder.",
+        "close": "Schließen",
         "done": "{name} entfernt."
       }
     },

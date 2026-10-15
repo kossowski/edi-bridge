@@ -70,8 +70,21 @@ function MemberRow({
   )
 }
 
-export function ListNote({ children }: { children: ReactNode }) {
-  return <p className="text-muted-foreground rounded-lg border p-3 text-sm">{children}</p>
+export function ListNote({
+  children,
+  ref,
+}: {
+  children: ReactNode
+  ref?: Ref<HTMLParagraphElement> | undefined
+}) {
+  return (
+    <p
+      ref={ref}
+      tabIndex={ref ? -1 : undefined}
+      className="text-muted-foreground rounded-lg border p-3 text-sm outline-none">
+      {children}
+    </p>
+  )
 }
 
 export function MemberList({
@@ -103,7 +116,7 @@ export function MemberList({
   }, [members, locale])
 
   if (members.length === 0) {
-    return <ListNote>{empty}</ListNote>
+    return <ListNote ref={countRef}>{empty}</ListNote>
   }
 
   const term = search.trim().toLocaleLowerCase(locale)

@@ -11,9 +11,10 @@ import { ListNote, MemberList } from '@/components/members/member-list'
 import { SettingsCard } from '@/components/settings/settings-card'
 import { useSession } from '@/hooks/use-session'
 import { useValidatedSubmit } from '@/hooks/use-validated-submit'
-import { createInvite, removeWorkspaceMember, revokeInvite } from '@/lib/api/client'
+import { ApiError, createInvite, removeWorkspaceMember, revokeInvite } from '@/lib/api/client'
 import {
   operatorWorkspaceMembersQuery,
+  refreshOperatorWorkspaceMembers,
   storeCreatedInvite,
   storeRemovedMember,
   storeRevokedInvite,
@@ -81,18 +82,22 @@ function CardQuery<Data>({
   return children(query.data)
 }
 
+function isGone(error: Error | null) {
+  return error instanceof ApiError && error.status === 404
+}
+
 function RemoveMemberDialog({
   workspaceId,
   member,
   open,
-  opener,
+  returnFocus,
   onOpenChange,
   onRemoved,
 }: {
   workspaceId: string
   member: WorkspaceMember | null
   open: boolean
-  opener: RefObject<HTMLElement | null>
+  returnFocus: () => HTMLElement | null
   onOpenChange: (open: boolean) => void
   onRemoved: (removed: WorkspaceMember) => void
 }) {
@@ -110,7 +115,15 @@ function RemoveMemberDialog({
       onRemoved(removed)
       storeRemovedMember(queryClient, workspaceId, removed.id)
     },
+    onError: (error) => {
+      if (isGone(error)) {
+        cancel.current?.focus()
+        refreshOperatorWorkspaceMembers(queryClient, workspaceId)
+      }
+    },
   })
+
+  const gone = isGone(remove.error)
 
   return (
     <AlertDialog
@@ -127,7 +140,7 @@ function RemoveMemberDialog({
         onOpenChange(next)
       }}>
       <AlertDialogContent
-        finalFocus={opener}
+        finalFocus={returnFocus}
         initialFocus={cancel}
         aria-busy={remove.isPending || undefined}>
         <AlertDialogHeader>
@@ -137,8 +150,8 @@ function RemoveMemberDialog({
           <AlertDialogDescription>{t('description')}</AlertDialogDescription>
         </AlertDialogHeader>
         {remove.isError && (
-          <p role="alert" className="text-sm text-red-800 dark:text-red-300">
-            {t('failed')}
+          <p role="alert" className="text-destructive-text text-sm wrap-anywhere">
+            {gone ? t('gone', { name: member?.name ?? '' }) : t('failed')}
           </p>
         )}
         <AlertDialogFooter>
@@ -146,19 +159,21 @@ function RemoveMemberDialog({
             ref={cancel}
             aria-disabled={remove.isPending || undefined}
             className="aria-disabled:cursor-progress aria-disabled:opacity-50">
-            {t('cancel')}
+            {gone ? t('close') : t('cancel')}
           </AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            aria-disabled={remove.isPending || undefined}
-            className="aria-disabled:cursor-progress aria-disabled:opacity-50"
-            onClick={() => {
-              if (member && !remove.isPending) {
-                remove.mutate(member)
-              }
-            }}>
-            {remove.isPending ? t('removing') : t('confirm')}
-          </AlertDialogAction>
+          {!gone && (
+            <AlertDialogAction
+              variant="destructive"
+              aria-disabled={remove.isPending || undefined}
+              className="aria-disabled:cursor-progress aria-disabled:opacity-50"
+              onClick={() => {
+                if (member && !remove.isPending) {
+                  remove.mutate(member)
+                }
+              }}>
+              {remove.isPending ? t('removing') : t('confirm')}
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -211,11 +226,10 @@ function RemovableMembers({
         key={target?.id}
         member={target}
         open={dialogOpen}
-        opener={opener}
+        returnFocus={() => (opener.current?.isConnected ? opener.current : count.current)}
         workspaceId={workspaceId}
         onOpenChange={setDialogOpen}
         onRemoved={(done) => {
-          opener.current = count.current
           setRemoved(done)
           setDialogOpen(false)
         }}

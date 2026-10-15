@@ -180,6 +180,14 @@ export function storeRemovedMember(queryClient: QueryClient, workspaceId: string
   void queryClient.invalidateQueries({ queryKey: workspaceMembersQuery.queryKey })
 }
 
+export function refreshOperatorWorkspaceMembers(queryClient: QueryClient, workspaceId: string) {
+  void queryClient.invalidateQueries({
+    queryKey: operatorWorkspaceMembersQuery(workspaceId).queryKey,
+  })
+  void queryClient.invalidateQueries({ queryKey: operatorWorkspacesQuery.queryKey })
+  void queryClient.invalidateQueries({ queryKey: workspaceMembersQuery.queryKey })
+}
+
 export function storeSavedOperatorWorkspaceSettings(
   queryClient: QueryClient,
   workspaceId: string,

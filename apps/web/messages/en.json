@@ -3993,6 +3993,8 @@
         "confirm": "Remove member",
         "removing": "Removing…",
         "failed": "The member could not be removed. Try again.",
+        "gone": "{name} is no longer in this Workspace. The list now shows the current members.",
+        "close": "Close",
         "done": "{name} removed."
       }
     },

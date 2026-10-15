@@ -33,6 +33,7 @@ import {
   createOperatorStore,
   createSessionStore,
   createWorkspaceMembers,
+  createWorkspaceMemberStore,
   createWorkspaceSettings,
   operatorHandlers,
   sandboxAdminSession,
@@ -43,6 +44,7 @@ import {
   seedWorkspace,
   seedWorkspaceSummaries,
   sessionHandlers,
+  type WorkspaceMemberStore,
   type WorkspaceSummaryRecord,
   workspaceSettingsHandlers,
 } from '@edi-bridge/mocks'
@@ -60,7 +62,7 @@ function operatorMocks({
   workspaceSummaries = seedWorkspaceSummaries,
 }: {
   invites?: ReadonlyArray<Invite>
-  members?: ReadonlyArray<WorkspaceMember>
+  members?: ReadonlyArray<WorkspaceMember> | WorkspaceMemberStore
   session?: typeof seedSession
   settings?: WorkspaceSettings
   workspaceSummaries?: ReadonlyArray<WorkspaceSummaryRecord>
@@ -741,6 +743,87 @@ export const RemoveFailsDark = meta.story({
     return darkMode()
   },
   play: ({ canvas }) => expectRemoveFailed(canvas),
+})
+
+export const RemoveLastMember = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(
+      ...operatorMocks({
+        members: [
+          {
+            id: '6a1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+            name: removedName,
+            email: 'mara.olsen@nordwind-handel.example',
+            role: 'admin',
+            lastActivityAt: null,
+          },
+        ],
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await openRemoveDialog(canvas)
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove member' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    const empty = await canvas.findByText(/^No members yet/)
+    await waitFor(() => expect(empty).toHaveFocus())
+  },
+})
+
+function alreadyGoneMocks() {
+  const members = createWorkspaceMemberStore()
+
+  return [
+    http.delete<{ workspaceId: string; userId: string }>(
+      `${apiUrl}${removeWorkspaceMemberEndpoint.path}`,
+      ({ params }) => {
+        members.remove(params.workspaceId, params.userId)
+
+        return HttpResponse.json({ message: 'Not found' }, { status: 404 })
+      },
+    ),
+    ...operatorMocks({ members }),
+  ]
+}
+
+export const RemoveAlreadyGone = meta.story({
+  ...membersTab,
+  beforeEach({ msw }) {
+    msw.use(...alreadyGoneMocks())
+  },
+  async play({ canvas }) {
+    await openRemoveDialog(canvas)
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove member' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      `${removedName} is no longer in this Workspace. The list now shows the current members.`,
+    )
+    await expect(within(dialog).queryByRole('button', { name: 'Remove member' })).toBeNull()
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Close' })).toHaveFocus())
+    await waitFor(() => expect(canvas.queryByText(removedName)).toBeNull())
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    await waitFor(() => expect(canvas.getByText('3 members')).toHaveFocus())
+  },
+})
+
+export const RemoveAlreadyGoneGerman = meta.story({
+  ...membersTab,
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...alreadyGoneMocks())
+  },
+  async play({ canvas }) {
+    await canvas.findByText(removedName)
+    await userEvent.click(memberRow(canvas, removedName).getByRole('button', { name: 'Entfernen' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Mitglied entfernen' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      `${removedName} ist nicht mehr in diesem Arbeitsbereich.`,
+    )
+    await expect(within(dialog).getByRole('button', { name: 'Schließen' })).toBeVisible()
+  },
 })
 
 export const RemoveGerman = meta.story({
