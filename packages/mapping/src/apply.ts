@@ -31,6 +31,7 @@ export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbo
 export const mappingErrorCodes = [
   'missingRequiredValue',
   'outsideLoop',
+  'unknownSource',
   'unknownTarget',
   'invalidTransform',
   'invalidDate',
@@ -358,7 +359,7 @@ type StructurePart =
 const childrenOf = (part: StructurePart): ReadonlyArray<StructurePart> =>
   part.kind === 'element' ? [] : part.children
 
-function elementPaths(parts: ReadonlyArray<StructurePart>): string[] {
+export function elementPaths(parts: ReadonlyArray<StructurePart>): string[] {
   return parts.flatMap((part) =>
     part.kind === 'element' ? [part.path] : elementPaths(childrenOf(part)),
   )
