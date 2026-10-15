@@ -1,6 +1,7 @@
 import { and, desc, eq, max, type SQL, sql } from 'drizzle-orm'
-import { alias, type SelectedFields } from 'drizzle-orm/pg-core'
 import { Effect } from 'effect'
+
+import type { SelectedFields } from 'drizzle-orm/pg-core'
 
 import {
   type MappingVersion,
@@ -8,6 +9,7 @@ import {
   type MappingVersionSummary,
   type PublishMappingDraftBody,
   type PublishedMappingVersionsQuery,
+  mappingDifferences,
   mappingSideLeaves,
   transformIssues,
   unknownPathMessage,
@@ -15,7 +17,7 @@ import {
 import { documentStructures, mappings, mappingVersions, users } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
-import { Conflict, Unprocessable } from './errors.js'
+import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { loadMappingDraft, loadRow, sidesOf } from './mapping.js'
 import {
   exactlyOne,
@@ -86,7 +88,7 @@ export const listMappingVersions = (mappingId: string) =>
     return rows.map(toEntry)
   })
 
-const loadVersionRow = (mappingId: string, versionId: string) =>
+export const loadMappingVersion = (mappingId: string, versionId: string) =>
   Effect.gen(function* () {
     const mapping = yield* loadRow(mappingId)
     yield* rejectingInvalidId(versionId)
@@ -99,21 +101,20 @@ const loadVersionRow = (mappingId: string, versionId: string) =>
       ),
     )
 
-    return { mapping, version: yield* foundOrNotFound(row) }
+    const version = yield* foundOrNotFound(row)
+
+    return {
+      ...toHeader(version),
+      ...version.graph,
+      ...sidesOf(mapping),
+    } satisfies MappingVersion
   })
 
-export const loadMappingVersion = (mappingId: string, versionId: string) =>
-  Effect.map(
-    loadVersionRow(mappingId, versionId),
-    ({ mapping, version }) =>
-      ({
-        ...toHeader(version),
-        ...version.graph,
-        ...sidesOf(mapping),
-      }) satisfies MappingVersion,
-  )
-
-const restoreInTransaction = async (tx: Transaction, mappingId: string, versionId: string) => {
+const restoreInTransaction = async (
+  tx: Transaction,
+  mappingId: string,
+  versionId: string,
+): Promise<NotFound | undefined> => {
   // Waits for a publish under way, so the comparison sees the version it adds.
   await tx
     .select({ id: mappings.id })
@@ -121,35 +122,46 @@ const restoreInTransaction = async (tx: Transaction, mappingId: string, versionI
     .where(eq(mappings.id, mappingId))
     .for('update')
 
-  const latest = alias(mappingVersions, 'latest')
+  const [restored] = await tx
+    .select({ graph: mappingVersions.graph })
+    .from(mappingVersions)
+    .where(and(eq(mappingVersions.id, versionId), eq(mappingVersions.mappingId, mappingId)))
 
-  const latestGraph = tx
-    .select({ graph: latest.graph })
-    .from(latest)
-    .where(eq(latest.mappingId, mappingId))
-    .orderBy(desc(latest.version))
+  if (!restored) {
+    return new NotFound()
+  }
+
+  const [latest] = await tx
+    .select({ graph: mappingVersions.graph })
+    .from(mappingVersions)
+    .where(eq(mappingVersions.mappingId, mappingId))
+    .orderBy(desc(mappingVersions.version))
     .limit(1)
 
   await tx
     .update(mappings)
     .set({
-      draft: sql`${mappingVersions.graph}`,
-      unpublishedChanges: sql`${mappingVersions.graph} is distinct from (${latestGraph})`,
+      draft: restored.graph,
+      unpublishedChanges: !latest || mappingDifferences(latest.graph, restored.graph).length > 0,
       draftUpdatedAt: sql`now()`,
     })
-    .from(mappingVersions)
-    .where(and(eq(mappings.id, mappingId), eq(mappingVersions.id, versionId)))
+    .where(eq(mappings.id, mappingId))
 }
 
 export const restoreMappingVersion = (mappingId: string, versionId: string) =>
   Effect.gen(function* () {
-    yield* loadVersionRow(mappingId, versionId)
+    yield* loadRow(mappingId)
+    yield* rejectingInvalidId(versionId)
 
     const db = yield* Db
 
-    yield* Effect.promise(() =>
+    const refusal = yield* Effect.promise(() =>
       db.transaction((tx) => restoreInTransaction(tx, mappingId, versionId)),
     )
+
+    if (refusal) {
+      return yield* Effect.fail(refusal)
+    }
 
     return yield* loadMappingDraft(mappingId)
   })

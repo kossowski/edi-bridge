@@ -177,6 +177,38 @@ const lookupWithoutTable: MappingGraph = {
   ],
 }
 
+const substringTransformId = '7d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a'
+
+const shortOrderNumber: MappingGraph = {
+  links: [],
+  transforms: [
+    {
+      id: substringTransformId,
+      kind: 'substring',
+      position: { x: 320, y: 80 },
+      config: { start: 0, length: 10 },
+    },
+  ],
+  transformLinks: [
+    {
+      from: { kind: 'source', path: 'BGM/1004' },
+      to: { kind: 'transform', transformId: substringTransformId, input: 'value' },
+    },
+    {
+      from: { kind: 'transform', transformId: substringTransformId, output: 'value' },
+      to: { kind: 'target', path: 'orderNumber' },
+    },
+  ],
+}
+
+const movedShortOrderNumber: MappingGraph = {
+  ...shortOrderNumber,
+  transforms: shortOrderNumber.transforms.map((transform) => ({
+    ...transform,
+    position: { x: 480, y: 160 },
+  })),
+}
+
 const unknownId = '0b6f1a7e-2c4d-4e8f-9a1b-3c5d7e9f1a2b'
 
 const restore = (mappingId: string, versionId: string, target = admin) =>
@@ -460,6 +492,22 @@ describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
 
     expect(mappingDraftSchema.parse(response.json())).toMatchObject({
       ...orderNumber,
+      unpublishedChanges: false,
+    })
+    expect((await publish(mapping.id, { changeNote: '' })).statusCode).toBe(409)
+  })
+
+  it('leaves no unpublished changes when the latest version only moves a transform', async () => {
+    const mapping = await createdMapping()
+    await save(mapping.id, shortOrderNumber)
+    const first = await published(mapping.id)
+    await save(mapping.id, movedShortOrderNumber)
+    await published(mapping.id)
+
+    const response = await restore(mapping.id, first.id)
+
+    expect(mappingDraftSchema.parse(response.json())).toMatchObject({
+      ...shortOrderNumber,
       unpublishedChanges: false,
     })
     expect((await publish(mapping.id, { changeNote: '' })).statusCode).toBe(409)
