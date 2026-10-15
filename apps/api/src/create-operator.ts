@@ -10,33 +10,6 @@ import { ensureOperator, type OperatorOutcome } from './operator.js'
 const usage =
   'Usage: create-operator --email <email> --name <name> --workspace <Workspace name> [--reset-password]'
 
-const { values } = parseArgs({
-  options: {
-    email: { type: 'string' },
-    name: { type: 'string' },
-    workspace: { type: 'string' },
-    'reset-password': { type: 'boolean', default: false },
-  },
-})
-
-const env = z
-  .object({
-    DATABASE_URL: z.url().default(localDatabaseUrl),
-    OPERATOR_PASSWORD: z.string().optional(),
-  })
-  .safeParse(process.env)
-
-if (!env.success) {
-  throw new Error(`Invalid environment configuration:\n${z.prettifyError(env.error)}`)
-}
-
-const { email, name, workspace } = values
-
-if (email === undefined || name === undefined || workspace === undefined) {
-  console.error(usage)
-  process.exit(1)
-}
-
 async function promptPassword() {
   if (!process.stdin.isTTY) {
     throw new Error('Set OPERATOR_PASSWORD or run the command in a terminal to enter the password.')
@@ -68,32 +41,64 @@ async function promptPassword() {
   }
 }
 
-const summary = (outcome: OperatorOutcome) =>
+const summary = (outcome: OperatorOutcome, workspaceName: string) =>
   [
     `User ${outcome.email}: ${outcome.user}`,
-    `Workspace "${workspace}": ${outcome.workspace}`,
+    `Workspace "${workspaceName}": ${outcome.workspace}`,
     `Operator: ${outcome.operatorGranted ? 'granted' : 'already granted'}`,
     `Admin of the Workspace: ${outcome.adminGranted ? 'granted' : 'already granted'}`,
     `Password: ${outcome.user === 'created' ? 'set' : outcome.passwordReset ? 'reset' : 'unchanged'}`,
   ].join('\n')
 
-await migrate(env.data.DATABASE_URL)
+async function createOperator() {
+  const { values } = parseArgs({
+    options: {
+      email: { type: 'string' },
+      name: { type: 'string' },
+      workspace: { type: 'string' },
+      'reset-password': { type: 'boolean', default: false },
+    },
+  })
 
-const connection = connect(env.data.DATABASE_URL)
+  const { email, name, workspace: workspaceName } = values
+
+  if (email === undefined || name === undefined || workspaceName === undefined) {
+    throw new Error(usage)
+  }
+
+  const env = z
+    .object({
+      DATABASE_URL: z.url().default(localDatabaseUrl),
+      OPERATOR_PASSWORD: z.string().optional(),
+    })
+    .safeParse(process.env)
+
+  if (!env.success) {
+    throw new Error(`Invalid environment configuration:\n${z.prettifyError(env.error)}`)
+  }
+
+  const { DATABASE_URL: databaseUrl, OPERATOR_PASSWORD: password } = env.data
+
+  await migrate(databaseUrl)
+
+  const connection = connect(databaseUrl)
+
+  try {
+    const outcome = await ensureOperator(
+      connection.db,
+      { email, name, workspaceName, resetPassword: values['reset-password'] },
+      () => (password === undefined ? promptPassword() : Promise.resolve(password)),
+    )
+
+    console.log(summary(outcome, workspaceName))
+  } finally {
+    await connection.close()
+  }
+}
 
 try {
-  const password = env.data.OPERATOR_PASSWORD
-
-  const outcome = await ensureOperator(
-    connection.db,
-    { email, name, workspaceName: workspace, resetPassword: values['reset-password'] },
-    () => (password === undefined ? promptPassword() : Promise.resolve(password)),
-  )
-
-  console.log(summary(outcome))
+  await createOperator()
 } catch (error) {
-  console.error(error instanceof Error ? error.message : error)
+  console.error(error instanceof Error ? error.message : 'The Operator could not be created.')
   process.exitCode = 1
-} finally {
-  await connection.close()
 }
