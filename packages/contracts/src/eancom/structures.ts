@@ -21,6 +21,8 @@ type SegmentUse = Occurrence & {
   qualifier: string | undefined
   // Narrows an element's code list to the codes this use allows, e.g. 1001 to 220 in ORDERS.
   codes?: Readonly<Record<string, ReadonlyArray<string>>>
+  // Composites that EANCOM requires in this use although the UN segment leaves them conditional.
+  requires?: ReadonlyArray<string>
 }
 
 type GroupUse = Occurrence & {
@@ -167,7 +169,7 @@ function build(uses: ReadonlyArray<Use>, parentPath: string): EdifactStructureNo
       name: definition.name,
       ...occurrence,
       children: definition.children.map(([code, required]) =>
-        segmentChild(code, required, path, narrowed),
+        segmentChild(code, required || (use.requires ?? []).includes(code), path, narrowed),
       ),
     }
   })
@@ -177,10 +179,15 @@ const text = (en: string, de: string): LocalizedText => ({ en, de })
 
 const m = { required: true } as const
 
-function header(messageType: MessageType, release = '96A', version = 'D') {
+function header(messageType: MessageType, association: string | null, release = '96A') {
   return segment('UNH', {
     ...m,
-    codes: { '0065': [messageType], '0052': [version], '0054': [release] },
+    codes: {
+      '0065': [messageType],
+      '0052': ['D'],
+      '0054': [release],
+      '0057': association ? [association] : [],
+    },
   })
 }
 
@@ -190,7 +197,7 @@ const parties = text('Name and address', 'Name und Anschrift')
 
 function party(qualifier: string, occurrence: Occurrence, children: ReadonlyArray<Use> = []) {
   return group(`SG2+${qualifier}`, parties, occurrence, [
-    segment(`NAD+${qualifier}`, m),
+    segment(`NAD+${qualifier}`, { ...m, requires: ['C082'] }),
     ...children,
   ])
 }
@@ -214,7 +221,11 @@ const productIdentification = [
   segment('IMD+F', { maxRepeat: 99 }),
 ]
 
-const lineItem = segment('LIN', { ...m, codes: { '7143': ['EN'] } })
+const lineItem = segment('LIN', { ...m, codes: { '7143': ['EN'] }, requires: ['C212'] })
+
+const price = group('SG28', text('Price details', 'Preisangaben'), { maxRepeat: 25 }, [
+  segment('PRI+AAA', { ...m, requires: ['C509'] }),
+])
 
 const lineCount = segment('CNT+2', { maxRepeat: 10 })
 
@@ -223,7 +234,7 @@ const orders: StructureDefinition = {
   release: 'D.96A',
   name: text('Purchase order', 'Bestellung'),
   uses: [
-    header('ORDERS'),
+    header('ORDERS', 'EAN008'),
     segment('BGM', { ...m, codes: { '1001': ['220'] } }),
     segment('DTM+137', m),
     segment('DTM+2'),
@@ -247,9 +258,7 @@ const orders: StructureDefinition = {
       ...productIdentification,
       segment('QTY+21', m),
       segment('DTM+2'),
-      group('SG28', text('Price details', 'Preisangaben'), { maxRepeat: 25 }, [
-        segment('PRI+AAA', m),
-      ]),
+      price,
     ]),
     segment('UNS', m),
     lineCount,
@@ -262,7 +271,7 @@ const desadv: StructureDefinition = {
   release: 'D.96A',
   name: text('Despatch advice', 'Liefermeldung'),
   uses: [
-    header('DESADV'),
+    header('DESADV', 'EAN005'),
     segment('BGM', { ...m, codes: { '1001': ['351'] } }),
     segment('DTM+137', m),
     segment('DTM+11'),
@@ -311,7 +320,7 @@ const invoic: StructureDefinition = {
   release: 'D.96A',
   name: text('Invoice', 'Rechnung'),
   uses: [
-    header('INVOIC'),
+    header('INVOIC', 'EAN008'),
     segment('BGM', { ...m, codes: { '1001': ['380', '381'] } }),
     segment('DTM+137', m),
     segment('DTM+35'),
@@ -335,9 +344,7 @@ const invoic: StructureDefinition = {
       group('SG26', text('Line amount', 'Positionsbetrag'), { maxRepeat: 5 }, [
         segment('MOA+203', m),
       ]),
-      group('SG28', text('Price details', 'Preisangaben'), { maxRepeat: 25 }, [
-        segment('PRI+AAA', m),
-      ]),
+      price,
       group('SG33', text('Line tax', 'Positionssteuer'), { maxRepeat: 5 }, [segment('TAX+7', m)]),
     ]),
     segment('UNS', m),
@@ -361,10 +368,10 @@ const contrl: StructureDefinition = {
   release: 'D.3',
   name: text('Syntax and service report', 'Syntax- und Servicebericht'),
   uses: [
-    header('CONTRL', '3'),
+    header('CONTRL', null, '3'),
     segment('UCI', { ...m, codes: { '0007': ['14'] } }),
     group('SG1', text('Message response', 'Antwort auf Nachricht'), { maxRepeat: 999_999 }, [
-      segment('UCM', m),
+      segment('UCM', { ...m, codes: { '0057': [] } }),
       group('SG2', text('Segment error', 'Segmentfehler'), { maxRepeat: 999 }, [segment('UCS', m)]),
     ]),
     trailer,

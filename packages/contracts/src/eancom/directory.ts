@@ -62,6 +62,10 @@ const elements = {
   '0057': {
     name: text('Association assigned code', 'Vom Verband vergebener Code'),
     format: 'an..6',
+    codes: {
+      EAN005: text('EAN version control number 005', 'EAN-Versionsnummer 005'),
+      EAN008: text('EAN version control number 008', 'EAN-Versionsnummer 008'),
+    },
   },
   '0062': { name: text('Message reference number', 'Nachrichtenreferenznummer'), format: 'an..14' },
   '0065': {
@@ -152,6 +156,13 @@ const elements = {
       '5': text('Replace', 'Ersetzen'),
       '31': text('Copy', 'Kopie'),
     },
+  },
+  '1229': {
+    name: text(
+      'Action request/notification, coded',
+      'Handlungsanforderung/-benachrichtigung, codiert',
+    ),
+    format: 'an..3',
   },
   '2005': {
     name: text('Date/time/period qualifier', 'Datum/Uhrzeit/Zeitspanne, Qualifier'),
@@ -582,6 +593,7 @@ const segments = {
     name: text('Line item', 'Positionsdaten'),
     children: [
       ['1082', false],
+      ['1229', false],
       ['C212', false],
     ],
   },

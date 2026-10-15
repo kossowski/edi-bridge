@@ -74,6 +74,37 @@ describe('messageTypeStructures', () => {
     }
   })
 
+  it.each([
+    ['ORDERS', 'SG2+BY/NAD+BY/C082'],
+    ['DESADV', 'SG2+DP/NAD+DP/C082'],
+    ['INVOIC', 'SG2+SU/NAD+SU/C082'],
+    ['ORDERS', 'SG25/LIN/C212'],
+    ['DESADV', 'SG10/SG17/LIN/C212'],
+    ['INVOIC', 'SG25/LIN/C212'],
+    ['ORDERS', 'SG25/SG28/PRI+AAA/C509'],
+    ['INVOIC', 'SG25/SG28/PRI+AAA/C509'],
+    ['ORDERS', 'SG1+CT/RFF+CT/C506'],
+    ['DESADV', 'DTM+137/C507'],
+    ['INVOIC', 'SG25/QTY+47/C186'],
+    ['INVOIC', 'SG48/MOA+77/C516'],
+  ] as const)('requires %s %s in use', (messageType, path) => {
+    expect(nodeAt(messageTypeStructures[messageType].children, path)).toMatchObject({
+      kind: 'composite',
+      required: true,
+    })
+  })
+
+  it.each([
+    ['ORDERS', [{ code: 'EAN008' }]],
+    ['DESADV', [{ code: 'EAN005' }]],
+    ['INVOIC', [{ code: 'EAN008' }]],
+    ['CONTRL', []],
+  ] as const)('gives the %s header its association assigned code', (messageType, codes) => {
+    expect(nodeAt(messageTypeStructures[messageType].children, 'UNH/S009/0057')).toMatchObject({
+      codes,
+    })
+  })
+
   it.each(messageTypes)('gives every node of %s a unique path', (messageType) => {
     const paths = flatten(messageTypeStructures[messageType].children).map(({ path }) => path)
 

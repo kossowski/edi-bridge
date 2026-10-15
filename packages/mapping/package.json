@@ -1,0 +1,32 @@
+{
+  "name": "@edi-bridge/mapping",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "oxlint && eslint",
+    "lint:fix": "oxlint --fix && eslint --fix",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@edi-bridge/contracts": "workspace:*",
+    "@edi-bridge/edifact": "workspace:*",
+    "effect": "^4.0.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@edi-bridge/eslint-config": "workspace:*",
+    "@edi-bridge/oxlint-config": "workspace:*",
+    "@edi-bridge/typescript-config": "workspace:*",
+    "@edi-bridge/vitest-config": "workspace:*",
+    "eslint": "^10.12.0",
+    "oxlint": "1.87.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  }
+}
