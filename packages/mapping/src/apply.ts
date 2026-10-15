@@ -376,7 +376,16 @@ function groupPaths(nodes: ReadonlyArray<EdifactStructureNode>): string[] {
 
 type LoopDraft = Omit<Loop, 'sourcePart'> & { sourcePart?: string }
 
-function wiringOf(version: OutboundMappingVersion, { lookupTables = new Map() }: ApplyOptions) {
+type Wiring = {
+  graph: Omit<Graph, 'expressions'>
+  loops: ReadonlyMap<string, Loop>
+  groupTargets: ReadonlyArray<string>
+}
+
+function wiringOf(
+  version: OutboundMappingVersion,
+  { lookupTables = new Map() }: ApplyOptions,
+): Wiring {
   const { transforms, transformLinks } = version
   const drafts = new Map<string, LoopDraft>()
 
@@ -431,7 +440,7 @@ function wiringOf(version: OutboundMappingVersion, { lookupTables = new Map() }:
 
   const issues = transformIssues(version)
 
-  const graph: Omit<Graph, 'expressions'> = {
+  const graph: Wiring['graph'] = {
     lookupTables: new Map(
       [...lookupTables].map(([id, entries]) => [
         id,
@@ -449,7 +458,7 @@ function wiringOf(version: OutboundMappingVersion, { lookupTables = new Map() }:
 
 function unknownTarget(
   links: OutboundMappingVersion['links'],
-  { graph, groupTargets }: ReturnType<typeof wiringOf>,
+  { graph, groupTargets }: Wiring,
   body: ReadonlyArray<EdifactStructureNode>,
 ): string | undefined {
   const elements = new Set(elementPaths(body))
@@ -495,7 +504,7 @@ function sourcePathsOf(
 
 function outsideLoop(
   links: OutboundMappingVersion['links'],
-  { graph, loops }: ReturnType<typeof wiringOf>,
+  { graph, loops }: Wiring,
 ): string | undefined {
   const reads = [
     ...links,
