@@ -119,10 +119,20 @@ function read({ document, scope }: Reading, path: string): JsonContent | undefin
   return value
 }
 
-function sourceValue(context: Reading, path: string): string | undefined {
-  const scalar = scalarSchema.safeParse(read(context, path))
+const valueSchema = z.union([z.string(), z.number(), z.boolean().transform(String)])
 
-  return scalar.success ? String(scalar.data) : undefined
+type Value = z.infer<typeof valueSchema>
+
+function scalarOf(context: Reading, path: string): Value | undefined {
+  const scalar = valueSchema.safeParse(read(context, path))
+
+  return scalar.success ? scalar.data : undefined
+}
+
+function sourceValue(context: Reading, path: string): string | undefined {
+  const scalar = scalarOf(context, path)
+
+  return scalar === undefined ? undefined : String(scalar)
 }
 
 function itemsOf(context: Reading, sourcePart: string): JsonContent[] {
@@ -181,11 +191,11 @@ function lookedUp(
 
 function applied(
   transform: Exclude<MappingTransform, { kind: 'conditional' }>,
-  args: Readonly<Record<string, string>>,
+  args: Readonly<Record<string, Value>>,
   { expressions, lookupTables }: Graph,
   fail: (code: MappingErrorCode) => MappingError,
 ): Effect.Effect<string, MappingError> {
-  const value = args.value ?? ''
+  const value = String(args.value ?? '')
 
   const formatted = (format: () => string | undefined, code: MappingErrorCode) => {
     const result = value === '' ? '' : format()
@@ -199,7 +209,8 @@ function applied(
     case 'concatenate':
       return Effect.succeed(
         transformPorts(transform)
-          .inputs.flatMap((input) => (args[input] ? [args[input]] : []))
+          .inputs.map((input) => String(args[input] ?? ''))
+          .filter((part) => part !== '')
           .join(transform.config.separator),
       )
     case 'split':
@@ -218,7 +229,11 @@ function applied(
     case 'numberFormat':
       return formatted(
         () =>
-          reformatNumber(value, transform.config.decimalPlaces, transform.config.decimalSeparator),
+          reformatNumber(
+            args.value ?? '',
+            transform.config.decimalPlaces,
+            transform.config.decimalSeparator,
+          ),
         'invalidNumber',
       )
     case 'lookupTable':
@@ -234,9 +249,9 @@ function applied(
   }
 }
 
-function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<string, MappingError> {
+function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<Value, MappingError> {
   if (start.kind === 'source') {
-    return Effect.succeed(sourceValue(evaluation, start.path) ?? '')
+    return Effect.succeed(scalarOf(evaluation, start.path) ?? '')
   }
 
   const { graph, scope, visiting } = evaluation
@@ -252,7 +267,7 @@ function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<strin
 
   const inner = { ...evaluation, visiting: new Set(visiting).add(transform.id) }
 
-  const inputOf = (input: string) => {
+  const inputOf = (input: string): Effect.Effect<Value, MappingError> => {
     const from = graph.feeding.get(`${transform.id}/${input}`)
 
     return from ? outputOf(inner, from) : Effect.succeed('')
@@ -262,13 +277,13 @@ function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<strin
     const { operator, compareTo } = transform.config
 
     return Effect.flatMap(inputOf('value'), (value) =>
-      inputOf(holds(operator, value, compareTo) ? 'then' : 'else'),
+      inputOf(holds(operator, String(value), compareTo) ? 'then' : 'else'),
     )
   }
 
   return Effect.flatMap(
     Effect.forEach(transformPorts(transform).inputs, (input) =>
-      Effect.map(inputOf(input), (value): readonly [string, string] => [input, value]),
+      Effect.map(inputOf(input), (value): readonly [string, Value] => [input, value]),
     ),
     (args) =>
       applied(transform, Object.fromEntries(args), graph, (code) =>
@@ -293,7 +308,7 @@ function valuesIn(context: Reading): Effect.Effect<Values, MappingError> {
   return Effect.as(
     Effect.forEach(context.graph.targets, ({ path, from }) =>
       Effect.map(outputOf({ ...context, targetPath: path, visiting: new Set() }, from), (value) =>
-        set(path, value),
+        set(path, String(value)),
       ),
     ),
     values,

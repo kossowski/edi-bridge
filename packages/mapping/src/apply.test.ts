@@ -820,6 +820,10 @@ describe('applyMappingVersion', () => {
     [1, '.', 19.99, '20.0'],
     [null, ',', '12.50', '12,50'],
     [null, ',', 7, '7'],
+    [null, ',', 1e-7, '0,0000001'],
+    [2, '.', 1e-7, '0.00'],
+    [null, '.', -2.5e-8, '-0.000000025'],
+    [2, ',', 1.5e21, '1500000000000000000000,00'],
   ])(
     'number format with %s decimal places and separator %s writes %s as %s',
     async (places, separator, price, expected) => {
@@ -830,7 +834,7 @@ describe('applyMappingVersion', () => {
     },
   )
 
-  it.each(['1.234,50', 'twelve', '12.', ' 12'])(
+  it.each(['1.234,50', 'twelve', '12.', ' 12', '1e-7'])(
     'number format fails naming the target element for %s',
     async (price) => {
       expect(await failure(pricing(2, '.'), pricedLine(price))).toMatchObject({

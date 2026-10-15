@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 const dateTokens = ['yyyy', 'yy', 'MM', 'dd', 'HH', 'mm', 'ss'] as const
 
 type DateToken = (typeof dateTokens)[number]
@@ -65,12 +67,31 @@ export function reformatDate(value: string, from: string, to: string): string | 
 }
 
 // Rounds half away from zero on the decimal digits, since binary floats round 1.005 down.
+function decimalOf(value: number): string {
+  const [mantissa = '', exponent = '0'] = String(value).split('e')
+  const sign = mantissa.startsWith('-') ? '-' : ''
+  const [whole = '', fraction = ''] = mantissa.replace('-', '').split('.')
+  const digits = `${whole}${fraction}`
+  const point = whole.length + Number(exponent)
+
+  if (point <= 0) {
+    return `${sign}0.${'0'.repeat(-point)}${digits}`
+  }
+
+  return point >= digits.length
+    ? `${sign}${digits}${'0'.repeat(point - digits.length)}`
+    : `${sign}${digits.slice(0, point)}.${digits.slice(point)}`
+}
+
 export function reformatNumber(
-  value: string,
+  value: string | number,
   places: number | null,
   separator: string,
 ): string | undefined {
-  const match = /^(-?)(\d+)(?:[.,](\d+))?$/.exec(value)
+  const number = z.number().safeParse(value)
+  const match = /^(-?)(\d+)(?:[.,](\d+))?$/.exec(
+    number.success ? decimalOf(number.data) : String(value),
+  )
 
   if (!match) {
     return undefined
