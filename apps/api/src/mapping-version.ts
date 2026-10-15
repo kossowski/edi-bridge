@@ -1,6 +1,8 @@
 import { and, desc, eq, max, type SQL } from 'drizzle-orm'
 import { Effect } from 'effect'
 
+import type { SelectedFields } from 'drizzle-orm/pg-core'
+
 import {
   type MappingVersion,
   type MappingVersionEntry,
@@ -22,20 +24,36 @@ import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
 
-const selectEntries = (db: Database, where: SQL | undefined) =>
+const header = {
+  id: mappingVersions.id,
+  mappingId: mappingVersions.mappingId,
+  mappingName: mappings.name,
+  version: mappingVersions.version,
+  publishedAt: mappingVersions.publishedAt,
+}
+
+const selectVersions = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
   db
-    .select({
-      id: mappingVersions.id,
-      mappingId: mappingVersions.mappingId,
-      mappingName: mappings.name,
-      version: mappingVersions.version,
-      publishedAt: mappingVersions.publishedAt,
-      changeNote: mappingVersions.changeNote,
-      publisherId: users.id,
-      publisherName: users.name,
-    })
+    .select({ ...header, ...fields })
     .from(mappingVersions)
     .innerJoin(mappings, eq(mappingVersions.mappingId, mappings.id))
+
+type HeaderRow = Awaited<ReturnType<typeof selectVersions<Record<never, never>>>>[number]
+
+const toHeader = (row: HeaderRow): MappingVersionSummary => ({
+  id: row.id,
+  mappingId: row.mappingId,
+  mappingName: row.mappingName,
+  version: row.version,
+  publishedAt: row.publishedAt.toISOString(),
+})
+
+const selectEntries = (db: Database, where: SQL | undefined) =>
+  selectVersions(db, {
+    changeNote: mappingVersions.changeNote,
+    publisherId: users.id,
+    publisherName: users.name,
+  })
     .innerJoin(users, eq(mappingVersions.publishedBy, users.id))
     .where(where)
     .orderBy(desc(mappingVersions.version))
@@ -43,11 +61,7 @@ const selectEntries = (db: Database, where: SQL | undefined) =>
 type EntryRow = Awaited<ReturnType<typeof selectEntries>>[number]
 
 const toEntry = (row: EntryRow): MappingVersionEntry => ({
-  id: row.id,
-  mappingId: row.mappingId,
-  mappingName: row.mappingName,
-  version: row.version,
-  publishedAt: row.publishedAt.toISOString(),
+  ...toHeader(row),
   changeNote: row.changeNote,
   publishedBy: { id: row.publisherId, name: row.publisherName },
   // Until Flows (#186) exist.
@@ -75,20 +89,15 @@ export const loadMappingVersion = (mappingId: string, versionId: string) =>
     const db = yield* Db
 
     const [row] = yield* Effect.promise(() =>
-      db
-        .select()
-        .from(mappingVersions)
-        .where(and(eq(mappingVersions.id, versionId), eq(mappingVersions.mappingId, mappingId))),
+      selectVersions(db, { graph: mappingVersions.graph }).where(
+        and(eq(mappingVersions.id, versionId), eq(mappingVersions.mappingId, mappingId)),
+      ),
     )
 
     const version = yield* foundOrNotFound(row)
 
     return {
-      id: version.id,
-      mappingId,
-      mappingName: mapping.name,
-      version: version.version,
-      publishedAt: version.publishedAt.toISOString(),
+      ...toHeader(version),
       ...version.graph,
       ...sidesOf(mapping),
     } satisfies MappingVersion
@@ -202,27 +211,17 @@ export const listPublishedMappingVersions = ({ messageType }: PublishedMappingVe
     const workspace = yield* CurrentWorkspace
 
     const rows = yield* Effect.promise(() =>
-      db
-        .select({
-          id: mappingVersions.id,
-          mappingId: mappingVersions.mappingId,
-          mappingName: mappings.name,
-          version: mappingVersions.version,
-          publishedAt: mappingVersions.publishedAt,
-        })
-        .from(mappingVersions)
-        .innerJoin(mappings, eq(mappingVersions.mappingId, mappings.id))
-        .where(
-          inWorkspace(
-            mappings,
-            workspace.id,
-            messageType === undefined ? undefined : eq(mappings.messageType, messageType),
-          ),
+      selectVersions(db, {}).where(
+        inWorkspace(
+          mappings,
+          workspace.id,
+          messageType === undefined ? undefined : eq(mappings.messageType, messageType),
         ),
+      ),
     )
 
     return rows
-      .map((row): MappingVersionSummary => ({ ...row, publishedAt: row.publishedAt.toISOString() }))
+      .map(toHeader)
       .toSorted(
         (a, b) => byName({ name: a.mappingName }, { name: b.mappingName }) || b.version - a.version,
       )
