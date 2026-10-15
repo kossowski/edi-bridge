@@ -1,4 +1,6 @@
 import {
+  type AcceptInviteInput,
+  acceptInviteEndpoint,
   acceptAiDraftEndpoint,
   type AcceptAiProposedPartsBody,
   acceptAiProposedPartsEndpoint,
@@ -36,6 +38,9 @@ import {
   type FlowInput,
   flowsEndpoint,
   inferDocumentStructureEndpoint,
+  inviteUnusableProblemSchema,
+  type InviteUnusableReason,
+  inviteUnusableStatus,
   type InviteInput,
   type FlowUpdate,
   homeEndpoint,
@@ -269,6 +274,38 @@ export function revokeInvite(workspaceId: string, inviteId: string) {
   return request(revokeInviteEndpoint, {
     path: toPath(revokeInviteEndpoint.path, { workspaceId, inviteId }),
   })
+}
+
+export function acceptInvite(body: AcceptInviteInput) {
+  return request(acceptInviteEndpoint, { body })
+}
+
+export type AcceptInviteRefusal = InviteUnusableReason | 'unknown' | 'existingAccount'
+
+export function acceptInviteRefusalOf(error: Error | null): AcceptInviteRefusal | null {
+  if (!(error instanceof ApiError)) {
+    return null
+  }
+
+  if (error.status === 404) {
+    return 'unknown'
+  }
+
+  if (error.status === 403) {
+    return 'existingAccount'
+  }
+
+  if (error.status !== inviteUnusableStatus) {
+    return null
+  }
+
+  try {
+    const parsed = inviteUnusableProblemSchema.safeParse(JSON.parse(error.body))
+
+    return parsed.success ? parsed.data.reason : null
+  } catch {
+    return null
+  }
 }
 
 export function listOperatorWorkspaceMembers(workspaceId: string) {

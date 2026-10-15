@@ -192,6 +192,52 @@
       }
     }
   },
+  "Invite": {
+    "metaTitle": "Passwort festlegen",
+    "title": "Passwort festlegen",
+    "description": "Sie wurden zu EDI Bridge eingeladen. Geben Sie Ihren Namen ein und wählen Sie ein Passwort. Danach melden Sie sich mit der E-Mail-Adresse an, an die die Einladung ging.",
+    "name": "Ihr Name",
+    "password": "Passwort",
+    "passwordHint": "Mindestens {min} Zeichen.",
+    "submit": "Passwort festlegen und anmelden",
+    "submitting": "Passwort wird festgelegt …",
+    "signIn": "Zur Anmeldung",
+    "errors": {
+      "name": {
+        "required": "Geben Sie Ihren Namen ein.",
+        "tooLong": "Verwenden Sie höchstens {max} Zeichen."
+      },
+      "password": {
+        "required": "Geben Sie ein Passwort ein.",
+        "tooShort": "Verwenden Sie mindestens {min} Zeichen.",
+        "tooLong": "Verwenden Sie höchstens {max} Zeichen."
+      },
+      "existingAccount": "Zu dieser E-Mail-Adresse gibt es schon ein Konto. Geben Sie dessen aktuelles Passwort ein, um dem Arbeitsbereich beizutreten.",
+      "failed": "Das Passwort konnte nicht festgelegt werden. Versuchen Sie es gleich noch einmal."
+    },
+    "outcome": {
+      "revoked": {
+        "title": "Diese Einladung wurde zurückgezogen",
+        "text": "Der Link funktioniert nicht mehr. Bitten Sie den Operator um eine neue Einladung."
+      },
+      "expired": {
+        "title": "Diese Einladung ist abgelaufen",
+        "text": "Einladungslinks gelten {days} Tage. Bitten Sie den Operator um eine neue Einladung."
+      },
+      "used": {
+        "title": "Diese Einladung wurde schon verwendet",
+        "text": "Ihr Passwort ist schon festgelegt. Melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an."
+      },
+      "unknown": {
+        "title": "Dieser Einladungslink funktioniert nicht",
+        "text": "Prüfen Sie, ob Sie den ganzen Link kopiert haben. Funktioniert er weiterhin nicht, bitten Sie den Operator um eine neue Einladung."
+      },
+      "signInFailed": {
+        "title": "Ihr Passwort ist festgelegt",
+        "text": "Die Anmeldung hat diesmal nicht geklappt. Melden Sie sich mit {email} und Ihrem neuen Passwort an."
+      }
+    }
+  },
   "Home": {
     "loading": "Start wird geladen",
     "setup": {
