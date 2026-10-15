@@ -20,9 +20,7 @@ type SegmentDefinition = {
 
 const text = (en: string, de: string): LocalizedText => ({ en, de })
 
-// Names and code meanings follow the EANCOM 1997 (D.96A) and syntax version 3 service segment
-// directories. Only the elements and codes the retail Mappings use are listed, and every element
-// in front of them, so that each element keeps its UN D.96A position.
+// Elements in front of the used ones are listed so that each element keeps its UN D.96A position.
 const elements = {
   '0004': { name: text('Sender identification', 'Absenderbezeichnung'), format: 'an..35' },
   '0007': {
