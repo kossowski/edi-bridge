@@ -1,16 +1,24 @@
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
-import type {
-  ConditionOperator,
-  JsonContent,
-  MappingLink,
-  MappingTransform,
-  MessageType,
-  TransformLink,
+import {
+  type ConditionOperator,
+  defaultCsvSettings,
+  inferDocumentStructure,
+  type JsonContent,
+  type MappingLink,
+  type MappingTransform,
+  type MessageType,
+  toEncodedFile,
+  type TransformLink,
 } from '@edi-bridge/contracts'
 
-import { applyMappingVersion, MappingError, type OutboundMappingVersion } from './index'
+import {
+  applyMappingVersion,
+  MappingError,
+  type OutboundMappingVersion,
+  readDocument,
+} from './index'
 
 function outboundVersion(
   messageType: MessageType,
@@ -1093,5 +1101,98 @@ describe('applyMappingVersion', () => {
       targetPath: 'BGM/1004',
       transformId,
     })
+  })
+
+  const headerFields = [
+    { id: '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c01', field: 'orderNumber', target: 'BGM/1004' },
+    { id: '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c02', field: 'orderDate', target: 'DTM+137/C507/2380' },
+    {
+      id: '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c03',
+      field: 'buyer',
+      target: 'SG2+BY/NAD+BY/C082/3039',
+    },
+    {
+      id: '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c04',
+      field: 'supplier',
+      target: 'SG2+SU/NAD+SU/C082/3039',
+    },
+  ]
+
+  const rootListOrderVersion = (list: string) =>
+    outboundVersion(
+      'ORDERS',
+      [
+        { sourcePath: `${list}[].gtin`, targetPath: 'SG25/LIN/C212/7140' },
+        { sourcePath: `${list}[].quantity`, targetPath: 'SG25/QTY+21/C186/6060' },
+      ],
+      {
+        transforms: [
+          loop,
+          ...headerFields.map(({ id, field }) =>
+            transformOf(id, { kind: 'jsonata', config: { expression: `${list}[0].${field}` } }),
+          ),
+        ],
+        transformLinks: [
+          ...looped(`${list}[]`, 'SG25', 'SG25/LIN/1082'),
+          ...headerFields.map(({ id, target }) => intoTarget(target, id)),
+        ],
+      },
+    )
+
+  const rootListOrderMessage = {
+    header: { tag: 'UNH', elements: [['1'], ['ORDERS', 'D', '96A', 'UN', 'EAN008']] },
+    segments: [
+      { tag: 'BGM', elements: [['220'], ['PO-4711']] },
+      { tag: 'DTM', elements: [['137', '20261014']] },
+      { tag: 'NAD', elements: [['BY'], ['4012345000009', '', '9']] },
+      { tag: 'NAD', elements: [['SU'], ['4000001000005', '', '9']] },
+      { tag: 'LIN', elements: [['1'], [''], ['4000862141404', 'EN']] },
+      { tag: 'QTY', elements: [['21', '12']] },
+      { tag: 'LIN', elements: [['2'], [''], ['4000862141411', 'EN']] },
+      { tag: 'QTY', elements: [['21', '5']] },
+      { tag: 'UNS', elements: [['S']] },
+    ],
+    trailer: { tag: 'UNT', elements: [['11'], ['1']] },
+  }
+
+  it('loops over the rows of a CSV Document, its header fields read from the first row', async () => {
+    const csv = [
+      'orderNumber;orderDate;buyer;supplier;gtin;quantity',
+      'PO-4711;20261014;4012345000009;4000001000005;4000862141404;12',
+      'PO-4711;20261014;4012345000009;4000001000005;4000862141411;5',
+    ].join('\n')
+
+    const structure = inferDocumentStructure({
+      kind: 'csvDocument',
+      document: toEncodedFile('order.csv', csv),
+      csv: defaultCsvSettings,
+    })
+
+    const document = await Effect.runPromise(readDocument(structure, csv))
+
+    expect(await apply(rootListOrderVersion('rows'), document)).toEqual(rootListOrderMessage)
+  })
+
+  it('loops over the items of a JSON Document whose root is a list', async () => {
+    const orderHeader = {
+      orderNumber: 'PO-4711',
+      orderDate: '20261014',
+      buyer: '4012345000009',
+      supplier: '4000001000005',
+    }
+
+    const json = JSON.stringify([
+      { ...orderHeader, gtin: '4000862141404', quantity: 12 },
+      { ...orderHeader, gtin: '4000862141411', quantity: 5 },
+    ])
+
+    const structure = inferDocumentStructure({
+      kind: 'jsonDocument',
+      document: toEncodedFile('order.json', json),
+    })
+
+    const document = await Effect.runPromise(readDocument(structure, json))
+
+    expect(await apply(rootListOrderVersion('items'), document)).toEqual(rootListOrderMessage)
   })
 })

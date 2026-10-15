@@ -300,15 +300,31 @@ const elements = {
     codes: { VAT: text('Value added tax', 'Umsatzsteuer') },
   },
   '5278': { name: text('Duty/tax/fee rate', 'Steuersatz'), format: 'an..17' },
+  '5279': {
+    name: text('Duty/tax/fee rate identification', 'Steuersatz, Identifikation'),
+    format: 'an..7',
+  },
   '5283': {
     name: text('Duty/tax/fee function qualifier', 'Funktion der Steuer, Qualifier'),
     format: 'an..3',
     codes: { '7': text('Tax', 'Steuer') },
   },
+  '5286': {
+    name: text('Duty/tax/fee assessment basis', 'Veranlagungsbasis der Steuer'),
+    format: 'an..15',
+  },
+  '5289': {
+    name: text('Duty/tax/fee account identification', 'Verrechnungskennzeichen der Steuer'),
+    format: 'an..6',
+  },
   '5305': {
     name: text('Duty/tax/fee category, coded', 'Steuerkategorie, codiert'),
     format: 'an..3',
-    codes: { S: text('Standard rate', 'Normalsatz') },
+    codes: {
+      S: text('Standard rate', 'Normalsatz'),
+      E: text('Exempt from tax', 'Steuerbefreit'),
+      O: text('Services outside scope of tax', 'Nicht steuerbar'),
+    },
   },
   '6060': { name: text('Quantity', 'Menge'), format: 'n..15' },
   '6063': {
@@ -352,6 +368,10 @@ const elements = {
     codes: { PCE: text('Piece', 'Stück'), KGM: text('Kilogram', 'Kilogramm') },
   },
   '7008': { name: text('Item description', 'Produktbeschreibung'), format: 'an..35' },
+  '7009': {
+    name: text('Item description identification', 'Produktbeschreibung, Identifikation'),
+    format: 'an..17',
+  },
   '7065': {
     name: text('Type of packages identification', 'Packstückart, Identifikation'),
     format: 'an..17',
@@ -360,7 +380,11 @@ const elements = {
   '7077': {
     name: text('Item description type, coded', 'Art der Produktbeschreibung, codiert'),
     format: 'an..3',
-    codes: { F: text('Free-form', 'Freitext') },
+    codes: { A: text('Free-form long description', 'Freies Format - lange Beschreibung') },
+  },
+  '7081': {
+    name: text('Item characteristic, coded', 'Produkt-/Leistungsgruppe, codiert'),
+    format: 'an..3',
   },
   '7140': { name: text('Item number', 'Produktnummer'), format: 'an..35' },
   '7143': {
@@ -451,8 +475,10 @@ const composites = {
   C243: {
     name: text('Duty/tax/fee detail', 'Steuerdetails'),
     elements: [
+      ['5279', false],
+      ['1131', false],
+      ['3055', false],
       ['5278', false],
-      ['5305', false],
     ],
   },
   C270: {
@@ -462,7 +488,15 @@ const composites = {
       ['6066', true],
     ],
   },
-  C273: { name: text('Item description', 'Produktbeschreibung'), elements: [['7008', false]] },
+  C273: {
+    name: text('Item description', 'Produktbeschreibung'),
+    elements: [
+      ['7009', false],
+      ['1131', false],
+      ['3055', false],
+      ['7008', false],
+    ],
+  },
   C504: {
     name: text('Currency details', 'Währungsdetails'),
     elements: [
@@ -498,6 +532,14 @@ const composites = {
     elements: [
       ['5025', true],
       ['5004', false],
+    ],
+  },
+  C533: {
+    name: text('Duty/tax/fee account detail', 'Verrechnungseinzelheiten der Steuer'),
+    elements: [
+      ['5289', true],
+      ['1131', false],
+      ['3055', false],
     ],
   },
   S002: {
@@ -585,6 +627,7 @@ const segments = {
     name: text('Item description', 'Produktbeschreibung'),
     children: [
       ['7077', false],
+      ['7081', false],
       ['C273', false],
     ],
     qualifiedBy: '7077',
@@ -663,7 +706,10 @@ const segments = {
     children: [
       ['5283', true],
       ['C241', false],
+      ['C533', false],
+      ['5286', false],
       ['C243', false],
+      ['5305', false],
     ],
     qualifiedBy: '5283',
   },

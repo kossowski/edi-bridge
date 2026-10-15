@@ -32,3 +32,34 @@ UNH S009 0057 is conditional in UN syntax version 3 and required (`R`) in EANCOM
 | INVOIC       | `EAN008` | CCG INVOIC printed page 230 | `UNH+ME000001+INVOIC:D:96A:UN:EAN008'` |
 
 The ESAP 20 specifications give later subset versions: `EAN009` in MS30 page 1 and MS35 page 1, `EAN006` in MS34 page 1. CONTRL keeps 0057 without a code list, in UNH and in UCM; see the CONTRL definition in the golden files README for `EAN002` and `EAN004`.
+
+## Item description
+
+IMD describes a line item. The EDIFACT column of the CCG layout gives the UN D.96A segment: 7077, 7081, C273 (7009, 1131, 3055, 7008). The free text in 7008 is the fourth component of the third element. The structures follow the CCG use of IMD for the item description:
+
+| Message Type | Use     | Source                      | Example in the source         |
+| ------------ | ------- | --------------------------- | ----------------------------- |
+| INVOIC       | `IMD+A` | CCG INVOIC printed page 321 | `IMD+A++:::Rudi Rüssel'`      |
+| DESADV       | `IMD+A` | CCG DESADV printed page 212 | `IMD+A++:::Rüssel von Rudi'`  |
+| ORDERS       | `IMD+A` | none                        | same use as INVOIC and DESADV |
+
+7077 `A` is the free-form long description. CCG INVOIC marks 7081, 7009, 1131 and 3055 as not used (`N`), so the IMD use leaves 3055 without a code and it does not fill itself. CCG ORDERS gives IMD only for colour and size (`IMD+B+SGR+:::XXL'`, printed page 133), so ORDERS keeps the same use as the others.
+
+## Tax details
+
+The UN D.96A TAX segment is 5283, C241, C533 (5289, 1131, 3055), 5286, C243 (5279, 1131, 3055, 5278) and 5305, as the EDIFACT column of CCG INVOIC printed page 352 and the TAX layout of MS35 page 6 show. The tax rate in 5278 is therefore the fourth component of the fifth element, and the tax category 5305 is the sixth element:
+
+| Source                      | Example in the source         |
+| --------------------------- | ----------------------------- |
+| CCG INVOIC printed page 353 | `TAX+7+VAT:::+::++:::16:::+'` |
+| MS35 page 6                 | `TAX+7+VAT+++:::25+S'`        |
+
+MS35 marks 1131 and 3055 in C243 as not used (`N`). CCG INVOIC leaves them optional (`O`), and its example leaves them empty. The TAX uses therefore leave 3055 without a code. 5305 is dependent (`D`) in CCG INVOIC and required (`R`) in MS35. The TAX uses of SG33 (printed page 352) and SG50 (printed page 418) keep the codes both sources give, so 5305 has no single code and does not fill itself:
+
+| Code | Meaning                       | Source                                                              |
+| ---- | ----------------------------- | ------------------------------------------------------------------- |
+| `S`  | Standard rate                 | MS35 page 6, `TAX+7+VAT+++:::25+S'`                                 |
+| `E`  | Exempt from tax               | CCG INVOIC printed pages 352 and 418, code list on printed page 432 |
+| `O`  | Services outside scope of tax | CCG INVOIC printed pages 352 and 418, code list on printed page 432 |
+
+CCG INVOIC uses 5305 only for an exempt invoice, and then leaves 5278 empty (note on DE 5305, printed page 298). Its example leaves 5305 empty in each TAX. MS35 refers to the Swedish code list T0197 and gives `S` in its example.

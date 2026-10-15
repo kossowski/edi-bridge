@@ -1,0 +1,53 @@
+{
+  "invoiceNumber": "87441",
+  "invoiceDate": "20.03.2000",
+  "deliveryDate": "15.03.1998",
+  "order": {
+    "number": "4711",
+    "date": "01.03.1998"
+  },
+  "deliveryNote": {
+    "number": "4714",
+    "date": "01.03.1998"
+  },
+  "buyer": {
+    "gln": "4071615111110",
+    "vatId": "DE090909"
+  },
+  "supplier": {
+    "gln": "4389876511113",
+    "vatId": "DE101010"
+  },
+  "invoicee": {
+    "gln": "4071615192710"
+  },
+  "deliveryParty": {
+    "gln": "4089876511111"
+  },
+  "currency": "EUR",
+  "lines": [
+    {
+      "gtin": "4000862141404",
+      "description": "Rudi Rüssel",
+      "quantity": 11,
+      "unit": "ST",
+      "netAmount": 108.13,
+      "vatRate": 16
+    },
+    {
+      "gtin": "4000862141423",
+      "description": "Rüssel von Rudi",
+      "quantity": 1,
+      "unit": "ST",
+      "netAmount": 108.13,
+      "vatRate": 16
+    }
+  ],
+  "totals": {
+    "invoiceAmount": 121.99,
+    "lineAmount": 108.13,
+    "taxableAmount": 105.16,
+    "vatRate": 16,
+    "vatAmount": 16.83
+  }
+}

@@ -218,7 +218,7 @@ function reference(qualifier: string, occurrence: Occurrence = { maxRepeat: 10 }
 
 const productIdentification = [
   segment('PIA+1', { maxRepeat: 25, codes: { '7143': ['SA', 'IN'] } }),
-  segment('IMD+F', { maxRepeat: 99 }),
+  segment('IMD+A', { maxRepeat: 99, codes: { '3055': [] } }),
 ]
 
 const lineItem = segment('LIN', { ...m, codes: { '7143': ['EN'] }, requires: ['C212'] })
@@ -228,6 +228,8 @@ const price = group('SG28', text('Price details', 'Preisangaben'), { maxRepeat: 
 ])
 
 const lineCount = segment('CNT+2', { maxRepeat: 10 })
+
+const tax = segment('TAX+7', { ...m, codes: { '3055': [] } })
 
 const orders: StructureDefinition = {
   messageType: 'ORDERS',
@@ -345,7 +347,7 @@ const invoic: StructureDefinition = {
         segment('MOA+203', m),
       ]),
       price,
-      group('SG33', text('Line tax', 'Positionssteuer'), { maxRepeat: 5 }, [segment('TAX+7', m)]),
+      group('SG33', text('Line tax', 'Positionssteuer'), { maxRepeat: 5 }, [tax]),
     ]),
     segment('UNS', m),
     lineCount,
@@ -355,10 +357,7 @@ const invoic: StructureDefinition = {
       segment('MOA+125'),
       segment('MOA+176'),
     ]),
-    group('SG50', text('Tax totals', 'Steuersummen'), { maxRepeat: 10 }, [
-      segment('TAX+7', m),
-      segment('MOA+124'),
-    ]),
+    group('SG50', text('Tax totals', 'Steuersummen'), { maxRepeat: 10 }, [tax, segment('MOA+124')]),
     trailer,
   ],
 }

@@ -11,7 +11,6 @@ import {
   type EdifactSegmentGroup,
   type EdifactStructureNode,
   type JsonContent,
-  jsonContentSchema,
   type LinkStart,
   type LookupTableEntry,
   type MappingTransform,
@@ -25,6 +24,7 @@ import {
 import type { Element, Message, Segment } from '@edi-bridge/edifact'
 
 import { reformatDate, reformatNumber } from './formats'
+import { jsonListSchema, jsonObjectSchema } from './json'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
 
@@ -49,10 +49,6 @@ export class MappingError extends Data.TaggedError('MappingError')<{
 }> {}
 
 type Values = ReadonlyMap<string, string>
-
-const objectSchema = z.record(z.string(), jsonContentSchema)
-
-const itemsSchema = z.array(jsonContentSchema)
 
 const scalarSchema = z.union([z.string(), z.number(), z.boolean()])
 
@@ -110,7 +106,7 @@ function read({ document, scope }: Reading, path: string): JsonContent | undefin
   let value: JsonContent | undefined = bound === undefined ? document : scope.items.get(bound)
 
   for (const key of rest === '' ? [] : rest.split('.')) {
-    const object = objectSchema.safeParse(value)
+    const object = jsonObjectSchema.safeParse(value)
 
     value = object.success && !key.endsWith('[]') ? object.data[key] : undefined
   }
@@ -135,7 +131,7 @@ function sourceValue(context: Reading, path: string): string | undefined {
 }
 
 function itemsOf(context: Reading, sourcePart: string): JsonContent[] {
-  const items = itemsSchema.safeParse(read(context, arrayBasePath(sourcePart)))
+  const items = jsonListSchema.safeParse(read(context, arrayBasePath(sourcePart)))
 
   return items.success ? items.data : []
 }
