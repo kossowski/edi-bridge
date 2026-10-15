@@ -28,7 +28,7 @@ import {
 
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
-import { lookupTableUnused, selectLookupTableUses } from './mapping-use.js'
+import { lookupTableUnused, selectLookupTableUses, selectUsesOfLookupTable } from './mapping-use.js'
 import {
   byName,
   foundOrNotFound,
@@ -113,10 +113,8 @@ const selectLookupTable = async (
     return undefined
   }
 
-  const usesOf = await selectLookupTableUses(db, workspaceId)
-
   return {
-    ...toSummary(row, usesOf(row.id)),
+    ...toSummary(row, await selectUsesOfLookupTable(db, workspaceId, row.id)),
     entries: await selectEntries(db, row.id),
     // Until code meanings are served (#228).
     codeMeanings: [],

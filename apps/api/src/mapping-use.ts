@@ -64,17 +64,21 @@ const useFields = {
   messageType: mappings.messageType,
 }
 
-export const selectLookupTableUses = async (db: Database | Transaction, workspaceId: string) => {
+const selectUsesByLookupTable = async (
+  db: Database | Transaction,
+  workspaceId: string,
+  reading: (graph: AnyColumn) => SQL | undefined,
+) => {
   const [inDrafts, inVersions] = await Promise.all([
     db
       .selectDistinct({ ...useFields, lookupTableId: lookupTableIdsOf(mappings.draft) })
       .from(mappings)
-      .where(inWorkspace(mappings, workspaceId)),
+      .where(inWorkspace(mappings, workspaceId, reading(mappings.draft))),
     db
       .selectDistinct({ ...useFields, lookupTableId: lookupTableIdsOf(mappingVersions.graph) })
       .from(mappingVersions)
       .innerJoin(mappings, eq(mappingVersions.mappingId, mappings.id))
-      .where(inWorkspace(mappings, workspaceId)),
+      .where(inWorkspace(mappings, workspaceId, reading(mappingVersions.graph))),
   ])
 
   const byLookupTable = new Map<string, Map<string, LookupTableUse>>()
@@ -95,6 +99,21 @@ export const selectLookupTableUses = async (db: Database | Transaction, workspac
 
   return (lookupTableId: string) =>
     [...(byLookupTable.get(lookupTableId)?.values() ?? [])].toSorted(byName)
+}
+
+export const selectLookupTableUses = (db: Database | Transaction, workspaceId: string) =>
+  selectUsesByLookupTable(db, workspaceId, () => undefined)
+
+export const selectUsesOfLookupTable = async (
+  db: Database | Transaction,
+  workspaceId: string,
+  lookupTableId: string,
+) => {
+  const usesOf = await selectUsesByLookupTable(db, workspaceId, (graph) =>
+    readsLookupTable(graph, lookupTableId),
+  )
+
+  return usesOf(lookupTableId)
 }
 
 export const lookupTableUnused = (lookupTableId: string): SQL | undefined =>
