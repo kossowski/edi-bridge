@@ -121,10 +121,20 @@ const kinds: KindHandlings = {
       input.credential === undefined
         ? {}
         : sealed(secrets, id, 'encryptedCredential', input.credential),
-    reach: (channel, secret) =>
-      Effect.flatMap(ChannelReach, (reach) =>
-        reach.sftp({ ...channel, credential: secret('encryptedCredential') ?? '' }),
-      ),
+    reach: ({ host, port, username, remotePath, authentication }, secret) => {
+      const credential = secret('encryptedCredential') ?? ''
+
+      return Effect.flatMap(ChannelReach, (reach) =>
+        reach.sftp({
+          host,
+          port,
+          username,
+          remotePath,
+          credential:
+            authentication === 'password' ? { password: credential } : { privateKey: credential },
+        }),
+      )
+    },
   },
   webhook: {
     responseFields: (row, apiPublicUrl) => ({

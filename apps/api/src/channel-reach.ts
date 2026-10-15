@@ -2,18 +2,19 @@ import { Context, Data, Effect } from 'effect'
 import { Client, type SFTPWrapper } from 'ssh2'
 import { z } from 'zod'
 
-import type { ChannelTestFailureReason, SftpAuthentication } from '@edi-bridge/contracts'
+import type { ChannelTestFailureReason } from '@edi-bridge/contracts'
 
 export class ChannelUnreachable extends Data.TaggedError('ChannelUnreachable')<{
   readonly reason: ChannelTestFailureReason
 }> {}
 
+export type SftpCredential = { password: string } | { privateKey: string }
+
 export interface SftpLogin {
   host: string
   port: number
   username: string
-  authentication: SftpAuthentication
-  credential: string
+  credential: SftpCredential
   remotePath: string
 }
 
@@ -167,9 +168,7 @@ const reachSftp = (login: SftpLogin, timeoutMs: number) =>
         port: login.port,
         username: login.username,
         readyTimeout: timeoutMs,
-        ...(login.authentication === 'password'
-          ? { password: login.credential }
-          : { privateKey: login.credential }),
+        ...login.credential,
       })
     } catch {
       settle(unreachable('loginRejected'))
