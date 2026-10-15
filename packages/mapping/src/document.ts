@@ -1,5 +1,4 @@
 import { Data, Effect } from 'effect'
-import { z } from 'zod'
 
 import {
   arrayBasePath,
@@ -7,10 +6,11 @@ import {
   DocumentStructureProblemError,
   type InferredDocumentStructure,
   type JsonContent,
-  jsonContentSchema,
   parseCsv,
   rootListPath,
 } from '@edi-bridge/contracts'
+
+import { jsonListSchema, jsonObjectSchema } from './json'
 
 export const documentReadErrorCodes = ['invalidJson', 'invalidCsv', 'unexpectedRoot'] as const
 
@@ -25,10 +25,6 @@ type ReadStructure = DocumentStructure | InferredDocumentStructure
 
 const failed = (code: DocumentReadErrorCode, line: number | null = null) =>
   Effect.fail(new DocumentReadError({ code, line }))
-
-const objectSchema = z.record(z.string(), jsonContentSchema)
-
-const listSchema = z.array(jsonContentSchema)
 
 function readJson(
   root: Extract<ReadStructure, { format: 'json' }>['root'],
@@ -45,12 +41,12 @@ function readJson(
   const listPath = rootListPath({ format: 'json', root })
 
   if (listPath === undefined) {
-    const object = objectSchema.safeParse(value)
+    const object = jsonObjectSchema.safeParse(value)
 
     return object.success ? Effect.succeed(object.data) : failed('unexpectedRoot')
   }
 
-  const list = listSchema.safeParse(value)
+  const list = jsonListSchema.safeParse(value)
 
   return list.success
     ? Effect.succeed({ [arrayBasePath(listPath)]: list.data })
