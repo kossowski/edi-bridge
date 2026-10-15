@@ -13,6 +13,7 @@ import {
   importLookupTableEndpoint,
   type LookupTable,
   lookupTableEndpoint,
+  lookupTableInUseMessage,
   lookupTableImportPreviewEndpoint,
   type LookupTableImportRow,
   type LookupTableInput,
@@ -544,7 +545,7 @@ export function lookupTableHandlers(
         }
 
         if (usageOf(existing).uses.length > 0) {
-          return conflict('A Draft or published Mapping Version uses this Lookup Table.')
+          return conflict(lookupTableInUseMessage)
         }
 
         store.delete(params.id)

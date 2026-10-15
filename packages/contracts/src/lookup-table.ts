@@ -183,6 +183,11 @@ export const deleteLookupTableEndpoint: Endpoint<
   response: z.undefined(),
 }
 
+export const lookupTableInUseStatus = 409
+
+export const lookupTableInUseMessage =
+  'A Draft or published Mapping Version uses this Lookup Table.'
+
 export const failedRunReferenceSchema = z.object({
   id: z.uuid(),
   receivedAt: z.iso.datetime(),

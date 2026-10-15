@@ -397,6 +397,8 @@ export {
   lookupTableSuggestionsSchema,
   type LookupTableSummary,
   lookupTableSummarySchema,
+  lookupTableInUseMessage,
+  lookupTableInUseStatus,
   type LookupTableUse,
   lookupTableUseSchema,
   lookupTablesEndpoint,

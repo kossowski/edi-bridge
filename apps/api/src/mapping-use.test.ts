@@ -14,6 +14,8 @@ import {
   documentStructuresEndpoint,
   documentStructureSummarySchema,
   lookupTableEndpoint,
+  lookupTableInUseMessage,
+  lookupTableInUseStatus,
   lookupTableSchema,
   lookupTablesEndpoint,
   lookupTableSummarySchema,
@@ -341,7 +343,8 @@ describe('Lookup Tables used by Mappings', () => {
 
     const response = await removeLookupTable(units.id)
 
-    expect(response.statusCode).toBe(409)
+    expect(response.statusCode).toBe(lookupTableInUseStatus)
+    expect(response.json()).toMatchObject({ message: lookupTableInUseMessage })
     expect(await lookupTableSummaries()).toHaveLength(1)
   })
 
@@ -353,7 +356,7 @@ describe('Lookup Tables used by Mappings', () => {
     await published(mapping.id)
     await save(mapping.id, empty)
 
-    expect((await removeLookupTable(units.id)).statusCode).toBe(409)
+    expect((await removeLookupTable(units.id)).statusCode).toBe(lookupTableInUseStatus)
   })
 
   it('deletes a Lookup Table once no Mapping uses it', async () => {

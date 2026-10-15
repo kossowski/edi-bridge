@@ -9,6 +9,8 @@ import {
   type LookupTableInput,
   lookupTableImportPreviewEndpoint,
   lookupTableEndpoint,
+  lookupTableInUseMessage,
+  lookupTableInUseStatus,
   lookupTableMissingCodesEndpoint,
   lookupTableSchema,
   lookupTablesEndpoint,
@@ -262,7 +264,10 @@ describe('lookupTableHandlers', () => {
     const units = seedLookupTableNamed('Units of measure')
     const path = toPath(deleteLookupTableEndpoint.path, { id: units.id })
 
-    expect((await send('DELETE', path)).status).toBe(409)
+    const response = await send('DELETE', path)
+
+    expect(response.status).toBe(lookupTableInUseStatus)
+    expect(await response.json()).toMatchObject({ message: lookupTableInUseMessage })
     expect((await send('GET', path)).status).toBe(200)
   })
 
@@ -272,7 +277,7 @@ describe('lookupTableHandlers', () => {
     server.use(...lookupTableHandlers(apiUrl, { mappings, versions }))
     const path = toPath(deleteLookupTableEndpoint.path, { id: units.id })
 
-    expect((await send('DELETE', path)).status).toBe(409)
+    expect((await send('DELETE', path)).status).toBe(lookupTableInUseStatus)
   })
 
   it.each([

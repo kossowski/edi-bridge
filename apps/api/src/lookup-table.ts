@@ -13,6 +13,7 @@ import {
   type LookupTableScopeInput,
   type LookupTableSuggestions,
   type LookupTableSuggestionsQuery,
+  lookupTableInUseMessage,
   type LookupTableSummary,
   type LookupTableUse,
   type MissingCode,
@@ -296,9 +297,7 @@ export const deleteLookupTable = (id: string) =>
     )
 
     if (deleted.length === 0) {
-      return yield* new Conflict({
-        message: 'A Draft or published Mapping Version uses this Lookup Table.',
-      })
+      return yield* new Conflict({ message: lookupTableInUseMessage })
     }
   })
 
