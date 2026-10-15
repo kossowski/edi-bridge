@@ -4,9 +4,14 @@
   "type": "module",
   "private": true,
   "exports": {
-    "./base.json": "./base.json"
+    "./base.json": "./base.json",
+    "./node.json": "./node.json"
   },
   "devDependencies": {
-    "@oxlint/plugins": "1.87.0"
+    "@oxlint/plugins": "1.87.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.12.0",
+    "eslint-plugin-perfectionist": "^5.12.1",
+    "eslint-plugin-turbo": "^2.11.7"
   }
 }
