@@ -16,7 +16,6 @@ import {
   type MappingVersion,
   type MessageTypeStructure,
   messageTypeStructures,
-  transformIssues,
   transformPorts,
 } from '@edi-bridge/contracts'
 
@@ -27,36 +26,22 @@ import { MappingError, type MappingErrorCode } from './errors'
 import { reformatDate, reformatNumber } from './formats'
 import { jsonListSchema, jsonObjectSchema } from './json'
 import { isBeneath, isRequiredOrFilled, setFilled, type Values } from './values'
+import {
+  type Expressions,
+  type Graph,
+  type LookupTables,
+  type Loop,
+  type Wiring,
+  wiringOf,
+} from './wiring'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
 
 const scalarSchema = z.union([z.string(), z.number(), z.boolean()])
 
-type Loop = {
-  id: string
-  sourcePart: string
-  targetParts: string[]
-  counterStart: number
-}
-
 type Scope = {
   items: ReadonlyMap<string, JsonContent>
   counters: ReadonlyMap<string, string>
-}
-
-type TransformTarget = { path: string; from: LinkStart & { kind: 'transform' } }
-
-type LookupTables = ReadonlyMap<string, ReadonlyMap<string, string>>
-
-type Expressions = ReadonlyMap<string, string>
-
-type Graph = {
-  expressions: Expressions
-  lookupTables: LookupTables
-  transforms: ReadonlyMap<string, MappingTransform>
-  feeding: ReadonlyMap<string, LinkStart>
-  valid: ReadonlySet<string>
-  targets: ReadonlyArray<TransformTarget>
 }
 
 type Context = {
@@ -329,98 +314,16 @@ function groupPaths(nodes: ReadonlyArray<EdifactStructureNode>): string[] {
   )
 }
 
-type LoopDraft = Omit<Loop, 'sourcePart'> & { sourcePart?: string }
-
-type Wiring = {
-  graph: Omit<Graph, 'expressions'>
-  loops: ReadonlyMap<string, Loop>
-  groupTargets: ReadonlyArray<string>
-}
-
-function wiringOf(
-  version: OutboundMappingVersion,
-  { lookupTables = new Map() }: ApplyOptions,
-): Wiring {
-  const { transforms, transformLinks } = version
-  const drafts = new Map<string, LoopDraft>()
-
-  for (const transform of transforms) {
-    if (transform.kind === 'loop') {
-      drafts.set(transform.id, {
-        id: transform.id,
-        targetParts: [],
-        counterStart: transform.config.counterStart,
-      })
-    }
-  }
-
-  const feeding = new Map<string, LinkStart>()
-  const targets: TransformTarget[] = []
-  const groupTargets: string[] = []
-
-  for (const { from, to } of transformLinks) {
-    if (to.kind === 'transform') {
-      const draft = drafts.get(to.transformId)
-
-      if (draft && to.input === 'items' && from.kind === 'source') {
-        draft.sourcePart = from.path
-      }
-
-      feeding.set(`${to.transformId}/${to.input}`, from)
-      continue
-    }
-
-    if (from.kind === 'transform' && from.output === 'items') {
-      groupTargets.push(to.path)
-      drafts.get(from.transformId)?.targetParts.push(to.path)
-      continue
-    }
-
-    if (from.kind === 'transform') {
-      targets.push({ path: to.path, from })
-    }
-  }
-
-  const loops = new Map<string, Loop>()
-
-  for (const { sourcePart, ...draft } of drafts.values()) {
-    if (sourcePart !== undefined) {
-      const loop = { sourcePart, ...draft }
-
-      for (const targetPart of loop.targetParts) {
-        loops.set(targetPart, loop)
-      }
-    }
-  }
-
-  const issues = transformIssues(version)
-
-  const graph: Wiring['graph'] = {
-    lookupTables: new Map(
-      [...lookupTables].map(([id, entries]) => [
-        id,
-        new Map(entries.map(({ sourceCode, targetCode }) => [sourceCode, targetCode])),
-      ]),
-    ),
-    transforms: new Map(transforms.map((transform) => [transform.id, transform])),
-    feeding,
-    valid: new Set(transforms.flatMap(({ id }) => (issues[id]?.length ? [] : [id]))),
-    targets,
-  }
-
-  return { graph, loops, groupTargets }
-}
-
 function unknownTarget(
   links: OutboundMappingVersion['links'],
-  { graph, groupTargets }: Wiring,
+  { graph, loopTargets }: Wiring,
   body: ReadonlyArray<EdifactStructureNode>,
 ): string | undefined {
   const elements = new Set(elementPaths(body))
   const groups = new Set(groupPaths(body))
 
   return (
-    groupTargets.find((path) => !groups.has(path)) ??
+    loopTargets.find((path) => !groups.has(path)) ??
     [...links.map(({ targetPath }) => targetPath), ...graph.targets.map(({ path }) => path)].find(
       (path) => !elements.has(path),
     )
@@ -644,7 +547,7 @@ export function applyMappingVersion(
 ): Effect.Effect<Message, MappingError> {
   const structure = messageTypeStructures[version.target.messageType]
   const { header, body } = framed(structure)
-  const wiring = wiringOf(version, options)
+  const wiring = wiringOf(version, options.lookupTables)
   const { graph, loops } = wiring
   const unknown = unknownTarget(version.links, wiring, body)
 
