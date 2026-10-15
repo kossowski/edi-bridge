@@ -9,6 +9,7 @@ import {
   createDocumentStructureEndpoint,
   createInviteEndpoint,
   createLookupTableEndpoint,
+  createMappingEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   deleteLookupTableEndpoint,
@@ -22,8 +23,11 @@ import {
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
+  mappingDraftEndpoint,
+  mappingsEndpoint,
   removeWorkspaceMemberEndpoint,
   revokeInviteEndpoint,
+  saveMappingDraftEndpoint,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -80,6 +84,7 @@ interface Ids {
   tradingPartner: string
   lookupTable: string
   documentStructure: string
+  mapping: string
 }
 
 let api: TestApi
@@ -109,6 +114,7 @@ beforeAll(async () => {
     tradingPartner: await createdId(createTradingPartnerEndpoint.path, tradingPartner),
     lookupTable: await createdId(createLookupTableEndpoint.path, lookupTable),
     documentStructure: await createdId(createDocumentStructureEndpoint.path, documentStructure),
+    mapping: await createdId(createMappingEndpoint.path, { messageType: 'ORDERS' }),
   }
 }, 60_000)
 
@@ -129,6 +135,8 @@ const workspaceReads = (): string[] => [
   withId(lookupTableMissingCodesEndpoint.path, ids.lookupTable),
   documentStructuresEndpoint.path,
   withId(documentStructureEndpoint.path, ids.documentStructure),
+  mappingsEndpoint.path,
+  withId(mappingDraftEndpoint.path, ids.mapping),
 ]
 
 const reads = () => [sessionEndpoint.path, workspaceMembersEndpoint.path, ...workspaceReads()]
@@ -204,6 +212,22 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
       method: 'PUT',
       url: withId(updateDocumentStructureEndpoint.path, ids.documentStructure),
       body: { name: 'ERP purchase orders', adjustments: [] },
+    }),
+  ],
+  [
+    'create a Mapping',
+    () => ({ method: 'POST', url: createMappingEndpoint.path, body: { messageType: 'DESADV' } }),
+  ],
+  [
+    'save the Draft of a Mapping',
+    () => ({
+      method: 'PUT',
+      url: withId(saveMappingDraftEndpoint.path, ids.mapping),
+      body: {
+        links: [{ sourcePath: 'BGM/1004', targetPath: 'orderNumber' }],
+        transforms: [],
+        transformLinks: [],
+      },
     }),
   ],
   [

@@ -50,6 +50,13 @@
       "when": 1792028807018,
       "tag": "0006_member_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792056217146,
+      "tag": "0007_mappings",
+      "breakpoints": true
     }
   ]
 }

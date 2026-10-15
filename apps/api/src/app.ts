@@ -10,6 +10,7 @@ import {
   createDocumentStructureEndpoint,
   createInviteEndpoint,
   createLookupTableEndpoint,
+  createMappingEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   deleteLookupTableEndpoint,
@@ -25,10 +26,13 @@ import {
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
   maxEncodedFileBytes,
+  mappingDraftEndpoint,
+  mappingsEndpoint,
   maxLookupTableCsvLength,
   operatorWorkspaceMembersEndpoint,
   removeWorkspaceMemberEndpoint,
   revokeInviteEndpoint,
+  saveMappingDraftEndpoint,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -64,6 +68,7 @@ import {
   suggestLookupTableEntries,
   updateLookupTable,
 } from './lookup-table.js'
+import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { parse, type ValidationError } from './parse.js'
 import {
   CurrentMember,
@@ -435,6 +440,29 @@ function registerRoutes(
           parse(updateDocumentStructureEndpoint.body, request.body),
         ),
       ),
+  )
+
+  app.get(mappingsEndpoint.path, (request, reply) => respond(request, reply, listMappings))
+
+  app.post(createMappingEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(createMappingEndpoint.body, request.body), createMapping),
+      201,
+    ),
+  )
+
+  app.get<{ Params: { id: string } }>(mappingDraftEndpoint.path, (request, reply) =>
+    respond(request, reply, loadMappingDraft(request.params.id)),
+  )
+
+  app.put<{ Params: { id: string } }>(saveMappingDraftEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      saveMappingDraft(request.params.id, parse(saveMappingDraftEndpoint.body, request.body)),
+    ),
   )
 
   app.get<{ Params: { workspaceId: string } }>(
