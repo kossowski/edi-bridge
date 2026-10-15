@@ -19,7 +19,7 @@ import type { Element, Message, Segment } from '@edi-bridge/edifact'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
 
-export type MappingErrorCode = 'missingRequiredValue' | 'unknownTarget'
+export type MappingErrorCode = 'missingRequiredValue' | 'outsideLoop' | 'unknownTarget'
 
 export class MappingError extends Data.TaggedError('MappingError')<{
   readonly code: MappingErrorCode
@@ -226,6 +226,28 @@ function unknownTarget(
   )?.path
 }
 
+function repeatingParts(sourcePath: string): string[] {
+  const keys = sourcePath.split('.')
+
+  return keys.flatMap((key, index) =>
+    key.endsWith('[]') ? [keys.slice(0, index + 1).join('.')] : [],
+  )
+}
+
+function outsideLoop(
+  links: OutboundMappingVersion['links'],
+  loops: ReadonlyMap<string, Loop>,
+): string | undefined {
+  return links.find(({ sourcePath, targetPath }) =>
+    repeatingParts(sourcePath).some(
+      (part) =>
+        ![...loops].some(
+          ([targetPart, loop]) => loop.sourcePart === part && isBeneath(targetPath, targetPart),
+        ),
+    ),
+  )?.targetPath
+}
+
 const hasValueBeneath = (part: StructurePart, values: Values) =>
   [...values.keys()].some((path) => isBeneath(path, part.path))
 
@@ -366,6 +388,12 @@ export function applyMappingVersion(
 
   if (unknown !== undefined) {
     return Effect.fail(new MappingError({ code: 'unknownTarget', targetPath: unknown }))
+  }
+
+  const outside = outsideLoop(version.links, loops)
+
+  if (outside !== undefined) {
+    return Effect.fail(new MappingError({ code: 'outsideLoop', targetPath: outside }))
   }
 
   const reading: Reading = {

@@ -459,6 +459,52 @@ describe('applyMappingVersion', () => {
     expect(message.trailer).toEqual({ tag: 'UNT', elements: [['15'], ['1']] })
   })
 
+  it.each<[string, MessageType, MappingLink[], Parameters<typeof outboundVersion>[2], string]>([
+    [
+      'no loop repeats the line item group',
+      'ORDERS',
+      [...orderHeader, ...orderLines],
+      {},
+      'SG25/LIN/C212/7140',
+    ],
+    [
+      'it fills a header field',
+      'ORDERS',
+      [
+        ...orderHeader.filter(({ targetPath }) => targetPath !== 'BGM/1004'),
+        { sourcePath: 'lines[].gtin', targetPath: 'BGM/1004' },
+        ...orderLines,
+      ],
+      orderLoop,
+      'BGM/1004',
+    ],
+    [
+      'only the line loop encloses it, not one over the packages',
+      'DESADV',
+      [
+        ...despatchHeader,
+        { sourcePath: 'packages[].lines[].gtin', targetPath: 'SG10/SG17/LIN/C212/7140' },
+        { sourcePath: 'packages[].lines[].quantity', targetPath: 'SG10/SG17/QTY+12/C186/6060' },
+      ],
+      { transforms: [loop], transformLinks: looped('packages[].lines[]', 'SG10/SG17') },
+      'SG10/SG17/LIN/C212/7140',
+    ],
+  ])(
+    'fails naming a target that reads a repeating part when %s',
+    (_, messageType, links, loops, target) => {
+      const version = outboundVersion(messageType, links, loops)
+
+      const document = {
+        ...order,
+        ...despatch,
+        lines: [{ gtin: '4000862141404', quantity: 12 }],
+        packages: [{ lines: [{ gtin: '4000862141404', quantity: 12 }] }],
+      }
+
+      expect(failure(version, document)).toMatchObject({ code: 'outsideLoop', targetPath: target })
+    },
+  )
+
   it.each([
     ['the loop items into an element', 'SG25/LIN/1082', 'SG25/LIN/1082', 'SG25/LIN/1082'],
     ['the loop items into a segment group the message type lacks', 'SG99', 'SG25/LIN/1082', 'SG99'],
