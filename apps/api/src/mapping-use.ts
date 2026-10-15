@@ -3,7 +3,7 @@ import { and, type AnyColumn, eq, type SQL, sql } from 'drizzle-orm'
 import { directionOf, type DocumentStructureUses, type LookupTableUse } from '@edi-bridge/contracts'
 import { mappings, mappingVersions } from '@edi-bridge/db'
 
-import { selectVersions, toHeader } from './mapping-version.js'
+import { selectVersionsOfDocumentStructure } from './mapping-version.js'
 import { byName, inWorkspace } from './rows.js'
 
 import type { Database, Transaction } from './db.js'
@@ -25,15 +25,10 @@ export const selectDocumentStructureUses = async (
       .select({ draft: mappings.draft })
       .from(mappings)
       .where(eq(mappings.documentStructureId, documentStructureId)),
-    selectVersions(db, { graph: mappingVersions.graph }).where(
-      eq(mappings.documentStructureId, documentStructureId),
-    ),
+    selectVersionsOfDocumentStructure(db, documentStructureId),
   ])
 
-  return {
-    drafts: drafts.map(({ draft }) => draft),
-    versions: versions.map((row) => ({ ...toHeader(row), ...row.graph })),
-  }
+  return { drafts: drafts.map(({ draft }) => draft), versions }
 }
 
 export const selectMappingsByDocumentStructure = async (db: Database, workspaceId: string) => {

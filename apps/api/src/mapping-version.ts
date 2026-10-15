@@ -10,6 +10,7 @@ import {
   type MappingVersion,
   type MappingVersionEntry,
   type MappingVersionSummary,
+  type PublishedMappingUse,
   type PublishMappingDraftBody,
   type PublishedMappingVersionsQuery,
   mappingDifferences,
@@ -36,7 +37,7 @@ const header = {
   publishedAt: mappingVersions.publishedAt,
 }
 
-export const selectVersions = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
+const selectVersions = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
   db
     .select({ ...header, ...fields })
     .from(mappingVersions)
@@ -44,13 +45,24 @@ export const selectVersions = <Fields extends SelectedFields>(db: Database, fiel
 
 type HeaderRow = Awaited<ReturnType<typeof selectVersions<Record<never, never>>>>[number]
 
-export const toHeader = (row: HeaderRow): MappingVersionSummary => ({
+const toHeader = (row: HeaderRow): MappingVersionSummary => ({
   id: row.id,
   mappingId: row.mappingId,
   mappingName: row.mappingName,
   version: row.version,
   publishedAt: row.publishedAt.toISOString(),
 })
+
+export const selectVersionsOfDocumentStructure = async (
+  db: Database,
+  documentStructureId: string,
+): Promise<PublishedMappingUse[]> => {
+  const rows = await selectVersions(db, { graph: mappingVersions.graph }).where(
+    eq(mappings.documentStructureId, documentStructureId),
+  )
+
+  return rows.map((row) => ({ ...toHeader(row), ...row.graph }))
+}
 
 const selectEntries = (db: Database, where: SQL | undefined) =>
   selectVersions(db, {
