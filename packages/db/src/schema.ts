@@ -324,8 +324,7 @@ export const direction = pgEnum('direction', directions)
 
 export const sftpAuthentication = pgEnum('sftp_authentication', sftpAuthentications)
 
-// The settings of one kind are all set, and those of every other kind are null.
-const settingsOf = (kind: SQL, columns: SQL[]) =>
+const allSetOnlyWhen = (kind: SQL, columns: SQL[]) =>
   sql`num_nonnulls(${sql.join(columns, sql`, `)}) = case when ${kind} then ${sql.raw(String(columns.length))} else 0 end`
 
 export const channels = pgTable(
@@ -363,7 +362,7 @@ export const channels = pgTable(
     ),
     check(
       'channels_sftp_settings',
-      settingsOf(sql`${table.type} = 'sftp'`, [
+      allSetOnlyWhen(sql`${table.type} = 'sftp'`, [
         sql`${table.host}`,
         sql`${table.port}`,
         sql`${table.username}`,
@@ -374,19 +373,22 @@ export const channels = pgTable(
     ),
     check(
       'channels_polling_interval',
-      settingsOf(sql`${table.type} = 'sftp' and ${table.direction} = 'inbound'`, [
+      allSetOnlyWhen(sql`${table.type} = 'sftp' and ${table.direction} = 'inbound'`, [
         sql`${table.pollingIntervalMinutes}`,
       ]),
     ),
     check(
       'channels_webhook_settings',
-      settingsOf(sql`${table.type} = 'webhook'`, [
+      allSetOnlyWhen(sql`${table.type} = 'webhook'`, [
         sql`${table.rateLimitPerMinute}`,
         sql`${table.encryptedWebhookToken}`,
         sql`${table.webhookTokenLastFour}`,
       ]),
     ),
-    check('channels_http_settings', settingsOf(sql`${table.type} = 'http'`, [sql`${table.url}`])),
+    check(
+      'channels_http_settings',
+      allSetOnlyWhen(sql`${table.type} = 'http'`, [sql`${table.url}`]),
+    ),
     check(
       'channels_authorization',
       sql`${table.type} = 'http' or ${table.encryptedAuthorization} is null`,
