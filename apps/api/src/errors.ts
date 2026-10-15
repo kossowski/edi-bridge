@@ -27,3 +27,7 @@ export class Forbidden extends Data.TaggedError('Forbidden') {
     return 'Forbidden'
   }
 }
+
+export class InviteUnusable extends Data.TaggedError('InviteUnusable')<{
+  readonly message: string
+}> {}

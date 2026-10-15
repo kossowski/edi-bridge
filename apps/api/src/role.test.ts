@@ -4,8 +4,10 @@ import { z } from 'zod'
 import type { InjectOptions } from 'fastify'
 
 import {
+  acceptInviteEndpoint,
   channelsEndpoint,
   createDocumentStructureEndpoint,
+  createInviteEndpoint,
   createLookupTableEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
@@ -20,11 +22,13 @@ import {
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
   lookupTablesEndpoint,
+  revokeInviteEndpoint,
   sessionEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
   tradingPartnerSchema,
+  toPath,
   tradingPartnersEndpoint,
   updateCompanyIdentityEndpoint,
   updateDocumentStructureEndpoint,
@@ -200,7 +204,27 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
       body: { name: 'ERP purchase orders', adjustments: [] },
     }),
   ],
+  [
+    'create an invite',
+    () => ({
+      method: 'POST',
+      url: toPath(createInviteEndpoint.path, { workspaceId: ownWorkspace.id }),
+      body: { email: 'invited@nordwind.example', role: 'admin' },
+    }),
+  ],
+  [
+    'revoke an invite',
+    () => ({
+      method: 'DELETE',
+      url: toPath(revokeInviteEndpoint.path, {
+        workspaceId: ownWorkspace.id,
+        inviteId: '5d0f3c1e-8a4b-4e6f-9b2d-1c7a3e5f9d08',
+      }),
+    }),
+  ],
 ]
+
+const publicChanges = new Set<string>([acceptInviteEndpoint.path])
 
 const snapshot = async (target: Client) =>
   Promise.all(
@@ -264,7 +288,9 @@ describe('the changes', () => {
     const uncovered = registered
       .filter(
         ({ method, url }) =>
-          !['GET', 'HEAD', 'OPTIONS'].includes(method) && !url.startsWith('/auth/'),
+          !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
+          !url.startsWith('/auth/') &&
+          !publicChanges.has(url),
       )
       .filter(({ method, url }) =>
         changes.every(([, request]) => {

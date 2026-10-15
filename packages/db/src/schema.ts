@@ -124,6 +124,24 @@ export const members = pgTable(
   ],
 )
 
+export const invites = pgTable(
+  'invites',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    email: text().notNull(),
+    role: workspaceRole().notNull(),
+    token: text().notNull().unique(),
+    createdAt: createdAt(),
+    expiresAt: timestamp({ withTimezone: true, mode: 'date' }).notNull(),
+    acceptedAt: timestamp({ withTimezone: true, mode: 'date' }),
+    revokedAt: timestamp({ withTimezone: true, mode: 'date' }),
+  },
+  (table) => [index().on(table.workspaceId)],
+)
+
 export const characterSet = pgEnum('character_set', characterSets)
 
 export const tradingPartnerGlnUnique = 'trading_partners_workspace_id_gln_unique'

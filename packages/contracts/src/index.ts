@@ -697,14 +697,21 @@ export {
 } from './trading-partner-activity'
 
 export {
+  type AcceptInviteInput,
+  acceptInviteEndpoint,
+  acceptInviteInputSchema,
   createInviteEndpoint,
   createWorkspaceEndpoint,
   type Invite,
   type InviteInput,
   inviteInputSchema,
   inviteSchema,
+  inviteUnusableStatus,
   inviteValidityDays,
+  maxPasswordLength,
+  maxUserNameLength,
   maxWorkspaceNameLength,
+  minPasswordLength,
   operatorWorkspacesEndpoint,
   resetSandboxWorkspaceEndpoint,
   revokeInviteEndpoint,

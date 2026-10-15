@@ -20,6 +20,46 @@ export interface Member {
   readonly role: WorkspaceRole
 }
 
+export interface SignedInUser {
+  readonly user: SessionUser
+  readonly operator: boolean
+}
+
+export class CurrentUser extends Context.Service<CurrentUser, SignedInUser>()('CurrentUser') {}
+
+export async function resolveUser(
+  auth: Auth,
+  database: Database,
+  request: FastifyRequest,
+): Promise<SignedInUser | undefined> {
+  const signedIn = await auth.api.getSession({ headers: headersOf(request) })
+
+  if (!signedIn) {
+    return undefined
+  }
+
+  const [found] = await database
+    .select({ operator: users.operator })
+    .from(users)
+    .where(eq(users.id, signedIn.user.id))
+
+  if (found === undefined) {
+    return undefined
+  }
+
+  const { id, name, email } = signedIn.user
+
+  return { user: { id, name, email }, operator: found.operator }
+}
+
+export const requireOperator = Effect.gen(function* () {
+  const { operator } = yield* CurrentUser
+
+  if (!operator) {
+    return yield* new Forbidden()
+  }
+})
+
 export class CurrentMember extends Context.Service<CurrentMember, Member>()('CurrentMember') {}
 
 export async function resolveMember(

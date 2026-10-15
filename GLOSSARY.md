@@ -36,6 +36,10 @@ _Avoid_: Superadmin, root, owner
 A user with a role, Admin or Viewer, in one Workspace. A user can be a Member of several Workspaces.
 _Avoid_: Membership, team member, seat
 
+**Invite**:
+A link the Operator creates for one email address, Workspace and role, and shares by hand. Through it, the invited user sets a password and becomes a Member. It is open for 7 days, until it is used or revoked.
+_Avoid_: Invitation, sign-up link
+
 **Admin**:
 A user with full control inside one Workspace.
 _Avoid_: Owner, manager

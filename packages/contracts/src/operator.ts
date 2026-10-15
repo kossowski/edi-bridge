@@ -101,6 +101,33 @@ export const revokeInviteEndpoint: Endpoint<
   response: inviteSchema,
 }
 
+export const minPasswordLength = 8
+
+export const maxPasswordLength = 128
+
+export const maxUserNameLength = 100
+
+export const acceptInviteInputSchema = z.object({
+  name: z.string().trim().min(1).max(maxUserNameLength),
+  password: z.string().min(minPasswordLength).max(maxPasswordLength),
+})
+
+export type AcceptInviteInput = z.infer<typeof acceptInviteInputSchema>
+
+export const inviteUnusableStatus = 410
+
+export const acceptInviteEndpoint: Endpoint<
+  undefined,
+  undefined,
+  AcceptInviteInput,
+  '/invites/:token/accept'
+> = {
+  method: 'POST',
+  path: '/invites/:token/accept',
+  body: acceptInviteInputSchema,
+  response: z.undefined(),
+}
+
 export const resetSandboxWorkspaceEndpoint: Endpoint<
   WorkspaceSummary,
   undefined,
