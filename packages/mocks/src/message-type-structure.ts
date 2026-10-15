@@ -7,12 +7,10 @@ import {
   messageTypeSchema,
   type MessageTypeStructure,
   messageTypeStructureEndpoint,
+  messageTypeStructures,
 } from '@edi-bridge/contracts'
 
-import { messageTypeStructures } from './eancom/structures'
 import { notFound } from './responses'
-
-export { messageTypeStructures } from './eancom/structures'
 
 export function messageTypeStructureHandler(apiUrl: string) {
   return http.get<{ messageType: string }>(

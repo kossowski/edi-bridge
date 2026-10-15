@@ -1,15 +1,17 @@
 import {
-  type EdifactCode,
-  type EdifactComposite,
-  type EdifactElement,
-  type EdifactStructureNode,
-  type LocalizedText,
   type MessageType,
   type MessageTypeStructure,
   messageTypeStructureSchema,
-} from '@edi-bridge/contracts'
-
+} from '../message-type'
 import { compositeDefinition, elementDefinition, segmentDefinition } from './directory'
+
+import type {
+  EdifactCode,
+  EdifactComposite,
+  EdifactElement,
+  EdifactStructureNode,
+  LocalizedText,
+} from '../edifact'
 
 type Occurrence = { required?: boolean; maxRepeat?: number }
 

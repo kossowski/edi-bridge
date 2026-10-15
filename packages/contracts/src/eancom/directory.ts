@@ -1,4 +1,4 @@
-import type { LocalizedText } from '@edi-bridge/contracts'
+import type { LocalizedText } from '../edifact'
 
 type ElementDefinition = {
   name: LocalizedText

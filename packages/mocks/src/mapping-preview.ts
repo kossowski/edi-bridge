@@ -7,6 +7,7 @@ import {
   type MappingPreview,
   mappingPreviewEndpoint,
   mappingSamplesEndpoint,
+  messageTypeStructures,
   type PreviewNote,
   previewNoteKey,
 } from '@edi-bridge/contracts'
@@ -32,7 +33,6 @@ import {
   unknownPaths,
 } from './mapping'
 import { type MappingSampleRecord, seedMappingSamples, toMappingSample } from './mapping-sample'
-import { messageTypeStructures } from './message-type-structure'
 import { evaluateExpressions, type LookUp, previewEntries } from './preview-engine'
 import { badRequest, notFound } from './responses'
 
