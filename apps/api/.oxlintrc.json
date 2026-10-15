@@ -1,4 +1,12 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
-  "extends": ["./node_modules/@edi-bridge/oxlint-config/base.json"]
+  "extends": ["./node_modules/@edi-bridge/oxlint-config/node.json"],
+  "ignorePatterns": [
+    "dist/**",
+    ".turbo/**",
+    "coverage/**",
+    "storybook-static/**",
+    "playwright-report/**",
+    "test-results/**"
+  ]
 }

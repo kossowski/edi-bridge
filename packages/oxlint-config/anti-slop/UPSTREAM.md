@@ -15,5 +15,5 @@ The copy in this directory is byte-identical to that path at that commit. It was
 ## Intentional deviations
 
 - No source changes.
-- `base.json` sets `categories.correctness` to `off`. ESLint stays the primary linter, and Oxlint runs only the anti-slop rules and `oxc/no-accumulating-spread`.
-- Each workspace has a `.oxlintrc.json` that extends `./node_modules/@edi-bridge/oxlint-config/base.json`. Oxlint does not resolve package names in `extends`, so the path goes through `node_modules`. Its `lint` script runs `oxlint && eslint`.
+- `base.json` sets `categories.correctness` to `off` and enables each rule by name: the anti-slop rules, `oxc/no-accumulating-spread` and the rules moved from `packages/eslint-config`.
+- Each workspace has a `.oxlintrc.json` that extends `./node_modules/@edi-bridge/oxlint-config/base.json`, or `node.json` for Node.js workspaces. Oxlint does not resolve package names in `extends`, so the path goes through `node_modules`. Oxlint does not inherit `ignorePatterns` through `extends`, so each `.oxlintrc.json` lists them. Its `lint` script runs `oxlint && eslint`.
