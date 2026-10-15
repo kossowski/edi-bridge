@@ -19,7 +19,7 @@ export const inWorkspace = (
   ...conditions: (SQL | undefined)[]
 ) => and(eq(table.workspaceId, workspaceId), ...conditions)
 
-const nameCollator = new Intl.Collator('de')
+export const nameCollator = new Intl.Collator('de')
 
 export const byName = (a: { name: string }, b: { name: string }) =>
   nameCollator.compare(a.name, b.name)

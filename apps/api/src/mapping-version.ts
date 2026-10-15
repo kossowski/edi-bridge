@@ -18,7 +18,13 @@ import { documentStructures, mappings, mappingVersions, users } from '@edi-bridg
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, Unprocessable } from './errors.js'
 import { loadRow, sidesOf } from './mapping.js'
-import { byName, exactlyOne, foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
+import {
+  exactlyOne,
+  foundOrNotFound,
+  inWorkspace,
+  nameCollator,
+  rejectingInvalidId,
+} from './rows.js'
 import { CurrentMember } from './session.js'
 import { CurrentWorkspace } from './workspace.js'
 
@@ -223,6 +229,6 @@ export const listPublishedMappingVersions = ({ messageType }: PublishedMappingVe
     return rows
       .map(toHeader)
       .toSorted(
-        (a, b) => byName({ name: a.mappingName }, { name: b.mappingName }) || b.version - a.version,
+        (a, b) => nameCollator.compare(a.mappingName, b.mappingName) || b.version - a.version,
       )
   })
