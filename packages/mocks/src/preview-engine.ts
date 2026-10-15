@@ -8,13 +8,14 @@ import {
   type LinkStart,
   type MappingGraph,
   type MappingTransform,
+  type OutputEntry,
   type PreviewNote,
   type PreviewNoteCode,
   transformIssues,
   transformPorts,
 } from '@edi-bridge/contracts'
 
-import { compatible, type DocumentValues, type Entry } from './document-values'
+import { compatible, type DocumentValues } from './document-values'
 
 // A rough stand-in for the mapping engine of tickets 27 and 28: enough to show what a change does
 // to the target Document, not a faithful execution of the Mapping.
@@ -335,7 +336,7 @@ export function previewEntries(
     ),
   ]
 
-  const entries: Entry[] = []
+  const entries: OutputEntry[] = []
   const notes: PreviewNote[] = []
 
   for (const [targetPath, start] of targets) {

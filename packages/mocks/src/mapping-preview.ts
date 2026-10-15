@@ -10,6 +10,7 @@ import {
   mappingSamplesEndpoint,
   messageTypeStructures,
   oriented,
+  type OutputEntry,
   type PreviewNote,
   previewNoteKey,
   unknownPaths,
@@ -20,7 +21,7 @@ import {
   seedDocumentStructures,
   toDocumentStructureStore,
 } from './document-structure'
-import { documentValues, type Entry, renderEdifact, renderJson } from './document-values'
+import { documentValues, renderEdifact, renderJson } from './document-values'
 import {
   type LookupTableRecord,
   type LookupTableStore,
@@ -64,7 +65,11 @@ export async function previewOutput({
   sample: MappingSampleRecord
   documentStructures: ReadonlyArray<DocumentStructure>
   lookUp: LookUp
-}): Promise<{ document: DocumentContent; notes: PreviewNote[]; entries: ReadonlyArray<Entry> }> {
+}): Promise<{
+  document: DocumentContent
+  notes: PreviewNote[]
+  entries: ReadonlyArray<OutputEntry>
+}> {
   const expressions = await evaluateExpressions(
     graph,
     sample.document.format === 'json' ? sample.document.content : undefined,
