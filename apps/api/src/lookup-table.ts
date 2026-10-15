@@ -27,14 +27,15 @@ import {
 } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
-import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { Conflict, NotFound } from './errors.js'
 import { lookupTableUnused, selectLookupTableUses, selectUsesOfLookupTable } from './mapping-use.js'
 import {
   byName,
   foundOrNotFound,
   inWorkspace,
-  rejectingDuplicate,
+  failingOnDuplicate,
   rejectingInvalidId,
+  writingInWorkspace,
 } from './rows.js'
 import { assertTradingPartnerIn, rejectingUnknownTradingPartner } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
@@ -245,19 +246,12 @@ const rewriteLookupTable = async (
 const nameUniqueConstraints = [lookupTableWorkspaceNameUnique, lookupTableTradingPartnerNameUnique]
 
 const writeInTransaction = <A>(write: (tx: Transaction) => Promise<A>) =>
-  Effect.gen(function* () {
-    const db = yield* Db
-
-    return yield* rejectingDuplicate(
-      () => db.transaction(write),
+  writingInWorkspace(write).pipe(
+    failingOnDuplicate(
       nameUniqueConstraints,
       'Another Lookup Table of this scope already uses this name',
-    ).pipe(
-      Effect.catchDefect((defect) =>
-        defect instanceof Unprocessable ? Effect.fail(defect) : Effect.die(defect),
-      ),
-    )
-  })
+    ),
+  )
 
 export const createLookupTable = ({ name, kind, scope, entries }: LookupTableInput) =>
   Effect.gen(function* () {

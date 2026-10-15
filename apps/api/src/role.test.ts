@@ -9,6 +9,7 @@ import {
   channelsEndpoint,
   createChannelEndpoint,
   createDocumentStructureEndpoint,
+  createFlowEndpoint,
   createInviteEndpoint,
   createLookupTableEndpoint,
   createMappingEndpoint,
@@ -17,7 +18,10 @@ import {
   deleteLookupTableEndpoint,
   documentStructureEndpoint,
   documentStructureOrigins,
+  type FlowInput,
   documentStructuresEndpoint,
+  flowEndpoint,
+  flowsEndpoint,
   importLookupTableEndpoint,
   inferDocumentStructureEndpoint,
   lookupTableEndpoint,
@@ -32,6 +36,7 @@ import {
   mappingVersionsEndpoint,
   mappingsEndpoint,
   messageTypeStructureEndpoint,
+  moveFlowMappingVersionEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   regenerateWebhookTokenEndpoint,
@@ -49,6 +54,7 @@ import {
   updateChannelEndpoint,
   updateCompanyIdentityEndpoint,
   updateDocumentStructureEndpoint,
+  updateFlowEndpoint,
   updateLookupTableEndpoint,
   updateTradingPartnerEndpoint,
   withCheckDigit,
@@ -99,6 +105,29 @@ const channel = {
   rateLimitPerMinute: 60,
 }
 
+const destination = {
+  type: 'http',
+  direction: 'outbound',
+  name: 'ERP HTTP delivery',
+  tradingPartnerId: null,
+  url: 'https://erp.nordwind-handel.example/api/edi/documents',
+  authorization: null,
+}
+
+const inboxOf = (tradingPartnerId: string) => ({
+  type: 'sftp',
+  direction: 'inbound',
+  name: 'Hansemarkt SFTP inbox',
+  tradingPartnerId,
+  host: 'sftp.hansemarkt.example',
+  port: 22,
+  username: 'nordwind',
+  remotePath: '/outbox',
+  authentication: 'password',
+  pollingIntervalMinutes: 5,
+  credential: 'sftp-password-4711',
+})
+
 const documentStructure = { name: 'ERP orders', origin: documentStructureOrigins.jsonDocument }
 
 interface Ids {
@@ -109,6 +138,7 @@ interface Ids {
   mapping: string
   mappingVersion: string
   laterMappingVersion: string
+  flow: string
 }
 
 let api: TestApi
@@ -116,6 +146,8 @@ let api: TestApi
 let operator: Client
 
 let ids: Ids
+
+let flowInput: FlowInput
 
 const withId = (path: string, id: string) => path.replace(':id', id)
 
@@ -131,11 +163,11 @@ async function createdId(url: string, body: NonNullable<InjectOptions['body']>) 
   return createdSchema.parse(response.json()).id
 }
 
-async function createdChannelId() {
+async function createdChannelId(body: NonNullable<InjectOptions['body']> = channel) {
   const response = await api.admin.inject({
     method: 'POST',
     url: createChannelEndpoint.path,
-    body: channel,
+    body,
   })
 
   expect(response.statusCode).toBe(201)
@@ -169,14 +201,26 @@ beforeAll(async () => {
 
   expect(saved.statusCode).toBe(200)
 
+  const tradingPartnerId = await createdId(createTradingPartnerEndpoint.path, tradingPartner)
+
+  flowInput = {
+    name: 'Hansemarkt ORDERS inbound',
+    tradingPartnerId,
+    messageType: 'ORDERS',
+    inboundChannelId: await createdChannelId(inboxOf(tradingPartnerId)),
+    destinationChannelId: await createdChannelId(destination),
+    mappingVersionId: mappingVersion,
+  }
+
   ids = {
-    tradingPartner: await createdId(createTradingPartnerEndpoint.path, tradingPartner),
+    tradingPartner: tradingPartnerId,
     channel: await createdChannelId(),
     lookupTable: await createdId(createLookupTableEndpoint.path, lookupTable),
     documentStructure: documentStructureId,
     mapping,
     mappingVersion,
     laterMappingVersion: await createdId(versionsPath, { changeNote: '' }),
+    flow: await createdId(createFlowEndpoint.path, flowInput),
   }
 }, 60_000)
 
@@ -192,6 +236,8 @@ const workspaceReads = (): string[] => [
   withId(tradingPartnerActivityEndpoint.path, ids.tradingPartner),
   channelsEndpoint.path,
   withId(channelEndpoint.path, ids.channel),
+  flowsEndpoint.path,
+  withId(flowEndpoint.path, ids.flow),
   lookupTablesEndpoint.path,
   `${lookupTableSuggestionsEndpoint.path}?kind=units`,
   withId(lookupTableEndpoint.path, ids.lookupTable),
@@ -243,6 +289,23 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
   [
     'regenerate a webhook token',
     () => ({ method: 'POST', url: withId(regenerateWebhookTokenEndpoint.path, ids.channel) }),
+  ],
+  ['create a Flow', () => ({ method: 'POST', url: createFlowEndpoint.path, body: flowInput })],
+  [
+    'update a Flow',
+    () => ({
+      method: 'PUT',
+      url: withId(updateFlowEndpoint.path, ids.flow),
+      body: { ...flowInput, name: 'Hansemarkt orders' },
+    }),
+  ],
+  [
+    'move a Flow to a newer Mapping Version',
+    () => ({
+      method: 'POST',
+      url: withId(moveFlowMappingVersionEndpoint.path, ids.flow),
+      body: { mappingVersionId: ids.laterMappingVersion },
+    }),
   ],
   [
     'create a Lookup Table',
