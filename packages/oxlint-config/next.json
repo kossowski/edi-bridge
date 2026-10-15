@@ -4,12 +4,12 @@
   "plugins": ["nextjs"],
   "jsPlugins": [
     {
-      "name": "next-js",
+      "name": "nextjs-js",
       "specifier": "@next/eslint-plugin-next"
     }
   ],
   "rules": {
-    "next-js/no-location-assign-relative-destination": "warn",
+    "nextjs-js/no-location-assign-relative-destination": "warn",
     "nextjs/google-font-display": "warn",
     "nextjs/google-font-preconnect": "warn",
     "nextjs/inline-script-id": "error",
