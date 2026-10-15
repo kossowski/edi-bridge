@@ -6,19 +6,15 @@ import {
   type ConditionOperator,
   type JsonContent,
   type LinkStart,
-  type LookupTableEntry,
   type MappingTransform,
   transformPorts,
 } from '@edi-bridge/contracts'
 
 import { MappingError, type MappingErrorCode } from './errors'
 import { reformatDate, reformatNumber } from './formats'
+import { setFilled, type Values } from './values'
 
 import type { Graph, LookupTables } from './wiring'
-
-export type ApplyOptions = {
-  lookupTables?: ReadonlyMap<string, ReadonlyArray<LookupTableEntry>>
-}
 
 export const valueSchema = z.union([z.string(), z.number(), z.boolean().transform(String)])
 
@@ -28,7 +24,7 @@ type Expressions = ReadonlyMap<string, string>
 
 export type EvaluatedGraph = Graph & { expressions: Expressions }
 
-export type Evaluation = {
+type Evaluation = {
   graph: EvaluatedGraph
   counters: ReadonlyMap<string, string>
   read: (sourcePath: string) => Value | undefined
@@ -148,7 +144,7 @@ function feedsOf(
   )
 }
 
-export function outputOf(
+function outputOf(
   evaluation: Evaluation,
   start: LinkStart,
   visiting: ReadonlySet<string> = new Set(),
@@ -171,13 +167,13 @@ export function outputOf(
     return Effect.succeed(counters.get(transform.id) ?? '')
   }
 
-  const inner = new Set(visiting).add(transform.id)
+  const seen = new Set(visiting).add(transform.id)
   const feeds = feedsOf(graph, transform)
 
   const inputOf = (input: string): Effect.Effect<Value, MappingError> => {
     const from = feeds.get(input)
 
-    return from ? outputOf(evaluation, from, inner) : Effect.succeed('')
+    return from ? outputOf(evaluation, from, seen) : Effect.succeed('')
   }
 
   if (transform.kind === 'conditional') {
@@ -190,7 +186,7 @@ export function outputOf(
 
   return Effect.flatMap(
     Effect.forEach(feeds, ([input, from]) =>
-      Effect.map(outputOf(evaluation, from, inner), (value): readonly [string, Value] => [
+      Effect.map(outputOf(evaluation, from, seen), (value): readonly [string, Value] => [
         input,
         value,
       ]),
@@ -200,7 +196,7 @@ export function outputOf(
   )
 }
 
-export function sourcePathsOf(
+function sourcePathsOf(
   graph: Pick<Graph, 'transforms' | 'feeding'>,
   start: LinkStart,
   visited = new Set<string>(),
@@ -219,6 +215,23 @@ export function sourcePathsOf(
 
   return [...feedsOf(graph, transform).values()].flatMap((from) =>
     sourcePathsOf(graph, from, visited),
+  )
+}
+
+export function targetValues(
+  { graph, counters, read }: Omit<Evaluation, 'targetPath'>,
+  values: Map<string, string>,
+  isKept: (targetPath: string) => boolean = () => true,
+): Effect.Effect<Values, MappingError> {
+  return Effect.as(
+    Effect.forEach(graph.targets, ({ path, from }) =>
+      Effect.map(outputOf({ graph, counters, read, targetPath: path }, from), (value) => {
+        if (isKept(path)) {
+          setFilled(values, path, String(value))
+        }
+      }),
+    ),
+    values,
   )
 }
 

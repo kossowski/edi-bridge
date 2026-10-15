@@ -21,15 +21,16 @@ import type { Message, Segment } from '@edi-bridge/edifact'
 import { elementPaths } from './elements'
 import { MappingError } from './errors'
 import {
-  type ApplyOptions,
   type EvaluatedGraph,
   evaluated,
-  outputOf,
   type SourceRead,
+  targetValues,
   transformReads,
 } from './evaluation'
 import { hasValueBeneath, isBeneath, isRequiredOrFilled, setFilled, type Values } from './values'
 import { type Loop, type Wiring, wiringOf } from './wiring'
+
+import type { ApplyOptions } from './options'
 
 export type InboundMappingVersion = Extract<MappingVersion, { direction: 'inbound' }>
 
@@ -181,14 +182,16 @@ function repetitionsOf({ occurrences, nodes }: PlacedPart, path: string): Occurr
 
 const stepOf = ({ path }: { path: string }) => path.split('/').at(-1)!
 
-function filled(entries: ReadonlyArray<readonly [string, JsonContent | undefined]>): JsonObject {
+function withoutEmpty(
+  entries: ReadonlyArray<readonly [string, JsonContent | undefined]>,
+): JsonObject {
   return Object.fromEntries(
     entries.flatMap(([key, value]) => (value === undefined || value === '' ? [] : [[key, value]])),
   )
 }
 
 function segmentContent(node: EdifactSegment, segment: Segment): JsonObject {
-  return filled(
+  return withoutEmpty(
     node.children.map((child, index) => {
       const element = segment.elements[index] ?? []
 
@@ -196,8 +199,8 @@ function segmentContent(node: EdifactSegment, segment: Segment): JsonObject {
         return [stepOf(child), element[0]]
       }
 
-      const components = filled(
-        child.children.map((component, at) => [stepOf(component), element[at]]),
+      const components = withoutEmpty(
+        child.children.map((component, position) => [stepOf(component), element[position]]),
       )
 
       return [stepOf(child), Object.keys(components).length === 0 ? undefined : components]
@@ -207,7 +210,7 @@ function segmentContent(node: EdifactSegment, segment: Segment): JsonObject {
 
 // JSONata reads the Message as the web canvas writes its paths: one step per structure node.
 function messageContent({ occurrences, nodes }: PlacedPart): JsonObject {
-  return filled(
+  return withoutEmpty(
     nodes.map((node) => {
       const repetitions =
         node.kind === 'segment'
@@ -282,21 +285,10 @@ function valuesIn(reading: Reading): Effect.Effect<Values, MappingError> {
     }
   }
 
-  return Effect.as(
-    Effect.forEach(reading.graph.targets, ({ path, from }) =>
-      Effect.map(
-        outputOf(
-          { graph: reading.graph, counters: reading.scope.counters, read, targetPath: path },
-          from,
-        ),
-        (value) => {
-          if (isInScope(reading, path)) {
-            setFilled(values, path, String(value))
-          }
-        },
-      ),
-    ),
+  return targetValues(
+    { graph: reading.graph, counters: reading.scope.counters, read },
     values,
+    (path) => isInScope(reading, path),
   )
 }
 

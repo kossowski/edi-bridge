@@ -17,10 +17,9 @@ import type { Element, Message, Segment } from '@edi-bridge/edifact'
 import { childrenOf, elementPaths, type StructurePart } from './elements'
 import { MappingError } from './errors'
 import {
-  type ApplyOptions,
   type EvaluatedGraph,
   evaluated,
-  outputOf,
+  targetValues,
   transformReads,
   type Value,
   valueSchema,
@@ -28,6 +27,8 @@ import {
 import { jsonListSchema, jsonObjectSchema } from './json'
 import { isBeneath, isRequiredOrFilled, setFilled, type Values } from './values'
 import { type Loop, type Wiring, wiringOf } from './wiring'
+
+import type { ApplyOptions } from './options'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
 
@@ -93,21 +94,12 @@ function valuesIn(context: Reading): Effect.Effect<Values, MappingError> {
     setFilled(values, targetPath, sourceValue(context, sourcePath))
   }
 
-  return Effect.as(
-    Effect.forEach(context.graph.targets, ({ path, from }) =>
-      Effect.map(
-        outputOf(
-          {
-            graph: context.graph,
-            counters: context.scope.counters,
-            read: (sourcePath) => scalarOf(context, sourcePath),
-            targetPath: path,
-          },
-          from,
-        ),
-        (value) => setFilled(values, path, String(value)),
-      ),
-    ),
+  return targetValues(
+    {
+      graph: context.graph,
+      counters: context.scope.counters,
+      read: (sourcePath) => scalarOf(context, sourcePath),
+    },
     values,
   )
 }

@@ -8,7 +8,7 @@ export { DocumentReadError, documentReadErrorCodes, readDocument } from './docum
 
 export type { OutboundMappingVersion } from './apply'
 
-export type { ApplyOptions } from './evaluation'
+export type { ApplyOptions } from './options'
 
 export type { MappingErrorCode } from './errors'
 
