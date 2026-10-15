@@ -140,7 +140,7 @@ export function InviteScreen({ token }: { token: string }) {
             value={values.password}
             onChange={(value) => change('password', value)}
           />
-          <div role="alert" className="text-sm text-red-800 empty:hidden dark:text-red-300">
+          <div role="alert" className="text-destructive-text text-sm empty:hidden">
             {requestError}
           </div>
           <Button disabled={isEntering(enter)} size="lg" type="submit" className="w-full">
