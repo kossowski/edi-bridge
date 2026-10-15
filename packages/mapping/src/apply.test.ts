@@ -273,14 +273,27 @@ describe('applyMappingVersion', () => {
     })
   })
 
-  it('writes the package type and the payment terms at their UN D.96A positions', async () => {
-    const despatchVersion = outboundVersion('DESADV', [
+  it('writes the package type of a DESADV at its UN D.96A position', async () => {
+    const version = outboundVersion('DESADV', [
       ...despatchHeader,
       { sourcePath: 'packageCount', targetPath: 'SG10/SG11/PAC/7224' },
       { sourcePath: 'packageType', targetPath: 'SG10/SG11/PAC/C202/7065' },
     ])
 
-    const invoiceVersion = outboundVersion('INVOIC', [
+    const { segments } = await apply(version, {
+      ...despatch,
+      packageCount: '3',
+      packageType: 'PX',
+    })
+
+    expect(segments.find(({ tag }) => tag === 'PAC')).toEqual({
+      tag: 'PAC',
+      elements: [['3'], [''], ['PX']],
+    })
+  })
+
+  it('writes the payment terms of an INVOIC at their UN D.96A positions', async () => {
+    const version = outboundVersion('INVOIC', [
       { sourcePath: 'buyer.gln', targetPath: 'SG2+BY/NAD+BY/C082/3039' },
       { sourcePath: 'supplier.gln', targetPath: 'SG2+SU/NAD+SU/C082/3039' },
       { sourcePath: 'invoiceNumber', targetPath: 'BGM/1004' },
@@ -290,13 +303,7 @@ describe('applyMappingVersion', () => {
       { sourcePath: 'paymentDays', targetPath: 'SG8/PAT+1/C112/2152' },
     ])
 
-    const despatchMessage = await apply(despatchVersion, {
-      ...despatch,
-      packageCount: '3',
-      packageType: 'PX',
-    })
-
-    const invoice = await apply(invoiceVersion, {
+    const { segments } = await apply(version, {
       ...order,
       invoiceNumber: 'INV-2026-0042',
       invoiceDate: '20261014',
@@ -305,11 +312,7 @@ describe('applyMappingVersion', () => {
       paymentDays: '30',
     })
 
-    expect(despatchMessage.segments.find(({ tag }) => tag === 'PAC')).toEqual({
-      tag: 'PAC',
-      elements: [['3'], [''], ['PX']],
-    })
-    expect(invoice.segments.find(({ tag }) => tag === 'PAT')).toEqual({
+    expect(segments.find(({ tag }) => tag === 'PAT')).toEqual({
       tag: 'PAT',
       elements: [['1'], [''], ['5', '3', 'D', '30']],
     })
