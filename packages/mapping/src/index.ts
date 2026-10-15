@@ -6,7 +6,9 @@ export { applyInboundMappingVersion } from './inbound'
 
 export { DocumentReadError, documentReadErrorCodes, readDocument } from './document'
 
-export type { ApplyOptions, OutboundMappingVersion } from './apply'
+export type { OutboundMappingVersion } from './apply'
+
+export type { ApplyOptions } from './evaluation'
 
 export type { MappingErrorCode } from './errors'
 
