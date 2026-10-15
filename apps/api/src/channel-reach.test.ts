@@ -54,6 +54,14 @@ const listening = async (server: Server) => {
   return z.object({ port: z.number() }).parse(server.address()).port
 }
 
+const refusedPort = async () => {
+  const refusing = createTcpServer()
+  const port = await listening(refusing)
+  await new Promise((resolve) => refusing.close(resolve))
+
+  return port
+}
+
 beforeAll(async () => {
   const started = await Promise.all([
     startTestApi(),
@@ -217,9 +225,7 @@ describe('POST /channels/:id/test for an SFTP Channel', () => {
   })
 
   it('reports a host that refuses the connection as unreachable', async () => {
-    const refusing = createTcpServer()
-    const port = await listening(refusing)
-    await new Promise((resolve) => refusing.close(resolve))
+    const port = await refusedPort()
 
     expect(await outcomeOf({ ...sftpOutbox(), host: '127.0.0.1', port })).toMatchObject({
       outcome: 'failed',
@@ -272,9 +278,7 @@ describe('POST /channels/:id/test for an HTTP Channel', () => {
   })
 
   it('reports a host that refuses the connection as unreachable', async () => {
-    const refusing = createTcpServer()
-    const port = await listening(refusing)
-    await new Promise((resolve) => refusing.close(resolve))
+    const port = await refusedPort()
 
     expect(await outcomeOf(httpDelivery(`http://127.0.0.1:${port}/`))).toMatchObject({
       outcome: 'failed',

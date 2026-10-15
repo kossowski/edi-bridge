@@ -99,8 +99,12 @@ const sftpReason = (error: Error): ChannelTestFailureReason => {
   return code === undefined ? 'unexpectedResponse' : sftpStatusReasons[code]
 }
 
-// Listing the directory proves the user may read it without transferring a Document.
-const listable = (sftp: SFTPWrapper, path: string, done: (error?: ChannelUnreachable) => void) => {
+// Opening the directory proves the user may read it without transferring a Document.
+const statAndOpenDirectory = (
+  sftp: SFTPWrapper,
+  path: string,
+  done: (error?: ChannelUnreachable) => void,
+) => {
   sftp.stat(path, (statError, stats) => {
     if (statError) {
       done(unreachable(sftpReason(statError)))
@@ -158,7 +162,7 @@ const reachSftp = (login: SftpLogin, timeoutMs: number) =>
           return
         }
 
-        listable(sftp, login.remotePath, settle)
+        statAndOpenDirectory(sftp, login.remotePath, settle)
       })
     })
 
@@ -188,9 +192,7 @@ const httpStatusReason = (status: number): ChannelTestFailureReason | undefined 
   return status >= 500 ? 'unexpectedResponse' : undefined
 }
 
-const fetchFailureSchema = z.object({
-  cause: z.object({ code: z.string().optional().catch(undefined) }).catch({}),
-})
+const fetchFailureSchema = z.object({ cause: z.object({ code: z.string() }) })
 
 // HEAD sends no Document; an endpoint that only accepts POST still answers it.
 const reachHttp = ({ url, authorization }: HttpDestination) =>
@@ -204,8 +206,7 @@ const reachHttp = ({ url, authorization }: HttpDestination) =>
       }),
     catch: (error) =>
       unreachable(
-        networkReason(fetchFailureSchema.catch({ cause: {} }).parse(error).cause.code) ??
-          'unexpectedResponse',
+        networkReason(fetchFailureSchema.safeParse(error).data?.cause.code) ?? 'unexpectedResponse',
       ),
   }).pipe(
     Effect.flatMap((response) => {
