@@ -9,6 +9,7 @@ import {
   type FailedRunReference,
   fromSearchParams,
   type FixTarget,
+  type GraphParts,
   importLookupTableEndpoint,
   type LookupTable,
   lookupTableEndpoint,
@@ -60,6 +61,8 @@ import {
   toTradingPartnerStore,
   type TradingPartnerStore,
 } from './trading-partner'
+
+import type { MappingVersionStore } from './mapping-version'
 
 export {
   type BlockingCode,
@@ -152,14 +155,15 @@ type LookupTableTarget = Extract<FixTarget, { kind: 'lookupTable' }>
 
 export type LookupTableWorld = {
   mappings?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
+  versions?: MappingVersionStore | undefined
   flows?: ReadonlyArray<FlowRecord> | FlowStore
   channels?: ReadonlyArray<ChannelRecord> | ChannelStore
   runs?: ReadonlyArray<RunSummary> | RunStore
   reprocessed?: ReadonlyArray<Reprocessed>
 }
 
-function readsTable(mapping: MappingDraftRecord, tableId: string) {
-  return mapping.transforms.some(
+function readsTable({ transforms }: GraphParts, tableId: string) {
+  return transforms.some(
     (transform) => transform.kind === 'lookupTable' && transform.config.lookupTableId === tableId,
   )
 }
@@ -254,10 +258,16 @@ export function createLookupTableUsage(
   }
 
   function usesOf(table: LookupTableRecord): LookupTableUse[] {
+    const publishedReaders = new Set(
+      (world.versions?.all() ?? []).flatMap((version) =>
+        readsTable(version, table.id) ? [version.mappingId] : [],
+      ),
+    )
+
     return mappings
       .all()
       .flatMap((mapping) =>
-        readsTable(mapping, table.id)
+        readsTable(mapping, table.id) || publishedReaders.has(mapping.id)
           ? [
               {
                 mappingId: mapping.id,
@@ -527,8 +537,14 @@ export function lookupTableHandlers(
     http.delete<{ id: string }>(
       `${apiUrl}${deleteLookupTableEndpoint.path}`,
       adminOnly(sessionStore, ({ params }) => {
-        if (!store.get(params.id)) {
+        const existing = store.get(params.id)
+
+        if (!existing) {
           return notFound()
+        }
+
+        if (usageOf(existing).uses.length > 0) {
+          return conflict('A Draft or published Mapping Version uses this Lookup Table.')
         }
 
         store.delete(params.id)

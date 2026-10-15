@@ -545,6 +545,7 @@ export function createHandlers(
       lookupTables: lookupTableStore,
       tradingPartners: tradingPartnerStore,
       mappings: mappingDraftStore,
+      versions: mappingVersionStore,
       flows,
       channels: channelStore,
       runs,

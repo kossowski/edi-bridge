@@ -491,9 +491,10 @@ describe('Lookup Table actions', () => {
 
   it('deletes a Lookup Table from a response without a body', async () => {
     server.use(...lookupTableHandlers(apiUrl))
+    const storeNumbers = seedLookupTableNamed('Hansemarkt store numbers')
 
-    await expect(deleteLookupTable(units.id)).resolves.toBeUndefined()
-    await expect(getLookupTable(units.id)).rejects.toMatchObject({ status: 404 })
+    await expect(deleteLookupTable(storeNumbers.id)).resolves.toBeUndefined()
+    await expect(getLookupTable(storeNumbers.id)).rejects.toMatchObject({ status: 404 })
   })
 })
 

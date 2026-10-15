@@ -31,10 +31,11 @@ import {
   seedLookupTableNamed,
   seedLookupTables,
 } from './lookup-table'
-import { mappingHandlers } from './mapping'
+import { mappingHandlers, seedMappingDrafts } from './mapping'
+import { createMappingVersionStore, type MappingVersionRecord } from './mapping-version'
 import { createRun, seedRuns } from './run'
 import { runDetailHandlers } from './run-detail'
-import { sandboxAdminSession, showcaseViewerSession } from './session'
+import { sandboxAdminSession, seedSession, showcaseViewerSession } from './session'
 import { seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
@@ -62,6 +63,36 @@ const input: LookupTableInput = {
   kind: 'other',
   scope: { kind: 'tradingPartner', tradingPartnerId: hansemarkt.id },
   entries: [{ sourceCode: 'KAR', targetCode: 'CT' }],
+}
+
+function usedOnlyByVersion(lookupTableId: string) {
+  const mapping = seedMappingDrafts.find(({ transforms }) =>
+    transforms.some(
+      (transform) =>
+        transform.kind === 'lookupTable' && transform.config.lookupTableId === lookupTableId,
+    ),
+  )!
+
+  const version: MappingVersionRecord = {
+    id: crypto.randomUUID(),
+    mappingId: mapping.id,
+    mappingName: mapping.name,
+    version: 1,
+    publishedAt: '2026-10-01T08:00:00.000Z',
+    messageType: mapping.messageType,
+    documentStructureId: mapping.documentStructureId,
+    changeNote: null,
+    publishedBy: { id: seedSession.user.id, name: seedSession.user.name },
+    links: mapping.links,
+    transforms: mapping.transforms,
+    transformLinks: mapping.transformLinks,
+  }
+
+  return {
+    mapping,
+    mappings: [{ ...mapping, links: [], transforms: [], transformLinks: [] }],
+    versions: createMappingVersionStore([version]),
+  }
 }
 
 async function getLookupTable(id: string) {
@@ -214,16 +245,34 @@ describe('lookupTableHandlers', () => {
     expect(response.status).toBe(200)
   })
 
-  it('deletes a Lookup Table', async () => {
+  it('deletes a Lookup Table no Mapping uses', async () => {
     server.use(...lookupTableHandlers(apiUrl))
-    const units = seedLookupTableNamed('Units of measure')
-    const path = toPath(deleteLookupTableEndpoint.path, { id: units.id })
+    const storeNumbers = seedLookupTableNamed('Hansemarkt store numbers')
+    const path = toPath(deleteLookupTableEndpoint.path, { id: storeNumbers.id })
 
     const response = await send('DELETE', path)
 
     expect(response.status).toBe(204)
     expect((await send('GET', path)).status).toBe(404)
-    expect((await listLookupTables()).map(({ id }) => id)).not.toContain(units.id)
+    expect((await listLookupTables()).map(({ id }) => id)).not.toContain(storeNumbers.id)
+  })
+
+  it('refuses to delete a Lookup Table a Draft uses', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+    const units = seedLookupTableNamed('Units of measure')
+    const path = toPath(deleteLookupTableEndpoint.path, { id: units.id })
+
+    expect((await send('DELETE', path)).status).toBe(409)
+    expect((await send('GET', path)).status).toBe(200)
+  })
+
+  it('refuses to delete a Lookup Table only a published Mapping Version uses', async () => {
+    const units = seedLookupTableNamed('Units of measure')
+    const { mappings, versions } = usedOnlyByVersion(units.id)
+    server.use(...lookupTableHandlers(apiUrl, { mappings, versions }))
+    const path = toPath(deleteLookupTableEndpoint.path, { id: units.id })
+
+    expect((await send('DELETE', path)).status).toBe(409)
   })
 
   it.each([
@@ -609,6 +658,16 @@ describe('Lookup Table uses', () => {
     expect(
       new Set(uses.flatMap(({ tradingPartners }) => tradingPartners.map(({ id }) => id))),
     ).toEqual(new Set([hansemarkt.id]))
+  })
+
+  it('names a Mapping whose published Mapping Version alone reads a table', async () => {
+    const units = seedLookupTableNamed('Units of measure')
+    const { mappings, versions, mapping } = usedOnlyByVersion(units.id)
+    server.use(...lookupTableHandlers(apiUrl, { mappings, versions }))
+
+    const { uses } = await getLookupTable(units.id)
+
+    expect(uses.map(({ mappingId }) => mappingId)).toEqual([mapping.id])
   })
 
   it('lists no uses for a table that no Mapping reads', async () => {
