@@ -47,7 +47,6 @@ function trimmed<Part>(parts: ReadonlyArray<Part>, empty: (part: Part) => boolea
   return parts.slice(0, parts.findLastIndex((part) => !empty(part)) + 1)
 }
 
-// An element the Message Type narrows to one code, such as a segment's qualifier, fills itself.
 function valueOf(element: EdifactElement, values: Values) {
   return values.get(element.path) ?? (element.codes.length === 1 ? element.codes[0]!.code : '')
 }
@@ -87,8 +86,7 @@ function elementPaths(parts: ReadonlyArray<StructurePart>): string[] {
 const hasValueBeneath = (part: StructurePart, values: Values) =>
   [...values.keys()].some((path) => path.startsWith(`${part.path}/`))
 
-// A part is there when it holds a value, or when it is required in a part that is there; only a
-// missing value in such a part fails, so an empty optional segment group is left out instead.
+// An empty optional segment group is left out rather than failing.
 function firstMissingRequired(
   parts: ReadonlyArray<StructurePart>,
   values: Values,
