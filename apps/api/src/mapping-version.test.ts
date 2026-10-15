@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { InjectOptions } from 'fastify'
@@ -26,7 +27,6 @@ import {
   sessionEndpoint,
   sessionSchema,
   toPath,
-  updateDocumentStructureEndpoint,
 } from '@edi-bridge/contracts'
 import { type Connection, documentStructures, mappings } from '@edi-bridge/db'
 
@@ -317,23 +317,25 @@ describe('POST /mappings/:mappingId/versions', () => {
     expect(await versionsOf(mapping.id)).toHaveLength(1)
   })
 
-  it('answers 422 and publishes nothing while the Draft links a path its Document Structure no longer has', async () => {
+  it('answers 422 and publishes nothing while the Draft links a path its Document Structure does not have', async () => {
     const mapping = await createdMapping()
-    await save(mapping.id, buyerGln)
 
-    const changed = await admin.inject({
-      method: 'PUT',
-      url: toPath(updateDocumentStructureEndpoint.path, { id: mapping.documentStructureId }),
-      body: { name: 'ERP orders', adjustments: [{ path: 'buyer', repeating: true }] },
-    })
-
-    expect(changed.statusCode).toBe(200)
+    // Updating the Document Structure refuses to strand a Draft's link, so only the store can.
+    await connection.db
+      .update(mappings)
+      .set({
+        draft: {
+          ...buyerGln,
+          links: [{ sourcePath: 'SG2+BY/NAD+BY/C082/3039', targetPath: 'buyer.fax' }],
+        },
+      })
+      .where(eq(mappings.id, mapping.id))
 
     const response = await publish(mapping.id, { changeNote: '' })
 
     expect(response.statusCode).toBe(422)
     expect(response.json()).toEqual({
-      message: 'The target has no field or element at buyer.gln',
+      message: 'The target has no field or element at buyer.fax',
     })
     expect(await versionsOf(mapping.id)).toEqual([])
   })

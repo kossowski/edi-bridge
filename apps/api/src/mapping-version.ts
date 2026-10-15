@@ -41,7 +41,7 @@ const header = {
   publishedAt: mappingVersions.publishedAt,
 }
 
-const selectVersions = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
+export const selectVersions = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
   db
     .select({ ...header, ...fields })
     .from(mappingVersions)
@@ -49,7 +49,7 @@ const selectVersions = <Fields extends SelectedFields>(db: Database, fields: Fie
 
 type HeaderRow = Awaited<ReturnType<typeof selectVersions<Record<never, never>>>>[number]
 
-const toHeader = (row: HeaderRow): MappingVersionSummary => ({
+export const toHeader = (row: HeaderRow): MappingVersionSummary => ({
   id: row.id,
   mappingId: row.mappingId,
   mappingName: row.mappingName,
