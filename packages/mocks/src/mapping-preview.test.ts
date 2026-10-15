@@ -266,9 +266,9 @@ describe('POST /mappings/:id/preview', () => {
     )
     expect(invoiceLines).toContain(`DTM+137:${invoiceDate.replaceAll('-', '')}:102'`)
     expect(invoiceLines.filter((line) => line.startsWith('LIN+'))).toEqual([
-      expect.stringMatching(/^LIN\+1\+\d{13}:EN'$/),
-      expect.stringMatching(/^LIN\+2\+\d{13}:EN'$/),
-      expect.stringMatching(/^LIN\+3\+\d{13}:EN'$/),
+      expect.stringMatching(/^LIN\+1\+\+\d{13}:EN'$/),
+      expect.stringMatching(/^LIN\+2\+\+\d{13}:EN'$/),
+      expect.stringMatching(/^LIN\+3\+\+\d{13}:EN'$/),
     ])
     expect(creditNotePreview.notes).toContainEqual({
       targetPath: 'SG48/MOA+77/C516/5004',

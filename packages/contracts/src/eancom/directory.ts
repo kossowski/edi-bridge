@@ -153,6 +153,13 @@ const elements = {
       '31': text('Copy', 'Kopie'),
     },
   },
+  '1229': {
+    name: text(
+      'Action request/notification, coded',
+      'Handlungsanforderung/-benachrichtigung, codiert',
+    ),
+    format: 'an..3',
+  },
   '2005': {
     name: text('Date/time/period qualifier', 'Datum/Uhrzeit/Zeitspanne, Qualifier'),
     format: 'an..3',
@@ -582,6 +589,7 @@ const segments = {
     name: text('Line item', 'Positionsdaten'),
     children: [
       ['1082', false],
+      ['1229', false],
       ['C212', false],
     ],
   },
