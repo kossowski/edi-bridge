@@ -206,7 +206,7 @@ describe('applyInboundMappingVersion', () => {
       const version = inboundVersion([{ sourcePath, targetPath: 'orderNumber' }])
 
       expect(await failure(version, structureOf([field('orderNumber')]), order)).toEqual(
-        new MappingError({ code: 'unknownSource', targetPath: 'orderNumber' }),
+        new MappingError({ code: 'unknownSource', targetPath: 'orderNumber', sourcePath }),
       )
     },
   )

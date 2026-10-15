@@ -18,5 +18,6 @@ export type MappingErrorCode = (typeof mappingErrorCodes)[number]
 export class MappingError extends Data.TaggedError('MappingError')<{
   readonly code: MappingErrorCode
   readonly targetPath: string
+  readonly sourcePath?: string
   readonly transformId?: string
 }> {}

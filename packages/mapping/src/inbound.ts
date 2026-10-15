@@ -210,7 +210,7 @@ export function applyInboundMappingVersion(
 
   for (const { sourcePath, targetPath } of version.links) {
     if (!elements.has(sourcePath)) {
-      return Effect.fail(new MappingError({ code: 'unknownSource', targetPath }))
+      return Effect.fail(new MappingError({ code: 'unknownSource', targetPath, sourcePath }))
     }
 
     if (!fields.has(targetPath)) {
