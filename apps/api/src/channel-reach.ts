@@ -22,13 +22,13 @@ export interface HttpDestination {
   authorization: string | null
 }
 
-export class ChannelConnections extends Context.Service<
-  ChannelConnections,
+export class ChannelReach extends Context.Service<
+  ChannelReach,
   {
-    readonly reachSftp: (login: SftpLogin) => Effect.Effect<void, ChannelUnreachable>
-    readonly reachHttp: (destination: HttpDestination) => Effect.Effect<void, ChannelUnreachable>
+    readonly sftp: (login: SftpLogin) => Effect.Effect<void, ChannelUnreachable>
+    readonly http: (destination: HttpDestination) => Effect.Effect<void, ChannelUnreachable>
   }
->()('ChannelConnections') {}
+>()('ChannelReach') {}
 
 const unreachable = (reason: ChannelTestFailureReason) => new ChannelUnreachable({ reason })
 
@@ -222,8 +222,8 @@ const timingOut = (effect: Effect.Effect<void, ChannelUnreachable>, timeoutMs: n
     orElse: () => Effect.fail(unreachable('timedOut')),
   })
 
-export const channelConnections = ({ timeoutMs }: { timeoutMs: number }) =>
-  ChannelConnections.of({
-    reachSftp: (login) => timingOut(reachSftp(login, timeoutMs), timeoutMs),
-    reachHttp: (destination) => timingOut(reachHttp(destination), timeoutMs),
+export const channelReach = ({ timeoutMs }: { timeoutMs: number }) =>
+  ChannelReach.of({
+    sftp: (login) => timingOut(reachSftp(login, timeoutMs), timeoutMs),
+    http: (destination) => timingOut(reachHttp(destination), timeoutMs),
   })

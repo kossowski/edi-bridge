@@ -14,7 +14,7 @@ const secretKeySchema = z
     `A key of ${secretKeyBytes} bytes, base64-encoded`,
   )
 
-const channelConnectionTimeoutMs = 10_000
+const channelReachTimeoutMs = 10_000
 
 const developmentChannelSecretKey = () =>
   Buffer.alloc(secretKeyBytes, 'edi-bridge-development-only')
@@ -64,7 +64,7 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
     channels: {
       secretKey: env.data.CHANNEL_SECRET_KEY,
       apiPublicUrl,
-      connectionTimeoutMs: channelConnectionTimeoutMs,
+      reachTimeoutMs: channelReachTimeoutMs,
     } satisfies ChannelSettings,
   }
 }

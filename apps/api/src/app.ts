@@ -66,7 +66,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { type AuthSettings, mountAuth } from './auth.js'
-import { ChannelConnections, channelConnections } from './channel-connection.js'
+import { ChannelReach, channelReach } from './channel-reach.js'
 import {
   ChannelEnvironment,
   type ChannelSettings,
@@ -247,7 +247,7 @@ function registerRoutes(
     apiPublicUrl: channelSettings.apiPublicUrl,
   }
 
-  const connections = channelConnections({ timeoutMs: channelSettings.connectionTimeoutMs })
+  const reach = channelReach({ timeoutMs: channelSettings.reachTimeoutMs })
 
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
@@ -266,7 +266,7 @@ function registerRoutes(
 
   const run = <A>(
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, ChannelConnections | ChannelEnvironment | Db>,
+    effect: Effect.Effect<A, Failure, ChannelEnvironment | ChannelReach | Db>,
     status: number,
   ) =>
     Effect.runPromise(
@@ -277,7 +277,7 @@ function registerRoutes(
         ),
         Effect.provideService(Db, database),
         Effect.provideService(ChannelEnvironment, channelEnvironment),
-        Effect.provideService(ChannelConnections, connections),
+        Effect.provideService(ChannelReach, reach),
       ),
     )
 
@@ -289,7 +289,7 @@ function registerRoutes(
     effect: Effect.Effect<
       A,
       Failure,
-      ChannelConnections | ChannelEnvironment | CurrentMember | CurrentWorkspace | Db
+      ChannelEnvironment | ChannelReach | CurrentMember | CurrentWorkspace | Db
     >,
     status = 200,
   ) => {

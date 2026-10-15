@@ -17,7 +17,7 @@ import {
 } from '@edi-bridge/contracts'
 import { channels, flows } from '@edi-bridge/db'
 
-import { ChannelConnections, type ChannelUnreachable } from './channel-connection.js'
+import { ChannelReach, type ChannelUnreachable } from './channel-reach.js'
 import { Db, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { byName, exactlyOne, inWorkspace, rejectingInvalidId, writingInWorkspace } from './rows.js'
@@ -30,7 +30,7 @@ import type { SecretBox } from './secret.js'
 export interface ChannelSettings {
   secretKey: Buffer
   apiPublicUrl: string
-  connectionTimeoutMs: number
+  reachTimeoutMs: number
 }
 
 export class ChannelEnvironment extends Context.Service<
@@ -89,7 +89,7 @@ interface KindHandling<K extends Kind> {
   reach: (
     channel: OfKind<Channel, K>,
     secret: (column: SecretColumn) => string | null,
-  ) => Effect.Effect<void, ChannelUnreachable, ChannelConnections>
+  ) => Effect.Effect<void, ChannelUnreachable, ChannelReach>
 }
 
 type KindHandlings = { [K in Kind]: KindHandling<K> }
@@ -122,14 +122,9 @@ const kinds: KindHandlings = {
         ? {}
         : sealed(secrets, id, 'encryptedCredential', input.credential),
     reach: (channel, secret) =>
-      Effect.gen(function* () {
-        const connections = yield* ChannelConnections
-
-        return yield* connections.reachSftp({
-          ...channel,
-          credential: secret('encryptedCredential') ?? '',
-        })
-      }),
+      Effect.flatMap(ChannelReach, (reach) =>
+        reach.sftp({ ...channel, credential: secret('encryptedCredential') ?? '' }),
+      ),
   },
   webhook: {
     responseFields: (row, apiPublicUrl) => ({
@@ -169,14 +164,9 @@ const kinds: KindHandlings = {
         : sealed(secrets, id, 'encryptedAuthorization', input.authorization)
     },
     reach: (channel, secret) =>
-      Effect.gen(function* () {
-        const connections = yield* ChannelConnections
-
-        return yield* connections.reachHttp({
-          url: channel.url,
-          authorization: secret('encryptedAuthorization'),
-        })
-      }),
+      Effect.flatMap(ChannelReach, (reach) =>
+        reach.http({ url: channel.url, authorization: secret('encryptedAuthorization') }),
+      ),
   },
 }
 
