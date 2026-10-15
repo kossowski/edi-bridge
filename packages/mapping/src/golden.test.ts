@@ -3,7 +3,13 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import { inferDocumentStructure, mappingVersionSchema, toEncodedFile } from '@edi-bridge/contracts'
-import { type Interchange, type Message, serialize, validate } from '@edi-bridge/edifact'
+import {
+  type Interchange,
+  type Message,
+  type Segment,
+  serialize,
+  validate,
+} from '@edi-bridge/edifact'
 
 import { applyMappingVersion, readDocument } from './index'
 
@@ -15,8 +21,27 @@ const unitTable = {
   entries: [{ sourceCode: 'ST', targetCode: 'PCE' }],
 }
 
+const interchangeHeader: Segment = {
+  tag: 'UNB',
+  elements: [
+    ['UNOC', '3'],
+    ['4389876511113', '14'],
+    ['4071615111110', '14'],
+    ['000320', '1200'],
+    ['00000001'],
+  ],
+}
+
+const interchangeTrailer: Segment = { tag: 'UNZ', elements: [['1'], ['00000001']] }
+
 function interchangeOf(message: Message): Interchange {
-  const segmentCount = message.segments.length + 4
+  const segments = [
+    interchangeHeader,
+    message.header,
+    ...message.segments,
+    message.trailer,
+    interchangeTrailer,
+  ]
 
   return {
     hasServiceStringAdvice: false,
@@ -28,20 +53,11 @@ function interchangeOf(message: Message): Interchange {
       repetition: ' ',
       segment: "'",
     },
-    header: {
-      tag: 'UNB',
-      elements: [
-        ['UNOC', '3'],
-        ['4389876511113', '14'],
-        ['4071615111110', '14'],
-        ['000320', '1200'],
-        ['00000001'],
-      ],
-    },
+    header: interchangeHeader,
     messages: [message],
-    trailer: { tag: 'UNZ', elements: [['1'], ['00000001']] },
+    trailer: interchangeTrailer,
     whitespace: {
-      lineBreaks: Array.from({ length: segmentCount }, (_, index) => (index === 0 ? '' : '\n')),
+      lineBreaks: segments.map((_, index) => (index === 0 ? '' : '\n')),
       trailingText: '\n',
     },
   }

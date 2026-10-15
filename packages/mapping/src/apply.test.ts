@@ -1103,22 +1103,23 @@ describe('applyMappingVersion', () => {
     })
   })
 
-  const headerIds = [
-    '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c01',
-    '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c02',
-    '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c03',
-    '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c04',
+  const headerFields = [
+    { id: '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c01', field: 'orderNumber', target: 'BGM/1004' },
+    { id: '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c02', field: 'orderDate', target: 'DTM+137/C507/2380' },
+    {
+      id: '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c03',
+      field: 'buyer',
+      target: 'SG2+BY/NAD+BY/C082/3039',
+    },
+    {
+      id: '6a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c04',
+      field: 'supplier',
+      target: 'SG2+SU/NAD+SU/C082/3039',
+    },
   ]
 
-  const listOrder = (list: string) => {
-    const header = [
-      ['orderNumber', 'BGM/1004'],
-      ['orderDate', 'DTM+137/C507/2380'],
-      ['buyer', 'SG2+BY/NAD+BY/C082/3039'],
-      ['supplier', 'SG2+SU/NAD+SU/C082/3039'],
-    ].map(([field, target], index) => ({ id: headerIds[index]!, field: field!, target: target! }))
-
-    return outboundVersion(
+  const rootListOrderVersion = (list: string) =>
+    outboundVersion(
       'ORDERS',
       [
         { sourcePath: `${list}[].gtin`, targetPath: 'SG25/LIN/C212/7140' },
@@ -1127,19 +1128,18 @@ describe('applyMappingVersion', () => {
       {
         transforms: [
           loop,
-          ...header.map(({ id, field }) =>
+          ...headerFields.map(({ id, field }) =>
             transformOf(id, { kind: 'jsonata', config: { expression: `${list}[0].${field}` } }),
           ),
         ],
         transformLinks: [
           ...looped(`${list}[]`, 'SG25', 'SG25/LIN/1082'),
-          ...header.map(({ id, target }) => intoTarget(target, id)),
+          ...headerFields.map(({ id, target }) => intoTarget(target, id)),
         ],
       },
     )
-  }
 
-  const listOrderMessage = {
+  const rootListOrderMessage = {
     header: { tag: 'UNH', elements: [['1'], ['ORDERS', 'D', '96A', 'UN', 'EAN008']] },
     segments: [
       { tag: 'BGM', elements: [['220'], ['PO-4711']] },
@@ -1170,11 +1170,11 @@ describe('applyMappingVersion', () => {
 
     const document = await Effect.runPromise(readDocument(structure, csv))
 
-    expect(await apply(listOrder('rows'), document)).toEqual(listOrderMessage)
+    expect(await apply(rootListOrderVersion('rows'), document)).toEqual(rootListOrderMessage)
   })
 
   it('loops over the items of a JSON Document whose root is a list', async () => {
-    const listedOrder = {
+    const orderHeader = {
       orderNumber: 'PO-4711',
       orderDate: '20261014',
       buyer: '4012345000009',
@@ -1182,8 +1182,8 @@ describe('applyMappingVersion', () => {
     }
 
     const json = JSON.stringify([
-      { ...listedOrder, gtin: '4000862141404', quantity: 12 },
-      { ...listedOrder, gtin: '4000862141411', quantity: 5 },
+      { ...orderHeader, gtin: '4000862141404', quantity: 12 },
+      { ...orderHeader, gtin: '4000862141411', quantity: 5 },
     ])
 
     const structure = inferDocumentStructure({
@@ -1193,6 +1193,6 @@ describe('applyMappingVersion', () => {
 
     const document = await Effect.runPromise(readDocument(structure, json))
 
-    expect(await apply(listOrder('items'), document)).toEqual(listOrderMessage)
+    expect(await apply(rootListOrderVersion('items'), document)).toEqual(rootListOrderMessage)
   })
 })
