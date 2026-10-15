@@ -69,7 +69,8 @@ const channels = [
 ]
 
 type Outcome =
-  { status: 'delivered'; failureStage: null } | { status: 'failed'; failureStage: 'mapping' }
+  | { status: 'delivered'; failureStage: null }
+  | { status: 'failed'; failureStage: 'mapping' }
 
 function run(
   receivedAt: string,

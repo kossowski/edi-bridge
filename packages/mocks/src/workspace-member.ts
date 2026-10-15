@@ -28,7 +28,8 @@ function sessionMember(session: Session, lastActivityAt: string) {
 }
 
 export type WorkspaceMembers =
-  ReadonlyArray<WorkspaceMember> | ReadonlyMap<string, ReadonlyArray<WorkspaceMember>>
+  | ReadonlyArray<WorkspaceMember>
+  | ReadonlyMap<string, ReadonlyArray<WorkspaceMember>>
 
 export type WorkspaceMemberStore = {
   get: (workspaceId: string) => ReadonlyArray<WorkspaceMember>

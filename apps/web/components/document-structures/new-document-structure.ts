@@ -59,7 +59,8 @@ export function keptChoices(
 }
 
 export type FileFacts =
-  { format: 'csv'; columnCount: number; rowCount: number } | { format: 'json'; fieldCount: number }
+  | { format: 'csv'; columnCount: number; rowCount: number }
+  | { format: 'json'; fieldCount: number }
 
 function parsedJson(text: string): JsonContent | undefined {
   try {

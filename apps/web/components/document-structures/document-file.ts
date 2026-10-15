@@ -33,7 +33,8 @@ export function fileProblem(size: number): FileProblem | null {
 }
 
 export type ChosenFile =
-  { problem: FileProblem; encoded: null } | { problem: null; encoded: EncodedFile }
+  | { problem: FileProblem; encoded: null }
+  | { problem: null; encoded: EncodedFile }
 
 export async function encodeFile(file: File): Promise<ChosenFile> {
   const problem = fileProblem(file.size)

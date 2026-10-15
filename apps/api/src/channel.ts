@@ -47,7 +47,9 @@ type Kind = Channel['type']
 type OfKind<T, K extends Kind> = Extract<T, { type: K }>
 
 export type SecretColumn =
-  'encryptedCredential' | 'encryptedWebhookToken' | 'encryptedAuthorization'
+  | 'encryptedCredential'
+  | 'encryptedWebhookToken'
+  | 'encryptedAuthorization'
 
 const hidden: MaskedSecret = { lastFour: null }
 

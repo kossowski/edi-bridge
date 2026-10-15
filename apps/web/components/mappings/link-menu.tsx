@@ -28,7 +28,8 @@ import type { LinkEdgeData, PlainEdgeData } from '@/components/mappings/link-edg
 import type { RowRef } from '@/components/mappings/mapping-links'
 
 export type LinkMenuEnd =
-  { kind: 'row'; row: RowRef } | { kind: 'transform'; transformId: string; name: string }
+  | { kind: 'row'; row: RowRef }
+  | { kind: 'transform'; transformId: string; name: string }
 
 export type LinkMenuTarget = {
   data: LinkEdgeData

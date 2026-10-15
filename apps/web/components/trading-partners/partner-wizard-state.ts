@@ -49,12 +49,16 @@ function isConnectionField(field: ChannelField): field is ConnectionField {
 export const connectionFields = channelFields.filter(isConnectionField)
 
 export type WizardMapping =
-  { way: 'existing'; mappingVersionId: string | null } | { way: 'ai' } | { way: 'later' }
+  | { way: 'existing'; mappingVersionId: string | null }
+  | { way: 'ai' }
+  | { way: 'later' }
 
 export type MappingWay = WizardMapping['way']
 
 export type MappingResult =
-  { way: 'existing'; mappingVersionId: string } | { way: 'ai' } | { way: 'later' }
+  | { way: 'existing'; mappingVersionId: string }
+  | { way: 'ai' }
+  | { way: 'later' }
 
 export type PartnerWizardState = {
   partner: { name: string; gln: string; glnLater: boolean }

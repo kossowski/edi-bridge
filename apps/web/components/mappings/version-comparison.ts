@@ -52,7 +52,9 @@ export function resolveVersions(
 }
 
 export type SampleSelection =
-  { kind: 'none' } | { kind: 'unknown' } | { kind: 'ready'; sample: MappingSample }
+  | { kind: 'none' }
+  | { kind: 'unknown' }
+  | { kind: 'ready'; sample: MappingSample }
 
 export function resolveSample(
   samples: ReadonlyArray<MappingSample>,

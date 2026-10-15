@@ -35,7 +35,8 @@ export type PlannedRoute<Channel extends PlanChannel> = {
 }
 
 export type PlannedDocument<Channel extends PlanChannel> = { messageType: WizardDocument } & (
-  { route: PlannedRoute<Channel> } | { reasons: LeftReason[] }
+  | { route: PlannedRoute<Channel> }
+  | { reasons: LeftReason[] }
 )
 
 export type SetupPlan<Channel extends PlanChannel> = {
