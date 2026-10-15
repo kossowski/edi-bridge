@@ -66,8 +66,11 @@ export const selectVersionsOfDocumentStructure = async (
   return rows.map((row) => ({ ...toHeader(row), ...row.graph }))
 }
 
-const selectEntries = (db: Database, where: SQL | undefined) =>
-  selectVersions(db, {
+const selectEntries = async (
+  db: Database,
+  where: SQL | undefined,
+): Promise<MappingVersionEntry[]> => {
+  const rows = await selectVersions(db, {
     changeNote: mappingVersions.changeNote,
     publisherId: users.id,
     publisherName: users.name,
@@ -76,9 +79,6 @@ const selectEntries = (db: Database, where: SQL | undefined) =>
     .where(where)
     .orderBy(desc(mappingVersions.version))
 
-type EntryRow = Awaited<ReturnType<typeof selectEntries>>[number]
-
-const toEntries = async (db: Database, rows: EntryRow[]): Promise<MappingVersionEntry[]> => {
   const flowsOf = await selectPinnedFlows(
     db,
     rows.map(({ id }) => id),
@@ -98,9 +98,7 @@ export const listMappingVersions = (mappingId: string) =>
 
     const db = yield* Db
 
-    return yield* Effect.promise(async () =>
-      toEntries(db, await selectEntries(db, eq(mappingVersions.mappingId, mappingId))),
-    )
+    return yield* Effect.promise(() => selectEntries(db, eq(mappingVersions.mappingId, mappingId)))
   })
 
 export const loadMappingVersion = (mappingId: string, versionId: string) =>
@@ -327,9 +325,7 @@ export const publishMappingDraft = (
 
     const { id } = yield* exactlyOne(outcome)
 
-    const entries = yield* Effect.promise(async () =>
-      toEntries(db, await selectEntries(db, eq(mappingVersions.id, id))),
-    )
+    const entries = yield* Effect.promise(() => selectEntries(db, eq(mappingVersions.id, id)))
 
     return yield* exactlyOne(entries)
   })

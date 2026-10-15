@@ -68,17 +68,25 @@ const countsByTradingPartner = async (
   return (tradingPartnerId: string) => byTradingPartner.get(tradingPartnerId) ?? 0
 }
 
-const selectSetups = async (db: Database, workspaceId: string, tradingPartnerId?: string) => {
-  const only = (table: typeof channels | typeof flows) =>
-    inWorkspace(
-      table,
-      workspaceId,
-      tradingPartnerId === undefined ? undefined : eq(table.tradingPartnerId, tradingPartnerId),
-    )
+const ofTradingPartner = (
+  table: typeof channels | typeof flows,
+  workspaceId: string,
+  tradingPartnerId?: string,
+) =>
+  inWorkspace(
+    table,
+    workspaceId,
+    tradingPartnerId === undefined ? undefined : eq(table.tradingPartnerId, tradingPartnerId),
+  )
 
+const selectChannelAndFlowCounts = async (
+  db: Database,
+  workspaceId: string,
+  tradingPartnerId?: string,
+) => {
   const [channelCountOf, flowCountOf] = await Promise.all([
-    countsByTradingPartner(db, channels, only(channels)),
-    countsByTradingPartner(db, flows, only(flows)),
+    countsByTradingPartner(db, channels, ofTradingPartner(channels, workspaceId, tradingPartnerId)),
+    countsByTradingPartner(db, flows, ofTradingPartner(flows, workspaceId, tradingPartnerId)),
   ])
 
   return (id: string) => ({ channelCount: channelCountOf(id), flowCount: flowCountOf(id) })
@@ -96,19 +104,19 @@ export const listTradingPartnerActivities = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
-  const [rows, setupOf] = yield* Effect.promise(() =>
+  const [rows, countsOf] = yield* Effect.promise(() =>
     Promise.all([
       db
         .select({ id: tradingPartners.id, name: tradingPartners.name })
         .from(tradingPartners)
         .where(inWorkspace(tradingPartners, workspace.id)),
-      selectSetups(db, workspace.id),
+      selectChannelAndFlowCounts(db, workspace.id),
     ]),
   )
 
   return rows
     .toSorted(byName)
-    .map(({ id }): TradingPartnerActivity => ({ ...noRuns(id), ...setupOf(id) }))
+    .map(({ id }): TradingPartnerActivity => ({ ...noRuns(id), ...countsOf(id) }))
 })
 
 const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
@@ -209,19 +217,19 @@ export const loadTradingPartnerActivity = (id: string) =>
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const [setupOf, flowsOfPartner] = yield* Effect.promise(() =>
+    const [countsOf, flowsOfPartner] = yield* Effect.promise(() =>
       Promise.all([
-        selectSetups(db, workspace.id, tradingPartnerId),
+        selectChannelAndFlowCounts(db, workspace.id, tradingPartnerId),
         db
           .select({ id: flows.id, name: flows.name })
           .from(flows)
-          .where(inWorkspace(flows, workspace.id, eq(flows.tradingPartnerId, tradingPartnerId))),
+          .where(ofTradingPartner(flows, workspace.id, tradingPartnerId)),
       ]),
     )
 
     return {
       ...noRuns(tradingPartnerId),
-      ...setupOf(tradingPartnerId),
+      ...countsOf(tradingPartnerId),
       days: lastUtcDays(now),
       flows: flowsOfPartner.toSorted(byName).map((flow) => ({ flow, runs: 0 })),
       problems: [],

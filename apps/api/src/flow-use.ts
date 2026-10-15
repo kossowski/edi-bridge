@@ -8,6 +8,16 @@ import { byName, inWorkspace } from './rows.js'
 
 import type { Database, Transaction } from './db.js'
 
+const groupedBy = <Row, Value>(
+  rows: Row[],
+  keyOf: (row: Row) => string,
+  valueOf: (row: Row) => Value,
+) => {
+  const groups = Map.groupBy(rows, keyOf)
+
+  return (key: string) => (groups.get(key) ?? []).map(valueOf)
+}
+
 export const selectTradingPartnersByMapping = async (
   db: Database | Transaction,
   workspaceId: string,
@@ -23,13 +33,11 @@ export const selectTradingPartnersByMapping = async (
     .innerJoin(tradingPartners, eq(flows.tradingPartnerId, tradingPartners.id))
     .where(inWorkspace(flows, workspaceId))
 
-  const byMapping = new Map<string, TradingPartnerSummary[]>()
-
-  for (const { mappingId, id, name } of rows.toSorted(byName)) {
-    byMapping.set(mappingId, [...(byMapping.get(mappingId) ?? []), { id, name }])
-  }
-
-  return (mappingId: string) => byMapping.get(mappingId) ?? []
+  return groupedBy(
+    rows.toSorted(byName),
+    (row) => row.mappingId,
+    ({ id, name }): TradingPartnerSummary => ({ id, name }),
+  )
 }
 
 const byTradingPartnerAndName = (a: PinnedFlow, b: PinnedFlow) =>
@@ -51,19 +59,15 @@ export const selectPinnedFlows = async (db: Database, mappingVersionIds: string[
           .innerJoin(tradingPartners, eq(flows.tradingPartnerId, tradingPartners.id))
           .where(inArray(flows.mappingVersionId, mappingVersionIds))
 
-  const byVersion = new Map<string, PinnedFlow[]>()
+  const flowsOf = groupedBy(
+    rows,
+    (row) => row.mappingVersionId,
+    (row): PinnedFlow => ({
+      id: row.id,
+      name: row.name,
+      tradingPartner: { id: row.tradingPartnerId, name: row.tradingPartnerName },
+    }),
+  )
 
-  for (const row of rows) {
-    byVersion.set(row.mappingVersionId, [
-      ...(byVersion.get(row.mappingVersionId) ?? []),
-      {
-        id: row.id,
-        name: row.name,
-        tradingPartner: { id: row.tradingPartnerId, name: row.tradingPartnerName },
-      },
-    ])
-  }
-
-  return (mappingVersionId: string) =>
-    (byVersion.get(mappingVersionId) ?? []).toSorted(byTradingPartnerAndName)
+  return (mappingVersionId: string) => flowsOf(mappingVersionId).toSorted(byTradingPartnerAndName)
 }
