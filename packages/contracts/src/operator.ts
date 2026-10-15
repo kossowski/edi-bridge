@@ -115,6 +115,10 @@ export const acceptInviteInputSchema = z.object({
 
 export type AcceptInviteInput = z.infer<typeof acceptInviteInputSchema>
 
+export const inviteUnknownStatus = 404
+
+export const invitePasswordMismatchStatus = 403
+
 export const inviteUnusableStatus = 410
 
 export const inviteUnusableReasonSchema = z.enum(['revoked', 'used', 'expired'])

@@ -6,7 +6,9 @@ import {
   acceptInviteEndpoint,
   createInviteEndpoint,
   type InviteInput,
+  invitePasswordMismatchStatus,
   inviteSchema,
+  inviteUnknownStatus,
   inviteUnusableMessages,
   inviteUnusableStatus,
   inviteValidityDays,
@@ -412,7 +414,7 @@ describe('POST /invites/accept', () => {
       password: 'nobody-password',
     })
 
-    expect(response.statusCode).toBe(404)
+    expect(response.statusCode).toBe(inviteUnknownStatus)
   })
 
   it('answers 400 for a password shorter than 8 characters and keeps the link open', async () => {
@@ -450,7 +452,7 @@ describe('POST /invites/accept', () => {
 
     const response = await accept(invite.link, { name: 'Takeover', password: 'takeover-password' })
 
-    expect(response.statusCode).toBe(403)
+    expect(response.statusCode).toBe(invitePasswordMismatchStatus)
     expect(await signInStatus({ email: existing.email, password: 'takeover-password' })).toBe(401)
     expect(await signInStatus(existing)).toBe(200)
     expect((await listInvites()).find(({ id }) => id === invite.id)?.acceptedAt).toBeNull()
