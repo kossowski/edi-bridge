@@ -63,7 +63,6 @@ export function reformatDate(value: string, from: string, to: string): string | 
     : undefined
 }
 
-// Rounds half away from zero on the decimal digits, since binary floats round 1.005 down.
 function decimalOf(value: number): string {
   const [mantissa = '', exponent = '0'] = String(value).split('e')
   const sign = mantissa.startsWith('-') ? '-' : ''
@@ -80,6 +79,7 @@ function decimalOf(value: number): string {
     : `${sign}${digits.slice(0, point)}.${digits.slice(point)}`
 }
 
+// Rounds half away from zero on the decimal digits, since binary floats round 1.005 down.
 export function reformatNumber(
   value: string | number,
   places: number | null,
