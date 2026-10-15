@@ -23,6 +23,8 @@ import {
   publishMappingDraftEndpoint,
   saveMappingDraftEndpoint,
   toPath,
+  tradingPartnerActivitiesEndpoint,
+  tradingPartnerActivityEndpoint,
   tradingPartnerSchema,
 } from '@edi-bridge/contracts'
 import {
@@ -358,5 +360,56 @@ describe('POST /mappings/:mappingId/versions with Flows to move', () => {
       message: 'Only Flows that use this Mapping move to the new version.',
     })
     expect((await historyOf(mapping.id)).map(({ id }) => id)).toEqual([first.id])
+  })
+})
+
+describe('the activity of a Trading Partner', () => {
+  it('counts its Channels and Flows in the list', async () => {
+    const hansemarkt = await createdTradingPartner('Hansemarkt GmbH')
+    const kaufzentrum = await createdTradingPartner('Kaufzentrum Nord')
+    const { destination } = await ownSystem()
+    const mapping = await createdMapping()
+    const first = await published(mapping.id)
+    await createdFlow('Filialen', hansemarkt.id, first.id, destination.id)
+    await createdFlow('Zentrallager', hansemarkt.id, first.id, destination.id)
+
+    const activities = tradingPartnerActivitiesEndpoint.response.parse(
+      await sent({ method: 'GET', url: tradingPartnerActivitiesEndpoint.path }, 200),
+    )
+
+    expect(
+      activities.map(({ tradingPartnerId, channelCount, flowCount }) => ({
+        tradingPartnerId,
+        channelCount,
+        flowCount,
+      })),
+    ).toEqual([
+      { tradingPartnerId: hansemarkt.id, channelCount: 2, flowCount: 2 },
+      { tradingPartnerId: kaufzentrum.id, channelCount: 0, flowCount: 0 },
+    ])
+  })
+
+  it('names its Flows by name with their counts', async () => {
+    const hansemarkt = await createdTradingPartner('Hansemarkt GmbH')
+    const alpenfrisch = await createdTradingPartner('Alpenfrisch Märkte AG')
+    const { destination } = await ownSystem()
+    const mapping = await createdMapping()
+    const first = await published(mapping.id)
+    const zentral = await createdFlow('Zentrallager', hansemarkt.id, first.id, destination.id)
+    const filialen = await createdFlow('Filialen', hansemarkt.id, first.id, destination.id)
+    await createdFlow('Alpenfrisch ORDERS', alpenfrisch.id, first.id, destination.id)
+
+    const activity = tradingPartnerActivityEndpoint.response.parse(
+      await sent(
+        { method: 'GET', url: toPath(tradingPartnerActivityEndpoint.path, { id: hansemarkt.id }) },
+        200,
+      ),
+    )
+
+    expect(activity).toMatchObject({ channelCount: 2, flowCount: 2 })
+    expect(activity.flows).toEqual([
+      { flow: { id: filialen.id, name: filialen.name }, runs: 0 },
+      { flow: { id: zentral.id, name: zentral.name }, runs: 0 },
+    ])
   })
 })
