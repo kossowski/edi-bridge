@@ -28,14 +28,14 @@ import {
   writeDocument,
 } from './index'
 
-const golden = (name: string, encoding: BufferEncoding = 'utf8') =>
+const goldenText = (name: string, encoding: BufferEncoding = 'utf8') =>
   readFileSync(new URL(`../golden/${name}`, import.meta.url), encoding)
 
 const goldenBytes = (name: string) =>
   new Uint8Array(readFileSync(new URL(`../golden/${name}`, import.meta.url)))
 
 const goldenVersion = (name: string): MappingVersion =>
-  mappingVersionSchema.parse(JSON.parse(golden(name)))
+  mappingVersionSchema.parse(JSON.parse(goldenText(name)))
 
 const unitTable = {
   id: '2b7c4e91-5d3a-4f8e-b6c2-9a1d0e3f4b57',
@@ -86,7 +86,7 @@ function interchangeOf(message: Message): Interchange {
 
 describe('the reference invoice', () => {
   it('maps to the golden INVOIC, byte for byte, and passes validation', async () => {
-    const text = golden('invoic-reference.document.json')
+    const text = goldenText('invoic-reference.document.json')
     const version = goldenVersion('invoic-reference.mapping.json')
 
     const structure = inferDocumentStructure({
@@ -109,7 +109,7 @@ describe('the reference invoice', () => {
     const interchange = interchangeOf(message)
 
     expect(() => validate(interchange)).not.toThrow()
-    expect(serialize(interchange)).toBe(golden('invoic-reference.edi', 'latin1'))
+    expect(serialize(interchange)).toBe(goldenText('invoic-reference.edi', 'latin1'))
   })
 })
 
@@ -129,7 +129,7 @@ function inboundVersion(name: string): InboundMappingVersion {
 }
 
 describe('the reference order', () => {
-  const interchange = parse(golden('orders-reference.edi', 'latin1'))
+  const interchange = parse(goldenText('orders-reference.edi', 'latin1'))
 
   it('passes validation', () => {
     expect(() => validate(interchange)).not.toThrow()
