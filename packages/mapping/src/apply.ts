@@ -1,11 +1,10 @@
-import { Data, Effect } from 'effect'
+import { Effect } from 'effect'
 import jsonata from 'jsonata'
 import { z } from 'zod'
 
 import {
   arrayBasePath,
   type ConditionOperator,
-  type EdifactComposite,
   type EdifactElement,
   type EdifactSegment,
   type EdifactSegmentGroup,
@@ -23,32 +22,13 @@ import {
 
 import type { Element, Message, Segment } from '@edi-bridge/edifact'
 
+import { childrenOf, elementPaths, type StructurePart } from './elements'
+import { MappingError, type MappingErrorCode } from './errors'
 import { reformatDate, reformatNumber } from './formats'
 import { jsonListSchema, jsonObjectSchema } from './json'
+import { isBeneath, isRequiredOrFilled, setFilled, type Values } from './values'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
-
-export const mappingErrorCodes = [
-  'missingRequiredValue',
-  'outsideLoop',
-  'unknownTarget',
-  'invalidTransform',
-  'invalidDate',
-  'invalidNumber',
-  'unknownLookupTable',
-  'noLookupMatch',
-  'expressionFailed',
-] as const
-
-export type MappingErrorCode = (typeof mappingErrorCodes)[number]
-
-export class MappingError extends Data.TaggedError('MappingError')<{
-  readonly code: MappingErrorCode
-  readonly targetPath: string
-  readonly transformId?: string
-}> {}
-
-type Values = ReadonlyMap<string, string>
 
 const scalarSchema = z.union([z.string(), z.number(), z.boolean()])
 
@@ -90,9 +70,6 @@ type Context = {
 }
 
 type Reading = Omit<Context, 'values'>
-
-const isBeneath = (path: string, part: string, separator = '/') =>
-  path === part || path.startsWith(`${part}${separator}`)
 
 function read({ document, scope }: Reading, path: string): JsonContent | undefined {
   const bound = [...scope.items.keys()]
@@ -302,20 +279,14 @@ function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<Value
 function valuesIn(context: Reading): Effect.Effect<Values, MappingError> {
   const values = new Map<string, string>()
 
-  const set = (targetPath: string, value: string | undefined) => {
-    if (value !== undefined && value !== '') {
-      values.set(targetPath, value)
-    }
-  }
-
   for (const { sourcePath, targetPath } of context.links) {
-    set(targetPath, sourceValue(context, sourcePath))
+    setFilled(values, targetPath, sourceValue(context, sourcePath))
   }
 
   return Effect.as(
     Effect.forEach(context.graph.targets, ({ path, from }) =>
       Effect.map(outputOf({ ...context, targetPath: path, visiting: new Set() }, from), (value) =>
-        set(path, String(value)),
+        setFilled(values, path, String(value)),
       ),
     ),
     values,
@@ -350,18 +321,6 @@ function segmentOf(segment: EdifactSegment, values: Values): Segment {
     tag: segment.tag,
     elements: trimmed(elements, (element) => element.every((value) => value === '')),
   }
-}
-
-type StructurePart =
-  EdifactStructureNode | EdifactSegment['children'][number] | EdifactComposite['children'][number]
-
-const childrenOf = (part: StructurePart): ReadonlyArray<StructurePart> =>
-  part.kind === 'element' ? [] : part.children
-
-function elementPaths(parts: ReadonlyArray<StructurePart>): string[] {
-  return parts.flatMap((part) =>
-    part.kind === 'element' ? [part.path] : elementPaths(childrenOf(part)),
-  )
 }
 
 function groupPaths(nodes: ReadonlyArray<EdifactStructureNode>): string[] {
@@ -518,12 +477,6 @@ function outsideLoop(
     ),
   )?.targetPath
 }
-
-const hasValueBeneath = (part: StructurePart, values: Values) =>
-  [...values.keys()].some((path) => isBeneath(path, part.path))
-
-const isRequiredOrFilled = (part: StructurePart, values: Values) =>
-  part.required || hasValueBeneath(part, values)
 
 function firstMissingRequired(
   parts: ReadonlyArray<StructurePart>,
