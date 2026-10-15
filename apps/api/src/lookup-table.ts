@@ -280,7 +280,7 @@ export const updateLookupTable = (
 
 export const deleteLookupTable = (id: string) =>
   Effect.gen(function* () {
-    yield* rejectingUnknownLookupTable(id)
+    yield* rejectingInvalidId(id)
 
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
@@ -295,6 +295,8 @@ export const deleteLookupTable = (id: string) =>
     )
 
     if (deleted.length === 0) {
+      yield* rejectingUnknownLookupTable(id)
+
       return yield* new Conflict({ message: lookupTableInUseMessage })
     }
   })
