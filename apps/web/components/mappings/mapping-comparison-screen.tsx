@@ -576,7 +576,12 @@ function OutputDocument({
         </span>
       </div>
       <DocumentText document={output.document} label={label} className="max-h-96 min-h-24" />
-      <PreviewNotes heading="h5" notes={output.notes} transforms={side.transforms} />
+      <PreviewNotes
+        document={output.document}
+        heading="h5"
+        notes={output.notes}
+        transforms={side.transforms}
+      />
     </div>
   )
 }

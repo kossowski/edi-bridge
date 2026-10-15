@@ -237,10 +237,13 @@ export const EngineStopped = meta.story({
   async play({ canvasElement }) {
     const canvas = await openPreview(canvasElement)
 
-    await expect(await canvas.findByText('1 target left empty')).toBeVisible()
     await expect(
-      canvas.getByText('This required value is not filled, so no target Document is built.'),
+      await canvas.findByRole('heading', {
+        name: 'The preview stopped and built no target Document',
+      }),
     ).toBeVisible()
+    await expect(canvas.queryByText('1 target left empty')).not.toBeInTheDocument()
+    await expect(canvas.getByText('This required value is not filled.')).toBeVisible()
     await expect(canvas.getByText('SG2+SU/NAD+SU/C082/3039')).toBeVisible()
   },
 })
@@ -253,10 +256,12 @@ export const EngineStoppedGerman = meta.story({
   async play({ canvasElement }) {
     const canvas = await openPreview(canvasElement, 'Vorschau')
 
-    await expect(await canvas.findByText('1 Ziel bleibt leer')).toBeVisible()
     await expect(
-      canvas.getByText('Dieser Pflichtwert ist nicht gefüllt, daher entsteht kein Ziel-Document.'),
+      await canvas.findByRole('heading', {
+        name: 'Die Vorschau hat angehalten und kein Ziel-Document erstellt',
+      }),
     ).toBeVisible()
+    await expect(canvas.getByText('Dieser Pflichtwert ist nicht gefüllt.')).toBeVisible()
   },
 })
 
