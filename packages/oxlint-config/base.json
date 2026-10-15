@@ -26,10 +26,6 @@
     {
       "name": "turbo",
       "specifier": "eslint-plugin-turbo"
-    },
-    {
-      "name": "eslint-core",
-      "specifier": "./eslint-core/index.js"
     }
   ],
   "rules": {
@@ -56,8 +52,6 @@
         "next": "*"
       }
     ],
-    "eslint-core/no-dupe-args": "error",
-    "eslint-core/no-octal": "error",
     "eslint/constructor-super": "error",
     "eslint/for-direction": "error",
     "eslint/getter-return": [
@@ -352,7 +346,6 @@
     {
       "files": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
       "rules": {
-        "eslint-core/no-dupe-args": "off",
         "eslint/constructor-super": "off",
         "eslint/getter-return": "off",
         "eslint/no-class-assign": "off",
