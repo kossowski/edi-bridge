@@ -189,16 +189,20 @@ export const createMapping = ({ messageType }: CreateMappingBody) =>
     return toSummary(yield* exactlyOne(rows))
   })
 
-export const sidesOf = (row: Row) => {
+export const sidesOf = ({
+  documentStructureId,
+  documentStructureName,
+  messageType,
+}: Pick<Row, 'documentStructureId' | 'documentStructureName' | 'messageType'>) => {
   const document: DocumentStructureSide = {
     kind: 'documentStructure',
-    documentStructureId: row.documentStructureId,
-    name: row.documentStructureName,
+    documentStructureId,
+    name: documentStructureName,
   }
 
-  const edifact: MessageTypeSide = { kind: 'messageType', messageType: row.messageType }
+  const edifact: MessageTypeSide = { kind: 'messageType', messageType }
 
-  return oriented(row.messageType, { document, edifact })
+  return oriented(messageType, { document, edifact })
 }
 
 const toDraft = (row: Row): MappingDraft => {
