@@ -10,20 +10,26 @@ import {
   type EdifactStructureNode,
   type JsonContent,
   jsonContentSchema,
+  type LinkStart,
+  type MappingTransform,
   type MappingVersion,
   type MessageTypeStructure,
   messageTypeStructures,
+  transformIssues,
+  transformPorts,
 } from '@edi-bridge/contracts'
 
 import type { Element, Message, Segment } from '@edi-bridge/edifact'
 
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
 
-export type MappingErrorCode = 'missingRequiredValue' | 'outsideLoop' | 'unknownTarget'
+export type MappingErrorCode =
+  'missingRequiredValue' | 'outsideLoop' | 'unknownTarget' | 'invalidTransform'
 
 export class MappingError extends Data.TaggedError('MappingError')<{
   readonly code: MappingErrorCode
   readonly targetPath: string
+  readonly transformId?: string
 }> {}
 
 type Values = ReadonlyMap<string, string>
@@ -35,10 +41,10 @@ const itemsSchema = z.array(jsonContentSchema)
 const scalarSchema = z.union([z.string(), z.number(), z.boolean()])
 
 type Loop = {
+  id: string
   sourcePart: string
   targetParts: string[]
   counterStart: number
-  counterTargets: string[]
 }
 
 type Scope = {
@@ -46,9 +52,19 @@ type Scope = {
   counters: ReadonlyMap<string, string>
 }
 
+type TransformTarget = { path: string; from: LinkStart & { kind: 'transform' } }
+
+type Graph = {
+  transforms: ReadonlyMap<string, MappingTransform>
+  feeding: ReadonlyMap<string, LinkStart>
+  valid: ReadonlySet<string>
+  targets: ReadonlyArray<TransformTarget>
+}
+
 type Context = {
   document: JsonContent
   links: OutboundMappingVersion['links']
+  graph: Graph
   loops: ReadonlyMap<string, Loop>
   numbered: Map<Loop, number>
   scope: Scope
@@ -92,18 +108,75 @@ function itemsOf(context: Reading, sourcePart: string): JsonContent[] {
   return items.success ? items.data : []
 }
 
-function valuesIn(context: Reading): Values {
-  const values = new Map(context.scope.counters)
+type Evaluation = Reading & { targetPath: string; visiting: ReadonlySet<string> }
 
-  for (const { sourcePath, targetPath } of context.links) {
-    const value = sourceValue(context, sourcePath)
+const failedTransform = (code: MappingErrorCode, { targetPath }: Evaluation, transformId: string) =>
+  new MappingError({ code, targetPath, transformId })
 
+function applied(
+  transform: MappingTransform,
+  args: Readonly<Record<string, string>>,
+): Effect.Effect<string, MappingError> {
+  switch (transform.kind) {
+    case 'constant':
+      return Effect.succeed(transform.config.value)
+    default:
+      return Effect.succeed(args.value ?? '')
+  }
+}
+
+function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<string, MappingError> {
+  if (start.kind === 'source') {
+    return Effect.succeed(sourceValue(evaluation, start.path) ?? '')
+  }
+
+  const { graph, scope, visiting } = evaluation
+  const transform = graph.transforms.get(start.transformId)
+
+  if (!transform || !graph.valid.has(transform.id) || visiting.has(transform.id)) {
+    return Effect.fail(failedTransform('invalidTransform', evaluation, start.transformId))
+  }
+
+  if (transform.kind === 'loop') {
+    return Effect.succeed(scope.counters.get(transform.id) ?? '')
+  }
+
+  const inner = { ...evaluation, visiting: new Set(visiting).add(transform.id) }
+
+  return Effect.flatMap(
+    Effect.forEach(transformPorts(transform).inputs, (input) => {
+      const from = graph.feeding.get(`${transform.id}/${input}`)
+
+      return Effect.map(
+        from ? outputOf(inner, from) : Effect.succeed(''),
+        (value): readonly [string, string] => [input, value],
+      )
+    }),
+    (args) => applied(transform, Object.fromEntries(args)),
+  )
+}
+
+function valuesIn(context: Reading): Effect.Effect<Values, MappingError> {
+  const values = new Map<string, string>()
+
+  const set = (targetPath: string, value: string | undefined) => {
     if (value !== undefined && value !== '') {
       values.set(targetPath, value)
     }
   }
 
-  return values
+  for (const { sourcePath, targetPath } of context.links) {
+    set(targetPath, sourceValue(context, sourcePath))
+  }
+
+  return Effect.as(
+    Effect.forEach(context.graph.targets, ({ path, from }) =>
+      Effect.map(outputOf({ ...context, targetPath: path, visiting: new Set() }, from), (value) =>
+        set(path, value),
+      ),
+    ),
+    values,
+  )
 }
 
 function trimmed<Part>(parts: ReadonlyArray<Part>, empty: (part: Part) => boolean): Part[] {
@@ -154,24 +227,25 @@ function groupPaths(nodes: ReadonlyArray<EdifactStructureNode>): string[] {
   )
 }
 
-type TransformTarget = { path: string; group: boolean }
-
 type LoopDraft = Omit<Loop, 'sourcePart'> & { sourcePart?: string }
 
-function wiringOf({ transforms, transformLinks }: OutboundMappingVersion) {
+function wiringOf(version: OutboundMappingVersion) {
+  const { transforms, transformLinks } = version
   const drafts = new Map<string, LoopDraft>()
 
   for (const transform of transforms) {
     if (transform.kind === 'loop') {
       drafts.set(transform.id, {
+        id: transform.id,
         targetParts: [],
         counterStart: transform.config.counterStart,
-        counterTargets: [],
       })
     }
   }
 
+  const feeding = new Map<string, LinkStart>()
   const targets: TransformTarget[] = []
+  const groupTargets: string[] = []
 
   for (const { from, to } of transformLinks) {
     if (to.kind === 'transform') {
@@ -181,20 +255,18 @@ function wiringOf({ transforms, transformLinks }: OutboundMappingVersion) {
         draft.sourcePart = from.path
       }
 
+      feeding.set(`${to.transformId}/${to.input}`, from)
       continue
     }
 
-    const output = from.kind === 'transform' ? from.output : undefined
-    const draft = from.kind === 'transform' ? drafts.get(from.transformId) : undefined
-
-    targets.push({ path: to.path, group: output === 'items' })
-
-    if (output === 'items') {
-      draft?.targetParts.push(to.path)
+    if (from.kind === 'transform' && from.output === 'items') {
+      groupTargets.push(to.path)
+      drafts.get(from.transformId)?.targetParts.push(to.path)
+      continue
     }
 
-    if (output === 'counter') {
-      draft?.counterTargets.push(to.path)
+    if (from.kind === 'transform') {
+      targets.push({ path: to.path, from })
     }
   }
 
@@ -210,20 +282,32 @@ function wiringOf({ transforms, transformLinks }: OutboundMappingVersion) {
     }
   }
 
-  return { loops, targets }
+  const issues = transformIssues(version)
+
+  const graph: Graph = {
+    transforms: new Map(transforms.map((transform) => [transform.id, transform])),
+    feeding,
+    valid: new Set(transforms.flatMap(({ id }) => (issues[id]?.length ? [] : [id]))),
+    targets,
+  }
+
+  return { graph, loops, groupTargets }
 }
 
 function unknownTarget(
   links: OutboundMappingVersion['links'],
-  targets: ReadonlyArray<TransformTarget>,
+  { graph, groupTargets }: ReturnType<typeof wiringOf>,
   body: ReadonlyArray<EdifactStructureNode>,
 ): string | undefined {
   const elements = new Set(elementPaths(body))
   const groups = new Set(groupPaths(body))
 
-  return [...links.map(({ targetPath }) => ({ path: targetPath, group: false })), ...targets].find(
-    ({ path, group }) => !(group ? groups : elements).has(path),
-  )?.path
+  return (
+    groupTargets.find((path) => !groups.has(path)) ??
+    [...links.map(({ targetPath }) => targetPath), ...graph.targets.map(({ path }) => path)].find(
+      (path) => !elements.has(path),
+    )
+  )
 }
 
 function repeatingParts(sourcePath: string): string[] {
@@ -292,21 +376,21 @@ const hasItemsBeneath = (part: StructurePart, context: Context) =>
 const isPresent = (part: StructurePart, context: Context) =>
   isRequiredOrFilled(part, context.values) || hasItemsBeneath(part, context)
 
-function within(context: Context, loop: Loop, item: JsonContent): Context {
+function within(
+  context: Context,
+  loop: Loop,
+  item: JsonContent,
+): Effect.Effect<Context, MappingError> {
   const numbered = context.numbered.get(loop) ?? 0
-  const counter = String(loop.counterStart + numbered)
 
   context.numbered.set(loop, numbered + 1)
 
   const scope = {
     items: new Map(context.scope.items).set(loop.sourcePart, item),
-    counters: new Map([
-      ...context.scope.counters,
-      ...loop.counterTargets.map((path) => [path, counter] as const),
-    ]),
+    counters: new Map(context.scope.counters).set(loop.id, String(loop.counterStart + numbered)),
   }
 
-  return { ...context, scope, values: valuesIn({ ...context, scope }) }
+  return Effect.map(valuesIn({ ...context, scope }), (values) => ({ ...context, scope, values }))
 }
 
 function loopSegments(
@@ -324,7 +408,9 @@ function loopSegments(
   }
 
   return Effect.map(
-    Effect.forEach(items, (item) => segmentsOf(group.children, within(context, loop, item))),
+    Effect.forEach(items, (item) =>
+      Effect.flatMap(within(context, loop, item), (inner) => segmentsOf(group.children, inner)),
+    ),
     (repetitions) => repetitions.flat(),
   )
 }
@@ -383,8 +469,9 @@ export function applyMappingVersion(
 ): Effect.Effect<Message, MappingError> {
   const structure = messageTypeStructures[version.target.messageType]
   const { header, body } = framed(structure)
-  const { loops, targets } = wiringOf(version)
-  const unknown = unknownTarget(version.links, targets, body)
+  const wiring = wiringOf(version)
+  const { graph, loops } = wiring
+  const unknown = unknownTarget(version.links, wiring, body)
 
   if (unknown !== undefined) {
     return Effect.fail(new MappingError({ code: 'unknownTarget', targetPath: unknown }))
@@ -399,16 +486,18 @@ export function applyMappingVersion(
   const reading: Reading = {
     document,
     links: version.links,
+    graph,
     loops,
     numbered: new Map(),
     scope: { items: new Map(), counters: new Map() },
   }
 
-  const context: Context = { ...reading, values: valuesIn(reading) }
-
-  return Effect.map(segmentsOf(body, context), (segments) => ({
-    header: segmentOf(header, new Map([[`${header.path}/0062`, messageReference]])),
-    segments,
-    trailer: { tag: 'UNT', elements: [[String(segments.length + 2)], [messageReference]] },
-  }))
+  return Effect.map(
+    Effect.flatMap(valuesIn(reading), (values) => segmentsOf(body, { ...reading, values })),
+    (segments) => ({
+      header: segmentOf(header, new Map([[`${header.path}/0062`, messageReference]])),
+      segments,
+      trailer: { tag: 'UNT', elements: [[String(segments.length + 2)], [messageReference]] },
+    }),
+  )
 }

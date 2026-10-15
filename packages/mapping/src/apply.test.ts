@@ -126,6 +126,36 @@ const orderLines: MappingLink[] = [
 
 const orderLoop = { transforms: [loop], transformLinks: looped('lines[]', 'SG25', 'SG25/LIN/1082') }
 
+const transformOf = (
+  id: string,
+  transform: Pick<MappingTransform, 'kind' | 'config'>,
+): MappingTransform =>
+  // SAFETY: each test passes a config that belongs to its kind.
+  ({ id, position: { x: 0, y: 0 }, ...transform }) as MappingTransform
+
+const transformId = '5d6e7f80-1a2b-4c3d-8e4f-5a6b7c8d9e0f'
+
+const intoTarget = (path: string, id = transformId, output = 'value'): TransformLink => ({
+  from: { kind: 'transform', transformId: id, output },
+  to: { kind: 'target', path },
+})
+
+const orderWithoutNumber = orderHeader.filter(({ targetPath }) => targetPath !== 'BGM/1004')
+
+const orderNumberVia = (
+  transform: Pick<MappingTransform, 'kind' | 'config'>,
+  transformLinks: TransformLink[],
+) =>
+  outboundVersion('ORDERS', [...orderWithoutNumber, ...orderLines], {
+    transforms: [loop, transformOf(transformId, transform)],
+    transformLinks: [...looped('lines[]', 'SG25', 'SG25/LIN/1082'), ...transformLinks],
+  })
+
+const orderWithLine = { ...order, lines: [{ gtin: '4000862141404', quantity: 12 }] }
+
+const orderNumberOf = (version: OutboundMappingVersion, document: JsonContent = orderWithLine) =>
+  apply(version, document).segments[0]
+
 describe('applyMappingVersion', () => {
   it('places plain links in the order of the Message Type, with qualifiers and positions', () => {
     const version = outboundVersion('INVOIC', [
@@ -523,4 +553,49 @@ describe('applyMappingVersion', () => {
       targetPath: unknown,
     })
   })
+
+  it('writes a constant into its target element', () => {
+    const version = orderNumberVia({ kind: 'constant', config: { value: 'PO-0001' } }, [
+      intoTarget('BGM/1004'),
+    ])
+
+    expect(orderNumberOf(version)).toEqual({ tag: 'BGM', elements: [['220'], ['PO-0001']] })
+  })
+
+  const missingTransformId = '0f1e2d3c-4b5a-4968-8776-5544332211aa'
+
+  it.each<[string, Pick<MappingTransform, 'kind' | 'config'>, TransformLink, string, string]>([
+    [
+      'its config is incomplete',
+      { kind: 'constant', config: { value: '' } },
+      intoTarget('BGM/1004'),
+      'BGM/1004',
+      transformId,
+    ],
+    [
+      'an input is unconnected',
+      { kind: 'substring', config: { start: 0, length: 4 } },
+      intoTarget('BGM/1004'),
+      'BGM/1004',
+      transformId,
+    ],
+    [
+      'a link starts at a transform the mapping lacks',
+      { kind: 'constant', config: { value: 'PO-0001' } },
+      intoTarget('BGM/1004', missingTransformId),
+      'BGM/1004',
+      missingTransformId,
+    ],
+  ])(
+    'fails naming the target element and the transform when %s',
+    (_, transform, link, targetPath, failedId) => {
+      const version = orderNumberVia(transform, [link])
+
+      expect(failure(version, orderWithLine)).toMatchObject({
+        code: 'invalidTransform',
+        targetPath,
+        transformId: failedId,
+      })
+    },
+  )
 })
