@@ -333,7 +333,7 @@ function arrayEntry(node: DocumentArray, context: Context): MappedEntries {
     )
   }
 
-  if (hasValueBeneath(node, context.values, '.')) {
+  if (hasValueBeneath(node, context.values, '.') || hasItemsBeneath(node.path, context)) {
     return Effect.map(itemOf(node.items, context), (item) => [[node.name, [item]]])
   }
 

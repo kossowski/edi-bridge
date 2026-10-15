@@ -495,6 +495,25 @@ describe('applyInboundMappingVersion', () => {
     })
   })
 
+  it('writes an array without a loop that holds only the items of a loop', async () => {
+    const version = inboundVersion(
+      [{ sourcePath: 'SG25/LIN/C212/7140', targetPath: 'orders[].lines[].gtin' }],
+      { transforms: [loopOf(lineLoopId)], transformLinks: looped('SG25', 'orders[].lines[]') },
+    )
+
+    const structure = structureOf([
+      array('orders[]', (path) =>
+        object(path, [
+          array(`${path}.lines[]`, (lines) => object(lines, [field(`${lines}.gtin`)])),
+        ]),
+      ),
+    ])
+
+    expect(await apply(version, structure, twoLines)).toEqual({
+      orders: [{ lines: [{ gtin: '4000862141404' }, { gtin: '4000862141411' }] }],
+    })
+  })
+
   it('reads the first repetition of a repeating segment group that no loop repeats', async () => {
     const version = inboundVersion(
       [
