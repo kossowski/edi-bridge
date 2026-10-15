@@ -26,17 +26,22 @@ import type { ValidationError } from './parse.js'
 import type { SecretBox } from './secret.js'
 
 export interface ChannelSettings {
-  readonly secrets: SecretBox
-  readonly apiPublicUrl: string
+  secretKey: Buffer
+  apiPublicUrl: string
 }
 
-export class ChannelEnvironment extends Context.Service<ChannelEnvironment, ChannelSettings>()(
-  'ChannelEnvironment',
-) {}
+export class ChannelEnvironment extends Context.Service<
+  ChannelEnvironment,
+  { readonly secrets: SecretBox; readonly apiPublicUrl: string }
+>()('ChannelEnvironment') {}
 
 type Row = typeof channels.$inferSelect
 
 type Values = Omit<typeof channels.$inferInsert, 'workspaceId'>
+
+type Kind = Channel['type']
+
+type OfKind<T, K extends Kind> = Extract<T, { type: K }>
 
 export type SecretColumn =
   'encryptedCredential' | 'encryptedWebhookToken' | 'encryptedAuthorization'
@@ -56,43 +61,6 @@ const webhookUrl = (apiPublicUrl: string, id: string) =>
 
 export const secretContext = (id: string, column: SecretColumn) => `channels/${id}/${column}`
 
-const toChannel = (row: Row, apiPublicUrl: string): Channel => {
-  const identity = {
-    id: row.id,
-    type: row.type,
-    direction: row.direction,
-    name: row.name,
-    tradingPartnerId: row.tradingPartnerId,
-  }
-
-  switch (row.type) {
-    case 'sftp':
-      return channelSchema.parse({
-        ...identity,
-        host: row.host,
-        port: row.port,
-        username: row.username,
-        remotePath: row.remotePath,
-        authentication: row.authentication,
-        credential: hidden,
-        ...(row.direction === 'inbound' && { pollingIntervalMinutes: row.pollingIntervalMinutes }),
-      })
-    case 'webhook':
-      return channelSchema.parse({
-        ...identity,
-        rateLimitPerMinute: row.rateLimitPerMinute,
-        url: webhookUrl(apiPublicUrl, row.id),
-        token: { lastFour: row.webhookTokenLastFour },
-      })
-    case 'http':
-      return channelSchema.parse({
-        ...identity,
-        url: row.url,
-        authorization: row.encryptedAuthorization === null ? null : hidden,
-      })
-  }
-}
-
 const sealed = (secrets: SecretBox, id: string, column: SecretColumn, plaintext: string) => ({
   [column]: secrets.seal(plaintext, secretContext(id, column)),
 })
@@ -102,60 +70,79 @@ const sealedToken = (secrets: SecretBox, id: string, token: string) => ({
   webhookTokenLastFour: token.slice(-4),
 })
 
-const settingsOf = (input: ChannelInput | ChannelUpdate) => {
-  const identity = {
-    type: input.type,
-    direction: input.direction,
-    name: input.name,
-    tradingPartnerId: input.tradingPartnerId,
-  }
-
-  switch (input.type) {
-    case 'sftp':
-      return {
-        ...identity,
-        host: input.host,
-        port: input.port,
-        username: input.username,
-        remotePath: input.remotePath,
-        authentication: input.authentication,
-        pollingIntervalMinutes: input.direction === 'inbound' ? input.pollingIntervalMinutes : null,
-      } satisfies Values
-    case 'webhook':
-      return { ...identity, rateLimitPerMinute: input.rateLimitPerMinute } satisfies Values
-    case 'http':
-      return { ...identity, url: input.url } satisfies Values
-  }
+interface KindHandling<K extends Kind> {
+  responseFields: (row: Row, apiPublicUrl: string) => object
+  columns: (input: OfKind<ChannelInput | ChannelUpdate, K>) => Partial<Values>
+  createdSecrets: (
+    secrets: SecretBox,
+    id: string,
+    input: OfKind<ChannelInput, K>,
+  ) => { columns: Partial<Values>; webhookToken: string | null }
+  changedSecrets: (
+    secrets: SecretBox,
+    id: string,
+    input: OfKind<ChannelUpdate, K>,
+  ) => Partial<Values>
 }
 
-const createdSecretsOf = (
-  secrets: SecretBox,
-  id: string,
-  input: ChannelInput,
-  webhookToken: string,
-) => {
-  switch (input.type) {
-    case 'sftp':
-      return sealed(secrets, id, 'encryptedCredential', input.credential)
-    case 'webhook':
-      return sealedToken(secrets, id, webhookToken)
-    case 'http':
-      return input.authorization === null
-        ? {}
-        : sealed(secrets, id, 'encryptedAuthorization', input.authorization)
-  }
-}
+type KindHandlings = { [K in Kind]: KindHandling<K> }
 
-// An omitted secret keeps the stored one.
-const changedSecretsOf = (secrets: SecretBox, id: string, input: ChannelUpdate) => {
-  switch (input.type) {
-    case 'sftp':
-      return input.credential === undefined
+const kinds: KindHandlings = {
+  sftp: {
+    responseFields: (row) => ({
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      remotePath: row.remotePath,
+      authentication: row.authentication,
+      credential: hidden,
+      ...(row.direction === 'inbound' && { pollingIntervalMinutes: row.pollingIntervalMinutes }),
+    }),
+    columns: (input) => ({
+      host: input.host,
+      port: input.port,
+      username: input.username,
+      remotePath: input.remotePath,
+      authentication: input.authentication,
+      pollingIntervalMinutes: input.direction === 'inbound' ? input.pollingIntervalMinutes : null,
+    }),
+    createdSecrets: (secrets, id, input) => ({
+      columns: sealed(secrets, id, 'encryptedCredential', input.credential),
+      webhookToken: null,
+    }),
+    changedSecrets: (secrets, id, input) =>
+      input.credential === undefined
         ? {}
-        : sealed(secrets, id, 'encryptedCredential', input.credential)
-    case 'webhook':
-      return {}
-    case 'http':
+        : sealed(secrets, id, 'encryptedCredential', input.credential),
+  },
+  webhook: {
+    responseFields: (row, apiPublicUrl) => ({
+      rateLimitPerMinute: row.rateLimitPerMinute,
+      url: webhookUrl(apiPublicUrl, row.id),
+      token: { lastFour: row.webhookTokenLastFour },
+    }),
+    columns: (input) => ({ rateLimitPerMinute: input.rateLimitPerMinute }),
+    createdSecrets: (secrets, id) => {
+      const webhookToken = newWebhookToken()
+
+      return { columns: sealedToken(secrets, id, webhookToken), webhookToken }
+    },
+    changedSecrets: () => ({}),
+  },
+  http: {
+    responseFields: (row) => ({
+      url: row.url,
+      authorization: row.encryptedAuthorization === null ? null : hidden,
+    }),
+    columns: (input) => ({ url: input.url }),
+    createdSecrets: (secrets, id, input) => ({
+      columns:
+        input.authorization === null
+          ? {}
+          : sealed(secrets, id, 'encryptedAuthorization', input.authorization),
+      webhookToken: null,
+    }),
+    changedSecrets: (secrets, id, input) => {
       if (input.authorization === undefined) {
         return {}
       }
@@ -163,8 +150,31 @@ const changedSecretsOf = (secrets: SecretBox, id: string, input: ChannelUpdate) 
       return input.authorization === null
         ? { encryptedAuthorization: null }
         : sealed(secrets, id, 'encryptedAuthorization', input.authorization)
-  }
+    },
+  },
 }
+
+const handlingOf = <K extends Kind>(type: K): KindHandling<K> => kinds[type]
+
+const identityOf = ({
+  type,
+  direction,
+  name,
+  tradingPartnerId,
+}: Row | ChannelInput | ChannelUpdate) =>
+  ({ type, direction, name, tradingPartnerId }) satisfies Partial<Values>
+
+const toChannel = (row: Row, apiPublicUrl: string): Channel =>
+  channelSchema.parse({
+    id: row.id,
+    ...identityOf(row),
+    ...handlingOf(row.type).responseFields(row, apiPublicUrl),
+  })
+
+const columnsOf = (input: ChannelInput | ChannelUpdate) => ({
+  ...identityOf(input),
+  ...handlingOf(input.type).columns(input),
+})
 
 const byId = (id: string) => eq(channels.id, id)
 
@@ -231,13 +241,9 @@ export const createChannel = (input: ChannelInput) =>
     const { secrets, apiPublicUrl } = yield* ChannelEnvironment
 
     const id = randomUUID()
-    const webhookToken = newWebhookToken()
+    const secretColumns = handlingOf(input.type).createdSecrets(secrets, id, input)
 
-    const values = {
-      id,
-      ...settingsOf(input),
-      ...createdSecretsOf(secrets, id, input, webhookToken),
-    }
+    const values = { id, ...columnsOf(input), ...secretColumns.columns }
 
     const rows = yield* writingWithTradingPartner(input.tradingPartnerId, (tx, workspaceId) =>
       tx
@@ -248,7 +254,7 @@ export const createChannel = (input: ChannelInput) =>
 
     return {
       channel: toChannel(yield* exactlyOne(rows), apiPublicUrl),
-      webhookToken: input.type === 'webhook' ? webhookToken : null,
+      webhookToken: secretColumns.webhookToken,
     } satisfies CreatedChannel
   })
 
@@ -299,7 +305,7 @@ export const updateChannel = (id: string, input: Effect.Effect<ChannelUpdate, Va
 
     return yield* updatingRow(
       id,
-      { ...settingsOf(changes), ...changedSecretsOf(secrets, id, changes) },
+      { ...columnsOf(changes), ...handlingOf(changes.type).changedSecrets(secrets, id, changes) },
       changes.tradingPartnerId,
     )
   })

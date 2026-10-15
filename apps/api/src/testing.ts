@@ -8,9 +8,11 @@ import { startTestDatabase } from '@edi-bridge/db/testing'
 
 import { buildApp } from './app.js'
 import { developmentWorkspace } from './development-workspace.js'
+import { secretKeyBytes } from './secret.js'
 import { addUser, storePassword } from './user.js'
 
 import type { AuthSettings } from './auth.js'
+import type { ChannelSettings } from './channel.js'
 import type { Database } from './db.js'
 
 export const ownWorkspace = { ...developmentWorkspace, gln: null }
@@ -29,8 +31,8 @@ export const testAuth: AuthSettings = {
   trustedOrigins: [webOrigin],
 }
 
-export const testChannels = {
-  secretKey: Buffer.alloc(32, 'test-channel-secret-key'),
+export const testChannels: ChannelSettings = {
+  secretKey: Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'),
   apiPublicUrl: 'http://localhost:3001',
 }
 

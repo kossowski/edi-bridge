@@ -4,6 +4,8 @@ import { localDatabaseUrl } from '@edi-bridge/db'
 
 import { secretKeyBytes } from './secret.js'
 
+import type { ChannelSettings } from './channel.js'
+
 const secretKeySchema = z
   .base64()
   .transform((value) => Buffer.from(value, 'base64'))
@@ -57,7 +59,7 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
       baseUrl: env.data.BETTER_AUTH_URL,
       trustedOrigins: webOrigin === undefined ? [] : [webOrigin],
     },
-    channels: { secretKey: env.data.CHANNEL_SECRET_KEY, apiPublicUrl },
+    channels: { secretKey: env.data.CHANNEL_SECRET_KEY, apiPublicUrl } satisfies ChannelSettings,
   }
 }
 

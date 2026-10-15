@@ -15,7 +15,7 @@ const encode = (bytes: Buffer) => bytes.toString('base64url')
 
 const decode = (text: string) => Buffer.from(text, 'base64url')
 
-// The context is bound as additional data, so a sealed secret cannot be moved to another row or column.
+// The context as AAD pins a sealed secret to its row and column.
 export function secretBox(key: Buffer): SecretBox {
   if (key.length !== secretKeyBytes) {
     throw new Error(`A secret key has ${secretKeyBytes} bytes`)

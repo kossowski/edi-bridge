@@ -62,6 +62,7 @@ import {
 import { type AuthSettings, mountAuth } from './auth.js'
 import {
   ChannelEnvironment,
+  type ChannelSettings,
   createChannel,
   listChannels,
   loadChannel,
@@ -139,7 +140,7 @@ export type Probe = () => Promise<void>
 
 export interface AppDependencies {
   auth: AuthSettings
-  channels: { secretKey: Buffer; apiPublicUrl: string }
+  channels: ChannelSettings
   database: Database
   logger?: boolean
   probes: { postgres: Probe; redis: Probe }
