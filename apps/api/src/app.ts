@@ -10,6 +10,7 @@ import {
   channelsEndpoint,
   createChannelEndpoint,
   regenerateWebhookTokenEndpoint,
+  testChannelEndpoint,
   updateChannelEndpoint,
   createDocumentStructureEndpoint,
   createFlowEndpoint,
@@ -65,6 +66,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { type AuthSettings, mountAuth } from './auth.js'
+import { ChannelReach, channelReach } from './channel-reach.js'
 import {
   ChannelEnvironment,
   type ChannelSettings,
@@ -72,6 +74,7 @@ import {
   listChannels,
   loadChannel,
   regenerateWebhookToken,
+  testChannel,
   updateChannel,
 } from './channel.js'
 import { type Database, Db } from './db.js'
@@ -244,6 +247,8 @@ function registerRoutes(
     apiPublicUrl: channelSettings.apiPublicUrl,
   }
 
+  const reach = channelReach({ timeoutMs: channelSettings.reachTimeoutMs })
+
   app.get('/health', { logLevel: 'silent' }, async (_request, reply) => {
     const [postgres, redis] = await Promise.all([
       check(probes.postgres, probeTimeoutMs),
@@ -261,7 +266,7 @@ function registerRoutes(
 
   const run = <A>(
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, ChannelEnvironment | Db>,
+    effect: Effect.Effect<A, Failure, ChannelEnvironment | ChannelReach | Db>,
     status: number,
   ) =>
     Effect.runPromise(
@@ -272,6 +277,7 @@ function registerRoutes(
         ),
         Effect.provideService(Db, database),
         Effect.provideService(ChannelEnvironment, channelEnvironment),
+        Effect.provideService(ChannelReach, reach),
       ),
     )
 
@@ -280,7 +286,11 @@ function registerRoutes(
   const respond = async <A>(
     request: FastifyRequest,
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, ChannelEnvironment | CurrentMember | CurrentWorkspace | Db>,
+    effect: Effect.Effect<
+      A,
+      Failure,
+      ChannelEnvironment | ChannelReach | CurrentMember | CurrentWorkspace | Db
+    >,
     status = 200,
   ) => {
     const member = await resolveMember(auth, database, request)
@@ -407,6 +417,10 @@ function registerRoutes(
 
   app.post<{ Params: { id: string } }>(regenerateWebhookTokenEndpoint.path, (request, reply) =>
     respond(request, reply, regenerateWebhookToken(request.params.id)),
+  )
+
+  app.post<{ Params: { id: string } }>(testChannelEndpoint.path, (request, reply) =>
+    respond(request, reply, testChannel(request.params.id)),
   )
 
   app.get(flowsEndpoint.path, (request, reply) => respond(request, reply, listFlows))

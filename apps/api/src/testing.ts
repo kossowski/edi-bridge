@@ -34,6 +34,7 @@ export const testAuth: AuthSettings = {
 export const testChannels: ChannelSettings = {
   secretKey: Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'),
   apiPublicUrl: 'http://localhost:3001',
+  reachTimeoutMs: 1500,
 }
 
 const up = () => Promise.resolve()
