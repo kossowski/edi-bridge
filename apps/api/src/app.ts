@@ -12,6 +12,7 @@ import {
   regenerateWebhookTokenEndpoint,
   updateChannelEndpoint,
   createDocumentStructureEndpoint,
+  createFlowEndpoint,
   createInviteEndpoint,
   createLookupTableEndpoint,
   createMappingEndpoint,
@@ -20,6 +21,8 @@ import {
   deleteLookupTableEndpoint,
   documentStructureEndpoint,
   documentStructuresEndpoint,
+  flowEndpoint,
+  flowsEndpoint,
   inferDocumentStructureEndpoint,
   importLookupTableEndpoint,
   inviteUnusableProblem,
@@ -39,6 +42,7 @@ import {
   mappingVersionEndpoint,
   mappingVersionsEndpoint,
   messageTypeStructureEndpoint,
+  moveFlowMappingVersionEndpoint,
   operatorWorkspaceMembersEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
@@ -54,6 +58,7 @@ import {
   updateLookupTableEndpoint,
   updateCompanyIdentityEndpoint,
   updateDocumentStructureEndpoint,
+  updateFlowEndpoint,
   updateTradingPartnerEndpoint,
   workspaceInvitesEndpoint,
   workspaceMembersEndpoint,
@@ -77,6 +82,7 @@ import {
   loadDocumentStructure,
   updateDocumentStructure,
 } from './document-structure.js'
+import { createFlow, listFlows, loadFlow, moveFlowMappingVersion, updateFlow } from './flow.js'
 import { acceptInvite, createInvite, listInvites, revokeInvite } from './invite.js'
 import {
   createLookupTable,
@@ -401,6 +407,40 @@ function registerRoutes(
 
   app.post<{ Params: { id: string } }>(regenerateWebhookTokenEndpoint.path, (request, reply) =>
     respond(request, reply, regenerateWebhookToken(request.params.id)),
+  )
+
+  app.get(flowsEndpoint.path, (request, reply) => respond(request, reply, listFlows))
+
+  app.get<{ Params: { id: string } }>(flowEndpoint.path, (request, reply) =>
+    respond(request, reply, loadFlow(request.params.id)),
+  )
+
+  app.post(createFlowEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(createFlowEndpoint.body, request.body), createFlow),
+      201,
+    ),
+  )
+
+  app.put<{ Params: { id: string } }>(updateFlowEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      updateFlow(request.params.id, parse(updateFlowEndpoint.body, request.body)),
+    ),
+  )
+
+  app.post<{ Params: { id: string } }>(moveFlowMappingVersionEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      moveFlowMappingVersion(
+        request.params.id,
+        parse(moveFlowMappingVersionEndpoint.body, request.body),
+      ),
+    ),
   )
 
   app.get(lookupTablesEndpoint.path, (request, reply) => respond(request, reply, listLookupTables))

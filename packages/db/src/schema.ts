@@ -395,3 +395,36 @@ export const channels = pgTable(
     ),
   ],
 )
+
+export const flows = pgTable(
+  'flows',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    tradingPartnerId: uuid()
+      .notNull()
+      .references(() => tradingPartners.id, { onDelete: 'cascade' }),
+    messageType: messageType().notNull(),
+    name: text().notNull(),
+    inboundChannelId: uuid()
+      .notNull()
+      .references(() => channels.id),
+    destinationChannelId: uuid()
+      .notNull()
+      .references(() => channels.id),
+    mappingVersionId: uuid()
+      .notNull()
+      .references(() => mappingVersions.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index().on(table.workspaceId),
+    index().on(table.tradingPartnerId),
+    index().on(table.inboundChannelId),
+    index().on(table.destinationChannelId),
+    index().on(table.mappingVersionId),
+  ],
+)
