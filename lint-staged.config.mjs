@@ -3,10 +3,7 @@
  * @type {import('lint-staged').Configuration}
  */
 const config = {
-  '{apps,packages/!(oxlint-config)}/**/*.{js,mjs,ts,tsx}': [
-    'oxlint --fix',
-    'eslint --fix --no-warn-ignored',
-  ],
+  '{apps,packages/!(oxlint-config)}/**/*.{js,mjs,ts,tsx}': 'oxlint --fix',
   '*': 'prettier --write --ignore-unknown',
 }
 

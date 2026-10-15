@@ -92,7 +92,7 @@ export function DocumentContent({ run }: { run: RunDetail }) {
       </p>
       <div
         role="region"
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll many lines
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll many lines
         tabIndex={0}
         aria-label={t('label')}
         className="focus-visible:ring-ring/50 max-h-[32rem] overflow-auto rounded-lg border outline-none focus-visible:ring-3">

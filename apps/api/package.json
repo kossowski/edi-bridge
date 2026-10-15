@@ -8,8 +8,8 @@
     "build": "tsdown",
     "start": "node --env-file-if-exists=../../.env dist/main.js",
     "create-operator": "tsx --env-file-if-exists=../../.env src/create-operator.ts",
-    "lint": "oxlint && eslint",
-    "lint:fix": "oxlint --fix && eslint --fix",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -30,13 +30,11 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@edi-bridge/eslint-config": "workspace:*",
     "@edi-bridge/oxlint-config": "workspace:*",
     "@edi-bridge/typescript-config": "workspace:*",
     "@edi-bridge/vitest-config": "workspace:*",
     "@types/node": "^24",
     "@types/ssh2": "^1.15.6",
-    "eslint": "^10.12.0",
     "oxlint": "1.87.0",
     "testcontainers": "^12.2.1",
     "tsdown": "^0.23.1",

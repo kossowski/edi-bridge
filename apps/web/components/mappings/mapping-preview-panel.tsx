@@ -64,7 +64,7 @@ export function DocumentText({
   return (
     <pre
       role="region"
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Document
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll a long Document
       tabIndex={0}
       aria-busy={busy}
       aria-label={label}

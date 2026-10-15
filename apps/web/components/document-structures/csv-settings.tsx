@@ -208,7 +208,7 @@ export function FirstRows({
       </figcaption>
       <div
         role="region"
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll wide rows
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need a tab stop to scroll wide rows
         tabIndex={0}
         aria-label={t('label', { fileName: file.fileName })}
         className="focus-visible:ring-ring/50 max-h-64 overflow-auto rounded-lg border outline-none focus-visible:ring-3">
