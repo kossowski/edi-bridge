@@ -1,0 +1,330 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+
+import type { InjectOptions } from 'fastify'
+
+import {
+  createDocumentStructureEndpoint,
+  createLookupTableEndpoint,
+  createMappingEndpoint,
+  documentStructureOrigins,
+  documentStructureSchema,
+  lookupTableSchema,
+  type LookupTableEntry,
+  type MappingGraph,
+  mappingPreviewEndpoint,
+  mappingPreviewSchema,
+  mappingSampleSchema,
+  mappingSamplesEndpoint,
+  mappingSummarySchema,
+  toPath,
+} from '@edi-bridge/contracts'
+import { type Connection, documentStructures, lookupTables, mappings } from '@edi-bridge/db'
+
+import { type Client, startTestApi, type TestApi } from './testing.js'
+
+let api: TestApi
+
+let connection: Connection
+
+let admin: Client
+
+let otherAdmin: Client
+
+let viewer: Client
+
+beforeAll(async () => {
+  api = await startTestApi()
+  ;({ connection, admin, otherAdmin, viewer } = api)
+}, 60_000)
+
+afterAll(async () => {
+  await api.stop()
+})
+
+beforeEach(async () => {
+  await connection.db.delete(mappings)
+  await connection.db.delete(documentStructures)
+  await connection.db.delete(lookupTables)
+})
+
+const order = {
+  orderNumber: 'PO-2026-10417',
+  orderDate: '2026-10-02',
+  currency: 'EUR',
+  note: null,
+  buyer: { gln: '4012345000016', name: 'Hansemarkt GmbH', city: 'Lübeck' },
+  lines: [
+    { lineNumber: 1, gtin: '04012345123456', quantity: 24, netPrice: 1.89, promotion: true },
+    { lineNumber: 2, gtin: '04012345654321', quantity: 12.5, netPrice: 3 },
+  ],
+  tags: ['express'],
+}
+
+type Origin = (typeof documentStructureOrigins)[keyof typeof documentStructureOrigins]
+
+const createdMapping = async (
+  messageType: string,
+  origin: Origin = documentStructureOrigins.jsonDocument,
+  target = admin,
+) => {
+  const structure = await target.inject({
+    method: 'POST',
+    url: createDocumentStructureEndpoint.path,
+    body: { name: 'ERP orders', origin },
+  })
+
+  expect(structure.statusCode).toBe(201)
+
+  const response = await target.inject({
+    method: 'POST',
+    url: createMappingEndpoint.path,
+    body: { messageType },
+  })
+
+  expect(response.statusCode).toBe(201)
+
+  return {
+    mapping: mappingSummarySchema.parse(response.json()),
+    structure: documentStructureSchema.parse(structure.json()),
+  }
+}
+
+const samplesOf = (id: string, target = admin) =>
+  target.inject({ method: 'GET', url: toPath(mappingSamplesEndpoint.path, { id }) })
+
+describe('GET /mappings/:id/samples', () => {
+  it("answers the Document Structure's sample for an outbound Mapping", async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    const response = await samplesOf(mapping.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(mappingSampleSchema.array().parse(response.json())).toEqual([
+      { id: structure.id, name: 'order.json', document: { format: 'json', content: order } },
+    ])
+  })
+
+  it('answers no Sample Document for an inbound Mapping', async () => {
+    const { mapping } = await createdMapping('ORDERS')
+
+    const response = await samplesOf(mapping.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual([])
+  })
+
+  it('answers no Sample Document for a Document Structure made from a JSON Schema', async () => {
+    const { mapping } = await createdMapping('INVOIC', documentStructureOrigins.jsonSchema)
+
+    expect((await samplesOf(mapping.id)).json()).toEqual([])
+  })
+
+  it('answers 404 for a Mapping of another Workspace', async () => {
+    const { mapping } = await createdMapping('INVOIC', undefined, otherAdmin)
+
+    expect((await samplesOf(mapping.id)).statusCode).toBe(404)
+  })
+})
+
+const invoice: MappingGraph = {
+  links: [
+    { sourcePath: 'orderNumber', targetPath: 'BGM/1004' },
+    { sourcePath: 'orderDate', targetPath: 'DTM+137/C507/2380' },
+    { sourcePath: 'buyer.gln', targetPath: 'SG2+BY/NAD+BY/C082/3039' },
+    { sourcePath: 'buyer.gln', targetPath: 'SG2+SU/NAD+SU/C082/3039' },
+  ],
+  transforms: [],
+  transformLinks: [],
+}
+
+const invoiceText = [
+  "UNH+1+INVOIC:D:96A:UN:EAN008'",
+  "BGM++PO-2026-10417'",
+  "DTM+137:2026-10-02'",
+  "NAD+BY+4012345000016::9'",
+  "NAD+SU+4012345000016::9'",
+  "CUX+2:EUR:4'",
+  "UNS+S'",
+  "MOA+77'",
+  "UNT+9+1'",
+].join('\n')
+
+const unknownId = '0b6f1a7e-2c4d-4e8f-9a1b-3c5d7e9f1a2b'
+
+const postLookupTable = async (entries: LookupTableEntry[], target = admin) => {
+  const response = await target.inject({
+    method: 'POST',
+    url: createLookupTableEndpoint.path,
+    body: { name: 'Bestellnummern', kind: 'other', scope: { kind: 'workspace' }, entries },
+  })
+
+  expect(response.statusCode).toBe(201)
+
+  return lookupTableSchema.parse(response.json()).id
+}
+
+const lookupTransformId = '6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f'
+
+const withOrderNumberLookup = (lookupTableId: string): MappingGraph => ({
+  links: invoice.links.filter(({ targetPath }) => targetPath !== 'BGM/1004'),
+  transforms: [
+    {
+      id: lookupTransformId,
+      kind: 'lookupTable',
+      position: { x: 320, y: 80 },
+      config: { lookupTableId, fallback: 'fail' },
+    },
+  ],
+  transformLinks: [
+    {
+      from: { kind: 'source', path: 'orderNumber' },
+      to: { kind: 'transform', transformId: lookupTransformId, input: 'value' },
+    },
+    {
+      from: { kind: 'transform', transformId: lookupTransformId, output: 'value' },
+      to: { kind: 'target', path: 'BGM/1004' },
+    },
+  ],
+})
+
+const preview = (id: string, body: NonNullable<InjectOptions['body']>, target = admin) =>
+  target.inject({ method: 'POST', url: toPath(mappingPreviewEndpoint.path, { id }), body })
+
+describe('POST /mappings/:id/preview', () => {
+  it('runs the mapping engine on the Sample Document with the graph it is sent', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    const response = await preview(mapping.id, { sampleId: structure.id, graph: invoice })
+
+    expect(response.statusCode).toBe(200)
+    expect(mappingPreviewSchema.parse(response.json())).toEqual({
+      sampleId: structure.id,
+      document: { format: 'edifact', content: invoiceText },
+      notes: [],
+    })
+  })
+
+  it('answers 200 to a Viewer, since a preview changes nothing', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    const response = await preview(mapping.id, { sampleId: structure.id, graph: invoice }, viewer)
+
+    expect(response.statusCode).toBe(200)
+  })
+
+  it("translates with the Workspace's Lookup Tables", async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    const lookupTableId = await postLookupTable([
+      { sourceCode: 'PO-2026-10417', targetCode: '10417' },
+    ])
+
+    const response = await preview(mapping.id, {
+      sampleId: structure.id,
+      graph: withOrderNumberLookup(lookupTableId),
+    })
+
+    expect(mappingPreviewSchema.parse(response.json())).toEqual({
+      sampleId: structure.id,
+      document: {
+        format: 'edifact',
+        content: invoiceText.replace('PO-2026-10417', '10417'),
+      },
+      notes: [],
+    })
+  })
+
+  it('answers the error of the engine as a note on an empty target', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    const lookupTableId = await postLookupTable([{ sourceCode: 'PO-1', targetCode: '1' }])
+
+    const response = await preview(mapping.id, {
+      sampleId: structure.id,
+      graph: withOrderNumberLookup(lookupTableId),
+    })
+
+    expect(mappingPreviewSchema.parse(response.json())).toEqual({
+      sampleId: structure.id,
+      document: { format: 'edifact', content: '' },
+      notes: [{ targetPath: 'BGM/1004', transformId: lookupTransformId, code: 'noLookupMatch' }],
+    })
+  })
+
+  it.each([
+    [
+      'a required value nobody links',
+      'missingRequiredValue',
+      'SG2+SU/NAD+SU/C082/3039',
+      {
+        ...invoice,
+        links: invoice.links.filter(({ targetPath }) => !targetPath.startsWith('SG2+SU')),
+      },
+    ],
+    [
+      'a link to an element the Message Type does not have',
+      'brokenLink',
+      'BGM/9999',
+      {
+        ...invoice,
+        links: [...invoice.links, { sourcePath: 'currency', targetPath: 'BGM/9999' }],
+      },
+    ],
+  ])('answers a note for %s', async (_, code, targetPath, graph) => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    const response = await preview(mapping.id, { sampleId: structure.id, graph })
+
+    expect(mappingPreviewSchema.parse(response.json()).notes).toEqual([
+      { targetPath, transformId: null, code },
+    ])
+  })
+
+  it('does not read the Lookup Tables of another Workspace', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    const foreignTableId = await postLookupTable(
+      [{ sourceCode: 'PO-2026-10417', targetCode: '10417' }],
+      otherAdmin,
+    )
+
+    const response = await preview(mapping.id, {
+      sampleId: structure.id,
+      graph: withOrderNumberLookup(foreignTableId),
+    })
+
+    expect(mappingPreviewSchema.parse(response.json()).notes).toEqual([
+      { targetPath: 'BGM/1004', transformId: lookupTransformId, code: 'unknownLookupTable' },
+    ])
+  })
+
+  it('answers 404 for a sample the Mapping does not have', async () => {
+    const { mapping } = await createdMapping('INVOIC')
+
+    const response = await preview(mapping.id, { sampleId: unknownId, graph: invoice })
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  it('answers 404 for an inbound Mapping, which has no Sample Document yet', async () => {
+    const { mapping, structure } = await createdMapping('ORDERS')
+
+    const response = await preview(mapping.id, { sampleId: structure.id, graph: invoice })
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  it('answers 400 for a body without a graph', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC')
+
+    expect((await preview(mapping.id, { sampleId: structure.id })).statusCode).toBe(400)
+  })
+
+  it('answers 404 for a Mapping of another Workspace', async () => {
+    const { mapping, structure } = await createdMapping('INVOIC', undefined, otherAdmin)
+
+    const response = await preview(mapping.id, { sampleId: structure.id, graph: invoice })
+
+    expect(response.statusCode).toBe(404)
+  })
+})

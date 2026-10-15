@@ -28,6 +28,8 @@ import {
   maxEncodedFileBytes,
   mappingComparisonEndpoint,
   mappingDraftEndpoint,
+  mappingPreviewEndpoint,
+  mappingSamplesEndpoint,
   mappingsEndpoint,
   maxLookupTableCsvLength,
   mappingVersionEndpoint,
@@ -74,6 +76,7 @@ import {
   suggestLookupTableEntries,
   updateLookupTable,
 } from './lookup-table.js'
+import { listMappingSamples, previewMapping } from './mapping-preview.js'
 import {
   compareMappingVersions,
   listMappingVersions,
@@ -166,6 +169,9 @@ const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024
 
 const readMethods = new Set(['GET', 'HEAD'])
 
+// A preview takes the graph in its body, but changes nothing.
+export const readsWithBody = new Set<string>([mappingPreviewEndpoint.path])
+
 type CheckStatus = 'down' | 'up'
 
 const check = (probe: Probe, timeoutMs: number): Promise<CheckStatus> =>
@@ -246,9 +252,10 @@ function registerRoutes(
 
     const active = Effect.andThen(recordActivity, effect)
 
-    const guarded = readMethods.has(request.method)
-      ? active
-      : Effect.andThen(requireChangeRight, active)
+    const guarded =
+      readMethods.has(request.method) || readsWithBody.has(request.routeOptions.url ?? '')
+        ? active
+        : Effect.andThen(requireChangeRight, active)
 
     return run(
       reply,
@@ -476,6 +483,18 @@ function registerRoutes(
       request,
       reply,
       saveMappingDraft(request.params.id, parse(saveMappingDraftEndpoint.body, request.body)),
+    ),
+  )
+
+  app.get<{ Params: { id: string } }>(mappingSamplesEndpoint.path, (request, reply) =>
+    respond(request, reply, listMappingSamples(request.params.id)),
+  )
+
+  app.post<{ Params: { id: string } }>(mappingPreviewEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      previewMapping(request.params.id, parse(mappingPreviewEndpoint.body, request.body)),
     ),
   )
 

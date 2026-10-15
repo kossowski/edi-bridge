@@ -25,6 +25,7 @@ import {
   lookupTablesEndpoint,
   mappingComparisonEndpoint,
   mappingDraftEndpoint,
+  mappingSamplesEndpoint,
   mappingVersionEndpoint,
   mappingVersionsEndpoint,
   mappingsEndpoint,
@@ -49,7 +50,7 @@ import {
   workspaceMembersEndpoint,
 } from '@edi-bridge/contracts'
 
-import { buildApp } from './app.js'
+import { buildApp, readsWithBody } from './app.js'
 import {
   addMember,
   type Client,
@@ -168,6 +169,7 @@ const workspaceReads = (): string[] => [
   withId(documentStructureEndpoint.path, ids.documentStructure),
   mappingsEndpoint.path,
   withId(mappingDraftEndpoint.path, ids.mapping),
+  withId(mappingSamplesEndpoint.path, ids.mapping),
   toPath(mappingVersionsEndpoint.path, { mappingId: ids.mapping }),
   toPath(mappingVersionEndpoint.path, { mappingId: ids.mapping, versionId: ids.mappingVersion }),
   `${toPath(mappingComparisonEndpoint.path, { mappingId: ids.mapping })}?from=${ids.mappingVersion}&to=${ids.laterMappingVersion}`,
@@ -379,7 +381,8 @@ describe('the changes', () => {
         ({ method, url }) =>
           !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
           !url.startsWith('/auth/') &&
-          !publicChanges.has(url),
+          !publicChanges.has(url) &&
+          !readsWithBody.has(url),
       )
       .filter(({ method, url }) =>
         changes.every(([, request]) => {
