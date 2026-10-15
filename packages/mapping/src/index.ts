@@ -2,6 +2,8 @@ export { applyMappingVersion } from './apply'
 
 export { MappingError, mappingErrorCodes } from './errors'
 
+export { documentEntries, messageEntries } from './entries'
+
 export { applyInboundMappingVersion } from './inbound'
 
 export {
