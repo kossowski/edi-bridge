@@ -147,14 +147,21 @@ const intoTarget = (path: string, id = transformId, output = 'value'): Transform
 
 const orderWithoutNumber = orderHeader.filter(({ targetPath }) => targetPath !== 'BGM/1004')
 
-const orderVia = (
+function orderVia(
   transform: Pick<MappingTransform, 'kind' | 'config'>,
   transformLinks: TransformLink[],
-) =>
-  outboundVersion('ORDERS', [...orderWithoutNumber, ...orderLines], {
-    transforms: [loop, transformOf(transformId, transform)],
-    transformLinks: [...looped('lines[]', 'SG25', 'SG25/LIN/1082'), ...transformLinks],
-  })
+) {
+  const replaced = transformLinks.flatMap(({ to }) => (to.kind === 'target' ? [to.path] : []))
+
+  return outboundVersion(
+    'ORDERS',
+    [...orderHeader, ...orderLines].filter(({ targetPath }) => !replaced.includes(targetPath)),
+    {
+      transforms: [loop, transformOf(transformId, transform)],
+      transformLinks: [...looped('lines[]', 'SG25', 'SG25/LIN/1082'), ...transformLinks],
+    },
+  )
+}
 
 const orderWithLine = { ...order, lines: [{ gtin: '4000862141404', quantity: 12 }] }
 
@@ -715,6 +722,54 @@ describe('applyMappingVersion', () => {
     expect(failure(version, { ...orderWithLine, prefix: 'PO' })).toMatchObject({
       code: 'invalidTransform',
       targetPath: 'BGM/1004',
+      transformId,
+    })
+  })
+
+  it.each([
+    ['yyyy-MM-dd', 'yyyyMMdd', '2026-10-14', '20261014'],
+    ['dd.MM.yy', 'yyyyMMdd', '14.10.26', '20261014'],
+    ['yyyy-MM-ddTHH:mm:ss', 'yyyyMMddHHmm', '2026-10-14T09:30:00', '202610140930'],
+    ['yyyyMMdd', 'yyyyMMddHHmm', '20261014', '202610140000'],
+    ['yyyyMMdd', 'dd/MM/yyyy', '20240229', '29/02/2024'],
+  ])('date format reads %s and writes %s', (from, to, date, expected) => {
+    const version = orderVia({ kind: 'dateFormat', config: { from, to } }, [
+      fromSource('orderDate'),
+      intoTarget('DTM+137/C507/2380'),
+    ])
+
+    expect(apply(version, { ...orderWithLine, orderDate: date }).segments[1]).toEqual({
+      tag: 'DTM',
+      elements: [['137', expected, '102']],
+    })
+  })
+
+  it('date format leaves an empty date empty', () => {
+    const version = orderVia(
+      { kind: 'dateFormat', config: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' } },
+      [fromSource('orderDate'), intoTarget('DTM+137/C507/2380')],
+    )
+
+    expect(apply(version, { ...orderWithLine, orderDate: '' }).segments[1]).toEqual({
+      tag: 'DTM',
+      elements: [['137', '', '102']],
+    })
+  })
+
+  it.each([
+    ['in another pattern', '14.10.2026'],
+    ['with a day the month lacks', '2026-02-29'],
+    ['with a month past December', '2026-13-01'],
+    ['with characters after the pattern', '2026-10-14 09:30'],
+  ])('date format fails naming the target element for a date %s', (_, date) => {
+    const version = orderVia(
+      { kind: 'dateFormat', config: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' } },
+      [fromSource('orderDate'), intoTarget('DTM+137/C507/2380')],
+    )
+
+    expect(failure(version, { ...orderWithLine, orderDate: date })).toMatchObject({
+      code: 'invalidDate',
+      targetPath: 'DTM+137/C507/2380',
       transformId,
     })
   })

@@ -21,10 +21,12 @@ import {
 
 import type { Element, Message, Segment } from '@edi-bridge/edifact'
 
+import { reformatDate } from './formats'
+
 export type OutboundMappingVersion = Extract<MappingVersion, { direction: 'outbound' }>
 
 export type MappingErrorCode =
-  'missingRequiredValue' | 'outsideLoop' | 'unknownTarget' | 'invalidTransform'
+  'missingRequiredValue' | 'outsideLoop' | 'unknownTarget' | 'invalidTransform' | 'invalidDate'
 
 export class MappingError extends Data.TaggedError('MappingError')<{
   readonly code: MappingErrorCode
@@ -116,8 +118,15 @@ const failedTransform = (code: MappingErrorCode, { targetPath }: Evaluation, tra
 function applied(
   transform: MappingTransform,
   args: Readonly<Record<string, string>>,
+  fail: (code: MappingErrorCode) => MappingError,
 ): Effect.Effect<string, MappingError> {
   const value = args.value ?? ''
+
+  const formatted = (format: () => string | undefined, code: MappingErrorCode) => {
+    const result = value === '' ? '' : format()
+
+    return result === undefined ? Effect.fail(fail(code)) : Effect.succeed(result)
+  }
 
   switch (transform.kind) {
     case 'constant':
@@ -136,6 +145,11 @@ function applied(
       return Effect.succeed(value.slice(start, length === null ? undefined : start + length))
     }
 
+    case 'dateFormat':
+      return formatted(
+        () => reformatDate(value, transform.config.from, transform.config.to),
+        'invalidDate',
+      )
     default:
       return Effect.succeed(value)
   }
@@ -168,7 +182,10 @@ function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<strin
         (value): readonly [string, string] => [input, value],
       )
     }),
-    (args) => applied(transform, Object.fromEntries(args)),
+    (args) =>
+      applied(transform, Object.fromEntries(args), (code) =>
+        failedTransform(code, evaluation, transform.id),
+      ),
   )
 }
 
