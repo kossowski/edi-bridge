@@ -19,6 +19,7 @@ import {
   tradingPartnerActivitySchema,
 } from '@edi-bridge/contracts'
 
+import { allOf, type Listing } from './listing'
 import { notFound, serverError } from './responses'
 import { type RunStore, toRunStore } from './run-store'
 import { type TradingPartnerStore, toTradingPartnerStore } from './trading-partner'
@@ -27,8 +28,6 @@ import {
   workspaceActivityOf,
   type WorkspaceActivityState,
 } from './workspace-activity'
-
-type Listing<T> = ReadonlyArray<T> | { all: () => readonly T[] }
 
 type PartnerFlow = Pick<FlowSummary, 'id' | 'name' | 'tradingPartnerId'>
 
@@ -40,10 +39,6 @@ export type TradingPartnerActivityData = {
   overdueAcknowledgements: ReadonlyArray<OverdueAcknowledgement>
   flows: Listing<PartnerFlow>
   channels: Listing<PartnerChannel>
-}
-
-function allOf<T>(listing: Listing<T>): readonly T[] {
-  return 'all' in listing ? listing.all() : listing
 }
 
 const day = 24 * 60 * 60 * 1000

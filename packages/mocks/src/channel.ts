@@ -25,12 +25,13 @@ import {
   webhookTokenSchema,
 } from '@edi-bridge/contracts'
 
+import { allOf, type Listing } from './listing'
 import { badRequest, conflict, notFound, unprocessable } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { hasTraffic, seedTradingPartners } from './trading-partner'
 
-import type { FlowRecord, FlowStore } from './flow'
+import type { FlowRecord } from './flow'
 
 type WebhookInput = Extract<ChannelInput, { type: 'webhook' }>
 
@@ -361,10 +362,8 @@ export const seedConnectionFailures: ReadonlyMap<string, ChannelTestFailureReaso
   rejectedLogin ? [[rejectedLogin.id, 'loginRejected']] : [],
 )
 
-function usedByFlow(flows: ReadonlyArray<FlowRecord> | FlowStore, channelId: string) {
-  const all = 'all' in flows ? flows.all() : flows
-
-  return all.some(
+function usedByFlow(flows: Listing<FlowRecord>, channelId: string) {
+  return allOf(flows).some(
     ({ inboundChannelId, destinationChannelId }) =>
       inboundChannelId === channelId || destinationChannelId === channelId,
   )
@@ -378,7 +377,7 @@ export function channelHandlers(
     connectionFailures = seedConnectionFailures,
   }: {
     channels?: ReadonlyArray<ChannelRecord> | ChannelStore
-    flows?: ReadonlyArray<FlowRecord> | FlowStore
+    flows?: Listing<FlowRecord>
     connectionFailures?: ReadonlyMap<string, ChannelTestFailureReason>
   } = {},
 ) {
