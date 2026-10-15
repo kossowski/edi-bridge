@@ -24,7 +24,15 @@ import {
 import { connect, type Connection, lookupTables, tradingPartners } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
-import { type Client, ownAdmin, signIn, startTestApi, type TestApi, testAuth } from './testing.js'
+import {
+  type Client,
+  ownAdmin,
+  signIn,
+  startTestApi,
+  type TestApi,
+  testAuth,
+  testChannels,
+} from './testing.js'
 
 import type { Transaction } from './db.js'
 
@@ -682,6 +690,7 @@ describe('a Lookup Table deleted right after a write', () => {
 
     deletingApp = buildApp({
       auth: testAuth,
+      channels: testChannels,
       database: deleting.db,
       probes: { postgres: up, redis: up },
     })

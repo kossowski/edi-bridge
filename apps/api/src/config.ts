@@ -2,6 +2,19 @@ import { z } from 'zod'
 
 import { localDatabaseUrl } from '@edi-bridge/db'
 
+import { secretKeyBytes } from './secret.js'
+
+const secretKeySchema = z
+  .base64()
+  .transform((value) => Buffer.from(value, 'base64'))
+  .refine(
+    (key) => key.length === secretKeyBytes,
+    `A key of ${secretKeyBytes} bytes, base64-encoded`,
+  )
+
+const developmentChannelSecretKey = () =>
+  Buffer.alloc(secretKeyBytes, 'edi-bridge-development-only')
+
 const envSchema = (production: boolean) =>
   z.object({
     DATABASE_URL: z.url().default(localDatabaseUrl),
@@ -12,6 +25,10 @@ const envSchema = (production: boolean) =>
     BETTER_AUTH_SECRET: production
       ? z.string().min(32)
       : z.string().min(32).default('edi-bridge-development-secret-not-for-production'),
+    CHANNEL_SECRET_KEY: production
+      ? secretKeySchema
+      : secretKeySchema.default(developmentChannelSecretKey),
+    API_PUBLIC_URL: z.url().optional(),
   })
 
 export function loadConfig(source: NodeJS.ProcessEnv) {
@@ -23,6 +40,13 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
 
   const webOrigin = env.data.WEB_ORIGIN
 
+  // Behind the reverse proxy the API answers under /api of the public origin.
+  const apiPublicUrl =
+    env.data.API_PUBLIC_URL ??
+    (source.NODE_ENV === 'production'
+      ? new URL('/api', env.data.BETTER_AUTH_URL).href
+      : env.data.BETTER_AUTH_URL)
+
   return {
     databaseUrl: env.data.DATABASE_URL,
     redisUrl: env.data.REDIS_URL,
@@ -33,6 +57,7 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
       baseUrl: env.data.BETTER_AUTH_URL,
       trustedOrigins: webOrigin === undefined ? [] : [webOrigin],
     },
+    channels: { secretKey: env.data.CHANNEL_SECRET_KEY, apiPublicUrl },
   }
 }
 

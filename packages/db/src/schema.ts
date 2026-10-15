@@ -17,8 +17,10 @@ import {
 
 import {
   acknowledgementTimeLimitHours,
+  channelTypes,
   characterSets,
   type CsvSettings,
+  directions,
   documentFormats,
   type DocumentStructureNode,
   jsonRoots,
@@ -26,6 +28,7 @@ import {
   type MappingGraph,
   maxLookupCodeLength,
   messageTypes,
+  sftpAuthentications,
   workspaceRoles,
 } from '@edi-bridge/contracts'
 
@@ -312,5 +315,81 @@ export const mappingVersions = pgTable(
   (table) => [
     unique('mapping_versions_mapping_id_version_unique').on(table.mappingId, table.version),
     check('mapping_versions_version_positive', sql`${table.version} >= 1`),
+  ],
+)
+
+export const channelType = pgEnum('channel_type', channelTypes)
+
+export const direction = pgEnum('direction', directions)
+
+export const sftpAuthentication = pgEnum('sftp_authentication', sftpAuthentications)
+
+// The settings of one kind are all set, and those of every other kind are null.
+const settingsOf = (kind: SQL, columns: SQL[]) =>
+  sql`num_nonnulls(${sql.join(columns, sql`, `)}) = case when ${kind} then ${sql.raw(String(columns.length))} else 0 end`
+
+export const channels = pgTable(
+  'channels',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    tradingPartnerId: uuid().references(() => tradingPartners.id, { onDelete: 'cascade' }),
+    type: channelType().notNull(),
+    direction: direction().notNull(),
+    name: text().notNull(),
+    host: text(),
+    port: integer(),
+    username: text(),
+    remotePath: text(),
+    authentication: sftpAuthentication(),
+    encryptedCredential: text(),
+    pollingIntervalMinutes: integer(),
+    rateLimitPerMinute: integer(),
+    encryptedWebhookToken: text(),
+    webhookTokenLastFour: text(),
+    url: text(),
+    encryptedAuthorization: text(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index().on(table.workspaceId),
+    index().on(table.tradingPartnerId),
+    check(
+      'channels_kind',
+      sql`(${table.type}, ${table.direction}) in (('sftp', 'inbound'), ('sftp', 'outbound'), ('webhook', 'inbound'), ('http', 'outbound'))`,
+    ),
+    check(
+      'channels_sftp_settings',
+      settingsOf(sql`${table.type} = 'sftp'`, [
+        sql`${table.host}`,
+        sql`${table.port}`,
+        sql`${table.username}`,
+        sql`${table.remotePath}`,
+        sql`${table.authentication}`,
+        sql`${table.encryptedCredential}`,
+      ]),
+    ),
+    check(
+      'channels_polling_interval',
+      settingsOf(sql`${table.type} = 'sftp' and ${table.direction} = 'inbound'`, [
+        sql`${table.pollingIntervalMinutes}`,
+      ]),
+    ),
+    check(
+      'channels_webhook_settings',
+      settingsOf(sql`${table.type} = 'webhook'`, [
+        sql`${table.rateLimitPerMinute}`,
+        sql`${table.encryptedWebhookToken}`,
+        sql`${table.webhookTokenLastFour}`,
+      ]),
+    ),
+    check('channels_http_settings', settingsOf(sql`${table.type} = 'http'`, [sql`${table.url}`])),
+    check(
+      'channels_authorization',
+      sql`${table.type} = 'http' or ${table.encryptedAuthorization} is null`,
+    ),
   ],
 )

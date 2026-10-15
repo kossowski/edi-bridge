@@ -57,6 +57,13 @@
       "when": 1792057453090,
       "tag": "0007_mappings",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792073173957,
+      "tag": "0008_channels",
+      "breakpoints": true
     }
   ]
 }

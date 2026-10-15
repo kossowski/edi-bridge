@@ -29,6 +29,11 @@ export const testAuth: AuthSettings = {
   trustedOrigins: [webOrigin],
 }
 
+export const testChannels = {
+  secretKey: Buffer.alloc(32, 'test-channel-secret-key'),
+  apiPublicUrl: 'http://localhost:3001',
+}
+
 const up = () => Promise.resolve()
 
 export interface Credentials {
@@ -119,6 +124,7 @@ export async function startTestApi() {
 
   const app = buildApp({
     auth: testAuth,
+    channels: testChannels,
     database: connection.db,
     probes: { postgres: up, redis: up },
     webOrigin,
