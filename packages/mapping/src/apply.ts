@@ -294,9 +294,9 @@ function loopSegments(
 ): Effect.Effect<Segment[], MappingError> {
   const items = itemsOf(context, loop.sourcePart)
 
-  // A required group without items fails as one without values does.
+  // Header fields linked beneath the group would fill it, so they must not count without items.
   if (items.length === 0) {
-    const found = group.required ? firstMissingRequired(group.children, context.values) : undefined
+    const found = group.required ? firstMissingRequired(group.children, new Map()) : undefined
 
     return found === undefined ? Effect.succeed([]) : Effect.fail(missing(found))
   }

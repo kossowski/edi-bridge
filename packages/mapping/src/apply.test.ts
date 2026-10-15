@@ -367,6 +367,25 @@ describe('applyMappingVersion', () => {
     })
   })
 
+  it('fails naming the line quantity when the required line item group gets no lines, though header fields fill it', () => {
+    const version = outboundVersion(
+      'ORDERS',
+      [
+        ...orderHeader,
+        { sourcePath: 'gtin', targetPath: 'SG25/LIN/C212/7140' },
+        { sourcePath: 'quantity', targetPath: 'SG25/QTY+21/C186/6060' },
+      ],
+      orderLoop,
+    )
+
+    const document = { ...order, gtin: '4000862141404', quantity: 12, lines: [] }
+
+    expect(failure(version, document)).toMatchObject({
+      code: 'missingRequiredValue',
+      targetPath: 'SG25/QTY+21/C186/6060',
+    })
+  })
+
   it('repeats an optional line item group inside its enclosing group, and leaves it out without lines', () => {
     const version = outboundVersion(
       'DESADV',
