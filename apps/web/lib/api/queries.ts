@@ -32,6 +32,7 @@ import type {
   RunListQuery,
   Tasks,
   TradingPartner,
+  WorkspaceMember,
   WorkspaceSettings,
   WorkspaceSummary,
 } from '@edi-bridge/contracts'
@@ -168,6 +169,15 @@ export function storeRevokedInvite(queryClient: QueryClient, revoked: Invite) {
     (invites) => invites?.filter((invite) => invite.id !== revoked.id),
   )
   void queryClient.invalidateQueries({ queryKey: operatorWorkspacesQuery.queryKey })
+}
+
+export function storeRemovedMember(queryClient: QueryClient, workspaceId: string, userId: string) {
+  queryClient.setQueryData<WorkspaceMember[]>(
+    operatorWorkspaceMembersQuery(workspaceId).queryKey,
+    (members) => members?.filter((member) => member.id !== userId),
+  )
+  void queryClient.invalidateQueries({ queryKey: operatorWorkspacesQuery.queryKey })
+  void queryClient.invalidateQueries({ queryKey: workspaceMembersQuery.queryKey })
 }
 
 export function storeSavedOperatorWorkspaceSettings(

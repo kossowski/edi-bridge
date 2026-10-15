@@ -3984,6 +3984,16 @@
       "first": {
         "title": "Laden Sie das erste Mitglied ein",
         "description": "Noch kann sich niemand in diesem Arbeitsbereich anmelden. Erstellen Sie unten einen Einladungslink und geben Sie ihn weiter."
+      },
+      "remove": {
+        "trigger": "Entfernen",
+        "title": "{name} aus diesem Arbeitsbereich entfernen?",
+        "description": "Diese Person verliert sofort den Zugang und wird abgemeldet. Sie können sie jederzeit wieder einladen.",
+        "cancel": "Abbrechen",
+        "confirm": "Mitglied entfernen",
+        "removing": "Wird entfernt…",
+        "failed": "Das Mitglied konnte nicht entfernt werden. Versuchen Sie es erneut.",
+        "done": "{name} entfernt."
       }
     },
     "invites": {

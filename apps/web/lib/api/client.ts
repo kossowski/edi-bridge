@@ -70,6 +70,7 @@ import {
   messageTypeStructureEndpoint,
   type MoveFlowMappingVersionBody,
   operatorWorkspaceMembersEndpoint,
+  removeWorkspaceMemberEndpoint,
   operatorWorkspaceSettingsEndpoint,
   parseAiDraftEvent,
   operatorWorkspacesEndpoint,
@@ -311,6 +312,12 @@ export function acceptInviteRefusalOf(error: Error | null): AcceptInviteRefusal 
 export function listOperatorWorkspaceMembers(workspaceId: string) {
   return request(operatorWorkspaceMembersEndpoint, {
     path: toPath(operatorWorkspaceMembersEndpoint.path, { workspaceId }),
+  })
+}
+
+export function removeWorkspaceMember(workspaceId: string, userId: string) {
+  return request(removeWorkspaceMemberEndpoint, {
+    path: toPath(removeWorkspaceMemberEndpoint.path, { workspaceId, userId }),
   })
 }
 

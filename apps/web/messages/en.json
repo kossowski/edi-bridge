@@ -3984,6 +3984,16 @@
       "first": {
         "title": "Invite the first member",
         "description": "Nobody can sign in to this Workspace yet. Create an invite link below and pass it on."
+      },
+      "remove": {
+        "trigger": "Remove",
+        "title": "Remove {name} from this Workspace?",
+        "description": "This person loses access at once and is signed out. You can invite them again at any time.",
+        "cancel": "Cancel",
+        "confirm": "Remove member",
+        "removing": "Removing…",
+        "failed": "The member could not be removed. Try again.",
+        "done": "{name} removed."
       }
     },
     "invites": {

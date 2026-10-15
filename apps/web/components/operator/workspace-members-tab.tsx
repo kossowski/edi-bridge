@@ -9,11 +9,13 @@ import { Failure, Loading } from '@/components/detail-parts'
 import { RadioField, TextField } from '@/components/form-field'
 import { ListNote, MemberList } from '@/components/members/member-list'
 import { SettingsCard } from '@/components/settings/settings-card'
+import { useSession } from '@/hooks/use-session'
 import { useValidatedSubmit } from '@/hooks/use-validated-submit'
-import { createInvite, revokeInvite } from '@/lib/api/client'
+import { createInvite, removeWorkspaceMember, revokeInvite } from '@/lib/api/client'
 import {
   operatorWorkspaceMembersQuery,
   storeCreatedInvite,
+  storeRemovedMember,
   storeRevokedInvite,
   workspaceInvitesQuery,
 } from '@/lib/api/queries'
@@ -23,6 +25,7 @@ import {
   type InviteInput,
   inviteValidityDays,
   workspaceRoles,
+  type WorkspaceMember,
   type WorkspaceRole,
   type WorkspaceSummary,
 } from '@edi-bridge/contracts'
@@ -78,14 +81,164 @@ function CardQuery<Data>({
   return children(query.data)
 }
 
+function RemoveMemberDialog({
+  workspaceId,
+  member,
+  open,
+  opener,
+  onOpenChange,
+  onRemoved,
+}: {
+  workspaceId: string
+  member: WorkspaceMember | null
+  open: boolean
+  opener: RefObject<HTMLElement | null>
+  onOpenChange: (open: boolean) => void
+  onRemoved: (removed: WorkspaceMember) => void
+}) {
+  const t = useTranslations('Operator.members.remove')
+  const queryClient = useQueryClient()
+  const cancel = useRef<HTMLButtonElement>(null)
+
+  const remove = useMutation({
+    mutationFn: async (target: WorkspaceMember) => {
+      await removeWorkspaceMember(workspaceId, target.id)
+
+      return target
+    },
+    onSuccess: (removed) => {
+      onRemoved(removed)
+      storeRemovedMember(queryClient, workspaceId, removed.id)
+    },
+  })
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (remove.isPending) {
+          return
+        }
+
+        if (!next) {
+          remove.reset()
+        }
+
+        onOpenChange(next)
+      }}>
+      <AlertDialogContent
+        finalFocus={opener}
+        initialFocus={cancel}
+        aria-busy={remove.isPending || undefined}>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="wrap-anywhere">
+            {t('title', { name: member?.name ?? '' })}
+          </AlertDialogTitle>
+          <AlertDialogDescription>{t('description')}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {remove.isError && (
+          <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+            {t('failed')}
+          </p>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel
+            ref={cancel}
+            aria-disabled={remove.isPending || undefined}
+            className="aria-disabled:cursor-progress aria-disabled:opacity-50">
+            {t('cancel')}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            aria-disabled={remove.isPending || undefined}
+            className="aria-disabled:cursor-progress aria-disabled:opacity-50"
+            onClick={() => {
+              if (member && !remove.isPending) {
+                remove.mutate(member)
+              }
+            }}>
+            {remove.isPending ? t('removing') : t('confirm')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+function RemovableMembers({
+  workspaceId,
+  members,
+  currentUserId,
+}: {
+  workspaceId: string
+  members: readonly WorkspaceMember[]
+  currentUserId: string | undefined
+}) {
+  const t = useTranslations('Operator.members')
+  const count = useRef<HTMLParagraphElement>(null)
+  const opener = useRef<HTMLElement | null>(null)
+  const [target, setTarget] = useState<WorkspaceMember | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [removed, setRemoved] = useState<WorkspaceMember | null>(null)
+
+  return (
+    <>
+      <p role="status" className="sr-only">
+        {removed && t('remove.done', { name: removed.name })}
+      </p>
+      <MemberList
+        action={(member, nameId) =>
+          member.id === currentUserId ? null : (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-describedby={nameId}
+              onClick={(event) => {
+                opener.current = event.currentTarget
+                setTarget(member)
+                setDialogOpen(true)
+              }}>
+              {t('remove.trigger')}
+            </Button>
+          )
+        }
+        countRef={count}
+        currentUserId={currentUserId}
+        empty={t('empty')}
+        members={members}
+      />
+      <RemoveMemberDialog
+        key={target?.id}
+        member={target}
+        open={dialogOpen}
+        opener={opener}
+        workspaceId={workspaceId}
+        onOpenChange={setDialogOpen}
+        onRemoved={(done) => {
+          opener.current = count.current
+          setRemoved(done)
+          setDialogOpen(false)
+        }}
+      />
+    </>
+  )
+}
+
 function Members({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Operator.members')
   const members = useQuery(operatorWorkspaceMembersQuery(workspaceId))
+  const { session } = useSession()
 
   return (
     <SettingsCard description={t('description')} title={t('title')}>
       <CardQuery namespace="Operator.members" query={members}>
-        {(data) => <MemberList empty={t('empty')} members={data} />}
+        {(data) => (
+          <RemovableMembers
+            currentUserId={session?.user.id}
+            members={data}
+            workspaceId={workspaceId}
+          />
+        )}
       </CardQuery>
     </SettingsCard>
   )
