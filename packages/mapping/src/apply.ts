@@ -180,7 +180,7 @@ function lookedUp(
 }
 
 function applied(
-  transform: MappingTransform,
+  transform: Exclude<MappingTransform, { kind: 'conditional' }>,
   args: Readonly<Record<string, string>>,
   { expressions, lookupTables }: Graph,
   fail: (code: MappingErrorCode) => MappingError,
@@ -223,12 +223,6 @@ function applied(
       )
     case 'lookupTable':
       return lookedUp(transform, value, lookupTables, fail)
-    case 'conditional':
-      return Effect.succeed(
-        holds(transform.config.operator, value, transform.config.compareTo)
-          ? (args.then ?? '')
-          : (args.else ?? ''),
-      )
     case 'jsonata': {
       const result = expressions.get(transform.id)
 
@@ -258,15 +252,24 @@ function outputOf(evaluation: Evaluation, start: LinkStart): Effect.Effect<strin
 
   const inner = { ...evaluation, visiting: new Set(visiting).add(transform.id) }
 
-  return Effect.flatMap(
-    Effect.forEach(transformPorts(transform).inputs, (input) => {
-      const from = graph.feeding.get(`${transform.id}/${input}`)
+  const inputOf = (input: string) => {
+    const from = graph.feeding.get(`${transform.id}/${input}`)
 
-      return Effect.map(
-        from ? outputOf(inner, from) : Effect.succeed(''),
-        (value): readonly [string, string] => [input, value],
-      )
-    }),
+    return from ? outputOf(inner, from) : Effect.succeed('')
+  }
+
+  if (transform.kind === 'conditional') {
+    const { operator, compareTo } = transform.config
+
+    return Effect.flatMap(inputOf('value'), (value) =>
+      inputOf(holds(operator, value, compareTo) ? 'then' : 'else'),
+    )
+  }
+
+  return Effect.flatMap(
+    Effect.forEach(transformPorts(transform).inputs, (input) =>
+      Effect.map(inputOf(input), (value): readonly [string, string] => [input, value]),
+    ),
     (args) =>
       applied(transform, Object.fromEntries(args), graph, (code) =>
         failedTransform(code, evaluation, transform.id),

@@ -946,6 +946,63 @@ describe('applyMappingVersion', () => {
     })
   })
 
+  const branchId = '2d3e4f5a-6b7c-4d8e-9f0a-1b2c3d4e5f60'
+
+  const conditionalBeside = (
+    branch: 'then' | 'else',
+    taken: TransformLink,
+    failing: Pick<MappingTransform, 'kind' | 'config'>,
+  ) =>
+    outboundVersion('ORDERS', [...orderWithoutNumber, ...orderLines], {
+      transforms: [
+        loop,
+        transformOf(transformId, {
+          kind: 'conditional',
+          config: { operator: 'equals', compareTo: 'rush' },
+        }),
+        transformOf(branchId, failing),
+      ],
+      transformLinks: [
+        ...looped('lines[]', 'SG25', 'SG25/LIN/1082'),
+        fromSource('orderType'),
+        taken,
+        fromSource('failingValue', 'value', branchId),
+        {
+          from: { kind: 'transform', transformId: branchId, output: 'value' },
+          to: { kind: 'transform', transformId, input: branch },
+        },
+        intoTarget('BGM/1004'),
+      ],
+    })
+
+  it('conditional leaves a failing else input alone when the condition holds', async () => {
+    const version = conditionalBeside('else', fromSource('rushNumber', 'then'), {
+      kind: 'lookupTable',
+      config: { lookupTableId: unitTableId, fallback: 'fail' },
+    })
+
+    const document = { ...rushOrder('rush'), failingValue: 'XX' }
+
+    expect((await apply(version, document, { lookupTables })).segments[0]).toEqual({
+      tag: 'BGM',
+      elements: [['220'], ['RUSH-1']],
+    })
+  })
+
+  it('conditional leaves a failing then input alone when the condition does not hold', async () => {
+    const version = conditionalBeside('then', fromSource('orderNumber', 'else'), {
+      kind: 'dateFormat',
+      config: { from: 'yyyy-MM-dd', to: 'yyyyMMdd' },
+    })
+
+    const document = { ...rushOrder('normal'), failingValue: '14.10.2026' }
+
+    expect(await orderNumberOf(version, document)).toEqual({
+      tag: 'BGM',
+      elements: [['220'], ['PO-4711']],
+    })
+  })
+
   const expressionVia = (expression: string, target = 'BGM/1004') =>
     orderVia({ kind: 'jsonata', config: { expression } }, [intoTarget(target)])
 
