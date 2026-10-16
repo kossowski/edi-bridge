@@ -21,6 +21,8 @@ pnpm --filter @edi-bridge/edifact test:mutation
 
 Stryker mutates the files in `src/`, but not the test files, and runs at most 2 workers. The configuration is in `stryker.config.json`.
 
+The repo patches `@stryker-mutator/vitest-runner` 10.0.0 with `patches/@stryker-mutator__vitest-runner@10.0.0.patch`. Without the patch, the runner builds test names that Vitest 5 does not match, so the tests do not run against the mutants and nearly every mutant survives ([stryker-js#6210](https://github.com/stryker-mutator/stryker-js/issues/6210)). The patch carries the fix from [stryker-js#6214](https://github.com/stryker-mutator/stryker-js/pull/6214). Remove the patch and its `patchedDependencies` entry in `pnpm-workspace.yaml` when a vitest-runner release with the fix ships.
+
 ### Read the report
 
 The terminal shows the mutation score per file and lists each surviving mutant with its file, line and change.
