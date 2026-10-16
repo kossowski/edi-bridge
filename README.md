@@ -81,7 +81,7 @@ pnpm --filter @edi-bridge/web exec playwright install chromium
 
 Tests never depend on the local Compose services.
 
-`pnpm check:fast` runs lint, type check, the tests and the stories. `pnpm check` adds the canvas stories, the e2e tests, the builds and Storybook. Both run one task at a time, the `concurrency` in `turbo.json`, to stay within the memory of a small machine.
+`pnpm check:fast` runs lint, type check, the tests and the stories. `pnpm check` adds the canvas stories, the e2e tests, the builds and Storybook. Both run one task at a time to stay within the memory of a small machine; `concurrency` in `turbo.json` sets this limit. The dev, watch and Storybook scripts run their persistent tasks side by side, so they raise the limit with `--concurrency=10`.
 
 ## Full stack in Docker
 
