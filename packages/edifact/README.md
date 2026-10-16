@@ -21,10 +21,12 @@ pnpm --filter @edi-bridge/edifact test:mutation
 
 Stryker mutates the files in `src/`, but not the test files, and runs at most 2 workers. The configuration is in `stryker.config.json`.
 
-The repo patches `@stryker-mutator/vitest-runner` 10.0.0 with `patches/@stryker-mutator__vitest-runner@10.0.0.patch`. Without the patch, the runner builds test names that Vitest 5 does not match, so the tests do not run against the mutants and nearly every mutant survives ([stryker-js#6210](https://github.com/stryker-mutator/stryker-js/issues/6210)). The patch carries the fix from [stryker-js#6214](https://github.com/stryker-mutator/stryker-js/pull/6214). Remove the patch and its `patchedDependencies` entry in `pnpm-workspace.yaml` when a vitest-runner release with the fix ships.
+The repo patches `@stryker-mutator/vitest-runner` for Vitest 5, see the header of `patches/@stryker-mutator__vitest-runner@10.0.0.patch`.
 
 ### Read the report
 
 The terminal shows the mutation score per file and lists each surviving mutant with its file, line and change.
 
 The HTML report is in `reports/mutation/index.html`. Git ignores this folder. Open the file in a browser and select a file to see its source with each mutant on its line. Select a mutant to see the change and its status. A surviving mutant shows a gap in the tests, or a change that does not alter the behaviour (an equivalent mutant).
+
+The vitest runner also reports a mutant as Survived when the mutant stops the test file from loading, because then no test runs ([stryker-js#6150](https://github.com/stryker-mutator/stryker-js/issues/6150)). So the reported score is lower than the real one. On this package, the first run with the patched runner scored 20.53 %, and the same run with `testRunner: "command"` scored 48.75 %: 877 mutants were of this kind. To find them, look for Survived mutants with 0 tests completed.
