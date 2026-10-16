@@ -4,6 +4,8 @@
 **/.turbo
 **/out
 **/coverage
+**/reports/mutation
+**/.stryker-tmp
 **/*.tsbuildinfo
 **/.env
 **/.env.*

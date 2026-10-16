@@ -40,6 +40,10 @@
       "cache": false,
       "persistent": true
     },
+    "test:mutation": {
+      "dependsOn": ["transit"],
+      "cache": false
+    },
     "dev": {
       "cache": false,
       "persistent": true,
