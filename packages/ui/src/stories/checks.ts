@@ -175,3 +175,25 @@ export async function waitForFocusInside(element: HTMLElement) {
 export async function waitForFocusOn(element: HTMLElement) {
   await waitFor(() => expect(element).toHaveFocus(), transitionWait)
 }
+
+const maxFocusStops = 30
+
+// Each press must leave the focus inside, and enough presses bring it back to where it started.
+async function expectFocusCycles(dialog: HTMLElement, press: () => Promise<void>) {
+  await waitForFocusInside(dialog)
+  const start = dialog.ownerDocument.activeElement
+
+  for (let stop = 1; stop <= maxFocusStops; stop++) {
+    await press()
+    await waitForFocusInside(dialog)
+
+    if (dialog.ownerDocument.activeElement === start) return
+  }
+
+  throw new Error(`The focus did not come back within ${maxFocusStops} stops.`)
+}
+
+export async function expectFocusTrapped(dialog: HTMLElement, userEvent: UserEvent) {
+  await expectFocusCycles(dialog, () => userEvent.tab())
+  await expectFocusCycles(dialog, () => userEvent.tab({ shift: true }))
+}
