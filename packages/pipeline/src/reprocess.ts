@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, DrizzleQueryError, eq, inArray } from 'drizzle-orm'
 import { DateTime, Effect } from 'effect'
 
 import {
@@ -48,93 +48,104 @@ export const reprocessRun = ({ workspaceId, runId, mappingVersionId }: Reprocess
     const receivedAt = yield* DateTime.nowAsDate
 
     const started = yield* Effect.promise(() =>
-      db.transaction(async (tx) => {
-        // Locks the replaced Run, so two Reprocesses of it start one new Run.
-        const [found] = await tx
-          .select({ run: runs, flow: flows })
-          .from(runs)
-          .innerJoin(flows, eq(flows.id, runs.flowId))
-          .where(and(eq(runs.workspaceId, workspaceId), eq(runs.id, runId)))
-          .for('update', { of: runs })
+      db.transaction(
+        async (
+          tx,
+        ): Promise<Effect.Effect<{ id: string }, RunNotReprocessable | MappingVersionNotOfRun>> => {
+          // Locks the replaced Run, so two Reprocesses of it start one new Run.
+          const [found] = await tx
+            .select({ run: runs, flow: flows })
+            .from(runs)
+            .innerJoin(flows, eq(flows.id, runs.flowId))
+            .where(and(eq(runs.workspaceId, workspaceId), eq(runs.id, runId)))
+            .for('update', { of: runs })
 
-        if (found === undefined) {
-          return new RunNotReprocessable({ runId })
-        }
+          if (found === undefined) {
+            return Effect.fail(new RunNotReprocessable({ runId }))
+          }
 
-        const run = { ...found.run, direction: directionOf(found.flow) }
-        const { flow } = found
+          const run = { ...found.run, direction: directionOf(found.flow) }
+          const { flow } = found
 
-        const [replacing] = await tx
-          .select({ id: runs.id })
-          .from(runs)
-          .where(eq(runs.replacesRunId, run.id))
+          const [replacing] = await tx
+            .select({ id: runs.id })
+            .from(runs)
+            .where(eq(runs.replacesRunId, run.id))
 
-        if (replacing !== undefined || !isReprocessable(run)) {
-          return new RunNotReprocessable({ runId })
-        }
+          if (replacing !== undefined || !isReprocessable(run)) {
+            return Effect.fail(new RunNotReprocessable({ runId }))
+          }
 
-        const [chosen] = await tx
-          .select({ id: mappingVersions.id })
-          .from(mappingVersions)
-          .where(
-            and(
-              eq(mappingVersions.id, mappingVersionId),
-              inArray(
-                mappingVersions.mappingId,
-                tx
-                  .select({ mappingId: mappingVersions.mappingId })
-                  .from(mappingVersions)
-                  .where(eq(mappingVersions.id, run.mappingVersionId)),
+          const [chosen] = await tx
+            .select({ id: mappingVersions.id })
+            .from(mappingVersions)
+            .where(
+              and(
+                eq(mappingVersions.id, mappingVersionId),
+                inArray(
+                  mappingVersions.mappingId,
+                  tx
+                    .select({ mappingId: mappingVersions.mappingId })
+                    .from(mappingVersions)
+                    .where(eq(mappingVersions.id, run.mappingVersionId)),
+                ),
               ),
+            )
+
+          if (chosen === undefined) {
+            return Effect.fail(new MappingVersionNotOfRun({ runId, mappingVersionId }))
+          }
+
+          const [created] = await tx
+            .insert(runs)
+            .values({
+              workspaceId,
+              documentId: run.documentId,
+              flowId: run.flowId,
+              tradingPartnerId: run.tradingPartnerId,
+              mappingVersionId: chosen.id,
+              manualSubmission: run.manualSubmission,
+              messageIndex: run.messageIndex,
+              replacesRunId: run.id,
+              receivedAt,
+            })
+            .returning({ id: runs.id })
+
+          if (created === undefined) {
+            throw new Error('Run insert returned no row')
+          }
+
+          // The Document was received already, so the receipt of the new Run succeeds at once.
+          await tx.insert(runSteps).values(
+            stagesOf(flow).map((stage, position) =>
+              stage === 'receipt'
+                ? {
+                    runId: created.id,
+                    position,
+                    stage,
+                    status: 'succeeded' as const,
+                    startedAt: receivedAt,
+                    finishedAt: receivedAt,
+                  }
+                : { runId: created.id, position, stage },
             ),
           )
 
-        if (chosen === undefined) {
-          return new MappingVersionNotOfRun({ runId, mappingVersionId })
-        }
-
-        const [created] = await tx
-          .insert(runs)
-          .values({
-            workspaceId,
-            documentId: run.documentId,
-            flowId: run.flowId,
-            tradingPartnerId: run.tradingPartnerId,
-            mappingVersionId: chosen.id,
-            manualSubmission: run.manualSubmission,
-            messageIndex: run.messageIndex,
-            replacesRunId: run.id,
-            receivedAt,
-          })
-          .returning({ id: runs.id })
-
-        if (created === undefined) {
-          throw new Error('Run insert returned no row')
-        }
-
-        // The Document was received already, so the receipt of the new Run succeeds at once.
-        await tx.insert(runSteps).values(
-          stagesOf(flow).map((stage, position) =>
-            stage === 'receipt'
-              ? {
-                  runId: created.id,
-                  position,
-                  stage,
-                  status: 'succeeded' as const,
-                  startedAt: receivedAt,
-                  finishedAt: receivedAt,
-                }
-              : { runId: created.id, position, stage },
-          ),
-        )
-
-        return created
-      }),
+          return Effect.succeed(created)
+        },
+      ),
+    ).pipe(
+      Effect.flatten,
+      // The unique link to the replaced Run stops a second Reprocess that passed the check at once.
+      Effect.catchDefect((defect) =>
+        defect instanceof DrizzleQueryError &&
+        defect.cause !== undefined &&
+        'constraint_name' in defect.cause &&
+        defect.cause.constraint_name === 'runs_replacesRunId_unique'
+          ? Effect.fail(new RunNotReprocessable({ runId }))
+          : Effect.die(defect),
+      ),
     )
-
-    if (started instanceof RunNotReprocessable || started instanceof MappingVersionNotOfRun) {
-      return yield* started
-    }
 
     const queued = { workspaceId, runId: started.id }
 
