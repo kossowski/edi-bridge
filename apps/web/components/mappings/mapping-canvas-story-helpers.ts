@@ -87,10 +87,10 @@ export async function findRow(canvasElement: HTMLElement, ref: RowRef) {
 // React Flow shows rows only once measured, which on a large draft can pass the default second.
 export async function findDrawnRow(canvasElement: HTMLElement, ref: RowRef) {
   return waitFor(
-    () => {
+    async () => {
       const row = rowOrThrow(canvasElement, ref)
 
-      expect(row).toBeVisible()
+      await expect(row).toBeVisible()
 
       return row
     },
