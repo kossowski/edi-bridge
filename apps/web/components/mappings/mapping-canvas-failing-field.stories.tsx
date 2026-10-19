@@ -114,7 +114,9 @@ const meta = preview.meta({
   },
 })
 
+// Arriving from a failed document's fix link selects the field, focuses it and moves it into view.
 export const TargetField = meta.story({
+  ...on('desktop'),
   async play({ canvas, canvasElement }) {
     const alert = await findAlert(
       canvasElement,
@@ -133,30 +135,46 @@ export const TargetField = meta.story({
 
     const row = await findRow(canvasElement, deepTarget)
 
+    await waitFor(() => expect(row).toHaveFocus())
+    await expect(row).toHaveAttribute('aria-pressed', 'true')
     await expect(partOf(row)).toHaveAttribute('data-failing', 'field')
     await expect(within(row).getByText('Failed here')).toBeVisible()
     await expect(canvas.getAllByText('Failed here')).toHaveLength(1)
-
-    // Arriving does not move the view: it opens at the top, as for any Mapping.
-    await expect(row).not.toHaveFocus()
-    await expect(
-      canvasElement.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform,
-    ).toMatch(/translate\([\d.]+px, 24px\)/)
+    await waitFor(() => expectFieldBesideSources(canvasElement, row))
   },
 })
 
-export const ShowTheField = meta.story({
+// A source field inside repeating parts: the parts open on arrival, down to the field.
+export const SourceField = meta.story({
   ...on('desktop'),
+  args: { id: outbound.id, field: 'packages[].lines[].quantity' },
   async play({ canvasElement }) {
-    const alert = await findAlert(canvasElement, 'A document failed at lines › gtin')
+    await findAlert(canvasElement, 'A document failed at packages › lines › quantity')
 
-    await userEvent.click(alert.getByRole('button', { name: 'Show the field' }))
-
-    const row = await findRow(canvasElement, deepTarget)
+    const row = await findRow(canvasElement, {
+      side: 'source',
+      path: 'packages[].lines[].quantity',
+    })
 
     await waitFor(() => expect(row).toHaveFocus())
     await expect(row).toHaveAttribute('aria-pressed', 'true')
+    await expect(partOf(row)).toHaveAttribute('data-failing', 'field')
     await waitFor(() => expectFieldBesideSources(canvasElement, row))
+  },
+})
+
+// An EDIFACT element of the target, named by its segment path.
+export const EdifactTargetField = meta.story({
+  ...on('desktop'),
+  args: { id: outbound.id, field: 'BGM/1004' },
+  async play({ canvasElement }) {
+    await findAlert(canvasElement, 'A document failed at BGM › 1004')
+
+    const row = await findRow(canvasElement, { side: 'target', path: 'BGM/1004' })
+
+    await waitFor(() => expect(row).toHaveFocus())
+    await expect(row).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expectFieldBesideSources(canvasElement, row, 'edge'))
   },
 })
 
@@ -177,8 +195,8 @@ export const ShowTheFieldClosesDetails = meta.story({
   },
 })
 
-// On a laptop the Transforms also fold to their rail for this visit, without keeping that choice;
-// the target field then keeps the source column's right edge beside it.
+// On a laptop the Transforms also fold to their rail for this visit, on arrival already, without
+// keeping that choice; the target field then keeps the source column's right edge beside it.
 export const ShowTheFieldOnLaptop = meta.story({
   ...on('laptop'),
   beforeEach() {
@@ -187,8 +205,8 @@ export const ShowTheFieldOnLaptop = meta.story({
   async play({ canvas, canvasElement }) {
     const alert = await findAlert(canvasElement, 'A document failed at lines › gtin')
 
-    await findRow(canvasElement, deepTarget)
-    await expect(canvas.getByRole('button', { name: 'Hide the Transforms' })).toBeVisible()
+    await waitFor(async () => expect(await findRow(canvasElement, deepTarget)).toHaveFocus())
+    await expect(canvas.getByRole('button', { name: 'Show the Transforms' })).toBeVisible()
     await openDetails(canvasElement)
     await userEvent.click(alert.getByRole('button', { name: 'Show the field' }))
 
@@ -281,6 +299,10 @@ export const UnknownField = meta.story({
     await expect(alert.getByRole('link', { name: 'Back to documents' })).toBeVisible()
     await findRow(canvasElement, deepTarget)
     await expect(canvasElement.querySelector('[data-failing]')).toBeNull()
+    await expect(canvasElement.querySelector('[aria-pressed="true"]')).toBeNull()
+    await expect(
+      canvasElement.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform,
+    ).toMatch(/translate\([\d.]+px, 24px\)/)
   },
 })
 

@@ -63,6 +63,24 @@ describe('findFailingField', () => {
     expect(found?.ancestors.map(({ path }) => path)).toEqual(['SG25', 'SG25/LIN', 'SG25/LIN/C212'])
   })
 
+  it('finds a target element of a qualified segment, as a fix link names it', () => {
+    const invoice = {
+      source: documentTree(seedDocumentStructureOf.INVOIC),
+      target: edifactTree(messageTypeStructures.INVOIC, 'en'),
+    }
+
+    expect(findFailingField('BGM/1004', invoice)?.row).toEqual({ side: 'target', path: 'BGM/1004' })
+
+    const found = findFailingField('SG25/IMD+A/C273/7008', invoice)
+
+    expect(found?.row).toEqual({ side: 'target', path: 'SG25/IMD+A/C273/7008' })
+    expect(found?.ancestors.map(({ path }) => path)).toEqual([
+      'SG25',
+      'SG25/IMD+A',
+      'SG25/IMD+A/C273',
+    ])
+  })
+
   it('finds nothing for a path neither side has', () => {
     expect(findFailingField('nowhere.field', inbound)).toBeNull()
     expect(findFailingField('  ', inbound)).toBeNull()
