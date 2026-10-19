@@ -6,7 +6,14 @@ import type { ReactNode } from 'react'
 
 import { AccountMenu } from '@/components/session/account-menu'
 import { accountMenuOf, sessionHandlers } from '@/components/session/session-story-helpers'
-import { darkMode, german, mobile, withSidebarProvider } from '@/components/story-helpers'
+import {
+  darkMode,
+  findOpenMenu,
+  german,
+  mobile,
+  waitForMenuClosed,
+  withSidebarProvider,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { sessionEndpoint, signOutEndpoint } from '@edi-bridge/contracts'
 import { sandboxAdminSession, seedSession, showcaseViewerSession } from '@edi-bridge/mocks'
@@ -105,6 +112,25 @@ export const ThemeChoice = meta.story({
       expect(await screen.findByRole('menuitemradio', { name: 'Dark' })).toBeVisible(),
     )
     await expect(screen.getByRole('menuitemradio', { name: 'System' })).toBeChecked()
+  },
+})
+
+export const LanguageChoice = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...sessionHandlers(sandboxAdminSession))
+  },
+  async play({ canvasElement }) {
+    const accountMenu = accountMenuOf(sandboxAdminSession.user.name)
+
+    await openMenu(accountMenu)
+    await userEvent.click(screen.getByRole('menuitem', { name: /Language/ }))
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Deutsch' }))
+    await waitForMenuClosed(canvasElement)
+
+    await userEvent.click(screen.getByRole('button', { name: accountMenu }))
+    await expect(
+      (await findOpenMenu(canvasElement)).getByRole('menuitem', { name: /Language/ }),
+    ).toBeVisible()
   },
 })
 
