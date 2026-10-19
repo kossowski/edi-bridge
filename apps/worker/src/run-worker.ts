@@ -14,9 +14,9 @@ import {
   pollInboundChannels,
   processRun,
   type QueuedRun,
-  queueReceivedRunsEvery,
   RunQueue,
   runQueueName,
+  sweepRunsEvery,
 } from '@edi-bridge/pipeline'
 
 const channelTimeoutMs = 10_000
@@ -26,12 +26,14 @@ export function startRunWorker({
   db,
   secrets,
   requeueInterval,
+  stuckAfter,
   pollingMinute,
 }: {
   redisUrl: string
   db: Connection['db']
   secrets: SecretBox
   requeueInterval: Duration.Input
+  stuckAfter: Duration.Input
   pollingMinute?: Duration.Input
 }) {
   // BullMQ blocks on its worker connection, so commands must wait for a reconnect, not fail.
@@ -54,8 +56,8 @@ export function startRunWorker({
     { connection: redis },
   )
 
-  const requeueing = Effect.runFork(
-    queueReceivedRunsEvery(requeueInterval).pipe(
+  const sweeping = Effect.runFork(
+    sweepRunsEvery({ interval: requeueInterval, stuckAfter }).pipe(
       Effect.provideService(Database, db),
       Effect.provideService(RunQueue, queue.service),
     ),
@@ -74,7 +76,7 @@ export function startRunWorker({
     worker,
     close: async () => {
       // A poll in flight stores and removes its current file before it stops.
-      await Effect.runPromise(Fiber.interruptAll([polling, requeueing]))
+      await Effect.runPromise(Fiber.interruptAll([polling, sweeping]))
       await Promise.all([worker.close(), queue.close()])
       redis.disconnect()
     },

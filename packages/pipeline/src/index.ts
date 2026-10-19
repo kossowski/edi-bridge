@@ -14,13 +14,17 @@ export {
 
 export { pollInboundChannels } from './poll-inbound-channels'
 
-export { queueReceivedRuns, queueReceivedRunsEvery } from './queue-received-runs'
+export { queueReceivedRuns } from './queue-received-runs'
 
 export { type ArrivingDocument, type Receipt, type ReceivedRun, receive } from './receive'
 
 export { isReprocessable, type Reprocess, reprocessRun } from './reprocess'
 
 export { retryRun } from './retry'
+
+export { sweepRunsEvery } from './sweep-runs'
+
+export { sweepStuckRuns } from './sweep-stuck-runs'
 
 export {
   Database,

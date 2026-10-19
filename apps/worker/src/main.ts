@@ -28,6 +28,7 @@ const runWorker = startRunWorker({
   db: connection.db,
   secrets: secretBox(config.channelSecretKey),
   requeueInterval: config.requeueInterval,
+  stuckAfter: config.stuckAfter,
 })
 
 runWorker.worker.on('error', (error) => {

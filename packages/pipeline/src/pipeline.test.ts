@@ -1,5 +1,5 @@
-import { eq, sql } from 'drizzle-orm'
-import { type Duration, Effect, Exit, Fiber } from 'effect'
+import { and, eq, sql } from 'drizzle-orm'
+import { Cause, type Duration, Effect, Exit, Fiber, Logger } from 'effect'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -18,10 +18,12 @@ import {
   type Connection,
   documents,
   flows,
+  postgresDocumentStorage,
   lookupTableEntries,
   mappings,
   mappingVersions,
   runs,
+  runSteps,
   tradingPartners,
   workspaces,
 } from '@edi-bridge/db'
@@ -33,12 +35,14 @@ import {
   channelDelivery,
   type DeliveryService,
   processRun,
-  queueReceivedRunsEvery,
   ReceiptRejected,
   receive,
   retryRun,
   RunNotRetryable,
+  sweepRunsEvery,
+  sweepStuckRuns,
 } from './index'
+import { Documents } from './services'
 import {
   addOrdersFlow,
   deliverOverSftp,
@@ -620,7 +624,9 @@ describe('the sweep of received Runs', () => {
     runId: string,
   ) => {
     const sweeping = Effect.runFork(
-      queueReceivedRunsEvery(interval).pipe(pipelineServices(connection.db, queue)),
+      sweepRunsEvery({ interval, stuckAfter: '10 minutes' }).pipe(
+        pipelineServices(connection.db, queue),
+      ),
     )
 
     try {
@@ -645,6 +651,539 @@ describe('the sweep of received Runs', () => {
     const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
 
     await sweep(inMemoryRunQueue({ failures: 1 }), '20 millis', runId)
+  })
+})
+
+const collectLogs = () => {
+  const messages: unknown[] = []
+
+  return { messages, logger: Logger.layer([Logger.make(({ message }) => messages.push(message))]) }
+}
+
+// A worker that stopped mid-Run leaves it processing, with its last change long ago.
+const leaveStuck = async (runId: string) => {
+  await connection.db.execute(
+    sql`update runs set status = 'processing', updated_at = updated_at - interval '1 hour' where id = ${runId}`,
+  )
+  await connection.db.execute(sql`
+    update run_steps
+    set started_at = started_at - interval '1 hour', finished_at = finished_at - interval '1 hour'
+    where run_id = ${runId}`)
+}
+
+const sweepStuck = async (queue = inMemoryRunQueue(), delivery = sftpDelivery) => {
+  await Effect.runPromise(
+    sweepStuckRuns('10 minutes').pipe(pipelineServices(connection.db, queue, delivery)),
+  )
+
+  return queue
+}
+
+describe('the sweep of stuck Runs', () => {
+  it('queues a stuck Run whose steps after receipt never started again as received', async () => {
+    const { runId } = await receiveInvoice()
+
+    await leaveStuck(runId)
+
+    const queue = await sweepStuck()
+
+    expect(queue.queued).toEqual([{ workspaceId: workspace.id, runId }])
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'received',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'pending' },
+        { stage: 'validation', status: 'pending' },
+        { stage: 'delivery', status: 'pending' },
+      ],
+    })
+
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+  })
+
+  it('leaves a Run processing within the bound', async () => {
+    const { runId } = await receiveInvoice()
+
+    await connection.db.update(runs).set({ status: 'processing' }).where(eq(runs.id, runId))
+
+    const queue = await sweepStuck()
+
+    expect(queue.queued).toEqual([])
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'processing' })
+  })
+
+  it('leaves a Run whose step started within the bound processing', async () => {
+    const { runId } = await receiveInvoice()
+
+    await leaveStuck(runId)
+    await connection.db.execute(
+      sql`update run_steps set status = 'running', started_at = now() where run_id = ${runId} and stage = 'mapping'`,
+    )
+
+    const queue = await sweepStuck()
+
+    expect(queue.queued).toEqual([])
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'processing' })
+  })
+
+  it('fails a stuck Run as a defect at its running step', async () => {
+    const { runId } = await receiveInvoice()
+
+    await connection.db.execute(
+      sql`update run_steps set status = 'running', started_at = now() where run_id = ${runId} and stage = 'mapping'`,
+    )
+    await leaveStuck(runId)
+
+    const queue = await sweepStuck()
+
+    expect(queue.queued).toEqual([])
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      error: { code: 'processingDefect', position: null, details: null },
+      problem: { reason: 'defect', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+    expect(ranStages(run)).toEqual(['receipt', 'mapping'])
+  })
+
+  // The worker stops while the Channel takes the Interchange.
+  const stopInDelivery = async (into: InvoiceWorkspace) => {
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+    const [queued] = queue.queued
+    const { promise: handingOver, resolve: handOverStarted } = Promise.withResolvers<void>()
+
+    const processing = Effect.runFork(
+      processRun(queued ?? { workspaceId: into.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => {
+          handOverStarted()
+
+          return Effect.never
+        }),
+      ),
+    )
+
+    // The Interchange is stored before the hand-over, so the Run changes no more after it starts.
+    try {
+      await handingOver
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(processing))
+    }
+
+    return runId
+  }
+
+  it('fails a Run stuck in its delivery at delivery, so a Retry delivers it', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Stalled Foods')
+    const remotePath = '/upload/stalled'
+
+    await sftp.exec(
+      `mkdir ${sftp.home}${remotePath} && chown ${sftp.username} ${sftp.home}${remotePath}`,
+    )
+    await deliverOverSftp(connection.db, into, { ...sftpLogin(), remotePath })
+
+    const runId = await stopInDelivery(into)
+
+    await leaveStuck(runId)
+    await sweepStuck()
+
+    const failed = await readRun(connection.db, runId)
+
+    expect(failed).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'processingDefect', position: null, details: null },
+      problem: { reason: 'defect', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+
+    const queue = inMemoryRunQueue()
+
+    await Effect.runPromise(
+      retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(connection.db, queue)),
+    )
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+    await expect(
+      remoteFile(`${remotePath}/INVOIC-${String(failed?.controlReference)}.edi`),
+    ).resolves.toBe(failed?.output)
+  })
+
+  it('fails a stuck Run already handed over at delivery, so its Retry records it delivered without handing it over again', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Handed Foods')
+
+    await deliverOverSftp(connection.db, into, sftpLogin())
+
+    const runId = await stopInDelivery(into)
+
+    await connection.db.execute(sql`update runs set handed_over_at = now() where id = ${runId}`)
+    await leaveStuck(runId)
+    await sweepStuck()
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      problem: { reason: 'defect', fixTarget: null },
+    })
+
+    const queue = inMemoryRunQueue()
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+
+    await Effect.runPromise(
+      retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(connection.db, queue)),
+    )
+    await processQueued(queue, handOvers)
+
+    expect(handOvers).not.toHaveBeenCalled()
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+  })
+
+  it('keeps a Run failed when its stalled worker resumes the delivery after the sweep', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+    const { promise: handingOver, resolve: handOverStarted } = Promise.withResolvers<void>()
+
+    // The worker stalls while the Channel takes the Interchange.
+    const stalled = Effect.runPromise(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => {
+          handOverStarted()
+
+          return Effect.promise(() => resumed)
+        }),
+      ),
+    )
+
+    await handingOver
+
+    await leaveStuck(runId)
+    await sweepStuck()
+    resume()
+    await stalled
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      problem: { reason: 'defect', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+    // The Channel took the Document, so its Retry must not hand it over again.
+    expect(run?.handedOverAt).not.toBeNull()
+  })
+
+  it('stops a stalled worker once the sweep released its Run to another worker', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+    const storage = postgresDocumentStorage(connection.db)
+
+    // The worker stalls after its claim, before its first step starts.
+    const stalled = Effect.runPromise(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        Effect.provideService(Documents, {
+          ...storage,
+          read: async (...args) => {
+            await resumed
+
+            return storage.read(...args)
+          },
+        }),
+        pipelineServices(connection.db, queue, handOvers),
+      ),
+    )
+
+    await vi.waitFor(
+      async () => {
+        expect(await readRun(connection.db, runId)).toMatchObject({ status: 'processing' })
+      },
+      { timeout: 2000, interval: 20 },
+    )
+
+    await leaveStuck(runId)
+    await processQueued(await sweepStuck(), handOvers)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+
+    resume()
+    await stalled
+
+    expect(handOvers).toHaveBeenCalledOnce()
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'delivered',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'succeeded' },
+      ],
+    })
+  })
+
+  it('keeps the Interchange its Retry delivered when the stalled worker resumes building its own', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Rebuilt Foods')
+
+    await deliverOverSftp(connection.db, into, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+    const [queued] = queue.queued
+    const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+    const { promise: building, resolve: buildStarted } = Promise.withResolvers<void>()
+    const { db } = connection
+    let hasStalled = false
+
+    const isDelivering = async () => {
+      const [delivery] = await db
+        .select({ status: runSteps.status })
+        .from(runSteps)
+        .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, 'delivery')))
+
+      return delivery?.status === 'running'
+    }
+
+    // The worker stalls as it claims the control reference of its Interchange.
+    const transaction: typeof db.transaction = async (run, config) => {
+      if (!hasStalled && (await isDelivering())) {
+        hasStalled = true
+        buildStarted()
+        await resumed
+      }
+
+      return db.transaction(run, config)
+    }
+
+    // SAFETY: its prototype is the connection's database, so it has every member but its own transaction.
+    const stallingDb: typeof db = Object.assign(Object.create(db) as typeof db, { transaction })
+
+    const { messages, logger } = collectLogs()
+
+    const stalled = Effect.runPromise(
+      processRun(queued ?? { workspaceId: into.id, runId }).pipe(
+        pipelineServices(stallingDb, queue, () => Effect.void),
+        Effect.provide(logger),
+      ),
+    )
+
+    await building
+    await leaveStuck(runId)
+    await sweepStuck()
+
+    // The Workspace changes its GLN meanwhile, so the two workers build different Interchanges.
+    await db
+      .update(workspaces)
+      .set({ gln: withCheckDigit('430000000099') })
+      .where(eq(workspaces.id, into.id))
+
+    const retried = inMemoryRunQueue()
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+
+    await Effect.runPromise(
+      retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(db, retried)),
+    )
+    await processQueued(retried, handOvers)
+
+    resume()
+    await stalled
+
+    const delivered = handOvers.mock.calls[0]?.[1].content
+
+    expect(handOvers).toHaveBeenCalledOnce()
+    await expect(readRun(db, runId)).resolves.toMatchObject({
+      status: 'delivered',
+      output: delivered?.toString('latin1'),
+    })
+    expect(messages).toEqual([[`A stalled worker stopped processing Run ${runId}, which it lost`]])
+  })
+
+  it('leaves the Run to its new worker when the stalled worker stops on a defect', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+    const { promise: handingOver, resolve: handOverStarted } = Promise.withResolvers<void>()
+    const { promise: handedOver, resolve: handOver } = Promise.withResolvers<void>()
+    const storage = postgresDocumentStorage(connection.db)
+
+    // The worker stalls after its claim and then loses its database connection.
+    const stalled = Effect.runPromiseExit(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        Effect.provideService(Documents, {
+          ...storage,
+          read: async () => {
+            await resumed
+
+            throw new Error('The connection to the database was lost')
+          },
+        }),
+        pipelineServices(connection.db, queue),
+      ),
+    )
+
+    await vi.waitFor(
+      async () => {
+        expect(await readRun(connection.db, runId)).toMatchObject({ status: 'processing' })
+      },
+      { timeout: 2000, interval: 20 },
+    )
+
+    await leaveStuck(runId)
+
+    const [requeued] = (await sweepStuck()).queued
+
+    const processing = Effect.runPromise(
+      processRun(requeued ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => {
+          handOverStarted()
+
+          return Effect.promise(() => handedOver)
+        }),
+      ),
+    )
+
+    await handingOver
+    resume()
+
+    const stopped = await stalled
+
+    handOver()
+    await processing
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'delivered',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'succeeded' },
+      ],
+    })
+    // It lost the Run, so its defect is logged as a lost Run instead.
+    expect(Exit.isSuccess(stopped)).toBe(true)
+  })
+
+  it('reports the defect that stopped the worker when failing its Run fails too', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const storage = postgresDocumentStorage(connection.db)
+    const { db } = connection
+    const defect = new Error('The Document storage broke')
+    let isDown = false
+
+    const transaction: typeof db.transaction = (run, config) =>
+      isDown
+        ? Promise.reject(new Error('The connection to the database was lost'))
+        : db.transaction(run, config)
+
+    // SAFETY: its prototype is the connection's database, so it has every member but its own transaction.
+    const downDb: typeof db = Object.assign(Object.create(db) as typeof db, { transaction })
+
+    const { messages, logger } = collectLogs()
+
+    const stopped = await Effect.runPromiseExit(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        Effect.provideService(Documents, {
+          ...storage,
+          read: () => {
+            isDown = true
+
+            return Promise.reject(defect)
+          },
+        }),
+        pipelineServices(downDb, queue),
+        Effect.provide(logger),
+      ),
+    )
+
+    expect(Exit.isFailure(stopped) && Cause.squash(stopped.cause)).toBe(defect)
+    expect(messages).toContainEqual([
+      `Run ${runId} was not failed on its defect`,
+      new Error('The connection to the database was lost'),
+    ])
+  })
+
+  it('finishes a step that the sweep checks meanwhile without a deadlock', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const { promise: finishing, resolve: finishStarted } = Promise.withResolvers<void>()
+    const { promise: locked, resolve: lock } = Promise.withResolvers<void>()
+    const { db } = connection
+    let isHandedOver = false
+    let hasStalled = false
+
+    // The worker stalls as it finishes the delivery step.
+    const transaction: typeof db.transaction = async (run, config) => {
+      if (isHandedOver && !hasStalled) {
+        hasStalled = true
+        finishStarted()
+        await locked
+      }
+
+      return db.transaction(run, config)
+    }
+
+    // SAFETY: its prototype is the connection's database, so it has every member but its own transaction.
+    const stallingDb: typeof db = Object.assign(Object.create(db) as typeof db, { transaction })
+
+    const processing = Effect.runPromise(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(stallingDb, queue, () =>
+          Effect.sync(() => {
+            isHandedOver = true
+          }),
+        ),
+      ),
+    )
+
+    await finishing
+
+    const waitsForLock = async () => {
+      const [waiting] = await db.execute<{ count: number }>(sql`
+        select count(*)::int as count from pg_stat_activity
+        where datname = current_database() and wait_event_type = 'Lock'`)
+
+      return waiting?.count ?? 0
+    }
+
+    // The sweep locks the Run before its steps, as it does to fail a stuck Run.
+    await db.transaction(async (tx) => {
+      await tx.select({ id: runs.id }).from(runs).where(eq(runs.id, runId)).for('update')
+      lock()
+      await vi.waitFor(async () => expect(await waitsForLock()).toBeGreaterThan(0), {
+        timeout: 2000,
+        interval: 20,
+      })
+      await tx
+        .update(runSteps)
+        .set({ status: 'running' })
+        .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, 'delivery')))
+    })
+
+    await processing
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
   })
 })
 

@@ -79,6 +79,7 @@ Each application's Dokploy **Environment** settings contain values with the form
 | worker      | `NODE_ENV`                     | `production`                                                                   |
 | worker      | `WORKER_HEALTH_PORT`           | `3002`                                                                         |
 | worker      | `RUN_REQUEUE_INTERVAL_SECONDS` | Not set; see below                                                             |
+| worker      | `RUN_STUCK_AFTER_MINUTES`      | Not set; see below                                                             |
 
 These runtime variables require neither Docker build arguments nor a repository `.env` file.
 
@@ -88,7 +89,9 @@ These runtime variables require neither Docker build arguments nor a repository 
 
 `<channel-secret-key>` is the key that encrypts the Channel secrets in Postgres: SFTP credentials, webhook tokens and HTTP Authorization headers. It is 32 random bytes, base64-encoded and stored in Dokploy. Generate it once, for example with `openssl rand -base64 32`. The API and the worker use the same key: the API encrypts the secrets, and the worker decrypts the SFTP credential when it delivers a Run. Neither starts in production without it. Keep the key: the stored Channel secrets cannot be decrypted with another key.
 
-`RUN_REQUEUE_INTERVAL_SECONDS` is how often the worker queues again the Runs that are still received, for example because Redis was unreachable when they arrived. The worker also does this when it starts. Its default is `60`.
+`RUN_REQUEUE_INTERVAL_SECONDS` is how often the worker queues again the Runs that are still received, for example because Redis was unreachable when they arrived. The worker also does this when it starts. The same interval paces the check for stuck Runs. Its default is `60`.
+
+`RUN_STUCK_AFTER_MINUTES` is how long a Run can stay processing without a change before the worker treats it as stuck, for example because a worker stopped during the Run. Set it higher than the longest step takes, because the worker fails a Run whose step runs longer. At each interval of `RUN_REQUEUE_INTERVAL_SECONDS`, the worker queues a stuck Run again if none of its steps after the receipt started. It fails every other stuck Run as a Defect at the step that was running or next to run, so the Run can be tried again. A Run that was already handed over fails at delivery, and its Retry does not hand it over a second time. Its default is `10`.
 
 `API_PUBLIC_URL` is the public URL of the API, which the API puts into the webhook URL of each webhook Channel. In production, its default is the `/api` path of `BETTER_AUTH_URL`, for example `https://edi-bridge.example.com/api`. In development, its default is `BETTER_AUTH_URL`. Set it only if the API is served from a different path or origin.
 
