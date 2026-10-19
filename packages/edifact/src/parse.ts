@@ -1,4 +1,5 @@
 import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
+import { isBrokenMessage } from './model'
 import {
   describePosition,
   interchangeSegmentPosition,
@@ -9,6 +10,7 @@ import {
 import type {
   Delimiters,
   Element,
+  Envelope,
   Interchange,
   ParsedInterchange,
   ParsedMessage,
@@ -50,7 +52,6 @@ const serviceStringAdvicePosition: Position = { segment: 1 }
 
 type PositionOf = (index: number) => Position
 
-// segmentErrors holds the first error in each segment; the tokenizer reads on past it.
 interface Tokens {
   segments: Segment[]
   segmentErrors: (ParseError | undefined)[]
@@ -217,8 +218,6 @@ const trailerError = ({
   return undefined
 }
 
-type Envelope = Omit<Interchange, 'messages'>
-
 interface Reading {
   tokenErrors: ParseError[]
   messages: ParsedMessage[]
@@ -357,7 +356,6 @@ export const parseMessages = (text: string): ParsedInterchange => {
   return { ...envelope, messages }
 }
 
-// Reports the first error in the order the tokenizer and then the envelope check meet them.
 export const parse = (text: string): Interchange => {
   const { tokenErrors, messages, envelope } = readInterchange(text)
 
@@ -366,7 +364,7 @@ export const parse = (text: string): Interchange => {
   }
 
   const validMessages = messages.map((message) => {
-    if ('error' in message) {
+    if (isBrokenMessage(message)) {
       throw message.error
     }
 

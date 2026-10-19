@@ -2,7 +2,7 @@
 
 Parses, validates and serializes EDIFACT Interchanges. The golden files that the tests use are described in [`golden/README.md`](golden/README.md).
 
-`parse` fails on the first error in an Interchange. `parseMessages` fails only on an error in the envelope (UNA, UNB, UNZ or a segment outside a Message) and returns each Message on its own: a broken Message keeps its UNH header and carries its `ParseError` with the position.
+`parse` fails on the first error in an Interchange. `parseMessages` fails only on an error in the envelope (UNA, UNB, UNZ or a segment outside a Message) and returns each Message on its own: a broken Message keeps its UNH header and carries its `ParseError` with the position. `isBrokenMessage` tells a broken Message from a valid one.
 
 ## Mutation testing
 

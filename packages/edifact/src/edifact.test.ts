@@ -7,6 +7,7 @@ import {
   type Interchange,
   parse,
   ParseError,
+  isBrokenMessage,
   parseMessages,
   readAcknowledgedInterchange,
   ReadAcknowledgementError,
@@ -117,7 +118,7 @@ describe('parseMessages', () => {
 
   const outcomes = (text: string) =>
     parseMessages(text).messages.map((message) =>
-      'error' in message
+      isBrokenMessage(message)
         ? { reference: message.header.elements[0]?.[0], error: message.error.message }
         : { reference: message.header.elements[0]?.[0] },
     )
@@ -135,6 +136,29 @@ describe('parseMessages', () => {
         interchangeOf(`UNH+M1+ORDERS:D:96A:UN:EAN008'${brokenSegment}UNT+3+M1'`, secondMessage),
       ),
     ).toEqual([{ reference: 'M1', error }, { reference: 'M2' }])
+  })
+
+  it.each([
+    [
+      'an invalid segment tag',
+      "bgm+220+PO1+9'",
+      { code: 'invalid-segment-tag', position: { segment: 5 } },
+    ],
+    [
+      'an unneeded release character',
+      "BGM+220+PO?1+9'",
+      {
+        code: 'unneeded-release-character',
+        position: { segment: 5, element: 2, component: 1 },
+      },
+    ],
+  ])('fails the whole parse for %s between Messages', (_case, brokenSegment, error) => {
+    const thrown = thrownBy(() =>
+      parseMessages(interchangeOf(firstMessage, brokenSegment, secondMessage)),
+    )
+
+    expect(thrown).toBeInstanceOf(ParseError)
+    expect(thrown).toMatchObject(error)
   })
 
   it('keeps the next Message after a Message without a trailer', () => {
@@ -156,7 +180,7 @@ describe('parseMessages', () => {
 
   it.each(messageErrorGoldenNames)('reports the error in %s on its Message', (name) => {
     const errors = parseMessages(readGolden('broken', name, 'edi')).messages.flatMap((message) =>
-      'error' in message ? [message.error] : [],
+      isBrokenMessage(message) ? [message.error] : [],
     )
 
     expect(errors).toHaveLength(1)
