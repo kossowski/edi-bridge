@@ -39,3 +39,9 @@ export class InviteUnusable extends Data.TaggedError('InviteUnusable')<{
     return inviteUnusableMessages[this.reason]
   }
 }
+
+export class AiReviewOpen extends Data.TaggedError('AiReviewOpen') {
+  override get message() {
+    return 'The AI review of the Draft is still open.'
+  }
+}

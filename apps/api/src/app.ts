@@ -6,6 +6,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
   acceptInviteEndpoint,
+  aiReviewOpenStatus,
   channelEndpoint,
   channelsEndpoint,
   createChannelEndpoint,
@@ -149,6 +150,7 @@ import {
 import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
 
 import type {
+  AiReviewOpen,
   Conflict,
   DocumentStructureRejected,
   Forbidden,
@@ -171,6 +173,7 @@ export interface AppDependencies {
 }
 
 type Failure =
+  | AiReviewOpen
   | Conflict
   | DocumentStructureRejected
   | Forbidden
@@ -197,6 +200,7 @@ const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> =
   InviteUnusable: inviteUnusableStatus,
   Unprocessable: 422,
   DocumentStructureRejected: 422,
+  AiReviewOpen: aiReviewOpenStatus,
 }
 
 const statusOf = Match.type<Failure>().pipe(

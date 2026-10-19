@@ -12,6 +12,7 @@ import {
   type MessageType,
   type MessageTypeSide,
   oriented,
+  remainingAiReview,
   type SaveMappingDraftBody,
   type TradingPartnerSummary,
   unknownPathMessage,
@@ -220,8 +221,7 @@ const toDraft = (row: Row): MappingDraft => {
     updatedAt: row.draftUpdatedAt.toISOString(),
     latestVersion: row.latestVersion,
     unpublishedChanges: row.unpublishedChanges,
-    // Until AI drafts are stored (#203).
-    aiReview: null,
+    aiReview: row.aiReview,
   }
 
   return { ...fields, ...sidesOf(row) }
@@ -317,10 +317,22 @@ export const saveMappingDraft = (
     }
 
     yield* Effect.promise(() =>
-      db
-        .update(mappings)
-        .set({ draft, unpublishedChanges: true, draftUpdatedAt: sql`now()` })
-        .where(inWorkspace(mappings, workspace.id, eq(mappings.id, id))),
+      db.transaction(async (tx) => {
+        // Locks the row, so the marks follow the Draft this save replaces.
+        const [before] = await tx
+          .select({ draft: mappings.draft, aiReview: mappings.aiReview })
+          .from(mappings)
+          .where(inWorkspace(mappings, workspace.id, eq(mappings.id, id)))
+          .for('update')
+
+        const aiReview =
+          before?.aiReview == null ? null : remainingAiReview(before.aiReview, before.draft, draft)
+
+        await tx
+          .update(mappings)
+          .set({ draft, aiReview, unpublishedChanges: true, draftUpdatedAt: sql`now()` })
+          .where(inWorkspace(mappings, workspace.id, eq(mappings.id, id)))
+      }),
     )
 
     return yield* loadMappingDraft(id)
