@@ -10,6 +10,8 @@ import {
   documentStructureSchema,
   type MappingLink,
   mappingSummarySchema,
+  saveMappingDraftEndpoint,
+  toPath,
 } from '@edi-bridge/contracts'
 import { documentStructures, mappings } from '@edi-bridge/db'
 
@@ -75,8 +77,19 @@ const answer = (links: ReadonlyArray<MappingLink>) => ({
 const modelAnswering = (...answers: ReadonlyArray<ReturnType<typeof answer>>) =>
   new MockLanguageModelV4({ doGenerate: [...answers] })
 
-const started = async (model: MockLanguageModelV4) => {
+const started = async (model: MockLanguageModelV4, draftLinks: MappingLink[] = []) => {
   const { mappingId, sampleId } = await createdInvoiceMapping()
+
+  if (draftLinks.length > 0) {
+    const saved = await api.admin.inject({
+      method: 'PUT',
+      url: toPath(saveMappingDraftEndpoint.path, { id: mappingId }),
+      body: { links: draftLinks, transforms: [], transformLinks: [] },
+    })
+
+    expect(saved.statusCode).toBe(200)
+  }
+
   const steps: AiDraftStep[] = []
 
   const run = draftMapping({
@@ -92,8 +105,8 @@ const started = async (model: MockLanguageModelV4) => {
   return { run, steps }
 }
 
-const drafted = async (model: MockLanguageModelV4) => {
-  const { run, steps } = await started(model)
+const drafted = async (model: MockLanguageModelV4, draftLinks: MappingLink[] = []) => {
+  const { run, steps } = await started(model, draftLinks)
 
   return { ...(await Effect.runPromise(run)), steps }
 }
@@ -223,18 +236,135 @@ describe('draftMapping', () => {
     expect(steps).toEqual([{ kind: 'readingSample', round: 1 }])
   })
 
-  it('feeds an answer that is no list of links back to the model', async () => {
-    const unreadable = {
-      ...answer([]),
-      content: [{ type: 'text' as const, text: '{"links":[{"sourcePath":"orderNumber"}]}' }],
-    }
+  const unreadable = {
+    ...answer([]),
+    content: [{ type: 'text' as const, text: '{"links":[{"sourcePath":"orderNumber"}]}' }],
+  }
 
+  it('feeds an answer that is no list of links back to the model with its Zod issues', async () => {
     const model = modelAnswering(unreadable, answer(invoiceLinks))
 
     const { tokens, steps } = await drafted(model)
 
     expect(tokens).toBe(240)
-    expect(steps).toContainEqual({ kind: 'fixingErrors', round: 1, errorCount: 1 })
+
+    expect(steps).toEqual([
+      { kind: 'readingSample', round: 1 },
+      { kind: 'linksDrafted', round: 1, linkCount: 0 },
+      { kind: 'checkingAgainstSample', round: 1 },
+      { kind: 'fixingErrors', round: 1, errorCount: 1 },
+      { kind: 'linksDrafted', round: 2, linkCount: 4 },
+      { kind: 'checkingAgainstSample', round: 2 },
+    ])
+
     expect(lastPrompt(model)).toContain('no list of links')
+    expect(lastPrompt(model)).toContain('links.0.targetPath')
+  })
+
+  it('shows the model its unreadable answer and tool calls before the feedback', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: [
+        toolCall('lookUpSegments', { segmentTags: ['NAD'] }),
+        unreadable,
+        answer(invoiceLinks),
+      ],
+    })
+
+    await drafted(model)
+
+    const prompt = JSON.stringify(model.doGenerateCalls[2]?.prompt)
+
+    expect(prompt).toContain('lookUpSegments')
+    expect(prompt).toContain('{\\"sourcePath\\":\\"orderNumber\\"}')
+  })
+
+  it('counts the tokens of every step of a round with an unreadable answer', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: [
+        toolCall('lookUpSegments', { segmentTags: ['NAD'] }),
+        toolCall('checkLinks', { links: invoiceLinks }),
+        unreadable,
+        answer(invoiceLinks),
+      ],
+    })
+
+    const { tokens } = await drafted(model)
+
+    expect(tokens).toBe(480)
+  })
+
+  it('counts the tokens of every step when the last round is unreadable', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: [
+        unreadable,
+        unreadable,
+        toolCall('lookUpSegments', { segmentTags: ['NAD'] }),
+        unreadable,
+      ],
+    })
+
+    const { error } = await failed(model)
+
+    expect(error).toEqual(new AiDraftFailed({ reason: 'checkFailed', tokens: 480 }))
+  })
+
+  const toolCallsUpToTheStepLimit = Array.from({ length: 8 }, () =>
+    toolCall('lookUpSegments', { segmentTags: ['NAD'] }),
+  )
+
+  it('feeds a round that ends at the step limit without an answer back to the model', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: [...toolCallsUpToTheStepLimit, answer(invoiceLinks)],
+    })
+
+    const { proposal, tokens, steps } = await drafted(model)
+
+    expect(proposal.links).toEqual(invoiceLinks)
+    expect(tokens).toBe(1080)
+    expect(steps).toContainEqual({ kind: 'fixingErrors', round: 1, errorCount: 1 })
+    expect(lastPrompt(model)).toContain('step limit')
+  })
+
+  it('fails the check with the tokens of a last round that ends at the step limit', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: [unreadable, unreadable, ...toolCallsUpToTheStepLimit],
+    })
+
+    const { error } = await failed(model)
+
+    expect(error).toEqual(new AiDraftFailed({ reason: 'checkFailed', tokens: 1200 }))
+  })
+
+  it('keeps the tokens of the steps before the provider fails', async () => {
+    const lookUp = toolCall('lookUpSegments', { segmentTags: ['NAD'] })
+    let calls = 0
+
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        calls++
+
+        if (calls === 1) {
+          return lookUp
+        }
+
+        throw new Error('connect ECONNREFUSED')
+      },
+    })
+
+    const { error } = await failed(model)
+
+    expect(error).toEqual(new AiDraftFailed({ reason: 'unavailable', tokens: 120 }))
+  })
+
+  it('returns the Draft with the proposal the check ran on', async () => {
+    const proposed = invoiceLinks.slice(1)
+
+    const { proposal, graph } = await drafted(
+      modelAnswering(answer(proposed)),
+      invoiceLinks.slice(0, 1),
+    )
+
+    expect(proposal.links).toEqual(proposed)
+    expect(graph).toEqual({ links: invoiceLinks, transforms: [], transformLinks: [] })
   })
 })

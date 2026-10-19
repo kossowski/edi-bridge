@@ -2,6 +2,7 @@ import {
   generateText,
   isStepCount,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
   type LanguageModel,
   type ModelMessage,
   Output,
@@ -185,9 +186,21 @@ const segmentDefinitions = (messageType: MessageType, segmentTags: ReadonlyArray
       parts: children.map(describedPart),
     }))
 
-type Answer =
-  | { links: MappingLink[]; tokens: number; responseMessages: ModelMessage[] }
-  | { unreadable: string; tokens: number }
+type Answer = { links: MappingLink[] } | { unreadable: string }
+
+function answerProblems(text: string): string {
+  let json: unknown
+
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return 'it is no JSON'
+  }
+
+  return (aiLinkListSchema.safeParse(json).error?.issues ?? [])
+    .map(({ path, message }) => `${path.join('.') || 'the answer'}: ${message}`)
+    .join('; ')
+}
 
 const errorMessage = (errors: ReadonlyArray<string>): ModelMessage => ({
   role: 'user',
@@ -232,6 +245,8 @@ export const draftMapping = ({ mappingId, sampleId, model, onStep }: AiDraftRequ
     let tokens = 0
 
     for (; ; round++) {
+      const roundMessages: ModelMessage[] = []
+
       const answer = yield* Effect.tryPromise({
         // Interrupting the run aborts the call to the model.
         try: async (abortSignal): Promise<Answer> => {
@@ -244,16 +259,25 @@ export const draftMapping = ({ mappingId, sampleId, model, onStep }: AiDraftRequ
               stopWhen: isStepCount(stepsPerRound),
               output: Output.object({ schema: aiLinkListSchema }),
               abortSignal,
+              // The result and its errors carry the usage of the last step only.
+              onStepEnd: ({ usage, response }) => {
+                tokens += tokensOf(usage)
+                roundMessages.push(...response.messages)
+              },
             })
 
-            return {
-              links: result.output.links,
-              tokens: tokensOf(result.usage),
-              responseMessages: result.responseMessages,
-            }
+            return { links: result.output.links }
           } catch (error) {
             if (NoObjectGeneratedError.isInstance(error)) {
-              return { unreadable: error.message, tokens: error.usage ? tokensOf(error.usage) : 0 }
+              return {
+                unreadable: `Your answer is no list of links: ${answerProblems(error.text ?? '')}`,
+              }
+            }
+
+            if (NoOutputGeneratedError.isInstance(error)) {
+              return {
+                unreadable: `You reached the step limit of ${stepsPerRound} steps without answering with links`,
+              }
             }
 
             throw error
@@ -262,25 +286,17 @@ export const draftMapping = ({ mappingId, sampleId, model, onStep }: AiDraftRequ
         catch: () => new AiDraftFailed({ reason: 'unavailable', tokens }),
       })
 
-      tokens += answer.tokens
+      messages.push(...roundMessages)
 
-      let errors: string[]
+      const proposal = toProposal('links' in answer ? answer.links : [])
 
-      if ('unreadable' in answer) {
-        errors = [`Your answer is no list of links: ${answer.unreadable}`]
-      } else {
-        messages.push(...answer.responseMessages)
+      onStep({ kind: 'linksDrafted', round, linkCount: proposal.links.length })
+      onStep({ kind: 'checkingAgainstSample', round })
 
-        const proposal = toProposal(answer.links)
+      const errors = 'links' in answer ? yield* check(proposal) : [answer.unreadable]
 
-        onStep({ kind: 'linksDrafted', round, linkCount: proposal.links.length })
-        onStep({ kind: 'checkingAgainstSample', round })
-
-        errors = yield* check(proposal)
-
-        if (errors.length === 0) {
-          return { proposal, tokens }
-        }
+      if (errors.length === 0) {
+        return { proposal, graph: withProposal(draft, proposal), tokens }
       }
 
       if (round === aiDraftRounds) {
