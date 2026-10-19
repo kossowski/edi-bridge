@@ -82,6 +82,25 @@ export async function findRow(canvasElement: HTMLElement, ref: RowRef) {
   })
 }
 
+// React Flow mounts the rows hidden and shows them once it has measured them. Some 200 rows take
+// that render and measure longer on a busy CI runner than the default second of waitFor.
+export async function findDrawnRow(canvasElement: HTMLElement, ref: RowRef) {
+  return waitFor(
+    () => {
+      const row = findRowButton(canvasElement, ref)
+
+      if (!row) {
+        throw new Error(`No row ${ref.side}:${ref.path}`)
+      }
+
+      expect(row).toBeVisible()
+
+      return row
+    },
+    { timeout: 5000 },
+  )
+}
+
 // A port of a transform, found by the transform's name, e.g. `in:part1` of Concatenate 1.
 export type PortHandle = { transform: string; handle: string }
 
