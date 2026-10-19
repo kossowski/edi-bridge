@@ -61,6 +61,7 @@ import {
   requestAiDraftEndpoint,
   restoreMappingVersionEndpoint,
   revokeInviteEndpoint,
+  retryRunEndpoint,
   runEndpoint,
   runsEndpoint,
   saveMappingDraftEndpoint,
@@ -136,7 +137,7 @@ import {
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
 import { parse, type ValidationError } from './parse.js'
-import { listRuns, loadRun } from './run.js'
+import { listRuns, loadRun, retryRun } from './run.js'
 import {
   CurrentMember,
   CurrentUser,
@@ -563,6 +564,10 @@ function registerRoutes(
 
   app.get<{ Params: { id: string } }>(runEndpoint.path, (request, reply) =>
     respond(request, reply, loadRun(request.params.id)),
+  )
+
+  app.post<{ Params: { id: string } }>(retryRunEndpoint.path, (request, reply) =>
+    respond(request, reply, retryRun(request.params.id)),
   )
 
   app.get(lookupTablesEndpoint.path, (request, reply) => respond(request, reply, listLookupTables))

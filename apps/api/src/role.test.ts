@@ -49,6 +49,7 @@ import {
   runsEndpoint,
   saveMappingDraftEndpoint,
   sessionEndpoint,
+  retryRunEndpoint,
   submitDocumentEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -456,6 +457,10 @@ const changes: Change[] = [
       url: submitDocumentEndpoint.path,
       body: { channelId: ids.channel, document: { fileName: 'invoice.json', content: '{}' } },
     }),
+  ],
+  [
+    'retry a Run',
+    () => ({ method: 'POST', url: toPath(retryRunEndpoint.path, { id: crypto.randomUUID() }) }),
   ],
   [
     'create an invite',
