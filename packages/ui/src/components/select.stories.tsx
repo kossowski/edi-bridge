@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from '@edi-bridge/ui/components/select'
 
-import { darkMode, expectVisibleFocusRing } from '../stories/checks'
+import { darkMode, expectVisibleFocusRing } from '../testing/checks'
 
 const meta = {
   title: 'UI/Select',

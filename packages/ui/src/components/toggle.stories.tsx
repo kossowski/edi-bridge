@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 
 import { Toggle } from '@edi-bridge/ui/components/toggle'
 
-import { darkMode, expectVisibleFocusRing } from '../stories/checks'
+import { darkMode, expectVisibleFocusRing } from '../testing/checks'
 
 const meta = {
   title: 'UI/Toggle',

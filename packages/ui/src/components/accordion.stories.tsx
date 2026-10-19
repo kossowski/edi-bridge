@@ -7,7 +7,7 @@ import {
   AccordionTrigger,
 } from '@edi-bridge/ui/components/accordion'
 
-import { darkMode, expectVisibleFocusRing } from '../stories/checks'
+import { darkMode, expectVisibleFocusRing } from '../testing/checks'
 
 const meta = {
   title: 'UI/Accordion',
