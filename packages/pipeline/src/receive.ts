@@ -3,7 +3,7 @@ import { DateTime, Effect } from 'effect'
 
 import { directionOf } from '@edi-bridge/contracts'
 import { channels, flows, type RawDocument, runs, runSteps } from '@edi-bridge/db'
-import { parse, ParseError } from '@edi-bridge/edifact'
+import { ParseError, parseMessages } from '@edi-bridge/edifact'
 
 import { ReceiptRejected } from './errors'
 import { Database, Documents, RunQueue } from './services'
@@ -28,10 +28,18 @@ export type Receipt = {
   notQueued: string[]
 }
 
-// A Document that doesn't parse as an Interchange declares no Message Types.
-function messageTypesOf(content: string): string[] {
+type DeclaredMessage = { messageType: string; messageIndex: number }
+
+type RoutedMessage = { flow: Flow; messageIndex: number | null }
+
+// A Document without an Interchange envelope declares no Message Types.
+function declaredMessagesOf(content: string): DeclaredMessage[] {
   try {
-    return parse(content).messages.flatMap(({ header }) => header.elements[1]?.[0] ?? [])
+    return parseMessages(content).messages.flatMap(({ header }, index) => {
+      const messageType = header.elements[1]?.[0]
+
+      return messageType === undefined ? [] : [{ messageType, messageIndex: index + 1 }]
+    })
   } catch (error) {
     if (error instanceof ParseError) {
       return []
@@ -43,24 +51,27 @@ function messageTypesOf(content: string): string[] {
 
 // Without a Message Type to route by, only an outbound Flow's Document Structure can read it.
 function route(content: string, channelFlows: readonly Flow[]) {
-  const declared = messageTypesOf(content)
+  const declared = declaredMessagesOf(content)
 
   if (declared.length === 0) {
     const outbound = channelFlows.filter((flow) => directionOf(flow) === 'outbound')
 
     return outbound.length > 1
       ? Effect.fail(new ReceiptRejected({ reason: 'ambiguousFlow' }))
-      : Effect.succeed({ routed: outbound, notRouted: [] })
+      : Effect.succeed({
+          routed: outbound.map((flow): RoutedMessage => ({ flow, messageIndex: null })),
+          notRouted: [],
+        })
   }
 
-  const routed: Flow[] = []
+  const routed: RoutedMessage[] = []
   const notRouted: Array<{ messageType: string }> = []
 
-  for (const messageType of declared) {
+  for (const { messageType, messageIndex } of declared) {
     const flow = channelFlows.find((candidate) => candidate.messageType === messageType)
 
     if (flow) {
-      routed.push(flow)
+      routed.push({ flow, messageIndex })
     } else {
       notRouted.push({ messageType })
     }
@@ -71,7 +82,7 @@ function route(content: string, channelFlows: readonly Flow[]) {
 
 const nameCollator = new Intl.Collator('de')
 
-const flowsOfChannel = (workspaceId: string, channelId: string) =>
+const checkInboundChannel = (workspaceId: string, channelId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
 
@@ -89,6 +100,11 @@ const flowsOfChannel = (workspaceId: string, channelId: string) =>
     if (channel.direction !== 'inbound') {
       return yield* new ReceiptRejected({ reason: 'outboundChannel' })
     }
+  })
+
+const routeOnChannel = ({ workspaceId, channelId, content }: ArrivingDocument) =>
+  Effect.gen(function* () {
+    const db = yield* Database
 
     const found = yield* Effect.promise(() =>
       db
@@ -97,24 +113,27 @@ const flowsOfChannel = (workspaceId: string, channelId: string) =>
         .where(and(eq(flows.workspaceId, workspaceId), eq(flows.inboundChannelId, channelId))),
     )
 
-    return found.length === 0
-      ? yield* new ReceiptRejected({ reason: 'noFlow' })
-      : found.toSorted((a, b) => nameCollator.compare(a.name, b.name))
+    if (found.length === 0) {
+      return yield* new ReceiptRejected({ reason: 'noFlow' })
+    }
+
+    const routing = yield* route(
+      content,
+      found.toSorted((a, b) => nameCollator.compare(a.name, b.name)),
+    )
+
+    return routing.routed.length === 0
+      ? yield* new ReceiptRejected({ reason: 'noRoutedMessage' })
+      : routing
   })
 
 export const receive = (arriving: ArrivingDocument) =>
   Effect.gen(function* () {
     const receiptStartedAt = yield* DateTime.nowAsDate
-    const channelFlows = yield* flowsOfChannel(arriving.workspaceId, arriving.channelId)
-    const { routed, notRouted } = yield* route(arriving.content, channelFlows)
 
-    if (routed.length === 0) {
-      return yield* new ReceiptRejected({ reason: 'noRoutedMessage' })
-    }
+    yield* checkInboundChannel(arriving.workspaceId, arriving.channelId)
 
-    if (routed.some((flow) => directionOf(flow) === 'inbound')) {
-      return yield* new ReceiptRejected({ reason: 'inboundNotProcessed' })
-    }
+    const { routed, notRouted } = yield* routeOnChannel(arriving)
 
     const documents = yield* Documents
 
@@ -133,7 +152,7 @@ export const receive = (arriving: ArrivingDocument) =>
     const created = yield* Effect.promise(() =>
       db.transaction((tx) =>
         Promise.all(
-          routed.map(async (flow) => {
+          routed.map(async ({ flow, messageIndex }) => {
             const [run] = await tx
               .insert(runs)
               .values({
@@ -143,6 +162,7 @@ export const receive = (arriving: ArrivingDocument) =>
                 tradingPartnerId: flow.tradingPartnerId,
                 manualSubmission: arriving.manualSubmission,
                 receivedAt: document.receivedAt,
+                messageIndex,
               })
               .returning()
 
@@ -173,8 +193,15 @@ export const receive = (arriving: ArrivingDocument) =>
 
     const queue = yield* RunQueue
 
+    const outboundFlowIds = new Set(
+      routed.flatMap(({ flow }) => (directionOf(flow) === 'outbound' ? [flow.id] : [])),
+    )
+
+    // processRun claims only outbound Runs, so inbound ones stay out of the queue.
+    const queued = created.filter((run) => outboundFlowIds.has(run.flowId))
+
     // The Runs are stored already, so one not queued stays received until the next sweep.
-    const [, notQueued] = yield* Effect.partition(created, (run) =>
+    const [, notQueued] = yield* Effect.partition(queued, (run) =>
       queue.enqueue({ workspaceId: arriving.workspaceId, runId: run.id }),
     )
 

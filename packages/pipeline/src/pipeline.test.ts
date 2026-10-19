@@ -94,6 +94,7 @@ describe('the receipt of a Document', () => {
       manualSubmission: true,
       flowId: workspace.flowId,
       tradingPartnerId: workspace.tradingPartnerId,
+      messageIndex: null,
       failureStage: null,
       output: null,
       document: { fileName: 'invoice.json', content: goldenInvoice },
@@ -128,6 +129,9 @@ describe('the receipt of a Document', () => {
       await unreachable.close()
     }
   })
+
+  const storedDocuments = (channelId: string) =>
+    connection.db.select().from(documents).where(eq(documents.channelId, channelId))
 
   const rejection = async (arriving: Partial<ArrivingDocument>) => {
     const queue = inMemoryRunQueue()
@@ -249,7 +253,7 @@ describe('the receipt of a Document', () => {
     )
 
     expect(receipt.notRouted).toEqual([{ messageType: 'ORDERS' }])
-    expect(receipt.runs).toHaveLength(2)
+    expect(receipt.runs.map(({ messageIndex }) => messageIndex)).toEqual([1, 3])
     expect(receipt.runs.every((run) => run.documentId === receipt.document.id)).toBe(true)
     expect(receipt.runs.every((run) => !run.manualSubmission)).toBe(true)
     expect(queue.queued.map(({ runId }) => runId)).toEqual(receipt.runs.map(({ id }) => id))
@@ -298,9 +302,6 @@ describe('the receipt of a Document', () => {
 
     return { channelId, flows: created }
   }
-
-  const storedDocuments = (channelId: string) =>
-    connection.db.select().from(documents).where(eq(documents.channelId, channelId))
 
   it('tries to queue every Run of a Document when one is not queued', async () => {
     const { channelId } = await channelWithFlows(['INVOIC'])
@@ -362,21 +363,74 @@ describe('the receipt of a Document', () => {
     await expect(storedDocuments(channelId)).resolves.toEqual([])
   })
 
-  it('rejects a Document routed to an inbound Flow and stores nothing', async () => {
-    const { channelId } = await channelWithFlows(['ORDERS'])
+  const ordersMessage = golden('orders-reference.edi', 'latin1')
+    .split('\n')
+    .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
 
-    const orders = [
+  const ordersInterchange = (messages: string[][]) =>
+    [
       golden('orders-reference.edi', 'latin1').split('\n')[0],
-      ...golden('orders-reference.edi', 'latin1')
-        .split('\n')
-        .filter((line) => line !== '' && !/^UN[BZ]/.test(line)),
-      "UNZ+1+00000001'",
+      ...messages.flat(),
+      `UNZ+${messages.length}+00000001'`,
     ].join('\n')
 
-    expect(await rejection({ channelId, content: orders })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'inboundNotProcessed' })),
+  it('receives an inbound Interchange of three Messages as three Runs linked to its Document', async () => {
+    const { channelId, flows: created } = await channelWithFlows(['ORDERS'])
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'orders.edi',
+        content: ordersInterchange([ordersMessage, ordersMessage, ordersMessage]),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
     )
-    await expect(storedDocuments(channelId)).resolves.toEqual([])
+
+    expect(receipt.notRouted).toEqual([])
+    expect(queue.queued).toEqual([])
+    expect(
+      receipt.runs.map(({ documentId, flowId, messageIndex }) => ({
+        documentId,
+        flowId,
+        messageIndex,
+      })),
+    ).toEqual(
+      [1, 2, 3].map((messageIndex) => ({
+        documentId: receipt.document.id,
+        flowId: created[0]?.id,
+        messageIndex,
+      })),
+    )
+    await expect(readRun(connection.db, receipt.runs[0]?.id ?? '')).resolves.toMatchObject({
+      status: 'received',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'pending' },
+        { stage: 'validation', status: 'pending' },
+        { stage: 'mapping', status: 'pending' },
+        { stage: 'delivery', status: 'pending' },
+      ],
+    })
+  })
+
+  it('receives a broken Message of an Interchange as a Run of its own', async () => {
+    const { channelId } = await channelWithFlows(['ORDERS'])
+
+    const withoutSegment = ordersMessage.filter((_, index) => index !== 2)
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'orders.edi',
+        content: ordersInterchange([ordersMessage, withoutSegment, ordersMessage]),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
+    )
+
+    expect(receipt.runs.map(({ messageIndex }) => messageIndex)).toEqual([1, 2, 3])
   })
 })
 
