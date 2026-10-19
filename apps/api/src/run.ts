@@ -1,17 +1,4 @@
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  lte,
-  or,
-  type SQL,
-  sql,
-} from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, inArray, lte, or, type SQL, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import type { SelectedFields } from 'drizzle-orm/pg-core'
@@ -344,22 +331,35 @@ export const waitForTradingPartnerRun = (id: string) =>
       })
     }
 
-    yield* Effect.promise(() =>
-      db
-        .update(runs)
-        .set({ waitingForTradingPartnerSince: sql`now()` })
-        .where(
-          inWorkspace(
-            runs,
-            workspace.id,
-            eq(runs.id, id),
-            isNull(runs.waitingForTradingPartnerSince),
-          ),
-        ),
-    )
+    const marked = yield* Effect.promise(() => markWaitingForTradingPartner(db, workspace.id, id))
+
+    // A Retry can claim the Run between the read above and the mark.
+    if (!marked) {
+      return yield* new Conflict({ message: 'The Run is no longer failed' })
+    }
 
     return yield* loadRun(id)
   })
+
+/**
+ * Marks a failed Run as waiting for the Trading Partner and keeps the time of an earlier mark.
+ * Answers false when the Run is no longer failed.
+ */
+export const markWaitingForTradingPartner = async (
+  db: Database,
+  workspaceId: string,
+  id: string,
+) => {
+  const marked = await db
+    .update(runs)
+    .set({
+      waitingForTradingPartnerSince: sql`coalesce(${runs.waitingForTradingPartnerSince}, now())`,
+    })
+    .where(inWorkspace(runs, workspaceId, eq(runs.id, id), eq(runs.status, 'failed')))
+    .returning({ id: runs.id })
+
+  return marked.length > 0
+}
 
 export const reprocessRun = (id: string, { mappingVersionId }: ReprocessRunBody) =>
   Effect.gen(function* () {

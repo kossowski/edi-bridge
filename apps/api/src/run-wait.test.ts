@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -10,6 +11,7 @@ import {
   toPath,
   waitForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
+import { runs } from '@edi-bridge/db'
 import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
 import {
   addOrdersFlow,
@@ -20,6 +22,7 @@ import {
   seedInvoiceWorkspace,
 } from '@edi-bridge/pipeline/testing'
 
+import { markWaitingForTradingPartner } from './run.js'
 import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
 
 let api: TestApi
@@ -163,6 +166,26 @@ describe('POST /runs/:id/wait-for-trading-partner', () => {
     expect(runDetailSchema.parse(again.json()).waitingForTradingPartnerSince).toBe(
       first.waitingForTradingPartnerSince,
     )
+  })
+
+  it('leaves a Run unmarked that is no longer failed when the mark is written', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+    // A Retry claims the Run between the read and the write of the mark.
+    await api.connection.db
+      .update(runs)
+      .set({ status: 'processing', failureStage: null, error: null, problem: null })
+      .where(eq(runs.id, id))
+
+    await expect(markWaitingForTradingPartner(api.connection.db, workspace.id, id)).resolves.toBe(
+      false,
+    )
+
+    const [row] = await api.connection.db
+      .select({ since: runs.waitingForTradingPartnerSince })
+      .from(runs)
+      .where(eq(runs.id, id))
+
+    expect(row).toEqual({ since: null })
   })
 
   it('answers 409 for a Run that the Workspace fixes and leaves it unmarked', async () => {
