@@ -1657,7 +1657,7 @@ describe('the Retry of a Run', () => {
     return { ...sftpLogin(), remotePath }
   }
 
-  it('resends the stored Interchange under its control reference once the SFTP Channel is reachable', async () => {
+  it('delivers the stored Interchange again under its control reference once the SFTP Channel is reachable', async () => {
     const into = await seedInvoiceWorkspace(connection.db, 'Flaky Foods')
     const login = await outboxOf('flaky')
     const flakyChannelId = await deliverOverSftp(connection.db, into, { ...login, port: 1 })

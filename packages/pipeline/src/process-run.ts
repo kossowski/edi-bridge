@@ -562,7 +562,7 @@ const messageSchema = z.object({
   trailer: segmentSchema,
 })
 
-// The Interchange is built once, at its first successful envelope, and a Retry resends it as stored.
+// The Interchange is built once, at its first successful envelope; a Retry delivers it again.
 const buildInterchange = (
   queued: QueuedRun,
   run: ClaimedRun,
