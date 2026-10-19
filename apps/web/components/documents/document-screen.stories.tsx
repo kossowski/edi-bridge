@@ -42,7 +42,7 @@ import preview from '../../.storybook/preview'
 
 const storyRun = storyRunFactory({ idPrefix: '40000000', hour: '07' })
 
-const missingField = storyRun(1, 'INVOIC', 'mapping')
+const missingField = storyRun(1, 'INVOIC', 'mapping', { defect: false })
 
 const missingFieldMapping = toMappingVersionSummary(
   seedMappingVersions.find(({ id }) => id === flowFor('INVOIC').mappingVersionId)!,
@@ -123,8 +123,7 @@ const incompleteSetup = storyRun(17, 'INVOIC', 'delivery')
 
 const unreadableFromErp = storyRun(18, 'INVOIC', 'parse')
 
-// The mocks stop this Run on a Defect at mapping.
-const defect = storyRun(47, 'ORDERS', 'mapping')
+const defect = storyRun(47, 'ORDERS', 'mapping', { defect: true })
 
 const runs = [
   missingField,

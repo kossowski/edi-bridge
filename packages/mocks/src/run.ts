@@ -40,7 +40,7 @@ export type RunFields = Pick<
   | 'manualSubmission'
   | 'status'
   | 'failureStage'
-> & { businessReference?: string | null }
+> & { businessReference?: string | null; defect?: boolean | undefined }
 
 // A CONTRL acknowledges a whole Interchange, so it carries no Business Reference.
 function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messageType'>) {
@@ -50,12 +50,13 @@ function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messa
 }
 
 // The Run Store places each Run in its Interchange.
-export function toRunSummary(run: RunFields): RunSummary {
+export function toRunSummary({ defect, ...run }: RunFields): RunSummary {
   const { failureStage } = run
 
   return runSummarySchema.parse({
     ...run,
-    problem: failureStage === null ? null : { reason: problemReasonOf({ ...run, failureStage }) },
+    problem:
+      failureStage === null ? null : { reason: problemReasonOf({ ...run, defect, failureStage }) },
     direction: directionOf(run),
     businessReference:
       run.businessReference === undefined ? businessReferenceOf(run) : run.businessReference,
@@ -111,7 +112,9 @@ export function generateRun(faker: Faker, receivedAt: Date): RunFields {
   }
 }
 
-export function createRun(overrides: Partial<RunSummary> = {}): RunSummary {
+export function createRun(
+  overrides: Partial<RunSummary> & Pick<RunFields, 'defect'> = {},
+): RunSummary {
   return toRunSummary({
     ...generateRun(defaultFaker, defaultFaker.date.recent({ days: 30 })),
     ...overrides,

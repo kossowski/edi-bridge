@@ -41,7 +41,10 @@ export type GeneratedErrorCode =
 
 export type GeneratedError = RunError & { code: GeneratedErrorCode }
 
-type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureStage'>
+// `defect` pins whether the Run stops on a Defect, for a story or test that needs one either way.
+type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureStage'> & {
+  defect?: boolean | undefined
+}
 
 export type BrokenPiece =
   | Pick<Extract<FixTarget, { kind: 'mapping' }>, 'kind' | 'fieldPath'>
@@ -112,8 +115,13 @@ const defectError: GeneratedError = {
 function stopsOnDefect(run: ProblemFields) {
   return (
     run.failureStage === 'mapping' &&
-    seededFaker(`defect:${run.id}`).datatype.boolean({ probability: 0.1 })
+    (run.defect ?? seededFaker(`defect:${run.id}`).datatype.boolean({ probability: 0.1 }))
   )
+}
+
+// The summary has drawn the Defect already, so the Message follows it instead of drawing again.
+function isDefect(run: RunSummary) {
+  return run.problem?.reason === 'defect'
 }
 
 type Fault = {
@@ -182,7 +190,7 @@ export function lookupTableFailureOf(run: RunSummary): Failure | null {
     run.failureStage === 'mapping' &&
     directionOf(run) === 'outbound' &&
     readsUnits(run) &&
-    !stopsOnDefect(run)
+    !isDefect(run)
     ? { error: missingUnitError, broken: missingUnit }
     : null
 }
@@ -374,7 +382,7 @@ function setComponent(segment: Segment, element: number, component: number, valu
 function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): FaultyMessage {
   const intact = { segments, fault: null, broken: null }
 
-  if (run.status !== 'failed' || stopsOnDefect(run)) {
+  if (run.status !== 'failed' || isDefect(run)) {
     return intact
   }
 
@@ -521,7 +529,7 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
     }
   }
 
-  if (stopsOnDefect(run)) {
+  if (isDefect(run)) {
     return { error: defectError, broken: null }
   }
 

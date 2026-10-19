@@ -15,7 +15,7 @@ export function storyRunFactory({ idPrefix, hour }: { idPrefix: string; hour: st
     index: number,
     messageType: MessageType,
     outcome: FailureStage | Exclude<RunStatus, 'failed'>,
-    changes: { receivedAt?: string; manualSubmission?: boolean } = {},
+    changes: { receivedAt?: string; manualSubmission?: boolean; defect?: boolean } = {},
   ) {
     const flow = flowFor(messageType)
 
