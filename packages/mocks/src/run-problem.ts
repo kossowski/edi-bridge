@@ -34,6 +34,7 @@ const reasons = {
   glnMissing: 'incompleteSetup',
   channelDefect: 'incompleteSetup',
   characterSetUnsupported: 'incompleteSetup',
+  processingDefect: 'defect',
 } as const satisfies Record<GeneratedErrorCode, ProblemReason>
 
 function destinationChannelOf(run: RunSummary, sources: ProblemSources) {
@@ -146,9 +147,12 @@ export function problemOf(
     return null
   }
 
+  const reason = reasons[error.code]
+
+  // A Defect lies in EDI Bridge, so nothing in the Workspace fixes it.
   return {
-    reason: reasons[error.code],
+    reason,
     whoFixes: fixer,
-    fixTarget: fixTargetOf(run, fixer, broken, mapping, sources),
+    fixTarget: reason === 'defect' ? null : fixTargetOf(run, fixer, broken, mapping, sources),
   }
 }

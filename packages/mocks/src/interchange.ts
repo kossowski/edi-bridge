@@ -37,6 +37,7 @@ export type GeneratedErrorCode =
   | 'glnMissing'
   | 'channelDefect'
   | 'characterSetUnsupported'
+  | 'processingDefect'
 
 export type GeneratedError = RunError & { code: GeneratedErrorCode }
 
@@ -98,6 +99,21 @@ function incompleteSetupOf(run: ProblemFields): Failure | null {
   ])
 
   return kind && { error: setupErrors[kind], broken: { kind } }
+}
+
+const defectError: GeneratedError = {
+  code: 'processingDefect',
+  message: 'The processing stopped on an unexpected error',
+  position: null,
+  details: null,
+}
+
+// A separate seed keeps the Messages of the other Runs as they were.
+function stopsOnDefect(run: ProblemFields) {
+  return (
+    run.failureStage === 'mapping' &&
+    seededFaker(`defect:${run.id}`).datatype.boolean({ probability: 0.1 })
+  )
 }
 
 type Fault = {
@@ -165,7 +181,8 @@ export function lookupTableFailureOf(run: RunSummary): Failure | null {
   return run.status === 'failed' &&
     run.failureStage === 'mapping' &&
     directionOf(run) === 'outbound' &&
-    readsUnits(run)
+    readsUnits(run) &&
+    !stopsOnDefect(run)
     ? { error: missingUnitError, broken: missingUnit }
     : null
 }
@@ -184,6 +201,10 @@ export function problemReasonOf(
     }
 
     case 'mapping': {
+      if (stopsOnDefect(run)) {
+        return 'defect'
+      }
+
       return directionOf(run) === 'outbound' && readsUnits(run) ? 'missingCode' : 'missingField'
     }
 
@@ -353,7 +374,7 @@ function setComponent(segment: Segment, element: number, component: number, valu
 function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): FaultyMessage {
   const intact = { segments, fault: null, broken: null }
 
-  if (run.status !== 'failed') {
+  if (run.status !== 'failed' || stopsOnDefect(run)) {
     return intact
   }
 
@@ -498,6 +519,10 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
       error: { code: fault.code, message: fault.message, position: null, details: null },
       broken,
     }
+  }
+
+  if (stopsOnDefect(run)) {
+    return { error: defectError, broken: null }
   }
 
   if (run.failureStage === 'mapping') {

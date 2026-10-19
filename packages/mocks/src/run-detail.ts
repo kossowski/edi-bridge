@@ -118,7 +118,10 @@ export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): R
   return (['inbound', 'outbound'] as const).flatMap((direction) => {
     const replaced = runs.find(
       (run) =>
-        directionOf(run) === direction && run.status === 'failed' && run.failureStage === 'mapping',
+        directionOf(run) === direction &&
+        run.status === 'failed' &&
+        run.failureStage === 'mapping' &&
+        run.problem.reason !== 'defect',
     )
 
     const replacing =
@@ -133,6 +136,20 @@ export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): R
 
     return replacing ? [{ replaced: replaced.id, replacing: replacing.id }] : []
   })
+}
+
+// Mirrors the API: the Trading Partner fixes its Document by a resend, a delivery failure by a Retry.
+function isReprocessable(
+  run: RunDetail,
+): run is RunDetail & { mappingVersion: MappingVersionSummary } {
+  return (
+    run.status === 'failed' &&
+    run.failureStage !== 'delivery' &&
+    run.problem !== null &&
+    run.problem.whoFixes !== 'tradingPartner' &&
+    run.mappingVersion !== null &&
+    run.replacedBy === null
+  )
 }
 
 function problem(status: number, message: string) {
@@ -426,6 +443,13 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
         return problem(404, 'Not Found')
       }
 
+      // Trying a Defect again outside delivery reprocesses it with its own Mapping Version.
+      if (run.problem?.reason === 'defect' && isReprocessable(run)) {
+        reprocess(run, run.mappingVersion)
+
+        return HttpResponse.json(detail(run.id))
+      }
+
       if (run.status !== 'failed' || run.failureStage !== 'delivery') {
         return problem(409, 'Only a Run that failed at delivery can be retried.')
       }
@@ -459,10 +483,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
           return problem(404, 'Not Found')
         }
 
-        if (run.problem?.whoFixes !== 'you' || run.replacedBy) {
+        if (!isReprocessable(run)) {
           return problem(
             409,
-            'Only a failed Run that the Workspace fixes and that is not replaced can be reprocessed.',
+            'Only a failed Run that is not replaced, failed before delivery and is not fixed by the Trading Partner can be reprocessed.',
           )
         }
 

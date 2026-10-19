@@ -63,6 +63,11 @@ function inboundOrders(
     : createRun({ ...run, status: 'failed', failureStage })
 }
 
+// A Defect stops a few Runs at mapping, so a large seed holds some.
+function defectRun() {
+  return createRuns({ count: 2000 }).find(({ problem }) => problem?.reason === 'defect')!
+}
+
 async function getRun(id: string) {
   const response = await fetch(`${apiUrl}${toPath(runEndpoint.path, { id })}`)
 
@@ -421,6 +426,8 @@ describe('the problem of a failed Run', () => {
         'workspaceGln',
         'tradingPartnerGln',
         'channelCredential',
+        // A Defect has no fix target.
+        undefined,
       ]),
     )
   })
@@ -478,6 +485,24 @@ describe('the problem of a failed Run', () => {
           name: run.tradingPartner.name,
         },
       ]).toContainEqual(run.problem?.fixTarget)
+    }
+  })
+
+  it('tries a Defect at mapping again without a fix target', async () => {
+    const runs = createRuns({ count: 2000 }).filter(({ problem }) => problem?.reason === 'defect')
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    expect(runs.length).toBeGreaterThan(0)
+
+    for (const run of runs) {
+      const { body } = await getRun(run.id)
+
+      expect(body).toMatchObject({
+        failureStage: 'mapping',
+        error: { code: 'processingDefect', position: null },
+        problem: { reason: 'defect', whoFixes: 'retry', fixTarget: null },
+      })
     }
   })
 
@@ -618,6 +643,24 @@ describe('POST /runs/:id/retry', () => {
     expect(after).toMatchObject({ id: run.id, status: 'delivered', failureStage: null })
     expect(after?.steps.slice(0, -1)).toEqual(before?.steps.slice(0, -1))
     expect(after?.steps.at(-1)?.status).toBe('succeeded')
+  })
+
+  it('reprocesses a Defect at mapping with its own Mapping Version and answers the replaced Run', async () => {
+    const run = defectRun()
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+    const { body: before } = await getRun(run.id)
+
+    const { status, body } = await post(toPath(retryRunEndpoint.path, { id: run.id }))
+    const { body: replacing } = await getRun(body?.replacedBy?.id ?? '')
+
+    expect(status).toBe(200)
+    expect(body).toMatchObject({ id: run.id, status: 'failed', failureStage: 'mapping' })
+    expect(replacing).toMatchObject({
+      status: 'delivered',
+      replaces: { id: run.id },
+      mappingVersion: before?.mappingVersion,
+    })
+    expect((await post(toPath(retryRunEndpoint.path, { id: run.id }))).status).toBe(409)
   })
 
   it.each(['parse', 'validation', 'mapping'] as const)(
@@ -783,6 +826,18 @@ describe('POST /runs/:id/reprocess', () => {
       failureStage: 'validation',
     })
 
+    const [latest] = await serveWithVersions(run)
+
+    const { status, body } = await post(toPath(reprocessRunEndpoint.path, { id: run.id }), {
+      mappingVersionId: latest!.id,
+    })
+
+    expect(status).toBe(201)
+    expect(body).toMatchObject({ status: 'delivered', replaces: { id: run.id } })
+  })
+
+  it('accepts a Defect at mapping', async () => {
+    const run = defectRun()
     const [latest] = await serveWithVersions(run)
 
     const { status, body } = await post(toPath(reprocessRunEndpoint.path, { id: run.id }), {
