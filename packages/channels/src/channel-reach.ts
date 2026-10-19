@@ -31,7 +31,7 @@ export class ChannelReach extends Context.Service<
   }
 >()('ChannelReach') {}
 
-const unreachable = (reason: ChannelTestFailureReason) => new ChannelUnreachable({ reason })
+export const unreachable = (reason: ChannelTestFailureReason) => new ChannelUnreachable({ reason })
 
 const unreachableHostCodes = new Set([
   'ECONNREFUSED',
@@ -93,7 +93,7 @@ const sftpFailureSchema = z.object({
     .catch(undefined),
 })
 
-const sftpReason = (error: Error): ChannelTestFailureReason => {
+export const sftpReason = (error: Error): ChannelTestFailureReason => {
   const { code } = sftpFailureSchema.parse(error)
 
   return code === undefined ? 'unexpectedResponse' : sftpStatusReasons[code]
@@ -133,7 +133,11 @@ const statAndOpenDirectory = (
 }
 
 // The host key is not pinned yet, so any key the server presents is accepted.
-const reachSftp = (login: SftpLogin, timeoutMs: number) =>
+export const sftpSession = (
+  login: SftpLogin,
+  timeoutMs: number,
+  use: (sftp: SFTPWrapper, done: (error?: ChannelUnreachable) => void) => void,
+) =>
   Effect.callback<void, ChannelUnreachable>((resume) => {
     const client = new Client()
     let settled = false
@@ -162,7 +166,7 @@ const reachSftp = (login: SftpLogin, timeoutMs: number) =>
           return
         }
 
-        statAndOpenDirectory(sftp, login.remotePath, settle)
+        use(sftp, settle)
       })
     })
 
@@ -182,6 +186,11 @@ const reachSftp = (login: SftpLogin, timeoutMs: number) =>
       settled = true
       client.end()
     })
+  })
+
+const reachSftp = (login: SftpLogin, timeoutMs: number) =>
+  sftpSession(login, timeoutMs, (sftp, done) => {
+    statAndOpenDirectory(sftp, login.remotePath, done)
   })
 
 const httpStatusReason = (status: number): ChannelTestFailureReason | undefined => {
@@ -216,7 +225,7 @@ const reachHttp = ({ url, authorization }: HttpDestination) =>
     }),
   )
 
-const timingOut = (effect: Effect.Effect<void, ChannelUnreachable>, timeoutMs: number) =>
+export const timingOut = (effect: Effect.Effect<void, ChannelUnreachable>, timeoutMs: number) =>
   Effect.timeoutOrElse(effect, {
     duration: timeoutMs,
     orElse: () => Effect.fail(unreachable('timedOut')),

@@ -8,3 +8,5 @@ export {
 } from './channel-reach'
 
 export { type SecretBox, secretBox, secretKeyBytes } from './secret'
+
+export { DeliveryFailed, type OutboundFile, uploadSftp } from './sftp-upload'
