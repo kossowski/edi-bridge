@@ -64,11 +64,11 @@ const processed = (runId: string) =>
     async () => {
       const run = await readRun(connection.db, runId)
 
-      expect(run?.steps.find(({ stage }) => stage === 'validation')?.finishedAt).not.toBeNull()
+      expect(run?.status === 'failed' || run?.output !== null).toBe(true)
 
       return run
     },
-    { timeout: 3000, interval: 50 },
+    { timeout: 2000, interval: 50 },
   )
 
 describe('the worker', () => {
@@ -106,6 +106,23 @@ describe('the worker', () => {
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
         { stage: 'validation', status: 'failed' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+  })
+
+  it('stops a queued Run with an unreadable Document at mapping', async () => {
+    const run = await processed(await arrive('not json'))
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      output: null,
+      error: { code: 'invalidJson' },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
         { stage: 'delivery', status: 'skipped' },
       ],
     })
