@@ -1,21 +1,11 @@
-import { Data, Effect } from 'effect'
+import { Effect } from 'effect'
 import { posix } from 'node:path'
 
-import type { ChannelTestFailureReason } from '@edi-bridge/contracts'
-
 import { sftpReason, sftpSession, timingOut, unreachable, type SftpLogin } from './channel-reach'
+import { DeliveryFailed, type OutboundDocument } from './delivery'
 import { type SftpChannel, sftpLogin } from './sftp-channel'
 
 import type { SecretBox } from './secret'
-
-export class DeliveryFailed extends Data.TaggedError('DeliveryFailed')<{
-  readonly reason: ChannelTestFailureReason
-}> {}
-
-export interface OutboundDocument {
-  name: string
-  content: Buffer
-}
 
 export const uploadSftp = (
   login: SftpLogin,

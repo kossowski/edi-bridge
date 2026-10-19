@@ -193,15 +193,16 @@ const reachSftp = (login: SftpLogin, timeoutMs: number) =>
     statAndOpenDirectory(sftp, login.remotePath, done)
   })
 
-const httpStatusReason = (status: number): ChannelTestFailureReason | undefined => {
-  if (status === 401 || status === 403) {
-    return 'loginRejected'
-  }
+export const rejectedLoginReason = (status: number): ChannelTestFailureReason | undefined =>
+  status === 401 || status === 403 ? 'loginRejected' : undefined
 
-  return status >= 500 ? 'unexpectedResponse' : undefined
-}
+const httpStatusReason = (status: number): ChannelTestFailureReason | undefined =>
+  rejectedLoginReason(status) ?? (status >= 500 ? 'unexpectedResponse' : undefined)
 
-const fetchFailureSchema = z.object({ cause: z.object({ code: z.string() }) })
+export const fetchFailureReasonSchema = z
+  .object({ cause: z.object({ code: z.string() }) })
+  .transform(({ cause }) => networkReason(cause.code) ?? 'unexpectedResponse')
+  .catch('unexpectedResponse')
 
 // HEAD sends no Document; an endpoint that only accepts POST still answers it.
 const reachHttp = ({ url, authorization }: HttpDestination) =>
@@ -213,10 +214,7 @@ const reachHttp = ({ url, authorization }: HttpDestination) =>
         headers: authorization === null ? {} : { authorization },
         signal,
       }),
-    catch: (error) =>
-      unreachable(
-        networkReason(fetchFailureSchema.safeParse(error).data?.cause.code) ?? 'unexpectedResponse',
-      ),
+    catch: (error) => unreachable(fetchFailureReasonSchema.parse(error)),
   }).pipe(
     Effect.flatMap((response) => {
       const reason = httpStatusReason(response.status)
