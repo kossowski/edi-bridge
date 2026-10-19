@@ -258,11 +258,12 @@ export function MarkWaitingStep({ run }: { run: FailedRun }) {
     <div className="flex min-w-0 flex-col items-start gap-2">
       <p>{t('problem.steps.markWaiting', { tradingPartner: run.tradingPartner.name })}</p>
       {canChange ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex max-w-full min-w-0 flex-wrap gap-2">
           <Button
             disabled={marked || wait.isPending}
             ref={markButton}
             variant="outline"
+            className="h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal"
             onClick={() => change(wait)}>
             <HugeiconsIcon
               icon={marked ? CheckmarkCircle02Icon : Clock01Icon}
@@ -280,6 +281,7 @@ export function MarkWaitingStep({ run }: { run: FailedRun }) {
               disabled={endWaiting.isPending}
               ref={endButton}
               variant="ghost"
+              className="h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal"
               onClick={() => change(endWaiting)}>
               {endWaiting.isPending
                 ? t('actions.endWaiting.pending')
