@@ -5,6 +5,7 @@ import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story
 import { PartnerWizard } from '@/components/trading-partners/partner-wizard'
 import {
   chooseMapping,
+  closeSelectPopup,
   continueTo,
   findMappingGroup,
   mappingSelect,
@@ -186,9 +187,9 @@ export const ManyMappings = meta.story({
     await waitFor(async () =>
       expect((await screen.findAllByRole('option')).length).toBeGreaterThan(20),
     )
-    const popup = screen.getByRole('listbox').closest('[data-base-ui-portal]')!
-    await userEvent.keyboard('{Escape}')
-    await waitFor(() => expect(popup.querySelector('[data-base-ui-focus-guard]')).toBeNull())
+    await closeSelectPopup(async () => {
+      await userEvent.keyboard('{Escape}')
+    })
     await expectNoPageScroll(canvasElement)
   },
 })
