@@ -787,8 +787,8 @@
             "wrong-format": "Ein Wert, der eine Zahl sein muss, enthält Buchstaben oder andere Zeichen.",
             "other": "Ein Wert verletzt die Regeln für diese Belegart, zum Beispiel ein falsches Datum oder ein unbekannter Code."
           },
-          "description": "{direction, select, inbound {EDI Bridge konnte die Datei von {tradingPartner} lesen, aber sie verletzt die EDI-Regeln. {problem}} other {Der übersetzte Beleg verletzt die EDI-Regeln für {tradingPartner}. {problem} Das Mapping füllt diese Stelle aus Ihrem Feld „{field}“.}}",
-          "descriptionWithoutTarget": "Der übersetzte Beleg verletzt die EDI-Regeln für {tradingPartner}. {problem} Das Mapping füllt diese Stelle aus einem Ihrer Felder."
+          "description": "{direction, select, inbound {EDI Bridge konnte die Datei von {tradingPartner} lesen, aber sie besteht die Prüfung gegen die EDI-Regeln nicht. {problem}} other {Der übersetzte Beleg für {tradingPartner} besteht die Prüfung gegen die EDI-Regeln nicht. {problem} Das Mapping füllt diese Stelle im Beleg aus Ihrem Feld „{field}“.}}",
+          "descriptionWithoutTarget": "Der übersetzte Beleg für {tradingPartner} besteht die Prüfung gegen die EDI-Regeln nicht. {problem} Das Mapping füllt diese Stelle im Beleg aus einem Ihrer Felder."
         },
         "missingCode": {
           "title": "Für den Code „{code}“ fehlt eine Übersetzung",

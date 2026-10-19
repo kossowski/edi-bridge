@@ -258,7 +258,14 @@ export const InvalidContentFromPartner = meta.story({
   args: { id: invalidContentInbound.id },
   async play({ canvas }) {
     await expect(
-      await canvas.findByRole('heading', { name: 'The content breaks the EDI rules' }),
+      await canvas.findByRole('heading', {
+        name: 'A numeric value contains letters or other characters',
+      }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        `EDI Bridge could read the file from ${partner.name}, but the file fails the check against the EDI rules. A value that must be a number contains letters or other characters.`,
+      ),
     ).toBeVisible()
     await expect(
       canvas.getByText(
@@ -310,7 +317,7 @@ export const InvalidContentFromYou = meta.story({
     ).toBeVisible()
     await expect(
       canvas.getByText(
-        /^The translated document breaks the EDI rules for .+\. A value is longer than its format allows\. The mapping fills it from your field “(buyer|supplier)\.gln”\.$/,
+        /^The translated document for .+ fails the check against the EDI rules\. A value is longer than its format allows\. The mapping fills this place in the document from your field “(buyer|supplier)\.gln”\.$/,
       ),
     ).toBeVisible()
     await expect(canvas.queryByText(/is empty/)).toBeNull()
@@ -330,6 +337,19 @@ export const EmptyValueFromYou = meta.story({
     ).toBeVisible()
     await expect(
       canvas.getByText(/A value that the rules for this kind of document require is empty\./),
+    ).toBeVisible()
+  },
+})
+
+export const GermanEmptyValueFromYou = meta.story({
+  args: { id: emptyValueOutbound.id },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'Ein Pflichtwert ist leer' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(/Ein Wert, den die Regeln für diese Belegart verlangen, ist leer\./),
     ).toBeVisible()
   },
 })

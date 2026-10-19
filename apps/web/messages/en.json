@@ -787,8 +787,8 @@
             "wrong-format": "A value that must be a number contains letters or other characters.",
             "other": "A value breaks the rules for this kind of document, for example a wrong date or an unknown code."
           },
-          "description": "{direction, select, inbound {EDI Bridge could read the file from {tradingPartner}, but it breaks the EDI rules. {problem}} other {The translated document breaks the EDI rules for {tradingPartner}. {problem} The mapping fills it from your field “{field}”.}}",
-          "descriptionWithoutTarget": "The translated document breaks the EDI rules for {tradingPartner}. {problem} The mapping takes it from one of your fields."
+          "description": "{direction, select, inbound {EDI Bridge could read the file from {tradingPartner}, but the file fails the check against the EDI rules. {problem}} other {The translated document for {tradingPartner} fails the check against the EDI rules. {problem} The mapping fills this place in the document from your field “{field}”.}}",
+          "descriptionWithoutTarget": "The translated document for {tradingPartner} fails the check against the EDI rules. {problem} The mapping fills this place in the document from one of your fields."
         },
         "missingCode": {
           "title": "The code “{code}” has no translation",
