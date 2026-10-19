@@ -8,11 +8,12 @@ import {
   runDetailSchema,
   runEndpoint,
   runListSchema,
+  runMappingFilterCase,
   runsEndpoint,
   submitDocumentEndpoint,
   toPath,
 } from '@edi-bridge/contracts'
-import { runs } from '@edi-bridge/db'
+import { flows, mappings, mappingVersions, runs } from '@edi-bridge/db'
 import { processRun } from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
@@ -332,4 +333,120 @@ describe('a Run that stopped on a defect', () => {
       problem: { reason: 'defect', whoFixes: 'retry', fixTarget: null },
     })
   })
+})
+
+describe('the shared mappingId filter case', () => {
+  const seeded = new Map<string, string>()
+
+  const seededId = (key: string) => {
+    const id = seeded.get(key)
+
+    if (id === undefined) {
+      throw new Error(`The filter case seeded no ${key}`)
+    }
+
+    return id
+  }
+
+  const inserted = ([row]: { id: string }[]) => {
+    if (row === undefined) {
+      throw new Error('Insert returned no row')
+    }
+
+    return row.id
+  }
+
+  beforeAll(async () => {
+    const { db } = api.connection
+    const [template] = await db.select().from(mappings).where(eq(mappings.id, workspace.mappingId))
+    const [flow] = await db.select().from(flows).where(eq(flows.id, workspace.flowId))
+
+    if (template === undefined || flow === undefined) {
+      throw new Error('The Workspace has no Mapping or Flow to copy')
+    }
+
+    // Submitted before the case Flow exists, so the Workspace's Flow alone takes each Document.
+    for (const { key } of runMappingFilterCase.runs) {
+      seeded.set(key, await submitted(goldenInvoice))
+    }
+
+    // Processing would record a Mapping Version on the Run that is not yet processed.
+    api.runQueue.queued.splice(0)
+
+    for (const key of runMappingFilterCase.mappings) {
+      const id = inserted(
+        await db
+          .insert(mappings)
+          .values({
+            workspaceId: workspace.id,
+            documentStructureId: template.documentStructureId,
+            messageType: template.messageType,
+            name: `Filter case ${key}`,
+            draft: template.draft,
+          })
+          .returning(),
+      )
+
+      seeded.set(key, id)
+    }
+
+    for (const [index, { key, mapping }] of runMappingFilterCase.mappingVersions.entries()) {
+      const version = runMappingFilterCase.mappingVersions
+        .slice(0, index + 1)
+        .filter((earlier) => earlier.mapping === mapping).length
+
+      const id = inserted(
+        await db
+          .insert(mappingVersions)
+          .values({
+            mappingId: seededId(mapping),
+            version,
+            graph: template.draft,
+            publishedBy: workspace.userId,
+          })
+          .returning(),
+      )
+
+      seeded.set(key, id)
+    }
+
+    for (const { key, pinnedMappingVersion } of runMappingFilterCase.flows) {
+      const id = inserted(
+        await db
+          .insert(flows)
+          .values({
+            workspaceId: workspace.id,
+            tradingPartnerId: flow.tradingPartnerId,
+            messageType: flow.messageType,
+            name: `Filter case ${key}`,
+            inboundChannelId: flow.inboundChannelId,
+            destinationChannelId: flow.destinationChannelId,
+            mappingVersionId: seededId(pinnedMappingVersion),
+          })
+          .returning(),
+      )
+
+      seeded.set(key, id)
+    }
+
+    for (const run of runMappingFilterCase.runs) {
+      await db
+        .update(runs)
+        .set({
+          flowId: seededId(run.flow),
+          mappingVersionId:
+            run.recordedMappingVersion === null ? null : seededId(run.recordedMappingVersion),
+        })
+        .where(eq(runs.id, seededId(run.key)))
+    }
+  })
+
+  it.each(runMappingFilterCase.filters)(
+    'lists the Runs of the Mappings $mappings',
+    async (filter) => {
+      const query = filter.mappings.map((key) => `mappingId=${seededId(key)}`).join('&')
+
+      expect(new Set(ids(await listed(query)))).toEqual(new Set(filter.runs.map(seededId)))
+    },
+  )
 })
