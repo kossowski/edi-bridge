@@ -247,7 +247,7 @@ const claimAttempt = (id: string, cutoff: Date) =>
           .set({ deliveryAttemptedAt: attemptedAt })
           .where(eq(acknowledgements.id, id))
 
-        return due
+        return { ...due, attemptedAt }
       }),
     )
   })
@@ -260,7 +260,7 @@ const sendAcknowledgement = (id: string, cutoff: Date) =>
       return
     }
 
-    const { previousAttempt, controlReference, content, channel } = claimed
+    const { previousAttempt, attemptedAt, controlReference, content, channel } = claimed
 
     if (content === null || controlReference === null) {
       return yield* Effect.die(new Error(`Acknowledgement ${id} has no CONTRL to send`))
@@ -270,7 +270,7 @@ const sendAcknowledgement = (id: string, cutoff: Date) =>
     const db = yield* Database
 
     // An attempt cut off before it was recorded may have landed, so the Channel checks for it.
-    const sent = yield* delivery(channel, {
+    const deliveryError = yield* delivery(channel, {
       name: `CONTRL-${String(controlReference)}.edi`,
       content: Buffer.from(content, 'latin1'),
       mediaType: 'application/edifact',
@@ -281,17 +281,20 @@ const sendAcknowledgement = (id: string, cutoff: Date) =>
       Effect.catchDefect(() => Effect.succeed('defect')),
     )
 
-    const handedOverAt = sent === null ? yield* DateTime.nowAsDate : null
+    const handedOverAt = deliveryError === null ? yield* DateTime.nowAsDate : null
 
+    // A later attempt claimed the CONTRL after this one outlasted the bound, so it records the outcome.
     yield* Effect.promise(() =>
       db
         .update(acknowledgements)
-        .set({ handedOverAt, deliveryError: sent })
-        .where(eq(acknowledgements.id, id)),
+        .set({ handedOverAt, deliveryError })
+        .where(
+          and(eq(acknowledgements.id, id), eq(acknowledgements.deliveryAttemptedAt, attemptedAt)),
+        ),
     )
 
-    if (sent !== null) {
-      yield* Effect.logWarning(`The CONTRL ${id} was not sent, tried again later: ${sent}`)
+    if (deliveryError !== null) {
+      yield* Effect.logWarning(`The CONTRL ${id} was not sent, tried again later: ${deliveryError}`)
     }
   })
 

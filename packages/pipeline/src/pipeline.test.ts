@@ -3366,4 +3366,29 @@ describe('the CONTRL answering a received Interchange', () => {
     await expect(acknowledgementOf(receipt.document.id)).resolves.toBeUndefined()
     expect(logs).toContainEqual([`The CONTRL for Document ${receipt.document.id} was not recorded`])
   })
+
+  it('records no attempt over a later one', async () => {
+    const into = await answeringWorkspace('Slow Orders')
+    const laterAttempt = new Date(Date.now() + 60_000)
+
+    const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+    const overtaken: DeliveryService = () =>
+      Effect.andThen(
+        Effect.promise(() =>
+          connection.db
+            .update(acknowledgements)
+            .set({ deliveryAttemptedAt: laterAttempt })
+            .where(eq(acknowledgements.documentId, receipt.document.id)),
+        ),
+        Effect.fail(new DeliveryFailed({ reason: 'hostUnreachable' })),
+      )
+
+    await sendWith(overtaken)
+
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toMatchObject({
+      deliveryAttemptedAt: laterAttempt,
+      deliveryError: null,
+    })
+  })
 })
