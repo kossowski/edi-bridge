@@ -1,0 +1,31 @@
+{
+  "name": "@edi-bridge/cli",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "tsx --env-file-if-exists=../../.env src/main.ts",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@edi-bridge/contracts": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@edi-bridge/api": "workspace:*",
+    "@edi-bridge/fixtures": "workspace:*",
+    "@edi-bridge/oxlint-config": "workspace:*",
+    "@edi-bridge/pipeline": "workspace:*",
+    "@edi-bridge/typescript-config": "workspace:*",
+    "@edi-bridge/vitest-config": "workspace:*",
+    "@types/node": "^24",
+    "oxlint": "1.87.0",
+    "tsx": "^4.23.15",
+    "typescript": "~7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

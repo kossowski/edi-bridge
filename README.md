@@ -2,13 +2,14 @@
 
 ⚠️ EDI Bridge is under active development. The current implementation is a deployment skeleton and is not ready for production use. APIs and data formats may change.
 
-A Turborepo monorepo with three apps and shared packages:
+A Turborepo monorepo with three apps, a contributor CLI and shared packages:
 
 | Path                         | What it is                               |
 | ---------------------------- | ---------------------------------------- |
 | `apps/web`                   | Next.js dashboard                        |
 | `apps/api`                   | Fastify HTTP API                         |
 | `apps/worker`                | Background worker                        |
+| `apps/cli`                   | Contributor CLI                          |
 | `packages/ui`                | Shared shadcn/ui components              |
 | `packages/fixtures`          | Fixture Documents to submit to a Channel |
 | `packages/oxlint-config`     | Shared Oxlint configs                    |
@@ -40,6 +41,43 @@ Before the api starts, `pnpm dev` seeds a development Workspace and its Operator
 The host ports of the infrastructure services can be changed in `.env` (`POSTGRES_PORT`, `REDIS_PORT`, `SFTP_PORT`). Compose binds all published ports to `127.0.0.1`. The bundled credentials are for local development only.
 
 Stop the infrastructure with `docker compose down`; add `-v` to also delete its data.
+
+## Submit a Document from the command line
+
+The `cli` script submits a Document file to an inbound Channel of the running API, for example of `pnpm dev`:
+
+```sh
+pnpm cli submit --channel "<inbound Channel name>" [--encoding <label>] <file>
+```
+
+The command signs in, looks up the Channel by its name and sends the file as a Manual Submission, so the pipeline processes it exactly like a Manual Submission from web, and its Runs are marked as manual. It prints one line per Run and one per Message Type that no Flow on the Channel routes. It exits with a non-zero code when the file is not valid in its encoding, the Channel is unknown or outbound, the sign-in fails or the API rejects the Document.
+
+`--encoding` names the character encoding of the file with a WHATWG label, such as `utf-8` (the default), `iso-8859-1` or `windows-1252`. The command stops before it signs in when a byte of the file is not valid in that encoding, so it never submits a damaged Document. The fixture Documents of `packages/fixtures` need these encodings:
+
+| Fixture          | Encoding       |
+| ---------------- | -------------- |
+| `orders-*.edi`   | `iso-8859-1`   |
+| `invoice-*.json` | `utf-8`        |
+| `dispatch-*.csv` | `windows-1252` |
+
+For example:
+
+```sh
+pnpm cli submit --channel "ERP webhook" --encoding windows-1252 packages/fixtures/documents/valid/dispatch-nordlicht-markt.csv
+```
+
+The [fixture library README](packages/fixtures/README.md) says which Channel and Flow each fixture needs.
+
+The command reads these variables from the environment or from `.env`:
+
+| Variable              | Value                                                                     |
+| --------------------- | ------------------------------------------------------------------------- |
+| `EDI_BRIDGE_API_URL`  | The API URL (default `http://localhost:3001`)                             |
+| `EDI_BRIDGE_EMAIL`    | The email of the user who submits                                         |
+| `EDI_BRIDGE_PASSWORD` | The password of that user                                                 |
+| `EDI_BRIDGE_ORIGIN`   | The origin the API trusts for sign-in (default the origin of the API URL) |
+
+`.env.example` sets the development Operator. The Channel must belong to the user's Workspace and have a Flow, so create both in web first.
 
 ## Mock mode
 
