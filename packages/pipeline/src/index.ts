@@ -2,6 +2,8 @@ export { bullmqRunQueue, runQueueName } from './bullmq-run-queue'
 
 export { channelDelivery } from './channel-delivery'
 
+export { decodeDocument } from './decode-document'
+
 export {
   MappingVersionNotOfRun,
   ReceiptRejected,

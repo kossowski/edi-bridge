@@ -6,6 +6,7 @@ import { channels } from '@edi-bridge/db'
 
 import type { SftpFile } from '@edi-bridge/channels'
 
+import { decodeDocument } from './decode-document'
 import { receive } from './receive'
 import { Database, Download } from './services'
 
@@ -25,17 +26,6 @@ const unchanged = (file: SftpFile, previous: SftpFile | undefined) =>
   previous !== undefined &&
   previous.size === file.size &&
   previous.modifiedAt.getTime() === file.modifiedAt.getTime()
-
-const utf8 = new TextDecoder('utf-8', { fatal: true })
-
-// EDIFACT in UNOA to UNOC is ISO 8859-1, which is rarely valid UTF-8 once it holds an umlaut.
-const decoded = (content: Buffer) => {
-  try {
-    return utf8.decode(content)
-  } catch {
-    return content.toString('latin1')
-  }
-}
 
 const removeStored = (channel: InboundChannel, file: SftpFile, state: ChannelPolling) =>
   Effect.gen(function* () {
@@ -82,7 +72,7 @@ const receiveFile = (channel: InboundChannel, file: SftpFile, state: ChannelPoll
     const download = yield* Download
     const content = yield* download.read(channel, file.name)
 
-    yield* storeAndRemove(channel, file, decoded(content), state)
+    yield* storeAndRemove(channel, file, decodeDocument(content), state)
   }).pipe(
     Effect.catchCause((cause) =>
       Effect.logError(
