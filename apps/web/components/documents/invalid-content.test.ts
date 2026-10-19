@@ -13,7 +13,7 @@ describe('invalidContentCode', () => {
     expect(invalidContentCode('too-long-element')).toBe('too-long-element')
   })
 
-  it('turns any other code into other', () => {
+  it('falls back to other for any other code', () => {
     expect(invalidContentCode('invalidDate')).toBe('other')
   })
 
