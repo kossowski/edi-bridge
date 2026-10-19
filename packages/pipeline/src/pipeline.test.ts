@@ -754,23 +754,21 @@ describe('the sweep of stuck Runs', () => {
   const stopInDelivery = async (into: InvoiceWorkspace) => {
     const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
     const [queued] = queue.queued
+    const { promise: handingOver, resolve: handOverStarted } = Promise.withResolvers<void>()
 
     const processing = Effect.runFork(
       processRun(queued ?? { workspaceId: into.id, runId }).pipe(
-        pipelineServices(connection.db, queue, () => Effect.never),
+        pipelineServices(connection.db, queue, () => {
+          handOverStarted()
+
+          return Effect.never
+        }),
       ),
     )
 
+    // The Interchange is stored before the hand-over, so the Run changes no more after it starts.
     try {
-      await vi.waitFor(
-        async () => {
-          expect((await readRun(connection.db, runId))?.steps[3]).toMatchObject({
-            stage: 'delivery',
-            status: 'running',
-          })
-        },
-        { timeout: 2000, interval: 20 },
-      )
+      await handingOver
     } finally {
       await Effect.runPromise(Fiber.interrupt(processing))
     }
@@ -853,22 +851,20 @@ describe('the sweep of stuck Runs', () => {
     const { queue, runId } = await receiveInvoice()
     const [queued] = queue.queued
     const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+    const { promise: handingOver, resolve: handOverStarted } = Promise.withResolvers<void>()
 
+    // The worker stalls while the Channel takes the Interchange.
     const stalled = Effect.runPromise(
       processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
-        pipelineServices(connection.db, queue, () => Effect.promise(() => resumed)),
+        pipelineServices(connection.db, queue, () => {
+          handOverStarted()
+
+          return Effect.promise(() => resumed)
+        }),
       ),
     )
 
-    await vi.waitFor(
-      async () => {
-        expect((await readRun(connection.db, runId))?.steps[3]).toMatchObject({
-          stage: 'delivery',
-          status: 'running',
-        })
-      },
-      { timeout: 2000, interval: 20 },
-    )
+    await handingOver
 
     await leaveStuck(runId)
     await sweepStuck()
