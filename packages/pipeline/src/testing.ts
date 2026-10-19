@@ -23,6 +23,7 @@ import {
   workspaces,
 } from '@edi-bridge/db'
 
+import { RunNotQueued } from './errors'
 import { Database, Documents, type QueuedRun, RunQueue, type RunQueueService } from './services'
 
 type Db = Connection['db']
@@ -66,13 +67,25 @@ export async function startTestRedis() {
 
 export type TestRedis = Awaited<ReturnType<typeof startTestRedis>>
 
-export function inMemoryRunQueue() {
+export function inMemoryRunQueue({ failures = 0 }: { failures?: number } = {}) {
   const queued: QueuedRun[] = []
+  let failing = failures
 
   return {
     queued,
     service: {
-      enqueue: (run: QueuedRun) => Effect.sync(() => void queued.push(run)),
+      enqueue: (run: QueuedRun) =>
+        Effect.suspend(() => {
+          if (failing > 0) {
+            failing -= 1
+
+            return Effect.fail(new RunNotQueued({ runId: run.runId, cause: 'unreachable' }))
+          }
+
+          queued.push(run)
+
+          return Effect.void
+        }),
     } satisfies RunQueueService,
   }
 }

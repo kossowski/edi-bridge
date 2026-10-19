@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm'
-import { Effect, Exit, Option } from 'effect'
+import { Effect, Exit } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { channels, connect, type Connection, documents, flows, runs } from '@edi-bridge/db'
+import { channels, connect, type Connection, documents, flows } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
 import {
@@ -12,7 +12,6 @@ import {
   processRun,
   ReceiptRejected,
   receive,
-  RunNotQueued,
 } from './index'
 import {
   golden,
@@ -77,11 +76,11 @@ describe('the receipt of a Document', () => {
     })
   })
 
-  it('fails with RunNotQueued when the Run queue is unreachable and keeps the Run received', async () => {
+  it('answers with the Runs not queued when the Run queue is unreachable and keeps them received', async () => {
     const unreachable = bullmqRunQueue('redis://127.0.0.1:1', { timeout: '200 millis' })
 
     try {
-      const exit = await Effect.runPromiseExit(
+      const receipt = await Effect.runPromise(
         receive({
           workspaceId: workspace.id,
           channelId: workspace.inboundChannelId,
@@ -91,21 +90,10 @@ describe('the receipt of a Document', () => {
         }).pipe(pipelineServices(connection.db, unreachable)),
       )
 
-      const [stored] = await connection.db
-        .select({ id: documents.id })
-        .from(documents)
-        .where(eq(documents.fileName, 'unqueued.json'))
+      const runId = receipt.runs[0]?.id ?? ''
 
-      const [run] = await connection.db
-        .select({ id: runs.id, status: runs.status })
-        .from(runs)
-        .where(eq(runs.documentId, stored?.id ?? ''))
-
-      const error = Option.getOrUndefined(Exit.findErrorOption(exit))
-
-      expect(error).toBeInstanceOf(RunNotQueued)
-      expect(error).toMatchObject({ runId: run?.id })
-      expect(run?.status).toBe('received')
+      expect(receipt.notQueued).toEqual([runId])
+      await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'received' })
     } finally {
       await unreachable.close()
     }
@@ -284,6 +272,38 @@ describe('the receipt of a Document', () => {
   const storedDocuments = (channelId: string) =>
     connection.db.select().from(documents).where(eq(documents.channelId, channelId))
 
+  it('tries to queue every Run of a Document when one is not queued', async () => {
+    const { channelId } = await channelWithFlows(['INVOIC'])
+
+    const invoice = golden('invoic-reference.edi', 'latin1')
+      .split('\n')
+      .filter((line) => line !== '')
+
+    const twoInvoices = [
+      ...invoice.filter((line) => line.startsWith('UNB')),
+      ...invoice.filter((line) => !/^UN[BZ]/.test(line)),
+      ...invoice.filter((line) => !/^UN[BZ]/.test(line)),
+      "UNZ+2+00000001'",
+    ].join('\n')
+
+    const queue = inMemoryRunQueue({ failures: 1 })
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'two-invoices.edi',
+        content: twoInvoices,
+        manualSubmission: true,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    const [first, second] = receipt.runs
+
+    expect(receipt.notQueued).toEqual([first?.id])
+    expect(queue.queued).toEqual([{ workspaceId: workspace.id, runId: second?.id }])
+  })
+
   it('routes a Document without Message Types to the only outbound Flow of the Channel', async () => {
     const { channelId, flows: created } = await channelWithFlows(['ORDERS', 'INVOIC'])
     const queue = inMemoryRunQueue()
@@ -330,9 +350,7 @@ describe('the receipt of a Document', () => {
   })
 })
 
-const receiveInvoice = async (content = goldenInvoice) => {
-  const queue = inMemoryRunQueue()
-
+const receiveInvoice = async (content = goldenInvoice, queue = inMemoryRunQueue()) => {
   const receipt = await Effect.runPromise(
     receive({
       workspaceId: workspace.id,
