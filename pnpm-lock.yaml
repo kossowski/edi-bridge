@@ -263,9 +263,6 @@ importers:
       '@types/node':
         specifier: ^24
         version: 24.19.1
-      '@types/ssh2':
-        specifier: ^1.15.6
-        version: 1.15.6
       oxlint:
         specifier: 1.87.0
         version: 1.87.0(oxlint-tsgolint@7.0.2004)
