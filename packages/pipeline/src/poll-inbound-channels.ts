@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, getTableColumns, sql } from 'drizzle-orm'
 import { Clock, Duration, Effect, Schedule } from 'effect'
 
 import { pollingIntervalMinutes } from '@edi-bridge/contracts'
@@ -9,7 +9,7 @@ import type { SftpFile } from '@edi-bridge/channels'
 import { receive } from './receive'
 import { Database, Download } from './services'
 
-type InboundChannel = typeof channels.$inferSelect
+type InboundChannel = typeof channels.$inferSelect & { pollingIntervalMinutes: number }
 
 type ChannelPolling = {
   polling: boolean
@@ -92,12 +92,7 @@ const receiveFile = (channel: InboundChannel, file: SftpFile, state: ChannelPoll
     ),
   )
 
-const pollChannel = (
-  channel: InboundChannel,
-  state: ChannelPolling,
-  now: number,
-  interval: number,
-) =>
+const pollChannel = (channel: InboundChannel, state: ChannelPolling) =>
   Effect.gen(function* () {
     const download = yield* Download
     const files = yield* download.list(channel)
@@ -114,10 +109,7 @@ const pollChannel = (
             Effect.logError(`Stored file ${file.name} of Channel ${channel.id} not removed`, cause),
           ),
         )
-      } else if (
-        unchanged(file, previous.get(file.name)) ||
-        file.modifiedAt.getTime() <= now - interval
-      ) {
+      } else if (unchanged(file, previous.get(file.name))) {
         yield* receiveFile(channel, file, state)
       }
     }
@@ -128,69 +120,77 @@ const inboundSftpChannels = Effect.gen(function* () {
 
   return yield* Effect.promise(() =>
     db
-      .select()
+      .select({
+        ...getTableColumns(channels),
+        // The channels_polling_interval check sets an interval on every inbound SFTP Channel.
+        pollingIntervalMinutes: sql<number>`${channels.pollingIntervalMinutes}`,
+      })
       .from(channels)
       .where(and(eq(channels.type, 'sftp'), eq(channels.direction, 'inbound'))),
   )
 })
 
-// Polling intervals are whole minutes, so a check every minute meets each of them.
-const checkEvery = Duration.minutes(pollingIntervalMinutes.min)
+export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)) =>
+  Effect.gen(function* () {
+    const minuteLength = Duration.fromInputUnsafe(minute)
+    // Polling intervals are whole minutes, so a check every minute meets each of them.
+    const checkEvery = Duration.times(minuteLength, pollingIntervalMinutes.min)
+    const states = new Map<string, ChannelPolling>()
 
-export const pollInboundChannels = Effect.gen(function* () {
-  const states = new Map<string, ChannelPolling>()
+    // Each check reads the Channels again, so a created or changed one needs no restart.
+    const pollDue = Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis
+      const inbound = yield* inboundSftpChannels
+      const ids = new Set(inbound.map(({ id }) => id))
 
-  // Each check reads the Channels again, so a created or changed one needs no restart.
-  const pollDue = Effect.gen(function* () {
-    const now = yield* Clock.currentTimeMillis
-    const inbound = yield* inboundSftpChannels
-    const ids = new Set(inbound.map(({ id }) => id))
-
-    for (const id of states.keys()) {
-      if (!ids.has(id)) {
-        states.delete(id)
-      }
-    }
-
-    for (const channel of inbound) {
-      const state = states.get(channel.id) ?? {
-        polling: false,
-        lastPollAt: undefined,
-        listed: new Map(),
-        storedNotRemoved: new Set(),
+      for (const id of states.keys()) {
+        if (!ids.has(id)) {
+          states.delete(id)
+        }
       }
 
-      const interval = Duration.toMillis(
-        Duration.minutes(channel.pollingIntervalMinutes ?? pollingIntervalMinutes.default),
-      )
+      for (const channel of inbound) {
+        const state = states.get(channel.id) ?? {
+          polling: false,
+          lastPollAt: undefined,
+          listed: new Map(),
+          storedNotRemoved: new Set(),
+        }
 
-      states.set(channel.id, state)
+        const interval = Duration.toMillis(
+          Duration.times(minuteLength, channel.pollingIntervalMinutes),
+        )
 
-      // A poll still running holds the next one back, so no file is received twice.
-      if (state.polling || (state.lastPollAt !== undefined && now - state.lastPollAt < interval)) {
-        continue
+        states.set(channel.id, state)
+
+        // A poll still running holds the next one back, so no file is received twice.
+        if (
+          state.polling ||
+          (state.lastPollAt !== undefined && now - state.lastPollAt < interval)
+        ) {
+          continue
+        }
+
+        state.polling = true
+        state.lastPollAt = now
+
+        // Each Channel polls in its own fiber, so a failure or defect stops only that Channel.
+        yield* pollChannel(channel, state).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logError(`Inbound Channel ${channel.id} not polled`, cause),
+          ),
+          Effect.ensuring(
+            Effect.sync(() => {
+              state.polling = false
+            }),
+          ),
+          Effect.forkChild,
+        )
       }
+    })
 
-      state.polling = true
-      state.lastPollAt = now
-
-      // Each Channel polls in its own fiber, so a failure or defect stops only that Channel.
-      yield* pollChannel(channel, state, now, interval).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logError(`Inbound Channel ${channel.id} not polled`, cause),
-        ),
-        Effect.ensuring(
-          Effect.sync(() => {
-            state.polling = false
-          }),
-        ),
-        Effect.forkChild,
-      )
-    }
+    return yield* pollDue.pipe(
+      Effect.catchCause((cause) => Effect.logError('Inbound Channels not polled', cause)),
+      Effect.repeat(Schedule.fixed(checkEvery)),
+    )
   })
-
-  return yield* pollDue.pipe(
-    Effect.catchCause((cause) => Effect.logError('Inbound Channels not polled', cause)),
-    Effect.repeat(Schedule.fixed(checkEvery)),
-  )
-})

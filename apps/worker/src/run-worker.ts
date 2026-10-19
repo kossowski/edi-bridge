@@ -26,11 +26,13 @@ export function startRunWorker({
   db,
   secrets,
   requeueInterval,
+  pollingMinute,
 }: {
   redisUrl: string
   db: Connection['db']
   secrets: SecretBox
   requeueInterval: Duration.Input
+  pollingMinute?: Duration.Input
 }) {
   // BullMQ blocks on its worker connection, so commands must wait for a reconnect, not fail.
   const redis = new Redis(redisUrl, { maxRetriesPerRequest: null })
@@ -60,7 +62,7 @@ export function startRunWorker({
   )
 
   const polling = Effect.runFork(
-    pollInboundChannels.pipe(
+    pollInboundChannels(pollingMinute).pipe(
       Effect.provideService(Database, db),
       Effect.provideService(Documents, documents),
       Effect.provideService(RunQueue, queue.service),

@@ -10,7 +10,6 @@ import {
   secretKeyBytes,
   sftpChannelDownload,
 } from '@edi-bridge/channels'
-import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
 import { channels, connect, type Connection, documents, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
@@ -28,20 +27,18 @@ import {
 
 let testDatabase: TestDatabase
 
-let sftp: TestSftpServer
-
 let connection: Connection
 
 let workspace: InvoiceWorkspace
 
 beforeAll(async () => {
-  ;[testDatabase, sftp] = await Promise.all([startTestDatabase(), startTestSftpServer()])
+  testDatabase = await startTestDatabase()
   connection = connect(testDatabase.url)
 }, 180_000)
 
 afterAll(async () => {
   await connection.close()
-  await Promise.all([testDatabase.stop(), sftp.stop()])
+  await testDatabase.stop()
 })
 
 const ordersInterchange = golden('orders-reference.edi', 'latin1')
@@ -58,29 +55,88 @@ const threeOrders = [
   "UNZ+3+00000001'",
 ].join('\n')
 
+type RemoteFile = { content: Buffer; modifiedAt: Date }
+
+// An SSH session per operation takes about half a second, so most Channels list from memory.
+const remotePaths = new Map<string, Map<string, RemoteFile>>()
+
+const remotePathOf = (channelId: string) =>
+  Effect.suspend(() => {
+    const files = remotePaths.get(channelId)
+
+    return files === undefined
+      ? Effect.fail(new DownloadFailed({ reason: 'remotePathMissing' }))
+      : Effect.succeed(files)
+  })
+
+const memoryDownload: DownloadService = {
+  list: (channel) =>
+    Effect.map(remotePathOf(channel.id), (files) =>
+      [...files].map(([name, { content, modifiedAt }]) => ({
+        name,
+        size: content.length,
+        modifiedAt,
+      })),
+    ),
+  read: (channel, name) =>
+    Effect.flatMap(remotePathOf(channel.id), (files) => {
+      const file = files.get(name)
+
+      return file === undefined
+        ? Effect.fail(new DownloadFailed({ reason: 'remotePathMissing' }))
+        : Effect.succeed(file.content)
+    }),
+  remove: (channel, name) =>
+    Effect.map(remotePathOf(channel.id), (files) => {
+      files.delete(name)
+    }),
+}
+
+const sftpLogin = {
+  username: 'edi_bridge',
+  password: 'edi-bridge-sftp-password',
+  remotePath: '/outbox',
+}
+
+const sftpDownload = sftpChannelDownload({ secrets: testSecrets, timeoutMs: 5000 })
+
+const inMemory = (channelId: string) => remotePaths.has(channelId)
+
+const download: DownloadService = {
+  list: (channel) =>
+    inMemory(channel.id) ? memoryDownload.list(channel) : sftpDownload.list(channel),
+  read: (channel, name) =>
+    inMemory(channel.id) ? memoryDownload.read(channel, name) : sftpDownload.read(channel, name),
+  remove: (channel, name) =>
+    inMemory(channel.id)
+      ? memoryDownload.remove(channel, name)
+      : sftpDownload.remove(channel, name),
+}
+
 type Call = { operation: 'list' | 'read' | 'remove'; channelId: string; name?: string }
 
 // Records each finished call, so a test knows a poll got that far.
-const recorded = (download: DownloadService) => {
+const recorded = (service: DownloadService) => {
   const calls: Call[] = []
 
   const noting = (call: Call) => Effect.ensuring(Effect.sync(() => calls.push(call)))
 
-  const service: DownloadService = {
+  const recording: DownloadService = {
     list: (channel) =>
-      download.list(channel).pipe(noting({ operation: 'list', channelId: channel.id })),
+      service.list(channel).pipe(noting({ operation: 'list', channelId: channel.id })),
     read: (channel, name) =>
-      download.read(channel, name).pipe(noting({ operation: 'read', channelId: channel.id, name })),
+      service.read(channel, name).pipe(noting({ operation: 'read', channelId: channel.id, name })),
     remove: (channel, name) =>
-      download
+      service
         .remove(channel, name)
         .pipe(noting({ operation: 'remove', channelId: channel.id, name })),
   }
 
-  return { calls, service }
+  return { calls, service: recording }
 }
 
-const sftpDownload = () => sftpChannelDownload({ secrets: testSecrets, timeoutMs: 5000 })
+// Waits chain up to four times in a test, which must stay well under 3 s.
+const wait = { timeout: 500, interval: 10 }
 
 let stopPolling: (() => Promise<void>) | undefined
 
@@ -92,18 +148,19 @@ beforeEach(async () => {
 afterEach(async () => {
   await stopPolling?.()
   stopPolling = undefined
+  remotePaths.clear()
   await connection.db.delete(workspaces).where(eq(workspaces.id, workspace.id))
 })
 
-const startPolling = async (download: DownloadService = sftpDownload()) => {
-  const recording = recorded(download)
+const startPolling = async (service: DownloadService = download) => {
+  const recording = recorded(service)
   const scope = await Effect.runPromise(Scope.make())
   const clock = await Effect.runPromise(TestClock.make().pipe(Scope.provide(scope)))
 
   await Effect.runPromise(clock.setTime(Date.now()))
 
   const polling = Effect.runFork(
-    pollInboundChannels.pipe(
+    pollInboundChannels().pipe(
       pipelineServices(connection.db, inMemoryRunQueue()),
       Effect.provideService(Download, recording.service),
       Effect.provideService(Clock.Clock, clock),
@@ -115,102 +172,93 @@ const startPolling = async (download: DownloadService = sftpDownload()) => {
     await Effect.runPromise(Scope.close(scope, Exit.void))
   }
 
+  const operations = (channelId: string) =>
+    recording.calls.filter((call) => call.channelId === channelId).map(({ operation }) => operation)
+
   const lists = (channelId: string) =>
-    recording.calls.filter((call) => call.operation === 'list' && call.channelId === channelId)
-      .length
+    operations(channelId).filter((operation) => operation === 'list').length
+
+  const minutesPass = async (minutes: number) => {
+    await Effect.runPromise(clock.adjust(Duration.minutes(minutes)))
+  }
+
+  const polled = (channelId: string, times: number) =>
+    vi.waitFor(() => {
+      expect(lists(channelId)).toBe(times)
+    }, wait)
 
   return {
     calls: recording.calls,
     lists,
-    minutesPass: async (minutes: number) => {
-      await Effect.runPromise(clock.adjust(Duration.minutes(minutes)))
+    operations,
+    minutesPass,
+    polled,
+    // A file is received at the second poll that lists it unchanged.
+    pollAgain: async (channelId: string, times = 1) => {
+      await polled(channelId, times)
+      await minutesPass(1)
     },
-    polled: (channelId: string, times: number) =>
-      vi.waitFor(
-        () => {
-          expect(lists(channelId)).toBe(times)
-        },
-        { timeout: 2000, interval: 20 },
-      ),
+    // A poll that receives a file ends after its last call, and holds the next poll back until then.
+    polledOnceMore: (channelId: string, times: number) =>
+      vi.waitFor(async () => {
+        await minutesPass(1)
+        expect(lists(channelId)).toBeGreaterThanOrEqual(times)
+      }, wait),
   }
 }
 
-let outboxes = 0
-
-type Placing = { old?: boolean; encoding?: BufferEncoding }
-
-// Two hours ago is longer than any polling interval in these tests.
-const writing = (path: string, content: string, { old = true, encoding = 'latin1' }: Placing) =>
-  [
-    `echo ${Buffer.from(content, encoding).toString('base64')} | base64 -d > ${path}`,
-    ...(old ? [`touch -d @${String(Math.floor(Date.now() / 1000) - 7200)} ${path}`] : []),
-  ].join(' && ')
+type Placing = { encoding?: BufferEncoding; modifiedAt?: Date }
 
 const outbox = async (
   files: Record<string, string> = {},
   options: Parameters<typeof receiveOverSftp>[3] = {},
 ) => {
-  outboxes += 1
-  const remotePath = `/upload/outbox-${String(outboxes)}`
-  const directory = `${sftp.home}${remotePath}`
-
-  await sftp.exec(
-    [
-      `install -d -m 777 ${directory}`,
-      ...Object.entries(files).map(([name, content]) =>
-        writing(`${directory}/${name}`, content, {}),
-      ),
-    ].join(' && '),
-  )
-
   const channelId = await receiveOverSftp(
     connection.db,
     workspace,
-    {
-      host: sftp.host,
-      port: sftp.port,
-      username: sftp.username,
-      password: sftp.password,
-      remotePath,
-    },
+    { host: 'sftp.invalid', port: 22, ...sftpLogin },
     options,
   )
 
-  const place = async (name: string, content: string, placing: Placing = {}) => {
-    await sftp.exec(writing(`${directory}/${name}`, content, placing))
+  const remote = new Map<string, RemoteFile>()
+
+  remotePaths.set(channelId, remote)
+
+  const place = (
+    name: string,
+    content: string,
+    { encoding = 'latin1', modifiedAt = new Date() }: Placing = {},
+  ) => {
+    remote.set(name, { content: Buffer.from(content, encoding), modifiedAt })
   }
 
-  const remaining = async () =>
-    (await sftp.exec(`ls -1 ${directory}`)).output.split('\n').filter(Boolean).toSorted()
+  for (const [name, content] of Object.entries(files)) {
+    place(name, content)
+  }
 
-  return { channelId, place, remaining }
+  return { channelId, place, remaining: () => [...remote.keys()].toSorted() }
 }
 
 const storedOn = (channelId: string) =>
   connection.db.select().from(documents).where(eq(documents.channelId, channelId))
 
 const received = (channelId: string, count: number) =>
-  vi.waitFor(
-    async () => {
-      expect(await storedOn(channelId)).toHaveLength(count)
-    },
-    { timeout: 3000, interval: 50 },
-  )
+  vi.waitFor(async () => {
+    expect(await storedOn(channelId)).toHaveLength(count)
+  }, wait)
 
-const removed = (box: { remaining: () => Promise<string[]> }, left: string[] = []) =>
-  vi.waitFor(
-    async () => {
-      expect(await box.remaining()).toEqual(left)
-    },
-    { timeout: 3000, interval: 50 },
-  )
+const removed = (box: { remaining: () => string[] }) =>
+  vi.waitFor(() => {
+    expect(box.remaining()).toEqual([])
+  }, wait)
 
 describe('the polling of inbound SFTP Channels', () => {
   it('receives an Interchange of three Messages in ISO 8859-1 as three Runs and removes its file', async () => {
     const orders = await addOrdersFlow(connection.db, workspace, { url: 'http://erp.invalid/' })
     const box = await outbox({ 'orders.edi': threeOrders }, { flowId: orders.flowId })
+    const polling = await startPolling()
 
-    await startPolling()
+    await polling.pollAgain(box.channelId)
     await removed(box)
 
     const [document] = await storedOn(box.channelId)
@@ -230,8 +278,11 @@ describe('the polling of inbound SFTP Channels', () => {
     const box = await outbox()
     const utf8 = "CTA+OC+Claus Früh'"
 
-    await box.place('utf8.edi', utf8, { encoding: 'utf8' })
-    await startPolling()
+    box.place('utf8.edi', utf8, { encoding: 'utf8' })
+
+    const polling = await startPolling()
+
+    await polling.pollAgain(box.channelId)
     await received(box.channelId, 1)
 
     expect(await storedOn(box.channelId)).toMatchObject([{ fileName: 'utf8.edi', content: utf8 }])
@@ -239,42 +290,53 @@ describe('the polling of inbound SFTP Channels', () => {
 
   it('removes a file whose Document is stored but rejected at receipt', async () => {
     const box = await outbox({ 'no-flow.edi': threeOrders })
+    const polling = await startPolling()
 
-    await startPolling()
+    await polling.pollAgain(box.channelId)
     await removed(box)
 
     expect(await storedOn(box.channelId)).toHaveLength(1)
   })
 
-  it('holds back a new file until the next poll finds its size and modification time unchanged', async () => {
+  it('holds back a file, however old, until the next poll finds its size and modification time unchanged', async () => {
     const box = await outbox()
 
-    await box.place('arriving.edi', threeOrders, { old: false })
+    box.place('arriving.edi', threeOrders, { modifiedAt: new Date(Date.now() - 7_200_000) })
 
     const polling = await startPolling()
 
-    await polling.polled(box.channelId, 1)
-    expect(await storedOn(box.channelId)).toHaveLength(0)
-
-    await polling.minutesPass(1)
+    await polling.pollAgain(box.channelId)
     await removed(box)
 
+    expect(polling.operations(box.channelId)).toEqual(['list', 'list', 'read', 'remove'])
     expect(await storedOn(box.channelId)).toHaveLength(1)
   })
 
-  it('holds back a file that grew since the previous poll', async () => {
+  it('holds back a file whose size or modification time changed since the previous poll', async () => {
     const box = await outbox()
+    const modifiedAt = new Date()
 
-    await box.place('growing.edi', ordersMessage.slice(0, 3).join('\n'), { old: false })
+    box.place('growing.edi', ordersMessage.slice(0, 3).join('\n'), { modifiedAt })
 
     const polling = await startPolling()
 
     await polling.polled(box.channelId, 1)
-    await box.place('growing.edi', ordersMessage.join('\n'), { old: false })
+    box.place('growing.edi', ordersMessage.join('\n'), { modifiedAt })
     await polling.minutesPass(1)
     await polling.polled(box.channelId, 2)
+    box.place('growing.edi', ordersMessage.join('\n'), { modifiedAt: new Date(Date.now() + 1000) })
+    await polling.minutesPass(1)
+    await polling.pollAgain(box.channelId, 3)
+    await removed(box)
 
-    expect(await storedOn(box.channelId)).toHaveLength(0)
+    expect(polling.operations(box.channelId)).toEqual([
+      'list',
+      'list',
+      'list',
+      'list',
+      'read',
+      'remove',
+    ])
   })
 
   it('polls each Channel at its own interval', async () => {
@@ -314,18 +376,16 @@ describe('the polling of inbound SFTP Channels', () => {
     await polling.polled(created.channelId, 1)
   })
 
-  const unreachable = () =>
-    receiveOverSftp(connection.db, workspace, {
-      host: '127.0.0.1',
-      port: 1,
-      username: sftp.username,
-      password: sftp.password,
-      remotePath: '/upload',
-    })
+  const overSftp = (
+    login: { host: string; port: number },
+    options: Parameters<typeof receiveOverSftp>[3] = {},
+  ) => receiveOverSftp(connection.db, workspace, { ...login, ...sftpLogin }, options)
+
+  const unreachable = () => overSftp({ host: '127.0.0.1', port: 1 })
 
   it('receives the files of the other Channels when one has a bad credential or an unreachable host', async () => {
-    const badCredential = await outbox(
-      { 'orders.edi': threeOrders },
+    const badCredentialId = await overSftp(
+      { host: 'sftp.invalid', port: 22 },
       { secrets: secretBox(randomBytes(secretKeyBytes)) },
     )
 
@@ -334,10 +394,10 @@ describe('the polling of inbound SFTP Channels', () => {
 
     const polling = await startPolling()
 
+    await polling.pollAgain(healthy.channelId)
     await removed(healthy)
-    await polling.polled(unreachableId, 1)
-
-    expect(await badCredential.remaining()).toEqual(['orders.edi'])
+    await polling.polled(badCredentialId, 2)
+    await polling.polled(unreachableId, 2)
   })
 
   it('polls a Channel again at its next interval after its poll failed', async () => {
@@ -352,14 +412,13 @@ describe('the polling of inbound SFTP Channels', () => {
 
   it('removes a stored file at the next poll when its removal failed, without receiving it again', async () => {
     const box = await outbox({ 'orders.edi': threeOrders })
-    const download = sftpDownload()
     let failures = 1
 
     const polling = await startPolling({
       ...download,
       remove: (channel, name) =>
         Effect.suspend(() => {
-          if (channel.id === box.channelId && failures > 0) {
+          if (failures > 0) {
             failures -= 1
 
             return Effect.fail(new DownloadFailed({ reason: 'timedOut' }))
@@ -369,45 +428,44 @@ describe('the polling of inbound SFTP Channels', () => {
         }),
     })
 
+    await polling.pollAgain(box.channelId)
     await vi.waitFor(() => {
-      expect(polling.calls).toContainEqual({
-        operation: 'remove',
-        channelId: box.channelId,
-        name: 'orders.edi',
-      })
-    }, 3000)
-    await polling.minutesPass(1)
+      expect(polling.operations(box.channelId)).toContain('remove')
+    }, wait)
+    await polling.polledOnceMore(box.channelId, 3)
     await removed(box)
 
+    expect(polling.operations(box.channelId).filter((operation) => operation !== 'list')).toEqual([
+      'read',
+      'remove',
+      'remove',
+    ])
     expect(await storedOn(box.channelId)).toHaveLength(1)
   })
 
   it('does not receive a file twice when a poll is still running at the next interval', async () => {
     const box = await outbox({ 'slow.edi': threeOrders })
-    const download = sftpDownload()
     const { promise: released, resolve: release } = Promise.withResolvers<void>()
     let reads = 0
 
     const polling = await startPolling({
       ...download,
       read: (channel, name) =>
-        channel.id === box.channelId
-          ? Effect.promise(async () => {
-              reads += 1
-              await released
-            }).pipe(Effect.andThen(download.read(channel, name)))
-          : download.read(channel, name),
+        Effect.promise(async () => {
+          reads += 1
+          await released
+        }).pipe(Effect.andThen(download.read(channel, name))),
     })
 
+    await polling.pollAgain(box.channelId)
     await vi.waitFor(() => {
       expect(reads).toBe(1)
-    }, 3000)
+    }, wait)
     await polling.minutesPass(1)
     await polling.minutesPass(1)
     release()
     await removed(box)
-    await polling.minutesPass(1)
-    await polling.polled(box.channelId, 2)
+    await polling.polledOnceMore(box.channelId, 3)
 
     expect(reads).toBe(1)
     expect(await storedOn(box.channelId)).toHaveLength(1)
