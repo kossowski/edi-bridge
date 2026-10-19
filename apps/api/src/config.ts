@@ -1,24 +1,13 @@
 import { z } from 'zod'
 
-import { secretKeyBytes } from '@edi-bridge/channels'
+import { secretKeyEnv } from '@edi-bridge/channels'
 import { localDatabaseUrl } from '@edi-bridge/db'
 
 import { aiModelFromEnv } from './ai-model.js'
 
 import type { ChannelSettings } from './channel.js'
 
-const secretKeySchema = z
-  .base64()
-  .transform((value) => Buffer.from(value, 'base64'))
-  .refine(
-    (key) => key.length === secretKeyBytes,
-    `A key of ${secretKeyBytes} bytes, base64-encoded`,
-  )
-
 const channelReachTimeoutMs = 10_000
-
-const developmentChannelSecretKey = () =>
-  Buffer.alloc(secretKeyBytes, 'edi-bridge-development-only')
 
 const envSchema = (production: boolean) =>
   z.object({
@@ -30,9 +19,7 @@ const envSchema = (production: boolean) =>
     BETTER_AUTH_SECRET: production
       ? z.string().min(32)
       : z.string().min(32).default('edi-bridge-development-secret-not-for-production'),
-    CHANNEL_SECRET_KEY: production
-      ? secretKeySchema
-      : secretKeySchema.default(developmentChannelSecretKey),
+    CHANNEL_SECRET_KEY: secretKeyEnv(production),
     API_PUBLIC_URL: z.url().optional(),
   })
 

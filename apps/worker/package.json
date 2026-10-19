@@ -14,6 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@edi-bridge/channels": "workspace:*",
     "@edi-bridge/db": "workspace:*",
     "@edi-bridge/pipeline": "workspace:*",
     "bullmq": "^6.3.16",
@@ -21,6 +22,7 @@
     "effect": "^4.0.4",
     "ioredis": "^6.0.0",
     "postgres": "^3.4.9",
+    "ssh2": "^1.17.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
