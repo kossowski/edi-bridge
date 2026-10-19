@@ -77,21 +77,36 @@ describe('uploadSftp', () => {
     ).toEqual(new DeliveryFailed({ reason: 'remotePathMissing' }))
   })
 
-  it('keeps a file of the same name and leaves no partial file behind', async () => {
+  it('counts a file of the same name as an earlier upload that landed and keeps it', async () => {
     await sftp.exec(
       `install -d -m 777 ${sftp.home}/upload/taken && echo earlier > ${sftp.home}/upload/taken/orders-44.edi`,
     )
 
-    expect(
-      await failure(
-        uploadSftp({ ...outbox(), remotePath: '/upload/taken' }, interchange('orders-44.edi'), {
-          timeoutMs,
-        }),
-      ),
-    ).toEqual(new DeliveryFailed({ reason: 'unexpectedResponse' }))
+    await Effect.runPromise(
+      uploadSftp({ ...outbox(), remotePath: '/upload/taken' }, interchange('orders-44.edi'), {
+        timeoutMs,
+      }),
+    )
 
     expect(await remoteListing('/upload/taken')).toEqual(['orders-44.edi'])
     expect(await remoteFile('/upload/taken/orders-44.edi')).toBe('earlier\n')
+  })
+
+  it('replaces the partial file of an earlier upload that timed out', async () => {
+    await sftp.exec(
+      `install -d -m 777 ${sftp.home}/upload/resumed && echo UNB > ${sftp.home}/upload/resumed/.orders-47.edi.part && chown ${sftp.username} ${sftp.home}/upload/resumed/.orders-47.edi.part`,
+    )
+
+    await Effect.runPromise(
+      uploadSftp({ ...outbox(), remotePath: '/upload/resumed' }, interchange('orders-47.edi'), {
+        timeoutMs,
+      }),
+    )
+
+    expect(await remoteListing('/upload/resumed')).toEqual(['orders-47.edi'])
+    expect(await remoteFile('/upload/resumed/orders-47.edi')).toBe(
+      "UNB+UNOC:3+4012345000009:14+4098765000002:14+261019:1627+42'",
+    )
   })
 
   it('reports a remote path the user may not write', async () => {

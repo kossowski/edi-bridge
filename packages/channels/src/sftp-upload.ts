@@ -23,22 +23,32 @@ export const uploadSftp = (
         })
       }
 
-      sftp.writeFile(partial, document.content, (writeError) => {
-        if (writeError) {
-          discardPartial(writeError)
+      // A file of the final name is an earlier attempt that landed, and its Retry delivers nothing.
+      sftp.stat(target, (missing) => {
+        if (!missing) {
+          done(Effect.void)
 
           return
         }
 
-        // Plain SFTP rename refuses an existing target, so a file of the same name is never replaced.
-        sftp.rename(partial, target, (renameError) => {
-          if (renameError) {
-            discardPartial(renameError)
+        // Writing the partial file replaces one that an attempt which timed out left behind.
+        sftp.writeFile(partial, document.content, (writeError) => {
+          if (writeError) {
+            discardPartial(writeError)
 
             return
           }
 
-          done(Effect.void)
+          // Plain SFTP rename refuses an existing target, so a file of the same name is never replaced.
+          sftp.rename(partial, target, (renameError) => {
+            if (renameError) {
+              discardPartial(renameError)
+
+              return
+            }
+
+            done(Effect.void)
+          })
         })
       })
     }),
