@@ -17,4 +17,10 @@ export {
   type RunQueueService,
 } from './services'
 
-export { DeliveryDefect, GlnMissing, MessageInvalid, processRun } from './process-run'
+export {
+  ChannelDefect,
+  DeliveryDefect,
+  GlnMissing,
+  MessageInvalid,
+  processRun,
+} from './process-run'

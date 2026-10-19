@@ -687,6 +687,41 @@ describe('the processing of a Run', () => {
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
   })
 
+  it('fails a Run at delivery as unreachable when the database fails in the delivery step', async () => {
+    const exhausted = await seedInvoiceWorkspace(connection.db, 'Exhausted Foods')
+
+    // The next control reference overflows its integer column when it is claimed.
+    await connection.db
+      .update(tradingPartners)
+      .set({ nextControlReference: 2_147_483_647 })
+      .where(eq(tradingPartners.id, exhausted.tradingPartnerId))
+    await deliverOverSftp(connection.db, exhausted, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), exhausted)
+
+    const [queued] = queue.queued
+
+    const exit = await Effect.runPromiseExit(
+      processRun(queued ?? { workspaceId: exhausted.id, runId }).pipe(
+        pipelineServices(connection.db, queue, sftpDelivery),
+      ),
+    )
+
+    expect(Exit.hasDies(exit)).toBe(true)
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'deliveryDefect', position: null },
+      problem: { reason: 'unreachable', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+  })
+
   it('fails a Run at delivery when the Delivery dies and passes the defect on', async () => {
     const broken = new Error('The Channel row is broken')
     const { queue, runId } = await receiveInvoice()
@@ -703,7 +738,7 @@ describe('the processing of a Run', () => {
     await expect(readRun(connection.db, runId)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      error: { code: 'deliveryDefect', position: null },
+      error: { code: 'channelDefect', position: null },
       problem: {
         reason: 'incompleteSetup',
         fixTarget: { kind: 'channelCredential', channelId, name: 'Hanse Retail SFTP inbox' },
@@ -795,7 +830,7 @@ describe('the processing of a Run', () => {
     await expect(readRun(connection.db, runId)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      error: { code: 'deliveryDefect', position: null },
+      error: { code: 'channelDefect', position: null },
       problem: {
         reason: 'incompleteSetup',
         fixTarget: {

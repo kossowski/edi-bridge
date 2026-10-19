@@ -66,6 +66,12 @@ export class CharacterSetUnsupported extends Data.TaggedError('CharacterSetUnsup
   readonly characterSet: CharacterSet
 }> {}
 
+// The Delivery adapter died: a broken Channel row or a credential that does not open.
+export class ChannelDefect extends Data.TaggedError('ChannelDefect')<{
+  readonly defect: unknown
+}> {}
+
+// Any other defect in the delivery step, such as a database error.
 export class DeliveryDefect extends Data.TaggedError('DeliveryDefect')<{
   readonly defect: unknown
 }> {}
@@ -158,7 +164,12 @@ const deliveryReasons: Record<ChannelTestFailureReason, string> = {
 
 const glnOwners = { workspace: 'The Workspace', tradingPartner: 'The Trading Partner' } as const
 
-type DeliveryError = DeliveryFailed | GlnMissing | CharacterSetUnsupported | DeliveryDefect
+type DeliveryError =
+  | DeliveryFailed
+  | GlnMissing
+  | CharacterSetUnsupported
+  | ChannelDefect
+  | DeliveryDefect
 
 const deliveryFailure = (
   failure: DeliveryError,
@@ -206,7 +217,18 @@ const deliveryFailure = (
           },
         },
       }),
-      // A broken Channel row and a credential that does not open both end here.
+      ChannelDefect: (): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'channelDefect',
+          message: 'The Channel could not be used for the delivery',
+          position: null,
+        },
+        problem: {
+          reason: 'incompleteSetup',
+          fixTarget: { kind: 'channelCredential', channelId: channel.id, name: channel.name },
+        },
+      }),
       DeliveryDefect: (): Failure => ({
         stage: 'delivery',
         error: {
@@ -214,10 +236,7 @@ const deliveryFailure = (
           message: 'The delivery stopped on an unexpected error',
           position: null,
         },
-        problem: {
-          reason: 'incompleteSetup',
-          fixTarget: { kind: 'channelCredential', channelId: channel.id, name: channel.name },
-        },
+        problem: { reason: 'unreachable', fixTarget: null },
       }),
     }),
   )
@@ -365,7 +384,9 @@ const deliver = (
     const delivery = yield* Delivery
 
     // The file name carries the control reference, as an upload never replaces an existing file.
-    yield* delivery(channel, { name: `${messageType}-${String(reference)}.edi`, content })
+    yield* delivery(channel, { name: `${messageType}-${String(reference)}.edi`, content }).pipe(
+      Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))),
+    )
   }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
 
 const orderNumberOf = ({ segments }: Message) =>
@@ -599,6 +620,7 @@ export const processRun = (queued: QueuedRun) =>
 
     const message = mapped.success
     const destination = yield* loadDestination(queued)
+
     const checked = yield* step(
       run.id,
       'validation',
@@ -642,8 +664,13 @@ export const processRun = (queued: QueuedRun) =>
     if (Result.isFailure(delivered)) {
       yield* fail(run.id, deliveryFailure(delivered.failure, destination))
 
-      if (Predicate.isTagged(delivered.failure, 'DeliveryDefect')) {
-        return yield* Effect.die(delivered.failure.defect)
+      const { failure } = delivered
+
+      if (
+        Predicate.isTagged(failure, 'ChannelDefect') ||
+        Predicate.isTagged(failure, 'DeliveryDefect')
+      ) {
+        return yield* Effect.die(failure.defect)
       }
     }
   })
