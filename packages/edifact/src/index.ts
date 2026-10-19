@@ -1,6 +1,8 @@
 export { readAcknowledgedInterchange, ReadAcknowledgementError } from './acknowledgement'
 
-export { parse, ParseError } from './parse'
+export { isBrokenMessage } from './model'
+
+export { parse, ParseError, parseMessages } from './parse'
 
 export { serialize, SerializeError, serializeMessage } from './serialize'
 
@@ -13,7 +15,18 @@ export type {
   ReadAcknowledgementErrorCode,
 } from './acknowledgement'
 
-export type { Delimiters, Element, Interchange, Message, Segment, Whitespace } from './model'
+export type {
+  BrokenMessage,
+  Delimiters,
+  Element,
+  Envelope,
+  Interchange,
+  Message,
+  ParsedInterchange,
+  ParsedMessage,
+  Segment,
+  Whitespace,
+} from './model'
 
 export type { ParseErrorCode } from './parse'
 

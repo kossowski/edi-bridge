@@ -1,4 +1,5 @@
 import { defaultDelimiters, hasReleaseCharacter, serviceCharacters } from './delimiters'
+import { isBrokenMessage } from './model'
 import {
   describePosition,
   interchangeSegmentPosition,
@@ -6,7 +7,15 @@ import {
   type Position,
 } from './position'
 
-import type { Delimiters, Element, Interchange, Message, Segment } from './model'
+import type {
+  Delimiters,
+  Element,
+  Envelope,
+  Interchange,
+  ParsedInterchange,
+  ParsedMessage,
+  Segment,
+} from './model'
 
 export type ParseErrorCode =
   | 'control-reference-mismatch'
@@ -45,6 +54,8 @@ type PositionOf = (index: number) => Position
 
 interface Tokens {
   segments: Segment[]
+  segmentErrors: (ParseError | undefined)[]
+  endError: ParseError | undefined
   lineBreaks: string[]
   trailingText: string
 }
@@ -53,6 +64,8 @@ const isLineBreak = (character: string) => character === '\r' || character === '
 
 const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf): Tokens => {
   const segments: Segment[] = []
+  const segmentErrors: (ParseError | undefined)[] = []
+  let segmentError: ParseError | undefined
   const lineBreaks: string[] = []
   let lineBreak = ''
   let offset = 0
@@ -78,7 +91,7 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
 
     if (releasing) {
       if (!released.has(character)) {
-        throw new ParseError('unneeded-release-character', currentPosition())
+        segmentError ??= new ParseError('unneeded-release-character', currentPosition())
       }
 
       value += character
@@ -96,11 +109,18 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
       const [tagElement = [], ...rest] = [...elements, [...components, value]]
       const [tag = ''] = tagElement
 
-      if (tagElement.length !== 1 || !segmentTag.test(tag)) {
-        throw new ParseError('invalid-segment-tag', positionOf(segments.length))
+      const validTag = tagElement.length === 1 && segmentTag.test(tag)
+
+      if (!validTag) {
+        segmentError ??= new ParseError('invalid-segment-tag', positionOf(segments.length))
       }
 
-      segments.push({ tag, elements: rest })
+      segments.push({
+        tag: validTag ? tag : tagElement.join(delimiters.component),
+        elements: rest,
+      })
+      segmentErrors.push(segmentError)
+      segmentError = undefined
       lineBreaks.push(lineBreak)
       lineBreak = ''
       trailingFrom = offset
@@ -119,15 +139,22 @@ const tokenize = (text: string, delimiters: Delimiters, positionOf: PositionOf):
     }
   }
 
-  if (releasing || elements.length > 0 || components.length > 0 || value.trim() !== '') {
-    if (segments.at(-1)?.tag === 'UNZ') {
-      throw new ParseError('text-after-interchange-trailer', positionOf(segments.length))
-    }
+  const unterminated =
+    releasing || elements.length > 0 || components.length > 0 || value.trim() !== ''
 
-    throw new ParseError('unterminated-segment', currentPosition())
+  const endError = !unterminated
+    ? undefined
+    : segments.at(-1)?.tag === 'UNZ'
+      ? new ParseError('text-after-interchange-trailer', positionOf(segments.length))
+      : new ParseError('unterminated-segment', currentPosition())
+
+  return {
+    segments,
+    segmentErrors,
+    endError,
+    lineBreaks,
+    trailingText: text.slice(trailingFrom),
   }
-
-  return { segments, lineBreaks, trailingText: text.slice(trailingFrom) }
 }
 
 const readDelimiters = (advice: string): Delimiters => {
@@ -165,7 +192,7 @@ interface TrailerCheck {
   controlReference: string | undefined
 }
 
-const checkTrailer = ({
+const trailerError = ({
   trailer,
   position,
   countMismatch,
@@ -173,19 +200,38 @@ const checkTrailer = ({
   controlReference,
 }: TrailerCheck) => {
   if (!matchesCount(controlValue(trailer, trailerCountElement), count)) {
-    throw new ParseError(countMismatch, { ...position, element: trailerCountElement, component: 1 })
+    return new ParseError(countMismatch, {
+      ...position,
+      element: trailerCountElement,
+      component: 1,
+    })
   }
 
   if (controlValue(trailer, trailerControlReferenceElement) !== controlReference) {
-    throw new ParseError('control-reference-mismatch', {
+    return new ParseError('control-reference-mismatch', {
       ...position,
       element: trailerControlReferenceElement,
       component: 1,
     })
   }
+
+  return undefined
 }
 
-export const parse = (text: string): Interchange => {
+interface Reading {
+  tokenErrors: ParseError[]
+  messages: ParsedMessage[]
+  envelope: Envelope | ParseError
+}
+
+interface OpenMessage {
+  index: number
+  header: Segment
+  segments: Segment[]
+  error: ParseError | undefined
+}
+
+const readInterchange = (text: string): Reading => {
   const hasServiceStringAdvice = text.startsWith(serviceStringAdviceTag)
 
   const delimiters = hasServiceStringAdvice
@@ -194,29 +240,48 @@ export const parse = (text: string): Interchange => {
 
   const position = interchangeSegmentPosition(hasServiceStringAdvice)
 
-  const { segments, lineBreaks, trailingText } = tokenize(
+  const { segments, segmentErrors, endError, lineBreaks, trailingText } = tokenize(
     hasServiceStringAdvice ? text.slice(serviceStringAdviceLength) : text,
     delimiters,
     position,
   )
 
-  const header = segments[0]
+  const tokenErrors = [...segmentErrors, endError].filter((error) => error !== undefined)
+  const messages: ParsedMessage[] = []
+  const failed = (error: ParseError): Reading => ({ tokenErrors, messages, envelope: error })
 
-  if (header?.tag !== 'UNB') {
-    throw new ParseError('missing-interchange-header', position(0))
+  const [header] = segments
+
+  if (segmentErrors[0]) {
+    return failed(segmentErrors[0])
   }
 
-  const messages: Message[] = []
-  let openMessage: { index: number; header: Segment; segments: Segment[] } | undefined
+  if (header?.tag !== 'UNB') {
+    return failed(new ParseError('missing-interchange-header', position(0)))
+  }
+
+  let openMessage: OpenMessage | undefined
+
+  const closeWithoutTrailer = (message: OpenMessage) => {
+    messages.push({
+      header: message.header,
+      error: message.error ?? new ParseError('missing-message-trailer', position(message.index)),
+    })
+    openMessage = undefined
+  }
 
   for (const [index, segment] of segments.entries()) {
+    const segmentError = segmentErrors[index]
+
     if (index === 0) {
       continue
     }
 
-    if (openMessage) {
-      if (segment.tag === 'UNT') {
-        checkTrailer({
+    if (openMessage && segment.tag === 'UNT') {
+      const error =
+        openMessage.error ??
+        segmentError ??
+        trailerError({
           trailer: segment,
           position: position(index),
           countMismatch: 'segment-count-mismatch',
@@ -224,48 +289,91 @@ export const parse = (text: string): Interchange => {
           controlReference: controlValue(openMessage.header, messageReferenceElement),
         })
 
-        messages.push({
-          header: openMessage.header,
-          segments: openMessage.segments,
-          trailer: segment,
-        })
-        openMessage = undefined
-      } else if (segment.tag === 'UNH' || segment.tag === 'UNZ') {
-        throw new ParseError('missing-message-trailer', position(openMessage.index))
-      } else {
-        openMessage.segments.push(segment)
-      }
-    } else if (segment.tag === 'UNH') {
-      openMessage = { index, header: segment, segments: [] }
-    } else if (segment.tag === 'UNZ') {
-      if (index < segments.length - 1) {
-        throw new ParseError('unexpected-segment', position(index + 1))
-      }
-
-      checkTrailer({
-        trailer: segment,
-        position: position(index),
-        countMismatch: 'message-count-mismatch',
-        count: messages.length,
-        controlReference: controlValue(header, interchangeControlReferenceElement),
-      })
-
-      return {
-        hasServiceStringAdvice,
-        delimiters,
-        header,
-        messages,
-        trailer: segment,
-        whitespace: { lineBreaks, trailingText },
-      }
+      messages.push(
+        error
+          ? { header: openMessage.header, error }
+          : { header: openMessage.header, segments: openMessage.segments, trailer: segment },
+      )
+      openMessage = undefined
+    } else if (openMessage && segment.tag !== 'UNH' && segment.tag !== 'UNZ') {
+      openMessage.segments.push(segment)
+      openMessage.error ??= segmentError
     } else {
-      throw new ParseError('unexpected-segment', position(index))
+      if (openMessage) {
+        closeWithoutTrailer(openMessage)
+      }
+
+      if (segment.tag === 'UNH') {
+        openMessage = { index, header: segment, segments: [], error: segmentError }
+      } else if (segmentError) {
+        return failed(segmentError)
+      } else if (segment.tag !== 'UNZ') {
+        return failed(new ParseError('unexpected-segment', position(index)))
+      } else if (index < segments.length - 1) {
+        return failed(new ParseError('unexpected-segment', position(index + 1)))
+      } else {
+        const error =
+          endError ??
+          trailerError({
+            trailer: segment,
+            position: position(index),
+            countMismatch: 'message-count-mismatch',
+            count: messages.length,
+            controlReference: controlValue(header, interchangeControlReferenceElement),
+          })
+
+        return error
+          ? failed(error)
+          : {
+              tokenErrors,
+              messages,
+              envelope: {
+                hasServiceStringAdvice,
+                delimiters,
+                header,
+                trailer: segment,
+                whitespace: { lineBreaks, trailingText },
+              },
+            }
+      }
     }
   }
 
   if (openMessage) {
-    throw new ParseError('missing-message-trailer', position(openMessage.index))
+    closeWithoutTrailer(openMessage)
   }
 
-  throw new ParseError('missing-interchange-trailer', position(0))
+  return failed(endError ?? new ParseError('missing-interchange-trailer', position(0)))
+}
+
+export const parseMessages = (text: string): ParsedInterchange => {
+  const { messages, envelope } = readInterchange(text)
+
+  if (envelope instanceof ParseError) {
+    throw envelope
+  }
+
+  return { ...envelope, messages }
+}
+
+export const parse = (text: string): Interchange => {
+  const { tokenErrors, messages, envelope } = readInterchange(text)
+
+  if (tokenErrors[0]) {
+    throw tokenErrors[0]
+  }
+
+  const validMessages = messages.map((message) => {
+    if (isBrokenMessage(message)) {
+      throw message.error
+    }
+
+    return message
+  })
+
+  if (envelope instanceof ParseError) {
+    throw envelope
+  }
+
+  return { ...envelope, messages: validMessages }
 }

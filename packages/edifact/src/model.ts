@@ -1,3 +1,5 @@
+import type { ParseError } from './parse'
+
 export interface Delimiters {
   component: string
   element: string
@@ -20,6 +22,16 @@ export interface Message {
   trailer: Segment
 }
 
+export interface BrokenMessage {
+  header: Segment
+  error: ParseError
+}
+
+export type ParsedMessage = Message | BrokenMessage
+
+export const isBrokenMessage = (message: ParsedMessage): message is BrokenMessage =>
+  'error' in message
+
 // lineBreaks holds the run of CR and LF characters before each segment from UNB to UNZ.
 export interface Whitespace {
   lineBreaks: string[]
@@ -33,4 +45,10 @@ export interface Interchange {
   messages: Message[]
   trailer: Segment
   whitespace?: Whitespace
+}
+
+export type Envelope = Omit<Interchange, 'messages'>
+
+export interface ParsedInterchange extends Envelope {
+  messages: ParsedMessage[]
 }
