@@ -468,8 +468,12 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       if (run.problem?.whoFixes !== 'tradingPartner') {
         return problem(
           409,
-          'Only a Run that the Trading Partner fixes can wait for the Trading Partner.',
+          'Only a Run that the Trading Partner fixes can wait for the Trading Partner',
         )
+      }
+
+      if (run.replacedBy !== null) {
+        return problem(409, 'A Run that another Run replaces cannot wait for the Trading Partner')
       }
 
       return HttpResponse.json(waitForTradingPartner(run))
@@ -485,7 +489,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
         }
 
         if (!waitingSince.delete(run.id)) {
-          return problem(409, 'Only a Run that waits for the Trading Partner can end its wait.')
+          return problem(409, 'Only a Run that waits for the Trading Partner can end its wait')
         }
 
         return HttpResponse.json(detail(run.id))

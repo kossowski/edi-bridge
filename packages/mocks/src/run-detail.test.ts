@@ -737,6 +737,27 @@ describe('POST /runs/:id/wait-for-trading-partner', () => {
     expect(body?.waitingForTradingPartnerSince).toBeNull()
   })
 
+  it('refuses a Run that another Run replaces and leaves it unmarked', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'parse' })
+
+    const resend = inboundOrders('00000000-0000-4000-8000-000000000002', {
+      receivedAt: '2026-10-02T09:00:00.000Z',
+    })
+
+    server.use(
+      ...runDetailHandlers(apiUrl, {
+        runs: [run, resend],
+        reprocessed: [{ replaced: run.id, replacing: resend.id }],
+      }),
+    )
+
+    const { status } = await post(toPath(waitForTradingPartnerRunEndpoint.path, { id: run.id }))
+    const { body } = await getRun(run.id)
+
+    expect(status).toBe(409)
+    expect(body?.waitingForTradingPartnerSince).toBeNull()
+  })
+
   it.each(['mapping', 'delivery'] as const)(
     'refuses a Run that failed at %s, which the Trading Partner does not fix',
     async (failureStage) => {
