@@ -622,12 +622,15 @@ const deliverInterchange = (
       mediaType: 'application/edifact',
       isRetry,
     })
-  }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
+  })
 
 const documentFormats = {
   json: { extension: 'json', mediaType: 'application/json' },
   csv: { extension: 'csv', mediaType: 'text/csv' },
 } as const
+
+const encodingOf = (structure: DocumentStructure) =>
+  structure.format === 'csv' ? structure.csv.encoding : 'utf-8'
 
 const deliverDocument = (
   run: ClaimedRun,
@@ -642,16 +645,15 @@ const deliverDocument = (
       return yield* Effect.die(new Error(`Run ${run.id} has no output to deliver`))
     }
 
-    const encoding = structure.format === 'csv' ? structure.csv.encoding : 'utf-8'
     const { extension, mediaType } = documentFormats[structure.format]
 
     yield* handOver(run, destination.channel, {
       name: `${pinned.messageType}-${run.id}.${extension}`,
-      content: Buffer.from(encodeText(run.output, encoding)),
+      content: Buffer.from(encodeText(run.output, encodingOf(structure))),
       mediaType,
       isRetry,
     })
-  }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
+  })
 
 const orderNumberOf = ({ segments }: Message) =>
   segments.find(({ tag, elements }) => tag === 'RFF' && elements[0]?.[0] === 'ON')
@@ -911,10 +913,10 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
       return undefined
     }
 
+    // A retried Run keeps the Mapping Version it was processed with.
     const [claimed] = yield* Effect.promise(() =>
       db
         .update(runs)
-        // A retried Run keeps the Mapping Version it was processed with.
         .set({
           status: 'processing',
           mappingVersionId: found.run.mappingVersionId ?? found.flow.mappingVersionId,
@@ -938,9 +940,14 @@ const deliveryStep = (
   delivering: Effect.Effect<void, DeliveryError, Database | Delivery>,
 ) =>
   Effect.gen(function* () {
-    const delivered = yield* step(run.id, 'delivery', delivering, async (tx) => {
-      await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
-    })
+    const delivered = yield* step(
+      run.id,
+      'delivery',
+      delivering.pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect })))),
+      async (tx) => {
+        await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
+      },
+    )
 
     if (Result.isFailure(delivered)) {
       yield* fail(run.id, deliveryFailure(delivered.failure, destination))
@@ -1093,13 +1100,12 @@ const processInbound = ({
 
     const db = yield* Database
     const written = mapped.success
-    const encoding = structure.format === 'csv' ? structure.csv.encoding : 'utf-8'
 
     const [mappedRun] = yield* Effect.promise(() =>
       db
         .update(runs)
         .set({
-          output: new TextDecoder(encoding).decode(written),
+          output: new TextDecoder(encodingOf(structure)).decode(written),
           businessReference: documentNumberOf(message),
         })
         .where(eq(runs.id, run.id))
@@ -1117,7 +1123,7 @@ const processInbound = ({
   })
 
 // A Retry leaves every step before the delivery succeeded.
-const isRetried = (runId: string) =>
+const isOnlyDeliveryLeft = (runId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
 
@@ -1148,7 +1154,7 @@ const processClaimed = (
 
     const pinned = yield* loadPinned(queued.workspaceId, mappingVersionId, direction)
 
-    if (yield* isRetried(run.id)) {
+    if (yield* isOnlyDeliveryLeft(run.id)) {
       const destination = yield* loadDestination(queued)
 
       return yield* deliveryStep(
