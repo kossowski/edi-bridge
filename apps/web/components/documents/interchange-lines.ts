@@ -1,7 +1,7 @@
 import type { ErrorPosition } from '@edi-bridge/contracts'
 
 export type InterchangeLine = {
-  number: number | null
+  number: number
   text: string
   highlight: readonly [start: number, end: number] | null
 }
@@ -117,6 +117,11 @@ function locate(
     : { highlight: element, precision: 'element' }
 }
 
+// The UNA declares the separators itself, so its characters split nothing.
+function locateAdvice(text: string, position: ErrorPosition): LocatedPosition | null {
+  return position.tag === 'UNA' ? { highlight: [0, text.length - 1], precision: 'segment' } : null
+}
+
 export function interchangeLines(source: string, position: ErrorPosition | null): InterchangeLines {
   const raw = source.replace(/^[\uFEFF\s]+/, '')
   const advice = adviceOf(raw)
@@ -124,14 +129,20 @@ export function interchangeLines(source: string, position: ErrorPosition | null)
   const segments = splitSegments(advice === null ? raw : raw.slice(9), separators)
   let precision: HighlightPrecision | null = null
 
-  const lines = segments.map((text, index): InterchangeLine => {
+  // Like packages/edifact, a UNA counts as segment 1.
+  const texts = advice === null ? segments : [advice, ...segments]
+
+  const lines = texts.map((text, index): InterchangeLine => {
     const number = index + 1
 
     if (position?.segment !== number) {
       return { number, text, highlight: null }
     }
 
-    const located = locate(text, position, separators)
+    const located =
+      advice !== null && index === 0
+        ? locateAdvice(text, position)
+        : locate(text, position, separators)
 
     if (located === null) {
       return { number, text, highlight: null }
@@ -142,8 +153,5 @@ export function interchangeLines(source: string, position: ErrorPosition | null)
     return { number, text, highlight: located.highlight }
   })
 
-  return {
-    lines: advice === null ? lines : [{ number: null, text: advice, highlight: null }, ...lines],
-    precision,
-  }
+  return { lines, precision }
 }

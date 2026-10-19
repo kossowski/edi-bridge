@@ -132,9 +132,7 @@ describe('GET /runs/:id', () => {
       const { body } = await getRun(run.id)
       const position = body?.error?.position
 
-      const segment = body?.interchange?.raw.slice("UNA:+.? '".length).split("'")[
-        position!.segment - 1
-      ]
+      const segment = body?.interchange?.raw.split("'")[position!.segment - 1]
 
       expect(body?.steps.map(({ stage, status }) => [stage, status])).toEqual([
         ['receipt', 'succeeded'],
@@ -150,7 +148,7 @@ describe('GET /runs/:id', () => {
     }
   })
 
-  it('points a validation error at the invalid date component', async () => {
+  it('points a validation error at the invalid date component, counting the UNA as segment 1', async () => {
     const run = inboundOrders('00000000-0000-4000-8000-000000000001', {
       failureStage: 'validation',
     })
@@ -159,7 +157,7 @@ describe('GET /runs/:id', () => {
 
     const { body } = await getRun(run.id)
 
-    expect(body?.error?.position).toEqual({ segment: 4, tag: 'DTM', element: 1, component: 2 })
+    expect(body?.error?.position).toEqual({ segment: 5, tag: 'DTM', element: 1, component: 2 })
     expect(body?.interchange?.raw).toContain("'DTM+137:20261341:102'")
     expect(body?.message?.segments[2]).toEqual({
       tag: 'DTM',
@@ -183,7 +181,7 @@ describe('GET /runs/:id', () => {
 
     expect(body?.interchange?.id).toBe(firstBody?.interchange?.id)
     expect(body?.message?.reference).toBe('2')
-    expect(body?.error?.position?.segment).toBe(1 + firstMessageLength + 3)
+    expect(body?.error?.position?.segment).toBe(2 + firstMessageLength + 3)
   })
 
   it('reports a delivery failure without a position after a 30 second timeout', async () => {
@@ -218,6 +216,52 @@ describe('GET /runs/:id', () => {
     expect(body).toMatchObject({ interchange: null, message: null })
     expect(body?.error?.position).toBeNull()
     expect(body?.mappingVersion).not.toBeNull()
+  })
+
+  it('has no Interchange for an outbound Run that failed at validation, and counts its position from the UNH as segment 1', async () => {
+    const run = createRun({
+      id: '00000000-0000-4000-8000-000000000002',
+      tradingPartner: hansemarkt,
+      messageType: 'INVOIC',
+      flow: invoicFlow,
+      status: 'failed',
+      failureStage: 'validation',
+    })
+
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+    const party = /NAD\+(\w+)/.exec(body?.error?.message ?? '')?.[1]
+
+    expect(body?.interchange).toBeNull()
+    expect(body?.message?.segments[0]?.tag).toBe('UNH')
+    expect(body?.error?.position).toEqual({
+      segment: party === 'BY' ? 5 : 6,
+      tag: 'NAD',
+      element: 2,
+      component: 1,
+    })
+  })
+
+  it('has no Interchange for an outbound Run that failed at delivery before building it', async () => {
+    const runs = createRuns({ count: 2000 }).filter(
+      (run) => run.direction === 'outbound' && run.failureStage === 'delivery',
+    )
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    const details = await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body!))
+
+    expect(
+      new Set(details.map(({ error, interchange }) => `${error?.code}:${interchange !== null}`)),
+    ).toEqual(
+      new Set([
+        'glnMissing:false',
+        'characterSetUnsupported:false',
+        'channelDefect:true',
+        'destinationUnreachable:true',
+      ]),
+    )
   })
 
   it('orders the steps of an outbound Run as mapping before validation', async () => {
@@ -662,6 +706,24 @@ describe('POST /runs/:id/retry', () => {
     expect(after).toMatchObject({ id: run.id, status: 'delivered', failureStage: null })
     expect(after?.steps.slice(0, -1)).toEqual(before?.steps.slice(0, -1))
     expect(after?.steps.at(-1)?.status).toBe('succeeded')
+  })
+
+  it('builds the Interchange when it delivers again a Run that failed before building it', async () => {
+    const runs = createRuns({ count: 2000 }).filter(
+      (run) => run.direction === 'outbound' && run.failureStage === 'delivery',
+    )
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    const details = await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body!))
+    const run = details.find(({ error }) => error?.code === 'glnMissing')!
+
+    await post(toPath(retryRunEndpoint.path, { id: run.id }))
+    const { body: after } = await getRun(run.id)
+
+    expect(after?.status).toBe('delivered')
+    expect(after?.interchange?.id).toEqual(expect.any(String))
+    expect(after?.interchange?.raw).toContain(`UNH+1+${run.messageType}`)
   })
 
   it('reprocesses a Defect at mapping with its own Mapping Version and answers the replaced Run', async () => {

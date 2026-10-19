@@ -380,6 +380,21 @@ export const TechnicalDetails = meta.story({
   },
 })
 
+export const TechnicalErrorLine = meta.story({
+  ...technicalTab,
+  args: { id: invalidContent.id },
+  async play({ canvas }) {
+    const facts = within(await canvas.findByLabelText('Technical details', { selector: 'dl' }))
+    const raw = canvas.getByRole('region', { name: 'Transmission as sent, one segment per line' })
+    const [advice] = within(raw).getAllByRole('listitem')
+
+    // UNA, UNB, UNH and BGM come first, so the invalid date of the DTM is segment 5.
+    await expect(facts.getByText(/^Segment 5 \(DTM\)/)).toBeVisible()
+    await expect(advice).toHaveTextContent(/^1UNA/)
+    await expect(raw.querySelector('[data-error-line]')).toHaveTextContent(/^5DTM\+137:/)
+  },
+})
+
 export const TechnicalReplaced = meta.story({
   ...technicalTab,
   args: { id: replaced.id },
