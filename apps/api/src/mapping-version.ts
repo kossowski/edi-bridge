@@ -21,7 +21,7 @@ import {
 import { documentStructures, flows, mappings, mappingVersions, users } from '@edi-bridge/db'
 
 import { Db, type Database, type Transaction } from './db.js'
-import { Conflict, NotFound, Unprocessable } from './errors.js'
+import { AiReviewOpen, Conflict, NotFound, Unprocessable } from './errors.js'
 import { selectPinnedFlows } from './flow-use.js'
 import { compareOutputs } from './mapping-preview.js'
 import { loadMappingDraft, loadRow, sidesOf } from './mapping.js'
@@ -158,13 +158,17 @@ const restoreInTransaction = async (
   tx: Transaction,
   mappingId: string,
   versionId: string,
-): Promise<NotFound | undefined> => {
+): Promise<AiReviewOpen | NotFound | undefined> => {
   // Waits for a publish under way, so the comparison sees the version it adds.
-  await tx
-    .select({ id: mappings.id })
+  const [locked] = await tx
+    .select({ aiReview: mappings.aiReview })
     .from(mappings)
     .where(eq(mappings.id, mappingId))
     .for('update')
+
+  if (locked?.aiReview) {
+    return new AiReviewOpen()
+  }
 
   const [restored] = await tx
     .select({ graph: mappingVersions.graph })
@@ -219,7 +223,7 @@ const unconfiguredTransform = () =>
 const unknownFlows = () =>
   new Unprocessable({ message: 'Only Flows that use this Mapping move to the new version.' })
 
-type Refusal = Conflict | Unprocessable
+type Refusal = AiReviewOpen | Conflict | Unprocessable
 
 const publishInTransaction = async (
   tx: Transaction,
@@ -230,6 +234,7 @@ const publishInTransaction = async (
   const [locked] = await tx
     .select({
       draft: mappings.draft,
+      aiReview: mappings.aiReview,
       unpublishedChanges: mappings.unpublishedChanges,
       messageType: mappings.messageType,
       children: documentStructures.children,
@@ -238,6 +243,10 @@ const publishInTransaction = async (
     .innerJoin(documentStructures, eq(mappings.documentStructureId, documentStructures.id))
     .where(eq(mappings.id, mappingId))
     .for('update')
+
+  if (locked?.aiReview) {
+    return new AiReviewOpen()
+  }
 
   if (!locked?.unpublishedChanges) {
     return noChanges()

@@ -13,10 +13,9 @@ import {
 import { documentContentSchema, previewNoteSchema } from './mapping-preview'
 import { messageTypeSchema } from './message-type'
 import {
-  type LinkEnd,
-  type LinkStart,
-  type MappingTransform,
+  linkPointKey,
   mappingTransformSchema,
+  transformConfigKey,
   type TransformLink,
   transformLinkSchema,
 } from './transform'
@@ -153,21 +152,8 @@ function changes<Part>(
   ]
 }
 
-function configKey(transform: MappingTransform) {
-  return `${transform.kind}:${JSON.stringify(transform.config, Object.keys(transform.config).sort())}`
-}
-
-function endKey(end: LinkStart | LinkEnd) {
-  switch (end.kind) {
-    case 'source':
-    case 'target':
-      return `${end.kind}:${end.path}`
-    case 'transform':
-      return `transform:${end.transformId}/${'output' in end ? end.output : end.input}`
-  }
-}
-
-const transformLinkKey = ({ from, to }: TransformLink) => `${endKey(from)}>${endKey(to)}`
+const transformLinkKey = ({ from, to }: TransformLink) =>
+  `${linkPointKey(from)}>${linkPointKey(to)}`
 
 export function mappingDifferences(before: GraphParts, after: GraphParts): MappingDifference[] {
   return [
@@ -181,7 +167,7 @@ export function mappingDifferences(before: GraphParts, after: GraphParts): Mappi
       before.transforms,
       after.transforms,
       ({ id }) => id,
-      (a, b) => configKey(a) === configKey(b),
+      (a, b) => transformConfigKey(a) === transformConfigKey(b),
     ).map((change): MappingDifference => ({ kind: 'transform', ...change })),
     ...changes(before.transformLinks, after.transformLinks, transformLinkKey, () => true).map(
       (change): MappingDifference => ({ kind: 'transformLink', ...change }),

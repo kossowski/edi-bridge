@@ -5,7 +5,10 @@ import Fastify from 'fastify'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
+  acceptAiDraftEndpoint,
+  acceptAiProposedPartsEndpoint,
   acceptInviteEndpoint,
+  aiReviewOpenStatus,
   channelEndpoint,
   channelsEndpoint,
   createChannelEndpoint,
@@ -75,6 +78,7 @@ import {
   type RunQueueService,
 } from '@edi-bridge/pipeline'
 
+import { acceptAiDraft, acceptAiProposedParts } from './ai-review.js'
 import { type AuthSettings, mountAuth } from './auth.js'
 import { ChannelReach, channelReach } from './channel-reach.js'
 import {
@@ -149,6 +153,7 @@ import {
 import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
 
 import type {
+  AiReviewOpen,
   Conflict,
   DocumentStructureRejected,
   Forbidden,
@@ -171,6 +176,7 @@ export interface AppDependencies {
 }
 
 type Failure =
+  | AiReviewOpen
   | Conflict
   | DocumentStructureRejected
   | Forbidden
@@ -197,6 +203,7 @@ const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> =
   InviteUnusable: inviteUnusableStatus,
   Unprocessable: 422,
   DocumentStructureRejected: 422,
+  AiReviewOpen: aiReviewOpenStatus,
 }
 
 const statusOf = Match.type<Failure>().pipe(
@@ -651,6 +658,21 @@ function registerRoutes(
       request,
       reply,
       saveMappingDraft(request.params.id, parse(saveMappingDraftEndpoint.body, request.body)),
+    ),
+  )
+
+  app.post<{ Params: { id: string } }>(acceptAiDraftEndpoint.path, (request, reply) =>
+    respond(request, reply, acceptAiDraft(request.params.id)),
+  )
+
+  app.post<{ Params: { id: string } }>(acceptAiProposedPartsEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      acceptAiProposedParts(
+        request.params.id,
+        parse(acceptAiProposedPartsEndpoint.body, request.body),
+      ),
     ),
   )
 
