@@ -1,4 +1,17 @@
-import { and, asc, count, desc, eq, gte, inArray, lte, or, type SQL, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import type { SelectedFields } from 'drizzle-orm/pg-core'
@@ -357,6 +370,37 @@ export const markWaitingForTradingPartner = async (
 
   return marked.length > 0
 }
+
+export const endWaitingForTradingPartnerRun = (id: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    yield* loadRun(id)
+
+    const [ended] = yield* Effect.promise(() =>
+      db
+        .update(runs)
+        .set({ waitingForTradingPartnerSince: null })
+        .where(
+          inWorkspace(
+            runs,
+            workspace.id,
+            eq(runs.id, id),
+            isNotNull(runs.waitingForTradingPartnerSince),
+          ),
+        )
+        .returning({ id: runs.id }),
+    )
+
+    if (ended === undefined) {
+      return yield* new Conflict({
+        message: 'Only a Run that waits for the Trading Partner can end its wait',
+      })
+    }
+
+    return yield* loadRun(id)
+  })
 
 export const reprocessRun = (id: string, { mappingVersionId }: ReprocessRunBody) =>
   Effect.gen(function* () {

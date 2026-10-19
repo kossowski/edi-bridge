@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { DeliveryFailed } from '@edi-bridge/channels'
 import {
+  endWaitingForTradingPartnerRunEndpoint,
   manualSubmissionSchema,
   runDetailSchema,
   runEndpoint,
@@ -96,6 +97,12 @@ const markWaiting = (id: string, as = admin) =>
   as.inject({
     method: waitForTradingPartnerRunEndpoint.method,
     url: toPath(waitForTradingPartnerRunEndpoint.path, { id }),
+  })
+
+const endWaiting = (id: string, as = admin) =>
+  as.inject({
+    method: endWaitingForTradingPartnerRunEndpoint.method,
+    url: toPath(endWaitingForTradingPartnerRunEndpoint.path, { id }),
   })
 
 const detail = async (id: string) => {
@@ -244,6 +251,60 @@ describe('POST /runs/:id/wait-for-trading-partner', () => {
 
   it('answers 404 for an unknown Run', async () => {
     const response = await markWaiting(crypto.randomUUID())
+
+    expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('DELETE /runs/:id/wait-for-trading-partner', () => {
+  it('ends the mark of a waiting Run', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+    await markWaiting(id)
+
+    const response = await endWaiting(id)
+
+    expect(response.statusCode, response.body).toBe(200)
+
+    const ended = runDetailSchema.parse(response.json())
+
+    expect(ended).toMatchObject({ id, status: 'failed', waitingForTradingPartnerSince: null })
+    await expect(detail(id)).resolves.toEqual(ended)
+  })
+
+  it('answers 409 for a Run that is not marked', async () => {
+    const id = await processed('orders.edi', unreadableOrders)
+
+    const response = await endWaiting(id)
+
+    expect(response.statusCode, response.body).toBe(409)
+  })
+
+  it('answers 403 to a Viewer and keeps the mark', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+    const marked = runDetailSchema.parse((await markWaiting(id)).json())
+
+    const response = await endWaiting(id, viewer)
+
+    expect(response.statusCode).toBe(403)
+    await expect(detail(id)).resolves.toMatchObject({
+      waitingForTradingPartnerSince: marked.waitingForTradingPartnerSince,
+    })
+  })
+
+  it('answers 404 for a Run of another Workspace and keeps the mark', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+    const marked = runDetailSchema.parse((await markWaiting(id)).json())
+
+    const response = await endWaiting(id, api.admin)
+
+    expect(response.statusCode).toBe(404)
+    await expect(detail(id)).resolves.toMatchObject({
+      waitingForTradingPartnerSince: marked.waitingForTradingPartnerSince,
+    })
+  })
+
+  it('answers 404 for an unknown Run', async () => {
+    const response = await endWaiting(crypto.randomUUID())
 
     expect(response.statusCode).toBe(404)
   })

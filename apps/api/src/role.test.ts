@@ -52,6 +52,7 @@ import {
   retryRunEndpoint,
   reprocessRunEndpoint,
   waitForTradingPartnerRunEndpoint,
+  endWaitingForTradingPartnerRunEndpoint,
   submitDocumentEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -469,6 +470,13 @@ const changes: Change[] = [
     () => ({
       method: 'POST',
       url: toPath(waitForTradingPartnerRunEndpoint.path, { id: crypto.randomUUID() }),
+    }),
+  ],
+  [
+    'end the wait of a Run for the Trading Partner',
+    () => ({
+      method: 'DELETE',
+      url: toPath(endWaitingForTradingPartnerRunEndpoint.path, { id: crypto.randomUUID() }),
     }),
   ],
   [
