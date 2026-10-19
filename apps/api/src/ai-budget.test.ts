@@ -24,7 +24,7 @@ beforeEach(async () => {
   await api.connection.db.delete(aiTokenUsage)
 })
 
-const inWorkspace =
+const providingWorkspace =
   (workspaceId: string) =>
   <A, E>(effect: Effect.Effect<A, E, CurrentWorkspace | Db>) =>
     effect.pipe(
@@ -41,7 +41,7 @@ const at =
     )
 
 const record = (tokens: number, workspaceId = ownWorkspace.id) =>
-  Effect.runPromise(recordAiTokenUsage(tokens).pipe(inWorkspace(workspaceId)))
+  Effect.runPromise(recordAiTokenUsage(tokens).pipe(providingWorkspace(workspaceId)))
 
 const getBudget = (target = api.admin) =>
   target.inject({ method: aiBudgetEndpoint.method, url: aiBudgetEndpoint.path })
@@ -55,17 +55,6 @@ describe('GET /workspaces/current/ai-budget', () => {
       dailyLimit: 200_000,
       usedToday: 0,
     })
-  })
-
-  it('resets at the next midnight in UTC', async () => {
-    const before = Date.now()
-    const { resetsAt } = aiBudgetSchema.parse((await getBudget()).json())
-
-    const reset = Date.parse(resetsAt)
-
-    expect(reset).toBeGreaterThan(before)
-    expect(reset - before).toBeLessThanOrEqual(24 * 60 * 60 * 1000)
-    expect(resetsAt).toMatch(/T00:00:00\.000Z$/)
   })
 
   it('sums the tokens recorded today in the Workspace', async () => {
@@ -88,7 +77,7 @@ describe('GET /workspaces/current/ai-budget', () => {
 })
 
 describe('AI token budget', () => {
-  const inOwnWorkspace = inWorkspace(ownWorkspace.id)
+  const inOwnWorkspace = providingWorkspace(ownWorkspace.id)
 
   it('counts only the tokens recorded on the same day in UTC', async () => {
     await Effect.runPromise(
@@ -107,6 +96,16 @@ describe('AI token budget', () => {
       usedToday: 70,
       resetsAt: '2026-10-20T00:00:00.000Z',
     })
+  })
+
+  it('resets at the next midnight in UTC', async () => {
+    const resetsAt = (iso: string) =>
+      Effect.runPromise(loadAiBudget.pipe(at(iso), inOwnWorkspace)).then(
+        (budget) => budget.resetsAt,
+      )
+
+    await expect(resetsAt('2026-10-19T00:00:00.000Z')).resolves.toBe('2026-10-20T00:00:00.000Z')
+    await expect(resetsAt('2026-10-19T23:59:59.999Z')).resolves.toBe('2026-10-20T00:00:00.000Z')
   })
 
   it('lets the Workspace draft while tokens are left', async () => {
