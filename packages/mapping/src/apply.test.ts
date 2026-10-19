@@ -1002,6 +1002,7 @@ describe('applyMappingVersion', () => {
         code: 'noLookupMatch',
         targetPath: 'SG25/QTY+21/C186/6411',
         transformId,
+        lookup: { lookupTableId: unitTableId, code: 'PCE' },
       },
     )
   })

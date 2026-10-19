@@ -970,13 +970,27 @@ describe('applyInboundMappingVersion', () => {
             }),
           ),
         ),
-      ).toEqual(new MappingError({ code, targetPath: 'orderDate', transformId }))
+      ).toEqual(
+        new MappingError({
+          code,
+          targetPath: 'orderDate',
+          transformId,
+          ...((code === 'unknownLookupTable' || code === 'noLookupMatch') && {
+            lookup: { lookupTableId: unitTableId, code: 'X2' },
+          }),
+        }),
+      )
     },
   )
 
   it('fails for a lookup table the engine lacks beneath a loop without repetitions', async () => {
     expect(await failure(unitsVia('keepValue'), orderStructure, messageOf([]))).toEqual(
-      new MappingError({ code: 'unknownLookupTable', targetPath: 'lines[].unit', transformId }),
+      new MappingError({
+        code: 'unknownLookupTable',
+        targetPath: 'lines[].unit',
+        transformId,
+        lookup: { lookupTableId: unitTableId, code: '' },
+      }),
     )
   })
 
