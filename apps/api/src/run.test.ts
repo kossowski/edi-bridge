@@ -149,21 +149,32 @@ describe('GET /runs', () => {
   it.each([
     ['another Mapping', () => `mappingId=${crypto.randomUUID()}`, () => []],
     ['the Flow', () => `flowId=${workspace.flowId}`, () => [received, failed, processed]],
+    ['another Flow', () => `flowId=${crypto.randomUUID()}`, () => []],
     [
       'the Trading Partner',
       () => `tradingPartnerId=${workspace.tradingPartnerId}`,
       () => [received, failed, processed],
     ],
+    ['another Trading Partner', () => `tradingPartnerId=${crypto.randomUUID()}`, () => []],
     ['another Message Type', () => 'messageType=ORDERS', () => []],
     ['the Failure Stage', () => 'failureStage=validation', () => [failed]],
+    ['another Failure Stage', () => 'failureStage=mapping', () => []],
     ['several statuses', () => 'status=received&status=processing', () => [received, processed]],
     ['channel traffic', () => 'manualSubmission=false', () => []],
     ['manual Submissions', () => 'manualSubmission=true', () => [received, failed, processed]],
     ['a time range', () => `receivedTo=${sevenDaysAgo}`, () => [processed]],
     ['a Business Reference', () => 'q=471', () => [processed]],
     ['a Trading Partner name in any case', () => 'q=hanse', () => [received, failed, processed]],
+    ['a text no Run contains', () => 'q=nordwind', () => []],
   ])('filters by %s', async (_, query, expected) => {
     expect(ids(await listed(query()))).toEqual(expected())
+  })
+
+  it('counts only the Runs the filters keep', async () => {
+    const list = await listed(`messageType=INVOIC&q=4711&receivedTo=${sevenDaysAgo}`)
+
+    expect(ids(list)).toEqual([processed])
+    expect(list).toMatchObject({ statusCounts: { ...noRuns, processing: 1 }, total: 1 })
   })
 
   it('pages the Runs', async () => {
