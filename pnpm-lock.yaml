@@ -330,6 +330,9 @@ importers:
       '@edi-bridge/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@edi-bridge/edifact':
+        specifier: workspace:*
+        version: link:../../packages/edifact
       '@edi-bridge/mocks':
         specifier: workspace:*
         version: link:../../packages/mocks
