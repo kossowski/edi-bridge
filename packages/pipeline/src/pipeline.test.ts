@@ -2757,6 +2757,17 @@ describe('the Acknowledgement of a sent Interchange', () => {
     })
   })
 
+  it('accepts an Interchange by a CONTRL with a zero-padded control reference', async () => {
+    const into = await acknowledgingWorkspace('Padded Foods')
+    const sent = await sendInvoice(into)
+
+    await receiveContrl(into, contrlOf(String(sent?.controlReference).padStart(5, '0'), '7'))
+
+    await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+      acknowledgementState: 'accepted',
+    })
+  })
+
   it('keeps the first Acknowledgement of an Interchange', async () => {
     const into = await acknowledgingWorkspace('Settled Foods')
     const sent = await sendInvoice(into)

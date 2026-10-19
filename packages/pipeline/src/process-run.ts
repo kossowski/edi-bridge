@@ -553,7 +553,7 @@ const handOver = (
   lease: StepLease,
   channel: Destination['channel'],
   document: OutboundDocument,
-  handedOver: Pick<typeof runs.$inferInsert, 'acknowledgementState'> = {},
+  acknowledgementState?: 'pending',
 ) =>
   Effect.gen(function* () {
     if (run.handedOverAt !== null) {
@@ -573,10 +573,7 @@ const handOver = (
 
     // Recorded even when the sweep failed the Run meanwhile, so its Retry does not hand it over again.
     yield* Effect.promise(() =>
-      db
-        .update(runs)
-        .set({ ...handedOver, handedOverAt })
-        .where(eq(runs.id, run.id)),
+      db.update(runs).set({ acknowledgementState, handedOverAt }).where(eq(runs.id, run.id)),
     )
   })
 
@@ -668,7 +665,7 @@ const deliverInterchange =
           mediaType: 'application/edifact',
           isRetry,
         },
-        { acknowledgementState: 'pending' },
+        'pending',
       )
     })
 
@@ -1330,25 +1327,26 @@ const acknowledgementStatesByAction = {
   rejected: 'rejected',
 } as const satisfies Record<InterchangeAction, AcknowledgementState>
 
-// A CONTRL that names no Interchange this Workspace sent acknowledges nothing, and its Run goes on.
 const acknowledgementIn = ({ interchange, message }: ReadMessage) => {
   const sender = interchange.header.elements[1]?.[0]
 
-  if (sender === undefined) {
+  if (sender === undefined || message.header.elements[1]?.[0] !== 'CONTRL') {
     return undefined
   }
 
   try {
     const { controlReference, action } = readAcknowledgedInterchange(message)
 
-    // The control references this Workspace sends are positive integers, so any other names none of them.
-    return /^[1-9]\d{0,8}$/.test(controlReference)
-      ? {
-          sender,
-          controlReference: Number(controlReference),
-          status: acknowledgementStatesByAction[action],
-        }
-      : undefined
+    if (!/^0*[1-9]\d{0,8}$/.test(controlReference)) {
+      // This Workspace sends positive integers only, so the CONTRL acknowledges nothing and its Run goes on.
+      return undefined
+    }
+
+    return {
+      sender,
+      controlReference: Number(controlReference),
+      state: acknowledgementStatesByAction[action],
+    }
   } catch (error) {
     if (error instanceof ReadAcknowledgementError) {
       return undefined
@@ -1360,19 +1358,19 @@ const acknowledgementIn = ({ interchange, message }: ReadMessage) => {
 
 type Acknowledgement = NonNullable<ReturnType<typeof acknowledgementIn>>
 
-// A late CONTRL still resolves an overdue Interchange, but the first Acknowledgement stays.
 const acknowledge = async (
   tx: Transaction,
   workspaceId: string,
-  { sender, controlReference, status }: Acknowledgement,
+  { sender, controlReference, state }: Acknowledgement,
 ) => {
   await tx
     .update(runs)
-    .set({ acknowledgementState: status })
+    .set({ acknowledgementState: state })
     .where(
       and(
         eq(runs.workspaceId, workspaceId),
         eq(runs.controlReference, controlReference),
+        // A late CONTRL still resolves an overdue Interchange, but the first Acknowledgement stays.
         inArray(runs.acknowledgementState, ['pending', 'overdue']),
         inArray(
           runs.tradingPartnerId,
@@ -1425,6 +1423,7 @@ const processInbound = ({
       'validation',
       () => validatedInbound(read.success),
       async (tx) => {
+        // An invalid CONTRL acknowledges nothing.
         if (acknowledgement !== undefined) {
           await acknowledge(tx, queued.workspaceId, acknowledgement)
         }

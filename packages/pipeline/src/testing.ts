@@ -418,7 +418,6 @@ export async function addOrdersFlow(
 
 const acknowledgementDocument = JSON.stringify({ interchangeReference: 'CTL1', action: '7' })
 
-// A CONTRL Flow of the Workspace's Trading Partner on its inbound Channel, posted to the ERP.
 export async function addContrlFlow(db: Db, workspace: InvoiceWorkspace, { url }: { url: string }) {
   const structure = inferDocumentStructure({
     kind: 'jsonDocument',
