@@ -1,4 +1,5 @@
 import { and, desc, eq, notExists, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 
 import { flows, lookupTableEntries, runs, tradingPartners } from '@edi-bridge/db'
 
@@ -9,6 +10,8 @@ import type { Database, Transaction } from './db.js'
 const lookupTableIdOfRun = sql<string>`${runs.problem} -> 'fixTarget' ->> 'lookupTableId'`
 
 const codeOfRun = sql<string>`${runs.problem} -> 'fixTarget' ->> 'code'`
+
+const replacing = alias(runs, 'replacing')
 
 export const selectBlockingCodes = async (
   db: Database | Transaction,
@@ -35,6 +38,13 @@ export const selectBlockingCodes = async (
         eq(runs.status, 'failed'),
         sql`${runs.problem} -> 'fixTarget' ->> 'kind' = 'lookupTable'`,
         lookupTableId === undefined ? undefined : sql`${lookupTableIdOfRun} = ${lookupTableId}`,
+        // A replaced Run is no longer open; the Run that replaces it counts instead.
+        notExists(
+          db
+            .select({ id: replacing.id })
+            .from(replacing)
+            .where(eq(replacing.replacesRunId, runs.id)),
+        ),
         // A failed Run stays failed once its code is translated, so the code is missing only until then.
         notExists(
           db

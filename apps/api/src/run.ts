@@ -7,6 +7,7 @@ import {
   directionOf,
   type FailureStage,
   type ProblemReason,
+  type ReprocessRunBody,
   type RunDetail,
   type RunList,
   type RunListQuery,
@@ -16,10 +17,15 @@ import {
   whoFixes,
 } from '@edi-bridge/contracts'
 import { flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-bridge/db'
-import { Database as PipelineDatabase, retryRun as retryDelivery } from '@edi-bridge/pipeline'
+import {
+  isReprocessable,
+  Database as PipelineDatabase,
+  reprocessRun as reprocessInPipeline,
+  retryRun as retryDelivery,
+} from '@edi-bridge/pipeline'
 
 import { Db, type Database } from './db.js'
-import { Conflict, NotFound } from './errors.js'
+import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { selectVersions, toHeader } from './mapping-version.js'
 import { inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
@@ -189,6 +195,7 @@ export const loadRun = (id: string) =>
         mappingVersionId: runs.mappingVersionId,
         error: runs.error,
         waitingForTradingPartnerSince: runs.waitingForTradingPartnerSince,
+        replacesRunId: runs.replacesRunId,
       }).where(inWorkspace(runs, workspace.id, eq(runs.id, id))),
     )
 
@@ -196,12 +203,13 @@ export const loadRun = (id: string) =>
       return yield* new NotFound()
     }
 
-    const [steps, [version]] = yield* Effect.promise(() =>
+    const [steps, [version], [replacedBy]] = yield* Effect.promise(() =>
       Promise.all([
         db.select().from(runSteps).where(eq(runSteps.runId, id)).orderBy(asc(runSteps.position)),
         row.mappingVersionId === null
           ? Promise.resolve([])
           : selectVersions(db, {}).where(eq(mappingVersions.id, row.mappingVersionId)),
+        db.select({ id: runs.id }).from(runs).where(eq(runs.replacesRunId, id)),
       ]),
     )
 
@@ -213,6 +221,8 @@ export const loadRun = (id: string) =>
         finishedAt: step.finishedAt?.toISOString() ?? null,
       })),
       mappingVersion: version ? toHeader(version) : null,
+      replaces: row.replacesRunId === null ? null : { id: row.replacesRunId },
+      replacedBy: replacedBy ?? null,
     })
   })
 
@@ -223,18 +233,16 @@ type DetailRow = SummaryRow & {
 
 const toDetail = (
   row: DetailRow,
-  loaded: Pick<RunDetail, 'steps' | 'mappingVersion'>,
+  loaded: Pick<RunDetail, 'steps' | 'mappingVersion' | 'replaces' | 'replacedBy'>,
 ): RunDetail => {
   const summary = toSummary(row)
 
   const shared = {
     ...summary,
     ...loaded,
-    // Interchanges, parsed Messages, Reprocess and Duplicates come with inbound processing.
+    // Interchanges, parsed Messages and Duplicates come with inbound processing.
     interchange: null,
     message: null,
-    replaces: null,
-    replacedBy: null,
     duplicateOf: null,
   }
 
@@ -265,12 +273,40 @@ const toDetail = (
   }
 }
 
+const reprocessWithVersion = (id: string, mappingVersionId: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    return yield* reprocessInPipeline({
+      workspaceId: workspace.id,
+      runId: id,
+      mappingVersionId,
+    }).pipe(
+      Effect.provideService(PipelineDatabase, db),
+      Effect.catchTags({
+        RunNotReprocessable: (error) => Effect.fail(new Conflict({ message: error.message })),
+        MappingVersionNotOfRun: (error) =>
+          Effect.fail(new Unprocessable({ message: error.message })),
+      }),
+    )
+  })
+
 export const retryRun = (id: string) =>
   Effect.gen(function* () {
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    yield* loadRun(id)
+    const run = yield* loadRun(id)
+
+    const candidate = { ...run, mappingVersionId: run.mappingVersion?.id ?? null }
+
+    // Trying a Defect again outside delivery reprocesses the Run with its own Mapping Version.
+    if (candidate.problem?.reason === 'defect' && isReprocessable(candidate)) {
+      yield* reprocessWithVersion(id, candidate.mappingVersionId)
+
+      return yield* loadRun(id)
+    }
 
     yield* retryDelivery({ workspaceId: workspace.id, runId: id }).pipe(
       Effect.provideService(PipelineDatabase, db),
@@ -280,4 +316,13 @@ export const retryRun = (id: string) =>
     )
 
     return yield* loadRun(id)
+  })
+
+export const reprocessRun = (id: string, { mappingVersionId }: ReprocessRunBody) =>
+  Effect.gen(function* () {
+    yield* loadRun(id)
+
+    const reprocessed = yield* reprocessWithVersion(id, mappingVersionId)
+
+    return yield* loadRun(reprocessed.runId)
   })

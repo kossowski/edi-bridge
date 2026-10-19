@@ -10,7 +10,10 @@ import {
   lookupTablesEndpoint,
   lookupTableSummarySchema,
   manualSubmissionSchema,
+  reprocessRunEndpoint,
+  runDetailSchema,
   submitDocumentEndpoint,
+  toPath,
   updateLookupTableEndpoint,
 } from '@edi-bridge/contracts'
 import { runs } from '@edi-bridge/db'
@@ -216,5 +219,28 @@ describe('the missing codes of a Lookup Table', () => {
     const codes = await missingCodes()
 
     expect(codes.map(({ code }) => code)).toEqual(['KAR'])
+  })
+
+  it('lists the Run that replaces a failed Run instead of the replaced one', async () => {
+    const replaced = await submitted(inUnit('PAL'))
+
+    await processQueued()
+
+    const response = await admin.inject({
+      method: reprocessRunEndpoint.method,
+      url: toPath(reprocessRunEndpoint.path, { id: replaced }),
+      body: { mappingVersionId: workspace.mappingVersionId },
+    })
+
+    expect(response.statusCode, response.body).toBe(201)
+
+    await processQueued()
+
+    const replacing = runDetailSchema.parse(response.json()).id
+    const codes = await missingCodes()
+
+    expect(codes.find(({ code }) => code === 'PAL')).toMatchObject({
+      failedRuns: [failedRun(replacing)],
+    })
   })
 })

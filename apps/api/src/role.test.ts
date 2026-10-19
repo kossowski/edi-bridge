@@ -50,6 +50,7 @@ import {
   saveMappingDraftEndpoint,
   sessionEndpoint,
   retryRunEndpoint,
+  reprocessRunEndpoint,
   submitDocumentEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -461,6 +462,14 @@ const changes: Change[] = [
   [
     'retry a Run',
     () => ({ method: 'POST', url: toPath(retryRunEndpoint.path, { id: crypto.randomUUID() }) }),
+  ],
+  [
+    'reprocess a Run',
+    () => ({
+      method: 'POST',
+      url: toPath(reprocessRunEndpoint.path, { id: crypto.randomUUID() }),
+      body: { mappingVersionId: crypto.randomUUID() },
+    }),
   ],
   [
     'create an invite',

@@ -305,8 +305,9 @@ function retriedOutcome(run: RunDetail) {
       return 'pending'
     }
 
+    // Trying a Defect again before delivery starts a new Run, which the problem card links.
     case 'failed': {
-      return 'failedAgain'
+      return run.replacedBy === null ? 'failedAgain' : null
     }
 
     case 'delivered':

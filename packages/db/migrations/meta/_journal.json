@@ -127,6 +127,20 @@
       "when": 1792440128108,
       "tag": "0017_run_delivery_retry",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792441889584,
+      "tag": "0018_document_immutable",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792441966182,
+      "tag": "0019_run_replaces",
+      "breakpoints": true
     }
   ]
 }

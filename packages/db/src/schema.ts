@@ -1,5 +1,6 @@
 import { type SQL, sql } from 'drizzle-orm'
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -526,6 +527,10 @@ export const runs = pgTable(
     controlReference: integer(),
     // Null for a Document that is not an Interchange.
     messageIndex: integer(),
+    // A Reprocess starts a new Run from the same Document.
+    replacesRunId: uuid()
+      .unique()
+      .references((): AnyPgColumn => runs.id),
     receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: updatedAt(),
   },

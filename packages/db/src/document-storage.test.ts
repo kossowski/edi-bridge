@@ -1,8 +1,9 @@
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { connect, type Connection } from './client.js'
 import { type DocumentStorage, postgresDocumentStorage } from './document-storage.js'
-import { channels, workspaces } from './schema.js'
+import { channels, documents, workspaces } from './schema.js'
 import { startTestDatabase, type TestDatabase } from './testing.js'
 
 let testDatabase: TestDatabase
@@ -90,6 +91,24 @@ describe('the Document storage', () => {
     })
 
     await expect(storage.read(workspaceId, stored.id)).resolves.toMatchObject({ content })
+  })
+
+  it.each([
+    ['content', { content: 'UNA:+.? ' }],
+    ['file name', { fileName: 'renamed.edi' }],
+    ['received time', { receivedAt: new Date(0) }],
+  ])('refuses a change to the %s of a stored Document', async (_field, change) => {
+    const stored = await storage.store({
+      workspaceId,
+      channelId,
+      fileName: 'invoice.edi',
+      content: invoice,
+    })
+
+    await expect(
+      connection.db.update(documents).set(change).where(eq(documents.id, stored.id)),
+    ).rejects.toThrow()
+    await expect(storage.read(workspaceId, stored.id)).resolves.toEqual(stored)
   })
 
   it('reads nothing for an unknown id', async () => {

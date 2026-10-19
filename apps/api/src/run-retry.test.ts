@@ -12,7 +12,7 @@ import {
   toPath,
 } from '@edi-bridge/contracts'
 import { runs } from '@edi-bridge/db'
-import { type DeliveryService, processRun, RunNotRetryable } from '@edi-bridge/pipeline'
+import { type DeliveryService, Documents, processRun, RunNotRetryable } from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
   type InvoiceWorkspace,
@@ -119,6 +119,57 @@ describe('POST /runs/:id/retry', () => {
       ['validation', 'succeeded'],
       ['delivery', 'succeeded'],
     ])
+  })
+
+  it('reprocesses a Run that failed on a Defect before delivery with its own Mapping Version', async () => {
+    const response = await admin.inject({
+      method: submitDocumentEndpoint.method,
+      url: submitDocumentEndpoint.path,
+      body: {
+        channelId: workspace.inboundChannelId,
+        document: { fileName: 'invoice.json', content: goldenInvoice },
+      },
+    })
+
+    const id = manualSubmissionSchema.parse(response.json()).runs[0]?.id ?? ''
+
+    // The Document storage breaks while the worker reads it.
+    for (const queued of api.runQueue.queued.splice(0)) {
+      await Effect.runPromiseExit(
+        processRun(queued).pipe(
+          Effect.provideService(Documents, {
+            store: () => Promise.reject(new Error('unused')),
+            read: () => Promise.reject(new Error('The Document storage is down')),
+          }),
+          pipelineServices(api.connection.db, api.runQueue, unreachable),
+        ),
+      )
+    }
+
+    await expect(detail(id)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      problem: { reason: 'defect', whoFixes: 'retry' },
+    })
+
+    const retried = await retry(id)
+
+    expect(retried.statusCode, retried.body).toBe(200)
+
+    const replaced = runDetailSchema.parse(retried.json())
+    const replacingId = replaced.replacedBy?.id ?? ''
+
+    expect(replaced).toMatchObject({ id, status: 'failed', failureStage: 'mapping' })
+    expect(api.runQueue.queued).toEqual([{ workspaceId: workspace.id, runId: replacingId }])
+
+    await processQueued(() => Effect.void)
+
+    await expect(detail(replacingId)).resolves.toMatchObject({
+      status: 'delivered',
+      replaces: { id },
+      mappingVersion: { id: workspace.mappingVersionId },
+    })
+    expect((await retry(id)).statusCode).toBe(409)
   })
 
   it('answers 409 for a Run that failed before delivery and leaves it failed', async () => {

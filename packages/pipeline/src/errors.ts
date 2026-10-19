@@ -36,3 +36,20 @@ export class RunNotRetryable extends Data.TaggedError('RunNotRetryable')<{
     return 'Only a Run that failed at delivery with something stored to deliver can be retried'
   }
 }
+
+export class RunNotReprocessable extends Data.TaggedError('RunNotReprocessable')<{
+  readonly runId: string
+}> {
+  override get message() {
+    return 'Only a failed Run that is not replaced yet and that neither the Trading Partner nor a Retry fixes can be reprocessed'
+  }
+}
+
+export class MappingVersionNotOfRun extends Data.TaggedError('MappingVersionNotOfRun')<{
+  readonly runId: string
+  readonly mappingVersionId: string
+}> {
+  override get message() {
+    return 'The Mapping Version does not belong to the Mapping of the Run'
+  }
+}
