@@ -65,7 +65,9 @@ const outcomeOf = ({ id, status, failureStage, problem }: SummaryRow): Outcome =
     return { status, failureStage, problem: null }
   }
 
-  throw new Error(`Run ${id} has status ${status} with Failure Stage ${String(failureStage)}`)
+  throw new Error(
+    `Run ${id} has status ${status} with Failure Stage ${String(failureStage)} and ${problem === null ? 'no problem' : 'a problem'}`,
+  )
 }
 
 const toSummary = (row: SummaryRow): RunSummary => ({
