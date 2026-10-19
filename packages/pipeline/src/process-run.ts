@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lt, notExists, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, lt, notExists } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { Data, DateTime, Effect, Match, Predicate, Result } from 'effect'
 import { z } from 'zod'
@@ -22,6 +22,7 @@ import {
   type RunProblem,
   type RunStepStage,
   segmentTagSchema,
+  whoFixes,
 } from '@edi-bridge/contracts'
 import {
   channels,
@@ -935,55 +936,72 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
     )
   })
 
-// A resend of the Trading Partner replaces the newest Run that waits for it, so the wait ends.
-const replaceWaitingRun = async (tx: Transaction, run: ClaimedRun) => {
-  if (run.businessReference === null || run.replacesRunId !== null) {
-    return
-  }
+const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
+  Effect.gen(function* () {
+    const { businessReference } = run
 
-  const replacing = alias(runs, 'replacing')
+    if (businessReference === null || run.replacesRunId !== null) {
+      return
+    }
 
-  // Locks the waiting Run, so two resends delivered at once replace it once.
-  const [waiting] = await tx
-    .select({ id: runs.id })
-    .from(runs)
-    .where(
-      and(
-        eq(runs.workspaceId, run.workspaceId),
-        eq(runs.flowId, run.flowId),
-        eq(runs.businessReference, run.businessReference),
-        eq(runs.status, 'failed'),
-        inArray(runs.failureStage, ['parse', 'validation']),
-        sql`${runs.problem}->>'reason' <> 'defect'`,
-        lt(runs.receivedAt, run.receivedAt),
-        notExists(tx.select().from(replacing).where(eq(replacing.replacesRunId, runs.id))),
+    const db = yield* Database
+    const replacing = alias(runs, 'replacing')
+
+    yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        const candidates = await tx
+          .select({ id: runs.id, failureStage: runs.failureStage, problem: runs.problem })
+          .from(runs)
+          .where(
+            and(
+              eq(runs.workspaceId, run.workspaceId),
+              eq(runs.flowId, run.flowId),
+              eq(runs.businessReference, businessReference),
+              eq(runs.status, 'failed'),
+              lt(runs.receivedAt, run.receivedAt),
+              notExists(tx.select().from(replacing).where(eq(replacing.replacesRunId, runs.id))),
+            ),
+          )
+          .orderBy(desc(runs.receivedAt))
+
+        // The Run shares the Flow of the resend, so it shares its Direction.
+        const waiting = candidates.find(
+          (candidate) => whoFixes({ ...candidate, direction }) === 'tradingPartner',
+        )
+
+        if (waiting === undefined) {
+          return
+        }
+
+        // Locks the waiting Run, so two resends delivered at once replace it once.
+        await tx.select({ id: runs.id }).from(runs).where(eq(runs.id, waiting.id)).for('update')
+
+        // A resend that waited for the lock reads the link the other one committed.
+        const [replaced] = await tx
+          .select({ id: runs.id })
+          .from(runs)
+          .where(eq(runs.replacesRunId, waiting.id))
+
+        if (replaced !== undefined) {
+          return
+        }
+
+        await tx.update(runs).set({ replacesRunId: waiting.id }).where(eq(runs.id, run.id))
+        await tx
+          .update(runs)
+          .set({ waitingForTradingPartnerSince: null })
+          .where(eq(runs.id, waiting.id))
+      }),
+    ).pipe(
+      // The Document is already handed over, so the Run stays delivered without the link.
+      Effect.catchCause((cause) =>
+        Effect.logError(`Delivered Run ${run.id} replaced no waiting Run`, cause),
       ),
     )
-    .orderBy(desc(runs.receivedAt))
-    .limit(1)
-    .for('update', { of: runs })
-
-  if (waiting === undefined) {
-    return
-  }
-
-  // A resend that waited for the lock reads the link the other one committed.
-  const [replaced] = await tx
-    .select({ id: runs.id })
-    .from(runs)
-    .where(eq(runs.replacesRunId, waiting.id))
-
-  if (replaced !== undefined) {
-    return
-  }
-
-  await tx.update(runs).set({ replacesRunId: waiting.id }).where(eq(runs.id, run.id))
-  await tx.update(runs).set({ waitingForTradingPartnerSince: null }).where(eq(runs.id, waiting.id))
-}
+  })
 
 const deliveryStep = (
   run: ClaimedRun,
-  direction: Direction,
   destination: Destination,
   delivering: Effect.Effect<void, DeliveryError, Database | Delivery>,
 ) =>
@@ -994,25 +1012,25 @@ const deliveryStep = (
       delivering.pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect })))),
       async (tx) => {
         await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
-
-        if (direction === 'inbound') {
-          await replaceWaitingRun(tx, run)
-        }
       },
     )
 
-    if (Result.isFailure(delivered)) {
-      yield* fail(run.id, deliveryFailure(delivered.failure, destination))
-
-      const { failure } = delivered
-
-      if (
-        Predicate.isTagged(failure, 'ChannelDefect') ||
-        Predicate.isTagged(failure, 'DeliveryDefect')
-      ) {
-        return yield* Effect.die(failure.defect)
-      }
+    if (Result.isSuccess(delivered)) {
+      return true
     }
+
+    yield* fail(run.id, deliveryFailure(delivered.failure, destination))
+
+    const { failure } = delivered
+
+    if (
+      Predicate.isTagged(failure, 'ChannelDefect') ||
+      Predicate.isTagged(failure, 'DeliveryDefect')
+    ) {
+      return yield* Effect.die(failure.defect)
+    }
+
+    return false
   })
 
 type Processing = {
@@ -1071,7 +1089,6 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
 
     yield* deliveryStep(
       delivering,
-      'outbound',
       destination,
       deliverInterchange(queued, delivering, pinned.messageType, destination, false),
     )
@@ -1174,12 +1191,15 @@ const processInbound = ({
     const delivering = mappedRun ?? run
     const destination = yield* loadDestination(queued)
 
-    yield* deliveryStep(
+    const delivered = yield* deliveryStep(
       delivering,
-      'inbound',
       destination,
       deliverDocument(delivering, pinned, destination, false),
     )
+
+    if (delivered) {
+      yield* replaceWaitingRun(delivering, 'inbound')
+    }
   })
 
 // A Retry leaves every step before the delivery succeeded.
@@ -1217,14 +1237,19 @@ const processClaimed = (
     if (yield* isOnlyDeliveryLeft(run.id)) {
       const destination = yield* loadDestination(queued)
 
-      return yield* deliveryStep(
+      const delivered = yield* deliveryStep(
         run,
-        direction,
         destination,
         direction === 'outbound'
           ? deliverInterchange(queued, run, pinned.messageType, destination, true)
           : deliverDocument(run, pinned, destination, true),
       )
+
+      if (delivered) {
+        yield* replaceWaitingRun(run, direction)
+      }
+
+      return
     }
 
     const documents = yield* Documents
