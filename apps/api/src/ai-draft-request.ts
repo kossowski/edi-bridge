@@ -1,8 +1,9 @@
 import { eq, sql } from 'drizzle-orm'
-import { Effect } from 'effect'
+import { Cause, Effect } from 'effect'
 
 import type { LanguageModel } from 'ai'
 import type { Context } from 'effect'
+import type { FastifyBaseLogger } from 'fastify'
 
 import {
   type AiDraftEvent,
@@ -87,23 +88,37 @@ const drafting = (
   sampleId: string,
   model: LanguageModel | null,
   emit: (event: AiDraftEvent) => void,
+  log: FastifyBaseLogger,
 ): Effect.Effect<AiDraftEvent, never, CurrentWorkspace | Db> => {
   if (model === null) {
     return Effect.succeed(unavailable)
   }
+
+  let tokens = 0
 
   return draftMapping({
     mappingId: id,
     sampleId,
     model,
     onStep: (step) => emit({ type: 'step', step }),
+    onTokens: (used) => {
+      tokens = used
+    },
   }).pipe(
-    Effect.tap(({ tokens }) => recordAiTokenUsage(tokens)),
     Effect.flatMap(({ proposal }) => storeDraft(id, sampleId, proposal)),
-    Effect.catchTag('AiDraftFailed', ({ reason, tokens }) =>
-      Effect.as(recordAiTokenUsage(tokens), { type: 'failed', reason } satisfies AiDraftEvent),
+    Effect.catchTag('AiDraftFailed', ({ reason }) =>
+      Effect.succeed({ type: 'failed', reason } satisfies AiDraftEvent),
     ),
-    Effect.catchCause(() => Effect.succeed(unavailable)),
+    Effect.catchCause((cause) =>
+      Effect.as(
+        Effect.sync(() =>
+          log.error({ err: Cause.squash(cause) }, 'The AI draft failed unexpectedly'),
+        ),
+        unavailable,
+      ),
+    ),
+    // Runs when the client goes away too, so cancelling a run does not escape the budget.
+    Effect.ensuring(Effect.suspend(() => recordAiTokenUsage(tokens))),
   )
 }
 
@@ -148,6 +163,7 @@ export const requestAiDraft = (
   id: string,
   input: Effect.Effect<RequestAiDraftBody, ValidationError>,
   model: LanguageModel | null,
+  log: FastifyBaseLogger,
 ) =>
   Effect.gen(function* () {
     const { mapping, samples } = yield* loadSamples(id)
@@ -165,5 +181,5 @@ export const requestAiDraft = (
 
     const services = yield* Effect.context<CurrentWorkspace | Db>()
 
-    return eventStream(services, (emit) => drafting(id, sampleId, model, emit))
+    return eventStream(services, (emit) => drafting(id, sampleId, model, emit, log))
   })

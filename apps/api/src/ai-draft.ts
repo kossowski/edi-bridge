@@ -46,6 +46,8 @@ export type AiDraftRequest = {
   sampleId: string
   model: LanguageModel
   onStep: (step: AiDraftStep) => void
+  // Reports the running token count, so a run cut short still counts against the budget.
+  onTokens?: (tokens: number) => void
 }
 
 const toProposal = (links: ReadonlyArray<MappingLink>): AiProposal => ({
@@ -211,7 +213,7 @@ const errorMessage = (errors: ReadonlyArray<string>): ModelMessage => ({
 
 const tokensOf = ({ totalTokens }: { totalTokens: number | undefined }) => totalTokens ?? 0
 
-export const draftMapping = ({ mappingId, sampleId, model, onStep }: AiDraftRequest) =>
+export const draftMapping = ({ mappingId, sampleId, model, onStep, onTokens }: AiDraftRequest) =>
   Effect.gen(function* () {
     const loaded = yield* loadSamples(mappingId)
     const draft = loaded.mapping.draft
@@ -262,6 +264,7 @@ export const draftMapping = ({ mappingId, sampleId, model, onStep }: AiDraftRequ
               // The result and its errors carry the usage of the last step only.
               onStepEnd: ({ usage, response }) => {
                 tokens += tokensOf(usage)
+                onTokens?.(tokens)
                 roundMessages.push(...response.messages)
               },
             })

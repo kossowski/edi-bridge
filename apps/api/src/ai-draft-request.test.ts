@@ -35,8 +35,16 @@ let api: TestApi
 
 const model = new MockLanguageModelV4({ doGenerate: (options) => generate(options) })
 
+const logged: Array<{ msg?: string; err?: unknown }> = []
+
 beforeAll(async () => {
-  api = await startTestApi({ aiModel: model })
+  api = await startTestApi({
+    aiModel: model,
+    logger: {
+      level: 'error',
+      stream: { write: (line: string) => logged.push(JSON.parse(line)) },
+    },
+  })
 }, 60_000)
 
 afterAll(async () => {
@@ -138,6 +146,40 @@ const draftOf = async (mappingId: string) =>
     ).json(),
   )
 
+const untilAborted = (signal: AbortSignal | undefined) =>
+  new Promise<never>((_, reject) => {
+    signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+  })
+
+// Destroying the raw response is how the client going away reaches the route.
+const cancelledAfter = async (
+  mappingId: string,
+  body: RequestAiDraftBody,
+  last: (event: AiDraftEvent) => boolean,
+) => {
+  const response = await api.admin.inject({
+    method: requestAiDraftEndpoint.method,
+    url: toPath(requestAiDraftEndpoint.path, { id: mappingId }),
+    headers: { accept: 'text/event-stream' },
+    body,
+    payloadAsStream: true,
+  })
+
+  let received = ''
+
+  for await (const chunk of response.stream()) {
+    received += String(chunk)
+
+    if (eventsOf(received).some(last)) {
+      break
+    }
+  }
+
+  response.raw.res.destroy()
+
+  return eventsOf(received)
+}
+
 const usedToday = async () =>
   aiBudgetSchema.parse(
     (await api.admin.inject({ method: 'GET', url: aiBudgetEndpoint.path })).json(),
@@ -228,6 +270,28 @@ describe('POST /mappings/:id/ai-draft', () => {
     expect(await draftOf(mappingId)).toMatchObject({ links: [], aiReview: null })
   })
 
+  it('records the tokens of the finished steps when the client cancels the run', async () => {
+    const { mappingId, sampleId } = await createdInvoiceMapping()
+    const broken = [{ sourcePath: 'orderNumber', targetPath: 'BGM/1004' }]
+    let calls = 0
+
+    generate = (options) => {
+      calls += 1
+
+      return calls === 1 ? Promise.resolve(answer(broken)) : untilAborted(options.abortSignal)
+    }
+
+    const events = await cancelledAfter(
+      mappingId,
+      { sampleId },
+      (event) => event.type === 'step' && event.step.kind === 'fixingErrors',
+    )
+
+    expect(events.at(-1)).toMatchObject({ type: 'step', step: { kind: 'fixingErrors' } })
+    await expect.poll(usedToday).toBe(120)
+    expect(await draftOf(mappingId)).toMatchObject({ links: [], aiReview: null })
+  })
+
   it('adds the proposed links to a Draft the Admin saved during the run', async () => {
     const { mappingId, sampleId } = await createdInvoiceMapping()
     const savedLink = { sourcePath: 'orderNumber', targetPath: 'SG1+ON/RFF+ON/C506/1154' }
@@ -278,6 +342,26 @@ describe('POST /mappings/:id/ai-draft', () => {
     expect(stored.links).toEqual(invoiceLinks)
     expect(inner).toMatchObject({ draft: { aiReview: stored.aiReview } })
     expect(await usedToday()).toBe(240)
+  })
+
+  it('logs an unexpected error before it reports the model provider as unavailable', async () => {
+    const { mappingId, sampleId } = await createdInvoiceMapping()
+
+    logged.length = 0
+
+    generate = async () => {
+      await api.connection.db.delete(mappings).where(eq(mappings.id, mappingId))
+
+      return answer(invoiceLinks)
+    }
+
+    const events = eventsOf((await requestDraft(mappingId, { sampleId })).body)
+
+    expect(events.at(-1)).toEqual({ type: 'failed', reason: 'unavailable' })
+    expect(logged).toContainEqual(
+      expect.objectContaining({ msg: 'The AI draft failed unexpectedly', err: expect.anything() }),
+    )
+    expect(await usedToday()).toBe(120)
   })
 
   it('answers 423 while the AI review of the Draft is open', async () => {

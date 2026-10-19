@@ -3,7 +3,7 @@ import { Effect, Match, Predicate } from 'effect'
 import Fastify from 'fastify'
 
 import type { LanguageModel } from 'ai'
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest, FastifyServerOptions } from 'fastify'
 
 import {
   acceptAiDraftEndpoint,
@@ -177,7 +177,7 @@ export interface AppDependencies {
   auth: AuthSettings
   channels: ChannelSettings
   database: Database
-  logger?: boolean
+  logger?: FastifyServerOptions['logger']
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
   runQueue: RunQueueService
@@ -697,6 +697,7 @@ function registerRoutes(
           request.params.id,
           parse(requestAiDraftEndpoint.body, request.body),
           aiModel,
+          request.log,
         ),
         () => Effect.sync(() => reply.headers(eventStreamHeaders)),
       ),
