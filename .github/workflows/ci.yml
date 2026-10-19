@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
-      full-stack: ${{ steps.full-stack.outputs.run }}
+      full-stack: ${{ steps.plan.outputs.full-stack }}
     steps:
       - name: Check out code
         uses: actions/checkout@v7
@@ -50,21 +50,6 @@ jobs:
             ]
         run: .github/scripts/plan-affected-jobs.sh
 
-      # The full-stack test exercises every app image, so turbo --affected on apps/web
-      # misses API, worker and Dockerfile changes. It skips only when no code changed.
-      - name: Select the full-stack E2E test
-        id: full-stack
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          if [ "$EVENT_NAME" != pull_request ] || ! git diff --quiet "origin/$BASE_REF...HEAD" -- \
-            apps packages patches compose.yaml package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .dockerignore .github; then
-            echo "run=true" >>"$GITHUB_OUTPUT"
-          else
-            echo "run=false" >>"$GITHUB_OUTPUT"
-          fi
-
   tasks:
     name: ${{ matrix.name }}
     needs: plan
@@ -94,8 +79,6 @@ jobs:
         if: ${{ !matrix.skip }}
         run: pnpm turbo run ${{ matrix.tasks }} ${{ github.event_name == 'pull_request' && '--affected' || '' }} ${{ matrix.args }}
 
-  # A job of its own: Docker networking changes during the Compose start abort Chromium
-  # module fetches in a Stories run on the same runner (#277, #338).
   full-stack-e2e:
     name: Full-stack E2E test
     needs: plan
@@ -124,10 +107,10 @@ jobs:
           node dist/create-operator.js --email "$OPERATOR_EMAIL" --name Operator --workspace "Full-stack E2E"
 
       - name: Run the full-stack E2E test
-        run: pnpm --filter @edi-bridge/web test:e2e:full-stack
+        run: pnpm turbo run test:e2e:full-stack --filter=@edi-bridge/web
 
       - name: Upload the Playwright traces
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
           name: full-stack-e2e-test-results
@@ -135,7 +118,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Print the Compose logs
-        if: failure()
+        if: failure() || cancelled()
         run: docker compose --profile full-stack logs --no-color --timestamps
 
   format:

@@ -3,7 +3,17 @@ set -euo pipefail
 
 jobs=$(jq -c . <<<"$MATRIX")
 
-if [ "$EVENT_NAME" != pull_request ] || ! git diff --quiet "origin/$BASE_REF...HEAD" -- .github; then
+changed() {
+  [ "$EVENT_NAME" != pull_request ] || ! git diff --quiet "origin/$BASE_REF...HEAD" -- "$@"
+}
+
+if changed apps packages patches compose.yaml package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .dockerignore .github; then
+  echo "full-stack=true" >>"$GITHUB_OUTPUT"
+else
+  echo "full-stack=false" >>"$GITHUB_OUTPUT"
+fi
+
+if changed .github; then
   echo "matrix=$jobs" >>"$GITHUB_OUTPUT"
   exit 0
 fi
