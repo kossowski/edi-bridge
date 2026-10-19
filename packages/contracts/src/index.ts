@@ -567,6 +567,7 @@ export {
 } from './trading-partner-health'
 
 export {
+  endWaitingForTradingPartnerRunEndpoint,
   type ErrorPosition,
   errorPositionSchema,
   type FailureStage,

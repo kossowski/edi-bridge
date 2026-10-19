@@ -5,6 +5,7 @@ import {
   runDetailSchema,
   runSummarySchema,
   waitForTradingPartnerRunEndpoint,
+  endWaitingForTradingPartnerRunEndpoint,
   whoFixes,
 } from './run'
 
@@ -242,6 +243,15 @@ describe('waitForTradingPartnerRunEndpoint', () => {
   it('marks a Run at its own path and answers with the Run detail', () => {
     expect(waitForTradingPartnerRunEndpoint).toMatchObject({
       method: 'POST',
+      path: '/runs/:id/wait-for-trading-partner',
+    })
+  })
+})
+
+describe('endWaitingForTradingPartnerRunEndpoint', () => {
+  it('ends the mark at the path of the mark and answers with the Run detail', () => {
+    expect(endWaitingForTradingPartnerRunEndpoint).toMatchObject({
+      method: 'DELETE',
       path: '/runs/:id/wait-for-trading-partner',
     })
   })

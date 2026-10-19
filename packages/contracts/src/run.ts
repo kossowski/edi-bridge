@@ -342,6 +342,17 @@ export const waitForTradingPartnerRunEndpoint: Endpoint<
   response: runDetailSchema,
 }
 
+export const endWaitingForTradingPartnerRunEndpoint: Endpoint<
+  RunDetail,
+  undefined,
+  undefined,
+  '/runs/:id/wait-for-trading-partner'
+> = {
+  method: 'DELETE',
+  path: '/runs/:id/wait-for-trading-partner',
+  response: runDetailSchema,
+}
+
 export const reprocessRunBodySchema = z.object({
   mappingVersionId: z.uuid(),
 })
