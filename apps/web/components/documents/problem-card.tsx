@@ -27,7 +27,7 @@ import type { FixTarget } from '@edi-bridge/contracts'
 
 export type WhatToDoStep = { key: string; content: ReactNode }
 
-function useProblemText({ problem, direction, tradingPartner }: FailedRun) {
+function useProblemText({ problem, direction, failureStage, tradingPartner }: FailedRun) {
   const t = useTranslations('Document.problem.reason')
   const { fixTarget } = problem
   const field = fixTarget?.kind === 'mapping' ? fixTarget.fieldPath : null
@@ -96,7 +96,10 @@ function useProblemText({ problem, direction, tradingPartner }: FailedRun) {
     }
 
     case 'defect': {
-      return { title: t('defect.title'), description: t('defect.description') }
+      return {
+        title: t('defect.title'),
+        description: t('defect.description', { stage: failureStage }),
+      }
     }
   }
 }
@@ -184,6 +187,21 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
     }
 
     case 'retry': {
+      // The setup has to be complete before trying again can work.
+      if (problem.reason === 'incompleteSetup' && target) {
+        return [
+          {
+            key: 'fix',
+            content: (
+              <StepBody text={t('completeSetup')}>
+                <FixLink primary runId={run.id} target={target} />
+              </StepBody>
+            ),
+          },
+          { key: 'tryAgain', content: <TryAgainStep run={run} /> },
+        ]
+      }
+
       return [
         { key: 'tryAgain', content: <TryAgainStep run={run} /> },
         ...(target

@@ -162,7 +162,7 @@ export function TryAgainStep({ run }: { run: FailedRun }) {
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-2">
-      <p>{t('problem.steps.tryAgain')}</p>
+      <p>{t('problem.steps.tryAgain', { stage: run.failureStage })}</p>
       {canChange ? (
         <Button disabled={retry.isPending} onClick={() => retry.mutate()}>
           <HugeiconsIcon icon={RepeatIcon} strokeWidth={2} aria-hidden />
