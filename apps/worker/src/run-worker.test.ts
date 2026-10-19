@@ -1,19 +1,28 @@
+import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
-import { connect, type Connection } from '@edi-bridge/db'
+import {
+  startTestErp,
+  startTestSftpServer,
+  type TestErp,
+  type TestSftpServer,
+} from '@edi-bridge/channels/testing'
+import { connect, type Connection, documents, runs } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 import { bullmqRunQueue, receive, type RunQueueService } from '@edi-bridge/pipeline'
 import {
+  addOrdersFlow,
   deliverOverSftp,
+  golden,
   goldenInvoice,
   goldenInvoicMessage,
   inMemoryRunQueue,
   type InvoiceWorkspace,
   pipelineServices,
   readRun,
+  receiveOverSftp,
   seedInvoiceWorkspace,
   startTestRedis,
   type TestRedis,
@@ -28,6 +37,10 @@ let testRedis: TestRedis
 
 let sftp: TestSftpServer
 
+let erp: TestErp
+
+let ordersChannelId: string
+
 let connection: Connection
 
 let workspace: InvoiceWorkspace
@@ -37,10 +50,11 @@ let queue: ReturnType<typeof bullmqRunQueue>
 let worker: ReturnType<typeof startRunWorker>
 
 beforeAll(async () => {
-  ;[testDatabase, testRedis, sftp] = await Promise.all([
+  ;[testDatabase, testRedis, sftp, erp] = await Promise.all([
     startTestDatabase(),
     startTestRedis(),
     startTestSftpServer(),
+    startTestErp(),
   ])
   connection = connect(testDatabase.url)
   workspace = await seedInvoiceWorkspace(connection.db, 'Nordwind Foods')
@@ -51,6 +65,7 @@ beforeAll(async () => {
     password: sftp.password,
     remotePath: '/upload',
   })
+  ordersChannelId = await pollOrders()
   queue = bullmqRunQueue(testRedis.url)
   worker = startRunWorker({
     redisUrl: testRedis.url,
@@ -64,8 +79,39 @@ afterAll(async () => {
   await worker.close()
   await queue.close()
   await connection.close()
-  await Promise.all([testDatabase.stop(), testRedis.stop(), sftp.stop()])
+  await Promise.all([testDatabase.stop(), testRedis.stop(), sftp.stop(), erp.stop()])
 })
+
+const ordersInterchange = golden('orders-reference.edi', 'latin1')
+
+// An ORDERS Interchange waits on the SFTP server of another Workspace before the worker starts.
+async function pollOrders() {
+  const orders = await seedInvoiceWorkspace(connection.db, 'Order Foods')
+  const { flowId } = await addOrdersFlow(connection.db, orders, { url: erp.url })
+  const remotePath = '/upload/orders'
+  const path = `${sftp.home}${remotePath}/orders.edi`
+
+  await sftp.exec(
+    [
+      `install -d -m 777 ${sftp.home}${remotePath}`,
+      `echo ${Buffer.from(ordersInterchange, 'latin1').toString('base64')} | base64 -d > ${path}`,
+      `touch -d @${String(Math.floor(Date.now() / 1000) - 7200)} ${path}`,
+    ].join(' && '),
+  )
+
+  return receiveOverSftp(
+    connection.db,
+    orders,
+    {
+      host: sftp.host,
+      port: sftp.port,
+      username: sftp.username,
+      password: sftp.password,
+      remotePath,
+    },
+    { flowId },
+  )
+}
 
 const arrive = async (content: string, runQueue: { service: RunQueueService } = queue) => {
   const receipt = await Effect.runPromise(
@@ -160,5 +206,35 @@ describe('the worker', () => {
     const runId = await arrive(goldenInvoice, inMemoryRunQueue())
 
     await expect(processed(runId)).resolves.toMatchObject({ status: 'delivered' })
+  })
+
+  it('polls an inbound SFTP Channel and posts its ORDERS Message to the HTTP Channel of the ERP', async () => {
+    const delivered = await vi.waitFor(
+      async () => {
+        const [run] = await connection.db
+          .select({ id: runs.id })
+          .from(runs)
+          .innerJoin(documents, eq(documents.id, runs.documentId))
+          .where(eq(documents.channelId, ordersChannelId))
+
+        const read = await readRun(connection.db, run?.id ?? '')
+
+        expect(read?.status).toBe('delivered')
+
+        return read
+      },
+      { timeout: 3000, interval: 50 },
+    )
+
+    expect(delivered?.steps.at(-1)).toMatchObject({ stage: 'delivery', status: 'succeeded' })
+    expect(erp.received).toMatchObject([
+      { method: 'POST', headers: { 'content-type': 'application/json' } },
+    ])
+    await vi.waitFor(
+      async () => {
+        expect((await sftp.exec(`ls -A ${sftp.home}/upload/orders`)).output).toBe('')
+      },
+      { timeout: 3000, interval: 50 },
+    )
   })
 })
