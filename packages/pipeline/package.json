@@ -1,0 +1,35 @@
+{
+  "name": "@edi-bridge/pipeline",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "dependencies": {
+    "@edi-bridge/contracts": "workspace:*",
+    "@edi-bridge/db": "workspace:*",
+    "@edi-bridge/edifact": "workspace:*",
+    "@edi-bridge/mapping": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "effect": "^4.0.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@edi-bridge/oxlint-config": "workspace:*",
+    "@edi-bridge/typescript-config": "workspace:*",
+    "@edi-bridge/vitest-config": "workspace:*",
+    "@types/node": "^24",
+    "oxlint": "1.87.0",
+    "typescript": "~7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
