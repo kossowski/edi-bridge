@@ -19,6 +19,14 @@ export {
 export { type SftpChannel, sftpLogin } from './sftp-channel'
 
 export {
+  DownloadFailed,
+  listSftp,
+  readSftp,
+  removeSftp,
+  sftpChannelDownload,
+} from './sftp-download'
+
+export {
   DeliveryFailed,
   type OutboundDocument,
   sftpChannelDelivery,
