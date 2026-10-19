@@ -19,17 +19,20 @@ import type {
 } from './definitions/definition'
 import type { Delimiters, Interchange, Segment } from './model'
 
-export type ValidationErrorCode =
-  | 'invalid-character'
-  | 'missing-element'
-  | 'missing-segment'
-  | 'too-long-element'
-  | 'too-many-repetitions'
-  | 'unexpected-element'
-  | 'unexpected-segment'
-  | 'unknown-code'
-  | 'unsupported-message-type'
-  | 'wrong-format'
+export const validationErrorCodes = [
+  'invalid-character',
+  'missing-element',
+  'missing-segment',
+  'too-long-element',
+  'too-many-repetitions',
+  'unexpected-element',
+  'unexpected-segment',
+  'unknown-code',
+  'unsupported-message-type',
+  'wrong-format',
+] as const
+
+export type ValidationErrorCode = (typeof validationErrorCodes)[number]
 
 export class ValidationError extends Error {
   override readonly name = 'ValidationError'
