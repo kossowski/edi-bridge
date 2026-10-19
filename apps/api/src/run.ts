@@ -36,12 +36,16 @@ const summaryFields = {
   messageType: flows.messageType,
 }
 
-const selectRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
+// Drizzle types the joins only with a known field; the list and its counts both select the status.
+const fromRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
   db
-    .select({ ...summaryFields, ...fields })
+    .select({ status: runs.status, ...fields })
     .from(runs)
     .innerJoin(flows, eq(flows.id, runs.flowId))
     .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
+
+const selectRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
+  fromRuns(db, { ...summaryFields, ...fields })
 
 type SummaryRow = Awaited<ReturnType<typeof selectRuns<Record<never, never>>>>[number]
 
@@ -144,25 +148,16 @@ export const listRuns = (query: RunListQuery) =>
           .orderBy(desc(runs.receivedAt), desc(runs.id))
           .limit(query.pageSize)
           .offset((query.page - 1) * query.pageSize),
-        db
-          .select({ status: runs.status, count: count() })
-          .from(runs)
-          .innerJoin(flows, eq(flows.id, runs.flowId))
-          .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
-          .where(matching)
-          .groupBy(runs.status),
+        fromRuns(db, { count: count() }).where(matching).groupBy(runs.status),
       ]),
     )
 
     const countOf = (status: RunStatus) => counted.find((row) => row.status === status)?.count ?? 0
 
-    const statusCounts: Record<RunStatus, number> = {
-      received: countOf('received'),
-      processing: countOf('processing'),
-      delivered: countOf('delivered'),
-      failed: countOf('failed'),
-      duplicate: countOf('duplicate'),
-    }
+    // SAFETY: the entries cover every status of runStatuses.
+    const statusCounts = Object.fromEntries(
+      runStatuses.map((status) => [status, countOf(status)]),
+    ) as Record<RunStatus, number>
 
     const total = runStatuses
       .filter((status) => !query.status?.length || query.status.includes(status))
