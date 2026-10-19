@@ -1691,14 +1691,16 @@ describe('the processing of an inbound Run', () => {
       const [resend] = await receiveInterchange(into, validOrders('128576'))
 
       expect(resend).toMatchObject({ status: 'delivered', replacesRunId: null })
-      await expect(readRun(connection.db, other?.id ?? '')).resolves.toMatchObject({
-        businessReference: '900001',
-        waitingForTradingPartnerSince: expect.any(Date),
-      })
-      await expect(readRun(connection.db, unreadable?.id ?? '')).resolves.toMatchObject({
-        businessReference: null,
-        waitingForTradingPartnerSince: expect.any(Date),
-      })
+
+      const [stillOther, stillUnreadable] = await Promise.all([
+        readRun(connection.db, other?.id ?? ''),
+        readRun(connection.db, unreadable?.id ?? ''),
+      ])
+
+      expect(stillOther?.businessReference).toBe('900001')
+      expect(stillOther?.waitingForTradingPartnerSince).not.toBeNull()
+      expect(stillUnreadable?.businessReference).toBeNull()
+      expect(stillUnreadable?.waitingForTradingPartnerSince).not.toBeNull()
     })
 
     it('leaves a waiting Run of another Flow', async () => {
