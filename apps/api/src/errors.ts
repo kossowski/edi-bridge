@@ -61,3 +61,9 @@ export class AiDraftFailed extends Data.TaggedError('AiDraftFailed')<{
   readonly reason: Exclude<AiDraftFailureReason, 'budgetExhausted'>
   readonly tokens: number
 }> {}
+
+export class Unauthorized extends Data.TaggedError('Unauthorized') {
+  override get message() {
+    return 'Unauthorized'
+  }
+}

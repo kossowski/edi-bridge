@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { notRoutedMessagesSchema } from './message-type'
 import { runSummarySchema } from './run'
 
 import type { Endpoint } from './endpoint'
@@ -31,7 +32,7 @@ export const manualSubmissionSchema = z.object({
     .refine((runs) => runs.every((run) => run.manualSubmission), {
       message: 'Every Run of a Manual Submission is marked as manual',
     }),
-  notRouted: z.array(z.object({ messageType: z.string().min(1) })),
+  notRouted: notRoutedMessagesSchema,
 })
 
 export type ManualSubmission = z.infer<typeof manualSubmissionSchema>

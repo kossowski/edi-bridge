@@ -17,6 +17,7 @@ import {
   channelEndpoint,
   channelsEndpoint,
   createChannelEndpoint,
+  receiveWebhookEndpoint,
   regenerateWebhookTokenEndpoint,
   testChannelEndpoint,
   updateChannelEndpoint,
@@ -81,6 +82,7 @@ import {
   updateFlowEndpoint,
   updateTradingPartnerEndpoint,
   waitForTradingPartnerRunEndpoint,
+  webhookTokenHeader,
   workspaceInvitesEndpoint,
   workspaceMembersEndpoint,
   workspaceSettingsEndpoint,
@@ -167,6 +169,7 @@ import {
   loadTradingPartnerActivity,
   updateTradingPartner,
 } from './trading-partner.js'
+import { bearerTokenSchema, receiveOnWebhook } from './webhook.js'
 import {
   listCurrentMembers,
   listWorkspaceMembers,
@@ -188,6 +191,7 @@ import type {
   Forbidden,
   InviteUnusable,
   NotFound,
+  Unauthorized,
   Unprocessable,
 } from './errors.js'
 
@@ -214,6 +218,7 @@ type Failure =
   | InviteUnusable
   | NotFound
   | ReceiptRejected
+  | Unauthorized
   | Unprocessable
   | ValidationError
 
@@ -227,6 +232,7 @@ const statusOfReceiptRejection: Record<ReceiptRejection, number> = {
 
 const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> = {
   ValidationError: 400,
+  Unauthorized: 401,
   Forbidden: 403,
   NotFound: 404,
   Conflict: 409,
@@ -267,6 +273,9 @@ const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
 
 const manualSubmissionBodyLimit = 6 * maxDocumentLength + 1024
+
+// UTF-8 takes at most 3 bytes per UTF-16 unit; Fastify buffers the body before the token check.
+const webhookBodyLimit = 3 * maxDocumentLength
 
 const eventStreamHeaders = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }
 
@@ -567,6 +576,31 @@ function registerRoutes(
         201,
       ),
   )
+
+  // Senders post the Document itself, so the route takes any content type as raw bytes.
+  void app.register((webhooks, _options, done) => {
+    webhooks.removeAllContentTypeParsers()
+    webhooks.addContentTypeParser('*', { parseAs: 'buffer' }, (_request, body, parsed) => {
+      parsed(null, body)
+    })
+
+    webhooks.post<{ Params: { id: string }; Body: Buffer }>(
+      receiveWebhookEndpoint.path,
+      { bodyLimit: webhookBodyLimit },
+      (request, reply) =>
+        run(
+          reply,
+          receiveOnWebhook(
+            request.params.id,
+            bearerTokenSchema.safeParse(request.headers[webhookTokenHeader.toLowerCase()]).data,
+            request.body,
+          ),
+          201,
+        ),
+    )
+
+    done()
+  })
 
   app.get(runsEndpoint.path, (request, reply) =>
     respond(request, reply, Effect.flatMap(parse(runsEndpoint.query, request.query), listRuns)),
