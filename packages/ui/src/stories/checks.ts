@@ -61,21 +61,23 @@ function contrastBehind(element: HTMLElement, color: string) {
 export async function expectVisibleFocusRing(element: HTMLElement, userEvent: UserEvent) {
   await userEvent.tab()
   await expect(element).toHaveFocus()
-  await waitFor(() => {
+  await waitFor(async () => {
     const style = getComputedStyle(element)
 
-    expect(style.outlineStyle).toBe('solid')
-    expect(Number.parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2)
-    expect(contrastBehind(element, style.outlineColor)).toBeGreaterThanOrEqual(3)
+    await expect(style.outlineStyle).toBe('solid')
+    await expect(Number.parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2)
+    await expect(contrastBehind(element, style.outlineColor)).toBeGreaterThanOrEqual(3)
   })
 }
 
 // The base classes transition every property, so a colour read right after a theme switch can be mid-way.
 export async function expectVisibleBorder(element: HTMLElement) {
-  await waitFor(() => {
+  await waitFor(async () => {
     const style = getComputedStyle(element)
 
-    expect(Number.parseFloat(style.borderTopWidth)).toBeGreaterThanOrEqual(1)
-    expect(contrastBehind(element, style.borderTopColor)).toBeGreaterThanOrEqual(minBorderContrast)
+    await expect(Number.parseFloat(style.borderTopWidth)).toBeGreaterThanOrEqual(1)
+    await expect(contrastBehind(element, style.borderTopColor)).toBeGreaterThanOrEqual(
+      minBorderContrast,
+    )
   })
 }
