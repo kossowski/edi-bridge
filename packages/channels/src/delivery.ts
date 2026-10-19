@@ -9,4 +9,5 @@ export class DeliveryFailed extends Data.TaggedError('DeliveryFailed')<{
 export interface OutboundDocument {
   name: string
   content: Buffer
+  mediaType?: string
 }

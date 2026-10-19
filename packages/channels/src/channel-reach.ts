@@ -201,7 +201,10 @@ const httpStatusReason = (status: number): ChannelTestFailureReason | undefined 
   return status >= 500 ? 'unexpectedResponse' : undefined
 }
 
-const fetchFailureSchema = z.object({ cause: z.object({ code: z.string() }) })
+export const fetchFailureReasonSchema = z
+  .object({ cause: z.object({ code: z.string() }) })
+  .transform(({ cause }) => networkReason(cause.code) ?? 'unexpectedResponse')
+  .catch('unexpectedResponse')
 
 // HEAD sends no Document; an endpoint that only accepts POST still answers it.
 const reachHttp = ({ url, authorization }: HttpDestination) =>
@@ -213,10 +216,7 @@ const reachHttp = ({ url, authorization }: HttpDestination) =>
         headers: authorization === null ? {} : { authorization },
         signal,
       }),
-    catch: (error) =>
-      unreachable(
-        networkReason(fetchFailureSchema.safeParse(error).data?.cause.code) ?? 'unexpectedResponse',
-      ),
+    catch: (error) => unreachable(fetchFailureReasonSchema.parse(error)),
   }).pipe(
     Effect.flatMap((response) => {
       const reason = httpStatusReason(response.status)

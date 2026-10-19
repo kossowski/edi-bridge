@@ -30,3 +30,5 @@ export {
 export { DeliveryFailed, type OutboundDocument } from './delivery'
 
 export { sftpChannelDelivery, uploadSftp } from './sftp-upload'
+
+export { postHttp } from './http-post'
