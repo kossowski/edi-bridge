@@ -11,6 +11,8 @@ import {
   InputGroupTextarea,
 } from '@edi-bridge/ui/components/input-group'
 
+import { darkMode, expectVisibleFocusRing } from '../stories/checks'
+
 type Args = { onClear: () => void }
 
 const meta = {
@@ -60,3 +62,26 @@ export const AddonFocusesTextarea: Story = {
     await expect(canvas.getByRole('textbox', { name: 'Note' })).toHaveFocus()
   },
 }
+
+export const Focused: Story = {
+  render: () => (
+    <InputGroup>
+      <InputGroupAddon>
+        <InputGroupText>GLN</InputGroupText>
+      </InputGroupAddon>
+      <InputGroupInput aria-label="Trading partner" />
+    </InputGroup>
+  ),
+  async play({ canvas, canvasElement, userEvent }) {
+    const group = canvasElement.querySelector<HTMLElement>('[data-slot=input-group]')
+
+    if (!group) throw new Error('The input group did not render.')
+    await expectVisibleFocusRing(
+      canvas.getByRole('textbox', { name: 'Trading partner' }),
+      userEvent,
+      group,
+    )
+  },
+}
+
+export const FocusedDark: Story = { ...Focused, beforeEach: darkMode }

@@ -58,15 +58,19 @@ function contrastBehind(element: HTMLElement, color: string) {
 }
 
 // WCAG 2.2 asks a focus indicator for 3:1 against the colours next to it.
-export async function expectVisibleFocusRing(element: HTMLElement, userEvent: UserEvent) {
+export async function expectVisibleFocusRing(
+  element: HTMLElement,
+  userEvent: UserEvent,
+  ring: HTMLElement = element,
+) {
   await userEvent.tab()
   await expect(element).toHaveFocus()
   await waitFor(async () => {
-    const style = getComputedStyle(element)
+    const style = getComputedStyle(ring)
 
     await expect(style.outlineStyle).toBe('solid')
     await expect(Number.parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2)
-    await expect(contrastBehind(element, style.outlineColor)).toBeGreaterThanOrEqual(3)
+    await expect(contrastBehind(ring, style.outlineColor)).toBeGreaterThanOrEqual(3)
   })
 }
 
