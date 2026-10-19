@@ -18,6 +18,7 @@ import {
   type Connection,
   documents,
   flows,
+  postgresDocumentStorage,
   lookupTableEntries,
   mappings,
   mappingVersions,
@@ -40,6 +41,7 @@ import {
   sweepRunsEvery,
   sweepStuckRuns,
 } from './index'
+import { Documents } from './services'
 import {
   addOrdersFlow,
   deliverOverSftp,
@@ -845,6 +847,98 @@ describe('the sweep of stuck Runs', () => {
 
     expect(handOvers).not.toHaveBeenCalled()
     await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+  })
+
+  it('keeps a Run failed when its stalled worker resumes the delivery after the sweep', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+
+    const stalled = Effect.runPromise(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => Effect.promise(() => resumed)),
+      ),
+    )
+
+    await vi.waitFor(
+      async () => {
+        expect((await readRun(connection.db, runId))?.steps[3]).toMatchObject({
+          stage: 'delivery',
+          status: 'running',
+        })
+      },
+      { timeout: 2000, interval: 20 },
+    )
+
+    await leaveStuck(runId)
+    await sweepStuck()
+    resume()
+    await stalled
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      problem: { reason: 'defect', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+    // The Channel took the Document, so its Retry must not hand it over again.
+    expect(run?.handedOverAt).not.toBeNull()
+  })
+
+  it('stops a stalled worker once the sweep released its Run to another worker', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+    const storage = postgresDocumentStorage(connection.db)
+
+    // The worker stalls after its claim, before its first step starts.
+    const stalled = Effect.runPromise(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        Effect.provideService(Documents, {
+          ...storage,
+          read: async (...args) => {
+            await resumed
+
+            return storage.read(...args)
+          },
+        }),
+        pipelineServices(connection.db, queue, handOvers),
+      ),
+    )
+
+    await vi.waitFor(
+      async () => {
+        expect(await readRun(connection.db, runId)).toMatchObject({ status: 'processing' })
+      },
+      { timeout: 2000, interval: 20 },
+    )
+
+    await leaveStuck(runId)
+    await processQueued(await sweepStuck(), handOvers)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+
+    resume()
+    await stalled
+
+    expect(handOvers).toHaveBeenCalledOnce()
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'delivered',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'succeeded' },
+      ],
+    })
   })
 })
 

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lt, notExists } from 'drizzle-orm'
+import { and, asc, desc, eq, exists, gt, inArray, lt, notExists } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { Data, DateTime, Effect, Match, Predicate, Result } from 'effect'
 import { z } from 'zod'
@@ -69,6 +69,11 @@ import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
 
 type Transaction = Parameters<Parameters<Database['Service']['transaction']>[0]>[0]
+
+// The sweep took the Run from a stalled worker, so another worker or a Retry owns it now.
+export class RunNotOwned extends Data.TaggedError('RunNotOwned')<{
+  readonly runId: string
+}> {}
 
 export class MessageInvalid extends Data.TaggedError('MessageInvalid')<{
   readonly cause: ValidationError
@@ -538,11 +543,18 @@ type Destination = Effect.Success<ReturnType<typeof loadDestination>>
 type ClaimedRun = typeof runs.$inferSelect
 
 // A defect after the hand-over leaves the Run failed at delivery, and its Retry must not deliver again.
-const handOver = (run: ClaimedRun, channel: Destination['channel'], document: OutboundDocument) =>
+const handOver = (
+  run: ClaimedRun,
+  lease: StepLease,
+  channel: Destination['channel'],
+  document: OutboundDocument,
+) =>
   Effect.gen(function* () {
     if (run.handedOverAt !== null) {
       return
     }
+
+    yield* ensureOwned(lease)
 
     const delivery = yield* Delivery
 
@@ -553,6 +565,7 @@ const handOver = (run: ClaimedRun, channel: Destination['channel'], document: Ou
     const db = yield* Database
     const handedOverAt = yield* DateTime.nowAsDate
 
+    // Recorded even when the sweep failed the Run meanwhile, so its Retry does not hand it over again.
     yield* Effect.promise(() => db.update(runs).set({ handedOverAt }).where(eq(runs.id, run.id)))
   })
 
@@ -603,28 +616,30 @@ const buildInterchange = (
     return { reference, content }
   })
 
-const deliverInterchange = (
-  queued: QueuedRun,
-  run: ClaimedRun,
-  messageType: MessageType,
-  destination: Destination,
-  isRetry: boolean,
-) =>
-  Effect.gen(function* () {
-    // Only UNOA to UNOC encode, all as ISO 8859-1, so a stored Interchange was written in it.
-    const { reference, content } =
-      run.output !== null && run.controlReference !== null
-        ? { reference: run.controlReference, content: Buffer.from(run.output, 'latin1') }
-        : yield* buildInterchange(queued, run, destination)
+const deliverInterchange =
+  (
+    queued: QueuedRun,
+    run: ClaimedRun,
+    messageType: MessageType,
+    destination: Destination,
+    isRetry: boolean,
+  ) =>
+  (lease: StepLease) =>
+    Effect.gen(function* () {
+      // Only UNOA to UNOC encode, all as ISO 8859-1, so a stored Interchange was written in it.
+      const { reference, content } =
+        run.output !== null && run.controlReference !== null
+          ? { reference: run.controlReference, content: Buffer.from(run.output, 'latin1') }
+          : yield* buildInterchange(queued, run, destination)
 
-    // The name carries the control reference, so a Retry uploads under the name of its first attempt.
-    yield* handOver(run, destination.channel, {
-      name: `${messageType}-${String(reference)}.edi`,
-      content,
-      mediaType: 'application/edifact',
-      isRetry,
+      // The name carries the control reference, so a Retry uploads under the name of its first attempt.
+      yield* handOver(run, lease, destination.channel, {
+        name: `${messageType}-${String(reference)}.edi`,
+        content,
+        mediaType: 'application/edifact',
+        isRetry,
+      })
     })
-  })
 
 const documentFormats = {
   json: { extension: 'json', mediaType: 'application/json' },
@@ -634,28 +649,25 @@ const documentFormats = {
 const encodingOf = (structure: DocumentStructure) =>
   structure.format === 'csv' ? structure.csv.encoding : 'utf-8'
 
-const deliverDocument = (
-  run: ClaimedRun,
-  pinned: Pinned,
-  destination: Destination,
-  isRetry: boolean,
-) =>
-  Effect.gen(function* () {
-    const { structure } = pinned
+const deliverDocument =
+  (run: ClaimedRun, pinned: Pinned, destination: Destination, isRetry: boolean) =>
+  (lease: StepLease) =>
+    Effect.gen(function* () {
+      const { structure } = pinned
 
-    if (run.output === null) {
-      return yield* Effect.die(new Error(`Run ${run.id} has no output to deliver`))
-    }
+      if (run.output === null) {
+        return yield* Effect.die(new Error(`Run ${run.id} has no output to deliver`))
+      }
 
-    const { extension, mediaType } = documentFormats[structure.format]
+      const { extension, mediaType } = documentFormats[structure.format]
 
-    yield* handOver(run, destination.channel, {
-      name: `${pinned.messageType}-${run.id}.${extension}`,
-      content: Buffer.from(encodeText(run.output, encodingOf(structure))),
-      mediaType,
-      isRetry,
+      yield* handOver(run, lease, destination.channel, {
+        name: `${pinned.messageType}-${run.id}.${extension}`,
+        content: Buffer.from(encodeText(run.output, encodingOf(structure))),
+        mediaType,
+        isRetry,
+      })
     })
-  })
 
 const orderNumberOf = ({ segments }: Message) =>
   segments.find(({ tag, elements }) => tag === 'RFF' && elements[0]?.[0] === 'ON')
@@ -756,45 +768,96 @@ const loadLookupTables = (workspaceId: string, { transforms }: MappingGraph) =>
     return loaded satisfies LoadedLookupTables
   })
 
-const updateStep = (
-  runId: string,
-  stage: RunStepStage,
-  values: Partial<typeof runSteps.$inferInsert>,
-) =>
-  Effect.flatMap(Database, (db) =>
-    Effect.promise(() =>
+// A worker owns a step while it runs with the start this worker wrote.
+type StepLease = { runId: string; stage: RunStepStage; startedAt: Date }
+
+const leased = ({ runId, stage, startedAt }: StepLease) =>
+  and(
+    eq(runSteps.runId, runId),
+    eq(runSteps.stage, stage),
+    eq(runSteps.status, 'running'),
+    eq(runSteps.startedAt, startedAt),
+  )
+
+// A worker that stalled past the stuck bound lost its Run to the sweep, so it stops.
+const ensureOwned = (lease: StepLease) =>
+  Effect.gen(function* () {
+    const db = yield* Database
+
+    const [owned] = yield* Effect.promise(() =>
+      db.select({ runId: runSteps.runId }).from(runSteps).where(leased(lease)),
+    )
+
+    if (owned === undefined) {
+      return yield* new RunNotOwned({ runId: lease.runId })
+    }
+  })
+
+// A step starts only from pending on a processing Run, so two workers never both start it.
+const startStep = (runId: string, stage: RunStepStage) =>
+  Effect.gen(function* () {
+    const db = yield* Database
+    const startedAt = yield* DateTime.nowAsDate
+
+    const [started] = yield* Effect.promise(() =>
       db
         .update(runSteps)
-        .set(values)
-        .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stage))),
-    ),
-  )
+        .set({ status: 'running', startedAt })
+        .where(
+          and(
+            eq(runSteps.runId, runId),
+            eq(runSteps.stage, stage),
+            eq(runSteps.status, 'pending'),
+            exists(
+              db
+                .select()
+                .from(runs)
+                .where(and(eq(runs.id, runId), eq(runs.status, 'processing'))),
+            ),
+          ),
+        )
+        .returning({ runId: runSteps.runId }),
+    )
+
+    if (started === undefined) {
+      return yield* new RunNotOwned({ runId })
+    }
+
+    return { runId, stage, startedAt } satisfies StepLease
+  })
 
 const step = <A, E, R>(
   runId: string,
   stage: RunStepStage,
-  effect: Effect.Effect<A, E, R>,
+  effect: Effect.Effect<A, E, R> | ((lease: StepLease) => Effect.Effect<A, E, R>),
   succeeded: (tx: Transaction) => Promise<void> = () => Promise.resolve(),
 ) =>
   Effect.gen(function* () {
-    yield* updateStep(runId, stage, { status: 'running', startedAt: yield* DateTime.nowAsDate })
+    const lease = yield* startStep(runId, stage)
 
-    const result = yield* Effect.result(effect)
+    const result = yield* Effect.result(Effect.isEffect(effect) ? effect : effect(lease))
     const db = yield* Database
     const finishedAt = yield* DateTime.nowAsDate
 
-    yield* Effect.promise(() =>
+    const finished = yield* Effect.promise(() =>
       db.transaction(async (tx) => {
-        await tx
+        const [own] = await tx
           .update(runSteps)
           .set({ status: Result.isSuccess(result) ? 'succeeded' : 'failed', finishedAt })
-          .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stage)))
+          .where(leased(lease))
+          .returning({ runId: runSteps.runId })
 
-        if (Result.isSuccess(result)) {
+        if (own !== undefined && Result.isSuccess(result)) {
           await succeeded(tx)
         }
+
+        return own !== undefined
       }),
     )
+
+    if (!finished) {
+      return yield* new RunNotOwned({ runId })
+    }
 
     return result
   })
@@ -1003,15 +1066,23 @@ const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
 const deliveryStep = (
   run: ClaimedRun,
   destination: Destination,
-  delivering: Effect.Effect<void, DeliveryError, Database | Delivery>,
+  delivering: (
+    lease: StepLease,
+  ) => Effect.Effect<void, DeliveryError | RunNotOwned, Database | Delivery>,
 ) =>
   Effect.gen(function* () {
     const delivered = yield* step(
       run.id,
       'delivery',
-      delivering.pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect })))),
+      (lease) =>
+        delivering(lease).pipe(
+          Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))),
+        ),
       async (tx) => {
-        await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
+        await tx
+          .update(runs)
+          .set({ status: 'delivered' })
+          .where(and(eq(runs.id, run.id), eq(runs.status, 'processing')))
       },
     )
 
@@ -1019,9 +1090,13 @@ const deliveryStep = (
       return true
     }
 
-    yield* fail(run.id, deliveryFailure(delivered.failure, destination))
-
     const { failure } = delivered
+
+    if (Predicate.isTagged(failure, 'RunNotOwned')) {
+      return yield* failure
+    }
+
+    yield* fail(run.id, deliveryFailure(failure, destination))
 
     if (
       Predicate.isTagged(failure, 'ChannelDefect') ||
@@ -1284,5 +1359,8 @@ export const processRun = (queued: QueuedRun) =>
     // The defect still dies, so the worker reports it.
     yield* processClaimed(queued, claimed).pipe(
       Effect.tapDefect(() => failOnDefect(claimed.run.id)),
+      Effect.catchTag('RunNotOwned', (error) =>
+        Effect.logWarning('A stalled worker stopped processing a Run it lost', error),
+      ),
     )
   })
