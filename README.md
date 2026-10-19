@@ -132,11 +132,21 @@ docker compose --profile full-stack up -d --build --wait
 
 `--wait` returns once every health check passes. The apps listen on the same ports as in local development (`WEB_PORT`, `API_PORT` and `WORKER_HEALTH_PORT` change the host ports), so stop `pnpm dev` first. Stop the stack with `docker compose --profile full-stack down`.
 
+No reverse proxy runs in the profile, so the browser calls the API directly on its host port. Compose builds the web image with `NEXT_PUBLIC_API_URL` set to `http://localhost:<API_PORT>`, and the API trusts `http://localhost:<WEB_PORT>` as the web origin. Next.js inlines `NEXT_PUBLIC_API_URL` at build time, so rebuild the web image (`--build`) after you change `API_PORT`.
+
 The stack runs the production images, so it has no development seed and no user. Create the Operator once in the running api container, and enter the password at the prompt:
 
 ```sh
 docker compose exec api node dist/create-operator.js --email <operator-email> --name "<operator-name>" --workspace "<workspace-name>"
 ```
+
+To create the Operator without a prompt, for example in a script, pass the password in `OPERATOR_PASSWORD` for this one command:
+
+```sh
+docker compose --profile full-stack exec -T -e OPERATOR_PASSWORD='<password>' api node dist/create-operator.js --email <operator-email> --name "<operator-name>" --workspace "<workspace-name>"
+```
+
+Then sign in at `http://localhost:3000` (or your `WEB_PORT`) with the email and password.
 
 See [Create the Operator](docs/deployment/deployment-operations.md#create-the-operator) for the options.
 

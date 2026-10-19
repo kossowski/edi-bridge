@@ -55,6 +55,8 @@ services:
       REDIS_URL: redis://redis:6379
       API_PORT: 3001
       BETTER_AUTH_URL: http://localhost:${API_PORT:-3001}
+      API_PUBLIC_URL: http://localhost:${API_PORT:-3001}
+      WEB_ORIGIN: http://localhost:${WEB_PORT:-3000}
       BETTER_AUTH_SECRET: edi-bridge-local-full-stack-secret-not-for-production
       CHANNEL_SECRET_KEY: ZWRpLWJyaWRnZS1sb2NhbC1mdWxsLXN0YWNrLWtleWU=
     ports:
@@ -90,6 +92,9 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      # The browser calls the API on its own host port; there is no proxy serving /api.
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-3001}
     ports:
       - '127.0.0.1:${WEB_PORT:-3000}:3000'
 
