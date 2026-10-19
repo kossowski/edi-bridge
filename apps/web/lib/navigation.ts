@@ -261,12 +261,18 @@ export function fixTargetHref(target: FixTarget, runId?: string) {
       return `${lookupTableHref(target.lookupTableId)}?${search}`
     }
 
-    case 'channel': {
+    case 'channel':
+    case 'channelCredential': {
       return `${navigationItems.channels.href}/${target.channelId}`
     }
 
-    case 'tradingPartner': {
+    case 'tradingPartner':
+    case 'tradingPartnerGln': {
       return tradingPartnerHref(target.tradingPartnerId)
+    }
+
+    case 'workspaceGln': {
+      return navigationItems.settings.href
     }
   }
 }

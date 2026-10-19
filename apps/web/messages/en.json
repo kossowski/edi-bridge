@@ -777,6 +777,10 @@
         "unreachable": {
           "title": "{direction, select, inbound {Your ERP did not answer} other {The server of {tradingPartner} did not answer}}",
           "description": "{direction, select, inbound {The document was translated, but your ERP did not accept it when EDI Bridge delivered it.} other {The document is ready, but the upload to {tradingPartner} failed.}} This is usually temporary."
+        },
+        "incompleteSetup": {
+          "title": "The setup for {tradingPartner} is not complete",
+          "description": "{piece, select, workspaceGln {The document is ready, but your company's GLN is missing, so EDI Bridge cannot address the document. Complete the setup, then try again.} tradingPartnerGln {The document is ready, but the GLN of {tradingPartner} is missing, so EDI Bridge cannot address the document. Complete the setup, then try again.} channelCredential {The document is ready, but EDI Bridge cannot use the login details of the connection to {tradingPartner}. Complete the setup, then try again.} tradingPartner {The document is ready, but EDI Bridge cannot write it in the character set chosen for {tradingPartner}. Choose a supported character set (UNOA, UNOB or UNOC) for {tradingPartner}, then try again.} other {The document is ready, but a part of the setup for {tradingPartner} is missing. Complete the setup, then try again.}}"
         }
       },
       "whoFixes": {
@@ -798,7 +802,10 @@
         "mapping": "Open “{name}” at this field",
         "lookupTable": "Add {code} to “{name}”",
         "channel": "Check the connection “{name}”",
-        "tradingPartner": "Open {name}"
+        "tradingPartner": "Open {name}",
+        "workspaceGln": "Record your company's GLN",
+        "tradingPartnerGln": "Add the GLN of {name}",
+        "channelCredential": "Check the login details of “{name}”"
       }
     },
     "actions": {

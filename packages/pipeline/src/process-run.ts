@@ -62,6 +62,16 @@ export class GlnMissing extends Data.TaggedError('GlnMissing')<{
   readonly party: 'workspace' | 'tradingPartner'
 }> {}
 
+export class CharacterSetUnsupported extends Data.TaggedError('CharacterSetUnsupported')<{
+  readonly characterSet: CharacterSet
+}> {}
+
+// The Delivery adapter died: a broken Channel row or a credential that does not open.
+export class ChannelDefect extends Data.TaggedError('ChannelDefect')<{
+  readonly defect: unknown
+}> {}
+
+// Any other defect in the delivery step, such as a database error.
 export class DeliveryDefect extends Data.TaggedError('DeliveryDefect')<{
   readonly defect: unknown
 }> {}
@@ -154,33 +164,82 @@ const deliveryReasons: Record<ChannelTestFailureReason, string> = {
 
 const glnOwners = { workspace: 'The Workspace', tradingPartner: 'The Trading Partner' } as const
 
-const deliveryFailure = Match.type<DeliveryFailed | GlnMissing | DeliveryDefect>().pipe(
-  Match.tagsExhaustive({
-    DeliveryFailed: ({ reason }): Failure => ({
-      stage: 'delivery',
-      error: { code: reason, message: deliveryReasons[reason], position: null },
-      problem: { reason: 'unreachable', fixTarget: null },
+type DeliveryError =
+  | DeliveryFailed
+  | GlnMissing
+  | CharacterSetUnsupported
+  | ChannelDefect
+  | DeliveryDefect
+
+const deliveryFailure = (
+  failure: DeliveryError,
+  { workspace, tradingPartner, channel }: Destination,
+): Failure =>
+  Match.value(failure).pipe(
+    Match.tagsExhaustive({
+      DeliveryFailed: ({ reason }): Failure => ({
+        stage: 'delivery',
+        error: { code: reason, message: deliveryReasons[reason], position: null },
+        problem: { reason: 'unreachable', fixTarget: null },
+      }),
+      GlnMissing: ({ party }): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'glnMissing',
+          message: `${glnOwners[party]} has no GLN for the Interchange`,
+          position: null,
+        },
+        problem: {
+          reason: 'incompleteSetup',
+          fixTarget:
+            party === 'workspace'
+              ? { kind: 'workspaceGln', name: workspace.name }
+              : {
+                  kind: 'tradingPartnerGln',
+                  tradingPartnerId: tradingPartner.id,
+                  name: tradingPartner.name,
+                },
+        },
+      }),
+      CharacterSetUnsupported: ({ characterSet }): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'characterSetUnsupported',
+          message: `Delivery in character set ${characterSet} is not supported`,
+          position: null,
+        },
+        problem: {
+          reason: 'incompleteSetup',
+          fixTarget: {
+            kind: 'tradingPartner',
+            tradingPartnerId: tradingPartner.id,
+            name: tradingPartner.name,
+          },
+        },
+      }),
+      ChannelDefect: (): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'channelDefect',
+          message: 'The Channel could not be used for the delivery',
+          position: null,
+        },
+        problem: {
+          reason: 'incompleteSetup',
+          fixTarget: { kind: 'channelCredential', channelId: channel.id, name: channel.name },
+        },
+      }),
+      DeliveryDefect: (): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'deliveryDefect',
+          message: 'The delivery stopped on an unexpected error',
+          position: null,
+        },
+        problem: { reason: 'unreachable', fixTarget: null },
+      }),
     }),
-    GlnMissing: ({ party }): Failure => ({
-      stage: 'delivery',
-      error: {
-        code: 'glnMissing',
-        message: `${glnOwners[party]} has no GLN for the Interchange`,
-        position: null,
-      },
-      problem: { reason: 'missingField', fixTarget: null },
-    }),
-    DeliveryDefect: (): Failure => ({
-      stage: 'delivery',
-      error: {
-        code: 'deliveryDefect',
-        message: 'The delivery stopped on an unexpected error',
-        position: null,
-      },
-      problem: { reason: 'unreachable', fixTarget: null },
-    }),
-  }),
-)
+  )
 
 const envelopeTrailer: Segment = { tag: 'UNZ', elements: [] }
 
@@ -242,7 +301,7 @@ const enveloped = (
 const encoded = (interchange: string, characterSet: CharacterSet) =>
   characterSet === 'UNOA' || characterSet === 'UNOB' || characterSet === 'UNOC'
     ? Effect.succeed(Buffer.from(interchange, 'latin1'))
-    : Effect.die(new Error(`Delivery in character set ${characterSet} is not supported`))
+    : Effect.fail(new CharacterSetUnsupported({ characterSet }))
 
 const validated = (message: Message, characterSet: CharacterSet) =>
   Effect.try({
@@ -263,9 +322,13 @@ const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
     const [found] = yield* Effect.promise(() =>
       db
         .select({
-          workspaceGln: workspaces.gln,
-          tradingPartnerGln: tradingPartners.gln,
-          characterSet: tradingPartners.characterSet,
+          workspace: { name: workspaces.name, gln: workspaces.gln },
+          tradingPartner: {
+            id: tradingPartners.id,
+            name: tradingPartners.name,
+            gln: tradingPartners.gln,
+            characterSet: tradingPartners.characterSet,
+          },
           channel: channels,
         })
         .from(runs)
@@ -289,16 +352,17 @@ const deliver = (
   queued: QueuedRun,
   message: Message,
   messageType: MessageType,
-  { workspaceGln, tradingPartnerGln, characterSet, channel }: Destination,
+  { workspace, tradingPartner, channel }: Destination,
 ) =>
   Effect.gen(function* () {
     const db = yield* Database
+    const { characterSet } = tradingPartner
 
-    if (workspaceGln === null) {
+    if (workspace.gln === null) {
       return yield* new GlnMissing({ party: 'workspace' })
     }
 
-    if (tradingPartnerGln === null) {
+    if (tradingPartner.gln === null) {
       return yield* new GlnMissing({ party: 'tradingPartner' })
     }
 
@@ -306,8 +370,8 @@ const deliver = (
 
     const interchange = enveloped(message, {
       characterSet,
-      sender: workspaceGln,
-      receiver: tradingPartnerGln,
+      sender: workspace.gln,
+      receiver: tradingPartner.gln,
       sentAt: yield* DateTime.now,
       reference,
     })
@@ -320,7 +384,9 @@ const deliver = (
     const delivery = yield* Delivery
 
     // The file name carries the control reference, as an upload never replaces an existing file.
-    yield* delivery(channel, { name: `${messageType}-${String(reference)}.edi`, content })
+    yield* delivery(channel, { name: `${messageType}-${String(reference)}.edi`, content }).pipe(
+      Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))),
+    )
   }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
 
 const orderNumberOf = ({ segments }: Message) =>
@@ -554,7 +620,12 @@ export const processRun = (queued: QueuedRun) =>
 
     const message = mapped.success
     const destination = yield* loadDestination(queued)
-    const checked = yield* step(run.id, 'validation', validated(message, destination.characterSet))
+
+    const checked = yield* step(
+      run.id,
+      'validation',
+      validated(message, destination.tradingPartner.characterSet),
+    )
 
     if (Result.isFailure(checked)) {
       return yield* fail(run.id, validationFailure(message, checked.failure))
@@ -591,10 +662,15 @@ export const processRun = (queued: QueuedRun) =>
     )
 
     if (Result.isFailure(delivered)) {
-      yield* fail(run.id, deliveryFailure(delivered.failure))
+      yield* fail(run.id, deliveryFailure(delivered.failure, destination))
 
-      if (Predicate.isTagged(delivered.failure, 'DeliveryDefect')) {
-        return yield* Effect.die(delivered.failure.defect)
+      const { failure } = delivered
+
+      if (
+        Predicate.isTagged(failure, 'ChannelDefect') ||
+        Predicate.isTagged(failure, 'DeliveryDefect')
+      ) {
+        return yield* Effect.die(failure.defect)
       }
     }
   })

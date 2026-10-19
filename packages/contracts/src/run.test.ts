@@ -85,6 +85,21 @@ describe('runDetailSchema', () => {
     expect(runDetailSchema.parse(missingCode)).toEqual(missingCode)
   })
 
+  it('names the setup piece to complete when a delivery stops on an incomplete setup', () => {
+    const incompleteSetup = {
+      ...unreadable,
+      direction: 'outbound',
+      failureStage: 'delivery',
+      problem: {
+        reason: 'incompleteSetup',
+        whoFixes: 'retry',
+        fixTarget: { kind: 'workspaceGln', name: 'Nordwind Foods' },
+      },
+    }
+
+    expect(runDetailSchema.parse(incompleteSetup)).toEqual(incompleteSetup)
+  })
+
   it('needs a problem on a failed Run', () => {
     expect(runDetailSchema.safeParse({ ...unreadable, problem: null }).success).toBe(false)
   })

@@ -22,6 +22,7 @@ import { seedLookupTableNamed } from './lookup-table'
 import { createRun, createRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore, interchangeIdOf } from './run-store'
+import { seedWorkspace } from './workspace'
 
 const apiUrl = 'http://api.test'
 
@@ -412,8 +413,61 @@ describe('the problem of a failed Run', () => {
       new Set(['you', 'retry', 'tradingPartner']),
     )
     expect(new Set(problems.map(({ fixTarget }) => fixTarget?.kind))).toEqual(
-      new Set(['mapping', 'lookupTable', 'channel', 'tradingPartner']),
+      new Set([
+        'mapping',
+        'lookupTable',
+        'channel',
+        'tradingPartner',
+        'workspaceGln',
+        'tradingPartnerGln',
+        'channelCredential',
+      ]),
     )
+  })
+
+  it('points an incomplete setup at the piece to complete before a retry', async () => {
+    const runs = createRuns({ count: 2000 }).filter(
+      ({ status, failureStage }) => status === 'failed' && failureStage === 'delivery',
+    )
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    const incomplete = (
+      await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body!))
+    ).filter(({ problem }) => problem?.reason === 'incompleteSetup')
+
+    expect(
+      new Set(incomplete.map(({ error, problem }) => `${error?.code}:${problem?.fixTarget?.kind}`)),
+    ).toEqual(
+      new Set([
+        'glnMissing:workspaceGln',
+        'glnMissing:tradingPartnerGln',
+        'channelDefect:channelCredential',
+        'characterSetUnsupported:tradingPartner',
+      ]),
+    )
+
+    for (const run of incomplete) {
+      const flow = seedFlows.find(({ id }) => id === run.flow.id)!
+      const channel = seedChannels.find(({ id }) => id === flow.destinationChannelId)!
+
+      expect(run.direction).toBe('outbound')
+      expect(run.problem?.whoFixes).toBe('retry')
+      expect([
+        { kind: 'workspaceGln', name: seedWorkspace.name },
+        {
+          kind: 'tradingPartnerGln',
+          tradingPartnerId: run.tradingPartner.id,
+          name: run.tradingPartner.name,
+        },
+        { kind: 'channelCredential', channelId: channel.id, name: channel.name },
+        {
+          kind: 'tradingPartner',
+          tradingPartnerId: run.tradingPartner.id,
+          name: run.tradingPartner.name,
+        },
+      ]).toContainEqual(run.problem?.fixTarget)
+    }
   })
 
   it('leaves a delivered Run without a problem', async () => {

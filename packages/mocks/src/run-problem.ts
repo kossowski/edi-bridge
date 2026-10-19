@@ -8,6 +8,8 @@ import {
   whoFixes,
 } from '@edi-bridge/contracts'
 
+import { seedWorkspace } from './workspace'
+
 import type { ChannelStore } from './channel'
 import type { FlowStore } from './flow'
 import type { BrokenPiece, GeneratedErrorCode, GeneratedMessage } from './interchange'
@@ -29,9 +31,19 @@ const reasons = {
   missingSourceField: 'missingField',
   destinationUnreachable: 'unreachable',
   destinationUnavailable: 'unreachable',
+  glnMissing: 'incompleteSetup',
+  channelDefect: 'incompleteSetup',
+  characterSetUnsupported: 'incompleteSetup',
 } as const satisfies Record<GeneratedErrorCode, ProblemReason>
 
+function destinationChannelOf(run: RunSummary, sources: ProblemSources) {
+  const flow = sources.flows.get(run.flow.id)
+
+  return flow && sources.channels.get(flow.destinationChannelId)
+}
+
 function brokenPieceTarget(
+  run: RunSummary,
   broken: BrokenPiece | null,
   mapping: MappingVersionSummary | null,
   sources: ProblemSources,
@@ -59,6 +71,34 @@ function brokenPieceTarget(
         ? { kind: 'lookupTable', lookupTableId: table.id, name: table.name, code: broken.code }
         : null
     }
+
+    case 'workspaceGln': {
+      return { kind: 'workspaceGln', name: seedWorkspace.name }
+    }
+
+    case 'tradingPartnerGln': {
+      return {
+        kind: 'tradingPartnerGln',
+        tradingPartnerId: run.tradingPartner.id,
+        name: run.tradingPartner.name,
+      }
+    }
+
+    case 'tradingPartner': {
+      return {
+        kind: 'tradingPartner',
+        tradingPartnerId: run.tradingPartner.id,
+        name: run.tradingPartner.name,
+      }
+    }
+
+    case 'channelCredential': {
+      const channel = destinationChannelOf(run, sources)
+
+      return channel
+        ? { kind: 'channelCredential', channelId: channel.id, name: channel.name }
+        : null
+    }
   }
 }
 
@@ -79,14 +119,17 @@ function fixTargetOf(
     }
 
     case 'retry': {
-      const flow = sources.flows.get(run.flow.id)
-      const channel = flow && sources.channels.get(flow.destinationChannelId)
+      if (broken !== null) {
+        return brokenPieceTarget(run, broken, mapping, sources)
+      }
+
+      const channel = destinationChannelOf(run, sources)
 
       return channel ? { kind: 'channel', channelId: channel.id, name: channel.name } : null
     }
 
     case 'you': {
-      return brokenPieceTarget(broken, mapping, sources)
+      return brokenPieceTarget(run, broken, mapping, sources)
     }
   }
 }
