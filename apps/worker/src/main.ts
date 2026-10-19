@@ -49,8 +49,16 @@ const healthServer = createHealthServer({
 
 async function shutdown(): Promise<void> {
   healthServer.close()
-  await runWorker.close()
-  await connection.close()
+
+  // The worker closes first, so a Run in flight still reaches the database.
+  for (const close of [() => runWorker.close(), () => connection.close()]) {
+    try {
+      await close()
+    } catch (error) {
+      console.error(`worker shutdown failed: ${String(error)}`)
+    }
+  }
+
   redis.disconnect()
 }
 
