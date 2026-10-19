@@ -28,3 +28,11 @@ export class RunNotQueued extends Data.TaggedError('RunNotQueued')<{
     return `Run ${this.runId} was received but could not be queued for processing`
   }
 }
+
+export class RunNotRetryable extends Data.TaggedError('RunNotRetryable')<{
+  readonly runId: string
+}> {
+  override get message() {
+    return 'Only a Run that failed at delivery can be retried'
+  }
+}

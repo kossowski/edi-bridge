@@ -519,6 +519,10 @@ export const runs = pgTable(
     problem: jsonb().$type<Omit<RunProblem, 'whoFixes'>>(),
     waitingForTradingPartnerSince: timestamp({ withTimezone: true, mode: 'date' }),
     output: text(),
+    // The mapped Message of an outbound Run, so a Retry builds its Interchange without mapping again.
+    deliveryInput: jsonb(),
+    // Set once the Channel took the output, so a Retry never delivers it twice.
+    handedOverAt: timestamp({ withTimezone: true, mode: 'date' }),
     controlReference: integer(),
     // Null for a Document that is not an Interchange.
     messageIndex: integer(),
