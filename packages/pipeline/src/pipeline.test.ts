@@ -2,7 +2,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { Cause, Duration, Effect, Exit, Fiber, Logger } from 'effect'
 import { TestClock } from 'effect/testing'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, assert, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { secretBox, secretKeyBytes, sftpChannelDelivery } from '@edi-bridge/channels'
@@ -2822,14 +2822,16 @@ describe('the Acknowledgement of a sent Interchange', () => {
   describe('the Overdue check', () => {
     const limitHours = 24
 
-    // The test clock stands that long after the hand-over of the sent Interchange.
     const atTimeAfter = (
       sent: { handedOverAt: Date | null } | undefined,
       after: Duration.Duration,
       check: Effect.Effect<unknown, never, Database | RunQueue>,
     ) =>
       Effect.gen(function* () {
-        yield* TestClock.setTime((sent?.handedOverAt?.getTime() ?? 0) + Duration.toMillis(after))
+        const handedOverAt = sent?.handedOverAt
+
+        assert.instanceOf(handedOverAt, Date)
+        yield* TestClock.setTime(handedOverAt.getTime() + Duration.toMillis(after))
         yield* check
       }).pipe(
         pipelineServices(connection.db, inMemoryRunQueue()),

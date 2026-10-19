@@ -14,13 +14,13 @@ export {
   RunNotRetryable,
 } from './errors'
 
+export { markOverdueInterchanges } from './mark-overdue-interchanges'
+
 export { pollInboundChannels } from './poll-inbound-channels'
 
 export { queueReceivedRuns } from './queue-received-runs'
 
 export { type ArrivingDocument, type Receipt, type ReceivedRun, receive } from './receive'
-
-export { markOverdueInterchanges } from './mark-overdue-interchanges'
 
 export { isReprocessable, type Reprocess, reprocessRun } from './reprocess'
 
