@@ -10,7 +10,6 @@ const lookupTableIdOfRun = sql<string>`${runs.problem} -> 'fixTarget' ->> 'looku
 
 const codeOfRun = sql<string>`${runs.problem} -> 'fixTarget' ->> 'code'`
 
-// A failed Run names a missing code until its Lookup Table translates that code.
 export const selectBlockingCodes = async (
   db: Database | Transaction,
   workspaceId: string,
@@ -36,6 +35,7 @@ export const selectBlockingCodes = async (
         eq(runs.status, 'failed'),
         sql`${runs.problem} -> 'fixTarget' ->> 'kind' = 'lookupTable'`,
         lookupTableId === undefined ? undefined : sql`${lookupTableIdOfRun} = ${lookupTableId}`,
+        // A failed Run stays failed once its code is translated, so the code is missing only until then.
         notExists(
           db
             .select({ sourceCode: lookupTableEntries.sourceCode })

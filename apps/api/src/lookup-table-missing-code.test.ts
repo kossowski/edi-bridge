@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -14,7 +14,7 @@ import {
   updateLookupTableEndpoint,
 } from '@edi-bridge/contracts'
 import { runs } from '@edi-bridge/db'
-import { processRun } from '@edi-bridge/pipeline'
+import { processRun, receive } from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
   type InvoiceWorkspace,
@@ -186,5 +186,33 @@ describe('the missing codes of a Lookup Table', () => {
       blockingCodes: ['KAR'],
     })
     await expect(missingCodes()).resolves.toMatchObject([{ code: 'KAR' }])
+  })
+
+  it('leaves out the failed Runs of another Workspace, even one naming this Lookup Table', async () => {
+    const other = await seedInvoiceWorkspace(api.connection.db, 'Elbe Foods')
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: other.id,
+        channelId: other.inboundChannelId,
+        fileName: 'invoice.json',
+        content: inUnit('PAL'),
+        manualSubmission: false,
+      }).pipe(pipelineServices(api.connection.db, api.runQueue)),
+    )
+
+    await processQueued()
+
+    // Only a Run of this Workspace can name its Lookup Table, so the Run of the other one is made to.
+    await api.connection.db
+      .update(runs)
+      .set({
+        problem: sql`jsonb_set(${runs.problem}, '{fixTarget,lookupTableId}', to_jsonb(${workspace.lookupTableId}::text))`,
+      })
+      .where(eq(runs.id, receipt.runs[0]?.id ?? ''))
+
+    const codes = await missingCodes()
+
+    expect(codes.map(({ code }) => code)).toEqual(['KAR'])
   })
 })
