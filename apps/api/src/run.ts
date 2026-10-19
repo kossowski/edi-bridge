@@ -272,12 +272,43 @@ const toDetail = (
   }
 }
 
+const startReplacing = (id: string, mappingVersionId: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    return yield* startReplacingRun({
+      workspaceId: workspace.id,
+      runId: id,
+      mappingVersionId,
+    }).pipe(
+      Effect.provideService(PipelineDatabase, db),
+      Effect.catchTags({
+        RunNotReprocessable: (error) => Effect.fail(new Conflict({ message: error.message })),
+        MappingVersionNotOfRun: (error) =>
+          Effect.fail(new Unprocessable({ message: error.message })),
+      }),
+    )
+  })
+
+// Trying a Defect again outside delivery reprocesses the Run with its own Mapping Version.
 export const retryRun = (id: string) =>
   Effect.gen(function* () {
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    yield* loadRun(id)
+    const run = yield* loadRun(id)
+
+    if (
+      run.status === 'failed' &&
+      run.problem.reason === 'defect' &&
+      run.failureStage !== 'delivery' &&
+      run.mappingVersion !== null
+    ) {
+      yield* startReplacing(id, run.mappingVersion.id)
+
+      return yield* loadRun(id)
+    }
 
     yield* retryDelivery({ workspaceId: workspace.id, runId: id }).pipe(
       Effect.provideService(PipelineDatabase, db),
@@ -291,23 +322,9 @@ export const retryRun = (id: string) =>
 
 export const reprocessRun = (id: string, { mappingVersionId }: ReprocessRunBody) =>
   Effect.gen(function* () {
-    const db = yield* Db
-    const workspace = yield* CurrentWorkspace
-
     yield* loadRun(id)
 
-    const replacing = yield* startReplacingRun({
-      workspaceId: workspace.id,
-      runId: id,
-      mappingVersionId,
-    }).pipe(
-      Effect.provideService(PipelineDatabase, db),
-      Effect.catchTags({
-        RunNotReprocessable: (error) => Effect.fail(new Conflict({ message: error.message })),
-        MappingVersionNotOfRun: (error) =>
-          Effect.fail(new Unprocessable({ message: error.message })),
-      }),
-    )
+    const replacing = yield* startReplacing(id, mappingVersionId)
 
     return yield* loadRun(replacing.runId)
   })
