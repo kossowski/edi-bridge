@@ -22,12 +22,18 @@ import {
   type CsvSettings,
   directions,
   documentFormats,
+  failureStages,
   type DocumentStructureNode,
   jsonRoots,
   lookupTableKinds,
   type MappingGraph,
   maxLookupCodeLength,
   messageTypes,
+  type RunError,
+  type RunProblem,
+  runStatuses,
+  runStepStages,
+  runStepStatuses,
   sftpAuthentications,
   workspaceRoles,
 } from '@edi-bridge/contracts'
@@ -426,5 +432,109 @@ export const flows = pgTable(
     index().on(table.inboundChannelId),
     index().on(table.destinationChannelId),
     index().on(table.mappingVersionId),
+  ],
+)
+
+export const documents = pgTable(
+  'documents',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    fileName: text().notNull(),
+    content: text().notNull(),
+    receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [index().on(table.workspaceId)],
+)
+
+export const runStatus = pgEnum('run_status', runStatuses)
+
+export const failureStage = pgEnum('failure_stage', failureStages)
+
+export const runs = pgTable(
+  'runs',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    documentId: uuid()
+      .notNull()
+      .references(() => documents.id),
+    flowId: uuid()
+      .notNull()
+      .references(() => flows.id),
+    tradingPartnerId: uuid()
+      .notNull()
+      .references(() => tradingPartners.id),
+    mappingVersionId: uuid().references(() => mappingVersions.id),
+    manualSubmission: boolean().notNull(),
+    status: runStatus().notNull().default('received'),
+    failureStage: failureStage(),
+    businessReference: text(),
+    error: jsonb().$type<RunError>(),
+    problem: jsonb().$type<Omit<RunProblem, 'whoFixes'>>(),
+    waitingForTradingPartnerSince: timestamp({ withTimezone: true, mode: 'date' }),
+    output: text(),
+    receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index().on(table.workspaceId, table.receivedAt.desc()),
+    index().on(table.documentId),
+    index().on(table.flowId),
+    index().on(table.tradingPartnerId),
+    index().on(table.mappingVersionId),
+    check(
+      'runs_failure',
+      allSetOnlyWhen(sql`${table.status} = 'failed'`, [
+        sql`${table.failureStage}`,
+        sql`${table.error}`,
+        sql`${table.problem}`,
+      ]),
+    ),
+    check(
+      'runs_waiting_for_trading_partner',
+      sql`${table.status} = 'failed' or ${table.waitingForTradingPartnerSince} is null`,
+    ),
+    // Only a Run that failed delivery has valid output: earlier stages never produced deliverable EDIFACT.
+    check(
+      'runs_output',
+      sql`${table.failureStage} is null or ${table.failureStage} = 'delivery' or ${table.output} is null`,
+    ),
+  ],
+)
+
+export const runStepStage = pgEnum('run_step_stage', runStepStages)
+
+export const runStepStatus = pgEnum('run_step_status', runStepStatuses)
+
+export const runSteps = pgTable(
+  'run_steps',
+  {
+    runId: uuid()
+      .notNull()
+      .references(() => runs.id, { onDelete: 'cascade' }),
+    position: integer().notNull(),
+    stage: runStepStage().notNull(),
+    status: runStepStatus().notNull().default('pending'),
+    startedAt: timestamp({ withTimezone: true, mode: 'date' }),
+    finishedAt: timestamp({ withTimezone: true, mode: 'date' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.runId, table.position] }),
+    unique('run_steps_run_id_stage_unique').on(table.runId, table.stage),
+    check('run_steps_position', sql`${table.position} >= 0`),
+    check(
+      'run_steps_timings',
+      sql`case ${table.status}
+        when 'pending' then num_nonnulls(${table.startedAt}, ${table.finishedAt}) = 0
+        when 'skipped' then num_nonnulls(${table.startedAt}, ${table.finishedAt}) = 0
+        when 'running' then ${table.startedAt} is not null and ${table.finishedAt} is null
+        else coalesce(${table.startedAt} <= ${table.finishedAt}, false)
+      end`,
+    ),
   ],
 )
