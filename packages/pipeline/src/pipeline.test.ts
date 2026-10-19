@@ -6,6 +6,7 @@ import { z } from 'zod'
 
 import { secretBox, secretKeyBytes, sftpChannelDelivery } from '@edi-bridge/channels'
 import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
+import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
   channels,
   connect,
@@ -16,8 +17,6 @@ import {
   workspaces,
 } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
-
-import type { CharacterSet } from '@edi-bridge/contracts'
 
 import {
   type ArrivingDocument,
@@ -450,6 +449,95 @@ describe('the receipt of a Document', () => {
     )
 
     expect(receipt.runs.map(({ messageIndex }) => messageIndex)).toEqual([1, 2, 3])
+  })
+
+  const ordersFromTwoPartners = async (glns: [string, string]) => {
+    const { channelId, flows: invoic } = await channelWithFlows(['INVOIC'])
+
+    const partners = await connection.db
+      .insert(tradingPartners)
+      .values(
+        glns.map((gln) => ({
+          workspaceId: workspace.id,
+          name: `Partner ${gln}`,
+          gln,
+          characterSet: 'UNOC' as const,
+          acknowledgementTimeLimitHours: 24,
+        })),
+      )
+      .returning()
+
+    const orders = await connection.db
+      .insert(flows)
+      .values(
+        partners.map((partner) => ({
+          workspaceId: workspace.id,
+          tradingPartnerId: partner.id,
+          messageType: 'ORDERS' as const,
+          name: `ORDERS from ${partner.name}`,
+          inboundChannelId: channelId,
+          destinationChannelId: workspace.outboundChannelId,
+          mappingVersionId: workspace.mappingVersionId,
+        })),
+      )
+      .returning()
+
+    return { channelId, orders, invoic }
+  }
+
+  const interchangeFrom = (sender: string, messages: string[][]) =>
+    [
+      `UNB+UNOC:3+${sender}:14+4012345000009:14+000324:1200+00000001'`,
+      ...messages.flat(),
+      `UNZ+${messages.length}+00000001'`,
+    ].join('\n')
+
+  it('routes an inbound Message to the Flow of the Trading Partner that sent the Interchange', async () => {
+    const { channelId, orders } = await ordersFromTwoPartners([
+      withCheckDigit('430000000001'),
+      withCheckDigit('430000000002'),
+    ])
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'orders.edi',
+        content: interchangeFrom(withCheckDigit('430000000002'), [ordersMessage]),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
+    )
+
+    expect(receipt.notRouted).toEqual([])
+    expect(
+      receipt.runs.map(({ flowId, tradingPartnerId }) => ({ flowId, tradingPartnerId })),
+    ).toEqual([{ flowId: orders[1]?.id, tradingPartnerId: orders[1]?.tradingPartnerId }])
+  })
+
+  it('lists a Message as not routed when several Flows of its Message Type share the Channel and none is from the sender', async () => {
+    const { channelId, invoic } = await ordersFromTwoPartners([
+      withCheckDigit('430000000003'),
+      withCheckDigit('430000000004'),
+    ])
+
+    const invoicMessage = golden('invoic-reference.edi', 'latin1')
+      .split('\n')
+      .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'interchange.edi',
+        content: interchangeFrom(withCheckDigit('430000000005'), [invoicMessage, ordersMessage]),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
+    )
+
+    expect(receipt.notRouted).toEqual([{ messageType: 'ORDERS' }])
+    expect(receipt.runs.map(({ flowId, messageIndex }) => ({ flowId, messageIndex }))).toEqual([
+      { flowId: invoic[0]?.id, messageIndex: 1 },
+    ])
   })
 })
 

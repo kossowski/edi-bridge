@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { DateTime, Effect } from 'effect'
 
 import { directionOf } from '@edi-bridge/contracts'
-import { channels, flows, type RawDocument, runs, runSteps } from '@edi-bridge/db'
+import { channels, flows, type RawDocument, runs, runSteps, tradingPartners } from '@edi-bridge/db'
 import { ParseError, parseMessages } from '@edi-bridge/edifact'
 
 import { ReceiptRejected } from './errors'
@@ -30,31 +30,58 @@ export type Receipt = {
 
 type DeclaredMessage = { messageType: string; messageIndex: number }
 
+type Declared = { sender: string | undefined; messages: DeclaredMessage[] }
+
+type ChannelFlow = { flow: Flow; tradingPartnerGln: string | null }
+
 type RoutedMessage = { flow: Flow; messageIndex: number | null }
 
 // A Document without an Interchange envelope declares no Message Types.
-function declaredMessagesOf(content: string): DeclaredMessage[] {
+function declaredMessagesOf(content: string): Declared {
   try {
-    return parseMessages(content).messages.flatMap(({ header }, index) => {
-      const messageType = header.elements[1]?.[0]
+    const interchange = parseMessages(content)
 
-      return messageType === undefined ? [] : [{ messageType, messageIndex: index + 1 }]
-    })
+    return {
+      sender: interchange.header.elements[1]?.[0],
+      messages: interchange.messages.flatMap(({ header }, index) => {
+        const messageType = header.elements[1]?.[0]
+
+        return messageType === undefined ? [] : [{ messageType, messageIndex: index + 1 }]
+      }),
+    }
   } catch (error) {
     if (error instanceof ParseError) {
-      return []
+      return { sender: undefined, messages: [] }
     }
 
     throw error
   }
 }
 
-// Without a Message Type to route by, only an outbound Flow's Document Structure can read it.
-function route(content: string, channelFlows: readonly Flow[]) {
-  const declared = declaredMessagesOf(content)
+// A Flow takes Documents from one Trading Partner, so a shared Message Type goes by the sender.
+function flowFor(
+  messageType: string,
+  sender: string | undefined,
+  channelFlows: readonly ChannelFlow[],
+) {
+  const candidates = channelFlows.filter(({ flow }) => flow.messageType === messageType)
 
-  if (declared.length === 0) {
-    const outbound = channelFlows.filter((flow) => directionOf(flow) === 'outbound')
+  const chosen =
+    candidates.length === 1
+      ? candidates
+      : candidates.filter(({ tradingPartnerGln }) => tradingPartnerGln === sender)
+
+  return chosen.length === 1 ? chosen[0]?.flow : undefined
+}
+
+// Without a Message Type to route by, only an outbound Flow's Document Structure can read it.
+function route(content: string, channelFlows: readonly ChannelFlow[]) {
+  const { sender, messages } = declaredMessagesOf(content)
+
+  if (messages.length === 0) {
+    const outbound = channelFlows.flatMap(({ flow }) =>
+      directionOf(flow) === 'outbound' ? [flow] : [],
+    )
 
     return outbound.length > 1
       ? Effect.fail(new ReceiptRejected({ reason: 'ambiguousFlow' }))
@@ -67,8 +94,8 @@ function route(content: string, channelFlows: readonly Flow[]) {
   const routed: RoutedMessage[] = []
   const notRouted: Array<{ messageType: string }> = []
 
-  for (const { messageType, messageIndex } of declared) {
-    const flow = channelFlows.find((candidate) => candidate.messageType === messageType)
+  for (const { messageType, messageIndex } of messages) {
+    const flow = flowFor(messageType, sender, channelFlows)
 
     if (flow) {
       routed.push({ flow, messageIndex })
@@ -108,8 +135,9 @@ const routeOnChannel = ({ workspaceId, channelId, content }: ArrivingDocument) =
 
     const found = yield* Effect.promise(() =>
       db
-        .select()
+        .select({ flow: flows, tradingPartnerGln: tradingPartners.gln })
         .from(flows)
+        .innerJoin(tradingPartners, eq(tradingPartners.id, flows.tradingPartnerId))
         .where(and(eq(flows.workspaceId, workspaceId), eq(flows.inboundChannelId, channelId))),
     )
 
@@ -119,7 +147,7 @@ const routeOnChannel = ({ workspaceId, channelId, content }: ArrivingDocument) =
 
     const routing = yield* route(
       content,
-      found.toSorted((a, b) => nameCollator.compare(a.name, b.name)),
+      found.toSorted((a, b) => nameCollator.compare(a.flow.name, b.flow.name)),
     )
 
     return routing.routed.length === 0
