@@ -99,7 +99,7 @@ describe('whoFixes', () => {
     ).toBe('retry')
   })
 
-  it('offers a retry for a defect at every Failure Stage', () => {
+  it('offers trying again for a defect at every Failure Stage', () => {
     for (const failureStage of failureStages) {
       for (const direction of ['inbound', 'outbound'] as const) {
         expect(whoFixes({ failureStage, direction, problem: { reason: 'defect' } })).toBe('retry')
@@ -187,7 +187,7 @@ describe('runDetailSchema', () => {
     ).toBe(false)
   })
 
-  it('offers a retry for a defect at any Failure Stage', () => {
+  it('accepts trying again for a defect outside delivery', () => {
     const defect = {
       ...unreadable,
       error: { ...error, code: 'processingDefect' },

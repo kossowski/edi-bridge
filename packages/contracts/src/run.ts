@@ -46,6 +46,8 @@ export function whoFixes(run: {
   direction: Direction
   problem: { reason: ProblemReason } | null
 }): Fixer | null {
+  // A Defect is fixed by trying again at any Failure Stage: Retry at delivery,
+  // Reprocess with the Run's own Mapping Version at any other stage.
   if (run.failureStage !== null && run.problem?.reason === 'defect') {
     return 'retry'
   }
