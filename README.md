@@ -4,14 +4,15 @@
 
 A Turborepo monorepo with three apps and shared packages:
 
-| Path                         | What it is                  |
-| ---------------------------- | --------------------------- |
-| `apps/web`                   | Next.js dashboard           |
-| `apps/api`                   | Fastify HTTP API            |
-| `apps/worker`                | Background worker           |
-| `packages/ui`                | Shared shadcn/ui components |
-| `packages/oxlint-config`     | Shared Oxlint configs       |
-| `packages/typescript-config` | Shared TypeScript configs   |
+| Path                         | What it is                               |
+| ---------------------------- | ---------------------------------------- |
+| `apps/web`                   | Next.js dashboard                        |
+| `apps/api`                   | Fastify HTTP API                         |
+| `apps/worker`                | Background worker                        |
+| `packages/ui`                | Shared shadcn/ui components              |
+| `packages/fixtures`          | Fixture Documents to submit to a Channel |
+| `packages/oxlint-config`     | Shared Oxlint configs                    |
+| `packages/typescript-config` | Shared TypeScript configs                |
 
 ## Local setup
 

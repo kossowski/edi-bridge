@@ -1,1 +1,2 @@
 packages/mapping/golden/** -text
+packages/fixtures/documents/** -text

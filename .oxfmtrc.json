@@ -36,6 +36,7 @@
     "apps/web/public/mockServiceWorker.js",
     "packages/db/migrations/",
     "packages/mapping/golden/*",
-    "!packages/mapping/golden/README.md"
+    "!packages/mapping/golden/README.md",
+    "packages/fixtures/documents/"
   ]
 }

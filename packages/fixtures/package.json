@@ -1,0 +1,32 @@
+{
+  "name": "@edi-bridge/fixtures",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./documents/*": "./documents/*"
+  },
+  "dependencies": {
+    "@edi-bridge/contracts": "workspace:*",
+    "@edi-bridge/edifact": "workspace:*",
+    "@edi-bridge/mapping": "workspace:*"
+  },
+  "devDependencies": {
+    "@edi-bridge/oxlint-config": "workspace:*",
+    "@edi-bridge/typescript-config": "workspace:*",
+    "@edi-bridge/vitest-config": "workspace:*",
+    "@types/node": "^24",
+    "effect": "^4.0.4",
+    "oxlint": "1.87.0",
+    "typescript": "~7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

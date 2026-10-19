@@ -1,0 +1,45 @@
+{
+  "invoiceNumber": "RE-2026-10872",
+  "invoiceDate": "24.10.2026",
+  "deliveryDate": "23.10.2026",
+  "order": {
+    "number": "RW-88123",
+    "date": "16.10.2026"
+  },
+  "deliveryNote": {
+    "number": "LS-2026-5540",
+    "date": "23.10.2026"
+  },
+  "buyer": {
+    "gln": "0234567000009",
+    "vatId": "DE300400500"
+  },
+  "supplier": {
+    "gln": "0212345000007",
+    "vatId": "DE100200300"
+  },
+  "invoicee": {
+    "gln": "0234567000023"
+  },
+  "deliveryParty": {
+    "gln": "0234567000016"
+  },
+  "currency": "EUR",
+  "lines": [
+    {
+      "gtin": "0212345100059",
+      "description": "Labskaus Konserve 400 g",
+      "quantity": 60,
+      "unit": "ST",
+      "netAmount": 167.4,
+      "vatRate": 7
+    }
+  ],
+  "totals": {
+    "invoiceAmount": 179.12,
+    "lineAmount": 167.4,
+    "taxableAmount": 167.4,
+    "vatRate": 7,
+    "vatAmount": 11.72
+  }
+}
