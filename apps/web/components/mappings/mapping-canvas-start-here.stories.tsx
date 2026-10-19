@@ -86,7 +86,7 @@ export const FailingField = meta.story({
   async play({ canvas, canvasElement }) {
     const alert = await findAlert(canvasElement, 'A document failed at invoiceNumber')
 
-    await expect(alert.queryByText(/marked on the canvas/)).toBeNull()
+    await expect(alert.queryByText(/shown on the canvas/)).toBeNull()
     await expect(alert.queryByText(/1024 pixels/)).toBeNull()
     await expect(canvas.getByRole('heading', { name: 'Start here' })).toBeVisible()
     await userEvent.click(alert.getByRole('button', { name: 'Show the field' }))
@@ -96,7 +96,7 @@ export const FailingField = meta.story({
     await waitFor(() => expect(row).toHaveFocus())
     await expect(row.closest('[data-failing]')).toHaveAttribute('data-failing', 'field')
     await expect(canvas.queryByRole('heading', { name: 'Start here' })).toBeNull()
-    await expect(alert.getByText(/It is marked on the canvas\./)).toBeVisible()
+    await expect(alert.getByText(/It is selected and shown on the canvas\./)).toBeVisible()
   },
 })
 

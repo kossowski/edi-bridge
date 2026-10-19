@@ -2619,7 +2619,7 @@
       "markInside": "Fehler darin",
       "title": "Ein Beleg ist an <code>{field}</code> gescheitert",
       "where": "{side, select, source {Das Feld liegt in der Quelle} other {Das Feld liegt im Ziel}}: {structure}.",
-      "marked": "Es ist auf der Zeichenfläche markiert.",
+      "marked": "Es ist auf der Zeichenfläche ausgewählt und zu sehen.",
       "fix": "Korrigieren Sie seine Verknüpfungen, veröffentlichen Sie den Entwurf und verarbeiten Sie den Beleg dann erneut.",
       "show": "Feld zeigen",
       "back": "Zurück zu den Belegen",
