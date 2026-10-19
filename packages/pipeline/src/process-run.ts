@@ -221,17 +221,25 @@ const parseFailure = (content: string, { cause, interchange }: MessageUnreadable
 
 type ReadMessage = { interchange: ParsedInterchange; message: Message; messageIndex: number }
 
-// Validation sees the Message as the first of its Interchange, so a position shifts to its own UNH.
+// Validation sees the Message alone in its Interchange, so its positions map back to the real ones.
 const inboundValidationFailure = (
   content: string,
-  { interchange, messageIndex }: ReadMessage,
+  { interchange, message, messageIndex }: ReadMessage,
   { cause }: MessageInvalid,
 ): Failure => {
   const tags = segmentTagsOf(content, interchange)
   const headers = tags.flatMap((tag, index) => (tag === 'UNH' ? [index + 1] : []))
   const validatedHeader = (interchange.hasServiceStringAdvice ? 1 : 0) + 2
+  const validatedTrailer = validatedHeader + message.segments.length + 1
   const shift = (headers[messageIndex - 1] ?? validatedHeader) - validatedHeader
   const { segment } = cause.position
+
+  const shifted =
+    segment < validatedHeader
+      ? segment
+      : segment <= validatedTrailer
+        ? segment + shift
+        : tags.lastIndexOf('UNZ') + 1
 
   return {
     stage: 'validation',
@@ -240,7 +248,7 @@ const inboundValidationFailure = (
       message: cause.message,
       position: positionIn(tags, {
         ...cause.position,
-        segment: segment < validatedHeader ? segment : segment + shift,
+        segment: shifted,
       }),
     },
     problem: { reason: 'invalidContent', fixTarget: null },

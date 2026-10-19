@@ -1284,6 +1284,26 @@ describe('the processing of an inbound Run', () => {
     })
   })
 
+  it('points a validation failure in the UNZ at the UNZ of the Interchange', async () => {
+    const into = await ordersWorkspace('Trailer Foods')
+
+    const content = interchangeOf([ordersMessage, ordersMessage, ordersMessage]).replace(
+      "UNZ+3+00000001'",
+      "UNZ+3+00000001+\u20ac'",
+    )
+
+    const runs = await receiveInterchange(into, content)
+
+    // UNB is segment 1 and the three Messages 2 to 67, so the UNZ is segment 68 for every Run.
+    expect(runs).toMatchObject(
+      [1, 2, 3].map(() => ({
+        status: 'failed',
+        failureStage: 'validation',
+        error: { code: 'invalid-character', position: { segment: 68, tag: 'UNZ', element: 3 } },
+      })),
+    )
+  })
+
   it('fails a Run at delivery when the ERP refuses the Document and keeps the Document', async () => {
     const into = await ordersWorkspace('Refused Foods')
 
