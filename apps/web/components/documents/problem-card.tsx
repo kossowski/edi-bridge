@@ -84,6 +84,16 @@ function useProblemText({ problem, direction, tradingPartner }: FailedRun) {
         description: t('unreachable.description', values),
       }
     }
+
+    case 'incompleteSetup': {
+      return {
+        title: t('incompleteSetup.title', values),
+        description: t('incompleteSetup.description', {
+          ...values,
+          piece: fixTarget?.kind ?? 'other',
+        }),
+      }
+    }
   }
 }
 

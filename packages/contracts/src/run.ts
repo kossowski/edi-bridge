@@ -183,6 +183,7 @@ export const problemReasons = [
   'missingCode',
   'missingField',
   'unreachable',
+  'incompleteSetup',
 ] as const
 
 export const problemReasonSchema = z.enum(problemReasons)
@@ -210,6 +211,20 @@ export const fixTargetSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('tradingPartner'),
     tradingPartnerId: z.uuid(),
+    name: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('workspaceGln'),
+    name: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('tradingPartnerGln'),
+    tradingPartnerId: z.uuid(),
+    name: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('channelCredential'),
+    channelId: z.uuid(),
     name: z.string().min(1),
   }),
 ])

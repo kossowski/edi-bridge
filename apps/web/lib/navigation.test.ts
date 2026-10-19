@@ -114,6 +114,16 @@ describe('fixTargetHref', () => {
       '/trading-partners/p-1',
     )
   })
+
+  it('opens the settings screen of each incomplete setup piece', () => {
+    expect(fixTargetHref({ kind: 'workspaceGln', name: 'Nordwind Foods' })).toBe('/settings')
+    expect(
+      fixTargetHref({ kind: 'tradingPartnerGln', tradingPartnerId: 'p-1', name: 'Acme' }),
+    ).toBe('/trading-partners/p-1')
+    expect(fixTargetHref({ kind: 'channelCredential', channelId: 'c-1', name: 'SFTP' })).toBe(
+      '/channels/c-1',
+    )
+  })
 })
 
 describe('tradingPartnerHref', () => {
