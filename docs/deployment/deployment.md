@@ -25,7 +25,7 @@ Dokploy's GitHub settings contain these application-specific patterns:
 | Application | Patterns                                                                                                                          |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | web         | `apps/web/**`, `packages/ui/**`, `packages/contracts/**`, `packages/mocks/**`                                                     |
-| api         | `apps/api/**`, `packages/contracts/**`, `packages/db/**`, `packages/edifact/**`, `packages/mapping/**`                            |
+| api         | `apps/api/**`, `packages/pipeline/**`, `packages/contracts/**`, `packages/db/**`, `packages/edifact/**`, `packages/mapping/**`    |
 | worker      | `apps/worker/**`, `packages/pipeline/**`, `packages/db/**`, `packages/contracts/**`, `packages/edifact/**`, `packages/mapping/**` |
 
 All three applications also watch these shared build inputs:
