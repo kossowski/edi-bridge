@@ -1,17 +1,19 @@
 import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
+import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
+import { secretBox, secretContext, secretKeyBytes } from '@edi-bridge/channels'
 import {
   startTestErp,
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
 } from '@edi-bridge/channels/testing'
-import { connect, type Connection, documents, mappings, runs } from '@edi-bridge/db'
+import { channels, connect, type Connection, documents, mappings, runs } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
-import { bullmqRunQueue, receive, type RunQueueService } from '@edi-bridge/pipeline'
+import { bullmqRunQueue, receive, retryRun, type RunQueueService } from '@edi-bridge/pipeline'
 import {
   addOrdersFlow,
   deliverOverSftp,
@@ -243,6 +245,64 @@ describe('the worker', () => {
     await vi.waitFor(() => {
       expect(reported).toContain(runId)
     })
+  })
+
+  it('delivers a Run retried after its delivery stopped on a defect', async () => {
+    const rotated = await seedInvoiceWorkspace(connection.db, 'Rotated Foods')
+    const remotePath = '/upload/rotated'
+
+    await sftp.exec(`install -d -m 777 ${sftp.home}${remotePath}`)
+
+    const login = {
+      host: sftp.host,
+      port: sftp.port,
+      username: sftp.username,
+      password: sftp.password,
+      remotePath,
+    }
+
+    const channelId = await deliverOverSftp(
+      connection.db,
+      rotated,
+      login,
+      secretBox(randomBytes(secretKeyBytes)),
+    )
+
+    const runId = await arrive(goldenInvoice, queue, rotated)
+
+    await expect(processed(runId)).resolves.toMatchObject({
+      status: 'failed',
+      error: { code: 'channelDefect' },
+    })
+
+    await connection.db
+      .update(channels)
+      .set({
+        encryptedCredential: testSecrets.seal(
+          login.password,
+          secretContext(channelId, 'encryptedCredential'),
+        ),
+      })
+      .where(eq(channels.id, channelId))
+
+    await Effect.runPromise(
+      retryRun({ workspaceId: rotated.id, runId }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    const run = await vi.waitFor(
+      async () => {
+        const read = await readRun(connection.db, runId)
+
+        expect(read?.status).toBe('delivered')
+
+        return read
+      },
+      { timeout: 1500, interval: 50 },
+    )
+
+    await expect(
+      remoteFile(`${remotePath}/INVOIC-${String(run?.controlReference)}.edi`),
+    ).resolves.toBe(run?.output)
   })
 
   it('processes a Run received but not queued after the next sweep', async () => {

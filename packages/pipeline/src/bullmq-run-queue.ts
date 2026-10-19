@@ -23,8 +23,17 @@ export function bullmqRunQueue(
   const service: RunQueueService = {
     enqueue: (run) =>
       Effect.tryPromise({
-        // The Run id as job id keeps a Run queued twice from being processed twice.
-        try: () => queue.add('process', run, { jobId: run.runId, removeOnComplete: true }),
+        try: async () => {
+          const died = await queue.getJob(run.runId)
+
+          // A Run that died keeps its failed job, which would swallow the job of its Retry.
+          if (died !== undefined && (await died.isFailed())) {
+            await died.remove()
+          }
+
+          // The Run id as job id keeps a Run queued twice from being processed twice.
+          return queue.add('process', run, { jobId: run.runId, removeOnComplete: true })
+        },
         catch: (cause) => new RunNotQueued({ runId: run.runId, cause }),
       }).pipe(
         Effect.timeoutOrElse({
