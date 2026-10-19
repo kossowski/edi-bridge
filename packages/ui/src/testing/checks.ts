@@ -138,9 +138,13 @@ export function page(canvasElement: HTMLElement) {
 // A busy CI runner can take longer than the default second to finish a transition or move focus.
 const transitionWait = { timeout: 5000 }
 
-// A dialog or sheet fades in.
-export async function findOpenDialog(canvasElement: HTMLElement, name: string) {
-  const dialog = await page(canvasElement).findByRole('dialog', { name }, transitionWait)
+// A dialog, alert dialog or sheet fades in.
+export async function findOpenDialog(
+  canvasElement: HTMLElement,
+  name: string,
+  role: 'alertdialog' | 'dialog' = 'dialog',
+) {
+  const dialog = await page(canvasElement).findByRole(role, { name }, transitionWait)
 
   await waitFor(() => expect(dialog).toBeVisible(), transitionWait)
 
@@ -178,13 +182,33 @@ export async function waitForFocusOn(element: HTMLElement) {
 
 const maxFocusStops = 30
 
-// Each press must leave the focus inside, and enough presses bring it back to where it started.
+// Base UI puts a focus guard at each end of a modal popup; a guard sends the focus back inside when it gets it.
+const focusGuard = '[data-base-ui-focus-guard]'
+
+function expectFocusInsideOrOnGuard(dialog: HTMLElement) {
+  const focused = dialog.ownerDocument.activeElement
+
+  if (dialog.contains(focused) || focused?.matches(focusGuard)) return
+  throw new Error(`Tab left the dialog for ${focused?.tagName} "${focused?.textContent}".`)
+}
+
+// In the Vitest browser run, Playwright presses the real key, so Chromium picks the next stop itself.
+// Storybook's own runner has no real keyboard and simulates the press.
+async function pressTab(userEvent: UserEvent, shift: boolean) {
+  if (!('__vitest_browser__' in globalThis)) return userEvent.tab({ shift })
+  const { userEvent: browserUserEvent } = await import('vitest/browser')
+
+  await browserUserEvent.keyboard(shift ? '{Shift>}{Tab}{/Shift}' : '{Tab}')
+}
+
+// Right after each press the focus must be inside or on a guard, and enough presses bring it back to where it started.
 async function expectFocusCycles(dialog: HTMLElement, press: () => Promise<void>) {
   await waitForFocusInside(dialog)
   const start = dialog.ownerDocument.activeElement
 
   for (let stop = 1; stop <= maxFocusStops; stop++) {
     await press()
+    expectFocusInsideOrOnGuard(dialog)
     await waitForFocusInside(dialog)
 
     if (dialog.ownerDocument.activeElement === start) return
@@ -194,6 +218,6 @@ async function expectFocusCycles(dialog: HTMLElement, press: () => Promise<void>
 }
 
 export async function expectFocusTrapped(dialog: HTMLElement, userEvent: UserEvent) {
-  await expectFocusCycles(dialog, () => userEvent.tab())
-  await expectFocusCycles(dialog, () => userEvent.tab({ shift: true }))
+  await expectFocusCycles(dialog, () => pressTab(userEvent, false))
+  await expectFocusCycles(dialog, () => pressTab(userEvent, true))
 }
