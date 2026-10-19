@@ -6,6 +6,7 @@ import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen
 import {
   openEmptyEditor,
   expectTransformCount,
+  findDrawnRow,
   findRow,
   findSaveStatus,
   liveStatus,
@@ -283,12 +284,21 @@ export const PublishManyRoutes = meta.story({
     )
   },
   async play({ canvas, canvasElement }) {
-    await userEvent.click(await canvas.findByRole('button', { name: /^Publish/ }))
+    // Opened before the canvas has drawn, the dialog's routes wait for that render of every row.
+    await findDrawnRow(canvasElement, source('despatchNumber'))
+    await userEvent.click(canvas.getByRole('button', { name: /^Publish/ }))
 
     const dialog = await page(canvasElement).findByRole('dialog', { name: /^Publish Version/ })
 
+    // The routes load from the mock API after the dialog opens, which can pass the default second.
+    const routes = await within(dialog).findByRole(
+      'group',
+      { name: 'Document routes' },
+      { timeout: 5000 },
+    )
+
     await expect(
-      await within(dialog).findByText('8 document routes keep their versions until you move them.'),
+      within(routes).getByText('8 document routes keep their versions until you move them.'),
     ).toBeInTheDocument()
     await expect(dialog.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight)
 

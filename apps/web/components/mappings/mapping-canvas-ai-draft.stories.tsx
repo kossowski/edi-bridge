@@ -208,9 +208,11 @@ export const RunningDialogStaysOpen = meta.story({
     await userEvent.keyboard('{Escape}')
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
     await expect(canvas.queryByRole('button', { name: 'Draft with AI' })).toBeNull()
-    await waitFor(() =>
-      expect(canvas.getByRole('button', { name: /need attention$/ })).toHaveFocus(),
-    )
+
+    // The preview debounce plus the mock API delay can pass the default second.
+    const attention = await findAttentionButton(canvasElement)
+
+    await waitFor(() => expect(attention).toHaveFocus())
   },
 })
 

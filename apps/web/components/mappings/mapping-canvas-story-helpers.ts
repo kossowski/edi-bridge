@@ -70,16 +70,32 @@ export async function findAlert(canvasElement: HTMLElement, title: string) {
   return within(alert)
 }
 
+function rowOrThrow(canvasElement: HTMLElement, ref: RowRef) {
+  const row = findRowButton(canvasElement, ref)
+
+  if (!row) {
+    throw new Error(`No row ${ref.side}:${ref.path}`)
+  }
+
+  return row
+}
+
 export async function findRow(canvasElement: HTMLElement, ref: RowRef) {
-  return waitFor(() => {
-    const row = findRowButton(canvasElement, ref)
+  return waitFor(() => rowOrThrow(canvasElement, ref))
+}
 
-    if (!row) {
-      throw new Error(`No row ${ref.side}:${ref.path}`)
-    }
+// React Flow shows rows only once measured, which on a large draft can pass the default second.
+export async function findDrawnRow(canvasElement: HTMLElement, ref: RowRef) {
+  return waitFor(
+    async () => {
+      const row = rowOrThrow(canvasElement, ref)
 
-    return row
-  })
+      await expect(row).toBeVisible()
+
+      return row
+    },
+    { timeout: 5000 },
+  )
 }
 
 // A port of a transform, found by the transform's name, e.g. `in:part1` of Concatenate 1.
