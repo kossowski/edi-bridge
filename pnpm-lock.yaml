@@ -199,6 +199,9 @@ importers:
       '@ai-sdk/anthropic':
         specifier: ^4.0.82
         version: 4.0.82(zod@4.6.5)
+      '@edi-bridge/channels':
+        specifier: workspace:*
+        version: link:../../packages/channels
       '@edi-bridge/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -497,6 +500,49 @@ importers:
       vitest:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@24.19.1)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(msw@3.0.2(@types/node@24.19.1)(supports-color@7.2.0)(typescript@7.0.2)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/channels:
+    dependencies:
+      '@edi-bridge/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      effect:
+        specifier: ^4.0.4
+        version: 4.0.4
+      ssh2:
+        specifier: ^1.17.0
+        version: 1.17.0
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@edi-bridge/oxlint-config':
+        specifier: workspace:*
+        version: link:../oxlint-config
+      '@edi-bridge/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@types/node':
+        specifier: ^24
+        version: 24.19.1
+      '@types/ssh2':
+        specifier: ^1.15.6
+        version: 1.15.6
+      oxlint:
+        specifier: 1.87.0
+        version: 1.87.0(oxlint-tsgolint@7.0.2004)
+      testcontainers:
+        specifier: ^12.2.1
+        version: 12.2.1(supports-color@7.2.0)
+      typescript:
+        specifier: ~7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.1)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/contracts:
     dependencies:

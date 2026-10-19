@@ -1,9 +1,10 @@
 import { createServer as createHttpServer, type IncomingHttpHeaders } from 'node:http'
-import { createServer as createTcpServer, type Server, type Socket } from 'node:net'
 import { utils } from 'ssh2'
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
+
+import type { Server } from 'node:net'
 
 import {
   type ChannelInput,
@@ -40,26 +41,12 @@ let erp: Server
 
 let erpUrl: string
 
-let silent: Server
-
-let silentPort: number
-
 const received: ReceivedRequest[] = []
-
-const openSockets = new Set<Socket>()
 
 const listening = async (server: Server) => {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
 
   return z.object({ port: z.number() }).parse(server.address()).port
-}
-
-const refusedPort = async () => {
-  const refusing = createTcpServer()
-  const port = await listening(refusing)
-  await new Promise((resolve) => refusing.close(resolve))
-
-  return port
 }
 
 beforeAll(async () => {
@@ -79,8 +66,6 @@ beforeAll(async () => {
   ;[api, sftp] = started
   ;({ admin } = api)
 
-  await sftp.exec(['sh', '-c', `install -d -m 700 /home/${sftpUser.username}/locked`])
-
   erp = createHttpServer((request, response) => {
     let body = ''
 
@@ -96,20 +81,10 @@ beforeAll(async () => {
     })
   })
   erpUrl = `http://127.0.0.1:${await listening(erp)}/api/edi/documents`
-
-  silent = createTcpServer((socket) => {
-    openSockets.add(socket)
-  })
-  silentPort = await listening(silent)
 }, 180_000)
 
 afterAll(async () => {
-  for (const socket of openSockets) {
-    socket.destroy()
-  }
-
   erp.close()
-  silent.close()
   await Promise.all([api.stop(), sftp.stop()])
 })
 
@@ -199,45 +174,6 @@ describe('POST /channels/:id/test for an SFTP Channel', () => {
       reason: 'loginRejected',
     })
   })
-
-  it('reports a private key that is not valid as a rejected login', async () => {
-    expect(
-      await outcomeOf({
-        ...sftpOutbox(),
-        authentication: 'privateKey',
-        credential: 'not a private key',
-      }),
-    ).toMatchObject({ outcome: 'failed', reason: 'loginRejected' })
-  })
-
-  it('reports a missing remote path', async () => {
-    expect(await outcomeOf({ ...sftpOutbox(), remotePath: '/outbox' })).toMatchObject({
-      outcome: 'failed',
-      reason: 'remotePathMissing',
-    })
-  })
-
-  it('reports a remote path the user may not read', async () => {
-    expect(await outcomeOf({ ...sftpOutbox(), remotePath: '/locked' })).toMatchObject({
-      outcome: 'failed',
-      reason: 'permissionDenied',
-    })
-  })
-
-  it('reports a host that refuses the connection as unreachable', async () => {
-    const port = await refusedPort()
-
-    expect(await outcomeOf({ ...sftpOutbox(), host: '127.0.0.1', port })).toMatchObject({
-      outcome: 'failed',
-      reason: 'hostUnreachable',
-    })
-  })
-
-  it('reports a host that never answers as timed out', async () => {
-    expect(await outcomeOf({ ...sftpOutbox(), host: '127.0.0.1', port: silentPort })).toMatchObject(
-      { outcome: 'failed', reason: 'timedOut' },
-    )
-  })
 })
 
 describe('POST /channels/:id/test for an HTTP Channel', () => {
@@ -250,46 +186,6 @@ describe('POST /channels/:id/test for an HTTP Channel', () => {
       url: '/api/edi/documents',
       headers: { authorization: 'Bearer erp-api-key-0815' },
       body: '',
-    })
-  })
-
-  it('counts any answer from the destination but a rejection or a server error as reached', async () => {
-    for (const status of [204, 301, 404, 405]) {
-      expect(await outcomeOf(httpDelivery(`${erpUrl}?status=${status}`))).toMatchObject({
-        outcome: 'succeeded',
-      })
-    }
-  })
-
-  it('reports a rejected authorization', async () => {
-    for (const status of [401, 403]) {
-      expect(await outcomeOf(httpDelivery(`${erpUrl}?status=${status}`))).toMatchObject({
-        outcome: 'failed',
-        reason: 'loginRejected',
-      })
-    }
-  })
-
-  it('reports a server error as an unexpected response', async () => {
-    expect(await outcomeOf(httpDelivery(`${erpUrl}?status=503`))).toMatchObject({
-      outcome: 'failed',
-      reason: 'unexpectedResponse',
-    })
-  })
-
-  it('reports a host that refuses the connection as unreachable', async () => {
-    const port = await refusedPort()
-
-    expect(await outcomeOf(httpDelivery(`http://127.0.0.1:${port}/`))).toMatchObject({
-      outcome: 'failed',
-      reason: 'hostUnreachable',
-    })
-  })
-
-  it('reports a host that never answers as timed out', async () => {
-    expect(await outcomeOf(httpDelivery(`http://127.0.0.1:${silentPort}/`))).toMatchObject({
-      outcome: 'failed',
-      reason: 'timedOut',
     })
   })
 })

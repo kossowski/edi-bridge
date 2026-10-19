@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { InjectOptions } from 'fastify'
 
+import { secretBox } from '@edi-bridge/channels'
 import {
   type ChannelInput,
   channelEndpoint,
@@ -16,7 +17,6 @@ import {
 import { channels, tradingPartners } from '@edi-bridge/db'
 
 import { secretContext, type SecretColumn } from './channel.js'
-import { secretBox } from './secret.js'
 import {
   type Client,
   otherWorkspace,

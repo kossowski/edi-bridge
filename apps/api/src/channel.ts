@@ -2,6 +2,7 @@ import { eq, or } from 'drizzle-orm'
 import { Context, Effect } from 'effect'
 import { randomInt, randomUUID } from 'node:crypto'
 
+import { ChannelReach, type ChannelUnreachable, type SecretBox } from '@edi-bridge/channels'
 import {
   type Channel,
   type ChannelInput,
@@ -17,7 +18,6 @@ import {
 } from '@edi-bridge/contracts'
 import { channels, flows } from '@edi-bridge/db'
 
-import { ChannelReach, type ChannelUnreachable } from './channel-reach.js'
 import { Db, type Transaction } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { byName, exactlyOne, inWorkspace, rejectingInvalidId, writingInWorkspace } from './rows.js'
@@ -25,7 +25,6 @@ import { assertTradingPartnerIn } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
-import type { SecretBox } from './secret.js'
 
 export interface ChannelSettings {
   secretKey: Buffer

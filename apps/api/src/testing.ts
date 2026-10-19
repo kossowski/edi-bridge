@@ -4,6 +4,7 @@ import { Effect } from 'effect'
 import type { LanguageModel } from 'ai'
 import type { FastifyServerOptions, InjectOptions, LightMyRequestResponse } from 'fastify'
 
+import { secretKeyBytes } from '@edi-bridge/channels'
 import { signInEndpoint, type WorkspaceRole } from '@edi-bridge/contracts'
 import { connect, members, workspaces } from '@edi-bridge/db'
 import { startTestDatabase } from '@edi-bridge/db/testing'
@@ -11,7 +12,6 @@ import { type QueuedRun, RunNotQueued, type RunQueueService } from '@edi-bridge/
 
 import { buildApp } from './app.js'
 import { developmentWorkspace } from './development-workspace.js'
-import { secretKeyBytes } from './secret.js'
 import { addUser, storePassword } from './user.js'
 
 import type { AuthSettings } from './auth.js'

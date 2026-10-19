@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.82",
+    "@edi-bridge/channels": "workspace:*",
     "@edi-bridge/contracts": "workspace:*",
     "@edi-bridge/db": "workspace:*",
     "@edi-bridge/edifact": "workspace:*",
