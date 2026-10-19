@@ -22,6 +22,10 @@ Conventional Commits, enforced by commitlint in the `commit-msg` hook. Fix the m
 
 Read `CODING_STANDARDS.md` before writing or reviewing code.
 
+### Checks
+
+What agents verify locally, leave to CI, and count as a UI or CI-only part. See `docs/agents/checks.md`; the agent scripts read this repo's values from `.agents/project.env`.
+
 ### Machine budget
 
 `.agents/machine.env` sets the budget for agent work on this machine: test slots, ticket leads, developers, swap and load limits. The agent scripts read it; skills name its keys.

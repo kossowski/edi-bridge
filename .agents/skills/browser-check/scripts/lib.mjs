@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
+import { join } from 'node:path'
 
 import { chromium } from 'playwright'
 
@@ -16,19 +18,38 @@ function freePort() {
   })
 }
 
-export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
-  const port = await freePort()
-  const child = spawn(
-    'pnpm',
-    ['--filter', '@edi-bridge/web', 'exec', 'next', 'dev', '--port', String(port)],
-    {
-      cwd: repo,
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      // apps/api doesn't serve the screens' endpoints yet, so the pages get their data from MSW.
-      env: { ...process.env, NEXT_PUBLIC_API_MOCKING: 'enabled' },
-    },
+function readEnvFile(file) {
+  return Object.fromEntries(
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#') && line.includes('='))
+      .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).replace(/^"(.*)"$/, '$1')]),
   )
+}
+
+export function webApp(repo) {
+  const file = join(repo, '.agents', 'project.env')
+  if (!existsSync(file)) throw new Error(`${file} is missing: it names WEB_PACKAGE and WEB_DEV_ENV, see docs/agents/checks.md`)
+  const { WEB_PACKAGE, WEB_DEV_ENV = '' } = readEnvFile(file)
+  if (!WEB_PACKAGE) throw new Error(`${file} sets no WEB_PACKAGE`)
+  const env = Object.fromEntries(
+    WEB_DEV_ENV.split(/\s+/)
+      .filter(Boolean)
+      .map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]),
+  )
+  return { pkg: WEB_PACKAGE, env, envText: WEB_DEV_ENV }
+}
+
+export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
+  const app = webApp(repo)
+  const port = await freePort()
+  const child = spawn('pnpm', ['--filter', app.pkg, 'exec', 'next', 'dev', '--port', String(port)], {
+    cwd: repo,
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, ...app.env },
+  })
   let log = ''
   child.stdout.on('data', (chunk) => (log += chunk))
   child.stderr.on('data', (chunk) => (log += chunk))
@@ -70,7 +91,7 @@ export async function startDevServer(repo, { timeoutMs = 120_000 } = {}) {
       if (running) {
         throw new Error(
           `A next dev server already runs for ${repo} at ${running[1]}. ` +
-            `Pass --base-url ${running[1]} if it runs with NEXT_PUBLIC_API_MOCKING=enabled, ` +
+            `Pass --base-url ${running[1]} if it runs with ${app.envText || 'the default env'}, ` +
             `or run the check against a worktree.`,
         )
       }

@@ -12,6 +12,8 @@ You plan, brief, review, and run every `git`, `gh`, and `gh stack` command that 
 
 Run every command from the repo root, the main checkout, and keep it on `main`. Reach a worktree with `git -C <worktree>` and `pnpm -C <worktree>`, and give subagents its absolute path. Paths in this skill are relative to the repo root.
 
+What this repo verifies locally, leaves to CI, counts as a UI or CI-only part, and splits into parallel parts is in `docs/agents/checks.md`.
+
 Communicate with subagents through **context pointers**: the ticket, the spec, the stack file, the parent branch. Don't paste what a pointer already reaches.
 
 When an engineering lead started you, its prompt names its session. Write each question and report into its inbox, as `question`, `report`, or `blocked` when you stop on a blocker:
@@ -30,7 +32,7 @@ Then you may nudge it with a one-line `SendMessage` naming the file, one try at 
 - **Part**: one PR of the stack, numbered `1` to `n` from the bottom.
 - **Branch**: `<type>/<NN>-<k>-<part-slug>`, where `<type>` is the commit type of the part and `<k>` the part number. Example: `feat/11-1-source-and-target-trees`.
 - **Parent**: the branch of part `k-1`. The parent of part 1 is `origin/main`.
-- **Worktree**: `../edi-bridge-worktrees/<NN>-<k>`, next to the repo root.
+- **Worktree**: `../<repo>-worktrees/<NN>-<k>`, next to the repo root, where `<repo>` is the repo root's folder name.
 - **Stack file**: `~/.agents/stacks/<NN>.md`, the plan and the PR numbers. It lives outside the repo and survives a context reset.
 
 ## Steps
@@ -50,7 +52,7 @@ Decide for this ticket how to split it into parts. The ticket as a whole is the 
 
 Order the parts so the stack reads as an argument: each part makes the one above it easy to review. Every acceptance criterion names the part that completes it. A ticket that is one change stays one part.
 
-A part is **parallel** when it and the part below it both build only on the same lower part and touch disjoint folders. Typical: part 1 in `contracts`, then an api part and a web part, the web part built against the MSW mocks. A parallel part is built at the same time as the part below it; on GitHub the stack stays linear. Mark it in the stack file with `Starts from: part <j>`.
+A part is **parallel** when it and the part below it both build only on the same lower part and touch disjoint folders. Typical: a contract part, then a server part and a client part that builds against mocks; `docs/agents/checks.md` names this repo's split. A parallel part is built at the same time as the part below it; on GitHub the stack stays linear. Mark it in the stack file with `Starts from: part <j>`.
 
 Write the stack file:
 
@@ -77,8 +79,8 @@ Start the next part as soon as the part below has its PR open and linked (step d
 
 ```bash
 git fetch origin
-git worktree add -b <branch> ../edi-bridge-worktrees/<NN>-<k> <parent>
-pnpm -C ../edi-bridge-worktrees/<NN>-<k> install --frozen-lockfile
+git worktree add -b <branch> ../<repo>-worktrees/<NN>-<k> <parent>
+pnpm -C ../<repo>-worktrees/<NN>-<k> install --frozen-lockfile
 ```
 
 For a parallel part, `<parent>` here and in its brief is the branch of the part its `Starts from` names.
@@ -101,15 +103,15 @@ Answer a developer's questions yourself, unless the answer is a product decision
 
 Skip the review and the browser check for a part that is **tiny** or **CI-only**, and write `skipped (tiny)` or `skipped (ci-only)` into the report's Review column:
 
-- **Tiny**: at most 20 insertions plus deletions in `git -C <worktree> diff --shortstat <parent>...HEAD -- . ':(exclude)pnpm-lock.yaml'`, generated files left out too, and no new behaviour: no new branch, route, endpoint, message or test case.
-- **CI-only**: every changed file is under `.github/` or `.husky/`, or is a config file at the repo root.
+- **Tiny**: at most 20 insertions plus deletions without the generated files, counted with the command in `docs/agents/checks.md`, and no new behaviour: no new branch, route, endpoint, message or test case.
+- **CI-only**: every changed file is a CI-only file of `docs/agents/checks.md`.
 
-Otherwise call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part changes what renders (components, routes, styles or i18n messages in `apps/web` or `packages/ui`), run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree, starts its dev server through `.agents/skills/developer/scripts/test-slot.sh`, and keeps the screenshots in its own context. Give the blocking findings you accept to one fresh developer subagent in the same worktree. A non-blocking finding goes into the report under Open; pass it on with the blocking ones only when its fix is trivial and inside the part's scope.
+Otherwise call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part is a UI part, run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree, starts its dev server through `.agents/skills/developer/scripts/test-slot.sh`, and keeps the screenshots in its own context. Give the blocking findings you accept to one fresh developer subagent in the same worktree. A non-blocking finding goes into the report under Open; pass it on with the blocking ones only when its fix is trivial and inside the part's scope.
 
 **d. Open the PR and link the stack.**
 
 ```bash
-git -C ../edi-bridge-worktrees/<NN>-<k> push -u origin <branch>
+git -C ../<repo>-worktrees/<NN>-<k> push -u origin <branch>
 gh pr create --base <parent branch name, `main` for part 1> --head <branch> \
   --title "<type>(<scope>): <subject>" --body-file <body file>
 ```

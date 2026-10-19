@@ -5,8 +5,8 @@
 # Usage: scripts/clean-tmp.sh <PR> [<PR> ...]
 #
 # Subagents name their scratch folders and files after the PR they check, e.g.
-# /tmp/edi-pr23-review, /tmp/pr27-browser or /tmp/pr14-submission.png. /tmp is
-# a tmpfs on this VM, so they hold RAM until deleted. Matches need a separator
+# /tmp/x-pr23-review, /tmp/pr27-browser or /tmp/pr14-submission.png. On a tmpfs
+# /tmp they hold RAM until deleted. Matches need a separator
 # after the number, so PR 2 never matches pr23. Session scratchpads under
 # /tmp/claude-* are never touched. Prints each deleted path and the space freed.
 set -euo pipefail

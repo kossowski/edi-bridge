@@ -7,12 +7,19 @@
 
 stack_file() { echo "$HOME/.agents/stacks/$1.md"; }
 
+worktrees_dir() { # → ../<repo>-worktrees next to the main checkout
+  local main
+  main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+  echo "$main/../$(basename "$main")-worktrees"
+}
+
 parse_stack() {
-  local nn=$1 file line k rest branch pr
+  local nn=$1 file line k rest branch pr wts
   file=$(stack_file "$nn")
   [[ -f $file ]] || { echo "No stack file $file" >&2; return 2; }
   TITLE=$(sed -n '1s/^# [0-9]*: //p' "$file")
   PARTS=() BRANCHES=() PRS=() WORKTREES=()
+  wts=$(worktrees_dir)
   while IFS= read -r line; do
     [[ $line =~ ^([0-9]+)\.\ (.*)$ ]] || continue
     k=${BASH_REMATCH[1]} rest=${BASH_REMATCH[2]}
@@ -20,7 +27,7 @@ parse_stack() {
     pr=$(awk -F' \\| ' '{print $3}' <<<"$rest" | sed -n 's/^PR: *#\{0,1\}//p' | xargs)
     [[ -n $branch ]] || { echo "Part $k has no branch in $file" >&2; return 2; }
     PARTS+=("$k") BRANCHES+=("$branch") PRS+=("${pr:--}")
-    WORKTREES+=("$(git rev-parse --show-toplevel)/../edi-bridge-worktrees/$nn-$k")
+    WORKTREES+=("$wts/$nn-$k")
   done <"$file"
   ((${#PARTS[@]} > 0)) || { echo "No parts in $file" >&2; return 2; }
 }

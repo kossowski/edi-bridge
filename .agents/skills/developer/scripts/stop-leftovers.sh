@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Stops what a developer or a check left running from the worktrees folder, or from one worktree:
+# Stops what a developer or a check left running from ../<repo>-worktrees, or from one worktree:
 # dev servers, Storybook, vitest browser runs and their Chromium. Matches on the working directory
 # of each process, spares this shell and its parents, and prints what it stopped.
 #
 # Usage: scripts/stop-leftovers.sh [<worktree>]
 set -uo pipefail
-root=$(git rev-parse --show-toplevel)
-dir=$(realpath -m "${1:-$root/../edi-bridge-worktrees}")
+project="$(dirname "$0")/../../../project.env"
+[ -f "$project" ] && . "$project"
+main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+dir=$(realpath -m "${1:-$main/../$(basename "$main")-worktrees}")
 
 skip=" $$ "; p=$PPID
 while [[ $p -gt 1 ]]; do
@@ -37,7 +39,7 @@ else
   echo "stopped ${#pids[@]} process(es)"
 fi
 
-for port in 3000 6006; do
+for port in ${DEV_PORTS:-}; do
   holder=$(ss -ltnpH "sport = :$port" 2>/dev/null | grep -o 'pid=[0-9]*' | head -1)
   [[ -n $holder ]] && echo "port $port is still held by pid ${holder#pid=}, which runs outside $dir"
 done
