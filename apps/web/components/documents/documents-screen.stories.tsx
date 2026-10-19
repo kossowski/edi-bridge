@@ -11,6 +11,10 @@ import preview from '../../.storybook/preview'
 
 const runs = createRuns({ count: 40 })
 
+const incompleteSetupRuns = createRuns({ count: 200 }).filter(
+  ({ problem }) => problem?.reason === 'incompleteSetup',
+)
+
 const allStatuses = { nextjs: { navigation: { pathname: '/documents', query: { status: 'all' } } } }
 
 const meta = preview.meta({
@@ -101,6 +105,18 @@ export const NothingMatches = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('No documents match')).toBeVisible()
     await expect(canvas.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(2)
+  },
+})
+
+export const IncompleteSetup = meta.story({
+  beforeEach({ msw }) {
+    msw.use(runsHandler(apiUrl, incompleteSetupRuns))
+  },
+  async play({ canvas }) {
+    const badges = await canvas.findAllByText('Complete the setup')
+
+    await expect(badges).toHaveLength(incompleteSetupRuns.length)
+    await expect(canvas.queryByText('Just try again')).toBeNull()
   },
 })
 

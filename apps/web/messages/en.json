@@ -664,6 +664,7 @@
     },
     "whoFixes": {
       "retry": "Just try again",
+      "setup": "Complete the setup",
       "tradingPartner": "Your partner fixes this",
       "you": "You fix this"
     },
@@ -791,7 +792,8 @@
       "whoFixes": {
         "you": "This one is on your side. You can fix it yourself.",
         "tradingPartner": "Nothing to fix on your side. {tradingPartner} has to send a corrected file.",
-        "retry": "Nothing is wrong with the document itself. Trying again usually works."
+        "retry": "Nothing is wrong with the document itself. Trying again usually works.",
+        "setup": "Nothing is wrong with the document itself. Complete the setup first, then try again."
       },
       "waiting": "Marked as waiting for {tradingPartner} since <time>{since}</time>.",
       "steps": {

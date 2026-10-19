@@ -664,6 +664,7 @@
     },
     "whoFixes": {
       "retry": "Erneut versuchen genügt",
+      "setup": "Einrichtung vervollständigen",
       "tradingPartner": "Ihr Partner behebt das",
       "you": "Sie beheben das"
     },
@@ -791,7 +792,8 @@
       "whoFixes": {
         "you": "Das liegt auf Ihrer Seite. Sie können es selbst beheben.",
         "tradingPartner": "Auf Ihrer Seite ist nichts zu beheben. {tradingPartner} muss eine korrigierte Datei senden.",
-        "retry": "Am Beleg selbst ist nichts falsch. Ein erneuter Versuch klappt meistens."
+        "retry": "Am Beleg selbst ist nichts falsch. Ein erneuter Versuch klappt meistens.",
+        "setup": "Am Beleg selbst ist nichts falsch. Vervollständigen Sie zuerst die Einrichtung und versuchen Sie es dann erneut."
       },
       "waiting": "Als wartend auf {tradingPartner} markiert seit <time>{since}</time>.",
       "steps": {

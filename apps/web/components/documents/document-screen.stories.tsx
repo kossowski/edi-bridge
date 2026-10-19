@@ -395,6 +395,14 @@ export const IncompleteSetup = meta.story({
       }),
     ).toBeVisible()
     await expect(canvas.getByText("your company's GLN is missing", { exact: false })).toBeVisible()
+    await expect(canvas.getByText('Complete the setup', { exact: true })).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'Nothing is wrong with the document itself. Complete the setup first, then try again.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByText('Just try again')).toBeNull()
+    await expect(canvas.queryByText('Trying again usually works.', { exact: false })).toBeNull()
     await expect(canvas.getByText('Complete the setup.')).toBeVisible()
 
     const fix = canvas.getByRole('link', { name: "Record your company's GLN" })
@@ -427,6 +435,12 @@ export const GermanIncompleteSetup = meta.story({
       await canvas.findByRole('heading', {
         name: `Die Einrichtung für ${partner.name} ist nicht vollständig`,
       }),
+    ).toBeVisible()
+    await expect(canvas.getByText('Einrichtung vervollständigen', { exact: true })).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'Am Beleg selbst ist nichts falsch. Vervollständigen Sie zuerst die Einrichtung und versuchen Sie es dann erneut.',
+      ),
     ).toBeVisible()
     await expectFixLink(
       canvas.getByRole('link', { name: `Zugangsdaten von „${channel.name}“ prüfen` }),
