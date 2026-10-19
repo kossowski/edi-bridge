@@ -18,6 +18,7 @@ import {
   mappingDraftSchema,
   mappingSummarySchema,
   parseAiDraftEvent,
+  proposedAiReview,
   type RequestAiDraftBody,
   requestAiDraftEndpoint,
   saveMappingDraftEndpoint,
@@ -180,6 +181,25 @@ const cancelledAfter = async (
   return eventsOf(received)
 }
 
+// The Admin saves the Draft while the model works on its answer.
+const savingDuringRun = (
+  mappingId: string,
+  saved: ReadonlyArray<MappingLink>,
+  proposed: ReadonlyArray<MappingLink>,
+) => {
+  generate = async () => {
+    const response = await api.admin.inject({
+      method: 'PUT',
+      url: toPath(saveMappingDraftEndpoint.path, { id: mappingId }),
+      body: { links: saved, transforms: [], transformLinks: [] },
+    })
+
+    expect(response.statusCode).toBe(200)
+
+    return answer(proposed)
+  }
+}
+
 const usedToday = async () =>
   aiBudgetSchema.parse(
     (await api.admin.inject({ method: 'GET', url: aiBudgetEndpoint.path })).json(),
@@ -296,17 +316,7 @@ describe('POST /mappings/:id/ai-draft', () => {
     const { mappingId, sampleId } = await createdInvoiceMapping()
     const savedLink = { sourcePath: 'orderNumber', targetPath: 'SG1+ON/RFF+ON/C506/1154' }
 
-    generate = async () => {
-      const saved = await api.admin.inject({
-        method: 'PUT',
-        url: toPath(saveMappingDraftEndpoint.path, { id: mappingId }),
-        body: { links: [savedLink], transforms: [], transformLinks: [] },
-      })
-
-      expect(saved.statusCode).toBe(200)
-
-      return answer(invoiceLinks)
-    }
+    savingDuringRun(mappingId, [savedLink], invoiceLinks)
 
     const events = eventsOf((await requestDraft(mappingId, { sampleId })).body)
 
@@ -315,6 +325,43 @@ describe('POST /mappings/:id/ai-draft', () => {
       draft: { links: [savedLink, ...invoiceLinks] },
     })
     expect((await draftOf(mappingId)).links).toEqual([savedLink, ...invoiceLinks])
+  })
+
+  it('keeps the link the Admin saved to a proposed target during the run', async () => {
+    const { mappingId, sampleId } = await createdInvoiceMapping()
+    const savedLink = { sourcePath: 'orderDate', targetPath: 'BGM/1004' }
+    const stored = invoiceLinks.slice(1)
+
+    savingDuringRun(mappingId, [savedLink], invoiceLinks)
+
+    const drafted = eventsOf((await requestDraft(mappingId, { sampleId })).body).at(-1)
+    const draft = await draftOf(mappingId)
+
+    expect(drafted).toMatchObject({
+      type: 'drafted',
+      proposal: { links: stored },
+      draft: { links: [savedLink, ...stored] },
+    })
+    expect(draft.links).toEqual([savedLink, ...stored])
+    expect(draft.aiReview).toEqual(
+      proposedAiReview(sampleId, { links: stored, transforms: [], transformLinks: [] }),
+    )
+  })
+
+  it('stores nothing when the Admin linked every proposed target during the run', async () => {
+    const { mappingId, sampleId } = await createdInvoiceMapping()
+    const savedLinks = invoiceLinks.map((link) => ({ ...link, sourcePath: 'orderNumber' }))
+
+    savingDuringRun(mappingId, savedLinks, invoiceLinks)
+
+    const drafted = eventsOf((await requestDraft(mappingId, { sampleId })).body).at(-1)
+
+    expect(drafted).toMatchObject({
+      type: 'drafted',
+      proposal: { links: [] },
+      draft: { links: savedLinks, aiReview: null },
+    })
+    expect(await draftOf(mappingId)).toMatchObject({ links: savedLinks, aiReview: null })
   })
 
   it('fails the run and keeps the other review when an AI review opened during the run', async () => {

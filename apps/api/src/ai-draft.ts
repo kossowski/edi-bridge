@@ -83,6 +83,16 @@ const linkedTargets = (graph: MappingGraph) => [
   ...transformLinkTargets(graph.transformLinks),
 ]
 
+// A target takes one link at most, so a link the Draft already has for a target wins.
+export const unlinkedProposal = (draft: MappingGraph, proposal: AiProposal): AiProposal => {
+  const linked = new Set(linkedTargets(draft))
+
+  return {
+    ...proposal,
+    links: proposal.links.filter(({ targetPath }) => !linked.has(targetPath)),
+  }
+}
+
 // Problems the graph has on its own come first, since the engine would stop at the first of them.
 const checkProposal = (
   loaded: Loaded,

@@ -14,7 +14,7 @@ import {
 import { mappings } from '@edi-bridge/db'
 
 import { recordAiTokenUsage, requireAiBudget } from './ai-budget.js'
-import { draftMapping, withProposal } from './ai-draft.js'
+import { draftMapping, unlinkedProposal, withProposal } from './ai-draft.js'
 import { Db } from './db.js'
 import { AiReviewOpen, NotFound } from './errors.js'
 import { loadSamples } from './mapping-preview.js'
@@ -32,55 +32,59 @@ const unavailable: AiDraftEvent = { type: 'failed', reason: 'unavailable' }
 
 const reviewOpened: AiDraftEvent = { type: 'failed', reason: 'checkFailed' }
 
-// Merges onto the Draft as it is now, since the Admin may have saved it during the run.
+// Merges onto the Draft as it is now, since the Admin may have saved it during the run. The
+// proposal holds only the links stored, so the event and the AI review name the same links.
 const storeDraft = (id: string, sampleId: string, proposal: AiProposal) =>
   Effect.gen(function* () {
-    const aiReview = proposedAiReview(sampleId, proposal)
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+    const where = inWorkspace(mappings, workspace.id, eq(mappings.id, id))
 
-    if (aiReview !== null) {
-      const db = yield* Db
-      const workspace = yield* CurrentWorkspace
-      const where = inWorkspace(mappings, workspace.id, eq(mappings.id, id))
+    const stored = yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        // Locks the row, so a save or another AI draft cannot slip in before the update.
+        const [current] = await tx
+          .select({ draft: mappings.draft, aiReview: mappings.aiReview })
+          .from(mappings)
+          .where(where)
+          .for('update')
 
-      const stored = yield* Effect.promise(() =>
-        db.transaction(async (tx) => {
-          // Locks the row, so a save or another AI draft cannot slip in before the update.
-          const [current] = await tx
-            .select({ draft: mappings.draft, aiReview: mappings.aiReview })
-            .from(mappings)
-            .where(where)
-            .for('update')
+        if (current === undefined) {
+          throw new Error(`The Mapping ${id} is gone`)
+        }
 
-          if (current === undefined) {
-            throw new Error(`The Mapping ${id} is gone`)
-          }
+        if (current.aiReview !== null) {
+          return null
+        }
 
-          if (current.aiReview !== null) {
-            return false
-          }
+        const merged = unlinkedProposal(current.draft, proposal)
+        const aiReview = proposedAiReview(sampleId, merged)
 
-          await tx
-            .update(mappings)
-            .set({
-              draft: withProposal(current.draft, proposal),
-              aiReview,
-              unpublishedChanges: true,
-              draftUpdatedAt: sql`now()`,
-            })
-            .where(where)
+        if (aiReview === null) {
+          return merged
+        }
 
-          return true
-        }),
-      )
+        await tx
+          .update(mappings)
+          .set({
+            draft: withProposal(current.draft, merged),
+            aiReview,
+            unpublishedChanges: true,
+            draftUpdatedAt: sql`now()`,
+          })
+          .where(where)
 
-      if (!stored) {
-        return reviewOpened
-      }
+        return merged
+      }),
+    )
+
+    if (stored === null) {
+      return reviewOpened
     }
 
     const draft = yield* loadMappingDraft(id)
 
-    return { type: 'drafted', proposal, draft } satisfies AiDraftEvent
+    return { type: 'drafted', proposal: stored, draft } satisfies AiDraftEvent
   })
 
 const drafting = (
