@@ -459,3 +459,38 @@ export async function readRun(db: Db, id: string) {
 
   return { ...run, document, steps }
 }
+
+export async function receiveOverSftp(
+  db: Db,
+  workspace: InvoiceWorkspace,
+  login: { host: string; port: number; username: string; password: string; remotePath: string },
+  {
+    flowId,
+    pollingIntervalMinutes = 1,
+    secrets = testSecrets,
+  }: { flowId?: string; pollingIntervalMinutes?: number; secrets?: SecretBox } = {},
+) {
+  const id = randomUUID()
+
+  await db.insert(channels).values({
+    id,
+    workspaceId: workspace.id,
+    tradingPartnerId: workspace.tradingPartnerId,
+    type: 'sftp',
+    direction: 'inbound',
+    name: `Hanse Retail SFTP outbox ${id.slice(0, 8)}`,
+    host: login.host,
+    port: login.port,
+    username: login.username,
+    remotePath: login.remotePath,
+    authentication: 'password',
+    encryptedCredential: secrets.seal(login.password, secretContext(id, 'encryptedCredential')),
+    pollingIntervalMinutes,
+  })
+
+  if (flowId !== undefined) {
+    await db.update(flows).set({ inboundChannelId: id }).where(eq(flows.id, flowId))
+  }
+
+  return id
+}
