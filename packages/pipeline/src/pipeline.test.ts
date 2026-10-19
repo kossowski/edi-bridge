@@ -133,6 +133,10 @@ describe('the receipt of a Document', () => {
   const storedDocuments = (channelId: string) =>
     connection.db.select().from(documents).where(eq(documents.channelId, channelId))
 
+  // The Document a rejection after storing kept, under the file name rejection() gives it.
+  const keptDocumentId = async (channelId: string) =>
+    (await storedDocuments(channelId)).find(({ fileName }) => fileName === 'invoice.json')?.id ?? ''
+
   const rejection = async (arriving: Partial<ArrivingDocument>) => {
     const queue = inMemoryRunQueue()
 
@@ -170,9 +174,10 @@ describe('the receipt of a Document', () => {
     expect(await rejection({ channelId: workspace.outboundChannelId })).toStrictEqual(
       Exit.fail(new ReceiptRejected({ reason: 'outboundChannel' })),
     )
+    await expect(storedDocuments(workspace.outboundChannelId)).resolves.toEqual([])
   })
 
-  it('rejects an inbound Channel without a Flow and stores no Document', async () => {
+  it('rejects an inbound Channel without a Flow and keeps the Document', async () => {
     const [channel] = await connection.db
       .insert(channels)
       .values({
@@ -186,15 +191,17 @@ describe('the receipt of a Document', () => {
       })
       .returning()
 
-    expect(await rejection({ channelId: channel?.id ?? '' })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'noFlow' })),
+    const channelId = channel?.id ?? ''
+    const exit = await rejection({ channelId })
+
+    expect(exit).toStrictEqual(
+      Exit.fail(
+        new ReceiptRejected({ reason: 'noFlow', documentId: await keptDocumentId(channelId) }),
+      ),
     )
-    await expect(
-      connection.db
-        .select()
-        .from(documents)
-        .where(eq(documents.channelId, channel?.id ?? '')),
-    ).resolves.toEqual([])
+    await expect(storedDocuments(channelId)).resolves.toMatchObject([
+      { fileName: 'invoice.json', content: goldenInvoice },
+    ])
   })
 
   it('queues one Run per routed Message of an Interchange and lists the others as not routed', async () => {
@@ -264,8 +271,15 @@ describe('the receipt of a Document', () => {
       "UNZ+1+00000001'",
     ].join('\n')
 
-    expect(await rejection({ channelId, content: ordersOnly })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'noRoutedMessage' })),
+    const exit = await rejection({ channelId, content: ordersOnly })
+
+    expect(exit).toStrictEqual(
+      Exit.fail(
+        new ReceiptRejected({
+          reason: 'noRoutedMessage',
+          documentId: await keptDocumentId(channelId),
+        }),
+      ),
     )
   })
 
@@ -354,13 +368,18 @@ describe('the receipt of a Document', () => {
     )
   })
 
-  it('rejects a Document without Message Types when several outbound Flows could take it', async () => {
+  it('rejects a Document without Message Types when several outbound Flows could take it and keeps it', async () => {
     const { channelId } = await channelWithFlows(['INVOIC', 'DESADV'])
+    const exit = await rejection({ channelId })
 
-    expect(await rejection({ channelId })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'ambiguousFlow' })),
+    expect(exit).toStrictEqual(
+      Exit.fail(
+        new ReceiptRejected({
+          reason: 'ambiguousFlow',
+          documentId: await keptDocumentId(channelId),
+        }),
+      ),
     )
-    await expect(storedDocuments(channelId)).resolves.toEqual([])
   })
 
   const ordersMessage = golden('orders-reference.edi', 'latin1')

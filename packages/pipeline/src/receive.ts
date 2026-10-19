@@ -133,8 +133,6 @@ export const receive = (arriving: ArrivingDocument) =>
 
     yield* checkInboundChannel(arriving.workspaceId, arriving.channelId)
 
-    const { routed, notRouted } = yield* routeOnChannel(arriving)
-
     const documents = yield* Documents
 
     const document = yield* Effect.promise(() =>
@@ -144,6 +142,11 @@ export const receive = (arriving: ArrivingDocument) =>
         fileName: arriving.fileName,
         content: arriving.content,
       }),
+    )
+
+    // A Document rejected after storing stays findable by its id.
+    const { routed, notRouted } = yield* routeOnChannel(arriving).pipe(
+      Effect.mapError(({ reason }) => new ReceiptRejected({ reason, documentId: document.id })),
     )
 
     const db = yield* Database

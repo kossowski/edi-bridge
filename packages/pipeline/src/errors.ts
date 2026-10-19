@@ -12,6 +12,8 @@ export type ReceiptRejection = keyof typeof receiptRejections
 
 export class ReceiptRejected extends Data.TaggedError('ReceiptRejected')<{
   readonly reason: ReceiptRejection
+  // Set when the Document was stored before the rejection.
+  readonly documentId?: string
 }> {
   override get message() {
     return receiptRejections[this.reason]
