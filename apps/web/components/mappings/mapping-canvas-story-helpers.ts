@@ -4,7 +4,7 @@ import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
 import type { BeforeEach } from 'storybook/internal/csf'
 
 import { nodeId } from '@/components/mappings/mapping-tree'
-import { findRowButton } from '@/components/mappings/tree-node'
+import { findRowButton, rowOfButton } from '@/components/mappings/tree-node'
 import { apiUrl } from '@/lib/api/config'
 import { mappingDraftEndpoint, toPath } from '@edi-bridge/contracts'
 import {
@@ -248,6 +248,11 @@ export async function openLinkMenuByKeyboard(
 }
 
 // An empty Mapping opens on "Start here"; this takes the path that opens the empty editor.
+// The editor focuses its first source row frames later, taking the focus from a row focused before.
 export async function openEmptyEditor(canvasElement: HTMLElement, name = 'Open the empty editor') {
   await userEvent.click(await within(canvasElement).findByRole('button', { name }))
+  await waitFor(
+    () => expect(rowOfButton(canvasElement.ownerDocument.activeElement)?.side).toBe('source'),
+    { timeout: 5000 },
+  )
 }
