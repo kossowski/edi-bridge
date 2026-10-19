@@ -4,6 +4,25 @@ import { runs, tradingPartners } from './schema.js'
 
 import type { Connection } from './client.js'
 
+type Transaction = Parameters<Parameters<Connection['db']['transaction']>[0]>[0]
+
+export async function claimTradingPartnerControlReference(
+  tx: Transaction,
+  tradingPartnerId: string,
+) {
+  const [partner] = await tx
+    .update(tradingPartners)
+    .set({ nextControlReference: sql`${tradingPartners.nextControlReference} + 1` })
+    .where(eq(tradingPartners.id, tradingPartnerId))
+    .returning({ claimed: sql<number>`${tradingPartners.nextControlReference} - 1` })
+
+  if (partner === undefined) {
+    throw new Error(`Trading Partner ${tradingPartnerId} is missing`)
+  }
+
+  return partner.claimed
+}
+
 // A Run keeps its reference, so a Retry resends the same Interchange.
 export function claimControlReference(
   db: Connection['db'],
@@ -24,18 +43,10 @@ export function claimControlReference(
       return run.controlReference
     }
 
-    const [partner] = await tx
-      .update(tradingPartners)
-      .set({ nextControlReference: sql`${tradingPartners.nextControlReference} + 1` })
-      .where(eq(tradingPartners.id, run.tradingPartnerId))
-      .returning({ claimed: sql<number>`${tradingPartners.nextControlReference} - 1` })
+    const claimed = await claimTradingPartnerControlReference(tx, run.tradingPartnerId)
 
-    if (partner === undefined) {
-      throw new Error(`Trading Partner ${run.tradingPartnerId} of Run ${runId} is missing`)
-    }
+    await tx.update(runs).set({ controlReference: claimed }).where(eq(runs.id, runId))
 
-    await tx.update(runs).set({ controlReference: partner.claimed }).where(eq(runs.id, runId))
-
-    return partner.claimed
+    return claimed
   })
 }

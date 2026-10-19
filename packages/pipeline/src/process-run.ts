@@ -40,7 +40,6 @@ import {
   workspaces,
 } from '@edi-bridge/db'
 import {
-  type Interchange,
   type InterchangeAction,
   isBrokenMessage,
   type Message,
@@ -49,8 +48,6 @@ import {
   type Position,
   readAcknowledgedInterchange,
   ReadAcknowledgementError,
-  type Segment,
-  serialize,
   validate,
   ValidationError,
 } from '@edi-bridge/edifact'
@@ -69,6 +66,7 @@ import {
 import type { DeliveryFailed, OutboundDocument } from '@edi-bridge/channels'
 import type { ParseError } from '@edi-bridge/edifact'
 
+import { enveloped, framed } from './envelope'
 import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
 
@@ -437,62 +435,6 @@ const deliveryFailure = (
       }),
     }),
   )
-
-const envelopeTrailer: Segment = { tag: 'UNZ', elements: [] }
-
-const framed = (message: Message, header: Segment, trailer = envelopeTrailer): Interchange => ({
-  hasServiceStringAdvice: false,
-  delimiters: {
-    component: ':',
-    element: '+',
-    decimal: '.',
-    release: '?',
-    repetition: ' ',
-    segment: "'",
-  },
-  header,
-  messages: [message],
-  trailer,
-})
-
-const twoDigits = (value: number) => String(value).padStart(2, '0')
-
-type Envelope = {
-  characterSet: CharacterSet
-  sender: string
-  receiver: string
-  sentAt: DateTime.Utc
-  reference: number
-}
-
-const enveloped = (
-  message: Message,
-  { characterSet, sender, receiver, sentAt, reference }: Envelope,
-) => {
-  const { year, month, day, hour, minute } = DateTime.toPartsUtc(sentAt)
-
-  return serialize({
-    ...framed(
-      message,
-      {
-        tag: 'UNB',
-        elements: [
-          [characterSet, '3'],
-          [sender, '14'],
-          [receiver, '14'],
-          [
-            twoDigits(year % 100) + twoDigits(month) + twoDigits(day),
-            twoDigits(hour) + twoDigits(minute),
-          ],
-          [String(reference)],
-        ],
-      },
-      { tag: 'UNZ', elements: [['1'], [String(reference)]] },
-    ),
-    // The default separators of UNOB are IS1 to IS4, so a UNA declares the printable ones.
-    hasServiceStringAdvice: characterSet === 'UNOB',
-  })
-}
 
 // UNOA to UNOC are ISO 8859-1 or a subset of it; Node has no encoder for UNOD to UNOF.
 const encoded = (interchange: string, characterSet: CharacterSet) =>

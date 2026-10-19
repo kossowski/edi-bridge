@@ -5,6 +5,7 @@ import { directionOf } from '@edi-bridge/contracts'
 import { channels, flows, type RawDocument, runs, runSteps, tradingPartners } from '@edi-bridge/db'
 import { ParseError, parseMessages } from '@edi-bridge/edifact'
 
+import { answerOf, recordAnswer, warnNotSent } from './acknowledgement'
 import { ReceiptRejected } from './errors'
 import { Database, Documents, RunQueue } from './services'
 import { stagesOf } from './stages'
@@ -76,7 +77,8 @@ function flowFor(
 
 // Without a Message Type to route by, only an outbound Flow's Document Structure can read it.
 function route(content: string, channelFlows: readonly ChannelFlow[]) {
-  const { sender, messages } = declaredMessagesOf(content)
+  const declared = declaredMessagesOf(content)
+  const { sender, messages } = declared
 
   if (messages.length === 0) {
     const outbound = channelFlows.flatMap(({ flow }) =>
@@ -88,6 +90,7 @@ function route(content: string, channelFlows: readonly ChannelFlow[]) {
       : Effect.succeed({
           routed: outbound.map((flow): RoutedMessage => ({ flow, messageIndex: null })),
           notRouted: [],
+          declared,
         })
   }
 
@@ -104,7 +107,7 @@ function route(content: string, channelFlows: readonly ChannelFlow[]) {
     }
   }
 
-  return Effect.succeed({ routed, notRouted })
+  return Effect.succeed({ routed, notRouted, declared })
 }
 
 const nameCollator = new Intl.Collator('de')
@@ -173,16 +176,36 @@ export const receive = (arriving: ArrivingDocument) =>
     )
 
     // A Document rejected after storing stays findable by its id.
-    const { routed, notRouted } = yield* routeOnChannel(arriving).pipe(
+    const { routed, notRouted, declared } = yield* routeOnChannel(arriving).pipe(
       Effect.mapError(({ reason }) => new ReceiptRejected({ reason, documentId: document.id })),
     )
+
+    // The Runs do not depend on the CONTRL, so a defect in it leaves the Document unanswered.
+    const answer = yield* answerOf(
+      arriving.workspaceId,
+      arriving.content,
+      {
+        sender: declared.sender,
+        messageTypes: declared.messages.map(({ messageType }) => messageType),
+      },
+      routed.map(({ flow }) => flow),
+    ).pipe(
+      Effect.catchCause((cause) =>
+        Effect.as(
+          Effect.logError(`The CONTRL for Document ${document.id} was not recorded`, cause),
+          undefined,
+        ),
+      ),
+    )
+
+    const answeredAt = yield* DateTime.now
 
     const db = yield* Database
     const receiptFinishedAt = yield* DateTime.nowAsDate
 
     const created = yield* Effect.promise(() =>
-      db.transaction((tx) =>
-        Promise.all(
+      db.transaction(async (tx) => {
+        const inserted = await Promise.all(
           routed.map(async ({ flow, messageIndex }) => {
             const [run] = await tx
               .insert(runs)
@@ -218,9 +241,24 @@ export const receive = (arriving: ArrivingDocument) =>
 
             return run
           }),
-        ),
-      ),
+        )
+
+        if (answer !== undefined) {
+          await recordAnswer(
+            tx,
+            { workspaceId: arriving.workspaceId, documentId: document.id },
+            answer,
+            answeredAt,
+          )
+        }
+
+        return inserted
+      }),
     )
+
+    if (answer !== undefined) {
+      yield* warnNotSent(document.id, answer)
+    }
 
     const queue = yield* RunQueue
 

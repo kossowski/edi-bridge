@@ -60,6 +60,7 @@ export function startRunWorker({
     sweepRunsEvery({ interval: requeueInterval, stuckAfter }).pipe(
       Effect.provideService(Database, db),
       Effect.provideService(RunQueue, queue.service),
+      Effect.provideService(Delivery, delivery),
     ),
   )
 

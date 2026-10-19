@@ -576,6 +576,68 @@ export const runs = pgTable(
   ],
 )
 
+export const acknowledgementNotSentReasons = [
+  'noOutboundChannel',
+  'ambiguousChannel',
+  'workspaceGlnMissing',
+  'tradingPartnerGlnMissing',
+  'unreadableInterchangeHeader',
+  'unechoableInterchangeHeader',
+] as const
+
+export const acknowledgementNotSentReason = pgEnum(
+  'acknowledgement_not_sent_reason',
+  acknowledgementNotSentReasons,
+)
+
+// The CONTRL this Workspace answers a received Interchange with.
+export const acknowledgements = pgTable(
+  'acknowledgements',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    documentId: uuid()
+      .notNull()
+      .unique()
+      .references(() => documents.id),
+    tradingPartnerId: uuid()
+      .notNull()
+      .references(() => tradingPartners.id),
+    channelId: uuid().references(() => channels.id),
+    controlReference: integer(),
+    content: text(),
+    notSentReason: acknowledgementNotSentReason(),
+    // Set at each attempt, so an attempt cut off by a worker restart is tried again after a bound.
+    deliveryAttemptedAt: timestamp({ withTimezone: true, mode: 'date' }),
+    deliveryError: text(),
+    handedOverAt: timestamp({ withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index().on(table.workspaceId),
+    index().on(table.tradingPartnerId),
+    index().on(table.channelId),
+    index('acknowledgements_unsent_index')
+      .on(table.deliveryAttemptedAt)
+      .where(sql`${table.handedOverAt} is null and ${table.notSentReason} is null`),
+    check(
+      'acknowledgements_content',
+      sql`num_nonnulls(${table.content}, ${table.controlReference}) in (0, 2)`,
+    ),
+    check(
+      'acknowledgements_not_sent_reason',
+      sql`(${table.notSentReason} is null) = (${table.channelId} is not null and ${table.content} is not null)`,
+    ),
+    check(
+      'acknowledgements_handed_over',
+      sql`${table.handedOverAt} is null or ${table.notSentReason} is null`,
+    ),
+    check('acknowledgements_control_reference', sql`${table.controlReference} >= 1`),
+  ],
+)
+
 export const runStepStage = pgEnum('run_step_stage', runStepStages)
 
 export const runStepStatus = pgEnum('run_step_status', runStepStatuses)
