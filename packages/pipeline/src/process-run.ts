@@ -921,13 +921,12 @@ const step = <A, E, R>(
     )
 
     if (finished === undefined) {
-      if (Result.isFailure(result) && Predicate.isTagged(result.failure, 'RunNotOwned')) {
-        return yield* result.failure
-      }
+      const failure = Result.isFailure(result) ? result.failure : undefined
 
+      // A step that found the Run lost itself passes on its cause, so the warning names it once.
       return yield* new RunNotOwned({
         runId,
-        cause: Result.isFailure(result) ? result.failure : undefined,
+        cause: failure instanceof RunNotOwned ? failure.cause : failure,
       })
     }
 
