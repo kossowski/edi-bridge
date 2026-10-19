@@ -5,6 +5,8 @@ import Fastify from 'fastify'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
+  acceptAiDraftEndpoint,
+  acceptAiProposedPartsEndpoint,
   acceptInviteEndpoint,
   aiReviewOpenStatus,
   channelEndpoint,
@@ -76,6 +78,7 @@ import {
   type RunQueueService,
 } from '@edi-bridge/pipeline'
 
+import { acceptAiDraft, acceptAiProposedParts } from './ai-review.js'
 import { type AuthSettings, mountAuth } from './auth.js'
 import { ChannelReach, channelReach } from './channel-reach.js'
 import {
@@ -655,6 +658,21 @@ function registerRoutes(
       request,
       reply,
       saveMappingDraft(request.params.id, parse(saveMappingDraftEndpoint.body, request.body)),
+    ),
+  )
+
+  app.post<{ Params: { id: string } }>(acceptAiDraftEndpoint.path, (request, reply) =>
+    respond(request, reply, acceptAiDraft(request.params.id)),
+  )
+
+  app.post<{ Params: { id: string } }>(acceptAiProposedPartsEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      acceptAiProposedParts(
+        request.params.id,
+        parse(acceptAiProposedPartsEndpoint.body, request.body),
+      ),
     ),
   )
 

@@ -4,6 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { InjectOptions } from 'fastify'
 
 import {
+  acceptAiDraftEndpoint,
+  acceptAiProposedPartsEndpoint,
   type AiReview,
   aiReviewOpenStatus,
   createDocumentStructureEndpoint,
@@ -30,9 +32,13 @@ let connection: Connection
 
 let admin: Client
 
+let viewer: Client
+
+let otherAdmin: Client
+
 beforeAll(async () => {
   api = await startTestApi()
-  ;({ connection, admin } = api)
+  ;({ connection, admin, viewer, otherAdmin } = api)
 }, 60_000)
 
 afterAll(async () => {
@@ -219,5 +225,127 @@ describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
     expect(response.statusCode).toBe(aiReviewOpenStatus)
     expect(response.json()).toEqual(aiReviewOpenProblem)
     expect(await draftOf(id)).toMatchObject({ ...proposed, aiReview: review })
+  })
+})
+
+const accept = (id: string, target = admin) =>
+  target.inject({ method: 'POST', url: toPath(acceptAiDraftEndpoint.path, { id }) })
+
+const acceptParts = (id: string, body: NonNullable<InjectOptions['body']>, target = admin) =>
+  target.inject({ method: 'POST', url: toPath(acceptAiProposedPartsEndpoint.path, { id }), body })
+
+const noParts = { links: [], transforms: [], transformLinks: [] }
+
+const noReviewProblem = { message: 'The Draft has no open AI review.' }
+
+describe('POST /mappings/:id/ai-draft/accept', () => {
+  it('closes the AI review, keeps the Draft and lets the Admin publish it', async () => {
+    const id = await draftedByAi()
+
+    const response = await accept(id)
+
+    expect(response.statusCode).toBe(200)
+
+    const accepted = mappingDraftSchema.parse(response.json())
+
+    expect(accepted).toMatchObject({ ...proposed, aiReview: null })
+    expect(await draftOf(id)).toEqual(accepted)
+    expect((await publish(id)).statusCode).toBe(201)
+  })
+
+  it('answers 409 for a Draft without an open AI review', async () => {
+    const id = await mappingWith(proposed)
+
+    const response = await accept(id)
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual(noReviewProblem)
+  })
+
+  it('answers 403 to a Viewer and keeps the review open', async () => {
+    const id = await draftedByAi()
+
+    expect((await accept(id, viewer)).statusCode).toBe(403)
+    expect((await draftOf(id)).aiReview).toEqual(review)
+  })
+
+  it('answers 404 for a Mapping of another Workspace', async () => {
+    const id = await draftedByAi()
+
+    expect((await accept(id, otherAdmin)).statusCode).toBe(404)
+    expect((await draftOf(id)).aiReview).toEqual(review)
+  })
+})
+
+describe('POST /mappings/:id/ai-draft/accept-parts', () => {
+  it('drops the marks of the accepted parts and keeps the others', async () => {
+    const id = await draftedByAi()
+
+    const response = await acceptParts(id, {
+      links: ['orderNumber'],
+      transforms: [constantId],
+      transformLinks: [],
+    })
+
+    expect(response.statusCode).toBe(200)
+
+    const expected = {
+      ...review,
+      proposedLinks: ['buyer.gln'],
+      proposedTransforms: [],
+    }
+
+    expect(mappingDraftSchema.parse(response.json()).aiReview).toEqual(expected)
+    expect((await draftOf(id)).aiReview).toEqual(expected)
+  })
+
+  it('closes the review once no proposed link, transform or transform link is left', async () => {
+    const id = await draftedByAi()
+
+    const response = await acceptParts(id, {
+      links: review.proposedLinks,
+      transforms: review.proposedTransforms,
+      transformLinks: review.proposedTransformLinks,
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(mappingDraftSchema.parse(response.json()).aiReview).toBeNull()
+    expect((await publish(id)).statusCode).toBe(201)
+  })
+
+  it('answers 409 and keeps every mark for a part the review does not mark', async () => {
+    const id = await draftedByAi()
+
+    const response = await acceptParts(id, { ...noParts, links: ['orderNumber', 'currency'] })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({
+      message: 'The AI review does not mark every part to accept.',
+    })
+    expect((await draftOf(id)).aiReview).toEqual(review)
+  })
+
+  it('answers 409 for a Draft without an open AI review', async () => {
+    const id = await mappingWith(proposed)
+
+    const response = await acceptParts(id, { ...noParts, links: ['orderNumber'] })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual(noReviewProblem)
+  })
+
+  it('answers 400 when it names no part', async () => {
+    const id = await draftedByAi()
+
+    expect((await acceptParts(id, noParts)).statusCode).toBe(400)
+  })
+
+  it('answers 403 to a Viewer and keeps every mark', async () => {
+    const id = await draftedByAi()
+
+    expect((await acceptParts(id, { ...noParts, links: ['orderNumber'] }, viewer)).statusCode).toBe(
+      403,
+    )
+    expect((await draftOf(id)).aiReview).toEqual(review)
   })
 })

@@ -4,6 +4,8 @@ import { z } from 'zod'
 import type { InjectOptions } from 'fastify'
 
 import {
+  acceptAiDraftEndpoint,
+  acceptAiProposedPartsEndpoint,
   acceptInviteEndpoint,
   channelEndpoint,
   channelsEndpoint,
@@ -400,6 +402,18 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
         mappingId: ids.mapping,
         versionId: ids.mappingVersion,
       }),
+    }),
+  ],
+  [
+    'accept the AI draft',
+    () => ({ method: 'POST', url: toPath(acceptAiDraftEndpoint.path, { id: ids.mapping }) }),
+  ],
+  [
+    'accept AI-proposed parts',
+    () => ({
+      method: 'POST',
+      url: toPath(acceptAiProposedPartsEndpoint.path, { id: ids.mapping }),
+      body: { links: ['orderNumber'], transforms: [], transformLinks: [] },
     }),
   ],
   [
