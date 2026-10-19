@@ -125,9 +125,11 @@ const lookupTable = async () => {
   return lookupTableSchema.parse(response.json())
 }
 
+const anyTimestamp: unknown = expect.any(String)
+
 const failedRun = (id: string) => ({
   id,
-  receivedAt: expect.any(String),
+  receivedAt: anyTimestamp,
   tradingPartner: { id: workspace.tradingPartnerId, name: 'Hanse Retail' },
   messageType: 'INVOIC',
   businessReference: null,
