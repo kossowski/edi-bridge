@@ -35,7 +35,6 @@ import {
   type Message,
   type Segment,
   serialize,
-  serializeMessage,
   validate,
   ValidationError,
 } from '@edi-bridge/edifact'
@@ -384,9 +383,11 @@ const deliver = (
     const delivery = yield* Delivery
 
     // The file name carries the control reference, as an upload never replaces an existing file.
-    yield* delivery(channel, { name: `${messageType}-${String(reference)}.edi`, content }).pipe(
-      Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))),
-    )
+    yield* delivery(channel, {
+      name: `${messageType}-${String(reference)}.edi`,
+      content,
+      mediaType: 'application/edifact',
+    }).pipe(Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))))
   }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
 
 const orderNumberOf = ({ segments }: Message) =>
@@ -632,18 +633,6 @@ export const processRun = (queued: QueuedRun) =>
     }
 
     const db = yield* Database
-
-    // HTTP delivery comes with its own ticket; until then such a Run waits at delivery.
-    if (destination.channel.type !== 'sftp') {
-      yield* Effect.promise(() =>
-        db
-          .update(runs)
-          .set({ output: serializeMessage(message), businessReference: orderNumberOf(message) })
-          .where(eq(runs.id, run.id)),
-      )
-
-      return
-    }
 
     yield* Effect.promise(() =>
       db

@@ -1,11 +1,16 @@
 import { eq } from 'drizzle-orm'
 import { type Duration, Effect, Exit, Fiber } from 'effect'
 import { randomBytes } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { secretBox, secretKeyBytes, sftpChannelDelivery } from '@edi-bridge/channels'
-import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
+import {
+  startTestErp,
+  startTestSftpServer,
+  type TestErp,
+  type TestSftpServer,
+} from '@edi-bridge/channels/testing'
 import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
   channels,
@@ -21,6 +26,7 @@ import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 import {
   type ArrivingDocument,
   bullmqRunQueue,
+  channelDelivery,
   type DeliveryService,
   processRun,
   queueReceivedRunsEvery,
@@ -44,6 +50,8 @@ let testDatabase: TestDatabase
 
 let sftp: TestSftpServer
 
+let erp: TestErp
+
 let connection: Connection
 
 let workspace: InvoiceWorkspace
@@ -59,7 +67,11 @@ const sftpLogin = () => ({
 })
 
 beforeAll(async () => {
-  ;[testDatabase, sftp] = await Promise.all([startTestDatabase(), startTestSftpServer()])
+  ;[testDatabase, sftp, erp] = await Promise.all([
+    startTestDatabase(),
+    startTestSftpServer(),
+    startTestErp(),
+  ])
   connection = connect(testDatabase.url)
   workspace = await seedInvoiceWorkspace(connection.db, 'Nordwind Foods')
   channelId = await deliverOverSftp(connection.db, workspace, sftpLogin())
@@ -67,7 +79,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await connection.close()
-  await Promise.all([testDatabase.stop(), sftp.stop()])
+  await Promise.all([testDatabase.stop(), sftp.stop(), erp.stop()])
 })
 
 describe('the receipt of a Document', () => {
@@ -563,6 +575,12 @@ const sftpDelivery: DeliveryService = sftpChannelDelivery({
   timeoutMs: 1500,
 })
 
+const deliveryByChannelType = channelDelivery({ secrets: testSecrets, timeoutMs: 1500 })
+
+beforeEach(() => {
+  erp.received.length = 0
+})
+
 const processQueued = async (
   queue: ReturnType<typeof inMemoryRunQueue>,
   delivery = sftpDelivery,
@@ -792,28 +810,40 @@ describe('the processing of a Run', () => {
     })
   })
 
-  it('leaves a Run for an HTTP Channel processing with its Message and its delivery pending', async () => {
+  it('delivers the valid INVOIC in its own Interchange to the HTTP Channel', async () => {
     const http = await seedInvoiceWorkspace(connection.db, 'Webshop Foods')
+
+    await connection.db
+      .update(channels)
+      .set({ url: erp.url })
+      .where(eq(channels.id, http.outboundChannelId))
+
     const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), http)
 
-    await processQueued(queue, () => Effect.die(new Error('HTTP delivery is another ticket')))
+    await processQueued(queue, deliveryByChannelType)
 
     const run = await readRun(connection.db, runId)
 
     expect(run).toMatchObject({
-      status: 'processing',
+      status: 'delivered',
       failureStage: null,
-      error: null,
-      controlReference: null,
       businessReference: '4711',
-      output: goldenInvoicMessage,
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
         { stage: 'validation', status: 'succeeded' },
-        { stage: 'delivery', status: 'pending', startedAt: null, finishedAt: null },
+        { stage: 'delivery', status: 'succeeded' },
       ],
     })
+    expect(run?.output).toMatch(/^UNB\+UNOC:3\+.*UNZ\+1\+1'$/)
+    expect(erp.received).toMatchObject([
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/edifact' },
+        // The test ERP reads the body as UTF-8, so it gets the Latin-1 bytes that way too.
+        body: Buffer.from(run?.output ?? '', 'latin1').toString(),
+      },
+    ])
   })
 
   it('fails a Run at delivery when its SFTP Channel is unreachable and keeps its Interchange', async () => {
