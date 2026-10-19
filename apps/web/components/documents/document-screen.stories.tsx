@@ -760,8 +760,32 @@ export const ProcessedAgain = meta.story({
   },
 })
 
+const unreachableOutboundPath = `${apiUrl}${toPath(runEndpoint.path, { id: unreachableOutbound.id })}`
+
+function retryAnswers(change: (run: RunDetail) => RunDetail) {
+  return http.post(`${apiUrl}${retryRunEndpoint.path}`, async () => {
+    const run = runDetailSchema.parse(await (await fetch(unreachableOutboundPath)).json())
+
+    return HttpResponse.json(change(run))
+  })
+}
+
 export const TryAgain = meta.story({
   args: { id: unreachableOutbound.id },
+  beforeEach({ msw }) {
+    msw.use(
+      retryAnswers((run) =>
+        runDetailSchema.parse({
+          ...run,
+          status: 'delivered',
+          failureStage: null,
+          error: null,
+          problem: null,
+          waitingForTradingPartnerSince: null,
+        }),
+      ),
+    )
+  },
   async play({ canvas }) {
     await expect(
       await canvas.findByText(
@@ -776,32 +800,8 @@ export const TryAgain = meta.story({
   },
 })
 
-const unreachableOutboundPath = `${apiUrl}${toPath(runEndpoint.path, { id: unreachableOutbound.id })}`
-
-function retryAnswers(change: (run: RunDetail) => RunDetail) {
-  return http.post(`${apiUrl}${retryRunEndpoint.path}`, async () => {
-    const run = runDetailSchema.parse(await (await fetch(unreachableOutboundPath)).json())
-
-    return HttpResponse.json(change(run))
-  })
-}
-
 export const TryAgainPending = meta.story({
   args: { id: unreachableOutbound.id },
-  beforeEach({ msw }) {
-    msw.use(
-      retryAnswers((run) =>
-        runDetailSchema.parse({
-          ...run,
-          status: 'processing',
-          failureStage: null,
-          error: null,
-          problem: null,
-          waitingForTradingPartnerSince: null,
-        }),
-      ),
-    )
-  },
   async play({ canvas }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Try again' }))
     await expect(await canvas.findByText('Delivering again')).toBeVisible()

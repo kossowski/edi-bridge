@@ -94,6 +94,42 @@ describe('uploadSftp', () => {
     expect(await remoteFile('/upload/taken/orders-44.edi')).toBe('earlier\n')
   })
 
+  it('counts a file of the same name as the earlier attempt of a Retry that landed and keeps it', async () => {
+    await sftp.exec(
+      `install -d -m 777 ${sftp.home}/upload/landed && echo earlier > ${sftp.home}/upload/landed/orders-48.edi`,
+    )
+
+    await Effect.runPromise(
+      uploadSftp(
+        { ...outbox(), remotePath: '/upload/landed' },
+        { ...interchange('orders-48.edi'), isRetry: true },
+        { timeoutMs },
+      ),
+    )
+
+    expect(await remoteListing('/upload/landed')).toEqual(['orders-48.edi'])
+    expect(await remoteFile('/upload/landed/orders-48.edi')).toBe('earlier\n')
+  })
+
+  it('replaces the partial file that the timed-out attempt of a Retry left behind', async () => {
+    await sftp.exec(
+      `install -d -m 777 ${sftp.home}/upload/resumed && echo UNB > ${sftp.home}/upload/resumed/.orders-47.edi.part && chown ${sftp.username} ${sftp.home}/upload/resumed/.orders-47.edi.part`,
+    )
+
+    await Effect.runPromise(
+      uploadSftp(
+        { ...outbox(), remotePath: '/upload/resumed' },
+        { ...interchange('orders-47.edi'), isRetry: true },
+        { timeoutMs },
+      ),
+    )
+
+    expect(await remoteListing('/upload/resumed')).toEqual(['orders-47.edi'])
+    expect(await remoteFile('/upload/resumed/orders-47.edi')).toBe(
+      "UNB+UNOC:3+4012345000009:14+4098765000002:14+261019:1627+42'",
+    )
+  })
+
   it('reports a remote path the user may not write', async () => {
     expect(
       await failure(

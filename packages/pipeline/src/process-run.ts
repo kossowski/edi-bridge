@@ -1,5 +1,6 @@
 import { and, asc, eq, gt, inArray } from 'drizzle-orm'
 import { Data, DateTime, Effect, Match, Predicate, Result } from 'effect'
+import { z } from 'zod'
 
 import {
   type ChannelTestFailureReason,
@@ -8,6 +9,7 @@ import {
   directionOf,
   type DocumentStructure,
   documentStructureSchema,
+  encodeText,
   type FailureStage,
   failureStageSchema,
   type FixTarget,
@@ -531,22 +533,46 @@ const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
 
 type Destination = Effect.Success<ReturnType<typeof loadDestination>>
 
-const handOver = (channel: Destination['channel'], document: OutboundDocument) =>
-  Effect.flatMap(Delivery, (delivery) =>
-    delivery(channel, document).pipe(
-      Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))),
-    ),
-  )
+type ClaimedRun = typeof runs.$inferSelect
 
-const deliver = (
+// A defect after the hand-over leaves the Run failed at delivery, and its Retry must not deliver again.
+const handOver = (run: ClaimedRun, channel: Destination['channel'], document: OutboundDocument) =>
+  Effect.gen(function* () {
+    if (run.handedOverAt !== null) {
+      return
+    }
+
+    const delivery = yield* Delivery
+
+    yield* delivery(channel, document).pipe(
+      Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))),
+    )
+
+    const db = yield* Database
+    const handedOverAt = yield* DateTime.nowAsDate
+
+    yield* Effect.promise(() => db.update(runs).set({ handedOverAt }).where(eq(runs.id, run.id)))
+  })
+
+const segmentSchema = z.object({ tag: z.string(), elements: z.array(z.array(z.string())) })
+
+const messageSchema = z.object({
+  header: segmentSchema,
+  segments: z.array(segmentSchema),
+  trailer: segmentSchema,
+})
+
+// The Interchange is built once, at its first successful envelope; a Retry delivers it again.
+const buildInterchange = (
   queued: QueuedRun,
-  message: Message,
-  messageType: MessageType,
-  { workspace, tradingPartner, channel }: Destination,
+  run: ClaimedRun,
+  { workspace, tradingPartner }: Destination,
 ) =>
   Effect.gen(function* () {
     const db = yield* Database
     const { characterSet } = tradingPartner
+    // The pipeline stored the delivery input itself, so one that breaks its schema is a defect.
+    const message = yield* Effect.orDie(parse(messageSchema, run.deliveryInput))
 
     if (workspace.gln === null) {
       return yield* new GlnMissing({ party: 'workspace' })
@@ -566,19 +592,68 @@ const deliver = (
       reference,
     })
 
+    const content = yield* encoded(interchange, characterSet)
+
     yield* Effect.promise(() =>
       db.update(runs).set({ output: interchange }).where(eq(runs.id, queued.runId)),
     )
 
-    const content = yield* encoded(interchange, characterSet)
+    return { reference, content }
+  })
 
-    // The file name carries the control reference, as an upload never replaces an existing file.
-    yield* handOver(channel, {
+const deliverInterchange = (
+  queued: QueuedRun,
+  run: ClaimedRun,
+  messageType: MessageType,
+  destination: Destination,
+  isRetry: boolean,
+) =>
+  Effect.gen(function* () {
+    // Only UNOA to UNOC encode, all as ISO 8859-1, so a stored Interchange was written in it.
+    const { reference, content } =
+      run.output !== null && run.controlReference !== null
+        ? { reference: run.controlReference, content: Buffer.from(run.output, 'latin1') }
+        : yield* buildInterchange(queued, run, destination)
+
+    // The name carries the control reference, so a Retry uploads under the name of its first attempt.
+    yield* handOver(run, destination.channel, {
       name: `${messageType}-${String(reference)}.edi`,
       content,
       mediaType: 'application/edifact',
+      isRetry,
     })
-  }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
+  })
+
+const documentFormats = {
+  json: { extension: 'json', mediaType: 'application/json' },
+  csv: { extension: 'csv', mediaType: 'text/csv' },
+} as const
+
+const encodingOf = (structure: DocumentStructure) =>
+  structure.format === 'csv' ? structure.csv.encoding : 'utf-8'
+
+const deliverDocument = (
+  run: ClaimedRun,
+  pinned: Pinned,
+  destination: Destination,
+  isRetry: boolean,
+) =>
+  Effect.gen(function* () {
+    const { structure } = pinned
+
+    if (run.output === null) {
+      return yield* Effect.die(new Error(`Run ${run.id} has no output to deliver`))
+    }
+
+    const { extension, mediaType } = documentFormats[structure.format]
+
+    yield* handOver(run, destination.channel, {
+      name: `${pinned.messageType}-${run.id}.${extension}`,
+      content: Buffer.from(encodeText(run.output, encodingOf(structure))),
+      mediaType,
+      isRetry,
+    })
+  })
 
 const orderNumberOf = ({ segments }: Message) =>
   segments.find(({ tag, elements }) => tag === 'RFF' && elements[0]?.[0] === 'ON')
@@ -838,10 +913,14 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
       return undefined
     }
 
+    // A retried Run keeps the Mapping Version it was processed with.
     const [claimed] = yield* Effect.promise(() =>
       db
         .update(runs)
-        .set({ status: 'processing', mappingVersionId: found.flow.mappingVersionId })
+        .set({
+          status: 'processing',
+          mappingVersionId: found.run.mappingVersionId ?? found.flow.mappingVersionId,
+        })
         .where(and(eq(runs.id, runId), eq(runs.status, 'received')))
         .returning(),
     )
@@ -855,17 +934,20 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
     )
   })
 
-type ClaimedRun = typeof runs.$inferSelect
-
 const deliveryStep = (
   run: ClaimedRun,
   destination: Destination,
   delivering: Effect.Effect<void, DeliveryError, Database | Delivery>,
 ) =>
   Effect.gen(function* () {
-    const delivered = yield* step(run.id, 'delivery', delivering, async (tx) => {
-      await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
-    })
+    const delivered = yield* step(
+      run.id,
+      'delivery',
+      delivering.pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect })))),
+      async (tx) => {
+        await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
+      },
+    )
 
     if (Result.isFailure(delivered)) {
       yield* fail(run.id, deliveryFailure(delivered.failure, destination))
@@ -925,14 +1007,21 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
 
     const db = yield* Database
 
-    yield* Effect.promise(() =>
+    const [checkedRun] = yield* Effect.promise(() =>
       db
         .update(runs)
-        .set({ businessReference: orderNumberOf(message) })
-        .where(eq(runs.id, run.id)),
+        .set({ businessReference: orderNumberOf(message), deliveryInput: message })
+        .where(eq(runs.id, run.id))
+        .returning(),
     )
 
-    yield* deliveryStep(run, destination, deliver(queued, message, pinned.messageType, destination))
+    const delivering = checkedRun ?? run
+
+    yield* deliveryStep(
+      delivering,
+      destination,
+      deliverInterchange(queued, delivering, pinned.messageType, destination, false),
+    )
   })
 
 // Receipt routed the Message by this envelope, so the Interchange reads again here.
@@ -966,11 +1055,6 @@ const validatedInbound = ({ interchange, message }: ReadMessage) =>
 
 const documentNumberOf = ({ segments }: Message) =>
   segments.find(({ tag }) => tag === 'BGM')?.elements[1]?.[0] ?? null
-
-const documentFormats = {
-  json: { extension: 'json', mediaType: 'application/json' },
-  csv: { extension: 'csv', mediaType: 'text/csv' },
-} as const
 
 const processInbound = ({
   queued,
@@ -1016,30 +1100,41 @@ const processInbound = ({
 
     const db = yield* Database
     const written = mapped.success
-    const encoding = structure.format === 'csv' ? structure.csv.encoding : 'utf-8'
 
-    yield* Effect.promise(() =>
+    const [mappedRun] = yield* Effect.promise(() =>
       db
         .update(runs)
         .set({
-          output: new TextDecoder(encoding).decode(written),
+          output: new TextDecoder(encodingOf(structure)).decode(written),
           businessReference: documentNumberOf(message),
         })
-        .where(eq(runs.id, run.id)),
+        .where(eq(runs.id, run.id))
+        .returning(),
     )
 
+    const delivering = mappedRun ?? run
     const destination = yield* loadDestination(queued)
-    const { extension, mediaType } = documentFormats[structure.format]
 
     yield* deliveryStep(
-      run,
+      delivering,
       destination,
-      handOver(destination.channel, {
-        name: `${pinned.messageType}-${run.id}.${extension}`,
-        content: Buffer.from(written),
-        mediaType,
-      }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect })))),
+      deliverDocument(delivering, pinned, destination, false),
     )
+  })
+
+// A Retry leaves every step before the delivery succeeded.
+const isOnlyDeliveryLeft = (runId: string) =>
+  Effect.gen(function* () {
+    const db = yield* Database
+
+    const steps = yield* Effect.promise(() =>
+      db
+        .select({ stage: runSteps.stage, status: runSteps.status })
+        .from(runSteps)
+        .where(eq(runSteps.runId, runId)),
+    )
+
+    return steps.every(({ stage, status }) => stage === 'delivery' || status === 'succeeded')
   })
 
 const processClaimed = (
@@ -1057,6 +1152,20 @@ const processClaimed = (
       return yield* Effect.die(new Error(`Run ${run.id} has no Mapping Version`))
     }
 
+    const pinned = yield* loadPinned(queued.workspaceId, mappingVersionId, direction)
+
+    if (yield* isOnlyDeliveryLeft(run.id)) {
+      const destination = yield* loadDestination(queued)
+
+      return yield* deliveryStep(
+        run,
+        destination,
+        direction === 'outbound'
+          ? deliverInterchange(queued, run, pinned.messageType, destination, true)
+          : deliverDocument(run, pinned, destination, true),
+      )
+    }
+
     const documents = yield* Documents
     const document = yield* Effect.promise(() => documents.read(queued.workspaceId, run.documentId))
 
@@ -1064,7 +1173,6 @@ const processClaimed = (
       return yield* Effect.die(new Error(`Document ${run.documentId} of Run ${run.id} is missing`))
     }
 
-    const pinned = yield* loadPinned(queued.workspaceId, mappingVersionId, direction)
     const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
 
     const processing = {

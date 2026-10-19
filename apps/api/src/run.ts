@@ -16,9 +16,10 @@ import {
   whoFixes,
 } from '@edi-bridge/contracts'
 import { flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-bridge/db'
+import { Database as PipelineDatabase, retryRun as retryDelivery } from '@edi-bridge/pipeline'
 
 import { Db, type Database } from './db.js'
-import { NotFound } from './errors.js'
+import { Conflict, NotFound } from './errors.js'
 import { selectVersions, toHeader } from './mapping-version.js'
 import { inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
@@ -263,3 +264,20 @@ const toDetail = (
     waitingForTradingPartnerSince: row.waitingForTradingPartnerSince?.toISOString() ?? null,
   }
 }
+
+export const retryRun = (id: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    yield* loadRun(id)
+
+    yield* retryDelivery({ workspaceId: workspace.id, runId: id }).pipe(
+      Effect.provideService(PipelineDatabase, db),
+      Effect.catchTag('RunNotRetryable', (error) =>
+        Effect.fail(new Conflict({ message: error.message })),
+      ),
+    )
+
+    return yield* loadRun(id)
+  })

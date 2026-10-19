@@ -18,6 +18,7 @@ import {
   type Connection,
   documents,
   flows,
+  lookupTableEntries,
   mappings,
   mappingVersions,
   runs,
@@ -35,6 +36,8 @@ import {
   queueReceivedRunsEvery,
   ReceiptRejected,
   receive,
+  retryRun,
+  RunNotRetryable,
 } from './index'
 import {
   addOrdersFlow,
@@ -1625,5 +1628,335 @@ describe('the processing of an inbound Run', () => {
     })
     expect(ranStages(run)).toEqual(['receipt', 'parse'])
     expect(erp.received).toHaveLength(0)
+  })
+})
+
+describe('the Retry of a Run', () => {
+  const retried = async (into: InvoiceWorkspace, runId: string, delivery = sftpDelivery) => {
+    const queue = inMemoryRunQueue()
+
+    await Effect.runPromise(
+      retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    expect(queue.queued).toEqual([{ workspaceId: into.id, runId }])
+
+    await processQueued(queue, delivery)
+
+    return readRun(connection.db, runId)
+  }
+
+  // Each Trading Partner counts its control references from 1, so each gets its own remote path.
+  const outboxOf = async (name: string) => {
+    const remotePath = `/upload/${name}`
+
+    await sftp.exec(
+      `mkdir ${sftp.home}${remotePath} && chown ${sftp.username} ${sftp.home}${remotePath}`,
+    )
+
+    return { ...sftpLogin(), remotePath }
+  }
+
+  it('delivers the stored Interchange again under its control reference once the SFTP Channel is reachable', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Flaky Foods')
+    const login = await outboxOf('flaky')
+    const flakyChannelId = await deliverOverSftp(connection.db, into, { ...login, port: 1 })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    await processQueued(queue)
+
+    const failed = await readRun(connection.db, runId)
+
+    await connection.db
+      .update(channels)
+      .set({ port: sftp.port })
+      .where(eq(channels.id, flakyChannelId))
+
+    const run = await retried(into, runId)
+
+    expect(run).toMatchObject({
+      status: 'delivered',
+      failureStage: null,
+      error: null,
+      problem: null,
+      output: failed?.output,
+      controlReference: failed?.controlReference,
+      mappingVersionId: into.mappingVersionId,
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded', finishedAt: failed?.steps[1]?.finishedAt },
+        { stage: 'validation', status: 'succeeded', finishedAt: failed?.steps[2]?.finishedAt },
+        { stage: 'delivery', status: 'succeeded' },
+      ],
+    })
+    await expect(
+      remoteFile(`${login.remotePath}/INVOIC-${String(failed?.controlReference)}.edi`),
+    ).resolves.toBe(failed?.output)
+  })
+
+  it('counts an Interchange that landed at the failed attempt as delivered and keeps it', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Landed Foods')
+    const login = await outboxOf('landed')
+    const landedChannelId = await deliverOverSftp(connection.db, into, { ...login, port: 1 })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    await processQueued(queue)
+
+    const failed = await readRun(connection.db, runId)
+    const name = `${login.remotePath}/INVOIC-${String(failed?.controlReference)}.edi`
+
+    // The Channel took the file but the attempt timed out before it answered.
+    await sftp.exec(`echo landed > ${sftp.home}${name}`)
+    await connection.db
+      .update(channels)
+      .set({ port: sftp.port })
+      .where(eq(channels.id, landedChannelId))
+
+    const run = await retried(into, runId)
+
+    expect(run).toMatchObject({ status: 'delivered', output: failed?.output })
+    await expect(remoteFile(name)).resolves.toBe('landed\n')
+  })
+
+  it('builds the Interchange of a Run that failed for a missing GLN from its stored Message without mapping again', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Late Foods')
+
+    await connection.db.update(workspaces).set({ gln: null }).where(eq(workspaces.id, into.id))
+    await deliverOverSftp(connection.db, into, await outboxOf('late'))
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    await processQueued(queue)
+
+    const failed = await readRun(connection.db, runId)
+
+    expect(failed).toMatchObject({ failureStage: 'delivery', output: null })
+
+    // Mapping again would miss the unit code, so only the stored Message can deliver the Run.
+    await connection.db
+      .delete(lookupTableEntries)
+      .where(eq(lookupTableEntries.lookupTableId, into.lookupTableId))
+    await connection.db
+      .update(workspaces)
+      .set({ gln: '4012345000009' })
+      .where(eq(workspaces.id, into.id))
+
+    const run = await retried(into, runId)
+    const reference = String(run?.controlReference)
+
+    expect(run).toMatchObject({
+      status: 'delivered',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded', finishedAt: failed?.steps[1]?.finishedAt },
+        { stage: 'validation', status: 'succeeded', finishedAt: failed?.steps[2]?.finishedAt },
+        { stage: 'delivery', status: 'succeeded' },
+      ],
+    })
+    expect(run?.output).toMatch(
+      new RegExp(`^UNB\\+UNOC:3\\+4012345000009:14\\+\\d{13}:14\\+[^+]+\\+${reference}'`),
+    )
+    expect(run?.output).toContain(invoicSegments)
+    await expect(remoteFile(`/upload/late/INVOIC-${reference}.edi`)).resolves.toBe(run?.output)
+  })
+
+  it('envelopes a Run that failed for its character set in the character set its Trading Partner has now', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Recoded Foods')
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ characterSet: 'UNOD' })
+      .where(eq(tradingPartners.id, into.tradingPartnerId))
+    await deliverOverSftp(connection.db, into, await outboxOf('recoded'))
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    await processQueued(queue)
+
+    const failed = await readRun(connection.db, runId)
+
+    expect(failed).toMatchObject({ error: { code: 'characterSetUnsupported' }, output: null })
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ characterSet: 'UNOC' })
+      .where(eq(tradingPartners.id, into.tradingPartnerId))
+
+    const run = await retried(into, runId)
+
+    expect(run).toMatchObject({ status: 'delivered', controlReference: failed?.controlReference })
+    expect(run?.output).toMatch(/^UNB\+UNOC:3\+/)
+    await expect(
+      remoteFile(`/upload/recoded/INVOIC-${String(run?.controlReference)}.edi`),
+    ).resolves.toBe(run?.output)
+  })
+
+  it('does not deliver again a Run whose delivery the Channel took before a defect failed it', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Unrecorded Foods')
+    const handedOver: string[] = []
+
+    const counting: DeliveryService = (_channel, document) =>
+      Effect.sync(() => {
+        handedOver.push(document.name)
+      })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    // The database refuses to record the delivery after the Channel took it.
+    await connection.db.execute(sql`
+      create function refuse_delivered() returns trigger language plpgsql as $$
+      begin
+        if new.status = 'delivered' then
+          raise exception 'The database refuses the delivery';
+        end if;
+        return new;
+      end $$`)
+    await connection.db.execute(
+      sql`create trigger refuse_delivered before update on runs for each row execute function refuse_delivered()`,
+    )
+
+    try {
+      const [queued] = queue.queued
+
+      const exit = await Effect.runPromiseExit(
+        processRun(queued ?? { workspaceId: into.id, runId }).pipe(
+          pipelineServices(connection.db, queue, counting),
+        ),
+      )
+
+      expect(Exit.hasDies(exit)).toBe(true)
+    } finally {
+      await connection.db.execute(sql`drop trigger refuse_delivered on runs`)
+      await connection.db.execute(sql`drop function refuse_delivered`)
+    }
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      problem: { reason: 'defect' },
+    })
+
+    const run = await retried(into, runId, counting)
+
+    expect(run).toMatchObject({ status: 'delivered' })
+    expect(handedOver).toEqual([`INVOIC-${String(run?.controlReference)}.edi`])
+  })
+
+  it('refuses a Run that did not fail at delivery and leaves it as it is', async () => {
+    const { queue, runId } = await receiveInvoice('not json')
+
+    await processQueued(queue)
+
+    const failed = await readRun(connection.db, runId)
+    const retrying = inMemoryRunQueue()
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        retryRun({ workspaceId: workspace.id, runId }).pipe(
+          pipelineServices(connection.db, retrying),
+        ),
+      ),
+    )
+
+    expect(error).toEqual(new RunNotRetryable({ runId }))
+    expect(retrying.queued).toEqual([])
+    await expect(readRun(connection.db, runId)).resolves.toEqual(failed)
+  })
+
+  it('refuses a Run that failed at delivery with neither a stored output nor a stored delivery input', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Early Foods')
+
+    await connection.db.update(workspaces).set({ gln: null }).where(eq(workspaces.id, into.id))
+    await deliverOverSftp(connection.db, into, await outboxOf('early'))
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    await processQueued(queue)
+
+    // A Run that failed at delivery before the delivery input was stored has neither.
+    await connection.db.update(runs).set({ deliveryInput: null }).where(eq(runs.id, runId))
+
+    const failed = await readRun(connection.db, runId)
+    const retrying = inMemoryRunQueue()
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(connection.db, retrying)),
+      ),
+    )
+
+    expect(failed).toMatchObject({ failureStage: 'delivery', output: null })
+    expect(error).toEqual(new RunNotRetryable({ runId }))
+    expect(retrying.queued).toEqual([])
+    await expect(readRun(connection.db, runId)).resolves.toEqual(failed)
+  })
+
+  it('refuses a Run of another Workspace', async () => {
+    const other = await seedInvoiceWorkspace(connection.db, 'Neighbour Foods')
+    const login = await outboxOf('neighbour')
+
+    await deliverOverSftp(connection.db, other, { ...login, port: 1 })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), other)
+
+    await processQueued(queue)
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        retryRun({ workspaceId: workspace.id, runId }).pipe(
+          pipelineServices(connection.db, inMemoryRunQueue()),
+        ),
+      ),
+    )
+
+    expect(error).toEqual(new RunNotRetryable({ runId }))
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'failed' })
+  })
+
+  it('posts the stored Document of an inbound Run again once the ERP takes it', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Recovered Foods')
+    const orders = await addOrdersFlow(connection.db, into, { url: `${erp.url}?status=503` })
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: into.id,
+        channelId: into.inboundChannelId,
+        fileName: 'orders.edi',
+        content: golden('orders-reference.edi', 'latin1'),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    await processQueued(queue, deliveryByChannelType)
+
+    const runId = receipt.runs[0]?.id ?? ''
+
+    await connection.db
+      .update(channels)
+      .set({ url: erp.url })
+      .where(eq(channels.id, orders.erpChannelId))
+
+    erp.received.length = 0
+
+    const run = await retried(into, runId, deliveryByChannelType)
+    const document = golden('orders-reference.document.json')
+
+    expect(run).toMatchObject({
+      status: 'delivered',
+      output: document,
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'delivery', status: 'succeeded' },
+      ],
+    })
+    expect(erp.received).toMatchObject([
+      { headers: { 'content-type': 'application/json' }, body: document },
+    ])
   })
 })

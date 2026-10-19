@@ -199,12 +199,13 @@ describe('createHandlers', () => {
     expect(await response.json()).toEqual(workspaceMembers)
   })
 
-  it('lists a retried Run as delivered', async () => {
+  it('lists a retried Run as delivered once it is delivered again', async () => {
     server.use(...createHandlers(apiUrl))
     const { runs } = await listRuns({ status: ['failed'], failureStage: ['delivery'] })
     const failed = runs[0]!
 
     await post(toPath(retryRunEndpoint.path, { id: failed.id }))
+    await getRun(failed.id)
 
     const { runs: listed } = await listRuns({
       flowId: [failed.flow.id],
