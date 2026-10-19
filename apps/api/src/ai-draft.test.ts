@@ -340,14 +340,14 @@ describe('draftMapping', () => {
     let calls = 0
 
     const model = new MockLanguageModelV4({
-      doGenerate: async () => {
+      doGenerate: () => {
         calls++
 
         if (calls === 1) {
-          return lookUp
+          return Promise.resolve(lookUp)
         }
 
-        throw new Error('connect ECONNREFUSED')
+        return Promise.reject(new Error('connect ECONNREFUSED'))
       },
     })
 
