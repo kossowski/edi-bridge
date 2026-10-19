@@ -1,6 +1,6 @@
 import { asc, eq } from 'drizzle-orm'
 import { Effect } from 'effect'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { GenericContainer, Wait } from 'testcontainers'
@@ -270,48 +270,32 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
 
 export type InvoiceWorkspace = Awaited<ReturnType<typeof seedInvoiceWorkspace>>
 
-// Points the Flow of the Workspace at a new outbound SFTP Channel of its Trading Partner.
 export async function deliverOverSftp(
   db: Db,
   workspace: InvoiceWorkspace,
   login: { host: string; port: number; username: string; password: string; remotePath: string },
   secrets: SecretBox = testSecrets,
 ) {
-  const channel = one(
-    await db
-      .insert(channels)
-      .values({
-        workspaceId: workspace.id,
-        tradingPartnerId: workspace.tradingPartnerId,
-        type: 'sftp',
-        direction: 'outbound',
-        name: 'Hanse Retail SFTP inbox',
-        host: login.host,
-        port: login.port,
-        username: login.username,
-        remotePath: login.remotePath,
-        authentication: 'password',
-        encryptedCredential: 'sealed below',
-      })
-      .returning(),
-  )
+  const id = randomUUID()
 
-  await db
-    .update(channels)
-    .set({
-      encryptedCredential: secrets.seal(
-        login.password,
-        secretContext(channel.id, 'encryptedCredential'),
-      ),
-    })
-    .where(eq(channels.id, channel.id))
+  await db.insert(channels).values({
+    id,
+    workspaceId: workspace.id,
+    tradingPartnerId: workspace.tradingPartnerId,
+    type: 'sftp',
+    direction: 'outbound',
+    name: 'Hanse Retail SFTP inbox',
+    host: login.host,
+    port: login.port,
+    username: login.username,
+    remotePath: login.remotePath,
+    authentication: 'password',
+    encryptedCredential: secrets.seal(login.password, secretContext(id, 'encryptedCredential')),
+  })
 
-  await db
-    .update(flows)
-    .set({ destinationChannelId: channel.id })
-    .where(eq(flows.id, workspace.flowId))
+  await db.update(flows).set({ destinationChannelId: id }).where(eq(flows.id, workspace.flowId))
 
-  return channel.id
+  return id
 }
 
 export async function readRun(db: Db, id: string) {

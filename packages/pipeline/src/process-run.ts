@@ -35,6 +35,7 @@ import {
   type Message,
   type Segment,
   serialize,
+  serializeMessage,
   validate,
   ValidationError,
 } from '@edi-bridge/edifact'
@@ -50,6 +51,8 @@ import type { DeliveryFailed } from '@edi-bridge/channels'
 
 import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
+
+type Transaction = Parameters<Parameters<Database['Service']['transaction']>[0]>[0]
 
 export class MessageInvalid extends Data.TaggedError('MessageInvalid')<{
   readonly cause: ValidationError
@@ -179,16 +182,9 @@ const deliveryFailure = Match.type<DeliveryFailed | GlnMissing | DeliveryDefect>
   }),
 )
 
-const envelopeHeader: Segment = { tag: 'UNB', elements: [] }
-
 const envelopeTrailer: Segment = { tag: 'UNZ', elements: [] }
 
-// Validation needs only a frame around the Message; delivery gives it a full envelope.
-const framed = (
-  message: Message,
-  header = envelopeHeader,
-  trailer = envelopeTrailer,
-): Interchange => ({
+const framed = (message: Message, header: Segment, trailer = envelopeTrailer): Interchange => ({
   hasServiceStringAdvice: false,
   delimiters: {
     component: ':',
@@ -219,8 +215,8 @@ const enveloped = (
 ) => {
   const { year, month, day, hour, minute } = DateTime.toPartsUtc(sentAt)
 
-  return serialize(
-    framed(
+  return serialize({
+    ...framed(
       message,
       {
         tag: 'UNB',
@@ -237,7 +233,9 @@ const enveloped = (
       },
       { tag: 'UNZ', elements: [['1'], [String(reference)]] },
     ),
-  )
+    // The default separators of UNOB are IS1 to IS4, so a UNA declares the printable ones.
+    hasServiceStringAdvice: characterSet === 'UNOB',
+  })
 }
 
 // UNOA to UNOC are ISO 8859-1 or a subset of it; Node has no encoder for UNOD to UNOF.
@@ -246,9 +244,9 @@ const encoded = (interchange: string, characterSet: CharacterSet) =>
     ? Effect.succeed(Buffer.from(interchange, 'latin1'))
     : Effect.die(new Error(`Delivery in character set ${characterSet} is not supported`))
 
-const validated = (message: Message) =>
+const validated = (message: Message, characterSet: CharacterSet) =>
   Effect.try({
-    try: () => validate(framed(message)),
+    try: () => validate(framed(message, { tag: 'UNB', elements: [[characterSet]] })),
     catch: (cause) => {
       if (cause instanceof ValidationError) {
         return new MessageInvalid({ cause })
@@ -285,12 +283,16 @@ const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
     return found
   })
 
-const deliver = (queued: QueuedRun, message: Message, messageType: MessageType) =>
+type Destination = Effect.Success<ReturnType<typeof loadDestination>>
+
+const deliver = (
+  queued: QueuedRun,
+  message: Message,
+  messageType: MessageType,
+  { workspaceGln, tradingPartnerGln, characterSet, channel }: Destination,
+) =>
   Effect.gen(function* () {
     const db = yield* Database
-
-    const { workspaceGln, tradingPartnerGln, characterSet, channel } =
-      yield* loadDestination(queued)
 
     if (workspaceGln === null) {
       return yield* new GlnMissing({ party: 'workspace' })
@@ -426,16 +428,31 @@ const updateStep = (
     ),
   )
 
-const step = <A, E, R>(runId: string, stage: RunStepStage, effect: Effect.Effect<A, E, R>) =>
+const step = <A, E, R>(
+  runId: string,
+  stage: RunStepStage,
+  effect: Effect.Effect<A, E, R>,
+  succeeded: (tx: Transaction) => Promise<void> = () => Promise.resolve(),
+) =>
   Effect.gen(function* () {
     yield* updateStep(runId, stage, { status: 'running', startedAt: yield* DateTime.nowAsDate })
 
     const result = yield* Effect.result(effect)
+    const db = yield* Database
+    const finishedAt = yield* DateTime.nowAsDate
 
-    yield* updateStep(runId, stage, {
-      status: Result.isSuccess(result) ? 'succeeded' : 'failed',
-      finishedAt: yield* DateTime.nowAsDate,
-    })
+    yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        await tx
+          .update(runSteps)
+          .set({ status: Result.isSuccess(result) ? 'succeeded' : 'failed', finishedAt })
+          .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stage)))
+
+        if (Result.isSuccess(result)) {
+          await succeeded(tx)
+        }
+      }),
+    )
 
     return result
   })
@@ -536,13 +553,26 @@ export const processRun = (queued: QueuedRun) =>
     }
 
     const message = mapped.success
-    const checked = yield* step(run.id, 'validation', validated(message))
+    const destination = yield* loadDestination(queued)
+    const checked = yield* step(run.id, 'validation', validated(message, destination.characterSet))
 
     if (Result.isFailure(checked)) {
       return yield* fail(run.id, validationFailure(message, checked.failure))
     }
 
     const db = yield* Database
+
+    // HTTP delivery comes with its own ticket; until then such a Run waits at delivery.
+    if (destination.channel.type !== 'sftp') {
+      yield* Effect.promise(() =>
+        db
+          .update(runs)
+          .set({ output: serializeMessage(message), businessReference: orderNumberOf(message) })
+          .where(eq(runs.id, run.id)),
+      )
+
+      return
+    }
 
     yield* Effect.promise(() =>
       db
@@ -551,7 +581,14 @@ export const processRun = (queued: QueuedRun) =>
         .where(eq(runs.id, run.id)),
     )
 
-    const delivered = yield* step(run.id, 'delivery', deliver(queued, message, pinned.messageType))
+    const delivered = yield* step(
+      run.id,
+      'delivery',
+      deliver(queued, message, pinned.messageType, destination),
+      async (tx) => {
+        await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
+      },
+    )
 
     if (Result.isFailure(delivered)) {
       yield* fail(run.id, deliveryFailure(delivered.failure))
@@ -559,11 +596,5 @@ export const processRun = (queued: QueuedRun) =>
       if (Predicate.isTagged(delivered.failure, 'DeliveryDefect')) {
         return yield* Effect.die(delivered.failure.defect)
       }
-
-      return
     }
-
-    yield* Effect.promise(() =>
-      db.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id)),
-    )
   })

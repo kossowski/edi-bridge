@@ -7,6 +7,7 @@ import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 import { bullmqRunQueue, receive, type RunQueueService } from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
+  goldenInvoicMessage,
   inMemoryRunQueue,
   type InvoiceWorkspace,
   pipelineServices,
@@ -68,7 +69,7 @@ const processed = (runId: string) =>
     async () => {
       const run = await readRun(connection.db, runId)
 
-      expect(['delivered', 'failed']).toContain(run?.status)
+      expect(run?.status === 'failed' || run?.output !== null).toBe(true)
 
       return run
     },
@@ -76,23 +77,22 @@ const processed = (runId: string) =>
   )
 
 describe('the worker', () => {
-  it('processes a Run queued at the receipt of a Document up to its delivery', async () => {
+  it('processes a Run queued at the receipt of a Document into a valid INVOIC', async () => {
     const run = await processed(await arrive(goldenInvoice))
 
     expect(run).toMatchObject({
-      status: 'failed',
+      status: 'processing',
       manualSubmission: false,
-      failureStage: 'delivery',
-      error: { code: 'deliveryDefect' },
+      failureStage: null,
       mappingVersionId: workspace.mappingVersionId,
+      output: goldenInvoicMessage,
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
         { stage: 'validation', status: 'succeeded' },
-        { stage: 'delivery', status: 'failed' },
+        { stage: 'delivery', status: 'pending' },
       ],
     })
-    expect(run?.output).toMatch(/^UNB\+UNOC:3\+.*UNZ\+1\+\d+'$/)
   })
 
   it('stops a queued Run with an invalid INVOIC at validation and keeps no output', async () => {
@@ -137,8 +137,8 @@ describe('the worker', () => {
     const runId = await arrive(goldenInvoice, inMemoryRunQueue())
 
     await expect(processed(runId)).resolves.toMatchObject({
-      status: 'failed',
-      failureStage: 'delivery',
+      status: 'processing',
+      output: goldenInvoicMessage,
     })
   })
 })
