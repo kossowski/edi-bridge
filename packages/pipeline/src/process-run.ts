@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, exists, gt, inArray, lt, notExists } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { Data, DateTime, Effect, Match, Predicate, Result } from 'effect'
+import { Data, DateTime, Effect, Match, Predicate, Ref, Result } from 'effect'
 import { z } from 'zod'
 
 import {
@@ -73,6 +73,7 @@ type Transaction = Parameters<Parameters<Database['Service']['transaction']>[0]>
 // The sweep took the Run from a stalled worker, so another worker or a Retry owns it now.
 export class RunNotOwned extends Data.TaggedError('RunNotOwned')<{
   readonly runId: string
+  readonly cause?: unknown
 }> {}
 
 export class MessageInvalid extends Data.TaggedError('MessageInvalid')<{
@@ -613,7 +614,7 @@ const buildInterchange = (
     // A stalled worker must not replace the Interchange that a Retry of the Run delivered.
     const stored = yield* Effect.promise(() =>
       db.transaction(async (tx) => {
-        if (!(await isLeased(tx, lease))) {
+        if (!(await isHeld(tx, run.id, { lease }))) {
           return false
         }
 
@@ -807,11 +808,31 @@ const ensureOwned = (lease: StepLease) =>
     }
   })
 
-// Locks the Run first, so the sweep cannot take it between this check and the write after it.
-const isLeased = async (tx: Transaction, lease: StepLease) => {
-  await tx.select({ id: runs.id }).from(runs).where(eq(runs.id, lease.runId)).for('update')
+// Between steps the worker holds its Run as it last changed it, since only the sweep changes it then.
+type Hold = { readonly lease: StepLease } | { readonly updatedAt: Date }
 
-  const [owned] = await tx.select({ runId: runSteps.runId }).from(runSteps).where(leased(lease))
+type Holding = { readonly runId: string; readonly hold: Ref.Ref<Hold> }
+
+// Locks the Run first, so the sweep cannot take it between this check and the write after it.
+const isHeld = async (tx: Transaction, runId: string, hold: Hold) => {
+  const [run] = await tx
+    .select({ updatedAt: runs.updatedAt })
+    .from(runs)
+    .where(eq(runs.id, runId))
+    .for('update')
+
+  if (run === undefined) {
+    return false
+  }
+
+  if ('updatedAt' in hold) {
+    return run.updatedAt.getTime() === hold.updatedAt.getTime()
+  }
+
+  const [owned] = await tx
+    .select({ runId: runSteps.runId })
+    .from(runSteps)
+    .where(leased(hold.lease))
 
   return owned !== undefined
 }
@@ -849,15 +870,17 @@ const startStep = (runId: string, stage: RunStepStage) =>
     return { runId, stage, startedAt } satisfies StepLease
   })
 
-// What a step stores for later steps goes into its finish, so only the worker that owns the Run stores it.
+// What a step stores for later steps goes into its finish, so only the worker that holds the Run stores it.
 const step = <A, E, R>(
-  runId: string,
+  { runId, hold }: Holding,
   stage: RunStepStage,
   run: (lease: StepLease) => Effect.Effect<A, E, R>,
   succeeded: (tx: Transaction, value: A) => Promise<void> = () => Promise.resolve(),
 ) =>
   Effect.gen(function* () {
     const lease = yield* startStep(runId, stage)
+
+    yield* Ref.set(hold, { lease })
 
     const result = yield* Effect.result(run(lease))
     const db = yield* Database
@@ -871,17 +894,31 @@ const step = <A, E, R>(
           .where(leased(lease))
           .returning({ runId: runSteps.runId })
 
-        if (own !== undefined && Result.isSuccess(result)) {
+        if (own === undefined) {
+          return undefined
+        }
+
+        if (Result.isSuccess(result)) {
           await succeeded(tx, result.success)
         }
 
-        return own !== undefined
+        const [changed] = await tx
+          .select({ updatedAt: runs.updatedAt })
+          .from(runs)
+          .where(eq(runs.id, runId))
+
+        return changed
       }),
     )
 
-    if (!finished) {
-      return yield* new RunNotOwned({ runId })
+    if (finished === undefined) {
+      return yield* new RunNotOwned({
+        runId,
+        cause: Result.isFailure(result) ? result.failure : undefined,
+      })
     }
+
+    yield* Ref.set(hold, finished)
 
     return result
   })
@@ -897,10 +934,10 @@ const failRun = async (tx: Transaction, runId: string, failure: Failure, positio
       problem: failure.problem,
     })
     .where(and(eq(runs.id, runId), eq(runs.status, 'processing')))
-    .returning({ id: runs.id })
+    .returning({ updatedAt: runs.updatedAt })
 
   if (failed === undefined) {
-    return false
+    return undefined
   }
 
   await tx
@@ -908,23 +945,36 @@ const failRun = async (tx: Transaction, runId: string, failure: Failure, positio
     .set({ status: 'skipped' })
     .where(and(eq(runSteps.runId, runId), gt(runSteps.position, position)))
 
-  return true
+  return failed
 }
 
-const fail = (runId: string, failure: Failure) =>
+const fail = ({ runId, hold }: Holding, failure: Failure) =>
   Effect.gen(function* () {
     const db = yield* Database
+    const held = yield* Ref.get(hold)
 
-    yield* Effect.promise(() =>
+    const failed = yield* Effect.promise(() =>
       db.transaction(async (tx) => {
-        const [failed] = await tx
+        if (!(await isHeld(tx, runId, held))) {
+          return undefined
+        }
+
+        const [stopped] = await tx
           .select({ position: runSteps.position })
           .from(runSteps)
           .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, failure.stage)))
 
-        await failRun(tx, runId, failure, failed?.position ?? 0)
+        return { failed: await failRun(tx, runId, failure, stopped?.position ?? 0) }
       }),
     )
+
+    if (failed === undefined) {
+      return yield* new RunNotOwned({ runId, cause: failure })
+    }
+
+    if (failed.failed !== undefined) {
+      yield* Ref.set(hold, failed.failed)
+    }
   })
 
 const defectFailure = (stage: FailureStage): Failure => ({
@@ -939,41 +989,62 @@ const defectFailure = (stage: FailureStage): Failure => ({
 })
 
 // A defect can stop a Run before its first step starts or after its step failed.
+const failStopped = async (tx: Transaction, runId: string, finishedAt: Date) => {
+  const steps = await tx
+    .select({ stage: runSteps.stage, status: runSteps.status, position: runSteps.position })
+    .from(runSteps)
+    .where(eq(runSteps.runId, runId))
+    .orderBy(asc(runSteps.position))
+
+  const stopped = steps.find(({ status }) => status !== 'succeeded' && status !== 'skipped')
+  const stage = failureStageSchema.safeParse(stopped?.stage)
+
+  if (stopped === undefined || !stage.success) {
+    return false
+  }
+
+  const failed = await failRun(tx, runId, defectFailure(stage.data), stopped.position)
+
+  if (failed === undefined || stopped.status === 'failed') {
+    return failed !== undefined
+  }
+
+  // A failed step has its timings, so a step that never started fails at the defect.
+  await tx
+    .update(runSteps)
+    .set({
+      status: 'failed',
+      ...(stopped.status === 'pending' && { startedAt: finishedAt }),
+      finishedAt,
+    })
+    .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stopped.stage)))
+
+  return true
+}
+
+// The sweep logs only the Runs it failed.
 export const failOnDefect = (runId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
     const finishedAt = yield* DateTime.nowAsDate
 
+    return yield* Effect.promise(() => db.transaction((tx) => failStopped(tx, runId, finishedAt)))
+  })
+
+// A stalled worker's defect must not fail the Run that another worker owns now.
+const failHeldOnDefect = ({ runId, hold }: Holding) =>
+  Effect.gen(function* () {
+    const db = yield* Database
+    const held = yield* Ref.get(hold)
+    const finishedAt = yield* DateTime.nowAsDate
+
     return yield* Effect.promise(() =>
       db.transaction(async (tx) => {
-        const steps = await tx
-          .select({ stage: runSteps.stage, status: runSteps.status, position: runSteps.position })
-          .from(runSteps)
-          .where(eq(runSteps.runId, runId))
-          .orderBy(asc(runSteps.position))
-
-        const stopped = steps.find(({ status }) => status !== 'succeeded' && status !== 'skipped')
-        const stage = failureStageSchema.safeParse(stopped?.stage)
-
-        if (stopped === undefined || !stage.success) {
+        if (!(await isHeld(tx, runId, held))) {
           return false
         }
 
-        const failed = await failRun(tx, runId, defectFailure(stage.data), stopped.position)
-
-        if (!failed || stopped.status === 'failed') {
-          return failed
-        }
-
-        // A failed step has its timings, so a step that never started fails at the defect.
-        await tx
-          .update(runSteps)
-          .set({
-            status: 'failed',
-            ...(stopped.status === 'pending' && { startedAt: finishedAt }),
-            finishedAt,
-          })
-          .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stopped.stage)))
+        await failStopped(tx, runId, finishedAt)
 
         return true
       }),
@@ -1090,6 +1161,7 @@ const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
   })
 
 const deliveryStep = (
+  holding: Holding,
   run: ClaimedRun,
   destination: Destination,
   delivering: (
@@ -1098,7 +1170,7 @@ const deliveryStep = (
 ) =>
   Effect.gen(function* () {
     const delivered = yield* step(
-      run.id,
+      holding,
       'delivery',
       (lease) =>
         delivering(lease).pipe(
@@ -1122,7 +1194,7 @@ const deliveryStep = (
       return yield* failure
     }
 
-    yield* fail(run.id, deliveryFailure(failure, destination))
+    yield* fail(holding, deliveryFailure(failure, destination))
 
     if (
       Predicate.isTagged(failure, 'ChannelDefect') ||
@@ -1135,6 +1207,7 @@ const deliveryStep = (
   })
 
 type Processing = {
+  holding: Holding
   queued: QueuedRun
   run: ClaimedRun
   content: string
@@ -1143,9 +1216,9 @@ type Processing = {
   tradingPartner: TradingPartner
 }
 
-const processOutbound = ({ queued, run, content, pinned, lookupTables }: Processing) =>
+const processOutbound = ({ holding, queued, run, content, pinned, lookupTables }: Processing) =>
   Effect.gen(function* () {
-    const mapped = yield* step(run.id, 'mapping', () =>
+    const mapped = yield* step(holding, 'mapping', () =>
       readDocument(pinned.structure, content).pipe(
         Effect.flatMap((document) =>
           mapMessage(
@@ -1158,7 +1231,7 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
     )
 
     if (Result.isFailure(mapped)) {
-      return yield* fail(run.id, mappingFailure(pinned, lookupTables, mapped.failure))
+      return yield* fail(holding, mappingFailure(pinned, lookupTables, mapped.failure))
     }
 
     const { message } = mapped.success
@@ -1166,7 +1239,7 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
     const delivering = { ...run, businessReference: orderNumberOf(message), deliveryInput: message }
 
     const checked = yield* step(
-      run.id,
+      holding,
       'validation',
       () => validated(message, destination.tradingPartner.characterSet),
       async (tx) => {
@@ -1181,10 +1254,11 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
     )
 
     if (Result.isFailure(checked)) {
-      return yield* fail(run.id, validationFailure(pinned, mapped.success, checked.failure))
+      return yield* fail(holding, validationFailure(pinned, mapped.success, checked.failure))
     }
 
     yield* deliveryStep(
+      holding,
       delivering,
       destination,
       deliverInterchange(queued, delivering, pinned.messageType, destination, false),
@@ -1224,6 +1298,7 @@ const documentNumberOf = ({ segments }: Message) =>
   segments.find(({ tag }) => tag === 'BGM')?.elements[1]?.[0] ?? null
 
 const processInbound = ({
+  holding,
   queued,
   run,
   content,
@@ -1234,7 +1309,7 @@ const processInbound = ({
   Effect.gen(function* () {
     // A waiting Run needs its Business Reference, so a resend can replace it.
     const read = yield* step(
-      run.id,
+      holding,
       'parse',
       () => readMessage(content, run.messageIndex),
       async (tx, { message }) => {
@@ -1246,15 +1321,15 @@ const processInbound = ({
     )
 
     if (Result.isFailure(read)) {
-      return yield* fail(run.id, parseFailure(content, tradingPartner, read.failure))
+      return yield* fail(holding, parseFailure(content, tradingPartner, read.failure))
     }
 
     const { message } = read.success
-    const checked = yield* step(run.id, 'validation', () => validatedInbound(read.success))
+    const checked = yield* step(holding, 'validation', () => validatedInbound(read.success))
 
     if (Result.isFailure(checked)) {
       return yield* fail(
-        run.id,
+        holding,
         inboundValidationFailure(content, tradingPartner, read.success, checked.failure),
       )
     }
@@ -1262,7 +1337,7 @@ const processInbound = ({
     const { structure } = pinned
 
     const mapped = yield* step(
-      run.id,
+      holding,
       'mapping',
       () =>
         applyInboundMappingVersion(
@@ -1280,7 +1355,7 @@ const processInbound = ({
     )
 
     if (Result.isFailure(mapped)) {
-      return yield* fail(run.id, mappingFailure(pinned, lookupTables, mapped.failure))
+      return yield* fail(holding, mappingFailure(pinned, lookupTables, mapped.failure))
     }
 
     const delivering = {
@@ -1292,6 +1367,7 @@ const processInbound = ({
     const destination = yield* loadDestination(queued)
 
     const delivered = yield* deliveryStep(
+      holding,
       delivering,
       destination,
       deliverDocument(delivering, pinned, destination, false),
@@ -1318,6 +1394,7 @@ const isOnlyDeliveryLeft = (runId: string) =>
   })
 
 const processClaimed = (
+  holding: Holding,
   queued: QueuedRun,
   {
     run,
@@ -1338,6 +1415,7 @@ const processClaimed = (
       const destination = yield* loadDestination(queued)
 
       const delivered = yield* deliveryStep(
+        holding,
         run,
         destination,
         direction === 'outbound'
@@ -1362,6 +1440,7 @@ const processClaimed = (
     const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
 
     const processing = {
+      holding,
       queued,
       run,
       content: document.content,
@@ -1381,11 +1460,27 @@ export const processRun = (queued: QueuedRun) =>
       return
     }
 
-    // The defect still dies, so the worker reports it.
-    yield* processClaimed(queued, claimed).pipe(
-      Effect.tapDefect(() => failOnDefect(claimed.run.id)),
-      Effect.catchTag('RunNotOwned', (error) =>
-        Effect.logWarning('A stalled worker stopped processing a Run it lost', error),
+    const holding = {
+      runId: claimed.run.id,
+      hold: yield* Ref.make<Hold>({ updatedAt: claimed.run.updatedAt }),
+    }
+
+    // The defect still dies, so the worker reports it, unless the worker lost the Run before it.
+    yield* processClaimed(holding, queued, claimed).pipe(
+      Effect.catchDefect((defect) =>
+        Effect.gen(function* () {
+          if (!(yield* failHeldOnDefect(holding))) {
+            return yield* new RunNotOwned({ runId: holding.runId, cause: defect })
+          }
+
+          return yield* Effect.die(defect)
+        }),
+      ),
+      Effect.catchTag('RunNotOwned', ({ runId, cause }) =>
+        Effect.logWarning(
+          `A stalled worker stopped processing Run ${runId}, which it lost`,
+          ...(cause === undefined ? [] : [cause]),
+        ),
       ),
     )
   })

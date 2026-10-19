@@ -1008,6 +1008,71 @@ describe('the sweep of stuck Runs', () => {
       output: delivered?.toString('latin1'),
     })
   })
+
+  it('leaves the Run to its new worker when the stalled worker stops on a defect', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+    const { promise: handingOver, resolve: handOverStarted } = Promise.withResolvers<void>()
+    const { promise: handedOver, resolve: handOver } = Promise.withResolvers<void>()
+    const storage = postgresDocumentStorage(connection.db)
+
+    // The worker stalls after its claim and then loses its database connection.
+    const stalled = Effect.runPromiseExit(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        Effect.provideService(Documents, {
+          ...storage,
+          read: async () => {
+            await resumed
+
+            throw new Error('The connection to the database was lost')
+          },
+        }),
+        pipelineServices(connection.db, queue),
+      ),
+    )
+
+    await vi.waitFor(
+      async () => {
+        expect(await readRun(connection.db, runId)).toMatchObject({ status: 'processing' })
+      },
+      { timeout: 2000, interval: 20 },
+    )
+
+    await leaveStuck(runId)
+
+    const [requeued] = (await sweepStuck()).queued
+
+    const processing = Effect.runPromise(
+      processRun(requeued ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => {
+          handOverStarted()
+
+          return Effect.promise(() => handedOver)
+        }),
+      ),
+    )
+
+    await handingOver
+    resume()
+
+    const stopped = await stalled
+
+    handOver()
+    await processing
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'delivered',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'succeeded' },
+      ],
+    })
+    // It lost the Run, so its defect is logged as a lost Run instead.
+    expect(Exit.isSuccess(stopped)).toBe(true)
+  })
 })
 
 const interchangeTime = (date: Date) =>
