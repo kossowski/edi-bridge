@@ -144,6 +144,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   const generated = new WeakMap<RunGroup, GeneratedGroup>()
   const chosenVersions = new Map<string, MappingVersionSummary>()
   const retried = new Map<string, RunDetail>()
+  const deliveringAgain = new Set<string>()
   const waitingSince = options.waitingForTradingPartnerSince ?? new Map<string, string>()
 
   const problemSources = {
@@ -214,7 +215,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     const retriedDetail = retried.get(id)
 
     if (retriedDetail) {
-      return retriedDetail
+      return deliveringAgain.has(id) ? deliverAgain(retriedDetail) : retriedDetail
     }
 
     const replacing = runs().replacingOf(id)
@@ -288,32 +289,55 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     return runDetailSchema.parse({ ...run, waitingForTradingPartnerSince: since })
   }
 
-  function retry(run: RunDetail) {
-    const now = Date.now()
-
-    const result = runDetailSchema.parse({
-      ...run,
-      status: 'delivered',
-      failureStage: null,
-      error: null,
-      problem: null,
-      waitingForTradingPartnerSince: null,
-      steps: run.steps.map((step) =>
-        step.stage === 'delivery'
-          ? {
-              ...step,
-              status: 'succeeded',
-              startedAt: new Date(now).toISOString(),
-              finishedAt: new Date(now + 840).toISOString(),
-            }
-          : step,
-      ),
-    })
-
-    retried.set(run.id, result)
+  function storeRetried(result: RunDetail) {
+    retried.set(result.id, result)
     runs().set(runSummarySchema.parse(result))
 
     return result
+  }
+
+  // The API answers before the worker delivers again, so the mock delivers by the next read.
+  function retry(run: RunDetail) {
+    deliveringAgain.add(run.id)
+
+    return storeRetried(
+      runDetailSchema.parse({
+        ...run,
+        status: 'received',
+        failureStage: null,
+        error: null,
+        problem: null,
+        waitingForTradingPartnerSince: null,
+        steps: run.steps.map((step) =>
+          step.stage === 'delivery'
+            ? { ...step, status: 'pending', startedAt: null, finishedAt: null }
+            : step,
+        ),
+      }),
+    )
+  }
+
+  function deliverAgain(run: RunDetail) {
+    const now = Date.now()
+
+    deliveringAgain.delete(run.id)
+
+    return storeRetried(
+      runDetailSchema.parse({
+        ...run,
+        status: 'delivered',
+        steps: run.steps.map((step) =>
+          step.stage === 'delivery'
+            ? {
+                ...step,
+                status: 'succeeded',
+                startedAt: new Date(now).toISOString(),
+                finishedAt: new Date(now + 840).toISOString(),
+              }
+            : step,
+        ),
+      }),
+    )
   }
 
   function reprocess(run: RunDetail, version: MappingVersionSummary) {

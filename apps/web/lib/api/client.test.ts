@@ -118,12 +118,12 @@ describe('Run detail actions', () => {
     failureStage: 'mapping',
   })
 
-  it('retries a delivery failure and gets the delivered Run back', async () => {
+  it('retries a delivery failure and gets the Run back received for its delivery', async () => {
     server.use(...runDetailHandlers(apiUrl, { runs: [deliveryFailure] }))
 
     const run = await retryRun(deliveryFailure.id)
 
-    expect(run).toMatchObject({ id: deliveryFailure.id, status: 'delivered' })
+    expect(run).toMatchObject({ id: deliveryFailure.id, status: 'received', failureStage: null })
   })
 
   it('reprocesses a mapping failure with the chosen Mapping Version', async () => {

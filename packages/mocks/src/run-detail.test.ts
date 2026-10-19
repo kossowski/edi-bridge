@@ -577,7 +577,7 @@ async function versionsOf(mappingId: string) {
 }
 
 describe('POST /runs/:id/retry', () => {
-  it('repeats the failed delivery and leaves the other steps unchanged', async () => {
+  it('answers with the Run received again and its delivery pending', async () => {
     const run = inboundOrders('00000000-0000-4000-8000-000000000001', {
       failureStage: 'delivery',
     })
@@ -586,10 +586,36 @@ describe('POST /runs/:id/retry', () => {
     const { body: before } = await getRun(run.id)
 
     const { status, body } = await post(toPath(retryRunEndpoint.path, { id: run.id }))
-    const { body: after } = await getRun(run.id)
 
     expect(status).toBe(200)
-    expect(body).toMatchObject({ id: run.id, status: 'delivered', failureStage: null, error: null })
+    expect(body).toMatchObject({
+      id: run.id,
+      status: 'received',
+      failureStage: null,
+      error: null,
+      problem: null,
+    })
+    expect(body?.steps.slice(0, -1)).toEqual(before?.steps.slice(0, -1))
+    expect(body?.steps.at(-1)).toEqual({
+      stage: 'delivery',
+      status: 'pending',
+      startedAt: null,
+      finishedAt: null,
+    })
+  })
+
+  it('delivers the Run again by its next read and leaves the other steps unchanged', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', {
+      failureStage: 'delivery',
+    })
+
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+    const { body: before } = await getRun(run.id)
+
+    await post(toPath(retryRunEndpoint.path, { id: run.id }))
+    const { body: after } = await getRun(run.id)
+
+    expect(after).toMatchObject({ id: run.id, status: 'delivered', failureStage: null })
     expect(after?.steps.slice(0, -1)).toEqual(before?.steps.slice(0, -1))
     expect(after?.steps.at(-1)?.status).toBe('succeeded')
   })
