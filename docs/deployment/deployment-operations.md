@@ -95,7 +95,7 @@ An application redeployment preserves the Postgres and Redis volumes.
 Update the database password and the affected applications together:
 
 1. Change the password for the affected database service in Dokploy.
-2. Update the corresponding connection URL in each affected application's **Environment** settings. Postgres uses `DATABASE_URL` in API. Redis uses `REDIS_URL` in both API and worker.
+2. Update the corresponding connection URL in each affected application's **Environment** settings. Postgres uses `DATABASE_URL` in both API and worker. Redis uses `REDIS_URL` in both API and worker.
 3. Redeploy each affected application.
 4. Follow [Verify the deployment](#verify-the-deployment).
 

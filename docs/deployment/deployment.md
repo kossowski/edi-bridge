@@ -67,7 +67,7 @@ Each application's Dokploy **Environment** settings contain values with the form
 | web         | `PORT`               | `3000`                                                                         |
 | api         | `NODE_ENV`           | `production`                                                                   |
 | api         | `API_PORT`           | `3001`                                                                         |
-| api         | `DATABASE_URL`       | `postgres://edi_bridge:<postgres-password>@<postgres-service>:5432/edi_bridge` |
+| api, worker | `DATABASE_URL`       | `postgres://edi_bridge:<postgres-password>@<postgres-service>:5432/edi_bridge` |
 | api         | `WEB_ORIGIN`         | Not set; see below                                                             |
 | api         | `BETTER_AUTH_URL`    | `https://edi-bridge.example.com`                                               |
 | api         | `BETTER_AUTH_SECRET` | `<auth-secret>`                                                                |
