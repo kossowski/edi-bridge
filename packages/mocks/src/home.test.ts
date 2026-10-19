@@ -288,7 +288,6 @@ describe('GET /home states', () => {
 
 describe('GET /home seeded', () => {
   it('shows every seeded Trading Partner and traffic in the window', async () => {
-    vi.useRealTimers()
     server.use(homeHandler(apiUrl))
 
     const home = await getHome({ window: '7d' })
