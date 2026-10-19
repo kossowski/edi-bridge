@@ -218,9 +218,15 @@ const trailerError = ({
   return undefined
 }
 
-interface Reading {
+export interface Reading {
+  hasServiceStringAdvice: boolean
+  segments: Segment[]
+  // The readable UNB, also when the rest of the envelope is broken.
+  header: Segment | undefined
   tokenErrors: ParseError[]
   messages: ParsedMessage[]
+  // The index in segments of each Message's UNH.
+  messageIndexes: number[]
   envelope: Envelope | ParseError
 }
 
@@ -231,7 +237,7 @@ interface OpenMessage {
   error: ParseError | undefined
 }
 
-const readInterchange = (text: string): Reading => {
+export const readInterchange = (text: string): Reading => {
   const hasServiceStringAdvice = text.startsWith(serviceStringAdviceTag)
 
   const delimiters = hasServiceStringAdvice
@@ -248,15 +254,25 @@ const readInterchange = (text: string): Reading => {
 
   const tokenErrors = [...segmentErrors, endError].filter((error) => error !== undefined)
   const messages: ParsedMessage[] = []
-  const failed = (error: ParseError): Reading => ({ tokenErrors, messages, envelope: error })
+  const messageIndexes: number[] = []
+  const [firstSegment] = segments
+  const header = !segmentErrors[0] && firstSegment?.tag === 'UNB' ? firstSegment : undefined
 
-  const [header] = segments
+  const reading = {
+    hasServiceStringAdvice,
+    segments,
+    header,
+    tokenErrors,
+    messages,
+    messageIndexes,
+  }
+  const failed = (error: ParseError): Reading => ({ ...reading, envelope: error })
 
   if (segmentErrors[0]) {
     return failed(segmentErrors[0])
   }
 
-  if (header?.tag !== 'UNB') {
+  if (header === undefined) {
     return failed(new ParseError('missing-interchange-header', position(0)))
   }
 
@@ -267,6 +283,7 @@ const readInterchange = (text: string): Reading => {
       header: message.header,
       error: message.error ?? new ParseError('missing-message-trailer', position(message.index)),
     })
+    messageIndexes.push(message.index)
     openMessage = undefined
   }
 
@@ -294,6 +311,7 @@ const readInterchange = (text: string): Reading => {
           ? { header: openMessage.header, error }
           : { header: openMessage.header, segments: openMessage.segments, trailer: segment },
       )
+      messageIndexes.push(openMessage.index)
       openMessage = undefined
     } else if (openMessage && segment.tag !== 'UNH' && segment.tag !== 'UNZ') {
       openMessage.segments.push(segment)
@@ -325,8 +343,7 @@ const readInterchange = (text: string): Reading => {
         return error
           ? failed(error)
           : {
-              tokenErrors,
-              messages,
+              ...reading,
               envelope: {
                 hasServiceStringAdvice,
                 delimiters,

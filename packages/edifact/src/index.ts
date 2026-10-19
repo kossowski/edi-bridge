@@ -1,3 +1,5 @@
+export { buildContrl } from './contrl'
+
 export { readAcknowledgedInterchange, ReadAcknowledgementError } from './acknowledgement'
 
 export { isBrokenMessage } from './model'

@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 
 import { messageDefinitions } from './definitions/message-definitions'
 import {
+  buildContrl,
   type Delimiters,
   type Interchange,
+  type Message,
   parse,
   ParseError,
   isBrokenMessage,
@@ -13,6 +15,7 @@ import {
   ReadAcknowledgementError,
   serialize,
   SerializeError,
+  serializeMessage,
   validate,
   ValidationError,
 } from './index'
@@ -478,5 +481,114 @@ describe('readAcknowledgedInterchange', () => {
 
     expect(error).toBeInstanceOf(ReadAcknowledgementError)
     expect(error).toMatchObject({ code })
+  })
+})
+
+describe('buildContrl', () => {
+  // Every CONTRL must pass validation and read back as the Acknowledgement it states.
+  const readBack = (contrl: Message) => {
+    const interchange = parse(
+      `UNB+UNOC:3+7350000001266:14+7300015200048:14+261020:0100+R1'${serializeMessage(contrl).replaceAll('\n', '')}UNZ+1+R1'`,
+    )
+
+    validate(interchange)
+
+    const [message] = interchange.messages
+
+    return message && readAcknowledgedInterchange(message)
+  }
+
+  const segmentsOf = (text: string) => {
+    const contrl = buildContrl(text, 'C1')
+
+    readBack(contrl)
+
+    return serializeMessage(contrl).split('\n')
+  }
+
+  const orders = (reference: string, ...segments: string[]) =>
+    `UNH+${reference}+ORDERS:D:96A:UN:EAN008'${segments.join('')}UNT+${String(segments.length + 2)}+${reference}'`
+
+  const interchangeOf = (...messages: string[]) =>
+    `UNB+UNOC:3+7300015200048:14+7350000001266:14+221125:1605+88776655'${messages.join('')}UNZ+${String(messages.length)}+88776655'`
+
+  const validOrder = ["BGM+220+PO1+9'", "DTM+137:20261020:102'", "UNS+S'"]
+
+  const uci = "UCI+88776655+7300015200048:14+7350000001266:14+7'"
+
+  it('accepts an Interchange without errors and each of its Messages', () => {
+    expect(
+      segmentsOf(interchangeOf(orders('M1', ...validOrder), orders('M2', ...validOrder))),
+    ).toEqual([
+      "UNH+C1+CONTRL:D:3:UN:EAN002'",
+      uci,
+      "UCM+M1+ORDERS:D:96A:UN:EAN008+7'",
+      "UCM+M2+ORDERS:D:96A:UN:EAN008+7'",
+      "UNT+5+C1'",
+    ])
+  })
+
+  it('rejects a Message with an invalid data element at its position', () => {
+    const text = interchangeOf(
+      orders('M1', ...validOrder),
+      orders('M2', "BGM+220+PO2+9'", `DTM+137:${'2'.repeat(40)}:102'`, "UNS+S'"),
+    )
+
+    expect(segmentsOf(text)).toEqual([
+      "UNH+C1+CONTRL:D:3:UN:EAN002'",
+      uci,
+      "UCM+M1+ORDERS:D:96A:UN:EAN008+7'",
+      "UCM+M2+ORDERS:D:96A:UN:EAN008+4'",
+      "UCS+3'",
+      "UCD+39+1:2'",
+      "UNT+7+C1'",
+    ])
+    expect(readBack(buildContrl(text, 'C1'))).toMatchObject({ action: 'rejected' })
+  })
+
+  it.each([
+    [
+      'a wrong segment count',
+      "UNH+M2+ORDERS:D:96A:UN:EAN008'BGM+220+PO2+9'UNT+5+M2'",
+      ["UCM+M2+ORDERS:D:96A:UN:EAN008+4+29+UNT+1'"],
+    ],
+    [
+      'a wrong message reference in its trailer',
+      "UNH+M2+ORDERS:D:96A:UN:EAN008'BGM+220+PO2+9'UNT+3+M3'",
+      ["UCM+M2+ORDERS:D:96A:UN:EAN008+4+28+UNT+2'"],
+    ],
+    [
+      'an unneeded release character',
+      "UNH+M2+ORDERS:D:96A:UN:EAN008'BGM+220+P?O2+9'UNT+3+M2'",
+      ["UCM+M2+ORDERS:D:96A:UN:EAN008+4'", "UCS+2'", "UCD+22+2'"],
+    ],
+    [
+      'an invalid segment tag',
+      "UNH+M2+ORDERS:D:96A:UN:EAN008'bgm+220+PO2+9'UNT+3+M2'",
+      ["UCM+M2+ORDERS:D:96A:UN:EAN008+4'", "UCS+2+12'"],
+    ],
+    [
+      'no trailer',
+      "UNH+M2+ORDERS:D:96A:UN:EAN008'BGM+220+PO2+9'",
+      ["UCM+M2+ORDERS:D:96A:UN:EAN008+4+13+UNT'"],
+    ],
+    [
+      'an unsupported Message Type',
+      "UNH+M2+APERAK:D:96A:UN:EAN003'BGM+305+AP2+9'UNT+3+M2'",
+      ["UCM+M2+APERAK:D:96A:UN:EAN003+4+14+UNH+2'"],
+    ],
+    [
+      'a missing segment',
+      "UNH+M2+ORDERS:D:96A:UN:EAN008'BGM+220+PO2+9'UNS+S'UNT+4+M2'",
+      ["UCM+M2+ORDERS:D:96A:UN:EAN008+4'", "UCS+3+13'"],
+    ],
+  ])('rejects a Message with %s', (_case, brokenMessage, responses) => {
+    expect(segmentsOf(interchangeOf(orders('M1', ...validOrder), brokenMessage))).toEqual([
+      "UNH+C1+CONTRL:D:3:UN:EAN002'",
+      uci,
+      "UCM+M1+ORDERS:D:96A:UN:EAN008+7'",
+      ...responses,
+      `UNT+${String(responses.length + 4)}+C1'`,
+    ])
   })
 })
