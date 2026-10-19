@@ -30,6 +30,8 @@ Work is delivered through a stack of PRs, the bottom one against `main`. Only a 
 2. In the issue body, check every acceptance-criteria checkbox that the work fulfils. Don't change the wording.
 3. Merging the stack closes the issue. Its linked PRs record where it was resolved, so it needs no closing comment.
 
+A ticket carries no notes, causes, measurements or decisions: resolving it only ticks its checkboxes. Findings go into commit bodies and PR descriptions.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_

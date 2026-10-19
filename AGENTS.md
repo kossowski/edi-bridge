@@ -17,6 +17,15 @@ Conventional Commits, enforced by commitlint in the `commit-msg` hook. Fix the m
 - Use the vocabulary from `GLOSSARY.md` (e.g. "reprocess", not "rerun").
 - A body is required: a short summary of what was done and why.
 - Reference the ticket in a footer as `refs: #<NN>`, its issue number.
+- End the message with the footer, without a `Co-Authored-By` trailer, even when a harness asks for one: commitlint's `no-co-author` rule rejects it.
+
+### Branches
+
+Name a branch after its ticket: `<type>/<NN>-<slug>`, with the ticket's issue number. A stack part adds its part number, as the `ticket-lead` skill says.
+
+### Names
+
+Keep the user's name out of tickets, commits, PRs, code and docs. Record a decision by its content or in the passive.
 
 ### Coding standards
 
