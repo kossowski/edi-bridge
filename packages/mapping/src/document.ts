@@ -23,6 +23,7 @@ export type DocumentWriteErrorCode = (typeof documentWriteErrorCodes)[number]
 export class DocumentWriteError extends Data.TaggedError('DocumentWriteError')<{
   readonly code: DocumentWriteErrorCode
   readonly line: number
+  readonly fieldPath: string | null
 }> {}
 
 export const documentReadErrorCodes = ['invalidJson', 'invalidCsv', 'unexpectedRoot'] as const
@@ -129,29 +130,49 @@ function csvCell(value: CsvCell, delimiter: string): string {
     : text
 }
 
+type WrittenText = {
+  text: string
+  // The path of the structure field whose cell holds the character at an index of the text.
+  fieldPathAt: (index: number) => string | null
+}
+
 function writeCsv(
   structure: Extract<ReadStructure, { format: 'csv' }>,
   content: JsonContent,
-): string {
+): WrittenText {
   const { delimiter, headerRow } = structure.csv
-  // Names, not path segments: they key the cells the engine writes and keep the sample's header.
-  const columns = rowFields(structure).map(({ name }) => name)
+  const fields = rowFields(structure)
   const items = jsonObjectSchema.parse(content)[arrayBasePath(rootListPath(structure))] ?? []
 
-  const line = (cells: ReadonlyArray<CsvCell>) =>
-    `${cells.map((cell) => csvCell(cell, delimiter)).join(delimiter)}${csvLineBreak}`
+  // Names, not path segments: they key the cells the engine writes and keep the sample's header.
+  const rows = [
+    ...(headerRow ? [fields.map(({ name, path }) => ({ value: name, fieldPath: path }))] : []),
+    ...jsonListSchema.parse(items).map((item) => {
+      const cells = csvRowSchema.parse(item)
 
-  const lines = jsonListSchema.parse(items).map((item) => {
-    const cells = csvRowSchema.parse(item)
+      return fields.map(({ name, path }) => ({ value: cells[name], fieldPath: path }))
+    }),
+  ]
 
-    return line(columns.map((column) => cells[column]))
-  })
+  const cellEnds: Array<{ end: number; fieldPath: string }> = []
+  let text = ''
 
-  return [...(headerRow ? [line(columns)] : []), ...lines].join('')
+  for (const row of rows) {
+    row.forEach(({ value, fieldPath }, index) => {
+      text += `${index === 0 ? '' : delimiter}${csvCell(value, delimiter)}`
+      cellEnds.push({ end: text.length, fieldPath })
+    })
+    text += csvLineBreak
+  }
+
+  return {
+    text,
+    fieldPathAt: (index) => cellEnds.find(({ end }) => index < end)?.fieldPath ?? null,
+  }
 }
 
 function encoded(
-  text: string,
+  { text, fieldPathAt }: WrittenText,
   encoding: CharacterEncoding,
 ): Effect.Effect<Uint8Array, DocumentWriteError> {
   try {
@@ -160,7 +181,13 @@ function encoded(
     if (error instanceof UnencodableCharacterError) {
       const line = text.slice(0, error.index).split('\n').length
 
-      return Effect.fail(new DocumentWriteError({ code: 'unencodableCharacter', line }))
+      return Effect.fail(
+        new DocumentWriteError({
+          code: 'unencodableCharacter',
+          line,
+          fieldPath: fieldPathAt(error.index),
+        }),
+      )
     }
 
     throw error
@@ -173,5 +200,5 @@ export function writeDocument(
 ): Effect.Effect<Uint8Array, DocumentWriteError> {
   return structure.format === 'csv'
     ? encoded(writeCsv(structure, content), structure.csv.encoding)
-    : encoded(`${JSON.stringify(content, null, 2)}\n`, 'utf-8')
+    : encoded({ text: `${JSON.stringify(content, null, 2)}\n`, fieldPathAt: () => null }, 'utf-8')
 }

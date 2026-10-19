@@ -277,7 +277,7 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
       url: lookupTableMissingCodesEndpoint.path.replace(':id', id),
     })
 
-  it('lists no missing codes until Mappings and Runs exist', async () => {
+  it('lists no missing codes for a Lookup Table without failed Runs', async () => {
     const { id } = await posted(units)
 
     const response = await missingCodes(id)

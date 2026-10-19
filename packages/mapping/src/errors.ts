@@ -15,9 +15,15 @@ export const mappingErrorCodes = [
 
 export type MappingErrorCode = (typeof mappingErrorCodes)[number]
 
+export type MissingLookup = {
+  readonly lookupTableId: string | null
+  readonly code: string
+}
+
 export class MappingError extends Data.TaggedError('MappingError')<{
   readonly code: MappingErrorCode
   readonly targetPath: string
   readonly sourcePath?: string
   readonly transformId?: string
+  readonly lookup?: MissingLookup
 }> {}

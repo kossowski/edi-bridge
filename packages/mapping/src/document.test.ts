@@ -175,13 +175,13 @@ describe('writeDocument', () => {
     expect(Buffer.from(bytes).toString('latin1')).toBe('city\r\nLübeck\r\n')
   })
 
-  it('fails naming the line of a character that Windows-1252 has no byte for', async () => {
+  it('fails naming the line and the field of a character that Windows-1252 has no byte for', async () => {
     const structure = csvStructure('city\nKöln\n', { encoding: 'windows-1252' })
 
     expect(
       await Effect.runPromise(
         Effect.flip(writeDocument(structure, { rows: [{ city: 'Köln' }, { city: 'Łódź' }] })),
       ),
-    ).toMatchObject({ code: 'unencodableCharacter', line: 3 })
+    ).toMatchObject({ code: 'unencodableCharacter', line: 3, fieldPath: 'rows[].city' })
   })
 })

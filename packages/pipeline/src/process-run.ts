@@ -10,6 +10,7 @@ import {
   documentStructureSchema,
   type FailureStage,
   failureStageSchema,
+  type FixTarget,
   type LookupTableEntry,
   type MappingGraph,
   type MessageType,
@@ -47,11 +48,12 @@ import {
 } from '@edi-bridge/edifact'
 import {
   applyInboundMappingVersion,
-  applyMappingVersion,
   type DocumentReadError,
   type DocumentWriteError,
   type MappingError,
   type MappingErrorCode,
+  type MappedMessage,
+  mapMessage,
   readDocument,
   writeDocument,
 } from '@edi-bridge/mapping'
@@ -113,13 +115,41 @@ const mappingReasons: Record<MappingErrorCode, ProblemReason> = {
   invalidTransform: 'invalidContent',
   invalidDate: 'invalidContent',
   invalidNumber: 'invalidContent',
-  unknownLookupTable: 'missingCode',
+  unknownLookupTable: 'incompleteSetup',
   noLookupMatch: 'missingCode',
   expressionFailed: 'invalidContent',
 }
 
+type LoadedLookupTable = { id: string; name: string; entries: LookupTableEntry[] }
+
+type LoadedLookupTables = ReadonlyMap<string, LoadedLookupTable>
+
+const entriesOf = (loaded: LoadedLookupTables) =>
+  new Map([...loaded].map(([id, { entries }]) => [id, entries]))
+
+const mappingTarget = ({ mappingId, mappingName }: Pinned, fieldPath: string): FixTarget => ({
+  kind: 'mapping',
+  mappingId,
+  name: mappingName,
+  fieldPath,
+})
+
+const mappingFixTarget = (
+  pinned: Pinned,
+  loaded: LoadedLookupTables,
+  { targetPath, lookup }: MappingError,
+): FixTarget => {
+  const table = lookup?.lookupTableId ? loaded.get(lookup.lookupTableId) : undefined
+
+  // A Lookup Table that is not chosen or no longer exists is fixed in the Mapping.
+  return table && lookup?.code
+    ? { kind: 'lookupTable', lookupTableId: table.id, name: table.name, code: lookup.code }
+    : mappingTarget(pinned, targetPath)
+}
+
 const mappingFailure = (
   pinned: Pinned,
+  loaded: LoadedLookupTables,
   error: MappingError | DocumentReadError | DocumentWriteError,
 ): Failure =>
   Match.value(error).pipe(
@@ -132,9 +162,10 @@ const mappingFailure = (
           position: null,
           details: null,
         },
+        // An unreadable Document names no field, and no fix target kind is a Document Structure.
         problem: { reason: 'unreadable', fixTarget: null },
       }),
-      DocumentWriteError: ({ code, line }): Failure => ({
+      DocumentWriteError: ({ code, line, fieldPath }): Failure => ({
         stage: 'mapping',
         error: {
           code,
@@ -142,28 +173,39 @@ const mappingFailure = (
           position: null,
           details: null,
         },
-        problem: { reason: 'invalidContent', fixTarget: null },
-      }),
-      MappingError: ({ code, targetPath }): Failure => ({
-        stage: 'mapping',
-        error: { code, message: `${code} at ${targetPath}`, position: null, details: null },
         problem: {
-          reason: mappingReasons[code],
-          fixTarget: {
-            kind: 'mapping',
-            mappingId: pinned.mappingId,
-            name: pinned.mappingName,
-            fieldPath: targetPath,
-          },
+          reason: 'invalidContent',
+          // Only a CSV Document has an encoding that can fail, and its every cell has a field.
+          fixTarget: fieldPath === null ? null : mappingTarget(pinned, fieldPath),
+        },
+      }),
+      MappingError: (mappingError): Failure => ({
+        stage: 'mapping',
+        error: {
+          code: mappingError.code,
+          message: `${mappingError.code} at ${mappingError.targetPath}`,
+          position: null,
+          details: null,
+        },
+        problem: {
+          reason: mappingReasons[mappingError.code],
+          fixTarget: mappingFixTarget(pinned, loaded, mappingError),
         },
       }),
     }),
   )
 
 // Validation runs on the Message alone, so a position counts from its UNH as segment 1.
-const validationFailure = (message: Message, { cause }: MessageInvalid): Failure => {
+const validationFailure = (
+  pinned: Pinned,
+  { message, targetPathAt }: MappedMessage,
+  { cause }: MessageInvalid,
+): Failure => {
   const segments = [message.header, ...message.segments, message.trailer]
   const segment = cause.position.segment - 1
+
+  // The envelope around the Message is the engine's own, so a failure in it is in no Mapping.
+  const fieldPath = targetPathAt({ ...cause.position, segment })
 
   return {
     stage: 'validation',
@@ -178,7 +220,10 @@ const validationFailure = (message: Message, { cause }: MessageInvalid): Failure
       },
       details: null,
     },
-    problem: { reason: 'invalidContent', fixTarget: null },
+    problem: {
+      reason: 'invalidContent',
+      fixTarget: fieldPath === undefined ? null : mappingTarget(pinned, fieldPath),
+    },
   }
 }
 
@@ -217,7 +262,20 @@ const positionIn = (tags: readonly string[], position: Position): RunError['posi
     : null
 }
 
-const parseFailure = (content: string, { cause, interchange }: MessageUnreadable): Failure => ({
+type TradingPartner = { id: string; name: string }
+
+// The Trading Partner fixes an inbound Message that breaks at parse or validation by sending it again.
+const resendTarget = ({ id, name }: TradingPartner): FixTarget => ({
+  kind: 'tradingPartner',
+  tradingPartnerId: id,
+  name,
+})
+
+const parseFailure = (
+  content: string,
+  sender: TradingPartner,
+  { cause, interchange }: MessageUnreadable,
+): Failure => ({
   stage: 'parse',
   error: {
     code: cause.code,
@@ -225,7 +283,7 @@ const parseFailure = (content: string, { cause, interchange }: MessageUnreadable
     position: positionIn(segmentTagsOf(content, interchange), cause.position),
     details: null,
   },
-  problem: { reason: 'unreadable', fixTarget: null },
+  problem: { reason: 'unreadable', fixTarget: resendTarget(sender) },
 })
 
 type ReadMessage = { interchange: ParsedInterchange; message: Message; messageIndex: number }
@@ -233,6 +291,7 @@ type ReadMessage = { interchange: ParsedInterchange; message: Message; messageIn
 // Validation sees the Message alone in its Interchange, so its positions map back to the real ones.
 const inboundValidationFailure = (
   content: string,
+  sender: TradingPartner,
   { interchange, message, messageIndex }: ReadMessage,
   { cause }: MessageInvalid,
 ): Failure => {
@@ -261,7 +320,7 @@ const inboundValidationFailure = (
       }),
       details: null,
     },
-    problem: { reason: 'invalidContent', fixTarget: null },
+    problem: { reason: 'invalidContent', fixTarget: resendTarget(sender) },
   }
 }
 
@@ -297,7 +356,10 @@ const deliveryFailure = (
           position: null,
           details: details ?? null,
         },
-        problem: { reason: 'unreachable', fixTarget: null },
+        problem: {
+          reason: 'unreachable',
+          fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
+        },
       }),
       GlnMissing: ({ party }): Failure => ({
         stage: 'delivery',
@@ -581,7 +643,7 @@ const loadLookupTables = (workspaceId: string, { transforms }: MappingGraph) =>
     ]
 
     if (ids.length === 0) {
-      return new Map<string, LookupTableEntry[]>()
+      return new Map() satisfies LoadedLookupTables
     }
 
     const db = yield* Database
@@ -590,23 +652,31 @@ const loadLookupTables = (workspaceId: string, { transforms }: MappingGraph) =>
       db
         .select({
           lookupTableId: lookupTables.id,
-          sourceCode: lookupTableEntries.sourceCode,
-          targetCode: lookupTableEntries.targetCode,
+          name: lookupTables.name,
+          entry: {
+            sourceCode: lookupTableEntries.sourceCode,
+            targetCode: lookupTableEntries.targetCode,
+          },
         })
         .from(lookupTables)
-        .innerJoin(lookupTableEntries, eq(lookupTableEntries.lookupTableId, lookupTables.id))
+        .leftJoin(lookupTableEntries, eq(lookupTableEntries.lookupTableId, lookupTables.id))
         .where(and(eq(lookupTables.workspaceId, workspaceId), inArray(lookupTables.id, ids)))
         .orderBy(asc(lookupTableEntries.position)),
     )
 
-    return new Map(
-      ids.map((id) => [
-        id,
-        rows
-          .filter(({ lookupTableId }) => lookupTableId === id)
-          .map(({ sourceCode, targetCode }) => ({ sourceCode, targetCode })),
-      ]),
-    )
+    const loaded = new Map<string, LoadedLookupTable>()
+
+    for (const { lookupTableId, name, entry } of rows) {
+      const table = loaded.get(lookupTableId) ?? { id: lookupTableId, name, entries: [] }
+
+      loaded.set(lookupTableId, table)
+
+      if (entry !== null) {
+        table.entries.push(entry)
+      }
+    }
+
+    return loaded satisfies LoadedLookupTables
   })
 
 const updateStep = (
@@ -751,9 +821,14 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
 
     const [found] = yield* Effect.promise(() =>
       db
-        .select({ run: runs, flow: flows })
+        .select({
+          run: runs,
+          flow: flows,
+          tradingPartner: { id: tradingPartners.id, name: tradingPartners.name },
+        })
         .from(runs)
         .innerJoin(flows, eq(flows.id, runs.flowId))
+        .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
         .where(
           and(eq(runs.workspaceId, workspaceId), eq(runs.id, runId), eq(runs.status, 'received')),
         ),
@@ -771,7 +846,13 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
         .returning(),
     )
 
-    return claimed && { run: claimed, direction: directionOf(found.flow) }
+    return (
+      claimed && {
+        run: claimed,
+        direction: directionOf(found.flow),
+        tradingPartner: found.tradingPartner,
+      }
+    )
   })
 
 type ClaimedRun = typeof runs.$inferSelect
@@ -805,7 +886,8 @@ type Processing = {
   run: ClaimedRun
   content: string
   pinned: Pinned
-  lookupTables: Map<string, LookupTableEntry[]>
+  lookupTables: LoadedLookupTables
+  tradingPartner: TradingPartner
 }
 
 const processOutbound = ({ queued, run, content, pinned, lookupTables }: Processing) =>
@@ -815,20 +897,20 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
       'mapping',
       readDocument(pinned.structure, content).pipe(
         Effect.flatMap((document) =>
-          applyMappingVersion(
+          mapMessage(
             { ...pinned.graph, target: { kind: 'messageType', messageType: pinned.messageType } },
             document,
-            { lookupTables },
+            { lookupTables: entriesOf(lookupTables) },
           ),
         ),
       ),
     )
 
     if (Result.isFailure(mapped)) {
-      return yield* fail(run.id, mappingFailure(pinned, mapped.failure))
+      return yield* fail(run.id, mappingFailure(pinned, lookupTables, mapped.failure))
     }
 
-    const message = mapped.success
+    const { message } = mapped.success
     const destination = yield* loadDestination(queued)
 
     const checked = yield* step(
@@ -838,7 +920,7 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
     )
 
     if (Result.isFailure(checked)) {
-      return yield* fail(run.id, validationFailure(message, checked.failure))
+      return yield* fail(run.id, validationFailure(pinned, mapped.success, checked.failure))
     }
 
     const db = yield* Database
@@ -890,18 +972,28 @@ const documentFormats = {
   csv: { extension: 'csv', mediaType: 'text/csv' },
 } as const
 
-const processInbound = ({ queued, run, content, pinned, lookupTables }: Processing) =>
+const processInbound = ({
+  queued,
+  run,
+  content,
+  pinned,
+  lookupTables,
+  tradingPartner,
+}: Processing) =>
   Effect.gen(function* () {
     const read = yield* step(run.id, 'parse', readMessage(content, run.messageIndex))
 
     if (Result.isFailure(read)) {
-      return yield* fail(run.id, parseFailure(content, read.failure))
+      return yield* fail(run.id, parseFailure(content, tradingPartner, read.failure))
     }
 
     const checked = yield* step(run.id, 'validation', validatedInbound(read.success))
 
     if (Result.isFailure(checked)) {
-      return yield* fail(run.id, inboundValidationFailure(content, read.success, checked.failure))
+      return yield* fail(
+        run.id,
+        inboundValidationFailure(content, tradingPartner, read.success, checked.failure),
+      )
     }
 
     const { message } = read.success
@@ -914,12 +1006,12 @@ const processInbound = ({ queued, run, content, pinned, lookupTables }: Processi
         { ...pinned.graph, source: { kind: 'messageType', messageType: pinned.messageType } },
         structure,
         message,
-        { lookupTables },
+        { lookupTables: entriesOf(lookupTables) },
       ).pipe(Effect.flatMap((document) => writeDocument(structure, document))),
     )
 
     if (Result.isFailure(mapped)) {
-      return yield* fail(run.id, mappingFailure(pinned, mapped.failure))
+      return yield* fail(run.id, mappingFailure(pinned, lookupTables, mapped.failure))
     }
 
     const db = yield* Database
@@ -952,7 +1044,11 @@ const processInbound = ({ queued, run, content, pinned, lookupTables }: Processi
 
 const processClaimed = (
   queued: QueuedRun,
-  { run, direction }: { run: ClaimedRun; direction: Direction },
+  {
+    run,
+    direction,
+    tradingPartner,
+  }: { run: ClaimedRun; direction: Direction; tradingPartner: TradingPartner },
 ) =>
   Effect.gen(function* () {
     const { mappingVersionId } = run
@@ -970,7 +1066,15 @@ const processClaimed = (
 
     const pinned = yield* loadPinned(queued.workspaceId, mappingVersionId, direction)
     const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
-    const processing = { queued, run, content: document.content, pinned, lookupTables }
+
+    const processing = {
+      queued,
+      run,
+      content: document.content,
+      pinned,
+      lookupTables,
+      tradingPartner,
+    }
 
     yield* direction === 'outbound' ? processOutbound(processing) : processInbound(processing)
   })

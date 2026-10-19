@@ -10,7 +10,7 @@ import {
   transformPorts,
 } from '@edi-bridge/contracts'
 
-import { MappingError, type MappingErrorCode } from './errors'
+import { MappingError, type MappingErrorCode, type MissingLookup } from './errors'
 import { reformatDate, reformatNumber } from './formats'
 import { setFilled, type Values } from './values'
 
@@ -23,6 +23,8 @@ export type Value = z.infer<typeof valueSchema>
 type Expressions = ReadonlyMap<string, string>
 
 export type EvaluatedGraph = Graph & { expressions: Expressions }
+
+type Fail = (code: MappingErrorCode, lookup?: MissingLookup) => MappingError
 
 type Evaluation = {
   graph: EvaluatedGraph
@@ -50,12 +52,12 @@ function lookedUp(
   { config: { lookupTableId, fallback } }: Extract<MappingTransform, { kind: 'lookupTable' }>,
   value: string,
   lookupTables: LookupTables,
-  fail: (code: MappingErrorCode) => MappingError,
+  fail: Fail,
 ): Effect.Effect<string, MappingError> {
   const table = lookupTableId === null ? undefined : lookupTables.get(lookupTableId)
 
   if (table === undefined) {
-    return Effect.fail(fail('unknownLookupTable'))
+    return Effect.fail(fail('unknownLookupTable', { lookupTableId, code: value }))
   }
 
   const found = table.get(value)
@@ -70,7 +72,7 @@ function lookedUp(
     case 'empty':
       return Effect.succeed('')
     case 'fail':
-      return Effect.fail(fail('noLookupMatch'))
+      return Effect.fail(fail('noLookupMatch', { lookupTableId, code: value }))
   }
 }
 
@@ -78,7 +80,7 @@ function applied(
   transform: Exclude<MappingTransform, { kind: 'loop' | 'conditional' }>,
   args: Readonly<Record<string, Value>>,
   { expressions, lookupTables }: EvaluatedGraph,
-  fail: (code: MappingErrorCode) => MappingError,
+  fail: Fail,
 ): Effect.Effect<string, MappingError> {
   const value = String(args.value ?? '')
 
@@ -156,8 +158,8 @@ function outputOf(
   const { graph, counters, targetPath } = evaluation
   const transform = graph.transforms.get(start.transformId)
 
-  const fail = (code: MappingErrorCode, transformId: string) =>
-    new MappingError({ code, targetPath, transformId })
+  const fail = (code: MappingErrorCode, transformId: string, lookup?: MissingLookup) =>
+    new MappingError({ code, targetPath, transformId, ...(lookup && { lookup }) })
 
   if (!transform || !graph.valid.has(transform.id) || visiting.has(transform.id)) {
     return Effect.fail(fail('invalidTransform', start.transformId))
@@ -192,7 +194,9 @@ function outputOf(
       ]),
     ),
     (args) =>
-      applied(transform, Object.fromEntries(args), graph, (code) => fail(code, transform.id)),
+      applied(transform, Object.fromEntries(args), graph, (code, lookup) =>
+        fail(code, transform.id, lookup),
+      ),
   )
 }
 

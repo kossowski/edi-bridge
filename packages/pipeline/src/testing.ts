@@ -272,6 +272,7 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
     mappingId: mapping.id,
     mappingVersionId: mappingVersion.id,
     flowId: flow.id,
+    lookupTableId: unitTable.id,
   }
 }
 
@@ -411,6 +412,7 @@ export async function addOrdersFlow(
     mappingId: mapping.id,
     mappingVersionId: pinned.id,
     erpChannelId: erp.id,
+    lookupTableId: unitTable.id,
   }
 }
 
