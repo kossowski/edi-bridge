@@ -28,6 +28,7 @@ import {
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
   deleteLookupTableEndpoint,
+  endWaitingForTradingPartnerRunEndpoint,
   documentStructureEndpoint,
   documentStructuresEndpoint,
   flowEndpoint,
@@ -139,7 +140,14 @@ import {
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
 import { parse, type ValidationError } from './parse.js'
-import { listRuns, loadRun, reprocessRun, retryRun, waitForTradingPartnerRun } from './run.js'
+import {
+  endWaitingForTradingPartnerRun,
+  listRuns,
+  loadRun,
+  reprocessRun,
+  retryRun,
+  waitForTradingPartnerRun,
+} from './run.js'
 import {
   CurrentMember,
   CurrentUser,
@@ -574,6 +582,11 @@ function registerRoutes(
 
   app.post<{ Params: { id: string } }>(waitForTradingPartnerRunEndpoint.path, (request, reply) =>
     respond(request, reply, waitForTradingPartnerRun(request.params.id)),
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    endWaitingForTradingPartnerRunEndpoint.path,
+    (request, reply) => respond(request, reply, endWaitingForTradingPartnerRun(request.params.id)),
   )
 
   app.post<{ Params: { id: string } }>(reprocessRunEndpoint.path, (request, reply) =>

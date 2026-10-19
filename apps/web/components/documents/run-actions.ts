@@ -5,7 +5,12 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
-import { reprocessRun, retryRun, waitForTradingPartner } from '@/lib/api/client'
+import {
+  endWaitingForTradingPartner,
+  reprocessRun,
+  retryRun,
+  waitForTradingPartner,
+} from '@/lib/api/client'
 import { homeKeys, interchangeKeys, runKeys, runQuery, taskKeys } from '@/lib/api/queries'
 import { type RunDetail, runDetailSchema } from '@edi-bridge/contracts'
 
@@ -57,6 +62,15 @@ export function useWaitForTradingPartner(id: string) {
 
   return useMutation({
     mutationFn: () => waitForTradingPartner(id),
+    onSuccess: (updated) => storeRun(queryClient, updated),
+  })
+}
+
+export function useEndWaitingForTradingPartner(id: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: () => endWaitingForTradingPartner(id),
     onSuccess: (updated) => storeRun(queryClient, updated),
   })
 }

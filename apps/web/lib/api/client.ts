@@ -126,6 +126,7 @@ import {
   updateOperatorWorkspaceSettingsEndpoint,
   updateTradingPartnerEndpoint,
   waitForTradingPartnerRunEndpoint,
+  endWaitingForTradingPartnerRunEndpoint,
   workspaceSettingsEndpoint,
   type WorkspaceInput,
   workspaceInvitesEndpoint,
@@ -379,6 +380,12 @@ export function reprocessRun(id: string, body: ReprocessRunBody) {
 export function waitForTradingPartner(id: string) {
   return request(waitForTradingPartnerRunEndpoint, {
     path: toPath(waitForTradingPartnerRunEndpoint.path, { id }),
+  })
+}
+
+export function endWaitingForTradingPartner(id: string) {
+  return request(endWaitingForTradingPartnerRunEndpoint, {
+    path: toPath(endWaitingForTradingPartnerRunEndpoint.path, { id }),
   })
 }
 

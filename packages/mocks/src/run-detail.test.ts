@@ -14,6 +14,7 @@ import {
   type RunSummary,
   toPath,
   waitForTradingPartnerRunEndpoint,
+  endWaitingForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
 
 import { seedChannels } from './channel'
@@ -736,6 +737,27 @@ describe('POST /runs/:id/wait-for-trading-partner', () => {
     expect(body?.waitingForTradingPartnerSince).toBeNull()
   })
 
+  it('refuses a Run that another Run replaces and leaves it unmarked', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'parse' })
+
+    const resend = inboundOrders('00000000-0000-4000-8000-000000000002', {
+      receivedAt: '2026-10-02T09:00:00.000Z',
+    })
+
+    server.use(
+      ...runDetailHandlers(apiUrl, {
+        runs: [run, resend],
+        reprocessed: [{ replaced: run.id, replacing: resend.id }],
+      }),
+    )
+
+    const { status } = await post(toPath(waitForTradingPartnerRunEndpoint.path, { id: run.id }))
+    const { body } = await getRun(run.id)
+
+    expect(status).toBe(409)
+    expect(body?.waitingForTradingPartnerSince).toBeNull()
+  })
+
   it.each(['mapping', 'delivery'] as const)(
     'refuses a Run that failed at %s, which the Trading Partner does not fix',
     async (failureStage) => {
@@ -754,6 +776,50 @@ describe('POST /runs/:id/wait-for-trading-partner', () => {
     const { status } = await post(
       toPath(waitForTradingPartnerRunEndpoint.path, { id: '00000000-0000-4000-8000-0000000000ff' }),
     )
+
+    expect(status).toBe(404)
+  })
+})
+
+describe('DELETE /runs/:id/wait-for-trading-partner', () => {
+  async function endWaiting(id: string) {
+    const response = await fetch(
+      `${apiUrl}${toPath(endWaitingForTradingPartnerRunEndpoint.path, { id })}`,
+      { method: 'DELETE' },
+    )
+
+    return {
+      status: response.status,
+      body: response.ok ? runDetailSchema.parse(await response.json()) : undefined,
+    }
+  }
+
+  it('ends the mark of a waiting Run', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'parse' })
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+    await post(toPath(waitForTradingPartnerRunEndpoint.path, { id: run.id }))
+
+    const { status, body } = await endWaiting(run.id)
+    const { body: after } = await getRun(run.id)
+
+    expect(status).toBe(200)
+    expect(body?.waitingForTradingPartnerSince).toBeNull()
+    expect(after?.waitingForTradingPartnerSince).toBeNull()
+  })
+
+  it('refuses a Run that is not marked', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'parse' })
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { status } = await endWaiting(run.id)
+
+    expect(status).toBe(409)
+  })
+
+  it('answers 404 for an unknown Run', async () => {
+    server.use(...runDetailHandlers(apiUrl, { runs: [] }))
+
+    const { status } = await endWaiting('00000000-0000-4000-8000-0000000000ff')
 
     expect(status).toBe(404)
   })

@@ -1,7 +1,20 @@
-import { and, asc, count, desc, eq, gte, inArray, lte, or, type SQL, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lte,
+  notExists,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm'
+import { alias, type SelectedFields } from 'drizzle-orm/pg-core'
 import { Effect } from 'effect'
-
-import type { SelectedFields } from 'drizzle-orm/pg-core'
 
 import {
   directionOf,
@@ -331,15 +344,23 @@ export const waitForTradingPartnerRun = (id: string) =>
       })
     }
 
+    if (run.replacedBy !== null) {
+      return yield* new Conflict({
+        message: 'A Run that another Run replaces cannot wait for the Trading Partner',
+      })
+    }
+
     const marked = yield* Effect.promise(() => markWaitingForTradingPartner(db, workspace.id, id))
 
-    // A Retry can claim the Run between the read above and the mark.
+    // A Retry or a resend can change the Run between the read above and the mark.
     if (!marked) {
-      return yield* new Conflict({ message: 'The Run is no longer failed' })
+      return yield* new Conflict({ message: 'The Run can no longer wait for the Trading Partner' })
     }
 
     return yield* loadRun(id)
   })
+
+const replacing = alias(runs, 'replacing')
 
 export const markWaitingForTradingPartner = async (
   db: Database,
@@ -352,11 +373,50 @@ export const markWaitingForTradingPartner = async (
       // A repeated mark keeps the time the wait began.
       waitingForTradingPartnerSince: sql`coalesce(${runs.waitingForTradingPartnerSince}, now())`,
     })
-    .where(inWorkspace(runs, workspaceId, eq(runs.id, id), eq(runs.status, 'failed')))
+    .where(
+      inWorkspace(
+        runs,
+        workspaceId,
+        eq(runs.id, id),
+        eq(runs.status, 'failed'),
+        notExists(db.select().from(replacing).where(eq(replacing.replacesRunId, runs.id))),
+      ),
+    )
     .returning({ id: runs.id })
 
   return marked.length > 0
 }
+
+export const endWaitingForTradingPartnerRun = (id: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    yield* loadRun(id)
+
+    const [ended] = yield* Effect.promise(() =>
+      db
+        .update(runs)
+        .set({ waitingForTradingPartnerSince: null })
+        .where(
+          inWorkspace(
+            runs,
+            workspace.id,
+            eq(runs.id, id),
+            isNotNull(runs.waitingForTradingPartnerSince),
+          ),
+        )
+        .returning({ id: runs.id }),
+    )
+
+    if (ended === undefined) {
+      return yield* new Conflict({
+        message: 'Only a Run that waits for the Trading Partner can end its wait',
+      })
+    }
+
+    return yield* loadRun(id)
+  })
 
 export const reprocessRun = (id: string, { mappingVersionId }: ReprocessRunBody) =>
   Effect.gen(function* () {

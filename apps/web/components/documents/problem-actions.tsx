@@ -11,7 +11,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
 import { ActionError } from '@/components/documents/action-error'
@@ -21,6 +21,7 @@ import {
 } from '@/components/documents/mapping-version-select'
 import { partnerMessage } from '@/components/documents/partner-message'
 import {
+  useEndWaitingForTradingPartner,
   useLatestRunActionResult,
   useReprocessRun,
   useRetryRun,
@@ -230,28 +231,69 @@ export function MarkWaitingStep({ run }: { run: FailedRun }) {
   const t = useTranslations('Document')
   const canChange = useCanChange()
   const wait = useWaitForTradingPartner(run.id)
+  const endWaiting = useEndWaitingForTradingPartner(run.id)
   const marked = run.waitingForTradingPartnerSince !== null
+  const markButton = useRef<HTMLButtonElement>(null)
+  const endButton = useRef<HTMLButtonElement>(null)
+  const focusAfterChange = useRef(false)
+
+  // The clicked button unmounts or turns disabled, so focus moves to the one that stays usable.
+  useEffect(() => {
+    if (focusAfterChange.current) {
+      focusAfterChange.current = false
+      ;(marked ? endButton : markButton).current?.focus()
+    }
+  }, [marked])
+
+  function change(mutation: typeof wait) {
+    focusAfterChange.current = true
+    mutation.mutate(undefined, {
+      onError: () => {
+        focusAfterChange.current = false
+      },
+    })
+  }
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-2">
       <p>{t('problem.steps.markWaiting', { tradingPartner: run.tradingPartner.name })}</p>
       {canChange ? (
-        <Button disabled={marked || wait.isPending} variant="outline" onClick={() => wait.mutate()}>
-          <HugeiconsIcon
-            icon={marked ? CheckmarkCircle02Icon : Clock01Icon}
-            strokeWidth={2}
-            aria-hidden
-          />
-          {marked
-            ? t('actions.markWaiting.marked')
-            : wait.isPending
-              ? t('actions.markWaiting.pending')
-              : t('actions.markWaiting.button')}
-        </Button>
+        <div className="flex max-w-full min-w-0 flex-wrap gap-2">
+          <Button
+            disabled={marked || wait.isPending}
+            ref={markButton}
+            variant="outline"
+            className="h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal"
+            onClick={() => change(wait)}>
+            <HugeiconsIcon
+              icon={marked ? CheckmarkCircle02Icon : Clock01Icon}
+              strokeWidth={2}
+              aria-hidden
+            />
+            {marked
+              ? t('actions.markWaiting.marked')
+              : wait.isPending
+                ? t('actions.markWaiting.pending')
+                : t('actions.markWaiting.button')}
+          </Button>
+          {marked && (
+            <Button
+              disabled={endWaiting.isPending}
+              ref={endButton}
+              variant="ghost"
+              className="h-auto min-h-8 max-w-full py-1.5 text-left whitespace-normal"
+              onClick={() => change(endWaiting)}>
+              {endWaiting.isPending
+                ? t('actions.endWaiting.pending')
+                : t('actions.endWaiting.button')}
+            </Button>
+          )}
+        </div>
       ) : (
         <ViewOnly text={t('actions.markWaiting.viewOnly')} />
       )}
       {wait.isError && <ActionError message={t('actions.markWaiting.failed')} />}
+      {endWaiting.isError && <ActionError message={t('actions.endWaiting.failed')} />}
     </div>
   )
 }

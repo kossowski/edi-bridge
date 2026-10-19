@@ -1,4 +1,5 @@
-import { and, asc, eq, gt, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, lt, notExists } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { Data, DateTime, Effect, Match, Predicate, Result } from 'effect'
 import { z } from 'zod'
 
@@ -21,6 +22,7 @@ import {
   type RunProblem,
   type RunStepStage,
   segmentTagSchema,
+  whoFixes,
 } from '@edi-bridge/contracts'
 import {
   channels,
@@ -934,6 +936,70 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
     )
   })
 
+const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
+  Effect.gen(function* () {
+    const { businessReference } = run
+
+    if (businessReference === null || run.replacesRunId !== null) {
+      return
+    }
+
+    const db = yield* Database
+    const replacing = alias(runs, 'replacing')
+
+    yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        const candidates = await tx
+          .select({ id: runs.id, failureStage: runs.failureStage, problem: runs.problem })
+          .from(runs)
+          .where(
+            and(
+              eq(runs.workspaceId, run.workspaceId),
+              eq(runs.flowId, run.flowId),
+              eq(runs.businessReference, businessReference),
+              eq(runs.status, 'failed'),
+              lt(runs.receivedAt, run.receivedAt),
+              notExists(tx.select().from(replacing).where(eq(replacing.replacesRunId, runs.id))),
+            ),
+          )
+          .orderBy(desc(runs.receivedAt))
+
+        // The Run shares the Flow of the resend, so it shares its Direction.
+        const waiting = candidates.find(
+          (candidate) => whoFixes({ ...candidate, direction }) === 'tradingPartner',
+        )
+
+        if (waiting === undefined) {
+          return
+        }
+
+        // Locks the waiting Run, so two resends delivered at once replace it once.
+        await tx.select({ id: runs.id }).from(runs).where(eq(runs.id, waiting.id)).for('update')
+
+        // A resend that waited for the lock reads the link the other one committed.
+        const [replaced] = await tx
+          .select({ id: runs.id })
+          .from(runs)
+          .where(eq(runs.replacesRunId, waiting.id))
+
+        if (replaced !== undefined) {
+          return
+        }
+
+        await tx.update(runs).set({ replacesRunId: waiting.id }).where(eq(runs.id, run.id))
+        await tx
+          .update(runs)
+          .set({ waitingForTradingPartnerSince: null })
+          .where(eq(runs.id, waiting.id))
+      }),
+    ).pipe(
+      // The Document is already handed over, so the Run stays delivered without the link.
+      Effect.catchCause((cause) =>
+        Effect.logError(`Delivered Run ${run.id} replaced no waiting Run`, cause),
+      ),
+    )
+  })
+
 const deliveryStep = (
   run: ClaimedRun,
   destination: Destination,
@@ -949,18 +1015,22 @@ const deliveryStep = (
       },
     )
 
-    if (Result.isFailure(delivered)) {
-      yield* fail(run.id, deliveryFailure(delivered.failure, destination))
-
-      const { failure } = delivered
-
-      if (
-        Predicate.isTagged(failure, 'ChannelDefect') ||
-        Predicate.isTagged(failure, 'DeliveryDefect')
-      ) {
-        return yield* Effect.die(failure.defect)
-      }
+    if (Result.isSuccess(delivered)) {
+      return true
     }
+
+    yield* fail(run.id, deliveryFailure(delivered.failure, destination))
+
+    const { failure } = delivered
+
+    if (
+      Predicate.isTagged(failure, 'ChannelDefect') ||
+      Predicate.isTagged(failure, 'DeliveryDefect')
+    ) {
+      return yield* Effect.die(failure.defect)
+    }
+
+    return false
   })
 
 type Processing = {
@@ -1071,6 +1141,17 @@ const processInbound = ({
       return yield* fail(run.id, parseFailure(content, tradingPartner, read.failure))
     }
 
+    const db = yield* Database
+    const { message } = read.success
+
+    // A waiting Run needs its Business Reference, so a resend can replace it.
+    yield* Effect.promise(() =>
+      db
+        .update(runs)
+        .set({ businessReference: documentNumberOf(message) })
+        .where(eq(runs.id, run.id)),
+    )
+
     const checked = yield* step(run.id, 'validation', validatedInbound(read.success))
 
     if (Result.isFailure(checked)) {
@@ -1080,7 +1161,6 @@ const processInbound = ({
       )
     }
 
-    const { message } = read.success
     const { structure } = pinned
 
     const mapped = yield* step(
@@ -1098,16 +1178,12 @@ const processInbound = ({
       return yield* fail(run.id, mappingFailure(pinned, lookupTables, mapped.failure))
     }
 
-    const db = yield* Database
     const written = mapped.success
 
     const [mappedRun] = yield* Effect.promise(() =>
       db
         .update(runs)
-        .set({
-          output: new TextDecoder(encodingOf(structure)).decode(written),
-          businessReference: documentNumberOf(message),
-        })
+        .set({ output: new TextDecoder(encodingOf(structure)).decode(written) })
         .where(eq(runs.id, run.id))
         .returning(),
     )
@@ -1115,11 +1191,15 @@ const processInbound = ({
     const delivering = mappedRun ?? run
     const destination = yield* loadDestination(queued)
 
-    yield* deliveryStep(
+    const delivered = yield* deliveryStep(
       delivering,
       destination,
       deliverDocument(delivering, pinned, destination, false),
     )
+
+    if (delivered) {
+      yield* replaceWaitingRun(delivering, 'inbound')
+    }
   })
 
 // A Retry leaves every step before the delivery succeeded.
@@ -1157,13 +1237,19 @@ const processClaimed = (
     if (yield* isOnlyDeliveryLeft(run.id)) {
       const destination = yield* loadDestination(queued)
 
-      return yield* deliveryStep(
+      const delivered = yield* deliveryStep(
         run,
         destination,
         direction === 'outbound'
           ? deliverInterchange(queued, run, pinned.messageType, destination, true)
           : deliverDocument(run, pinned, destination, true),
       )
+
+      if (delivered) {
+        yield* replaceWaitingRun(run, direction)
+      }
+
+      return
     }
 
     const documents = yield* Documents

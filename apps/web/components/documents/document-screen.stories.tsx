@@ -24,6 +24,7 @@ import {
   type RunProblem,
   toPath,
   waitForTradingPartnerRunEndpoint,
+  endWaitingForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
 import {
   controlReferenceOf,
@@ -991,6 +992,7 @@ export const MarkWaiting = meta.story({
     await expect(
       canvas.getByText(`Marked as waiting for ${partner.name} since`, { exact: false }),
     ).toBeVisible()
+    await waitFor(() => expect(canvas.getByRole('button', { name: 'End waiting' })).toHaveFocus())
   },
 })
 
@@ -1005,6 +1007,43 @@ export const MarkWaitingFailed = meta.story({
     )
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
       'The mark was not set. Try again.',
+    )
+  },
+})
+
+const markWaitingFirst = () =>
+  fetch(`${apiUrl}${toPath(waitForTradingPartnerRunEndpoint.path, { id: unreadable.id })}`, {
+    method: 'POST',
+  })
+
+export const EndWaiting = meta.story({
+  args: { id: unreadable.id },
+  async beforeEach() {
+    await markWaitingFirst()
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'End waiting' }))
+    const mark = await canvas.findByRole('button', { name: 'Mark as waiting for partner' })
+    await expect(mark).toBeEnabled()
+    await expect(canvas.queryByRole('button', { name: 'End waiting' })).toBeNull()
+    await waitFor(() => expect(mark).toHaveFocus())
+  },
+})
+
+export const EndWaitingFailed = meta.story({
+  args: { id: unreadable.id },
+  async beforeEach({ msw }) {
+    await markWaitingFirst()
+    msw.use(
+      http.delete(`${apiUrl}${endWaitingForTradingPartnerRunEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'End waiting' }))
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'The wait did not end. Try again.',
     )
   },
 })
