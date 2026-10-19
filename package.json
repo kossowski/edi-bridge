@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "turbo run dev --concurrency=10",
     "dev:mock": "turbo run dev:mock --concurrency=10",
+    "cli": "pnpm --silent --filter @edi-bridge/cli start",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
