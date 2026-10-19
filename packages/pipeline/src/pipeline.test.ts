@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
-import { Effect, Exit } from 'effect'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { type Duration, Effect, Exit, Fiber } from 'effect'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { channels, connect, type Connection, documents, flows } from '@edi-bridge/db'
@@ -10,6 +10,7 @@ import {
   type ArrivingDocument,
   bullmqRunQueue,
   processRun,
+  queueReceivedRunsEvery,
   ReceiptRejected,
   receive,
 } from './index'
@@ -381,6 +382,41 @@ const ranStages = (run: ReadRun) =>
 const parsedInvoice: unknown = JSON.parse(goldenInvoice)
 
 const invoiceDocument = z.looseObject({ lines: z.array(z.looseObject({})) }).parse(parsedInvoice)
+
+describe('the sweep of received Runs', () => {
+  const sweep = async (
+    queue: ReturnType<typeof inMemoryRunQueue>,
+    interval: Duration.Input,
+    runId: string,
+  ) => {
+    const sweeping = Effect.runFork(
+      queueReceivedRunsEvery(interval).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    try {
+      await vi.waitFor(
+        () => {
+          expect(queue.queued).toContainEqual({ workspaceId: workspace.id, runId })
+        },
+        { timeout: 2000, interval: 20 },
+      )
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(sweeping))
+    }
+  }
+
+  it('queues a Run left received at once', async () => {
+    const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
+
+    await sweep(inMemoryRunQueue(), '1 hour', runId)
+  })
+
+  it('tries again at the next interval after a failed sweep', async () => {
+    const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
+
+    await sweep(inMemoryRunQueue({ failures: 1 }), '20 millis', runId)
+  })
+})
 
 describe('the processing of a Run', () => {
   it('maps the Document with the pinned Mapping Version and keeps the valid INVOIC as output', async () => {

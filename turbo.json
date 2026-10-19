@@ -56,6 +56,7 @@
         "API_PORT",
         "WEB_ORIGIN",
         "WORKER_HEALTH_PORT",
+        "RUN_REQUEUE_INTERVAL_SECONDS",
         "BETTER_AUTH_URL",
         "BETTER_AUTH_SECRET",
         "NODE_ENV"

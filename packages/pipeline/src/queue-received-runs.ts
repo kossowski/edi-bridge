@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { Effect } from 'effect'
+import { type Duration, Effect, Schedule } from 'effect'
 
 import { directionOf } from '@edi-bridge/contracts'
 import { flows, runs } from '@edi-bridge/db'
@@ -25,3 +25,10 @@ export const queueReceivedRuns = Effect.gen(function* () {
     { discard: true },
   )
 })
+
+// A failed sweep leaves its Runs received, and the next one tries them again.
+export const queueReceivedRunsEvery = (interval: Duration.Input) =>
+  queueReceivedRuns.pipe(
+    Effect.catchCause((cause) => Effect.logError('Received Runs not queued', cause)),
+    Effect.repeat(Schedule.spaced(interval)),
+  )

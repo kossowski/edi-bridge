@@ -1,4 +1,3 @@
-import { Cause, Exit } from 'effect'
 import { Redis } from 'ioredis'
 import { once } from 'node:events'
 
@@ -23,16 +22,14 @@ redis.on('error', (error: NodeJS.ErrnoException) => {
 
 const connection = connect(config.databaseUrl)
 
-const runWorker = startRunWorker({ redisUrl: config.redisUrl, db: connection.db })
+const runWorker = startRunWorker({
+  redisUrl: config.redisUrl,
+  db: connection.db,
+  requeueInterval: config.requeueInterval,
+})
 
 runWorker.worker.on('error', (error) => {
   console.warn(`run worker error: ${error.message}`)
-})
-
-void runWorker.queuedReceivedRuns.then((exit) => {
-  if (Exit.isFailure(exit)) {
-    console.error(`received runs not queued at start: ${Cause.pretty(exit.cause)}`)
-  }
 })
 
 runWorker.worker.on('failed', (queued, error) => {

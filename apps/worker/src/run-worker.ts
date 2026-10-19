@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq'
-import { Effect } from 'effect'
+import { type Duration, Effect, Fiber } from 'effect'
 import { Redis } from 'ioredis'
 
 import { type Connection, postgresDocumentStorage } from '@edi-bridge/db'
@@ -9,12 +9,20 @@ import {
   Documents,
   processRun,
   type QueuedRun,
-  queueReceivedRuns,
+  queueReceivedRunsEvery,
   RunQueue,
   runQueueName,
 } from '@edi-bridge/pipeline'
 
-export function startRunWorker({ redisUrl, db }: { redisUrl: string; db: Connection['db'] }) {
+export function startRunWorker({
+  redisUrl,
+  db,
+  requeueInterval,
+}: {
+  redisUrl: string
+  db: Connection['db']
+  requeueInterval: Duration.Input
+}) {
   // BullMQ blocks on its worker connection, so commands must wait for a reconnect, not fail.
   const redis = new Redis(redisUrl, { maxRetriesPerRequest: null })
   const documents = postgresDocumentStorage(db)
@@ -32,8 +40,8 @@ export function startRunWorker({ redisUrl, db }: { redisUrl: string; db: Connect
     { connection: redis },
   )
 
-  const queuedReceivedRuns = Effect.runPromiseExit(
-    queueReceivedRuns.pipe(
+  const requeueing = Effect.runFork(
+    queueReceivedRunsEvery(requeueInterval).pipe(
       Effect.provideService(Database, db),
       Effect.provideService(RunQueue, queue.service),
     ),
@@ -41,9 +49,8 @@ export function startRunWorker({ redisUrl, db }: { redisUrl: string; db: Connect
 
   return {
     worker,
-    queuedReceivedRuns,
     close: async () => {
-      await queuedReceivedRuns
+      await Effect.runPromise(Fiber.interrupt(requeueing))
       await Promise.all([worker.close(), queue.close()])
       redis.disconnect()
     },

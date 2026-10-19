@@ -1,4 +1,4 @@
-import { Effect, Exit } from 'effect'
+import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
@@ -36,7 +36,11 @@ beforeAll(async () => {
   connection = connect(testDatabase.url)
   workspace = await seedInvoiceWorkspace(connection.db, 'Nordwind Foods')
   queue = bullmqRunQueue(testRedis.url)
-  worker = startRunWorker({ redisUrl: testRedis.url, db: connection.db })
+  worker = startRunWorker({
+    redisUrl: testRedis.url,
+    db: connection.db,
+    requeueInterval: '100 millis',
+  })
 }, 120_000)
 
 afterAll(async () => {
@@ -129,19 +133,12 @@ describe('the worker', () => {
     })
   })
 
-  it('processes a Run received but not queued once a worker starts', async () => {
+  it('processes a Run received but not queued after the next sweep', async () => {
     const runId = await arrive(goldenInvoice, inMemoryRunQueue())
-    const restarted = startRunWorker({ redisUrl: testRedis.url, db: connection.db })
 
-    try {
-      expect(Exit.isSuccess(await restarted.queuedReceivedRuns)).toBe(true)
-
-      await expect(processed(runId)).resolves.toMatchObject({
-        status: 'processing',
-        output: goldenInvoicMessage,
-      })
-    } finally {
-      await restarted.close()
-    }
+    await expect(processed(runId)).resolves.toMatchObject({
+      status: 'processing',
+      output: goldenInvoicMessage,
+    })
   })
 })
