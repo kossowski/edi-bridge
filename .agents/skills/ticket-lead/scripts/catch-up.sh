@@ -45,4 +45,4 @@ for i in "${!PARTS[@]}"; do
     echo "part $k: pushed $(git -C "$wt" rev-parse --short HEAD)"
   fi
 done
-echo "stack #$nn is on origin/main $(git rev-parse --short origin/main); run check:fast on the top worktree and wait for CI on every PR"
+echo "stack #$nn is on origin/main $(git rev-parse --short origin/main); wait for CI on every PR"

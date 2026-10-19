@@ -1,11 +1,13 @@
 ---
 name: browser-check
-description: 'Check a web change in headless Chromium: every changed page at three widths, with screenshots, axe-core WCAG 2.2 AA checks and ticket-specific interactions. Use as the Browser axis of a review when a diff touches apps/web or packages/ui, or when asked to check a UI change in a browser.'
+description: 'Check a web change in headless Chromium: every changed page at three widths, with screenshots, axe-core WCAG 2.2 AA checks and ticket-specific interactions. Use as the Browser axis of a review when a diff touches the UI paths of docs/agents/checks.md, or when asked to check a UI change in a browser.'
 ---
 
 The Browser axis of a review. curl sees only server HTML. This check sees what runs in the browser: layout at each breakpoint, focus, overflow, and interactions. It is a rough check that nothing is broken. It runs in light mode and English only.
 
-It doesn't add committed tests. Ticket 19 adds those once the UX is final.
+It doesn't add committed tests.
+
+`docs/agents/checks.md` names this repo's UI paths and how the browser check starts its server.
 
 ## Set up
 
@@ -21,7 +23,7 @@ The branch under review needs its dependencies installed (`pnpm install` in its 
 
 ## 1. Pick the routes
 
-List the pages the diff changes. If the diff touches the shell (`apps/web/app/layout.tsx`, `apps/web/components/app-*`) or `packages/ui`, take every route from `apps/web/lib/navigation.ts`.
+List the pages the diff changes. If the diff touches the shell or the shared UI, take every route from the navigation file `docs/agents/checks.md` names.
 
 For a dynamic route such as `/documents/[id]`, pass concrete URLs. Take the ids from the links on the list page, and pick one per state the ticket changes.
 
@@ -32,7 +34,7 @@ node .agents/skills/browser-check/scripts/browser-check.mjs \
 	--repo <worktree of the branch> --out <dir outside the repo> --routes /,/documents
 ```
 
-The script starts `next dev` on a free port with `NEXT_PUBLIC_API_MOCKING=enabled`, so the pages get their data from the mocks package. It stops the server afterwards. Next refuses a second dev server for the same checkout. If one already runs, the script names its URL. Pass that URL with `--base-url` only if the server runs in mock mode (`pnpm --filter @edi-bridge/web dev:mock`). Otherwise run the check against a worktree.
+The script starts `next dev` of `WEB_PACKAGE` on a free port with `WEB_DEV_ENV`, both from `.agents/project.env` in the checked repo, for example a mock mode, so the pages get their data without a backend. It stops the server afterwards. Next refuses a second dev server for the same checkout. If one already runs, the script names its URL. Pass that URL with `--base-url` only if the server runs with the same `WEB_DEV_ENV`. Otherwise run the check against a worktree.
 
 Each page counts as loaded when no element has `aria-busy="true"`. Screens mark their loading state that way. A page that is still busy after 20 seconds becomes an `error` finding, and the script doesn't check its skeleton. For each route it opens 390, 768 and 1440px. It reports:
 
@@ -63,7 +65,7 @@ try {
 }
 ```
 
-`gotoSettled` waits for the theme and for the page to load, the same way the fixed checks do. `startDevServer` starts the server in mock mode. `lib.mjs` also exports `hasHorizontalOverflow(page)` and the `widths` list.
+`gotoSettled` waits for the theme and for the page to load, the same way the fixed checks do. `startDevServer` starts the server the same way. `lib.mjs` also exports `hasHorizontalOverflow(page)` and the `widths` list.
 
 - Find elements by role and accessible name, in English.
 - Keep the output quiet: print one `pass` or `fail` line per criterion. Print details such as the DOM, the console log or values only for a failing step.
@@ -76,10 +78,10 @@ There are 3 screenshots per route, one per width. Open them for the changed rout
 
 ## Report
 
-Stay under 400 words. List each finding with where it occurs (route, width), what is wrong, and the evidence (a screenshot path or the failing step). Mark findings from step 2 and failed criteria from step 3 as hard. Mark visual judgements from step 4 as judgement calls. If there are no findings, say which routes and criteria you checked.
+Stay under 400 words. List each finding with where it occurs (route, width), what is wrong, and the evidence (a screenshot path or the failing step). Mark findings from step 2 and failed criteria from step 3 as blocking. Mark visual judgements from step 4 as non-blocking. If there are no findings, say which routes and criteria you checked.
 
 ## Limits
 
 - The check runs against `next dev`, not a production build.
-- Pages get mock data, not data from `apps/api`.
+- Pages get the data `WEB_DEV_ENV` selects, mock data when it sets a mock mode.
 - The script can't tell that a screen has loaded if the screen doesn't set `aria-busy` while it loads. It then checks the loading state.
