@@ -5,7 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import {
   OrderLifecycleResults,
@@ -59,6 +59,7 @@ export function AppSearch() {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedResult, setSelectedResult] = useState('')
+  const openingResult = useRef(false)
 
   const businessReference = businessReferenceIn(search)
   const settled = useDebouncedValue(businessReference, businessReference ?? '', searchDelay)
@@ -119,8 +120,20 @@ export function AppSearch() {
   useSearchShortcut(() => changeOpen(!open))
 
   function openResult(href: string) {
+    openingResult.current = true
     changeOpen(false)
     router.push(href)
+  }
+
+  // The workspace layout keeps #main-content, so the opened page's content takes the focus.
+  function focusAfterClose() {
+    if (!openingResult.current) {
+      return true
+    }
+
+    openingResult.current = false
+
+    return document.getElementById('main-content') ?? false
   }
 
   return (
@@ -140,6 +153,7 @@ export function AppSearch() {
       </Button>
       <CommandDialog
         description={t('description')}
+        finalFocus={focusAfterClose}
         open={open}
         title={t('title')}
         onOpenChange={changeOpen}>
