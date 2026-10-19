@@ -854,7 +854,7 @@ describe('the processing of a Run', () => {
   it('fails a Run at delivery when its SFTP Channel is unreachable and keeps its Interchange', async () => {
     const unreachable = await seedInvoiceWorkspace(connection.db, 'Unreachable Foods')
 
-    await deliverOverSftp(connection.db, unreachable, {
+    const channelId = await deliverOverSftp(connection.db, unreachable, {
       ...sftpLogin(),
       host: '127.0.0.1',
       port: 1,
@@ -870,7 +870,10 @@ describe('the processing of a Run', () => {
       status: 'failed',
       failureStage: 'delivery',
       error: { code: 'hostUnreachable', position: null, details: null },
-      problem: { reason: 'unreachable', fixTarget: null },
+      problem: {
+        reason: 'unreachable',
+        fixTarget: { kind: 'channel', channelId, name: 'Hanse Retail SFTP inbox' },
+      },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
@@ -1346,7 +1349,14 @@ describe('the processing of an inbound Run', () => {
         position: { segment: 44, tag: 'UNT' },
         details: null,
       },
-      problem: { reason: 'unreadable', fixTarget: null },
+      problem: {
+        reason: 'unreadable',
+        fixTarget: {
+          kind: 'tradingPartner',
+          tradingPartnerId: into.tradingPartnerId,
+          name: 'Hanse Retail',
+        },
+      },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'parse', status: 'failed' },
@@ -1372,7 +1382,14 @@ describe('the processing of an inbound Run', () => {
       failureStage: 'validation',
       output: null,
       error: { position: { segment: 25, tag: 'BGM', element: 3 }, details: null },
-      problem: { reason: 'invalidContent', fixTarget: null },
+      problem: {
+        reason: 'invalidContent',
+        fixTarget: {
+          kind: 'tradingPartner',
+          tradingPartnerId: into.tradingPartnerId,
+          name: 'Hanse Retail',
+        },
+      },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'parse', status: 'succeeded' },
@@ -1422,7 +1439,14 @@ describe('the processing of an inbound Run', () => {
         position: null,
         details: { kind: 'httpResponse', status: 503 },
       },
-      problem: { reason: 'unreachable', fixTarget: null },
+      problem: {
+        reason: 'unreachable',
+        fixTarget: {
+          kind: 'channel',
+          channelId: into.orders.erpChannelId,
+          name: 'ERP order import',
+        },
+      },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'parse', status: 'succeeded' },

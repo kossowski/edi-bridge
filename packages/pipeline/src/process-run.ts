@@ -240,7 +240,20 @@ const positionIn = (tags: readonly string[], position: Position): RunError['posi
     : null
 }
 
-const parseFailure = (content: string, { cause, interchange }: MessageUnreadable): Failure => ({
+type Sender = { id: string; name: string }
+
+// The Trading Partner fixes an inbound Message that breaks at parse or validation by sending it again.
+const resendTarget = ({ id, name }: Sender): FixTarget => ({
+  kind: 'tradingPartner',
+  tradingPartnerId: id,
+  name,
+})
+
+const parseFailure = (
+  content: string,
+  sender: Sender,
+  { cause, interchange }: MessageUnreadable,
+): Failure => ({
   stage: 'parse',
   error: {
     code: cause.code,
@@ -248,7 +261,7 @@ const parseFailure = (content: string, { cause, interchange }: MessageUnreadable
     position: positionIn(segmentTagsOf(content, interchange), cause.position),
     details: null,
   },
-  problem: { reason: 'unreadable', fixTarget: null },
+  problem: { reason: 'unreadable', fixTarget: resendTarget(sender) },
 })
 
 type ReadMessage = { interchange: ParsedInterchange; message: Message; messageIndex: number }
@@ -256,6 +269,7 @@ type ReadMessage = { interchange: ParsedInterchange; message: Message; messageIn
 // Validation sees the Message alone in its Interchange, so its positions map back to the real ones.
 const inboundValidationFailure = (
   content: string,
+  sender: Sender,
   { interchange, message, messageIndex }: ReadMessage,
   { cause }: MessageInvalid,
 ): Failure => {
@@ -284,7 +298,7 @@ const inboundValidationFailure = (
       }),
       details: null,
     },
-    problem: { reason: 'invalidContent', fixTarget: null },
+    problem: { reason: 'invalidContent', fixTarget: resendTarget(sender) },
   }
 }
 
@@ -320,7 +334,10 @@ const deliveryFailure = (
           position: null,
           details: details ?? null,
         },
-        problem: { reason: 'unreachable', fixTarget: null },
+        problem: {
+          reason: 'unreachable',
+          fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
+        },
       }),
       GlnMissing: ({ party }): Failure => ({
         stage: 'delivery',
@@ -783,9 +800,14 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
 
     const [found] = yield* Effect.promise(() =>
       db
-        .select({ run: runs, flow: flows })
+        .select({
+          run: runs,
+          flow: flows,
+          tradingPartner: { id: tradingPartners.id, name: tradingPartners.name },
+        })
         .from(runs)
         .innerJoin(flows, eq(flows.id, runs.flowId))
+        .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
         .where(
           and(eq(runs.workspaceId, workspaceId), eq(runs.id, runId), eq(runs.status, 'received')),
         ),
@@ -803,7 +825,13 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
         .returning(),
     )
 
-    return claimed && { run: claimed, direction: directionOf(found.flow) }
+    return (
+      claimed && {
+        run: claimed,
+        direction: directionOf(found.flow),
+        tradingPartner: found.tradingPartner,
+      }
+    )
   })
 
 type ClaimedRun = typeof runs.$inferSelect
@@ -839,6 +867,7 @@ type Processing = {
   pinned: Pinned
   lookupTables: Map<string, LookupTableEntry[]>
   lookupTableNames: LookupTableNames
+  tradingPartner: Sender
 }
 
 const processOutbound = ({
@@ -937,18 +966,22 @@ const processInbound = ({
   pinned,
   lookupTables,
   lookupTableNames,
+  tradingPartner,
 }: Processing) =>
   Effect.gen(function* () {
     const read = yield* step(run.id, 'parse', readMessage(content, run.messageIndex))
 
     if (Result.isFailure(read)) {
-      return yield* fail(run.id, parseFailure(content, read.failure))
+      return yield* fail(run.id, parseFailure(content, tradingPartner, read.failure))
     }
 
     const checked = yield* step(run.id, 'validation', validatedInbound(read.success))
 
     if (Result.isFailure(checked)) {
-      return yield* fail(run.id, inboundValidationFailure(content, read.success, checked.failure))
+      return yield* fail(
+        run.id,
+        inboundValidationFailure(content, tradingPartner, read.success, checked.failure),
+      )
     }
 
     const { message } = read.success
@@ -999,7 +1032,11 @@ const processInbound = ({
 
 const processClaimed = (
   queued: QueuedRun,
-  { run, direction }: { run: ClaimedRun; direction: Direction },
+  {
+    run,
+    direction,
+    tradingPartner,
+  }: { run: ClaimedRun; direction: Direction; tradingPartner: Sender },
 ) =>
   Effect.gen(function* () {
     const { mappingVersionId } = run
@@ -1017,7 +1054,7 @@ const processClaimed = (
 
     const pinned = yield* loadPinned(queued.workspaceId, mappingVersionId, direction)
     const tables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
-    const processing = { queued, run, content: document.content, pinned, ...tables }
+    const processing = { queued, run, content: document.content, pinned, ...tables, tradingPartner }
 
     yield* direction === 'outbound' ? processOutbound(processing) : processInbound(processing)
   })
