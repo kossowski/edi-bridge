@@ -41,7 +41,7 @@ COPY --from=prepare /app/out/json/ .
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY --from=prepare /app/out/full/ .
 RUN pnpm turbo run build --filter=@edi-bridge/api
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store mkdir -p /deploy && pnpm deploy --filter=@edi-bridge/api --prod --legacy /deploy/api
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store mkdir -p /deploy && pnpm deploy --config.allow-unused-patches=true --filter=@edi-bridge/api --prod --legacy /deploy/api
 
 FROM ${NODE_IMAGE} AS runner
 ENV NODE_ENV=production
