@@ -331,8 +331,7 @@ export const retryRun = (id: string) =>
     return yield* loadRun(id)
   })
 
-// A repeated mark keeps the time of the first one.
-export const waitForTradingPartner = (id: string) =>
+export const waitForTradingPartnerRun = (id: string) =>
   Effect.gen(function* () {
     const db = yield* Db
     const workspace = yield* CurrentWorkspace

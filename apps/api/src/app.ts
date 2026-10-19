@@ -139,7 +139,7 @@ import {
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
 import { parse, type ValidationError } from './parse.js'
-import { listRuns, loadRun, reprocessRun, retryRun, waitForTradingPartner } from './run.js'
+import { listRuns, loadRun, reprocessRun, retryRun, waitForTradingPartnerRun } from './run.js'
 import {
   CurrentMember,
   CurrentUser,
@@ -573,7 +573,7 @@ function registerRoutes(
   )
 
   app.post<{ Params: { id: string } }>(waitForTradingPartnerRunEndpoint.path, (request, reply) =>
-    respond(request, reply, waitForTradingPartner(request.params.id)),
+    respond(request, reply, waitForTradingPartnerRun(request.params.id)),
   )
 
   app.post<{ Params: { id: string } }>(reprocessRunEndpoint.path, (request, reply) =>
