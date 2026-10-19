@@ -1,7 +1,8 @@
 import { hashPassword } from 'better-auth/crypto'
 import { Effect } from 'effect'
 
-import type { InjectOptions, LightMyRequestResponse } from 'fastify'
+import type { LanguageModel } from 'ai'
+import type { FastifyServerOptions, InjectOptions, LightMyRequestResponse } from 'fastify'
 
 import { signInEndpoint, type WorkspaceRole } from '@edi-bridge/contracts'
 import { connect, members, workspaces } from '@edi-bridge/db'
@@ -132,7 +133,10 @@ export const otherAdmin: NewMember = {
   role: 'admin',
 }
 
-export async function startTestApi() {
+export async function startTestApi({
+  aiModel = null,
+  logger = false,
+}: { aiModel?: LanguageModel | null; logger?: FastifyServerOptions['logger'] } = {}) {
   const testDatabase = await startTestDatabase()
   const connection = connect(testDatabase.url)
 
@@ -144,9 +148,11 @@ export async function startTestApi() {
   const runQueue = testRunQueue()
 
   const app = buildApp({
+    aiModel,
     auth: testAuth,
     channels: testChannels,
     database: connection.db,
+    logger,
     probes: { postgres: up, redis: up },
     runQueue: runQueue.service,
     webOrigin,

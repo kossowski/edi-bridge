@@ -50,3 +50,15 @@ describe('the public API URL', () => {
     )
   })
 })
+
+describe('the AI model', () => {
+  it('drafts with the model of AI_MODEL when an Anthropic API key is set', () => {
+    expect(
+      loadConfig({ ANTHROPIC_API_KEY: 'sk-ant-test', AI_MODEL: 'claude-opus-5-5' }).aiModel,
+    ).toMatchObject({ modelId: 'claude-opus-5-5' })
+  })
+
+  it('is missing without an Anthropic API key', () => {
+    expect(loadConfig(production).aiModel).toBeNull()
+  })
+})

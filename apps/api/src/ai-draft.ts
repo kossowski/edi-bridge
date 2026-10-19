@@ -46,6 +46,8 @@ export type AiDraftRequest = {
   sampleId: string
   model: LanguageModel
   onStep: (step: AiDraftStep) => void
+  // Reports the running token count, so a run cut short still counts against the budget.
+  onTokens?: (tokens: number) => void
 }
 
 const toProposal = (links: ReadonlyArray<MappingLink>): AiProposal => ({
@@ -54,7 +56,7 @@ const toProposal = (links: ReadonlyArray<MappingLink>): AiProposal => ({
   transformLinks: [],
 })
 
-const withProposal = (draft: MappingGraph, proposal: AiProposal): MappingGraph => ({
+export const withProposal = (draft: MappingGraph, proposal: AiProposal): MappingGraph => ({
   links: [...draft.links, ...proposal.links],
   transforms: [...draft.transforms, ...proposal.transforms],
   transformLinks: [...draft.transformLinks, ...proposal.transformLinks],
@@ -80,6 +82,16 @@ const linkedTargets = (graph: MappingGraph) => [
   ...graph.links.map(({ targetPath }) => targetPath),
   ...transformLinkTargets(graph.transformLinks),
 ]
+
+// A target takes one link at most, so a link the Draft already has for a target wins.
+export const unlinkedProposal = (draft: MappingGraph, proposal: AiProposal): AiProposal => {
+  const linked = new Set(linkedTargets(draft))
+
+  return {
+    ...proposal,
+    links: proposal.links.filter(({ targetPath }) => !linked.has(targetPath)),
+  }
+}
 
 // Problems the graph has on its own come first, since the engine would stop at the first of them.
 const checkProposal = (
@@ -211,7 +223,7 @@ const errorMessage = (errors: ReadonlyArray<string>): ModelMessage => ({
 
 const tokensOf = ({ totalTokens }: { totalTokens: number | undefined }) => totalTokens ?? 0
 
-export const draftMapping = ({ mappingId, sampleId, model, onStep }: AiDraftRequest) =>
+export const draftMapping = ({ mappingId, sampleId, model, onStep, onTokens }: AiDraftRequest) =>
   Effect.gen(function* () {
     const loaded = yield* loadSamples(mappingId)
     const draft = loaded.mapping.draft
@@ -262,6 +274,7 @@ export const draftMapping = ({ mappingId, sampleId, model, onStep }: AiDraftRequ
               // The result and its errors carry the usage of the last step only.
               onStepEnd: ({ usage, response }) => {
                 tokens += tokensOf(usage)
+                onTokens?.(tokens)
                 roundMessages.push(...response.messages)
               },
             })

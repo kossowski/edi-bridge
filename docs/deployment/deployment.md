@@ -73,6 +73,8 @@ Each application's Dokploy **Environment** settings contain values with the form
 | api         | `BETTER_AUTH_SECRET`           | `<auth-secret>`                                                                |
 | api         | `CHANNEL_SECRET_KEY`           | `<channel-secret-key>`                                                         |
 | api         | `API_PUBLIC_URL`               | Not set; see below                                                             |
+| api         | `ANTHROPIC_API_KEY`            | `<anthropic-api-key>`                                                          |
+| api         | `AI_MODEL`                     | Not set; see below                                                             |
 | api, worker | `REDIS_URL`                    | `redis://:<redis-password>@<redis-service>:6379`                               |
 | worker      | `NODE_ENV`                     | `production`                                                                   |
 | worker      | `WORKER_HEALTH_PORT`           | `3002`                                                                         |
@@ -89,6 +91,10 @@ These runtime variables require neither Docker build arguments nor a repository 
 `RUN_REQUEUE_INTERVAL_SECONDS` is how often the worker queues again the Runs that are still received, for example because Redis was unreachable when they arrived. The worker also does this when it starts. Its default is `60`.
 
 `API_PUBLIC_URL` is the public URL of the API, which the API puts into the webhook URL of each webhook Channel. In production, its default is the `/api` path of `BETTER_AUTH_URL`, for example `https://edi-bridge.example.com/api`. In development, its default is `BETTER_AUTH_URL`. Set it only if the API is served from a different path or origin.
+
+`<anthropic-api-key>` is the Anthropic API key with which the API requests AI drafts of Mappings. It is stored in Dokploy. Without it, the API starts, but every AI draft fails as unavailable. The API does not start with a key that contains whitespace.
+
+`AI_MODEL` is the Anthropic model that drafts the Mappings. Its default is `claude-sonnet-5-5`. Set it only to draft with another model.
 
 ## API URL of the web application
 
