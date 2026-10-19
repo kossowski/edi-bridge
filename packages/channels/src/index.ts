@@ -17,7 +17,7 @@ export {
 
 export {
   DeliveryFailed,
-  type OutboundFile,
+  type OutboundDocument,
   type OutboundSftpChannel,
   sftpChannelDelivery,
   uploadSftp,

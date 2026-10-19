@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   DeliveryFailed,
-  type OutboundFile,
+  type OutboundDocument,
   type OutboundSftpChannel,
   secretBox,
   secretKeyBytes,
@@ -36,7 +36,7 @@ const outbox = (): SftpLogin => ({
   remotePath: '/upload',
 })
 
-const interchange = (name: string): OutboundFile => ({
+const interchange = (name: string): OutboundDocument => ({
   name,
   content: Buffer.from("UNB+UNOC:3+4012345000009:14+4098765000002:14+261019:1627+42'"),
 })
@@ -134,7 +134,7 @@ const outboundChannel = (): OutboundSftpChannel => ({
 })
 
 describe('sftpChannelDelivery', () => {
-  it('opens the sealed password of the channel and uploads the file', async () => {
+  it('opens the sealed password of the channel and uploads the document', async () => {
     await Effect.runPromise(deliver(outboundChannel(), interchange('desadv-7.edi')))
 
     expect(await remoteFile('/upload/desadv-7.edi')).toBe(

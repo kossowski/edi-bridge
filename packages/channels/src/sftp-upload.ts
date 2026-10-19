@@ -10,18 +10,18 @@ export class DeliveryFailed extends Data.TaggedError('DeliveryFailed')<{
   readonly reason: ChannelTestFailureReason
 }> {}
 
-export interface OutboundFile {
+export interface OutboundDocument {
   name: string
   content: Buffer
 }
 
 export const uploadSftp = (
   login: SftpLogin,
-  file: OutboundFile,
+  document: OutboundDocument,
   { timeoutMs }: { timeoutMs: number },
 ) => {
-  const target = posix.join(login.remotePath, file.name)
-  const partial = posix.join(login.remotePath, `.${file.name}.part`)
+  const target = posix.join(login.remotePath, document.name)
+  const partial = posix.join(login.remotePath, `.${document.name}.part`)
 
   return timingOut(
     sftpSession(login, timeoutMs, (sftp, done) => {
@@ -31,7 +31,7 @@ export const uploadSftp = (
         })
       }
 
-      sftp.writeFile(partial, file.content, (writeError) => {
+      sftp.writeFile(partial, document.content, (writeError) => {
         if (writeError) {
           discardPartial(writeError)
 
@@ -93,8 +93,8 @@ const loginOf = (secrets: SecretBox, channel: OutboundSftpChannel): SftpLogin =>
 
 export const sftpChannelDelivery =
   ({ secrets, timeoutMs }: { secrets: SecretBox; timeoutMs: number }) =>
-  (channel: OutboundSftpChannel, file: OutboundFile) =>
+  (channel: OutboundSftpChannel, document: OutboundDocument) =>
     Effect.flatMap(
       Effect.sync(() => loginOf(secrets, channel)),
-      (login) => uploadSftp(login, file, { timeoutMs }),
+      (login) => uploadSftp(login, document, { timeoutMs }),
     )
