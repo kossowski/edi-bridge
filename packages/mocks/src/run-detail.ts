@@ -443,7 +443,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
         return problem(404, 'Not Found')
       }
 
-      // Trying a Defect again outside delivery reprocesses it with its own Mapping Version.
+      // Before delivery there is no finished Document to send again, so the Defect is reprocessed.
       if (run.problem?.reason === 'defect' && isReprocessable(run)) {
         reprocess(run, run.mappingVersion)
 
