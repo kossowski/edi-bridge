@@ -1,4 +1,5 @@
-import { and, asc, eq, gt, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, lt, notExists, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { Data, DateTime, Effect, Match, Predicate, Result } from 'effect'
 import { z } from 'zod'
 
@@ -934,8 +935,55 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
     )
   })
 
+// A resend of the Trading Partner replaces the newest Run that waits for it, so the wait ends.
+const replaceWaitingRun = async (tx: Transaction, run: ClaimedRun) => {
+  if (run.businessReference === null || run.replacesRunId !== null) {
+    return
+  }
+
+  const replacing = alias(runs, 'replacing')
+
+  // Locks the waiting Run, so two resends delivered at once replace it once.
+  const [waiting] = await tx
+    .select({ id: runs.id })
+    .from(runs)
+    .where(
+      and(
+        eq(runs.workspaceId, run.workspaceId),
+        eq(runs.flowId, run.flowId),
+        eq(runs.businessReference, run.businessReference),
+        eq(runs.status, 'failed'),
+        inArray(runs.failureStage, ['parse', 'validation']),
+        sql`${runs.problem}->>'reason' <> 'defect'`,
+        lt(runs.receivedAt, run.receivedAt),
+        notExists(tx.select().from(replacing).where(eq(replacing.replacesRunId, runs.id))),
+      ),
+    )
+    .orderBy(desc(runs.receivedAt))
+    .limit(1)
+    .for('update', { of: runs })
+
+  if (waiting === undefined) {
+    return
+  }
+
+  // A resend that waited for the lock reads the link the other one committed.
+  const [replaced] = await tx
+    .select({ id: runs.id })
+    .from(runs)
+    .where(eq(runs.replacesRunId, waiting.id))
+
+  if (replaced !== undefined) {
+    return
+  }
+
+  await tx.update(runs).set({ replacesRunId: waiting.id }).where(eq(runs.id, run.id))
+  await tx.update(runs).set({ waitingForTradingPartnerSince: null }).where(eq(runs.id, waiting.id))
+}
+
 const deliveryStep = (
   run: ClaimedRun,
+  direction: Direction,
   destination: Destination,
   delivering: Effect.Effect<void, DeliveryError, Database | Delivery>,
 ) =>
@@ -946,6 +994,10 @@ const deliveryStep = (
       delivering.pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect })))),
       async (tx) => {
         await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
+
+        if (direction === 'inbound') {
+          await replaceWaitingRun(tx, run)
+        }
       },
     )
 
@@ -1019,6 +1071,7 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
 
     yield* deliveryStep(
       delivering,
+      'outbound',
       destination,
       deliverInterchange(queued, delivering, pinned.messageType, destination, false),
     )
@@ -1071,6 +1124,17 @@ const processInbound = ({
       return yield* fail(run.id, parseFailure(content, tradingPartner, read.failure))
     }
 
+    const db = yield* Database
+    const { message } = read.success
+
+    // A waiting Run needs its Business Reference, so a resend can replace it.
+    yield* Effect.promise(() =>
+      db
+        .update(runs)
+        .set({ businessReference: documentNumberOf(message) })
+        .where(eq(runs.id, run.id)),
+    )
+
     const checked = yield* step(run.id, 'validation', validatedInbound(read.success))
 
     if (Result.isFailure(checked)) {
@@ -1080,7 +1144,6 @@ const processInbound = ({
       )
     }
 
-    const { message } = read.success
     const { structure } = pinned
 
     const mapped = yield* step(
@@ -1098,16 +1161,12 @@ const processInbound = ({
       return yield* fail(run.id, mappingFailure(pinned, lookupTables, mapped.failure))
     }
 
-    const db = yield* Database
     const written = mapped.success
 
     const [mappedRun] = yield* Effect.promise(() =>
       db
         .update(runs)
-        .set({
-          output: new TextDecoder(encodingOf(structure)).decode(written),
-          businessReference: documentNumberOf(message),
-        })
+        .set({ output: new TextDecoder(encodingOf(structure)).decode(written) })
         .where(eq(runs.id, run.id))
         .returning(),
     )
@@ -1117,6 +1176,7 @@ const processInbound = ({
 
     yield* deliveryStep(
       delivering,
+      'inbound',
       destination,
       deliverDocument(delivering, pinned, destination, false),
     )
@@ -1159,6 +1219,7 @@ const processClaimed = (
 
       return yield* deliveryStep(
         run,
+        direction,
         destination,
         direction === 'outbound'
           ? deliverInterchange(queued, run, pinned.messageType, destination, true)

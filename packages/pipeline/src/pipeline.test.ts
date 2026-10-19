@@ -1629,6 +1629,91 @@ describe('the processing of an inbound Run', () => {
     expect(ranStages(run)).toEqual(['receipt', 'parse'])
     expect(erp.received).toHaveLength(0)
   })
+
+  describe('a delivered resend', () => {
+    const invalidOrders = (order: string) =>
+      interchangeOf([replaced("BGM+220:::+128576+9'", `BGM+220:::+${order}+99'`)])
+
+    const validOrders = (order: string) =>
+      interchangeOf([replaced("BGM+220:::+128576+9'", `BGM+220:::+${order}+9'`)])
+
+    const markWaiting = (runId: string) =>
+      connection.db
+        .update(runs)
+        .set({ waitingForTradingPartnerSince: new Date() })
+        .where(eq(runs.id, runId))
+
+    it('replaces the newest waiting Run of its Flow with its Business Reference and ends the mark', async () => {
+      const into = await ordersWorkspace('Resend Foods')
+      const [older] = await receiveInterchange(into, invalidOrders('128576'))
+      const [newer] = await receiveInterchange(into, invalidOrders('128576'))
+
+      await markWaiting(newer?.id ?? '')
+
+      const [resend] = await receiveInterchange(into, validOrders('128576'))
+
+      expect(newer).toMatchObject({ status: 'failed', businessReference: '128576' })
+      expect(resend).toMatchObject({ status: 'delivered', replacesRunId: newer?.id })
+      await expect(readRun(connection.db, newer?.id ?? '')).resolves.toMatchObject({
+        status: 'failed',
+        waitingForTradingPartnerSince: null,
+      })
+      await expect(readRun(connection.db, older?.id ?? '')).resolves.toMatchObject({
+        status: 'failed',
+        replacesRunId: null,
+      })
+    })
+
+    it('replaces a waiting Run once, so the next resend replaces the Run before it', async () => {
+      const into = await ordersWorkspace('Twice Sent Foods')
+      const [older] = await receiveInterchange(into, invalidOrders('128576'))
+      const [newer] = await receiveInterchange(into, invalidOrders('128576'))
+
+      const [first] = await receiveInterchange(into, validOrders('128576'))
+      const [second] = await receiveInterchange(into, validOrders('128576'))
+
+      expect(first).toMatchObject({ replacesRunId: newer?.id })
+      expect(second).toMatchObject({ replacesRunId: older?.id })
+    })
+
+    it('leaves a waiting Run of another Business Reference or without one', async () => {
+      const into = await ordersWorkspace('Other Order Foods')
+      const [other] = await receiveInterchange(into, invalidOrders('900001'))
+
+      const [unreadable] = await receiveInterchange(
+        into,
+        interchangeOf([ordersMessage.filter((line) => !line.startsWith('BGM'))]),
+      )
+
+      await markWaiting(other?.id ?? '')
+      await markWaiting(unreadable?.id ?? '')
+
+      const [resend] = await receiveInterchange(into, validOrders('128576'))
+
+      expect(resend).toMatchObject({ status: 'delivered', replacesRunId: null })
+      await expect(readRun(connection.db, other?.id ?? '')).resolves.toMatchObject({
+        businessReference: '900001',
+        waitingForTradingPartnerSince: expect.any(Date),
+      })
+      await expect(readRun(connection.db, unreadable?.id ?? '')).resolves.toMatchObject({
+        businessReference: null,
+        waitingForTradingPartnerSince: expect.any(Date),
+      })
+    })
+
+    it('leaves a waiting Run of another Flow', async () => {
+      const into = await ordersWorkspace('Two Flow Foods')
+      const [waiting] = await receiveInterchange(into, invalidOrders('128576'))
+      const elsewhere = await ordersWorkspace('Elsewhere Foods')
+
+      const [resend] = await receiveInterchange(elsewhere, validOrders('128576'))
+
+      expect(resend).toMatchObject({ status: 'delivered', replacesRunId: null })
+      await expect(readRun(connection.db, waiting?.id ?? '')).resolves.toMatchObject({
+        status: 'failed',
+      })
+    })
+  })
 })
 
 describe('the Retry of a Run', () => {
