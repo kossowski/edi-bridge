@@ -5,6 +5,7 @@ import {
   directionOf,
   type FailureStage,
   fromSearchParams,
+  type MappingVersionSummary,
   type MessageType,
   type RunListQuery,
   runsEndpoint,
@@ -18,6 +19,7 @@ import {
   type FlowStore,
   type MappingCatalogue,
   type MappingRecord,
+  recordedMappingVersionOf as seededRecordedMappingVersionOf,
   seedFlows,
   seedMappings,
   toFlowStore,
@@ -275,10 +277,10 @@ function matchesExceptStatus(
   run: RunSummary,
   query: RunListQuery,
   text: string,
-  mappingOfFlow: (flowId: string) => string | undefined,
+  mappingOfRun: (run: RunSummary) => string | undefined,
 ) {
   const receivedAt = Date.parse(run.receivedAt)
-  const mappingId = query.mappingId?.length ? mappingOfFlow(run.flow.id) : undefined
+  const mappingId = query.mappingId?.length ? mappingOfRun(run) : undefined
 
   return (
     (text === '' ||
@@ -303,9 +305,11 @@ export function runsHandler(
   {
     flows = seedFlows,
     mappings = seedMappings,
+    recordedMappingVersionOf = seededRecordedMappingVersionOf,
   }: {
     flows?: ReadonlyArray<FlowRecord> | FlowStore
     mappings?: ReadonlyArray<MappingRecord> | MappingCatalogue
+    recordedMappingVersionOf?: (run: RunSummary) => MappingVersionSummary | null
   } = {},
 ) {
   let store: RunStore | undefined
@@ -323,8 +327,15 @@ export function runsHandler(
     const { status } = query.data
     const text = query.data.q?.toLowerCase() ?? ''
 
-    const mappingOfFlow = (flowId: string) => {
-      const flow = flowStore.get(flowId)
+    // Mirrors the api: a Run not yet processed falls back to the version its Flow pins now.
+    const mappingOfRun = (run: RunSummary) => {
+      const recorded = recordedMappingVersionOf(run)
+
+      if (recorded) {
+        return recorded.mappingId
+      }
+
+      const flow = flowStore.get(run.flow.id)
 
       return flow && catalogue.find(flow.mappingVersionId)?.mapping.mappingId
     }
@@ -340,7 +351,7 @@ export function runsHandler(
     const filtered: RunSummary[] = []
 
     for (const run of store.newestFirst()) {
-      if (!matchesExceptStatus(run, query.data, text, mappingOfFlow)) {
+      if (!matchesExceptStatus(run, query.data, text, mappingOfRun)) {
         continue
       }
 

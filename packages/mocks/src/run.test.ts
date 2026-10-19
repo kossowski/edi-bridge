@@ -2,19 +2,23 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  type MappingVersionSummary,
+  mappingVersionSummarySchema,
   type RunListQuery,
   runDetailSchema,
   runEndpoint,
   runListSchema,
+  runMappingFilterCase,
   runsEndpoint,
   toPath,
   toSearchParams,
 } from '@edi-bridge/contracts'
 
-import { seedFlows, seedMappings } from './flow'
+import { type FlowRecord, type MappingRecord, seedFlows, seedMappings } from './flow'
 import { createRun, createRuns, runsHandler, seedRuns } from './run'
 import { runDetailHandlers, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
+import { stableUuid } from './seed-id'
 import { seedRunsBeforeAll } from './test-helpers'
 import { seedTradingPartners } from './trading-partner'
 
@@ -170,7 +174,7 @@ describe('GET /runs', () => {
     expect(body?.runs.map((run) => run.id)).toEqual(['00000000-0000-4000-8000-000000000001'])
   })
 
-  it('filters by the Mapping that the Flow of each Run uses', async () => {
+  it('filters seeded Runs of Flows that share a Mapping by that Mapping', async () => {
     const mappingOf = (flowId: string) => {
       const versionId = seedFlows.find(({ id }) => id === flowId)!.mappingVersionId
 
@@ -204,6 +208,71 @@ describe('GET /runs', () => {
       '00000000-0000-4000-8000-000000000001',
       '00000000-0000-4000-8000-000000000002',
     ])
+  })
+
+  it('filters by the Mapping Version each Run recorded, else the one its Flow pins', async () => {
+    const { mappings, mappingVersions, flows, runs, filters } = runMappingFilterCase
+    const idOf = (key: string) => stableUuid(`run-mapping-filter-case:${key}`)
+    const template = seedFlows.find(({ messageType }) => messageType === 'ORDERS')!
+
+    const mappingRecords: MappingRecord[] = mappings.map((mapping) => ({
+      mappingId: idOf(mapping),
+      messageType: 'ORDERS',
+      versions: mappingVersions
+        .filter((version) => version.mapping === mapping)
+        .map(({ key }, index) =>
+          mappingVersionSummarySchema.parse({
+            id: idOf(key),
+            mappingId: idOf(mapping),
+            mappingName: mapping,
+            version: index + 1,
+            publishedAt: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+          }),
+        )
+        .reverse(),
+    }))
+
+    const versionById = new Map<string, MappingVersionSummary>(
+      mappingRecords.flatMap(({ versions }) => versions.map((version) => [version.id, version])),
+    )
+
+    const flowRecords: FlowRecord[] = flows.map(({ key, pinnedMappingVersion }) => ({
+      ...template,
+      id: idOf(key),
+      name: key,
+      mappingVersionId: idOf(pinnedMappingVersion),
+    }))
+
+    const recorded = new Map(
+      runs.map(({ key, recordedMappingVersion }) => [
+        idOf(key),
+        recordedMappingVersion === null ? null : versionById.get(idOf(recordedMappingVersion))!,
+      ]),
+    )
+
+    server.use(
+      runsHandler(
+        apiUrl,
+        runs.map(({ key, flow }) =>
+          createRun({
+            id: idOf(key),
+            flow: { id: idOf(flow), name: flow },
+            messageType: 'ORDERS',
+          }),
+        ),
+        {
+          flows: flowRecords,
+          mappings: mappingRecords,
+          recordedMappingVersionOf: (run) => recorded.get(run.id)!,
+        },
+      ),
+    )
+
+    for (const filter of filters) {
+      const { body } = await listRuns({ mappingId: filter.mappings.map(idOf) })
+
+      expect(new Set(body?.runs.map((run) => run.id))).toEqual(new Set(filter.runs.map(idOf)))
+    }
   })
 
   it('filters by a time range that includes both of its ends', async () => {
