@@ -17,6 +17,7 @@
     "test:canvas": "vitest run --project storybook-canvas",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:full-stack": "playwright test --config playwright.full-stack.config.ts",
     "storybook": "storybook dev --port 6006 --no-open",
     "build-storybook": "storybook build"
   },
@@ -40,6 +41,8 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@edi-bridge/fixtures": "workspace:*",
+    "@edi-bridge/mapping": "workspace:*",
     "@edi-bridge/oxlint-config": "workspace:*",
     "@edi-bridge/typescript-config": "workspace:*",
     "@edi-bridge/vitest-config": "workspace:*",

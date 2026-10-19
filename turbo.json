@@ -67,6 +67,18 @@
       "dependsOn": ["transit"],
       "passThroughEnv": ["CI", "PLAYWRIGHT_*"]
     },
+    "test:e2e:full-stack": {
+      "dependsOn": ["transit"],
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "PLAYWRIGHT_*",
+        "WEB_PORT",
+        "API_PORT",
+        "OPERATOR_EMAIL",
+        "OPERATOR_PASSWORD"
+      ]
+    },
     "build-storybook": {
       "dependsOn": ["transit"],
       "outputs": ["storybook-static/**"]
