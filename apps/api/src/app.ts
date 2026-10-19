@@ -8,6 +8,7 @@ import {
   acceptAiDraftEndpoint,
   acceptAiProposedPartsEndpoint,
   acceptInviteEndpoint,
+  aiBudgetEndpoint,
   aiReviewOpenStatus,
   channelEndpoint,
   channelsEndpoint,
@@ -78,6 +79,7 @@ import {
   type RunQueueService,
 } from '@edi-bridge/pipeline'
 
+import { loadAiBudget } from './ai-budget.js'
 import { acceptAiDraft, acceptAiProposedParts } from './ai-review.js'
 import { type AuthSettings, mountAuth } from './auth.js'
 import { ChannelReach, channelReach } from './channel-reach.js'
@@ -387,6 +389,11 @@ function registerRoutes(
         updateCompanyIdentity,
       ),
     ),
+  )
+
+  // Viewers have no AI access, so they don't see the budget either.
+  app.get(aiBudgetEndpoint.path, (request, reply) =>
+    respond(request, reply, Effect.andThen(requireChangeRight, loadAiBudget)),
   )
 
   app.get(workspaceMembersEndpoint.path, (request, reply) =>
