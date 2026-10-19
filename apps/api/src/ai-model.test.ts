@@ -18,4 +18,11 @@ describe('aiModelFromEnv', () => {
     expect(aiModelFromEnv({})).toBeNull()
     expect(aiModelFromEnv({ ANTHROPIC_API_KEY: '' })).toBeNull()
   })
+
+  it('rejects a malformed API key instead of drafting without a model', () => {
+    expect(() => aiModelFromEnv({ ANTHROPIC_API_KEY: 'sk-ant-test\n' })).toThrow(
+      'ANTHROPIC_API_KEY',
+    )
+    expect(() => aiModelFromEnv({ ANTHROPIC_API_KEY: ' ' })).toThrow('ANTHROPIC_API_KEY')
+  })
 })
