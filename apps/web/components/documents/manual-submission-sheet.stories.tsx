@@ -65,6 +65,9 @@ async function submitFile(file: File, channel?: string) {
 
   if (channel) {
     await chooseChannel(content, channel)
+  } else {
+    // An upload before the channels load finds no default channel.
+    await loaded(content)
   }
 
   await userEvent.upload(content.getByLabelText('File'), file)
