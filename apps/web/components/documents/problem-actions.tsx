@@ -11,7 +11,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { linkClass } from '@/components/detail-parts'
 import { ActionError } from '@/components/documents/action-error'
@@ -233,6 +233,26 @@ export function MarkWaitingStep({ run }: { run: FailedRun }) {
   const wait = useWaitForTradingPartner(run.id)
   const endWaiting = useEndWaitingForTradingPartner(run.id)
   const marked = run.waitingForTradingPartnerSince !== null
+  const markButton = useRef<HTMLButtonElement>(null)
+  const endButton = useRef<HTMLButtonElement>(null)
+  const focusAfterChange = useRef(false)
+
+  // The clicked button unmounts or turns disabled, so focus moves to the one that stays usable.
+  useEffect(() => {
+    if (focusAfterChange.current) {
+      focusAfterChange.current = false
+      ;(marked ? endButton : markButton).current?.focus()
+    }
+  }, [marked])
+
+  function change(mutation: typeof wait) {
+    focusAfterChange.current = true
+    mutation.mutate(undefined, {
+      onError: () => {
+        focusAfterChange.current = false
+      },
+    })
+  }
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-2">
@@ -241,8 +261,9 @@ export function MarkWaitingStep({ run }: { run: FailedRun }) {
         <div className="flex flex-wrap gap-2">
           <Button
             disabled={marked || wait.isPending}
+            ref={markButton}
             variant="outline"
-            onClick={() => wait.mutate()}>
+            onClick={() => change(wait)}>
             <HugeiconsIcon
               icon={marked ? CheckmarkCircle02Icon : Clock01Icon}
               strokeWidth={2}
@@ -257,8 +278,9 @@ export function MarkWaitingStep({ run }: { run: FailedRun }) {
           {marked && (
             <Button
               disabled={endWaiting.isPending}
+              ref={endButton}
               variant="ghost"
-              onClick={() => endWaiting.mutate()}>
+              onClick={() => change(endWaiting)}>
               {endWaiting.isPending
                 ? t('actions.endWaiting.pending')
                 : t('actions.endWaiting.button')}
