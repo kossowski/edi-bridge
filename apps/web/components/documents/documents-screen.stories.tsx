@@ -177,17 +177,6 @@ async function expectRowsStacked(canvasElement: HTMLElement) {
   await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth)
 }
 
-export const Mobile = meta.story({
-  ...mobile,
-  beforeEach({ msw }) {
-    msw.use(runsHandler(apiUrl, runs))
-  },
-  async play({ canvas, canvasElement }) {
-    await expect(await canvas.findByText(/^\d+ documents?$/)).toBeVisible()
-    await expectRowsStacked(canvasElement)
-  },
-})
-
 // Only a scroller may be wider than its box; a wider wrapper lets the screen move sideways.
 function overflowingWrappers(canvasElement: HTMLElement) {
   return [...canvasElement.querySelectorAll<HTMLElement>('*')].flatMap((element) => {
@@ -200,17 +189,26 @@ function overflowingWrappers(canvasElement: HTMLElement) {
       !element.classList.contains('sr-only') &&
       !element.classList.contains('truncate')
 
-    return overflows ? [element.className] : []
+    return overflows ? [selectorOf(element)] : []
   })
 }
 
-export const MobileWrappersFit = meta.story({
+function selectorOf(element: HTMLElement) {
+  const { slot } = element.dataset
+
+  if (slot) return `${element.localName}[data-slot="${slot}"]`
+
+  return [element.localName, ...element.classList].join('.')
+}
+
+export const Mobile = meta.story({
   ...mobile,
   beforeEach({ msw }) {
     msw.use(runsHandler(apiUrl, runs))
   },
   async play({ canvas, canvasElement }) {
     await expect(await canvas.findByText(/^\d+ documents?$/)).toBeVisible()
+    await expectRowsStacked(canvasElement)
     await expect(overflowingWrappers(canvasElement)).toEqual([])
   },
 })
