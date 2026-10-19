@@ -206,7 +206,7 @@ function RowButton({
     'aria-describedby': describedBy || undefined,
     [rowIdAttribute]: data.id,
     className:
-      'nodrag focus-visible:ring-ring/50 pointer-events-auto flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-3',
+      'nodrag focus-visible:ring-ring/50 pointer-events-auto flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left outline-none focus-visible:ring-3 data-focus-shown:ring-3 data-focus-shown:ring-ring/50',
     onClick: () => toggleSelected(data),
   }
 

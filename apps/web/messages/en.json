@@ -2619,7 +2619,7 @@
       "markInside": "Failed inside",
       "title": "A document failed at <code>{field}</code>",
       "where": "The field is in the {side, select, source {source} other {target}}: {structure}.",
-      "marked": "It is marked on the canvas.",
+      "marked": "It is selected and shown on the canvas.",
       "fix": "Correct its links, publish the Draft, then process the failed document again.",
       "show": "Show the field",
       "back": "Back to documents",

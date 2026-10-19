@@ -4,7 +4,7 @@ import { ComputerIcon, InformationCircleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { type RefObject, useId, useRef, useState } from 'react'
+import { type RefObject, useEffect, useId, useRef, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { Fact, LoadFailure } from '@/components/detail-parts'
@@ -259,6 +259,22 @@ function EditorBody({
     onLinkYourself()
     withCanvas((handle) => handle.showFailingField())
   }
+
+  // A fix link shows its field once, on arrival; under "Start here" the Admin chooses first. A
+  // window that only later grows to desktop size does not count as an arrival.
+  const arrivedAt = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (failingField === null || field === undefined || arrivedAt.current === field) {
+      return
+    }
+
+    arrivedAt.current = field
+
+    if (desktop && !startHere) {
+      withCanvas((handle) => handle.showFailingField({ arrival: true }))
+    }
+  }, [desktop, failingField, field, startHere])
 
   return (
     <>

@@ -55,7 +55,7 @@ export function useFailingField(
   }
 }
 
-const code = (chunks: ReactNode) => <code className="font-mono break-all">{chunks}</code>
+const code = (chunks: ReactNode) => <code className="font-mono wrap-anywhere">{chunks}</code>
 
 function BackToDocuments() {
   const t = useTranslations('Mapping.failingField')

@@ -1,5 +1,9 @@
+import { delay, http } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
+
+import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
+import type { BeforeEach } from 'storybook/internal/csf'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
@@ -13,7 +17,8 @@ import { viewerStory } from '@/components/session/session-story-helpers'
 import { page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { createHandlers } from '@edi-bridge/mocks'
+import { documentStructureEndpoint } from '@edi-bridge/contracts'
+import { createHandlers, seedMappingDrafts } from '@edi-bridge/mocks'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
 
@@ -22,6 +27,9 @@ import preview from '../../.storybook/preview'
 const inbound = seeded('Hansemarkt: ORDERS to ERP JSON')
 
 const outbound = seeded('Hansemarkt: ERP JSON to DESADV')
+
+// Nothing is linked yet, so only a Viewer arrives on its canvas instead of "Start here".
+const csvExport = seedMappingDrafts.find(({ name }) => name === 'Spreewald: ERP CSV to INVOIC')!
 
 const deepTarget: RowRef = { side: 'target', path: 'lines[].gtin' }
 
@@ -68,11 +76,13 @@ function sourceTreeOf(canvasElement: HTMLElement) {
 
 // At no less than the zoom floor, with the details closed, the field's whole row is in the pane
 // beside the source column: all of it, or at least its right edge with the link handles. While the
-// source tree fits the pane's height, its first fields stay in view.
+// source tree fits the pane's height and the field is not further down, its first fields stay in
+// view.
 async function expectFieldBesideSources(
   canvasElement: HTMLElement,
   field: HTMLElement,
   source: 'whole' | 'edge' = 'whole',
+  firstSources: 'inView' | 'passed' = 'inView',
 ) {
   const pane = rectOf(canvasElement, '.mapping-canvas')
   const box = field.closest('.react-flow__node')!.getBoundingClientRect()
@@ -92,9 +102,28 @@ async function expectFieldBesideSources(
     await expect(heading.left).toBeGreaterThanOrEqual(pane.left)
   }
 
-  if (tree.bottom - tree.top <= pane.height - 48) {
+  if (firstSources === 'inView' && tree.bottom - tree.top <= pane.height - 48) {
     await expect(tree.top).toBeGreaterThanOrEqual(pane.top)
   }
+}
+
+// Holds the target's Document Structure back until the story lets it through, so the failing field
+// resolves only after the story has acted.
+let releaseStructure = () => {}
+
+const holdStructureBack: BeforeEach<ReactRenderer> = ({ msw }: StoryContext) => {
+  const held = new Promise<void>((resolve) => {
+    releaseStructure = resolve
+  })
+
+  msw.use(
+    http.get(`${apiUrl}${documentStructureEndpoint.path}`, async () => {
+      await held
+      await delay(0)
+
+      return undefined
+    }),
+  )
 }
 
 const meta = preview.meta({
@@ -114,7 +143,9 @@ const meta = preview.meta({
   },
 })
 
+// Arriving from a failed document's fix link selects the field, focuses it and moves it into view.
 export const TargetField = meta.story({
+  ...on('desktop'),
   async play({ canvas, canvasElement }) {
     const alert = await findAlert(
       canvasElement,
@@ -124,7 +155,7 @@ export const TargetField = meta.story({
     await expect(
       alert.getByText(/The field is in the target: Data format ERP purchase order\./),
     ).toBeVisible()
-    await expect(alert.getByText(/It is marked on the canvas\./)).toBeVisible()
+    await expect(alert.getByText(/It is selected and shown on the canvas\./)).toBeVisible()
     await expect(alert.getByRole('button', { name: 'Show the field' })).toBeVisible()
     await expect(alert.getByRole('link', { name: 'Back to documents' })).toHaveAttribute(
       'href',
@@ -133,31 +164,102 @@ export const TargetField = meta.story({
 
     const row = await findRow(canvasElement, deepTarget)
 
+    await waitFor(() => expect(row).toHaveFocus())
+    await expect(getComputedStyle(row).boxShadow).not.toBe('none')
+    await expect(row).toHaveAttribute('aria-pressed', 'true')
     await expect(partOf(row)).toHaveAttribute('data-failing', 'field')
     await expect(within(row).getByText('Failed here')).toBeVisible()
     await expect(canvas.getAllByText('Failed here')).toHaveLength(1)
-
-    // Arriving does not move the view: it opens at the top, as for any Mapping.
-    await expect(row).not.toHaveFocus()
-    await expect(
-      canvasElement.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform,
-    ).toMatch(/translate\([\d.]+px, 24px\)/)
+    await waitFor(() => expectFieldBesideSources(canvasElement, row))
   },
 })
 
-export const ShowTheField = meta.story({
+// Focus the user already moved stays where it is; the field is still selected and in view.
+export const FocusMovedBeforeArrival = meta.story({
   ...on('desktop'),
-  async play({ canvasElement }) {
-    const alert = await findAlert(canvasElement, 'A document failed at lines › gtin')
+  beforeEach: holdStructureBack,
+  async play({ canvas, canvasElement }) {
+    const details = await canvas.findByRole('button', { name: 'Details' })
 
-    await userEvent.click(alert.getByRole('button', { name: 'Show the field' }))
+    details.focus()
+    releaseStructure()
 
     const row = await findRow(canvasElement, deepTarget)
 
+    await waitFor(() => expect(row).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expectFieldBesideSources(canvasElement, row))
+    await expect(details).toHaveFocus()
+  },
+})
+
+// A source field inside repeating parts: the parts open on arrival, down to the field.
+export const SourceField = meta.story({
+  ...on('desktop'),
+  args: { id: outbound.id, field: 'packages[].lines[].quantity' },
+  async play({ canvasElement }) {
+    await findAlert(canvasElement, 'A document failed at packages › lines › quantity')
+
+    const row = await findRow(canvasElement, {
+      side: 'source',
+      path: 'packages[].lines[].quantity',
+    })
+
     await waitFor(() => expect(row).toHaveFocus())
     await expect(row).toHaveAttribute('aria-pressed', 'true')
+    await expect(partOf(row)).toHaveAttribute('data-failing', 'field')
     await waitFor(() => expectFieldBesideSources(canvasElement, row))
   },
+})
+
+// An EDIFACT element of the target, named by its segment path.
+export const EdifactTargetField = meta.story({
+  ...on('desktop'),
+  args: { id: outbound.id, field: 'BGM/1004' },
+  async play({ canvasElement }) {
+    await findAlert(canvasElement, 'A document failed at BGM › 1004')
+
+    const row = await findRow(canvasElement, { side: 'target', path: 'BGM/1004' })
+
+    await waitFor(() => expect(row).toHaveFocus())
+    await expect(row).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expectFieldBesideSources(canvasElement, row, 'edge'))
+  },
+})
+
+// An element of a qualified segment inside a segment group, as a fix link names it.
+export const QualifiedSegmentInGroup = meta.story({
+  ...on('desktop'),
+  args: { id: csvExport.id, field: 'SG25/IMD+A/C273/7008' },
+  ...viewerStory({
+    async play({ canvasElement }) {
+      await findAlert(canvasElement, 'A document failed at SG25 › IMD+A › C273 › 7008')
+
+      const row = await findRow(canvasElement, { side: 'target', path: 'SG25/IMD+A/C273/7008' })
+
+      await waitFor(() => expect(row).toHaveFocus())
+      await expect(row).toHaveAttribute('aria-pressed', 'true')
+      await expect(partOf(row)).toHaveAttribute('data-failing', 'field')
+      await waitFor(() => expectFieldBesideSources(canvasElement, row, 'edge', 'passed'))
+    },
+  }),
+})
+
+// A column of a CSV source, under the rows it repeats in.
+export const CsvSourceColumn = meta.story({
+  ...on('desktop'),
+  args: { id: csvExport.id, field: 'rows[].Bezeichnung' },
+  ...viewerStory({
+    async play({ canvasElement }) {
+      await findAlert(canvasElement, 'A document failed at rows › Bezeichnung')
+
+      const row = await findRow(canvasElement, { side: 'source', path: 'rows[].Bezeichnung' })
+
+      await waitFor(() => expect(row).toHaveFocus())
+      await expect(row).toHaveAttribute('aria-pressed', 'true')
+      await expect(partOf(row)).toHaveAttribute('data-failing', 'field')
+      await waitFor(() => expectFieldBesideSources(canvasElement, row))
+    },
+  }),
 })
 
 // The details close to make room for the field beside the source column.
@@ -177,8 +279,8 @@ export const ShowTheFieldClosesDetails = meta.story({
   },
 })
 
-// On a laptop the Transforms also fold to their rail for this visit, without keeping that choice;
-// the target field then keeps the source column's right edge beside it.
+// On a laptop the Transforms also fold to their rail for this visit, on arrival already, without
+// keeping that choice; the target field then keeps the source column's right edge beside it.
 export const ShowTheFieldOnLaptop = meta.story({
   ...on('laptop'),
   beforeEach() {
@@ -187,8 +289,8 @@ export const ShowTheFieldOnLaptop = meta.story({
   async play({ canvas, canvasElement }) {
     const alert = await findAlert(canvasElement, 'A document failed at lines › gtin')
 
-    await findRow(canvasElement, deepTarget)
-    await expect(canvas.getByRole('button', { name: 'Hide the Transforms' })).toBeVisible()
+    await waitFor(async () => expect(await findRow(canvasElement, deepTarget)).toHaveFocus())
+    await expect(canvas.getByRole('button', { name: 'Show the Transforms' })).toBeVisible()
     await openDetails(canvasElement)
     await userEvent.click(alert.getByRole('button', { name: 'Show the field' }))
 
@@ -281,6 +383,10 @@ export const UnknownField = meta.story({
     await expect(alert.getByRole('link', { name: 'Back to documents' })).toBeVisible()
     await findRow(canvasElement, deepTarget)
     await expect(canvasElement.querySelector('[data-failing]')).toBeNull()
+    await expect(canvasElement.querySelector('[aria-pressed="true"]')).toBeNull()
+    await expect(
+      canvasElement.querySelector<HTMLElement>('.react-flow__viewport')!.style.transform,
+    ).toMatch(/translate\([\d.]+px, 24px\)/)
   },
 })
 
@@ -290,7 +396,7 @@ export const SmallScreen = meta.story({
     const alert = await findAlert(canvasElement, 'A document failed at lines › gtin')
 
     await expect(alert.getByText(/The field is in the target/)).toBeVisible()
-    await expect(alert.queryByText(/1024 pixels|marked on the canvas/)).toBeNull()
+    await expect(alert.queryByText(/1024 pixels|shown on the canvas/)).toBeNull()
     await expect(alert.queryByRole('button', { name: 'Show the field' })).toBeNull()
     await expect(within(canvasElement).getByText(/at least 1024 pixels wide/)).toBeVisible()
     await expect(canvasElement.querySelector('.react-flow')).toBeNull()

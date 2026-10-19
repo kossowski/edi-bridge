@@ -194,7 +194,34 @@ const transformExtent: [[number, number], [number, number]] = [
 
 export type CanvasSide = { title: string; items: ReadonlyArray<TreeItem> }
 
-export type MappingCanvasHandle = { showFailingField: () => void; focusFirstRow: () => void }
+function focusIsFree() {
+  return document.activeElement === null || document.activeElement === document.body
+}
+
+// Focus moved by script after a click shows no ring in Chromium; the mark keeps it until the user
+// next acts on the field or leaves it.
+function focusShown(element: HTMLElement) {
+  element.focus({ preventScroll: true, focusVisible: true })
+
+  if (element.matches(':focus-visible')) {
+    return
+  }
+
+  const clear = () => {
+    delete element.dataset.focusShown
+    element.removeEventListener('blur', clear)
+    element.removeEventListener('pointerdown', clear)
+  }
+
+  element.dataset.focusShown = ''
+  element.addEventListener('blur', clear)
+  element.addEventListener('pointerdown', clear)
+}
+
+export type MappingCanvasHandle = {
+  showFailingField: (options?: { arrival?: boolean }) => void
+  focusFirstRow: () => void
+}
 
 // From the source column's left the view reaches to the field's right end, where its mark sits.
 function reachOf(node: CanvasNode) {
@@ -903,7 +930,7 @@ export function MappingCanvas({
     () => ({
       // Room for the field beside the source column: the details close and, where that is not
       // enough, the Transforms fold to their rail for this visit only.
-      showFailingField: () => {
+      showFailingField: ({ arrival = false } = {}) => {
         if (!failingField) {
           return
         }
@@ -922,7 +949,12 @@ export function MappingCanvas({
         whenRendered(
           () => flow.current !== null && shown(button()),
           () => {
-            button()?.focus({ preventScroll: true })
+            const field = button()
+
+            // On arrival the field takes focus only while nothing else has it yet.
+            if (field && (!arrival || focusIsFree())) {
+              focusShown(field)
+            }
 
             const pane = container.current
             const node = flow.current?.getNode(nodeId(row.side, row.path))
