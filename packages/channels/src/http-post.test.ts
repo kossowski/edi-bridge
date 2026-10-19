@@ -95,7 +95,9 @@ describe('postHttp', () => {
     for (const status of [401, 403]) {
       expect(
         await failure(postHttp(destination(`${erp.url}?status=${status}`), order(), { timeoutMs })),
-      ).toEqual(new DeliveryFailed({ reason: 'loginRejected', httpStatus: status }))
+      ).toEqual(
+        new DeliveryFailed({ reason: 'loginRejected', details: { kind: 'httpResponse', status } }),
+      )
     }
   })
 
@@ -103,7 +105,12 @@ describe('postHttp', () => {
     for (const status of [301, 404, 422, 503]) {
       expect(
         await failure(postHttp(destination(`${erp.url}?status=${status}`), order(), { timeoutMs })),
-      ).toEqual(new DeliveryFailed({ reason: 'unexpectedResponse', httpStatus: status }))
+      ).toEqual(
+        new DeliveryFailed({
+          reason: 'unexpectedResponse',
+          details: { kind: 'httpResponse', status },
+        }),
+      )
     }
   })
 

@@ -12,11 +12,11 @@ import { type HttpChannel, httpDestination } from './http-channel'
 
 import type { SecretBox } from './secret'
 
-const answerFailure = (httpStatus: number) =>
+const answerFailure = (status: number) =>
   Effect.fail(
     new DeliveryFailed({
-      reason: rejectedLoginReason(httpStatus) ?? 'unexpectedResponse',
-      httpStatus,
+      reason: rejectedLoginReason(status) ?? 'unexpectedResponse',
+      details: { kind: 'httpResponse', status },
     }),
   )
 

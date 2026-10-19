@@ -1,10 +1,10 @@
 import { Data } from 'effect'
 
-import type { ChannelTestFailureReason } from '@edi-bridge/contracts'
+import type { ChannelTestFailureReason, RunErrorDetails } from '@edi-bridge/contracts'
 
 export class DeliveryFailed extends Data.TaggedError('DeliveryFailed')<{
   readonly reason: ChannelTestFailureReason
-  readonly httpStatus?: number
+  readonly details?: RunErrorDetails
 }> {}
 
 export interface OutboundDocument {

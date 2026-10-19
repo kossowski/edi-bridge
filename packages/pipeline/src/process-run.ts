@@ -289,13 +289,13 @@ const deliveryFailure = (
 ): Failure =>
   Match.value(failure).pipe(
     Match.tagsExhaustive({
-      DeliveryFailed: ({ reason, httpStatus }): Failure => ({
+      DeliveryFailed: ({ reason, details }): Failure => ({
         stage: 'delivery',
         error: {
           code: reason,
           message: deliveryReasons[reason],
           position: null,
-          details: httpStatus === undefined ? null : { kind: 'httpResponse', status: httpStatus },
+          details: details ?? null,
         },
         problem: { reason: 'unreachable', fixTarget: null },
       }),
