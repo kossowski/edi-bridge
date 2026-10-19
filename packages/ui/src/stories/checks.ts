@@ -65,12 +65,55 @@ export async function expectVisibleFocusRing(
 ) {
   await userEvent.tab()
   await expect(element).toHaveFocus()
-  await waitFor(async () => {
-    const style = getComputedStyle(ring)
+  await waitFor(() => expectSolidRing(ring))
+}
 
-    await expect(style.outlineStyle).toBe('solid')
-    await expect(Number.parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2)
-    await expect(contrastBehind(ring, style.outlineColor)).toBeGreaterThanOrEqual(3)
+async function expectSolidRing(ring: HTMLElement) {
+  const style = getComputedStyle(ring)
+
+  await expect(style.outlineStyle).toBe('solid')
+  await expect(Number.parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2)
+  await expect(contrastBehind(ring, style.outlineColor)).toBeGreaterThanOrEqual(3)
+}
+
+function outlineReach(element: HTMLElement) {
+  const style = getComputedStyle(element)
+
+  return Number.parseFloat(style.outlineOffset) + Number.parseFloat(style.outlineWidth)
+}
+
+function overlaps(a: DOMRect, b: DOMRect) {
+  // Half a pixel absorbs subpixel layout between items that only touch.
+  const slack = 0.5
+
+  return (
+    a.left < b.right - slack &&
+    b.left < a.right - slack &&
+    a.top < b.bottom - slack &&
+    b.top < a.bottom - slack
+  )
+}
+
+// A focused item in a segmented group sits above its neighbours, so a ring outside its box paints over theirs.
+export async function expectFocusRingInside(element: HTMLElement, neighbours: HTMLElement[]) {
+  await expect(element).toHaveFocus()
+  await waitFor(async () => {
+    await expectSolidRing(element)
+
+    const reach = Math.max(outlineReach(element), 0)
+    const box = element.getBoundingClientRect()
+    const ring = new DOMRect(
+      box.x - reach,
+      box.y - reach,
+      box.width + 2 * reach,
+      box.height + 2 * reach,
+    )
+
+    await expect(reach).toBeLessThanOrEqual(2)
+
+    for (const neighbour of neighbours) {
+      await expect(overlaps(ring, neighbour.getBoundingClientRect())).toBe(false)
+    }
   })
 }
 
