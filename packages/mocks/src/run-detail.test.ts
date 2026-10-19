@@ -132,9 +132,7 @@ describe('GET /runs/:id', () => {
       const { body } = await getRun(run.id)
       const position = body?.error?.position
 
-      const segment = body?.interchange?.raw.slice("UNA:+.? '".length).split("'")[
-        position!.segment - 1
-      ]
+      const segment = body?.interchange?.raw.split("'")[position!.segment - 1]
 
       expect(body?.steps.map(({ stage, status }) => [stage, status])).toEqual([
         ['receipt', 'succeeded'],
@@ -150,7 +148,7 @@ describe('GET /runs/:id', () => {
     }
   })
 
-  it('points a validation error at the invalid date component', async () => {
+  it('points a validation error at the invalid date component, counting the UNA as segment 1', async () => {
     const run = inboundOrders('00000000-0000-4000-8000-000000000001', {
       failureStage: 'validation',
     })
@@ -159,7 +157,7 @@ describe('GET /runs/:id', () => {
 
     const { body } = await getRun(run.id)
 
-    expect(body?.error?.position).toEqual({ segment: 4, tag: 'DTM', element: 1, component: 2 })
+    expect(body?.error?.position).toEqual({ segment: 5, tag: 'DTM', element: 1, component: 2 })
     expect(body?.interchange?.raw).toContain("'DTM+137:20261341:102'")
     expect(body?.message?.segments[2]).toEqual({
       tag: 'DTM',
@@ -183,7 +181,7 @@ describe('GET /runs/:id', () => {
 
     expect(body?.interchange?.id).toBe(firstBody?.interchange?.id)
     expect(body?.message?.reference).toBe('2')
-    expect(body?.error?.position?.segment).toBe(1 + firstMessageLength + 3)
+    expect(body?.error?.position?.segment).toBe(2 + firstMessageLength + 3)
   })
 
   it('reports a delivery failure without a position after a 30 second timeout', async () => {

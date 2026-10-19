@@ -635,6 +635,8 @@ function interchangeDate(iso: string) {
   return `${iso.slice(2, 4)}${iso.slice(5, 7)}${iso.slice(8, 10)}:${iso.slice(11, 13)}${iso.slice(14, 16)}`
 }
 
+const serviceStringAdvice = "UNA:+.? '"
+
 export type GeneratedInterchange = {
   raw: string
   positions: ReadonlyMap<string, ErrorPosition | null>
@@ -654,6 +656,7 @@ export function serializeInterchange({
   const positions = new Map<string, ErrorPosition | null>()
 
   const lines = [
+    serviceStringAdvice,
     serializeSegment(
       seg(
         'UNB',
@@ -682,5 +685,5 @@ export function serializeInterchange({
 
   lines.push(serializeSegment(seg('UNZ', String(messages.length), controlReference)))
 
-  return { raw: `UNA:+.? '${lines.join('')}`, positions }
+  return { raw: lines.join(''), positions }
 }
