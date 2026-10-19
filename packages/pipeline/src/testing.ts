@@ -2,6 +2,7 @@ import { asc, eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { GenericContainer, Wait } from 'testcontainers'
 
 import { inferDocumentStructure, mappingVersionSchema, toEncodedFile } from '@edi-bridge/contracts'
 import {
@@ -22,7 +23,7 @@ import {
   workspaces,
 } from '@edi-bridge/db'
 
-import { Database, Documents, type QueuedRun, RunQueue } from './services'
+import { Database, Documents, type QueuedRun, RunQueue, type RunQueueService } from './services'
 
 type Db = Connection['db']
 
@@ -49,17 +50,35 @@ const goldenVersion = (() => {
   return version
 })()
 
+export async function startTestRedis() {
+  const container = await new GenericContainer('redis:8.10.2-alpine3.23')
+    .withExposedPorts(6379)
+    .withWaitStrategy(Wait.forLogMessage('Ready to accept connections'))
+    .start()
+
+  return {
+    url: `redis://${container.getHost()}:${String(container.getMappedPort(6379))}`,
+    stop: async () => {
+      await container.stop()
+    },
+  }
+}
+
+export type TestRedis = Awaited<ReturnType<typeof startTestRedis>>
+
 export function inMemoryRunQueue() {
   const queued: QueuedRun[] = []
 
   return {
     queued,
-    service: { enqueue: (run: QueuedRun) => Effect.sync(() => void queued.push(run)) },
+    service: {
+      enqueue: (run: QueuedRun) => Effect.sync(() => void queued.push(run)),
+    } satisfies RunQueueService,
   }
 }
 
 export const pipelineServices =
-  (db: Db, queue: ReturnType<typeof inMemoryRunQueue>) =>
+  (db: Db, queue: { service: RunQueueService }) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Database, db),

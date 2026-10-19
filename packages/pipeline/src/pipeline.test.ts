@@ -1,12 +1,19 @@
 import { eq } from 'drizzle-orm'
-import { Effect, Exit } from 'effect'
+import { Effect, Exit, Option } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { channels, connect, type Connection, documents, flows } from '@edi-bridge/db'
+import { channels, connect, type Connection, documents, flows, runs } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
-import { type ArrivingDocument, processRun, ReceiptRejected, receive } from './index'
+import {
+  type ArrivingDocument,
+  bullmqRunQueue,
+  processRun,
+  ReceiptRejected,
+  receive,
+  RunNotQueued,
+} from './index'
 import {
   golden,
   goldenInvoice,
@@ -68,6 +75,40 @@ describe('the receipt of a Document', () => {
         { stage: 'delivery', status: 'pending', startedAt: null, finishedAt: null },
       ],
     })
+  })
+
+  it('fails with RunNotQueued when the Run queue is unreachable and keeps the Run received', async () => {
+    const unreachable = bullmqRunQueue('redis://127.0.0.1:1', { timeout: '200 millis' })
+
+    try {
+      const exit = await Effect.runPromiseExit(
+        receive({
+          workspaceId: workspace.id,
+          channelId: workspace.inboundChannelId,
+          fileName: 'unqueued.json',
+          content: goldenInvoice,
+          manualSubmission: true,
+        }).pipe(pipelineServices(connection.db, unreachable)),
+      )
+
+      const [stored] = await connection.db
+        .select({ id: documents.id })
+        .from(documents)
+        .where(eq(documents.fileName, 'unqueued.json'))
+
+      const [run] = await connection.db
+        .select({ id: runs.id, status: runs.status })
+        .from(runs)
+        .where(eq(runs.documentId, stored?.id ?? ''))
+
+      const error = Option.getOrUndefined(Exit.findErrorOption(exit))
+
+      expect(error).toBeInstanceOf(RunNotQueued)
+      expect(error).toMatchObject({ runId: run?.id })
+      expect(run?.status).toBe('received')
+    } finally {
+      await unreachable.close()
+    }
   })
 
   const rejection = async (arriving: Partial<ArrivingDocument>) => {
