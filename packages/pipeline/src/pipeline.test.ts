@@ -1199,4 +1199,131 @@ describe('the processing of an inbound Run', () => {
       })),
     )
   })
+
+  const replaced = (segment: string, by: string) =>
+    ordersMessage.map((line) => (line === segment ? by : line))
+
+  it('fails only the Run of a Message that fails mapping and delivers the others', async () => {
+    const into = await ordersWorkspace('Kilogram Foods')
+    const inKilograms = replaced("QTY+21:20:PCE'", "QTY+21:20:KGM'")
+
+    const runs = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage, inKilograms, ordersMessage]),
+    )
+
+    expect(runs.map((run) => run?.status)).toEqual(['delivered', 'failed', 'delivered'])
+    expect(runs[1]).toMatchObject({
+      failureStage: 'mapping',
+      output: null,
+      error: { code: 'noLookupMatch', position: null },
+      problem: {
+        reason: 'missingCode',
+        fixTarget: { kind: 'mapping', mappingId: into.orders.mappingId },
+      },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'mapping', status: 'failed' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+    expect(erp.received).toHaveLength(2)
+  })
+
+  it('fails a broken Message at parse with its position in the Interchange', async () => {
+    const into = await ordersWorkspace('Broken Foods')
+    const withoutBgm = ordersMessage.filter((line) => !line.startsWith('BGM'))
+
+    const runs = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage, withoutBgm, ordersMessage]),
+    )
+
+    expect(runs.map((run) => run?.status)).toEqual(['delivered', 'failed', 'delivered'])
+    // UNB is segment 1, the first Message 2 to 23, so the UNT of the second one is segment 44.
+    expect(runs[1]).toMatchObject({
+      failureStage: 'parse',
+      output: null,
+      error: { code: 'segment-count-mismatch', position: { segment: 44, tag: 'UNT' } },
+      problem: { reason: 'unreadable', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
+        { stage: 'mapping', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+  })
+
+  it('fails an invalid Message at validation with its position in the Interchange', async () => {
+    const into = await ordersWorkspace('Invalid Foods')
+    const unknownFunction = replaced("BGM+220:::+128576+9'", "BGM+220:::+128576+99'")
+
+    const runs = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage, unknownFunction, ordersMessage]),
+    )
+
+    expect(runs.map((run) => run?.status)).toEqual(['delivered', 'failed', 'delivered'])
+    // The second Message starts with its UNH at segment 24, so its BGM is segment 25.
+    expect(runs[1]).toMatchObject({
+      failureStage: 'validation',
+      output: null,
+      error: { position: { segment: 25, tag: 'BGM', element: 3 } },
+      problem: { reason: 'invalidContent', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'succeeded' },
+        { stage: 'validation', status: 'failed' },
+        { stage: 'mapping', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+  })
+
+  it('fails a Run at delivery when the ERP refuses the Document and keeps the Document', async () => {
+    const into = await ordersWorkspace('Refused Foods')
+
+    await connection.db
+      .update(channels)
+      .set({ url: `${erp.url}?status=503` })
+      .where(eq(channels.id, into.orders.erpChannelId))
+
+    const [run] = await receiveInterchange(into, ordersInterchange)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      output: golden('orders-reference.document.json'),
+      error: { code: 'unexpectedResponse', position: null },
+      problem: { reason: 'unreachable', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+    expect(ranStages(run)).toEqual(['receipt', 'parse', 'validation', 'mapping', 'delivery'])
+  })
+
+  it('posts a CSV Document in the encoding of its Document Structure', async () => {
+    const into = await ordersWorkspace('Spreadsheet Foods', { format: 'csv' })
+    const document = golden('orders-reference.document.csv', 'latin1')
+
+    const [run] = await receiveInterchange(into, ordersInterchange)
+
+    expect(run).toMatchObject({ status: 'delivered', output: document })
+    expect(erp.received).toMatchObject([
+      {
+        headers: { 'content-type': 'text/csv' },
+        // The test ERP reads the body as UTF-8, so it gets the Windows-1252 bytes that way too.
+        body: Buffer.from(document, 'latin1').toString(),
+      },
+    ])
+  })
 })
