@@ -6,6 +6,7 @@ import type { SelectedFields } from 'drizzle-orm/pg-core'
 import {
   directionOf,
   type FailureStage,
+  type ProblemReason,
   type RunDetail,
   type RunList,
   type RunListQuery,
@@ -27,6 +28,7 @@ const summaryFields = {
   receivedAt: runs.receivedAt,
   status: runs.status,
   failureStage: runs.failureStage,
+  problem: runs.problem,
   manualSubmission: runs.manualSubmission,
   businessReference: runs.businessReference,
   tradingPartnerId: tradingPartners.id,
@@ -50,20 +52,22 @@ const selectRuns = <Fields extends SelectedFields>(db: Database, fields: Fields)
 type SummaryRow = Awaited<ReturnType<typeof selectRuns<Record<never, never>>>>[number]
 
 type Outcome =
-  | { status: 'failed'; failureStage: FailureStage }
-  | { status: Exclude<RunStatus, 'failed'>; failureStage: null }
+  | { status: 'failed'; failureStage: FailureStage; problem: { reason: ProblemReason } }
+  | { status: Exclude<RunStatus, 'failed'>; failureStage: null; problem: null }
 
-// The database sets a Failure Stage exactly on a failed Run.
-const outcomeOf = ({ id, status, failureStage }: SummaryRow): Outcome => {
-  if (status === 'failed' && failureStage !== null) {
-    return { status, failureStage }
+// The database sets a Failure Stage and a problem exactly on a failed Run.
+const outcomeOf = ({ id, status, failureStage, problem }: SummaryRow): Outcome => {
+  if (status === 'failed' && failureStage !== null && problem !== null) {
+    return { status, failureStage, problem: { reason: problem.reason } }
   }
 
   if (status !== 'failed' && failureStage === null) {
-    return { status, failureStage }
+    return { status, failureStage, problem: null }
   }
 
-  throw new Error(`Run ${id} has status ${status} with Failure Stage ${String(failureStage)}`)
+  throw new Error(
+    `Run ${id} has status ${status} with Failure Stage ${String(failureStage)} and ${problem === null ? 'no problem' : 'a problem'}`,
+  )
 }
 
 const toSummary = (row: SummaryRow): RunSummary => ({
@@ -183,7 +187,6 @@ export const loadRun = (id: string) =>
       selectRuns(db, {
         mappingVersionId: runs.mappingVersionId,
         error: runs.error,
-        problem: runs.problem,
         waitingForTradingPartnerSince: runs.waitingForTradingPartnerSince,
       }).where(inWorkspace(runs, workspace.id, eq(runs.id, id))),
     )
@@ -214,7 +217,6 @@ export const loadRun = (id: string) =>
 
 type DetailRow = SummaryRow & {
   error: (typeof runs.$inferSelect)['error']
-  problem: (typeof runs.$inferSelect)['problem']
   waitingForTradingPartnerSince: Date | null
 }
 

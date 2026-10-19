@@ -3,11 +3,13 @@ import type { Faker } from '@faker-js/faker'
 import {
   directionOf,
   type ErrorPosition,
+  type FailureStage,
   type FixTarget,
   type InterchangeParty,
   type MessageType,
   type ParsedMessage,
   type ParsedSegment,
+  type ProblemReason,
   type RunError,
   type RunSummary,
   withCheckDigit,
@@ -38,6 +40,8 @@ export type GeneratedErrorCode =
 
 export type GeneratedError = RunError & { code: GeneratedErrorCode }
 
+type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureStage'>
+
 export type BrokenPiece =
   | Pick<Extract<FixTarget, { kind: 'mapping' }>, 'kind' | 'fieldPath'>
   | Pick<Extract<FixTarget, { kind: 'lookupTable' }>, 'kind' | 'name' | 'code'>
@@ -60,26 +64,30 @@ const setupErrors: Record<SetupPiece, GeneratedError> = {
     code: 'glnMissing',
     message: 'The Workspace has no GLN for the Interchange',
     position: null,
+    details: null,
   },
   tradingPartnerGln: {
     code: 'glnMissing',
     message: 'The Trading Partner has no GLN for the Interchange',
     position: null,
+    details: null,
   },
   channelCredential: {
     code: 'channelDefect',
     message: 'The Channel could not be used for the delivery',
     position: null,
+    details: null,
   },
   tradingPartner: {
     code: 'characterSetUnsupported',
     message: 'Delivery in character set UNOD is not supported',
     position: null,
+    details: null,
   },
 }
 
 // A separate seed keeps the Messages of the other Runs as they were.
-function incompleteSetupOf(run: RunSummary): Failure | null {
+function incompleteSetupOf(run: ProblemFields): Failure | null {
   if (run.failureStage !== 'delivery' || directionOf(run) !== 'outbound') {
     return null
   }
@@ -117,12 +125,13 @@ const missingUnitError = {
   code: 'lookupMissing',
   message: `The Lookup Table "${missingUnit.name}" has no entry for "${missingUnit.code}".`,
   position: null,
+  details: null,
 } as const
 
 let unitReadingFlowIds: ReadonlySet<string> | undefined
 
 // Only outbound Mappings translate your units for the partner, so only their Runs miss one.
-function readsUnits(run: RunSummary) {
+function readsUnits(run: Pick<RunSummary, 'flow'>) {
   unitReadingFlowIds ??= unitReadingFlows()
 
   return unitReadingFlowIds.has(run.flow.id)
@@ -159,6 +168,29 @@ export function lookupTableFailureOf(run: RunSummary): Failure | null {
     readsUnits(run)
     ? { error: missingUnitError, broken: missingUnit }
     : null
+}
+
+// Follows the Failure the Message of a failed Run is generated with, without generating it.
+export function problemReasonOf(
+  run: ProblemFields & { failureStage: FailureStage },
+): ProblemReason {
+  switch (run.failureStage) {
+    case 'parse': {
+      return 'unreadable'
+    }
+
+    case 'validation': {
+      return 'invalidContent'
+    }
+
+    case 'mapping': {
+      return directionOf(run) === 'outbound' && readsUnits(run) ? 'missingCode' : 'missingField'
+    }
+
+    case 'delivery': {
+      return incompleteSetupOf(run) === null ? 'unreachable' : 'incompleteSetup'
+    }
+  }
 }
 
 const partyGlnFields = { BY: 'buyer.gln', SU: 'supplier.gln' } as const
@@ -462,7 +494,10 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
   }
 
   if (fault !== null) {
-    return { error: { code: fault.code, message: fault.message, position: null }, broken }
+    return {
+      error: { code: fault.code, message: fault.message, position: null, details: null },
+      broken,
+    }
   }
 
   if (run.failureStage === 'mapping') {
@@ -474,6 +509,7 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
         code: 'missingSourceField',
         message: `The required source field "${lines}[${line}].gtin" is missing.`,
         position: null,
+        details: null,
       },
       broken: { kind: 'mapping', fieldPath: `${lines}[].gtin` },
     }
@@ -492,11 +528,13 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
             code: 'destinationUnreachable',
             message: `The SFTP server of ${run.tradingPartner.name} refused the connection (ECONNREFUSED).`,
             position: null,
+            details: null,
           }
         : {
             code: 'destinationUnavailable',
             message: 'The ERP answered the HTTP POST with 503 Service Unavailable.',
             position: null,
+            details: { kind: 'httpResponse', status: 503 },
           },
     broken: null,
   }

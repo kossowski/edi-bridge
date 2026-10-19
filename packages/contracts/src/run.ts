@@ -21,6 +21,20 @@ export const failureStageSchema = z.enum(failureStages)
 
 export type FailureStage = z.infer<typeof failureStageSchema>
 
+export const problemReasons = [
+  'unreadable',
+  'invalidContent',
+  'missingCode',
+  'missingField',
+  'unreachable',
+  'incompleteSetup',
+  'defect',
+] as const
+
+export const problemReasonSchema = z.enum(problemReasons)
+
+export type ProblemReason = z.infer<typeof problemReasonSchema>
+
 export const fixers = ['you', 'retry', 'tradingPartner'] as const
 
 export const fixerSchema = z.enum(fixers)
@@ -30,7 +44,14 @@ export type Fixer = z.infer<typeof fixerSchema>
 export function whoFixes(run: {
   failureStage: FailureStage | null
   direction: Direction
+  problem: { reason: ProblemReason } | null
 }): Fixer | null {
+  // A Defect is fixed by trying again at any Failure Stage: Retry at delivery,
+  // Reprocess with the Run's own Mapping Version at any other stage.
+  if (run.failureStage !== null && run.problem?.reason === 'defect') {
+    return 'retry'
+  }
+
   switch (run.failureStage) {
     case null: {
       return null
@@ -74,10 +95,12 @@ export const runSummarySchema = z.discriminatedUnion('status', [
   runSummaryBaseSchema.extend({
     status: z.literal('failed'),
     failureStage: failureStageSchema,
+    problem: z.object({ reason: problemReasonSchema }),
   }),
   runSummaryBaseSchema.extend({
     status: runStatusSchema.exclude(['failed']),
     failureStage: z.null(),
+    problem: z.null(),
   }),
 ])
 
@@ -143,10 +166,20 @@ export const errorPositionSchema = z.object({
 
 export type ErrorPosition = z.infer<typeof errorPositionSchema>
 
+export const runErrorDetailsSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('httpResponse'),
+    status: z.number().int().min(100).max(599),
+  }),
+])
+
+export type RunErrorDetails = z.infer<typeof runErrorDetailsSchema>
+
 export const runErrorSchema = z.object({
   code: z.string().min(1),
   message: z.string().min(1),
   position: errorPositionSchema.nullable(),
+  details: runErrorDetailsSchema.nullable(),
 })
 
 export type RunError = z.infer<typeof runErrorSchema>
@@ -176,19 +209,6 @@ export type RunInterchange = z.infer<typeof runInterchangeSchema>
 export const runReferenceSchema = z.object({ id: z.uuid() })
 
 export type RunReference = z.infer<typeof runReferenceSchema>
-
-export const problemReasons = [
-  'unreadable',
-  'invalidContent',
-  'missingCode',
-  'missingField',
-  'unreachable',
-  'incompleteSetup',
-] as const
-
-export const problemReasonSchema = z.enum(problemReasons)
-
-export type ProblemReason = z.infer<typeof problemReasonSchema>
 
 export const fixTargetSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -284,7 +304,7 @@ export const runDetailSchema = z
       context.addIssue({
         code: 'custom',
         path: ['problem', 'whoFixes'],
-        message: 'Who fixes a problem follows from the Failure Stage and the direction',
+        message: 'Who fixes a problem follows from its reason, the Failure Stage and the direction',
       })
     }
 

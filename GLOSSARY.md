@@ -181,8 +181,12 @@ _Avoid_: Resend, double, repeat
 _On screen_: Duplicate (DE: Duplikat)
 
 **Failure Stage**:
-The step at which a Run failed (parse, validation, mapping or delivery), which determines whether it is fixed by Retry, by Reprocess, or only by a resend from the Trading Partner.
+The step at which a Run failed (parse, validation, mapping or delivery), which determines whether it is fixed by Retry, by Reprocess, or only by a resend from the Trading Partner; a Defect is the exception, fixed by trying again at any Failure Stage.
 _Avoid_: Error type, error category
+
+**Defect**:
+An unexpected error in EDI Bridge itself, not in the Document or the setup, that fails a Run; it is fixed by trying again (Retry at delivery, Reprocess with the Run's own Mapping Version at any other Failure Stage) and is reported to error monitoring.
+_Avoid_: Bug, crash
 
 **Retry**:
 Repeating the failed delivery step of a Run unchanged, for transient failures such as an unreachable destination.

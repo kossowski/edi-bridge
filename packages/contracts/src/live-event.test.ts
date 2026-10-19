@@ -6,6 +6,7 @@ const run = {
   id: '6f1c2a5e-8d4b-4c3e-9a7f-1b2c3d4e5f60',
   status: 'delivered',
   failureStage: null,
+  problem: null,
   receivedAt: '2026-10-10T12:00:00.000Z',
   tradingPartner: { id: '10000000-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' },
   messageType: 'ORDERS',

@@ -34,6 +34,7 @@ const parsed = runDetailSchema.parse({
     code: 'invalidDate',
     message: 'The date 20261341 does not exist',
     position: { segment: 4, tag: 'DTM', element: 1, component: 2 },
+    details: null,
   },
   problem: {
     reason: 'invalidContent',

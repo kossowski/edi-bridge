@@ -26,6 +26,7 @@ const run: RunSummary = {
   interchange: null,
   status: 'delivered',
   failureStage: null,
+  problem: null,
 }
 
 describe('manualSubmissionInputSchema', () => {

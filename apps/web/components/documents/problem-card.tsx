@@ -94,6 +94,10 @@ function useProblemText({ problem, direction, tradingPartner }: FailedRun) {
         }),
       }
     }
+
+    case 'defect': {
+      return { title: t('defect.title'), description: t('defect.description') }
+    }
   }
 }
 

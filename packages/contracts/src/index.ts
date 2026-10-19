@@ -594,6 +594,8 @@ export {
   runDetailSchema,
   runEndpoint,
   type RunError,
+  type RunErrorDetails,
+  runErrorDetailsSchema,
   runErrorSchema,
   type RunInterchange,
   runInterchangeSchema,

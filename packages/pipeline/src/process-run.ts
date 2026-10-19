@@ -126,7 +126,12 @@ const mappingFailure = (
     Match.tagsExhaustive({
       DocumentReadError: ({ code }): Failure => ({
         stage: 'mapping',
-        error: { code, message: `The Document is unreadable: ${code}`, position: null },
+        error: {
+          code,
+          message: `The Document is unreadable: ${code}`,
+          position: null,
+          details: null,
+        },
         problem: { reason: 'unreadable', fixTarget: null },
       }),
       DocumentWriteError: ({ code, line }): Failure => ({
@@ -135,12 +140,13 @@ const mappingFailure = (
           code,
           message: `Line ${String(line)} of the Document cannot be written in its encoding`,
           position: null,
+          details: null,
         },
         problem: { reason: 'invalidContent', fixTarget: null },
       }),
       MappingError: ({ code, targetPath }): Failure => ({
         stage: 'mapping',
-        error: { code, message: `${code} at ${targetPath}`, position: null },
+        error: { code, message: `${code} at ${targetPath}`, position: null, details: null },
         problem: {
           reason: mappingReasons[code],
           fixTarget: {
@@ -170,6 +176,7 @@ const validationFailure = (message: Message, { cause }: MessageInvalid): Failure
         element: cause.position.element ?? null,
         component: cause.position.component ?? null,
       },
+      details: null,
     },
     problem: { reason: 'invalidContent', fixTarget: null },
   }
@@ -216,6 +223,7 @@ const parseFailure = (content: string, { cause, interchange }: MessageUnreadable
     code: cause.code,
     message: cause.message,
     position: positionIn(segmentTagsOf(content, interchange), cause.position),
+    details: null,
   },
   problem: { reason: 'unreadable', fixTarget: null },
 })
@@ -251,6 +259,7 @@ const inboundValidationFailure = (
         ...cause.position,
         segment: shifted,
       }),
+      details: null,
     },
     problem: { reason: 'invalidContent', fixTarget: null },
   }
@@ -280,9 +289,14 @@ const deliveryFailure = (
 ): Failure =>
   Match.value(failure).pipe(
     Match.tagsExhaustive({
-      DeliveryFailed: ({ reason }): Failure => ({
+      DeliveryFailed: ({ reason, details }): Failure => ({
         stage: 'delivery',
-        error: { code: reason, message: deliveryReasons[reason], position: null },
+        error: {
+          code: reason,
+          message: deliveryReasons[reason],
+          position: null,
+          details: details ?? null,
+        },
         problem: { reason: 'unreachable', fixTarget: null },
       }),
       GlnMissing: ({ party }): Failure => ({
@@ -291,6 +305,7 @@ const deliveryFailure = (
           code: 'glnMissing',
           message: `${glnOwners[party]} has no GLN for the Interchange`,
           position: null,
+          details: null,
         },
         problem: {
           reason: 'incompleteSetup',
@@ -310,6 +325,7 @@ const deliveryFailure = (
           code: 'characterSetUnsupported',
           message: `Delivery in character set ${characterSet} is not supported`,
           position: null,
+          details: null,
         },
         problem: {
           reason: 'incompleteSetup',
@@ -326,6 +342,7 @@ const deliveryFailure = (
           code: 'channelDefect',
           message: 'The Channel could not be used for the delivery',
           position: null,
+          details: null,
         },
         problem: {
           reason: 'incompleteSetup',
@@ -338,8 +355,9 @@ const deliveryFailure = (
           code: 'deliveryDefect',
           message: 'The delivery stopped on an unexpected error',
           position: null,
+          details: null,
         },
-        problem: { reason: 'unreachable', fixTarget: null },
+        problem: { reason: 'defect', fixTarget: null },
       }),
     }),
   )
@@ -681,8 +699,9 @@ const defectFailure = (stage: FailureStage): Failure => ({
     code: 'processingDefect',
     message: 'The processing stopped on an unexpected error',
     position: null,
+    details: null,
   },
-  problem: { reason: stage === 'delivery' ? 'unreachable' : 'invalidContent', fixTarget: null },
+  problem: { reason: 'defect', fixTarget: null },
 })
 
 // A defect can stop a Run before its first step starts or after its step failed.

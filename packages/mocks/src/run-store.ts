@@ -94,7 +94,7 @@ function place(runs: ReadonlyArray<RunSummary>, replaces: ReadonlyMap<string, st
     // An outbound replacing Run maps the same ERP Document again, into its own Interchange.
     group.messageOwners.push({
       runId: run.id,
-      run: replaced ? { ...replaced, status: 'delivered', failureStage: null } : run,
+      run: replaced ? { ...replaced, status: 'delivered', failureStage: null, problem: null } : run,
     })
     group.allRunIds.push(run.id)
     bundles.set(key, group)

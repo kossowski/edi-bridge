@@ -5,16 +5,16 @@ import path from 'node:path'
 import postgres from 'postgres'
 
 // Resolved through the package, so it still works when the api bundles this file.
-const migrationsFolder = path.join(
+export const migrationsFolder = path.join(
   path.dirname(createRequire(import.meta.url).resolve('@edi-bridge/db/package.json')),
   'migrations',
 )
 
-export async function migrate(url: string) {
+export async function migrate(url: string, folder = migrationsFolder) {
   const sql = postgres(url, { max: 1, onnotice: () => {} })
 
   try {
-    await applyMigrations(drizzle({ client: sql }), { migrationsFolder })
+    await applyMigrations(drizzle({ client: sql }), { migrationsFolder: folder })
   } finally {
     await sql.end({ timeout: 5 })
   }

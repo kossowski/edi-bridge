@@ -91,19 +91,26 @@ describe('postHttp', () => {
     expect(erp.received[0]?.headers).not.toHaveProperty('authorization')
   })
 
-  it('reports a rejected authorization', async () => {
+  it('reports a rejected authorization with the answered status', async () => {
     for (const status of [401, 403]) {
       expect(
         await failure(postHttp(destination(`${erp.url}?status=${status}`), order(), { timeoutMs })),
-      ).toEqual(new DeliveryFailed({ reason: 'loginRejected' }))
+      ).toEqual(
+        new DeliveryFailed({ reason: 'loginRejected', details: { kind: 'httpResponse', status } }),
+      )
     }
   })
 
-  it('reports any other answer but a 2xx as an unexpected response', async () => {
+  it('reports any other answer but a 2xx as an unexpected response with its status', async () => {
     for (const status of [301, 404, 422, 503]) {
       expect(
         await failure(postHttp(destination(`${erp.url}?status=${status}`), order(), { timeoutMs })),
-      ).toEqual(new DeliveryFailed({ reason: 'unexpectedResponse' }))
+      ).toEqual(
+        new DeliveryFailed({
+          reason: 'unexpectedResponse',
+          details: { kind: 'httpResponse', status },
+        }),
+      )
     }
   })
 
