@@ -225,6 +225,18 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     return result
   }
 
+  function interchangeOf(group: RunGroup) {
+    const { interchange } = generate(group)
+
+    return (
+      interchange && {
+        id: group.id,
+        controlReference: interchange.controlReference,
+        raw: interchange.raw,
+      }
+    )
+  }
+
   // An inbound replacing Run reprocesses the Message of the Run it replaced.
   function messageOwnerOf(group: RunGroup, runId: string) {
     return group.messageOwners.some((owner) => owner.runId === runId)
@@ -271,11 +283,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       problem: runError && problemOf(run, message, mappingVersion, problemSources),
       waitingForTradingPartnerSince: waitingSince.get(id) ?? null,
       duplicateOf: run.status === 'duplicate' ? originalOf(run) : null,
-      interchange: interchange && {
-        id: group.id,
-        controlReference: interchange.controlReference,
-        raw: interchange.raw,
-      },
+      interchange: interchangeOf(group),
       message:
         statusOf(run, direction === 'inbound' ? 'parse' : 'mapping') === 'succeeded'
           ? message.parsed
@@ -351,10 +359,14 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
     deliveringAgain.delete(run.id)
 
+    const delivered = runDetailSchema.parse({ ...run, status: 'delivered' })
+    runs().set(runSummarySchema.parse(delivered))
+
+    // A delivery that failed before the Interchange was built builds it on the Retry.
     return storeRetried(
       runDetailSchema.parse({
-        ...run,
-        status: 'delivered',
+        ...delivered,
+        interchange: run.interchange ?? interchangeOf(runs().groupOf(run.id)!),
         steps: run.steps.map((step) =>
           step.stage === 'delivery'
             ? {

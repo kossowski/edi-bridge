@@ -104,6 +104,13 @@ function incompleteSetupOf(run: ProblemFields): Failure | null {
   return kind && { error: setupErrors[kind], broken: { kind } }
 }
 
+// The api checks the GLNs and the character set before it builds the Interchange.
+export function failsBeforeInterchange(run: ProblemFields) {
+  const code = incompleteSetupOf(run)?.error?.code
+
+  return code === 'glnMissing' || code === 'characterSetUnsupported'
+}
+
 const defectError: GeneratedError = {
   code: 'processingDefect',
   message: 'The processing stopped on an unexpected error',

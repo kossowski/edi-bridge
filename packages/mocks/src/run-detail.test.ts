@@ -243,6 +243,27 @@ describe('GET /runs/:id', () => {
     })
   })
 
+  it('has no Interchange for an outbound Run that failed at delivery before building it', async () => {
+    const runs = createRuns({ count: 2000 }).filter(
+      (run) => run.direction === 'outbound' && run.failureStage === 'delivery',
+    )
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    const details = await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body!))
+
+    expect(
+      new Set(details.map(({ error, interchange }) => `${error?.code}:${interchange !== null}`)),
+    ).toEqual(
+      new Set([
+        'glnMissing:false',
+        'characterSetUnsupported:false',
+        'channelDefect:true',
+        'destinationUnreachable:true',
+      ]),
+    )
+  })
+
   it('orders the steps of an outbound Run as mapping before validation', async () => {
     const run = createRun({
       id: '00000000-0000-4000-8000-000000000002',
@@ -685,6 +706,23 @@ describe('POST /runs/:id/retry', () => {
     expect(after).toMatchObject({ id: run.id, status: 'delivered', failureStage: null })
     expect(after?.steps.slice(0, -1)).toEqual(before?.steps.slice(0, -1))
     expect(after?.steps.at(-1)?.status).toBe('succeeded')
+  })
+
+  it('builds the Interchange when it delivers again a Run that failed before building it', async () => {
+    const runs = createRuns({ count: 2000 }).filter(
+      (run) => run.direction === 'outbound' && run.failureStage === 'delivery',
+    )
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    const details = await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body!))
+    const run = details.find(({ error }) => error?.code === 'glnMissing')!
+
+    await post(toPath(retryRunEndpoint.path, { id: run.id }))
+    const { body: after } = await getRun(run.id)
+
+    expect(after).toMatchObject({ status: 'delivered', interchange: { id: expect.any(String) } })
+    expect(after?.interchange?.raw).toContain(`UNH+1+${run.messageType}`)
   })
 
   it('reprocesses a Defect at mapping with its own Mapping Version and answers the replaced Run', async () => {

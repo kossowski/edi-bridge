@@ -1,6 +1,7 @@
 import { directionOf, type RunSummary } from '@edi-bridge/contracts'
 
 import { hash } from './hash'
+import { failsBeforeInterchange } from './interchange'
 import { statusOf } from './run-steps'
 import { stableUuid } from './seed-id'
 
@@ -52,8 +53,11 @@ export function bundleKeyOf(
 }
 
 // The api writes an outbound Interchange in the delivery step, so only a validated Message has one.
-function hasInterchange(firstRun: Parameters<typeof statusOf>[0]) {
-  return directionOf(firstRun) === 'inbound' || statusOf(firstRun, 'validation') === 'succeeded'
+function hasInterchange(firstRun: RunSummary) {
+  return (
+    directionOf(firstRun) === 'inbound' ||
+    (statusOf(firstRun, 'validation') === 'succeeded' && !failsBeforeInterchange(firstRun))
+  )
 }
 
 type Placement = {
