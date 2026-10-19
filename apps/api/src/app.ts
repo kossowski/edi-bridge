@@ -60,6 +60,7 @@ import {
   removeWorkspaceMemberEndpoint,
   requestAiDraftEndpoint,
   restoreMappingVersionEndpoint,
+  reprocessRunEndpoint,
   revokeInviteEndpoint,
   retryRunEndpoint,
   runEndpoint,
@@ -137,7 +138,7 @@ import {
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
 import { parse, type ValidationError } from './parse.js'
-import { listRuns, loadRun, retryRun } from './run.js'
+import { listRuns, loadRun, reprocessRun, retryRun } from './run.js'
 import {
   CurrentMember,
   CurrentUser,
@@ -568,6 +569,17 @@ function registerRoutes(
 
   app.post<{ Params: { id: string } }>(retryRunEndpoint.path, (request, reply) =>
     respond(request, reply, retryRun(request.params.id)),
+  )
+
+  app.post<{ Params: { id: string } }>(reprocessRunEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(reprocessRunEndpoint.body, request.body), (body) =>
+        reprocessRun(request.params.id, body),
+      ),
+      201,
+    ),
   )
 
   app.get(lookupTablesEndpoint.path, (request, reply) => respond(request, reply, listLookupTables))
