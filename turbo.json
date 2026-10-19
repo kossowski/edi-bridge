@@ -14,15 +14,18 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
     },
+    "typegen": {
+      "outputs": [".next/types/**"]
+    },
     "lint": {
-      "dependsOn": ["transit"]
+      "dependsOn": ["transit", "typegen"]
     },
     "lint:fix": {
-      "dependsOn": ["transit"],
+      "dependsOn": ["transit", "typegen"],
       "cache": false
     },
     "check-types": {
-      "dependsOn": ["transit"]
+      "dependsOn": ["transit", "typegen"]
     },
     "test": {
       "dependsOn": ["transit"],
