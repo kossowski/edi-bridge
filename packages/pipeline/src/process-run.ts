@@ -921,6 +921,10 @@ const step = <A, E, R>(
     )
 
     if (finished === undefined) {
+      if (Result.isFailure(result) && Predicate.isTagged(result.failure, 'RunNotOwned')) {
+        return yield* result.failure
+      }
+
       return yield* new RunNotOwned({
         runId,
         cause: Result.isFailure(result) ? result.failure : undefined,

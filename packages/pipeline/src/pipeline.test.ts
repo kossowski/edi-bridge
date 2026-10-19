@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { type Duration, Effect, Exit, Fiber } from 'effect'
+import { type Duration, Effect, Exit, Fiber, Logger } from 'effect'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -654,6 +654,12 @@ describe('the sweep of received Runs', () => {
   })
 })
 
+const collectLogs = () => {
+  const messages: unknown[] = []
+
+  return { messages, logger: Logger.layer([Logger.make(({ message }) => messages.push(message))]) }
+}
+
 // A worker that stopped mid-Run leaves it processing, with its last change long ago.
 const leaveStuck = async (runId: string) => {
   await connection.db.execute(
@@ -973,9 +979,12 @@ describe('the sweep of stuck Runs', () => {
     // SAFETY: its prototype is the connection's database, so it has every member but its own transaction.
     const stallingDb: typeof db = Object.assign(Object.create(db) as typeof db, { transaction })
 
+    const { messages, logger } = collectLogs()
+
     const stalled = Effect.runPromise(
       processRun(queued ?? { workspaceId: into.id, runId }).pipe(
         pipelineServices(stallingDb, queue, () => Effect.void),
+        Effect.provide(logger),
       ),
     )
 
@@ -1007,6 +1016,7 @@ describe('the sweep of stuck Runs', () => {
       status: 'delivered',
       output: delivered?.toString('latin1'),
     })
+    expect(messages).toEqual([[`A stalled worker stopped processing Run ${runId}, which it lost`]])
   })
 
   it('leaves the Run to its new worker when the stalled worker stops on a defect', async () => {
