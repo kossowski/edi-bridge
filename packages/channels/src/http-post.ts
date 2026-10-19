@@ -12,8 +12,13 @@ import { type HttpChannel, httpDestination } from './http-channel'
 
 import type { SecretBox } from './secret'
 
-const answerFailure = (status: number) =>
-  Effect.fail(unreachable(rejectedLoginReason(status) ?? 'unexpectedResponse'))
+const answerFailure = (httpStatus: number) =>
+  Effect.fail(
+    new DeliveryFailed({
+      reason: rejectedLoginReason(httpStatus) ?? 'unexpectedResponse',
+      httpStatus,
+    }),
+  )
 
 const postHeaders = (authorization: string | null, document: OutboundDocument) => {
   const headers = new Headers({
@@ -49,11 +54,12 @@ export const postHttp = (
         return response
       },
       catch: (error) => unreachable(fetchFailureReasonSchema.parse(error)),
-    }).pipe(
-      Effect.flatMap((response) => (response.ok ? Effect.void : answerFailure(response.status))),
-    ),
+    }),
     timeoutMs,
-  ).pipe(Effect.mapError(({ reason }) => new DeliveryFailed({ reason })))
+  ).pipe(
+    Effect.mapError(({ reason }) => new DeliveryFailed({ reason })),
+    Effect.flatMap((response) => (response.ok ? Effect.void : answerFailure(response.status))),
+  )
 
 export const httpChannelDelivery =
   ({ secrets, timeoutMs }: { secrets: SecretBox; timeoutMs: number }) =>
