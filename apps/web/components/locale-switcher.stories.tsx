@@ -1,7 +1,7 @@
 import { expect, userEvent, waitFor } from 'storybook/test'
 
 import { LocaleSwitcher } from '@/components/locale-switcher'
-import { findOpenMenu, german, page } from '@/components/story-helpers'
+import { findOpenMenu, german, waitForFocusOn, waitForMenuClosed } from '@/components/story-helpers'
 
 import preview from '../.storybook/preview'
 
@@ -28,7 +28,7 @@ export const ChoosingClosesTheMenu = meta.story({
     const menu = await findOpenMenu(canvasElement)
 
     await userEvent.click(menu.getByRole('menuitemradio', { name: 'Deutsch' }))
-    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
+    await waitForMenuClosed(canvasElement)
 
     await userEvent.click(canvas.getByRole('checkbox', { name: 'Next control' }))
     await expect(canvas.getByRole('checkbox', { name: 'Next control' })).toBeChecked()
@@ -45,7 +45,9 @@ export const ChoosingByKeyboard = meta.story({
 
     await waitFor(() => expect(menu.getByRole('menuitemradio', { name: 'English' })).toHaveFocus())
     await userEvent.keyboard('{ArrowDown}{Enter}')
-    await waitFor(() => expect(page(canvasElement).queryByRole('menu')).toBeNull())
+    await waitForMenuClosed(canvasElement)
+    await waitFor(() => expect(trigger).toBeEnabled())
+    await waitForFocusOn(trigger)
   },
 })
 
