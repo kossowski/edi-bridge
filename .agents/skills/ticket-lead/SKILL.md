@@ -153,7 +153,7 @@ It rebases each part onto its parent, bottom to top, and pushes with lease; a pa
 
 ### 6. Report
 
-Stop every background shell, monitor and subagent you started, run `bash .agents/skills/developer/scripts/stop-leftovers.sh` for the servers a developer forgot, and delete the screenshots in your scratchpad. Keep all worktrees until `/land` has merged the stack.
+Stop every background shell, monitor and subagent you started, run `bash .agents/skills/developer/scripts/stop-leftovers.sh <NN>` for the servers a developer forgot in this ticket's worktrees, and delete the screenshots in your scratchpad. Keep all worktrees until `/land` has merged the stack.
 
 ```bash
 bash .agents/skills/ticket-lead/scripts/stack-status.sh <NN>
