@@ -32,6 +32,7 @@ import {
   type TestApi,
   testAuth,
   testChannels,
+  testRunQueue,
 } from './testing.js'
 
 import type { Transaction } from './db.js'
@@ -693,6 +694,7 @@ describe('a Lookup Table deleted right after a write', () => {
       channels: testChannels,
       database: deleting.db,
       probes: { postgres: up, redis: up },
+      runQueue: testRunQueue().service,
     })
     deletingAdmin = await signIn(deletingApp, ownAdmin)
   })

@@ -1,5 +1,5 @@
 import cors from '@fastify/cors'
-import { Effect, Predicate } from 'effect'
+import { Effect, Match, Predicate } from 'effect'
 import Fastify from 'fastify'
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -42,6 +42,7 @@ import {
   maxLookupTableCsvLength,
   mappingVersionEndpoint,
   mappingVersionsEndpoint,
+  maxDocumentLength,
   messageTypeStructureEndpoint,
   moveFlowMappingVersionEndpoint,
   operatorWorkspaceMembersEndpoint,
@@ -50,8 +51,11 @@ import {
   removeWorkspaceMemberEndpoint,
   restoreMappingVersionEndpoint,
   revokeInviteEndpoint,
+  runEndpoint,
+  runsEndpoint,
   saveMappingDraftEndpoint,
   sessionEndpoint,
+  submitDocumentEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
@@ -64,6 +68,13 @@ import {
   workspaceInvitesEndpoint,
   workspaceMembersEndpoint,
 } from '@edi-bridge/contracts'
+import {
+  type ReceiptRejected,
+  type ReceiptRejection,
+  type RunNotQueued,
+  RunQueue,
+  type RunQueueService,
+} from '@edi-bridge/pipeline'
 
 import { type AuthSettings, mountAuth } from './auth.js'
 import { ChannelReach, channelReach } from './channel-reach.js'
@@ -98,6 +109,7 @@ import {
   suggestLookupTableEntries,
   updateLookupTable,
 } from './lookup-table.js'
+import { submitDocument } from './manual-submission.js'
 import { listMappingSamples, previewMapping } from './mapping-preview.js'
 import {
   compareMappingVersions,
@@ -110,6 +122,7 @@ import {
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
 import { parse, type ValidationError } from './parse.js'
+import { listRuns, loadRun } from './run.js'
 import { secretBox } from './secret.js'
 import {
   CurrentMember,
@@ -154,6 +167,7 @@ export interface AppDependencies {
   logger?: boolean
   probes: { postgres: Probe; redis: Probe }
   probeTimeoutMs?: number
+  runQueue: RunQueueService
   webOrigin?: string | undefined
 }
 
@@ -163,10 +177,21 @@ type Failure =
   | Forbidden
   | InviteUnusable
   | NotFound
+  | ReceiptRejected
+  | RunNotQueued
   | Unprocessable
   | ValidationError
 
-const statusOf: Record<Failure['_tag'], number> = {
+const statusOfReceiptRejection: Record<ReceiptRejection, number> = {
+  unknownChannel: 422,
+  outboundChannel: 422,
+  noFlow: 422,
+  noRoutedMessage: 422,
+  ambiguousFlow: 422,
+  inboundNotProcessed: 422,
+}
+
+const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> = {
   ValidationError: 400,
   Forbidden: 403,
   NotFound: 404,
@@ -174,7 +199,14 @@ const statusOf: Record<Failure['_tag'], number> = {
   InviteUnusable: inviteUnusableStatus,
   Unprocessable: 422,
   DocumentStructureRejected: 422,
+  // The Runs are received; the worker queues them when it starts again.
+  RunNotQueued: 503,
 }
+
+const statusOf = Match.type<Failure>().pipe(
+  Match.tag('ReceiptRejected', ({ reason }) => statusOfReceiptRejection[reason]),
+  Match.orElse((error) => statusOfTag[error._tag]),
+)
 
 const bodyOf = (error: Failure) => {
   if (Predicate.isTagged(error, 'DocumentStructureRejected')) {
@@ -191,6 +223,8 @@ const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 
 // Base64 takes 4 characters per 3 bytes; 1 MiB covers the name, labels and JSON around the Document.
 const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
+
+const manualSubmissionBodyLimit = 6 * maxDocumentLength + 1024
 
 const readMethods = new Set(['GET', 'HEAD'])
 
@@ -237,6 +271,7 @@ function registerRoutes(
     database,
     probes,
     probeTimeoutMs = 2000,
+    runQueue,
     webOrigin,
   }: AppDependencies,
 ) {
@@ -266,18 +301,17 @@ function registerRoutes(
 
   const run = <A>(
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, ChannelEnvironment | ChannelReach | Db>,
+    effect: Effect.Effect<A, Failure, ChannelEnvironment | ChannelReach | Db | RunQueue>,
     status: number,
   ) =>
     Effect.runPromise(
       effect.pipe(
         Effect.map((body) => reply.code(status).send(body)),
-        Effect.catch((error) =>
-          Effect.sync(() => reply.code(statusOf[error._tag]).send(bodyOf(error))),
-        ),
+        Effect.catch((error) => Effect.sync(() => reply.code(statusOf(error)).send(bodyOf(error)))),
         Effect.provideService(Db, database),
         Effect.provideService(ChannelEnvironment, channelEnvironment),
         Effect.provideService(ChannelReach, reach),
+        Effect.provideService(RunQueue, runQueue),
       ),
     )
 
@@ -289,7 +323,7 @@ function registerRoutes(
     effect: Effect.Effect<
       A,
       Failure,
-      ChannelEnvironment | ChannelReach | CurrentMember | CurrentWorkspace | Db
+      ChannelEnvironment | ChannelReach | CurrentMember | CurrentWorkspace | Db | RunQueue
     >,
     status = 200,
   ) => {
@@ -455,6 +489,26 @@ function registerRoutes(
         parse(moveFlowMappingVersionEndpoint.body, request.body),
       ),
     ),
+  )
+
+  app.post(
+    submitDocumentEndpoint.path,
+    { bodyLimit: manualSubmissionBodyLimit },
+    (request, reply) =>
+      respond(
+        request,
+        reply,
+        Effect.flatMap(parse(submitDocumentEndpoint.body, request.body), submitDocument),
+        201,
+      ),
+  )
+
+  app.get(runsEndpoint.path, (request, reply) =>
+    respond(request, reply, Effect.flatMap(parse(runsEndpoint.query, request.query), listRuns)),
+  )
+
+  app.get<{ Params: { id: string } }>(runEndpoint.path, (request, reply) =>
+    respond(request, reply, loadRun(request.params.id)),
   )
 
   app.get(lookupTablesEndpoint.path, (request, reply) => respond(request, reply, listLookupTables))

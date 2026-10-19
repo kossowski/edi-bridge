@@ -1,0 +1,224 @@
+import { eq } from 'drizzle-orm'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+
+import {
+  manualSubmissionSchema,
+  runListSchema,
+  runsEndpoint,
+  submitDocumentEndpoint,
+} from '@edi-bridge/contracts'
+import { channels, flows } from '@edi-bridge/db'
+import {
+  golden,
+  goldenInvoice,
+  type InvoiceWorkspace,
+  seedInvoiceWorkspace,
+} from '@edi-bridge/pipeline/testing'
+
+import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+
+let api: TestApi
+
+let workspace: InvoiceWorkspace
+
+let admin: Client
+
+let viewer: Client
+
+beforeAll(async () => {
+  api = await startTestApi()
+  workspace = await seedInvoiceWorkspace(api.connection.db, 'Nordwind Foods')
+
+  const member = (role: 'admin' | 'viewer') => ({
+    name: `Nordwind Foods ${role}`,
+    email: `${role}@nordwind-foods.example`,
+    password: `nordwind-foods-${role}-password`,
+    workspaceId: workspace.id,
+    role,
+  })
+
+  await addMember(api.connection.db, member('admin'))
+  await addMember(api.connection.db, member('viewer'))
+  admin = await signIn(api.app, member('admin'))
+  viewer = await signIn(api.app, member('viewer'))
+}, 60_000)
+
+afterAll(async () => {
+  await api.stop()
+})
+
+beforeEach(() => {
+  api.runQueue.queued.length = 0
+  api.runQueue.redis.reachable = true
+})
+
+const submit = (content: string, { channelId = workspace.inboundChannelId, as = admin } = {}) =>
+  as.inject({
+    method: submitDocumentEndpoint.method,
+    url: submitDocumentEndpoint.path,
+    body: { channelId, document: { fileName: 'invoice.json', content } },
+  })
+
+const receivedRuns = async () => {
+  const response = await admin.inject({ method: 'GET', url: runsEndpoint.path })
+
+  return runListSchema.parse(response.json()).statusCounts.received
+}
+
+const ordersInterchange = golden('orders-reference.edi', 'latin1')
+
+describe('POST /manual-submissions', () => {
+  it('receives the Document as a manual Run on the Flow of the Channel and queues it', async () => {
+    const response = await submit(goldenInvoice)
+
+    expect(response.statusCode, response.body).toBe(201)
+
+    const submission = manualSubmissionSchema.parse(response.json())
+
+    expect(submission).toMatchObject({
+      runs: [
+        {
+          status: 'received',
+          failureStage: null,
+          tradingPartner: { id: workspace.tradingPartnerId, name: 'Hanse Retail' },
+          messageType: 'INVOIC',
+          direction: 'outbound',
+          flow: { id: workspace.flowId, name: 'Invoices to Hanse Retail' },
+          manualSubmission: true,
+          businessReference: null,
+          interchange: null,
+        },
+      ],
+      notRouted: [],
+    })
+    expect(api.runQueue.queued).toEqual([
+      { workspaceId: workspace.id, runId: submission.runs[0]?.id },
+    ])
+  })
+
+  it.each([
+    ['the Channel does not exist', () => crypto.randomUUID(), 'The Channel does not exist'],
+    [
+      'the Channel is outbound',
+      () => workspace.outboundChannelId,
+      'A Document can only arrive on an inbound Channel',
+    ],
+  ])('answers 422 when %s', async (_, channelId, message) => {
+    const response = await submit(goldenInvoice, { channelId: channelId() })
+
+    expect(response.statusCode).toBe(422)
+    expect(response.json()).toEqual({ message })
+  })
+
+  it('answers 422 when no Flow routes Documents from the Channel', async () => {
+    const [unrouted] = await api.connection.db
+      .insert(channels)
+      .values({
+        workspaceId: workspace.id,
+        type: 'webhook',
+        direction: 'inbound',
+        name: 'Unrouted webhook',
+        rateLimitPerMinute: 60,
+        encryptedWebhookToken: 'encrypted',
+        webhookTokenLastFour: 'wxyz',
+      })
+      .returning()
+
+    const response = await submit(goldenInvoice, { channelId: unrouted?.id })
+
+    expect(response.statusCode).toBe(422)
+    expect(response.json()).toEqual({ message: 'No Flow routes Documents from this Channel' })
+  })
+
+  it('answers 422 when no Flow on the Channel routes a Message of the Document', async () => {
+    const response = await submit(ordersInterchange)
+
+    expect(response.statusCode).toBe(422)
+    expect(response.json()).toEqual({
+      message: 'No Flow on this Channel routes a Message of this Document',
+    })
+  })
+
+  describe('with a second Flow on the Channel', () => {
+    const addFlow = async (messageType: 'ORDERS' | 'DESADV', name: string) => {
+      const [flow] = await api.connection.db
+        .insert(flows)
+        .values({
+          workspaceId: workspace.id,
+          tradingPartnerId: workspace.tradingPartnerId,
+          messageType,
+          name,
+          inboundChannelId: workspace.inboundChannelId,
+          destinationChannelId: workspace.outboundChannelId,
+          mappingVersionId: workspace.mappingVersionId,
+        })
+        .returning()
+
+      return flow?.id ?? ''
+    }
+
+    const removeFlow = (id: string) => api.connection.db.delete(flows).where(eq(flows.id, id))
+
+    it('answers 422 when several outbound Flows could take a Document without Message Types', async () => {
+      const flowId = await addFlow('DESADV', 'Despatch advices to Hanse Retail')
+
+      try {
+        const response = await submit(goldenInvoice)
+
+        expect(response.statusCode).toBe(422)
+        expect(response.json()).toEqual({
+          message: 'Several outbound Flows on this Channel could take this Document',
+        })
+      } finally {
+        await removeFlow(flowId)
+      }
+    })
+
+    it('answers 422 for a Document routed to an inbound Flow', async () => {
+      const flowId = await addFlow('ORDERS', 'Orders from Hanse Retail')
+
+      try {
+        const response = await submit(ordersInterchange)
+
+        expect(response.statusCode).toBe(422)
+        expect(response.json()).toEqual({
+          message: 'Documents for inbound Flows are not processed yet',
+        })
+      } finally {
+        await removeFlow(flowId)
+      }
+    })
+  })
+
+  it('answers 503 when the Run queue is unreachable and keeps the Run received', async () => {
+    api.runQueue.redis.reachable = false
+    const before = await receivedRuns()
+
+    const response = await submit(goldenInvoice)
+
+    expect(response.statusCode).toBe(503)
+    expect(response.json<{ message: string }>().message).toContain(
+      'was received but could not be queued for processing',
+    )
+    expect(await receivedRuns()).toBe(before + 1)
+  })
+
+  it('answers 400 for a body without a Document', async () => {
+    const response = await admin.inject({
+      method: submitDocumentEndpoint.method,
+      url: submitDocumentEndpoint.path,
+      body: { channelId: workspace.inboundChannelId },
+    })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('answers 403 to a Viewer and receives nothing', async () => {
+    const before = await receivedRuns()
+
+    const response = await submit(goldenInvoice, { as: viewer })
+
+    expect(response.statusCode).toBe(403)
+    expect(await receivedRuns()).toBe(before)
+  })
+})

@@ -23,6 +23,7 @@ import {
   testChannels,
   type TestApi,
   webOrigin,
+  testRunQueue,
 } from './testing.js'
 
 const operator: NewMember = {
@@ -84,6 +85,7 @@ describe('POST /auth/sign-in/email in production', () => {
       channels: testChannels,
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
+      runQueue: testRunQueue().service,
     })
 
   it('does not trust the local web origin unless WEB_ORIGIN names it', async () => {

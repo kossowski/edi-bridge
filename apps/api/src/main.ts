@@ -2,6 +2,7 @@ import { Redis } from 'ioredis'
 import postgres from 'postgres'
 
 import { connect, migrate } from '@edi-bridge/db'
+import { bullmqRunQueue } from '@edi-bridge/pipeline'
 
 import { buildApp } from './app.js'
 import { config } from './config.js'
@@ -16,6 +17,8 @@ const sql = postgres(config.databaseUrl, { connect_timeout: 2, max: 5 })
 // for a reconnect, so the health route reports the outage right away.
 const redis = new Redis(config.redisUrl, { enableOfflineQueue: false, maxRetriesPerRequest: 1 })
 
+const runQueue = bullmqRunQueue(config.redisUrl)
+
 const app = buildApp({
   auth: config.auth,
   channels: config.channels,
@@ -29,6 +32,7 @@ const app = buildApp({
       await redis.ping()
     },
   },
+  runQueue: runQueue.service,
   webOrigin: config.webOrigin,
 })
 
@@ -38,6 +42,7 @@ redis.on('error', (error: Error) => {
 
 async function shutdown(): Promise<void> {
   await app.close()
+  await runQueue.close()
   await connection.close()
   await sql.end({ timeout: 5 })
   redis.disconnect()
