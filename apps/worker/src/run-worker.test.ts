@@ -1,13 +1,14 @@
-import { Effect } from 'effect'
+import { Effect, Exit } from 'effect'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { connect, type Connection } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
-import { bullmqRunQueue, receive } from '@edi-bridge/pipeline'
+import { bullmqRunQueue, receive, type RunQueueService } from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
   goldenInvoicMessage,
+  inMemoryRunQueue,
   type InvoiceWorkspace,
   pipelineServices,
   readRun,
@@ -45,7 +46,7 @@ afterAll(async () => {
   await Promise.all([testDatabase.stop(), testRedis.stop()])
 })
 
-const arrive = async (content: string) => {
+const arrive = async (content: string, runQueue: { service: RunQueueService } = queue) => {
   const receipt = await Effect.runPromise(
     receive({
       workspaceId: workspace.id,
@@ -53,7 +54,7 @@ const arrive = async (content: string) => {
       fileName: 'invoice.json',
       content,
       manualSubmission: false,
-    }).pipe(pipelineServices(connection.db, queue)),
+    }).pipe(pipelineServices(connection.db, runQueue)),
   )
 
   return receipt.runs[0]?.id ?? ''
@@ -126,5 +127,21 @@ describe('the worker', () => {
         { stage: 'delivery', status: 'skipped' },
       ],
     })
+  })
+
+  it('processes a Run received but not queued once a worker starts', async () => {
+    const runId = await arrive(goldenInvoice, inMemoryRunQueue())
+    const restarted = startRunWorker({ redisUrl: testRedis.url, db: connection.db })
+
+    try {
+      expect(Exit.isSuccess(await restarted.queuedReceivedRuns)).toBe(true)
+
+      await expect(processed(runId)).resolves.toMatchObject({
+        status: 'processing',
+        output: goldenInvoicMessage,
+      })
+    } finally {
+      await restarted.close()
+    }
   })
 })
