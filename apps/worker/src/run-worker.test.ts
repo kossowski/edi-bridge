@@ -72,7 +72,15 @@ beforeAll(async () => {
     db: connection.db,
     secrets: testSecrets,
     requeueInterval: '100 millis',
+    pollingMinute: '100 millis',
   })
+  // Each SFTP operation takes an SSH session, so the receipt of the ORDERS file outlasts a test.
+  await vi.waitFor(
+    async () => {
+      expect((await sftp.exec(`ls -A ${sftp.home}/upload/orders`)).output).toBe('')
+    },
+    { timeout: 30_000, interval: 100 },
+  )
 }, 180_000)
 
 afterAll(async () => {
@@ -95,7 +103,6 @@ async function pollOrders() {
     [
       `install -d -m 777 ${sftp.home}${remotePath}`,
       `echo ${Buffer.from(ordersInterchange, 'latin1').toString('base64')} | base64 -d > ${path}`,
-      `touch -d @${String(Math.floor(Date.now() / 1000) - 7200)} ${path}`,
     ].join(' && '),
   )
 
@@ -136,7 +143,7 @@ const processed = (runId: string) =>
 
       return run
     },
-    { timeout: 3000, interval: 50 },
+    { timeout: 1500, interval: 50 },
   )
 
 const remoteFile = async (path: string) =>
@@ -223,18 +230,12 @@ describe('the worker', () => {
 
         return read
       },
-      { timeout: 3000, interval: 50 },
+      { timeout: 1500, interval: 50 },
     )
 
     expect(delivered?.steps.at(-1)).toMatchObject({ stage: 'delivery', status: 'succeeded' })
     expect(erp.received).toMatchObject([
       { method: 'POST', headers: { 'content-type': 'application/json' } },
     ])
-    await vi.waitFor(
-      async () => {
-        expect((await sftp.exec(`ls -A ${sftp.home}/upload/orders`)).output).toBe('')
-      },
-      { timeout: 3000, interval: 50 },
-    )
   })
 })
