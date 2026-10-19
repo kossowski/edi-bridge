@@ -1,11 +1,13 @@
-import { createServer as createHttpServer, type IncomingHttpHeaders } from 'node:http'
-import { utils } from 'ssh2'
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers'
+import { createServer as createTcpServer, type Server, type Socket } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 
-import type { Server } from 'node:net'
-
+import {
+  listening,
+  startTestErp,
+  startTestSftpServer,
+  type TestErp,
+  type TestSftpServer,
+} from '@edi-bridge/channels/testing'
 import {
   type ChannelInput,
   createChannelEndpoint,
@@ -17,79 +19,41 @@ import { channels } from '@edi-bridge/db'
 
 import { type Client, startTestApi, type TestApi } from './testing.js'
 
-const sftpImage =
-  'atmoz/sftp:alpine@sha256:7e439fabeae536fa254340724c042e11999924d906417dbb5c73602ad518813f'
-
-const sftpUser = { username: 'edi_bridge', password: 'edi-bridge-sftp-password' }
-
-const keyPair = utils.generateKeyPairSync('ed25519')
-
-interface ReceivedRequest {
-  method: string | undefined
-  url: string | undefined
-  headers: IncomingHttpHeaders
-  body: string
-}
-
 let api: TestApi
 
 let admin: Client
 
-let sftp: StartedTestContainer
+let sftp: TestSftpServer
 
-let erp: Server
+let erp: TestErp
 
-let erpUrl: string
+let silent: Server
 
-const received: ReceivedRequest[] = []
+let silentPort: number
 
-const listening = async (server: Server) => {
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-
-  return z.object({ port: z.number() }).parse(server.address()).port
-}
+const openSockets = new Set<Socket>()
 
 beforeAll(async () => {
-  const started = await Promise.all([
-    startTestApi(),
-    new GenericContainer(sftpImage)
-      .withPlatform('linux/amd64')
-      .withCommand([`${sftpUser.username}:${sftpUser.password}:::upload`])
-      .withCopyContentToContainer([
-        { content: `${keyPair.public}\n`, target: `/home/${sftpUser.username}/.ssh/keys/id.pub` },
-      ])
-      .withExposedPorts(22)
-      .withWaitStrategy(Wait.forLogMessage(/Server listening on/))
-      .start(),
-  ])
-
-  ;[api, sftp] = started
+  ;[api, sftp, erp] = await Promise.all([startTestApi(), startTestSftpServer(), startTestErp()])
   ;({ admin } = api)
 
-  erp = createHttpServer((request, response) => {
-    let body = ''
-
-    request.on('data', (chunk: Buffer) => {
-      body += chunk.toString()
-    })
-    request.on('end', () => {
-      received.push({ method: request.method, url: request.url, headers: request.headers, body })
-
-      const status = Number(new URL(request.url ?? '/', 'http://erp').searchParams.get('status'))
-
-      response.writeHead(status || 200).end()
-    })
+  silent = createTcpServer((socket) => {
+    openSockets.add(socket)
   })
-  erpUrl = `http://127.0.0.1:${await listening(erp)}/api/edi/documents`
+  silentPort = await listening(silent)
 }, 180_000)
 
 afterAll(async () => {
-  erp.close()
-  await Promise.all([api.stop(), sftp.stop()])
+  for (const socket of openSockets) {
+    socket.destroy()
+  }
+
+  silent.close()
+  await Promise.all([api.stop(), sftp.stop(), erp.stop()])
 })
 
 beforeEach(async () => {
-  received.length = 0
+  erp.received.length = 0
   await api.connection.db.delete(channels)
 })
 
@@ -128,15 +92,15 @@ const sftpOutbox = () =>
     direction: 'outbound',
     name: 'Hansemarkt SFTP outbox',
     tradingPartnerId: null,
-    host: sftp.getHost(),
-    port: sftp.getMappedPort(22),
-    username: sftpUser.username,
+    host: sftp.host,
+    port: sftp.port,
+    username: sftp.username,
     remotePath: '/upload',
     authentication: 'password',
-    credential: sftpUser.password,
+    credential: sftp.password,
   }) satisfies ChannelInput
 
-const httpDelivery = (url = erpUrl) =>
+const httpDelivery = (url = erp.url) =>
   ({
     type: 'http',
     direction: 'outbound',
@@ -163,7 +127,7 @@ describe('POST /channels/:id/test for an SFTP Channel', () => {
         direction: 'inbound',
         pollingIntervalMinutes: 1,
         authentication: 'privateKey',
-        credential: keyPair.private,
+        credential: sftp.privateKey,
       }),
     ).toMatchObject({ outcome: 'succeeded' })
   })
@@ -180,12 +144,27 @@ describe('POST /channels/:id/test for an HTTP Channel', () => {
   it('reaches the destination with the stored authorization and sends no Document', async () => {
     expect(await outcomeOf(httpDelivery())).toMatchObject({ outcome: 'succeeded' })
 
-    expect(received).toHaveLength(1)
-    expect(received[0]).toMatchObject({
+    expect(erp.received).toHaveLength(1)
+    expect(erp.received[0]).toMatchObject({
       method: 'HEAD',
       url: '/api/edi/documents',
       headers: { authorization: 'Bearer erp-api-key-0815' },
       body: '',
+    })
+  })
+
+  it('reports a rejected authorization', async () => {
+    expect(await outcomeOf(httpDelivery(`${erp.url}?status=401`))).toMatchObject({
+      outcome: 'failed',
+      reason: 'loginRejected',
+    })
+  })
+
+  // Passes only with the 1.5 s reach timeout of the test settings; the 10 s default outlasts the test.
+  it('reports a host that never answers as timed out', async () => {
+    expect(await outcomeOf(httpDelivery(`http://127.0.0.1:${String(silentPort)}/`))).toMatchObject({
+      outcome: 'failed',
+      reason: 'timedOut',
     })
   })
 })
@@ -207,13 +186,13 @@ describe('POST /channels/:id/test', () => {
     const channel = await created(httpDelivery(), api.otherAdmin)
 
     expect((await tested(channel.id)).status).toBe(404)
-    expect(received).toEqual([])
+    expect(erp.received).toEqual([])
   })
 
   it('is not available to a Viewer', async () => {
     const channel = await created(httpDelivery())
 
     expect((await tested(channel.id, api.viewer)).status).toBe(403)
-    expect(received).toEqual([])
+    expect(erp.received).toEqual([])
   })
 })
