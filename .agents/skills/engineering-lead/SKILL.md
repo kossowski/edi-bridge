@@ -51,6 +51,8 @@ Fill the wave from the runnable tickets in the order the board prints them: the 
 
 ### 3. Spawn a ticket lead per ticket
 
+Read the ticket's Prerequisites first. Take every open one to the user before the ticket starts. A ticket whose open prerequisites are needed only at landing may start meanwhile; when the user is away, start only such a ticket, and write its prerequisites under "Open for the user".
+
 ```bash
 bash .agents/skills/engineering-lead/scripts/spawn-ticket-lead.sh <NN> <your session name>
 ```

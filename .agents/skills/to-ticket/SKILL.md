@@ -46,6 +46,7 @@ Present the proposed breakdown as a numbered list. For each ticket, show:
 - **Title**: short descriptive name
 - **Blocked by**: which other tickets (if any) must complete first
 - **What it delivers**: the end-to-end behaviour this ticket makes work
+- **Prerequisites**: what only the user can provide, or none
 
 Ask the user:
 
@@ -74,6 +75,8 @@ Do NOT close or modify any parent issue.
 
 **Blocked by:** the numbers/titles of the tickets that gate this one, or "None (can start immediately)".
 
+**Prerequisites:** what only the user can provide before or during the work: new secrets or env vars in the deployment, external documents or sources, credentials, permissions. "None" when there are none.
+
 **Status:** ready-for-agent
 
 - [ ] Acceptance criterion 1
@@ -95,6 +98,10 @@ The end-to-end behaviour this ticket makes work, from the user's perspective, no
 
 - [ ] Criterion 1
 - [ ] Criterion 2
+
+## Prerequisites
+
+- What only the user can provide before or during the work: new secrets or env vars in the deployment, external documents or sources, credentials, permissions. "None" when there are none.
 
 ## Blocked by
 

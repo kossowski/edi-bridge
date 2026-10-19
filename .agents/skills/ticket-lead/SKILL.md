@@ -69,6 +69,8 @@ Ticket: <ticket path>
 
 Show the plan to the user in one short message and continue without waiting.
 
+When the plan needs a new env var, secret or external input that the ticket's Prerequisites don't list, ask for it at once, as a `question` to the lead or to the user, and build on meanwhile.
+
 When a part turns out to hold two changes while you build it, narrow its scope to the first change and add a new part above it for the second. Update the stack file. Work already committed stays in the part where it landed.
 
 ### 3. Build each part, bottom to top
