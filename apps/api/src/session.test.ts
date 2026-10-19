@@ -25,6 +25,7 @@ import {
   webOrigin,
   testRunQueue,
 } from './testing.js'
+import { memoryWebhookRateLimiter } from './webhook-rate-limit.js'
 
 const operator: NewMember = {
   name: 'Platform Operator',
@@ -86,6 +87,7 @@ describe('POST /auth/sign-in/email in production', () => {
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
       runQueue: testRunQueue().service,
+      webhookRateLimiter: memoryWebhookRateLimiter(),
     })
 
   it('does not trust the local web origin unless WEB_ORIGIN names it', async () => {

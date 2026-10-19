@@ -34,6 +34,7 @@ import {
   testChannels,
   testRunQueue,
 } from './testing.js'
+import { memoryWebhookRateLimiter } from './webhook-rate-limit.js'
 
 import type { Transaction } from './db.js'
 
@@ -695,6 +696,7 @@ describe('a Lookup Table deleted right after a write', () => {
       database: deleting.db,
       probes: { postgres: up, redis: up },
       runQueue: testRunQueue().service,
+      webhookRateLimiter: memoryWebhookRateLimiter(),
     })
     deletingAdmin = await signIn(deletingApp, ownAdmin)
   })

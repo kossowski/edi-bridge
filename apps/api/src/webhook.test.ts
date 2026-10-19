@@ -37,6 +37,24 @@ let unroutedChannelId: string
 
 let unroutedToken: string
 
+const createWebhookChannel = async (name: string, rateLimitPerMinute: number) => {
+  const created = await admin.inject({
+    method: createChannelEndpoint.method,
+    url: createChannelEndpoint.path,
+    body: {
+      type: 'webhook',
+      direction: 'inbound',
+      name,
+      tradingPartnerId: null,
+      rateLimitPerMinute,
+    },
+  })
+
+  const { channel, webhookToken } = createdChannelSchema.parse(created.json())
+
+  return { channelId: channel.id, token: webhookToken ?? '' }
+}
+
 beforeAll(async () => {
   api = await startTestApi()
   workspace = await seedInvoiceWorkspace(api.connection.db, 'Nordwind Foods')
@@ -59,22 +77,10 @@ beforeAll(async () => {
 
   token = regeneratedWebhookTokenSchema.parse(regenerated.json()).webhookToken
 
-  const created = await admin.inject({
-    method: createChannelEndpoint.method,
-    url: createChannelEndpoint.path,
-    body: {
-      type: 'webhook',
-      direction: 'inbound',
-      name: 'Unrouted webhook',
-      tradingPartnerId: null,
-      rateLimitPerMinute: 60,
-    },
-  })
+  const unrouted = await createWebhookChannel('Unrouted webhook', 60)
 
-  const { channel, webhookToken } = createdChannelSchema.parse(created.json())
-
-  unroutedChannelId = channel.id
-  unroutedToken = webhookToken ?? ''
+  unroutedChannelId = unrouted.channelId
+  unroutedToken = unrouted.token
 }, 60_000)
 
 afterAll(async () => {
@@ -87,19 +93,19 @@ beforeEach(() => {
 
 const withToken = (presented: string) => ({ [webhookTokenHeader]: webhookAuthorization(presented) })
 
-type Delivery = {
+type WebhookRequest = {
   channelId?: string
   headers?: Record<string, string>
   contentType?: string | null
 }
 
-const deliver = (
+const post = (
   content: string | Buffer,
   {
     channelId = workspace.inboundChannelId,
     headers = withToken(token),
     contentType = 'application/json',
-  }: Delivery = {},
+  }: WebhookRequest = {},
 ) =>
   api.app.inject({
     method: receiveWebhookEndpoint.method,
@@ -122,7 +128,7 @@ const storedDocuments = async () => {
 
 describe('POST /webhooks/:id', () => {
   it('receives a Document with a valid token as a Run that is not manual and queues it', async () => {
-    const response = await deliver(goldenInvoice)
+    const response = await post(goldenInvoice)
 
     expect(response.statusCode, response.body).toBe(201)
 
@@ -144,7 +150,7 @@ describe('POST /webhooks/:id', () => {
   })
 
   it('takes the Bearer scheme in any letter case', async () => {
-    const response = await deliver(goldenInvoice, {
+    const response = await post(goldenInvoice, {
       headers: { [webhookTokenHeader]: `bEARER ${token}` },
     })
 
@@ -154,7 +160,7 @@ describe('POST /webhooks/:id', () => {
   it.each([null, 'text/plain', 'application/octet-stream'])(
     'takes the body as the Document with the content type %s',
     async (contentType) => {
-      const response = await deliver(goldenInvoice, { contentType })
+      const response = await post(goldenInvoice, { contentType })
 
       expect(response.statusCode, response.body).toBe(201)
       expect(receiveWebhookEndpoint.response.parse(response.json()).runs).toHaveLength(1)
@@ -173,7 +179,7 @@ describe('POST /webhooks/:id', () => {
     const runsBefore = await receivedRuns()
     const documentsBefore = await storedDocuments()
 
-    const response = await deliver(goldenInvoice, options())
+    const response = await post(goldenInvoice, options())
 
     expect(response.statusCode).toBe(401)
     expect(response.json()).toEqual({ message: 'Unauthorized' })
@@ -185,7 +191,7 @@ describe('POST /webhooks/:id', () => {
   it('answers 422 as for a Manual Submission when no Flow routes Documents from the Channel', async () => {
     const documentsBefore = await storedDocuments()
 
-    const response = await deliver(goldenInvoice, {
+    const response = await post(goldenInvoice, {
       channelId: unroutedChannelId,
       headers: withToken(unroutedToken),
     })
@@ -196,7 +202,7 @@ describe('POST /webhooks/:id', () => {
   })
 
   it('answers 422 as for a Manual Submission when no Flow routes a Message of the Document', async () => {
-    const response = await deliver(golden('orders-reference.edi', 'latin1'), {
+    const response = await post(golden('orders-reference.edi', 'latin1'), {
       contentType: 'application/edifact',
     })
 
@@ -207,25 +213,66 @@ describe('POST /webhooks/:id', () => {
   })
 
   it('answers 400 for an empty body', async () => {
-    const response = await deliver('', { contentType: 'text/plain' })
+    const response = await post('', { contentType: 'text/plain' })
 
     expect(response.statusCode).toBe(400)
     expect(api.runQueue.queued).toEqual([])
   })
 
   it('answers 400 for a body over the maximum Document length', async () => {
-    const response = await deliver('x'.repeat(maxDocumentLength + 1), { contentType: 'text/plain' })
+    const response = await post('x'.repeat(maxDocumentLength + 1), { contentType: 'text/plain' })
 
     expect(response.statusCode).toBe(400)
     expect(api.runQueue.queued).toEqual([])
   })
 
   it('answers 413 for a body over the largest Document in UTF-8', async () => {
-    const response = await deliver(Buffer.alloc(3 * maxDocumentLength + 1, 'x'), {
+    const response = await post(Buffer.alloc(3 * maxDocumentLength + 1, 'x'), {
       contentType: 'text/plain',
     })
 
     expect(response.statusCode).toBe(413)
     expect(api.runQueue.queued).toEqual([])
+  })
+
+  it('answers 429 with Retry-After and stores nothing once a Channel is over its rate limit, while another Channel still gets through', async () => {
+    const limited = await createWebhookChannel('Limited webhook', 2)
+    const toLimited = { channelId: limited.channelId, headers: withToken(limited.token) }
+
+    expect((await post(goldenInvoice, toLimited)).statusCode).toBe(422)
+    expect((await post(goldenInvoice, toLimited)).statusCode).toBe(422)
+
+    const documentsBefore = await storedDocuments()
+
+    const rejected = await post(goldenInvoice, toLimited)
+
+    expect(rejected.statusCode).toBe(429)
+    expect(rejected.json()).toEqual({ message: 'Too many requests' })
+    expect(Number(rejected.headers['retry-after'])).toBeGreaterThanOrEqual(1)
+    expect(Number(rejected.headers['retry-after'])).toBeLessThanOrEqual(60)
+    expect(await storedDocuments()).toBe(documentsBefore)
+
+    const other = await post(goldenInvoice)
+
+    expect(other.statusCode, other.body).toBe(201)
+  })
+
+  it('does not count a request with a wrong token against the Channel rate limit', async () => {
+    const limited = await createWebhookChannel('Guarded webhook', 1)
+
+    const toLimitedWithWrongToken = {
+      channelId: limited.channelId,
+      headers: withToken(`whk_${'x'.repeat(32)}`),
+    }
+
+    expect((await post(goldenInvoice, toLimitedWithWrongToken)).statusCode).toBe(401)
+    expect((await post(goldenInvoice, toLimitedWithWrongToken)).statusCode).toBe(401)
+
+    const sender = await post(goldenInvoice, {
+      channelId: limited.channelId,
+      headers: withToken(limited.token),
+    })
+
+    expect(sender.statusCode).toBe(422)
   })
 })

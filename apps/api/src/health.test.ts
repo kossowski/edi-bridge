@@ -4,6 +4,7 @@ import { connect, localDatabaseUrl } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
 import { testAuth, testChannels, testRunQueue } from './testing.js'
+import { memoryWebhookRateLimiter } from './webhook-rate-limit.js'
 
 const connection = connect(localDatabaseUrl)
 
@@ -25,6 +26,7 @@ describe('GET /health', () => {
       database,
       probes: { postgres: up, redis: up },
       runQueue: testRunQueue().service,
+      webhookRateLimiter: memoryWebhookRateLimiter(),
     })
 
     const response = await app.inject({ method: 'GET', url: '/health' })
@@ -43,6 +45,7 @@ describe('GET /health', () => {
       database,
       probes: { postgres: down, redis: up },
       runQueue: testRunQueue().service,
+      webhookRateLimiter: memoryWebhookRateLimiter(),
     })
 
     const response = await app.inject({ method: 'GET', url: '/health' })
@@ -61,6 +64,7 @@ describe('GET /health', () => {
       database,
       probes: { postgres: up, redis: down },
       runQueue: testRunQueue().service,
+      webhookRateLimiter: memoryWebhookRateLimiter(),
     })
 
     const response = await app.inject({ method: 'GET', url: '/health' })
@@ -81,6 +85,7 @@ describe('GET /health', () => {
       database,
       probes: { postgres: hangs, redis: up },
       runQueue: testRunQueue().service,
+      webhookRateLimiter: memoryWebhookRateLimiter(),
       probeTimeoutMs: 20,
     })
 

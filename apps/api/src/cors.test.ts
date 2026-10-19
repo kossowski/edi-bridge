@@ -5,6 +5,7 @@ import { connect, localDatabaseUrl } from '@edi-bridge/db'
 
 import { buildApp } from './app.js'
 import { testAuth, testChannels, testRunQueue } from './testing.js'
+import { memoryWebhookRateLimiter } from './webhook-rate-limit.js'
 
 const connection = connect(localDatabaseUrl)
 
@@ -17,6 +18,7 @@ const app = buildApp({
   probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
   runQueue: testRunQueue().service,
   webOrigin,
+  webhookRateLimiter: memoryWebhookRateLimiter(),
 })
 
 afterAll(async () => {

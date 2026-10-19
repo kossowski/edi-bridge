@@ -39,6 +39,7 @@ import {
   testRunQueue,
 } from './testing.js'
 import { addUser } from './user.js'
+import { memoryWebhookRateLimiter } from './webhook-rate-limit.js'
 
 const operatorOfOwnWorkspace: NewMember = {
   name: 'Invite Operator',
@@ -159,6 +160,7 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
       runQueue: testRunQueue().service,
+      webhookRateLimiter: memoryWebhookRateLimiter(),
     })
 
     const client = await signIn(sameOrigin, operatorOfOwnWorkspace)

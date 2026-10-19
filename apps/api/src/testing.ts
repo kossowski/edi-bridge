@@ -14,6 +14,7 @@ import { utcDay } from './ai-budget.js'
 import { buildApp } from './app.js'
 import { developmentWorkspace } from './development-workspace.js'
 import { addUser, storePassword } from './user.js'
+import { memoryWebhookRateLimiter } from './webhook-rate-limit.js'
 
 import type { AuthSettings } from './auth.js'
 import type { ChannelSettings } from './channel.js'
@@ -168,6 +169,7 @@ export async function startTestApi({
     probes: { postgres: up, redis: up },
     runQueue: runQueue.service,
     webOrigin,
+    webhookRateLimiter: memoryWebhookRateLimiter(),
   })
 
   return {

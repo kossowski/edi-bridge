@@ -88,6 +88,7 @@ import {
   testChannels,
   testRunQueue,
 } from './testing.js'
+import { memoryWebhookRateLimiter } from './webhook-rate-limit.js'
 
 const operatorAsViewer: NewMember = {
   name: 'Platform Operator',
@@ -583,6 +584,7 @@ describe('the changes', () => {
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
       runQueue: testRunQueue().service,
+      webhookRateLimiter: memoryWebhookRateLimiter(),
     })
 
     app.addHook('onRoute', ({ method, url }) => {
