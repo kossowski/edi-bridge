@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 
+import { focusMainContent } from '@/components/main-content-focus'
 import {
   OrderLifecycleResults,
   orderLifecycleResultValue,
@@ -113,6 +114,10 @@ export function AppSearch() {
   const failed = failures.some((failure) => failure.failed)
 
   function changeOpen(next: boolean) {
+    if (next) {
+      openingResult.current = false
+    }
+
     setOpen(next)
     setSearch('')
   }
@@ -125,15 +130,12 @@ export function AppSearch() {
     router.push(href)
   }
 
-  // The workspace layout keeps #main-content, so the opened page's content takes the focus.
-  function focusAfterClose() {
-    if (!openingResult.current) {
-      return true
+  // The workspace layout keeps #main-content, so the opened page's content takes the focus. Base UI
+  // would move a final focus on to the first control inside it, so the palette sets it itself.
+  function focusAfterClose(opened: boolean) {
+    if (!opened && openingResult.current) {
+      focusMainContent()
     }
-
-    openingResult.current = false
-
-    return document.getElementById('main-content') ?? false
   }
 
   return (
@@ -153,10 +155,11 @@ export function AppSearch() {
       </Button>
       <CommandDialog
         description={t('description')}
-        finalFocus={focusAfterClose}
+        finalFocus={() => !openingResult.current}
         open={open}
         title={t('title')}
-        onOpenChange={changeOpen}>
+        onOpenChange={changeOpen}
+        onOpenChangeComplete={focusAfterClose}>
         <Command
           filter={matchesAllTerms}
           label={t('title')}

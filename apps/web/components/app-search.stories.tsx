@@ -5,6 +5,7 @@ import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 import type { ReactNode } from 'react'
 
 import { AppSearch } from '@/components/app-search'
+import { findMainContent, mainContentId } from '@/components/main-content-focus'
 import { QueryProvider } from '@/components/query-provider'
 import { sessionHandlers } from '@/components/session/session-story-helpers'
 import {
@@ -97,6 +98,7 @@ export const Results = meta.story({
     await waitFor(() =>
       expect(dialog.queryByRole('option', { name: /^Hansemarkt GmbH/ })).toBeNull(),
     )
+    // SAFETY: the seed holds Alpenfrisch Märkte AG, whose option the palette just showed.
     const partner = seedTradingPartners.find(({ name }) => name === 'Alpenfrisch Märkte AG')!
     await userEvent.click(dialog.getByRole('option', { name: /^Alpenfrisch Märkte AG/ }))
     await expect(getRouter().push).toHaveBeenCalledWith(`/trading-partners/${partner.id}`)
@@ -129,18 +131,26 @@ export const KeyboardShortcut = meta.story({
   },
 })
 
-// The workspace layout keeps #main-content while the page inside it changes.
+// The workspace layout keeps #main-content while the page inside it changes. Like a real page, it
+// holds controls, which must not take the focus in its place.
 const besideMainContent = (Story: () => ReactNode) => (
   <>
     <Story />
-    <div id="main-content" tabIndex={-1} className="p-4 outline-none">
-      Main content
+    <div id={mainContentId} tabIndex={-1} className="flex gap-2 p-4 outline-none">
+      <button type="button">All 24</button>
+      <input aria-label="Search the glossary" />
     </div>
   </>
 )
 
 function mainContent(canvasElement: HTMLElement) {
-  return canvasElement.ownerDocument.getElementById('main-content')!
+  const element = findMainContent(canvasElement.ownerDocument)
+
+  if (!element) {
+    throw new Error('No #main-content beside the story')
+  }
+
+  return element
 }
 
 export const OpenedResultFocusesMainContent = meta.story({
@@ -215,6 +225,7 @@ export const OrderBesideOtherResults = meta.story({
 
     await expect(within(orders).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true')
     await expect(dialog.queryByText('Nothing found.')).toBeNull()
+    // SAFETY: getAllByRole throws when the group holds no option.
     await userEvent.click(within(orders).getAllByRole('option')[0]!)
     await expect(getRouter().push).toHaveBeenCalledWith(
       `/orders/${orderLifecycleReferences.failures}`,
