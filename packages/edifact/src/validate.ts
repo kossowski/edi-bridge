@@ -20,6 +20,7 @@ import type {
 import type { Delimiters, Interchange, Segment } from './model'
 
 export type ValidationErrorCode =
+  | 'invalid-character'
   | 'missing-element'
   | 'missing-segment'
   | 'too-long-element'
@@ -248,8 +249,67 @@ const validateMessage = (
   }
 }
 
+const levelA = new Set('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,-()/=\'+:?!"%&*;<>')
+
+const levelB = new Set([...levelA, ...'abcdefghijklmnopqrstuvwxyz'])
+
+const latin1 = /^[\u0020-\u007E\u00A0-\u00FF]$/u
+
+// No repertoire is known for UNOD to UNOF, so their Interchanges skip the check.
+const repertoires = new Map<string, (character: string) => boolean>([
+  ['UNOA', (character) => levelA.has(character)],
+  ['UNOB', (character) => levelB.has(character)],
+  ['UNOC', (character) => latin1.test(character)],
+])
+
+const checkRepertoire = (interchange: Interchange, positionOf: (index: number) => Position) => {
+  const inRepertoire = repertoires.get(interchange.header.elements[0]?.[0] ?? '')
+
+  if (inRepertoire === undefined) {
+    return
+  }
+
+  const segments = [
+    interchange.header,
+    ...interchange.messages.flatMap(({ header, segments, trailer }) => [
+      header,
+      ...segments,
+      trailer,
+    ]),
+    interchange.trailer,
+  ]
+
+  for (const [index, { tag, elements }] of segments.entries()) {
+    const rules = segmentRules.get(tag)
+
+    for (const [elementIndex, values] of elements.entries()) {
+      const rule = rules?.[elementIndex]
+      const composite = rule === undefined || 'components' in rule
+
+      for (const [componentIndex, value] of values.entries()) {
+        const character = [...value].findIndex((found) => !inRepertoire(found))
+
+        if (character !== -1) {
+          const position: Position = { ...positionOf(index), element: elementIndex + 1 }
+
+          if (composite) {
+            position.component = componentIndex + 1
+          }
+
+          position.character = character + 1
+
+          throw new ValidationError('invalid-character', position)
+        }
+      }
+    }
+  }
+}
+
 export const validate = (interchange: Interchange) => {
   const positionOf = interchangeSegmentPosition(interchange.hasServiceStringAdvice)
+
+  checkRepertoire(interchange, positionOf)
+
   const checkSegment = segmentChecker(interchange.delimiters)
   let headerIndex = 1
 

@@ -3,13 +3,16 @@ export interface Position {
   segment: number
   element?: number
   component?: number
+  // Counts within the value as read, so a release character before it does not count.
+  character?: number
 }
 
-export const describePosition = ({ segment, element, component }: Position) =>
+export const describePosition = ({ segment, element, component, character }: Position) =>
   [
     `segment ${segment}`,
     element === undefined ? undefined : `element ${element}`,
     component === undefined ? undefined : `component ${component}`,
+    character === undefined ? undefined : `character ${character}`,
   ]
     .filter(Boolean)
     .join(', ')
