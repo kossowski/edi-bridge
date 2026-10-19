@@ -721,7 +721,8 @@ describe('POST /runs/:id/retry', () => {
     await post(toPath(retryRunEndpoint.path, { id: run.id }))
     const { body: after } = await getRun(run.id)
 
-    expect(after).toMatchObject({ status: 'delivered', interchange: { id: expect.any(String) } })
+    expect(after?.status).toBe('delivered')
+    expect(after?.interchange?.id).toEqual(expect.any(String))
     expect(after?.interchange?.raw).toContain(`UNH+1+${run.messageType}`)
   })
 
