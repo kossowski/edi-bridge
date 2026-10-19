@@ -341,10 +341,6 @@ export const waitForTradingPartnerRun = (id: string) =>
     return yield* loadRun(id)
   })
 
-/**
- * Marks a failed Run as waiting for the Trading Partner and keeps the time of an earlier mark.
- * Answers false when the Run is no longer failed.
- */
 export const markWaitingForTradingPartner = async (
   db: Database,
   workspaceId: string,
@@ -353,6 +349,7 @@ export const markWaitingForTradingPartner = async (
   const marked = await db
     .update(runs)
     .set({
+      // A repeated mark keeps the time the wait began.
       waitingForTradingPartnerSince: sql`coalesce(${runs.waitingForTradingPartnerSince}, now())`,
     })
     .where(inWorkspace(runs, workspaceId, eq(runs.id, id), eq(runs.status, 'failed')))
