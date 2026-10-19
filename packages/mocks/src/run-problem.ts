@@ -24,8 +24,9 @@ export type ProblemSources = {
 const reasons = {
   invalidCharacter: 'unreadable',
   segmentCountMismatch: 'unreadable',
-  missingComponent: 'invalidContent',
-  unknownCode: 'invalidContent',
+  'missing-element': 'invalidContent',
+  'too-long-element': 'invalidContent',
+  'unknown-code': 'invalidContent',
   invalidDate: 'invalidContent',
   lookupMissing: 'missingCode',
   missingSourceField: 'missingField',

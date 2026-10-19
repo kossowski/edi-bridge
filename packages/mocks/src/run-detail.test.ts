@@ -264,6 +264,35 @@ describe('GET /runs/:id', () => {
     )
   })
 
+  it('fails an outbound Run at validation with the codes of the edifact package', async () => {
+    const runs = Array.from({ length: 12 }, (_, index) =>
+      createRun({
+        id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        tradingPartner: hansemarkt,
+        messageType: 'INVOIC',
+        flow: invoicFlow,
+        status: 'failed',
+        failureStage: 'validation',
+      }),
+    )
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    const bodies = await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body))
+    const tooLong = bodies.find((body) => body?.error?.code === 'too-long-element')
+    const position = tooLong?.error?.position
+    const party = tooLong?.message?.segments[position!.segment - 1]
+
+    expect(new Set(bodies.map((body) => body?.error?.code))).toEqual(
+      new Set(['missing-element', 'too-long-element']),
+    )
+    expect(tooLong?.problem).toMatchObject({ reason: 'invalidContent', whoFixes: 'you' })
+    expect(party?.tag).toBe('NAD')
+    expect(
+      party?.elements[position!.element! - 1]?.[position!.component! - 1]?.length,
+    ).toBeGreaterThan(35)
+  })
+
   it('orders the steps of an outbound Run as mapping before validation', async () => {
     const run = createRun({
       id: '00000000-0000-4000-8000-000000000002',

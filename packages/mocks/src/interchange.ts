@@ -27,8 +27,9 @@ type Segment = { tag: string; elements: string[][] }
 export type GeneratedErrorCode =
   | 'invalidCharacter'
   | 'segmentCountMismatch'
-  | 'missingComponent'
-  | 'unknownCode'
+  | 'missing-element'
+  | 'too-long-element'
+  | 'unknown-code'
   | 'invalidDate'
   | 'lookupMissing'
   | 'missingSourceField'
@@ -436,15 +437,27 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
       if (outbound) {
         const party = faker.helpers.objectKey(partyGlnFields)
         const nad = indexOf(segments, 'NAD', party)
+        const gln = segments[nad]!.elements[1]![0]!
+        // A separate seed keeps the Messages of the other Runs as they were.
+        const tooLong = seededFaker(`validationFault:${run.id}`).datatype.boolean()
+        // The mapping joins the GLNs of all addresses instead of taking the first one.
+        const value = tooLong ? [gln, gln, gln].join(',') : ''
 
         return {
-          segments: segments.with(nad, setComponent(segments[nad]!, 2, 1, '')),
+          segments: segments.with(nad, setComponent(segments[nad]!, 2, 1, value)),
           fault: {
             segment: nad,
             element: 2,
             component: 1,
-            code: 'missingComponent',
-            message: `Required component 3039 (party identification) of NAD+${party} is empty.`,
+            ...(tooLong
+              ? {
+                  code: 'too-long-element',
+                  message: `Component 3039 (party identification) of NAD+${party} has ${String(value.length)} characters, but its format an..35 allows 35.`,
+                }
+              : {
+                  code: 'missing-element',
+                  message: `Required component 3039 (party identification) of NAD+${party} is empty.`,
+                }),
           },
           broken: { kind: 'mapping', fieldPath: partyGlnFields[party] },
         }
@@ -459,7 +472,7 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
             segment: uci,
             element: 4,
             component: 1,
-            code: 'unknownCode',
+            code: 'unknown-code',
             message: 'Code "9" is not in code list 0083 (action, coded).',
           },
           broken: null,
