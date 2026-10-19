@@ -223,7 +223,13 @@ export const KeyboardFocus = meta.story({
 
     await userEvent.tab()
     await expect(publish).toHaveFocus()
-    await expect(getComputedStyle(publish).boxShadow).not.toBe('none')
+    // The button transitions every property, so the outline can still be growing right after the Tab.
+    await waitFor(async () => {
+      const style = getComputedStyle(publish)
+
+      await expect(style.outlineStyle).toBe('solid')
+      await expect(Number.parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2)
+    })
   },
 })
 

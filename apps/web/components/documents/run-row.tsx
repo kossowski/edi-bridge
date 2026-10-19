@@ -22,7 +22,6 @@ import {
   ItemTitle,
 } from '@edi-bridge/ui/components/item'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
-import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { RunSummary } from '@edi-bridge/contracts'
 
@@ -85,7 +84,7 @@ export function RunRow({ run }: { run: RunSummary }) {
       <ItemActions className="basis-full flex-wrap pl-10.5 @2xl:ml-auto @2xl:basis-auto @2xl:justify-end @2xl:pl-0">
         <RunStatusBadge status={run.status} />
         {run.status === 'failed' && (
-          <Link href={href} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
+          <Link href={href} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
             {t('whatToDo')}
             <span className="sr-only">: {title}</span>
           </Link>
