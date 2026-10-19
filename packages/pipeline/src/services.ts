@@ -1,6 +1,7 @@
 import { Context, type Effect } from 'effect'
 
-import type { Connection, DocumentStorage } from '@edi-bridge/db'
+import type { DeliveryFailed, OutboundDocument } from '@edi-bridge/channels'
+import type { channels, Connection, DocumentStorage } from '@edi-bridge/db'
 
 import type { RunNotQueued } from './errors'
 
@@ -20,4 +21,15 @@ export type RunQueueService = {
 
 export class RunQueue extends Context.Service<RunQueue, RunQueueService>()(
   '@edi-bridge/pipeline/RunQueue',
+) {}
+
+export type DestinationChannel = typeof channels.$inferSelect
+
+export type DeliveryService = (
+  channel: DestinationChannel,
+  document: OutboundDocument,
+) => Effect.Effect<void, DeliveryFailed>
+
+export class Delivery extends Context.Service<Delivery, DeliveryService>()(
+  '@edi-bridge/pipeline/Delivery',
 ) {}

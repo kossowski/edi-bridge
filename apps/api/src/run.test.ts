@@ -38,7 +38,7 @@ const invalidInvoice = JSON.stringify({
   invoiceNumber: 'INV-'.repeat(10),
 })
 
-// Received in this order: the processed Run ten days ago, then the failed one, then the received one.
+// Received in this order: the delivered Run ten days ago, then the failed one, then the received one.
 let processed: string
 
 let failed: string
@@ -63,7 +63,7 @@ const submitted = async (content: string) => {
 const processQueued = async () => {
   for (const queued of api.runQueue.queued.splice(0)) {
     await Effect.runPromise(
-      processRun(queued).pipe(pipelineServices(api.connection.db, api.runQueue)),
+      processRun(queued).pipe(pipelineServices(api.connection.db, api.runQueue, () => Effect.void)),
     )
   }
 }
@@ -116,7 +116,7 @@ describe('GET /runs', () => {
 
     expect(ids(list)).toEqual([received, failed, processed])
     expect(list).toMatchObject({
-      statusCounts: { ...noRuns, received: 1, processing: 1, failed: 1 },
+      statusCounts: { ...noRuns, received: 1, delivered: 1, failed: 1 },
       total: 3,
       page: 1,
       pageSize: 50,
@@ -159,7 +159,7 @@ describe('GET /runs', () => {
     ['another Message Type', () => 'messageType=ORDERS', () => []],
     ['the Failure Stage', () => 'failureStage=validation', () => [failed]],
     ['another Failure Stage', () => 'failureStage=mapping', () => []],
-    ['several statuses', () => 'status=received&status=processing', () => [received, processed]],
+    ['several statuses', () => 'status=received&status=delivered', () => [received, processed]],
     ['channel traffic', () => 'manualSubmission=false', () => []],
     ['manual Submissions', () => 'manualSubmission=true', () => [received, failed, processed]],
     ['a time range', () => `receivedTo=${sevenDaysAgo}`, () => [processed]],
@@ -174,7 +174,7 @@ describe('GET /runs', () => {
     const list = await listed(`messageType=INVOIC&q=4711&receivedTo=${sevenDaysAgo}`)
 
     expect(ids(list)).toEqual([processed])
-    expect(list).toMatchObject({ statusCounts: { ...noRuns, processing: 1 }, total: 1 })
+    expect(list).toMatchObject({ statusCounts: { ...noRuns, delivered: 1 }, total: 1 })
   })
 
   it('pages the Runs', async () => {
@@ -210,12 +210,12 @@ const detail = async (id: string, as = admin) => {
 }
 
 describe('GET /runs/:id', () => {
-  it('shows a processed Run with its steps and Mapping Version', async () => {
+  it('shows a delivered Run with its steps and Mapping Version', async () => {
     const run = await detail(processed)
 
     expect(run).toMatchObject({
       id: processed,
-      status: 'processing',
+      status: 'delivered',
       failureStage: null,
       businessReference: '4711',
       mappingVersion: {
@@ -235,12 +235,9 @@ describe('GET /runs/:id', () => {
       ['receipt', 'succeeded'],
       ['mapping', 'succeeded'],
       ['validation', 'succeeded'],
-      ['delivery', 'pending'],
+      ['delivery', 'succeeded'],
     ])
-    expect(
-      run.steps.slice(0, 3).every(({ startedAt, finishedAt }) => startedAt && finishedAt),
-    ).toBe(true)
-    expect(run.steps[3]).toMatchObject({ startedAt: null, finishedAt: null })
+    expect(run.steps.every(({ startedAt, finishedAt }) => startedAt && finishedAt)).toBe(true)
   })
 
   it('shows a failed Run with its error and who fixes it', async () => {

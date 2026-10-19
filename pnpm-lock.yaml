@@ -785,6 +785,9 @@ importers:
 
   packages/pipeline:
     dependencies:
+      '@edi-bridge/channels':
+        specifier: workspace:*
+        version: link:../channels
       '@edi-bridge/contracts':
         specifier: workspace:*
         version: link:../contracts

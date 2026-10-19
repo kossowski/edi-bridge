@@ -6,6 +6,8 @@ import { type Connection, postgresDocumentStorage } from '@edi-bridge/db'
 import {
   bullmqRunQueue,
   Database,
+  Delivery,
+  type DeliveryService,
   Documents,
   processRun,
   type QueuedRun,
@@ -13,6 +15,9 @@ import {
   RunQueue,
   runQueueName,
 } from '@edi-bridge/pipeline'
+
+const unwiredDelivery: DeliveryService = () =>
+  Effect.die(new Error('Delivery is not wired into the worker yet'))
 
 export function startRunWorker({
   redisUrl,
@@ -35,6 +40,7 @@ export function startRunWorker({
         processRun(data).pipe(
           Effect.provideService(Database, db),
           Effect.provideService(Documents, documents),
+          Effect.provideService(Delivery, unwiredDelivery),
         ),
       ),
     { connection: redis },
