@@ -25,6 +25,7 @@ import {
   type CsvSettings,
   directions,
   documentFormats,
+  documentRetentionDays,
   failureStages,
   type DocumentStructureNode,
   jsonRoots,
@@ -48,12 +49,17 @@ export const workspaces = pgTable(
     name: text().notNull(),
     gln: text(),
     aiDailyTokenLimit: integer().notNull().default(aiDailyTokenLimit.default),
+    documentRetentionDays: integer().notNull().default(documentRetentionDays.default),
     createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
   (table) => [
     check(
       'ai_daily_token_limit_range',
       sql`${table.aiDailyTokenLimit} between ${sql.raw(String(aiDailyTokenLimit.min))} and ${sql.raw(String(aiDailyTokenLimit.max))}`,
+    ),
+    check(
+      'document_retention_days_range',
+      sql`${table.documentRetentionDays} between ${sql.raw(String(documentRetentionDays.min))} and ${sql.raw(String(documentRetentionDays.max))}`,
     ),
   ],
 )

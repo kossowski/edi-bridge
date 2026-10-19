@@ -1,0 +1,2 @@
+ALTER TABLE "workspaces" ADD COLUMN "document_retention_days" integer DEFAULT 90 NOT NULL;--> statement-breakpoint
+ALTER TABLE "workspaces" ADD CONSTRAINT "document_retention_days_range" CHECK ("workspaces"."document_retention_days" between 7 and 730);

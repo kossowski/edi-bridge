@@ -1,6 +1,8 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { documentRetentionDays } from '@edi-bridge/contracts'
+
 import { connect, type Connection } from './client.js'
 import { migrate } from './migrate.js'
 import {
@@ -73,6 +75,47 @@ describe('schema', () => {
         .values({ ...tradingPartner, workspaceId: '00000000-0000-4000-8000-000000000000' }),
     ).rejects.toThrow()
   })
+})
+
+describe('a Workspace', () => {
+  it('has the default retention period', async () => {
+    const workspace = await insertWorkspace(connection.db)
+
+    expect(workspace.documentRetentionDays).toBe(documentRetentionDays.default)
+  })
+
+  it.each([documentRetentionDays.min, documentRetentionDays.max])(
+    'stores a retention period of %i days',
+    async (days) => {
+      const workspace = await insertWorkspace(connection.db)
+
+      const stored = await only(
+        connection.db
+          .update(workspaces)
+          .set({ documentRetentionDays: days })
+          .where(eq(workspaces.id, workspace.id))
+          .returning(),
+      )
+
+      expect(stored.documentRetentionDays).toBe(days)
+    },
+  )
+
+  it.each([documentRetentionDays.min - 1, documentRetentionDays.max + 1])(
+    'rejects a retention period of %i days',
+    async (days) => {
+      const workspace = await insertWorkspace(connection.db)
+
+      await expect(
+        connection.db
+          .update(workspaces)
+          .set({ documentRetentionDays: days })
+          .where(eq(workspaces.id, workspace.id)),
+      ).rejects.toMatchObject({
+        cause: { constraint_name: 'document_retention_days_range' },
+      })
+    },
+  )
 })
 
 describe('a Lookup Table', () => {
