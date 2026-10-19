@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 
 import { ToggleGroup, ToggleGroupItem } from '@edi-bridge/ui/components/toggle-group'
 
-import { darkMode, expectFocusRingInside, expectVisibleFocusRing } from '../stories/checks'
+import { darkMode, expectFocusRingInside, expectVisibleFocusRing } from '../testing/checks'
 
 const meta = {
   title: 'UI/ToggleGroup',

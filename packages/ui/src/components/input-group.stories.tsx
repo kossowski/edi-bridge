@@ -11,7 +11,7 @@ import {
   InputGroupTextarea,
 } from '@edi-bridge/ui/components/input-group'
 
-import { darkMode, expectVisibleFocusRing } from '../stories/checks'
+import { darkMode, expectVisibleFocusRing } from '../testing/checks'
 
 type Args = { onClear: () => void }
 

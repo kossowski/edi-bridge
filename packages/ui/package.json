@@ -13,7 +13,8 @@
     "./postcss.config": "./postcss.config.mjs",
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
-    "./hooks/*": "./src/hooks/*.ts"
+    "./hooks/*": "./src/hooks/*.ts",
+    "./testing/*": "./src/testing/*.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -40,7 +41,8 @@
     "react-dom": "19.3.0",
     "storybook": "^10.6.1",
     "tailwindcss": "^4",
-    "typescript": "~7.0.2"
+    "typescript": "~7.0.2",
+    "vitest": "^5.0.3"
   },
   "peerDependencies": {
     "react": "^19",
