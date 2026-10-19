@@ -1,8 +1,17 @@
-import { Effect } from 'effect'
+import { Effect, Exit } from 'effect'
 import { createServer, type Server, type Socket } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
-import { DeliveryFailed, type HttpDestination, type OutboundDocument, postHttp } from './index'
+import {
+  DeliveryFailed,
+  type HttpChannel,
+  httpChannelDelivery,
+  type HttpDestination,
+  type OutboundDocument,
+  postHttp,
+  secretBox,
+  secretKeyBytes,
+} from './index'
 import { listening, startTestErp, type TestErp } from './testing'
 
 const timeoutMs = 1500
@@ -111,5 +120,57 @@ describe('postHttp', () => {
         postHttp(destination(`http://127.0.0.1:${silentPort}/`), order(), { timeoutMs }),
       ),
     ).toEqual(new DeliveryFailed({ reason: 'timedOut' }))
+  })
+})
+
+const secrets = secretBox(Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'))
+
+const channelId = '9a4c2e71-3b8d-4f05-b6e2-7d1f0c8a5e39'
+
+const deliver = httpChannelDelivery({ secrets, timeoutMs })
+
+const erpChannel = (): HttpChannel => ({
+  id: channelId,
+  url: erp.url,
+  encryptedAuthorization: secrets.seal(
+    'Bearer erp-api-key-0815',
+    `channels/${channelId}/encryptedAuthorization`,
+  ),
+})
+
+describe('httpChannelDelivery', () => {
+  it('opens the sealed authorization of the channel and posts the document', async () => {
+    await Effect.runPromise(deliver(erpChannel(), order()))
+
+    expect(erp.received).toHaveLength(1)
+    expect(erp.received[0]).toMatchObject({
+      method: 'POST',
+      headers: { authorization: 'Bearer erp-api-key-0815' },
+      body: '{"orderNumber":"PO-4711","lines":[{"gtin":"4012345000016"}]}',
+    })
+  })
+
+  it('posts without authorization when the channel has none', async () => {
+    await Effect.runPromise(deliver({ ...erpChannel(), encryptedAuthorization: null }, order()))
+
+    expect(erp.received[0]?.headers).not.toHaveProperty('authorization')
+  })
+
+  it('refuses an authorization sealed for another channel', async () => {
+    const exit = await Effect.runPromiseExit(
+      deliver(
+        {
+          ...erpChannel(),
+          encryptedAuthorization: secrets.seal(
+            'Bearer erp-api-key-0815',
+            'channels/0b7a4f2e-9c13-4d58-8e61-3f2a9d7c5b40/encryptedAuthorization',
+          ),
+        },
+        order(),
+      ),
+    )
+
+    expect(Exit.hasDies(exit)).toBe(true)
+    expect(erp.received).toHaveLength(0)
   })
 })

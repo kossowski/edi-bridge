@@ -7,6 +7,9 @@ import {
   unreachable,
 } from './channel-reach'
 import { DeliveryFailed, type OutboundDocument } from './delivery'
+import { type HttpChannel, httpDestination } from './http-channel'
+
+import type { SecretBox } from './secret'
 
 const answerFailure = (status: number) =>
   Effect.fail(
@@ -46,3 +49,11 @@ export const postHttp = (
     ),
     timeoutMs,
   ).pipe(Effect.mapError(({ reason }) => new DeliveryFailed({ reason })))
+
+export const httpChannelDelivery =
+  ({ secrets, timeoutMs }: { secrets: SecretBox; timeoutMs: number }) =>
+  (channel: HttpChannel, document: OutboundDocument) =>
+    Effect.flatMap(
+      Effect.sync(() => httpDestination(secrets, channel)),
+      (destination) => postHttp(destination, document, { timeoutMs }),
+    )
