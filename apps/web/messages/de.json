@@ -780,7 +780,7 @@
         },
         "incompleteSetup": {
           "title": "Die Einrichtung für {tradingPartner} ist nicht vollständig",
-          "description": "{piece, select, workspaceGln {Der Beleg ist fertig, aber die GLN Ihres Unternehmens fehlt, daher kann EDI Bridge den Beleg nicht adressieren.} tradingPartnerGln {Der Beleg ist fertig, aber die GLN von {tradingPartner} fehlt, daher kann EDI Bridge den Beleg nicht adressieren.} channelCredential {Der Beleg ist fertig, aber EDI Bridge kann die Zugangsdaten der Verbindung zu {tradingPartner} nicht verwenden.} tradingPartner {Der Beleg ist fertig, aber EDI Bridge kann ihn nicht im Zeichensatz schreiben, der für {tradingPartner} gewählt ist.} other {Der Beleg ist fertig, aber ein Teil der Einrichtung für {tradingPartner} fehlt.}} Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut."
+          "description": "{piece, select, workspaceGln {Der Beleg ist fertig, aber die GLN Ihres Unternehmens fehlt, daher kann EDI Bridge den Beleg nicht adressieren. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} tradingPartnerGln {Der Beleg ist fertig, aber die GLN von {tradingPartner} fehlt, daher kann EDI Bridge den Beleg nicht adressieren. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} channelCredential {Der Beleg ist fertig, aber EDI Bridge kann die Zugangsdaten der Verbindung zu {tradingPartner} nicht verwenden. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} tradingPartner {Der Beleg ist fertig, aber EDI Bridge kann ihn nicht im Zeichensatz schreiben, der für {tradingPartner} gewählt ist. Wählen Sie für {tradingPartner} einen unterstützten Zeichensatz (UNOA, UNOB oder UNOC) und versuchen Sie es dann erneut.} other {Der Beleg ist fertig, aber ein Teil der Einrichtung für {tradingPartner} fehlt. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.}}"
         }
       },
       "whoFixes": {
@@ -803,7 +803,7 @@
         "lookupTable": "{code} zu „{name}“ hinzufügen",
         "channel": "Verbindung „{name}“ prüfen",
         "tradingPartner": "{name} öffnen",
-        "workspaceGln": "GLN von „{name}“ erfassen",
+        "workspaceGln": "GLN Ihres Unternehmens erfassen",
         "tradingPartnerGln": "GLN von {name} erfassen",
         "channelCredential": "Zugangsdaten von „{name}“ prüfen"
       }

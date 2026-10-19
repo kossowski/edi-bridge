@@ -381,7 +381,7 @@ export const IncompleteSetup = meta.story({
     await expect(canvas.getByText("your company's GLN is missing", { exact: false })).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
     await expectFixLink(
-      canvas.getByRole('link', { name: `Record the GLN of “${seedWorkspace.name}”` }),
+      canvas.getByRole('link', { name: "Record your company's GLN" }),
       '/settings',
     )
   },
