@@ -231,6 +231,19 @@ describe('POST /runs/:id/wait-for-trading-partner', () => {
     await expect(detail(id)).resolves.toMatchObject({ status: 'delivered' })
   })
 
+  it('answers 409 for a Run that a resend replaces and leaves it unmarked', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+    const resend = await processed('orders.edi', ordersInterchange)
+
+    const response = await markWaiting(id)
+
+    expect(response.statusCode, response.body).toBe(409)
+    await expect(detail(id)).resolves.toMatchObject({
+      replacedBy: { id: resend },
+      waitingForTradingPartnerSince: null,
+    })
+  })
+
   it('answers 403 to a Viewer and leaves the Run unmarked', async () => {
     const id = await processed('orders.edi', invalidOrders)
 
