@@ -2717,8 +2717,6 @@
         "noOutboundChannel",
         "ambiguousChannel",
         "workspaceGlnMissing",
-        "tradingPartnerGlnMissing",
-        "unreadableInterchangeHeader",
         "unechoableInterchangeHeader"
       ]
     },

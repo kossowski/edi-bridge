@@ -580,8 +580,6 @@ export const acknowledgementNotSentReasons = [
   'noOutboundChannel',
   'ambiguousChannel',
   'workspaceGlnMissing',
-  'tradingPartnerGlnMissing',
-  'unreadableInterchangeHeader',
   'unechoableInterchangeHeader',
 ] as const
 
@@ -590,7 +588,6 @@ export const acknowledgementNotSentReason = pgEnum(
   acknowledgementNotSentReasons,
 )
 
-// The CONTRL this Workspace answers a received Interchange with.
 export const acknowledgements = pgTable(
   'acknowledgements',
   {

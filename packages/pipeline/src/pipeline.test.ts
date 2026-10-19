@@ -1793,10 +1793,10 @@ describe('the processing of an inbound Run', () => {
     .split('\n')
     .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
 
-  const interchangeOf = (messages: string[][]) =>
-    [ordersInterchange.split('\n')[0], ...messages.flat(), `UNZ+${messages.length}+00000001'`].join(
-      '\n',
-    )
+  const fromHanseRetail = "UNB+UNOC:3+4071615111110:14+4389876511113:14+000324:1200+00000001'"
+
+  const interchangeOf = (messages: string[][], count = messages.length) =>
+    [fromHanseRetail, ...messages.flat(), `UNZ+${count}+00000001'`].join('\n')
 
   const ordersWorkspace = async (name: string, options: { format?: 'json' | 'csv' } = {}) => {
     const created = await seedInvoiceWorkspace(connection.db, name)
@@ -2936,10 +2936,10 @@ describe('the CONTRL answering a received Interchange', () => {
     .split('\n')
     .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
 
-  const interchangeOf = (messages: string[][]) =>
-    [ordersInterchange.split('\n')[0], ...messages.flat(), `UNZ+${messages.length}+00000001'`].join(
-      '\n',
-    )
+  const fromHanseRetail = "UNB+UNOC:3+4071615111110:14+4389876511113:14+000324:1200+00000001'"
+
+  const interchangeOf = (messages: string[][], count = messages.length) =>
+    [fromHanseRetail, ...messages.flat(), `UNZ+${count}+00000001'`].join('\n')
 
   const answeringWorkspace = async (name: string) => {
     const into = await seedInvoiceWorkspace(connection.db, name)
@@ -2948,10 +2948,10 @@ describe('the CONTRL answering a received Interchange', () => {
     return { ...into, orders }
   }
 
-  const receiveInterchange = async (into: InvoiceWorkspace, content: string) => {
+  const receiving = async (into: InvoiceWorkspace, content: string) => {
     const { messages, logger } = collectLogs()
 
-    const receipt = await Effect.runPromise(
+    const exit = await Effect.runPromiseExit(
       receive({
         workspaceId: into.id,
         channelId: into.inboundChannelId,
@@ -2961,7 +2961,28 @@ describe('the CONTRL answering a received Interchange', () => {
       }).pipe(pipelineServices(connection.db, inMemoryRunQueue()), Effect.provide(logger)),
     )
 
-    return { receipt, logs: messages }
+    return { exit, logs: messages }
+  }
+
+  const receiveInterchange = async (into: InvoiceWorkspace, content: string) => {
+    const { exit, logs } = await receiving(into, content)
+
+    assert(Exit.isSuccess(exit), 'The Interchange was not received')
+
+    return { receipt: exit.value, logs }
+  }
+
+  // Without a readable envelope, routing may still find an outbound Flow for the Document.
+  const documentIdOf = (exit: Exit.Exit<{ document: { id: string } }, ReceiptRejected>) => {
+    if (Exit.isSuccess(exit)) {
+      return exit.value.document.id
+    }
+
+    const rejected = Cause.squash(exit.cause)
+
+    assert(rejected instanceof ReceiptRejected, 'The receipt failed without a rejection')
+
+    return rejected.documentId ?? ''
   }
 
   const sendWith = (delivery: DeliveryService, retryAfter: Duration.Input = '10 minutes') =>
@@ -3025,7 +3046,7 @@ describe('the CONTRL answering a received Interchange', () => {
         content:
           "UNB+UNOC:3+4389876511113:14+4071615111110:14+YYMMDD:HHMM+1'" +
           "UNH+1+CONTRL:D:3:UN:EAN002'" +
-          "UCI+00000001+4398765000004:14+4012345000009:14+7'" +
+          "UCI+00000001+4071615111110:14+4389876511113:14+7'" +
           "UCM+ME0001+ORDERS:D:96A:UN:EAN008+7'" +
           "UNT+4+1'" +
           "UNZ+1+1'",
@@ -3209,7 +3230,7 @@ describe('the CONTRL answering a received Interchange', () => {
         controlReference: 1,
       })
       expect(acknowledgement?.content).toContain(
-        "UCI+00000001+4398765000004:14+4012345000009:14+7'",
+        "UCI+00000001+4071615111110:14+4389876511113:14+7'",
       )
       expect(logs).toContainEqual([
         `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: no outbound EDIFACT Flow of its Trading Partner names a Channel`,
@@ -3263,30 +3284,86 @@ describe('the CONTRL answering a received Interchange', () => {
         },
       })
     })
+  })
 
-    it('names a Trading Partner without a GLN', async () => {
-      const into = await answeringWorkspace('Partner GLN-less Orders')
+  it('rejects an Interchange whose envelope is broken in a CONTRL sent', async () => {
+    const into = await answeringWorkspace('Miscounted Orders')
+    const delivery = recordingDelivery()
 
-      await connection.db
-        .update(tradingPartners)
-        .set({ gln: null })
-        .where(eq(tradingPartners.id, into.tradingPartnerId))
+    const { exit } = await receiving(into, interchangeOf([ordersMessage], 2))
+    await sendWith(delivery.service)
 
-      await expect(recordedFor(into)).resolves.toMatchObject({
-        acknowledgement: { notSentReason: 'tradingPartnerGlnMissing', content: null },
-      })
+    expect(delivery.to(into.outboundChannelId)).toMatchObject([
+      {
+        content: expect.stringContaining('UCI+00000001+4071615111110:14+4389876511113:14+4+29+UNZ'),
+      },
+    ])
+    await expect(acknowledgementOf(documentIdOf(exit))).resolves.toMatchObject({
+      notSentReason: null,
+      handedOverAt: expect.any(Date),
     })
+  })
 
-    it('names an Interchange whose UNB cannot be read', async () => {
-      const into = await answeringWorkspace('Headless Orders')
+  it('answers an Interchange whose Message Type no Flow takes', async () => {
+    const into = await answeringWorkspace('Price Catalogue')
+    const delivery = recordingDelivery()
 
-      const withoutReference = interchangeOf([ordersMessage])
+    const pricat = ordersMessage.map((line) => line.replace('ORDERS:D:96A', 'PRICAT:D:96A'))
+
+    const { exit } = await receiving(into, interchangeOf([pricat]))
+    await sendWith(delivery.service)
+
+    expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toMatchObject({
+      reason: 'noRoutedMessage',
+    })
+    expect(delivery.to(into.outboundChannelId)).toMatchObject([
+      {
+        content: expect.stringContaining(
+          "UCI+00000001+4071615111110:14+4389876511113:14+7'UCM+ME0001+PRICAT",
+        ),
+      },
+    ])
+  })
+
+  it('answers no Interchange from a sender without a Trading Partner', async () => {
+    const into = await answeringWorkspace('Stranger Orders')
+
+    const { receipt, logs } = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage]).replace('4071615111110:14', '4012345000009:14'),
+    )
+
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toBeUndefined()
+    expect(logs).toContainEqual([
+      `The Interchange of Document ${receipt.document.id} gets no CONTRL: no Trading Partner has the GLN 4012345000009 of its sender`,
+    ])
+  })
+
+  it('answers no Interchange whose UNB cannot be read', async () => {
+    const into = await answeringWorkspace('Headless Orders')
+
+    const { exit } = await receiving(
+      into,
+      interchangeOf([ordersMessage])
         .replace("+00000001'", "'")
-        .replace("UNZ+1+00000001'", "UNZ+1'")
+        .replace("UNZ+1+00000001'", "UNZ+1'"),
+    )
 
-      await expect(recordedFor(into, withoutReference)).resolves.toMatchObject({
-        acknowledgement: { notSentReason: 'unreadableInterchangeHeader', content: null },
-      })
-    })
+    await expect(acknowledgementOf(documentIdOf(exit))).resolves.toBeUndefined()
+  })
+
+  it('keeps the Runs of an Interchange whose CONTRL cannot be recorded', async () => {
+    const into = await answeringWorkspace('Exhausted Orders')
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ nextControlReference: 2_147_483_647 })
+      .where(eq(tradingPartners.id, into.tradingPartnerId))
+
+    const { receipt, logs } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+    expect(receipt.runs).toHaveLength(1)
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toBeUndefined()
+    expect(logs).toContainEqual([`The CONTRL for Document ${receipt.document.id} was not recorded`])
   })
 })

@@ -1,4 +1,4 @@
-CREATE TYPE "public"."acknowledgement_not_sent_reason" AS ENUM('noOutboundChannel', 'ambiguousChannel', 'workspaceGlnMissing', 'tradingPartnerGlnMissing', 'unreadableInterchangeHeader', 'unechoableInterchangeHeader');--> statement-breakpoint
+CREATE TYPE "public"."acknowledgement_not_sent_reason" AS ENUM('noOutboundChannel', 'ambiguousChannel', 'workspaceGlnMissing', 'unechoableInterchangeHeader');--> statement-breakpoint
 CREATE TABLE "acknowledgements" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,

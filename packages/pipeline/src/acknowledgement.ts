@@ -1,12 +1,11 @@
-import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm'
-import { DateTime, type Duration, Effect } from 'effect'
+import { and, eq, isNull, lt, or } from 'drizzle-orm'
+import { Data, DateTime, type Duration, Effect, Result } from 'effect'
 
 import { directionOf } from '@edi-bridge/contracts'
 import {
   acknowledgements,
   channels,
   claimTradingPartnerControlReference,
-  type Connection,
   flows,
   tradingPartners,
   workspaces,
@@ -16,19 +15,13 @@ import {
   BuildContrlError,
   type BuildContrlErrorCode,
   type Message,
+  readInterchange,
 } from '@edi-bridge/edifact'
 
 import { enveloped } from './envelope'
 import { Database, Delivery } from './services'
 
-type Transaction = Parameters<Parameters<Connection['db']['transaction']>[0]>[0]
-
 type NotSentReason = NonNullable<(typeof acknowledgements.$inferSelect)['notSentReason']>
-
-type AnsweredFlow = {
-  messageType: (typeof flows.$inferSelect)['messageType']
-  tradingPartnerId: string
-}
 
 export type Answer = {
   tradingPartnerId: string
@@ -37,31 +30,28 @@ export type Answer = {
   contrl: { message: Message; sender: string; receiver: string } | null
 }
 
-const buildErrorReasons = {
-  'unreadable-interchange-header': 'unreadableInterchangeHeader',
-  'unechoable-interchange-header': 'unechoableInterchangeHeader',
-} as const satisfies Record<BuildContrlErrorCode, NotSentReason>
+class ContrlNotBuilt extends Data.TaggedError('ContrlNotBuilt')<{
+  readonly code: BuildContrlErrorCode
+}> {}
 
 const notSentMessages: Record<NotSentReason, string> = {
   noOutboundChannel: 'no outbound EDIFACT Flow of its Trading Partner names a Channel',
   ambiguousChannel: 'the outbound EDIFACT Flows of its Trading Partner name different Channels',
   workspaceGlnMissing: 'the Workspace has no GLN',
-  tradingPartnerGlnMissing: 'its Trading Partner has no GLN',
-  unreadableInterchangeHeader: 'its UNB cannot be read',
   unechoableInterchangeHeader: 'its UNB cannot be echoed in a valid CONTRL',
 }
 
-const builtContrl = (content: string) => {
-  try {
-    return { message: buildContrl(content, '1'), notSentReason: null }
-  } catch (error) {
-    if (error instanceof BuildContrlError) {
-      return { message: null, notSentReason: buildErrorReasons[error.code] }
-    }
+const builtContrl = (content: string) =>
+  Effect.try({
+    try: () => buildContrl(content, '1'),
+    catch: (cause) => {
+      if (cause instanceof BuildContrlError) {
+        return new ContrlNotBuilt({ code: cause.code })
+      }
 
-    throw error
-  }
-}
+      throw cause
+    },
+  })
 
 // The destination of the Trading Partner's outbound EDIFACT Flows is where it takes Interchanges.
 const channelOf = (workspaceId: string, tradingPartnerId: string) =>
@@ -96,118 +86,127 @@ const channelOf = (workspaceId: string, tradingPartnerId: string) =>
       : { channelId, notSentReason: null }
   })
 
-// The Trading Partner of the Interchange is the one of its Runs' Flows, by its sender when several.
-const tradingPartnerOf = (sender: string | undefined, answered: readonly AnsweredFlow[]) =>
+// A Document without a readable UNB is no Interchange, and a CONTRL is never answered.
+const answerOf = (workspaceId: string, documentId: string, content: string) =>
   Effect.gen(function* () {
-    const db = yield* Database
-    const ids = [...new Set(answered.map(({ tradingPartnerId }) => tradingPartnerId))]
+    const built = yield* Effect.result(builtContrl(content))
 
-    const partners = yield* Effect.promise(() =>
-      db
-        .select({ id: tradingPartners.id, gln: tradingPartners.gln })
-        .from(tradingPartners)
-        .where(inArray(tradingPartners.id, ids)),
-    )
-
-    return partners.length === 1 ? partners[0] : partners.find(({ gln }) => gln === sender)
-  })
-
-// A Document without inbound Runs is no Interchange, and a CONTRL is never answered.
-export const answerOf = (
-  workspaceId: string,
-  content: string,
-  declared: { sender: string | undefined; messageTypes: readonly string[] },
-  routed: readonly AnsweredFlow[],
-) =>
-  Effect.gen(function* () {
-    const inbound = routed.filter((flow) => directionOf(flow) === 'inbound')
-
-    if (
-      inbound.length === 0 ||
-      declared.messageTypes.every((messageType) => messageType === 'CONTRL')
-    ) {
+    if (Result.isFailure(built) && built.failure.code === 'unreadable-interchange-header') {
       return undefined
     }
 
-    const tradingPartner = yield* tradingPartnerOf(declared.sender, inbound)
+    const { header, messages } = readInterchange(content)
+    const messageTypes = messages.map(({ message }) => message.header.elements[1]?.[0])
 
-    if (tradingPartner === undefined) {
+    if (messageTypes.length > 0 && messageTypes.every((messageType) => messageType === 'CONTRL')) {
+      return undefined
+    }
+
+    const sender = header?.elements[1]?.[0] ?? ''
+    const db = yield* Database
+
+    const [found] = yield* Effect.promise(() =>
+      db
+        .select({ tradingPartnerId: tradingPartners.id, workspaceGln: workspaces.gln })
+        .from(tradingPartners)
+        .innerJoin(workspaces, eq(workspaces.id, tradingPartners.workspaceId))
+        .where(and(eq(tradingPartners.workspaceId, workspaceId), eq(tradingPartners.gln, sender))),
+    )
+
+    if (found === undefined) {
       yield* Effect.logWarning(
-        'A received Interchange gets no CONTRL: its Runs belong to several Trading Partners, none its sender',
+        `The Interchange of Document ${documentId} gets no CONTRL: no Trading Partner has the GLN ${sender} of its sender`,
       )
 
       return undefined
     }
 
-    const db = yield* Database
-
-    const [workspace] = yield* Effect.promise(() =>
-      db.select({ gln: workspaces.gln }).from(workspaces).where(eq(workspaces.id, workspaceId)),
-    )
-
-    const { channelId, notSentReason: channelReason } = yield* channelOf(
-      workspaceId,
-      tradingPartner.id,
-    )
-
-    const built = builtContrl(content)
-    const sender = workspace?.gln ?? null
-    const receiver = tradingPartner.gln
-
-    const glnReason =
-      sender === null
-        ? ('workspaceGlnMissing' as const)
-        : receiver === null
-          ? ('tradingPartnerGlnMissing' as const)
-          : null
+    const { tradingPartnerId, workspaceGln } = found
+    const { channelId, notSentReason } = yield* channelOf(workspaceId, tradingPartnerId)
+    const message = Result.isSuccess(built) ? built.success : null
 
     return {
-      tradingPartnerId: tradingPartner.id,
+      tradingPartnerId,
       channelId,
-      notSentReason: built.notSentReason ?? glnReason ?? channelReason,
+      notSentReason:
+        message === null
+          ? 'unechoableInterchangeHeader'
+          : workspaceGln === null
+            ? 'workspaceGlnMissing'
+            : notSentReason,
       contrl:
-        built.message === null || sender === null || receiver === null
+        message === null || workspaceGln === null
           ? null
-          : { message: built.message, sender, receiver },
+          : { message, sender: workspaceGln, receiver: sender },
     } satisfies Answer
   })
 
-// The CONTRL is recorded with the Runs, so a worker sends it even after a restart.
-export const recordAnswer = async (
-  tx: Transaction,
+const recordAnswer = (
   { workspaceId, documentId }: { workspaceId: string; documentId: string },
   { tradingPartnerId, channelId, notSentReason, contrl }: Answer,
   sentAt: DateTime.Utc,
-) => {
-  const controlReference =
-    contrl === null ? null : await claimTradingPartnerControlReference(tx, tradingPartnerId)
+) =>
+  Effect.gen(function* () {
+    const db = yield* Database
 
-  await tx.insert(acknowledgements).values({
-    workspaceId,
-    documentId,
-    tradingPartnerId,
-    channelId,
-    notSentReason,
-    controlReference,
-    content:
-      contrl === null || controlReference === null
-        ? null
-        : enveloped(contrl.message, {
-            characterSet: 'UNOC',
-            sender: contrl.sender,
-            receiver: contrl.receiver,
-            sentAt,
-            reference: controlReference,
-          }),
+    yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        const sent =
+          contrl === null
+            ? null
+            : {
+                ...contrl,
+                reference: await claimTradingPartnerControlReference(tx, tradingPartnerId),
+              }
+
+        await tx.insert(acknowledgements).values({
+          workspaceId,
+          documentId,
+          tradingPartnerId,
+          channelId,
+          notSentReason,
+          controlReference: sent?.reference ?? null,
+          content:
+            sent === null
+              ? null
+              : enveloped(sent.message, {
+                  characterSet: 'UNOC',
+                  sender: sent.sender,
+                  receiver: sent.receiver,
+                  sentAt,
+                  reference: sent.reference,
+                }),
+        })
+      }),
+    )
   })
-}
 
-export const warnNotSent = (documentId: string, { notSentReason }: Answer) =>
+const warnNotSent = (documentId: string, { notSentReason }: Answer) =>
   notSentReason === null
     ? Effect.void
     : Effect.logWarning(
         `The CONTRL for Document ${documentId} is not sent: ${notSentMessages[notSentReason]}`,
       )
+
+// The receipt does not depend on the CONTRL, so a defect in it leaves the Document unanswered.
+export const answerDocument = (
+  stored: { workspaceId: string; documentId: string; content: string },
+  answeredAt: DateTime.Utc,
+) =>
+  Effect.gen(function* () {
+    const answer = yield* answerOf(stored.workspaceId, stored.documentId, stored.content)
+
+    if (answer === undefined) {
+      return
+    }
+
+    yield* recordAnswer(stored, answer, answeredAt)
+    yield* warnNotSent(stored.documentId, answer)
+  }).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logError(`The CONTRL for Document ${stored.documentId} was not recorded`, cause),
+    ),
+  )
 
 const isDue = (cutoff: Date) =>
   and(
@@ -296,7 +295,6 @@ const sendAcknowledgement = (id: string, cutoff: Date) =>
     }
   })
 
-// A CONTRL whose attempt failed or was cut off is tried again once the bound passed.
 export const sendAcknowledgements = (retryAfter: Duration.Input) =>
   Effect.gen(function* () {
     const db = yield* Database
