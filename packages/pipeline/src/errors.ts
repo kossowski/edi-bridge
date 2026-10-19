@@ -12,7 +12,7 @@ export type ReceiptRejection = keyof typeof receiptRejections
 
 export class ReceiptRejected extends Data.TaggedError('ReceiptRejected')<{
   readonly reason: ReceiptRejection
-  // Set when the Document was stored before the rejection.
+  // So the poller can tell a stored file from an unstored one.
   readonly documentId?: string
 }> {
   override get message() {

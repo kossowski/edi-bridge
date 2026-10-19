@@ -132,7 +132,6 @@ describe('the receipt of a Document', () => {
   const storedDocuments = (channelId: string) =>
     connection.db.select().from(documents).where(eq(documents.channelId, channelId))
 
-  // The Document a rejection after storing kept, under the file name rejection() gives it.
   const keptDocumentId = async (channelId: string) =>
     (await storedDocuments(channelId)).find(({ fileName }) => fileName === 'invoice.json')?.id ?? ''
 
