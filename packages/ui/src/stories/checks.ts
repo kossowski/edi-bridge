@@ -1,4 +1,4 @@
-import { expect, waitFor } from 'storybook/test'
+import { expect, waitFor, within } from 'storybook/test'
 
 import type { StoryContext } from '@storybook/react'
 
@@ -128,4 +128,50 @@ export async function expectVisibleBorder(element: HTMLElement) {
       minBorderContrast,
     )
   })
+}
+
+// Menus, dialogs and sheets render in a portal outside the story's root.
+export function page(canvasElement: HTMLElement) {
+  return within(canvasElement.ownerDocument.body)
+}
+
+// A busy CI runner can take longer than the default second to finish a transition or move focus.
+const transitionWait = { timeout: 5000 }
+
+// A dialog or sheet fades in.
+export async function findOpenDialog(canvasElement: HTMLElement, name: string) {
+  const dialog = await page(canvasElement).findByRole('dialog', { name }, transitionWait)
+
+  await waitFor(() => expect(dialog).toBeVisible(), transitionWait)
+
+  return dialog
+}
+
+// The menu fades in.
+export async function findOpenMenu(canvasElement: HTMLElement) {
+  const menu = await page(canvasElement).findByRole('menu')
+
+  await waitFor(() => expect(menu).toBeVisible())
+
+  return within(menu)
+}
+
+// The menu, and any submenu open in it, fades out before it leaves the page.
+export async function waitForMenuClosed(canvasElement: HTMLElement) {
+  await waitFor(
+    () => expect(page(canvasElement).queryAllByRole('menu')).toHaveLength(0),
+    transitionWait,
+  )
+}
+
+// A dialog takes the focus a frame or more after it shows; a key pressed before then misses it.
+export async function waitForFocusInside(element: HTMLElement) {
+  await waitFor(
+    () => expect(element.contains(element.ownerDocument.activeElement)).toBe(true),
+    transitionWait,
+  )
+}
+
+export async function waitForFocusOn(element: HTMLElement) {
+  await waitFor(() => expect(element).toHaveFocus(), transitionWait)
 }
