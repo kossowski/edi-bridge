@@ -12,6 +12,12 @@ export class DownloadFailed extends Data.TaggedError('DownloadFailed')<{
   readonly reason: ChannelTestFailureReason
 }> {}
 
+export interface SftpFile {
+  readonly name: string
+  readonly size: number
+  readonly modifiedAt: Date
+}
+
 const downloading = <A>(
   login: SftpLogin,
   timeoutMs: number,
@@ -22,7 +28,7 @@ const downloading = <A>(
   )
 
 export const listSftp = (login: SftpLogin, { timeoutMs }: { timeoutMs: number }) =>
-  downloading<string[]>(login, timeoutMs, (sftp, done) => {
+  downloading<SftpFile[]>(login, timeoutMs, (sftp, done) => {
     sftp.readdir(login.remotePath, (error, entries) => {
       if (error) {
         done(Effect.fail(unreachable(sftpReason(error))))
@@ -35,7 +41,11 @@ export const listSftp = (login: SftpLogin, { timeoutMs }: { timeoutMs: number })
           entries
             // A hidden name marks a file still being written, as uploadSftp does.
             .filter(({ filename, attrs }) => !filename.startsWith('.') && attrs.isFile())
-            .map(({ filename }) => filename),
+            .map(({ filename, attrs }) => ({
+              name: filename,
+              size: attrs.size,
+              modifiedAt: new Date(attrs.mtime * 1000),
+            })),
         ),
       )
     })

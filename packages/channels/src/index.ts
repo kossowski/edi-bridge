@@ -23,6 +23,7 @@ export {
   listSftp,
   readSftp,
   removeSftp,
+  type SftpFile,
   sftpChannelDownload,
 } from './sftp-download'
 

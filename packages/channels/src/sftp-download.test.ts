@@ -38,7 +38,7 @@ const inboundChannel = (remotePath: string): SftpChannel => ({
   encryptedCredential: secrets.seal(sftp.password, `channels/${channelId}/encryptedCredential`),
 })
 
-const inbox = async (name: string, files: Record<string, string>) => {
+const inbox = async (name: string, files: Record<string, string | Buffer>) => {
   const path = `/upload/${name}`
 
   await sftp.exec(`install -d -m 777 ${sftp.home}${path}`)
@@ -52,6 +52,9 @@ const inbox = async (name: string, files: Record<string, string>) => {
   return inboundChannel(path)
 }
 
+const listedNames = async (channel: SftpChannel) =>
+  (await Effect.runPromise(download.list(channel))).map(({ name }) => name).toSorted()
+
 describe('sftpChannelDownload', () => {
   it('lists the files in the remote path of the channel', async () => {
     const channel = await inbox('listed', {
@@ -59,9 +62,25 @@ describe('sftpChannelDownload', () => {
       'orders-2.edi': "UNB+UNOC:3'",
     })
 
-    expect((await Effect.runPromise(download.list(channel))).toSorted()).toEqual([
-      'orders-1.edi',
-      'orders-2.edi',
+    expect(await listedNames(channel)).toEqual(['orders-1.edi', 'orders-2.edi'])
+  })
+
+  it('lists the size and modification time of each file', async () => {
+    const channel = await inbox('stat', {
+      'orders-10.edi': "UNB+UNOC:3'",
+      'orders-11.edi': "UNB+UNOC:3+4098765000002:14'",
+    })
+
+    await sftp.exec(`touch -d @1760889600 ${sftp.home}/upload/stat/orders-10.edi`)
+    await sftp.exec(`touch -d @1760893200 ${sftp.home}/upload/stat/orders-11.edi`)
+
+    expect(
+      (await Effect.runPromise(download.list(channel))).toSorted((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    ).toEqual([
+      { name: 'orders-10.edi', size: 11, modifiedAt: new Date('2025-10-19T16:00:00Z') },
+      { name: 'orders-11.edi', size: 28, modifiedAt: new Date('2025-10-19T17:00:00Z') },
     ])
   })
 
@@ -73,7 +92,7 @@ describe('sftpChannelDownload', () => {
 
     await sftp.exec(`install -d -m 777 ${sftp.home}/upload/mixed/archive`)
 
-    expect(await Effect.runPromise(download.list(channel))).toEqual(['orders-3.edi'])
+    expect(await listedNames(channel)).toEqual(['orders-3.edi'])
   })
 
   it('reads the content of a file', async () => {
@@ -94,7 +113,7 @@ describe('sftpChannelDownload', () => {
 
     await Effect.runPromise(download.remove(channel, 'orders-6.edi'))
 
-    expect(await Effect.runPromise(download.list(channel))).toEqual(['orders-7.edi'])
+    expect(await listedNames(channel)).toEqual(['orders-7.edi'])
   })
 
   it('reports a missing remote path', async () => {
