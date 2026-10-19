@@ -23,6 +23,7 @@ import {
   requestAiDraftEndpoint,
   saveMappingDraftEndpoint,
   toPath,
+  updateWorkspaceSettingsEndpoint,
 } from '@edi-bridge/contracts'
 import { aiTokenUsage, documentStructures, mappings, workspaces } from '@edi-bridge/db'
 
@@ -448,6 +449,31 @@ describe('POST /mappings/:id/ai-draft', () => {
       dailyLimit: 1000,
       usedToday: 1000,
     })
+  })
+
+  it('applies a daily limit changed in the settings to the next AI draft', async () => {
+    const { mappingId, sampleId } = await createdInvoiceMapping()
+
+    await api.connection.db.insert(aiTokenUsage).values({
+      workspaceId: ownWorkspace.id,
+      day: new Date().toISOString().slice(0, 10),
+      tokens: 1000,
+    })
+
+    const changeLimit = (dailyLimit: number) =>
+      api.admin.inject({
+        method: updateWorkspaceSettingsEndpoint.method,
+        url: updateWorkspaceSettingsEndpoint.path,
+        body: { documentRetentionDays: 90, aiTokenBudget: { dailyLimit } },
+      })
+
+    expect((await changeLimit(1000)).statusCode).toBe(200)
+    expect((await requestDraft(mappingId, { sampleId })).statusCode).toBe(aiBudgetExhaustedStatus)
+
+    expect((await changeLimit(2000)).statusCode).toBe(200)
+    answering(answer(invoiceLinks))
+
+    expect((await requestDraft(mappingId, { sampleId })).statusCode).toBe(200)
   })
 
   it('answers 403 to a Viewer', async () => {

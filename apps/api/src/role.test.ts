@@ -62,9 +62,12 @@ import {
   updateDocumentStructureEndpoint,
   updateFlowEndpoint,
   updateLookupTableEndpoint,
+  updateOperatorWorkspaceSettingsEndpoint,
   updateTradingPartnerEndpoint,
+  updateWorkspaceSettingsEndpoint,
   withCheckDigit,
   workspaceMembersEndpoint,
+  workspaceSettingsEndpoint,
 } from '@edi-bridge/contracts'
 
 import { buildApp, readsWithBody } from './app.js'
@@ -134,6 +137,8 @@ const inboxOf = (tradingPartnerId: string) => ({
   pollingIntervalMinutes: 5,
   credential: 'sftp-password-4711',
 })
+
+const changedSettings = { documentRetentionDays: 30, aiTokenBudget: { dailyLimit: 1000 } }
 
 const documentStructure = { name: 'ERP orders', origin: documentStructureOrigins.jsonDocument }
 
@@ -260,6 +265,7 @@ const workspaceReads = (): string[] => [
   `${toPath(mappingComparisonEndpoint.path, { mappingId: ids.mapping })}?from=${ids.mappingVersion}&to=${ids.laterMappingVersion}`,
   publishedMappingVersionsEndpoint.path,
   runsEndpoint.path,
+  workspaceSettingsEndpoint.path,
 ]
 
 const reads = () => [sessionEndpoint.path, workspaceMembersEndpoint.path, ...workspaceReads()]
@@ -271,6 +277,18 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
       method: 'PUT',
       url: updateCompanyIdentityEndpoint.path,
       body: { gln: withCheckDigit('021234500000') },
+    }),
+  ],
+  [
+    'update the Workspace settings',
+    () => ({ method: 'PUT', url: updateWorkspaceSettingsEndpoint.path, body: changedSettings }),
+  ],
+  [
+    'update the settings of a Workspace as the Operator',
+    () => ({
+      method: 'PUT',
+      url: toPath(updateOperatorWorkspaceSettingsEndpoint.path, { workspaceId: ownWorkspace.id }),
+      body: changedSettings,
     }),
   ],
   [
