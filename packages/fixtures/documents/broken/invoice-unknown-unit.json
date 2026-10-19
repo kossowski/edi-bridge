@@ -1,0 +1,53 @@
+{
+  "invoiceNumber": "RE-2026-10873",
+  "invoiceDate": "22.10.2026",
+  "deliveryDate": "20.10.2026",
+  "order": {
+    "number": "4500817236",
+    "date": "15.10.2026"
+  },
+  "deliveryNote": {
+    "number": "LS-2026-5531",
+    "date": "20.10.2026"
+  },
+  "buyer": {
+    "gln": "0223456000008",
+    "vatId": "DE200300400"
+  },
+  "supplier": {
+    "gln": "0212345000007",
+    "vatId": "DE100200300"
+  },
+  "invoicee": {
+    "gln": "0223456000015"
+  },
+  "deliveryParty": {
+    "gln": "0223456000022"
+  },
+  "currency": "EUR",
+  "lines": [
+    {
+      "gtin": "0212345100011",
+      "description": "Kaffee Hanseat gemahlen 500 g",
+      "quantity": 48,
+      "unit": "ST",
+      "netAmount": 311.52,
+      "vatRate": 7
+    },
+    {
+      "gtin": "0212345100042",
+      "description": "Rote Grütze 500 g",
+      "quantity": 5,
+      "unit": "KAR",
+      "netAmount": 131.4,
+      "vatRate": 7
+    }
+  ],
+  "totals": {
+    "invoiceAmount": 473.92,
+    "lineAmount": 442.92,
+    "taxableAmount": 442.92,
+    "vatRate": 7,
+    "vatAmount": 31.0
+  }
+}

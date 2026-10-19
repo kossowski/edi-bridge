@@ -553,6 +553,43 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@24.19.1)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/fixtures:
+    dependencies:
+      '@edi-bridge/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@edi-bridge/edifact':
+        specifier: workspace:*
+        version: link:../edifact
+      '@edi-bridge/mapping':
+        specifier: workspace:*
+        version: link:../mapping
+    devDependencies:
+      '@edi-bridge/oxlint-config':
+        specifier: workspace:*
+        version: link:../oxlint-config
+      '@edi-bridge/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@types/node':
+        specifier: ^24
+        version: 24.19.1
+      effect:
+        specifier: ^4.0.4
+        version: 4.0.4
+      oxlint:
+        specifier: 1.87.0
+        version: 1.87.0(oxlint-tsgolint@7.0.2004)
+      typescript:
+        specifier: ~7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.1)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/mapping:
     dependencies:
       '@edi-bridge/contracts':
