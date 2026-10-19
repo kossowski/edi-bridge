@@ -6,6 +6,13 @@ const version = 'v1'
 
 export const secretKeyBytes = 32
 
+export type SecretColumn =
+  | 'encryptedCredential'
+  | 'encryptedWebhookToken'
+  | 'encryptedAuthorization'
+
+export const secretContext = (id: string, column: SecretColumn) => `channels/${id}/${column}`
+
 export interface SecretBox {
   seal: (plaintext: string, context: string) => string
   open: (sealed: string, context: string) => string
