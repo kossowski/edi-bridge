@@ -27,7 +27,7 @@ const reasons = {
   'missing-element': 'invalidContent',
   'too-long-element': 'invalidContent',
   'unknown-code': 'invalidContent',
-  invalidDate: 'invalidContent',
+  'wrong-format': 'invalidContent',
   lookupMissing: 'missingCode',
   missingSourceField: 'missingField',
   destinationUnreachable: 'unreachable',
