@@ -71,7 +71,6 @@ import {
 import {
   type ReceiptRejected,
   type ReceiptRejection,
-  type RunNotQueued,
   RunQueue,
   type RunQueueService,
 } from '@edi-bridge/pipeline'
@@ -178,7 +177,6 @@ type Failure =
   | InviteUnusable
   | NotFound
   | ReceiptRejected
-  | RunNotQueued
   | Unprocessable
   | ValidationError
 
@@ -199,8 +197,6 @@ const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> =
   InviteUnusable: inviteUnusableStatus,
   Unprocessable: 422,
   DocumentStructureRejected: 422,
-  // The Runs are received; the worker queues them when it starts again.
-  RunNotQueued: 503,
 }
 
 const statusOf = Match.type<Failure>().pipe(

@@ -190,16 +190,18 @@ describe('POST /manual-submissions', () => {
     })
   })
 
-  it('answers 503 when the Run queue is unreachable and keeps the Run received', async () => {
+  it('answers 201 with the received Runs when the Run queue is unreachable', async () => {
     api.runQueue.redis.reachable = false
     const before = await receivedRuns()
 
     const response = await submit(goldenInvoice)
 
-    expect(response.statusCode).toBe(503)
-    expect(response.json<{ message: string }>().message).toContain(
-      'was received but could not be queued for processing',
-    )
+    expect(response.statusCode, response.body).toBe(201)
+    expect(manualSubmissionSchema.parse(response.json())).toMatchObject({
+      runs: [{ status: 'received', flow: { id: workspace.flowId }, manualSubmission: true }],
+      notRouted: [],
+    })
+    expect(api.runQueue.queued).toEqual([])
     expect(await receivedRuns()).toBe(before + 1)
   })
 
