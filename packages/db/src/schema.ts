@@ -546,6 +546,10 @@ export const runs = pgTable(
     index().on(table.tradingPartnerId),
     index().on(table.mappingVersionId),
     index().on(table.tradingPartnerId, table.controlReference),
+    // The Overdue check reads only the Interchanges that still await an Acknowledgement.
+    index('runs_pending_acknowledgement_index')
+      .on(table.handedOverAt)
+      .where(sql`${table.acknowledgementState} = 'pending'`),
     check(
       'runs_failure',
       allSetOnlyWhen(sql`${table.status} = 'failed'`, [

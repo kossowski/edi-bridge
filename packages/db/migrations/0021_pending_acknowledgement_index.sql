@@ -1,0 +1,1 @@
+CREATE INDEX "runs_pending_acknowledgement_index" ON "runs" USING btree ("handed_over_at") WHERE "runs"."acknowledgement_state" = 'pending';
