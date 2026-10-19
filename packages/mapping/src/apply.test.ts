@@ -15,6 +15,7 @@ import {
 
 import {
   applyMappingVersion,
+  mapMessage,
   MappingError,
   type OutboundMappingVersion,
   readDocument,
@@ -1293,5 +1294,48 @@ describe('applyMappingVersion', () => {
     const document = await Effect.runPromise(readDocument(structure, json))
 
     expect(await apply(rootListOrderVersion('items'), document)).toEqual(rootListOrderMessage)
+  })
+})
+
+describe('mapMessage', () => {
+  it('names the target path that wrote a position of the Message, counted from its UNH', async () => {
+    const version = outboundVersion('INVOIC', [
+      { sourcePath: 'invoiceNumber', targetPath: 'BGM/1004' },
+      { sourcePath: 'invoiceDate', targetPath: 'DTM+137/C507/2380' },
+      { sourcePath: 'buyer.gln', targetPath: 'SG2+BY/NAD+BY/C082/3039' },
+      { sourcePath: 'supplier.gln', targetPath: 'SG2+SU/NAD+SU/C082/3039' },
+      { sourcePath: 'total', targetPath: 'SG48/MOA+77/C516/5004' },
+    ])
+
+    const document = {
+      invoiceNumber: 'INV-2026-0042',
+      invoiceDate: '20261014',
+      buyer: { gln: '4012345000009' },
+      supplier: { gln: '4000001000005' },
+      total: '119.00',
+    }
+
+    const { message, targetPathAt } = await Effect.runPromise(mapMessage(version, document))
+
+    expect(message).toEqual(await apply(version, document))
+    expect(
+      [
+        { segment: 2, element: 2 },
+        { segment: 4, element: 2, component: 1 },
+        { segment: 8, element: 1, component: 2 },
+        { segment: 3, element: 1 },
+        { segment: 2, element: 9 },
+        { segment: 9 },
+        { segment: 10 },
+      ].map(targetPathAt),
+    ).toEqual([
+      'BGM/1004',
+      'SG2+BY/NAD+BY/C082/3039',
+      'SG48/MOA+77/C516/5004',
+      'DTM+137/C507',
+      'BGM',
+      'UNT',
+      undefined,
+    ])
   })
 })

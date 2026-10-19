@@ -13,7 +13,7 @@ import {
   messageTypeStructures,
 } from '@edi-bridge/contracts'
 
-import type { Element, Message, Segment } from '@edi-bridge/edifact'
+import type { Element, Message, Position, Segment } from '@edi-bridge/edifact'
 
 import { childrenOf, elementPaths, type StructurePart } from './elements'
 import { MappingError } from './errors'
@@ -236,11 +236,14 @@ function within(
   return Effect.map(valuesIn({ ...context, scope }), (values) => ({ ...context, scope, values }))
 }
 
+// A written segment keeps the structure segment it was written from.
+type Written = { segment: Segment; node: EdifactSegment }
+
 function loopSegments(
   group: EdifactSegmentGroup,
   loop: Loop,
   context: Context,
-): Effect.Effect<Segment[], MappingError> {
+): Effect.Effect<Written[], MappingError> {
   const items = itemsOf(context, loop.sourcePart)
 
   // Header fields linked beneath the group would fill it, so they must not count without items.
@@ -261,9 +264,9 @@ function loopSegments(
 function segmentsOf(
   nodes: ReadonlyArray<EdifactStructureNode>,
   context: Context,
-): Effect.Effect<Segment[], MappingError> {
+): Effect.Effect<Written[], MappingError> {
   return Effect.map(
-    Effect.forEach(nodes, (node): Effect.Effect<Segment[], MappingError> => {
+    Effect.forEach(nodes, (node): Effect.Effect<Written[], MappingError> => {
       const loop = context.loops.get(node.path)
 
       if (node.kind === 'segmentGroup' && loop) {
@@ -281,7 +284,7 @@ function segmentsOf(
       const found = firstMissingRequired(node.children, context.values)
 
       return found === undefined
-        ? Effect.succeed([segmentOf(node, context.values)])
+        ? Effect.succeed([{ segment: segmentOf(node, context.values), node }])
         : Effect.fail(missing(found))
     }),
     (lists) => lists.flat(),
@@ -301,18 +304,39 @@ function framed({ messageType, children }: MessageTypeStructure) {
     throw new Error(`The ${messageType} structure does not run from UNH to UNT`)
   }
 
-  return { header, body }
+  return { header, body, trailer }
 }
 
 const messageReference = '1'
 
-export function applyMappingVersion(
+export type MappedMessage = {
+  message: Message
+  // Counts the segments from the UNH as segment 1, as a validation of the Message alone does.
+  targetPathAt: (position: Position) => string | undefined
+}
+
+const targetPathIn = (
+  nodes: ReadonlyArray<EdifactSegment>,
+  { segment, element, component }: Position,
+) => {
+  const node = nodes[segment - 1]
+  const child = element === undefined ? undefined : node?.children[element - 1]
+
+  const part =
+    child?.kind === 'composite' && component !== undefined
+      ? child.children[component - 1]
+      : undefined
+
+  return (part ?? child ?? node)?.path
+}
+
+export function mapMessage(
   version: OutboundGraph,
   document: JsonContent,
   options: ApplyOptions = {},
-): Effect.Effect<Message, MappingError> {
+): Effect.Effect<MappedMessage, MappingError> {
   const structure = messageTypeStructures[version.target.messageType]
-  const { header, body } = framed(structure)
+  const { header, body, trailer } = framed(structure)
   const wiring = wiringOf(version, options.lookupTables)
   const { graph, loops } = wiring
   const unknown = unknownTarget(version.links, wiring, body)
@@ -339,11 +363,27 @@ export function applyMappingVersion(
 
     return Effect.map(
       Effect.flatMap(valuesIn(reading), (values) => segmentsOf(body, { ...reading, values })),
-      (segments) => ({
-        header: segmentOf(header, new Map([[`${header.path}/0062`, messageReference]])),
-        segments,
-        trailer: { tag: 'UNT', elements: [[String(segments.length + 2)], [messageReference]] },
-      }),
+      (written) => {
+        const segments = written.map(({ segment }) => segment)
+        const nodes = [header, ...written.map(({ node }) => node), trailer]
+
+        return {
+          message: {
+            header: segmentOf(header, new Map([[`${header.path}/0062`, messageReference]])),
+            segments,
+            trailer: { tag: 'UNT', elements: [[String(segments.length + 2)], [messageReference]] },
+          },
+          targetPathAt: (position) => targetPathIn(nodes, position),
+        }
+      },
     )
   })
+}
+
+export function applyMappingVersion(
+  version: OutboundGraph,
+  document: JsonContent,
+  options: ApplyOptions = {},
+): Effect.Effect<Message, MappingError> {
+  return Effect.map(mapMessage(version, document, options), ({ message }) => message)
 }

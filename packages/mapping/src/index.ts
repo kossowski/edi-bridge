@@ -1,4 +1,4 @@
-export { applyMappingVersion } from './apply'
+export { applyMappingVersion, mapMessage } from './apply'
 
 export { MappingError, mappingErrorCodes } from './errors'
 
@@ -15,7 +15,7 @@ export {
   writeDocument,
 } from './document'
 
-export type { OutboundMappingVersion } from './apply'
+export type { MappedMessage, OutboundMappingVersion } from './apply'
 
 export type { ApplyOptions } from './options'
 
