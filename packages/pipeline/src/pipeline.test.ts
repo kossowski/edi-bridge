@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import { type Duration, Effect, Exit, Fiber } from 'effect'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
@@ -19,6 +19,7 @@ import {
   documents,
   flows,
   mappings,
+  mappingVersions,
   runs,
   tradingPartners,
   workspaces,
@@ -781,7 +782,14 @@ describe('the processing of a Run', () => {
           code: 'invalid-character',
           position: { segment: 17, tag: 'IMD', element: 3, component: 4 },
         },
-        problem: { reason: 'invalidContent', fixTarget: null },
+        problem: {
+          reason: 'invalidContent',
+          fixTarget: {
+            kind: 'mapping',
+            mappingId: outside.mappingId,
+            fieldPath: 'SG25/IMD+A/C273/7008',
+          },
+        },
         steps: [
           { stage: 'receipt', status: 'succeeded' },
           { stage: 'mapping', status: 'succeeded' },
@@ -1061,7 +1069,15 @@ describe('the processing of a Run', () => {
         code: 'too-long-element',
         position: { segment: 2, tag: 'BGM', element: 2, component: null },
       },
-      problem: { reason: 'invalidContent', fixTarget: null },
+      problem: {
+        reason: 'invalidContent',
+        fixTarget: {
+          kind: 'mapping',
+          mappingId: workspace.mappingId,
+          name: 'Reference invoice: ERP JSON to INVOIC',
+          fieldPath: 'BGM/1004',
+        },
+      },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
@@ -1330,6 +1346,44 @@ describe('the processing of an inbound Run', () => {
     expect(erp.received).toHaveLength(2)
   })
 
+  it('points a Run whose Lookup Table no longer exists at its Mapping as an incomplete setup', async () => {
+    const into = await ordersWorkspace('Tableless Foods')
+
+    const [pinned] = await connection.db
+      .select({ graph: mappingVersions.graph })
+      .from(mappingVersions)
+      .where(eq(mappingVersions.id, into.orders.mappingVersionId))
+
+    if (pinned === undefined) {
+      throw new Error('The ORDERS Flow has no Mapping Version')
+    }
+
+    await connection.db
+      .update(mappingVersions)
+      .set({
+        graph: {
+          ...pinned.graph,
+          transforms: pinned.graph.transforms.map((transform) =>
+            transform.kind === 'lookupTable'
+              ? { ...transform, config: { ...transform.config, lookupTableId: randomUUID() } }
+              : transform,
+          ),
+        },
+      })
+      .where(eq(mappingVersions.id, into.orders.mappingVersionId))
+
+    const [run] = await receiveInterchange(into, ordersInterchange)
+
+    expect(run).toMatchObject({
+      failureStage: 'mapping',
+      error: { code: 'unknownLookupTable' },
+      problem: {
+        reason: 'incompleteSetup',
+        fixTarget: { kind: 'mapping', mappingId: into.orders.mappingId },
+      },
+    })
+  })
+
   it('fails a broken Message at parse with its position in the Interchange', async () => {
     const into = await ordersWorkspace('Broken Foods')
     const withoutBgm = ordersMessage.filter((line) => !line.startsWith('BGM'))
@@ -1472,6 +1526,31 @@ describe('the processing of an inbound Run', () => {
         body: Buffer.from(document, 'latin1').toString(),
       },
     ])
+  })
+
+  it('fails a Run at mapping naming the CSV column that the encoding of its Document Structure cannot write', async () => {
+    const into = await ordersWorkspace('Encoding Foods', { format: 'csv' })
+
+    const polishContact = ordersInterchange
+      .replace('UNB+UNOC:3', 'UNB+UNOD:3')
+      .replace("CTA+OC+Claus Fr\u00fch'", "CTA+OC+\u0141ukasz Nowak'")
+
+    const [run] = await receiveInterchange(into, polishContact)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      error: { code: 'unencodableCharacter', position: null, details: null },
+      problem: {
+        reason: 'invalidContent',
+        fixTarget: {
+          kind: 'mapping',
+          mappingId: into.orders.mappingId,
+          name: 'Reference order: ORDERS to ERP CSV',
+          fieldPath: 'rows[].Ansprechpartner',
+        },
+      },
+    })
   })
 
   it('processes an inbound Run handed out twice only once', async () => {

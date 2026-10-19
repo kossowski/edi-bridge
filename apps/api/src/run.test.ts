@@ -253,7 +253,11 @@ describe('GET /runs/:id', () => {
         position: { segment: 2, tag: 'BGM', element: 2, component: null },
         details: null,
       },
-      problem: { reason: 'invalidContent', whoFixes: 'you', fixTarget: null },
+      problem: {
+        reason: 'invalidContent',
+        whoFixes: 'you',
+        fixTarget: { kind: 'mapping', mappingId: workspace.mappingId, fieldPath: 'BGM/1004' },
+      },
       waitingForTradingPartnerSince: null,
     })
     expect(run.steps.map(({ status }) => status)).toEqual([
