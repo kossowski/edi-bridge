@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { type Duration, Effect, Exit, Fiber, Logger } from 'effect'
+import { Cause, type Duration, Effect, Exit, Fiber, Logger } from 'effect'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -1082,6 +1082,46 @@ describe('the sweep of stuck Runs', () => {
     })
     // It lost the Run, so its defect is logged as a lost Run instead.
     expect(Exit.isSuccess(stopped)).toBe(true)
+  })
+
+  it('reports the defect that stopped the worker when failing its Run fails too', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const storage = postgresDocumentStorage(connection.db)
+    const { db } = connection
+    const defect = new Error('The Document storage broke')
+    let isDown = false
+
+    const transaction: typeof db.transaction = (run, config) =>
+      isDown
+        ? Promise.reject(new Error('The connection to the database was lost'))
+        : db.transaction(run, config)
+
+    // SAFETY: its prototype is the connection's database, so it has every member but its own transaction.
+    const downDb: typeof db = Object.assign(Object.create(db) as typeof db, { transaction })
+
+    const { messages, logger } = collectLogs()
+
+    const stopped = await Effect.runPromiseExit(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        Effect.provideService(Documents, {
+          ...storage,
+          read: () => {
+            isDown = true
+
+            return Promise.reject(defect)
+          },
+        }),
+        pipelineServices(downDb, queue),
+        Effect.provide(logger),
+      ),
+    )
+
+    expect(Exit.isFailure(stopped) && Cause.squash(stopped.cause)).toBe(defect)
+    expect(messages).toContainEqual([
+      `Run ${runId} was not failed on its defect`,
+      new Error('The connection to the database was lost'),
+    ])
   })
 
   it('finishes a step that the sweep checks meanwhile without a deadlock', async () => {

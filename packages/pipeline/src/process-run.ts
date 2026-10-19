@@ -1484,7 +1484,17 @@ export const processRun = (queued: QueuedRun) =>
     yield* processClaimed(holding, queued, claimed).pipe(
       Effect.catchDefect((defect) =>
         Effect.gen(function* () {
-          if (!(yield* failHeldOnDefect(holding))) {
+          // A failure to fail the Run must not hide the defect that stopped it.
+          const held = yield* failHeldOnDefect(holding).pipe(
+            Effect.catchDefect((failing) =>
+              Effect.as(
+                Effect.logError(`Run ${holding.runId} was not failed on its defect`, failing),
+                true,
+              ),
+            ),
+          )
+
+          if (!held) {
             return yield* new RunNotOwned({ runId: holding.runId, cause: defect })
           }
 
