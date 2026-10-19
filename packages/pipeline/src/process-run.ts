@@ -553,7 +553,7 @@ const handOver = (
   lease: StepLease,
   channel: Destination['channel'],
   document: OutboundDocument,
-  handedOver: Pick<typeof runs.$inferInsert, 'acknowledgementStatus'> = {},
+  handedOver: Pick<typeof runs.$inferInsert, 'acknowledgementState'> = {},
 ) =>
   Effect.gen(function* () {
     if (run.handedOverAt !== null) {
@@ -668,7 +668,7 @@ const deliverInterchange =
           mediaType: 'application/edifact',
           isRetry,
         },
-        { acknowledgementStatus: 'pending' },
+        { acknowledgementState: 'pending' },
       )
     })
 
@@ -1324,7 +1324,7 @@ const validatedInbound = ({ interchange, message }: ReadMessage) =>
     },
   })
 
-const acknowledgementStatuses = {
+const acknowledgementStatesByAction = {
   accepted: 'accepted',
   received: 'accepted',
   rejected: 'rejected',
@@ -1346,7 +1346,7 @@ const acknowledgementIn = ({ interchange, message }: ReadMessage) => {
       ? {
           sender,
           controlReference: Number(controlReference),
-          status: acknowledgementStatuses[action],
+          status: acknowledgementStatesByAction[action],
         }
       : undefined
   } catch (error) {
@@ -1368,12 +1368,12 @@ const acknowledge = async (
 ) => {
   await tx
     .update(runs)
-    .set({ acknowledgementStatus: status })
+    .set({ acknowledgementState: status })
     .where(
       and(
         eq(runs.workspaceId, workspaceId),
         eq(runs.controlReference, controlReference),
-        inArray(runs.acknowledgementStatus, ['pending', 'overdue']),
+        inArray(runs.acknowledgementState, ['pending', 'overdue']),
         inArray(
           runs.tradingPartnerId,
           tx

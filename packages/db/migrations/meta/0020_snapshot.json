@@ -1,5 +1,5 @@
 {
-  "id": "21c81a2d-5a6f-49c0-9da8-1a06080721eb",
+  "id": "53c7ca18-e21d-4cbd-9666-709b3cea7089",
   "prevId": "d7aeeb78-283f-45a7-abb1-cf76fb596164",
   "version": "7",
   "dialect": "postgresql",
@@ -1757,8 +1757,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "acknowledgement_status": {
-          "name": "acknowledgement_status",
+        "acknowledgement_state": {
+          "name": "acknowledgement_state",
           "type": "acknowledgement_state",
           "typeSchema": "public",
           "primaryKey": false,
@@ -2003,9 +2003,9 @@
           "name": "runs_control_reference",
           "value": "\"runs\".\"control_reference\" >= 1"
         },
-        "runs_acknowledgement_status": {
-          "name": "runs_acknowledgement_status",
-          "value": "\"runs\".\"acknowledgement_status\" is null or (\"runs\".\"handed_over_at\" is not null and \"runs\".\"control_reference\" is not null)"
+        "runs_acknowledgement_state": {
+          "name": "runs_acknowledgement_state",
+          "value": "\"runs\".\"acknowledgement_state\" is null or (\"runs\".\"handed_over_at\" is not null and \"runs\".\"control_reference\" is not null)"
         },
         "runs_message_index": {
           "name": "runs_message_index",

@@ -529,7 +529,7 @@ export const runs = pgTable(
     handedOverAt: timestamp({ withTimezone: true, mode: 'date' }),
     controlReference: integer(),
     // Null for an Interchange handed over before Acknowledgements were tracked.
-    acknowledgementStatus: acknowledgementState(),
+    acknowledgementState: acknowledgementState(),
     // Null for a Document that is not an Interchange.
     messageIndex: integer(),
     // A Reprocess starts a new Run from the same Document.
@@ -565,8 +565,8 @@ export const runs = pgTable(
     ),
     check('runs_control_reference', sql`${table.controlReference} >= 1`),
     check(
-      'runs_acknowledgement_status',
-      sql`${table.acknowledgementStatus} is null or (${table.handedOverAt} is not null and ${table.controlReference} is not null)`,
+      'runs_acknowledgement_state',
+      sql`${table.acknowledgementState} is null or (${table.handedOverAt} is not null and ${table.controlReference} is not null)`,
     ),
     check('runs_message_index', sql`${table.messageIndex} >= 1`),
   ],

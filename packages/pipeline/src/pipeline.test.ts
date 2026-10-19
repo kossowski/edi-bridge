@@ -2697,7 +2697,7 @@ describe('the Acknowledgement of a sent Interchange', () => {
 
     await expect(sendInvoice(into)).resolves.toMatchObject({
       status: 'delivered',
-      acknowledgementStatus: 'pending',
+      acknowledgementState: 'pending',
     })
   })
 
@@ -2712,7 +2712,7 @@ describe('the Acknowledgement of a sent Interchange', () => {
     await expect(sendInvoice(into)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      acknowledgementStatus: null,
+      acknowledgementState: null,
     })
   })
 
@@ -2733,10 +2733,10 @@ describe('the Acknowledgement of a sent Interchange', () => {
         contrlOf(String(sent?.controlReference), action, { messages }),
       )
 
-      expect(contrl).toMatchObject({ status: 'delivered', acknowledgementStatus: null })
+      expect(contrl).toMatchObject({ status: 'delivered', acknowledgementState: null })
       await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
         status: 'delivered',
-        acknowledgementStatus: status,
+        acknowledgementState: status,
       })
     },
   )
@@ -2747,13 +2747,13 @@ describe('the Acknowledgement of a sent Interchange', () => {
 
     await connection.db
       .update(runs)
-      .set({ acknowledgementStatus: 'overdue' })
+      .set({ acknowledgementState: 'overdue' })
       .where(eq(runs.id, sent?.id ?? ''))
 
     await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
 
     await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
-      acknowledgementStatus: 'accepted',
+      acknowledgementState: 'accepted',
     })
   })
 
@@ -2765,7 +2765,7 @@ describe('the Acknowledgement of a sent Interchange', () => {
     await receiveContrl(into, contrlOf(String(sent?.controlReference), '4'))
 
     await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
-      acknowledgementStatus: 'accepted',
+      acknowledgementState: 'accepted',
     })
   })
 
@@ -2784,7 +2784,7 @@ describe('the Acknowledgement of a sent Interchange', () => {
 
     expect(contrl).toMatchObject({ status: 'delivered' })
     await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
-      acknowledgementStatus: 'pending',
+      acknowledgementState: 'pending',
     })
   })
 
@@ -2799,10 +2799,10 @@ describe('the Acknowledgement of a sent Interchange', () => {
     await receiveContrl(other, contrlOf(String(elsewhere?.controlReference), '4'))
 
     await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
-      acknowledgementStatus: 'pending',
+      acknowledgementState: 'pending',
     })
     await expect(readRun(connection.db, elsewhere?.id ?? '')).resolves.toMatchObject({
-      acknowledgementStatus: 'rejected',
+      acknowledgementState: 'rejected',
     })
   })
 })
