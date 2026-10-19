@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@edi-bridge/contracts": "workspace:*",
+    "@edi-bridge/edifact": "workspace:*",
     "@edi-bridge/mocks": "workspace:*",
     "@edi-bridge/ui": "workspace:*",
     "@hugeicons/core-free-icons": "^4.3.5",

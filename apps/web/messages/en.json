@@ -761,9 +761,34 @@
           "description": "{direction, select, inbound {The file is damaged or incomplete, so EDI Bridge could not read it. {tradingPartner} has been told automatically with a receipt confirmation.} other {The file that your ERP exported is damaged, incomplete or in an encoding or format that EDI Bridge cannot read. The fix is in the export of your ERP: check its encoding and format.}}"
         },
         "invalidContent": {
-          "title": "{direction, select, inbound {The content breaks the EDI rules} other {A required value is empty}}",
-          "description": "{direction, select, inbound {EDI Bridge could read the file, but a value in it breaks the rules for this kind of document, for example a wrong date or an unknown code.} other {The translated document breaks the EDI rules for {tradingPartner}: a required value is empty. The mapping fills it from your field “{field}”.}}",
-          "descriptionWithoutTarget": "EDI Bridge could not fill a required value for {tradingPartner}. The mapping takes it from one of your fields."
+          "title": {
+            "invalid-character": "A value contains a character the character set does not allow",
+            "missing-element": "A required value is empty",
+            "missing-segment": "A required part of the document is missing",
+            "too-long-element": "A value is too long for its format",
+            "too-many-repetitions": "A part of the document repeats too often",
+            "unexpected-element": "A part of the document has more values than allowed",
+            "unexpected-segment": "A part of the document is in the wrong place",
+            "unknown-code": "A code is not in its code list",
+            "unsupported-message-type": "EDI Bridge does not support this kind of document",
+            "wrong-format": "A numeric value contains letters or other characters",
+            "other": "The content breaks the EDI rules"
+          },
+          "problem": {
+            "invalid-character": "A value contains a character that the character set of the transmission does not allow.",
+            "missing-element": "A value that the rules for this kind of document require is empty.",
+            "missing-segment": "A part of the document that the rules for this kind of document require is missing.",
+            "too-long-element": "A value is longer than its format allows.",
+            "too-many-repetitions": "A part of the document repeats more often than the rules for this kind of document allow.",
+            "unexpected-element": "A part of the document holds more values than its format allows.",
+            "unexpected-segment": "A part of the document is in a place where the rules for this kind of document do not allow it.",
+            "unknown-code": "A code is not one of the codes that the standard allows for this value.",
+            "unsupported-message-type": "The document is of a kind or version that EDI Bridge cannot check.",
+            "wrong-format": "A value that must be a number contains letters or other characters.",
+            "other": "A value breaks the rules for this kind of document, for example a wrong date or an unknown code."
+          },
+          "description": "{direction, select, inbound {EDI Bridge could read the file from {tradingPartner}, but the file fails the check against the EDI rules. {problem}} other {The translated document for {tradingPartner} fails the check against the EDI rules. {problem} The mapping fills this place in the document from your field “{field}”.}}",
+          "descriptionWithoutTarget": "The translated document for {tradingPartner} fails the check against the EDI rules. {problem} The mapping fills this place in the document from one of your fields."
         },
         "missingCode": {
           "title": "The code “{code}” has no translation",

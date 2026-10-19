@@ -31,9 +31,10 @@ const parsed = runDetailSchema.parse({
   replaces: null,
   replacedBy: null,
   error: {
-    code: 'invalidDate',
-    message: 'The date 20261341 does not exist',
-    position: { segment: 4, tag: 'DTM', element: 1, component: 2 },
+    code: 'wrong-format',
+    message:
+      'Component 6060 (quantity) of QTY is "24 PCE", but its format n..15 allows only digits',
+    position: { segment: 9, tag: 'QTY', element: 1, component: 2 },
     details: null,
   },
   problem: {
@@ -66,7 +67,7 @@ we could not process your purchase order 4711 (ORDERS). It came in the transmiss
 
 A value in it breaks the EDIFACT rules for this kind of document.
 
-Technical detail: The date 20261341 does not exist (error code invalidDate, segment 4 (DTM), element 1, component 2).
+Technical detail: Component 6060 (quantity) of QTY is "24 PCE", but its format n..15 allows only digits (error code wrong-format, segment 9 (QTY), element 1, component 2).
 
 Could you check the file and send a corrected version?
 
@@ -86,7 +87,7 @@ Thank you`)
 
     expect(message).toContain('we could not process your purchase order (ORDERS).\n\n')
     expect(message).toContain(
-      'Technical detail: The date 20261341 does not exist (error code invalidDate).',
+      'Technical detail: Component 6060 (quantity) of QTY is "24 PCE", but its format n..15 allows only digits (error code wrong-format).',
     )
   })
 
@@ -97,7 +98,7 @@ Thank you`)
     })
 
     expect(message).toMatch(/^Hallo Spreewald Markt,\n\nwir konnten Ihren Beleg „Bestellung 4711“/)
-    expect(message).toContain('Fehlercode invalidDate, Segment 4 (DTM), Element 1, Komponente 2')
+    expect(message).toContain('Fehlercode wrong-format, Segment 9 (QTY), Element 1, Komponente 2')
     expect(message).toMatch(/Vielen Dank$/)
   })
 })

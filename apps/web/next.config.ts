@@ -6,7 +6,12 @@ const withNextIntl = createNextIntlPlugin()
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  transpilePackages: ['@edi-bridge/contracts', '@edi-bridge/mocks', '@edi-bridge/ui'],
+  transpilePackages: [
+    '@edi-bridge/contracts',
+    '@edi-bridge/edifact',
+    '@edi-bridge/mocks',
+    '@edi-bridge/ui',
+  ],
 }
 
 export default withNextIntl(nextConfig)

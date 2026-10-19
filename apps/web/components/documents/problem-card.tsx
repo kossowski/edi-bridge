@@ -8,6 +8,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { FixerBadge, fixerIcons, shownFixer } from '@/components/documents/fixer-badge'
+import { invalidContentCode } from '@/components/documents/invalid-content'
 import {
   CopyPartnerMessage,
   MarkWaitingStep,
@@ -27,7 +28,7 @@ import type { FixTarget } from '@edi-bridge/contracts'
 
 export type WhatToDoStep = { key: string; content: ReactNode }
 
-function useProblemText({ problem, direction, failureStage, tradingPartner }: FailedRun) {
+function useProblemText({ problem, error, direction, failureStage, tradingPartner }: FailedRun) {
   const t = useTranslations('Document.problem.reason')
   const { fixTarget } = problem
   const field = fixTarget?.kind === 'mapping' ? fixTarget.fieldPath : null
@@ -43,12 +44,15 @@ function useProblemText({ problem, direction, failureStage, tradingPartner }: Fa
     }
 
     case 'invalidContent': {
+      const code = invalidContentCode(error.code)
+      const described = { ...values, problem: t(`invalidContent.problem.${code}`) }
+
       return {
-        title: t('invalidContent.title', values),
+        title: t(`invalidContent.title.${code}`),
         description:
           direction === 'outbound' && field === null
-            ? t('invalidContent.descriptionWithoutTarget', values)
-            : t('invalidContent.description', { ...values, field: field ?? '' }),
+            ? t('invalidContent.descriptionWithoutTarget', described)
+            : t('invalidContent.description', { ...described, field: field ?? '' }),
       }
     }
 

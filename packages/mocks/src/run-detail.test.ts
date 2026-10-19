@@ -16,6 +16,7 @@ import {
   waitForTradingPartnerRunEndpoint,
   endWaitingForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
+import { parse, validate } from '@edi-bridge/edifact'
 
 import { seedChannels } from './channel'
 import { seedFlows } from './flow'
@@ -148,7 +149,7 @@ describe('GET /runs/:id', () => {
     }
   })
 
-  it('points a validation error at the invalid date component, counting the UNA as segment 1', async () => {
+  it('fails an inbound Run at validation as the edifact validator does, counting the UNA as segment 1', async () => {
     const run = inboundOrders('00000000-0000-4000-8000-000000000001', {
       failureStage: 'validation',
     })
@@ -156,14 +157,18 @@ describe('GET /runs/:id', () => {
     server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
 
     const { body } = await getRun(run.id)
+    const quantity = body?.message?.segments[6]
 
-    expect(body?.error?.position).toEqual({ segment: 5, tag: 'DTM', element: 1, component: 2 })
-    expect(body?.interchange?.raw).toContain("'DTM+137:20261341:102'")
-    expect(body?.message?.segments[2]).toEqual({
-      tag: 'DTM',
-      name: 'Date/time/period',
-      elements: [['137', '20261341', '102']],
-    })
+    expect(body?.error?.code).toBe('wrong-format')
+    expect(body?.error?.position).toEqual({ segment: 9, tag: 'QTY', element: 1, component: 2 })
+    expect(quantity?.tag).toBe('QTY')
+    expect(quantity?.elements[0]?.[1]).toMatch(/^\d+ PCE$/)
+    expect(() => validate(parse(body!.interchange!.raw))).toThrow(
+      expect.objectContaining({
+        code: body?.error?.code,
+        position: { segment: 9, element: 1, component: 2 },
+      }),
+    )
   })
 
   it('counts the error position across all Messages of the Interchange', async () => {
@@ -181,7 +186,9 @@ describe('GET /runs/:id', () => {
 
     expect(body?.interchange?.id).toBe(firstBody?.interchange?.id)
     expect(body?.message?.reference).toBe('2')
-    expect(body?.error?.position?.segment).toBe(2 + firstMessageLength + 3)
+    const quantity = body!.message!.segments.findIndex(({ tag }) => tag === 'QTY') + 1
+
+    expect(body?.error?.position?.segment).toBe(2 + firstMessageLength + quantity)
   })
 
   it('reports a delivery failure without a position after a 30 second timeout', async () => {
@@ -262,6 +269,35 @@ describe('GET /runs/:id', () => {
         'destinationUnreachable:true',
       ]),
     )
+  })
+
+  it('fails an outbound Run at validation with the codes of the edifact package', async () => {
+    const runs = Array.from({ length: 12 }, (_, index) =>
+      createRun({
+        id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        tradingPartner: hansemarkt,
+        messageType: 'INVOIC',
+        flow: invoicFlow,
+        status: 'failed',
+        failureStage: 'validation',
+      }),
+    )
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    const bodies = await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body))
+    const tooLong = bodies.find((body) => body?.error?.code === 'too-long-element')
+    const position = tooLong?.error?.position
+    const party = tooLong?.message?.segments[position!.segment - 1]
+
+    expect(new Set(bodies.map((body) => body?.error?.code))).toEqual(
+      new Set(['missing-element', 'too-long-element']),
+    )
+    expect(tooLong?.problem).toMatchObject({ reason: 'invalidContent', whoFixes: 'you' })
+    expect(party?.tag).toBe('NAD')
+    expect(
+      party?.elements[position!.element! - 1]?.[position!.component! - 1]?.length,
+    ).toBeGreaterThan(35)
   })
 
   it('orders the steps of an outbound Run as mapping before validation', async () => {

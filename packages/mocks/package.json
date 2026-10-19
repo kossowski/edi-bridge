@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@edi-bridge/contracts": "workspace:*",
+    "@edi-bridge/edifact": "workspace:*",
     "@faker-js/faker": "^10.6.0",
     "jsonata": "^2.2.2",
     "msw": "^3.0.2",

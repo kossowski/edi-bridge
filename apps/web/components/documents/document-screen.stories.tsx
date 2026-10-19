@@ -88,6 +88,8 @@ const invalidContentInbound = storyRun(3, 'ORDERS', 'validation')
 
 const invalidContentOutbound = storyRun(4, 'DESADV', 'validation')
 
+const emptyValueOutbound = storyRun(20, 'DESADV', 'validation')
+
 const missingCode = storyRun(5, 'INVOIC', 'mapping')
 
 const unreachableOutbound = storyRun(6, 'INVOIC', 'delivery')
@@ -131,6 +133,7 @@ const runs = [
   unreadable,
   invalidContentInbound,
   invalidContentOutbound,
+  emptyValueOutbound,
   missingCode,
   unreachableOutbound,
   unreachableInbound,
@@ -255,7 +258,14 @@ export const InvalidContentFromPartner = meta.story({
   args: { id: invalidContentInbound.id },
   async play({ canvas }) {
     await expect(
-      await canvas.findByRole('heading', { name: 'The content breaks the EDI rules' }),
+      await canvas.findByRole('heading', {
+        name: 'A numeric value contains letters or other characters',
+      }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        `EDI Bridge could read the file from ${partner.name}, but the file fails the check against the EDI rules. A value that must be a number contains letters or other characters.`,
+      ),
     ).toBeVisible()
     await expect(
       canvas.getByText(
@@ -303,13 +313,55 @@ export const InvalidContentFromYou = meta.story({
   args: { id: invalidContentOutbound.id },
   async play({ canvas }) {
     await expect(
-      await canvas.findByRole('heading', { name: 'A required value is empty' }),
+      await canvas.findByRole('heading', { name: 'A value is too long for its format' }),
     ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        /^The translated document for .+ fails the check against the EDI rules\. A value is longer than its format allows\. The mapping fills this place in the document from your field “(buyer|supplier)\.gln”\.$/,
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByText(/is empty/)).toBeNull()
     await expect(canvas.getByText('You fix this')).toBeVisible()
     const link = canvas.getByRole('link', { name: /at this field$/ })
     await expect(link.getAttribute('href')).toMatch(
       /^\/mappings\/[\w-]+\?field=(buyer|supplier)\.gln$/,
     )
+  },
+})
+
+export const EmptyValueFromYou = meta.story({
+  args: { id: emptyValueOutbound.id },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'A required value is empty' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(/A value that the rules for this kind of document require is empty\./),
+    ).toBeVisible()
+  },
+})
+
+export const GermanEmptyValueFromYou = meta.story({
+  args: { id: emptyValueOutbound.id },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'Ein Pflichtwert ist leer' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(/Ein Wert, den die Regeln für diese Belegart verlangen, ist leer\./),
+    ).toBeVisible()
+  },
+})
+
+export const GermanInvalidContentFromYou = meta.story({
+  args: { id: invalidContentOutbound.id },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'Ein Wert ist zu lang für sein Format' }),
+    ).toBeVisible()
+    await expect(canvas.getByText(/Ein Wert ist länger, als sein Format erlaubt\./)).toBeVisible()
   },
 })
 

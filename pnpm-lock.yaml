@@ -330,6 +330,9 @@ importers:
       '@edi-bridge/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@edi-bridge/edifact':
+        specifier: workspace:*
+        version: link:../../packages/edifact
       '@edi-bridge/mocks':
         specifier: workspace:*
         version: link:../../packages/mocks
@@ -739,6 +742,9 @@ importers:
       '@edi-bridge/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@edi-bridge/edifact':
+        specifier: workspace:*
+        version: link:../edifact
       '@faker-js/faker':
         specifier: ^10.6.0
         version: 10.6.0

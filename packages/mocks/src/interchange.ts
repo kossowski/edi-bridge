@@ -15,6 +15,8 @@ import {
   withCheckDigit,
 } from '@edi-bridge/contracts'
 
+import type { ValidationErrorCode } from '@edi-bridge/edifact'
+
 import { seedFlows } from './flow'
 import { seedLookupTableNamed } from './lookup-table-seed'
 import { publishedVersionsByMapping, seedMappingDrafts } from './mapping'
@@ -27,9 +29,10 @@ type Segment = { tag: string; elements: string[][] }
 export type GeneratedErrorCode =
   | 'invalidCharacter'
   | 'segmentCountMismatch'
-  | 'missingComponent'
-  | 'unknownCode'
-  | 'invalidDate'
+  | Extract<
+      ValidationErrorCode,
+      'missing-element' | 'too-long-element' | 'unknown-code' | 'wrong-format'
+    >
   | 'lookupMissing'
   | 'missingSourceField'
   | 'destinationUnreachable'
@@ -436,15 +439,27 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
       if (outbound) {
         const party = faker.helpers.objectKey(partyGlnFields)
         const nad = indexOf(segments, 'NAD', party)
+        const gln = segments[nad]!.elements[1]![0]!
+        // A separate seed keeps the Messages of the other Runs as they were.
+        const tooLong = seededFaker(`validationFault:${run.id}`).datatype.boolean()
+        // The mapping joins the GLNs of all addresses instead of taking the first one.
+        const value = tooLong ? [gln, gln, gln].join(',') : ''
 
         return {
-          segments: segments.with(nad, setComponent(segments[nad]!, 2, 1, '')),
+          segments: segments.with(nad, setComponent(segments[nad]!, 2, 1, value)),
           fault: {
             segment: nad,
             element: 2,
             component: 1,
-            code: 'missingComponent',
-            message: `Required component 3039 (party identification) of NAD+${party} is empty.`,
+            ...(tooLong
+              ? {
+                  code: 'too-long-element',
+                  message: `Component 3039 (party identification) of NAD+${party} has ${String(value.length)} characters, but its format an..35 allows 35.`,
+                }
+              : {
+                  code: 'missing-element',
+                  message: `Required component 3039 (party identification) of NAD+${party} is empty.`,
+                }),
           },
           broken: { kind: 'mapping', fieldPath: partyGlnFields[party] },
         }
@@ -459,24 +474,25 @@ function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): Faulty
             segment: uci,
             element: 4,
             component: 1,
-            code: 'unknownCode',
+            code: 'unknown-code',
             message: 'Code "9" is not in code list 0083 (action, coded).',
           },
           broken: null,
         }
       }
 
-      const dtm = indexOf(segments, 'DTM', '137')
-      const date = `${compactDate(run.receivedAt).slice(0, 4)}1341`
+      const qty = indexOf(segments, 'QTY')
+      // The partner writes the unit into the quantity as well.
+      const quantity = `${segments[qty]!.elements[0]![1]!} PCE`
 
       return {
-        segments: segments.with(dtm, setComponent(segments[dtm]!, 1, 2, date)),
+        segments: segments.with(qty, setComponent(segments[qty]!, 1, 2, quantity)),
         fault: {
-          segment: dtm,
+          segment: qty,
           element: 1,
           component: 2,
-          code: 'invalidDate',
-          message: `"${date}" is not a valid date in format 102 (CCYYMMDD).`,
+          code: 'wrong-format',
+          message: `Component 6060 (quantity) of QTY is "${quantity}", but its format n..15 allows only digits.`,
         },
         broken: null,
       }
