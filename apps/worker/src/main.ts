@@ -1,8 +1,11 @@
 import { Redis } from 'ioredis'
 import { once } from 'node:events'
 
+import { connect } from '@edi-bridge/db'
+
 import { config } from './config.js'
 import { createHealthServer } from './health.js'
+import { startRunWorker } from './run-worker.js'
 
 // Without the offline queue, commands fail fast while Redis is unreachable instead of waiting
 // for a reconnect, so the health check reports the outage right away.
@@ -17,6 +20,22 @@ redis.on('error', (error: NodeJS.ErrnoException) => {
   console.warn(`redis connection error: ${error.code ?? error.message}`)
 })
 
+const connection = connect(config.databaseUrl)
+
+const runWorker = startRunWorker({
+  redisUrl: config.redisUrl,
+  db: connection.db,
+  requeueInterval: config.requeueInterval,
+})
+
+runWorker.worker.on('error', (error) => {
+  console.warn(`run worker error: ${error.message}`)
+})
+
+runWorker.worker.on('failed', (queued, error) => {
+  console.error(`run ${queued?.data.runId ?? 'unknown'} failed: ${error.message}`)
+})
+
 const healthServer = createHealthServer({
   probes: {
     redis: async () => {
@@ -25,13 +44,25 @@ const healthServer = createHealthServer({
   },
 })
 
-function shutdown(): void {
+async function shutdown(): Promise<void> {
   healthServer.close()
+
+  // The worker closes first, so a Run in flight still reaches the database.
+  for (const close of [() => runWorker.close(), () => connection.close()]) {
+    try {
+      await close()
+    } catch (error) {
+      console.error(`worker shutdown failed: ${String(error)}`)
+    }
+  }
+
   redis.disconnect()
 }
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.once(signal, shutdown)
+  process.once(signal, () => {
+    void shutdown()
+  })
 }
 
 healthServer.listen(config.healthPort, '0.0.0.0')

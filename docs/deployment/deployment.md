@@ -22,11 +22,11 @@ The local [`compose.yaml`](../../compose.yaml) defines the development setup. Pr
 
 Dokploy's GitHub settings contain these application-specific patterns:
 
-| Application | Patterns                                                                      |
-| ----------- | ----------------------------------------------------------------------------- |
-| web         | `apps/web/**`, `packages/ui/**`, `packages/contracts/**`, `packages/mocks/**` |
-| api         | `apps/api/**`                                                                 |
-| worker      | `apps/worker/**`                                                              |
+| Application | Patterns                                                                                                                          |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| web         | `apps/web/**`, `packages/ui/**`, `packages/contracts/**`, `packages/mocks/**`                                                     |
+| api         | `apps/api/**`, `packages/contracts/**`, `packages/db/**`, `packages/edifact/**`, `packages/mapping/**`                            |
+| worker      | `apps/worker/**`, `packages/pipeline/**`, `packages/db/**`, `packages/contracts/**`, `packages/edifact/**`, `packages/mapping/**` |
 
 All three applications also watch these shared build inputs:
 
@@ -60,22 +60,23 @@ Each application's Dokploy **Environment** settings contain values with the form
 
 `<postgres-password>` and `<redis-password>` represent the corresponding passwords stored in Dokploy. Passwords in connection URLs require URL encoding if they contain characters with a special meaning in URLs.
 
-| Application | Variable             | Value template                                                                 |
-| ----------- | -------------------- | ------------------------------------------------------------------------------ |
-| web         | `NODE_ENV`           | `production`                                                                   |
-| web         | `HOSTNAME`           | `0.0.0.0`                                                                      |
-| web         | `PORT`               | `3000`                                                                         |
-| api         | `NODE_ENV`           | `production`                                                                   |
-| api         | `API_PORT`           | `3001`                                                                         |
-| api         | `DATABASE_URL`       | `postgres://edi_bridge:<postgres-password>@<postgres-service>:5432/edi_bridge` |
-| api         | `WEB_ORIGIN`         | Not set; see below                                                             |
-| api         | `BETTER_AUTH_URL`    | `https://edi-bridge.example.com`                                               |
-| api         | `BETTER_AUTH_SECRET` | `<auth-secret>`                                                                |
-| api         | `CHANNEL_SECRET_KEY` | `<channel-secret-key>`                                                         |
-| api         | `API_PUBLIC_URL`     | Not set; see below                                                             |
-| api, worker | `REDIS_URL`          | `redis://:<redis-password>@<redis-service>:6379`                               |
-| worker      | `NODE_ENV`           | `production`                                                                   |
-| worker      | `WORKER_HEALTH_PORT` | `3002`                                                                         |
+| Application | Variable                       | Value template                                                                 |
+| ----------- | ------------------------------ | ------------------------------------------------------------------------------ |
+| web         | `NODE_ENV`                     | `production`                                                                   |
+| web         | `HOSTNAME`                     | `0.0.0.0`                                                                      |
+| web         | `PORT`                         | `3000`                                                                         |
+| api         | `NODE_ENV`                     | `production`                                                                   |
+| api         | `API_PORT`                     | `3001`                                                                         |
+| api, worker | `DATABASE_URL`                 | `postgres://edi_bridge:<postgres-password>@<postgres-service>:5432/edi_bridge` |
+| api         | `WEB_ORIGIN`                   | Not set; see below                                                             |
+| api         | `BETTER_AUTH_URL`              | `https://edi-bridge.example.com`                                               |
+| api         | `BETTER_AUTH_SECRET`           | `<auth-secret>`                                                                |
+| api         | `CHANNEL_SECRET_KEY`           | `<channel-secret-key>`                                                         |
+| api         | `API_PUBLIC_URL`               | Not set; see below                                                             |
+| api, worker | `REDIS_URL`                    | `redis://:<redis-password>@<redis-service>:6379`                               |
+| worker      | `NODE_ENV`                     | `production`                                                                   |
+| worker      | `WORKER_HEALTH_PORT`           | `3002`                                                                         |
+| worker      | `RUN_REQUEUE_INTERVAL_SECONDS` | Not set; see below                                                             |
 
 These runtime variables require neither Docker build arguments nor a repository `.env` file.
 
@@ -84,6 +85,8 @@ These runtime variables require neither Docker build arguments nor a repository 
 `WEB_ORIGIN` is the web origin that the API allows for cross-origin (CORS) requests and trusts for sign-in. In development, its default is `http://localhost:3000`. In production, it has no default, and the API trusts only the origin of `BETTER_AUTH_URL`. This deployment does not need it, because web and API share one origin through the `/api` prefix.
 
 `<channel-secret-key>` is the key that encrypts the Channel secrets in Postgres: SFTP credentials, webhook tokens and HTTP Authorization headers. It is 32 random bytes, base64-encoded and stored in Dokploy. Generate it once, for example with `openssl rand -base64 32`. The API does not start in production without it. Keep the key: the API cannot decrypt the stored Channel secrets with another key.
+
+`RUN_REQUEUE_INTERVAL_SECONDS` is how often the worker queues again the Runs that are still received, for example because Redis was unreachable when they arrived. The worker also does this when it starts. Its default is `60`.
 
 `API_PUBLIC_URL` is the public URL of the API, which the API puts into the webhook URL of each webhook Channel. In production, its default is the `/api` path of `BETTER_AUTH_URL`, for example `https://edi-bridge.example.com/api`. In development, its default is `BETTER_AUTH_URL`. Set it only if the API is served from a different path or origin.
 

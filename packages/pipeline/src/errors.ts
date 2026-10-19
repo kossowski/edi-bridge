@@ -18,3 +18,12 @@ export class ReceiptRejected extends Data.TaggedError('ReceiptRejected')<{
     return receiptRejections[this.reason]
   }
 }
+
+export class RunNotQueued extends Data.TaggedError('RunNotQueued')<{
+  readonly runId: string
+  readonly cause: unknown
+}> {
+  override get message() {
+    return `Run ${this.runId} was received but could not be queued for processing`
+  }
+}

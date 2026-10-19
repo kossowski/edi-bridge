@@ -25,6 +25,7 @@ export type Receipt = {
   document: RawDocument
   runs: ReceivedRun[]
   notRouted: Array<{ messageType: string }>
+  notQueued: string[]
 }
 
 // A Document that doesn't parse as an Interchange declares no Message Types.
@@ -172,9 +173,19 @@ export const receive = (arriving: ArrivingDocument) =>
 
     const queue = yield* RunQueue
 
-    yield* Effect.forEach(created, (run) =>
+    // The Runs are stored already, so one not queued stays received until the next sweep.
+    const [, notQueued] = yield* Effect.partition(created, (run) =>
       queue.enqueue({ workspaceId: arriving.workspaceId, runId: run.id }),
     )
 
-    return { document, runs: created, notRouted } satisfies Receipt
+    if (notQueued.length > 0) {
+      yield* Effect.logWarning('Received Runs not queued until the next sweep', notQueued)
+    }
+
+    return {
+      document,
+      runs: created,
+      notRouted,
+      notQueued: notQueued.map(({ runId }) => runId),
+    } satisfies Receipt
   })

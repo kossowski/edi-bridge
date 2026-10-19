@@ -1,12 +1,19 @@
 import { eq } from 'drizzle-orm'
-import { Effect, Exit } from 'effect'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { type Duration, Effect, Exit, Fiber } from 'effect'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { channels, connect, type Connection, documents, flows } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
-import { type ArrivingDocument, processRun, ReceiptRejected, receive } from './index'
+import {
+  type ArrivingDocument,
+  bullmqRunQueue,
+  processRun,
+  queueReceivedRunsEvery,
+  ReceiptRejected,
+  receive,
+} from './index'
 import {
   golden,
   goldenInvoice,
@@ -68,6 +75,29 @@ describe('the receipt of a Document', () => {
         { stage: 'delivery', status: 'pending', startedAt: null, finishedAt: null },
       ],
     })
+  })
+
+  it('answers with the Runs not queued when the Run queue is unreachable and keeps them received', async () => {
+    const unreachable = bullmqRunQueue('redis://127.0.0.1:1', { timeout: '200 millis' })
+
+    try {
+      const receipt = await Effect.runPromise(
+        receive({
+          workspaceId: workspace.id,
+          channelId: workspace.inboundChannelId,
+          fileName: 'unqueued.json',
+          content: goldenInvoice,
+          manualSubmission: true,
+        }).pipe(pipelineServices(connection.db, unreachable)),
+      )
+
+      const runId = receipt.runs[0]?.id ?? ''
+
+      expect(receipt.notQueued).toEqual([runId])
+      await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'received' })
+    } finally {
+      await unreachable.close()
+    }
   })
 
   const rejection = async (arriving: Partial<ArrivingDocument>) => {
@@ -243,6 +273,38 @@ describe('the receipt of a Document', () => {
   const storedDocuments = (channelId: string) =>
     connection.db.select().from(documents).where(eq(documents.channelId, channelId))
 
+  it('tries to queue every Run of a Document when one is not queued', async () => {
+    const { channelId } = await channelWithFlows(['INVOIC'])
+
+    const invoice = golden('invoic-reference.edi', 'latin1')
+      .split('\n')
+      .filter((line) => line !== '')
+
+    const twoInvoices = [
+      ...invoice.filter((line) => line.startsWith('UNB')),
+      ...invoice.filter((line) => !/^UN[BZ]/.test(line)),
+      ...invoice.filter((line) => !/^UN[BZ]/.test(line)),
+      "UNZ+2+00000001'",
+    ].join('\n')
+
+    const queue = inMemoryRunQueue({ failures: 1 })
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'two-invoices.edi',
+        content: twoInvoices,
+        manualSubmission: true,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    const [first, second] = receipt.runs
+
+    expect(receipt.notQueued).toEqual([first?.id])
+    expect(queue.queued).toEqual([{ workspaceId: workspace.id, runId: second?.id }])
+  })
+
   it('routes a Document without Message Types to the only outbound Flow of the Channel', async () => {
     const { channelId, flows: created } = await channelWithFlows(['ORDERS', 'INVOIC'])
     const queue = inMemoryRunQueue()
@@ -289,9 +351,7 @@ describe('the receipt of a Document', () => {
   })
 })
 
-const receiveInvoice = async (content = goldenInvoice) => {
-  const queue = inMemoryRunQueue()
-
+const receiveInvoice = async (content = goldenInvoice, queue = inMemoryRunQueue()) => {
   const receipt = await Effect.runPromise(
     receive({
       workspaceId: workspace.id,
@@ -322,6 +382,41 @@ const ranStages = (run: ReadRun) =>
 const parsedInvoice: unknown = JSON.parse(goldenInvoice)
 
 const invoiceDocument = z.looseObject({ lines: z.array(z.looseObject({})) }).parse(parsedInvoice)
+
+describe('the sweep of received Runs', () => {
+  const sweep = async (
+    queue: ReturnType<typeof inMemoryRunQueue>,
+    interval: Duration.Input,
+    runId: string,
+  ) => {
+    const sweeping = Effect.runFork(
+      queueReceivedRunsEvery(interval).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    try {
+      await vi.waitFor(
+        () => {
+          expect(queue.queued).toContainEqual({ workspaceId: workspace.id, runId })
+        },
+        { timeout: 2000, interval: 20 },
+      )
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(sweeping))
+    }
+  }
+
+  it('queues a Run left received at once', async () => {
+    const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
+
+    await sweep(inMemoryRunQueue(), '1 hour', runId)
+  })
+
+  it('tries again at the next interval after a failed sweep', async () => {
+    const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
+
+    await sweep(inMemoryRunQueue({ failures: 1 }), '20 millis', runId)
+  })
+})
 
 describe('the processing of a Run', () => {
   it('maps the Document with the pinned Mapping Version and keeps the valid INVOIC as output', async () => {

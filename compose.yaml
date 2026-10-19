@@ -71,11 +71,14 @@ services:
       context: .
       dockerfile: apps/worker/Dockerfile
     environment:
+      DATABASE_URL: postgres://edi_bridge:edi_bridge@postgres:5432/edi_bridge
       REDIS_URL: redis://redis:6379
       WORKER_HEALTH_PORT: 3002
     ports:
       - '127.0.0.1:${WORKER_HEALTH_PORT:-3002}:3002'
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
