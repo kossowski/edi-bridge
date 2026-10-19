@@ -19,6 +19,7 @@ import {
   runSummarySchema,
   type TradingPartner,
   waitForTradingPartnerRunEndpoint,
+  endWaitingForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
 
 import { type ChannelStore, toChannelStore } from './channel'
@@ -473,6 +474,23 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
       return HttpResponse.json(waitForTradingPartner(run))
     }),
+
+    http.delete<{ id: string }>(
+      `${apiUrl}${endWaitingForTradingPartnerRunEndpoint.path}`,
+      ({ params }) => {
+        const run = detail(params.id)
+
+        if (run === undefined) {
+          return problem(404, 'Not Found')
+        }
+
+        if (!waitingSince.delete(run.id)) {
+          return problem(409, 'Only a Run that waits for the Trading Partner can end its wait.')
+        }
+
+        return HttpResponse.json(detail(run.id))
+      },
+    ),
 
     http.post<{ id: string }>(
       `${apiUrl}${reprocessRunEndpoint.path}`,
