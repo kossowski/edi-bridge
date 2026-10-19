@@ -17,6 +17,7 @@ import {
 
 import {
   acknowledgementTimeLimitHours,
+  type AiReview,
   channelTypes,
   characterSets,
   type CsvSettings,
@@ -292,6 +293,7 @@ export const mappings = pgTable(
     messageType: messageType().notNull(),
     name: text().notNull(),
     draft: jsonb().$type<MappingGraph>().notNull(),
+    aiReview: jsonb().$type<AiReview>(),
     unpublishedChanges: boolean().notNull().default(true),
     draftUpdatedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     createdAt: createdAt(),
