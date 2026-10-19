@@ -260,21 +260,19 @@ function EditorBody({
     withCanvas((handle) => handle.showFailingField())
   }
 
-  // A fix link shows its field once, on arrival; under "Start here" the Admin chooses first.
+  // A fix link shows its field once, on arrival; under "Start here" the Admin chooses first. A
+  // window that only later grows to desktop size does not count as an arrival.
   const arrivedAt = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!desktop || failingField === null || field === undefined || arrivedAt.current === field) {
+    if (failingField === null || field === undefined || arrivedAt.current === field) {
       return
     }
 
     arrivedAt.current = field
 
-    if (!startHere) {
-      whenRendered(
-        () => canvas.current !== null,
-        () => canvas.current?.showFailingField(),
-      )
+    if (desktop && !startHere) {
+      withCanvas((handle) => handle.showFailingField({ arrival: true }))
     }
   }, [desktop, failingField, field, startHere])
 

@@ -1,5 +1,9 @@
+import { delay, http } from 'msw'
 import { NextIntlClientProvider } from 'next-intl'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
+
+import type { ReactRenderer, StoryContext } from '@storybook/nextjs-vite'
+import type { BeforeEach } from 'storybook/internal/csf'
 
 import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen'
 import {
@@ -13,6 +17,7 @@ import { viewerStory } from '@/components/session/session-story-helpers'
 import { page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
+import { documentStructureEndpoint } from '@edi-bridge/contracts'
 import { createHandlers } from '@edi-bridge/mocks'
 
 import type { RowRef } from '@/components/mappings/mapping-links'
@@ -97,6 +102,25 @@ async function expectFieldBesideSources(
   }
 }
 
+// Holds the target's Document Structure back until the story lets it through, so the failing field
+// resolves only after the story has acted.
+let releaseStructure = () => {}
+
+const holdStructureBack: BeforeEach<ReactRenderer> = ({ msw }: StoryContext) => {
+  const held = new Promise<void>((resolve) => {
+    releaseStructure = resolve
+  })
+
+  msw.use(
+    http.get(`${apiUrl}${documentStructureEndpoint.path}`, async () => {
+      await held
+      await delay(0)
+
+      return undefined
+    }),
+  )
+}
+
 const meta = preview.meta({
   title: 'Mappings/MappingCanvasScreen/FailingField',
   component: MappingCanvasScreen,
@@ -136,11 +160,30 @@ export const TargetField = meta.story({
     const row = await findRow(canvasElement, deepTarget)
 
     await waitFor(() => expect(row).toHaveFocus())
+    await expect(getComputedStyle(row).boxShadow).not.toBe('none')
     await expect(row).toHaveAttribute('aria-pressed', 'true')
     await expect(partOf(row)).toHaveAttribute('data-failing', 'field')
     await expect(within(row).getByText('Failed here')).toBeVisible()
     await expect(canvas.getAllByText('Failed here')).toHaveLength(1)
     await waitFor(() => expectFieldBesideSources(canvasElement, row))
+  },
+})
+
+// Focus the user already moved stays where it is; the field is still selected and in view.
+export const FocusMovedBeforeArrival = meta.story({
+  ...on('desktop'),
+  beforeEach: holdStructureBack,
+  async play({ canvas, canvasElement }) {
+    const details = await canvas.findByRole('button', { name: 'Details' })
+
+    details.focus()
+    releaseStructure()
+
+    const row = await findRow(canvasElement, deepTarget)
+
+    await waitFor(() => expect(row).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expectFieldBesideSources(canvasElement, row))
+    await expect(details).toHaveFocus()
   },
 })
 
