@@ -22,6 +22,7 @@ import {
   aiBudgetEndpoint,
   aiBudgetExhaustedStatus,
   aiReviewOpenStatus,
+  mappingSamplesEndpoint,
   requestAiDraftEndpoint,
 } from '@edi-bridge/contracts'
 import {
@@ -320,6 +321,34 @@ export const BudgetExhausted = meta.story({
 
     await expect(start).toHaveAttribute('aria-disabled', 'true')
     await expect(start).toHaveAccessibleDescription(notice)
+  },
+})
+
+const noSampleRequests = countAiDraftRequests()
+
+export const NoSampleDocument = meta.story({
+  beforeEach: [
+    aiDraft('proposing'),
+    ({ msw }: StoryContext) => {
+      msw.use(http.get(`${apiUrl}${mappingSamplesEndpoint.path}`, () => HttpResponse.json([])))
+    },
+    noSampleRequests,
+  ],
+  async play({ canvasElement }) {
+    const dialog = await openAiDraft(canvasElement)
+    const notice = /has no Sample Documents yet/
+
+    await expect(await dialog.findByText(notice)).toBeVisible()
+
+    const start = dialog.getByRole('button', { name: 'Start the AI draft' })
+
+    await expect(start).toHaveAttribute('aria-disabled', 'true')
+    await expect(start).toHaveAccessibleDescription(notice)
+    await waitFor(() => expect(start).toHaveStyle({ opacity: '0.5' }))
+
+    await userEvent.click(start)
+    await expect(noSampleRequests.count()).toBe(0)
+    await expect(dialog.queryByRole('list', { name: 'Progress' })).toBeNull()
   },
 })
 

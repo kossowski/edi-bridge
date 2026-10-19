@@ -32,3 +32,13 @@ export const Destructive: Story = {
 export const Disabled: Story = {
   args: { disabled: true },
 }
+
+export const FocusableWhenDisabled: Story = {
+  args: { disabled: true, focusableWhenDisabled: true },
+  async play({ canvas }) {
+    const button = canvas.getByRole('button', { name: 'Reprocess' })
+
+    await expect(button).toHaveAttribute('aria-disabled', 'true')
+    await expect(button).toHaveStyle({ opacity: '0.5' })
+  },
+}
