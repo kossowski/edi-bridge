@@ -51,6 +51,7 @@ import {
   sessionEndpoint,
   retryRunEndpoint,
   reprocessRunEndpoint,
+  waitForTradingPartnerRunEndpoint,
   submitDocumentEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
@@ -462,6 +463,13 @@ const changes: Change[] = [
   [
     'retry a Run',
     () => ({ method: 'POST', url: toPath(retryRunEndpoint.path, { id: crypto.randomUUID() }) }),
+  ],
+  [
+    'mark a Run as waiting for the Trading Partner',
+    () => ({
+      method: 'POST',
+      url: toPath(waitForTradingPartnerRunEndpoint.path, { id: crypto.randomUUID() }),
+    }),
   ],
   [
     'reprocess a Run',

@@ -318,6 +318,46 @@ export const retryRun = (id: string) =>
     return yield* loadRun(id)
   })
 
+export const waitForTradingPartnerRun = (id: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const run = yield* loadRun(id)
+
+    if (run.problem?.whoFixes !== 'tradingPartner') {
+      return yield* new Conflict({
+        message: 'Only a Run that the Trading Partner fixes can wait for the Trading Partner',
+      })
+    }
+
+    const marked = yield* Effect.promise(() => markWaitingForTradingPartner(db, workspace.id, id))
+
+    // A Retry can claim the Run between the read above and the mark.
+    if (!marked) {
+      return yield* new Conflict({ message: 'The Run is no longer failed' })
+    }
+
+    return yield* loadRun(id)
+  })
+
+export const markWaitingForTradingPartner = async (
+  db: Database,
+  workspaceId: string,
+  id: string,
+) => {
+  const marked = await db
+    .update(runs)
+    .set({
+      // A repeated mark keeps the time the wait began.
+      waitingForTradingPartnerSince: sql`coalesce(${runs.waitingForTradingPartnerSince}, now())`,
+    })
+    .where(inWorkspace(runs, workspaceId, eq(runs.id, id), eq(runs.status, 'failed')))
+    .returning({ id: runs.id })
+
+  return marked.length > 0
+}
+
 export const reprocessRun = (id: string, { mappingVersionId }: ReprocessRunBody) =>
   Effect.gen(function* () {
     yield* loadRun(id)
