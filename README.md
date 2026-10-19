@@ -168,6 +168,8 @@ docker build -f apps/api/Dockerfile .
 
 GitHub Actions runs lint, check-types, test (one package at a time, so each Vitest run gets the whole runner), the stories, the canvas stories in three shards, the Playwright tests, build and the Storybook build on every pull request. Turborepo's `--affected` flag limits the run to the packages changed on the branch and the packages that depend on them. A job whose tasks are all unaffected is skipped before it installs dependencies.
 
+The full-stack E2E test runs in a job of its own: it builds and starts the `full-stack` profile, creates the Operator and runs `test:e2e:full-stack`. It runs on every push to `main` and on every pull request that changes code, dependencies, the Compose file or the workflows. On failure, the job uploads the Playwright traces and prints the Compose logs.
+
 ## Deployment
 
 See [Dokploy deployment configuration](docs/deployment/deployment.md) and [Deploy and maintain EDI Bridge](docs/deployment/deployment-operations.md) for service configuration, routing, and verification.

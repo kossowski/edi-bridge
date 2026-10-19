@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      full-stack: ${{ steps.full-stack.outputs.run }}
     steps:
       - name: Check out code
         uses: actions/checkout@v7
@@ -49,6 +50,21 @@ jobs:
             ]
         run: .github/scripts/plan-affected-jobs.sh
 
+      # The full-stack test exercises every app image, so turbo --affected on apps/web
+      # misses API, worker and Dockerfile changes. It skips only when no code changed.
+      - name: Select the full-stack E2E test
+        id: full-stack
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" != pull_request ] || ! git diff --quiet "origin/$BASE_REF...HEAD" -- \
+            apps packages patches compose.yaml package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .dockerignore .github; then
+            echo "run=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "run=false" >>"$GITHUB_OUTPUT"
+          fi
+
   tasks:
     name: ${{ matrix.name }}
     needs: plan
@@ -78,6 +94,50 @@ jobs:
         if: ${{ !matrix.skip }}
         run: pnpm turbo run ${{ matrix.tasks }} ${{ github.event_name == 'pull_request' && '--affected' || '' }} ${{ matrix.args }}
 
+  # A job of its own: Docker networking changes during the Compose start abort Chromium
+  # module fetches in a Stories run on the same runner (#277, #338).
+  full-stack-e2e:
+    name: Full-stack E2E test
+    needs: plan
+    if: needs.plan.outputs.full-stack == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPERATOR_EMAIL: operator@example.com
+      OPERATOR_PASSWORD: full-stack-ci-operator-password
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Set up
+        uses: ./.github/actions/setup
+        with:
+          job: full-stack-e2e
+          chromium: 'true'
+
+      - name: Start the full-stack profile
+        run: docker compose --profile full-stack up -d --build --wait --wait-timeout 180
+
+      - name: Create the Operator
+        run: >-
+          docker compose --profile full-stack exec -T -e OPERATOR_PASSWORD api
+          node dist/create-operator.js --email "$OPERATOR_EMAIL" --name Operator --workspace "Full-stack E2E"
+
+      - name: Run the full-stack E2E test
+        run: pnpm --filter @edi-bridge/web test:e2e:full-stack
+
+      - name: Upload the Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-stack-e2e-test-results
+          path: apps/web/test-results
+          if-no-files-found: ignore
+
+      - name: Print the Compose logs
+        if: failure()
+        run: docker compose --profile full-stack logs --no-color --timestamps
+
   format:
     name: Format
     runs-on: ubuntu-latest
@@ -97,16 +157,18 @@ jobs:
   checks:
     name: CI passed
     if: always()
-    needs: [plan, tasks, format]
+    needs: [plan, tasks, full-stack-e2e, format]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - name: Require the plan, task and format jobs to pass
+      - name: Require the plan, task, full-stack E2E and format jobs to pass
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           TASKS_RESULT: ${{ needs.tasks.result }}
+          FULL_STACK_E2E_RESULT: ${{ needs.full-stack-e2e.result }}
           FORMAT_RESULT: ${{ needs.format.result }}
         run: |
           test "$PLAN_RESULT" = success
           test "$FORMAT_RESULT" = success
           test "$TASKS_RESULT" = success || test "$TASKS_RESULT" = skipped
+          test "$FULL_STACK_E2E_RESULT" = success || test "$FULL_STACK_E2E_RESULT" = skipped

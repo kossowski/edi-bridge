@@ -14,7 +14,7 @@ It type-checks and unit-tests the packages changed since `<parent>` and every pa
 
 ## Left to CI and the hooks
 
-- CI runs every task on each PR: `lint`, `check-types`, `test`, `test:stories`, `test:canvas`, `test:e2e`, `build` and `build-storybook` (`.github/workflows/ci.yml`). Run one of these locally only to reproduce a failed CI task.
+- CI runs every task on each PR: `lint`, `check-types`, `test`, `test:stories`, `test:canvas`, `test:e2e`, `build` and `build-storybook`, and `test:e2e:full-stack` against the `full-stack` Compose profile in a job of its own (`.github/workflows/ci.yml`). Run one of these locally only to reproduce a failed CI task.
 - The pre-commit hook runs lint-staged: `oxlint --fix` and `oxfmt` on the staged files.
 
 ## UI parts
