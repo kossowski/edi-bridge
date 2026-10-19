@@ -3,7 +3,7 @@ import { type Duration, Effect, Schedule } from 'effect'
 
 import { runs } from '@edi-bridge/db'
 
-import { Database, RunQueue } from './services'
+import { Database, type QueuedRun, RunQueue } from './services'
 
 export const queueReceivedRuns = Effect.gen(function* () {
   const db = yield* Database
@@ -25,3 +25,17 @@ export const queueReceivedRunsEvery = (interval: Duration.Input) =>
     Effect.catchCause((cause) => Effect.logError('Received Runs not queued', cause)),
     Effect.repeat(Schedule.spaced(interval)),
   )
+
+// The sweep of received Runs queues a Run that is not queued here.
+export const queueOrLeaveToSweep = (run: QueuedRun, which: 'Retried' | 'Reprocessed') =>
+  Effect.gen(function* () {
+    const queue = yield* RunQueue
+
+    yield* queue
+      .enqueue(run)
+      .pipe(
+        Effect.catchTag('RunNotQueued', (error) =>
+          Effect.logWarning(`${which} Run not queued until the next sweep`, error),
+        ),
+      )
+  })

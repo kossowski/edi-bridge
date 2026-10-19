@@ -5,7 +5,8 @@ import { directionOf, whoFixes } from '@edi-bridge/contracts'
 import { flows, mappingVersions, runs, runSteps } from '@edi-bridge/db'
 
 import { MappingVersionNotOfRun, RunNotReprocessable } from './errors'
-import { Database, type QueuedRun, RunQueue } from './services'
+import { queueOrLeaveToSweep } from './queue-received-runs'
+import { Database, type QueuedRun } from './services'
 import { stagesOf } from './stages'
 
 export type Reprocess = QueuedRun & { mappingVersionId: string }
@@ -28,7 +29,6 @@ const isReprocessable = (run: Run, flow: typeof flows.$inferSelect) =>
 export const reprocessRun = ({ workspaceId, runId, mappingVersionId }: Reprocess) =>
   Effect.gen(function* () {
     const db = yield* Database
-    const queue = yield* RunQueue
     const receivedAt = yield* DateTime.nowAsDate
 
     const started = yield* Effect.promise(() =>
@@ -125,14 +125,7 @@ export const reprocessRun = ({ workspaceId, runId, mappingVersionId }: Reprocess
 
     const queued = { workspaceId, runId: started.id }
 
-    // The sweep of received Runs queues a Run that is not queued here.
-    yield* queue
-      .enqueue(queued)
-      .pipe(
-        Effect.catchTag('RunNotQueued', (error) =>
-          Effect.logWarning('Reprocessed Run not queued until the next sweep', error),
-        ),
-      )
+    yield* queueOrLeaveToSweep(queued, 'Reprocessed')
 
     return queued
   })

@@ -4,13 +4,13 @@ import { Effect } from 'effect'
 import { runs, runSteps } from '@edi-bridge/db'
 
 import { RunNotRetryable } from './errors'
-import { Database, type QueuedRun, RunQueue } from './services'
+import { queueOrLeaveToSweep } from './queue-received-runs'
+import { Database, type QueuedRun } from './services'
 
 // The Run goes back to received with its earlier steps succeeded, so the worker repeats only the delivery.
 export const retryRun = (queued: QueuedRun) =>
   Effect.gen(function* () {
     const db = yield* Database
-    const queue = yield* RunQueue
 
     const reopened = yield* Effect.promise(() =>
       db.transaction(async (tx) => {
@@ -52,12 +52,5 @@ export const retryRun = (queued: QueuedRun) =>
       return yield* new RunNotRetryable({ runId: queued.runId })
     }
 
-    // The sweep of received Runs queues a Run that is not queued here.
-    yield* queue
-      .enqueue(queued)
-      .pipe(
-        Effect.catchTag('RunNotQueued', (error) =>
-          Effect.logWarning('Retried Run not queued until the next sweep', error),
-        ),
-      )
+    yield* queueOrLeaveToSweep(queued, 'Retried')
   })
