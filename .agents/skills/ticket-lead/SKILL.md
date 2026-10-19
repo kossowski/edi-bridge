@@ -71,7 +71,7 @@ When a part turns out to hold two changes while you build it, narrow its scope t
 
 ### 3. Build each part, bottom to top
 
-Start the next part as soon as the part below has its PR open and linked (step d); CI on the part below runs meanwhile (step e). Start a parallel part together with the part below it. At most two developers run at once.
+Start the next part as soon as the part below has its PR open and linked (step d); CI on the part below runs meanwhile (step e). Start a parallel part together with the part below it. At most `MAX_DEVELOPERS_PER_TICKET_LEAD` developers from `.agents/machine.env` run at once.
 
 **a. Create the worktree.**
 

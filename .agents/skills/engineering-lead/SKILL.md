@@ -45,7 +45,7 @@ It lists each ticket with its status, how many tickets it blocks, its area label
 
 ### 2. Size the wave
 
-The machine sets the pace, not the board: a heavy check peaks near 6 GB on an 11 GB VM, and the slot script lets two heavy commands run at once. Run **at most three** ticket leads at a time; a fourth only waits for a slot.
+The machine sets the pace, not the board: the slot script and `.agents/machine.env` set the budget. Run at most `MAX_TICKET_LEADS` ticket leads at a time; one more only waits for a slot.
 
 Fill the wave from the runnable tickets in the order the board prints them: the ticket that unblocks the most others first. Skip a ticket the board marks `overlaps` while the overlapping ticket runs; two tickets in the same package land on each other's files, and the second pays for it in its catch-up rebase.
 

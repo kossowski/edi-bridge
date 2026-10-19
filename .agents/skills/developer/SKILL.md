@@ -17,7 +17,7 @@ You are the **developer** for one brief. It names a GOAL, a WORKTREE with its br
 
   Leave stories, canvas, e2e, build and build-storybook to CI on the PR; the pre-commit hook lints and formats what you commit, and the ticket lead's browser check covers UI behaviour. For a failed CI run, also rerun its failed task the same way, `turbo run <task> --filter='...[<parent>]'`, when it runs on this machine.
 
-  The slot script is the machine's RAM budget: a heavy command peaks near 6 GB on an 11 GB VM, so two run at once at most, and the second only when enough RAM is free. Every heavy command goes through it: test, type check, build, vitest, Storybook, Playwright, and a dev server for a browser check. `pnpm install` does not.
+  The slot script and `.agents/machine.env` set the machine's budget: a few heavy commands at once, each slot after the first only while enough RAM is free. Every heavy command goes through it: test, type check, build, vitest, Storybook, Playwright, and a dev server for a browser check. `pnpm install` does not.
 
 - **Stop what you started**: every dev server, Storybook and background shell is gone before you report. Start and stop a dev server inside one slot command, so the slot frees itself when the check ends. `bash .agents/skills/developer/scripts/stop-leftovers.sh <worktree>` stops what still runs from your worktree and prints it.
 - **Commit** per `AGENTS.md`: one commit per concern, footer `refs: #<NN>`. Fix the message when the hook rejects it.

@@ -22,6 +22,10 @@ Conventional Commits, enforced by commitlint in the `commit-msg` hook. Fix the m
 
 Read `CODING_STANDARDS.md` before writing or reviewing code.
 
+### Machine budget
+
+`.agents/machine.env` sets the budget for agent work on this machine: test slots, ticket leads, developers, swap and load limits. The agent scripts read it; skills name its keys.
+
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

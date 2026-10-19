@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Exits when the inbox holds a message (printed oldest first), a ticket lead sits on a permission prompt or the machine swaps; otherwise a heartbeat after N seconds.
+# Exits when the inbox holds a message (printed oldest first), a ticket lead sits on a permission prompt or swap passes SWAP_LIMIT_MB; otherwise a heartbeat after N seconds.
 # Usage: watch.sh [seconds, default 5400]
+budget="$(dirname "$0")/../../../machine.env"
+[ -f "$budget" ] && . "$budget"
 inbox=${AGENTS_INBOX:-$HOME/.agents/leads/inbox}
 mkdir -p "$inbox/done"
 end=$((SECONDS + ${1:-5400}))
@@ -15,7 +17,7 @@ while [ $SECONDS -lt $end ]; do
     exit 0
   fi
   swap=$(free -m | awk '/^Swap:/{print $3}')
-  if [ "$swap" -gt 1500 ]; then
+  if [ "$swap" -gt "${SWAP_LIMIT_MB:-1500}" ]; then
     echo "MEMORY PRESSURE: swap ${swap}MB used, $(free -m | awk '/^Mem:/{print $7}')MB available"
     exit 0
   fi
