@@ -20,6 +20,7 @@ import {
   runDetailSchema,
   runEndpoint,
   type RunDetail,
+  type RunError,
   type RunProblem,
   toPath,
   waitForTradingPartnerRunEndpoint,
@@ -141,7 +142,9 @@ const runs = [
 
 const channel = seedChannels.find(({ id }) => id === flowFor('INVOIC').destinationChannelId)!
 
-function incompleteSetupDetail(fixTarget: RunProblem['fixTarget']) {
+type IncompleteSetup = { error: RunError; fixTarget: RunProblem['fixTarget'] }
+
+function incompleteSetupDetail({ error, fixTarget }: IncompleteSetup) {
   return runDetailSchema.parse({
     ...incompleteSetup,
     steps: [
@@ -155,20 +158,16 @@ function incompleteSetupDetail(fixTarget: RunProblem['fixTarget']) {
     mappingVersion: missingFieldMapping,
     replaces: null,
     replacedBy: null,
-    error: {
-      code: 'glnMissing',
-      message: 'The Workspace has no GLN for the Interchange',
-      position: null,
-    },
+    error,
     problem: { reason: 'incompleteSetup', whoFixes: 'retry', fixTarget },
     waitingForTradingPartnerSince: null,
     duplicateOf: null,
   })
 }
 
-function servingIncompleteSetup(fixTarget: RunProblem['fixTarget']) {
+function servingIncompleteSetup(setup: IncompleteSetup) {
   return http.get(`${apiUrl}${toPath(runEndpoint.path, { id: incompleteSetup.id })}`, () =>
-    HttpResponse.json(incompleteSetupDetail(fixTarget)),
+    HttpResponse.json(incompleteSetupDetail(setup)),
   )
 }
 
@@ -370,7 +369,16 @@ export const DeliveryFailureToErp = meta.story({
 export const IncompleteSetup = meta.story({
   args: { id: incompleteSetup.id },
   beforeEach({ msw }) {
-    msw.use(servingIncompleteSetup({ kind: 'workspaceGln', name: seedWorkspace.name }))
+    msw.use(
+      servingIncompleteSetup({
+        error: {
+          code: 'glnMissing',
+          message: 'The Workspace has no GLN for the Interchange',
+          position: null,
+        },
+        fixTarget: { kind: 'workspaceGln', name: seedWorkspace.name },
+      }),
+    )
   },
   async play({ canvas }) {
     await expect(
@@ -393,9 +401,12 @@ export const GermanIncompleteSetup = meta.story({
   beforeEach({ msw }) {
     msw.use(
       servingIncompleteSetup({
-        kind: 'channelCredential',
-        channelId: channel.id,
-        name: channel.name,
+        error: {
+          code: 'channelDefect',
+          message: 'The Channel could not be used for the delivery',
+          position: null,
+        },
+        fixTarget: { kind: 'channelCredential', channelId: channel.id, name: channel.name },
       }),
     )
   },
@@ -408,6 +419,44 @@ export const GermanIncompleteSetup = meta.story({
     await expectFixLink(
       canvas.getByRole('link', { name: `Zugangsdaten von „${channel.name}“ prüfen` }),
       `/channels/${channel.id}`,
+    )
+  },
+})
+
+export const UnsupportedCharacterSet = meta.story({
+  args: { id: incompleteSetup.id },
+  beforeEach({ msw }) {
+    msw.use(
+      servingIncompleteSetup({
+        error: {
+          code: 'characterSetUnsupported',
+          message: 'Delivery in character set UNOD is not supported',
+          position: null,
+        },
+        fixTarget: {
+          kind: 'tradingPartner',
+          tradingPartnerId: partner.id,
+          name: partner.name,
+        },
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        name: `The setup for ${partner.name} is not complete`,
+      }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        `Choose a supported character set (UNOA, UNOB or UNOC) for ${partner.name}, then try again.`,
+        { exact: false },
+      ),
+    ).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
+    await expectFixLink(
+      canvas.getByRole('link', { name: `Open ${partner.name}` }),
+      `/trading-partners/${partner.id}`,
     )
   },
 })
