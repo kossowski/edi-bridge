@@ -1,8 +1,17 @@
-import { Effect } from 'effect'
+import { Effect, Exit } from 'effect'
 import { createServer } from 'node:net'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { DeliveryFailed, type OutboundFile, type SftpLogin, uploadSftp } from './index'
+import {
+  DeliveryFailed,
+  type OutboundFile,
+  type OutboundSftpChannel,
+  secretBox,
+  secretKeyBytes,
+  sftpChannelDelivery,
+  type SftpLogin,
+  uploadSftp,
+} from './index'
 import { listening, startTestSftpServer, type TestSftpServer } from './testing'
 
 const timeoutMs = 1500
@@ -105,5 +114,67 @@ describe('uploadSftp', () => {
         }),
       ),
     ).toEqual(new DeliveryFailed({ reason: 'hostUnreachable' }))
+  })
+})
+
+const secrets = secretBox(Buffer.alloc(secretKeyBytes, 'test-channel-secret-key'))
+
+const channelId = '5d1e8c3a-7f42-4b9e-a0d6-2c9b1f8e4a17'
+
+const deliver = sftpChannelDelivery({ secrets, timeoutMs })
+
+const outboundChannel = (): OutboundSftpChannel => ({
+  id: channelId,
+  host: sftp.host,
+  port: sftp.port,
+  username: sftp.username,
+  remotePath: '/upload',
+  authentication: 'password',
+  encryptedCredential: secrets.seal(sftp.password, `channels/${channelId}/encryptedCredential`),
+})
+
+describe('sftpChannelDelivery', () => {
+  it('opens the sealed password of the channel and uploads the file', async () => {
+    await Effect.runPromise(deliver(outboundChannel(), interchange('desadv-7.edi')))
+
+    expect(await remoteFile('/upload/desadv-7.edi')).toBe(
+      "UNB+UNOC:3+4012345000009:14+4098765000002:14+261019:1627+42'",
+    )
+  })
+
+  it('opens the sealed private key of the channel', async () => {
+    await Effect.runPromise(
+      deliver(
+        {
+          ...outboundChannel(),
+          authentication: 'privateKey',
+          encryptedCredential: secrets.seal(
+            sftp.privateKey,
+            `channels/${channelId}/encryptedCredential`,
+          ),
+        },
+        interchange('desadv-8.edi'),
+      ),
+    )
+
+    expect(await remoteListing('/upload')).toContain('desadv-8.edi')
+  })
+
+  it('refuses a credential sealed for another channel', async () => {
+    const exit = await Effect.runPromiseExit(
+      deliver(
+        {
+          ...outboundChannel(),
+          encryptedCredential: secrets.seal(
+            sftp.password,
+            'channels/0b7a4f2e-9c13-4d58-8e61-3f2a9d7c5b40/encryptedCredential',
+          ),
+        },
+        interchange('desadv-9.edi'),
+      ),
+    )
+
+    expect(Exit.hasDies(exit)).toBe(true)
+    expect(await remoteListing('/upload')).not.toContain('desadv-9.edi')
   })
 })

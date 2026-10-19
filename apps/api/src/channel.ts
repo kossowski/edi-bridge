@@ -2,7 +2,13 @@ import { eq, or } from 'drizzle-orm'
 import { Context, Effect } from 'effect'
 import { randomInt, randomUUID } from 'node:crypto'
 
-import { ChannelReach, type ChannelUnreachable, type SecretBox } from '@edi-bridge/channels'
+import {
+  ChannelReach,
+  type ChannelUnreachable,
+  type SecretBox,
+  type SecretColumn,
+  secretContext,
+} from '@edi-bridge/channels'
 import {
   type Channel,
   type ChannelInput,
@@ -45,11 +51,6 @@ type Kind = Channel['type']
 
 type OfKind<T, K extends Kind> = Extract<T, { type: K }>
 
-export type SecretColumn =
-  | 'encryptedCredential'
-  | 'encryptedWebhookToken'
-  | 'encryptedAuthorization'
-
 const hidden: MaskedSecret = { lastFour: null }
 
 const tokenAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -62,8 +63,6 @@ const newWebhookToken = () =>
 // Senders outside the browser call the webhook URL, so it is absolute.
 const webhookUrl = (apiPublicUrl: string, id: string) =>
   `${apiPublicUrl.replace(/\/$/, '')}${toPath(webhookPath, { id })}`
-
-export const secretContext = (id: string, column: SecretColumn) => `channels/${id}/${column}`
 
 const sealed = (secrets: SecretBox, id: string, column: SecretColumn, plaintext: string) => ({
   [column]: secrets.seal(plaintext, secretContext(id, column)),
