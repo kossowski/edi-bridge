@@ -379,6 +379,12 @@ importers:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.3.0)(immer@11.1.21)(react@19.3.0)(use-sync-external-store@1.7.0(react@19.3.0))
     devDependencies:
+      '@edi-bridge/fixtures':
+        specifier: workspace:*
+        version: link:../../packages/fixtures
+      '@edi-bridge/mapping':
+        specifier: workspace:*
+        version: link:../../packages/mapping
       '@edi-bridge/oxlint-config':
         specifier: workspace:*
         version: link:../../packages/oxlint-config

@@ -150,6 +150,14 @@ Then sign in at `http://localhost:3000` (or your `WEB_PORT`) with the email and 
 
 See [Create the Operator](docs/deployment/deployment-operations.md#create-the-operator) for the options.
 
+A Playwright test runs against the started stack. It signs in as the Operator, sets up an invoice Flow to the profile's SFTP service through the API, submits an invoice manually in the UI and waits until the Run is delivered. Pass the Operator's credentials, and `WEB_PORT` and `API_PORT` if you changed them:
+
+```sh
+OPERATOR_EMAIL=<operator-email> OPERATOR_PASSWORD='<password>' pnpm --filter @edi-bridge/web test:e2e:full-stack
+```
+
+Each run creates its own Channels, Mapping and Flow, so the test runs again against the same stack. `test:e2e` keeps running only the mock-mode tests.
+
 A single image builds with:
 
 ```sh
