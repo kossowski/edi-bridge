@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@edi-bridge/api": "workspace:*",
-    "@edi-bridge/db": "workspace:*",
+    "@edi-bridge/fixtures": "workspace:*",
     "@edi-bridge/oxlint-config": "workspace:*",
     "@edi-bridge/pipeline": "workspace:*",
     "@edi-bridge/typescript-config": "workspace:*",

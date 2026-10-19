@@ -1,4 +1,5 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -12,7 +13,8 @@ import {
   webOrigin,
 } from '@edi-bridge/api/src/testing'
 import { runListSchema, runsEndpoint, toSearchParams } from '@edi-bridge/contracts'
-import { golden, goldenInvoice, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
+import { fixtures, readFixture } from '@edi-bridge/fixtures'
+import { golden, goldenInvoice, readRun, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
 import { runCli } from './cli'
 
@@ -21,6 +23,18 @@ const member = {
   email: 'admin@nordwind-foods.example',
   password: 'nordwind-foods-admin-password',
 }
+
+const require = createRequire(import.meta.url)
+
+const dispatch = fixtures.find(
+  (fixture) => fixture.path === 'documents/valid/dispatch-nordlicht-markt.csv',
+)
+
+if (dispatch === undefined) {
+  throw new Error('The dispatch fixture is missing')
+}
+
+const dispatchFile = require.resolve(`@edi-bridge/fixtures/${dispatch.path}`)
 
 let api: TestApi
 
@@ -96,7 +110,41 @@ describe('submit', () => {
     expect(runListSchema.parse(response.json()).runs.map((run) => run.id)).toContain(runId)
   })
 
+  // The ERP webhook routes a Document without a Message Type to its only outbound Flow.
+  it('decodes the file in the encoding that --encoding names', async () => {
+    const result = await cli([
+      'submit',
+      '--channel',
+      'ERP webhook',
+      '--encoding',
+      dispatch.encoding,
+      dispatchFile,
+    ])
+
+    expect(result.stderr).toBe('')
+    expect(result.exitCode).toBe(0)
+
+    const runId = /^Run ([0-9a-f-]{36}): /.exec(result.stdout)?.[1]
+
+    expect(runId, result.stdout).toBeDefined()
+
+    const run = await readRun(api.connection.db, runId ?? '')
+
+    expect(run?.document?.content).toBe(readFixture(dispatch))
+    expect(run?.document?.content).toContain('Käufer;Warenempfänger')
+  })
+
   it.each([
+    [
+      'the file is not valid in the default encoding utf-8',
+      ['--channel', 'ERP webhook', dispatchFile],
+      'is not valid utf-8; name its encoding with --encoding',
+    ],
+    [
+      'the encoding is unknown',
+      ['--channel', 'ERP webhook', '--encoding', 'latin-9000', 'invoice.json'],
+      'Unknown encoding "latin-9000"',
+    ],
     [
       'the Channel name is unknown',
       ['--channel', 'Unknown', 'invoice.json'],
@@ -120,7 +168,7 @@ describe('submit', () => {
     [
       'the Channel is missing',
       ['invoice.json'],
-      'Usage: submit --channel <inbound Channel name> <file>',
+      'Usage: submit --channel <inbound Channel name> [--encoding <label>] <file>',
     ],
   ])('fails when %s', async (_, args, message) => {
     const result = await cli(['submit', ...args])

@@ -288,9 +288,9 @@ importers:
       '@edi-bridge/api':
         specifier: workspace:*
         version: link:../api
-      '@edi-bridge/db':
+      '@edi-bridge/fixtures':
         specifier: workspace:*
-        version: link:../../packages/db
+        version: link:../../packages/fixtures
       '@edi-bridge/oxlint-config':
         specifier: workspace:*
         version: link:../../packages/oxlint-config
