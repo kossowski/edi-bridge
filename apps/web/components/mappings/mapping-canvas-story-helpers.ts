@@ -5,6 +5,7 @@ import type { BeforeEach } from 'storybook/internal/csf'
 
 import { nodeId } from '@/components/mappings/mapping-tree'
 import { findRowButton, rowOfButton } from '@/components/mappings/tree-node'
+import { findOpenDialog, findOpenMenu, waitForFocusInside } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { mappingDraftEndpoint, toPath } from '@edi-bridge/contracts'
 import {
@@ -44,11 +45,6 @@ export function reviewing(record: MappingDraftRecord): BeforeEach<ReactRenderer>
       }),
     )
   }
-}
-
-// The tooltip renders in a portal outside the story's root.
-export function page(canvasElement: HTMLElement) {
-  return within(canvasElement.ownerDocument.body)
 }
 
 export async function findAlert(canvasElement: HTMLElement, title: string) {
@@ -180,19 +176,8 @@ export const source = (path: string): RowRef => ({ side: 'source', path })
 
 export const target = (path: string): RowRef => ({ side: 'target', path })
 
-// A sheet renders in a portal outside the story's root, and fades in. A busy CI runner can take
-// longer than the default second to finish the open transition.
-export async function findSheetElement(canvasElement: HTMLElement, name: string) {
-  const wait = { timeout: 5000 }
-  const sheet = await page(canvasElement).findByRole('dialog', { name }, wait)
-
-  await waitFor(() => expect(sheet).toBeVisible(), wait)
-
-  return sheet
-}
-
 export async function findSheet(canvasElement: HTMLElement, name: string) {
-  return within(await findSheetElement(canvasElement, name))
+  return within(await findOpenDialog(canvasElement, name))
 }
 
 export function detailsPanel(canvasElement: HTMLElement, name = 'Details') {
@@ -202,12 +187,9 @@ export function detailsPanel(canvasElement: HTMLElement, name = 'Details') {
 export async function openDetails(canvasElement: HTMLElement, name = 'Details') {
   await userEvent.click(await within(canvasElement).findByRole('button', { name }))
 
-  const sheet = await findSheetElement(canvasElement, name)
+  const sheet = await findOpenDialog(canvasElement, name)
 
-  // The sheet takes the focus a frame or more after it shows; a key pressed before then misses it.
-  await waitFor(() => expect(sheet.contains(sheet.ownerDocument.activeElement)).toBe(true), {
-    timeout: 5000,
-  })
+  await waitForFocusInside(sheet)
 
   return within(sheet)
 }
@@ -238,19 +220,10 @@ export async function findLinkLine(canvasElement: HTMLElement, name: string) {
   return link.querySelector<SVGPathElement>('.react-flow__edge-interaction')!
 }
 
-// The menu renders in a portal outside the story's root, and fades in.
-export async function findLinkMenu(canvasElement: HTMLElement) {
-  const menu = await page(canvasElement).findByRole('menu')
-
-  await waitFor(() => expect(menu).toBeVisible())
-
-  return within(menu)
-}
-
 export async function openLinkMenuByMouse(canvasElement: HTMLElement, name: string) {
   await userEvent.pointer({ keys: '[MouseRight]', target: await findLinkLine(canvasElement, name) })
 
-  return findLinkMenu(canvasElement)
+  return findOpenMenu(canvasElement)
 }
 
 export async function openLinkMenuByKeyboard(
@@ -260,7 +233,7 @@ export async function openLinkMenuByKeyboard(
 ) {
   await pressOn(await within(canvasElement).findByRole('group', { name }), keys)
 
-  return findLinkMenu(canvasElement)
+  return findOpenMenu(canvasElement)
 }
 
 // An empty Mapping opens on "Start here"; this takes the path that opens the empty editor.

@@ -2,10 +2,23 @@ import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
+import type { ReactNode } from 'react'
+
 import { AppSearch } from '@/components/app-search'
+import { findMainContent, mainContentId } from '@/components/main-content-focus'
 import { QueryProvider } from '@/components/query-provider'
 import { sessionHandlers } from '@/components/session/session-story-helpers'
-import { darkMode, desktop, german, laptop, mobile, tablet } from '@/components/story-helpers'
+import {
+  darkMode,
+  desktop,
+  findOpenDialog,
+  german,
+  laptop,
+  mobile,
+  tablet,
+  waitForFocusInside,
+  waitForFocusOn,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { runsEndpoint, tradingPartnersEndpoint } from '@edi-bridge/contracts'
 import {
@@ -85,6 +98,7 @@ export const Results = meta.story({
     await waitFor(() =>
       expect(dialog.queryByRole('option', { name: /^Hansemarkt GmbH/ })).toBeNull(),
     )
+    // SAFETY: the seed holds Alpenfrisch Märkte AG, whose option the palette just showed.
     const partner = seedTradingPartners.find(({ name }) => name === 'Alpenfrisch Märkte AG')!
     await userEvent.click(dialog.getByRole('option', { name: /^Alpenfrisch Märkte AG/ }))
     await expect(getRouter().push).toHaveBeenCalledWith(`/trading-partners/${partner.id}`)
@@ -117,6 +131,71 @@ export const KeyboardShortcut = meta.story({
   },
 })
 
+// The workspace layout keeps #main-content while the page inside it changes. Like a real page, it
+// holds controls, which must not take the focus in its place.
+const besideMainContent = (Story: () => ReactNode) => (
+  <>
+    <Story />
+    <div id={mainContentId} tabIndex={-1} className="flex gap-2 p-4 outline-none">
+      <button type="button">All 24</button>
+      <input aria-label="Search the glossary" />
+    </div>
+  </>
+)
+
+function mainContent(canvasElement: HTMLElement) {
+  const element = findMainContent(canvasElement.ownerDocument)
+
+  if (!element) {
+    throw new Error('No #main-content beside the story')
+  }
+
+  return element
+}
+
+export const OpenedResultFocusesMainContent = meta.story({
+  decorators: [besideMainContent],
+  async play({ canvas, canvasElement }) {
+    await userEvent.click(await canvas.findByRole('button', { name: searchButton }))
+    const dialog = await findOpenDialog(canvasElement, 'Search')
+
+    await userEvent.type(within(dialog).getByRole('combobox'), 'glossary')
+    await userEvent.click(await within(dialog).findByRole('option', { name: /^Help & glossary/ }))
+    await expect(getRouter().push).toHaveBeenCalledWith('/help')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitForFocusOn(mainContent(canvasElement))
+  },
+})
+
+export const KeyboardResultFocusesMainContent = meta.story({
+  decorators: [besideMainContent],
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('button', { name: searchButton })
+    await userEvent.keyboard('{Control>}k{/Control}')
+    const dialog = await findOpenDialog(canvasElement, 'Search')
+
+    await waitForFocusInside(dialog)
+    await userEvent.keyboard('code translations')
+    await waitFor(() => expect(within(dialog).getAllByRole('option')).toHaveLength(1))
+    await userEvent.keyboard('{Enter}')
+    await expect(getRouter().push).toHaveBeenCalledWith('/code-translations')
+    await waitForFocusOn(mainContent(canvasElement))
+  },
+})
+
+export const ClosingReturnsFocusToSearch = meta.story({
+  decorators: [besideMainContent],
+  async play({ canvas, canvasElement }) {
+    const button = await canvas.findByRole('button', { name: searchButton })
+
+    await userEvent.click(button)
+    await waitForFocusInside(await findOpenDialog(canvasElement, 'Search'))
+    await userEvent.keyboard('{Escape}')
+    await waitForFocusOn(button)
+    await expect(getRouter().push).not.toHaveBeenCalled()
+  },
+})
+
 export const Order = meta.story({
   async play({ canvas }) {
     const dialog = await openPalette(canvas)
@@ -146,6 +225,7 @@ export const OrderBesideOtherResults = meta.story({
 
     await expect(within(orders).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true')
     await expect(dialog.queryByText('Nothing found.')).toBeNull()
+    // SAFETY: getAllByRole throws when the group holds no option.
     await userEvent.click(within(orders).getAllByRole('option')[0]!)
     await expect(getRouter().push).toHaveBeenCalledWith(
       `/orders/${orderLifecycleReferences.failures}`,

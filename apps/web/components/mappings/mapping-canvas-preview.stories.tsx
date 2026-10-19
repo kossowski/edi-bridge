@@ -5,13 +5,13 @@ import {
   openEmptyEditor,
   findRow,
   findSaveStatus,
-  page,
   pressOn,
   seeded,
   source,
   target,
   findSheet,
 } from '@/components/mappings/mapping-canvas-story-helpers'
+import { page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { createHandlers } from '@edi-bridge/mocks'
 

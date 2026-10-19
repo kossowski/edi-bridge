@@ -337,6 +337,26 @@ export const Tablet = meta.story({
   },
 })
 
+export const GermanTablet = meta.story({
+  ...tablet,
+  decorators: [besideSidebar, german],
+  parameters: {
+    ...tablet.parameters,
+    nextjs: { navigation: { pathname: '/mappings/m-1/versions/compare' } },
+  },
+  beforeEach({ msw }) {
+    msw.use(...sessionHandlers(showcaseViewerSession))
+  },
+  async play({ canvas, canvasElement }) {
+    const pathMenu = await canvas.findByRole('button', { name: 'Ganzen Pfad anzeigen' })
+
+    await expect(pathMenu).toBeVisible()
+    await expect(
+      canvasElement.querySelector('[data-slot="breadcrumb-ellipsis"]'),
+    ).toHaveTextContent('Mehr')
+  },
+})
+
 export const Mobile = meta.story({
   ...mobile,
   parameters: {

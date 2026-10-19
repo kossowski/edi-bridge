@@ -5,9 +5,9 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { AppPage } from '@/components/app-page'
 import { AiReviewState } from '@/components/mappings/ai-review-state'
-import { page } from '@/components/mappings/mapping-canvas-story-helpers'
+import {} from '@/components/mappings/mapping-canvas-story-helpers'
 import { DraftStateLabel, PublishDraft } from '@/components/mappings/publish-draft'
-import { darkMode, german } from '@/components/story-helpers'
+import { darkMode, german, page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { mappingDraftQuery } from '@/lib/api/queries'
 import {

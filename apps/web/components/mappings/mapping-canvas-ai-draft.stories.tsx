@@ -12,10 +12,10 @@ import { MappingCanvasScreen } from '@/components/mappings/mapping-canvas-screen
 import {
   expectSavedLinkCount,
   findSheet,
-  page,
   seeded,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { viewerStory } from '@/components/session/session-story-helpers'
+import { page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import {

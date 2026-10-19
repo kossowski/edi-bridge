@@ -175,7 +175,11 @@ export function AccountMenu() {
                       value={locale}
                       onValueChange={(value: string) => startTransition(() => setLocale(value))}>
                       {locales.map((option) => (
-                        <DropdownMenuRadioItem key={option} lang={option} value={option}>
+                        <DropdownMenuRadioItem
+                          key={option}
+                          closeOnClick
+                          lang={option}
+                          value={option}>
                           {t(`language.${option}`)}
                         </DropdownMenuRadioItem>
                       ))}

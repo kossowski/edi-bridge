@@ -5,8 +5,9 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
+import { focusMainContent } from '@/components/main-content-focus'
 import {
   OrderLifecycleResults,
   orderLifecycleResultValue,
@@ -59,6 +60,7 @@ export function AppSearch() {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedResult, setSelectedResult] = useState('')
+  const openingResult = useRef(false)
 
   const businessReference = businessReferenceIn(search)
   const settled = useDebouncedValue(businessReference, businessReference ?? '', searchDelay)
@@ -112,6 +114,10 @@ export function AppSearch() {
   const failed = failures.some((failure) => failure.failed)
 
   function changeOpen(next: boolean) {
+    if (next) {
+      openingResult.current = false
+    }
+
     setOpen(next)
     setSearch('')
   }
@@ -119,8 +125,17 @@ export function AppSearch() {
   useSearchShortcut(() => changeOpen(!open))
 
   function openResult(href: string) {
+    openingResult.current = true
     changeOpen(false)
     router.push(href)
+  }
+
+  // The workspace layout keeps #main-content, so the opened page's content takes the focus. Base UI
+  // would move a final focus on to the first control inside it, so the palette sets it itself.
+  function focusAfterClose(opened: boolean) {
+    if (!opened && openingResult.current) {
+      focusMainContent()
+    }
   }
 
   return (
@@ -140,9 +155,11 @@ export function AppSearch() {
       </Button>
       <CommandDialog
         description={t('description')}
+        finalFocus={() => !openingResult.current}
         open={open}
         title={t('title')}
-        onOpenChange={changeOpen}>
+        onOpenChange={changeOpen}
+        onOpenChangeComplete={focusAfterClose}>
         <Command
           filter={matchesAllTerms}
           label={t('title')}

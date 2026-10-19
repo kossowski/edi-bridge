@@ -11,7 +11,6 @@ import {
   findSaveStatus,
   liveStatus,
   openDetails,
-  page,
   pressOn,
   seeded,
   source,
@@ -19,7 +18,7 @@ import {
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { transformsHiddenKey } from '@/components/mappings/transform-list'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { laptop } from '@/components/story-helpers'
+import { laptop, page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { mappingVersionsEndpoint, type MappingVersionEntry } from '@edi-bridge/contracts'

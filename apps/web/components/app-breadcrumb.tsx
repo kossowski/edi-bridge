@@ -71,7 +71,7 @@ function PathMenu({ crumbs, firstHidden }: { crumbs: ReadonlyArray<Crumb>; first
         <DropdownMenu>
           <DropdownMenuTrigger
             render={<Button size="icon-xs" variant="ghost" aria-label={t('showPath')} />}>
-            <BreadcrumbEllipsis />
+            <BreadcrumbEllipsis label={t('more')} />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-auto max-w-80">
             {crumbs.slice(firstHidden).map((crumb) => (
