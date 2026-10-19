@@ -13,6 +13,7 @@ export {
   type SecretColumn,
   secretContext,
   secretKeyBytes,
+  secretKeyEnv,
 } from './secret'
 
 export {

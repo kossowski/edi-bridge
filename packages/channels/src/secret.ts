@@ -1,10 +1,25 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
+import { z } from 'zod'
 
 const algorithm = 'aes-256-gcm'
 
 const version = 'v1'
 
 export const secretKeyBytes = 32
+
+const secretKeySchema = z
+  .base64()
+  .transform((value) => Buffer.from(value, 'base64'))
+  .refine(
+    (key) => key.length === secretKeyBytes,
+    `A key of ${secretKeyBytes} bytes, base64-encoded`,
+  )
+
+const developmentSecretKey = () => Buffer.alloc(secretKeyBytes, 'edi-bridge-development-only')
+
+// The API and the worker share the key, so outside production they share its default too.
+export const secretKeyEnv = (production: boolean) =>
+  production ? secretKeySchema : secretKeySchema.default(developmentSecretKey)
 
 export type SecretColumn =
   | 'encryptedCredential'
