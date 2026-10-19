@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { type Duration, Effect, Exit, Fiber } from 'effect'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,6 +23,7 @@ import {
   mappings,
   mappingVersions,
   runs,
+  runSteps,
   tradingPartners,
   workspaces,
 } from '@edi-bridge/db'
@@ -934,6 +935,77 @@ describe('the sweep of stuck Runs', () => {
         { stage: 'validation', status: 'succeeded' },
         { stage: 'delivery', status: 'succeeded' },
       ],
+    })
+  })
+
+  it('keeps the Interchange its Retry delivered when the stalled worker resumes building its own', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Rebuilt Foods')
+
+    await deliverOverSftp(connection.db, into, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+    const [queued] = queue.queued
+    const { promise: resumed, resolve: resume } = Promise.withResolvers<void>()
+    const { promise: building, resolve: buildStarted } = Promise.withResolvers<void>()
+    const { db } = connection
+    let hasStalled = false
+
+    const isDelivering = async () => {
+      const [delivery] = await db
+        .select({ status: runSteps.status })
+        .from(runSteps)
+        .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, 'delivery')))
+
+      return delivery?.status === 'running'
+    }
+
+    // The worker stalls as it claims the control reference of its Interchange.
+    const transaction: typeof db.transaction = async (run, config) => {
+      if (!hasStalled && (await isDelivering())) {
+        hasStalled = true
+        buildStarted()
+        await resumed
+      }
+
+      return db.transaction(run, config)
+    }
+
+    // SAFETY: its prototype is the connection's database, so it has every member but its own transaction.
+    const stallingDb: typeof db = Object.assign(Object.create(db) as typeof db, { transaction })
+
+    const stalled = Effect.runPromise(
+      processRun(queued ?? { workspaceId: into.id, runId }).pipe(
+        pipelineServices(stallingDb, queue, () => Effect.void),
+      ),
+    )
+
+    await building
+    await leaveStuck(runId)
+    await sweepStuck()
+
+    // The Workspace changes its GLN meanwhile, so the two workers build different Interchanges.
+    await db
+      .update(workspaces)
+      .set({ gln: withCheckDigit('430000000099') })
+      .where(eq(workspaces.id, into.id))
+
+    const retried = inMemoryRunQueue()
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+
+    await Effect.runPromise(
+      retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(db, retried)),
+    )
+    await processQueued(retried, handOvers)
+
+    resume()
+    await stalled
+
+    const delivered = handOvers.mock.calls[0]?.[1].content
+
+    expect(handOvers).toHaveBeenCalledOnce()
+    await expect(readRun(db, runId)).resolves.toMatchObject({
+      status: 'delivered',
+      output: delivered?.toString('latin1'),
     })
   })
 })

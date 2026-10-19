@@ -581,6 +581,7 @@ const messageSchema = z.object({
 const buildInterchange = (
   queued: QueuedRun,
   run: ClaimedRun,
+  lease: StepLease,
   { workspace, tradingPartner }: Destination,
 ) =>
   Effect.gen(function* () {
@@ -609,9 +610,22 @@ const buildInterchange = (
 
     const content = yield* encoded(interchange, characterSet)
 
-    yield* Effect.promise(() =>
-      db.update(runs).set({ output: interchange }).where(eq(runs.id, queued.runId)),
+    // A stalled worker must not replace the Interchange that a Retry of the Run delivered.
+    const stored = yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        if (!(await isLeased(tx, lease))) {
+          return false
+        }
+
+        await tx.update(runs).set({ output: interchange }).where(eq(runs.id, run.id))
+
+        return true
+      }),
     )
+
+    if (!stored) {
+      return yield* new RunNotOwned({ runId: run.id })
+    }
 
     return { reference, content }
   })
@@ -630,7 +644,7 @@ const deliverInterchange =
       const { reference, content } =
         run.output !== null && run.controlReference !== null
           ? { reference: run.controlReference, content: Buffer.from(run.output, 'latin1') }
-          : yield* buildInterchange(queued, run, destination)
+          : yield* buildInterchange(queued, run, lease, destination)
 
       // The name carries the control reference, so a Retry uploads under the name of its first attempt.
       yield* handOver(run, lease, destination.channel, {
@@ -793,6 +807,15 @@ const ensureOwned = (lease: StepLease) =>
     }
   })
 
+// Locks the Run first, so the sweep cannot take it between this check and the write after it.
+const isLeased = async (tx: Transaction, lease: StepLease) => {
+  await tx.select({ id: runs.id }).from(runs).where(eq(runs.id, lease.runId)).for('update')
+
+  const [owned] = await tx.select({ runId: runSteps.runId }).from(runSteps).where(leased(lease))
+
+  return owned !== undefined
+}
+
 // A step starts only from pending on a processing Run, so two workers never both start it.
 const startStep = (runId: string, stage: RunStepStage) =>
   Effect.gen(function* () {
@@ -826,16 +849,17 @@ const startStep = (runId: string, stage: RunStepStage) =>
     return { runId, stage, startedAt } satisfies StepLease
   })
 
+// What a step stores for later steps goes into its finish, so only the worker that owns the Run stores it.
 const step = <A, E, R>(
   runId: string,
   stage: RunStepStage,
-  effect: Effect.Effect<A, E, R> | ((lease: StepLease) => Effect.Effect<A, E, R>),
-  succeeded: (tx: Transaction) => Promise<void> = () => Promise.resolve(),
+  run: (lease: StepLease) => Effect.Effect<A, E, R>,
+  succeeded: (tx: Transaction, value: A) => Promise<void> = () => Promise.resolve(),
 ) =>
   Effect.gen(function* () {
     const lease = yield* startStep(runId, stage)
 
-    const result = yield* Effect.result(Effect.isEffect(effect) ? effect : effect(lease))
+    const result = yield* Effect.result(run(lease))
     const db = yield* Database
     const finishedAt = yield* DateTime.nowAsDate
 
@@ -848,7 +872,7 @@ const step = <A, E, R>(
           .returning({ runId: runSteps.runId })
 
         if (own !== undefined && Result.isSuccess(result)) {
-          await succeeded(tx)
+          await succeeded(tx, result.success)
         }
 
         return own !== undefined
@@ -915,7 +939,6 @@ const defectFailure = (stage: FailureStage): Failure => ({
 })
 
 // A defect can stop a Run before its first step starts or after its step failed.
-// Answers whether it failed the Run.
 export const failOnDefect = (runId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
@@ -1122,9 +1145,7 @@ type Processing = {
 
 const processOutbound = ({ queued, run, content, pinned, lookupTables }: Processing) =>
   Effect.gen(function* () {
-    const mapped = yield* step(
-      run.id,
-      'mapping',
+    const mapped = yield* step(run.id, 'mapping', () =>
       readDocument(pinned.structure, content).pipe(
         Effect.flatMap((document) =>
           mapMessage(
@@ -1142,28 +1163,26 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
 
     const { message } = mapped.success
     const destination = yield* loadDestination(queued)
+    const delivering = { ...run, businessReference: orderNumberOf(message), deliveryInput: message }
 
     const checked = yield* step(
       run.id,
       'validation',
-      validated(message, destination.tradingPartner.characterSet),
+      () => validated(message, destination.tradingPartner.characterSet),
+      async (tx) => {
+        await tx
+          .update(runs)
+          .set({
+            businessReference: delivering.businessReference,
+            deliveryInput: delivering.deliveryInput,
+          })
+          .where(eq(runs.id, run.id))
+      },
     )
 
     if (Result.isFailure(checked)) {
       return yield* fail(run.id, validationFailure(pinned, mapped.success, checked.failure))
     }
-
-    const db = yield* Database
-
-    const [checkedRun] = yield* Effect.promise(() =>
-      db
-        .update(runs)
-        .set({ businessReference: orderNumberOf(message), deliveryInput: message })
-        .where(eq(runs.id, run.id))
-        .returning(),
-    )
-
-    const delivering = checkedRun ?? run
 
     yield* deliveryStep(
       delivering,
@@ -1213,24 +1232,25 @@ const processInbound = ({
   tradingPartner,
 }: Processing) =>
   Effect.gen(function* () {
-    const read = yield* step(run.id, 'parse', readMessage(content, run.messageIndex))
+    // A waiting Run needs its Business Reference, so a resend can replace it.
+    const read = yield* step(
+      run.id,
+      'parse',
+      () => readMessage(content, run.messageIndex),
+      async (tx, { message }) => {
+        await tx
+          .update(runs)
+          .set({ businessReference: documentNumberOf(message) })
+          .where(eq(runs.id, run.id))
+      },
+    )
 
     if (Result.isFailure(read)) {
       return yield* fail(run.id, parseFailure(content, tradingPartner, read.failure))
     }
 
-    const db = yield* Database
     const { message } = read.success
-
-    // A waiting Run needs its Business Reference, so a resend can replace it.
-    yield* Effect.promise(() =>
-      db
-        .update(runs)
-        .set({ businessReference: documentNumberOf(message) })
-        .where(eq(runs.id, run.id)),
-    )
-
-    const checked = yield* step(run.id, 'validation', validatedInbound(read.success))
+    const checked = yield* step(run.id, 'validation', () => validatedInbound(read.success))
 
     if (Result.isFailure(checked)) {
       return yield* fail(
@@ -1244,29 +1264,31 @@ const processInbound = ({
     const mapped = yield* step(
       run.id,
       'mapping',
-      applyInboundMappingVersion(
-        { ...pinned.graph, source: { kind: 'messageType', messageType: pinned.messageType } },
-        structure,
-        message,
-        { lookupTables: entriesOf(lookupTables) },
-      ).pipe(Effect.flatMap((document) => writeDocument(structure, document))),
+      () =>
+        applyInboundMappingVersion(
+          { ...pinned.graph, source: { kind: 'messageType', messageType: pinned.messageType } },
+          structure,
+          message,
+          { lookupTables: entriesOf(lookupTables) },
+        ).pipe(
+          Effect.flatMap((document) => writeDocument(structure, document)),
+          Effect.map((written) => new TextDecoder(encodingOf(structure)).decode(written)),
+        ),
+      async (tx, output) => {
+        await tx.update(runs).set({ output }).where(eq(runs.id, run.id))
+      },
     )
 
     if (Result.isFailure(mapped)) {
       return yield* fail(run.id, mappingFailure(pinned, lookupTables, mapped.failure))
     }
 
-    const written = mapped.success
+    const delivering = {
+      ...run,
+      businessReference: documentNumberOf(message),
+      output: mapped.success,
+    }
 
-    const [mappedRun] = yield* Effect.promise(() =>
-      db
-        .update(runs)
-        .set({ output: new TextDecoder(encodingOf(structure)).decode(written) })
-        .where(eq(runs.id, run.id))
-        .returning(),
-    )
-
-    const delivering = mappedRun ?? run
     const destination = yield* loadDestination(queued)
 
     const delivered = yield* deliveryStep(
