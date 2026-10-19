@@ -16,22 +16,14 @@ import { aiTokenUsage, workspaces } from '@edi-bridge/db'
 import {
   addMember,
   type Client,
-  type NewMember,
   otherWorkspace,
+  ownOperator,
   ownWorkspace,
   signIn,
   startTestApi,
   type TestApi,
+  today,
 } from './testing.js'
-
-const operatorOfOwnWorkspace: NewMember = {
-  name: 'Settings Operator',
-  email: 'operator@settings.example',
-  password: 'settings-operator-password',
-  workspaceId: ownWorkspace.id,
-  role: 'viewer',
-  operator: true,
-}
 
 const defaults = {
   documentRetentionDays: documentRetentionDays.default,
@@ -49,8 +41,8 @@ let operator: Client
 
 beforeAll(async () => {
   api = await startTestApi()
-  await addMember(api.connection.db, operatorOfOwnWorkspace)
-  operator = await signIn(api.app, operatorOfOwnWorkspace)
+  await addMember(api.connection.db, ownOperator)
+  operator = await signIn(api.app, ownOperator)
 }, 60_000)
 
 afterAll(async () => {
@@ -65,12 +57,10 @@ beforeEach(async () => {
   })
 })
 
-const today = () => new Date().toISOString().slice(0, 10)
-
 const getSettings = (target: Client = api.admin) =>
   target.inject({ method: 'GET', url: workspaceSettingsEndpoint.path })
 
-const putSettings = (body: Partial<WorkspaceSettingsInput>, target: Client = api.admin) =>
+const putSettings = (body: Partial<WorkspaceSettingsInput>, target: Client = operator) =>
   target.inject({ method: 'PUT', url: updateWorkspaceSettingsEndpoint.path, body })
 
 const operatorPath = (workspaceId: string) =>
@@ -182,8 +172,14 @@ describe('PUT /workspaces/current/settings', () => {
     expect((await getSettings()).json()).toEqual(defaults)
   })
 
-  it('answers 403 to a Viewer and changes nothing', async () => {
-    expect((await putSettings(changed, api.viewer)).statusCode).toBe(403)
+  it.each([
+    ['an Admin', () => api.admin],
+    ['a Viewer', () => api.viewer],
+  ])('answers 403 to %s and changes nothing', async (_case, target) => {
+    const response = await putSettings(changed, target())
+
+    expect(response.statusCode).toBe(403)
+    expect(response.json()).toEqual({ message: 'Forbidden' })
     expect((await getSettings()).json()).toEqual(defaults)
   })
 
@@ -195,7 +191,7 @@ describe('PUT /workspaces/current/settings', () => {
 
 describe('GET /operator/workspaces/:workspaceId/settings', () => {
   it('returns the settings of any Workspace to the Operator', async () => {
-    await putSettings(changed, api.otherAdmin)
+    await putOperatorSettings(otherWorkspace.id, changed)
     await api.connection.db
       .insert(aiTokenUsage)
       .values({ workspaceId: otherWorkspace.id, day: today(), tokens: 42 })

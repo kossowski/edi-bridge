@@ -8,7 +8,7 @@ import type { WorkspaceSettings, WorkspaceSettingsInput } from '@edi-bridge/cont
 import { loadAiBudget } from './ai-budget.js'
 import { Db } from './db.js'
 import { exactlyOne } from './rows.js'
-import { CurrentWorkspace, requireWorkspace } from './workspace.js'
+import { CurrentWorkspace } from './workspace.js'
 
 export const loadWorkspaceSettings: Effect.Effect<WorkspaceSettings, never, CurrentWorkspace | Db> =
   Effect.gen(function* () {
@@ -45,11 +45,3 @@ export const updateWorkspaceSettings = ({
 
     return yield* loadWorkspaceSettings
   })
-
-export const forWorkspace =
-  (workspaceId: string) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    Effect.andThen(
-      requireWorkspace(workspaceId),
-      Effect.provideService(effect, CurrentWorkspace, { id: workspaceId }),
-    )

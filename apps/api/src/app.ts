@@ -144,6 +144,7 @@ import {
   recordActivity,
   requireChangeRight,
   requireOperator,
+  requireOperatorRight,
   resolveMember,
   resolveUser,
 } from './session.js'
@@ -160,12 +161,13 @@ import {
   listWorkspaceMembers,
   removeWorkspaceMember,
 } from './workspace-member.js'
+import { loadWorkspaceSettings, updateWorkspaceSettings } from './workspace-settings.js'
 import {
-  forWorkspace,
-  loadWorkspaceSettings,
-  updateWorkspaceSettings,
-} from './workspace-settings.js'
-import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
+  CurrentWorkspace,
+  forExistingWorkspace,
+  loadCurrentWorkspace,
+  updateCompanyIdentity,
+} from './workspace.js'
 
 import type {
   AiBudgetExhausted,
@@ -427,9 +429,9 @@ function registerRoutes(
     respond(
       request,
       reply,
-      Effect.flatMap(
-        parse(updateWorkspaceSettingsEndpoint.body, request.body),
-        updateWorkspaceSettings,
+      requireOperatorRight.pipe(
+        Effect.andThen(parse(updateWorkspaceSettingsEndpoint.body, request.body)),
+        Effect.flatMap(updateWorkspaceSettings),
       ),
     ),
   )
@@ -835,7 +837,7 @@ function registerRoutes(
       respondToOperator(
         request,
         reply,
-        loadWorkspaceSettings.pipe(forWorkspace(request.params.workspaceId)),
+        loadWorkspaceSettings.pipe(forExistingWorkspace(request.params.workspaceId)),
       ),
   )
 
@@ -848,7 +850,7 @@ function registerRoutes(
         Effect.flatMap(
           parse(updateOperatorWorkspaceSettingsEndpoint.body, request.body),
           updateWorkspaceSettings,
-        ).pipe(forWorkspace(request.params.workspaceId)),
+        ).pipe(forExistingWorkspace(request.params.workspaceId)),
       ),
   )
 
