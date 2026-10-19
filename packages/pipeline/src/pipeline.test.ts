@@ -3293,15 +3293,15 @@ describe('the CONTRL answering a received Interchange', () => {
     const { exit } = await receiving(into, interchangeOf([ordersMessage], 2))
     await sendWith(delivery.service)
 
-    expect(delivery.to(into.outboundChannelId)).toMatchObject([
-      {
-        content: expect.stringContaining('UCI+00000001+4071615111110:14+4389876511113:14+4+29+UNZ'),
-      },
-    ])
-    await expect(acknowledgementOf(documentIdOf(exit))).resolves.toMatchObject({
-      notSentReason: null,
-      handedOverAt: expect.any(Date),
-    })
+    const sent = delivery.to(into.outboundChannelId)
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]?.content).toContain('UCI+00000001+4071615111110:14+4389876511113:14+4+29+UNZ')
+
+    const acknowledgement = await acknowledgementOf(documentIdOf(exit))
+
+    expect(acknowledgement?.notSentReason).toBeNull()
+    expect(acknowledgement?.handedOverAt).toBeInstanceOf(Date)
   })
 
   it('answers an Interchange whose Message Type no Flow takes', async () => {
@@ -3316,13 +3316,12 @@ describe('the CONTRL answering a received Interchange', () => {
     expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toMatchObject({
       reason: 'noRoutedMessage',
     })
-    expect(delivery.to(into.outboundChannelId)).toMatchObject([
-      {
-        content: expect.stringContaining(
-          "UCI+00000001+4071615111110:14+4389876511113:14+7'UCM+ME0001+PRICAT",
-        ),
-      },
-    ])
+    const sent = delivery.to(into.outboundChannelId)
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]?.content).toContain(
+      "UCI+00000001+4071615111110:14+4389876511113:14+7'UCM+ME0001+PRICAT",
+    )
   })
 
   it('answers no Interchange from a sender without a Trading Partner', async () => {
