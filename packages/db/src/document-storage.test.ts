@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { connect, type Connection } from './client.js'
 import { type DocumentStorage, postgresDocumentStorage } from './document-storage.js'
-import { workspaces } from './schema.js'
+import { channels, workspaces } from './schema.js'
 import { startTestDatabase, type TestDatabase } from './testing.js'
 
 let testDatabase: TestDatabase
@@ -13,21 +13,43 @@ let storage: DocumentStorage
 
 let workspaceId: string
 
-beforeAll(async () => {
-  testDatabase = await startTestDatabase()
-  connection = connect(testDatabase.url)
-  storage = postgresDocumentStorage(connection.db)
+let channelId: string
 
+async function insertWorkspace(name: string) {
   const [workspace] = await connection.db
     .insert(workspaces)
-    .values({ name: 'Nordwind Foods' })
+    .values({ name })
     .returning({ id: workspaces.id })
 
   if (workspace === undefined) {
     throw new Error('Workspace insert returned no row')
   }
 
-  workspaceId = workspace.id
+  const [channel] = await connection.db
+    .insert(channels)
+    .values({
+      workspaceId: workspace.id,
+      type: 'webhook',
+      direction: 'inbound',
+      name: 'ERP webhook',
+      rateLimitPerMinute: 60,
+      encryptedWebhookToken: 'encrypted',
+      webhookTokenLastFour: 'abcd',
+    })
+    .returning({ id: channels.id })
+
+  if (channel === undefined) {
+    throw new Error('Channel insert returned no row')
+  }
+
+  return { workspaceId: workspace.id, channelId: channel.id }
+}
+
+beforeAll(async () => {
+  testDatabase = await startTestDatabase()
+  connection = connect(testDatabase.url)
+  storage = postgresDocumentStorage(connection.db)
+  ;({ workspaceId, channelId } = await insertWorkspace('Nordwind Foods'))
 }, 60_000)
 
 afterAll(async () => {
@@ -40,11 +62,17 @@ const invoice =
 
 describe('the Document storage', () => {
   it('reads back a stored Document unmodified', async () => {
-    const stored = await storage.store({ workspaceId, fileName: 'invoice.edi', content: invoice })
+    const stored = await storage.store({
+      workspaceId,
+      channelId,
+      fileName: 'invoice.edi',
+      content: invoice,
+    })
 
-    await expect(storage.read(stored.id)).resolves.toEqual({
+    await expect(storage.read(workspaceId, stored.id)).resolves.toEqual({
       id: stored.id,
       workspaceId,
+      channelId,
       fileName: 'invoice.edi',
       content: invoice,
       receivedAt: stored.receivedAt,
@@ -54,19 +82,46 @@ describe('the Document storage', () => {
   it('keeps characters outside ASCII', async () => {
     const content = '{"supplier":"Müller & Söhne GmbH","note":"Größe ½ – ✓"}'
 
-    const stored = await storage.store({ workspaceId, fileName: 'invoice.json', content })
+    const stored = await storage.store({
+      workspaceId,
+      channelId,
+      fileName: 'invoice.json',
+      content,
+    })
 
-    await expect(storage.read(stored.id)).resolves.toMatchObject({ content })
+    await expect(storage.read(workspaceId, stored.id)).resolves.toMatchObject({ content })
   })
 
   it('reads nothing for an unknown id', async () => {
-    await expect(storage.read('00000000-0000-4000-8000-000000000000')).resolves.toBeUndefined()
+    await expect(
+      storage.read(workspaceId, '00000000-0000-4000-8000-000000000000'),
+    ).resolves.toBeUndefined()
+  })
+
+  it('reads nothing for a Document of another Workspace', async () => {
+    const other = await insertWorkspace('Hanse Retail')
+
+    const stored = await storage.store({ ...other, fileName: 'invoice.edi', content: invoice })
+
+    await expect(storage.read(workspaceId, stored.id)).resolves.toBeUndefined()
+  })
+
+  it('rejects a Document without an existing Channel', async () => {
+    await expect(
+      storage.store({
+        workspaceId,
+        channelId: '00000000-0000-4000-8000-000000000000',
+        fileName: 'invoice.edi',
+        content: invoice,
+      }),
+    ).rejects.toThrow()
   })
 
   it('rejects a Document without an existing Workspace', async () => {
     await expect(
       storage.store({
         workspaceId: '00000000-0000-4000-8000-000000000000',
+        channelId,
         fileName: 'invoice.edi',
         content: invoice,
       }),

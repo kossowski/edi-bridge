@@ -1,5 +1,5 @@
 {
-  "id": "670de910-0617-45d5-9108-b1c55e6e79b6",
+  "id": "3f17755e-71a6-4453-9bbe-e1e2590b94bf",
   "prevId": "21df32ed-d7ab-4c90-ade1-eb364329e7f6",
   "version": "7",
   "dialect": "postgresql",
@@ -496,6 +496,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "file_name": {
           "name": "file_name",
           "type": "text",
@@ -531,6 +537,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "documents_channel_id_index": {
+          "name": "documents_channel_id_index",
+          "columns": [
+            {
+              "expression": "channel_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -545,6 +566,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "documents_channel_id_channels_id_fk": {
+          "name": "documents_channel_id_channels_id_fk",
+          "tableFrom": "documents",
+          "tableTo": "channels",
+          "columnsFrom": [
+            "channel_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -1544,7 +1578,7 @@
         },
         "run_steps_timings": {
           "name": "run_steps_timings",
-          "value": "case \"run_steps\".\"status\"\n        when 'pending' then num_nonnulls(\"run_steps\".\"started_at\", \"run_steps\".\"finished_at\") = 0\n        when 'skipped' then num_nonnulls(\"run_steps\".\"started_at\", \"run_steps\".\"finished_at\") = 0\n        when 'running' then \"run_steps\".\"started_at\" is not null and \"run_steps\".\"finished_at\" is null\n        else coalesce(\"run_steps\".\"started_at\" <= \"run_steps\".\"finished_at\", false)\n      end"
+          "value": "case\n        when \"run_steps\".\"status\" in ('pending', 'skipped') then num_nonnulls(\"run_steps\".\"started_at\", \"run_steps\".\"finished_at\") = 0\n        when \"run_steps\".\"status\" = 'running' then \"run_steps\".\"started_at\" is not null and \"run_steps\".\"finished_at\" is null\n        else coalesce(\"run_steps\".\"started_at\" <= \"run_steps\".\"finished_at\", false)\n      end"
         }
       },
       "isRLSEnabled": false

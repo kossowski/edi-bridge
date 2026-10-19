@@ -330,7 +330,12 @@ describe('a Run', () => {
     const document = await only(
       connection.db
         .insert(documents)
-        .values({ workspaceId, fileName: 'invoice.json', content: '{"invoiceNumber":"INV-1001"}' })
+        .values({
+          workspaceId,
+          channelId: inbound.id,
+          fileName: 'invoice.json',
+          content: '{"invoiceNumber":"INV-1001"}',
+        })
         .returning(),
     )
 
@@ -556,6 +561,20 @@ describe('a Run', () => {
           stage: 'delivery',
           status: 'pending',
           startedAt: at('12:00:00'),
+        }),
+      ).rejects.toThrow()
+    })
+
+    it('rejects a skipped step with a finish time', async () => {
+      const run = await insertRun()
+
+      await expect(
+        connection.db.insert(runSteps).values({
+          runId: run.id,
+          position: 3,
+          stage: 'delivery',
+          status: 'skipped',
+          finishedAt: at('12:00:00'),
         }),
       ).rejects.toThrow()
     })

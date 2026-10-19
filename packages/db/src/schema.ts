@@ -442,11 +442,14 @@ export const documents = pgTable(
     workspaceId: uuid()
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
+    channelId: uuid()
+      .notNull()
+      .references(() => channels.id),
     fileName: text().notNull(),
     content: text().notNull(),
     receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
-  (table) => [index().on(table.workspaceId)],
+  (table) => [index().on(table.workspaceId), index().on(table.channelId)],
 )
 
 export const runStatus = pgEnum('run_status', runStatuses)
@@ -499,7 +502,7 @@ export const runs = pgTable(
       'runs_waiting_for_trading_partner',
       sql`${table.status} = 'failed' or ${table.waitingForTradingPartnerSince} is null`,
     ),
-    // Only a Run that failed delivery has valid output: earlier stages never produced deliverable EDIFACT.
+    // A Run that failed before delivery never has output: no earlier stage produces deliverable EDIFACT.
     check(
       'runs_output',
       sql`${table.failureStage} is null or ${table.failureStage} = 'delivery' or ${table.output} is null`,
@@ -529,10 +532,9 @@ export const runSteps = pgTable(
     check('run_steps_position', sql`${table.position} >= 0`),
     check(
       'run_steps_timings',
-      sql`case ${table.status}
-        when 'pending' then num_nonnulls(${table.startedAt}, ${table.finishedAt}) = 0
-        when 'skipped' then num_nonnulls(${table.startedAt}, ${table.finishedAt}) = 0
-        when 'running' then ${table.startedAt} is not null and ${table.finishedAt} is null
+      sql`case
+        when ${table.status} in ('pending', 'skipped') then num_nonnulls(${table.startedAt}, ${table.finishedAt}) = 0
+        when ${table.status} = 'running' then ${table.startedAt} is not null and ${table.finishedAt} is null
         else coalesce(${table.startedAt} <= ${table.finishedAt}, false)
       end`,
     ),

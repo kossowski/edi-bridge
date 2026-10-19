@@ -5,6 +5,7 @@ CREATE TYPE "public"."run_step_status" AS ENUM('succeeded', 'failed', 'running',
 CREATE TABLE "documents" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"workspace_id" uuid NOT NULL,
+	"channel_id" uuid NOT NULL,
 	"file_name" text NOT NULL,
 	"content" text NOT NULL,
 	"received_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -20,10 +21,9 @@ CREATE TABLE "run_steps" (
 	CONSTRAINT "run_steps_run_id_position_pk" PRIMARY KEY("run_id","position"),
 	CONSTRAINT "run_steps_run_id_stage_unique" UNIQUE("run_id","stage"),
 	CONSTRAINT "run_steps_position" CHECK ("run_steps"."position" >= 0),
-	CONSTRAINT "run_steps_timings" CHECK (case "run_steps"."status"
-        when 'pending' then num_nonnulls("run_steps"."started_at", "run_steps"."finished_at") = 0
-        when 'skipped' then num_nonnulls("run_steps"."started_at", "run_steps"."finished_at") = 0
-        when 'running' then "run_steps"."started_at" is not null and "run_steps"."finished_at" is null
+	CONSTRAINT "run_steps_timings" CHECK (case
+        when "run_steps"."status" in ('pending', 'skipped') then num_nonnulls("run_steps"."started_at", "run_steps"."finished_at") = 0
+        when "run_steps"."status" = 'running' then "run_steps"."started_at" is not null and "run_steps"."finished_at" is null
         else coalesce("run_steps"."started_at" <= "run_steps"."finished_at", false)
       end)
 );
@@ -51,6 +51,7 @@ CREATE TABLE "runs" (
 );
 --> statement-breakpoint
 ALTER TABLE "documents" ADD CONSTRAINT "documents_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "documents" ADD CONSTRAINT "documents_channel_id_channels_id_fk" FOREIGN KEY ("channel_id") REFERENCES "public"."channels"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "run_steps" ADD CONSTRAINT "run_steps_run_id_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "runs" ADD CONSTRAINT "runs_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "runs" ADD CONSTRAINT "runs_document_id_documents_id_fk" FOREIGN KEY ("document_id") REFERENCES "public"."documents"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -58,6 +59,7 @@ ALTER TABLE "runs" ADD CONSTRAINT "runs_flow_id_flows_id_fk" FOREIGN KEY ("flow_
 ALTER TABLE "runs" ADD CONSTRAINT "runs_trading_partner_id_trading_partners_id_fk" FOREIGN KEY ("trading_partner_id") REFERENCES "public"."trading_partners"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "runs" ADD CONSTRAINT "runs_mapping_version_id_mapping_versions_id_fk" FOREIGN KEY ("mapping_version_id") REFERENCES "public"."mapping_versions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "documents_workspace_id_index" ON "documents" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX "documents_channel_id_index" ON "documents" USING btree ("channel_id");--> statement-breakpoint
 CREATE INDEX "runs_workspace_id_received_at_index" ON "runs" USING btree ("workspace_id","received_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "runs_document_id_index" ON "runs" USING btree ("document_id");--> statement-breakpoint
 CREATE INDEX "runs_flow_id_index" ON "runs" USING btree ("flow_id");--> statement-breakpoint
