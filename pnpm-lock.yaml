@@ -624,6 +624,52 @@ importers:
         specifier: ^2.11.7
         version: 2.11.7(eslint@9.39.5(jiti@2.6.1)(supports-color@7.2.0))(turbo@2.11.7)
 
+  packages/pipeline:
+    dependencies:
+      '@edi-bridge/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@edi-bridge/db':
+        specifier: workspace:*
+        version: link:../db
+      '@edi-bridge/edifact':
+        specifier: workspace:*
+        version: link:../edifact
+      '@edi-bridge/mapping':
+        specifier: workspace:*
+        version: link:../mapping
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(kysely@0.29.6)(postgres@3.4.9)
+      effect:
+        specifier: ^4.0.4
+        version: 4.0.4
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@edi-bridge/oxlint-config':
+        specifier: workspace:*
+        version: link:../oxlint-config
+      '@edi-bridge/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@edi-bridge/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@types/node':
+        specifier: ^24
+        version: 24.19.1
+      oxlint:
+        specifier: 1.87.0
+        version: 1.87.0(oxlint-tsgolint@7.0.2004)
+      typescript:
+        specifier: ~7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.1)(@vitest/browser-playwright@5.0.3)(@vitest/ui@5.0.3)(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/typescript-config: {}
 
   packages/ui:
