@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm/pg-core'
 
 import {
+  acknowledgementStates,
   acknowledgementTimeLimitHours,
   aiDailyTokenLimit,
   type AiReview,
@@ -495,6 +496,8 @@ export const runStatus = pgEnum('run_status', runStatuses)
 
 export const failureStage = pgEnum('failure_stage', failureStages)
 
+export const acknowledgementState = pgEnum('acknowledgement_state', acknowledgementStates)
+
 export const runs = pgTable(
   'runs',
   {
@@ -525,6 +528,8 @@ export const runs = pgTable(
     // Set once the Channel took the output, so a Retry never delivers it twice.
     handedOverAt: timestamp({ withTimezone: true, mode: 'date' }),
     controlReference: integer(),
+    // Null for an Interchange handed over before Acknowledgements were tracked.
+    acknowledgementStatus: acknowledgementState(),
     // Null for a Document that is not an Interchange.
     messageIndex: integer(),
     // A Reprocess starts a new Run from the same Document.
@@ -540,6 +545,7 @@ export const runs = pgTable(
     index().on(table.flowId),
     index().on(table.tradingPartnerId),
     index().on(table.mappingVersionId),
+    index().on(table.tradingPartnerId, table.controlReference),
     check(
       'runs_failure',
       allSetOnlyWhen(sql`${table.status} = 'failed'`, [
@@ -558,6 +564,10 @@ export const runs = pgTable(
       sql`${table.failureStage} is null or ${table.failureStage} = 'delivery' or ${table.output} is null`,
     ),
     check('runs_control_reference', sql`${table.controlReference} >= 1`),
+    check(
+      'runs_acknowledgement_status',
+      sql`${table.acknowledgementStatus} is null or (${table.handedOverAt} is not null and ${table.controlReference} is not null)`,
+    ),
     check('runs_message_index', sql`${table.messageIndex} >= 1`),
   ],
 )
