@@ -50,6 +50,8 @@ Decide for this ticket how to split it into parts. The ticket as a whole is the 
 
 Order the parts so the stack reads as an argument: each part makes the one above it easy to review. Every acceptance criterion names the part that completes it. A ticket that is one change stays one part.
 
+A part is **parallel** when it and the part below it both build only on the same lower part and touch disjoint folders. Typical: part 1 in `contracts`, then an api part and a web part, the web part built against the MSW mocks. A parallel part is built at the same time as the part below it; on GitHub the stack stays linear. Mark it in the stack file with `Starts from: part <j>`.
+
 Write the stack file:
 
 ```markdown
@@ -59,6 +61,7 @@ Ticket: <ticket path>
 
 1. <part title> | <branch> | PR: - | Completes criteria: <criterion numbers, or none>
    Scope: <what this part covers; what it leaves to later parts>
+   Starts from: part <j>, only for a parallel part
 2. ...
 ```
 
@@ -68,7 +71,7 @@ When a part turns out to hold two changes while you build it, narrow its scope t
 
 ### 3. Build each part, bottom to top
 
-Finish one part before starting the next: PR open, linked, and CI green.
+Start the next part as soon as the part below has its PR open and linked (step d); CI on the part below runs meanwhile (step e). Start a parallel part together with the part below it. At most two developers run at once.
 
 **a. Create the worktree.**
 
@@ -77,6 +80,8 @@ git fetch origin
 git worktree add -b <branch> ../edi-bridge-worktrees/<NN>-<k> <parent>
 pnpm -C ../edi-bridge-worktrees/<NN>-<k> install --frozen-lockfile
 ```
+
+For a parallel part, `<parent>` here and in its brief is the branch of the part its `Starts from` names.
 
 **b. Implement.** Spawn a fresh developer subagent with this brief:
 
@@ -92,7 +97,9 @@ A fix subagent, for review findings or a red CI, gets the same brief with the fi
 
 Answer a developer's questions yourself, unless the answer is a product decision. Take those to whoever started you, and record the other answers for the report.
 
-**c. Review.** Skip the review and the browser check for a part that is **tiny** or **CI-only**, and write `skipped (tiny)` or `skipped (ci-only)` into the report's Review column:
+**c. Review.** A parallel part first moves onto the part below it, once its developer has reported and that part has its PR open: `bash .agents/skills/ticket-lead/scripts/catch-up.sh <NN> --from <k>`. From then on its parent is part `k-1`, as for any part.
+
+Skip the review and the browser check for a part that is **tiny** or **CI-only**, and write `skipped (tiny)` or `skipped (ci-only)` into the report's Review column:
 
 - **Tiny**: at most 20 insertions plus deletions in `git -C <worktree> diff --shortstat <parent>...HEAD -- . ':(exclude)pnpm-lock.yaml'`, generated files left out too, and no new behaviour: no new branch, route, endpoint, message or test case.
 - **CI-only**: every changed file is under `.github/` or `.husky/`, or is a config file at the repo root.
@@ -126,7 +133,7 @@ The first call creates the stack on GitHub, later calls add the new PR to it. PR
 bash .agents/skills/ticket-lead/scripts/wait-for-ci.sh <PR> $(git -C <worktree> rev-parse HEAD)
 ```
 
-The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh developer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again.
+The commit makes the script wait until GitHub shows the push. Without it, the script can report the previous commit's CI. If CI fails, a fresh developer subagent fixes it in the worktree. Then `git -C <worktree> push`, and wait again. Parts already started above it follow as in _Fix a lower part_.
 
 ### 4. Resolve the ticket
 
@@ -172,4 +179,4 @@ When a finding belongs to the code of an earlier part, fix it there, not in the 
 2. `git -C <lower worktree> push`
 3. `bash .agents/skills/ticket-lead/scripts/catch-up.sh <NN> --from <k+1>`, where `<k>` is the fixed part: it rebases every part above onto the one below it and pushes with lease.
 
-Wait for CI on every PR you pushed, as in step 3e. The stack on GitHub needs no change: its PRs and bases stay the same.
+Run the catch-up once no developer works in a part above: it stops at a worktree with uncommitted changes. Wait for CI on every PR you pushed, as in step 3e. The stack on GitHub needs no change: its PRs and bases stay the same.
