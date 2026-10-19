@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { messageDefinitions } from './definitions/message-definitions'
 import {
   buildContrl,
+  BuildContrlError,
   type Delimiters,
   type Interchange,
   type Message,
@@ -590,5 +591,77 @@ describe('buildContrl', () => {
       ...responses,
       `UNT+${String(responses.length + 4)}+C1'`,
     ])
+  })
+
+  it('counts the error positions from each UNH after a service string advice', () => {
+    const text = `UNA:+.? '${interchangeOf(
+      orders('M1', "BGM+220+P?O1+9'", "DTM+137:20261020:102'", "UNS+S'"),
+      orders('M2', ...validOrder),
+      orders('M3', "BGM+220+PO3+9'", `DTM+137:${'2'.repeat(40)}:102'`, "UNS+S'"),
+    )}`
+
+    expect(segmentsOf(text)).toEqual([
+      "UNH+C1+CONTRL:D:3:UN:EAN002'",
+      uci,
+      "UCM+M1+ORDERS:D:96A:UN:EAN008+4'",
+      "UCS+2'",
+      "UCD+22+2'",
+      "UCM+M2+ORDERS:D:96A:UN:EAN008+7'",
+      "UCM+M3+ORDERS:D:96A:UN:EAN008+4'",
+      "UCS+3'",
+      "UCD+39+1:2'",
+      "UNT+10+C1'",
+    ])
+  })
+
+  const unb = "UNB+UNOC:3+7300015200048:14+7350000001266:14+221125:1605+88776655'"
+
+  it.each([
+    [
+      'a wrong Message count',
+      `${unb}${orders('M1', ...validOrder)}UNZ+2+88776655'`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+29+UNZ+1'",
+    ],
+    [
+      'a wrong control reference in its trailer',
+      `${unb}${orders('M1', ...validOrder)}UNZ+1+88776656'`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+28+UNZ+2'",
+    ],
+    [
+      'no trailer',
+      `${unb}${orders('M1', ...validOrder)}`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+13+UNZ'",
+    ],
+    [
+      'a segment outside a Message',
+      `${unb}BGM+220+PO1+9'UNZ+0+88776655'`,
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+33'",
+    ],
+    [
+      'an invalid character in its header',
+      `UNB+UNOA:3+7300015200048:14+Recipient:14+221125:1605+88776655'${orders('M1', ...validOrder)}UNZ+1+88776655'`,
+      "UCI+88776655+7300015200048:14+Recipient:14+4+21+UNB+3:1'",
+    ],
+  ])('rejects an Interchange with %s', (_case, text, response) => {
+    expect(segmentsOf(text)).toEqual(["UNH+C1+CONTRL:D:3:UN:EAN002'", response, "UNT+3+C1'"])
+    expect(readBack(buildContrl(text, 'C1'))).toMatchObject({ action: 'rejected' })
+  })
+
+  it.each([
+    ['no header', "UNH+M1+ORDERS:D:96A:UN:EAN008'UNT+2+M1'"],
+    [
+      'a broken header',
+      "UNB+UNOC:3+73000?15200048:14+7350000001266:14+221125:1605+88776655'UNZ+0+88776655'",
+    ],
+    [
+      'a header without control reference',
+      "UNB+UNOC:3+7300015200048:14+7350000001266:14+221125:1605'UNZ+0+'",
+    ],
+    ['a broken service string advice', "UNA:+'"],
+  ])('builds no CONTRL for an Interchange with %s', (_case, text) => {
+    const error = thrownBy(() => buildContrl(text, 'C1'))
+
+    expect(error).toBeInstanceOf(BuildContrlError)
+    expect(error).toMatchObject({ code: 'unreadable-interchange-header' })
   })
 })

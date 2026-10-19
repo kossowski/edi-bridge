@@ -1,4 +1,4 @@
-export { buildContrl } from './contrl'
+export { buildContrl, BuildContrlError } from './contrl'
 
 export { readAcknowledgedInterchange, ReadAcknowledgementError } from './acknowledgement'
 
@@ -9,6 +9,8 @@ export { parse, ParseError, parseMessages } from './parse'
 export { serialize, SerializeError, serializeMessage } from './serialize'
 
 export { validate, ValidationError, validationErrorCodes } from './validate'
+
+export type { BuildContrlErrorCode } from './contrl'
 
 export type {
   AcknowledgedInterchange,

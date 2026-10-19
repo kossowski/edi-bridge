@@ -266,6 +266,7 @@ export const readInterchange = (text: string): Reading => {
     messages,
     messageIndexes,
   }
+
   const failed = (error: ParseError): Reading => ({ ...reading, envelope: error })
 
   if (segmentErrors[0]) {
