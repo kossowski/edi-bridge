@@ -1,5 +1,6 @@
 import { type Duration, Effect, Schedule } from 'effect'
 
+import { markOverdueInterchanges } from './mark-overdue-interchanges'
 import { queueReceivedRuns } from './queue-received-runs'
 import { sweepStuckRuns } from './sweep-stuck-runs'
 
@@ -18,6 +19,9 @@ export const sweepRunsEvery = ({
       ),
       queueReceivedRuns.pipe(
         Effect.catchCause((cause) => Effect.logError('Received Runs not queued', cause)),
+      ),
+      markOverdueInterchanges.pipe(
+        Effect.catchCause((cause) => Effect.logError('Overdue Interchanges not marked', cause)),
       ),
     ],
     { discard: true },

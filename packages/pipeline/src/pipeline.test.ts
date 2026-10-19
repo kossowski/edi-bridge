@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { Cause, type Duration, Effect, Exit, Fiber, Logger } from 'effect'
+import { Cause, Duration, Effect, Exit, Fiber, Logger } from 'effect'
+import { TestClock } from 'effect/testing'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -34,6 +35,7 @@ import {
   bullmqRunQueue,
   channelDelivery,
   type DeliveryService,
+  markOverdueInterchanges,
   processRun,
   ReceiptRejected,
   receive,
@@ -42,7 +44,7 @@ import {
   sweepRunsEvery,
   sweepStuckRuns,
 } from './index'
-import { Documents } from './services'
+import { type Database, Documents, type RunQueue } from './services'
 import {
   addContrlFlow,
   addOrdersFlow,
@@ -2814,6 +2816,106 @@ describe('the Acknowledgement of a sent Interchange', () => {
     })
     await expect(readRun(connection.db, elsewhere?.id ?? '')).resolves.toMatchObject({
       acknowledgementState: 'rejected',
+    })
+  })
+
+  describe('the Overdue check', () => {
+    const limitHours = 24
+
+    // The test clock stands that long after the hand-over of the sent Interchange.
+    const atTimeAfter = (
+      sent: { handedOverAt: Date | null } | undefined,
+      after: Duration.Duration,
+      check: Effect.Effect<unknown, never, Database | RunQueue>,
+    ) =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime((sent?.handedOverAt?.getTime() ?? 0) + Duration.toMillis(after))
+        yield* check
+      }).pipe(
+        pipelineServices(connection.db, inMemoryRunQueue()),
+        Effect.provide(TestClock.layer()),
+      )
+
+    const checkAfter = (
+      sent: { handedOverAt: Date | null } | undefined,
+      after: Duration.Duration,
+    ) => Effect.runPromise(atTimeAfter(sent, after, markOverdueInterchanges))
+
+    it('keeps an Interchange pending within the time limit of its Trading Partner', async () => {
+      const into = await acknowledgingWorkspace('Patient Foods')
+      const sent = await sendInvoice(into)
+
+      await checkAfter(sent, Duration.subtract(Duration.hours(limitHours), Duration.millis(1)))
+
+      await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+        acknowledgementState: 'pending',
+      })
+    })
+
+    it('marks an Interchange overdue once the time limit of its Trading Partner passed', async () => {
+      const into = await acknowledgingWorkspace('Overdue Foods')
+      const sent = await sendInvoice(into)
+
+      await checkAfter(sent, Duration.hours(limitHours))
+
+      await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+        status: 'delivered',
+        acknowledgementState: 'overdue',
+      })
+    })
+
+    it('reads the time limit of the Trading Partner of the Interchange', async () => {
+      const into = await acknowledgingWorkspace('Hasty Foods')
+      const sent = await sendInvoice(into)
+
+      await connection.db
+        .update(tradingPartners)
+        .set({ acknowledgementTimeLimitHours: 2 })
+        .where(eq(tradingPartners.id, into.tradingPartnerId))
+
+      await checkAfter(sent, Duration.hours(2))
+
+      await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+        acknowledgementState: 'overdue',
+      })
+    })
+
+    it('keeps the Acknowledgement of an acknowledged Interchange', async () => {
+      const into = await acknowledgingWorkspace('Answered Foods')
+      const sent = await sendInvoice(into)
+
+      await receiveContrl(into, contrlOf(String(sent?.controlReference), '4'))
+      await checkAfter(sent, Duration.hours(limitHours))
+
+      await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+        acknowledgementState: 'rejected',
+      })
+    })
+
+    it('runs with the sweep of Runs', async () => {
+      const into = await acknowledgingWorkspace('Swept Foods')
+      const sent = await sendInvoice(into)
+
+      const sweeping = Effect.runFork(
+        atTimeAfter(
+          sent,
+          Duration.hours(limitHours),
+          sweepRunsEvery({ interval: '1 hour', stuckAfter: '10 minutes' }),
+        ),
+      )
+
+      try {
+        await vi.waitFor(
+          async () => {
+            await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+              acknowledgementState: 'overdue',
+            })
+          },
+          { timeout: 2000, interval: 20 },
+        )
+      } finally {
+        await Effect.runPromise(Fiber.interrupt(sweeping))
+      }
     })
   })
 })
