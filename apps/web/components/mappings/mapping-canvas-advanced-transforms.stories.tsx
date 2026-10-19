@@ -10,7 +10,6 @@ import {
   findRow,
   findSaveStatus,
   liveStatus,
-  page,
   pressOn,
   seeded,
   source,
@@ -18,6 +17,7 @@ import {
   transformNodeOf,
   expectTransformCount,
 } from '@/components/mappings/mapping-canvas-story-helpers'
+import { page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { lookupTablesEndpoint } from '@edi-bridge/contracts'

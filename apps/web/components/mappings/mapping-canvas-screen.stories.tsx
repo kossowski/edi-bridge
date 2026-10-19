@@ -14,18 +14,17 @@ import {
   findSaveStatus,
   handleOf,
   liveStatus,
-  page,
   pressOn,
   seeded,
   source,
   startDrag,
   target,
   expectSavedLinkCount,
-  findLinkMenu,
   openLinkMenuByKeyboard,
   openLinkMenuByMouse,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { nodeId } from '@/components/mappings/mapping-tree'
+import { findOpenMenu, page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import {
@@ -982,7 +981,7 @@ export const LinkFocusByKeyboard = meta.story({
 
     await userEvent.keyboard(' ')
 
-    const menu = await findLinkMenu(canvasElement)
+    const menu = await findOpenMenu(canvasElement)
 
     await expect(menu.getAllByRole('menuitem').length).toBeGreaterThan(0)
   },

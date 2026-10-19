@@ -4,11 +4,11 @@ import { useId } from 'react'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { AppPage } from '@/components/app-page'
-import { inReview, page, seeded } from '@/components/mappings/mapping-canvas-story-helpers'
+import { inReview, seeded } from '@/components/mappings/mapping-canvas-story-helpers'
 import { DraftStateLabel } from '@/components/mappings/publish-draft'
 import { VersionsSheet } from '@/components/mappings/versions-sheet'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import { darkMode, german, mobile, page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { mappingDraftQuery } from '@/lib/api/queries'
 import {

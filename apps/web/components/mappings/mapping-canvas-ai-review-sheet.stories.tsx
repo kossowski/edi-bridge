@@ -8,15 +8,14 @@ import {
   inReview,
   inReviewWith,
   openDetails,
-  page,
   reviewing,
   seeded,
   target,
   findSheet,
-  findSheetElement,
 } from '@/components/mappings/mapping-canvas-story-helpers'
 import { findRowButton } from '@/components/mappings/tree-node'
 import { viewerStory } from '@/components/session/session-story-helpers'
+import { findOpenDialog, page } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
 import { acceptAiProposedPartsEndpoint, mappingPreviewEndpoint } from '@edi-bridge/contracts'
@@ -63,7 +62,7 @@ async function openSheet(
 ) {
   await userEvent.click(await findAttentionButton(canvasElement, button))
 
-  return findSheetElement(canvasElement, name)
+  return findOpenDialog(canvasElement, name)
 }
 
 function heading(title: string, count?: number) {

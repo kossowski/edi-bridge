@@ -5,7 +5,7 @@ import type { BeforeEach } from 'storybook/internal/csf'
 
 import { nodeId } from '@/components/mappings/mapping-tree'
 import { findRowButton, rowOfButton } from '@/components/mappings/tree-node'
-import { findOpenDialog, findOpenMenu, page, waitForFocusInside } from '@/components/story-helpers'
+import { findOpenDialog, findOpenMenu, waitForFocusInside } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { mappingDraftEndpoint, toPath } from '@edi-bridge/contracts'
 import {
@@ -21,8 +21,6 @@ import {
 
 import type { RowRef } from '@/components/mappings/mapping-links'
 import type { AiProposal } from '@edi-bridge/contracts'
-
-export { page }
 
 export function seeded(name: string) {
   return seedMappingDrafts.find((draft) => draft.name === name && draft.latestVersion !== null)!
@@ -178,10 +176,8 @@ export const source = (path: string): RowRef => ({ side: 'source', path })
 
 export const target = (path: string): RowRef => ({ side: 'target', path })
 
-export const findSheetElement = findOpenDialog
-
 export async function findSheet(canvasElement: HTMLElement, name: string) {
-  return within(await findSheetElement(canvasElement, name))
+  return within(await findOpenDialog(canvasElement, name))
 }
 
 export function detailsPanel(canvasElement: HTMLElement, name = 'Details') {
@@ -224,12 +220,10 @@ export async function findLinkLine(canvasElement: HTMLElement, name: string) {
   return link.querySelector<SVGPathElement>('.react-flow__edge-interaction')!
 }
 
-export const findLinkMenu = findOpenMenu
-
 export async function openLinkMenuByMouse(canvasElement: HTMLElement, name: string) {
   await userEvent.pointer({ keys: '[MouseRight]', target: await findLinkLine(canvasElement, name) })
 
-  return findLinkMenu(canvasElement)
+  return findOpenMenu(canvasElement)
 }
 
 export async function openLinkMenuByKeyboard(
@@ -239,7 +233,7 @@ export async function openLinkMenuByKeyboard(
 ) {
   await pressOn(await within(canvasElement).findByRole('group', { name }), keys)
 
-  return findLinkMenu(canvasElement)
+  return findOpenMenu(canvasElement)
 }
 
 // An empty Mapping opens on "Start here"; this takes the path that opens the empty editor.
