@@ -1,11 +1,16 @@
 import { eq } from 'drizzle-orm'
 import { type Duration, Effect, Exit, Fiber } from 'effect'
 import { randomBytes } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { secretBox, secretKeyBytes, sftpChannelDelivery } from '@edi-bridge/channels'
-import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
+import {
+  startTestErp,
+  startTestSftpServer,
+  type TestErp,
+  type TestSftpServer,
+} from '@edi-bridge/channels/testing'
 import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
   channels,
@@ -21,6 +26,7 @@ import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 import {
   type ArrivingDocument,
   bullmqRunQueue,
+  channelDelivery,
   type DeliveryService,
   processRun,
   queueReceivedRunsEvery,
@@ -28,6 +34,7 @@ import {
   receive,
 } from './index'
 import {
+  addOrdersFlow,
   deliverOverSftp,
   golden,
   goldenInvoice,
@@ -44,6 +51,8 @@ let testDatabase: TestDatabase
 
 let sftp: TestSftpServer
 
+let erp: TestErp
+
 let connection: Connection
 
 let workspace: InvoiceWorkspace
@@ -59,7 +68,11 @@ const sftpLogin = () => ({
 })
 
 beforeAll(async () => {
-  ;[testDatabase, sftp] = await Promise.all([startTestDatabase(), startTestSftpServer()])
+  ;[testDatabase, sftp, erp] = await Promise.all([
+    startTestDatabase(),
+    startTestSftpServer(),
+    startTestErp(),
+  ])
   connection = connect(testDatabase.url)
   workspace = await seedInvoiceWorkspace(connection.db, 'Nordwind Foods')
   channelId = await deliverOverSftp(connection.db, workspace, sftpLogin())
@@ -67,7 +80,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await connection.close()
-  await Promise.all([testDatabase.stop(), sftp.stop()])
+  await Promise.all([testDatabase.stop(), sftp.stop(), erp.stop()])
 })
 
 describe('the receipt of a Document', () => {
@@ -406,7 +419,9 @@ describe('the receipt of a Document', () => {
     )
 
     expect(receipt.notRouted).toEqual([])
-    expect(queue.queued).toEqual([])
+    expect(queue.queued).toEqual(
+      receipt.runs.map(({ id }) => ({ workspaceId: workspace.id, runId: id })),
+    )
     expect(
       receipt.runs.map(({ documentId, flowId, messageIndex }) => ({
         documentId,
@@ -561,6 +576,12 @@ const receiveInvoice = async (
 const sftpDelivery: DeliveryService = sftpChannelDelivery({
   secrets: testSecrets,
   timeoutMs: 1500,
+})
+
+const deliveryByChannelType = channelDelivery({ secrets: testSecrets, timeoutMs: 1500 })
+
+beforeEach(() => {
+  erp.received.length = 0
 })
 
 const processQueued = async (
@@ -792,28 +813,40 @@ describe('the processing of a Run', () => {
     })
   })
 
-  it('leaves a Run for an HTTP Channel processing with its Message and its delivery pending', async () => {
+  it('delivers the valid INVOIC in its own Interchange to the HTTP Channel', async () => {
     const http = await seedInvoiceWorkspace(connection.db, 'Webshop Foods')
+
+    await connection.db
+      .update(channels)
+      .set({ url: erp.url })
+      .where(eq(channels.id, http.outboundChannelId))
+
     const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), http)
 
-    await processQueued(queue, () => Effect.die(new Error('HTTP delivery is another ticket')))
+    await processQueued(queue, deliveryByChannelType)
 
     const run = await readRun(connection.db, runId)
 
     expect(run).toMatchObject({
-      status: 'processing',
+      status: 'delivered',
       failureStage: null,
-      error: null,
-      controlReference: null,
       businessReference: '4711',
-      output: goldenInvoicMessage,
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
         { stage: 'validation', status: 'succeeded' },
-        { stage: 'delivery', status: 'pending', startedAt: null, finishedAt: null },
+        { stage: 'delivery', status: 'succeeded' },
       ],
     })
+    expect(run?.output).toMatch(/^UNB\+UNOC:3\+.*UNZ\+1\+1'$/)
+    expect(erp.received).toMatchObject([
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/edifact' },
+        // The test ERP reads the body as UTF-8, so it gets the Latin-1 bytes that way too.
+        body: Buffer.from(run?.output ?? '', 'latin1').toString(),
+      },
+    ])
   })
 
   it('fails a Run at delivery when its SFTP Channel is unreachable and keeps its Interchange', async () => {
@@ -1089,5 +1122,255 @@ describe('the processing of a Run', () => {
     await processQueued(queue)
 
     await expect(readRun(connection.db, runId)).resolves.toEqual(processed)
+  })
+})
+
+describe('the processing of an inbound Run', () => {
+  const ordersInterchange = golden('orders-reference.edi', 'latin1')
+
+  const ordersMessage = ordersInterchange
+    .split('\n')
+    .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
+
+  const interchangeOf = (messages: string[][]) =>
+    [ordersInterchange.split('\n')[0], ...messages.flat(), `UNZ+${messages.length}+00000001'`].join(
+      '\n',
+    )
+
+  const ordersWorkspace = async (name: string, options: { format?: 'json' | 'csv' } = {}) => {
+    const created = await seedInvoiceWorkspace(connection.db, name)
+    const orders = await addOrdersFlow(connection.db, created, { url: erp.url, ...options })
+
+    return { ...created, orders }
+  }
+
+  const receiveInterchange = async (into: InvoiceWorkspace, content: string) => {
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: into.id,
+        channelId: into.inboundChannelId,
+        fileName: 'orders.edi',
+        content,
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    await processQueued(queue, deliveryByChannelType)
+
+    return Promise.all(receipt.runs.map(({ id }) => readRun(connection.db, id)))
+  }
+
+  it('maps each Message of an ORDERS Interchange to the ERP Document and posts it to the HTTP Channel', async () => {
+    const into = await ordersWorkspace('Order Foods')
+    const document = golden('orders-reference.document.json')
+
+    const runs = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage, ordersMessage, ordersMessage]),
+    )
+
+    expect(runs).toHaveLength(3)
+
+    for (const run of runs) {
+      expect(run).toMatchObject({
+        status: 'delivered',
+        failureStage: null,
+        mappingVersionId: into.orders.mappingVersionId,
+        businessReference: '128576',
+        output: document,
+        steps: [
+          { stage: 'receipt', status: 'succeeded' },
+          { stage: 'parse', status: 'succeeded' },
+          { stage: 'validation', status: 'succeeded' },
+          { stage: 'mapping', status: 'succeeded' },
+          { stage: 'delivery', status: 'succeeded' },
+        ],
+      })
+      expect(ranStages(run)).toEqual(['receipt', 'parse', 'validation', 'mapping', 'delivery'])
+    }
+
+    expect(erp.received).toMatchObject(
+      [1, 2, 3].map(() => ({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: document,
+      })),
+    )
+  })
+
+  const replaced = (segment: string, by: string) =>
+    ordersMessage.map((line) => (line === segment ? by : line))
+
+  it('fails only the Run of a Message that fails mapping and delivers the others', async () => {
+    const into = await ordersWorkspace('Kilogram Foods')
+    const inKilograms = replaced("QTY+21:20:PCE'", "QTY+21:20:KGM'")
+
+    const runs = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage, inKilograms, ordersMessage]),
+    )
+
+    expect(runs.map((run) => run?.status)).toEqual(['delivered', 'failed', 'delivered'])
+    expect(runs[1]).toMatchObject({
+      failureStage: 'mapping',
+      output: null,
+      error: { code: 'noLookupMatch', position: null },
+      problem: {
+        reason: 'missingCode',
+        fixTarget: { kind: 'mapping', mappingId: into.orders.mappingId },
+      },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'mapping', status: 'failed' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+    expect(erp.received).toHaveLength(2)
+  })
+
+  it('fails a broken Message at parse with its position in the Interchange', async () => {
+    const into = await ordersWorkspace('Broken Foods')
+    const withoutBgm = ordersMessage.filter((line) => !line.startsWith('BGM'))
+
+    const runs = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage, withoutBgm, ordersMessage]),
+    )
+
+    expect(runs.map((run) => run?.status)).toEqual(['delivered', 'failed', 'delivered'])
+    // UNB is segment 1, the first Message 2 to 23, so the UNT of the second one is segment 44.
+    expect(runs[1]).toMatchObject({
+      failureStage: 'parse',
+      output: null,
+      error: { code: 'segment-count-mismatch', position: { segment: 44, tag: 'UNT' } },
+      problem: { reason: 'unreadable', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
+        { stage: 'mapping', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+  })
+
+  it('fails an invalid Message at validation with its position in the Interchange', async () => {
+    const into = await ordersWorkspace('Invalid Foods')
+    const unknownFunction = replaced("BGM+220:::+128576+9'", "BGM+220:::+128576+99'")
+
+    const runs = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage, unknownFunction, ordersMessage]),
+    )
+
+    expect(runs.map((run) => run?.status)).toEqual(['delivered', 'failed', 'delivered'])
+    // The second Message starts with its UNH at segment 24, so its BGM is segment 25.
+    expect(runs[1]).toMatchObject({
+      failureStage: 'validation',
+      output: null,
+      error: { position: { segment: 25, tag: 'BGM', element: 3 } },
+      problem: { reason: 'invalidContent', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'succeeded' },
+        { stage: 'validation', status: 'failed' },
+        { stage: 'mapping', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+  })
+
+  it('points a validation failure in the UNZ at the UNZ of the Interchange', async () => {
+    const into = await ordersWorkspace('Trailer Foods')
+
+    const content = interchangeOf([ordersMessage, ordersMessage, ordersMessage]).replace(
+      "UNZ+3+00000001'",
+      "UNZ+3+00000001+\u20ac'",
+    )
+
+    const runs = await receiveInterchange(into, content)
+
+    // UNB is segment 1 and the three Messages 2 to 67, so the UNZ is segment 68 for every Run.
+    expect(runs).toMatchObject(
+      [1, 2, 3].map(() => ({
+        status: 'failed',
+        failureStage: 'validation',
+        error: { code: 'invalid-character', position: { segment: 68, tag: 'UNZ', element: 3 } },
+      })),
+    )
+  })
+
+  it('fails a Run at delivery when the ERP refuses the Document and keeps the Document', async () => {
+    const into = await ordersWorkspace('Refused Foods')
+
+    await connection.db
+      .update(channels)
+      .set({ url: `${erp.url}?status=503` })
+      .where(eq(channels.id, into.orders.erpChannelId))
+
+    const [run] = await receiveInterchange(into, ordersInterchange)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      output: golden('orders-reference.document.json'),
+      error: { code: 'unexpectedResponse', position: null },
+      problem: { reason: 'unreachable', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+    expect(ranStages(run)).toEqual(['receipt', 'parse', 'validation', 'mapping', 'delivery'])
+  })
+
+  it('posts a CSV Document in the encoding of its Document Structure', async () => {
+    const into = await ordersWorkspace('Spreadsheet Foods', { format: 'csv' })
+    const document = golden('orders-reference.document.csv', 'latin1')
+
+    const [run] = await receiveInterchange(into, ordersInterchange)
+
+    expect(run).toMatchObject({ status: 'delivered', output: document })
+    expect(erp.received).toMatchObject([
+      {
+        headers: { 'content-type': 'text/csv' },
+        // The test ERP reads the body as UTF-8, so it gets the Windows-1252 bytes that way too.
+        body: Buffer.from(document, 'latin1').toString(),
+      },
+    ])
+  })
+
+  it('processes an inbound Run handed out twice only once', async () => {
+    const into = await ordersWorkspace('Twice Foods')
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: into.id,
+        channelId: into.inboundChannelId,
+        fileName: 'orders.edi',
+        content: ordersInterchange,
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    const runId = receipt.runs[0]?.id ?? ''
+
+    await processQueued(queue, deliveryByChannelType)
+
+    const processed = await readRun(connection.db, runId)
+
+    await processQueued(queue, deliveryByChannelType)
+
+    await expect(readRun(connection.db, runId)).resolves.toEqual(processed)
+    expect(processed?.status).toBe('delivered')
+    expect(erp.received).toHaveLength(1)
   })
 })

@@ -177,18 +177,23 @@ describe('POST /manual-submissions', () => {
       }
     })
 
-    it('answers 201 with a received Run for a Document routed to an inbound Flow', async () => {
+    it('answers 201 with a queued Run for a Document routed to an inbound Flow', async () => {
       const flowId = await addFlow('ORDERS', 'Orders from Hanse Retail')
 
       try {
         const response = await submit(ordersInterchange)
 
         expect(response.statusCode, response.body).toBe(201)
-        expect(manualSubmissionSchema.parse(response.json())).toMatchObject({
+
+        const submission = manualSubmissionSchema.parse(response.json())
+
+        expect(submission).toMatchObject({
           runs: [{ status: 'received', direction: 'inbound', flow: { id: flowId } }],
           notRouted: [],
         })
-        expect(api.runQueue.queued).toEqual([])
+        expect(api.runQueue.queued).toEqual([
+          { workspaceId: workspace.id, runId: submission.runs[0]?.id },
+        ])
       } finally {
         await removeFlow(flowId)
       }

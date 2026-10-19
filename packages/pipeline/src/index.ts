@@ -1,5 +1,7 @@
 export { bullmqRunQueue, runQueueName } from './bullmq-run-queue'
 
+export { channelDelivery } from './channel-delivery'
+
 export { ReceiptRejected, type ReceiptRejection, receiptRejections, RunNotQueued } from './errors'
 
 export { queueReceivedRuns, queueReceivedRunsEvery } from './queue-received-runs'
@@ -22,5 +24,6 @@ export {
   DeliveryDefect,
   GlnMissing,
   MessageInvalid,
+  MessageUnreadable,
   processRun,
 } from './process-run'

@@ -2,10 +2,11 @@ import { Worker } from 'bullmq'
 import { type Duration, Effect, Fiber } from 'effect'
 import { Redis } from 'ioredis'
 
-import { type SecretBox, sftpChannelDelivery } from '@edi-bridge/channels'
+import { type SecretBox } from '@edi-bridge/channels'
 import { type Connection, postgresDocumentStorage } from '@edi-bridge/db'
 import {
   bullmqRunQueue,
+  channelDelivery,
   Database,
   Delivery,
   Documents,
@@ -33,7 +34,7 @@ export function startRunWorker({
   const redis = new Redis(redisUrl, { maxRetriesPerRequest: null })
   const documents = postgresDocumentStorage(db)
   const queue = bullmqRunQueue(redisUrl)
-  const delivery = sftpChannelDelivery({ secrets, timeoutMs: deliveryTimeoutMs })
+  const delivery = channelDelivery({ secrets, timeoutMs: deliveryTimeoutMs })
 
   const worker = new Worker<QueuedRun>(
     runQueueName,
