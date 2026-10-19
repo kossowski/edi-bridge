@@ -3,7 +3,12 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 
-import { inferDocumentStructure, mappingVersionSchema, toEncodedFile } from '@edi-bridge/contracts'
+import {
+  inferDocumentStructure,
+  mappingVersionSchema,
+  toEncodedFile,
+  withCheckDigit,
+} from '@edi-bridge/contracts'
 import {
   type Interchange,
   type Message,
@@ -176,13 +181,7 @@ describe.each(fixtures.map((fixture) => ({ ...fixture, name: fixture.path })))(
   },
 )
 
-const checkDigitHolds = (digits: string) => {
-  const sum = [...digits.slice(0, -1)]
-    .toReversed()
-    .reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 3 : 1), 0)
-
-  return (10 - (sum % 10)) % 10 === Number(digits.at(-1))
-}
+const checkDigitHolds = (digits: string) => withCheckDigit(digits.slice(0, -1)) === digits
 
 describe('the GS1 numbers', () => {
   const numbers = fixtures.flatMap((fixture) =>

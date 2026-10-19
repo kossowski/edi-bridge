@@ -6,7 +6,7 @@ The fixture library holds realistic Documents, valid and deliberately broken, to
 packages/fixtures/documents/valid/orders-nordlicht-markt.edi
 ```
 
-`documents/valid/` holds the Documents that pass every stage. `documents/broken/` holds the Documents that fail at one stage, with one fault each. `src/fixtures.ts` indexes every file with its format, character encoding, Message Type and expected outcome. A broken fixture names its Failure Stage and error code. `readFixture` decodes a fixture in its encoding.
+`documents/valid/` holds the Documents that pass every stage that exists for their format. No Mapping for DESADV exists yet, so a valid dispatch CSV is only read through the Document Structure inferred from it. `documents/broken/` holds the Documents that fail at one stage, with one fault each. `src/fixtures.ts` indexes every file with its format, character encoding, Message Type and expected outcome. A broken fixture names its Failure Stage and error code. `readFixture` decodes a fixture in its encoding.
 
 ## Companies and numbers
 

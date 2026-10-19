@@ -85,7 +85,7 @@ export const fixtures: readonly Fixture[] = [
     format: 'edifact',
     encoding: 'iso-8859-1',
     messageType: 'ORDERS',
-    description: 'The order number in BGM has 46 characters; the element allows 35.',
+    description: 'The order number in BGM has 47 characters; the element allows 35.',
     valid: false,
     failure: { stage: 'validation', code: 'too-long-element' },
   },
