@@ -92,7 +92,12 @@ A fix subagent, for review findings or a red CI, gets the same brief with the fi
 
 Answer a developer's questions yourself, unless the answer is a product decision. Take those to whoever started you, and record the other answers for the report.
 
-**c. Review.** Call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part changes what renders (components, routes, styles or i18n messages in `apps/web` or `packages/ui`), run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree, starts its dev server through `.agents/skills/developer/scripts/test-slot.sh`, and keeps the screenshots in its own context. Give all findings you accept to one fresh developer subagent in the same worktree.
+**c. Review.** Skip the review and the browser check for a part that is **tiny** or **CI-only**, and write `skipped (tiny)` or `skipped (ci-only)` into the report's Review column:
+
+- **Tiny**: at most 20 insertions plus deletions in `git -C <worktree> diff --shortstat <parent>...HEAD -- . ':(exclude)pnpm-lock.yaml'`, generated files left out too, and no new behaviour: no new branch, route, endpoint, message or test case.
+- **CI-only**: every changed file is under `.github/` or `.husky/`, or is a config file at the repo root.
+
+Otherwise call the Skill tool with `code-review`, fixed point `<parent>`, in the worktree. If the part changes what renders (components, routes, styles or i18n messages in `apps/web` or `packages/ui`), run a **browser-check subagent** in parallel that calls the Skill tool with `browser-check` against the worktree, starts its dev server through `.agents/skills/developer/scripts/test-slot.sh`, and keeps the screenshots in its own context. Give the blocking findings you accept to one fresh developer subagent in the same worktree. A non-blocking finding goes into the report under Open; pass it on with the blocking ones only when its fix is trivial and inside the part's scope.
 
 **d. Open the PR and link the stack.**
 
@@ -152,11 +157,11 @@ When an engineering lead started you, write the report into its inbox as `report
 
 | Part | PR | Lines | CI | Review |
 |---|---|---|---|---|
-| 1 <title> | #<PR> | +<a> −<d> | green | <n> fixed · <n> dismissed |
+| 1 <title> | #<PR> | +<a> −<d> | green | <n> fixed · <n> dismissed · <n> open, or skipped (tiny), skipped (ci-only) |
 
-- **Browser**: <routes checked> · <n> fixed · <n> dismissed, or "no UI change"
+- **Browser**: <routes checked> · <n> fixed · <n> dismissed · <n> open, or "no UI change"
 - **Decisions I made for you**: <questions answered without asking, with the answer>
-- **Open**: <anything left, or "nothing">
+- **Open**: <non-blocking findings left unfixed, with part and file; anything else left, or "nothing">
 ```
 
 ## Fix a lower part

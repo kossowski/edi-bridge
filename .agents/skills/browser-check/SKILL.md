@@ -76,7 +76,7 @@ There are 3 screenshots per route, one per width. Open them for the changed rout
 
 ## Report
 
-Stay under 400 words. List each finding with where it occurs (route, width), what is wrong, and the evidence (a screenshot path or the failing step). Mark findings from step 2 and failed criteria from step 3 as hard. Mark visual judgements from step 4 as judgement calls. If there are no findings, say which routes and criteria you checked.
+Stay under 400 words. List each finding with where it occurs (route, width), what is wrong, and the evidence (a screenshot path or the failing step). Mark findings from step 2 and failed criteria from step 3 as blocking. Mark visual judgements from step 4 as non-blocking. If there are no findings, say which routes and criteria you checked.
 
 ## Limits
 
