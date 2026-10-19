@@ -635,6 +635,19 @@ function interchangeDate(iso: string) {
   return `${iso.slice(2, 4)}${iso.slice(5, 7)}${iso.slice(8, 10)}:${iso.slice(11, 13)}${iso.slice(14, 16)}`
 }
 
+// Validation of an outbound Message sees it alone, so the api counts its UNH as segment 1.
+export function messagePositionOf({ fault, segments }: GeneratedMessage): ErrorPosition | null {
+  return (
+    fault && {
+      segment: fault.segment + 1,
+      // SAFETY: injectFault places each fault on an index of the segments it returns.
+      tag: segments[fault.segment]!.tag,
+      element: fault.element,
+      component: fault.component,
+    }
+  )
+}
+
 const serviceStringAdvice = "UNA:+.? '"
 
 export type GeneratedInterchange = {
@@ -670,17 +683,10 @@ export function serializeInterchange({
   ]
 
   for (const { runId, message } of messages) {
-    const { fault, segments } = message
-    positions.set(
-      runId,
-      fault && {
-        segment: lines.length + 1 + fault.segment,
-        tag: segments[fault.segment]!.tag,
-        element: fault.element,
-        component: fault.component,
-      },
-    )
-    lines.push(...segments.map(serializeSegment))
+    const position = messagePositionOf(message)
+    // The Interchange so far comes before the Message, so it shifts the Message's own position.
+    positions.set(runId, position && { ...position, segment: lines.length + position.segment })
+    lines.push(...message.segments.map(serializeSegment))
   }
 
   lines.push(serializeSegment(seg('UNZ', String(messages.length), controlReference)))

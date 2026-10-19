@@ -51,8 +51,9 @@ export function bundleKeyOf(
     : run.id
 }
 
+// The api writes an outbound Interchange in the delivery step, so only a validated Message has one.
 function hasInterchange(firstRun: Parameters<typeof statusOf>[0]) {
-  return directionOf(firstRun) === 'inbound' || statusOf(firstRun, 'mapping') === 'succeeded'
+  return directionOf(firstRun) === 'inbound' || statusOf(firstRun, 'validation') === 'succeeded'
 }
 
 type Placement = {

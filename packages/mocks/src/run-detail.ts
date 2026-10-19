@@ -28,6 +28,7 @@ import {
   type GeneratedInterchange,
   type GeneratedMessage,
   generateMessage,
+  messagePositionOf,
   partiesOf,
   serializeInterchange,
 } from './interchange'
@@ -153,6 +154,14 @@ function isReprocessable(
   )
 }
 
+// The api writes no Interchange for an outbound Run that failed at validation, and counts the
+// position within the Message alone.
+function outboundValidationPosition(run: RunSummary, message: GeneratedMessage) {
+  return directionOf(run) === 'outbound' && run.failureStage === 'validation'
+    ? messagePositionOf(message)
+    : null
+}
+
 function problem(status: number, message: string) {
   return HttpResponse.json({ message }, { status })
 }
@@ -255,7 +264,9 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       steps: timeSteps(run),
       error: runError && {
         ...runError,
-        position: interchange?.positions.get(messageOwner) ?? null,
+        position: interchange
+          ? (interchange.positions.get(messageOwner) ?? null)
+          : outboundValidationPosition(run, message),
       },
       problem: runError && problemOf(run, message, mappingVersion, problemSources),
       waitingForTradingPartnerSince: waitingSince.get(id) ?? null,

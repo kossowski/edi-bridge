@@ -218,6 +218,31 @@ describe('GET /runs/:id', () => {
     expect(body?.mappingVersion).not.toBeNull()
   })
 
+  it('has no Interchange for an outbound Run that failed at validation, and counts its position from the UNH as segment 1', async () => {
+    const run = createRun({
+      id: '00000000-0000-4000-8000-000000000002',
+      tradingPartner: hansemarkt,
+      messageType: 'INVOIC',
+      flow: invoicFlow,
+      status: 'failed',
+      failureStage: 'validation',
+    })
+
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+    const party = /NAD\+(\w+)/.exec(body?.error?.message ?? '')?.[1]
+
+    expect(body?.interchange).toBeNull()
+    expect(body?.message?.segments[0]?.tag).toBe('UNH')
+    expect(body?.error?.position).toEqual({
+      segment: party === 'BY' ? 5 : 6,
+      tag: 'NAD',
+      element: 2,
+      component: 1,
+    })
+  })
+
   it('orders the steps of an outbound Run as mapping before validation', async () => {
     const run = createRun({
       id: '00000000-0000-4000-8000-000000000002',
