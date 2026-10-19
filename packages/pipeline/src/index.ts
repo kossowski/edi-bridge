@@ -18,7 +18,7 @@ export { queueReceivedRuns, queueReceivedRunsEvery } from './queue-received-runs
 
 export { type ArrivingDocument, type Receipt, type ReceivedRun, receive } from './receive'
 
-export { type Reprocess, reprocessRun } from './reprocess'
+export { isReprocessable, type Reprocess, reprocessRun } from './reprocess'
 
 export { retryRun } from './retry'
 

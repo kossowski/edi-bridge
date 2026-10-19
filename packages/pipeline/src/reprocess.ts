@@ -1,7 +1,14 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { DateTime, Effect } from 'effect'
 
-import { directionOf, whoFixes } from '@edi-bridge/contracts'
+import {
+  type Direction,
+  directionOf,
+  type FailureStage,
+  type ProblemReason,
+  type RunStatus,
+  whoFixes,
+} from '@edi-bridge/contracts'
 import { flows, mappingVersions, runs, runSteps } from '@edi-bridge/db'
 
 import { MappingVersionNotOfRun, RunNotReprocessable } from './errors'
@@ -11,17 +18,26 @@ import { stagesOf } from './stages'
 
 export type Reprocess = QueuedRun & { mappingVersionId: string }
 
-type Run = typeof runs.$inferSelect
+type Reprocessable = {
+  status: RunStatus
+  failureStage: FailureStage | null
+  direction: Direction
+  problem: { reason: ProblemReason } | null
+  mappingVersionId: string | null
+}
 
 // The Trading Partner fixes its Document by a resend, and a delivery failure by a Retry.
-const isReprocessable = (run: Run, flow: typeof flows.$inferSelect) =>
+export const isReprocessable = <R extends Reprocessable>(
+  run: R,
+): run is R & { mappingVersionId: string } =>
   run.status === 'failed' &&
   run.failureStage !== null &&
   run.failureStage !== 'delivery' &&
   run.problem !== null &&
+  run.mappingVersionId !== null &&
   whoFixes({
     failureStage: run.failureStage,
-    direction: directionOf(flow),
+    direction: run.direction,
     problem: run.problem,
   }) !== 'tradingPartner'
 
@@ -45,18 +61,15 @@ export const reprocessRun = ({ workspaceId, runId, mappingVersionId }: Reprocess
           return new RunNotReprocessable({ runId })
         }
 
-        const { run, flow } = found
+        const run = { ...found.run, direction: directionOf(found.flow) }
+        const { flow } = found
 
         const [replacing] = await tx
           .select({ id: runs.id })
           .from(runs)
           .where(eq(runs.replacesRunId, run.id))
 
-        if (
-          replacing !== undefined ||
-          run.mappingVersionId === null ||
-          !isReprocessable(run, flow)
-        ) {
+        if (replacing !== undefined || !isReprocessable(run)) {
           return new RunNotReprocessable({ runId })
         }
 

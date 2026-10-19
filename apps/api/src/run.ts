@@ -18,8 +18,9 @@ import {
 } from '@edi-bridge/contracts'
 import { flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-bridge/db'
 import {
+  isReprocessable,
   Database as PipelineDatabase,
-  reprocessRun as startReplacingRun,
+  reprocessRun as reprocessInPipeline,
   retryRun as retryDelivery,
 } from '@edi-bridge/pipeline'
 
@@ -272,12 +273,12 @@ const toDetail = (
   }
 }
 
-const startReplacing = (id: string, mappingVersionId: string) =>
+const reprocessWithVersion = (id: string, mappingVersionId: string) =>
   Effect.gen(function* () {
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    return yield* startReplacingRun({
+    return yield* reprocessInPipeline({
       workspaceId: workspace.id,
       runId: id,
       mappingVersionId,
@@ -291,7 +292,6 @@ const startReplacing = (id: string, mappingVersionId: string) =>
     )
   })
 
-// Trying a Defect again outside delivery reprocesses the Run with its own Mapping Version.
 export const retryRun = (id: string) =>
   Effect.gen(function* () {
     const db = yield* Db
@@ -299,13 +299,11 @@ export const retryRun = (id: string) =>
 
     const run = yield* loadRun(id)
 
-    if (
-      run.status === 'failed' &&
-      run.problem.reason === 'defect' &&
-      run.failureStage !== 'delivery' &&
-      run.mappingVersion !== null
-    ) {
-      yield* startReplacing(id, run.mappingVersion.id)
+    const candidate = { ...run, mappingVersionId: run.mappingVersion?.id ?? null }
+
+    // Trying a Defect again outside delivery reprocesses the Run with its own Mapping Version.
+    if (candidate.problem?.reason === 'defect' && isReprocessable(candidate)) {
+      yield* reprocessWithVersion(id, candidate.mappingVersionId)
 
       return yield* loadRun(id)
     }
@@ -324,7 +322,7 @@ export const reprocessRun = (id: string, { mappingVersionId }: ReprocessRunBody)
   Effect.gen(function* () {
     yield* loadRun(id)
 
-    const replacing = yield* startReplacing(id, mappingVersionId)
+    const reprocessed = yield* reprocessWithVersion(id, mappingVersionId)
 
-    return yield* loadRun(replacing.runId)
+    return yield* loadRun(reprocessed.runId)
   })
