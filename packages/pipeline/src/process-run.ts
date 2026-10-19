@@ -915,12 +915,13 @@ const defectFailure = (stage: FailureStage): Failure => ({
 })
 
 // A defect can stop a Run before its first step starts or after its step failed.
+// Answers whether it failed the Run.
 export const failOnDefect = (runId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
     const finishedAt = yield* DateTime.nowAsDate
 
-    yield* Effect.promise(() =>
+    return yield* Effect.promise(() =>
       db.transaction(async (tx) => {
         const steps = await tx
           .select({ stage: runSteps.stage, status: runSteps.status, position: runSteps.position })
@@ -932,13 +933,13 @@ export const failOnDefect = (runId: string) =>
         const stage = failureStageSchema.safeParse(stopped?.stage)
 
         if (stopped === undefined || !stage.success) {
-          return
+          return false
         }
 
         const failed = await failRun(tx, runId, defectFailure(stage.data), stopped.position)
 
         if (!failed || stopped.status === 'failed') {
-          return
+          return failed
         }
 
         // A failed step has its timings, so a step that never started fails at the defect.
@@ -950,6 +951,8 @@ export const failOnDefect = (runId: string) =>
             finishedAt,
           })
           .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stopped.stage)))
+
+        return true
       }),
     )
   })

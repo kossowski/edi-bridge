@@ -5,9 +5,28 @@ import { runs, runSteps } from '@edi-bridge/db'
 
 import { failOnDefect } from './process-run'
 import { queueOrLeaveToSweep } from './queue-received-runs'
-import { Database } from './services'
+import { Database, type QueuedRun } from './services'
+
+type Db = Database['Service']
 
 // A Run is stuck once neither it nor any of its steps changed within the bound.
+const isStuck = (db: Db, cutoff: Date) =>
+  and(
+    eq(runs.status, 'processing'),
+    lt(runs.updatedAt, cutoff),
+    notExists(
+      db
+        .select()
+        .from(runSteps)
+        .where(
+          and(
+            eq(runSteps.runId, runs.id),
+            or(gte(runSteps.startedAt, cutoff), gte(runSteps.finishedAt, cutoff)),
+          ),
+        ),
+    ),
+  )
+
 export const sweepStuckRuns = (stuckAfter: Duration.Input) =>
   Effect.gen(function* () {
     const db = yield* Database
@@ -18,29 +37,14 @@ export const sweepStuckRuns = (stuckAfter: Duration.Input) =>
       db
         .select({ workspaceId: runs.workspaceId, runId: runs.id })
         .from(runs)
-        .where(
-          and(
-            eq(runs.status, 'processing'),
-            lt(runs.updatedAt, cutoff),
-            notExists(
-              db
-                .select()
-                .from(runSteps)
-                .where(
-                  and(
-                    eq(runSteps.runId, runs.id),
-                    or(gte(runSteps.startedAt, cutoff), gte(runSteps.finishedAt, cutoff)),
-                  ),
-                ),
-            ),
-          ),
-        ),
+        .where(isStuck(db, cutoff)),
     )
 
     yield* Effect.forEach(stuck, (run) => releaseOrFail(run, cutoff), { discard: true })
   })
 
-const releaseOrFail = (run: { workspaceId: string; runId: string }, cutoff: Date) =>
+// A stuck Run is a defect either way: its worker died or stalled past the bound.
+const releaseOrFail = (run: QueuedRun, cutoff: Date) =>
   Effect.gen(function* () {
     const db = yield* Database
 
@@ -52,8 +56,7 @@ const releaseOrFail = (run: { workspaceId: string; runId: string }, cutoff: Date
         .where(
           and(
             eq(runs.id, run.runId),
-            eq(runs.status, 'processing'),
-            lt(runs.updatedAt, cutoff),
+            isStuck(db, cutoff),
             notExists(
               db
                 .select()
@@ -72,11 +75,13 @@ const releaseOrFail = (run: { workspaceId: string; runId: string }, cutoff: Date
     )
 
     if (released !== undefined) {
+      yield* Effect.logError(`Stuck Run ${run.runId} released to be processed again`)
       yield* queueOrLeaveToSweep(run, 'Stuck')
 
       return
     }
 
-    yield* Effect.logError(`Stuck Run ${run.runId} failed as a defect`)
-    yield* failOnDefect(run.runId)
+    if (yield* failOnDefect(run.runId)) {
+      yield* Effect.logError(`Stuck Run ${run.runId} failed as a defect`)
+    }
   })
