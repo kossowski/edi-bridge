@@ -20,6 +20,7 @@ const redis = new Redis(config.redisUrl, { enableOfflineQueue: false, maxRetries
 const runQueue = bullmqRunQueue(config.redisUrl)
 
 const app = buildApp({
+  aiModel: config.aiModel,
   auth: config.auth,
   channels: config.channels,
   database: connection.db,

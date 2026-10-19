@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { localDatabaseUrl } from '@edi-bridge/db'
 
+import { aiModelFromEnv } from './ai-model.js'
 import { secretKeyBytes } from './secret.js'
 
 import type { ChannelSettings } from './channel.js'
@@ -66,6 +67,7 @@ export function loadConfig(source: NodeJS.ProcessEnv) {
       apiPublicUrl,
       reachTimeoutMs: channelReachTimeoutMs,
     } satisfies ChannelSettings,
+    aiModel: aiModelFromEnv(source),
   }
 }
 

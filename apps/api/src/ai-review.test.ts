@@ -114,7 +114,7 @@ const mappingWith = async (graph: MappingGraph) => {
   return id
 }
 
-// Drafting with the AI comes with a later route; until then the test stores its outcome directly.
+// Stores the outcome of an AI draft directly, so these tests need no model.
 const openReview = async (id: string) => {
   await connection.db.update(mappings).set({ aiReview: review }).where(eq(mappings.id, id))
 }

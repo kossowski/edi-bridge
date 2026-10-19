@@ -2,6 +2,7 @@ import cors from '@fastify/cors'
 import { Effect, Match, Predicate } from 'effect'
 import Fastify from 'fastify'
 
+import type { LanguageModel } from 'ai'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import {
@@ -9,6 +10,8 @@ import {
   acceptAiProposedPartsEndpoint,
   acceptInviteEndpoint,
   aiBudgetEndpoint,
+  type AiBudgetExhaustedProblem,
+  aiBudgetExhaustedStatus,
   aiReviewOpenStatus,
   channelEndpoint,
   channelsEndpoint,
@@ -53,6 +56,7 @@ import {
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   removeWorkspaceMemberEndpoint,
+  requestAiDraftEndpoint,
   restoreMappingVersionEndpoint,
   revokeInviteEndpoint,
   runEndpoint,
@@ -80,6 +84,7 @@ import {
 } from '@edi-bridge/pipeline'
 
 import { loadAiBudget } from './ai-budget.js'
+import { requestAiDraft } from './ai-draft-request.js'
 import { acceptAiDraft, acceptAiProposedParts } from './ai-review.js'
 import { type AuthSettings, mountAuth } from './auth.js'
 import { ChannelReach, channelReach } from './channel-reach.js'
@@ -155,6 +160,7 @@ import {
 import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
 
 import type {
+  AiBudgetExhausted,
   AiReviewOpen,
   Conflict,
   DocumentStructureRejected,
@@ -167,6 +173,7 @@ import type {
 export type Probe = () => Promise<void>
 
 export interface AppDependencies {
+  aiModel?: LanguageModel | null
   auth: AuthSettings
   channels: ChannelSettings
   database: Database
@@ -178,6 +185,7 @@ export interface AppDependencies {
 }
 
 type Failure =
+  | AiBudgetExhausted
   | AiReviewOpen
   | Conflict
   | DocumentStructureRejected
@@ -206,6 +214,7 @@ const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> =
   Unprocessable: 422,
   DocumentStructureRejected: 422,
   AiReviewOpen: aiReviewOpenStatus,
+  AiBudgetExhausted: aiBudgetExhaustedStatus,
 }
 
 const statusOf = Match.type<Failure>().pipe(
@@ -216,6 +225,14 @@ const statusOf = Match.type<Failure>().pipe(
 const bodyOf = (error: Failure) => {
   if (Predicate.isTagged(error, 'DocumentStructureRejected')) {
     return error.problem
+  }
+
+  if (Predicate.isTagged(error, 'AiBudgetExhausted')) {
+    return {
+      code: 'aiBudgetExhausted',
+      message: error.message,
+      budget: error.budget,
+    } satisfies AiBudgetExhaustedProblem
   }
 
   return Predicate.isTagged(error, 'InviteUnusable')
@@ -230,6 +247,8 @@ const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
 const documentStructureBodyLimit = Math.ceil(maxEncodedFileBytes / 3) * 4 + 1024 * 1024
 
 const manualSubmissionBodyLimit = 6 * maxDocumentLength + 1024
+
+const eventStreamHeaders = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }
 
 const readMethods = new Set(['GET', 'HEAD'])
 
@@ -271,6 +290,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
 function registerRoutes(
   app: FastifyInstance,
   {
+    aiModel = null,
     auth: authSettings,
     channels: channelSettings,
     database,
@@ -665,6 +685,21 @@ function registerRoutes(
       request,
       reply,
       saveMappingDraft(request.params.id, parse(saveMappingDraftEndpoint.body, request.body)),
+    ),
+  )
+
+  app.post<{ Params: { id: string } }>(requestAiDraftEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.tap(
+        requestAiDraft(
+          request.params.id,
+          parse(requestAiDraftEndpoint.body, request.body),
+          aiModel,
+        ),
+        () => Effect.sync(() => reply.headers(eventStreamHeaders)),
+      ),
     ),
   )
 

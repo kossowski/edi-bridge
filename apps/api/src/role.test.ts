@@ -43,6 +43,7 @@ import {
   publishMappingDraftEndpoint,
   regenerateWebhookTokenEndpoint,
   removeWorkspaceMemberEndpoint,
+  requestAiDraftEndpoint,
   restoreMappingVersionEndpoint,
   revokeInviteEndpoint,
   runsEndpoint,
@@ -402,6 +403,14 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
         mappingId: ids.mapping,
         versionId: ids.mappingVersion,
       }),
+    }),
+  ],
+  [
+    'request an AI draft',
+    () => ({
+      method: 'POST',
+      url: toPath(requestAiDraftEndpoint.path, { id: ids.mapping }),
+      body: { sampleId: ids.mapping },
     }),
   ],
   [
