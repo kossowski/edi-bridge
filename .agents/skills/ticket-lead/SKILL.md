@@ -88,7 +88,7 @@ SCOPE     Part <k> in the stack file.
 Call the Skill tool with `developer`.
 ```
 
-A fix subagent, for review findings or a red CI, gets the same brief with the findings or the failed run as GOAL.
+A fix subagent, for review findings or a red CI, gets the same brief with the findings, or the failed run's id and task, as GOAL.
 
 Answer a developer's questions yourself, unless the answer is a product decision. Take those to whoever started you, and record the other answers for the report.
 
@@ -133,7 +133,7 @@ Resolve the ticket as `docs/agents/issue-tracker.md` describes. The step is done
 bash .agents/skills/ticket-lead/scripts/catch-up.sh <NN>
 ```
 
-It rebases each part onto its parent, bottom to top, and pushes with lease; a part already on its parent is skipped. At a conflict it names the worktree and the files: resolve them, `git -C <worktree> rebase --continue`, and run it again. Take a product decision to whoever started you. Then run `pnpm -C <top worktree> check:fast` through `.agents/skills/developer/scripts/test-slot.sh`, and wait for CI on every PR as in step 3e. The step is done when the script reports the stack on `origin/main` and every PR is green.
+It rebases each part onto its parent, bottom to top, and pushes with lease; a part already on its parent is skipped. At a conflict it names the worktree and the files: resolve them, `git -C <worktree> rebase --continue`, and run it again. Take a product decision to whoever started you. Then wait for CI on every PR as in step 3e. The step is done when the script reports the stack on `origin/main` and every PR is green.
 
 ### 6. Report
 
