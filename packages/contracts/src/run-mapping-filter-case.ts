@@ -6,7 +6,6 @@ export type RunMappingFilterCase = {
   filters: readonly { mappings: readonly string[]; runs: readonly string[] }[]
 }
 
-// Keys stand for ids each consumer seeds; arrays run in publishing and receiving order.
 export const runMappingFilterCase = {
   mappings: ['orders', 'ordersV2'],
   mappingVersions: [
@@ -18,14 +17,20 @@ export const runMappingFilterCase = {
   runs: [
     { key: 'mappedWithOrders1', flow: 'inbound', recordedMappingVersion: 'orders1' },
     { key: 'mappedWithOrders2', flow: 'inbound', recordedMappingVersion: 'orders2' },
+    { key: 'mappedWithOrdersV2First', flow: 'inbound', recordedMappingVersion: 'ordersV2First' },
     { key: 'notYetProcessed', flow: 'inbound', recordedMappingVersion: null },
   ],
   filters: [
     { mappings: ['orders'], runs: ['mappedWithOrders1', 'mappedWithOrders2'] },
-    { mappings: ['ordersV2'], runs: ['notYetProcessed'] },
+    { mappings: ['ordersV2'], runs: ['mappedWithOrdersV2First', 'notYetProcessed'] },
     {
       mappings: ['orders', 'ordersV2'],
-      runs: ['mappedWithOrders1', 'mappedWithOrders2', 'notYetProcessed'],
+      runs: [
+        'mappedWithOrders1',
+        'mappedWithOrders2',
+        'mappedWithOrdersV2First',
+        'notYetProcessed',
+      ],
     },
   ],
 } as const satisfies RunMappingFilterCase

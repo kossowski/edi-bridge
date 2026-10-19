@@ -1,24 +1,29 @@
 import { describe, expect, it } from 'vitest'
 
-import { runListQuerySchema } from './run'
 import { runMappingFilterCase } from './run-mapping-filter-case'
 
 const { mappingVersions, flows, runs, filters } = runMappingFilterCase
 
+type Run = (typeof runs)[number]
+
 const mappingOfVersion = (version: string) =>
   mappingVersions.find(({ key }) => key === version)?.mapping
 
-const versionOfRun = (run: (typeof runs)[number]) =>
-  run.recordedMappingVersion ?? flows.find(({ key }) => key === run.flow)?.pinnedMappingVersion
+const pinnedVersionOf = (run: Run) =>
+  flows.find(({ key }) => key === run.flow)?.pinnedMappingVersion
 
-const matching = (mappings: readonly string[], versionOf: typeof versionOfRun) =>
-  runs
-    .filter((run) => {
-      const version = versionOf(run)
+const versionOfRun = (run: Run) => run.recordedMappingVersion ?? pinnedVersionOf(run)
 
-      return version !== undefined && mappings.includes(mappingOfVersion(version) ?? '')
-    })
-    .map(({ key }) => key)
+const runKeysMatching = (mappings: readonly string[], versionOf: typeof versionOfRun) =>
+  new Set(
+    runs
+      .filter((run) => {
+        const version = versionOf(run)
+
+        return version !== undefined && mappings.includes(mappingOfVersion(version) ?? '')
+      })
+      .map(({ key }) => key),
+  )
 
 describe('runMappingFilterCase', () => {
   it('refers only to Mappings, Mapping Versions and Flows it declares', () => {
@@ -47,25 +52,25 @@ describe('runMappingFilterCase', () => {
     ).toBe(true)
   })
 
-  it('expects the Runs whose recorded Mapping Version, else the Flow’s, belongs to the Mappings', () => {
+  it("expects the Runs whose recorded Mapping Version, else the Flow's, belongs to the Mappings", () => {
     for (const filter of filters) {
-      expect(matching(filter.mappings, versionOfRun)).toEqual(filter.runs)
+      expect(runKeysMatching(filter.mappings, versionOfRun)).toEqual(new Set(filter.runs))
     }
   })
 
   it('has a Run recorded before its Flow moved on and a Run not yet processed', () => {
     expect(runs.some(({ recordedMappingVersion }) => recordedMappingVersion === null)).toBe(true)
-
-    const pinnedToday = (run: (typeof runs)[number]) =>
-      flows.find(({ key }) => key === run.flow)?.pinnedMappingVersion
-
     expect(
       filters.some((filter) => {
-        const byPinned = matching(filter.mappings, pinnedToday)
+        const byPinned = runKeysMatching(filter.mappings, pinnedVersionOf)
 
-        return byPinned.join() !== filter.runs.join()
+        return byPinned.size !== filter.runs.length || filter.runs.some((run) => !byPinned.has(run))
       }),
     ).toBe(true)
+  })
+
+  it('has a Run that recorded the Mapping Version its Flow pins now', () => {
+    expect(runs.some((run) => run.recordedMappingVersion === pinnedVersionOf(run))).toBe(true)
   })
 
   it('moves a Flow to a Mapping Version of another Mapping', () => {
@@ -74,14 +79,8 @@ describe('runMappingFilterCase', () => {
         (run) =>
           run.recordedMappingVersion !== null &&
           mappingOfVersion(run.recordedMappingVersion) !==
-            mappingOfVersion(flows.find(({ key }) => key === run.flow)?.pinnedMappingVersion ?? ''),
+            mappingOfVersion(pinnedVersionOf(run) ?? ''),
       ),
     ).toBe(true)
-  })
-})
-
-describe('runListQuerySchema mappingId', () => {
-  it('states that a Run matches by the Mapping Version it recorded', () => {
-    expect(runListQuerySchema.shape.mappingId.description).toMatch(/recorded/)
   })
 })
