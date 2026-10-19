@@ -188,6 +188,33 @@ export const Mobile = meta.story({
   },
 })
 
+// Only a scroller may be wider than its box; a wider wrapper lets the screen move sideways.
+function overflowingWrappers(canvasElement: HTMLElement) {
+  return [...canvasElement.querySelectorAll<HTMLElement>('*')].flatMap((element) => {
+    const { overflowX } = getComputedStyle(element)
+
+    const overflows =
+      element.scrollWidth > element.clientWidth &&
+      overflowX !== 'auto' &&
+      overflowX !== 'scroll' &&
+      !element.classList.contains('sr-only') &&
+      !element.classList.contains('truncate')
+
+    return overflows ? [element.className] : []
+  })
+}
+
+export const MobileWrappersFit = meta.story({
+  ...mobile,
+  beforeEach({ msw }) {
+    msw.use(runsHandler(apiUrl, runs))
+  },
+  async play({ canvas, canvasElement }) {
+    await expect(await canvas.findByText(/^\d+ documents?$/)).toBeVisible()
+    await expect(overflowingWrappers(canvasElement)).toEqual([])
+  },
+})
+
 export const Tablet = meta.story({
   ...tablet,
   decorators: [besideSidebar],

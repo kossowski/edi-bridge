@@ -108,7 +108,7 @@ function StatusGroupFilter({
   const format = useFormatter()
 
   return (
-    <div className="-m-1 max-w-[calc(100%+0.5rem)] overflow-x-auto p-1">
+    <div className="max-w-full overflow-x-auto">
       <ToggleGroup
         spacing={0}
         value={[value]}
