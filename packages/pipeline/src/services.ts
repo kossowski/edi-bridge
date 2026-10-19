@@ -1,6 +1,12 @@
 import { Context, type Effect } from 'effect'
 
-import type { DeliveryFailed, OutboundDocument } from '@edi-bridge/channels'
+import type {
+  DeliveryFailed,
+  DownloadFailed,
+  OutboundDocument,
+  SftpChannel,
+  SftpFile,
+} from '@edi-bridge/channels'
 import type { channels, Connection, DocumentStorage } from '@edi-bridge/db'
 
 import type { RunNotQueued } from './errors'
@@ -32,4 +38,14 @@ export type DeliveryService = (
 
 export class Delivery extends Context.Service<Delivery, DeliveryService>()(
   '@edi-bridge/pipeline/Delivery',
+) {}
+
+export type DownloadService = {
+  list: (channel: SftpChannel) => Effect.Effect<SftpFile[], DownloadFailed>
+  read: (channel: SftpChannel, name: string) => Effect.Effect<Buffer, DownloadFailed>
+  remove: (channel: SftpChannel, name: string) => Effect.Effect<void, DownloadFailed>
+}
+
+export class Download extends Context.Service<Download, DownloadService>()(
+  '@edi-bridge/pipeline/Download',
 ) {}
