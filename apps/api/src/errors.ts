@@ -2,6 +2,7 @@ import { Data } from 'effect'
 
 import {
   type AiBudget,
+  type AiDraftFailureReason,
   type DocumentStructureProblem,
   type InviteUnusableReason,
   inviteUnusableMessages,
@@ -54,3 +55,9 @@ export class AiBudgetExhausted extends Data.TaggedError('AiBudgetExhausted')<{
     return 'The daily AI budget of the Workspace is used up.'
   }
 }
+
+// Carries the tokens the run used, so they count against the budget although no Draft came out.
+export class AiDraftFailed extends Data.TaggedError('AiDraftFailed')<{
+  readonly reason: Exclude<AiDraftFailureReason, 'budgetExhausted'>
+  readonly tokens: number
+}> {}

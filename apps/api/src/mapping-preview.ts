@@ -52,7 +52,7 @@ const samplesOfStructure = (structure: DocumentStructure): Effect.Effect<Mapping
   )
 }
 
-const loadSamples = (id: string) =>
+export const loadSamples = (id: string) =>
   Effect.gen(function* () {
     const mapping = yield* loadRow(id)
     const structure = yield* loadDocumentStructure(mapping.documentStructureId)
@@ -86,7 +86,7 @@ const noteOf = ({ code, targetPath, transformId }: MappingError): PreviewNote =>
 
 type Written = { document: DocumentContent; entries: OutputEntry[] }
 
-type Engine = {
+export type Engine = {
   empty: DocumentContent
   run: (graph: MappingGraph) => Effect.Effect<Written, MappingError>
 }
@@ -153,13 +153,13 @@ const outputOf = (engine: Engine, graph: MappingGraph) =>
     onSuccess: (written) => ({ ...written, notes: [] }),
   })
 
-type Loaded = {
+export type Loaded = {
   mapping: { messageType: MessageType }
   structure: DocumentStructure
   samples: ReadonlyArray<MappingSample>
 }
 
-const startEngine = (
+export const startEngine = (
   { mapping, structure, samples }: Loaded,
   sampleId: string,
   graphs: ReadonlyArray<MappingGraph>,
