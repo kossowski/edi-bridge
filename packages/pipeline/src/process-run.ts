@@ -634,6 +634,31 @@ const step = <A, E, R>(
     return result
   })
 
+// Only a processing Run fails, so a defect never overwrites a Run that already failed.
+const failRun = async (tx: Transaction, runId: string, failure: Failure, position: number) => {
+  const [failed] = await tx
+    .update(runs)
+    .set({
+      status: 'failed',
+      failureStage: failure.stage,
+      error: failure.error,
+      problem: failure.problem,
+    })
+    .where(and(eq(runs.id, runId), eq(runs.status, 'processing')))
+    .returning({ id: runs.id })
+
+  if (failed === undefined) {
+    return false
+  }
+
+  await tx
+    .update(runSteps)
+    .set({ status: 'skipped' })
+    .where(and(eq(runSteps.runId, runId), gt(runSteps.position, position)))
+
+  return true
+}
+
 const fail = (runId: string, failure: Failure) =>
   Effect.gen(function* () {
     const db = yield* Database
@@ -645,20 +670,7 @@ const fail = (runId: string, failure: Failure) =>
           .from(runSteps)
           .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, failure.stage)))
 
-        await tx
-          .update(runSteps)
-          .set({ status: 'skipped' })
-          .where(and(eq(runSteps.runId, runId), gt(runSteps.position, failed?.position ?? 0)))
-
-        await tx
-          .update(runs)
-          .set({
-            status: 'failed',
-            failureStage: failure.stage,
-            error: failure.error,
-            problem: failure.problem,
-          })
-          .where(eq(runs.id, runId))
+        await failRun(tx, runId, failure, failed?.position ?? 0)
       }),
     )
   })
@@ -673,7 +685,7 @@ const defectFailure = (stage: FailureStage): Failure => ({
   problem: { reason: stage === 'delivery' ? 'unreachable' : 'invalidContent', fixTarget: null },
 })
 
-// Fails a Run still processing at the step that ran, or else the first one that did not finish.
+// A defect can stop a Run before its first step starts or after its step failed.
 const failOnDefect = (runId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
@@ -687,32 +699,16 @@ const failOnDefect = (runId: string) =>
           .where(eq(runSteps.runId, runId))
           .orderBy(asc(runSteps.position))
 
-        const [stopped] = steps.flatMap(({ stage, status, position }) => {
-          const failureStage = failureStageSchema.safeParse(stage)
+        const stopped = steps.find(({ status }) => status !== 'succeeded' && status !== 'skipped')
+        const stage = failureStageSchema.safeParse(stopped?.stage)
 
-          return failureStage.success && (status === 'running' || status === 'pending')
-            ? [{ stage: failureStage.data, status, position }]
-            : []
-        })
-
-        if (stopped === undefined) {
+        if (stopped === undefined || !stage.success) {
           return
         }
 
-        const failure = defectFailure(stopped.stage)
+        const failed = await failRun(tx, runId, defectFailure(stage.data), stopped.position)
 
-        const [failed] = await tx
-          .update(runs)
-          .set({
-            status: 'failed',
-            failureStage: failure.stage,
-            error: failure.error,
-            problem: failure.problem,
-          })
-          .where(and(eq(runs.id, runId), eq(runs.status, 'processing')))
-          .returning({ id: runs.id })
-
-        if (failed === undefined) {
+        if (!failed || stopped.status === 'failed') {
           return
         }
 
@@ -725,11 +721,6 @@ const failOnDefect = (runId: string) =>
             finishedAt,
           })
           .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stopped.stage)))
-
-        await tx
-          .update(runSteps)
-          .set({ status: 'skipped' })
-          .where(and(eq(runSteps.runId, runId), gt(runSteps.position, stopped.position)))
       }),
     )
   })

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { type Duration, Effect, Exit, Fiber } from 'effect'
 import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -1112,6 +1112,55 @@ describe('the processing of a Run', () => {
       error: { code: 'invalidJson', position: null },
       problem: { reason: 'unreadable', fixTarget: null },
     })
+  })
+
+  it('fails a Run at its failed step when processing stops on a defect before the Run fails', async () => {
+    const { queue, runId } = await receiveInvoice('not json')
+
+    // The database refuses the failure of the Run after the mapping step failed.
+    await connection.db.execute(sql`
+      create function refuse_run_failure() returns trigger language plpgsql as $$
+      begin
+        if new.status = 'failed' and new.error->>'code' <> 'processingDefect' then
+          raise exception 'The database refuses the failure';
+        end if;
+        return new;
+      end $$`)
+    await connection.db.execute(
+      sql`create trigger refuse_run_failure before update on runs for each row execute function refuse_run_failure()`,
+    )
+
+    try {
+      const [queued] = queue.queued
+
+      const exit = await Effect.runPromiseExit(
+        processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+          pipelineServices(connection.db, queue),
+        ),
+      )
+
+      expect(Exit.hasDies(exit)).toBe(true)
+    } finally {
+      await connection.db.execute(sql`drop trigger refuse_run_failure on runs`)
+      await connection.db.execute(sql`drop function refuse_run_failure`)
+    }
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      output: null,
+      error: { code: 'processingDefect', position: null },
+      problem: { reason: 'invalidContent', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+    expect(ranStages(run)).toEqual(['receipt', 'mapping'])
   })
 
   it('fails a Run at its first unfinished stage when processing stops on a defect before it', async () => {
