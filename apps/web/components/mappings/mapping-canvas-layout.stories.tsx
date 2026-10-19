@@ -290,7 +290,7 @@ export const PublishManyRoutes = meta.story({
 
     const dialog = await page(canvasElement).findByRole('dialog', { name: /^Publish Version/ })
 
-    // The dialog asks the mock API for the routes when it opens and shows them once they are in.
+    // The routes load from the mock API after the dialog opens, which can pass the default second.
     const routes = await within(dialog).findByRole(
       'group',
       { name: 'Document routes' },

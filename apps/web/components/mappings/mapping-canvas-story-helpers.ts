@@ -70,28 +70,25 @@ export async function findAlert(canvasElement: HTMLElement, title: string) {
   return within(alert)
 }
 
-export async function findRow(canvasElement: HTMLElement, ref: RowRef) {
-  return waitFor(() => {
-    const row = findRowButton(canvasElement, ref)
+function rowOrThrow(canvasElement: HTMLElement, ref: RowRef) {
+  const row = findRowButton(canvasElement, ref)
 
-    if (!row) {
-      throw new Error(`No row ${ref.side}:${ref.path}`)
-    }
+  if (!row) {
+    throw new Error(`No row ${ref.side}:${ref.path}`)
+  }
 
-    return row
-  })
+  return row
 }
 
-// React Flow mounts the rows hidden and shows them once it has measured them. Some 200 rows take
-// that render and measure longer on a busy CI runner than the default second of waitFor.
+export async function findRow(canvasElement: HTMLElement, ref: RowRef) {
+  return waitFor(() => rowOrThrow(canvasElement, ref))
+}
+
+// React Flow shows rows only once measured, which on a large draft can pass the default second.
 export async function findDrawnRow(canvasElement: HTMLElement, ref: RowRef) {
   return waitFor(
     () => {
-      const row = findRowButton(canvasElement, ref)
-
-      if (!row) {
-        throw new Error(`No row ${ref.side}:${ref.path}`)
-      }
+      const row = rowOrThrow(canvasElement, ref)
 
       expect(row).toBeVisible()
 

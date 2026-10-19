@@ -209,8 +209,7 @@ export const RunningDialogStaysOpen = meta.story({
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
     await expect(canvas.queryByRole('button', { name: 'Draft with AI' })).toBeNull()
 
-    // The button counts what needs attention once the preview of the drafted links is in. That
-    // preview waits for the debounce, then for the mock API, so it can land after the default second.
+    // The preview debounce plus the mock API delay can pass the default second.
     const attention = await findAttentionButton(canvasElement)
 
     await waitFor(() => expect(attention).toHaveFocus())
