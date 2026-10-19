@@ -7,14 +7,13 @@ import type { Context } from 'effect'
 import {
   type AiDraftEvent,
   type AiProposal,
-  type MappingGraph,
   proposedAiReview,
   type RequestAiDraftBody,
 } from '@edi-bridge/contracts'
 import { mappings } from '@edi-bridge/db'
 
 import { recordAiTokenUsage, requireAiBudget } from './ai-budget.js'
-import { draftMapping } from './ai-draft.js'
+import { draftMapping, withProposal } from './ai-draft.js'
 import { Db } from './db.js'
 import { AiReviewOpen, NotFound } from './errors.js'
 import { loadSamples } from './mapping-preview.js'
@@ -30,23 +29,57 @@ const frame = (event: AiDraftEvent) => encoder.encode(`data:${JSON.stringify(eve
 
 const unavailable: AiDraftEvent = { type: 'failed', reason: 'unavailable' }
 
-const storeDraft = (id: string, sampleId: string, proposal: AiProposal, graph: MappingGraph) =>
+const reviewOpened: AiDraftEvent = { type: 'failed', reason: 'checkFailed' }
+
+// Merges onto the Draft as it is now, since the Admin may have saved it during the run.
+const storeDraft = (id: string, sampleId: string, proposal: AiProposal) =>
   Effect.gen(function* () {
     const aiReview = proposedAiReview(sampleId, proposal)
 
     if (aiReview !== null) {
       const db = yield* Db
       const workspace = yield* CurrentWorkspace
+      const where = inWorkspace(mappings, workspace.id, eq(mappings.id, id))
 
-      yield* Effect.promise(() =>
-        db
-          .update(mappings)
-          .set({ draft: graph, aiReview, unpublishedChanges: true, draftUpdatedAt: sql`now()` })
-          .where(inWorkspace(mappings, workspace.id, eq(mappings.id, id))),
+      const stored = yield* Effect.promise(() =>
+        db.transaction(async (tx) => {
+          // Locks the row, so a save or another AI draft cannot slip in before the update.
+          const [current] = await tx
+            .select({ draft: mappings.draft, aiReview: mappings.aiReview })
+            .from(mappings)
+            .where(where)
+            .for('update')
+
+          if (current === undefined) {
+            throw new Error(`The Mapping ${id} is gone`)
+          }
+
+          if (current.aiReview !== null) {
+            return false
+          }
+
+          await tx
+            .update(mappings)
+            .set({
+              draft: withProposal(current.draft, proposal),
+              aiReview,
+              unpublishedChanges: true,
+              draftUpdatedAt: sql`now()`,
+            })
+            .where(where)
+
+          return true
+        }),
       )
+
+      if (!stored) {
+        return reviewOpened
+      }
     }
 
-    return yield* loadMappingDraft(id)
+    const draft = yield* loadMappingDraft(id)
+
+    return { type: 'drafted', proposal, draft } satisfies AiDraftEvent
   })
 
 const drafting = (
@@ -66,13 +99,7 @@ const drafting = (
     onStep: (step) => emit({ type: 'step', step }),
   }).pipe(
     Effect.tap(({ tokens }) => recordAiTokenUsage(tokens)),
-    Effect.flatMap(({ proposal, graph }) =>
-      Effect.map(storeDraft(id, sampleId, proposal, graph), (draft): AiDraftEvent => ({
-        type: 'drafted',
-        proposal,
-        draft,
-      })),
-    ),
+    Effect.flatMap(({ proposal }) => storeDraft(id, sampleId, proposal)),
     Effect.catchTag('AiDraftFailed', ({ reason, tokens }) =>
       Effect.as(recordAiTokenUsage(tokens), { type: 'failed', reason } satisfies AiDraftEvent),
     ),

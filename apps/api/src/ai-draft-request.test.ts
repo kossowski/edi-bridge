@@ -228,6 +228,58 @@ describe('POST /mappings/:id/ai-draft', () => {
     expect(await draftOf(mappingId)).toMatchObject({ links: [], aiReview: null })
   })
 
+  it('adds the proposed links to a Draft the Admin saved during the run', async () => {
+    const { mappingId, sampleId } = await createdInvoiceMapping()
+    const savedLink = { sourcePath: 'orderNumber', targetPath: 'SG1+ON/RFF+ON/C506/1154' }
+
+    generate = async () => {
+      const saved = await api.admin.inject({
+        method: 'PUT',
+        url: toPath(saveMappingDraftEndpoint.path, { id: mappingId }),
+        body: { links: [savedLink], transforms: [], transformLinks: [] },
+      })
+
+      expect(saved.statusCode).toBe(200)
+
+      return answer(invoiceLinks)
+    }
+
+    const events = eventsOf((await requestDraft(mappingId, { sampleId })).body)
+
+    expect(events.at(-1)).toMatchObject({
+      type: 'drafted',
+      draft: { links: [savedLink, ...invoiceLinks] },
+    })
+    expect((await draftOf(mappingId)).links).toEqual([savedLink, ...invoiceLinks])
+  })
+
+  it('fails the run and keeps the other review when an AI review opened during the run', async () => {
+    const { mappingId, sampleId } = await createdInvoiceMapping()
+    let calls = 0
+    let inner: AiDraftEvent | undefined
+
+    generate = async () => {
+      calls += 1
+
+      if (calls === 1) {
+        inner = eventsOf((await requestDraft(mappingId, { sampleId })).body).at(-1)
+      }
+
+      return answer(invoiceLinks)
+    }
+
+    const events = eventsOf((await requestDraft(mappingId, { sampleId })).body)
+
+    expect(inner).toMatchObject({ type: 'drafted' })
+    expect(events.at(-1)).toEqual({ type: 'failed', reason: 'checkFailed' })
+
+    const stored = await draftOf(mappingId)
+
+    expect(stored.links).toEqual(invoiceLinks)
+    expect(inner).toMatchObject({ draft: { aiReview: stored.aiReview } })
+    expect(await usedToday()).toBe(240)
+  })
+
   it('answers 423 while the AI review of the Draft is open', async () => {
     const { mappingId, sampleId } = await createdInvoiceMapping()
 

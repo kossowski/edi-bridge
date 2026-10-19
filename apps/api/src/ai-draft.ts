@@ -54,7 +54,7 @@ const toProposal = (links: ReadonlyArray<MappingLink>): AiProposal => ({
   transformLinks: [],
 })
 
-const withProposal = (draft: MappingGraph, proposal: AiProposal): MappingGraph => ({
+export const withProposal = (draft: MappingGraph, proposal: AiProposal): MappingGraph => ({
   links: [...draft.links, ...proposal.links],
   transforms: [...draft.transforms, ...proposal.transforms],
   transformLinks: [...draft.transformLinks, ...proposal.transformLinks],
