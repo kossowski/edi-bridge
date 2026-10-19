@@ -840,7 +840,7 @@
       "tryAgain": {
         "button": "Erneut versuchen",
         "pending": "Wird erneut versucht",
-        "failed": "Die Zustellung ist nicht erneut gestartet. Versuchen Sie es noch einmal.",
+        "failed": "{stage, select, delivery {Die Zustellung ist nicht erneut gestartet. Versuchen Sie es noch einmal.} other {Die Verarbeitung ist nicht erneut gestartet. Versuchen Sie es noch einmal.}}",
         "viewOnly": "Ein Admin kann es erneut versuchen."
       },
       "copyMessage": {

@@ -174,7 +174,9 @@ export function TryAgainStep({ run, secondary }: { run: FailedRun; secondary: bo
       ) : (
         <ViewOnly text={t('actions.tryAgain.viewOnly')} />
       )}
-      {retry.isError && <ActionError message={t('actions.tryAgain.failed')} />}
+      {retry.isError && (
+        <ActionError message={t('actions.tryAgain.failed', { stage: run.failureStage })} />
+      )}
     </div>
   )
 }

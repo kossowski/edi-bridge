@@ -840,7 +840,7 @@
       "tryAgain": {
         "button": "Try again",
         "pending": "Trying again",
-        "failed": "The delivery did not start again. Try once more.",
+        "failed": "{stage, select, delivery {The delivery did not start again. Try once more.} other {The processing did not start again. Try once more.}}",
         "viewOnly": "An Admin can try again."
       },
       "copyMessage": {
