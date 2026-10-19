@@ -46,12 +46,12 @@ let failed: string
 
 let received: string
 
-const submitted = async (content: string) => {
-  const response = await admin.inject({
+const submitted = async (content: string, as = admin, channelId = workspace.inboundChannelId) => {
+  const response = await as.inject({
     method: submitDocumentEndpoint.method,
     url: submitDocumentEndpoint.path,
     body: {
-      channelId: workspace.inboundChannelId,
+      channelId,
       document: { fileName: 'invoice.json', content },
     },
   })
@@ -338,6 +338,8 @@ describe('a Run that stopped on a defect', () => {
 describe('the shared mappingId filter case', () => {
   const seeded = new Map<string, string>()
 
+  let caseAdmin: Client
+
   const seededId = (key: string) => {
     const id = seeded.get(key)
 
@@ -358,31 +360,53 @@ describe('the shared mappingId filter case', () => {
 
   beforeAll(async () => {
     const { db } = api.connection
-    const [template] = await db.select().from(mappings).where(eq(mappings.id, workspace.mappingId))
-    const [flow] = await db.select().from(flows).where(eq(flows.id, workspace.flowId))
+    // Its own Workspace keeps the case's Runs out of the exact lists the other tests assert.
+    const caseWorkspace = await seedInvoiceWorkspace(db, 'Filter case Foods')
 
-    if (template === undefined || flow === undefined) {
+    const member = {
+      name: 'Filter case Foods admin',
+      email: 'admin@filter-case-foods.example',
+      password: 'filter-case-foods-admin-password',
+      workspaceId: caseWorkspace.id,
+      role: 'admin' as const,
+    }
+
+    await addMember(db, member)
+    caseAdmin = await signIn(api.app, member)
+
+    const [workspaceMapping] = await db
+      .select()
+      .from(mappings)
+      .where(eq(mappings.id, caseWorkspace.mappingId))
+
+    const [flow] = await db.select().from(flows).where(eq(flows.id, caseWorkspace.flowId))
+
+    if (workspaceMapping === undefined || flow === undefined) {
       throw new Error('The Workspace has no Mapping or Flow to copy')
     }
 
     // Submitted before the case Flow exists, so the Workspace's Flow alone takes each Document.
     for (const { key } of runMappingFilterCase.runs) {
-      seeded.set(key, await submitted(goldenInvoice))
+      seeded.set(key, await submitted(goldenInvoice, caseAdmin, caseWorkspace.inboundChannelId))
     }
 
     // Processing would record a Mapping Version on the Run that is not yet processed.
-    api.runQueue.queued.splice(0)
+    const othersQueued = api.runQueue.queued.filter(
+      ({ workspaceId }) => workspaceId !== caseWorkspace.id,
+    )
+
+    api.runQueue.queued.splice(0, api.runQueue.queued.length, ...othersQueued)
 
     for (const key of runMappingFilterCase.mappings) {
       const id = inserted(
         await db
           .insert(mappings)
           .values({
-            workspaceId: workspace.id,
-            documentStructureId: template.documentStructureId,
-            messageType: template.messageType,
+            workspaceId: caseWorkspace.id,
+            documentStructureId: workspaceMapping.documentStructureId,
+            messageType: workspaceMapping.messageType,
             name: `Filter case ${key}`,
-            draft: template.draft,
+            draft: workspaceMapping.draft,
           })
           .returning(),
       )
@@ -390,10 +414,11 @@ describe('the shared mappingId filter case', () => {
       seeded.set(key, id)
     }
 
-    for (const [index, { key, mapping }] of runMappingFilterCase.mappingVersions.entries()) {
-      const version = runMappingFilterCase.mappingVersions
-        .slice(0, index + 1)
-        .filter((earlier) => earlier.mapping === mapping).length
+    const lastVersion = new Map<string, number>()
+
+    for (const { key, mapping } of runMappingFilterCase.mappingVersions) {
+      const version = (lastVersion.get(mapping) ?? 0) + 1
+      lastVersion.set(mapping, version)
 
       const id = inserted(
         await db
@@ -401,8 +426,8 @@ describe('the shared mappingId filter case', () => {
           .values({
             mappingId: seededId(mapping),
             version,
-            graph: template.draft,
-            publishedBy: workspace.userId,
+            graph: workspaceMapping.draft,
+            publishedBy: caseWorkspace.userId,
           })
           .returning(),
       )
@@ -415,7 +440,7 @@ describe('the shared mappingId filter case', () => {
         await db
           .insert(flows)
           .values({
-            workspaceId: workspace.id,
+            workspaceId: caseWorkspace.id,
             tradingPartnerId: flow.tradingPartnerId,
             messageType: flow.messageType,
             name: `Filter case ${key}`,
@@ -432,11 +457,15 @@ describe('the shared mappingId filter case', () => {
     for (const run of runMappingFilterCase.runs) {
       await db
         .update(runs)
-        .set({
-          flowId: seededId(run.flow),
-          mappingVersionId:
-            run.recordedMappingVersion === null ? null : seededId(run.recordedMappingVersion),
-        })
+        .set(
+          run.recordedMappingVersion === null
+            ? { flowId: seededId(run.flow), status: 'received', mappingVersionId: null }
+            : {
+                flowId: seededId(run.flow),
+                status: 'delivered',
+                mappingVersionId: seededId(run.recordedMappingVersion),
+              },
+        )
         .where(eq(runs.id, seededId(run.key)))
     }
   })
@@ -446,7 +475,9 @@ describe('the shared mappingId filter case', () => {
     async (filter) => {
       const query = filter.mappings.map((key) => `mappingId=${seededId(key)}`).join('&')
 
-      expect(new Set(ids(await listed(query)))).toEqual(new Set(filter.runs.map(seededId)))
+      expect(new Set(ids(await listed(query, caseAdmin)))).toEqual(
+        new Set(filter.runs.map(seededId)),
+      )
     },
   )
 })
