@@ -87,7 +87,10 @@ const receiveFile = (channel: InboundChannel, file: SftpFile, state: ChannelPoll
     yield* storeAndRemove(channel, file, decoded(content), state)
   }).pipe(
     Effect.catchCause((cause) =>
-      Effect.logError(`File ${file.name} of Channel ${channel.id} not received`, cause),
+      Effect.logError(
+        `File ${file.name} of Channel ${channel.id} not received or not removed`,
+        cause,
+      ),
     ),
   )
 
