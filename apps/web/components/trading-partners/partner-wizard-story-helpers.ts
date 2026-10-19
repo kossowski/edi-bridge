@@ -91,5 +91,15 @@ export async function chooseMapping(canvas: Canvas, document: WizardDocument, ma
   const group = await findMappingGroup(canvas, document)
   await userEvent.click(group.getByRole('radio', { name: /existing mapping/ }))
   await userEvent.click(mappingSelect(canvas, document))
-  await userEvent.click(await screen.findByRole('option', { name: new RegExp(`^${mapping}`) }))
+  const option = await screen.findByRole('option', { name: new RegExp(`^${mapping}`) })
+  await closeSelectPopup(() => userEvent.click(option))
+}
+
+export async function closeSelectPopup(close: () => Promise<void>) {
+  const popup = screen.getByRole('listbox').closest('[data-base-ui-portal]')
+  await expect(popup).toBeInTheDocument()
+  await close()
+  // The closed popup keeps its focus guards until the next frame, which Chromium throttles in a
+  // hidden iframe, and axe fails a story that ends before then with aria-hidden-focus.
+  await waitFor(() => expect(popup?.querySelector('[data-base-ui-focus-guard]')).toBeNull())
 }
