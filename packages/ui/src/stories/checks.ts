@@ -102,6 +102,7 @@ export async function expectFocusRingInside(element: HTMLElement, neighbours: HT
 
     const reach = Math.max(outlineReach(element), 0)
     const box = element.getBoundingClientRect()
+
     const ring = new DOMRect(
       box.x - reach,
       box.y - reach,
