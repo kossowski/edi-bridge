@@ -250,7 +250,27 @@ describe('a Run', () => {
       businessReference: null,
       error: null,
       output: null,
+      messageIndex: null,
     })
+  })
+
+  it('records the position of its Message in the Interchange', async () => {
+    const { run } = await newRun(connection.db)
+
+    const stored = await only(
+      connection.db
+        .insert(runs)
+        .values({ ...run, messageIndex: 2 })
+        .returning(),
+    )
+
+    expect(stored.messageIndex).toBe(2)
+  })
+
+  it('rejects a Message index below one', async () => {
+    const { run } = await newRun(connection.db)
+
+    await expect(connection.db.insert(runs).values({ ...run, messageIndex: 0 })).rejects.toThrow()
   })
 
   const validationError = {
