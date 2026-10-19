@@ -1,8 +1,16 @@
 import { delay, http, HttpResponse } from 'msw'
-import { expect, within } from 'storybook/test'
+import { expect, userEvent, within } from 'storybook/test'
 
 import { DocumentsScreen } from '@/components/documents/documents-screen'
-import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
+import {
+  besideSidebar,
+  darkMode,
+  german,
+  goBack,
+  mobile,
+  tablet,
+  withMemoryHistory,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { runsEndpoint } from '@edi-bridge/contracts'
 import { createRuns, runsHandler, seedRuns } from '@edi-bridge/mocks'
@@ -43,6 +51,23 @@ export const AllStatuses = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('40 documents')).toBeVisible()
+  },
+})
+
+export const BackUndoesStatusFilter = meta.story({
+  decorators: [withMemoryHistory],
+  beforeEach({ msw }) {
+    msw.use(runsHandler(apiUrl, runs))
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: /^All\b/ }))
+    await expect(await canvas.findByText('40 documents')).toBeVisible()
+
+    goBack()
+
+    await expect(
+      await canvas.findByRole('button', { name: /^Needs attention\b/, pressed: true }),
+    ).toBeVisible()
   },
 })
 

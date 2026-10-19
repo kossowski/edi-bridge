@@ -1,7 +1,7 @@
-import { expect, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { OrdersScreen } from '@/components/orders/orders-screen'
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import { darkMode, german, goBack, mobile, withMemoryHistory } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { orderLifecycleListHandler, orderLifecycleReferences } from '@edi-bridge/mocks'
 
@@ -48,6 +48,40 @@ export const FilteredByStatus = meta.story({
     ).toBeVisible()
     await expect(within(list).getAllByText('Needs attention').length).toBeGreaterThan(0)
     await expect(within(list).queryByText('Done')).toBeNull()
+  },
+})
+
+export const BackUndoesStatusFilter = meta.story({
+  decorators: [withMemoryHistory],
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: /^Needs attention \d+$/ }))
+    await expect(
+      await canvas.findByRole('button', { name: /^Needs attention \d+$/, pressed: true }),
+    ).toBeVisible()
+
+    goBack()
+
+    await expect(
+      await canvas.findByRole('button', { name: /^All \d+$/, pressed: true }),
+    ).toBeVisible()
+  },
+})
+
+export const BackUndoesWholeSearch = meta.story({
+  parameters: ordersAt({ status: 'needs-attention' }),
+  decorators: [withMemoryHistory],
+  async play({ canvas }) {
+    await canvas.findByRole('button', { name: /^Needs attention \d+$/, pressed: true })
+    // Each keystroke waits out the search delay, so every one reaches the URL.
+    await userEvent.type(canvas.getByRole('searchbox'), 'zz', { delay: 400 })
+    await expect(await canvas.findByText('No orders match')).toBeVisible()
+
+    goBack()
+
+    await waitFor(() => expect(canvas.getByRole('searchbox')).toHaveValue(''))
+    await expect(
+      canvas.getByRole('button', { name: /^Needs attention \d+$/, pressed: true }),
+    ).toBeVisible()
   },
 })
 

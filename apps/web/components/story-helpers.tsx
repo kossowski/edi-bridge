@@ -1,5 +1,10 @@
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { NextIntlClientProvider } from 'next-intl'
-import { type ReactNode } from 'react'
+import {
+  PathnameContext,
+  SearchParamsContext,
+} from 'next/dist/shared/lib/hooks-client-context.shared-runtime'
+import { type ReactNode, useLayoutEffect, useMemo, useState } from 'react'
 import { expect } from 'storybook/test'
 
 import messagesDe from '@/messages/de.json'
@@ -53,6 +58,54 @@ export const besideSidebar = (Story: () => ReactNode) => (
     <Story />
   </div>
 )
+
+type StoryNavigation = { pathname: string; query?: Record<string, string> }
+
+function MemoryHistory({ start, children }: { start: StoryNavigation; children: ReactNode }) {
+  const [history, setHistory] = useState(() => ({
+    entries: [`${start.pathname}?${new URLSearchParams(start.query)}`],
+    index: 0,
+  }))
+
+  useLayoutEffect(() => {
+    const router = getRouter()
+
+    router.push.mockImplementation((href: string) =>
+      setHistory(({ entries, index }) => ({
+        entries: [...entries.slice(0, index + 1), href],
+        index: index + 1,
+      })),
+    )
+    router.replace.mockImplementation((href: string) =>
+      setHistory(({ entries, index }) => ({ entries: entries.with(index, href), index })),
+    )
+    router.back.mockImplementation(() =>
+      setHistory(({ entries, index }) => ({ entries, index: Math.max(0, index - 1) })),
+    )
+  }, [])
+
+  const href = history.entries[history.index] ?? ''
+  const [pathname = '', search = ''] = href.split('?')
+  const searchParams = useMemo(() => new URLSearchParams(search), [search])
+
+  return (
+    <PathnameContext.Provider value={pathname}>
+      <SearchParamsContext.Provider value={searchParams}>{children}</SearchParamsContext.Provider>
+    </PathnameContext.Provider>
+  )
+}
+
+// Router push, replace and back move through a history of the story's own, so Back can be tested.
+export const withMemoryHistory = (
+  Story: () => ReactNode,
+  { parameters }: { parameters: { nextjs?: { navigation?: StoryNavigation } } },
+) => (
+  <MemoryHistory start={parameters.nextjs?.navigation ?? { pathname: '/' }}>
+    <Story />
+  </MemoryHistory>
+)
+
+export const goBack = () => getRouter().back()
 
 export const withSidebarProvider = (
   Story: () => ReactNode,

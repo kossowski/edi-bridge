@@ -24,6 +24,8 @@ export function useUrlFilters<Filters extends { page: number }>(
   }
 
   const latest = useRef(filters)
+  // The search the last search-only change navigated to; a typing burst replaces that entry.
+  const searchEntry = useRef<string>(undefined)
 
   useEffect(() => {
     latest.current = filters
@@ -31,11 +33,22 @@ export function useUrlFilters<Filters extends { page: number }>(
 
   const updateFilters = useCallback(
     (change: Partial<Filters>) => {
+      const current = toSearch(latest.current)
       const next = { ...latest.current, page: 1, ...change }
+      const nextSearch = toSearch(next)
 
       latest.current = next
-      setState((current) => ({ ...current, filters: next }))
-      router.replace(`${pathname}?${toSearch(next)}`, { scroll: false })
+      setState((previous) => ({ ...previous, filters: next }))
+
+      if (nextSearch === current) {
+        return
+      }
+
+      const searchOnly = Object.keys(change).join() === 'q'
+      const method = searchOnly && searchEntry.current === current ? 'replace' : 'push'
+
+      searchEntry.current = searchOnly ? nextSearch : undefined
+      router[method](`${pathname}?${nextSearch}`, { scroll: false })
     },
     [pathname, router, toSearch],
   )
