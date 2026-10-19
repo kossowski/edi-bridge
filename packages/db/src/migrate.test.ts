@@ -1,33 +1,20 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { type MappingGraph, withCheckDigit } from '@edi-bridge/contracts'
-
 import { connect, type Connection } from './client.js'
 import { migrate } from './migrate.js'
 import {
-  channels,
   documents,
   documentStructures,
-  flows,
   lookupTableEntries,
   lookupTables,
-  mappings,
-  mappingVersions,
   runs,
   runSteps,
   tradingPartners,
-  users,
   workspaces,
 } from './schema.js'
+import { insertWorkspace, newRun, only, tradingPartner } from './test-fixtures.js'
 import { startTestDatabase, type TestDatabase } from './testing.js'
-
-const tradingPartner = {
-  name: 'Hanse Retail',
-  gln: withCheckDigit('020000000002'),
-  characterSet: 'UNOC',
-  acknowledgementTimeLimitHours: 24,
-} satisfies Omit<typeof tradingPartners.$inferInsert, 'workspaceId'>
 
 let testDatabase: TestDatabase
 
@@ -43,19 +30,6 @@ afterAll(async () => {
   await testDatabase.stop()
 })
 
-async function insertWorkspace() {
-  const [workspace] = await connection.db
-    .insert(workspaces)
-    .values({ name: 'Nordwind Foods', gln: withCheckDigit('020000000001') })
-    .returning()
-
-  if (workspace === undefined) {
-    throw new Error('Workspace insert returned no row')
-  }
-
-  return workspace
-}
-
 describe('migrate', () => {
   it('applies again without changes to an up-to-date database', async () => {
     await expect(migrate(testDatabase.url)).resolves.toBeUndefined()
@@ -64,7 +38,7 @@ describe('migrate', () => {
 
 describe('schema', () => {
   it('stores a Trading Partner in Test Mode with empty onboarding', async () => {
-    const workspace = await insertWorkspace()
+    const workspace = await insertWorkspace(connection.db)
 
     const [stored] = await connection.db
       .insert(tradingPartners)
@@ -81,7 +55,7 @@ describe('schema', () => {
   })
 
   it('returns an onboarding timestamp as the same instant', async () => {
-    const workspace = await insertWorkspace()
+    const workspace = await insertWorkspace(connection.db)
     const sentAt = new Date('2026-10-14T12:00:00.123Z')
 
     const [stored] = await connection.db
@@ -126,7 +100,7 @@ describe('a Lookup Table', () => {
       .where(eq(lookupTableEntries.lookupTableId, lookupTableId))
 
   it('takes its entries along when deleted', async () => {
-    const workspace = await insertWorkspace()
+    const workspace = await insertWorkspace(connection.db)
     const lookupTable = await insertLookupTable(workspace.id)
 
     await connection.db.delete(lookupTables).where(eq(lookupTables.id, lookupTable.id))
@@ -135,7 +109,7 @@ describe('a Lookup Table', () => {
   })
 
   it('is deleted with the Trading Partner it belongs to', async () => {
-    const workspace = await insertWorkspace()
+    const workspace = await insertWorkspace(connection.db)
 
     const [partner] = await connection.db
       .insert(tradingPartners)
@@ -177,7 +151,7 @@ describe('a Document Structure', () => {
   } satisfies Omit<typeof documentStructures.$inferInsert, 'workspaceId'>
 
   it('is deleted with its Workspace', async () => {
-    const workspace = await insertWorkspace()
+    const workspace = await insertWorkspace(connection.db)
 
     await connection.db
       .insert(documentStructures)
@@ -194,7 +168,7 @@ describe('a Document Structure', () => {
   })
 
   it('rejects CSV settings on a JSON Document Structure', async () => {
-    const workspace = await insertWorkspace()
+    const workspace = await insertWorkspace(connection.db)
 
     await expect(
       connection.db.insert(documentStructures).values({
@@ -206,7 +180,7 @@ describe('a Document Structure', () => {
   })
 
   it('rejects a sample without its text', async () => {
-    const workspace = await insertWorkspace()
+    const workspace = await insertWorkspace(connection.db)
 
     await expect(
       connection.db.insert(documentStructures).values({
@@ -220,145 +194,8 @@ describe('a Document Structure', () => {
 })
 
 describe('a Run', () => {
-  const emptyGraph: MappingGraph = { links: [], transforms: [], transformLinks: [] }
-
-  async function only<T>(rows: Promise<T[]>) {
-    const [row] = await rows
-
-    if (row === undefined) {
-      throw new Error('Insert returned no row')
-    }
-
-    return row
-  }
-
-  async function insertFlow() {
-    const workspace = await insertWorkspace()
-    const workspaceId = workspace.id
-
-    const partner = await only(
-      connection.db
-        .insert(tradingPartners)
-        .values({ ...tradingPartner, gln: null, workspaceId })
-        .returning(),
-    )
-
-    const user = await only(
-      connection.db
-        .insert(users)
-        .values({ name: 'Ops', email: `${crypto.randomUUID()}@nordwind.example` })
-        .returning(),
-    )
-
-    const structure = await only(
-      connection.db
-        .insert(documentStructures)
-        .values({
-          workspaceId,
-          name: 'ERP invoices',
-          format: 'json',
-          jsonRoot: 'object',
-          children: [],
-        })
-        .returning(),
-    )
-
-    const mapping = await only(
-      connection.db
-        .insert(mappings)
-        .values({
-          workspaceId,
-          documentStructureId: structure.id,
-          messageType: 'INVOIC',
-          name: 'ERP invoice to INVOIC',
-          draft: emptyGraph,
-        })
-        .returning(),
-    )
-
-    const mappingVersion = await only(
-      connection.db
-        .insert(mappingVersions)
-        .values({ mappingId: mapping.id, version: 1, graph: emptyGraph, publishedBy: user.id })
-        .returning(),
-    )
-
-    const inbound = await only(
-      connection.db
-        .insert(channels)
-        .values({
-          workspaceId,
-          type: 'webhook',
-          direction: 'inbound',
-          name: 'ERP webhook',
-          rateLimitPerMinute: 60,
-          encryptedWebhookToken: 'encrypted',
-          webhookTokenLastFour: 'abcd',
-        })
-        .returning(),
-    )
-
-    const destination = await only(
-      connection.db
-        .insert(channels)
-        .values({
-          workspaceId,
-          tradingPartnerId: partner.id,
-          type: 'http',
-          direction: 'outbound',
-          name: 'Hanse Retail AS2 gateway',
-          url: 'https://edi.hanse-retail.example/inbox',
-        })
-        .returning(),
-    )
-
-    const flow = await only(
-      connection.db
-        .insert(flows)
-        .values({
-          workspaceId,
-          tradingPartnerId: partner.id,
-          messageType: 'INVOIC',
-          name: 'Invoices to Hanse Retail',
-          inboundChannelId: inbound.id,
-          destinationChannelId: destination.id,
-          mappingVersionId: mappingVersion.id,
-        })
-        .returning(),
-    )
-
-    const document = await only(
-      connection.db
-        .insert(documents)
-        .values({
-          workspaceId,
-          channelId: inbound.id,
-          fileName: 'invoice.json',
-          content: '{"invoiceNumber":"INV-1001"}',
-        })
-        .returning(),
-    )
-
-    return { workspaceId, flow, mappingVersion, document }
-  }
-
-  async function newRun() {
-    const { workspaceId, flow, mappingVersion, document } = await insertFlow()
-
-    return {
-      run: {
-        workspaceId,
-        documentId: document.id,
-        flowId: flow.id,
-        tradingPartnerId: flow.tradingPartnerId,
-        manualSubmission: true,
-      } satisfies typeof runs.$inferInsert,
-      mappingVersion,
-    }
-  }
-
   it('records a received Run of a Manual Submission', async () => {
-    const { run } = await newRun()
+    const { run } = await newRun(connection.db)
 
     const stored = await only(connection.db.insert(runs).values(run).returning())
 
@@ -387,7 +224,7 @@ describe('a Run', () => {
   } satisfies Partial<typeof runs.$inferInsert>
 
   it('records a Run that failed validation with its error and no output', async () => {
-    const { run } = await newRun()
+    const { run } = await newRun(connection.db)
 
     const stored = await only(
       connection.db
@@ -400,7 +237,7 @@ describe('a Run', () => {
   })
 
   it('rejects a failed Run without its Failure Stage', async () => {
-    const { run } = await newRun()
+    const { run } = await newRun(connection.db)
 
     await expect(
       connection.db.insert(runs).values({ ...run, ...failedValidation, failureStage: null }),
@@ -408,7 +245,7 @@ describe('a Run', () => {
   })
 
   it('rejects a failed Run without its error', async () => {
-    const { run } = await newRun()
+    const { run } = await newRun(connection.db)
 
     await expect(
       connection.db.insert(runs).values({ ...run, ...failedValidation, error: null }),
@@ -416,7 +253,7 @@ describe('a Run', () => {
   })
 
   it('rejects a Failure Stage on a Run that did not fail', async () => {
-    const { run } = await newRun()
+    const { run } = await newRun(connection.db)
 
     await expect(
       connection.db.insert(runs).values({ ...run, status: 'processing', failureStage: 'mapping' }),
@@ -424,7 +261,7 @@ describe('a Run', () => {
   })
 
   it('never stores output for a Run that failed validation', async () => {
-    const { run } = await newRun()
+    const { run } = await newRun(connection.db)
 
     await expect(
       connection.db
@@ -434,7 +271,7 @@ describe('a Run', () => {
   })
 
   it('rejects waiting for the Trading Partner on a Run that did not fail', async () => {
-    const { run } = await newRun()
+    const { run } = await newRun(connection.db)
 
     await expect(
       connection.db
@@ -447,7 +284,7 @@ describe('a Run', () => {
     const at = (time: string) => new Date(`2026-10-14T${time}Z`)
 
     async function insertRun() {
-      const { run, mappingVersion } = await newRun()
+      const { run, mappingVersion } = await newRun(connection.db)
 
       return only(
         connection.db
