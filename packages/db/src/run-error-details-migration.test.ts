@@ -1,12 +1,12 @@
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { runErrorSchema, runProblemSchema } from '@edi-bridge/contracts'
+import { type MappingGraph, runErrorSchema, runProblemSchema } from '@edi-bridge/contracts'
 
 import { connect, type Connection } from './client.js'
 import { migrate } from './migrate.js'
 import { runs } from './schema.js'
-import { newRun, only } from './test-fixtures.js'
+import { emptyGraph, only } from './test-fixtures.js'
 import { startTestDatabase, type TestDatabase } from './testing.js'
 
 const storedProblemSchema = runProblemSchema.omit({ whoFixes: true })
@@ -104,7 +104,7 @@ const failedRuns = [
 
 type StoredFailure = (typeof failedRuns)[number]['error' | 'problem']
 
-const jsonb = (value: StoredFailure) => sql`${JSON.stringify(value)}::jsonb`
+const jsonb = (value: StoredFailure | MappingGraph) => sql`${JSON.stringify(value)}::jsonb`
 
 let testDatabase: TestDatabase
 
@@ -114,39 +114,104 @@ const runIds = new Map<string, string>()
 
 let deliveredRunId: string
 
+type RunOwners = {
+  workspaceId: string
+  tradingPartnerId: string
+  flowId: string
+  documentId: string
+}
+
+// Plain SQL with only the columns of migration 0015, so later schema changes leave the old rows intact.
+async function insertRunOwners(db: Connection['db']) {
+  return only(
+    db.execute<RunOwners>(sql`
+      with workspace as (
+        insert into workspaces (name) values ('Nordwind Foods') returning id
+      ), partner as (
+        insert into trading_partners (workspace_id, name, character_set, acknowledgement_time_limit_hours)
+        select id, 'Hanse Retail', 'UNOC', 24 from workspace
+        returning id
+      ), publisher as (
+        insert into users (name, email) values ('Ops', 'ops@nordwind.example') returning id
+      ), structure as (
+        insert into document_structures (workspace_id, name, format, json_root, children)
+        select id, 'ERP invoices', 'json', 'object', '[]'::jsonb from workspace
+        returning id
+      ), mapping as (
+        insert into mappings (workspace_id, document_structure_id, message_type, name, draft)
+        select workspace.id, structure.id, 'INVOIC', 'ERP invoice to INVOIC', ${jsonb(emptyGraph)}
+        from workspace, structure
+        returning id
+      ), mapping_version as (
+        insert into mapping_versions (mapping_id, version, graph, published_by)
+        select mapping.id, 1, ${jsonb(emptyGraph)}, publisher.id from mapping, publisher
+        returning id
+      ), inbound as (
+        insert into channels (workspace_id, type, direction, name, rate_limit_per_minute, encrypted_webhook_token, webhook_token_last_four)
+        select id, 'webhook', 'inbound', 'ERP webhook', 60, 'encrypted', 'abcd' from workspace
+        returning id
+      ), destination as (
+        insert into channels (workspace_id, trading_partner_id, type, direction, name, url)
+        select workspace.id, partner.id, 'http', 'outbound', 'Hanse Retail AS2 gateway', 'https://edi.hanse-retail.example/inbox'
+        from workspace, partner
+        returning id
+      ), flow as (
+        insert into flows (workspace_id, trading_partner_id, message_type, name, inbound_channel_id, destination_channel_id, mapping_version_id)
+        select workspace.id, partner.id, 'INVOIC', 'Invoices to Hanse Retail', inbound.id, destination.id, mapping_version.id
+        from workspace, partner, inbound, destination, mapping_version
+        returning id
+      ), document as (
+        insert into documents (workspace_id, channel_id, file_name, content)
+        select workspace.id, inbound.id, 'invoice.json', '{"invoiceNumber":"INV-1001"}'
+        from workspace, inbound
+        returning id
+      )
+      select workspace.id as "workspaceId", partner.id as "tradingPartnerId", flow.id as "flowId", document.id as "documentId"
+      from workspace, partner, flow, document
+    `),
+  )
+}
+
+type OldRun =
+  | { status: 'delivered' }
+  | {
+      status: 'failed'
+      failureStage: string
+      error: StoredFailure
+      problem: StoredFailure
+    }
+
+async function insertOldRun(db: Connection['db'], owners: RunOwners, run: OldRun) {
+  const failure =
+    run.status === 'failed'
+      ? sql`${run.failureStage}, ${jsonb(run.error)}, ${jsonb(run.problem)}`
+      : sql`null, null, null`
+
+  const stored = await only(
+    db.execute<{ id: string }>(sql`
+      insert into runs (workspace_id, document_id, flow_id, trading_partner_id, manual_submission, status, failure_stage, error, problem)
+      values (${owners.workspaceId}, ${owners.documentId}, ${owners.flowId}, ${owners.tradingPartnerId}, true, ${run.status}, ${failure})
+      returning id
+    `),
+  )
+
+  return stored.id
+}
+
 beforeAll(async () => {
   testDatabase = await startTestDatabase({ upTo: '0015_run_message_index' })
   connection = connect(testDatabase.url)
 
+  const owners = await insertRunOwners(connection.db)
+
   for (const failed of failedRuns) {
-    const { run } = await newRun(connection.db)
-
-    const stored = await only(
-      connection.db
-        .insert(runs)
-        .values({
-          ...run,
-          status: 'failed',
-          failureStage: failed.failureStage,
-          error: jsonb(failed.error),
-          problem: jsonb(failed.problem),
-        })
-        .returning({ id: runs.id }),
+    runIds.set(
+      failed.name,
+      await insertOldRun(connection.db, owners, { status: 'failed', ...failed }),
     )
-
-    runIds.set(failed.name, stored.id)
   }
 
-  const { run } = await newRun(connection.db)
-
-  deliveredRunId = (
-    await only(
-      connection.db
-        .insert(runs)
-        .values({ ...run, status: 'delivered' })
-        .returning({ id: runs.id }),
-    )
-  ).id
+  deliveredRunId = await insertOldRun(connection.db, owners, { status: 'delivered' })
 
   await migrate(testDatabase.url)
 }, 60_000)
