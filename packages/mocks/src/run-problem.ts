@@ -32,7 +32,8 @@ const reasons = {
   destinationUnreachable: 'unreachable',
   destinationUnavailable: 'unreachable',
   glnMissing: 'incompleteSetup',
-  deliveryDefect: 'incompleteSetup',
+  channelDefect: 'incompleteSetup',
+  characterSetUnsupported: 'incompleteSetup',
 } as const satisfies Record<GeneratedErrorCode, ProblemReason>
 
 function destinationChannelOf(run: RunSummary, sources: ProblemSources) {
@@ -78,6 +79,14 @@ function brokenPieceTarget(
     case 'tradingPartnerGln': {
       return {
         kind: 'tradingPartnerGln',
+        tradingPartnerId: run.tradingPartner.id,
+        name: run.tradingPartner.name,
+      }
+    }
+
+    case 'tradingPartner': {
+      return {
+        kind: 'tradingPartner',
         tradingPartnerId: run.tradingPartner.id,
         name: run.tradingPartner.name,
       }

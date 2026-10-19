@@ -436,7 +436,16 @@ describe('the problem of a failed Run', () => {
       await Promise.all(runs.map(async ({ id }) => (await getRun(id)).body!))
     ).filter(({ problem }) => problem?.reason === 'incompleteSetup')
 
-    expect(incomplete.length).toBeGreaterThan(0)
+    expect(
+      new Set(incomplete.map(({ error, problem }) => `${error?.code}:${problem?.fixTarget?.kind}`)),
+    ).toEqual(
+      new Set([
+        'glnMissing:workspaceGln',
+        'glnMissing:tradingPartnerGln',
+        'channelDefect:channelCredential',
+        'characterSetUnsupported:tradingPartner',
+      ]),
+    )
 
     for (const run of incomplete) {
       const flow = seedFlows.find(({ id }) => id === run.flow.id)!
@@ -452,6 +461,11 @@ describe('the problem of a failed Run', () => {
           name: run.tradingPartner.name,
         },
         { kind: 'channelCredential', channelId: channel.id, name: channel.name },
+        {
+          kind: 'tradingPartner',
+          tradingPartnerId: run.tradingPartner.id,
+          name: run.tradingPartner.name,
+        },
       ]).toContainEqual(run.problem?.fixTarget)
     }
   })

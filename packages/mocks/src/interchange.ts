@@ -33,7 +33,8 @@ export type GeneratedErrorCode =
   | 'destinationUnreachable'
   | 'destinationUnavailable'
   | 'glnMissing'
-  | 'deliveryDefect'
+  | 'channelDefect'
+  | 'characterSetUnsupported'
 
 export type GeneratedError = RunError & { code: GeneratedErrorCode }
 
@@ -44,10 +45,15 @@ export type BrokenPiece =
 
 export type SetupPiece = Extract<
   FixTarget['kind'],
-  'workspaceGln' | 'tradingPartnerGln' | 'channelCredential'
+  'workspaceGln' | 'tradingPartnerGln' | 'channelCredential' | 'tradingPartner'
 >
 
-const setupPieces = ['workspaceGln', 'tradingPartnerGln', 'channelCredential'] as const
+const setupPieces = [
+  'workspaceGln',
+  'tradingPartnerGln',
+  'channelCredential',
+  'tradingPartner',
+] as const
 
 const setupErrors: Record<SetupPiece, GeneratedError> = {
   workspaceGln: {
@@ -61,8 +67,13 @@ const setupErrors: Record<SetupPiece, GeneratedError> = {
     position: null,
   },
   channelCredential: {
-    code: 'deliveryDefect',
-    message: 'The delivery stopped on an unexpected error',
+    code: 'channelDefect',
+    message: 'The Channel could not be used for the delivery',
+    position: null,
+  },
+  tradingPartner: {
+    code: 'characterSetUnsupported',
+    message: 'Delivery in character set UNOD is not supported',
     position: null,
   },
 }
