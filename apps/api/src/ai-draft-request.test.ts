@@ -43,7 +43,12 @@ beforeAll(async () => {
     aiModel: model,
     logger: {
       level: 'error',
-      stream: { write: (line: string) => logged.push(JSON.parse(line)) },
+      stream: {
+        write: (line: string) => {
+          // SAFETY: pino writes each log entry as one JSON object with optional msg and err fields.
+          logged.push(JSON.parse(line) as { msg?: string; err?: unknown })
+        },
+      },
     },
   })
 }, 60_000)
@@ -405,9 +410,8 @@ describe('POST /mappings/:id/ai-draft', () => {
     const events = eventsOf((await requestDraft(mappingId, { sampleId })).body)
 
     expect(events.at(-1)).toEqual({ type: 'failed', reason: 'unavailable' })
-    expect(logged).toContainEqual(
-      expect.objectContaining({ msg: 'The AI draft failed unexpectedly', err: expect.anything() }),
-    )
+    const failure = logged.find((entry) => entry.msg === 'The AI draft failed unexpectedly')
+    expect(failure?.err).toEqual(expect.anything())
     expect(await usedToday()).toBe(120)
   })
 
