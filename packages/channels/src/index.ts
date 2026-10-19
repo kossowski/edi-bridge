@@ -27,9 +27,6 @@ export {
   sftpChannelDownload,
 } from './sftp-download'
 
-export {
-  DeliveryFailed,
-  type OutboundDocument,
-  sftpChannelDelivery,
-  uploadSftp,
-} from './sftp-upload'
+export { DeliveryFailed, type OutboundDocument } from './delivery'
+
+export { sftpChannelDelivery, uploadSftp } from './sftp-upload'
