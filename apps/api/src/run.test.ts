@@ -313,7 +313,7 @@ describe('a Run that stopped on a defect', () => {
       .where(eq(runs.id, defect))
   })
 
-  it('offers a retry in the Run list', async () => {
+  it('names the defect reason of a failed Run in the Run list', async () => {
     const list = await listed('status=failed')
 
     expect(list.runs.find(({ id }) => id === defect)).toMatchObject({
@@ -322,7 +322,7 @@ describe('a Run that stopped on a defect', () => {
     })
   })
 
-  it('offers a retry in the Run detail', async () => {
+  it('offers trying again for a defect in the Run detail', async () => {
     await expect(detail(defect)).resolves.toMatchObject({
       failureStage: 'mapping',
       problem: { reason: 'defect', whoFixes: 'retry', fixTarget: null },
