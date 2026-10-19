@@ -1,4 +1,17 @@
-import { and, asc, count, desc, eq, gte, inArray, lte, or, type SQL, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import type { SelectedFields } from 'drizzle-orm/pg-core'
@@ -313,6 +326,37 @@ export const retryRun = (id: string) =>
       Effect.catchTag('RunNotRetryable', (error) =>
         Effect.fail(new Conflict({ message: error.message })),
       ),
+    )
+
+    return yield* loadRun(id)
+  })
+
+// A repeated mark keeps the time of the first one.
+export const waitForTradingPartner = (id: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+
+    const run = yield* loadRun(id)
+
+    if (run.problem?.whoFixes !== 'tradingPartner') {
+      return yield* new Conflict({
+        message: 'Only a Run that the Trading Partner fixes can wait for the Trading Partner',
+      })
+    }
+
+    yield* Effect.promise(() =>
+      db
+        .update(runs)
+        .set({ waitingForTradingPartnerSince: sql`now()` })
+        .where(
+          inWorkspace(
+            runs,
+            workspace.id,
+            eq(runs.id, id),
+            isNull(runs.waitingForTradingPartnerSince),
+          ),
+        ),
     )
 
     return yield* loadRun(id)

@@ -1,0 +1,201 @@
+import { Effect } from 'effect'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import {
+  manualSubmissionSchema,
+  runDetailSchema,
+  runEndpoint,
+  submitDocumentEndpoint,
+  toPath,
+  waitForTradingPartnerRunEndpoint,
+} from '@edi-bridge/contracts'
+import { processRun } from '@edi-bridge/pipeline'
+import {
+  addOrdersFlow,
+  golden,
+  goldenInvoice,
+  type InvoiceWorkspace,
+  pipelineServices,
+  seedInvoiceWorkspace,
+} from '@edi-bridge/pipeline/testing'
+
+import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+
+let api: TestApi
+
+let workspace: InvoiceWorkspace
+
+let admin: Client
+
+let viewer: Client
+
+beforeAll(async () => {
+  api = await startTestApi()
+  workspace = await seedInvoiceWorkspace(api.connection.db, 'Nordwind Foods')
+  // No inbound Run in these tests reaches the delivery to the ERP.
+  await addOrdersFlow(api.connection.db, workspace, { url: 'http://127.0.0.1:9/orders' })
+
+  const member = (role: 'admin' | 'viewer') => ({
+    name: `Nordwind Foods ${role}`,
+    email: `${role}@nordwind-foods.example`,
+    password: `nordwind-foods-${role}-password`,
+    workspaceId: workspace.id,
+    role,
+  })
+
+  await addMember(api.connection.db, member('admin'))
+  await addMember(api.connection.db, member('viewer'))
+  admin = await signIn(api.app, member('admin'))
+  viewer = await signIn(api.app, member('viewer'))
+}, 60_000)
+
+afterAll(async () => {
+  await api.stop()
+})
+
+const ordersInterchange = golden('orders-reference.edi', 'latin1')
+
+const invalidOrders = ordersInterchange.replace("BGM+220:::+128576+9'", "BGM+220:::+128576+99'")
+
+const unreadableOrders = ordersInterchange.replace("UNT+22+ME0001'", "UNT+23+ME0001'")
+
+const processed = async (fileName: string, content: string) => {
+  const response = await admin.inject({
+    method: submitDocumentEndpoint.method,
+    url: submitDocumentEndpoint.path,
+    body: { channelId: workspace.inboundChannelId, document: { fileName, content } },
+  })
+
+  expect(response.statusCode, response.body).toBe(201)
+
+  for (const queued of api.runQueue.queued.splice(0)) {
+    await Effect.runPromise(
+      processRun(queued).pipe(pipelineServices(api.connection.db, api.runQueue, () => Effect.void)),
+    )
+  }
+
+  return manualSubmissionSchema.parse(response.json()).runs[0]?.id ?? ''
+}
+
+const wait = (id: string, as = admin) =>
+  as.inject({
+    method: waitForTradingPartnerRunEndpoint.method,
+    url: toPath(waitForTradingPartnerRunEndpoint.path, { id }),
+  })
+
+const detail = async (id: string) => {
+  const response = await admin.inject({ method: 'GET', url: toPath(runEndpoint.path, { id }) })
+
+  expect(response.statusCode, response.body).toBe(200)
+
+  return runDetailSchema.parse(response.json())
+}
+
+describe('a failed inbound Run', () => {
+  it('awaits a resend from the Trading Partner after a parse failure', async () => {
+    const id = await processed('orders.edi', unreadableOrders)
+
+    await expect(detail(id)).resolves.toMatchObject({
+      status: 'failed',
+      direction: 'inbound',
+      failureStage: 'parse',
+      problem: {
+        whoFixes: 'tradingPartner',
+        fixTarget: { kind: 'tradingPartner', tradingPartnerId: workspace.tradingPartnerId },
+      },
+      waitingForTradingPartnerSince: null,
+    })
+  })
+
+  it('awaits a resend from the Trading Partner after a validation failure', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+
+    await expect(detail(id)).resolves.toMatchObject({
+      status: 'failed',
+      direction: 'inbound',
+      failureStage: 'validation',
+      problem: {
+        whoFixes: 'tradingPartner',
+        fixTarget: { kind: 'tradingPartner', tradingPartnerId: workspace.tradingPartnerId },
+      },
+      waitingForTradingPartnerSince: null,
+    })
+  })
+})
+
+describe('POST /runs/:id/wait-for-trading-partner', () => {
+  it('marks a Run that the Trading Partner fixes as waiting for the Trading Partner', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+    const before = Date.now()
+
+    const response = await wait(id)
+
+    expect(response.statusCode, response.body).toBe(200)
+
+    const marked = runDetailSchema.parse(response.json())
+    const since = Date.parse(marked.waitingForTradingPartnerSince ?? '')
+
+    expect(marked).toMatchObject({ id, status: 'failed', failureStage: 'validation' })
+    expect(since).toBeGreaterThanOrEqual(before - 1000)
+    expect(since).toBeLessThanOrEqual(Date.now() + 1000)
+    await expect(detail(id)).resolves.toEqual(marked)
+  })
+
+  it('keeps the time of the first mark when the Run is marked again', async () => {
+    const id = await processed('orders.edi', unreadableOrders)
+
+    const first = runDetailSchema.parse((await wait(id)).json())
+    const again = await wait(id)
+
+    expect(again.statusCode, again.body).toBe(200)
+    expect(runDetailSchema.parse(again.json()).waitingForTradingPartnerSince).toBe(
+      first.waitingForTradingPartnerSince,
+    )
+  })
+
+  it('answers 409 for a Run that the Workspace fixes and leaves it unmarked', async () => {
+    const id = await processed('invoice.json', 'not json')
+
+    const response = await wait(id)
+
+    expect(response.statusCode, response.body).toBe(409)
+    await expect(detail(id)).resolves.toMatchObject({
+      status: 'failed',
+      problem: { whoFixes: 'you' },
+      waitingForTradingPartnerSince: null,
+    })
+  })
+
+  it('answers 409 for a delivered Run', async () => {
+    const id = await processed('invoice.json', goldenInvoice)
+
+    const response = await wait(id)
+
+    expect(response.statusCode, response.body).toBe(409)
+    await expect(detail(id)).resolves.toMatchObject({ status: 'delivered' })
+  })
+
+  it('answers 403 to a Viewer and leaves the Run unmarked', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+
+    const response = await wait(id, viewer)
+
+    expect(response.statusCode).toBe(403)
+    await expect(detail(id)).resolves.toMatchObject({ waitingForTradingPartnerSince: null })
+  })
+
+  it('answers 404 for a Run of another Workspace and leaves it unmarked', async () => {
+    const id = await processed('orders.edi', invalidOrders)
+
+    const response = await wait(id, api.admin)
+
+    expect(response.statusCode).toBe(404)
+    await expect(detail(id)).resolves.toMatchObject({ waitingForTradingPartnerSince: null })
+  })
+
+  it('answers 404 for an unknown Run', async () => {
+    const response = await wait(crypto.randomUUID())
+
+    expect(response.statusCode).toBe(404)
+  })
+})
