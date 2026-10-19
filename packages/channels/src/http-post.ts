@@ -3,6 +3,7 @@ import { Effect } from 'effect'
 import {
   fetchFailureReasonSchema,
   type HttpDestination,
+  rejectedLoginReason,
   timingOut,
   unreachable,
 } from './channel-reach'
@@ -12,9 +13,7 @@ import { type HttpChannel, httpDestination } from './http-channel'
 import type { SecretBox } from './secret'
 
 const answerFailure = (status: number) =>
-  Effect.fail(
-    unreachable(status === 401 || status === 403 ? 'loginRejected' : 'unexpectedResponse'),
-  )
+  Effect.fail(unreachable(rejectedLoginReason(status) ?? 'unexpectedResponse'))
 
 const postHeaders = (authorization: string | null, document: OutboundDocument) => {
   const headers = new Headers({

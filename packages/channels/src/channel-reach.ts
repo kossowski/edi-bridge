@@ -193,13 +193,11 @@ const reachSftp = (login: SftpLogin, timeoutMs: number) =>
     statAndOpenDirectory(sftp, login.remotePath, done)
   })
 
-const httpStatusReason = (status: number): ChannelTestFailureReason | undefined => {
-  if (status === 401 || status === 403) {
-    return 'loginRejected'
-  }
+export const rejectedLoginReason = (status: number): ChannelTestFailureReason | undefined =>
+  status === 401 || status === 403 ? 'loginRejected' : undefined
 
-  return status >= 500 ? 'unexpectedResponse' : undefined
-}
+const httpStatusReason = (status: number): ChannelTestFailureReason | undefined =>
+  rejectedLoginReason(status) ?? (status >= 500 ? 'unexpectedResponse' : undefined)
 
 export const fetchFailureReasonSchema = z
   .object({ cause: z.object({ code: z.string() }) })
