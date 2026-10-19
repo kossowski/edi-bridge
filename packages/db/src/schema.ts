@@ -58,7 +58,7 @@ export const workspaces = pgTable(
   ],
 )
 
-// One row per Workspace and day in UTC, the day the AI budget resets on.
+// Days are in UTC, since the AI budget resets at midnight UTC.
 export const aiTokenUsage = pgTable(
   'ai_token_usage',
   {
