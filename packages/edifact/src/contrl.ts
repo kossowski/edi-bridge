@@ -1,3 +1,4 @@
+import { defaultDelimiters } from './delimiters'
 import { messageIdentifierElement } from './message-identifier'
 import { isBrokenMessage } from './model'
 import { ParseError, readInterchange } from './parse'
@@ -9,7 +10,7 @@ import type { ParseErrorCode } from './parse'
 import type { Position } from './position'
 import type { ValidationErrorCode } from './validate'
 
-export type BuildContrlErrorCode = 'unreadable-interchange-header'
+export type BuildContrlErrorCode = 'unechoable-interchange-header' | 'unreadable-interchange-header'
 
 export class BuildContrlError extends Error {
   override readonly name = 'BuildContrlError'
@@ -40,11 +41,10 @@ const partyComponents = 3
 
 const messageIdentifierComponents = 5
 
-// Codes of the syntax version 3 code list 0085.
 const parseErrorCodes: Record<ParseErrorCode, string> = {
   'control-reference-mismatch': '28',
   'invalid-segment-tag': '12',
-  'invalid-service-string-advice': '22',
+  'invalid-service-string-advice': '20',
   'message-count-mismatch': '29',
   'missing-interchange-header': '13',
   'missing-interchange-trailer': '13',
@@ -70,9 +70,9 @@ const validationErrorCodes: Record<ValidationErrorCode, string> = {
   'wrong-format': '37',
 }
 
-type SyntaxError = ParseError | ValidationError
+type ReceivedError = ParseError | ValidationError
 
-const syntaxErrorCode = (error: SyntaxError) =>
+const syntaxErrorCode = (error: ReceivedError) =>
   error instanceof ParseError ? parseErrorCodes[error.code] : validationErrorCodes[error.code]
 
 const valueOf = (segment: Segment, element: number) => segment.elements[element - 1]?.[0] ?? ''
@@ -123,9 +123,8 @@ const missingTrailerTags: Partial<Record<ParseErrorCode, string>> = {
   'missing-message-trailer': 'UNT',
 }
 
-// Undefined for an error in a user data segment. segmentAt takes the segment number of the error position.
 const serviceSegmentError = (
-  error: SyntaxError,
+  error: ReceivedError,
   segmentAt: (segment: number) => Segment | undefined,
 ): Element[] | undefined => {
   const code = syntaxErrorCode(error)
@@ -142,43 +141,53 @@ const serviceSegmentError = (
     : undefined
 }
 
-// The position in segmentAt counts from the Message's UNH as segment 1.
+const contrlOf = (messageReference: string, segments: Segment[]): Message => ({
+  header: { tag: 'UNH', elements: [[messageReference], contrlIdentifier] },
+  segments,
+  trailer: { tag: 'UNT', elements: [[String(segments.length + 2)], [messageReference]] },
+})
+
+// The CONTRL goes out in UNOC, whatever syntax the received Interchange used.
+const contrlErrorOf = (segments: Segment[]) =>
+  validationErrorOf({
+    hasServiceStringAdvice: false,
+    delimiters: defaultDelimiters,
+    header: { tag: 'UNB', elements: [['UNOC', '3']] },
+    messages: [contrlOf('C', segments)],
+    trailer: { tag: 'UNZ', elements: [] },
+  })
+
+const messageResponseOf = (header: Segment, ...response: Element[]): Segment => ({
+  tag: 'UCM',
+  elements: [
+    [valueOf(header, messageReferenceElement)],
+    (header.elements[messageIdentifierElement - 1] ?? []).slice(0, messageIdentifierComponents),
+    ...response,
+  ],
+})
+
 const messageResponse = (
-  { header }: ParsedMessage,
-  error: SyntaxError | undefined,
+  header: Segment,
+  error: ReceivedError | undefined,
   firstSegment: number,
   segmentAt: (position: number) => Segment | undefined,
 ): Segment[] => {
-  const reference = [valueOf(header, messageReferenceElement)]
-
-  const identifier = (header.elements[messageIdentifierElement - 1] ?? []).slice(
-    0,
-    messageIdentifierComponents,
-  )
-
   if (error === undefined) {
-    return [{ tag: 'UCM', elements: [reference, identifier, [accepted]] }]
+    return [messageResponseOf(header, [accepted])]
   }
 
   const position = error.position.segment - firstSegment + 1
-  const segment = segmentAt(position)
-
   const serviceError = serviceSegmentError(error, (number) => segmentAt(number - firstSegment + 1))
 
   if (serviceError) {
-    return [
-      withoutTrailingEmptyElements({
-        tag: 'UCM',
-        elements: [reference, identifier, [rejected], ...serviceError],
-      }),
-    ]
+    return [withoutTrailingEmptyElements(messageResponseOf(header, [rejected], ...serviceError))]
   }
 
   const code = syntaxErrorCode(error)
-  const identification = dataElementIdentification(segment, error.position)
+  const identification = dataElementIdentification(segmentAt(position), error.position)
 
   return [
-    { tag: 'UCM', elements: [reference, identifier, [rejected]] },
+    messageResponseOf(header, [rejected]),
     identification.length === 0
       ? { tag: 'UCS', elements: [[String(position)], [code]] }
       : { tag: 'UCS', elements: [[String(position)]] },
@@ -186,22 +195,37 @@ const messageResponse = (
   ]
 }
 
+// UCM elements 1 and 2 echo UNH elements 1 and 2, so the UCM's error position names the UNH's.
+const unechoableHeaderError = (acceptance: Segment, messages: ParsedMessage[]) => {
+  for (const { header } of messages) {
+    const error = contrlErrorOf([acceptance, messageResponseOf(header, [accepted])])
+
+    if (error) {
+      return [
+        [rejected],
+        [validationErrorCodes[error.code]],
+        ['UNH'],
+        dataElementIdentification(header, error.position),
+      ]
+    }
+  }
+
+  return undefined
+}
+
 const messageResponses = (
   envelope: Envelope,
-  messages: ParsedMessage[],
-  messageIndexes: number[],
+  messages: { headerIndex: number; message: ParsedMessage }[],
   received: Segment[],
 ) => {
   const positionOf = interchangeSegmentPosition(envelope.hasServiceStringAdvice)
   // validate counts the segments of a Message checked alone from the first UNH.
   const firstSegmentAlone = positionOf(1).segment
 
-  return messages.flatMap((message, index) => {
+  return messages.flatMap(({ headerIndex, message }) => {
     if (isBrokenMessage(message)) {
-      const headerIndex = messageIndexes[index] ?? 0
-
       return messageResponse(
-        message,
+        message.header,
         message.error,
         positionOf(headerIndex).segment,
         (position) => received[headerIndex + position - 1],
@@ -211,7 +235,7 @@ const messageResponses = (
     const messageSegments = [message.header, ...message.segments, message.trailer]
 
     return messageResponse(
-      message,
+      message.header,
       validationErrorOf({ ...envelope, messages: [message] }),
       firstSegmentAlone,
       (position) => messageSegments[position - 1],
@@ -243,52 +267,78 @@ const readableInterchange = (text: string) => {
   }
 }
 
+const rejection = (
+  error: ReceivedError,
+  segmentAt: (segment: number) => Segment | undefined,
+): Element[] => [
+  [rejected],
+  ...(serviceSegmentError(error, segmentAt) ?? [[syntaxErrorCode(error)]]),
+]
+
 export const buildContrl = (text: string, messageReference: string): Message => {
   const {
     hasServiceStringAdvice,
     header,
     messages,
-    messageIndexes,
     segments: received,
     envelope,
   } = readableInterchange(text)
 
-  const positionOf = interchangeSegmentPosition(hasServiceStringAdvice)
+  const firstSegment = interchangeSegmentPosition(hasServiceStringAdvice)(0).segment
 
-  const envelopeError =
-    envelope instanceof ParseError ? envelope : validationErrorOf({ ...envelope, messages: [] })
+  const interchangeResponse = (...response: Element[]) =>
+    withoutTrailingEmptyElements({
+      tag: 'UCI',
+      elements: [
+        [valueOf(header, controlReferenceElement)],
+        partyOf(header, senderElement),
+        partyOf(header, recipientElement),
+        ...response,
+      ],
+    })
 
-  // A parse error counts segments in the received text, validation of the envelope alone counts UNB and UNZ only.
-  const envelopeSegmentAt = (segment: number) =>
-    envelope instanceof ParseError
-      ? received[segment - positionOf(0).segment]
-      : [envelope.header, envelope.trailer][segment - positionOf(0).segment]
+  const acceptance = interchangeResponse([accepted])
 
-  const interchangeResponse = withoutTrailingEmptyElements({
-    tag: 'UCI',
-    elements: [
-      [valueOf(header, controlReferenceElement)],
-      partyOf(header, senderElement),
-      partyOf(header, recipientElement),
-      ...(envelopeError === undefined
-        ? [[accepted]]
-        : [
-            [rejected],
-            ...(serviceSegmentError(envelopeError, envelopeSegmentAt) ?? [
-              [syntaxErrorCode(envelopeError)],
-            ]),
-          ]),
-    ],
-  })
-
-  const segments =
-    envelopeError === undefined && !(envelope instanceof ParseError)
-      ? [interchangeResponse, ...messageResponses(envelope, messages, messageIndexes, received)]
-      : [interchangeResponse]
-
-  return {
-    header: { tag: 'UNH', elements: [[messageReference], contrlIdentifier] },
-    segments,
-    trailer: { tag: 'UNT', elements: [[String(segments.length + 2)], [messageReference]] },
+  if (contrlErrorOf([acceptance])) {
+    throw new BuildContrlError('unechoable-interchange-header')
   }
+
+  const responses = () => {
+    if (envelope instanceof ParseError) {
+      return [
+        interchangeResponse(...rejection(envelope, (segment) => received[segment - firstSegment])),
+      ]
+    }
+
+    const envelopeError = validationErrorOf({ ...envelope, messages: [] })
+
+    if (envelopeError) {
+      // Validation of the envelope alone counts only UNB and UNZ.
+      const envelopeSegments = [envelope.header, envelope.trailer]
+
+      return [
+        interchangeResponse(
+          ...rejection(envelopeError, (segment) => envelopeSegments[segment - firstSegment]),
+        ),
+      ]
+    }
+
+    const headerError = unechoableHeaderError(
+      acceptance,
+      messages.map(({ message }) => message),
+    )
+
+    return headerError
+      ? [interchangeResponse(...headerError)]
+      : [acceptance, ...messageResponses(envelope, messages, received)]
+  }
+
+  const segments = responses()
+  const contrlError = contrlErrorOf(segments)
+
+  if (contrlError) {
+    throw new Error('Built an invalid CONTRL', { cause: contrlError })
+  }
+
+  return contrlOf(messageReference, segments)
 }

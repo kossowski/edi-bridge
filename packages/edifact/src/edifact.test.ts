@@ -648,6 +648,50 @@ describe('buildContrl', () => {
   })
 
   it.each([
+    [
+      'a too long reference',
+      orders('M2'.padEnd(20, 'X'), ...validOrder),
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+39+UNH+1'",
+    ],
+    [
+      'an empty reference',
+      orders('', ...validOrder),
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+13+UNH+1'",
+    ],
+    [
+      'an unknown Message Type',
+      "UNH+M2+ZZZZZZ:D:96A:UN:EAN008'BGM+220'UNT+3+M2'",
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+12+UNH+2:1'",
+    ],
+    [
+      'no message identifier',
+      "UNH+M2'UNT+2+M2'",
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+13+UNH+2'",
+    ],
+  ])(
+    'rejects the Interchange when a UCM cannot echo the header of a Message with %s',
+    (_case, brokenMessage, response) => {
+      const text = interchangeOf(orders('M1', ...validOrder), brokenMessage)
+
+      expect(segmentsOf(text)).toEqual(["UNH+C1+CONTRL:D:3:UN:EAN002'", response, "UNT+3+C1'"])
+      expect(readBack(buildContrl(text, 'C1'))).toMatchObject({ action: 'rejected' })
+    },
+  )
+
+  it.each([
+    [
+      'control reference',
+      `UNB+UNOC:3+7300015200048:14+7350000001266:14+221125:1605+${'R'.repeat(20)}'UNZ+0+${'R'.repeat(20)}'`,
+    ],
+    ['sender', `UNB+UNOC:3+${'7'.repeat(40)}:14+7350000001266:14+221125:1605+R1'UNZ+0+R1'`],
+  ])('builds no CONTRL when no UCI can echo the %s of the header', (_case, text) => {
+    const error = thrownBy(() => buildContrl(text, 'C1'))
+
+    expect(error).toBeInstanceOf(BuildContrlError)
+    expect(error).toMatchObject({ code: 'unechoable-interchange-header' })
+  })
+
+  it.each([
     ['no header', "UNH+M1+ORDERS:D:96A:UN:EAN008'UNT+2+M1'"],
     [
       'a broken header',
