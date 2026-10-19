@@ -529,6 +529,7 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
 
   it('no longer blocks on a Run that was reprocessed', async () => {
     const replacing = createRun({ ...newerFailure, id: '00000000-0000-4000-8000-000000000003' })
+
     const runs = [
       newerFailure,
       { ...replacing, status: 'delivered', failureStage: null, problem: null } as const,
