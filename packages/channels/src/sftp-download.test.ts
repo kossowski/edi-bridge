@@ -105,6 +105,13 @@ describe('sftpChannelDownload', () => {
     )
   })
 
+  it('reads non-ASCII bytes unchanged', async () => {
+    const content = Buffer.from([0x55, 0x4e, 0x42, 0x2b, 0xe4, 0xdf, 0x27])
+    const channel = await inbox('latin1', { 'orders-12.edi': content })
+
+    expect(await Effect.runPromise(download.read(channel, 'orders-12.edi'))).toEqual(content)
+  })
+
   it('removes a file and keeps the others', async () => {
     const channel = await inbox('removed', {
       'orders-6.edi': "UNB+UNOC:3'",
