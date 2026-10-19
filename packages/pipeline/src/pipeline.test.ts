@@ -6,6 +6,7 @@ import { z } from 'zod'
 
 import { secretBox, secretKeyBytes, sftpChannelDelivery } from '@edi-bridge/channels'
 import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
+import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
   channels,
   connect,
@@ -16,8 +17,6 @@ import {
   workspaces,
 } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
-
-import type { CharacterSet } from '@edi-bridge/contracts'
 
 import {
   type ArrivingDocument,
@@ -94,6 +93,7 @@ describe('the receipt of a Document', () => {
       manualSubmission: true,
       flowId: workspace.flowId,
       tradingPartnerId: workspace.tradingPartnerId,
+      messageIndex: null,
       failureStage: null,
       output: null,
       document: { fileName: 'invoice.json', content: goldenInvoice },
@@ -128,6 +128,12 @@ describe('the receipt of a Document', () => {
       await unreachable.close()
     }
   })
+
+  const storedDocuments = (channelId: string) =>
+    connection.db.select().from(documents).where(eq(documents.channelId, channelId))
+
+  const keptDocumentId = async (channelId: string) =>
+    (await storedDocuments(channelId)).find(({ fileName }) => fileName === 'invoice.json')?.id ?? ''
 
   const rejection = async (arriving: Partial<ArrivingDocument>) => {
     const queue = inMemoryRunQueue()
@@ -166,9 +172,10 @@ describe('the receipt of a Document', () => {
     expect(await rejection({ channelId: workspace.outboundChannelId })).toStrictEqual(
       Exit.fail(new ReceiptRejected({ reason: 'outboundChannel' })),
     )
+    await expect(storedDocuments(workspace.outboundChannelId)).resolves.toEqual([])
   })
 
-  it('rejects an inbound Channel without a Flow and stores no Document', async () => {
+  it('rejects an inbound Channel without a Flow and keeps the Document', async () => {
     const [channel] = await connection.db
       .insert(channels)
       .values({
@@ -182,15 +189,17 @@ describe('the receipt of a Document', () => {
       })
       .returning()
 
-    expect(await rejection({ channelId: channel?.id ?? '' })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'noFlow' })),
+    const channelId = channel?.id ?? ''
+    const exit = await rejection({ channelId })
+
+    expect(exit).toStrictEqual(
+      Exit.fail(
+        new ReceiptRejected({ reason: 'noFlow', documentId: await keptDocumentId(channelId) }),
+      ),
     )
-    await expect(
-      connection.db
-        .select()
-        .from(documents)
-        .where(eq(documents.channelId, channel?.id ?? '')),
-    ).resolves.toEqual([])
+    await expect(storedDocuments(channelId)).resolves.toMatchObject([
+      { fileName: 'invoice.json', content: goldenInvoice },
+    ])
   })
 
   it('queues one Run per routed Message of an Interchange and lists the others as not routed', async () => {
@@ -249,7 +258,7 @@ describe('the receipt of a Document', () => {
     )
 
     expect(receipt.notRouted).toEqual([{ messageType: 'ORDERS' }])
-    expect(receipt.runs).toHaveLength(2)
+    expect(receipt.runs.map(({ messageIndex }) => messageIndex)).toEqual([1, 3])
     expect(receipt.runs.every((run) => run.documentId === receipt.document.id)).toBe(true)
     expect(receipt.runs.every((run) => !run.manualSubmission)).toBe(true)
     expect(queue.queued.map(({ runId }) => runId)).toEqual(receipt.runs.map(({ id }) => id))
@@ -260,8 +269,15 @@ describe('the receipt of a Document', () => {
       "UNZ+1+00000001'",
     ].join('\n')
 
-    expect(await rejection({ channelId, content: ordersOnly })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'noRoutedMessage' })),
+    const exit = await rejection({ channelId, content: ordersOnly })
+
+    expect(exit).toStrictEqual(
+      Exit.fail(
+        new ReceiptRejected({
+          reason: 'noRoutedMessage',
+          documentId: await keptDocumentId(channelId),
+        }),
+      ),
     )
   })
 
@@ -298,9 +314,6 @@ describe('the receipt of a Document', () => {
 
     return { channelId, flows: created }
   }
-
-  const storedDocuments = (channelId: string) =>
-    connection.db.select().from(documents).where(eq(documents.channelId, channelId))
 
   it('tries to queue every Run of a Document when one is not queued', async () => {
     const { channelId } = await channelWithFlows(['INVOIC'])
@@ -353,30 +366,177 @@ describe('the receipt of a Document', () => {
     )
   })
 
-  it('rejects a Document without Message Types when several outbound Flows could take it', async () => {
+  it('rejects a Document without Message Types when several outbound Flows could take it and keeps it', async () => {
     const { channelId } = await channelWithFlows(['INVOIC', 'DESADV'])
+    const exit = await rejection({ channelId })
 
-    expect(await rejection({ channelId })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'ambiguousFlow' })),
+    expect(exit).toStrictEqual(
+      Exit.fail(
+        new ReceiptRejected({
+          reason: 'ambiguousFlow',
+          documentId: await keptDocumentId(channelId),
+        }),
+      ),
     )
-    await expect(storedDocuments(channelId)).resolves.toEqual([])
   })
 
-  it('rejects a Document routed to an inbound Flow and stores nothing', async () => {
-    const { channelId } = await channelWithFlows(['ORDERS'])
+  const ordersMessage = golden('orders-reference.edi', 'latin1')
+    .split('\n')
+    .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
 
-    const orders = [
+  const ordersInterchange = (messages: string[][]) =>
+    [
       golden('orders-reference.edi', 'latin1').split('\n')[0],
-      ...golden('orders-reference.edi', 'latin1')
-        .split('\n')
-        .filter((line) => line !== '' && !/^UN[BZ]/.test(line)),
-      "UNZ+1+00000001'",
+      ...messages.flat(),
+      `UNZ+${messages.length}+00000001'`,
     ].join('\n')
 
-    expect(await rejection({ channelId, content: orders })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'inboundNotProcessed' })),
+  it('receives an inbound Interchange of three Messages as three Runs linked to its Document', async () => {
+    const { channelId, flows: created } = await channelWithFlows(['ORDERS'])
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'orders.edi',
+        content: ordersInterchange([ordersMessage, ordersMessage, ordersMessage]),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
     )
-    await expect(storedDocuments(channelId)).resolves.toEqual([])
+
+    expect(receipt.notRouted).toEqual([])
+    expect(queue.queued).toEqual([])
+    expect(
+      receipt.runs.map(({ documentId, flowId, messageIndex }) => ({
+        documentId,
+        flowId,
+        messageIndex,
+      })),
+    ).toEqual(
+      [1, 2, 3].map((messageIndex) => ({
+        documentId: receipt.document.id,
+        flowId: created[0]?.id,
+        messageIndex,
+      })),
+    )
+    await expect(readRun(connection.db, receipt.runs[0]?.id ?? '')).resolves.toMatchObject({
+      status: 'received',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'pending' },
+        { stage: 'validation', status: 'pending' },
+        { stage: 'mapping', status: 'pending' },
+        { stage: 'delivery', status: 'pending' },
+      ],
+    })
+  })
+
+  it('receives a broken Message of an Interchange as a Run of its own', async () => {
+    const { channelId } = await channelWithFlows(['ORDERS'])
+
+    const withoutSegment = ordersMessage.filter((_, index) => index !== 2)
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'orders.edi',
+        content: ordersInterchange([ordersMessage, withoutSegment, ordersMessage]),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
+    )
+
+    expect(receipt.runs.map(({ messageIndex }) => messageIndex)).toEqual([1, 2, 3])
+  })
+
+  const ordersFromTwoPartners = async (glns: [string, string]) => {
+    const { channelId, flows: invoic } = await channelWithFlows(['INVOIC'])
+
+    const partners = await connection.db
+      .insert(tradingPartners)
+      .values(
+        glns.map((gln) => ({
+          workspaceId: workspace.id,
+          name: `Partner ${gln}`,
+          gln,
+          characterSet: 'UNOC' as const,
+          acknowledgementTimeLimitHours: 24,
+        })),
+      )
+      .returning()
+
+    const orders = await connection.db
+      .insert(flows)
+      .values(
+        partners.map((partner) => ({
+          workspaceId: workspace.id,
+          tradingPartnerId: partner.id,
+          messageType: 'ORDERS' as const,
+          name: `ORDERS from ${partner.name}`,
+          inboundChannelId: channelId,
+          destinationChannelId: workspace.outboundChannelId,
+          mappingVersionId: workspace.mappingVersionId,
+        })),
+      )
+      .returning()
+
+    return { channelId, orders, invoic }
+  }
+
+  const interchangeFrom = (sender: string, messages: string[][]) =>
+    [
+      `UNB+UNOC:3+${sender}:14+4012345000009:14+000324:1200+00000001'`,
+      ...messages.flat(),
+      `UNZ+${messages.length}+00000001'`,
+    ].join('\n')
+
+  it('routes an inbound Message to the Flow of the Trading Partner that sent the Interchange', async () => {
+    const { channelId, orders } = await ordersFromTwoPartners([
+      withCheckDigit('430000000001'),
+      withCheckDigit('430000000002'),
+    ])
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'orders.edi',
+        content: interchangeFrom(withCheckDigit('430000000002'), [ordersMessage]),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
+    )
+
+    expect(receipt.notRouted).toEqual([])
+    expect(
+      receipt.runs.map(({ flowId, tradingPartnerId }) => ({ flowId, tradingPartnerId })),
+    ).toEqual([{ flowId: orders[1]?.id, tradingPartnerId: orders[1]?.tradingPartnerId }])
+  })
+
+  it('lists a Message as not routed when several Flows of its Message Type share the Channel and none is from the sender', async () => {
+    const { channelId, invoic } = await ordersFromTwoPartners([
+      withCheckDigit('430000000003'),
+      withCheckDigit('430000000004'),
+    ])
+
+    const invoicMessage = golden('invoic-reference.edi', 'latin1')
+      .split('\n')
+      .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'interchange.edi',
+        content: interchangeFrom(withCheckDigit('430000000005'), [invoicMessage, ordersMessage]),
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
+    )
+
+    expect(receipt.notRouted).toEqual([{ messageType: 'ORDERS' }])
+    expect(receipt.runs.map(({ flowId, messageIndex }) => ({ flowId, messageIndex }))).toEqual([
+      { flowId: invoic[0]?.id, messageIndex: 1 },
+    ])
   })
 })
 

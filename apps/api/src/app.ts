@@ -212,7 +212,6 @@ const statusOfReceiptRejection: Record<ReceiptRejection, number> = {
   noFlow: 422,
   noRoutedMessage: 422,
   ambiguousFlow: 422,
-  inboundNotProcessed: 422,
 }
 
 const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> = {

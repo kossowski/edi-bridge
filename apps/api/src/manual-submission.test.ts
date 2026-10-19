@@ -7,7 +7,7 @@ import {
   runsEndpoint,
   submitDocumentEndpoint,
 } from '@edi-bridge/contracts'
-import { channels, flows } from '@edi-bridge/db'
+import { channels, flows, runs } from '@edi-bridge/db'
 import {
   golden,
   goldenInvoice,
@@ -157,7 +157,10 @@ describe('POST /manual-submissions', () => {
       return flow?.id ?? ''
     }
 
-    const removeFlow = (id: string) => api.connection.db.delete(flows).where(eq(flows.id, id))
+    const removeFlow = async (id: string) => {
+      await api.connection.db.delete(runs).where(eq(runs.flowId, id))
+      await api.connection.db.delete(flows).where(eq(flows.id, id))
+    }
 
     it('answers 422 when several outbound Flows could take a Document without Message Types', async () => {
       const flowId = await addFlow('DESADV', 'Despatch advices to Hanse Retail')
@@ -174,16 +177,18 @@ describe('POST /manual-submissions', () => {
       }
     })
 
-    it('answers 422 for a Document routed to an inbound Flow', async () => {
+    it('answers 201 with a received Run for a Document routed to an inbound Flow', async () => {
       const flowId = await addFlow('ORDERS', 'Orders from Hanse Retail')
 
       try {
         const response = await submit(ordersInterchange)
 
-        expect(response.statusCode).toBe(422)
-        expect(response.json()).toEqual({
-          message: 'Documents for inbound Flows are not processed yet',
+        expect(response.statusCode, response.body).toBe(201)
+        expect(manualSubmissionSchema.parse(response.json())).toMatchObject({
+          runs: [{ status: 'received', direction: 'inbound', flow: { id: flowId } }],
+          notRouted: [],
         })
+        expect(api.runQueue.queued).toEqual([])
       } finally {
         await removeFlow(flowId)
       }
