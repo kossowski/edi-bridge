@@ -1840,6 +1840,34 @@ describe('the Retry of a Run', () => {
     await expect(readRun(connection.db, runId)).resolves.toEqual(failed)
   })
 
+  it('refuses a Run that failed at delivery with neither a stored output nor a stored delivery input', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Early Foods')
+
+    await connection.db.update(workspaces).set({ gln: null }).where(eq(workspaces.id, into.id))
+    await deliverOverSftp(connection.db, into, await outboxOf('early'))
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    await processQueued(queue)
+
+    // A Run that failed at delivery before the delivery input was stored has neither.
+    await connection.db.update(runs).set({ deliveryInput: null }).where(eq(runs.id, runId))
+
+    const failed = await readRun(connection.db, runId)
+    const retrying = inMemoryRunQueue()
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(connection.db, retrying)),
+      ),
+    )
+
+    expect(failed).toMatchObject({ failureStage: 'delivery', output: null })
+    expect(error).toEqual(new RunNotRetryable({ runId }))
+    expect(retrying.queued).toEqual([])
+    await expect(readRun(connection.db, runId)).resolves.toEqual(failed)
+  })
+
   it('refuses a Run of another Workspace', async () => {
     const other = await seedInvoiceWorkspace(connection.db, 'Neighbour Foods')
     const login = await outboxOf('neighbour')

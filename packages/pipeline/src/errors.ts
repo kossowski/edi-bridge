@@ -33,6 +33,6 @@ export class RunNotRetryable extends Data.TaggedError('RunNotRetryable')<{
   readonly runId: string
 }> {
   override get message() {
-    return 'Only a Run that failed at delivery can be retried'
+    return 'Only a Run that failed at delivery with something stored to deliver can be retried'
   }
 }

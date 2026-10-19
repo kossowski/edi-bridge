@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -10,7 +11,8 @@ import {
   submitDocumentEndpoint,
   toPath,
 } from '@edi-bridge/contracts'
-import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
+import { runs } from '@edi-bridge/db'
+import { type DeliveryService, processRun, RunNotRetryable } from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
   type InvoiceWorkspace,
@@ -127,6 +129,32 @@ describe('POST /runs/:id/retry', () => {
     expect(response.statusCode, response.body).toBe(409)
     expect(api.runQueue.queued).toEqual([])
     await expect(detail(id)).resolves.toMatchObject({ status: 'failed', failureStage: 'mapping' })
+  })
+
+  it('answers 409 for a Run that failed at delivery without a stored output or delivery input', async () => {
+    const id = await processed(goldenInvoice, unreachable)
+
+    // A Run that failed at delivery before the delivery input was stored has neither.
+    await api.connection.db
+      .update(runs)
+      .set({ output: null, deliveryInput: null })
+      .where(eq(runs.id, id))
+
+    const response = await retry(id)
+
+    expect(response.statusCode, response.body).toBe(409)
+    expect(response.json()).toEqual({ message: new RunNotRetryable({ runId: id }).message })
+    expect(api.runQueue.queued).toEqual([])
+    await expect(detail(id)).resolves.toMatchObject({ status: 'failed', failureStage: 'delivery' })
+  })
+
+  it('answers 409 to the second of two Retries at once', async () => {
+    const id = await processed(goldenInvoice, unreachable)
+
+    const responses = await Promise.all([retry(id), retry(id)])
+
+    expect(responses.map(({ statusCode }) => statusCode).toSorted()).toEqual([200, 409])
+    expect(api.runQueue.queued.splice(0)).toEqual([{ workspaceId: workspace.id, runId: id }])
   })
 
   it('answers 409 for a delivered Run', async () => {

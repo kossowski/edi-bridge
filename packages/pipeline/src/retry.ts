@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNotNull, or } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import { runs, runSteps } from '@edi-bridge/db'
@@ -29,6 +29,8 @@ export const retryRun = (queued: QueuedRun) =>
               eq(runs.id, queued.runId),
               eq(runs.status, 'failed'),
               eq(runs.failureStage, 'delivery'),
+              // A Run that failed before delivery inputs were stored has nothing to deliver.
+              or(isNotNull(runs.output), isNotNull(runs.deliveryInput)),
             ),
           )
           .returning({ id: runs.id })
