@@ -205,6 +205,88 @@ describe('the receipt of a Document', () => {
       Exit.fail(new ReceiptRejected({ reason: 'noRoutedMessage' })),
     )
   })
+
+  const channelWithFlows = async (messageTypes: Array<'INVOIC' | 'DESADV' | 'ORDERS'>) => {
+    const [channel] = await connection.db
+      .insert(channels)
+      .values({
+        workspaceId: workspace.id,
+        type: 'webhook',
+        direction: 'inbound',
+        name: 'Shop webhook',
+        rateLimitPerMinute: 60,
+        encryptedWebhookToken: 'encrypted',
+        webhookTokenLastFour: 'ijkl',
+      })
+      .returning()
+
+    const channelId = channel?.id ?? ''
+
+    const created = await connection.db
+      .insert(flows)
+      .values(
+        messageTypes.map((messageType, index) => ({
+          workspaceId: workspace.id,
+          tradingPartnerId: workspace.tradingPartnerId,
+          messageType,
+          name: `${index + 1}. ${messageType} from the shop`,
+          inboundChannelId: channelId,
+          destinationChannelId: workspace.outboundChannelId,
+          mappingVersionId: workspace.mappingVersionId,
+        })),
+      )
+      .returning()
+
+    return { channelId, flows: created }
+  }
+
+  const storedDocuments = (channelId: string) =>
+    connection.db.select().from(documents).where(eq(documents.channelId, channelId))
+
+  it('routes a Document without Message Types to the only outbound Flow of the Channel', async () => {
+    const { channelId, flows: created } = await channelWithFlows(['ORDERS', 'INVOIC'])
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId,
+        fileName: 'invoice.json',
+        content: goldenInvoice,
+        manualSubmission: true,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    expect(receipt.runs.map(({ flowId }) => flowId)).toEqual(
+      created.filter(({ messageType }) => messageType === 'INVOIC').map(({ id }) => id),
+    )
+  })
+
+  it('rejects a Document without Message Types when several outbound Flows could take it', async () => {
+    const { channelId } = await channelWithFlows(['INVOIC', 'DESADV'])
+
+    expect(await rejection({ channelId })).toStrictEqual(
+      Exit.fail(new ReceiptRejected({ reason: 'ambiguousFlow' })),
+    )
+    await expect(storedDocuments(channelId)).resolves.toEqual([])
+  })
+
+  it('rejects a Document routed to an inbound Flow and stores nothing', async () => {
+    const { channelId } = await channelWithFlows(['ORDERS'])
+
+    const orders = [
+      golden('orders-reference.edi', 'latin1').split('\n')[0],
+      ...golden('orders-reference.edi', 'latin1')
+        .split('\n')
+        .filter((line) => line !== '' && !/^UN[BZ]/.test(line)),
+      "UNZ+1+00000001'",
+    ].join('\n')
+
+    expect(await rejection({ channelId, content: orders })).toStrictEqual(
+      Exit.fail(new ReceiptRejected({ reason: 'inboundNotProcessed' })),
+    )
+    await expect(storedDocuments(channelId)).resolves.toEqual([])
+  })
 })
 
 const receiveInvoice = async (content = goldenInvoice) => {

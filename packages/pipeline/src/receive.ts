@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { DateTime, Effect } from 'effect'
 
+import { directionOf } from '@edi-bridge/contracts'
 import { channels, flows, type RawDocument, runs, runSteps } from '@edi-bridge/db'
 import { parse, ParseError } from '@edi-bridge/edifact'
 
@@ -39,20 +40,23 @@ function messageTypesOf(content: string): string[] {
   }
 }
 
-// Without a Message Type to route by, the Document goes to the Channel's first Flow by name, whose
-// processing then reads or rejects it.
-function route(content: string, [first, ...rest]: readonly [Flow, ...Flow[]]) {
+// Without a Message Type to route by, only an outbound Flow's Document Structure can read it.
+function route(content: string, channelFlows: readonly Flow[]) {
   const declared = messageTypesOf(content)
 
   if (declared.length === 0) {
-    return { routed: [first], notRouted: [] }
+    const outbound = channelFlows.filter((flow) => directionOf(flow) === 'outbound')
+
+    return outbound.length > 1
+      ? Effect.fail(new ReceiptRejected({ reason: 'ambiguousFlow' }))
+      : Effect.succeed({ routed: outbound, notRouted: [] })
   }
 
   const routed: Flow[] = []
   const notRouted: Array<{ messageType: string }> = []
 
   for (const messageType of declared) {
-    const flow = [first, ...rest].find((candidate) => candidate.messageType === messageType)
+    const flow = channelFlows.find((candidate) => candidate.messageType === messageType)
 
     if (flow) {
       routed.push(flow)
@@ -61,7 +65,7 @@ function route(content: string, [first, ...rest]: readonly [Flow, ...Flow[]]) {
     }
   }
 
-  return { routed, notRouted }
+  return Effect.succeed({ routed, notRouted })
 }
 
 const nameCollator = new Intl.Collator('de')
@@ -92,21 +96,23 @@ const flowsOfChannel = (workspaceId: string, channelId: string) =>
         .where(and(eq(flows.workspaceId, workspaceId), eq(flows.inboundChannelId, channelId))),
     )
 
-    const [first, ...rest] = found.toSorted((a, b) => nameCollator.compare(a.name, b.name))
-
-    return first === undefined
+    return found.length === 0
       ? yield* new ReceiptRejected({ reason: 'noFlow' })
-      : ([first, ...rest] as const)
+      : found.toSorted((a, b) => nameCollator.compare(a.name, b.name))
   })
 
 export const receive = (arriving: ArrivingDocument) =>
   Effect.gen(function* () {
     const receiptStartedAt = yield* DateTime.nowAsDate
     const channelFlows = yield* flowsOfChannel(arriving.workspaceId, arriving.channelId)
-    const { routed, notRouted } = route(arriving.content, channelFlows)
+    const { routed, notRouted } = yield* route(arriving.content, channelFlows)
 
     if (routed.length === 0) {
       return yield* new ReceiptRejected({ reason: 'noRoutedMessage' })
+    }
+
+    if (routed.some((flow) => directionOf(flow) === 'inbound')) {
+      return yield* new ReceiptRejected({ reason: 'inboundNotProcessed' })
     }
 
     const documents = yield* Documents

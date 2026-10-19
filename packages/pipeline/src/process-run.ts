@@ -40,6 +40,7 @@ import {
   readDocument,
 } from '@edi-bridge/mapping'
 
+import { parse } from './parse'
 import { Database, Documents, type QueuedRun } from './services'
 
 export class MessageInvalid extends Data.TaggedError('MessageInvalid')<{
@@ -144,16 +145,15 @@ const framed = (message: Message): Interchange => ({
 })
 
 const validated = (message: Message) =>
-  Effect.suspend(() => {
-    try {
-      validate(framed(message))
+  Effect.try({
+    try: () => validate(framed(message)),
+    catch: (cause) => {
+      if (cause instanceof ValidationError) {
+        return new MessageInvalid({ cause })
+      }
 
-      return Effect.void
-    } catch (cause) {
-      return cause instanceof ValidationError
-        ? Effect.fail(new MessageInvalid({ cause }))
-        : Effect.die(cause)
-    }
+      throw cause
+    },
   })
 
 const orderNumberOf = ({ segments }: Message) =>
@@ -185,12 +185,9 @@ const loadPinned = (workspaceId: string, mappingVersionId: string) =>
       return yield* Effect.die(new Error(`Mapping ${mapping.id} is not outbound`))
     }
 
-    return {
-      mappingId: mapping.id,
-      mappingName: mapping.name,
-      graph: version.graph,
-      messageType: mapping.messageType,
-      structure: documentStructureSchema.parse({
+    // A stored Document Structure that breaks its schema is a defect, not a failure of the Run.
+    const parsed = yield* Effect.orDie(
+      parse(documentStructureSchema, {
         id: structure.id,
         name: structure.name,
         format: structure.format,
@@ -198,6 +195,14 @@ const loadPinned = (workspaceId: string, mappingVersionId: string) =>
         sample: null,
         children: structure.children,
       }),
+    )
+
+    return {
+      mappingId: mapping.id,
+      mappingName: mapping.name,
+      graph: version.graph,
+      messageType: mapping.messageType,
+      structure: parsed,
     } satisfies Pinned
   })
 
@@ -314,7 +319,6 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
         ),
     )
 
-    // Inbound processing (parse, validation, mapping to the own systems) comes with #191.
     if (found === undefined || directionOf(found.flow) !== 'outbound') {
       return undefined
     }
