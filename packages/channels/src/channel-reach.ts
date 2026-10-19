@@ -103,65 +103,65 @@ export const sftpReason = (error: Error): ChannelTestFailureReason => {
 const statAndOpenDirectory = (
   sftp: SFTPWrapper,
   path: string,
-  done: (error?: ChannelUnreachable) => void,
+  done: (outcome: Effect.Effect<void, ChannelUnreachable>) => void,
 ) => {
   sftp.stat(path, (statError, stats) => {
     if (statError) {
-      done(unreachable(sftpReason(statError)))
+      done(Effect.fail(unreachable(sftpReason(statError))))
 
       return
     }
 
     if (!stats.isDirectory()) {
-      done(unreachable('remotePathMissing'))
+      done(Effect.fail(unreachable('remotePathMissing')))
 
       return
     }
 
     sftp.opendir(path, (openError, handle) => {
       if (openError) {
-        done(unreachable(sftpReason(openError)))
+        done(Effect.fail(unreachable(sftpReason(openError))))
 
         return
       }
 
       sftp.close(handle, () => {
-        done()
+        done(Effect.void)
       })
     })
   })
 }
 
 // The host key is not pinned yet, so any key the server presents is accepted.
-export const sftpSession = (
+export const sftpSession = <A>(
   login: SftpLogin,
   timeoutMs: number,
-  use: (sftp: SFTPWrapper, done: (error?: ChannelUnreachable) => void) => void,
+  use: (sftp: SFTPWrapper, done: (outcome: Effect.Effect<A, ChannelUnreachable>) => void) => void,
 ) =>
-  Effect.callback<void, ChannelUnreachable>((resume) => {
+  Effect.callback<A, ChannelUnreachable>((resume) => {
     const client = new Client()
     let settled = false
 
-    const settle = (error?: ChannelUnreachable) => {
+    const settle = (outcome: Effect.Effect<A, ChannelUnreachable>) => {
       if (settled) {
         return
       }
 
       settled = true
       client.end()
-      resume(error ? Effect.fail(error) : Effect.void)
+      resume(outcome)
     }
 
     client.on('error', (error) => {
-      settle(unreachable(sshReason(error)))
+      settle(Effect.fail(unreachable(sshReason(error))))
     })
     client.on('close', () => {
-      settle(unreachable('unexpectedResponse'))
+      settle(Effect.fail(unreachable('unexpectedResponse')))
     })
     client.on('ready', () => {
       client.sftp((error, sftp) => {
         if (error) {
-          settle(unreachable('unexpectedResponse'))
+          settle(Effect.fail(unreachable('unexpectedResponse')))
 
           return
         }
@@ -179,7 +179,7 @@ export const sftpSession = (
         ...login.credential,
       })
     } catch {
-      settle(unreachable('loginRejected'))
+      settle(Effect.fail(unreachable('loginRejected')))
     }
 
     return Effect.sync(() => {
@@ -225,7 +225,7 @@ const reachHttp = ({ url, authorization }: HttpDestination) =>
     }),
   )
 
-export const timingOut = (effect: Effect.Effect<void, ChannelUnreachable>, timeoutMs: number) =>
+export const timingOut = <A>(effect: Effect.Effect<A, ChannelUnreachable>, timeoutMs: number) =>
   Effect.timeoutOrElse(effect, {
     duration: timeoutMs,
     orElse: () => Effect.fail(unreachable('timedOut')),

@@ -16,10 +16,11 @@ export {
   secretKeyEnv,
 } from './secret'
 
+export { type SftpChannel, sftpLogin } from './sftp-channel'
+
 export {
   DeliveryFailed,
   type OutboundDocument,
-  type OutboundSftpChannel,
   sftpChannelDelivery,
   uploadSftp,
 } from './sftp-upload'

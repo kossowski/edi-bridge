@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   DeliveryFailed,
   type OutboundDocument,
-  type OutboundSftpChannel,
+  type SftpChannel,
   secretBox,
   secretKeyBytes,
   sftpChannelDelivery,
@@ -123,7 +123,7 @@ const channelId = '5d1e8c3a-7f42-4b9e-a0d6-2c9b1f8e4a17'
 
 const deliver = sftpChannelDelivery({ secrets, timeoutMs })
 
-const outboundChannel = (): OutboundSftpChannel => ({
+const outboundChannel = (): SftpChannel => ({
   id: channelId,
   host: sftp.host,
   port: sftp.port,
