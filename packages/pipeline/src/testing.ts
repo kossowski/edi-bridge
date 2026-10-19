@@ -1,9 +1,11 @@
 import { asc, eq } from 'drizzle-orm'
 import { Effect } from 'effect'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { GenericContainer, Wait } from 'testcontainers'
 
+import { type SecretBox, secretBox, secretContext, secretKeyBytes } from '@edi-bridge/channels'
 import { inferDocumentStructure, mappingVersionSchema, toEncodedFile } from '@edi-bridge/contracts'
 import {
   channels,
@@ -24,7 +26,15 @@ import {
 } from '@edi-bridge/db'
 
 import { RunNotQueued } from './errors'
-import { Database, Documents, type QueuedRun, RunQueue, type RunQueueService } from './services'
+import {
+  Database,
+  Delivery,
+  type DeliveryService,
+  Documents,
+  type QueuedRun,
+  RunQueue,
+  type RunQueueService,
+} from './services'
 
 type Db = Connection['db']
 
@@ -90,14 +100,19 @@ export function inMemoryRunQueue({ failures = 0 }: { failures?: number } = {}) {
   }
 }
 
+const noDelivery: DeliveryService = () => Effect.die(new Error('This test delivers nothing'))
+
 export const pipelineServices =
-  (db: Db, queue: { service: RunQueueService }) =>
+  (db: Db, queue: { service: RunQueueService }, delivery = noDelivery) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Database, db),
       Effect.provideService(Documents, postgresDocumentStorage(db)),
       Effect.provideService(RunQueue, queue.service),
+      Effect.provideService(Delivery, delivery),
     )
+
+export const testSecrets = secretBox(randomBytes(secretKeyBytes))
 
 const one = <A>(rows: A[]): A => {
   const [row] = rows
@@ -254,6 +269,34 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
 }
 
 export type InvoiceWorkspace = Awaited<ReturnType<typeof seedInvoiceWorkspace>>
+
+export async function deliverOverSftp(
+  db: Db,
+  workspace: InvoiceWorkspace,
+  login: { host: string; port: number; username: string; password: string; remotePath: string },
+  secrets: SecretBox = testSecrets,
+) {
+  const id = randomUUID()
+
+  await db.insert(channels).values({
+    id,
+    workspaceId: workspace.id,
+    tradingPartnerId: workspace.tradingPartnerId,
+    type: 'sftp',
+    direction: 'outbound',
+    name: 'Hanse Retail SFTP inbox',
+    host: login.host,
+    port: login.port,
+    username: login.username,
+    remotePath: login.remotePath,
+    authentication: 'password',
+    encryptedCredential: secrets.seal(login.password, secretContext(id, 'encryptedCredential')),
+  })
+
+  await db.update(flows).set({ destinationChannelId: id }).where(eq(flows.id, workspace.flowId))
+
+  return id
+}
 
 export async function readRun(db: Db, id: string) {
   const [run] = await db.select().from(runs).where(eq(runs.id, id))

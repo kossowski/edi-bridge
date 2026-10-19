@@ -6,6 +6,15 @@ export { queueReceivedRuns, queueReceivedRunsEvery } from './queue-received-runs
 
 export { type ArrivingDocument, type Receipt, type ReceivedRun, receive } from './receive'
 
-export { Database, Documents, type QueuedRun, RunQueue, type RunQueueService } from './services'
+export {
+  Database,
+  Delivery,
+  type DeliveryService,
+  type DestinationChannel,
+  Documents,
+  type QueuedRun,
+  RunQueue,
+  type RunQueueService,
+} from './services'
 
-export { MessageInvalid, processRun } from './process-run'
+export { DeliveryDefect, GlnMissing, MessageInvalid, processRun } from './process-run'

@@ -1,7 +1,9 @@
 import { and, asc, eq, gt, inArray } from 'drizzle-orm'
-import { Data, DateTime, Effect, Predicate, Result } from 'effect'
+import { Data, DateTime, Effect, Match, Predicate, Result } from 'effect'
 
 import {
+  type ChannelTestFailureReason,
+  type CharacterSet,
   directionOf,
   type DocumentStructure,
   documentStructureSchema,
@@ -15,6 +17,8 @@ import {
   type RunStepStage,
 } from '@edi-bridge/contracts'
 import {
+  channels,
+  claimControlReference,
   documentStructures,
   flows,
   lookupTableEntries,
@@ -23,11 +27,14 @@ import {
   mappingVersions,
   runs,
   runSteps,
+  tradingPartners,
+  workspaces,
 } from '@edi-bridge/db'
 import {
   type Interchange,
   type Message,
   type Segment,
+  serialize,
   serializeMessage,
   validate,
   ValidationError,
@@ -40,11 +47,23 @@ import {
   readDocument,
 } from '@edi-bridge/mapping'
 
+import type { DeliveryFailed } from '@edi-bridge/channels'
+
 import { parse } from './parse'
-import { Database, Documents, type QueuedRun } from './services'
+import { Database, Delivery, Documents, type QueuedRun } from './services'
+
+type Transaction = Parameters<Parameters<Database['Service']['transaction']>[0]>[0]
 
 export class MessageInvalid extends Data.TaggedError('MessageInvalid')<{
   readonly cause: ValidationError
+}> {}
+
+export class GlnMissing extends Data.TaggedError('GlnMissing')<{
+  readonly party: 'workspace' | 'tradingPartner'
+}> {}
+
+export class DeliveryDefect extends Data.TaggedError('DeliveryDefect')<{
+  readonly defect: unknown
 }> {}
 
 type Failure = {
@@ -124,12 +143,48 @@ const validationFailure = (message: Message, { cause }: MessageInvalid): Failure
   }
 }
 
-const envelopeHeader: Segment = { tag: 'UNB', elements: [] }
+const deliveryReasons: Record<ChannelTestFailureReason, string> = {
+  loginRejected: 'The SFTP server rejected the login',
+  hostUnreachable: 'The host of the Channel is unreachable',
+  timedOut: 'The Channel did not answer in time',
+  remotePathMissing: 'The remote path of the Channel does not exist',
+  permissionDenied: 'The Channel refused to take the file',
+  unexpectedResponse: 'The Channel answered unexpectedly',
+}
+
+const glnOwners = { workspace: 'The Workspace', tradingPartner: 'The Trading Partner' } as const
+
+const deliveryFailure = Match.type<DeliveryFailed | GlnMissing | DeliveryDefect>().pipe(
+  Match.tagsExhaustive({
+    DeliveryFailed: ({ reason }): Failure => ({
+      stage: 'delivery',
+      error: { code: reason, message: deliveryReasons[reason], position: null },
+      problem: { reason: 'unreachable', fixTarget: null },
+    }),
+    GlnMissing: ({ party }): Failure => ({
+      stage: 'delivery',
+      error: {
+        code: 'glnMissing',
+        message: `${glnOwners[party]} has no GLN for the Interchange`,
+        position: null,
+      },
+      problem: { reason: 'missingField', fixTarget: null },
+    }),
+    DeliveryDefect: (): Failure => ({
+      stage: 'delivery',
+      error: {
+        code: 'deliveryDefect',
+        message: 'The delivery stopped on an unexpected error',
+        position: null,
+      },
+      problem: { reason: 'unreachable', fixTarget: null },
+    }),
+  }),
+)
 
 const envelopeTrailer: Segment = { tag: 'UNZ', elements: [] }
 
-// Delivery wraps the Message in its own Interchange; validation needs only a frame around it.
-const framed = (message: Message): Interchange => ({
+const framed = (message: Message, header: Segment, trailer = envelopeTrailer): Interchange => ({
   hasServiceStringAdvice: false,
   delimiters: {
     component: ':',
@@ -139,14 +194,59 @@ const framed = (message: Message): Interchange => ({
     repetition: ' ',
     segment: "'",
   },
-  header: envelopeHeader,
+  header,
   messages: [message],
-  trailer: envelopeTrailer,
+  trailer,
 })
 
-const validated = (message: Message) =>
+const twoDigits = (value: number) => String(value).padStart(2, '0')
+
+type Envelope = {
+  characterSet: CharacterSet
+  sender: string
+  receiver: string
+  sentAt: DateTime.Utc
+  reference: number
+}
+
+const enveloped = (
+  message: Message,
+  { characterSet, sender, receiver, sentAt, reference }: Envelope,
+) => {
+  const { year, month, day, hour, minute } = DateTime.toPartsUtc(sentAt)
+
+  return serialize({
+    ...framed(
+      message,
+      {
+        tag: 'UNB',
+        elements: [
+          [characterSet, '3'],
+          [sender, '14'],
+          [receiver, '14'],
+          [
+            twoDigits(year % 100) + twoDigits(month) + twoDigits(day),
+            twoDigits(hour) + twoDigits(minute),
+          ],
+          [String(reference)],
+        ],
+      },
+      { tag: 'UNZ', elements: [['1'], [String(reference)]] },
+    ),
+    // The default separators of UNOB are IS1 to IS4, so a UNA declares the printable ones.
+    hasServiceStringAdvice: characterSet === 'UNOB',
+  })
+}
+
+// UNOA to UNOC are ISO 8859-1 or a subset of it; Node has no encoder for UNOD to UNOF.
+const encoded = (interchange: string, characterSet: CharacterSet) =>
+  characterSet === 'UNOA' || characterSet === 'UNOB' || characterSet === 'UNOC'
+    ? Effect.succeed(Buffer.from(interchange, 'latin1'))
+    : Effect.die(new Error(`Delivery in character set ${characterSet} is not supported`))
+
+const validated = (message: Message, characterSet: CharacterSet) =>
   Effect.try({
-    try: () => validate(framed(message)),
+    try: () => validate(framed(message, { tag: 'UNB', elements: [[characterSet]] })),
     catch: (cause) => {
       if (cause instanceof ValidationError) {
         return new MessageInvalid({ cause })
@@ -155,6 +255,73 @@ const validated = (message: Message) =>
       throw cause
     },
   })
+
+const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
+  Effect.gen(function* () {
+    const db = yield* Database
+
+    const [found] = yield* Effect.promise(() =>
+      db
+        .select({
+          workspaceGln: workspaces.gln,
+          tradingPartnerGln: tradingPartners.gln,
+          characterSet: tradingPartners.characterSet,
+          channel: channels,
+        })
+        .from(runs)
+        .innerJoin(workspaces, eq(workspaces.id, runs.workspaceId))
+        .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
+        .innerJoin(flows, eq(flows.id, runs.flowId))
+        .innerJoin(channels, eq(channels.id, flows.destinationChannelId))
+        .where(and(eq(runs.workspaceId, workspaceId), eq(runs.id, runId))),
+    )
+
+    if (found === undefined) {
+      return yield* Effect.die(new Error(`Run ${runId} has no destination Channel`))
+    }
+
+    return found
+  })
+
+type Destination = Effect.Success<ReturnType<typeof loadDestination>>
+
+const deliver = (
+  queued: QueuedRun,
+  message: Message,
+  messageType: MessageType,
+  { workspaceGln, tradingPartnerGln, characterSet, channel }: Destination,
+) =>
+  Effect.gen(function* () {
+    const db = yield* Database
+
+    if (workspaceGln === null) {
+      return yield* new GlnMissing({ party: 'workspace' })
+    }
+
+    if (tradingPartnerGln === null) {
+      return yield* new GlnMissing({ party: 'tradingPartner' })
+    }
+
+    const reference = yield* Effect.promise(() => claimControlReference(db, queued))
+
+    const interchange = enveloped(message, {
+      characterSet,
+      sender: workspaceGln,
+      receiver: tradingPartnerGln,
+      sentAt: yield* DateTime.now,
+      reference,
+    })
+
+    yield* Effect.promise(() =>
+      db.update(runs).set({ output: interchange }).where(eq(runs.id, queued.runId)),
+    )
+
+    const content = yield* encoded(interchange, characterSet)
+    const delivery = yield* Delivery
+
+    // The file name carries the control reference, as an upload never replaces an existing file.
+    yield* delivery(channel, { name: `${messageType}-${String(reference)}.edi`, content })
+  }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
 
 const orderNumberOf = ({ segments }: Message) =>
   segments.find(({ tag, elements }) => tag === 'RFF' && elements[0]?.[0] === 'ON')
@@ -261,16 +428,31 @@ const updateStep = (
     ),
   )
 
-const step = <A, E, R>(runId: string, stage: RunStepStage, effect: Effect.Effect<A, E, R>) =>
+const step = <A, E, R>(
+  runId: string,
+  stage: RunStepStage,
+  effect: Effect.Effect<A, E, R>,
+  succeeded: (tx: Transaction) => Promise<void> = () => Promise.resolve(),
+) =>
   Effect.gen(function* () {
     yield* updateStep(runId, stage, { status: 'running', startedAt: yield* DateTime.nowAsDate })
 
     const result = yield* Effect.result(effect)
+    const db = yield* Database
+    const finishedAt = yield* DateTime.nowAsDate
 
-    yield* updateStep(runId, stage, {
-      status: Result.isSuccess(result) ? 'succeeded' : 'failed',
-      finishedAt: yield* DateTime.nowAsDate,
-    })
+    yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        await tx
+          .update(runSteps)
+          .set({ status: Result.isSuccess(result) ? 'succeeded' : 'failed', finishedAt })
+          .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stage)))
+
+        if (Result.isSuccess(result)) {
+          await succeeded(tx)
+        }
+      }),
+    )
 
     return result
   })
@@ -371,7 +553,8 @@ export const processRun = (queued: QueuedRun) =>
     }
 
     const message = mapped.success
-    const checked = yield* step(run.id, 'validation', validated(message))
+    const destination = yield* loadDestination(queued)
+    const checked = yield* step(run.id, 'validation', validated(message, destination.characterSet))
 
     if (Result.isFailure(checked)) {
       return yield* fail(run.id, validationFailure(message, checked.failure))
@@ -379,10 +562,39 @@ export const processRun = (queued: QueuedRun) =>
 
     const db = yield* Database
 
+    // HTTP delivery comes with its own ticket; until then such a Run waits at delivery.
+    if (destination.channel.type !== 'sftp') {
+      yield* Effect.promise(() =>
+        db
+          .update(runs)
+          .set({ output: serializeMessage(message), businessReference: orderNumberOf(message) })
+          .where(eq(runs.id, run.id)),
+      )
+
+      return
+    }
+
     yield* Effect.promise(() =>
       db
         .update(runs)
-        .set({ output: serializeMessage(message), businessReference: orderNumberOf(message) })
+        .set({ businessReference: orderNumberOf(message) })
         .where(eq(runs.id, run.id)),
     )
+
+    const delivered = yield* step(
+      run.id,
+      'delivery',
+      deliver(queued, message, pinned.messageType, destination),
+      async (tx) => {
+        await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
+      },
+    )
+
+    if (Result.isFailure(delivered)) {
+      yield* fail(run.id, deliveryFailure(delivered.failure))
+
+      if (Predicate.isTagged(delivered.failure, 'DeliveryDefect')) {
+        return yield* Effect.die(delivered.failure.defect)
+      }
+    }
   })

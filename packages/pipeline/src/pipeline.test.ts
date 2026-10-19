@@ -3,18 +3,32 @@ import { type Duration, Effect, Exit, Fiber } from 'effect'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { channels, connect, type Connection, documents, flows } from '@edi-bridge/db'
+import { sftpChannelDelivery } from '@edi-bridge/channels'
+import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
+import {
+  channels,
+  connect,
+  type Connection,
+  documents,
+  flows,
+  tradingPartners,
+  workspaces,
+} from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
+
+import type { CharacterSet } from '@edi-bridge/contracts'
 
 import {
   type ArrivingDocument,
   bullmqRunQueue,
+  type DeliveryService,
   processRun,
   queueReceivedRunsEvery,
   ReceiptRejected,
   receive,
 } from './index'
 import {
+  deliverOverSftp,
   golden,
   goldenInvoice,
   goldenInvoicMessage,
@@ -23,23 +37,35 @@ import {
   pipelineServices,
   readRun,
   seedInvoiceWorkspace,
+  testSecrets,
 } from './testing'
 
 let testDatabase: TestDatabase
+
+let sftp: TestSftpServer
 
 let connection: Connection
 
 let workspace: InvoiceWorkspace
 
+const sftpLogin = () => ({
+  host: sftp.host,
+  port: sftp.port,
+  username: sftp.username,
+  password: sftp.password,
+  remotePath: '/upload',
+})
+
 beforeAll(async () => {
-  testDatabase = await startTestDatabase()
+  ;[testDatabase, sftp] = await Promise.all([startTestDatabase(), startTestSftpServer()])
   connection = connect(testDatabase.url)
   workspace = await seedInvoiceWorkspace(connection.db, 'Nordwind Foods')
-}, 60_000)
+  await deliverOverSftp(connection.db, workspace, sftpLogin())
+}, 180_000)
 
 afterAll(async () => {
   await connection.close()
-  await testDatabase.stop()
+  await Promise.all([testDatabase.stop(), sftp.stop()])
 })
 
 describe('the receipt of a Document', () => {
@@ -351,11 +377,15 @@ describe('the receipt of a Document', () => {
   })
 })
 
-const receiveInvoice = async (content = goldenInvoice, queue = inMemoryRunQueue()) => {
+const receiveInvoice = async (
+  content = goldenInvoice,
+  queue = inMemoryRunQueue(),
+  into: InvoiceWorkspace = workspace,
+) => {
   const receipt = await Effect.runPromise(
     receive({
-      workspaceId: workspace.id,
-      channelId: workspace.inboundChannelId,
+      workspaceId: into.id,
+      channelId: into.inboundChannelId,
       fileName: 'invoice.json',
       content,
       manualSubmission: true,
@@ -365,9 +395,19 @@ const receiveInvoice = async (content = goldenInvoice, queue = inMemoryRunQueue(
   return { queue, runId: receipt.runs[0]?.id ?? '' }
 }
 
-const processQueued = async (queue: ReturnType<typeof inMemoryRunQueue>) => {
+const sftpDelivery: DeliveryService = sftpChannelDelivery({
+  secrets: testSecrets,
+  timeoutMs: 1500,
+})
+
+const processQueued = async (
+  queue: ReturnType<typeof inMemoryRunQueue>,
+  delivery = sftpDelivery,
+) => {
   for (const queued of queue.queued) {
-    await Effect.runPromise(processRun(queued).pipe(pipelineServices(connection.db, queue)))
+    await Effect.runPromise(
+      processRun(queued).pipe(pipelineServices(connection.db, queue, delivery)),
+    )
   }
 }
 
@@ -418,11 +458,160 @@ describe('the sweep of received Runs', () => {
   })
 })
 
+const interchangeTime = (date: Date) =>
+  date.toISOString().replace(/^\d\d(\d\d)-(\d\d)-(\d\d)T(\d\d):(\d\d).*$/, '$1$2$3:$4$5')
+
+const invoicSegments = goldenInvoicMessage.split('\n').join('')
+
+// UNOC is ISO 8859-1, so the file holds Latin-1 bytes.
+const remoteFile = async (path: string) =>
+  Buffer.from((await sftp.exec(`base64 ${sftp.home}${path}`)).output, 'base64').toString('latin1')
+
 describe('the processing of a Run', () => {
-  it('maps the Document with the pinned Mapping Version and keeps the valid INVOIC as output', async () => {
+  it('delivers the valid INVOIC in its own Interchange to the SFTP Channel', async () => {
     const { queue, runId } = await receiveInvoice()
+    const before = new Date()
 
     await processQueued(queue)
+
+    const after = new Date()
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'delivered',
+      failureStage: null,
+      error: null,
+      problem: null,
+      mappingVersionId: workspace.mappingVersionId,
+      businessReference: '4711',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'succeeded' },
+      ],
+    })
+    expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
+
+    const [receipt, mapping, validation, delivery] = run?.steps ?? []
+
+    expect(receipt?.finishedAt?.getTime()).toBeLessThanOrEqual(mapping?.startedAt?.getTime() ?? 0)
+    expect(mapping?.finishedAt?.getTime()).toBeLessThanOrEqual(
+      validation?.startedAt?.getTime() ?? 0,
+    )
+    expect(validation?.finishedAt?.getTime()).toBeLessThanOrEqual(
+      delivery?.startedAt?.getTime() ?? 0,
+    )
+
+    const reference = String(run?.controlReference)
+    const time = /^UNB\+[^+]*\+[^+]*\+[^+]*\+([^+]*)\+/.exec(run?.output ?? '')?.[1]
+
+    expect([interchangeTime(before), interchangeTime(after)]).toContain(time)
+    expect(run?.output).toBe(
+      `UNB+UNOC:3+4389876511113:14+4071615111110:14+${time}+${reference}'` +
+        invoicSegments +
+        `UNZ+1+${reference}'`,
+    )
+
+    const delivered = await remoteFile(`/upload/INVOIC-${reference}.edi`)
+
+    expect(delivered).toBe(run?.output)
+    expect(delivered.match(/UNH\+/g)).toHaveLength(1)
+  })
+
+  const invoiceDescribing = (...descriptions: string[]) =>
+    JSON.stringify({
+      ...invoiceDocument,
+      lines: invoiceDocument.lines.map((line, index) => ({
+        ...line,
+        description: descriptions[index],
+      })),
+    })
+
+  const sftpWorkspaceIn = async (
+    name: string,
+    characterSet: CharacterSet,
+    remotePath = '/upload',
+  ) => {
+    const created = await seedInvoiceWorkspace(connection.db, name)
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ characterSet })
+      .where(eq(tradingPartners.id, created.tradingPartnerId))
+    await deliverOverSftp(connection.db, created, { ...sftpLogin(), remotePath })
+
+    return created
+  }
+
+  it('declares the separators in a UNA when it delivers in UNOB', async () => {
+    // Each Trading Partner counts its control references from 1, so a file name repeats across them.
+    await sftp.exec(
+      `mkdir ${sftp.home}/upload/unob && chown ${sftp.username} ${sftp.home}/upload/unob`,
+    )
+
+    const unob = await sftpWorkspaceIn('Lowercase Foods', 'UNOB', '/upload/unob')
+
+    const { queue, runId } = await receiveInvoice(
+      invoiceDescribing('Rudi Ruessel', 'Ruessel von Rudi'),
+      inMemoryRunQueue(),
+      unob,
+    )
+
+    await processQueued(queue)
+
+    const run = await readRun(connection.db, runId)
+    const reference = String(run?.controlReference)
+
+    expect(run).toMatchObject({ status: 'delivered' })
+    expect(run?.output).toMatch(/^UNA:\+\.\? 'UNB\+UNOB:3\+4389876511113:14\+.*:::Rudi Ruessel'/)
+    await expect(remoteFile(`/upload/unob/INVOIC-${reference}.edi`)).resolves.toBe(run?.output)
+  })
+
+  it.each([
+    ['UNOC', 'a code point above U+00FF', ['Rudi Rüssel €', 'Rüssel von Rudi'], 13],
+    ['UNOA', 'a lower-case letter', ['Rudi Rüssel', 'Rüssel von Rudi'], 2],
+  ] as const)(
+    'fails a Run at validation when its Message leaves %s with %s',
+    async (characterSet, _character, descriptions, character) => {
+      const outside = await sftpWorkspaceIn(`Outside ${characterSet} Foods`, characterSet)
+
+      const { queue, runId } = await receiveInvoice(
+        invoiceDescribing(...descriptions),
+        inMemoryRunQueue(),
+        outside,
+      )
+
+      await processQueued(queue)
+
+      const run = await readRun(connection.db, runId)
+
+      expect(run).toMatchObject({
+        status: 'failed',
+        failureStage: 'validation',
+        output: null,
+        controlReference: null,
+        error: {
+          code: 'invalid-character',
+          position: { segment: 17, tag: 'IMD', element: 3, component: 4 },
+        },
+        problem: { reason: 'invalidContent', fixTarget: null },
+        steps: [
+          { stage: 'receipt', status: 'succeeded' },
+          { stage: 'mapping', status: 'succeeded' },
+          { stage: 'validation', status: 'failed' },
+          { stage: 'delivery', status: 'skipped' },
+        ],
+      })
+      expect(run?.error?.message).toMatch(new RegExp(`, character ${String(character)}$`))
+    },
+  )
+
+  it('leaves a Run for an HTTP Channel processing with its Message and its delivery pending', async () => {
+    const http = await seedInvoiceWorkspace(connection.db, 'Webshop Foods')
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), http)
+
+    await processQueued(queue, () => Effect.die(new Error('HTTP delivery is another ticket')))
 
     const run = await readRun(connection.db, runId)
 
@@ -430,25 +619,96 @@ describe('the processing of a Run', () => {
       status: 'processing',
       failureStage: null,
       error: null,
-      problem: null,
-      mappingVersionId: workspace.mappingVersionId,
+      controlReference: null,
       businessReference: '4711',
       output: goldenInvoicMessage,
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
         { stage: 'validation', status: 'succeeded' },
-        { stage: 'delivery', status: 'pending' },
+        { stage: 'delivery', status: 'pending', startedAt: null, finishedAt: null },
       ],
     })
-    expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation'])
+  })
 
-    const [receipt, mapping, validation] = run?.steps ?? []
+  it('fails a Run at delivery when its SFTP Channel is unreachable and keeps its Interchange', async () => {
+    const unreachable = await seedInvoiceWorkspace(connection.db, 'Unreachable Foods')
 
-    expect(receipt?.finishedAt?.getTime()).toBeLessThanOrEqual(mapping?.startedAt?.getTime() ?? 0)
-    expect(mapping?.finishedAt?.getTime()).toBeLessThanOrEqual(
-      validation?.startedAt?.getTime() ?? 0,
+    await deliverOverSftp(connection.db, unreachable, {
+      ...sftpLogin(),
+      host: '127.0.0.1',
+      port: 1,
+    })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), unreachable)
+
+    await processQueued(queue)
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'hostUnreachable', position: null },
+      problem: { reason: 'unreachable', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+    expect(run?.output).toMatch(/^UNB\+UNOC:3\+.*UNZ\+1\+1'$/)
+    expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
+  })
+
+  it('fails a Run at delivery when the Delivery dies and passes the defect on', async () => {
+    const broken = new Error('The Channel row is broken')
+    const { queue, runId } = await receiveInvoice()
+
+    const [queued] = queue.queued
+
+    const exit = await Effect.runPromiseExit(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => Effect.die(broken)),
+      ),
     )
+
+    expect(exit).toStrictEqual(Exit.die(broken))
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'deliveryDefect', position: null },
+      problem: { reason: 'unreachable', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+  })
+
+  it('fails a Run at delivery when the Workspace has no GLN for the Interchange', async () => {
+    const withoutGln = await seedInvoiceWorkspace(connection.db, 'Unnamed Foods')
+
+    await connection.db
+      .update(workspaces)
+      .set({ gln: null })
+      .where(eq(workspaces.id, withoutGln.id))
+    await deliverOverSftp(connection.db, withoutGln, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), withoutGln)
+
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      output: null,
+      error: { code: 'glnMissing', position: null },
+      problem: { reason: 'missingField', fixTarget: null },
+    })
   })
 
   it('stops a Run with an invalid INVOIC at validation and keeps no output', async () => {

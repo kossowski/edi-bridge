@@ -96,6 +96,38 @@ describe('validate', () => {
     expect(error).toBeInstanceOf(ValidationError)
     expect(error).toMatchObject(JSON.parse(readGolden('invalid', name, 'json')))
   })
+
+  const withFreeText = (characterSet: string, text: string) =>
+    parse(
+      readGolden('valid', 'orders-without-una', 'edi')
+        .replace('UNOC', characterSet)
+        .replace("DTM+2:20221201:102'", `DTM+2:20221201:102'FTX+AAI+++${text}'`)
+        .replace('UNT+14+', 'UNT+15+'),
+    )
+
+  it.each([
+    ['UNOA', 'a lower-case letter', 'NO SALe', 7],
+    ['UNOB', 'a letter with a diacritic', 'Grüße', 3],
+    ['UNOC', 'a code point above U+00FF', 'Price in €', 10],
+  ])('reports the first character outside %s, %s', (characterSet, _character, text, character) => {
+    const error = thrownBy(() => validate(withFreeText(characterSet, text)))
+
+    expect(error).toBeInstanceOf(ValidationError)
+    expect(error).toMatchObject({
+      code: 'invalid-character',
+      position: { segment: 6, element: 4, component: 1, character },
+      message: `invalid-character at segment 6, element 4, component 1, character ${String(character)}`,
+    })
+  })
+
+  it.each([
+    ['UNOA', 'NO SALE: 50% (1/2) "NOW"!'],
+    ['UNOB', 'No sale today'],
+    ['UNOC', 'Grüße'],
+    ['UNOD', 'Price in €'],
+  ])('accepts a Message within the repertoire of %s', (characterSet, text) => {
+    expect(() => validate(withFreeText(characterSet, text))).not.toThrow()
+  })
 })
 
 describe('serialize', () => {
