@@ -12,7 +12,7 @@ import {
   SheetTrigger,
 } from '@edi-bridge/ui/components/sheet'
 
-import { expectFocusTrapped, findOpenDialog } from '../stories/checks'
+import { expectFocusTrapped, findOpenDialog } from '../testing/checks'
 
 const meta = {
   title: 'UI/Sheet',

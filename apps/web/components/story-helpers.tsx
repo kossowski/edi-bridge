@@ -15,7 +15,7 @@ export {
   waitForFocusInside,
   waitForFocusOn,
   waitForMenuClosed,
-} from '@edi-bridge/ui/stories/checks'
+} from '@edi-bridge/ui/testing/checks'
 
 export async function expectNoPageScroll(canvasElement: HTMLElement) {
   const page = canvasElement.ownerDocument.documentElement

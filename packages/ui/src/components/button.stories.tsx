@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 
-import { darkMode, expectVisibleBorder, expectVisibleFocusRing } from '../stories/checks'
+import { darkMode, expectVisibleBorder, expectVisibleFocusRing } from '../testing/checks'
 
 const meta = {
   title: 'UI/Button',

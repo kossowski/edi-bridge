@@ -18,7 +18,7 @@ import {
   expectFocusTrapped,
   expectVisibleFocusRing,
   findOpenDialog,
-} from '../stories/checks'
+} from '../testing/checks'
 
 const meta = {
   title: 'UI/Sidebar',

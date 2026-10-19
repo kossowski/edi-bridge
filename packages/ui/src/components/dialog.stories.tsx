@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from '@edi-bridge/ui/components/dialog'
 
-import { expectFocusTrapped, findOpenDialog } from '../stories/checks'
+import { expectFocusTrapped, findOpenDialog } from '../testing/checks'
 
 const meta = {
   title: 'UI/Dialog',
