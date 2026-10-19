@@ -22,11 +22,11 @@ The local [`compose.yaml`](../../compose.yaml) defines the development setup. Pr
 
 Dokploy's GitHub settings contain these application-specific patterns:
 
-| Application | Patterns                                                                                                                                               |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| web         | `apps/web/**`, `packages/ui/**`, `packages/contracts/**`, `packages/mocks/**`                                                                          |
-| api         | `apps/api/**`, `packages/channels/**`, `packages/pipeline/**`, `packages/contracts/**`, `packages/db/**`, `packages/edifact/**`, `packages/mapping/**` |
-| worker      | `apps/worker/**`, `packages/pipeline/**`, `packages/db/**`, `packages/contracts/**`, `packages/edifact/**`, `packages/mapping/**`                      |
+| Application | Patterns                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| web         | `apps/web/**`, `packages/ui/**`, `packages/contracts/**`, `packages/mocks/**`                                                                             |
+| api         | `apps/api/**`, `packages/channels/**`, `packages/pipeline/**`, `packages/contracts/**`, `packages/db/**`, `packages/edifact/**`, `packages/mapping/**`    |
+| worker      | `apps/worker/**`, `packages/channels/**`, `packages/pipeline/**`, `packages/contracts/**`, `packages/db/**`, `packages/edifact/**`, `packages/mapping/**` |
 
 All three applications also watch these shared build inputs:
 
@@ -71,7 +71,7 @@ Each application's Dokploy **Environment** settings contain values with the form
 | api         | `WEB_ORIGIN`                   | Not set; see below                                                             |
 | api         | `BETTER_AUTH_URL`              | `https://edi-bridge.example.com`                                               |
 | api         | `BETTER_AUTH_SECRET`           | `<auth-secret>`                                                                |
-| api         | `CHANNEL_SECRET_KEY`           | `<channel-secret-key>`                                                         |
+| api, worker | `CHANNEL_SECRET_KEY`           | `<channel-secret-key>`                                                         |
 | api         | `API_PUBLIC_URL`               | Not set; see below                                                             |
 | api         | `ANTHROPIC_API_KEY`            | `<anthropic-api-key>`                                                          |
 | api         | `AI_MODEL`                     | Not set; see below                                                             |
@@ -86,7 +86,7 @@ These runtime variables require neither Docker build arguments nor a repository 
 
 `WEB_ORIGIN` is the web origin that the API allows for cross-origin (CORS) requests and trusts for sign-in. In development, its default is `http://localhost:3000`. In production, it has no default, and the API trusts only the origin of `BETTER_AUTH_URL`. This deployment does not need it, because web and API share one origin through the `/api` prefix.
 
-`<channel-secret-key>` is the key that encrypts the Channel secrets in Postgres: SFTP credentials, webhook tokens and HTTP Authorization headers. It is 32 random bytes, base64-encoded and stored in Dokploy. Generate it once, for example with `openssl rand -base64 32`. The API does not start in production without it. Keep the key: the API cannot decrypt the stored Channel secrets with another key.
+`<channel-secret-key>` is the key that encrypts the Channel secrets in Postgres: SFTP credentials, webhook tokens and HTTP Authorization headers. It is 32 random bytes, base64-encoded and stored in Dokploy. Generate it once, for example with `openssl rand -base64 32`. The API and the worker use the same key: the API encrypts the secrets, and the worker decrypts the SFTP credential when it delivers a Run. Neither starts in production without it. Keep the key: the stored Channel secrets cannot be decrypted with another key.
 
 `RUN_REQUEUE_INTERVAL_SECONDS` is how often the worker queues again the Runs that are still received, for example because Redis was unreachable when they arrived. The worker also does this when it starts. Its default is `60`.
 

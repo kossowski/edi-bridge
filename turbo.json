@@ -59,6 +59,7 @@
         "RUN_REQUEUE_INTERVAL_SECONDS",
         "BETTER_AUTH_URL",
         "BETTER_AUTH_SECRET",
+        "CHANNEL_SECRET_KEY",
         "NODE_ENV"
       ]
     },

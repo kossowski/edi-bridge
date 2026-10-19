@@ -1,6 +1,7 @@
 import { Redis } from 'ioredis'
 import { once } from 'node:events'
 
+import { secretBox } from '@edi-bridge/channels'
 import { connect } from '@edi-bridge/db'
 
 import { config } from './config.js'
@@ -25,6 +26,7 @@ const connection = connect(config.databaseUrl)
 const runWorker = startRunWorker({
   redisUrl: config.redisUrl,
   db: connection.db,
+  secrets: secretBox(config.channelSecretKey),
   requeueInterval: config.requeueInterval,
 })
 

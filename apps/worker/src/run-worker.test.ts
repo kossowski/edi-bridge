@@ -2,10 +2,12 @@ import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
+import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
 import { connect, type Connection } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 import { bullmqRunQueue, receive, type RunQueueService } from '@edi-bridge/pipeline'
 import {
+  deliverOverSftp,
   goldenInvoice,
   goldenInvoicMessage,
   inMemoryRunQueue,
@@ -15,6 +17,7 @@ import {
   seedInvoiceWorkspace,
   startTestRedis,
   type TestRedis,
+  testSecrets,
 } from '@edi-bridge/pipeline/testing'
 
 import { startRunWorker } from './run-worker.js'
@@ -22,6 +25,8 @@ import { startRunWorker } from './run-worker.js'
 let testDatabase: TestDatabase
 
 let testRedis: TestRedis
+
+let sftp: TestSftpServer
 
 let connection: Connection
 
@@ -32,22 +37,34 @@ let queue: ReturnType<typeof bullmqRunQueue>
 let worker: ReturnType<typeof startRunWorker>
 
 beforeAll(async () => {
-  ;[testDatabase, testRedis] = await Promise.all([startTestDatabase(), startTestRedis()])
+  ;[testDatabase, testRedis, sftp] = await Promise.all([
+    startTestDatabase(),
+    startTestRedis(),
+    startTestSftpServer(),
+  ])
   connection = connect(testDatabase.url)
   workspace = await seedInvoiceWorkspace(connection.db, 'Nordwind Foods')
+  await deliverOverSftp(connection.db, workspace, {
+    host: sftp.host,
+    port: sftp.port,
+    username: sftp.username,
+    password: sftp.password,
+    remotePath: '/upload',
+  })
   queue = bullmqRunQueue(testRedis.url)
   worker = startRunWorker({
     redisUrl: testRedis.url,
     db: connection.db,
+    secrets: testSecrets,
     requeueInterval: '100 millis',
   })
-}, 120_000)
+}, 180_000)
 
 afterAll(async () => {
   await worker.close()
   await queue.close()
   await connection.close()
-  await Promise.all([testDatabase.stop(), testRedis.stop()])
+  await Promise.all([testDatabase.stop(), testRedis.stop(), sftp.stop()])
 })
 
 const arrive = async (content: string, runQueue: { service: RunQueueService } = queue) => {
@@ -69,30 +86,36 @@ const processed = (runId: string) =>
     async () => {
       const run = await readRun(connection.db, runId)
 
-      expect(run?.status === 'failed' || run?.output !== null).toBe(true)
+      expect(['delivered', 'failed']).toContain(run?.status)
 
       return run
     },
-    { timeout: 2000, interval: 50 },
+    { timeout: 3000, interval: 50 },
   )
 
+const remoteFile = async (path: string) =>
+  Buffer.from((await sftp.exec(`base64 ${sftp.home}${path}`)).output, 'base64').toString('latin1')
+
 describe('the worker', () => {
-  it('processes a Run queued at the receipt of a Document into a valid INVOIC', async () => {
+  it('delivers a Run queued at the receipt of a Document as an INVOIC to the SFTP Channel', async () => {
     const run = await processed(await arrive(goldenInvoice))
 
     expect(run).toMatchObject({
-      status: 'processing',
+      status: 'delivered',
       manualSubmission: false,
       failureStage: null,
       mappingVersionId: workspace.mappingVersionId,
-      output: goldenInvoicMessage,
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
         { stage: 'validation', status: 'succeeded' },
-        { stage: 'delivery', status: 'pending' },
+        { stage: 'delivery', status: 'succeeded' },
       ],
     })
+    expect(run?.output).toContain(goldenInvoicMessage.split('\n').join(''))
+    await expect(remoteFile(`/upload/INVOIC-${String(run?.controlReference)}.edi`)).resolves.toBe(
+      run?.output,
+    )
   })
 
   it('stops a queued Run with an invalid INVOIC at validation and keeps no output', async () => {
@@ -136,9 +159,6 @@ describe('the worker', () => {
   it('processes a Run received but not queued after the next sweep', async () => {
     const runId = await arrive(goldenInvoice, inMemoryRunQueue())
 
-    await expect(processed(runId)).resolves.toMatchObject({
-      status: 'processing',
-      output: goldenInvoicMessage,
-    })
+    await expect(processed(runId)).resolves.toMatchObject({ status: 'delivered' })
   })
 })
