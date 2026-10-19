@@ -19,7 +19,6 @@ export class ReceiptRejected extends Data.TaggedError('ReceiptRejected')<{
   }
 }
 
-// The Run is recorded as received, but no worker will pick it up until it is queued again.
 export class RunNotQueued extends Data.TaggedError('RunNotQueued')<{
   readonly runId: string
   readonly cause: unknown

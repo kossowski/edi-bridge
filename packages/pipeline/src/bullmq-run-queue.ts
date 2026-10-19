@@ -8,13 +8,14 @@ import type { QueuedRun, RunQueueService } from './services'
 
 export const runQueueName = 'runs'
 
-// Without the offline queue, an unreachable Redis fails the enqueue instead of holding it.
 export function bullmqRunQueue(
   redisUrl: string,
   { timeout = '5 seconds' }: { timeout?: Duration.Input } = {},
 ) {
+  // Without the offline queue, an unreachable Redis fails the enqueue instead of holding it.
   const redis = new Redis(redisUrl, { enableOfflineQueue: false, maxRetriesPerRequest: 1 })
 
+  // A failed enqueue reports the outage as RunNotQueued, so ioredis need not log it too.
   redis.on('error', () => {})
 
   const queue = new Queue<QueuedRun>(runQueueName, { connection: redis })
