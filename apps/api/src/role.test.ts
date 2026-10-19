@@ -62,9 +62,12 @@ import {
   updateDocumentStructureEndpoint,
   updateFlowEndpoint,
   updateLookupTableEndpoint,
+  updateOperatorWorkspaceSettingsEndpoint,
   updateTradingPartnerEndpoint,
+  updateWorkspaceSettingsEndpoint,
   withCheckDigit,
   workspaceMembersEndpoint,
+  workspaceSettingsEndpoint,
 } from '@edi-bridge/contracts'
 
 import { buildApp, readsWithBody } from './app.js'
@@ -134,6 +137,8 @@ const inboxOf = (tradingPartnerId: string) => ({
   pollingIntervalMinutes: 5,
   credential: 'sftp-password-4711',
 })
+
+const changedSettings = { documentRetentionDays: 30, aiTokenBudget: { dailyLimit: 1000 } }
 
 const documentStructure = { name: 'ERP orders', origin: documentStructureOrigins.jsonDocument }
 
@@ -260,11 +265,29 @@ const workspaceReads = (): string[] => [
   `${toPath(mappingComparisonEndpoint.path, { mappingId: ids.mapping })}?from=${ids.mappingVersion}&to=${ids.laterMappingVersion}`,
   publishedMappingVersionsEndpoint.path,
   runsEndpoint.path,
+  workspaceSettingsEndpoint.path,
 ]
 
 const reads = () => [sessionEndpoint.path, workspaceMembersEndpoint.path, ...workspaceReads()]
 
-const changes: [string, () => InjectOptions & { url: string }][] = [
+type Change = [string, () => InjectOptions & { url: string }]
+
+const operatorChanges: Change[] = [
+  [
+    'update the Workspace settings',
+    () => ({ method: 'PUT', url: updateWorkspaceSettingsEndpoint.path, body: changedSettings }),
+  ],
+  [
+    'update the settings of a Workspace as the Operator',
+    () => ({
+      method: 'PUT',
+      url: toPath(updateOperatorWorkspaceSettingsEndpoint.path, { workspaceId: ownWorkspace.id }),
+      body: changedSettings,
+    }),
+  ],
+]
+
+const changes: Change[] = [
   [
     'update the company identity',
     () => ({
@@ -273,6 +296,7 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
       body: { gln: withCheckDigit('021234500000') },
     }),
   ],
+  ...operatorChanges,
   [
     'create a Trading Partner',
     () => ({ method: 'POST', url: createTradingPartnerEndpoint.path, body: tradingPartner }),
@@ -505,6 +529,18 @@ describe('a Viewer', () => {
   })
 })
 
+describe('an Admin', () => {
+  it.each(operatorChanges)('answers 403 and changes nothing to %s', async (_, request) => {
+    const before = await snapshot(api.admin)
+
+    const response = await api.admin.inject(request())
+
+    expect(response.statusCode).toBe(403)
+    expect(response.json()).toEqual({ message: 'Forbidden' })
+    expect(await snapshot(api.admin)).toEqual(before)
+  })
+})
+
 describe('the changes', () => {
   it('cover every changing route', async () => {
     const registered: { method: string; url: string }[] = []
@@ -557,5 +593,16 @@ describe('the Operator', () => {
 
     expect(response.statusCode).toBe(200)
     expect(tradingPartnerSchema.parse(response.json()).name).toBe('Hansemarkt Operator GmbH')
+  })
+
+  it('changes the settings of a Workspace where it is a Viewer', async () => {
+    const response = await operator.inject({
+      method: 'PUT',
+      url: updateWorkspaceSettingsEndpoint.path,
+      body: changedSettings,
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject(changedSettings)
   })
 })

@@ -54,6 +54,7 @@ import {
   messageTypeStructureEndpoint,
   moveFlowMappingVersionEndpoint,
   operatorWorkspaceMembersEndpoint,
+  operatorWorkspaceSettingsEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   removeWorkspaceMemberEndpoint,
@@ -71,11 +72,14 @@ import {
   tradingPartnersEndpoint,
   updateLookupTableEndpoint,
   updateCompanyIdentityEndpoint,
+  updateOperatorWorkspaceSettingsEndpoint,
+  updateWorkspaceSettingsEndpoint,
   updateDocumentStructureEndpoint,
   updateFlowEndpoint,
   updateTradingPartnerEndpoint,
   workspaceInvitesEndpoint,
   workspaceMembersEndpoint,
+  workspaceSettingsEndpoint,
 } from '@edi-bridge/contracts'
 import {
   type ReceiptRejected,
@@ -140,6 +144,7 @@ import {
   recordActivity,
   requireChangeRight,
   requireOperator,
+  requireOperatorRight,
   resolveMember,
   resolveUser,
 } from './session.js'
@@ -156,7 +161,13 @@ import {
   listWorkspaceMembers,
   removeWorkspaceMember,
 } from './workspace-member.js'
-import { CurrentWorkspace, loadCurrentWorkspace, updateCompanyIdentity } from './workspace.js'
+import { loadWorkspaceSettings, updateWorkspaceSettings } from './workspace-settings.js'
+import {
+  CurrentWorkspace,
+  forExistingWorkspace,
+  loadCurrentWorkspace,
+  updateCompanyIdentity,
+} from './workspace.js'
 
 import type {
   AiBudgetExhausted,
@@ -406,6 +417,21 @@ function registerRoutes(
       Effect.flatMap(
         parse(updateCompanyIdentityEndpoint.body, request.body),
         updateCompanyIdentity,
+      ),
+    ),
+  )
+
+  app.get(workspaceSettingsEndpoint.path, (request, reply) =>
+    respond(request, reply, loadWorkspaceSettings),
+  )
+
+  app.put(updateWorkspaceSettingsEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      requireOperatorRight.pipe(
+        Effect.andThen(parse(updateWorkspaceSettingsEndpoint.body, request.body)),
+        Effect.flatMap(updateWorkspaceSettings),
       ),
     ),
   )
@@ -802,6 +828,29 @@ function registerRoutes(
         reply,
         removeWorkspaceMember(request.params.workspaceId, request.params.userId),
         204,
+      ),
+  )
+
+  app.get<{ Params: { workspaceId: string } }>(
+    operatorWorkspaceSettingsEndpoint.path,
+    (request, reply) =>
+      respondToOperator(
+        request,
+        reply,
+        loadWorkspaceSettings.pipe(forExistingWorkspace(request.params.workspaceId)),
+      ),
+  )
+
+  app.put<{ Params: { workspaceId: string } }>(
+    updateOperatorWorkspaceSettingsEndpoint.path,
+    (request, reply) =>
+      respondToOperator(
+        request,
+        reply,
+        Effect.flatMap(
+          parse(updateOperatorWorkspaceSettingsEndpoint.body, request.body),
+          updateWorkspaceSettings,
+        ).pipe(forExistingWorkspace(request.params.workspaceId)),
       ),
   )
 

@@ -131,3 +131,12 @@ export const requireChangeRight = Effect.gen(function* () {
     return yield* new Forbidden()
   }
 })
+
+// Only the Operator changes what a Workspace may spend, so a shared login can't raise its own AI budget.
+export const requireOperatorRight = Effect.gen(function* () {
+  const { operator } = yield* CurrentMember
+
+  if (!operator) {
+    return yield* new Forbidden()
+  }
+})

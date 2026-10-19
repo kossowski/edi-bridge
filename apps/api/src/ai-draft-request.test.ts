@@ -23,16 +23,28 @@ import {
   requestAiDraftEndpoint,
   saveMappingDraftEndpoint,
   toPath,
+  updateWorkspaceSettingsEndpoint,
 } from '@edi-bridge/contracts'
 import { aiTokenUsage, documentStructures, mappings, workspaces } from '@edi-bridge/db'
 
-import { type Client, ownWorkspace, startTestApi, type TestApi } from './testing.js'
+import {
+  addMember,
+  type Client,
+  ownOperator,
+  ownWorkspace,
+  signIn,
+  startTestApi,
+  type TestApi,
+  today,
+} from './testing.js'
 
 type Generate = MockLanguageModelV4['doGenerate']
 
 let generate: Generate
 
 let api: TestApi
+
+let operator: Client
 
 const model = new MockLanguageModelV4({ doGenerate: (options) => generate(options) })
 
@@ -51,6 +63,8 @@ beforeAll(async () => {
       },
     },
   })
+  await addMember(api.connection.db, ownOperator)
+  operator = await signIn(api.app, ownOperator)
 }, 60_000)
 
 afterAll(async () => {
@@ -437,7 +451,7 @@ describe('POST /mappings/:id/ai-draft', () => {
 
     await api.connection.db.insert(aiTokenUsage).values({
       workspaceId: ownWorkspace.id,
-      day: new Date().toISOString().slice(0, 10),
+      day: today(),
       tokens: 1000,
     })
 
@@ -448,6 +462,31 @@ describe('POST /mappings/:id/ai-draft', () => {
       dailyLimit: 1000,
       usedToday: 1000,
     })
+  })
+
+  it('applies a daily limit changed in the settings to the next AI draft', async () => {
+    const { mappingId, sampleId } = await createdInvoiceMapping()
+
+    await api.connection.db.insert(aiTokenUsage).values({
+      workspaceId: ownWorkspace.id,
+      day: today(),
+      tokens: 1000,
+    })
+
+    const changeLimit = (dailyLimit: number) =>
+      operator.inject({
+        method: updateWorkspaceSettingsEndpoint.method,
+        url: updateWorkspaceSettingsEndpoint.path,
+        body: { documentRetentionDays: 90, aiTokenBudget: { dailyLimit } },
+      })
+
+    expect((await changeLimit(1000)).statusCode).toBe(200)
+    expect((await requestDraft(mappingId, { sampleId })).statusCode).toBe(aiBudgetExhaustedStatus)
+
+    expect((await changeLimit(2000)).statusCode).toBe(200)
+    answering(answer(invoiceLinks))
+
+    expect((await requestDraft(mappingId, { sampleId })).statusCode).toBe(200)
   })
 
   it('answers 403 to a Viewer', async () => {

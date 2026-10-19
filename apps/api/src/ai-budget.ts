@@ -12,13 +12,12 @@ import { CurrentWorkspace } from './workspace.js'
 const dayMillis = 24 * 60 * 60 * 1000
 
 // The budget runs per day in UTC, so every installation resets at the same moment.
+export const utcDay = (millis: number) => new Date(millis).toISOString().slice(0, 10)
+
 const today = Effect.map(Clock.currentTimeMillis, (now) => {
   const start = now - (now % dayMillis)
 
-  return {
-    day: new Date(start).toISOString().slice(0, 10),
-    resetsAt: new Date(start + dayMillis).toISOString(),
-  }
+  return { day: utcDay(start), resetsAt: new Date(start + dayMillis).toISOString() }
 })
 
 export const loadAiBudget: Effect.Effect<AiBudget, never, CurrentWorkspace | Db> = Effect.gen(

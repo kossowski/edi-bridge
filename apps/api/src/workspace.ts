@@ -49,3 +49,11 @@ export const requireWorkspace = (workspaceId: string) =>
 
     yield* foundOrNotFound(rows[0])
   })
+
+export const forExistingWorkspace =
+  (workspaceId: string) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.andThen(
+      requireWorkspace(workspaceId),
+      Effect.provideService(effect, CurrentWorkspace, { id: workspaceId }),
+    )

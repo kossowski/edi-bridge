@@ -10,6 +10,7 @@ import { connect, members, workspaces } from '@edi-bridge/db'
 import { startTestDatabase } from '@edi-bridge/db/testing'
 import { type QueuedRun, RunNotQueued, type RunQueueService } from '@edi-bridge/pipeline'
 
+import { utcDay } from './ai-budget.js'
 import { buildApp } from './app.js'
 import { developmentWorkspace } from './development-workspace.js'
 import { addUser, storePassword } from './user.js'
@@ -25,6 +26,8 @@ export const otherWorkspace = {
   name: 'Sudhafen Logistik AG',
   gln: null,
 }
+
+export const today = () => utcDay(Date.now())
 
 export const webOrigin = 'http://localhost:3000'
 
@@ -131,6 +134,15 @@ export const otherAdmin: NewMember = {
   password: 'sudhafen-admin-password',
   workspaceId: otherWorkspace.id,
   role: 'admin',
+}
+
+export const ownOperator: NewMember = {
+  name: 'Platform Operator',
+  email: 'operator@platform.example',
+  password: 'platform-operator-password',
+  workspaceId: ownWorkspace.id,
+  role: 'viewer',
+  operator: true,
 }
 
 export async function startTestApi({
