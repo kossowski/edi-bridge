@@ -854,6 +854,11 @@
         "marked": "Marked as waiting",
         "failed": "The mark was not set. Try again.",
         "viewOnly": "An Admin can mark it."
+      },
+      "endWaiting": {
+        "button": "End waiting",
+        "pending": "Ending",
+        "failed": "The wait did not end. Try again."
       }
     },
     "result": {

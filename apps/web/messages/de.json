@@ -854,6 +854,11 @@
         "marked": "Als wartend markiert",
         "failed": "Die Markierung wurde nicht gesetzt. Versuchen Sie es erneut.",
         "viewOnly": "Ein Admin kann den Beleg markieren."
+      },
+      "endWaiting": {
+        "button": "Warten beenden",
+        "pending": "Wird beendet",
+        "failed": "Das Warten wurde nicht beendet. Versuchen Sie es erneut."
       }
     },
     "result": {

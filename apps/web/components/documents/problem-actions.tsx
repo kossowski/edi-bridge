@@ -21,6 +21,7 @@ import {
 } from '@/components/documents/mapping-version-select'
 import { partnerMessage } from '@/components/documents/partner-message'
 import {
+  useEndWaitingForTradingPartner,
   useLatestRunActionResult,
   useReprocessRun,
   useRetryRun,
@@ -230,28 +231,45 @@ export function MarkWaitingStep({ run }: { run: FailedRun }) {
   const t = useTranslations('Document')
   const canChange = useCanChange()
   const wait = useWaitForTradingPartner(run.id)
+  const endWaiting = useEndWaitingForTradingPartner(run.id)
   const marked = run.waitingForTradingPartnerSince !== null
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-2">
       <p>{t('problem.steps.markWaiting', { tradingPartner: run.tradingPartner.name })}</p>
       {canChange ? (
-        <Button disabled={marked || wait.isPending} variant="outline" onClick={() => wait.mutate()}>
-          <HugeiconsIcon
-            icon={marked ? CheckmarkCircle02Icon : Clock01Icon}
-            strokeWidth={2}
-            aria-hidden
-          />
-          {marked
-            ? t('actions.markWaiting.marked')
-            : wait.isPending
-              ? t('actions.markWaiting.pending')
-              : t('actions.markWaiting.button')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={marked || wait.isPending}
+            variant="outline"
+            onClick={() => wait.mutate()}>
+            <HugeiconsIcon
+              icon={marked ? CheckmarkCircle02Icon : Clock01Icon}
+              strokeWidth={2}
+              aria-hidden
+            />
+            {marked
+              ? t('actions.markWaiting.marked')
+              : wait.isPending
+                ? t('actions.markWaiting.pending')
+                : t('actions.markWaiting.button')}
+          </Button>
+          {marked && (
+            <Button
+              disabled={endWaiting.isPending}
+              variant="ghost"
+              onClick={() => endWaiting.mutate()}>
+              {endWaiting.isPending
+                ? t('actions.endWaiting.pending')
+                : t('actions.endWaiting.button')}
+            </Button>
+          )}
+        </div>
       ) : (
         <ViewOnly text={t('actions.markWaiting.viewOnly')} />
       )}
       {wait.isError && <ActionError message={t('actions.markWaiting.failed')} />}
+      {endWaiting.isError && <ActionError message={t('actions.endWaiting.failed')} />}
     </div>
   )
 }
