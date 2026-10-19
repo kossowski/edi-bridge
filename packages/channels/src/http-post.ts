@@ -35,14 +35,20 @@ export const postHttp = (
 ) =>
   timingOut(
     Effect.tryPromise({
-      try: (signal) =>
-        fetch(url, {
+      try: async (signal) => {
+        const response = await fetch(url, {
           method: 'POST',
           redirect: 'manual',
           headers: postHeaders(authorization, document),
           body: document.content,
           signal,
-        }),
+        })
+
+        // An unread body holds its keep-alive connection until garbage collection.
+        await response.body?.cancel()
+
+        return response
+      },
       catch: (error) => unreachable(fetchFailureReasonSchema.parse(error)),
     }).pipe(
       Effect.flatMap((response) => (response.ok ? Effect.void : answerFailure(response.status))),

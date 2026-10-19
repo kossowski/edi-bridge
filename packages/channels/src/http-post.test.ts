@@ -1,6 +1,7 @@
 import { Effect, Exit } from 'effect'
+import { createServer as createHttpServer, type ServerResponse } from 'node:http'
 import { createServer, type Server, type Socket } from 'node:net'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   DeliveryFailed,
@@ -103,6 +104,35 @@ describe('postHttp', () => {
       expect(
         await failure(postHttp(destination(`${erp.url}?status=${status}`), order(), { timeoutMs })),
       ).toEqual(new DeliveryFailed({ reason: 'unexpectedResponse' }))
+    }
+  })
+
+  it('releases the connection of an unread answer body', async () => {
+    const answers: ServerResponse[] = []
+
+    const streaming = createHttpServer((request, response) => {
+      const status = Number(new URL(request.url ?? '/', 'http://erp').searchParams.get('status'))
+
+      answers.push(response)
+      response.writeHead(status).write('an answer body the delivery never reads')
+    })
+
+    const port = await listening(streaming)
+
+    try {
+      await Effect.runPromise(
+        postHttp(destination(`http://127.0.0.1:${port}/?status=200`), order(), { timeoutMs }),
+      )
+      await failure(
+        postHttp(destination(`http://127.0.0.1:${port}/?status=503`), order(), { timeoutMs }),
+      )
+
+      await vi.waitFor(() => {
+        expect(answers.map((answer) => answer.closed)).toEqual([true, true])
+      })
+    } finally {
+      streaming.closeAllConnections()
+      streaming.close()
     }
   })
 
