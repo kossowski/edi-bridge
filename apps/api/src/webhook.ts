@@ -10,8 +10,9 @@ import { Database, decodeDocument, Documents, receive } from '@edi-bridge/pipeli
 
 import { ChannelEnvironment } from './channel.js'
 import { Db } from './db.js'
-import { Unauthorized } from './errors.js'
+import { RateLimited, Unauthorized } from './errors.js'
 import { parse } from './parse.js'
+import { WebhookRateLimit } from './webhook-rate-limit.js'
 
 // A webhook request carries no file name, so every Document it stores gets this one.
 const webhookFileName = 'webhook'
@@ -39,7 +40,11 @@ const authenticate = (channelId: string, presented: string | undefined) =>
 
     const [channel] = yield* Effect.promise(() =>
       db
-        .select({ workspaceId: channels.workspaceId, sealed: channels.encryptedWebhookToken })
+        .select({
+          workspaceId: channels.workspaceId,
+          rateLimitPerMinute: channels.rateLimitPerMinute,
+          sealed: channels.encryptedWebhookToken,
+        })
         .from(channels)
         .where(and(eq(channels.id, channelId), eq(channels.type, 'webhook'))),
     )
@@ -50,9 +55,14 @@ const authenticate = (channelId: string, presented: string | undefined) =>
 
     const stored = secrets.open(channel.sealed, secretContext(channelId, 'encryptedWebhookToken'))
 
-    return sameToken(presented, stored)
-      ? { workspaceId: channel.workspaceId }
-      : yield* new Unauthorized()
+    if (!sameToken(presented, stored)) {
+      return yield* new Unauthorized()
+    }
+
+    // The check constraint sets a rate limit on every webhook Channel, so a missing one is a Defect.
+    const rateLimitPerMinute = yield* Effect.orDie(Effect.fromNullishOr(channel.rateLimitPerMinute))
+
+    return { workspaceId: channel.workspaceId, rateLimitPerMinute }
   })
 
 export const receiveOnWebhook = (
@@ -61,7 +71,14 @@ export const receiveOnWebhook = (
   body: Buffer,
 ) =>
   Effect.gen(function* () {
-    const { workspaceId } = yield* authenticate(channelId, presentedToken)
+    const { workspaceId, rateLimitPerMinute } = yield* authenticate(channelId, presentedToken)
+    const rateLimit = yield* WebhookRateLimit
+    const decision = yield* Effect.promise(() => rateLimit.take(channelId, rateLimitPerMinute))
+
+    if (!decision.allowed) {
+      return yield* new RateLimited({ retryAfterSeconds: decision.retryAfterSeconds })
+    }
+
     const content = yield* parse(documentSchema.shape.content, decodeDocument(body))
     const db = yield* Db
 

@@ -6,6 +6,7 @@ import { bullmqRunQueue } from '@edi-bridge/pipeline'
 
 import { buildApp } from './app.js'
 import { config } from './config.js'
+import { redisWebhookRateLimiter } from './webhook-rate-limit.js'
 
 await migrate(config.databaseUrl)
 
@@ -35,6 +36,7 @@ const app = buildApp({
   },
   runQueue: runQueue.service,
   webOrigin: config.webOrigin,
+  webhookRateLimiter: redisWebhookRateLimiter(redis),
 })
 
 redis.on('error', (error: Error) => {

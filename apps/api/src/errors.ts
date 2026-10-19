@@ -67,3 +67,11 @@ export class Unauthorized extends Data.TaggedError('Unauthorized') {
     return 'Unauthorized'
   }
 }
+
+export class RateLimited extends Data.TaggedError('RateLimited')<{
+  readonly retryAfterSeconds: number
+}> {
+  override get message() {
+    return 'Too many requests'
+  }
+}

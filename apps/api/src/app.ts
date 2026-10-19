@@ -169,6 +169,7 @@ import {
   loadTradingPartnerActivity,
   updateTradingPartner,
 } from './trading-partner.js'
+import { WebhookRateLimit, type WebhookRateLimiter } from './webhook-rate-limit.js'
 import { bearerTokenSchema, receiveOnWebhook } from './webhook.js'
 import {
   listCurrentMembers,
@@ -191,6 +192,7 @@ import type {
   Forbidden,
   InviteUnusable,
   NotFound,
+  RateLimited,
   Unauthorized,
   Unprocessable,
 } from './errors.js'
@@ -207,6 +209,7 @@ export interface AppDependencies {
   probeTimeoutMs?: number
   runQueue: RunQueueService
   webOrigin?: string | undefined
+  webhookRateLimiter: WebhookRateLimiter
 }
 
 type Failure =
@@ -217,6 +220,7 @@ type Failure =
   | Forbidden
   | InviteUnusable
   | NotFound
+  | RateLimited
   | ReceiptRejected
   | Unauthorized
   | Unprocessable
@@ -236,6 +240,7 @@ const statusOfTag: Record<Exclude<Failure['_tag'], 'ReceiptRejected'>, number> =
   Forbidden: 403,
   NotFound: 404,
   Conflict: 409,
+  RateLimited: 429,
   InviteUnusable: inviteUnusableStatus,
   Unprocessable: 422,
   DocumentStructureRejected: 422,
@@ -265,6 +270,9 @@ const bodyOf = (error: Failure) => {
     ? inviteUnusableProblem(error.reason)
     : { message: error.message }
 }
+
+const headersOf = (error: Failure): Record<string, string> =>
+  Predicate.isTagged(error, 'RateLimited') ? { 'retry-after': String(error.retryAfterSeconds) } : {}
 
 // JSON escapes a control character in six bytes, the worst case for a CSV of the maximum length.
 const lookupTableImportBodyLimit = 6 * maxLookupTableCsvLength + 1024
@@ -327,6 +335,7 @@ function registerRoutes(
     probeTimeoutMs = 2000,
     runQueue,
     webOrigin,
+    webhookRateLimiter,
   }: AppDependencies,
 ) {
   const inviteOrigin = webOrigin ?? new URL(authSettings.baseUrl).origin
@@ -361,7 +370,11 @@ function registerRoutes(
     Effect.runPromise(
       effect.pipe(
         Effect.map((body) => reply.code(status).send(body)),
-        Effect.catch((error) => Effect.sync(() => reply.code(statusOf(error)).send(bodyOf(error)))),
+        Effect.catch((error) =>
+          Effect.sync(() =>
+            reply.code(statusOf(error)).headers(headersOf(error)).send(bodyOf(error)),
+          ),
+        ),
         Effect.provideService(Db, database),
         Effect.provideService(ChannelEnvironment, channelEnvironment),
         Effect.provideService(ChannelReach, reach),
@@ -594,7 +607,7 @@ function registerRoutes(
             request.params.id,
             bearerTokenSchema.safeParse(request.headers[webhookTokenHeader.toLowerCase()]).data,
             request.body,
-          ),
+          ).pipe(Effect.provideService(WebhookRateLimit, webhookRateLimiter)),
           201,
         ),
     )
