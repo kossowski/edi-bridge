@@ -364,8 +364,8 @@ export const TechnicalDetails = meta.story({
     const facts = within(await canvas.findByLabelText('Technical details', { selector: 'dl' }))
     await expect(facts.getByText('Checked')).toBeVisible()
     await expect(facts.getByText('ORDERS')).toBeVisible()
-    await expect(facts.getByText('invalidDate')).toBeVisible()
-    await expect(facts.getByText(/^Segment \d+ \(DTM\), element 1, component 2$/)).toBeVisible()
+    await expect(facts.getByText('wrong-format')).toBeVisible()
+    await expect(facts.getByText(/^Segment \d+ \(QTY\), element 1, component 2$/)).toBeVisible()
     await expect(facts.getByRole('link', { name: /^Control reference \d+$/ })).toHaveAttribute(
       'href',
       expect.stringMatching(/^\/documents\?view=transmissions&q=\d+$/),
@@ -388,10 +388,10 @@ export const TechnicalErrorLine = meta.story({
     const raw = canvas.getByRole('region', { name: 'Transmission as sent, one segment per line' })
     const [advice] = within(raw).getAllByRole('listitem')
 
-    // UNA, UNB, UNH and BGM come first, so the invalid date of the DTM is segment 5.
-    await expect(facts.getByText(/^Segment 5 \(DTM\)/)).toBeVisible()
+    // UNA, UNB, UNH, BGM, DTM, two NADs and LIN come first, so the first QTY is segment 9.
+    await expect(facts.getByText(/^Segment 9 \(QTY\)/)).toBeVisible()
     await expect(advice).toHaveTextContent(/^1UNA/)
-    await expect(raw.querySelector('[data-error-line]')).toHaveTextContent(/^5DTM\+137:/)
+    await expect(raw.querySelector('[data-error-line]')).toHaveTextContent(/^9QTY\+21:/)
   },
 })
 
