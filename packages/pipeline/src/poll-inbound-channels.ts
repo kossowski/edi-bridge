@@ -15,8 +15,7 @@ type ChannelPolling = {
   polling: boolean
   lastPollAt: number | undefined
   listed: ReadonlyMap<string, SftpFile>
-  // Files stored as a Document whose removal failed; they are removed, not received, again.
-  stored: Set<string>
+  storedNotRemoved: Set<string>
 }
 
 const fileKey = ({ name, size, modifiedAt }: SftpFile) =>
@@ -43,7 +42,7 @@ const removeStored = (channel: InboundChannel, file: SftpFile, state: ChannelPol
     const download = yield* Download
 
     yield* download.remove(channel, file.name)
-    state.stored.delete(fileKey(file))
+    state.storedNotRemoved.delete(fileKey(file))
   })
 
 const storeAndRemove = (
@@ -74,7 +73,7 @@ const storeAndRemove = (
       return
     }
 
-    state.stored.add(fileKey(file))
+    state.storedNotRemoved.add(fileKey(file))
     yield* removeStored(channel, file, state)
   }).pipe(Effect.uninterruptible)
 
@@ -83,7 +82,6 @@ const receiveFile = (channel: InboundChannel, file: SftpFile, state: ChannelPoll
     const download = yield* Download
     const content = yield* download.read(channel, file.name)
 
-    // Once its Document is stored, the file is removed before the poll stops.
     yield* storeAndRemove(channel, file, decoded(content), state)
   }).pipe(
     Effect.catchCause((cause) =>
@@ -107,10 +105,10 @@ const pollChannel = (
     const keys = new Set(files.map(fileKey))
 
     state.listed = new Map(files.map((file) => [file.name, file]))
-    state.stored = new Set([...state.stored].filter((key) => keys.has(key)))
+    state.storedNotRemoved = new Set([...state.storedNotRemoved].filter((key) => keys.has(key)))
 
     for (const file of files) {
-      if (state.stored.has(fileKey(file))) {
+      if (state.storedNotRemoved.has(fileKey(file))) {
         yield* removeStored(channel, file, state).pipe(
           Effect.catchCause((cause) =>
             Effect.logError(`Stored file ${file.name} of Channel ${channel.id} not removed`, cause),
@@ -159,7 +157,7 @@ export const pollInboundChannels = Effect.gen(function* () {
         polling: false,
         lastPollAt: undefined,
         listed: new Map(),
-        stored: new Set(),
+        storedNotRemoved: new Set(),
       }
 
       const interval = Duration.toMillis(
