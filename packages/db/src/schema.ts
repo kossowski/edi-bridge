@@ -203,6 +203,7 @@ export const tradingPartners = pgTable(
     testMode: boolean().notNull().default(true),
     testInterchangeSentAt: timestamp({ withTimezone: true, mode: 'date' }),
     contrlReceivedAt: timestamp({ withTimezone: true, mode: 'date' }),
+    nextControlReference: integer().notNull().default(1),
     createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
   (table) => [
@@ -212,6 +213,7 @@ export const tradingPartners = pgTable(
       'acknowledgement_time_limit_hours_range',
       sql`${table.acknowledgementTimeLimitHours} between ${sql.raw(String(acknowledgementTimeLimitHours.min))} and ${sql.raw(String(acknowledgementTimeLimitHours.max))}`,
     ),
+    check('trading_partners_next_control_reference', sql`${table.nextControlReference} >= 1`),
   ],
 )
 
@@ -511,6 +513,7 @@ export const runs = pgTable(
     problem: jsonb().$type<Omit<RunProblem, 'whoFixes'>>(),
     waitingForTradingPartnerSince: timestamp({ withTimezone: true, mode: 'date' }),
     output: text(),
+    controlReference: integer(),
     receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: updatedAt(),
   },
@@ -537,6 +540,7 @@ export const runs = pgTable(
       'runs_output',
       sql`${table.failureStage} is null or ${table.failureStage} = 'delivery' or ${table.output} is null`,
     ),
+    check('runs_control_reference', sql`${table.controlReference} >= 1`),
   ],
 )
 
