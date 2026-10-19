@@ -26,7 +26,7 @@ For each PR, bottom to top:
 bash .agents/skills/ticket-lead/scripts/wait-for-ci.sh <PR>
 ```
 
-Every run exits 0. If one doesn't, stop.
+Every run exits 0. When it names a run cancelled without a green twin, re-run that run as it says and wait again. Any other failure: stop.
 
 ## 3. Merge
 

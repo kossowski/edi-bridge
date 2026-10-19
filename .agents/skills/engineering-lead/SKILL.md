@@ -69,7 +69,7 @@ It returns as soon as the inbox holds a message and prints each one, oldest firs
 
 Act on each message, then move its file to `~/.agents/leads/inbox/done/`. Answer a ticket lead with `herdr agent prompt ticket-<NN> "<answer>"`; it arrives as its next prompt. A message is one of:
 
-- **Question.** A technical one you answer. A product decision goes to the user when they are present; when the user said they are away, decide, write the decision into the state file, and answer. The other tickets keep running meanwhile.
+- **Question.** A technical one you answer. A product decision with a clear recommendation, yours or the ticket lead's, you decide: answer, and log it under "Decisions I made for the user". The rest goes to the user when they are present: a decision where no option is clearly better, and anything that needs a permission or a credential only the user can grant. When the user said they are away, decide those too and log them; permissions and credentials wait for the user. The other tickets keep running meanwhile.
 - **Ready report.** Verify it with `bash .agents/skills/ticket-lead/scripts/stack-status.sh <NN>`; the stack file is on this machine. `ready for /land`: mark the ticket ready and go to step 5. Otherwise answer with its list, most often "main moved to <commit>: run the catch-up step and report again".
 - **Blocked report.** Unblock it with an answer, or take it to the user.
 
