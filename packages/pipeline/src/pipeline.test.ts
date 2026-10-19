@@ -1069,7 +1069,7 @@ describe('the processing of a Run', () => {
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation'])
   })
 
-  it('stops a Run whose Mapping Version fails at mapping and names the Mapping to fix', async () => {
+  it('stops a Run whose code is missing from a Lookup Table at mapping and names the code to add', async () => {
     const unknownUnit = JSON.stringify({
       ...invoiceDocument,
       lines: invoiceDocument.lines.map((line) => ({ ...line, unit: 'KG' })),
@@ -1088,7 +1088,12 @@ describe('the processing of a Run', () => {
       error: { code: 'noLookupMatch', position: null, details: null },
       problem: {
         reason: 'missingCode',
-        fixTarget: { kind: 'mapping', mappingId: workspace.mappingId },
+        fixTarget: {
+          kind: 'lookupTable',
+          lookupTableId: workspace.lookupTableId,
+          name: 'Units',
+          code: 'KG',
+        },
       },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
@@ -1304,7 +1309,12 @@ describe('the processing of an inbound Run', () => {
       error: { code: 'noLookupMatch', position: null, details: null },
       problem: {
         reason: 'missingCode',
-        fixTarget: { kind: 'mapping', mappingId: into.orders.mappingId },
+        fixTarget: {
+          kind: 'lookupTable',
+          lookupTableId: into.orders.lookupTableId,
+          name: 'Order units',
+          code: 'KGM',
+        },
       },
       steps: [
         { stage: 'receipt', status: 'succeeded' },

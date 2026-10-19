@@ -10,6 +10,7 @@ import {
   documentStructureSchema,
   type FailureStage,
   failureStageSchema,
+  type FixTarget,
   type LookupTableEntry,
   type MappingGraph,
   type MessageType,
@@ -118,8 +119,30 @@ const mappingReasons: Record<MappingErrorCode, ProblemReason> = {
   expressionFailed: 'invalidContent',
 }
 
+type LookupTableNames = ReadonlyMap<string, string>
+
+const mappingFixTarget = (
+  pinned: Pinned,
+  lookupTableNames: LookupTableNames,
+  { targetPath, lookup }: MappingError,
+): FixTarget => {
+  const lookupTableId = lookup?.lookupTableId ?? null
+  const name = lookupTableId === null ? undefined : lookupTableNames.get(lookupTableId)
+
+  // A Lookup Table that is not chosen or no longer exists is fixed in the Mapping.
+  return lookupTableId !== null && name !== undefined && lookup?.code
+    ? { kind: 'lookupTable', lookupTableId, name, code: lookup.code }
+    : {
+        kind: 'mapping',
+        mappingId: pinned.mappingId,
+        name: pinned.mappingName,
+        fieldPath: targetPath,
+      }
+}
+
 const mappingFailure = (
   pinned: Pinned,
+  lookupTableNames: LookupTableNames,
   error: MappingError | DocumentReadError | DocumentWriteError,
 ): Failure =>
   Match.value(error).pipe(
@@ -144,17 +167,17 @@ const mappingFailure = (
         },
         problem: { reason: 'invalidContent', fixTarget: null },
       }),
-      MappingError: ({ code, targetPath }): Failure => ({
+      MappingError: (mappingError): Failure => ({
         stage: 'mapping',
-        error: { code, message: `${code} at ${targetPath}`, position: null, details: null },
+        error: {
+          code: mappingError.code,
+          message: `${mappingError.code} at ${mappingError.targetPath}`,
+          position: null,
+          details: null,
+        },
         problem: {
-          reason: mappingReasons[code],
-          fixTarget: {
-            kind: 'mapping',
-            mappingId: pinned.mappingId,
-            name: pinned.mappingName,
-            fieldPath: targetPath,
-          },
+          reason: mappingReasons[mappingError.code],
+          fixTarget: mappingFixTarget(pinned, lookupTableNames, mappingError),
         },
       }),
     }),
@@ -581,7 +604,10 @@ const loadLookupTables = (workspaceId: string, { transforms }: MappingGraph) =>
     ]
 
     if (ids.length === 0) {
-      return new Map<string, LookupTableEntry[]>()
+      return {
+        lookupTables: new Map<string, LookupTableEntry[]>(),
+        lookupTableNames: new Map<string, string>(),
+      }
     }
 
     const db = yield* Database
@@ -590,23 +616,29 @@ const loadLookupTables = (workspaceId: string, { transforms }: MappingGraph) =>
       db
         .select({
           lookupTableId: lookupTables.id,
-          sourceCode: lookupTableEntries.sourceCode,
-          targetCode: lookupTableEntries.targetCode,
+          name: lookupTables.name,
+          entry: {
+            sourceCode: lookupTableEntries.sourceCode,
+            targetCode: lookupTableEntries.targetCode,
+          },
         })
         .from(lookupTables)
-        .innerJoin(lookupTableEntries, eq(lookupTableEntries.lookupTableId, lookupTables.id))
+        .leftJoin(lookupTableEntries, eq(lookupTableEntries.lookupTableId, lookupTables.id))
         .where(and(eq(lookupTables.workspaceId, workspaceId), inArray(lookupTables.id, ids)))
         .orderBy(asc(lookupTableEntries.position)),
     )
 
-    return new Map(
-      ids.map((id) => [
-        id,
-        rows
-          .filter(({ lookupTableId }) => lookupTableId === id)
-          .map(({ sourceCode, targetCode }) => ({ sourceCode, targetCode })),
-      ]),
-    )
+    return {
+      lookupTables: new Map(
+        ids.map((id) => [
+          id,
+          rows.flatMap(({ lookupTableId, entry }) =>
+            lookupTableId === id && entry !== null ? [entry] : [],
+          ),
+        ]),
+      ),
+      lookupTableNames: new Map(rows.map(({ lookupTableId, name }) => [lookupTableId, name])),
+    }
   })
 
 const updateStep = (
@@ -806,9 +838,17 @@ type Processing = {
   content: string
   pinned: Pinned
   lookupTables: Map<string, LookupTableEntry[]>
+  lookupTableNames: LookupTableNames
 }
 
-const processOutbound = ({ queued, run, content, pinned, lookupTables }: Processing) =>
+const processOutbound = ({
+  queued,
+  run,
+  content,
+  pinned,
+  lookupTables,
+  lookupTableNames,
+}: Processing) =>
   Effect.gen(function* () {
     const mapped = yield* step(
       run.id,
@@ -825,7 +865,7 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
     )
 
     if (Result.isFailure(mapped)) {
-      return yield* fail(run.id, mappingFailure(pinned, mapped.failure))
+      return yield* fail(run.id, mappingFailure(pinned, lookupTableNames, mapped.failure))
     }
 
     const message = mapped.success
@@ -890,7 +930,14 @@ const documentFormats = {
   csv: { extension: 'csv', mediaType: 'text/csv' },
 } as const
 
-const processInbound = ({ queued, run, content, pinned, lookupTables }: Processing) =>
+const processInbound = ({
+  queued,
+  run,
+  content,
+  pinned,
+  lookupTables,
+  lookupTableNames,
+}: Processing) =>
   Effect.gen(function* () {
     const read = yield* step(run.id, 'parse', readMessage(content, run.messageIndex))
 
@@ -919,7 +966,7 @@ const processInbound = ({ queued, run, content, pinned, lookupTables }: Processi
     )
 
     if (Result.isFailure(mapped)) {
-      return yield* fail(run.id, mappingFailure(pinned, mapped.failure))
+      return yield* fail(run.id, mappingFailure(pinned, lookupTableNames, mapped.failure))
     }
 
     const db = yield* Database
@@ -969,8 +1016,8 @@ const processClaimed = (
     }
 
     const pinned = yield* loadPinned(queued.workspaceId, mappingVersionId, direction)
-    const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
-    const processing = { queued, run, content: document.content, pinned, lookupTables }
+    const tables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
+    const processing = { queued, run, content: document.content, pinned, ...tables }
 
     yield* direction === 'outbound' ? processOutbound(processing) : processInbound(processing)
   })
