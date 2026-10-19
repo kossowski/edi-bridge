@@ -380,6 +380,21 @@ export const TechnicalDetails = meta.story({
   },
 })
 
+export const TechnicalErrorLine = meta.story({
+  ...technicalTab,
+  args: { id: invalidContent.id },
+  async play({ canvas }) {
+    const facts = within(await canvas.findByLabelText('Technical details', { selector: 'dl' }))
+    const [, segment] = facts.getByText(/^Segment \d+ \(DTM\)/).textContent!.match(/(\d+)/)!
+    const raw = canvas.getByRole('region', { name: 'Transmission as sent, one segment per line' })
+    const [advice] = within(raw).getAllByRole('listitem')
+    const errorLine = raw.querySelector('[data-error-line]')!
+
+    await expect(advice).toHaveTextContent(/^1UNA/)
+    await expect(errorLine).toHaveTextContent(new RegExp(`^${segment}DTM\\+137:`))
+  },
+})
+
 export const TechnicalReplaced = meta.story({
   ...technicalTab,
   args: { id: replaced.id },
