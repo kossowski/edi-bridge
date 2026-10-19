@@ -3,6 +3,7 @@ import { Effect } from 'effect'
 
 import {
   applyLookupTableImport,
+  type BlockingMissingCode,
   classifyLookupTableImport,
   type LookupTable,
   type LookupTableEntry,
@@ -29,6 +30,7 @@ import {
 import { Db, type Database, type Transaction } from './db.js'
 import { Conflict, NotFound } from './errors.js'
 import { lookupTableUnused, selectLookupTableUses, selectUsesOfLookupTable } from './mapping-use.js'
+import { selectBlockingCodes } from './missing-code.js'
 import {
   byName,
   foundOrNotFound,
@@ -63,16 +65,19 @@ const scopeOf = ({ tradingPartnerId, tradingPartnerName }: Row): LookupTableScop
     ? { kind: 'tradingPartner', tradingPartner: { id: tradingPartnerId, name: tradingPartnerName } }
     : { kind: 'workspace' }
 
-const toSummary = (row: Row, uses: LookupTableUse[]): LookupTableSummary => ({
+const toSummary = (
+  row: Row,
+  uses: LookupTableUse[],
+  blocking: BlockingMissingCode[],
+): LookupTableSummary => ({
   id: row.id,
   name: row.name,
   kind: row.kind,
   scope: scopeOf(row),
   entryCount: row.entryCount,
   uses,
-  // Until Runs (#187) exist.
-  missingCodeCounts: { blocking: 0, upcoming: 0 },
-  blockingCodes: [],
+  missingCodeCounts: { blocking: blocking.length, upcoming: 0 },
+  blockingCodes: blocking.map(({ code }) => code),
   updatedAt: row.updatedAt.toISOString(),
 })
 
@@ -118,14 +123,15 @@ export const listLookupTables = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
-  const [rows, usesOf] = yield* Effect.promise(() =>
+  const [rows, usesOf, blockingOf] = yield* Effect.promise(() =>
     Promise.all([
       selectRows(db, inWorkspace(lookupTables, workspace.id)),
       selectLookupTableUses(db, workspace.id),
+      selectBlockingCodes(db, workspace.id),
     ]),
   )
 
-  return rows.map((row) => toSummary(row, usesOf(row.id))).toSorted(byName)
+  return rows.map((row) => toSummary(row, usesOf(row.id), blockingOf(row.id))).toSorted(byName)
 })
 
 const selectLookupTable = async (
@@ -142,8 +148,13 @@ const selectLookupTable = async (
     return undefined
   }
 
+  const [uses, blockingOf] = await Promise.all([
+    selectUsesOfLookupTable(db, workspaceId, row.id),
+    selectBlockingCodes(db, workspaceId, row.id),
+  ])
+
   return {
-    ...toSummary(row, await selectUsesOfLookupTable(db, workspaceId, row.id)),
+    ...toSummary(row, uses, blockingOf(row.id)),
     entries: await selectEntries(db, row.id),
     // Until code meanings are served (#228).
     codeMeanings: [],
@@ -185,8 +196,11 @@ export const listLookupTableMissingCodes = (id: string) =>
   Effect.gen(function* () {
     yield* rejectingUnknownLookupTable(id)
 
-    // Until Mappings (#185) and Runs (#187) exist.
-    return [] satisfies MissingCode[]
+    const db = yield* Db
+    const workspace = yield* CurrentWorkspace
+    const blockingOf = yield* Effect.promise(() => selectBlockingCodes(db, workspace.id, id))
+
+    return blockingOf(id) satisfies MissingCode[]
   })
 
 export const suggestLookupTableEntries = ({ tradingPartnerId }: LookupTableSuggestionsQuery) =>
