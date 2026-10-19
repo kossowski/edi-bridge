@@ -1,8 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { type Duration, Effect, Schedule } from 'effect'
 
-import { directionOf } from '@edi-bridge/contracts'
-import { flows, runs } from '@edi-bridge/db'
+import { runs } from '@edi-bridge/db'
 
 import { Database, RunQueue } from './services'
 
@@ -12,18 +11,12 @@ export const queueReceivedRuns = Effect.gen(function* () {
 
   const received = yield* Effect.promise(() =>
     db
-      .select({ workspaceId: runs.workspaceId, runId: runs.id, messageType: flows.messageType })
+      .select({ workspaceId: runs.workspaceId, runId: runs.id })
       .from(runs)
-      .innerJoin(flows, eq(flows.id, runs.flowId))
       .where(eq(runs.status, 'received')),
   )
 
-  // processRun claims only outbound Runs, so inbound ones stay out of the queue.
-  yield* Effect.forEach(
-    received.filter((run) => directionOf(run) === 'outbound'),
-    ({ workspaceId, runId }) => queue.enqueue({ workspaceId, runId }),
-    { discard: true },
-  )
+  yield* Effect.forEach(received, (run) => queue.enqueue(run), { discard: true })
 })
 
 // A failed sweep leaves its Runs received, and the next one tries them again.

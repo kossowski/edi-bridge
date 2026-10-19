@@ -224,15 +224,8 @@ export const receive = (arriving: ArrivingDocument) =>
 
     const queue = yield* RunQueue
 
-    const outboundFlowIds = new Set(
-      routed.flatMap(({ flow }) => (directionOf(flow) === 'outbound' ? [flow.id] : [])),
-    )
-
-    // processRun claims only outbound Runs, so inbound ones stay out of the queue.
-    const queued = created.filter((run) => outboundFlowIds.has(run.flowId))
-
     // The Runs are stored already, so one not queued stays received until the next sweep.
-    const [, notQueued] = yield* Effect.partition(queued, (run) =>
+    const [, notQueued] = yield* Effect.partition(created, (run) =>
       queue.enqueue({ workspaceId: arriving.workspaceId, runId: run.id }),
     )
 

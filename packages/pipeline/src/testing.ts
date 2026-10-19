@@ -6,7 +6,13 @@ import { createRequire } from 'node:module'
 import { GenericContainer, Wait } from 'testcontainers'
 
 import { type SecretBox, secretBox, secretContext, secretKeyBytes } from '@edi-bridge/channels'
-import { inferDocumentStructure, mappingVersionSchema, toEncodedFile } from '@edi-bridge/contracts'
+import {
+  adjustDocumentStructure,
+  type DocumentStructureOrigin,
+  inferDocumentStructure,
+  mappingVersionSchema,
+  toEncodedFile,
+} from '@edi-bridge/contracts'
 import {
   channels,
   type Connection,
@@ -259,6 +265,7 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
 
   return {
     id: workspaceId,
+    userId: user.id,
     tradingPartnerId: tradingPartner.id,
     inboundChannelId: inboundChannel.id,
     outboundChannelId: outboundChannel.id,
@@ -269,6 +276,143 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
 }
 
 export type InvoiceWorkspace = Awaited<ReturnType<typeof seedInvoiceWorkspace>>
+
+const orderFormats = {
+  json: {
+    mappingVersion: 'orders-reference-json.mapping.json',
+    origin: (): DocumentStructureOrigin => ({
+      kind: 'jsonDocument',
+      document: toEncodedFile(
+        'orders-reference.document.json',
+        golden('orders-reference.document.json'),
+      ),
+    }),
+    adjustments: [],
+  },
+  csv: {
+    mappingVersion: 'orders-reference-csv.mapping.json',
+    origin: (): DocumentStructureOrigin => ({
+      kind: 'csvDocument',
+      document: {
+        fileName: 'orders-reference.document.csv',
+        content: golden('orders-reference.document.csv', 'base64'),
+      },
+      csv: { delimiter: ';', headerRow: true, encoding: 'windows-1252' },
+    }),
+    // The ERP expects the price as 10,00, so the Admin makes it a text column.
+    adjustments: [{ path: 'rows[].Preis', type: 'string' as const }],
+  },
+}
+
+// An ORDERS Flow of the Workspace's Trading Partner on its inbound Channel, delivered to the ERP.
+export async function addOrdersFlow(
+  db: Db,
+  workspace: InvoiceWorkspace,
+  { url, format = 'json' }: { url: string; format?: keyof typeof orderFormats },
+) {
+  const { mappingVersion, origin, adjustments } = orderFormats[format]
+  const version = mappingVersionSchema.parse(JSON.parse(golden(mappingVersion)))
+
+  if (version.direction !== 'inbound') {
+    throw new Error(`The reference Mapping Version ${mappingVersion} is not inbound`)
+  }
+
+  const structure = adjustDocumentStructure(
+    { ...inferDocumentStructure(origin()), id: randomUUID(), name: version.target.name },
+    { name: version.target.name, adjustments },
+  )
+
+  const documentStructure = one(
+    await db
+      .insert(documentStructures)
+      .values({
+        workspaceId: workspace.id,
+        name: structure.name,
+        ...(structure.format === 'json'
+          ? { format: 'json' as const, jsonRoot: structure.root }
+          : { format: 'csv' as const, csv: structure.csv }),
+        children: structure.children,
+      })
+      .returning(),
+  )
+
+  const unitTable = one(
+    await db
+      .insert(lookupTables)
+      .values({ workspaceId: workspace.id, name: 'Order units', kind: 'units' })
+      .returning(),
+  )
+
+  await db
+    .insert(lookupTableEntries)
+    .values({ lookupTableId: unitTable.id, position: 0, sourceCode: 'PCE', targetCode: 'ST' })
+
+  const graph = {
+    links: version.links,
+    transforms: version.transforms.map((transform) =>
+      transform.kind === 'lookupTable'
+        ? { ...transform, config: { ...transform.config, lookupTableId: unitTable.id } }
+        : transform,
+    ),
+    transformLinks: version.transformLinks,
+  }
+
+  const mapping = one(
+    await db
+      .insert(mappings)
+      .values({
+        workspaceId: workspace.id,
+        documentStructureId: documentStructure.id,
+        messageType: 'ORDERS',
+        name: version.mappingName,
+        draft: graph,
+        unpublishedChanges: false,
+      })
+      .returning(),
+  )
+
+  const pinned = one(
+    await db
+      .insert(mappingVersions)
+      .values({ mappingId: mapping.id, version: 1, graph, publishedBy: workspace.userId })
+      .returning(),
+  )
+
+  const erp = one(
+    await db
+      .insert(channels)
+      .values({
+        workspaceId: workspace.id,
+        type: 'http',
+        direction: 'outbound',
+        name: 'ERP order import',
+        url,
+      })
+      .returning(),
+  )
+
+  const flow = one(
+    await db
+      .insert(flows)
+      .values({
+        workspaceId: workspace.id,
+        tradingPartnerId: workspace.tradingPartnerId,
+        messageType: 'ORDERS',
+        name: 'Orders from Hanse Retail',
+        inboundChannelId: workspace.inboundChannelId,
+        destinationChannelId: erp.id,
+        mappingVersionId: pinned.id,
+      })
+      .returning(),
+  )
+
+  return {
+    flowId: flow.id,
+    mappingId: mapping.id,
+    mappingVersionId: pinned.id,
+    erpChannelId: erp.id,
+  }
+}
 
 export async function deliverOverSftp(
   db: Db,

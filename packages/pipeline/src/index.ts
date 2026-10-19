@@ -24,5 +24,6 @@ export {
   DeliveryDefect,
   GlnMissing,
   MessageInvalid,
+  MessageUnreadable,
   processRun,
 } from './process-run'

@@ -34,6 +34,7 @@ import {
   receive,
 } from './index'
 import {
+  addOrdersFlow,
   deliverOverSftp,
   golden,
   goldenInvoice,
@@ -418,7 +419,9 @@ describe('the receipt of a Document', () => {
     )
 
     expect(receipt.notRouted).toEqual([])
-    expect(queue.queued).toEqual([])
+    expect(queue.queued).toEqual(
+      receipt.runs.map(({ id }) => ({ workspaceId: workspace.id, runId: id })),
+    )
     expect(
       receipt.runs.map(({ documentId, flowId, messageIndex }) => ({
         documentId,
@@ -1119,5 +1122,81 @@ describe('the processing of a Run', () => {
     await processQueued(queue)
 
     await expect(readRun(connection.db, runId)).resolves.toEqual(processed)
+  })
+})
+
+describe('the processing of an inbound Run', () => {
+  const ordersInterchange = golden('orders-reference.edi', 'latin1')
+
+  const ordersMessage = ordersInterchange
+    .split('\n')
+    .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
+
+  const interchangeOf = (messages: string[][]) =>
+    [ordersInterchange.split('\n')[0], ...messages.flat(), `UNZ+${messages.length}+00000001'`].join(
+      '\n',
+    )
+
+  const ordersWorkspace = async (name: string, options: { format?: 'json' | 'csv' } = {}) => {
+    const created = await seedInvoiceWorkspace(connection.db, name)
+    const orders = await addOrdersFlow(connection.db, created, { url: erp.url, ...options })
+
+    return { ...created, orders }
+  }
+
+  const receiveInterchange = async (into: InvoiceWorkspace, content: string) => {
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: into.id,
+        channelId: into.inboundChannelId,
+        fileName: 'orders.edi',
+        content,
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    await processQueued(queue, deliveryByChannelType)
+
+    return Promise.all(receipt.runs.map(({ id }) => readRun(connection.db, id)))
+  }
+
+  it('maps each Message of an ORDERS Interchange to the ERP Document and posts it to the HTTP Channel', async () => {
+    const into = await ordersWorkspace('Order Foods')
+    const document = golden('orders-reference.document.json')
+
+    const runs = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage, ordersMessage, ordersMessage]),
+    )
+
+    expect(runs).toHaveLength(3)
+
+    for (const run of runs) {
+      expect(run).toMatchObject({
+        status: 'delivered',
+        failureStage: null,
+        mappingVersionId: into.orders.mappingVersionId,
+        businessReference: '128576',
+        output: document,
+        steps: [
+          { stage: 'receipt', status: 'succeeded' },
+          { stage: 'parse', status: 'succeeded' },
+          { stage: 'validation', status: 'succeeded' },
+          { stage: 'mapping', status: 'succeeded' },
+          { stage: 'delivery', status: 'succeeded' },
+        ],
+      })
+      expect(ranStages(run)).toEqual(['receipt', 'parse', 'validation', 'mapping', 'delivery'])
+    }
+
+    expect(erp.received).toMatchObject(
+      [1, 2, 3].map(() => ({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: document,
+      })),
+    )
   })
 })

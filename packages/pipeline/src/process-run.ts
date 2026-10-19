@@ -4,6 +4,7 @@ import { Data, DateTime, Effect, Match, Predicate, Result } from 'effect'
 import {
   type ChannelTestFailureReason,
   type CharacterSet,
+  type Direction,
   directionOf,
   type DocumentStructure,
   documentStructureSchema,
@@ -15,6 +16,7 @@ import {
   type RunError,
   type RunProblem,
   type RunStepStage,
+  segmentTagSchema,
 } from '@edi-bridge/contracts'
 import {
   channels,
@@ -32,21 +34,29 @@ import {
 } from '@edi-bridge/db'
 import {
   type Interchange,
+  isBrokenMessage,
   type Message,
+  type ParsedInterchange,
+  parseMessages,
+  type Position,
   type Segment,
   serialize,
   validate,
   ValidationError,
 } from '@edi-bridge/edifact'
 import {
+  applyInboundMappingVersion,
   applyMappingVersion,
   type DocumentReadError,
+  type DocumentWriteError,
   type MappingError,
   type MappingErrorCode,
   readDocument,
+  writeDocument,
 } from '@edi-bridge/mapping'
 
-import type { DeliveryFailed } from '@edi-bridge/channels'
+import type { DeliveryFailed, OutboundDocument } from '@edi-bridge/channels'
+import type { ParseError } from '@edi-bridge/edifact'
 
 import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
@@ -55,6 +65,11 @@ type Transaction = Parameters<Parameters<Database['Service']['transaction']>[0]>
 
 export class MessageInvalid extends Data.TaggedError('MessageInvalid')<{
   readonly cause: ValidationError
+}> {}
+
+export class MessageUnreadable extends Data.TaggedError('MessageUnreadable')<{
+  readonly cause: ParseError
+  readonly interchange: ParsedInterchange
 }> {}
 
 export class GlnMissing extends Data.TaggedError('GlnMissing')<{
@@ -102,34 +117,41 @@ const mappingReasons: Record<MappingErrorCode, ProblemReason> = {
   expressionFailed: 'invalidContent',
 }
 
-const mappingFailure = (pinned: Pinned, error: MappingError | DocumentReadError): Failure =>
-  Predicate.isTagged(error, 'DocumentReadError')
-    ? {
+const mappingFailure = (
+  pinned: Pinned,
+  error: MappingError | DocumentReadError | DocumentWriteError,
+): Failure =>
+  Match.value(error).pipe(
+    Match.tagsExhaustive({
+      DocumentReadError: ({ code }): Failure => ({
         stage: 'mapping',
-        error: {
-          code: error.code,
-          message: `The Document is unreadable: ${error.code}`,
-          position: null,
-        },
+        error: { code, message: `The Document is unreadable: ${code}`, position: null },
         problem: { reason: 'unreadable', fixTarget: null },
-      }
-    : {
+      }),
+      DocumentWriteError: ({ code, line }): Failure => ({
         stage: 'mapping',
         error: {
-          code: error.code,
-          message: `${error.code} at ${error.targetPath}`,
+          code,
+          message: `Line ${String(line)} of the Document cannot be written in its encoding`,
           position: null,
         },
+        problem: { reason: 'invalidContent', fixTarget: null },
+      }),
+      MappingError: ({ code, targetPath }): Failure => ({
+        stage: 'mapping',
+        error: { code, message: `${code} at ${targetPath}`, position: null },
         problem: {
-          reason: mappingReasons[error.code],
+          reason: mappingReasons[code],
           fixTarget: {
             kind: 'mapping',
             mappingId: pinned.mappingId,
             name: pinned.mappingName,
-            fieldPath: error.targetPath,
+            fieldPath: targetPath,
           },
         },
-      }
+      }),
+    }),
+  )
 
 // Validation runs on the Message alone, so a position counts from its UNH as segment 1.
 const validationFailure = (message: Message, { cause }: MessageInvalid): Failure => {
@@ -147,6 +169,79 @@ const validationFailure = (message: Message, { cause }: MessageInvalid): Failure
         element: cause.position.element ?? null,
         component: cause.position.component ?? null,
       },
+    },
+    problem: { reason: 'invalidContent', fixTarget: null },
+  }
+}
+
+// The Run's Document is the whole Interchange, so a position counts its segments from the UNA or UNB.
+const segmentTagsOf = (
+  content: string,
+  { delimiters, hasServiceStringAdvice }: ParsedInterchange,
+) => {
+  const tags = hasServiceStringAdvice ? ['UNA'] : []
+  // A UNA declares a space as the release character when there is none.
+  const hasRelease = delimiters.release !== ' '
+  let start = hasServiceStringAdvice ? "UNA:+.? '".length : 0
+
+  for (let index = start; index < content.length; index++) {
+    if (hasRelease && content[index] === delimiters.release) {
+      index++
+    } else if (content[index] === delimiters.segment) {
+      tags.push(content.slice(start, index).trim().slice(0, 3))
+      start = index + 1
+    }
+  }
+
+  return tags
+}
+
+const positionIn = (tags: readonly string[], position: Position): RunError['position'] => {
+  const tag = segmentTagSchema.safeParse(tags[position.segment - 1])
+
+  return tag.success
+    ? {
+        segment: position.segment,
+        tag: tag.data,
+        element: position.element ?? null,
+        component: position.component ?? null,
+      }
+    : null
+}
+
+const parseFailure = (content: string, { cause, interchange }: MessageUnreadable): Failure => ({
+  stage: 'parse',
+  error: {
+    code: cause.code,
+    message: cause.message,
+    position: positionIn(segmentTagsOf(content, interchange), cause.position),
+  },
+  problem: { reason: 'unreadable', fixTarget: null },
+})
+
+type ReadMessage = { interchange: ParsedInterchange; message: Message; messageIndex: number }
+
+// Validation sees the Message as the first of its Interchange, so a position shifts to its own UNH.
+const inboundValidationFailure = (
+  content: string,
+  { interchange, messageIndex }: ReadMessage,
+  { cause }: MessageInvalid,
+): Failure => {
+  const tags = segmentTagsOf(content, interchange)
+  const headers = tags.flatMap((tag, index) => (tag === 'UNH' ? [index + 1] : []))
+  const validatedHeader = (interchange.hasServiceStringAdvice ? 1 : 0) + 2
+  const shift = (headers[messageIndex - 1] ?? validatedHeader) - validatedHeader
+  const { segment } = cause.position
+
+  return {
+    stage: 'validation',
+    error: {
+      code: cause.code,
+      message: cause.message,
+      position: positionIn(tags, {
+        ...cause.position,
+        segment: segment < validatedHeader ? segment : segment + shift,
+      }),
     },
     problem: { reason: 'invalidContent', fixTarget: null },
   }
@@ -347,6 +442,13 @@ const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
 
 type Destination = Effect.Success<ReturnType<typeof loadDestination>>
 
+const handOver = (channel: Destination['channel'], document: OutboundDocument) =>
+  Effect.flatMap(Delivery, (delivery) =>
+    delivery(channel, document).pipe(
+      Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))),
+    ),
+  )
+
 const deliver = (
   queued: QueuedRun,
   message: Message,
@@ -380,21 +482,20 @@ const deliver = (
     )
 
     const content = yield* encoded(interchange, characterSet)
-    const delivery = yield* Delivery
 
     // The file name carries the control reference, as an upload never replaces an existing file.
-    yield* delivery(channel, {
+    yield* handOver(channel, {
       name: `${messageType}-${String(reference)}.edi`,
       content,
       mediaType: 'application/edifact',
-    }).pipe(Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))))
+    })
   }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
 
 const orderNumberOf = ({ segments }: Message) =>
   segments.find(({ tag, elements }) => tag === 'RFF' && elements[0]?.[0] === 'ON')
     ?.elements[0]?.[1] ?? null
 
-const loadPinned = (workspaceId: string, mappingVersionId: string) =>
+const loadPinned = (workspaceId: string, mappingVersionId: string, direction: Direction) =>
   Effect.gen(function* () {
     const db = yield* Database
 
@@ -415,8 +516,8 @@ const loadPinned = (workspaceId: string, mappingVersionId: string) =>
 
     const { version, mapping, structure } = row
 
-    if (directionOf(mapping) !== 'outbound') {
-      return yield* Effect.die(new Error(`Mapping ${mapping.id} is not outbound`))
+    if (directionOf(mapping) !== direction) {
+      return yield* Effect.die(new Error(`Mapping ${mapping.id} is not ${direction}`))
     }
 
     // A stored Document Structure that breaks its schema is a defect, not a failure of the Run.
@@ -568,7 +669,7 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
         ),
     )
 
-    if (found === undefined || directionOf(found.flow) !== 'outbound') {
+    if (found === undefined) {
       return undefined
     }
 
@@ -580,35 +681,53 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
         .returning(),
     )
 
-    return claimed
+    return claimed && { run: claimed, direction: directionOf(found.flow) }
   })
 
-export const processRun = (queued: QueuedRun) =>
+type ClaimedRun = typeof runs.$inferSelect
+
+const deliveryStep = (
+  run: ClaimedRun,
+  destination: Destination,
+  delivering: Effect.Effect<void, DeliveryError, Database | Delivery>,
+) =>
   Effect.gen(function* () {
-    const run = yield* claim(queued)
+    const delivered = yield* step(run.id, 'delivery', delivering, async (tx) => {
+      await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
+    })
 
-    if (run === undefined || run.mappingVersionId === null) {
-      return
+    if (Result.isFailure(delivered)) {
+      yield* fail(run.id, deliveryFailure(delivered.failure, destination))
+
+      const { failure } = delivered
+
+      if (
+        Predicate.isTagged(failure, 'ChannelDefect') ||
+        Predicate.isTagged(failure, 'DeliveryDefect')
+      ) {
+        return yield* Effect.die(failure.defect)
+      }
     }
+  })
 
-    const documents = yield* Documents
-    const document = yield* Effect.promise(() => documents.read(queued.workspaceId, run.documentId))
+type Processing = {
+  queued: QueuedRun
+  run: ClaimedRun
+  content: string
+  pinned: Pinned
+  lookupTables: Map<string, LookupTableEntry[]>
+}
 
-    if (document === undefined) {
-      return yield* Effect.die(new Error(`Document ${run.documentId} of Run ${run.id} is missing`))
-    }
-
-    const pinned = yield* loadPinned(queued.workspaceId, run.mappingVersionId)
-    const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
-
+const processOutbound = ({ queued, run, content, pinned, lookupTables }: Processing) =>
+  Effect.gen(function* () {
     const mapped = yield* step(
       run.id,
       'mapping',
-      readDocument(pinned.structure, document.content).pipe(
-        Effect.flatMap((content) =>
+      readDocument(pinned.structure, content).pipe(
+        Effect.flatMap((document) =>
           applyMappingVersion(
             { ...pinned.graph, target: { kind: 'messageType', messageType: pinned.messageType } },
-            content,
+            document,
             { lookupTables },
           ),
         ),
@@ -641,25 +760,130 @@ export const processRun = (queued: QueuedRun) =>
         .where(eq(runs.id, run.id)),
     )
 
-    const delivered = yield* step(
+    yield* deliveryStep(run, destination, deliver(queued, message, pinned.messageType, destination))
+  })
+
+// Receipt routed the Message by this envelope, so the Interchange reads again here.
+const readMessage = (content: string, messageIndex: number | null) =>
+  Effect.gen(function* () {
+    const interchange = parseMessages(content)
+    const message = messageIndex === null ? undefined : interchange.messages[messageIndex - 1]
+
+    if (messageIndex === null || message === undefined) {
+      return yield* Effect.die(new Error(`The Interchange has no Message ${String(messageIndex)}`))
+    }
+
+    if (isBrokenMessage(message)) {
+      return yield* new MessageUnreadable({ cause: message.error, interchange })
+    }
+
+    return { interchange, message, messageIndex } satisfies ReadMessage
+  })
+
+const validatedInbound = ({ interchange, message }: ReadMessage) =>
+  Effect.try({
+    try: () => validate({ ...interchange, messages: [message] }),
+    catch: (cause) => {
+      if (cause instanceof ValidationError) {
+        return new MessageInvalid({ cause })
+      }
+
+      throw cause
+    },
+  })
+
+const documentNumberOf = ({ segments }: Message) =>
+  segments.find(({ tag }) => tag === 'BGM')?.elements[1]?.[0] ?? null
+
+const documentFormats = {
+  json: { extension: 'json', mediaType: 'application/json' },
+  csv: { extension: 'csv', mediaType: 'text/csv' },
+} as const
+
+const processInbound = ({ queued, run, content, pinned, lookupTables }: Processing) =>
+  Effect.gen(function* () {
+    const read = yield* step(run.id, 'parse', readMessage(content, run.messageIndex))
+
+    if (Result.isFailure(read)) {
+      return yield* fail(run.id, parseFailure(content, read.failure))
+    }
+
+    const checked = yield* step(run.id, 'validation', validatedInbound(read.success))
+
+    if (Result.isFailure(checked)) {
+      return yield* fail(run.id, inboundValidationFailure(content, read.success, checked.failure))
+    }
+
+    const { message } = read.success
+    const { structure } = pinned
+
+    const mapped = yield* step(
       run.id,
-      'delivery',
-      deliver(queued, message, pinned.messageType, destination),
-      async (tx) => {
-        await tx.update(runs).set({ status: 'delivered' }).where(eq(runs.id, run.id))
-      },
+      'mapping',
+      applyInboundMappingVersion(
+        { ...pinned.graph, source: { kind: 'messageType', messageType: pinned.messageType } },
+        structure,
+        message,
+        { lookupTables },
+      ).pipe(Effect.flatMap((document) => writeDocument(structure, document))),
     )
 
-    if (Result.isFailure(delivered)) {
-      yield* fail(run.id, deliveryFailure(delivered.failure, destination))
-
-      const { failure } = delivered
-
-      if (
-        Predicate.isTagged(failure, 'ChannelDefect') ||
-        Predicate.isTagged(failure, 'DeliveryDefect')
-      ) {
-        return yield* Effect.die(failure.defect)
-      }
+    if (Result.isFailure(mapped)) {
+      return yield* fail(run.id, mappingFailure(pinned, mapped.failure))
     }
+
+    const db = yield* Database
+    const written = mapped.success
+    const encoding = structure.format === 'csv' ? structure.csv.encoding : 'utf-8'
+
+    yield* Effect.promise(() =>
+      db
+        .update(runs)
+        .set({
+          output: new TextDecoder(encoding).decode(written),
+          businessReference: documentNumberOf(message),
+        })
+        .where(eq(runs.id, run.id)),
+    )
+
+    const destination = yield* loadDestination(queued)
+    const { extension, mediaType } = documentFormats[structure.format]
+
+    yield* deliveryStep(
+      run,
+      destination,
+      handOver(destination.channel, {
+        name: `${pinned.messageType}-${run.id}.${extension}`,
+        content: Buffer.from(written),
+        mediaType,
+      }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect })))),
+    )
+  })
+
+export const processRun = (queued: QueuedRun) =>
+  Effect.gen(function* () {
+    const claimed = yield* claim(queued)
+
+    if (claimed === undefined) {
+      return
+    }
+
+    const { run, direction } = claimed
+
+    if (run.mappingVersionId === null) {
+      return
+    }
+
+    const documents = yield* Documents
+    const document = yield* Effect.promise(() => documents.read(queued.workspaceId, run.documentId))
+
+    if (document === undefined) {
+      return yield* Effect.die(new Error(`Document ${run.documentId} of Run ${run.id} is missing`))
+    }
+
+    const pinned = yield* loadPinned(queued.workspaceId, run.mappingVersionId, direction)
+    const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
+    const processing = { queued, run, content: document.content, pinned, lookupTables }
+
+    yield* direction === 'outbound' ? processOutbound(processing) : processInbound(processing)
   })
