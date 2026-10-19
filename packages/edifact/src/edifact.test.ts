@@ -7,6 +7,7 @@ import {
   type Interchange,
   parse,
   ParseError,
+  parseMessages,
   readAcknowledgedInterchange,
   ReadAcknowledgementError,
   serialize,
@@ -66,6 +67,16 @@ describe('parse', () => {
     expect(interchange.messages[0]?.segments[0]?.elements[3]).toEqual(freeText)
   })
 
+  it('reports a segment error in a later Message before a trailer error in an earlier one', () => {
+    const error = thrownBy(() =>
+      parse(
+        "UNB+UNOC:3+A+B+261014:0930+CTL1'UNH+M1+ORDERS:D:96A:UN:EAN008'UNT+3+M1'UNH+M2+ORDERS:D:96A:UN:EAN008'bgm+220+PO2+9'UNT+3+M2'UNZ+2+CTL1'",
+      ),
+    )
+
+    expect(error).toMatchObject({ code: 'invalid-segment-tag', position: { segment: 5 } })
+  })
+
   it('treats a space in the UNA release position as no release character', () => {
     const interchange = parse(
       "UNA:+.  'UNB+UNOC:3+A B+C+261014:0930+1'UNH+1+ORDERS:D:96A:UN:EAN008'FTX+AAI+++O K'UNT+3+1'UNZ+1+1'",
@@ -73,6 +84,116 @@ describe('parse', () => {
 
     expect(interchange.header.elements[1]).toEqual(['A B'])
     expect(interchange.messages[0]?.segments[0]?.elements[3]).toEqual(['O K'])
+  })
+})
+
+describe('parseMessages', () => {
+  const interchangeOf = (...messages: string[]) =>
+    `UNB+UNOC:3+A+B+261014:0930+CTL1'${messages.join('')}UNZ+${String(messages.length)}+CTL1'`
+
+  const firstMessage = "UNH+M1+ORDERS:D:96A:UN:EAN008'BGM+220+PO1+9'UNT+3+M1'"
+
+  it('returns a valid Message next to a Message with a wrong segment count', () => {
+    const interchange = parseMessages(
+      interchangeOf(firstMessage, "UNH+M2+ORDERS:D:96A:UN:EAN008'BGM+220+PO2+9'UNT+4+M2'"),
+    )
+
+    const [validMessage, brokenMessage] = interchange.messages
+
+    expect(interchange.messages).toHaveLength(2)
+    expect(validMessage).toEqual({
+      header: { tag: 'UNH', elements: [['M1'], ['ORDERS', 'D', '96A', 'UN', 'EAN008']] },
+      segments: [{ tag: 'BGM', elements: [['220'], ['PO1'], ['9']] }],
+      trailer: { tag: 'UNT', elements: [['3'], ['M1']] },
+    })
+    expect(brokenMessage).toMatchObject({
+      header: { tag: 'UNH', elements: [['M2'], ['ORDERS', 'D', '96A', 'UN', 'EAN008']] },
+      error: { code: 'segment-count-mismatch', position: { segment: 7, element: 1, component: 1 } },
+    })
+    expect(brokenMessage).toHaveProperty('error', expect.any(ParseError))
+  })
+
+  const secondMessage = "UNH+M2+ORDERS:D:96A:UN:EAN008'BGM+220+PO2+9'UNT+3+M2'"
+
+  const outcomes = (text: string) =>
+    parseMessages(text).messages.map((message) =>
+      'error' in message
+        ? { reference: message.header.elements[0]?.[0], error: message.error.message }
+        : { reference: message.header.elements[0]?.[0] },
+    )
+
+  it.each([
+    ['an invalid segment tag', "bgm+220+PO1+9'", 'invalid-segment-tag at segment 3'],
+    [
+      'an unneeded release character',
+      "BGM+220+PO?1+9'",
+      'unneeded-release-character at segment 3, element 2, component 1',
+    ],
+  ])('keeps the other Messages when one has %s', (_case, brokenSegment, error) => {
+    expect(
+      outcomes(
+        interchangeOf(`UNH+M1+ORDERS:D:96A:UN:EAN008'${brokenSegment}UNT+3+M1'`, secondMessage),
+      ),
+    ).toEqual([{ reference: 'M1', error }, { reference: 'M2' }])
+  })
+
+  it('keeps the next Message after a Message without a trailer', () => {
+    expect(outcomes(readGolden('broken', 'message-without-trailer', 'edi'))).toEqual([
+      { reference: 'ME000001', error: 'missing-message-trailer at segment 2' },
+      { reference: 'ME000002' },
+    ])
+  })
+
+  const messageErrorGoldenNames = [
+    'doubled-segment-terminator',
+    'last-message-without-trailer',
+    'lowercase-segment-tag',
+    'message-reference-mismatch',
+    'message-segment-count-mismatch',
+    'message-without-trailer',
+    'unneeded-release-character',
+  ]
+
+  it.each(messageErrorGoldenNames)('reports the error in %s on its Message', (name) => {
+    const errors = parseMessages(readGolden('broken', name, 'edi')).messages.flatMap((message) =>
+      'error' in message ? [message.error] : [],
+    )
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toMatchObject(JSON.parse(readGolden('broken', name, 'json')))
+  })
+
+  it.each(
+    goldenNames('broken').filter(
+      (name) =>
+        !messageErrorGoldenNames.includes(name) &&
+        name !== 'message-without-trailer-at-end-of-text',
+    ),
+  )('fails the whole parse for the envelope error in %s', (name) => {
+    const error = thrownBy(() => parseMessages(readGolden('broken', name, 'edi')))
+
+    expect(error).toBeInstanceOf(ParseError)
+    expect(error).toMatchObject(JSON.parse(readGolden('broken', name, 'json')))
+  })
+
+  it('fails the whole parse when the text ends inside a Message', () => {
+    const error = thrownBy(() =>
+      parseMessages(readGolden('broken', 'message-without-trailer-at-end-of-text', 'edi')),
+    )
+
+    expect(error).toBeInstanceOf(ParseError)
+    expect(error).toMatchObject({
+      code: 'missing-interchange-trailer',
+      position: { segment: 2 },
+    })
+  })
+
+  it('returns the envelope of an Interchange as parse does', () => {
+    const text = readGolden('valid', 'orders-with-multiple-messages', 'edi')
+
+    expect(parseMessages(text)).toEqual(
+      JSON.parse(readGolden('valid', 'orders-with-multiple-messages', 'json')),
+    )
   })
 })
 

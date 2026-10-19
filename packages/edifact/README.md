@@ -2,6 +2,8 @@
 
 Parses, validates and serializes EDIFACT Interchanges. The golden files that the tests use are described in [`golden/README.md`](golden/README.md).
 
+`parse` fails on the first error in an Interchange. `parseMessages` fails only on an error in the envelope (UNA, UNB, UNZ or a segment outside a Message) and returns each Message on its own: a broken Message keeps its UNH header and carries its `ParseError` with the position.
+
 ## Mutation testing
 
 Mutation testing checks how well the tests detect changes to the code. [Stryker](https://stryker-mutator.io/) changes the source in small ways, for example it replaces `<` with `<=` or removes a condition. Each changed version is a mutant. Stryker runs the tests against each mutant:
