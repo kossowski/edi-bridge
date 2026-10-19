@@ -119,6 +119,7 @@
   },
   "Breadcrumb": {
     "label": "Breadcrumb",
+    "more": "More",
     "showPath": "Show the whole path",
     "details": "Details",
     "new": "New",

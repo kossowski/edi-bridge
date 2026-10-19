@@ -119,6 +119,7 @@
   },
   "Breadcrumb": {
     "label": "Navigationspfad",
+    "more": "Mehr",
     "showPath": "Ganzen Pfad anzeigen",
     "details": "Details",
     "new": "Neu",
