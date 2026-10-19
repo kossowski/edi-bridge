@@ -1,6 +1,6 @@
-import { expect, fn } from 'storybook/test'
+import { expect, fn, waitFor } from 'storybook/test'
 
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryContext, StoryObj } from '@storybook/react'
 
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 
@@ -13,6 +13,8 @@ const meta = {
 export default meta
 
 type Story = StoryObj<typeof meta>
+
+type Keyboard = StoryContext['userEvent']
 
 function darkMode() {
   document.documentElement.classList.add('dark')
@@ -52,6 +54,19 @@ function contrastWithPage(color: string) {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
+// WCAG 2.2 asks a focus indicator for 3:1 against the colours next to it.
+async function expectVisibleFocusRing(element: HTMLElement, keyboard: Keyboard) {
+  await keyboard.tab()
+  await expect(element).toHaveFocus()
+  await waitFor(() => {
+    const style = getComputedStyle(element)
+
+    expect(style.outlineStyle).toBe('solid')
+    expect(Number.parseFloat(style.outlineWidth)).toBeGreaterThanOrEqual(2)
+    expect(contrastWithPage(style.outlineColor)).toBeGreaterThanOrEqual(3)
+  })
+}
+
 async function expectVisibleBorder(element: HTMLElement) {
   const style = getComputedStyle(element)
 
@@ -59,14 +74,23 @@ async function expectVisibleBorder(element: HTMLElement) {
   await expect(contrastWithPage(style.borderTopColor)).toBeGreaterThanOrEqual(1.2)
 }
 
+const focusRing = {
+  async play({ canvas, userEvent }) {
+    await expectVisibleFocusRing(canvas.getByRole('button', { name: 'Reprocess' }), userEvent)
+  },
+} satisfies Story
+
 const outlineLink = {
   render: () => (
     <a href="#edit" className={buttonVariants({ variant: 'outline' })}>
       Edit
     </a>
   ),
-  async play({ canvas }) {
-    await expectVisibleBorder(canvas.getByRole('link', { name: 'Edit' }))
+  async play({ canvas, userEvent }) {
+    const link = canvas.getByRole('link', { name: 'Edit' })
+
+    await expectVisibleBorder(link)
+    await expectVisibleFocusRing(link, userEvent)
   },
 } satisfies Story
 
@@ -77,10 +101,17 @@ export const Default: Story = {
   },
 }
 
+export const DefaultFocused: Story = focusRing
+
+export const DefaultFocusedDark: Story = { ...focusRing, beforeEach: darkMode }
+
 export const Outline: Story = {
   args: { variant: 'outline' },
-  async play({ canvas }) {
-    await expectVisibleBorder(canvas.getByRole('button', { name: 'Reprocess' }))
+  async play({ canvas, userEvent }) {
+    const button = canvas.getByRole('button', { name: 'Reprocess' })
+
+    await expectVisibleBorder(button)
+    await expectVisibleFocusRing(button, userEvent)
   },
 }
 
@@ -90,9 +121,21 @@ export const OutlineLink: Story = outlineLink
 
 export const OutlineLinkDark: Story = { ...outlineLink, beforeEach: darkMode }
 
-export const Destructive: Story = {
-  args: { variant: 'destructive' },
-}
+export const Secondary: Story = { ...focusRing, args: { variant: 'secondary' } }
+
+export const SecondaryDark: Story = { ...Secondary, beforeEach: darkMode }
+
+export const Ghost: Story = { ...focusRing, args: { variant: 'ghost' } }
+
+export const GhostDark: Story = { ...Ghost, beforeEach: darkMode }
+
+export const Destructive: Story = { ...focusRing, args: { variant: 'destructive' } }
+
+export const DestructiveDark: Story = { ...Destructive, beforeEach: darkMode }
+
+export const Link: Story = { ...focusRing, args: { variant: 'link' } }
+
+export const LinkDark: Story = { ...Link, beforeEach: darkMode }
 
 export const Disabled: Story = {
   args: { disabled: true },
