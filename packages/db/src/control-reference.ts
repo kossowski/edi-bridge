@@ -2,9 +2,7 @@ import { and, eq, sql } from 'drizzle-orm'
 
 import { runs, tradingPartners } from './schema.js'
 
-import type { Connection } from './client.js'
-
-type Transaction = Parameters<Parameters<Connection['db']['transaction']>[0]>[0]
+import type { Connection, Transaction } from './client.js'
 
 export async function claimTradingPartnerControlReference(
   tx: Transaction,

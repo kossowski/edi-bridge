@@ -1,4 +1,4 @@
-export { connect, type Connection, localDatabaseUrl } from './client.js'
+export { connect, type Connection, localDatabaseUrl, type Transaction } from './client.js'
 
 export { claimControlReference, claimTradingPartnerControlReference } from './control-reference.js'
 

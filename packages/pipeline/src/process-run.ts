@@ -37,6 +37,7 @@ import {
   runs,
   runSteps,
   tradingPartners,
+  type Transaction,
   workspaces,
 } from '@edi-bridge/db'
 import {
@@ -69,8 +70,6 @@ import type { ParseError } from '@edi-bridge/edifact'
 import { enveloped, framed } from './envelope'
 import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
-
-type Transaction = Parameters<Parameters<Database['Service']['transaction']>[0]>[0]
 
 // The sweep took the Run from a stalled worker, so another worker or a Retry owns it now.
 export class RunNotOwned extends Data.TaggedError('RunNotOwned')<{

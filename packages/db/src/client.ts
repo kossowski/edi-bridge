@@ -16,3 +16,5 @@ export function connect(url: string) {
 }
 
 export type Connection = ReturnType<typeof connect>
+
+export type Transaction = Parameters<Parameters<Connection['db']['transaction']>[0]>[0]
