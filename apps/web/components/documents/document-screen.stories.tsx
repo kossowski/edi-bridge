@@ -20,6 +20,7 @@ import {
   runDetailSchema,
   runEndpoint,
   type RunDetail,
+  type RunProblem,
   toPath,
   waitForTradingPartnerRunEndpoint,
 } from '@edi-bridge/contracts'
@@ -32,6 +33,7 @@ import {
   seedChannels,
   seedMappingDrafts,
   seedMappingVersions,
+  seedWorkspace,
   toMappingVersionSummary,
 } from '@edi-bridge/mocks'
 
@@ -115,6 +117,8 @@ const replaced = storyRun(15, 'ORDERS', 'mapping')
 
 const replacing = storyRun(16, 'ORDERS', 'delivered')
 
+const incompleteSetup = storyRun(17, 'INVOIC', 'delivery')
+
 const runs = [
   missingField,
   unreadable,
@@ -132,9 +136,41 @@ const runs = [
   duplicateFromErp,
   replaced,
   replacing,
+  incompleteSetup,
 ]
 
 const channel = seedChannels.find(({ id }) => id === flowFor('INVOIC').destinationChannelId)!
+
+function incompleteSetupDetail(fixTarget: RunProblem['fixTarget']) {
+  return runDetailSchema.parse({
+    ...incompleteSetup,
+    steps: [
+      { stage: 'receipt', status: 'succeeded' },
+      { stage: 'mapping', status: 'succeeded' },
+      { stage: 'validation', status: 'succeeded' },
+      { stage: 'delivery', status: 'failed' },
+    ].map((step) => ({ ...step, startedAt: null, finishedAt: null })),
+    interchange: null,
+    message: null,
+    mappingVersion: missingFieldMapping,
+    replaces: null,
+    replacedBy: null,
+    error: {
+      code: 'glnMissing',
+      message: 'The Workspace has no GLN for the Interchange',
+      position: null,
+    },
+    problem: { reason: 'incompleteSetup', whoFixes: 'retry', fixTarget },
+    waitingForTradingPartnerSince: null,
+    duplicateOf: null,
+  })
+}
+
+function servingIncompleteSetup(fixTarget: RunProblem['fixTarget']) {
+  return http.get(`${apiUrl}${toPath(runEndpoint.path, { id: incompleteSetup.id })}`, () =>
+    HttpResponse.json(incompleteSetupDetail(fixTarget)),
+  )
+}
 
 const meta = preview.meta({
   title: 'Documents/DocumentScreen',
@@ -328,6 +364,51 @@ export const DeliveryFailureToErp = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'Your ERP did not answer' }),
     ).toBeVisible()
+  },
+})
+
+export const IncompleteSetup = meta.story({
+  args: { id: incompleteSetup.id },
+  beforeEach({ msw }) {
+    msw.use(servingIncompleteSetup({ kind: 'workspaceGln', name: seedWorkspace.name }))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        name: `The setup for ${partner.name} is not complete`,
+      }),
+    ).toBeVisible()
+    await expect(canvas.getByText("your company's GLN is missing", { exact: false })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
+    await expectFixLink(
+      canvas.getByRole('link', { name: `Record the GLN of “${seedWorkspace.name}”` }),
+      '/settings',
+    )
+  },
+})
+
+export const GermanIncompleteSetup = meta.story({
+  args: { id: incompleteSetup.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(
+      servingIncompleteSetup({
+        kind: 'channelCredential',
+        channelId: channel.id,
+        name: channel.name,
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', {
+        name: `Die Einrichtung für ${partner.name} ist nicht vollständig`,
+      }),
+    ).toBeVisible()
+    await expectFixLink(
+      canvas.getByRole('link', { name: `Zugangsdaten von „${channel.name}“ prüfen` }),
+      `/channels/${channel.id}`,
+    )
   },
 })
 

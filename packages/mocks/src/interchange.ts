@@ -32,12 +32,54 @@ export type GeneratedErrorCode =
   | 'missingSourceField'
   | 'destinationUnreachable'
   | 'destinationUnavailable'
+  | 'glnMissing'
+  | 'deliveryDefect'
 
 export type GeneratedError = RunError & { code: GeneratedErrorCode }
 
 export type BrokenPiece =
   | Pick<Extract<FixTarget, { kind: 'mapping' }>, 'kind' | 'fieldPath'>
   | Pick<Extract<FixTarget, { kind: 'lookupTable' }>, 'kind' | 'name' | 'code'>
+  | { kind: SetupPiece }
+
+export type SetupPiece = Extract<
+  FixTarget['kind'],
+  'workspaceGln' | 'tradingPartnerGln' | 'channelCredential'
+>
+
+const setupPieces = ['workspaceGln', 'tradingPartnerGln', 'channelCredential'] as const
+
+const setupErrors: Record<SetupPiece, GeneratedError> = {
+  workspaceGln: {
+    code: 'glnMissing',
+    message: 'The Workspace has no GLN for the Interchange',
+    position: null,
+  },
+  tradingPartnerGln: {
+    code: 'glnMissing',
+    message: 'The Trading Partner has no GLN for the Interchange',
+    position: null,
+  },
+  channelCredential: {
+    code: 'deliveryDefect',
+    message: 'The delivery stopped on an unexpected error',
+    position: null,
+  },
+}
+
+// A separate seed keeps the Messages of the other Runs as they were.
+function incompleteSetupOf(run: RunSummary): Failure | null {
+  if (run.failureStage !== 'delivery' || directionOf(run) !== 'outbound') {
+    return null
+  }
+
+  const kind = seededFaker(`setupPiece:${run.id}`).helpers.weightedArrayElement([
+    { weight: 9, value: null },
+    ...setupPieces.map((piece) => ({ weight: 1, value: piece })),
+  ])
+
+  return kind && { error: setupErrors[kind], broken: { kind } }
+}
 
 type Fault = {
   segment: number
@@ -424,6 +466,12 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
       },
       broken: { kind: 'mapping', fieldPath: `${lines}[].gtin` },
     }
+  }
+
+  const incompleteSetup = incompleteSetupOf(run)
+
+  if (incompleteSetup !== null) {
+    return incompleteSetup
   }
 
   return {
