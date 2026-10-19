@@ -335,6 +335,21 @@ export const linkEndSchema = z.discriminatedUnion('kind', [
 
 export type LinkEnd = z.infer<typeof linkEndSchema>
 
+// Sorts the keys, since a stored Draft comes back from jsonb with them in another order.
+export function transformConfigKey(transform: MappingTransform) {
+  return `${transform.kind}:${JSON.stringify(transform.config, Object.keys(transform.config).sort())}`
+}
+
+export function linkPointKey(point: LinkStart | LinkEnd) {
+  switch (point.kind) {
+    case 'source':
+    case 'target':
+      return `${point.kind}:${point.path}`
+    case 'transform':
+      return `transform:${point.transformId}/${'output' in point ? point.output : point.input}`
+  }
+}
+
 // A link straight from a source field to a target element is a plain Mapping link; transform
 // links are the ones that start or end at a transform.
 export const transformLinkSchema = z

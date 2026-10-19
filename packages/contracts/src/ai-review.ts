@@ -1,7 +1,14 @@
 import { z } from 'zod'
 
+import {
+  type LinkEnd,
+  linkPointKey,
+  type MappingTransform,
+  transformConfigKey,
+  type TransformLink,
+} from './transform'
+
 import type { GraphParts, MappingLink } from './mapping'
-import type { LinkEnd, MappingTransform, TransformLink } from './transform'
 
 // Each part a Draft can hold has its own key: a plain link its target path, a transform its id
 // and a transform link where it ends, since a target or transform input takes one link at most.
@@ -53,10 +60,10 @@ export function aiReviewProblems(review: AiReview, graph: GraphParts): string[] 
 }
 
 const sameTransform = (before: MappingTransform, after: MappingTransform) =>
-  before.kind === after.kind && JSON.stringify(before.config) === JSON.stringify(after.config)
+  transformConfigKey(before) === transformConfigKey(after)
 
 const sameStart = (before: TransformLink, after: TransformLink) =>
-  JSON.stringify(before.from) === JSON.stringify(after.from)
+  linkPointKey(before.from) === linkPointKey(after.from)
 
 function keptKeys<Part>(
   keys: ReadonlyArray<string>,

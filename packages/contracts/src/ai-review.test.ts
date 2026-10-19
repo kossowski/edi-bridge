@@ -114,6 +114,22 @@ describe('remainingAiReview', () => {
     ])
   })
 
+  it('keeps every mark when the stored Draft lists the keys of its parts in another order', () => {
+    const stored = {
+      ...proposed,
+      transforms: [{ ...dateFormat, config: { to: 'yyyyMMdd', from: 'yyyy-MM-dd' } }],
+      transformLinks: [
+        intoDateFormat,
+        {
+          ...outOfDateFormat,
+          from: { output: 'value', transformId: dateFormat.id, kind: 'transform' },
+        } as const,
+      ],
+    }
+
+    expect(remainingAiReview(review, stored, proposed)).toEqual(review)
+  })
+
   it('never marks a part the Admin added', () => {
     const after = {
       ...proposed,
