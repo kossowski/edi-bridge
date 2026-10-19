@@ -16,6 +16,9 @@ export const messageTypeSchema = z.enum(messageTypes)
 
 export type MessageType = z.infer<typeof messageTypeSchema>
 
+// The raw UNH type, not a MessageType: a Message of an unknown type is not routed either.
+export const notRoutedMessagesSchema = z.array(z.object({ messageType: z.string().min(1) }))
+
 export const messageTypeDirections = {
   ORDERS: 'inbound',
   DESADV: 'outbound',

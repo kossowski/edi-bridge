@@ -41,6 +41,7 @@ import {
   moveFlowMappingVersionEndpoint,
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
+  receiveWebhookEndpoint,
   regenerateWebhookTokenEndpoint,
   removeWorkspaceMemberEndpoint,
   requestAiDraftEndpoint,
@@ -517,7 +518,8 @@ const changes: Change[] = [
   ],
 ]
 
-const publicChanges = new Set<string>([acceptInviteEndpoint.path])
+// The webhook route authenticates by the Channel's token, not by a session and its role.
+const publicChanges = new Set<string>([acceptInviteEndpoint.path, receiveWebhookEndpoint.path])
 
 const snapshot = async (target: Client) =>
   Promise.all(

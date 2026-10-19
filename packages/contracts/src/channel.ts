@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { type Direction, directionSchema } from './message-type'
+import { type Direction, directionSchema, notRoutedMessagesSchema } from './message-type'
 
 import type { Endpoint } from './endpoint'
 
@@ -31,6 +31,25 @@ export const webhookTokenHeader = 'Authorization'
 
 export function webhookAuthorization(token: string) {
   return `Bearer ${token}`
+}
+
+export const webhookSubmissionSchema = z.strictObject({
+  documentId: z.uuid(),
+  runs: z.array(z.strictObject({ id: z.uuid() })).min(1),
+  notRouted: notRoutedMessagesSchema,
+})
+
+export type WebhookSubmission = z.infer<typeof webhookSubmissionSchema>
+
+export const receiveWebhookEndpoint: Endpoint<
+  WebhookSubmission,
+  undefined,
+  undefined,
+  typeof webhookPath
+> = {
+  method: 'POST',
+  path: webhookPath,
+  response: webhookSubmissionSchema,
 }
 
 // Write-only: accepted in requests, never returned. Responses carry a maskedSecretSchema instead.
