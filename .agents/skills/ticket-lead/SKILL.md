@@ -14,7 +14,15 @@ Run every command from the repo root, the main checkout, and keep it on `main`. 
 
 Communicate with subagents through **context pointers**: the ticket, the spec, the stack file, the parent branch. Don't paste what a pointer already reaches.
 
-When an engineering lead started you, its prompt names its session. Your questions and reports go to it with `SendMessage`; end your turn after sending, and its answer arrives as your next prompt. Otherwise they go to the user.
+When an engineering lead started you, its prompt names its session. Write each question and report into its inbox, as `question`, `report`, or `blocked` when you stop on a blocker:
+
+```bash
+bash .agents/skills/ticket-lead/scripts/tell-lead.sh <NN> <question|report|blocked> <<'EOF'
+<message>
+EOF
+```
+
+Then you may nudge it with a one-line `SendMessage` naming the file, one try at most; the file is the message. End your turn, and its answer arrives as your next prompt. Without an engineering lead, questions and reports go to the user.
 
 ## Names
 
@@ -137,7 +145,7 @@ bash .agents/skills/ticket-lead/scripts/stack-status.sh <NN>
 
 The report goes out when it prints `ready for /land`. Otherwise fix what it lists first.
 
-When an engineering lead started you, send it the report with `SendMessage` and end your turn. It answers what is open and tells you when to land by prompting `/land <NN>` into your session.
+When an engineering lead started you, write the report into its inbox as `report` and end your turn. It answers what is open and tells you when to land by prompting `/land <NN>` into your session.
 
 ```markdown
 **<NN> — <ticket title>**: stack of <n> PRs on `main` <short commit>, ready for `/land`

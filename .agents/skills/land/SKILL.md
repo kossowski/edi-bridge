@@ -83,4 +83,10 @@ Pass every landed PR number. Add the deleted paths and the space freed to the re
 - **/tmp**: <space freed and deleted paths>, or "nothing to clean"
 ```
 
-When an engineering lead prompted `/land`, also send it the report with `SendMessage`.
+When an engineering lead prompted `/land`, also write the report into its inbox, then end your turn:
+
+```bash
+bash .agents/skills/ticket-lead/scripts/tell-lead.sh <NN> report <<'EOF'
+<report>
+EOF
+```
