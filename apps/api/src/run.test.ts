@@ -129,7 +129,9 @@ describe('GET /runs', () => {
       direction: 'outbound',
       flow: { id: workspace.flowId, name: 'Invoices to Hanse Retail' },
       manualSubmission: true,
+      problem: { reason: 'invalidContent' },
     })
+    expect(list.runs[0]?.problem).toBeNull()
     expect(list.runs[2]?.businessReference).toBe('4711')
   })
 
@@ -249,6 +251,7 @@ describe('GET /runs/:id', () => {
       error: {
         code: 'too-long-element',
         position: { segment: 2, tag: 'BGM', element: 2, component: null },
+        details: null,
       },
       problem: { reason: 'invalidContent', whoFixes: 'you', fixTarget: null },
       waitingForTradingPartnerSince: null,
@@ -284,5 +287,45 @@ describe('GET /runs/:id', () => {
     })
 
     expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('a Run that stopped on a defect', () => {
+  let defect: string
+
+  beforeAll(async () => {
+    defect = await submitted(invalidInvoice)
+    await processQueued()
+
+    // The pipeline fails a Run on a defect only when processing breaks; this stands in for one.
+    await api.connection.db
+      .update(runs)
+      .set({
+        failureStage: 'mapping',
+        error: {
+          code: 'processingDefect',
+          message: 'The processing stopped on an unexpected error',
+          position: null,
+          details: null,
+        },
+        problem: { reason: 'defect', fixTarget: null },
+      })
+      .where(eq(runs.id, defect))
+  })
+
+  it('offers a retry in the Run list', async () => {
+    const list = await listed('status=failed')
+
+    expect(list.runs.find(({ id }) => id === defect)).toMatchObject({
+      failureStage: 'mapping',
+      problem: { reason: 'defect' },
+    })
+  })
+
+  it('offers a retry in the Run detail', async () => {
+    await expect(detail(defect)).resolves.toMatchObject({
+      failureStage: 'mapping',
+      problem: { reason: 'defect', whoFixes: 'retry', fixTarget: null },
+    })
   })
 })

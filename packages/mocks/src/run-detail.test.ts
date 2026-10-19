@@ -425,6 +425,17 @@ describe('the problem of a failed Run', () => {
     )
   })
 
+  it('names the reason of its problem in every failed Run summary', async () => {
+    const runs = createRuns({ count: 2000 }).filter(({ status }) => status === 'failed')
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    for (const run of runs) {
+      const { body } = await getRun(run.id)
+
+      expect(run.problem, run.id).toEqual({ reason: body?.problem?.reason })
+    }
+  })
+
   it('points an incomplete setup at the piece to complete before a retry', async () => {
     const runs = createRuns({ count: 2000 }).filter(
       ({ status, failureStage }) => status === 'failed' && failureStage === 'delivery',
@@ -495,6 +506,7 @@ describe('a Duplicate', () => {
       receivedAt: '2026-10-02T08:00:00.000Z',
       status: 'duplicate',
       failureStage: null,
+      problem: null,
     })
 
     return { ...duplicate, interchange: { id: interchangeIdOf(duplicate), controlReference } }

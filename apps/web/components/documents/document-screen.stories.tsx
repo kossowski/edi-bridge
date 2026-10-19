@@ -65,6 +65,7 @@ const missingFieldDetail = runDetailSchema.parse({
     code: 'missingSourceField',
     message: 'The source field lines[].gtin is empty',
     position: null,
+    details: null,
   },
   problem: {
     reason: 'missingField',
@@ -375,6 +376,7 @@ export const IncompleteSetup = meta.story({
           code: 'glnMissing',
           message: 'The Workspace has no GLN for the Interchange',
           position: null,
+          details: null,
         },
         fixTarget: { kind: 'workspaceGln', name: seedWorkspace.name },
       }),
@@ -405,6 +407,7 @@ export const GermanIncompleteSetup = meta.story({
           code: 'channelDefect',
           message: 'The Channel could not be used for the delivery',
           position: null,
+          details: null,
         },
         fixTarget: { kind: 'channelCredential', channelId: channel.id, name: channel.name },
       }),
@@ -432,6 +435,7 @@ export const UnsupportedCharacterSet = meta.story({
           code: 'characterSetUnsupported',
           message: 'Delivery in character set UNOD is not supported',
           position: null,
+          details: null,
         },
         fixTarget: {
           kind: 'tradingPartner',

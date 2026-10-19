@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { runDetailSchema, waitForTradingPartnerRunEndpoint, whoFixes } from './run'
+import {
+  failureStages,
+  runDetailSchema,
+  runSummarySchema,
+  waitForTradingPartnerRunEndpoint,
+  whoFixes,
+} from './run'
 
-const base = {
+const summary = {
   id: '00000000-0000-4000-8000-000000000001',
   receivedAt: '2026-10-01T08:00:00.000Z',
   tradingPartner: { id: '10000000-0000-4000-8000-000000000001', name: 'Hansemarkt GmbH' },
@@ -12,6 +18,10 @@ const base = {
   manualSubmission: false,
   businessReference: 'PO000001',
   interchange: null,
+} as const
+
+const base = {
+  ...summary,
   steps: [{ stage: 'receipt', status: 'succeeded', startedAt: null, finishedAt: null }],
   message: null,
   mappingVersion: null,
@@ -19,7 +29,12 @@ const base = {
   replacedBy: null,
 } as const
 
-const error = { code: 'segmentCountMismatch', message: 'UNT declares 9 segments.', position: null }
+const error = {
+  code: 'segmentCountMismatch',
+  message: 'UNT declares 9 segments.',
+  position: null,
+  details: null,
+}
 
 const tradingPartnerProblem = {
   reason: 'unreadable',
@@ -42,26 +57,75 @@ const unreadable = {
 } as const
 
 describe('whoFixes', () => {
+  const unreadableProblem = { reason: 'unreadable' } as const
+
   it('leaves a Run without a Failure Stage to nobody', () => {
-    expect(whoFixes({ failureStage: null, direction: 'inbound' })).toBeNull()
+    expect(whoFixes({ failureStage: null, direction: 'inbound', problem: null })).toBeNull()
   })
 
   it('asks the Trading Partner to resend an inbound Run that could not be read or validated', () => {
-    expect(whoFixes({ failureStage: 'parse', direction: 'inbound' })).toBe('tradingPartner')
-    expect(whoFixes({ failureStage: 'validation', direction: 'inbound' })).toBe('tradingPartner')
+    for (const failureStage of ['parse', 'validation'] as const) {
+      expect(whoFixes({ failureStage, direction: 'inbound', problem: unreadableProblem })).toBe(
+        'tradingPartner',
+      )
+    }
   })
 
   it('leaves an outbound validation failure to the Workspace', () => {
-    expect(whoFixes({ failureStage: 'validation', direction: 'outbound' })).toBe('you')
+    expect(
+      whoFixes({
+        failureStage: 'validation',
+        direction: 'outbound',
+        problem: { reason: 'invalidContent' },
+      }),
+    ).toBe('you')
   })
 
   it('leaves a mapping failure to the Workspace in both directions', () => {
-    expect(whoFixes({ failureStage: 'mapping', direction: 'inbound' })).toBe('you')
-    expect(whoFixes({ failureStage: 'mapping', direction: 'outbound' })).toBe('you')
+    for (const direction of ['inbound', 'outbound'] as const) {
+      expect(
+        whoFixes({ failureStage: 'mapping', direction, problem: { reason: 'missingField' } }),
+      ).toBe('you')
+    }
   })
 
   it('offers a retry for a delivery failure', () => {
-    expect(whoFixes({ failureStage: 'delivery', direction: 'outbound' })).toBe('retry')
+    expect(
+      whoFixes({
+        failureStage: 'delivery',
+        direction: 'outbound',
+        problem: { reason: 'unreachable' },
+      }),
+    ).toBe('retry')
+  })
+
+  it('offers a retry for a defect at every Failure Stage', () => {
+    for (const failureStage of failureStages) {
+      for (const direction of ['inbound', 'outbound'] as const) {
+        expect(whoFixes({ failureStage, direction, problem: { reason: 'defect' } })).toBe('retry')
+      }
+    }
+  })
+})
+
+describe('runSummarySchema', () => {
+  it('carries the problem reason of a failed Run so a list row tells who fixes it', () => {
+    const failed = {
+      ...summary,
+      status: 'failed',
+      failureStage: 'parse',
+      problem: { reason: 'defect' },
+    }
+
+    expect(runSummarySchema.parse(failed)).toEqual(failed)
+    expect(whoFixes(runSummarySchema.parse(failed))).toBe('retry')
+    expect(runSummarySchema.safeParse({ ...failed, problem: null }).success).toBe(false)
+  })
+
+  it('carries no problem on a Run that did not fail', () => {
+    const delivered = { ...summary, status: 'delivered', failureStage: null, problem: null }
+
+    expect(runSummarySchema.parse(delivered)).toEqual(delivered)
   })
 })
 
@@ -98,6 +162,39 @@ describe('runDetailSchema', () => {
     }
 
     expect(runDetailSchema.parse(incompleteSetup)).toEqual(incompleteSetup)
+  })
+
+  it('records the HTTP status the receiving system answered on a delivery failure', () => {
+    const rejected = {
+      ...unreadable,
+      direction: 'outbound',
+      failureStage: 'delivery',
+      error: {
+        code: 'unexpectedResponse',
+        message: 'The Channel answered unexpectedly',
+        position: null,
+        details: { kind: 'httpResponse', status: 422 },
+      },
+      problem: { reason: 'unreachable', whoFixes: 'retry', fixTarget: null },
+    }
+
+    expect(runDetailSchema.parse(rejected)).toEqual(rejected)
+    expect(
+      runDetailSchema.safeParse({
+        ...rejected,
+        error: { ...rejected.error, details: { kind: 'httpResponse', status: 42 } },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('offers a retry for a defect at any Failure Stage', () => {
+    const defect = {
+      ...unreadable,
+      error: { ...error, code: 'processingDefect' },
+      problem: { reason: 'defect', whoFixes: 'retry', fixTarget: null },
+    }
+
+    expect(runDetailSchema.parse(defect)).toEqual(defect)
   })
 
   it('needs a problem on a failed Run', () => {

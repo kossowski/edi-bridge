@@ -803,7 +803,7 @@ describe('the processing of a Run', () => {
     await expect(readRun(connection.db, runId)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      error: { code: 'characterSetUnsupported', position: null },
+      error: { code: 'characterSetUnsupported', position: null, details: null },
       problem: {
         reason: 'incompleteSetup',
         fixTarget: {
@@ -869,7 +869,7 @@ describe('the processing of a Run', () => {
     expect(run).toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      error: { code: 'hostUnreachable', position: null },
+      error: { code: 'hostUnreachable', position: null, details: null },
       problem: { reason: 'unreachable', fixTarget: null },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
@@ -882,7 +882,7 @@ describe('the processing of a Run', () => {
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
   })
 
-  it('fails a Run at delivery as unreachable when the database fails in the delivery step', async () => {
+  it('fails a Run at delivery on a defect when the database fails in the delivery step', async () => {
     const exhausted = await seedInvoiceWorkspace(connection.db, 'Exhausted Foods')
 
     // The next control reference overflows its integer column when it is claimed.
@@ -906,8 +906,8 @@ describe('the processing of a Run', () => {
     await expect(readRun(connection.db, runId)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      error: { code: 'deliveryDefect', position: null },
-      problem: { reason: 'unreachable', fixTarget: null },
+      error: { code: 'deliveryDefect', position: null, details: null },
+      problem: { reason: 'defect', fixTarget: null },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
@@ -933,7 +933,7 @@ describe('the processing of a Run', () => {
     await expect(readRun(connection.db, runId)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      error: { code: 'channelDefect', position: null },
+      error: { code: 'channelDefect', position: null, details: null },
       problem: {
         reason: 'incompleteSetup',
         fixTarget: { kind: 'channelCredential', channelId, name: 'Hanse Retail SFTP inbox' },
@@ -964,7 +964,7 @@ describe('the processing of a Run', () => {
       status: 'failed',
       failureStage: 'delivery',
       output: null,
-      error: { code: 'glnMissing', position: null },
+      error: { code: 'glnMissing', position: null, details: null },
       problem: {
         reason: 'incompleteSetup',
         fixTarget: { kind: 'workspaceGln', name: 'Unnamed Foods' },
@@ -989,7 +989,7 @@ describe('the processing of a Run', () => {
       status: 'failed',
       failureStage: 'delivery',
       output: null,
-      error: { code: 'glnMissing', position: null },
+      error: { code: 'glnMissing', position: null, details: null },
       problem: {
         reason: 'incompleteSetup',
         fixTarget: {
@@ -1025,7 +1025,7 @@ describe('the processing of a Run', () => {
     await expect(readRun(connection.db, runId)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      error: { code: 'channelDefect', position: null },
+      error: { code: 'channelDefect', position: null, details: null },
       problem: {
         reason: 'incompleteSetup',
         fixTarget: {
@@ -1085,7 +1085,7 @@ describe('the processing of a Run', () => {
       status: 'failed',
       failureStage: 'mapping',
       output: null,
-      error: { code: 'noLookupMatch', position: null },
+      error: { code: 'noLookupMatch', position: null, details: null },
       problem: {
         reason: 'missingCode',
         fixTarget: { kind: 'mapping', mappingId: workspace.mappingId },
@@ -1109,7 +1109,7 @@ describe('the processing of a Run', () => {
       status: 'failed',
       failureStage: 'mapping',
       output: null,
-      error: { code: 'invalidJson', position: null },
+      error: { code: 'invalidJson', position: null, details: null },
       problem: { reason: 'unreadable', fixTarget: null },
     })
   })
@@ -1151,8 +1151,8 @@ describe('the processing of a Run', () => {
       status: 'failed',
       failureStage: 'mapping',
       output: null,
-      error: { code: 'processingDefect', position: null },
-      problem: { reason: 'invalidContent', fixTarget: null },
+      error: { code: 'processingDefect', position: null, details: null },
+      problem: { reason: 'defect', fixTarget: null },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'failed' },
@@ -1186,8 +1186,8 @@ describe('the processing of a Run', () => {
       status: 'failed',
       failureStage: 'mapping',
       output: null,
-      error: { code: 'processingDefect', position: null },
-      problem: { reason: 'invalidContent', fixTarget: null },
+      error: { code: 'processingDefect', position: null, details: null },
+      problem: { reason: 'defect', fixTarget: null },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'failed' },
@@ -1301,7 +1301,7 @@ describe('the processing of an inbound Run', () => {
     expect(runs[1]).toMatchObject({
       failureStage: 'mapping',
       output: null,
-      error: { code: 'noLookupMatch', position: null },
+      error: { code: 'noLookupMatch', position: null, details: null },
       problem: {
         reason: 'missingCode',
         fixTarget: { kind: 'mapping', mappingId: into.orders.mappingId },
@@ -1331,7 +1331,11 @@ describe('the processing of an inbound Run', () => {
     expect(runs[1]).toMatchObject({
       failureStage: 'parse',
       output: null,
-      error: { code: 'segment-count-mismatch', position: { segment: 44, tag: 'UNT' } },
+      error: {
+        code: 'segment-count-mismatch',
+        position: { segment: 44, tag: 'UNT' },
+        details: null,
+      },
       problem: { reason: 'unreadable', fixTarget: null },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
@@ -1357,7 +1361,7 @@ describe('the processing of an inbound Run', () => {
     expect(runs[1]).toMatchObject({
       failureStage: 'validation',
       output: null,
-      error: { position: { segment: 25, tag: 'BGM', element: 3 } },
+      error: { position: { segment: 25, tag: 'BGM', element: 3 }, details: null },
       problem: { reason: 'invalidContent', fixTarget: null },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
@@ -1403,7 +1407,11 @@ describe('the processing of an inbound Run', () => {
       status: 'failed',
       failureStage: 'delivery',
       output: golden('orders-reference.document.json'),
-      error: { code: 'unexpectedResponse', position: null },
+      error: {
+        code: 'unexpectedResponse',
+        position: null,
+        details: { kind: 'httpResponse', status: 503 },
+      },
       problem: { reason: 'unreachable', fixTarget: null },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
@@ -1492,8 +1500,8 @@ describe('the processing of an inbound Run', () => {
       status: 'failed',
       failureStage: 'parse',
       output: null,
-      error: { code: 'processingDefect', position: null },
-      problem: { reason: 'invalidContent', fixTarget: null },
+      error: { code: 'processingDefect', position: null, details: null },
+      problem: { reason: 'defect', fixTarget: null },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'parse', status: 'failed' },

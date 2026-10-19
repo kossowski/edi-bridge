@@ -325,6 +325,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       receivedAt: new Date().toISOString(),
       status: 'delivered',
       failureStage: null,
+      problem: null,
     })
 
     chosenVersions.set(replacing.id, version)

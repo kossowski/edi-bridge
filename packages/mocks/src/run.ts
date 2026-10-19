@@ -24,6 +24,7 @@ import {
   toMappingCatalogue,
 } from './flow'
 import { hash } from './hash'
+import { problemReasonOf } from './interchange'
 import { includesText, pageOf } from './list'
 import { badRequest } from './responses'
 import { createRunStore, interchangeIdOf, type RunStore, toRunStore } from './run-store'
@@ -50,8 +51,11 @@ function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messa
 
 // The Run Store places each Run in its Interchange.
 export function toRunSummary(run: RunFields): RunSummary {
+  const { failureStage } = run
+
   return runSummarySchema.parse({
     ...run,
+    problem: failureStage === null ? null : { reason: problemReasonOf({ ...run, failureStage }) },
     direction: directionOf(run),
     businessReference:
       run.businessReference === undefined ? businessReferenceOf(run) : run.businessReference,

@@ -782,6 +782,10 @@
         "incompleteSetup": {
           "title": "The setup for {tradingPartner} is not complete",
           "description": "{piece, select, workspaceGln {The document is ready, but your company's GLN is missing, so EDI Bridge cannot address the document. Complete the setup, then try again.} tradingPartnerGln {The document is ready, but the GLN of {tradingPartner} is missing, so EDI Bridge cannot address the document. Complete the setup, then try again.} channelCredential {The document is ready, but EDI Bridge cannot use the login details of the connection to {tradingPartner}. Complete the setup, then try again.} tradingPartner {The document is ready, but EDI Bridge cannot write it in the character set chosen for {tradingPartner}. Choose a supported character set (UNOA, UNOB or UNOC) for {tradingPartner}, then try again.} other {The document is ready, but a part of the setup for {tradingPartner} is missing. Complete the setup, then try again.}}"
+        },
+        "defect": {
+          "title": "EDI Bridge hit an internal error",
+          "description": "The error happened inside EDI Bridge, not in the document. Try again; if it happens again, the error is logged for the team."
         }
       },
       "whoFixes": {

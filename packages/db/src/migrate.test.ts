@@ -277,6 +277,7 @@ describe('a Run', () => {
     code: 'missingField',
     message: 'BGM 1004 document number is missing',
     position: { segment: 2, tag: 'BGM', element: 2, component: null },
+    details: null,
   }
 
   const failedValidation = {
