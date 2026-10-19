@@ -520,6 +520,8 @@ export const runs = pgTable(
     waitingForTradingPartnerSince: timestamp({ withTimezone: true, mode: 'date' }),
     output: text(),
     controlReference: integer(),
+    // Null for a Document that is not an Interchange.
+    messageIndex: integer(),
     receivedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: updatedAt(),
   },
@@ -547,6 +549,7 @@ export const runs = pgTable(
       sql`${table.failureStage} is null or ${table.failureStage} = 'delivery' or ${table.output} is null`,
     ),
     check('runs_control_reference', sql`${table.controlReference} >= 1`),
+    check('runs_message_index', sql`${table.messageIndex} >= 1`),
   ],
 )
 
