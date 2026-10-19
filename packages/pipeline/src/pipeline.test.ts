@@ -1073,6 +1073,68 @@ describe('the sweep of stuck Runs', () => {
     // It lost the Run, so its defect is logged as a lost Run instead.
     expect(Exit.isSuccess(stopped)).toBe(true)
   })
+
+  it('finishes a step that the sweep checks meanwhile without a deadlock', async () => {
+    const { queue, runId } = await receiveInvoice()
+    const [queued] = queue.queued
+    const { promise: finishing, resolve: finishStarted } = Promise.withResolvers<void>()
+    const { promise: locked, resolve: lock } = Promise.withResolvers<void>()
+    const { db } = connection
+    let isHandedOver = false
+    let hasStalled = false
+
+    // The worker stalls as it finishes the delivery step.
+    const transaction: typeof db.transaction = async (run, config) => {
+      if (isHandedOver && !hasStalled) {
+        hasStalled = true
+        finishStarted()
+        await locked
+      }
+
+      return db.transaction(run, config)
+    }
+
+    // SAFETY: its prototype is the connection's database, so it has every member but its own transaction.
+    const stallingDb: typeof db = Object.assign(Object.create(db) as typeof db, { transaction })
+
+    const processing = Effect.runPromise(
+      processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(stallingDb, queue, () =>
+          Effect.sync(() => {
+            isHandedOver = true
+          }),
+        ),
+      ),
+    )
+
+    await finishing
+
+    const waitsForLock = async () => {
+      const [waiting] = await db.execute<{ count: number }>(sql`
+        select count(*)::int as count from pg_stat_activity
+        where datname = current_database() and wait_event_type = 'Lock'`)
+
+      return waiting?.count ?? 0
+    }
+
+    // The sweep locks the Run before its steps, as it does to fail a stuck Run.
+    await db.transaction(async (tx) => {
+      await tx.select({ id: runs.id }).from(runs).where(eq(runs.id, runId)).for('update')
+      lock()
+      await vi.waitFor(async () => expect(await waitsForLock()).toBeGreaterThan(0), {
+        timeout: 2000,
+        interval: 20,
+      })
+      await tx
+        .update(runSteps)
+        .set({ status: 'running' })
+        .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, 'delivery')))
+    })
+
+    await processing
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+  })
 })
 
 const interchangeTime = (date: Date) =>

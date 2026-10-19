@@ -813,13 +813,20 @@ type Hold = { readonly lease: StepLease } | { readonly updatedAt: Date }
 
 type Holding = { readonly runId: string; readonly hold: Ref.Ref<Hold> }
 
-// Locks the Run first, so the sweep cannot take it between this check and the write after it.
-const isHeld = async (tx: Transaction, runId: string, hold: Hold) => {
+// Every transaction that writes a Run and its steps locks the Run first, so two never deadlock.
+const lockRun = async (tx: Transaction, runId: string) => {
   const [run] = await tx
     .select({ updatedAt: runs.updatedAt })
     .from(runs)
     .where(eq(runs.id, runId))
     .for('update')
+
+  return run
+}
+
+// Locks the Run first, so the sweep cannot take it between this check and the write after it.
+const isHeld = async (tx: Transaction, runId: string, hold: Hold) => {
+  const run = await lockRun(tx, runId)
 
   if (run === undefined) {
     return false
@@ -888,6 +895,8 @@ const step = <A, E, R>(
 
     const finished = yield* Effect.promise(() =>
       db.transaction(async (tx) => {
+        await lockRun(tx, runId)
+
         const [own] = await tx
           .update(runSteps)
           .set({ status: Result.isSuccess(result) ? 'succeeded' : 'failed', finishedAt })
@@ -990,6 +999,8 @@ const defectFailure = (stage: FailureStage): Failure => ({
 
 // A defect can stop a Run before its first step starts or after its step failed.
 const failStopped = async (tx: Transaction, runId: string, finishedAt: Date) => {
+  await lockRun(tx, runId)
+
   const steps = await tx
     .select({ stage: runSteps.stage, status: runSteps.status, position: runSteps.position })
     .from(runSteps)
