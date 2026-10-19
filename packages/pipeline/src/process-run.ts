@@ -852,7 +852,7 @@ const defectFailure = (stage: FailureStage): Failure => ({
 })
 
 // A defect can stop a Run before its first step starts or after its step failed.
-const failOnDefect = (runId: string) =>
+export const failOnDefect = (runId: string) =>
   Effect.gen(function* () {
     const db = yield* Database
     const finishedAt = yield* DateTime.nowAsDate

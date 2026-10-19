@@ -33,11 +33,12 @@ import {
   channelDelivery,
   type DeliveryService,
   processRun,
-  queueReceivedRunsEvery,
   ReceiptRejected,
   receive,
   retryRun,
   RunNotRetryable,
+  sweepRunsEvery,
+  sweepStuckRuns,
 } from './index'
 import {
   addOrdersFlow,
@@ -620,7 +621,9 @@ describe('the sweep of received Runs', () => {
     runId: string,
   ) => {
     const sweeping = Effect.runFork(
-      queueReceivedRunsEvery(interval).pipe(pipelineServices(connection.db, queue)),
+      sweepRunsEvery({ interval, stuckAfter: '10 minutes' }).pipe(
+        pipelineServices(connection.db, queue),
+      ),
     )
 
     try {
@@ -645,6 +648,203 @@ describe('the sweep of received Runs', () => {
     const { runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue({ failures: 1 }))
 
     await sweep(inMemoryRunQueue({ failures: 1 }), '20 millis', runId)
+  })
+})
+
+// A worker that stopped mid-Run leaves it processing, with its last change long ago.
+const leaveStuck = async (runId: string) => {
+  await connection.db.execute(
+    sql`update runs set status = 'processing', updated_at = updated_at - interval '1 hour' where id = ${runId}`,
+  )
+  await connection.db.execute(sql`
+    update run_steps
+    set started_at = started_at - interval '1 hour', finished_at = finished_at - interval '1 hour'
+    where run_id = ${runId}`)
+}
+
+const sweepStuck = async (queue = inMemoryRunQueue(), delivery = sftpDelivery) => {
+  await Effect.runPromise(
+    sweepStuckRuns('10 minutes').pipe(pipelineServices(connection.db, queue, delivery)),
+  )
+
+  return queue
+}
+
+describe('the sweep of stuck Runs', () => {
+  it('queues a stuck Run whose steps after receipt never started again as received', async () => {
+    const { runId } = await receiveInvoice()
+
+    await leaveStuck(runId)
+
+    const queue = await sweepStuck()
+
+    expect(queue.queued).toEqual([{ workspaceId: workspace.id, runId }])
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'received',
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'pending' },
+        { stage: 'validation', status: 'pending' },
+        { stage: 'delivery', status: 'pending' },
+      ],
+    })
+
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+  })
+
+  it('leaves a Run processing within the bound', async () => {
+    const { runId } = await receiveInvoice()
+
+    await connection.db.update(runs).set({ status: 'processing' }).where(eq(runs.id, runId))
+
+    const queue = await sweepStuck()
+
+    expect(queue.queued).toEqual([])
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'processing' })
+  })
+
+  it('leaves a Run whose step started within the bound processing', async () => {
+    const { runId } = await receiveInvoice()
+
+    await leaveStuck(runId)
+    await connection.db.execute(
+      sql`update run_steps set status = 'running', started_at = now() where run_id = ${runId} and stage = 'mapping'`,
+    )
+
+    const queue = await sweepStuck()
+
+    expect(queue.queued).toEqual([])
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'processing' })
+  })
+
+  it('fails a stuck Run as a defect at its running step', async () => {
+    const { runId } = await receiveInvoice()
+
+    await connection.db.execute(
+      sql`update run_steps set status = 'running', started_at = now() where run_id = ${runId} and stage = 'mapping'`,
+    )
+    await leaveStuck(runId)
+
+    const queue = await sweepStuck()
+
+    expect(queue.queued).toEqual([])
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      error: { code: 'processingDefect', position: null, details: null },
+      problem: { reason: 'defect', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+    expect(ranStages(run)).toEqual(['receipt', 'mapping'])
+  })
+
+  // The worker stops while the Channel takes the Interchange.
+  const stopInDelivery = async (into: InvoiceWorkspace) => {
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+    const [queued] = queue.queued
+
+    const processing = Effect.runFork(
+      processRun(queued ?? { workspaceId: into.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => Effect.never),
+      ),
+    )
+
+    try {
+      await vi.waitFor(
+        async () => {
+          expect((await readRun(connection.db, runId))?.steps[3]).toMatchObject({
+            stage: 'delivery',
+            status: 'running',
+          })
+        },
+        { timeout: 2000, interval: 20 },
+      )
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(processing))
+    }
+
+    return runId
+  }
+
+  it('fails a Run stuck in its delivery at delivery, so a Retry delivers it', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Stalled Foods')
+    const remotePath = '/upload/stalled'
+
+    await sftp.exec(
+      `mkdir ${sftp.home}${remotePath} && chown ${sftp.username} ${sftp.home}${remotePath}`,
+    )
+    await deliverOverSftp(connection.db, into, { ...sftpLogin(), remotePath })
+
+    const runId = await stopInDelivery(into)
+
+    await leaveStuck(runId)
+    await sweepStuck()
+
+    const failed = await readRun(connection.db, runId)
+
+    expect(failed).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'processingDefect', position: null, details: null },
+      problem: { reason: 'defect', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'succeeded' },
+        { stage: 'validation', status: 'succeeded' },
+        { stage: 'delivery', status: 'failed' },
+      ],
+    })
+
+    const queue = inMemoryRunQueue()
+
+    await Effect.runPromise(
+      retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(connection.db, queue)),
+    )
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
+    await expect(
+      remoteFile(`${remotePath}/INVOIC-${String(failed?.controlReference)}.edi`),
+    ).resolves.toBe(failed?.output)
+  })
+
+  it('fails a stuck Run already handed over at delivery, so its Retry records it delivered without handing it over again', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Handed Foods')
+
+    await deliverOverSftp(connection.db, into, sftpLogin())
+
+    const runId = await stopInDelivery(into)
+
+    await connection.db.execute(sql`update runs set handed_over_at = now() where id = ${runId}`)
+    await leaveStuck(runId)
+    await sweepStuck()
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      problem: { reason: 'defect', fixTarget: null },
+    })
+
+    const queue = inMemoryRunQueue()
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+
+    await Effect.runPromise(
+      retryRun({ workspaceId: into.id, runId }).pipe(pipelineServices(connection.db, queue)),
+    )
+    await processQueued(queue, handOvers)
+
+    expect(handOvers).not.toHaveBeenCalled()
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'delivered' })
   })
 })
 

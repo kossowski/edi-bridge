@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -74,6 +74,7 @@ beforeAll(async () => {
     db: connection.db,
     secrets: testSecrets,
     requeueInterval: '100 millis',
+    stuckAfter: '1 hour',
     pollingMinute: '100 millis',
   })
   // Each SFTP operation takes an SSH session, so the receipt of the ORDERS file outlasts a test.
@@ -307,6 +308,20 @@ describe('the worker', () => {
 
   it('processes a Run received but not queued after the next sweep', async () => {
     const runId = await arrive(goldenInvoice, inMemoryRunQueue())
+
+    await expect(processed(runId)).resolves.toMatchObject({ status: 'delivered' })
+  })
+
+  it('processes a Run stuck in processing after the next sweep', async () => {
+    const runId = await arrive(goldenInvoice, inMemoryRunQueue())
+
+    // A worker that stopped after its claim left the Run processing two hours ago.
+    await connection.db.execute(
+      sql`update runs set status = 'processing', updated_at = now() - interval '2 hours' where id = ${runId}`,
+    )
+    await connection.db.execute(
+      sql`update run_steps set finished_at = now() - interval '2 hours', started_at = now() - interval '2 hours' where run_id = ${runId} and stage = 'receipt'`,
+    )
 
     await expect(processed(runId)).resolves.toMatchObject({ status: 'delivered' })
   })
