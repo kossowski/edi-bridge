@@ -9,7 +9,7 @@ import {
   type TestErp,
   type TestSftpServer,
 } from '@edi-bridge/channels/testing'
-import { connect, type Connection, documents, runs } from '@edi-bridge/db'
+import { connect, type Connection, documents, mappings, runs } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 import { bullmqRunQueue, receive, type RunQueueService } from '@edi-bridge/pipeline'
 import {
@@ -120,11 +120,15 @@ async function pollOrders() {
   )
 }
 
-const arrive = async (content: string, runQueue: { service: RunQueueService } = queue) => {
+const arrive = async (
+  content: string,
+  runQueue: { service: RunQueueService } = queue,
+  into: InvoiceWorkspace = workspace,
+) => {
   const receipt = await Effect.runPromise(
     receive({
-      workspaceId: workspace.id,
-      channelId: workspace.inboundChannelId,
+      workspaceId: into.id,
+      channelId: into.inboundChannelId,
       fileName: 'invoice.json',
       content,
       manualSubmission: false,
@@ -206,6 +210,38 @@ describe('the worker', () => {
         { stage: 'validation', status: 'skipped' },
         { stage: 'delivery', status: 'skipped' },
       ],
+    })
+  })
+
+  it('fails a Run that stops on a defect and reports the defect', async () => {
+    const defective = await seedInvoiceWorkspace(connection.db, 'Defective Foods')
+    const reported: string[] = []
+
+    // An outbound Flow pinned to an inbound Mapping is a defect of the stored setup.
+    await connection.db
+      .update(mappings)
+      .set({ messageType: 'ORDERS' })
+      .where(eq(mappings.id, defective.mappingId))
+    await deliverOverSftp(connection.db, defective, {
+      host: sftp.host,
+      port: sftp.port,
+      username: sftp.username,
+      password: sftp.password,
+      remotePath: '/upload',
+    })
+    worker.worker.on('failed', (job) => {
+      reported.push(job?.data.runId ?? '')
+    })
+
+    const runId = await arrive(goldenInvoice, queue, defective)
+
+    await expect(processed(runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      error: { code: 'processingDefect' },
+    })
+    await vi.waitFor(() => {
+      expect(reported).toContain(runId)
     })
   })
 

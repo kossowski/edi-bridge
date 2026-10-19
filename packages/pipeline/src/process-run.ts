@@ -9,6 +9,7 @@ import {
   type DocumentStructure,
   documentStructureSchema,
   type FailureStage,
+  failureStageSchema,
   type LookupTableEntry,
   type MappingGraph,
   type MessageType,
@@ -633,6 +634,31 @@ const step = <A, E, R>(
     return result
   })
 
+// Only a processing Run fails, so a defect never overwrites a Run that already failed.
+const failRun = async (tx: Transaction, runId: string, failure: Failure, position: number) => {
+  const [failed] = await tx
+    .update(runs)
+    .set({
+      status: 'failed',
+      failureStage: failure.stage,
+      error: failure.error,
+      problem: failure.problem,
+    })
+    .where(and(eq(runs.id, runId), eq(runs.status, 'processing')))
+    .returning({ id: runs.id })
+
+  if (failed === undefined) {
+    return false
+  }
+
+  await tx
+    .update(runSteps)
+    .set({ status: 'skipped' })
+    .where(and(eq(runSteps.runId, runId), gt(runSteps.position, position)))
+
+  return true
+}
+
 const fail = (runId: string, failure: Failure) =>
   Effect.gen(function* () {
     const db = yield* Database
@@ -644,20 +670,57 @@ const fail = (runId: string, failure: Failure) =>
           .from(runSteps)
           .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, failure.stage)))
 
+        await failRun(tx, runId, failure, failed?.position ?? 0)
+      }),
+    )
+  })
+
+const defectFailure = (stage: FailureStage): Failure => ({
+  stage,
+  error: {
+    code: 'processingDefect',
+    message: 'The processing stopped on an unexpected error',
+    position: null,
+  },
+  problem: { reason: stage === 'delivery' ? 'unreachable' : 'invalidContent', fixTarget: null },
+})
+
+// A defect can stop a Run before its first step starts or after its step failed.
+const failOnDefect = (runId: string) =>
+  Effect.gen(function* () {
+    const db = yield* Database
+    const finishedAt = yield* DateTime.nowAsDate
+
+    yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        const steps = await tx
+          .select({ stage: runSteps.stage, status: runSteps.status, position: runSteps.position })
+          .from(runSteps)
+          .where(eq(runSteps.runId, runId))
+          .orderBy(asc(runSteps.position))
+
+        const stopped = steps.find(({ status }) => status !== 'succeeded' && status !== 'skipped')
+        const stage = failureStageSchema.safeParse(stopped?.stage)
+
+        if (stopped === undefined || !stage.success) {
+          return
+        }
+
+        const failed = await failRun(tx, runId, defectFailure(stage.data), stopped.position)
+
+        if (!failed || stopped.status === 'failed') {
+          return
+        }
+
+        // A failed step has its timings, so a step that never started fails at the defect.
         await tx
           .update(runSteps)
-          .set({ status: 'skipped' })
-          .where(and(eq(runSteps.runId, runId), gt(runSteps.position, failed?.position ?? 0)))
-
-        await tx
-          .update(runs)
           .set({
             status: 'failed',
-            failureStage: failure.stage,
-            error: failure.error,
-            problem: failure.problem,
+            ...(stopped.status === 'pending' && { startedAt: finishedAt }),
+            finishedAt,
           })
-          .where(eq(runs.id, runId))
+          .where(and(eq(runSteps.runId, runId), eq(runSteps.stage, stopped.stage)))
       }),
     )
   })
@@ -868,18 +931,15 @@ const processInbound = ({ queued, run, content, pinned, lookupTables }: Processi
     )
   })
 
-export const processRun = (queued: QueuedRun) =>
+const processClaimed = (
+  queued: QueuedRun,
+  { run, direction }: { run: ClaimedRun; direction: Direction },
+) =>
   Effect.gen(function* () {
-    const claimed = yield* claim(queued)
+    const { mappingVersionId } = run
 
-    if (claimed === undefined) {
-      return
-    }
-
-    const { run, direction } = claimed
-
-    if (run.mappingVersionId === null) {
-      return
+    if (mappingVersionId === null) {
+      return yield* Effect.die(new Error(`Run ${run.id} has no Mapping Version`))
     }
 
     const documents = yield* Documents
@@ -889,9 +949,23 @@ export const processRun = (queued: QueuedRun) =>
       return yield* Effect.die(new Error(`Document ${run.documentId} of Run ${run.id} is missing`))
     }
 
-    const pinned = yield* loadPinned(queued.workspaceId, run.mappingVersionId, direction)
+    const pinned = yield* loadPinned(queued.workspaceId, mappingVersionId, direction)
     const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)
     const processing = { queued, run, content: document.content, pinned, lookupTables }
 
     yield* direction === 'outbound' ? processOutbound(processing) : processInbound(processing)
+  })
+
+export const processRun = (queued: QueuedRun) =>
+  Effect.gen(function* () {
+    const claimed = yield* claim(queued)
+
+    if (claimed === undefined) {
+      return
+    }
+
+    // The defect still dies, so the worker reports it.
+    yield* processClaimed(queued, claimed).pipe(
+      Effect.tapDefect(() => failOnDefect(claimed.run.id)),
+    )
   })

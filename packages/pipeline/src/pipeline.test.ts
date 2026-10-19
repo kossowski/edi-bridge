@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { type Duration, Effect, Exit, Fiber } from 'effect'
 import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,6 +18,8 @@ import {
   type Connection,
   documents,
   flows,
+  mappings,
+  runs,
   tradingPartners,
   workspaces,
 } from '@edi-bridge/db'
@@ -1112,6 +1114,89 @@ describe('the processing of a Run', () => {
     })
   })
 
+  it('fails a Run at its failed step when processing stops on a defect before the Run fails', async () => {
+    const { queue, runId } = await receiveInvoice('not json')
+
+    // The database refuses the failure of the Run after the mapping step failed.
+    await connection.db.execute(sql`
+      create function refuse_run_failure() returns trigger language plpgsql as $$
+      begin
+        if new.status = 'failed' and new.error->>'code' <> 'processingDefect' then
+          raise exception 'The database refuses the failure';
+        end if;
+        return new;
+      end $$`)
+    await connection.db.execute(
+      sql`create trigger refuse_run_failure before update on runs for each row execute function refuse_run_failure()`,
+    )
+
+    try {
+      const [queued] = queue.queued
+
+      const exit = await Effect.runPromiseExit(
+        processRun(queued ?? { workspaceId: workspace.id, runId }).pipe(
+          pipelineServices(connection.db, queue),
+        ),
+      )
+
+      expect(Exit.hasDies(exit)).toBe(true)
+    } finally {
+      await connection.db.execute(sql`drop trigger refuse_run_failure on runs`)
+      await connection.db.execute(sql`drop function refuse_run_failure`)
+    }
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      output: null,
+      error: { code: 'processingDefect', position: null },
+      problem: { reason: 'invalidContent', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+    expect(ranStages(run)).toEqual(['receipt', 'mapping'])
+  })
+
+  it('fails a Run at its first unfinished stage when processing stops on a defect before it', async () => {
+    const defective = await seedInvoiceWorkspace(connection.db, 'Defective Foods')
+
+    // An outbound Flow pinned to an inbound Mapping is a defect of the stored setup.
+    await connection.db
+      .update(mappings)
+      .set({ messageType: 'ORDERS' })
+      .where(eq(mappings.id, defective.mappingId))
+    await deliverOverSftp(connection.db, defective, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), defective)
+
+    const exit = await Effect.runPromiseExit(
+      processRun({ workspaceId: defective.id, runId }).pipe(
+        pipelineServices(connection.db, queue, sftpDelivery),
+      ),
+    )
+
+    expect(Exit.hasDies(exit)).toBe(true)
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      output: null,
+      error: { code: 'processingDefect', position: null },
+      problem: { reason: 'invalidContent', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'mapping', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+  })
+
   it('processes a Run handed out twice only once', async () => {
     const { queue, runId } = await receiveInvoice()
 
@@ -1372,5 +1457,52 @@ describe('the processing of an inbound Run', () => {
     await expect(readRun(connection.db, runId)).resolves.toEqual(processed)
     expect(processed?.status).toBe('delivered')
     expect(erp.received).toHaveLength(1)
+  })
+
+  it('fails an inbound Run at the running step when processing stops on a defect in it', async () => {
+    const into = await ordersWorkspace('Lost Foods')
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: into.id,
+        channelId: into.inboundChannelId,
+        fileName: 'orders.edi',
+        content: ordersInterchange,
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    const runId = receipt.runs[0]?.id ?? ''
+
+    // The Interchange has no ninth Message, so reading it again in the parse step dies.
+    await connection.db.update(runs).set({ messageIndex: 9 }).where(eq(runs.id, runId))
+
+    const exit = await Effect.runPromiseExit(
+      processRun({ workspaceId: into.id, runId }).pipe(
+        pipelineServices(connection.db, queue, deliveryByChannelType),
+      ),
+    )
+
+    expect(Exit.hasDies(exit)).toBe(true)
+
+    const run = await readRun(connection.db, runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'parse',
+      output: null,
+      error: { code: 'processingDefect', position: null },
+      problem: { reason: 'invalidContent', fixTarget: null },
+      steps: [
+        { stage: 'receipt', status: 'succeeded' },
+        { stage: 'parse', status: 'failed' },
+        { stage: 'validation', status: 'skipped' },
+        { stage: 'mapping', status: 'skipped' },
+        { stage: 'delivery', status: 'skipped' },
+      ],
+    })
+    expect(ranStages(run)).toEqual(['receipt', 'parse'])
+    expect(erp.received).toHaveLength(0)
   })
 })
