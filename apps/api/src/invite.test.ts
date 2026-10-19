@@ -36,6 +36,7 @@ import {
   testAuth,
   testChannels,
   webOrigin,
+  testRunQueue,
 } from './testing.js'
 import { addUser } from './user.js'
 
@@ -157,6 +158,7 @@ describe('POST /operator/workspaces/:workspaceId/invites', () => {
       channels: testChannels,
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
+      runQueue: testRunQueue().service,
     })
 
     const client = await signIn(sameOrigin, operatorOfOwnWorkspace)

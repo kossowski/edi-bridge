@@ -43,8 +43,10 @@ import {
   removeWorkspaceMemberEndpoint,
   restoreMappingVersionEndpoint,
   revokeInviteEndpoint,
+  runsEndpoint,
   saveMappingDraftEndpoint,
   sessionEndpoint,
+  submitDocumentEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
@@ -73,6 +75,7 @@ import {
   type TestApi,
   testAuth,
   testChannels,
+  testRunQueue,
 } from './testing.js'
 
 const operatorAsViewer: NewMember = {
@@ -253,6 +256,7 @@ const workspaceReads = (): string[] => [
   toPath(mappingVersionEndpoint.path, { mappingId: ids.mapping, versionId: ids.mappingVersion }),
   `${toPath(mappingComparisonEndpoint.path, { mappingId: ids.mapping })}?from=${ids.mappingVersion}&to=${ids.laterMappingVersion}`,
   publishedMappingVersionsEndpoint.path,
+  runsEndpoint.path,
 ]
 
 const reads = () => [sessionEndpoint.path, workspaceMembersEndpoint.path, ...workspaceReads()]
@@ -399,6 +403,14 @@ const changes: [string, () => InjectOptions & { url: string }][] = [
     }),
   ],
   [
+    'submit a Document',
+    () => ({
+      method: 'POST',
+      url: submitDocumentEndpoint.path,
+      body: { channelId: ids.channel, document: { fileName: 'invoice.json', content: '{}' } },
+    }),
+  ],
+  [
     'create an invite',
     () => ({
       method: 'POST',
@@ -479,6 +491,7 @@ describe('the changes', () => {
       channels: testChannels,
       database: api.connection.db,
       probes: { postgres: () => Promise.resolve(), redis: () => Promise.resolve() },
+      runQueue: testRunQueue().service,
     })
 
     app.addHook('onRoute', ({ method, url }) => {

@@ -1,10 +1,12 @@
 import { hashPassword } from 'better-auth/crypto'
+import { Effect } from 'effect'
 
 import type { InjectOptions, LightMyRequestResponse } from 'fastify'
 
 import { signInEndpoint, type WorkspaceRole } from '@edi-bridge/contracts'
 import { connect, members, workspaces } from '@edi-bridge/db'
 import { startTestDatabase } from '@edi-bridge/db/testing'
+import { type QueuedRun, RunNotQueued, type RunQueueService } from '@edi-bridge/pipeline'
 
 import { buildApp } from './app.js'
 import { developmentWorkspace } from './development-workspace.js'
@@ -38,6 +40,20 @@ export const testChannels: ChannelSettings = {
 }
 
 const up = () => Promise.resolve()
+
+export function testRunQueue() {
+  const queued: QueuedRun[] = []
+  const redis = { reachable: true }
+
+  const service: RunQueueService = {
+    enqueue: (run) =>
+      redis.reachable
+        ? Effect.sync(() => void queued.push(run))
+        : Effect.fail(new RunNotQueued({ runId: run.runId, cause: 'unreachable' })),
+  }
+
+  return { queued, redis, service }
+}
 
 export interface Credentials {
   email: string
@@ -125,17 +141,21 @@ export async function startTestApi() {
   await addMember(connection.db, ownViewer)
   await addMember(connection.db, otherAdmin)
 
+  const runQueue = testRunQueue()
+
   const app = buildApp({
     auth: testAuth,
     channels: testChannels,
     database: connection.db,
     probes: { postgres: up, redis: up },
+    runQueue: runQueue.service,
     webOrigin,
   })
 
   return {
     app,
     connection,
+    runQueue,
     databaseUrl: testDatabase.url,
     admin: await signIn(app, ownAdmin),
     viewer: await signIn(app, ownViewer),
