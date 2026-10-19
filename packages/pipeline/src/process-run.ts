@@ -62,6 +62,10 @@ export class GlnMissing extends Data.TaggedError('GlnMissing')<{
   readonly party: 'workspace' | 'tradingPartner'
 }> {}
 
+export class CharacterSetUnsupported extends Data.TaggedError('CharacterSetUnsupported')<{
+  readonly characterSet: CharacterSet
+}> {}
+
 export class DeliveryDefect extends Data.TaggedError('DeliveryDefect')<{
   readonly defect: unknown
 }> {}
@@ -154,33 +158,69 @@ const deliveryReasons: Record<ChannelTestFailureReason, string> = {
 
 const glnOwners = { workspace: 'The Workspace', tradingPartner: 'The Trading Partner' } as const
 
-const deliveryFailure = Match.type<DeliveryFailed | GlnMissing | DeliveryDefect>().pipe(
-  Match.tagsExhaustive({
-    DeliveryFailed: ({ reason }): Failure => ({
-      stage: 'delivery',
-      error: { code: reason, message: deliveryReasons[reason], position: null },
-      problem: { reason: 'unreachable', fixTarget: null },
+type DeliveryError = DeliveryFailed | GlnMissing | CharacterSetUnsupported | DeliveryDefect
+
+const deliveryFailure = (
+  failure: DeliveryError,
+  { workspace, tradingPartner, channel }: Destination,
+): Failure =>
+  Match.value(failure).pipe(
+    Match.tagsExhaustive({
+      DeliveryFailed: ({ reason }): Failure => ({
+        stage: 'delivery',
+        error: { code: reason, message: deliveryReasons[reason], position: null },
+        problem: { reason: 'unreachable', fixTarget: null },
+      }),
+      GlnMissing: ({ party }): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'glnMissing',
+          message: `${glnOwners[party]} has no GLN for the Interchange`,
+          position: null,
+        },
+        problem: {
+          reason: 'incompleteSetup',
+          fixTarget:
+            party === 'workspace'
+              ? { kind: 'workspaceGln', name: workspace.name }
+              : {
+                  kind: 'tradingPartnerGln',
+                  tradingPartnerId: tradingPartner.id,
+                  name: tradingPartner.name,
+                },
+        },
+      }),
+      CharacterSetUnsupported: ({ characterSet }): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'characterSetUnsupported',
+          message: `Delivery in character set ${characterSet} is not supported`,
+          position: null,
+        },
+        problem: {
+          reason: 'incompleteSetup',
+          fixTarget: {
+            kind: 'tradingPartner',
+            tradingPartnerId: tradingPartner.id,
+            name: tradingPartner.name,
+          },
+        },
+      }),
+      // A broken Channel row and a credential that does not open both end here.
+      DeliveryDefect: (): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'deliveryDefect',
+          message: 'The delivery stopped on an unexpected error',
+          position: null,
+        },
+        problem: {
+          reason: 'incompleteSetup',
+          fixTarget: { kind: 'channelCredential', channelId: channel.id, name: channel.name },
+        },
+      }),
     }),
-    GlnMissing: ({ party }): Failure => ({
-      stage: 'delivery',
-      error: {
-        code: 'glnMissing',
-        message: `${glnOwners[party]} has no GLN for the Interchange`,
-        position: null,
-      },
-      problem: { reason: 'missingField', fixTarget: null },
-    }),
-    DeliveryDefect: (): Failure => ({
-      stage: 'delivery',
-      error: {
-        code: 'deliveryDefect',
-        message: 'The delivery stopped on an unexpected error',
-        position: null,
-      },
-      problem: { reason: 'unreachable', fixTarget: null },
-    }),
-  }),
-)
+  )
 
 const envelopeTrailer: Segment = { tag: 'UNZ', elements: [] }
 
@@ -242,7 +282,7 @@ const enveloped = (
 const encoded = (interchange: string, characterSet: CharacterSet) =>
   characterSet === 'UNOA' || characterSet === 'UNOB' || characterSet === 'UNOC'
     ? Effect.succeed(Buffer.from(interchange, 'latin1'))
-    : Effect.die(new Error(`Delivery in character set ${characterSet} is not supported`))
+    : Effect.fail(new CharacterSetUnsupported({ characterSet }))
 
 const validated = (message: Message, characterSet: CharacterSet) =>
   Effect.try({
@@ -263,9 +303,13 @@ const loadDestination = ({ workspaceId, runId }: QueuedRun) =>
     const [found] = yield* Effect.promise(() =>
       db
         .select({
-          workspaceGln: workspaces.gln,
-          tradingPartnerGln: tradingPartners.gln,
-          characterSet: tradingPartners.characterSet,
+          workspace: { name: workspaces.name, gln: workspaces.gln },
+          tradingPartner: {
+            id: tradingPartners.id,
+            name: tradingPartners.name,
+            gln: tradingPartners.gln,
+            characterSet: tradingPartners.characterSet,
+          },
           channel: channels,
         })
         .from(runs)
@@ -289,16 +333,17 @@ const deliver = (
   queued: QueuedRun,
   message: Message,
   messageType: MessageType,
-  { workspaceGln, tradingPartnerGln, characterSet, channel }: Destination,
+  { workspace, tradingPartner, channel }: Destination,
 ) =>
   Effect.gen(function* () {
     const db = yield* Database
+    const { characterSet } = tradingPartner
 
-    if (workspaceGln === null) {
+    if (workspace.gln === null) {
       return yield* new GlnMissing({ party: 'workspace' })
     }
 
-    if (tradingPartnerGln === null) {
+    if (tradingPartner.gln === null) {
       return yield* new GlnMissing({ party: 'tradingPartner' })
     }
 
@@ -306,8 +351,8 @@ const deliver = (
 
     const interchange = enveloped(message, {
       characterSet,
-      sender: workspaceGln,
-      receiver: tradingPartnerGln,
+      sender: workspace.gln,
+      receiver: tradingPartner.gln,
       sentAt: yield* DateTime.now,
       reference,
     })
@@ -554,7 +599,11 @@ export const processRun = (queued: QueuedRun) =>
 
     const message = mapped.success
     const destination = yield* loadDestination(queued)
-    const checked = yield* step(run.id, 'validation', validated(message, destination.characterSet))
+    const checked = yield* step(
+      run.id,
+      'validation',
+      validated(message, destination.tradingPartner.characterSet),
+    )
 
     if (Result.isFailure(checked)) {
       return yield* fail(run.id, validationFailure(message, checked.failure))
@@ -591,7 +640,7 @@ export const processRun = (queued: QueuedRun) =>
     )
 
     if (Result.isFailure(delivered)) {
-      yield* fail(run.id, deliveryFailure(delivered.failure))
+      yield* fail(run.id, deliveryFailure(delivered.failure, destination))
 
       if (Predicate.isTagged(delivered.failure, 'DeliveryDefect')) {
         return yield* Effect.die(delivered.failure.defect)

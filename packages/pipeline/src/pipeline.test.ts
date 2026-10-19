@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm'
 import { type Duration, Effect, Exit, Fiber } from 'effect'
+import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { sftpChannelDelivery } from '@edi-bridge/channels'
+import { secretBox, secretKeyBytes, sftpChannelDelivery } from '@edi-bridge/channels'
 import { startTestSftpServer, type TestSftpServer } from '@edi-bridge/channels/testing'
 import {
   channels,
@@ -48,6 +49,8 @@ let connection: Connection
 
 let workspace: InvoiceWorkspace
 
+let channelId: string
+
 const sftpLogin = () => ({
   host: sftp.host,
   port: sftp.port,
@@ -60,7 +63,7 @@ beforeAll(async () => {
   ;[testDatabase, sftp] = await Promise.all([startTestDatabase(), startTestSftpServer()])
   connection = connect(testDatabase.url)
   workspace = await seedInvoiceWorkspace(connection.db, 'Nordwind Foods')
-  await deliverOverSftp(connection.db, workspace, sftpLogin())
+  channelId = await deliverOverSftp(connection.db, workspace, sftpLogin())
 }, 180_000)
 
 afterAll(async () => {
@@ -607,6 +610,28 @@ describe('the processing of a Run', () => {
     },
   )
 
+  it('fails a Run at delivery when no encoder writes the character set of its Trading Partner', async () => {
+    const unod = await sftpWorkspaceIn('Cyrillic Foods', 'UNOD')
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), unod)
+
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'characterSetUnsupported', position: null },
+      problem: {
+        reason: 'incompleteSetup',
+        fixTarget: {
+          kind: 'tradingPartner',
+          tradingPartnerId: unod.tradingPartnerId,
+          name: 'Hanse Retail',
+        },
+      },
+    })
+  })
+
   it('leaves a Run for an HTTP Channel processing with its Message and its delivery pending', async () => {
     const http = await seedInvoiceWorkspace(connection.db, 'Webshop Foods')
     const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), http)
@@ -679,7 +704,10 @@ describe('the processing of a Run', () => {
       status: 'failed',
       failureStage: 'delivery',
       error: { code: 'deliveryDefect', position: null },
-      problem: { reason: 'unreachable', fixTarget: null },
+      problem: {
+        reason: 'incompleteSetup',
+        fixTarget: { kind: 'channelCredential', channelId, name: 'Hanse Retail SFTP inbox' },
+      },
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
@@ -707,7 +735,75 @@ describe('the processing of a Run', () => {
       failureStage: 'delivery',
       output: null,
       error: { code: 'glnMissing', position: null },
-      problem: { reason: 'missingField', fixTarget: null },
+      problem: {
+        reason: 'incompleteSetup',
+        fixTarget: { kind: 'workspaceGln', name: 'Unnamed Foods' },
+      },
+    })
+  })
+
+  it('fails a Run at delivery when the Trading Partner has no GLN for the Interchange', async () => {
+    const withoutGln = await seedInvoiceWorkspace(connection.db, 'Partnerless Foods')
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ gln: null })
+      .where(eq(tradingPartners.id, withoutGln.tradingPartnerId))
+    await deliverOverSftp(connection.db, withoutGln, sftpLogin())
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), withoutGln)
+
+    await processQueued(queue)
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      output: null,
+      error: { code: 'glnMissing', position: null },
+      problem: {
+        reason: 'incompleteSetup',
+        fixTarget: {
+          kind: 'tradingPartnerGln',
+          tradingPartnerId: withoutGln.tradingPartnerId,
+          name: 'Hanse Retail',
+        },
+      },
+    })
+  })
+
+  it('fails a Run at delivery when the credential of its Channel does not open', async () => {
+    const rotated = await seedInvoiceWorkspace(connection.db, 'Rotated Foods')
+
+    const rotatedChannelId = await deliverOverSftp(
+      connection.db,
+      rotated,
+      sftpLogin(),
+      secretBox(randomBytes(secretKeyBytes)),
+    )
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), rotated)
+
+    const [queued] = queue.queued
+
+    const exit = await Effect.runPromiseExit(
+      processRun(queued ?? { workspaceId: rotated.id, runId }).pipe(
+        pipelineServices(connection.db, queue, sftpDelivery),
+      ),
+    )
+
+    expect(Exit.hasDies(exit)).toBe(true)
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'deliveryDefect', position: null },
+      problem: {
+        reason: 'incompleteSetup',
+        fixTarget: {
+          kind: 'channelCredential',
+          channelId: rotatedChannelId,
+          name: 'Hanse Retail SFTP inbox',
+        },
+      },
     })
   })
 
