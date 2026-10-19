@@ -527,7 +527,7 @@ export const runs = pgTable(
     controlReference: integer(),
     // Null for a Document that is not an Interchange.
     messageIndex: integer(),
-    // A Reprocess starts a new Run from the same Document; a Run is replaced at most once.
+    // A Reprocess starts a new Run from the same Document.
     replacesRunId: uuid()
       .unique()
       .references((): AnyPgColumn => runs.id),
