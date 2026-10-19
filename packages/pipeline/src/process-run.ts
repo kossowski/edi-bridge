@@ -614,7 +614,7 @@ const deliverInterchange = (
         ? { reference: run.controlReference, content: Buffer.from(run.output, 'latin1') }
         : yield* buildInterchange(queued, run, destination)
 
-    // The file name carries the control reference, as an upload never replaces an existing file.
+    // The name carries the control reference, so a Retry uploads under the name of its first attempt.
     yield* handOver(run, destination.channel, {
       name: `${messageType}-${String(reference)}.edi`,
       content,
