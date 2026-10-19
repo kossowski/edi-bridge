@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.82",
+    "@edi-bridge/channels": "workspace:*",
     "@edi-bridge/contracts": "workspace:*",
     "@edi-bridge/db": "workspace:*",
     "@edi-bridge/edifact": "workspace:*",
@@ -38,7 +39,6 @@
     "@edi-bridge/typescript-config": "workspace:*",
     "@edi-bridge/vitest-config": "workspace:*",
     "@types/node": "^24",
-    "@types/ssh2": "^1.15.6",
     "oxlint": "1.87.0",
     "testcontainers": "^12.2.1",
     "tsdown": "^0.23.1",

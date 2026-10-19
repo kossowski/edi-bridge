@@ -5,6 +5,7 @@ import Fastify from 'fastify'
 import type { LanguageModel } from 'ai'
 import type { FastifyInstance, FastifyReply, FastifyRequest, FastifyServerOptions } from 'fastify'
 
+import { ChannelReach, channelReach, secretBox } from '@edi-bridge/channels'
 import {
   acceptAiDraftEndpoint,
   acceptAiProposedPartsEndpoint,
@@ -87,7 +88,6 @@ import { loadAiBudget } from './ai-budget.js'
 import { requestAiDraft } from './ai-draft-request.js'
 import { acceptAiDraft, acceptAiProposedParts } from './ai-review.js'
 import { type AuthSettings, mountAuth } from './auth.js'
-import { ChannelReach, channelReach } from './channel-reach.js'
 import {
   ChannelEnvironment,
   type ChannelSettings,
@@ -133,7 +133,6 @@ import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from 
 import { loadMessageTypeStructure } from './message-type.js'
 import { parse, type ValidationError } from './parse.js'
 import { listRuns, loadRun } from './run.js'
-import { secretBox } from './secret.js'
 import {
   CurrentMember,
   CurrentUser,

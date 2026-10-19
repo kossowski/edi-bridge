@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
+import { secretKeyBytes } from '@edi-bridge/channels'
 import { localDatabaseUrl } from '@edi-bridge/db'
 
 import { aiModelFromEnv } from './ai-model.js'
-import { secretKeyBytes } from './secret.js'
 
 import type { ChannelSettings } from './channel.js'
 
