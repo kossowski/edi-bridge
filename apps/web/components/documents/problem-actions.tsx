@@ -155,23 +155,28 @@ export function ProcessAgainStep({ run, mapping }: { run: FailedRun; mapping: Re
   )
 }
 
-export function TryAgainStep({ run }: { run: FailedRun }) {
+export function TryAgainStep({ run, secondary }: { run: FailedRun; secondary: boolean }) {
   const t = useTranslations('Document')
   const canChange = useCanChange()
   const retry = useRetryRun(run.id)
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-2">
-      <p>{t('problem.steps.tryAgain')}</p>
+      <p>{t('problem.steps.tryAgain', { stage: run.failureStage })}</p>
       {canChange ? (
-        <Button disabled={retry.isPending} onClick={() => retry.mutate()}>
+        <Button
+          disabled={retry.isPending}
+          variant={secondary ? 'outline' : 'default'}
+          onClick={() => retry.mutate()}>
           <HugeiconsIcon icon={RepeatIcon} strokeWidth={2} aria-hidden />
           {retry.isPending ? t('actions.tryAgain.pending') : t('actions.tryAgain.button')}
         </Button>
       ) : (
         <ViewOnly text={t('actions.tryAgain.viewOnly')} />
       )}
-      {retry.isError && <ActionError message={t('actions.tryAgain.failed')} />}
+      {retry.isError && (
+        <ActionError message={t('actions.tryAgain.failed', { stage: run.failureStage })} />
+      )}
     </div>
   )
 }

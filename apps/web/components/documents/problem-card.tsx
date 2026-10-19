@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 import type { ReactNode } from 'react'
 
-import { FixerBadge, fixerIcons } from '@/components/documents/fixer-badge'
+import { FixerBadge, fixerIcons, shownFixer } from '@/components/documents/fixer-badge'
 import {
   CopyPartnerMessage,
   MarkWaitingStep,
@@ -27,7 +27,7 @@ import type { FixTarget } from '@edi-bridge/contracts'
 
 export type WhatToDoStep = { key: string; content: ReactNode }
 
-function useProblemText({ problem, direction, tradingPartner }: FailedRun) {
+function useProblemText({ problem, direction, failureStage, tradingPartner }: FailedRun) {
   const t = useTranslations('Document.problem.reason')
   const { fixTarget } = problem
   const field = fixTarget?.kind === 'mapping' ? fixTarget.fieldPath : null
@@ -96,7 +96,10 @@ function useProblemText({ problem, direction, tradingPartner }: FailedRun) {
     }
 
     case 'defect': {
-      return { title: t('defect.title'), description: t('defect.description') }
+      return {
+        title: t('defect.title'),
+        description: t('defect.description', { stage: failureStage }),
+      }
     }
   }
 }
@@ -139,6 +142,17 @@ function StepBody({ text, children }: { text: string; children?: ReactNode }) {
   )
 }
 
+function fixStep(text: string, run: FailedRun, target: FixTarget, primary: boolean): WhatToDoStep {
+  return {
+    key: 'fix',
+    content: (
+      <StepBody text={text}>
+        <FixLink primary={primary} runId={run.id} target={target} />
+      </StepBody>
+    ),
+  }
+}
+
 export function useFixSteps(run: FailedRun): WhatToDoStep[] {
   const t = useTranslations('Document.problem.steps')
   const { problem, tradingPartner } = run
@@ -165,18 +179,7 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
       }
 
       return [
-        ...(target
-          ? [
-              {
-                key: 'fix',
-                content: (
-                  <StepBody text={t('fixCause')}>
-                    <FixLink primary runId={run.id} target={target} />
-                  </StepBody>
-                ),
-              },
-            ]
-          : []),
+        ...(target ? [fixStep(t('fixCause'), run, target, true)] : []),
         ...(mapping
           ? [{ key: 'processAgain', content: <ProcessAgainStep mapping={mapping} run={run} /> }]
           : []),
@@ -184,20 +187,17 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
     }
 
     case 'retry': {
+      // The setup has to be complete before trying again can work.
+      if (problem.reason === 'incompleteSetup' && target) {
+        return [
+          fixStep(t('completeSetup'), run, target, true),
+          { key: 'tryAgain', content: <TryAgainStep run={run} secondary /> },
+        ]
+      }
+
       return [
-        { key: 'tryAgain', content: <TryAgainStep run={run} /> },
-        ...(target
-          ? [
-              {
-                key: 'fix',
-                content: (
-                  <StepBody text={t('checkConnection')}>
-                    <FixLink primary={false} runId={run.id} target={target} />
-                  </StepBody>
-                ),
-              },
-            ]
-          : []),
+        { key: 'tryAgain', content: <TryAgainStep run={run} secondary={false} /> },
+        ...(target ? [fixStep(t('checkConnection'), run, target, false)] : []),
       ]
     }
 
@@ -273,7 +273,7 @@ export function ProblemCard({ run }: { run: FailedRun }) {
   const { title, description } = useProblemText(run)
   const steps = useFixSteps(run)
   const freshlyReprocessed = useFreshlyReprocessed(run.id)
-  const fixer = run.problem.whoFixes
+  const fixer = shownFixer(run.problem.whoFixes, run.problem.reason)
 
   return (
     <Card className="ring-destructive/40">

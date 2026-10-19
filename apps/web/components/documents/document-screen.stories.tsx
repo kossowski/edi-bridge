@@ -42,7 +42,7 @@ import preview from '../../.storybook/preview'
 
 const storyRun = storyRunFactory({ idPrefix: '40000000', hour: '07' })
 
-const missingField = storyRun(1, 'INVOIC', 'mapping')
+const missingField = storyRun(1, 'INVOIC', 'mapping', { defect: false })
 
 const missingFieldMapping = toMappingVersionSummary(
   seedMappingVersions.find(({ id }) => id === flowFor('INVOIC').mappingVersionId)!,
@@ -121,6 +121,10 @@ const replacing = storyRun(16, 'ORDERS', 'delivered')
 
 const incompleteSetup = storyRun(17, 'INVOIC', 'delivery')
 
+const unreadableFromErp = storyRun(18, 'INVOIC', 'parse')
+
+const defect = storyRun(47, 'ORDERS', 'mapping', { defect: true })
+
 const runs = [
   missingField,
   unreadable,
@@ -139,6 +143,8 @@ const runs = [
   replaced,
   replacing,
   incompleteSetup,
+  unreadableFromErp,
+  defect,
 ]
 
 const channel = seedChannels.find(({ id }) => id === flowFor('INVOIC').destinationChannelId)!
@@ -389,11 +395,22 @@ export const IncompleteSetup = meta.story({
       }),
     ).toBeVisible()
     await expect(canvas.getByText("your company's GLN is missing", { exact: false })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
-    await expectFixLink(
-      canvas.getByRole('link', { name: "Record your company's GLN" }),
-      '/settings',
-    )
+    await expect(canvas.getByText('Complete the setup', { exact: true })).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'Nothing is wrong with the document itself. Complete the setup first, then try again.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByText('Just try again')).toBeNull()
+    await expect(canvas.queryByText('Trying again usually works.', { exact: false })).toBeNull()
+    await expect(canvas.getByText('Complete the setup.')).toBeVisible()
+
+    const fix = canvas.getByRole('link', { name: "Record your company's GLN" })
+    const tryAgain = canvas.getByRole('button', { name: 'Try again' })
+
+    await expectFixLink(fix, '/settings')
+    await expect(tryAgain).toBeVisible()
+    await expect(fix.compareDocumentPosition(tryAgain)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
   },
 })
 
@@ -418,6 +435,12 @@ export const GermanIncompleteSetup = meta.story({
       await canvas.findByRole('heading', {
         name: `Die Einrichtung für ${partner.name} ist nicht vollständig`,
       }),
+    ).toBeVisible()
+    await expect(canvas.getByText('Einrichtung vervollständigen', { exact: true })).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'Am Beleg selbst ist nichts falsch. Vervollständigen Sie zuerst die Einrichtung und versuchen Sie es dann erneut.',
+      ),
     ).toBeVisible()
     await expectFixLink(
       canvas.getByRole('link', { name: `Zugangsdaten von „${channel.name}“ prüfen` }),
@@ -462,6 +485,90 @@ export const UnsupportedCharacterSet = meta.story({
       canvas.getByRole('link', { name: `Open ${partner.name}` }),
       `/trading-partners/${partner.id}`,
     )
+  },
+})
+
+export const UnreadableFromErp = meta.story({
+  args: { id: unreadableFromErp.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${toPath(runEndpoint.path, { id: unreadableFromErp.id })}`, () =>
+        HttpResponse.json(
+          runDetailSchema.parse({
+            ...unreadableFromErp,
+            steps: [
+              { stage: 'receipt', status: 'succeeded' },
+              { stage: 'parse', status: 'failed' },
+              { stage: 'mapping', status: 'skipped' },
+              { stage: 'validation', status: 'skipped' },
+              { stage: 'delivery', status: 'skipped' },
+            ].map((step) => ({ ...step, startedAt: null, finishedAt: null })),
+            interchange: null,
+            message: null,
+            mappingVersion: null,
+            replaces: null,
+            replacedBy: null,
+            error: {
+              code: 'invalidJson',
+              message: 'The document is not valid JSON',
+              position: null,
+              details: null,
+            },
+            problem: { reason: 'unreadable', whoFixes: 'you', fixTarget: null },
+            waitingForTradingPartnerSince: null,
+            duplicateOf: null,
+          }),
+        ),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'EDI Bridge cannot read the file from your ERP' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText('The fix is in the export of your ERP: check its encoding and format.', {
+        exact: false,
+      }),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('link', { name: /^Open/ })).toBeNull()
+  },
+})
+
+export const Defect = meta.story({
+  args: { id: defect.id },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'EDI Bridge hit an internal error' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'EDI Bridge hit an internal error while translating the document. Try again; if it happens again, the error is logged for the team.',
+      ),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'Try again. EDI Bridge processes the original file once more with the same mapping version.',
+      ),
+    ).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))
+    await expect(
+      await canvas.findByText('This document was processed again. The new attempt replaces it.'),
+    ).toBeVisible()
+    await expect(canvas.getByRole('link', { name: 'Open the new attempt' })).toBeVisible()
+  },
+})
+
+export const GermanDefect = meta.story({
+  args: { id: defect.id },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(
+        'In EDI Bridge ist beim Übersetzen des Belegs ein interner Fehler aufgetreten.',
+        { exact: false },
+      ),
+    ).toBeVisible()
   },
 })
 

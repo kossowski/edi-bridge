@@ -73,9 +73,21 @@ function DocumentView({ run }: { run: RunDetail }) {
   )
 }
 
+// No live event reaches this screen, so it reads a Run in progress again until it ends.
+const inProgressPollMs = 2000
+
+function inProgress(run: RunDetail) {
+  return run.status === 'received' || run.status === 'processing'
+}
+
 export function DocumentScreen({ id }: { id: string }) {
   const t = useTranslations('Document')
-  const { data, error, isPending, refetch } = useQuery(runQuery(id))
+
+  const { data, error, isPending, refetch } = useQuery({
+    ...runQuery(id),
+    refetchInterval: ({ state }) =>
+      state.data && inProgress(state.data) ? inProgressPollMs : false,
+  })
 
   if (data) {
     return <DocumentView run={data} />

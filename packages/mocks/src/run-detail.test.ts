@@ -48,7 +48,8 @@ function inboundOrders(
   {
     failureStage,
     receivedAt = '2026-10-01T08:00:00.000Z',
-  }: { failureStage?: FailureStage; receivedAt?: string } = {},
+    defect,
+  }: { failureStage?: FailureStage; receivedAt?: string; defect?: boolean } = {},
 ) {
   const run = {
     id,
@@ -60,7 +61,14 @@ function inboundOrders(
 
   return failureStage === undefined
     ? createRun({ ...run, status: 'delivered', failureStage: null })
-    : createRun({ ...run, status: 'failed', failureStage })
+    : createRun({ ...run, status: 'failed', failureStage, defect })
+}
+
+function defectRun() {
+  return inboundOrders('00000000-0000-4000-8000-0000000000d1', {
+    failureStage: 'mapping',
+    defect: true,
+  })
 }
 
 async function getRun(id: string) {
@@ -421,6 +429,7 @@ describe('the problem of a failed Run', () => {
         'workspaceGln',
         'tradingPartnerGln',
         'channelCredential',
+        undefined,
       ]),
     )
   })
@@ -478,6 +487,40 @@ describe('the problem of a failed Run', () => {
           name: run.tradingPartner.name,
         },
       ]).toContainEqual(run.problem?.fixTarget)
+    }
+  })
+
+  it('keeps a Run pinned without a Defect off one in its summary and detail', async () => {
+    const drawn = createRuns({ count: 2000 }).filter(({ problem }) => problem?.reason === 'defect')
+    const runs = drawn.map((run) => createRun({ ...run, defect: false }))
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    expect(runs.length).toBeGreaterThan(0)
+
+    for (const run of runs) {
+      const { body } = await getRun(run.id)
+
+      expect(run.problem?.reason).not.toBe('defect')
+      expect(body?.problem?.reason).toBe(run.problem?.reason)
+    }
+  })
+
+  it('tries a Defect at mapping again without a fix target', async () => {
+    const runs = createRuns({ count: 2000 }).filter(({ problem }) => problem?.reason === 'defect')
+
+    server.use(...runDetailHandlers(apiUrl, { runs }))
+
+    expect(runs.length).toBeGreaterThan(0)
+
+    for (const run of runs) {
+      const { body } = await getRun(run.id)
+
+      expect(body).toMatchObject({
+        failureStage: 'mapping',
+        error: { code: 'processingDefect', position: null },
+        problem: { reason: 'defect', whoFixes: 'retry', fixTarget: null },
+      })
     }
   })
 
@@ -618,6 +661,24 @@ describe('POST /runs/:id/retry', () => {
     expect(after).toMatchObject({ id: run.id, status: 'delivered', failureStage: null })
     expect(after?.steps.slice(0, -1)).toEqual(before?.steps.slice(0, -1))
     expect(after?.steps.at(-1)?.status).toBe('succeeded')
+  })
+
+  it('reprocesses a Defect at mapping with its own Mapping Version and answers the replaced Run', async () => {
+    const run = defectRun()
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+    const { body: before } = await getRun(run.id)
+
+    const { status, body } = await post(toPath(retryRunEndpoint.path, { id: run.id }))
+    const { body: replacing } = await getRun(body?.replacedBy?.id ?? '')
+
+    expect(status).toBe(200)
+    expect(body).toMatchObject({ id: run.id, status: 'failed', failureStage: 'mapping' })
+    expect(replacing).toMatchObject({
+      status: 'delivered',
+      replaces: { id: run.id },
+      mappingVersion: before?.mappingVersion,
+    })
+    expect((await post(toPath(retryRunEndpoint.path, { id: run.id }))).status).toBe(409)
   })
 
   it.each(['parse', 'validation', 'mapping'] as const)(
@@ -786,6 +847,20 @@ describe('POST /runs/:id/reprocess', () => {
     const [latest] = await serveWithVersions(run)
 
     const { status, body } = await post(toPath(reprocessRunEndpoint.path, { id: run.id }), {
+      // SAFETY: the seeded Mapping of the ORDERS Flow has at least one Mapping Version.
+      mappingVersionId: latest!.id,
+    })
+
+    expect(status).toBe(201)
+    expect(body).toMatchObject({ status: 'delivered', replaces: { id: run.id } })
+  })
+
+  it('accepts a Defect at mapping', async () => {
+    const run = defectRun()
+    const [latest] = await serveWithVersions(run)
+
+    const { status, body } = await post(toPath(reprocessRunEndpoint.path, { id: run.id }), {
+      // SAFETY: the seeded Mapping of the ORDERS Flow has at least one Mapping Version.
       mappingVersionId: latest!.id,
     })
 

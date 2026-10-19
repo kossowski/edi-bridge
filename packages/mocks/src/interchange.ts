@@ -37,10 +37,14 @@ export type GeneratedErrorCode =
   | 'glnMissing'
   | 'channelDefect'
   | 'characterSetUnsupported'
+  | 'processingDefect'
 
 export type GeneratedError = RunError & { code: GeneratedErrorCode }
 
-type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureStage'>
+// `defect` pins whether the Run stops on a Defect, for a story or test that needs one either way.
+type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureStage'> & {
+  defect?: boolean | undefined
+}
 
 export type BrokenPiece =
   | Pick<Extract<FixTarget, { kind: 'mapping' }>, 'kind' | 'fieldPath'>
@@ -98,6 +102,26 @@ function incompleteSetupOf(run: ProblemFields): Failure | null {
   ])
 
   return kind && { error: setupErrors[kind], broken: { kind } }
+}
+
+const defectError: GeneratedError = {
+  code: 'processingDefect',
+  message: 'The processing stopped on an unexpected error',
+  position: null,
+  details: null,
+}
+
+// A separate seed keeps the Messages of the other Runs as they were.
+function stopsOnDefect(run: ProblemFields) {
+  return (
+    run.failureStage === 'mapping' &&
+    (run.defect ?? seededFaker(`defect:${run.id}`).datatype.boolean({ probability: 0.1 }))
+  )
+}
+
+// The summary has drawn the Defect already, so the Message follows it instead of drawing again.
+function isDefect(run: RunSummary) {
+  return run.problem?.reason === 'defect'
 }
 
 type Fault = {
@@ -165,7 +189,8 @@ export function lookupTableFailureOf(run: RunSummary): Failure | null {
   return run.status === 'failed' &&
     run.failureStage === 'mapping' &&
     directionOf(run) === 'outbound' &&
-    readsUnits(run)
+    readsUnits(run) &&
+    !isDefect(run)
     ? { error: missingUnitError, broken: missingUnit }
     : null
 }
@@ -184,6 +209,10 @@ export function problemReasonOf(
     }
 
     case 'mapping': {
+      if (stopsOnDefect(run)) {
+        return 'defect'
+      }
+
       return directionOf(run) === 'outbound' && readsUnits(run) ? 'missingCode' : 'missingField'
     }
 
@@ -353,7 +382,7 @@ function setComponent(segment: Segment, element: number, component: number, valu
 function injectFault(faker: Faker, run: RunSummary, segments: Segment[]): FaultyMessage {
   const intact = { segments, fault: null, broken: null }
 
-  if (run.status !== 'failed') {
+  if (run.status !== 'failed' || isDefect(run)) {
     return intact
   }
 
@@ -498,6 +527,10 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
       error: { code: fault.code, message: fault.message, position: null, details: null },
       broken,
     }
+  }
+
+  if (isDefect(run)) {
+    return { error: defectError, broken: null }
   }
 
   if (run.failureStage === 'mapping') {

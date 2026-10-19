@@ -664,6 +664,7 @@
     },
     "whoFixes": {
       "retry": "Erneut versuchen genügt",
+      "setup": "Einrichtung vervollständigen",
       "tradingPartner": "Ihr Partner behebt das",
       "you": "Sie beheben das"
     },
@@ -756,8 +757,8 @@
       "whatToDo": "Was zu tun ist",
       "reason": {
         "unreadable": {
-          "title": "{tradingPartner} hat eine beschädigte Datei gesendet",
-          "description": "Die Datei ist beschädigt oder unvollständig, daher konnte EDI Bridge sie nicht lesen. {tradingPartner} wurde automatisch mit einer Empfangsbestätigung informiert."
+          "title": "{direction, select, inbound {{tradingPartner} hat eine beschädigte Datei gesendet} other {EDI Bridge kann die Datei aus Ihrem ERP nicht lesen}}",
+          "description": "{direction, select, inbound {Die Datei ist beschädigt oder unvollständig, daher konnte EDI Bridge sie nicht lesen. {tradingPartner} wurde automatisch mit einer Empfangsbestätigung informiert.} other {Die Datei, die Ihr ERP exportiert hat, ist beschädigt, unvollständig oder in einer Zeichenkodierung oder einem Format, das EDI Bridge nicht lesen kann. Die Lösung liegt im Export Ihres ERP: Prüfen Sie Zeichenkodierung und Format.}}"
         },
         "invalidContent": {
           "title": "{direction, select, inbound {Der Inhalt verletzt die EDI-Regeln} other {Ein Pflichtwert ist leer}}",
@@ -785,21 +786,23 @@
         },
         "defect": {
           "title": "In EDI Bridge ist ein interner Fehler aufgetreten",
-          "description": "Der Fehler liegt in EDI Bridge, nicht im Beleg. Versuchen Sie es erneut; tritt er wieder auf, ist er für das Team protokolliert."
+          "description": "In EDI Bridge ist beim {stage, select, parse {Lesen der Datei} validation {Prüfen des Inhalts} mapping {Übersetzen des Belegs} other {Zustellen des Belegs}} ein interner Fehler aufgetreten. Versuchen Sie es erneut; tritt er wieder auf, ist er für das Team protokolliert."
         }
       },
       "whoFixes": {
         "you": "Das liegt auf Ihrer Seite. Sie können es selbst beheben.",
         "tradingPartner": "Auf Ihrer Seite ist nichts zu beheben. {tradingPartner} muss eine korrigierte Datei senden.",
-        "retry": "Am Beleg selbst ist nichts falsch. Ein erneuter Versuch klappt meistens."
+        "retry": "Am Beleg selbst ist nichts falsch. Ein erneuter Versuch klappt meistens.",
+        "setup": "Am Beleg selbst ist nichts falsch. Vervollständigen Sie zuerst die Einrichtung und versuchen Sie es dann erneut."
       },
       "waiting": "Als wartend auf {tradingPartner} markiert seit <time>{since}</time>.",
       "steps": {
         "fixCause": "Beheben Sie die Ursache.",
+        "completeSetup": "Vervollständigen Sie die Einrichtung.",
         "fixCauseWithoutTarget": "Beheben Sie die hier beschriebene Ursache. EDI Bridge kann diesen Beleg nicht erneut verarbeiten, {direction, select, inbound {bitten Sie also {tradingPartner}, ihn erneut zu senden} other {senden Sie ihn also erneut aus Ihrem ERP}}.",
         "checkConnection": "Wenn es weiter fehlschlägt, prüfen Sie die Verbindungsdaten.",
         "processAgain": "Verarbeiten Sie den Beleg erneut. EDI Bridge nutzt die Originaldatei, {direction, select, inbound {{tradingPartner} muss} other {Ihr ERP muss}} also nichts erneut senden.",
-        "tryAgain": "Versuchen Sie es erneut. Der fertige Beleg wird noch einmal gesendet, nichts wird neu übersetzt.",
+        "tryAgain": "{stage, select, delivery {Versuchen Sie es erneut. Der fertige Beleg wird noch einmal gesendet, nichts wird neu übersetzt.} other {Versuchen Sie es erneut. EDI Bridge verarbeitet die Originaldatei noch einmal mit derselben Mapping-Version.}}",
         "tellTradingPartner": "Informieren Sie {tradingPartner} und bitten Sie um eine korrigierte Datei. Die Nachricht enthält die technischen Details für das IT-Team. Die Kontaktdaten stehen auf der Partnerseite.",
         "markWaiting": "Markieren Sie den Beleg, damit Ihr Team weiß, dass Sie auf {tradingPartner} warten."
       },
@@ -837,7 +840,7 @@
       "tryAgain": {
         "button": "Erneut versuchen",
         "pending": "Wird erneut versucht",
-        "failed": "Die Zustellung ist nicht erneut gestartet. Versuchen Sie es noch einmal.",
+        "failed": "{stage, select, delivery {Die Zustellung ist nicht erneut gestartet. Versuchen Sie es noch einmal.} other {Die Verarbeitung ist nicht erneut gestartet. Versuchen Sie es noch einmal.}}",
         "viewOnly": "Ein Admin kann es erneut versuchen."
       },
       "copyMessage": {

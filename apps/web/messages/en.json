@@ -664,6 +664,7 @@
     },
     "whoFixes": {
       "retry": "Just try again",
+      "setup": "Complete the setup",
       "tradingPartner": "Your partner fixes this",
       "you": "You fix this"
     },
@@ -756,8 +757,8 @@
       "whatToDo": "What to do",
       "reason": {
         "unreadable": {
-          "title": "{tradingPartner} sent a damaged file",
-          "description": "The file is damaged or incomplete, so EDI Bridge could not read it. {tradingPartner} has been told automatically with a receipt confirmation."
+          "title": "{direction, select, inbound {{tradingPartner} sent a damaged file} other {EDI Bridge cannot read the file from your ERP}}",
+          "description": "{direction, select, inbound {The file is damaged or incomplete, so EDI Bridge could not read it. {tradingPartner} has been told automatically with a receipt confirmation.} other {The file that your ERP exported is damaged, incomplete or in an encoding or format that EDI Bridge cannot read. The fix is in the export of your ERP: check its encoding and format.}}"
         },
         "invalidContent": {
           "title": "{direction, select, inbound {The content breaks the EDI rules} other {A required value is empty}}",
@@ -785,21 +786,23 @@
         },
         "defect": {
           "title": "EDI Bridge hit an internal error",
-          "description": "The error happened inside EDI Bridge, not in the document. Try again; if it happens again, the error is logged for the team."
+          "description": "EDI Bridge hit an internal error while {stage, select, parse {reading the file} validation {checking the content} mapping {translating the document} other {delivering the document}}. Try again; if it happens again, the error is logged for the team."
         }
       },
       "whoFixes": {
         "you": "This one is on your side. You can fix it yourself.",
         "tradingPartner": "Nothing to fix on your side. {tradingPartner} has to send a corrected file.",
-        "retry": "Nothing is wrong with the document itself. Trying again usually works."
+        "retry": "Nothing is wrong with the document itself. Trying again usually works.",
+        "setup": "Nothing is wrong with the document itself. Complete the setup first, then try again."
       },
       "waiting": "Marked as waiting for {tradingPartner} since <time>{since}</time>.",
       "steps": {
         "fixCause": "Fix the cause.",
+        "completeSetup": "Complete the setup.",
         "fixCauseWithoutTarget": "Fix the cause described here. EDI Bridge cannot process this document again, so {direction, select, inbound {ask {tradingPartner} to send it again} other {send it again from your ERP}}.",
         "checkConnection": "If it keeps failing, check the connection details.",
         "processAgain": "Process it again. EDI Bridge uses the original file, so {direction, select, inbound {{tradingPartner} does} other {your ERP does}} not have to send anything again.",
-        "tryAgain": "Try again. The finished document is sent once more, nothing is translated again.",
+        "tryAgain": "{stage, select, delivery {Try again. The finished document is sent once more, nothing is translated again.} other {Try again. EDI Bridge processes the original file once more with the same mapping version.}}",
         "tellTradingPartner": "Tell {tradingPartner} and ask for a corrected file. The message includes the technical detail their IT team needs. Their contact details are on the partner page.",
         "markWaiting": "Mark it so your team knows you are waiting for {tradingPartner}."
       },
@@ -837,7 +840,7 @@
       "tryAgain": {
         "button": "Try again",
         "pending": "Trying again",
-        "failed": "The delivery did not start again. Try once more.",
+        "failed": "{stage, select, delivery {The delivery did not start again. Try once more.} other {The processing did not start again. Try once more.}}",
         "viewOnly": "An Admin can try again."
       },
       "copyMessage": {

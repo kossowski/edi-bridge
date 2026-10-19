@@ -5,7 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 
-import { FixerBadge } from '@/components/documents/fixer-badge'
+import { FixerBadge, shownFixer } from '@/components/documents/fixer-badge'
 import { RelativeTime } from '@/components/documents/relative-time'
 import { RunStatusBadge } from '@/components/documents/run-status'
 import { useRunTitle } from '@/components/documents/run-title'
@@ -77,7 +77,7 @@ export function RunRow({ run }: { run: RunSummary }) {
             <span className="text-destructive text-sm font-medium">
               {plainNames.failureStageTitle(run.failureStage)}
             </span>
-            {fixer && <FixerBadge fixer={fixer} />}
+            {fixer && <FixerBadge fixer={shownFixer(fixer, run.problem?.reason)} />}
           </div>
         )}
       </ItemContent>
