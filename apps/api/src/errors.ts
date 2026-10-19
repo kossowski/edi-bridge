@@ -1,6 +1,7 @@
 import { Data } from 'effect'
 
 import {
+  type AiBudget,
   type DocumentStructureProblem,
   type InviteUnusableReason,
   inviteUnusableMessages,
@@ -43,5 +44,13 @@ export class InviteUnusable extends Data.TaggedError('InviteUnusable')<{
 export class AiReviewOpen extends Data.TaggedError('AiReviewOpen') {
   override get message() {
     return 'The AI review of the Draft is still open.'
+  }
+}
+
+export class AiBudgetExhausted extends Data.TaggedError('AiBudgetExhausted')<{
+  readonly budget: AiBudget
+}> {
+  override get message() {
+    return 'The daily AI budget of the Workspace is used up.'
   }
 }

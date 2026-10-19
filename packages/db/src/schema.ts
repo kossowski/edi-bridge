@@ -2,6 +2,7 @@ import { type SQL, sql } from 'drizzle-orm'
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -17,6 +18,7 @@ import {
 
 import {
   acknowledgementTimeLimitHours,
+  aiDailyTokenLimit,
   type AiReview,
   channelTypes,
   characterSets,
@@ -39,12 +41,38 @@ import {
   workspaceRoles,
 } from '@edi-bridge/contracts'
 
-export const workspaces = pgTable('workspaces', {
-  id: uuid().primaryKey().defaultRandom(),
-  name: text().notNull(),
-  gln: text(),
-  createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
-})
+export const workspaces = pgTable(
+  'workspaces',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: text().notNull(),
+    gln: text(),
+    aiDailyTokenLimit: integer().notNull().default(aiDailyTokenLimit.default),
+    createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      'ai_daily_token_limit_range',
+      sql`${table.aiDailyTokenLimit} between ${sql.raw(String(aiDailyTokenLimit.min))} and ${sql.raw(String(aiDailyTokenLimit.max))}`,
+    ),
+  ],
+)
+
+// Days are in UTC, since the AI budget resets at midnight UTC.
+export const aiTokenUsage = pgTable(
+  'ai_token_usage',
+  {
+    workspaceId: uuid()
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    day: date({ mode: 'string' }).notNull(),
+    tokens: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.day] }),
+    check('tokens_not_negative', sql`${table.tokens} >= 0`),
+  ],
+)
 
 const createdAt = () => timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow()
 
