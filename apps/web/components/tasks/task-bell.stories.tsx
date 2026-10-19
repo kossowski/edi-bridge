@@ -1,5 +1,6 @@
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
+import { mainContentId } from '@/components/main-content-focus'
 import { darkMode, german, mobile } from '@/components/story-helpers'
 import { TaskBell } from '@/components/tasks/task-bell'
 import { everyKind, hansemarkt } from '@/components/tasks/task-story-helpers'
@@ -61,11 +62,14 @@ export const EveryKind = meta.story({
 
 export const OpenAllTasks = meta.story({
   decorators: [
+    // The workspace layout keeps #main-content while the page inside it changes. Like a real page,
+    // it holds controls, which must not take the focus in its place.
     (Story) => (
       <>
         <Story />
-        <div id="main-content" tabIndex={-1} className="p-4 outline-none">
-          Main content
+        <div id={mainContentId} tabIndex={-1} className="flex gap-2 p-4 outline-none">
+          <button type="button">All 24</button>
+          <input aria-label="Search the tasks" />
         </div>
       </>
     ),
@@ -79,7 +83,7 @@ export const OpenAllTasks = meta.story({
     await userEvent.click(within(popover).getByRole('link', { name: 'Open all tasks' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     await waitFor(() =>
-      expect(canvasElement.ownerDocument.activeElement).toHaveAttribute('id', 'main-content'),
+      expect(canvasElement.ownerDocument.activeElement).toHaveAttribute('id', mainContentId),
     )
   },
 })

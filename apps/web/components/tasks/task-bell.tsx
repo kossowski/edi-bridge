@@ -7,6 +7,7 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRef, useState } from 'react'
 
+import { focusMainContent } from '@/components/main-content-focus'
 import { TaskIcon, useTaskText } from '@/components/tasks/task-text'
 import { tasksQuery } from '@/lib/api/queries'
 import { taskHref } from '@/lib/task-href'
@@ -117,21 +118,26 @@ export function TaskBell() {
   const count = data?.tasks.length ?? 0
   const shownCount = count > badgeLimit ? `${badgeLimit}+` : String(count)
   const navigating = useRef(false)
-  const close = () => setOpen(false)
+
+  function changeOpen(next: boolean) {
+    if (next) {
+      navigating.current = false
+    }
+
+    setOpen(next)
+  }
 
   function navigate() {
     navigating.current = true
-    close()
+    setOpen(false)
   }
 
-  function focusAfterClose() {
-    if (!navigating.current) {
-      return true
+  // The workspace layout keeps #main-content, so the opened page's content takes the focus. Base UI
+  // would move a final focus on to the first control inside it, so the bell sets it itself.
+  function focusAfterClose(opened: boolean) {
+    if (!opened && navigating.current) {
+      focusMainContent()
     }
-
-    navigating.current = false
-
-    return document.getElementById('main-content') ?? false
   }
 
   function content() {
@@ -147,7 +153,7 @@ export function TaskBell() {
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={changeOpen} onOpenChangeComplete={focusAfterClose}>
       <PopoverTrigger
         render={
           <Button
@@ -168,7 +174,7 @@ export function TaskBell() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        finalFocus={focusAfterClose}
+        finalFocus={() => !navigating.current}
         className="max-h-(--available-height) w-[min(22rem,calc(100vw-2rem))] gap-0 p-0">
         <div className="flex shrink-0 flex-col gap-0.5 border-b px-3 py-2.5">
           <PopoverTitle>{t('title')}</PopoverTitle>
