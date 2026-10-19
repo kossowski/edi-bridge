@@ -1346,4 +1346,31 @@ describe('the processing of an inbound Run', () => {
       },
     ])
   })
+
+  it('processes an inbound Run handed out twice only once', async () => {
+    const into = await ordersWorkspace('Twice Foods')
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: into.id,
+        channelId: into.inboundChannelId,
+        fileName: 'orders.edi',
+        content: ordersInterchange,
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    const runId = receipt.runs[0]?.id ?? ''
+
+    await processQueued(queue, deliveryByChannelType)
+
+    const processed = await readRun(connection.db, runId)
+
+    await processQueued(queue, deliveryByChannelType)
+
+    await expect(readRun(connection.db, runId)).resolves.toEqual(processed)
+    expect(processed?.status).toBe('delivered')
+    expect(erp.received).toHaveLength(1)
+  })
 })
