@@ -23,15 +23,8 @@ export const uploadSftp = (
         })
       }
 
-      // A file of the final name is an earlier attempt that landed, and its Retry delivers nothing.
-      sftp.stat(target, (missing) => {
-        if (!missing) {
-          done(Effect.void)
-
-          return
-        }
-
-        // Writing the partial file replaces one that an attempt which timed out left behind.
+      // Writing the partial file replaces one that an attempt which timed out left behind.
+      const upload = () => {
         sftp.writeFile(partial, document.content, (writeError) => {
           if (writeError) {
             discardPartial(writeError)
@@ -50,6 +43,23 @@ export const uploadSftp = (
             done(Effect.void)
           })
         })
+      }
+
+      if (!document.isRetry) {
+        upload()
+
+        return
+      }
+
+      // For a Retry, a file of the final name is its earlier attempt that landed.
+      sftp.stat(target, (missing) => {
+        if (missing) {
+          upload()
+
+          return
+        }
+
+        done(Effect.void)
       })
     }),
     timeoutMs,

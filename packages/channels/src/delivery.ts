@@ -11,4 +11,5 @@ export interface OutboundDocument {
   name: string
   content: Buffer
   mediaType?: string
+  isRetry?: boolean
 }

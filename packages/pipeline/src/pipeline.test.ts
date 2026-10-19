@@ -1695,6 +1695,31 @@ describe('the Retry of a Run', () => {
     ).resolves.toBe(failed?.output)
   })
 
+  it('counts an Interchange that landed at the failed attempt as delivered and keeps it', async () => {
+    const into = await seedInvoiceWorkspace(connection.db, 'Landed Foods')
+    const login = await outboxOf('landed')
+    const landedChannelId = await deliverOverSftp(connection.db, into, { ...login, port: 1 })
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    await processQueued(queue)
+
+    const failed = await readRun(connection.db, runId)
+    const name = `${login.remotePath}/INVOIC-${String(failed?.controlReference)}.edi`
+
+    // The Channel took the file but the attempt timed out before it answered.
+    await sftp.exec(`echo landed > ${sftp.home}${name}`)
+    await connection.db
+      .update(channels)
+      .set({ port: sftp.port })
+      .where(eq(channels.id, landedChannelId))
+
+    const run = await retried(into, runId)
+
+    expect(run).toMatchObject({ status: 'delivered', output: failed?.output })
+    await expect(remoteFile(name)).resolves.toBe('landed\n')
+  })
+
   it('builds the Interchange of a Run that failed for a missing GLN from its stored Message without mapping again', async () => {
     const into = await seedInvoiceWorkspace(connection.db, 'Late Foods')
 

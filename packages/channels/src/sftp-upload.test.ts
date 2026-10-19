@@ -77,30 +77,51 @@ describe('uploadSftp', () => {
     ).toEqual(new DeliveryFailed({ reason: 'remotePathMissing' }))
   })
 
-  it('counts a file of the same name as an earlier upload that landed and keeps it', async () => {
+  it('keeps a file of the same name and leaves no partial file behind', async () => {
     await sftp.exec(
       `install -d -m 777 ${sftp.home}/upload/taken && echo earlier > ${sftp.home}/upload/taken/orders-44.edi`,
     )
 
-    await Effect.runPromise(
-      uploadSftp({ ...outbox(), remotePath: '/upload/taken' }, interchange('orders-44.edi'), {
-        timeoutMs,
-      }),
-    )
+    expect(
+      await failure(
+        uploadSftp({ ...outbox(), remotePath: '/upload/taken' }, interchange('orders-44.edi'), {
+          timeoutMs,
+        }),
+      ),
+    ).toEqual(new DeliveryFailed({ reason: 'unexpectedResponse' }))
 
     expect(await remoteListing('/upload/taken')).toEqual(['orders-44.edi'])
     expect(await remoteFile('/upload/taken/orders-44.edi')).toBe('earlier\n')
   })
 
-  it('replaces the partial file of an earlier upload that timed out', async () => {
+  it('counts a file of the same name as the earlier attempt of a Retry that landed and keeps it', async () => {
+    await sftp.exec(
+      `install -d -m 777 ${sftp.home}/upload/landed && echo earlier > ${sftp.home}/upload/landed/orders-48.edi`,
+    )
+
+    await Effect.runPromise(
+      uploadSftp(
+        { ...outbox(), remotePath: '/upload/landed' },
+        { ...interchange('orders-48.edi'), isRetry: true },
+        { timeoutMs },
+      ),
+    )
+
+    expect(await remoteListing('/upload/landed')).toEqual(['orders-48.edi'])
+    expect(await remoteFile('/upload/landed/orders-48.edi')).toBe('earlier\n')
+  })
+
+  it('replaces the partial file that the timed-out attempt of a Retry left behind', async () => {
     await sftp.exec(
       `install -d -m 777 ${sftp.home}/upload/resumed && echo UNB > ${sftp.home}/upload/resumed/.orders-47.edi.part && chown ${sftp.username} ${sftp.home}/upload/resumed/.orders-47.edi.part`,
     )
 
     await Effect.runPromise(
-      uploadSftp({ ...outbox(), remotePath: '/upload/resumed' }, interchange('orders-47.edi'), {
-        timeoutMs,
-      }),
+      uploadSftp(
+        { ...outbox(), remotePath: '/upload/resumed' },
+        { ...interchange('orders-47.edi'), isRetry: true },
+        { timeoutMs },
+      ),
     )
 
     expect(await remoteListing('/upload/resumed')).toEqual(['orders-47.edi'])

@@ -606,6 +606,7 @@ const deliverInterchange = (
   run: ClaimedRun,
   messageType: MessageType,
   destination: Destination,
+  isRetry: boolean,
 ) =>
   Effect.gen(function* () {
     // Only UNOA to UNOC encode, all as ISO 8859-1, so a stored Interchange was written in it.
@@ -619,6 +620,7 @@ const deliverInterchange = (
       name: `${messageType}-${String(reference)}.edi`,
       content,
       mediaType: 'application/edifact',
+      isRetry,
     })
   }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
 
@@ -627,7 +629,12 @@ const documentFormats = {
   csv: { extension: 'csv', mediaType: 'text/csv' },
 } as const
 
-const deliverDocument = (run: ClaimedRun, pinned: Pinned, destination: Destination) =>
+const deliverDocument = (
+  run: ClaimedRun,
+  pinned: Pinned,
+  destination: Destination,
+  isRetry: boolean,
+) =>
   Effect.gen(function* () {
     const { structure } = pinned
 
@@ -642,6 +649,7 @@ const deliverDocument = (run: ClaimedRun, pinned: Pinned, destination: Destinati
       name: `${pinned.messageType}-${run.id}.${extension}`,
       content: Buffer.from(encodeText(run.output, encoding)),
       mediaType,
+      isRetry,
     })
   }).pipe(Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))))
 
@@ -1005,7 +1013,7 @@ const processOutbound = ({ queued, run, content, pinned, lookupTables }: Process
     yield* deliveryStep(
       delivering,
       destination,
-      deliverInterchange(queued, delivering, pinned.messageType, destination),
+      deliverInterchange(queued, delivering, pinned.messageType, destination, false),
     )
   })
 
@@ -1101,7 +1109,11 @@ const processInbound = ({
     const delivering = mappedRun ?? run
     const destination = yield* loadDestination(queued)
 
-    yield* deliveryStep(delivering, destination, deliverDocument(delivering, pinned, destination))
+    yield* deliveryStep(
+      delivering,
+      destination,
+      deliverDocument(delivering, pinned, destination, false),
+    )
   })
 
 // A Retry leaves every step before the delivery succeeded.
@@ -1143,8 +1155,8 @@ const processClaimed = (
         run,
         destination,
         direction === 'outbound'
-          ? deliverInterchange(queued, run, pinned.messageType, destination)
-          : deliverDocument(run, pinned, destination),
+          ? deliverInterchange(queued, run, pinned.messageType, destination, true)
+          : deliverDocument(run, pinned, destination, true),
       )
     }
 
