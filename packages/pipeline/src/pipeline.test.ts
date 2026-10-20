@@ -38,12 +38,14 @@ import {
 } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
+import { defectCauseOf } from './defect-report'
 import {
   type ArrivingDocument,
   bullmqRunQueue,
   channelDelivery,
   type DeliveryService,
   decodeDocument,
+  DefectReporter,
   deleteExpiredDocuments,
   LiveEvents,
   type LiveEventsService,
@@ -2073,7 +2075,7 @@ describe('the trace of a Run', () => {
 })
 
 describe('the defect report of a Run', () => {
-  it('reports a Delivery that dies once, tagged with its Workspace, Run and Trading Partner', async () => {
+  it('reports a Delivery that dies once as a channel defect, tagged with its ids', async () => {
     const broken = new Error('The Channel row is broken')
     const { queue, runId } = await receiveInvoice()
 
@@ -2088,9 +2090,54 @@ describe('the defect report of a Run', () => {
         workspaceId: workspace.id,
         runId,
         tradingPartnerId: workspace.tradingPartnerId,
-        defect: broken,
+        channelId,
+        code: 'channelDefect',
+        cause: defectCauseOf(broken),
       },
     ])
+  })
+
+  it('reports only the name and stack frames of a defect, never its message or properties', async () => {
+    const secret = 'hunter2-decrypted-credential'
+
+    const leaking = Object.assign(new Error(`Login of ${secret} failed\nwith ${secret}`), {
+      credential: secret,
+      channel: { password: secret },
+    })
+
+    const { queue, runId } = await receiveInvoice()
+
+    await Effect.runPromiseExit(
+      processRun(queue.queued[0] ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, () => Effect.die(leaking)),
+      ),
+    )
+
+    const reports = defectReportsOf(runId)
+
+    expect(reports.map(({ cause }) => cause.name)).toEqual(['Error'])
+    expect(reports[0]?.cause.frames.length).toBeGreaterThan(0)
+    expect(JSON.stringify(reports)).not.toContain(secret)
+  })
+
+  it('leaves the Run failed and its defect dying when the reporter dies', async () => {
+    const broken = new Error('The Channel row is broken')
+    const { queue, runId } = await receiveInvoice()
+
+    const exit = await Effect.runPromiseExit(
+      processRun(queue.queued[0] ?? { workspaceId: workspace.id, runId }).pipe(
+        Effect.provideService(DefectReporter, {
+          report: () => Effect.die(new Error('The reporter is down')),
+        }),
+        pipelineServices(connection.db, queue, () => Effect.die(broken)),
+      ),
+    )
+
+    expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toBe(broken)
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      problem: { reason: 'incompleteSetup' },
+    })
   })
 
   it('reports a processing defect once, tagged with its Workspace, Run and Trading Partner', async () => {
@@ -2116,12 +2163,14 @@ describe('the defect report of a Run', () => {
         workspaceId: defective.id,
         runId,
         tradingPartnerId: defective.tradingPartnerId,
-        defect: Cause.squash(Exit.isFailure(exit) ? exit.cause : Cause.empty),
+        channelId: null,
+        code: 'processingDefect',
+        cause: defectCauseOf(Cause.squash(Exit.isFailure(exit) ? exit.cause : Cause.empty)),
       },
     ])
   })
 
-  it('reports a delivery defect once', async () => {
+  it('reports a control reference that overflows as a defect once', async () => {
     const exhausted = await seedInvoiceWorkspace(connection.db, 'Overflowing Foods')
 
     // The next control reference overflows its integer column when it is claimed.
@@ -2129,7 +2178,7 @@ describe('the defect report of a Run', () => {
       .update(tradingPartners)
       .set({ nextControlReference: 2_147_483_647 })
       .where(eq(tradingPartners.id, exhausted.tradingPartnerId))
-    await deliverOverSftp(connection.db, exhausted, sftpLogin())
+    const exhaustedChannelId = await deliverOverSftp(connection.db, exhausted, sftpLogin())
 
     const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), exhausted)
 
@@ -2140,7 +2189,13 @@ describe('the defect report of a Run', () => {
     )
 
     expect(defectReportsOf(runId)).toMatchObject([
-      { workspaceId: exhausted.id, runId, tradingPartnerId: exhausted.tradingPartnerId },
+      {
+        workspaceId: exhausted.id,
+        runId,
+        tradingPartnerId: exhausted.tradingPartnerId,
+        channelId: exhaustedChannelId,
+        code: 'deliveryDefect',
+      },
     ])
   })
 
@@ -2158,7 +2213,13 @@ describe('the defect report of a Run', () => {
       problem: { reason: 'defect' },
     })
     expect(defectReportsOf(runId)).toMatchObject([
-      { workspaceId: workspace.id, runId, tradingPartnerId: workspace.tradingPartnerId },
+      {
+        workspaceId: workspace.id,
+        runId,
+        tradingPartnerId: workspace.tradingPartnerId,
+        channelId: null,
+        code: 'processingDefect',
+      },
     ])
   })
 
@@ -2173,7 +2234,13 @@ describe('the defect report of a Run', () => {
     await sweepStuck()
 
     expect(defectReportsOf(runId)).toMatchObject([
-      { workspaceId: workspace.id, runId, tradingPartnerId: workspace.tradingPartnerId },
+      {
+        workspaceId: workspace.id,
+        runId,
+        tradingPartnerId: workspace.tradingPartnerId,
+        channelId: null,
+        code: 'processingDefect',
+      },
     ])
   })
 

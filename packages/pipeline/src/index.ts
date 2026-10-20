@@ -6,7 +6,13 @@ export { namesOtherEncoding } from '@edi-bridge/edifact'
 
 export { type DecodedDocument, decodeDocument, DocumentUndecodable } from './decode-document'
 
-export { DefectReporter, type DefectReport, type DefectReporterService } from './defect-report'
+export {
+  DefectReporter,
+  type DefectCause,
+  type DefectCode,
+  type DefectReport,
+  type DefectReporterService,
+} from './defect-report'
 
 export { deleteExpiredDocuments } from './delete-expired-documents'
 
