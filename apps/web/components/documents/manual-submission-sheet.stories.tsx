@@ -511,6 +511,52 @@ export const FileBeingRead = meta.story({
   },
 })
 
+// A file the browser fails to read, as one deleted or moved after it was chosen.
+const unreadable = Object.assign(new File(['UNB'], 'unreadable.edi'), {
+  arrayBuffer: () => Promise.reject(new DOMException('The file is gone.', 'NotFoundError')),
+})
+
+export const UnreadableFile = meta.story({
+  args: { defaultChannelId: inbox.id },
+  async play() {
+    const content = await sheet()
+
+    await loaded(content)
+    await userEvent.upload(content.getByLabelText('File'), unreadable)
+
+    await expect(
+      await content.findByText(
+        'The file could not be read. Choose it again or choose another file.',
+      ),
+    ).toBeVisible()
+    await expect(content.getByLabelText('File')).toHaveAttribute('aria-invalid', 'true')
+    await expect(content.getByLabelText('File')).toHaveValue('')
+    await expect(content.queryByText('Chosen: unreadable.edi')).toBeNull()
+
+    await userEvent.upload(content.getByLabelText('File'), order)
+    await expect(content.queryByText(/could not be read/)).toBeNull()
+    await clickUpload(content)
+    await expect(await content.findByRole('heading', { name: '1 document created' })).toBeVisible()
+  },
+})
+
+export const GermanUnreadableFile = meta.story({
+  args: { defaultChannelId: inbox.id },
+  decorators: [german],
+  async play() {
+    const content = await sheet('Beleg hochladen')
+
+    await loaded(content, 'Woher kommt der Beleg?')
+    await userEvent.upload(content.getByLabelText('Datei'), unreadable)
+
+    await expect(
+      await content.findByText(
+        'Die Datei konnte nicht gelesen werden. Wählen Sie sie erneut oder wählen Sie eine andere Datei.',
+      ),
+    ).toBeVisible()
+  },
+})
+
 export const ChannelChangeClearsFailure = meta.story({
   args: { defaultChannelId: inbox.id },
   beforeEach({ msw }) {

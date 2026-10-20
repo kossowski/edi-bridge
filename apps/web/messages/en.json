@@ -3825,7 +3825,8 @@
       "file": {
         "required": "Choose a file.",
         "empty": "The file is empty.",
-        "tooLarge": "The file is too large. A file can have at most 5 MB."
+        "tooLarge": "The file is too large. A file can have at most 5 MB.",
+        "unreadable": "The file could not be read. Choose it again or choose another file."
       },
       "unroutable": "No document route on this connection handles the documents in this file. Set up a document route for them first.",
       "undecodable": {

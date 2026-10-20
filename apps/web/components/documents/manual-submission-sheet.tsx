@@ -219,6 +219,13 @@ function FileField({
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
+  // A file that could not be read is dropped, so choosing the same file again fires a change.
+  useEffect(() => {
+    if (file === null && input.current) {
+      input.current.value = ''
+    }
+  }, [file])
+
   function drop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
     setDragging(false)
@@ -344,7 +351,7 @@ function ManualSubmissionForm({
   const [encoding, setEncoding] = useState<CharacterEncoding>('utf-8')
   const latestFile = useRef<File | null>(null)
   const [channelError, setChannelError] = useState(false)
-  const [fileProblem, setFileProblem] = useState<DocumentProblem | null>(null)
+  const [fileProblem, setFileProblem] = useState<DocumentProblem | 'unreadable' | null>(null)
 
   const submission = useMutation({
     mutationFn: (input: { channel: Channel; document: SubmittedDocument }) =>
@@ -373,11 +380,20 @@ function ManualSubmissionForm({
     submission.reset()
 
     if (next !== null) {
-      void readFile(next).then((result) => {
-        if (latestFile.current === next) {
-          setChosen(result)
-        }
-      })
+      void readFile(next).then(
+        (result) => {
+          if (latestFile.current === next) {
+            setChosen(result)
+          }
+        },
+        () => {
+          if (latestFile.current === next) {
+            latestFile.current = null
+            setFile(null)
+            setFileProblem('unreadable')
+          }
+        },
+      )
     }
   }
 

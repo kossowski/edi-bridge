@@ -3825,7 +3825,8 @@
       "file": {
         "required": "Wählen Sie eine Datei.",
         "empty": "Die Datei ist leer.",
-        "tooLarge": "Die Datei ist zu groß. Eine Datei darf höchstens 5 MB groß sein."
+        "tooLarge": "Die Datei ist zu groß. Eine Datei darf höchstens 5 MB groß sein.",
+        "unreadable": "Die Datei konnte nicht gelesen werden. Wählen Sie sie erneut oder wählen Sie eine andere Datei."
       },
       "unroutable": "Kein Belegweg auf dieser Verbindung verarbeitet die Belege in dieser Datei. Richten Sie zuerst einen Belegweg für sie ein.",
       "undecodable": {
