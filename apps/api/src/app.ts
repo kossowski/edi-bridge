@@ -37,6 +37,8 @@ import {
   flowEndpoint,
   flowsEndpoint,
   inferDocumentStructureEndpoint,
+  interchangeEndpoint,
+  interchangesEndpoint,
   importLookupTableEndpoint,
   inviteUnusableProblem,
   inviteUnusableStatus,
@@ -125,6 +127,7 @@ import {
   updateDocumentStructure,
 } from './document-structure.js'
 import { createFlow, listFlows, loadFlow, moveFlowMappingVersion, updateFlow } from './flow.js'
+import { listInterchanges, loadInterchange } from './interchange.js'
 import { acceptInvite, createInvite, listInvites, revokeInvite } from './invite.js'
 import {
   createLookupTable,
@@ -656,6 +659,18 @@ function registerRoutes(
   )
 
   app.get(tasksEndpoint.path, (request, reply) => respond(request, reply, listTasks))
+
+  app.get(interchangesEndpoint.path, (request, reply) =>
+    respond(
+      request,
+      reply,
+      Effect.flatMap(parse(interchangesEndpoint.query, request.query), listInterchanges),
+    ),
+  )
+
+  app.get<{ Params: { id: string } }>(interchangeEndpoint.path, (request, reply) =>
+    respond(request, reply, loadInterchange(request.params.id)),
+  )
 
   app.get(runsEndpoint.path, (request, reply) =>
     respond(request, reply, Effect.flatMap(parse(runsEndpoint.query, request.query), listRuns)),
