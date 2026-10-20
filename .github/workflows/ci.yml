@@ -145,13 +145,16 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v7
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version-file: package.json
 
       - name: Test the Claude Code hooks
-        run: node --test '.claude/hooks/*.test.mjs'
+        run: pnpm test:agent-hooks
 
   checks:
     name: CI passed
