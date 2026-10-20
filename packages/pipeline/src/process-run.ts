@@ -1341,19 +1341,30 @@ type Processing = {
   tradingPartner: TradingPartner
 }
 
+// What a Run stores of its built Message: its references and the Message as the delivery input.
+const builtOf = (message: Message) => ({ ...referencesOf(message), deliveryInput: message })
+
 const processOutbound = ({ holding, queued, run, document, pinned, lookupTables }: Processing) =>
   Effect.gen(function* () {
-    const mapped = yield* step(holding, 'mapping', () =>
-      storedTextOf(document, encodingOf(pinned.structure)).pipe(
-        Effect.flatMap((content) => readDocument(pinned.structure, content)),
-        Effect.flatMap((document) =>
-          mapMessage(
-            { ...pinned.graph, target: { kind: 'messageType', messageType: pinned.messageType } },
-            document,
-            { lookupTables: entriesOf(lookupTables) },
+    const mapped = yield* step(
+      holding,
+      'mapping',
+      () =>
+        storedTextOf(document, encodingOf(pinned.structure)).pipe(
+          Effect.flatMap((content) => readDocument(pinned.structure, content)),
+          Effect.flatMap((document) =>
+            mapMessage(
+              { ...pinned.graph, target: { kind: 'messageType', messageType: pinned.messageType } },
+              document,
+              { lookupTables: entriesOf(lookupTables) },
+            ),
           ),
         ),
-      ),
+      // The built Message is kept even when validation fails,
+      // so the failing segment position can point into it.
+      async (tx, { message }) => {
+        await tx.update(runs).set(builtOf(message)).where(eq(runs.id, run.id))
+      },
     )
 
     if (Result.isFailure(mapped)) {
@@ -1363,26 +1374,10 @@ const processOutbound = ({ holding, queued, run, document, pinned, lookupTables 
     const { message } = mapped.success
     const destination = yield* loadDestination(queued)
 
-    const delivering = {
-      ...run,
-      ...referencesOf(message),
-      deliveryInput: message,
-    }
+    const delivering = { ...run, ...builtOf(message) }
 
-    const checked = yield* step(
-      holding,
-      'validation',
-      () => validated(message, destination.tradingPartner.characterSet),
-      async (tx) => {
-        await tx
-          .update(runs)
-          .set({
-            businessReference: delivering.businessReference,
-            documentNumber: delivering.documentNumber,
-            deliveryInput: delivering.deliveryInput,
-          })
-          .where(eq(runs.id, run.id))
-      },
+    const checked = yield* step(holding, 'validation', () =>
+      validated(message, destination.tradingPartner.characterSet),
     )
 
     if (Result.isFailure(checked)) {
