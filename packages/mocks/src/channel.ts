@@ -2,6 +2,7 @@ import { en, Faker, faker as defaultFaker } from '@faker-js/faker'
 import { http, HttpResponse } from 'msw'
 
 import {
+  acceptHostKeyEndpoint,
   type Channel,
   channelEndpoint,
   type ChannelInput,
@@ -15,10 +16,13 @@ import {
   type ChannelUpdate,
   createChannelEndpoint,
   type Direction,
+  type HostKeyFingerprint,
+  hostKeyFingerprintSchema,
   type MaskedSecret,
   regenerateWebhookTokenEndpoint,
   sftpAuthentications,
   testChannelEndpoint,
+  type TestedHostKey,
   toPath,
   updateChannelEndpoint,
   webhookPath,
@@ -69,7 +73,11 @@ function webhookUrl(apiUrl: string, id: string) {
 export function toChannel(record: ChannelRecord, apiUrl: string): Channel {
   switch (record.type) {
     case 'sftp':
-      return channelSchema.parse({ ...record, credential: hidden })
+      return channelSchema.parse({
+        ...record,
+        credential: hidden,
+        hostKeyFingerprint: record.hostKeyFingerprint ?? null,
+      })
     case 'webhook': {
       const { token, ...rest } = record
 
@@ -104,6 +112,17 @@ function parseRecord(record: ChannelRecord): ChannelRecord {
 // not on the first GET. The API URL does not matter for that.
 function assertServable(record: ChannelRecord) {
   toChannel(record, '')
+}
+
+const base64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+// Seeded by host, so every test of one server shows one key and a mismatch stays reproducible.
+export function serverHostKey(host: string): HostKeyFingerprint {
+  const faker = seededFaker(`hostKey:${host}`)
+
+  return hostKeyFingerprintSchema.parse(
+    `SHA256:${faker.string.fromCharacters(base64, 42)}${faker.helpers.arrayElement([...'AEIMQUYcgkosw048'])}`,
+  )
 }
 
 function sftpConnection(
@@ -197,6 +216,18 @@ function generateChannel(
 
 const seedTrafficPartners = seedTradingPartners.filter(hasTraffic)
 
+// The second partner's Channels predate the host key check; the third partner replaced its server.
+function seedHostKey(host: string, index: number) {
+  switch (index) {
+    case 1:
+      return null
+    case 2:
+      return serverHostKey(`old.${host}`)
+    default:
+      return serverHostKey(host)
+  }
+}
+
 const erpSeeds: ReadonlyArray<ChannelRecord> = [
   {
     id: seedId(3, 1),
@@ -222,11 +253,16 @@ const tradingPartnerSeeds = seedTrafficPartners.flatMap(
   (tradingPartner, index): ChannelRecord[] => {
     const shortName = tradingPartner.name.split(' ')[0] ?? tradingPartner.name
 
+    const host = `sftp.${shortName.toLowerCase()}.example`
+
     const connection = sftpConnection(
       seededFaker(`sftp:${tradingPartner.id}`),
       tradingPartner.id,
-      `sftp.${shortName.toLowerCase()}.example`,
-      { authentication: index % 2 === 0 ? 'password' : 'privateKey' },
+      host,
+      {
+        authentication: index % 2 === 0 ? 'password' : 'privateKey',
+        hostKeyFingerprint: seedHostKey(host, index),
+      },
     )
 
     return (['inbound', 'outbound'] as const).map((direction, offset) =>
@@ -327,7 +363,15 @@ function applyUpdate(
     }
 
     return {
-      record: { ...update, id: existing.id, credential: update.credential ?? existing.credential },
+      record: {
+        ...update,
+        id: existing.id,
+        credential: update.credential ?? existing.credential,
+        hostKeyFingerprint:
+          update.hostKeyFingerprint === undefined
+            ? existing.hostKeyFingerprint
+            : update.hostKeyFingerprint,
+      },
     }
   }
 
@@ -359,9 +403,59 @@ const rejectedLogin = seedChannels.find(
     type === 'sftp' && direction === 'outbound' && tradingPartnerId === awaitingContrl?.id,
 )
 
-export const seedConnectionFailures: ReadonlyMap<string, ChannelTestResultReason> = new Map(
+// A mismatching host key follows from the stored and the presented key, never from this list.
+export type ConnectionFailure = Exclude<ChannelTestResultReason, 'hostKeyMismatch'>
+
+export const seedConnectionFailures: ReadonlyMap<string, ConnectionFailure> = new Map(
   rejectedLogin ? [[rejectedLogin.id, 'loginRejected']] : [],
 )
+
+const unreached: ReadonlySet<ConnectionFailure> = new Set([
+  'hostUnreachable',
+  'timedOut',
+  'seededChannel',
+])
+
+export function refusesHostKey(record: ChannelRecord) {
+  return (
+    record.type === 'sftp' &&
+    record.hostKeyFingerprint != null &&
+    record.hostKeyFingerprint !== serverHostKey(record.host)
+  )
+}
+
+function testedHostKey(
+  record: ChannelRecord,
+  failure: ConnectionFailure | undefined,
+): TestedHostKey | null {
+  if (record.type !== 'sftp' || (failure && unreached.has(failure))) {
+    return null
+  }
+
+  const fingerprint = serverHostKey(record.host)
+  const confirmed = record.hostKeyFingerprint ?? null
+
+  return {
+    fingerprint,
+    state: confirmed === null ? 'unchecked' : confirmed === fingerprint ? 'matches' : 'mismatch',
+  }
+}
+
+function testResult(
+  record: ChannelRecord,
+  failure: ConnectionFailure | undefined,
+): ChannelTestResult {
+  const testedAt = new Date().toISOString()
+  const hostKey = testedHostKey(record, failure)
+
+  if (hostKey?.state === 'mismatch') {
+    return { outcome: 'failed', reason: 'hostKeyMismatch', testedAt, hostKey }
+  }
+
+  return failure
+    ? { outcome: 'failed', reason: failure, testedAt, hostKey }
+    : { outcome: 'succeeded', testedAt, hostKey }
+}
 
 function usedByFlow(flows: Listing<FlowRecord>, channelId: string) {
   return allOf(flows).some(
@@ -379,7 +473,7 @@ export function channelHandlers(
   }: {
     channels?: ReadonlyArray<ChannelRecord> | ChannelStore
     flows?: Listing<FlowRecord>
-    connectionFailures?: ReadonlyMap<string, ChannelTestResultReason>
+    connectionFailures?: ReadonlyMap<string, ConnectionFailure>
   } = {},
 ) {
   const store = toChannelStore(channels)
@@ -473,16 +567,34 @@ export function channelHandlers(
       return HttpResponse.json({ channel: toChannel(updated, apiUrl), webhookToken: updated.token })
     }),
     http.post<{ id: string }>(`${apiUrl}${testChannelEndpoint.path}`, ({ params }) => {
-      if (!store.get(params.id)) {
-        return notFound()
-      }
+      const record = store.get(params.id)
 
-      const testedAt = new Date().toISOString()
-      const reason = failures.get(params.id)
-
-      return HttpResponse.json<ChannelTestResult>(
-        reason ? { outcome: 'failed', reason, testedAt } : { outcome: 'succeeded', testedAt },
-      )
+      return record ? HttpResponse.json(testResult(record, failures.get(params.id))) : notFound()
     }),
+    http.put<{ id: string }>(
+      `${apiUrl}${acceptHostKeyEndpoint.path}`,
+      async ({ params, request }) => {
+        const existing = store.get(params.id)
+
+        if (!existing) {
+          return notFound()
+        }
+
+        if (existing.type !== 'sftp') {
+          return conflict('Only SFTP Channels have a host key')
+        }
+
+        const body = acceptHostKeyEndpoint.body.safeParse(await request.json())
+
+        if (!body.success) {
+          return badRequest(body.error.message)
+        }
+
+        const updated = { ...existing, hostKeyFingerprint: body.data.hostKeyFingerprint }
+        store.set(updated)
+
+        return HttpResponse.json(toChannel(updated, apiUrl))
+      },
+    ),
   ]
 }

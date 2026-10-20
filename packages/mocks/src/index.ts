@@ -1,5 +1,4 @@
 import type {
-  ChannelTestResultReason,
   DocumentStructure,
   AiNoticeReason,
   Invite,
@@ -13,6 +12,7 @@ import { aiDraftHandlers, type AiDraftOptions } from './ai-draft'
 import {
   channelHandlers,
   type ChannelRecord,
+  type ConnectionFailure,
   createChannelStore,
   seedChannels,
   seedConnectionFailures,
@@ -114,11 +114,13 @@ export {
   channelHandlers,
   type ChannelRecord,
   type ChannelStore,
+  type ConnectionFailure,
   createChannel,
   createChannels,
   createChannelStore,
   randomWebhookToken,
   seedChannels,
+  serverHostKey,
   seedConnectionFailures,
   toChannel,
 } from './channel'
@@ -389,7 +391,7 @@ export function createHandlers(
     invites?: ReadonlyArray<Invite>
     tradingPartners?: ReadonlyArray<TradingPartner>
     channels?: ReadonlyArray<ChannelRecord>
-    connectionFailures?: ReadonlyMap<string, ChannelTestResultReason>
+    connectionFailures?: ReadonlyMap<string, ConnectionFailure>
     testInterchange?: TestInterchangeOptions
     mappingDrafts?: ReadonlyArray<MappingDraftRecord> | MappingDraftStore
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore

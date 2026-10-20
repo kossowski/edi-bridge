@@ -43,6 +43,7 @@ export type ChannelFormValues = {
   remotePath: string
   authentication: SftpAuthentication
   credential: string
+  hostKeyFingerprint: string
   pollingIntervalMinutes: string
   rateLimitPerMinute: string
   url: string
@@ -64,6 +65,7 @@ const fieldKinds = {
   tradingPartnerId: 'choice',
   host: 'format',
   port: 'number',
+  hostKeyFingerprint: 'format',
   username: 'text',
   remotePath: 'format',
   pollingIntervalMinutes: 'number',
@@ -129,6 +131,8 @@ function toBody(values: ChannelFormValues, secrets: { keep: boolean }) {
         remotePath: values.remotePath,
         authentication: values.authentication,
         credential,
+        hostKeyFingerprint:
+          values.hostKeyFingerprint.trim() === '' ? null : values.hostKeyFingerprint,
         ...(kind.direction === 'inbound' && {
           pollingIntervalMinutes: toNumber(values.pollingIntervalMinutes),
         }),
@@ -204,6 +208,7 @@ export function toFormValues(channel?: Channel): ChannelFormValues {
     remotePath: '/',
     authentication: 'password',
     credential: '',
+    hostKeyFingerprint: '',
     pollingIntervalMinutes: String(pollingIntervalMinutes.default),
     rateLimitPerMinute: String(webhookRateLimitPerMinute.default),
     url: '',
@@ -220,6 +225,7 @@ export function toFormValues(channel?: Channel): ChannelFormValues {
         username: channel.username,
         remotePath: channel.remotePath,
         authentication: channel.authentication,
+        hostKeyFingerprint: channel.hostKeyFingerprint ?? '',
         ...(channel.direction === 'inbound' && {
           pollingIntervalMinutes: String(channel.pollingIntervalMinutes),
         }),

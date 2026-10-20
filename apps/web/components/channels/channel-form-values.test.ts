@@ -12,6 +12,8 @@ import {
 
 const blank = toFormValues()
 
+const fingerprint = 'SHA256:nThbg6kXUpJWGl7E1IGOCspRomTxdCARLviKw6E5SY8'
+
 const sftp: ChannelFormValues = {
   ...blank,
   kind: 'sftp-inbound',
@@ -43,6 +45,15 @@ describe('toFormValues', () => {
     })
   })
 
+  it('fills the confirmed host key, which is no secret', () => {
+    const channel = existing(channelKinds[0], { hostKeyFingerprint: fingerprint })
+
+    expect(toFormValues(channel)).toMatchObject({ hostKeyFingerprint: fingerprint })
+    expect(toFormValues(existing(channelKinds[0], { hostKeyFingerprint: null }))).toMatchObject({
+      hostKeyFingerprint: '',
+    })
+  })
+
   it('never fills a secret from a saved Channel', () => {
     const channel = existing(channelKinds[0])
 
@@ -64,8 +75,21 @@ describe('validateNewChannel', () => {
         remotePath: '/outbox',
         authentication: 'password',
         credential: 's3cret',
+        hostKeyFingerprint: null,
         pollingIntervalMinutes: 5,
       },
+    })
+  })
+
+  it('stores a pasted host key fingerprint without the surrounding whitespace', () => {
+    expect(validateNewChannel({ ...sftp, hostKeyFingerprint: ` ${fingerprint}\n` })).toMatchObject({
+      input: { hostKeyFingerprint: fingerprint },
+    })
+  })
+
+  it('rejects a host key fingerprint that is not an OpenSSH SHA256 one', () => {
+    expect(validateNewChannel({ ...sftp, hostKeyFingerprint: '16:27:ac:a5:76:28:2d:36' })).toEqual({
+      errors: { hostKeyFingerprint: 'format' },
     })
   })
 
@@ -141,6 +165,18 @@ describe('validateChannelUpdate', () => {
     const result = validateChannelUpdate({ ...toFormValues(channel), name: 'Renamed' }, channel)
 
     expect(result).toMatchObject({ input: { name: 'Renamed', credential: undefined } })
+  })
+
+  it('keeps the confirmed host key, or removes it when the field is cleared', () => {
+    const channel = existing(channelKinds[0], { hostKeyFingerprint: fingerprint })
+    const values = toFormValues(channel)
+
+    expect(validateChannelUpdate(values, channel)).toMatchObject({
+      input: { hostKeyFingerprint: fingerprint },
+    })
+    expect(validateChannelUpdate({ ...values, hostKeyFingerprint: ' ' }, channel)).toMatchObject({
+      input: { hostKeyFingerprint: null },
+    })
   })
 
   it('requires a new credential when the authentication method changes', () => {

@@ -1513,48 +1513,6 @@
         "sftp": "SFTP",
         "webhook": "Webhook",
         "http": "HTTP"
-      },
-      "test": {
-        "button": "Verbindung testen",
-        "pending": "Wird getestet…",
-        "pendingStatus": "{name} wird getestet…",
-        "succeeded": "Die Verbindung funktioniert.",
-        "testedAt": "Getestet <when>{time}</when>.",
-        "requestFailed": "Der Test konnte nicht laufen. Versuchen Sie es erneut.",
-        "failed": {
-          "hostKeyMismatch": {
-            "title": "Der Server hat einen anderen Serverschlüssel gezeigt.",
-            "hint": "Der Serverschlüssel ist nicht der bestätigte, deshalb hat sich EDI Bridge nicht angemeldet. Fragen Sie die IT der Gegenseite, ob sie ihren Server oder den Serverschlüssel ersetzt hat, bevor Sie den neuen Serverschlüssel übernehmen."
-          },
-          "loginRejected": {
-            "title": "Die Anmeldung wurde abgelehnt.",
-            "hint": "Prüfen Sie den Benutzernamen und das Passwort oder den Schlüssel. Die IT der Gegenseite kann sie bestätigen."
-          },
-          "hostUnreachable": {
-            "title": "Der Server war nicht erreichbar.",
-            "hint": "Prüfen Sie die Serveradresse und fragen Sie die IT der Gegenseite, ob ihre Firewall EDI Bridge durchlässt."
-          },
-          "timedOut": {
-            "title": "Der Server hat nicht rechtzeitig geantwortet.",
-            "hint": "Versuchen Sie es in ein paar Minuten erneut. Passiert es öfter, fragen Sie die IT der Gegenseite, ob der Server läuft."
-          },
-          "remotePathMissing": {
-            "title": "Den Ordner gibt es nicht.",
-            "hint": "Prüfen Sie den Ordnerpfad. Die IT der Gegenseite kann Ihnen den richtigen nennen."
-          },
-          "permissionDenied": {
-            "title": "EDI Bridge darf den Ordner nicht nutzen.",
-            "hint": "Bitten Sie die IT der Gegenseite, diesem Benutzer Lesen und Schreiben im Ordner zu erlauben."
-          },
-          "unexpectedResponse": {
-            "title": "Der Server hat unerwartet geantwortet.",
-            "hint": "Prüfen Sie die Adresse. Stimmt sie, bitten Sie die IT der Gegenseite, das Protokoll ihres Servers anzusehen."
-          },
-          "seededChannel": {
-            "title": "Das ist eine Demo-Verbindung.",
-            "hint": "Eine Demo-Verbindung sendet nie, darum gibt es nichts zu testen."
-          }
-        }
       }
     },
     "addDocument": {
@@ -1967,6 +1925,69 @@
       "notSet": "Keiner",
       "endsIn": "Endet auf {lastFour}"
     },
+    "hostKey": {
+      "title": "Serverschlüssel",
+      "confirmed": "EDI Bridge verbindet sich nur mit einem Server, der diesen Schlüssel zeigt.",
+      "unchecked": {
+        "title": "Der Serverschlüssel wird noch nicht geprüft.",
+        "description": "Solange kein Serverschlüssel bestätigt ist, verbindet sich EDI Bridge mit jedem Server, der unter dieser Adresse antwortet.",
+        "action": "Testen Sie die Verbindung, um den Serverschlüssel zu sehen und zu übernehmen, oder fügen Sie ihn beim Bearbeiten der Verbindung ein.",
+        "viewOnly": "Ein Admin kann den Serverschlüssel bestätigen."
+      }
+    },
+    "test": {
+      "button": "Verbindung testen",
+      "pending": "Wird getestet…",
+      "pendingStatus": "{name} wird getestet…",
+      "succeeded": "Die Verbindung funktioniert.",
+      "testedAt": "Getestet <when>{time}</when>.",
+      "requestFailed": "Der Test konnte nicht laufen. Versuchen Sie es erneut.",
+      "failed": {
+        "hostKeyMismatch": {
+          "title": "Der Server hat einen anderen Serverschlüssel gezeigt.",
+          "hint": "Der Serverschlüssel ist nicht der bestätigte, deshalb hat sich EDI Bridge nicht angemeldet. Fragen Sie die IT der Gegenseite, ob sie ihren Server oder den Serverschlüssel ersetzt hat, bevor Sie den neuen Serverschlüssel übernehmen."
+        },
+        "loginRejected": {
+          "title": "Die Anmeldung wurde abgelehnt.",
+          "hint": "Prüfen Sie den Benutzernamen und das Passwort oder den Schlüssel. Die IT der Gegenseite kann sie bestätigen."
+        },
+        "hostUnreachable": {
+          "title": "Der Server war nicht erreichbar.",
+          "hint": "Prüfen Sie die Serveradresse und fragen Sie die IT der Gegenseite, ob ihre Firewall EDI Bridge durchlässt."
+        },
+        "timedOut": {
+          "title": "Der Server hat nicht rechtzeitig geantwortet.",
+          "hint": "Versuchen Sie es in ein paar Minuten erneut. Passiert es öfter, fragen Sie die IT der Gegenseite, ob der Server läuft."
+        },
+        "remotePathMissing": {
+          "title": "Den Ordner gibt es nicht.",
+          "hint": "Prüfen Sie den Ordnerpfad. Die IT der Gegenseite kann Ihnen den richtigen nennen."
+        },
+        "permissionDenied": {
+          "title": "EDI Bridge darf den Ordner nicht nutzen.",
+          "hint": "Bitten Sie die IT der Gegenseite, diesem Benutzer Lesen und Schreiben im Ordner zu erlauben."
+        },
+        "unexpectedResponse": {
+          "title": "Der Server hat unerwartet geantwortet.",
+          "hint": "Prüfen Sie die Adresse. Stimmt sie, bitten Sie die IT der Gegenseite, das Protokoll ihres Servers anzusehen."
+        },
+        "seededChannel": {
+          "title": "Das ist eine Demo-Verbindung.",
+          "hint": "Eine Demo-Verbindung sendet nie, darum gibt es nichts zu testen."
+        }
+      },
+      "hostKey": {
+        "matches": "Der Server hat den bestätigten Schlüssel gezeigt.",
+        "unchecked": "Vergleichen Sie diesen Schlüssel mit dem Fingerabdruck, den Ihnen die IT der Gegenseite nennt, bevor Sie ihn übernehmen.",
+        "shown": "Gezeigter Serverschlüssel",
+        "confirmed": "Bestätigter Serverschlüssel",
+        "accept": "Diesen Schlüssel übernehmen",
+        "acceptNew": "Neuen Schlüssel übernehmen",
+        "accepting": "Wird übernommen…",
+        "accepted": "Schlüssel übernommen. EDI Bridge prüft ihn bei jeder Verbindung.",
+        "acceptFailed": "Der Schlüssel konnte nicht übernommen werden. Versuchen Sie es erneut."
+      }
+    },
     "webhook": {
       "title": "Webhook",
       "description": "Absender schicken Documents per POST an diese URL und übergeben den Token im <header></header>-Header.",
@@ -2022,6 +2043,11 @@
       "port": {
         "label": "Port",
         "description": "Meist 22."
+      },
+      "hostKeyFingerprint": {
+        "label": "Fingerabdruck des Serverschlüssels (optional)",
+        "description": "Der SHA256-Fingerabdruck des Serverschlüssels (meist Ed25519), wie ihn ssh-keygen -lf ausgibt. Oder lassen Sie das Feld leer und übernehmen Sie den Schlüssel, den ein Verbindungstest zeigt.",
+        "keep": "Der SHA256-Fingerabdruck des Serverschlüssels (meist Ed25519), wie ihn ssh-keygen -lf ausgibt, oder der Schlüssel, den ein Verbindungstest gezeigt hat. Leeren Sie das Feld, um den Schlüssel nicht mehr zu prüfen."
       },
       "username": {
         "label": "Benutzername",
@@ -2079,6 +2105,7 @@
       "format": {
         "host": "Geben Sie einen Hostnamen ohne Protokoll, Pfad und Port ein.",
         "remotePath": "Geben Sie einen absoluten Pfad ein, der mit / beginnt.",
+        "hostKeyFingerprint": "Geben Sie den Fingerabdruck als SHA256: gefolgt von 43 Zeichen ein.",
         "url": "Geben Sie eine vollständige URL ein, die mit https:// oder http:// beginnt."
       },
       "invalid": "Prüfen Sie diesen Wert.",

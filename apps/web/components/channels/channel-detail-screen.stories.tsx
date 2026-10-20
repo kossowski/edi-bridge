@@ -6,8 +6,12 @@ import { ChannelDetailScreen } from '@/components/channels/channel-detail-screen
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import messagesDe from '@/messages/de.json'
-import { channelEndpoint, regenerateWebhookTokenEndpoint } from '@edi-bridge/contracts'
-import { createHandlers, seedChannels } from '@edi-bridge/mocks'
+import {
+  acceptHostKeyEndpoint,
+  channelEndpoint,
+  regenerateWebhookTokenEndpoint,
+} from '@edi-bridge/contracts'
+import { createHandlers, seedChannels, serverHostKey } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
 
@@ -19,7 +23,23 @@ const sftpInbox = seeded('Hansemarkt SFTP inbox')
 
 const sftpOutbox = seeded('Hansemarkt SFTP outbox')
 
+const uncheckedInbox = seeded('Alpenfrisch SFTP inbox')
+
+const replacedKeyOutbox = seeded('Rheinkauf SFTP outbox')
+
 const webhook = seeded('ERP webhook')
+
+function hostOf(channel: (typeof seedChannels)[number]) {
+  return channel.type === 'sftp' ? channel.host : ''
+}
+
+function confirmedKeyOf(channel: (typeof seedChannels)[number]) {
+  return channel.type === 'sftp' ? (channel.hostKeyFingerprint ?? '') : ''
+}
+
+function hostKeySection(canvasElement: HTMLElement) {
+  return within(within(canvasElement).getByRole('region', { name: 'Host key' }))
+}
 
 const httpDelivery = seeded('ERP HTTP delivery')
 
@@ -43,6 +63,122 @@ export const InboundSftp = meta.story({
     await expect(canvas.getByText('Polled folder')).toBeVisible()
     await expect(await canvas.findByRole('link', { name: 'Hansemarkt GmbH' })).toBeVisible()
     await expect(canvas.queryByText(/whk_/)).toBeNull()
+  },
+})
+
+export const ConfirmedHostKey = meta.story({
+  args: { id: sftpInbox.id },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { name: 'Host key' })
+    const section = hostKeySection(canvasElement)
+    await expect(section.getByText(confirmedKeyOf(sftpInbox))).toBeVisible()
+    await expect(
+      section.getByText('EDI Bridge connects only to a server that shows this key.'),
+    ).toBeVisible()
+
+    await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
+    await expect(await section.findByText('The server showed the confirmed key.')).toBeVisible()
+    await expect(section.getAllByText(confirmedKeyOf(sftpInbox))).toHaveLength(2)
+    await expect(section.queryByRole('button', { name: /^Accept/ })).toBeNull()
+  },
+})
+
+export const UncheckedHostKey = meta.story({
+  args: { id: uncheckedInbox.id },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { name: 'Host key' })
+    const section = hostKeySection(canvasElement)
+    await expect(section.getByText("The server's key is not checked yet.")).toBeVisible()
+    await expect(section.getByText(/paste the key when you edit the connection\.$/)).toBeVisible()
+
+    await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
+    await expect(await section.findByText('The connection works.')).toBeVisible()
+    const shown = serverHostKey(hostOf(uncheckedInbox))
+    await expect(section.getByText(shown)).toBeVisible()
+
+    await userEvent.click(section.getByRole('button', { name: 'Accept this key' }))
+    await expect(
+      await section.findByText('Key accepted. EDI Bridge checks it on every connection.'),
+    ).toBeVisible()
+    await expect(section.queryByText("The server's key is not checked yet.")).toBeNull()
+    await expect(
+      section.getByText('EDI Bridge connects only to a server that shows this key.'),
+    ).toBeVisible()
+  },
+})
+
+export const MismatchingHostKey = meta.story({
+  args: { id: replacedKeyOutbox.id },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { name: 'Host key' })
+    const section = hostKeySection(canvasElement)
+
+    await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
+    await expect(await section.findByText('The server showed a different key.')).toBeVisible()
+    const shown = serverHostKey(hostOf(replacedKeyOutbox))
+    await expect(section.getByText(shown)).toBeVisible()
+    await expect(section.getAllByText(confirmedKeyOf(replacedKeyOutbox))).toHaveLength(2)
+
+    await userEvent.click(section.getByRole('button', { name: 'Accept the new key' }))
+    await expect(
+      await section.findByText('Key accepted. EDI Bridge checks it on every connection.'),
+    ).toBeVisible()
+    await expect(section.queryByText('The server showed a different key.')).toBeNull()
+    await expect(section.queryByText(confirmedKeyOf(replacedKeyOutbox))).toBeNull()
+    await expect(section.getAllByText(shown)[0]).toBeVisible()
+  },
+})
+
+export const AcceptHostKeyFails = meta.story({
+  args: { id: uncheckedInbox.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.put(`${apiUrl}${acceptHostKeyEndpoint.path}`, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+    )
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { name: 'Host key' })
+    const section = hostKeySection(canvasElement)
+    await userEvent.click(section.getByRole('button', { name: /^Test connection/ }))
+    await userEvent.click(await section.findByRole('button', { name: 'Accept this key' }))
+    await expect(await section.findByRole('alert')).toHaveTextContent(
+      'The key could not be accepted. Try again.',
+    )
+  },
+})
+
+export const UncheckedHostKeyGerman = meta.story({
+  args: { id: uncheckedInbox.id },
+  decorators: [
+    (Story) => (
+      <NextIntlClientProvider locale="de" messages={messagesDe} timeZone="Europe/Berlin">
+        <Story />
+      </NextIntlClientProvider>
+    ),
+  ],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText('Der Serverschlüssel wird noch nicht geprüft.'),
+    ).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: /^Verbindung testen/ }))
+    await expect(
+      await canvas.findByRole('button', { name: 'Diesen Schlüssel übernehmen' }),
+    ).toBeVisible()
+  },
+})
+
+export const UncheckedHostKeyDark = meta.story({
+  args: { id: uncheckedInbox.id },
+  beforeEach() {
+    document.documentElement.classList.add('dark')
+
+    return () => document.documentElement.classList.remove('dark')
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: /^Test connection/ }))
+    await expect(await canvas.findByRole('button', { name: 'Accept this key' })).toBeVisible()
   },
 })
 
@@ -195,6 +331,19 @@ export const ViewerInboundSftp = meta.story({
       ).toBeInTheDocument()
       await expect(canvas.queryByRole('button', { name: 'Upload a document' })).toBeNull()
       await expect(canvas.queryByRole('link', { name: 'Edit' })).toBeNull()
+      await expect(canvas.queryByRole('button', { name: /^Test connection/ })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerUncheckedHostKey = meta.story({
+  args: { id: uncheckedInbox.id },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByText("The server's key is not checked yet.")).toBeVisible()
+      await expect(canvas.getByText('An Admin can confirm the key.')).toBeVisible()
+      await expect(canvas.queryByText(/when you edit the connection/)).toBeNull()
+      await expect(canvas.queryByRole('button', { name: /^Test connection/ })).toBeNull()
     },
   }),
 })

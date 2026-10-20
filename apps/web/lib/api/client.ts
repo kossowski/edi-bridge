@@ -1,4 +1,5 @@
 import {
+  acceptHostKeyEndpoint,
   type AcceptInviteInput,
   acceptInviteEndpoint,
   acceptAiDraftEndpoint,
@@ -17,6 +18,7 @@ import {
   createChannelEndpoint,
   type CreateDocumentStructureBody,
   createDocumentStructureEndpoint,
+  type HostKeyFingerprint,
   createFlowEndpoint,
   createInviteEndpoint,
   createLookupTableEndpoint,
@@ -700,6 +702,13 @@ export function regenerateWebhookToken(id: string) {
 
 export function testChannel(id: string) {
   return request(testChannelEndpoint, { path: toPath(testChannelEndpoint.path, { id }) })
+}
+
+export function acceptHostKey(id: string, hostKeyFingerprint: HostKeyFingerprint) {
+  return request(acceptHostKeyEndpoint, {
+    path: toPath(acceptHostKeyEndpoint.path, { id }),
+    body: { hostKeyFingerprint },
+  })
 }
 
 export function listFlows() {

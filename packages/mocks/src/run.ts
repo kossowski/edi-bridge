@@ -14,6 +14,7 @@ import {
   runSummarySchema,
 } from '@edi-bridge/contracts'
 
+import { refusesHostKey, seedChannels } from './channel'
 import {
   type FlowRecord,
   type FlowStore,
@@ -42,7 +43,11 @@ export type RunFields = Pick<
   | 'manualSubmission'
   | 'status'
   | 'failureStage'
-> & { businessReference?: string | null; defect?: boolean | undefined }
+> & {
+  businessReference?: string | null
+  defect?: boolean | undefined
+  refusedHostKey?: boolean | undefined
+}
 
 // A CONTRL acknowledges a whole Interchange, so it carries no Business Reference.
 function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messageType'>) {
@@ -52,13 +57,15 @@ function businessReferenceOf({ id, messageType }: Pick<RunSummary, 'id' | 'messa
 }
 
 // The Run Store places each Run in its Interchange.
-export function toRunSummary({ defect, ...run }: RunFields): RunSummary {
+export function toRunSummary({ defect, refusedHostKey, ...run }: RunFields): RunSummary {
   const { failureStage } = run
 
   return runSummarySchema.parse({
     ...run,
     problem:
-      failureStage === null ? null : { reason: problemReasonOf({ ...run, defect, failureStage }) },
+      failureStage === null
+        ? null
+        : { reason: problemReasonOf({ ...run, defect, refusedHostKey, failureStage }) },
     direction: directionOf(run),
     businessReference:
       run.businessReference === undefined ? businessReferenceOf(run) : run.businessReference,
@@ -181,6 +188,31 @@ function followOrders(runs: ReadonlyArray<RunFields>): RunFields[] {
   })
 }
 
+function refusesDestinationHostKey(run: RunFields) {
+  const flow = seedFlows.find(({ id }) => id === run.flow.id)
+  const channel = flow && seedChannels.find(({ id }) => id === flow.destinationChannelId)
+
+  return (
+    run.failureStage === 'delivery' &&
+    directionOf(run) === 'outbound' &&
+    problemReasonOf({ ...run, failureStage: run.failureStage }) === 'unreachable' &&
+    channel !== undefined &&
+    refusesHostKey(channel)
+  )
+}
+
+// The SFTP server of a Channel replaced its host key, so it refused the latest delivery.
+function refuseLatestHostKey(runs: ReadonlyArray<RunFields>): RunFields[] {
+  const latest = runs
+    .filter(refusesDestinationHostKey)
+    .reduce<RunFields | undefined>(
+      (found, run) => (found && found.receivedAt >= run.receivedAt ? found : run),
+      undefined,
+    )
+
+  return runs.map((run) => (run === latest ? { ...run, refusedHostKey: true } : run))
+}
+
 type Original = Order & { controlReference: string }
 
 // A Duplicate is an Interchange received again, so it repeats the control reference and the
@@ -260,7 +292,9 @@ export function createRuns({
     runs.push(run, ...siblings)
   }
 
-  const placed = createRunStore(followOrders(runs.slice(0, count)).map(toRunSummary)).all()
+  const placed = createRunStore(
+    refuseLatestHostKey(followOrders(runs.slice(0, count))).map(toRunSummary),
+  ).all()
 
   return createRunStore(receiveAgain(placed)).all().slice()
 }
