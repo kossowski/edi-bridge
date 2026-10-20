@@ -75,6 +75,7 @@ import {
   sendTestInterchangeEndpoint,
   sessionEndpoint,
   submitDocumentEndpoint,
+  tasksEndpoint,
   tradingPartnerActivitiesEndpoint,
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
@@ -169,6 +170,7 @@ import {
   resolveMember,
   resolveUser,
 } from './session.js'
+import { listTasks } from './task.js'
 import {
   createTradingPartner,
   listTradingPartnerActivities,
@@ -652,6 +654,8 @@ function registerRoutes(
     (request, reply) =>
       respond(request, reply, loadOrderLifecycles(request.params.businessReference)),
   )
+
+  app.get(tasksEndpoint.path, (request, reply) => respond(request, reply, listTasks))
 
   app.get(runsEndpoint.path, (request, reply) =>
     respond(request, reply, Effect.flatMap(parse(runsEndpoint.query, request.query), listRuns)),
