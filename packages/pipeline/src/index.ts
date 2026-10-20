@@ -73,6 +73,7 @@ export {
   type QueuedRun,
   RunQueue,
   type RunQueueService,
+  type RunTrace,
 } from './services'
 
 export {

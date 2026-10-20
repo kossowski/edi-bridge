@@ -128,7 +128,7 @@ describe('POST /manual-submissions', () => {
       ],
       notRouted: [],
     })
-    expect(api.runQueue.queued).toEqual([
+    expect(api.runQueue.queued).toMatchObject([
       { workspaceId: workspace.id, runId: submission.runs[0]?.id },
     ])
   })
@@ -268,7 +268,7 @@ describe('POST /manual-submissions', () => {
           runs: [{ status: 'received', direction: 'inbound', flow: { id: flowId } }],
           notRouted: [],
         })
-        expect(api.runQueue.queued).toEqual([
+        expect(api.runQueue.queued).toMatchObject([
           { workspaceId: workspace.id, runId: submission.runs[0]?.id },
         ])
       } finally {

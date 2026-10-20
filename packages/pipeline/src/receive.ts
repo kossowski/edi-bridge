@@ -343,9 +343,14 @@ export const queueReceived = (created: readonly ReceivedRun[]) =>
   Effect.gen(function* () {
     const queue = yield* RunQueue
 
+    const trace = yield* Effect.currentSpan.pipe(
+      Effect.map(({ traceId, spanId, sampled }) => ({ trace: { traceId, spanId, sampled } })),
+      Effect.orElseSucceed(() => ({})),
+    )
+
     const [, notQueued] = yield* Effect.partition(
       created.filter(({ status }) => status === 'received'),
-      (run) => queue.enqueue({ workspaceId: run.workspaceId, runId: run.id }),
+      (run) => queue.enqueue({ workspaceId: run.workspaceId, runId: run.id, ...trace }),
     )
 
     if (notQueued.length > 0) {
@@ -452,4 +457,12 @@ export const receive = (arriving: ArrivingDocument) =>
       notRouted,
       notQueued,
     } satisfies Receipt
-  })
+  }).pipe(
+    Effect.withSpan('run.receipt', {
+      attributes: {
+        workspaceId: arriving.workspaceId,
+        channelId: arriving.channelId,
+        manualSubmission: arriving.manualSubmission,
+      },
+    }),
+  )

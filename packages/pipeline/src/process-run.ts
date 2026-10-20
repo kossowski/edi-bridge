@@ -12,7 +12,7 @@ import {
   notExists,
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { Data, DateTime, Effect, Match, Predicate, Ref, Result } from 'effect'
+import { Data, DateTime, Effect, Match, Predicate, Ref, Result, Tracer } from 'effect'
 
 import {
   type AcknowledgementState,
@@ -1034,7 +1034,7 @@ const step = <A, E, R>(
     yield* Ref.set(hold, finished)
 
     return result
-  })
+  }).pipe(Effect.withSpan(`run.${stage}`, { attributes: { runId } }))
 
 // Only a processing Run fails, so a defect never overwrites a Run that already failed.
 const failRun = async (tx: Transaction, runId: string, failure: Failure, position: number) => {
@@ -1771,4 +1771,9 @@ export const processRun = (queued: QueuedRun) =>
       ),
       Effect.ensuring(publishRunChanges([claimed.run.id])),
     )
-  })
+  }).pipe(
+    Effect.withSpan('run.processing', {
+      attributes: { workspaceId: queued.workspaceId, runId: queued.runId },
+      parent: queued.trace && Tracer.externalSpan(queued.trace),
+    }),
+  )

@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { Cause, Duration, Effect, Exit, Fiber, Logger } from 'effect'
+import { Cause, Duration, Effect, Exit, Fiber, Logger, Option, Tracer } from 'effect'
 import { TestClock } from 'effect/testing'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, assert, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -135,7 +135,7 @@ describe('the receipt of a Document', () => {
 
     expect(receipt.notRouted).toEqual([])
     expect(receipt.runs).toHaveLength(1)
-    expect(queue.queued).toEqual([{ workspaceId: workspace.id, runId: receipt.runs[0]?.id }])
+    expect(queue.queued).toMatchObject([{ workspaceId: workspace.id, runId: receipt.runs[0]?.id }])
 
     await expect(readRun(connection.db, receipt.runs[0]?.id ?? '')).resolves.toMatchObject({
       status: 'received',
@@ -200,12 +200,13 @@ describe('the receipt of a Document', () => {
 
     expect(queue.queued).toEqual([])
 
-    return exit
+    // A span annotates the cause of a failure that passes it, so the test compares the error.
+    return Exit.isFailure(exit) ? Cause.squash(exit.cause) : exit
   }
 
   it('rejects a Channel that does not exist', async () => {
     expect(await rejection({ channelId: '00000000-0000-4000-8000-000000000000' })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'unknownChannel' })),
+      new ReceiptRejected({ reason: 'unknownChannel' }),
     )
   })
 
@@ -213,13 +214,13 @@ describe('the receipt of a Document', () => {
     const other = await seedInvoiceWorkspace(connection.db, 'Hanse Retail')
 
     expect(await rejection({ channelId: other.inboundChannelId })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'unknownChannel' })),
+      new ReceiptRejected({ reason: 'unknownChannel' }),
     )
   })
 
   it('rejects an outbound Channel', async () => {
     expect(await rejection({ channelId: workspace.outboundChannelId })).toStrictEqual(
-      Exit.fail(new ReceiptRejected({ reason: 'outboundChannel' })),
+      new ReceiptRejected({ reason: 'outboundChannel' }),
     )
     await expect(storedDocuments(workspace.outboundChannelId)).resolves.toEqual([])
   })
@@ -239,12 +240,10 @@ describe('the receipt of a Document', () => {
       .returning()
 
     const channelId = channel?.id ?? ''
-    const exit = await rejection({ channelId })
+    const rejected = await rejection({ channelId })
 
-    expect(exit).toStrictEqual(
-      Exit.fail(
-        new ReceiptRejected({ reason: 'noFlow', documentId: await keptDocumentId(channelId) }),
-      ),
+    expect(rejected).toStrictEqual(
+      new ReceiptRejected({ reason: 'noFlow', documentId: await keptDocumentId(channelId) }),
     )
     await expect(storedDocuments(channelId)).resolves.toMatchObject([
       { fileName: 'invoice.json', content: goldenInvoice },
@@ -318,15 +317,13 @@ describe('the receipt of a Document', () => {
       "UNZ+1+00000001'",
     ].join('\n')
 
-    const exit = await rejection({ channelId, content: { text: ordersOnly } })
+    const rejected = await rejection({ channelId, content: { text: ordersOnly } })
 
-    expect(exit).toStrictEqual(
-      Exit.fail(
-        new ReceiptRejected({
-          reason: 'noRoutedMessage',
-          documentId: await keptDocumentId(channelId),
-        }),
-      ),
+    expect(rejected).toStrictEqual(
+      new ReceiptRejected({
+        reason: 'noRoutedMessage',
+        documentId: await keptDocumentId(channelId),
+      }),
     )
   })
 
@@ -396,7 +393,7 @@ describe('the receipt of a Document', () => {
     const [first, second] = receipt.runs
 
     expect(receipt.notQueued).toEqual([first?.id])
-    expect(queue.queued).toEqual([{ workspaceId: workspace.id, runId: second?.id }])
+    expect(queue.queued).toMatchObject([{ workspaceId: workspace.id, runId: second?.id }])
   })
 
   it('routes a Document without Message Types to the only outbound Flow of the Channel', async () => {
@@ -420,15 +417,13 @@ describe('the receipt of a Document', () => {
 
   it('rejects a Document without Message Types when several outbound Flows could take it and keeps it', async () => {
     const { channelId } = await channelWithFlows(['INVOIC', 'DESADV'])
-    const exit = await rejection({ channelId })
+    const rejected = await rejection({ channelId })
 
-    expect(exit).toStrictEqual(
-      Exit.fail(
-        new ReceiptRejected({
-          reason: 'ambiguousFlow',
-          documentId: await keptDocumentId(channelId),
-        }),
-      ),
+    expect(rejected).toStrictEqual(
+      new ReceiptRejected({
+        reason: 'ambiguousFlow',
+        documentId: await keptDocumentId(channelId),
+      }),
     )
   })
 
@@ -458,7 +453,7 @@ describe('the receipt of a Document', () => {
     )
 
     expect(receipt.notRouted).toEqual([])
-    expect(queue.queued).toEqual(
+    expect(queue.queued).toMatchObject(
       receipt.runs.map(({ id }) => ({ workspaceId: workspace.id, runId: id })),
     )
     expect(
@@ -1684,7 +1679,7 @@ describe('the processing of a Run', () => {
       ),
     )
 
-    expect(exit).toStrictEqual(Exit.die(broken))
+    expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toBe(broken)
     await expect(readRun(connection.db, runId)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
@@ -1978,6 +1973,102 @@ describe('the processing of a Run', () => {
     await processQueued(queue)
 
     await expect(readRun(connection.db, runId)).resolves.toEqual(processed)
+  })
+})
+
+describe('the trace of a Run', () => {
+  const recordingTracer = () => {
+    const spans: Tracer.NativeSpan[] = []
+
+    const tracer = Tracer.make({
+      span(options) {
+        const span = new Tracer.NativeSpan(options)
+
+        spans.push(span)
+
+        return span
+      },
+    })
+
+    return { spans, tracer }
+  }
+
+  const parentIdOf = (span: Tracer.NativeSpan | undefined) =>
+    span === undefined
+      ? undefined
+      : Option.getOrUndefined(Option.map(span.parent, (parent) => parent.spanId))
+
+  it('continues the trace of the receipt through each stage of its processing', async () => {
+    const receiving = recordingTracer()
+    const processing = recordingTracer()
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId: workspace.inboundChannelId,
+        fileName: 'invoice.json',
+        content: { text: goldenInvoice },
+        manualSubmission: true,
+      }).pipe(
+        pipelineServices(connection.db, queue),
+        Effect.provideService(Tracer.Tracer, receiving.tracer),
+      ),
+    )
+
+    const runId = receipt.runs[0]?.id ?? ''
+    const receiptSpan = receiving.spans.find(({ name }) => name === 'run.receipt')
+
+    expect(receiptSpan?.attributes.get('workspaceId')).toBe(workspace.id)
+
+    // A queued Run crosses Redis as JSON, so its trace is plain data.
+    const queued: unknown = JSON.parse(JSON.stringify(queue.queued[0]))
+
+    expect(queued).toEqual({
+      workspaceId: workspace.id,
+      runId,
+      trace: { traceId: receiptSpan?.traceId, spanId: receiptSpan?.spanId, sampled: true },
+    })
+
+    await Effect.runPromise(
+      processRun(queue.queued[0] ?? { workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, sftpDelivery),
+        Effect.provideService(Tracer.Tracer, processing.tracer),
+      ),
+    )
+
+    const processSpan = processing.spans.find(({ name }) => name === 'run.processing')
+
+    expect(processSpan?.traceId).toBe(receiptSpan?.traceId)
+    expect(parentIdOf(processSpan)).toBe(receiptSpan?.spanId)
+    expect(processSpan?.attributes.get('runId')).toBe(runId)
+    expect(
+      processing.spans
+        .filter(({ name }) => /^run\.(mapping|validation|delivery)$/.test(name))
+        .map((span) => ({ name: span.name, traceId: span.traceId, parentId: parentIdOf(span) })),
+    ).toEqual(
+      ['run.mapping', 'run.validation', 'run.delivery'].map((name) => ({
+        name,
+        traceId: receiptSpan?.traceId,
+        parentId: processSpan?.spanId,
+      })),
+    )
+  })
+
+  it('starts a trace of its own for a Run queued without one', async () => {
+    const processing = recordingTracer()
+    const { queue, runId } = await receiveInvoice()
+
+    await Effect.runPromise(
+      processRun({ workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, queue, sftpDelivery),
+        Effect.provideService(Tracer.Tracer, processing.tracer),
+      ),
+    )
+
+    const processSpan = processing.spans.find(({ name }) => name === 'run.processing')
+
+    expect(processSpan?.parent).toEqual(Option.none())
   })
 })
 

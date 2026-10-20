@@ -19,7 +19,10 @@ export class Documents extends Context.Service<Documents, DocumentStorage>()(
   '@edi-bridge/pipeline/Documents',
 ) {}
 
-export type QueuedRun = { workspaceId: string; runId: string }
+// The trace of the receipt, so the processing of the Run continues it.
+export type RunTrace = { traceId: string; spanId: string; sampled: boolean }
+
+export type QueuedRun = { workspaceId: string; runId: string; trace?: RunTrace }
 
 export type RunQueueService = {
   enqueue: (run: QueuedRun) => Effect.Effect<void, RunNotQueued>
