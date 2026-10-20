@@ -55,7 +55,7 @@ const untouchedInbox = {
 
 const withUntouchedInbox = [...seedChannels, untouchedInbox]
 
-const oneDataFormat = (messageType: 'DESADV' | 'INVOIC') =>
+const oneDocumentStructure = (messageType: 'DESADV' | 'INVOIC') =>
   documentStructureHandlers(apiUrl, { documentStructures: [seedDocumentStructureOf[messageType]] })
 
 function serverError() {
@@ -301,7 +301,7 @@ export const AddDocumentWithExistingMapping = meta.story({
 export const AddDocumentWithAi = meta.story({
   ...at(awaiting, 'documents'),
   beforeEach({ msw }) {
-    msw.use(...oneDataFormat('DESADV'))
+    msw.use(...oneDocumentStructure('DESADV'))
   },
   async play({ canvasElement }) {
     const sheet = within(await openSheet(canvasElement))
@@ -320,7 +320,7 @@ export const AddDocumentWithAi = meta.story({
   },
 })
 
-export const AddDocumentWithAiChoosesDataFormat = meta.story({
+export const AddDocumentWithAiChoosesDocumentStructure = meta.story({
   ...at(awaiting, 'documents'),
   async play({ canvasElement }) {
     const sheet = within(await openSheet(canvasElement))
@@ -395,7 +395,7 @@ export const CreateMappingFails = meta.story({
   ...at(awaiting, 'documents'),
   beforeEach({ msw }) {
     msw.use(
-      ...oneDataFormat('INVOIC'),
+      ...oneDocumentStructure('INVOIC'),
       http.post(`${apiUrl}${createMappingEndpoint.path}`, serverError),
     )
   },
@@ -410,14 +410,50 @@ export const CreateMappingFails = meta.story({
   },
 })
 
-export const CreateMappingDataFormatGone = meta.story({
+const documentStructureGone = [
+  ...oneDocumentStructure('INVOIC'),
+  http.post(`${apiUrl}${createMappingEndpoint.path}`, () =>
+    HttpResponse.json({ message: 'The Document Structure does not exist.' }, { status: 422 }),
+  ),
+  http.get(`${apiUrl}${publishedMappingVersionsEndpoint.path}`, () => HttpResponse.json([])),
+]
+
+export const CreateMappingDocumentStructureGone = meta.story({
+  ...at(awaiting, 'documents'),
+  beforeEach({ msw }) {
+    msw.use(...documentStructureGone)
+  },
+  async play({ canvasElement }) {
+    const sheet = within(await openSheet(canvasElement))
+    await userEvent.click(sheet.getByRole('radio', { name: /^Invoices/ }))
+    await expect(
+      await sheet.findByRole('radio', { name: /^Create a new one with AI/ }),
+    ).toBeChecked()
+    await userEvent.click(sheet.getByRole('button', { name: 'Create the mapping' }))
+    await expect(await sheet.findByText(/Your data format no longer exists/)).toBeVisible()
+  },
+})
+
+export const DocumentStructuresLoadingInSheet = meta.story({
+  ...at(awaiting, 'documents'),
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { state: 'loading' }))
+  },
+  async play({ canvasElement }) {
+    const sheet = within(await openSheet(canvasElement))
+    await userEvent.click(sheet.getByRole('radio', { name: /^Invoices/ }))
+    await expect(await sheet.findByText('Loading the mappings…')).toBeVisible()
+    await expect(sheet.queryByRole('button', { name: 'Create the mapping' })).toBeNull()
+    await expect(sheet.queryByRole('button', { name: 'Add document type' })).toBeNull()
+  },
+})
+
+// Without the Document Structures the sheet cannot name one, so it leaves the choice to the create step.
+export const DocumentStructuresUnavailableInSheet = meta.story({
   ...at(awaiting, 'documents'),
   beforeEach({ msw }) {
     msw.use(
-      ...oneDataFormat('INVOIC'),
-      http.post(`${apiUrl}${createMappingEndpoint.path}`, () =>
-        HttpResponse.json({ message: 'The Document Structure does not exist.' }, { status: 422 }),
-      ),
+      ...documentStructureHandlers(apiUrl, { state: 'error' }),
       http.get(`${apiUrl}${publishedMappingVersionsEndpoint.path}`, () => HttpResponse.json([])),
     )
   },
@@ -428,7 +464,7 @@ export const CreateMappingDataFormatGone = meta.story({
       await sheet.findByRole('radio', { name: /^Create a new one with AI/ }),
     ).toBeChecked()
     await userEvent.click(sheet.getByRole('button', { name: 'Create the mapping' }))
-    await expect(await sheet.findByText(/Your data format no longer exists/)).toBeVisible()
+    await expect(getRouter().push).toHaveBeenCalledWith('/mappings?new=INVOIC')
   },
 })
 
@@ -468,6 +504,23 @@ export const GermanAddDocumentSheet = meta.story({
     await userEvent.click(sheet.getByRole('radio', { name: /^Rechnungen/ }))
     await expect(await sheet.findByText('Welches Mapping übersetzt sie?')).toBeVisible()
     await expect(sheet.getByRole('radio', { name: /^Ein neues mit KI erstellen/ })).toBeVisible()
+  },
+})
+
+export const GermanCreateMappingDocumentStructureGone = meta.story({
+  ...at(awaiting, 'documents'),
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...documentStructureGone)
+  },
+  async play({ canvasElement }) {
+    const sheet = within(await openSheet(canvasElement, 'Belegart hinzufügen'))
+    await userEvent.click(sheet.getByRole('radio', { name: /^Rechnungen/ }))
+    await expect(
+      await sheet.findByRole('radio', { name: /^Ein neues mit KI erstellen/ }),
+    ).toBeChecked()
+    await userEvent.click(sheet.getByRole('button', { name: 'Mapping erstellen' }))
+    await expect(await sheet.findByText(/Ihr Datenformat gibt es nicht mehr/)).toBeVisible()
   },
 })
 
