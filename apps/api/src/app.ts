@@ -461,7 +461,7 @@ function registerRoutes(
   const respondToOperator = async <A>(
     request: FastifyRequest,
     reply: FastifyReply,
-    effect: Effect.Effect<A, Failure, CurrentUser | Db>,
+    effect: Effect.Effect<A, Failure, ChannelEnvironment | CurrentUser | Db>,
     status = 200,
   ) => {
     const user = await resolveUser(auth, database, request)

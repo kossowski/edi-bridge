@@ -1,14 +1,16 @@
-import { and, count, eq, gt, isNull, max, sql } from 'drizzle-orm'
+import { and, type AnyColumn, count, eq, gt, isNull, max, sql } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import { invites, members, runs, workspaces } from '@edi-bridge/db'
 
 import type { WorkspaceInput, WorkspaceSummary } from '@edi-bridge/contracts'
 
+import { ChannelEnvironment } from './channel.js'
 import { Db } from './db.js'
 import { startOfUtcDay } from './duration.js'
 import { Conflict } from './errors.js'
 import { byName, exactlyOne } from './rows.js'
+import { seedWorkspace } from './seed.js'
 
 import type { ValidationError } from './parse.js'
 
@@ -23,7 +25,7 @@ const loadSummaries = (workspaceId?: string) =>
     const db = yield* Db
     const now = new Date()
 
-    const of = (column: typeof workspaces.id) =>
+    const of = (column: AnyColumn) =>
       workspaceId === undefined ? undefined : eq(column, workspaceId)
 
     const [rows, memberRows, inviteRows, runRows] = yield* Effect.promise(() =>
@@ -100,8 +102,9 @@ const duplicateName = new Conflict({ message: 'Another Workspace already uses th
 
 export const createWorkspace = (input: Effect.Effect<WorkspaceInput, ValidationError>) =>
   Effect.gen(function* () {
-    const { name } = yield* input
+    const { name, seed } = yield* input
     const db = yield* Db
+    const { secrets } = yield* ChannelEnvironment
 
     // The lock keeps two Operators from creating the same name at once.
     const created = yield* Effect.promise(() =>
@@ -121,6 +124,10 @@ export const createWorkspace = (input: Effect.Effect<WorkspaceInput, ValidationE
           .insert(workspaces)
           .values({ name })
           .returning({ id: workspaces.id })
+
+        if (workspace !== undefined && seed) {
+          await seedWorkspace(tx, workspace.id, { secrets })
+        }
 
         return workspace
       }),

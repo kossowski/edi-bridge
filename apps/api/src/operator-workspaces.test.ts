@@ -1,15 +1,30 @@
+import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 import {
   createInviteEndpoint,
   createWorkspaceEndpoint,
+  flowsEndpoint,
+  glnIssue,
+  lookupTablesEndpoint,
+  mappingsEndpoint,
+  orderLifecyclesEndpoint,
+  orderLifecycleListSchema,
+  runDetailSchema,
+  runEndpoint,
+  runListSchema,
+  runsEndpoint,
+  tradingPartnerSchema,
   tradingPartnersEndpoint,
   type WorkspaceInput,
+  type WorkspaceSummary,
   operatorWorkspacesEndpoint,
   toPath,
   workspaceSummarySchema,
 } from '@edi-bridge/contracts'
+import { acknowledgements, channels, documents, runs } from '@edi-bridge/db'
+import { parse, validate } from '@edi-bridge/edifact'
 
 import { hourMs } from './duration.js'
 import {
@@ -180,5 +195,121 @@ describe('POST /operator/workspaces', () => {
     const response = await createWorkspace(api.admin, { name: 'Admin Workspace', seed: false })
 
     expect(response.statusCode).toBe(403)
+  })
+})
+
+describe('POST /operator/workspaces with seed', () => {
+  let created: WorkspaceSummary
+
+  let admin: Client
+
+  beforeAll(async () => {
+    created = await createdWorkspace({ name: 'Talblick Feinkost GmbH', seed: true })
+    admin = await memberOf(created.id, 'talblick')
+  })
+
+  const restricted = /^02\d{11}$/
+
+  it('marks the Workspace as seeded and gives it a GLN of its own', () => {
+    expect(created).toMatchObject({ seeded: true, kind: 'standard', memberCount: 0 })
+    expect(created.gln).toMatch(restricted)
+    expect(created.documentsToday).toBeGreaterThan(0)
+  })
+
+  it('seeds Trading Partners, Lookup Tables, Mappings and Flows', async () => {
+    const partners = await read(admin, tradingPartnersEndpoint.path, z.array(tradingPartnerSchema))
+
+    expect(partners.length).toBeGreaterThanOrEqual(2)
+
+    for (const { gln } of partners) {
+      expect(gln).toMatch(restricted)
+    }
+
+    expect(await read(admin, lookupTablesEndpoint.path, z.array(z.unknown()))).not.toEqual([])
+    expect(await read(admin, mappingsEndpoint.path, z.array(z.unknown()))).not.toEqual([])
+    expect(await read(admin, flowsEndpoint.path, z.array(z.unknown()))).not.toEqual([])
+  })
+
+  it('seeds Runs in end states only, each readable in full', async () => {
+    const list = await read(admin, `${runsEndpoint.path}?pageSize=100`, runListSchema)
+
+    expect(list.statusCounts).toMatchObject({ received: 0, processing: 0 })
+    expect(list.statusCounts.delivered).toBeGreaterThan(0)
+    expect(list.statusCounts.failed).toBeGreaterThan(0)
+    expect(list.statusCounts.duplicate).toBeGreaterThan(0)
+
+    for (const { id } of list.runs) {
+      await read(admin, toPath(runEndpoint.path, { id }), runDetailSchema)
+    }
+
+    const lifecycles = await read(admin, orderLifecyclesEndpoint.path, orderLifecycleListSchema)
+
+    expect(lifecycles.total).toBeGreaterThan(0)
+  })
+
+  it('uses GLNs and GTINs from the prefixes 020 to 029 with valid check digits', async () => {
+    const db = api.connection.db
+
+    const texts = [
+      ...(await db
+        .select({ text: documents.content })
+        .from(documents)
+        .where(eq(documents.workspaceId, created.id))),
+      ...(await db
+        .select({ text: runs.output })
+        .from(runs)
+        .where(eq(runs.workspaceId, created.id))),
+      ...(await db
+        .select({ text: acknowledgements.content })
+        .from(acknowledgements)
+        .where(eq(acknowledgements.workspaceId, created.id))),
+    ].flatMap(({ text }) => (text === null ? [] : [text]))
+
+    const numbers = texts.flatMap((text) => text.match(/(?<!\d)\d{13}(?!\d)/g) ?? [])
+
+    expect(numbers.length).toBeGreaterThan(0)
+
+    for (const number of numbers) {
+      expect(number).toMatch(restricted)
+      expect(glnIssue(number)).toBeNull()
+    }
+  })
+
+  it('writes Interchanges that parse and validate', async () => {
+    const db = api.connection.db
+
+    const outputs = await db
+      .select({ output: runs.output })
+      .from(runs)
+      .where(eq(runs.workspaceId, created.id))
+
+    const interchanges = outputs.flatMap(({ output }) =>
+      output?.startsWith('UNB') ? [output] : [],
+    )
+
+    expect(interchanges.length).toBeGreaterThan(0)
+
+    for (const interchange of interchanges) {
+      expect(() => validate(parse(interchange))).not.toThrow()
+    }
+  })
+
+  it('marks every seeded Channel as seeded, on a reserved .invalid host', async () => {
+    const seeded = await api.connection.db
+      .select()
+      .from(channels)
+      .where(eq(channels.workspaceId, created.id))
+
+    expect(seeded.length).toBeGreaterThan(0)
+
+    for (const channel of seeded) {
+      expect(channel.seeded).toBe(true)
+
+      const address = channel.host ?? (channel.url === null ? null : new URL(channel.url).hostname)
+
+      if (address !== null) {
+        expect(address).toMatch(/\.invalid$/)
+      }
+    }
   })
 })
