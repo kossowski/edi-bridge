@@ -191,6 +191,43 @@ export const ReviewWithUnsureNames = meta.story({
     await expect(canvas.getByRole('textbox', { name: 'Name of this data format' })).toHaveValue(
       'Rechnungsexport 2026 10 08',
     )
+    await expect(canvas.queryByText('Fields named without AI')).toBeNull()
+  },
+})
+
+export const FieldNamesWithoutAiBudget = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { documentStructureFieldNamesNotice: 'aiBudgetExhausted' }))
+  },
+  async play({ canvas, canvasElement }) {
+    await drop(canvasElement, invoiceExport)
+    await review(canvasElement)
+    const notice = within(await canvas.findByRole('status', { name: 'Fields named without AI' }))
+
+    await expect(
+      notice.getByText(
+        "Today's AI budget is used up, so the field names come from the file. Check them and change any name below.",
+      ),
+    ).toBeVisible()
+    await expect(canvas.getByText('2 names to check')).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: 'Yes, “Unit” is right' }))
+    await expect(canvas.getByText('1 name to check')).toBeVisible()
+  },
+})
+
+export const FieldNamesWithoutAiUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { documentStructureFieldNamesNotice: 'aiUnavailable' }))
+  },
+  async play({ canvas, canvasElement }) {
+    await drop(canvasElement, invoiceExport)
+    await review(canvasElement)
+
+    await expect(
+      await canvas.findByText(
+        'The AI could not name the fields, so the field names come from the file. Check them and change any name below.',
+      ),
+    ).toBeVisible()
   },
 })
 
@@ -222,9 +259,60 @@ export const AllConfirmed = meta.story({
         expect.stringMatching(/^\/data-formats\/[\da-f-]{36}$/),
       ),
     )
+    await expect(labels?.map(({ path }) => path)).toEqual([
+      'rows[]',
+      'rows[].RechNr',
+      'rows[].RechDatum',
+      'rows[].AuftrNr',
+      'rows[].KdNr',
+      'rows[].ArtNr',
+      'rows[].Bezeichnung',
+      'rows[].Menge',
+      'rows[].ME',
+      'rows[].EPreis',
+      'rows[].Netto',
+      'rows[].MwSt',
+      'rows[].Whg',
+    ])
+    await expect(labels).toContainEqual({
+      path: 'rows[].RechNr',
+      label: 'Invoice number',
+      labelReason: '"RechNr" stands for "Rechnungsnummer", the number of the invoice.',
+    })
+    await expect(labels).toContainEqual({
+      path: 'rows[].ME',
+      label: 'Unit',
+      labelReason:
+        '"ME" stands for "Mengeneinheit", the unit the quantity is counted in, if the values are units. Values KRT and ST look like units.',
+    })
+    await expect(labels).toContainEqual({
+      path: 'rows[].EPreis',
+      label: 'Price per unit',
+      labelReason: null,
+    })
+  },
+})
+
+export const AllConfirmedWithoutAi = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { documentStructureFieldNamesNotice: 'aiBudgetExhausted' }))
+  },
+  async play({ canvas, canvasElement, msw }) {
+    let labels: FieldLabelChoice[] | undefined
+
+    msw.use(
+      http.post(createPath, async ({ request }) => {
+        labels = createDocumentStructureEndpoint.body.parse(await request.clone().json()).labels
+      }),
+    )
+    await drop(canvasElement, invoiceExport)
+    await review(canvasElement)
+    await confirmEveryName(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: 'Save data format' }))
+    await waitFor(() => expect(getRouter().push).toHaveBeenCalled())
     await expect(labels).toEqual([
       { path: 'rows[].ME', label: 'Unit' },
-      { path: 'rows[].EPreis', label: 'Price per unit' },
+      { path: 'rows[].EPreis', label: 'Unit price' },
     ])
   },
 })
@@ -405,6 +493,24 @@ export const German = meta.story({
     await review(canvasElement, 'Felder aus Rechnungsexport_2026-10-08.csv')
     await expect(canvas.getByRole('button', { name: 'Zuerst 2 Namen prüfen' })).toBeDisabled()
     await expect(canvas.getByRole('button', { name: 'Ja, „Unit price“ stimmt' })).toBeVisible()
+  },
+})
+
+export const GermanFieldNamesWithoutAi = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { documentStructureFieldNamesNotice: 'aiBudgetExhausted' }))
+  },
+  async play({ canvas, canvasElement }) {
+    await drop(canvasElement, invoiceExport, /^Legen Sie einen Export/)
+    await review(canvasElement, 'Felder aus Rechnungsexport_2026-10-08.csv')
+    const notice = within(await canvas.findByRole('status', { name: 'Felder ohne KI benannt' }))
+
+    await expect(
+      notice.getByText(
+        'Das KI-Budget für heute ist aufgebraucht, daher stammen die Feldnamen aus der Datei. Prüfen Sie sie und ändern Sie bei Bedarf unten jeden Namen.',
+      ),
+    ).toBeVisible()
   },
 })
 

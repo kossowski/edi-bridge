@@ -618,16 +618,22 @@ export const German = meta.story({
   decorators: [german],
   args: { code: 'KRT' },
   async play({ canvas }) {
-    await expect(await canvas.findByRole('list', { name: 'Werte (4)' })).toBeVisible()
+    const values = within(await canvas.findByRole('list', { name: 'Werte (4)' }))
+
+    await expect(values.getAllByText('Stück')).toHaveLength(2)
     await expect(canvas.getByText('Mengeneinheiten · An jeden Partner gesendet')).toBeVisible()
     await expect(canvas.getByText('Was der Partner erhält')).toBeVisible()
 
     const missing = within(await canvas.findByRole('region', { name: 'Noch nicht übersetzt' }))
 
     await expect(missing.getByRole('textbox', { name: 'KRT senden als' })).toHaveValue('CT')
+    await expect(missing.getByText('CT bedeutet Karton.')).toBeVisible()
     await userEvent.click(missing.getByRole('button', { name: 'Übernehmen: KRT' }))
     await expect(await canvas.findByText('KRT wird jetzt als CT gesendet')).toBeVisible()
     await expect(canvas.getByRole('link', { name: /^.+ erneut verarbeiten$/ })).toHaveFocus()
+    await expect(
+      await within(canvas.getByRole('list', { name: 'Werte (5)' })).findByText('Karton'),
+    ).toBeVisible()
   },
 })
 

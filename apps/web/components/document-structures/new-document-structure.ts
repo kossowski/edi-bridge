@@ -1,9 +1,11 @@
 import {
   type CsvSettings,
+  type DocumentStructureInference,
   type DocumentStructureNode,
   documentStructureNodes,
   type DocumentStructureOriginKind,
   type EncodedFile,
+  type FieldLabelChoice,
   type InferredDocumentStructure,
   type JsonContent,
   jsonContentSchema,
@@ -56,6 +58,23 @@ export function keptChoices(
       return before.get(path) !== label || nextLabel === label
     }),
   )
+}
+
+export function labelsToSave(
+  { children, fieldNamesNotice }: Pick<DocumentStructureInference, 'children' | 'fieldNamesNotice'>,
+  choices: LabelChoices,
+): FieldLabelChoice[] {
+  const namedByAi = fieldNamesNotice === null
+
+  if (namedByAi) {
+    return [...documentStructureNodes(children)].map(({ node }) => {
+      const label = choices.get(node.path) ?? node.label
+
+      return { path: node.path, label, labelReason: label === node.label ? node.labelReason : null }
+    })
+  }
+
+  return [...choices].map(([path, label]) => ({ path, label }))
 }
 
 export type FileFacts =

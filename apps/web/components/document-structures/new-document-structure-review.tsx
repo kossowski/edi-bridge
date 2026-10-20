@@ -1,5 +1,7 @@
 'use client'
 
+import { InformationCircleIcon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import { useId, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
@@ -24,9 +26,11 @@ import { firstValues, sampleContent } from '@/components/document-structures/sam
 import { leafCount } from '@/components/document-structures/structure-tree'
 import { TextField } from '@/components/form-field'
 import {
-  type InferredDocumentStructure,
+  type DocumentStructureInference,
+  type FieldNamesNotice,
   maxDocumentStructureNameLength,
 } from '@edi-bridge/contracts'
+import { Alert, AlertDescription, AlertTitle } from '@edi-bridge/ui/components/alert'
 import { Button } from '@edi-bridge/ui/components/button'
 
 function SaveLabel({ block, saving }: { block: SaveBlock | null; saving: boolean }) {
@@ -43,6 +47,19 @@ function SaveLabel({ block, saving }: { block: SaveBlock | null; saving: boolean
   return saving ? t('saving') : t('submit')
 }
 
+function FieldNamesNoticeAlert({ notice }: { notice: FieldNamesNotice }) {
+  const t = useTranslations('DocumentStructureForm.review.fieldNamesNotice')
+  const titleId = useId()
+
+  return (
+    <Alert role="status" aria-labelledby={titleId}>
+      <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} aria-hidden />
+      <AlertTitle id={titleId}>{t('title')}</AlertTitle>
+      <AlertDescription>{t(notice.reason)}</AlertDescription>
+    </Alert>
+  )
+}
+
 export function Review({
   inferred,
   choices,
@@ -56,7 +73,7 @@ export function Review({
   onSave,
   onAnotherFile,
 }: {
-  inferred: InferredDocumentStructure
+  inferred: DocumentStructureInference
   choices: LabelChoices
   name: string
   saving: boolean
@@ -147,7 +164,7 @@ export function Review({
             id={`${id}-title`}
             ref={focusOnMount}
             tabIndex={-1}
-            className="font-semibold break-all outline-hidden">
+            className="font-semibold wrap-break-word outline-hidden">
             {sample ? t('review.title', { fileName: sample.fileName }) : t('review.titleNoSample')}
           </h2>
           <p className="flex flex-wrap items-center gap-x-2 text-sm">
@@ -172,6 +189,7 @@ export function Review({
           {t('anotherFile')}
         </Button>
       </section>
+      {inferred.fieldNamesNotice && <FieldNamesNoticeAlert notice={inferred.fieldNamesNotice} />}
       {sample && content ? (
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <div className="min-w-0 lg:sticky lg:top-4">

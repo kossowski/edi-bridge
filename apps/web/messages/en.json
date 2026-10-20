@@ -3341,7 +3341,12 @@
       "fields": "{count, plural, one {# field found} other {# fields found}}",
       "toCheck": "{count, plural, one {# name to check} other {# names to check}}",
       "allChecked": "All names checked",
-      "fieldsLabel": "Fields"
+      "fieldsLabel": "Fields",
+      "fieldNamesNotice": {
+        "title": "Fields named without AI",
+        "aiBudgetExhausted": "Today's AI budget is used up, so the field names come from the file. Check them and change any name below.",
+        "aiUnavailable": "The AI could not name the fields, so the field names come from the file. Check them and change any name below."
+      }
     },
     "field": {
       "from": "from <code>{name}</code>",
@@ -3610,7 +3615,11 @@
         "description": "The suggested values could not be loaded. Try again, or add your own values.",
         "retry": "Try again"
       },
-      "byAi": "Suggested by AI"
+      "byAi": "Suggested by AI",
+      "budget": {
+        "exhausted": "Today's AI budget is used up, so no values are suggested. Add your own values below; suggestions are back tomorrow.",
+        "turnedOff": "AI is turned off, so no values are suggested. Add your own values below."
+      }
     },
     "values": {
       "title": "Values in the new list",

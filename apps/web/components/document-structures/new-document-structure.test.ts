@@ -5,6 +5,7 @@ import {
   type DocumentField,
   type DocumentStructureNode,
   type EncodedFile,
+  fieldNamesNotices,
 } from '@edi-bridge/contracts'
 
 import { encodeBase64 } from './document-file'
@@ -12,6 +13,7 @@ import {
   fileFacts,
   keptChoices,
   labelsToCheck,
+  labelsToSave,
   readingSteps,
   readProgress,
   saveBlock,
@@ -73,6 +75,44 @@ describe('labelsToCheck', () => {
     const choices = new Map([['rows[].EPreis', 'Price per unit']])
 
     expect(labelsToCheck(invoiceRows, choices).map(({ path }) => path)).toEqual(['rows[].ME'])
+  })
+})
+
+describe('labelsToSave', () => {
+  const aiNamed = { children: invoiceRows, fieldNamesNotice: null }
+
+  it('keeps every name and reason of the AI the user did not change', () => {
+    expect(labelsToSave(aiNamed, new Map())).toEqual([
+      { path: 'rows[]', label: 'Rows', labelReason: 'Each line of the file.' },
+      { path: 'rows[].RechNr', label: 'Invoice number', labelReason: 'Read from the column name.' },
+      { path: 'rows[].ME', label: 'Unit', labelReason: 'Read from the column name.' },
+      { path: 'rows[].EPreis', label: 'Unit price', labelReason: 'Read from the column name.' },
+    ])
+  })
+
+  it('names a renamed node by hand and keeps the reason when the AI name is chosen again', () => {
+    const choices = new Map([
+      ['rows[].ME', 'Unit'],
+      ['rows[].EPreis', 'Price per unit'],
+    ])
+
+    expect(labelsToSave(aiNamed, choices).slice(2)).toEqual([
+      { path: 'rows[].ME', label: 'Unit', labelReason: 'Read from the column name.' },
+      { path: 'rows[].EPreis', label: 'Price per unit', labelReason: null },
+    ])
+  })
+
+  it('sends only the choices when the fields were named without AI', () => {
+    const withoutAi = {
+      children: invoiceRows,
+      fieldNamesNotice: fieldNamesNotices.aiBudgetExhausted,
+    }
+
+    const choices = new Map([['rows[].EPreis', 'Price per unit']])
+
+    expect(labelsToSave(withoutAi, choices)).toEqual([
+      { path: 'rows[].EPreis', label: 'Price per unit' },
+    ])
   })
 })
 

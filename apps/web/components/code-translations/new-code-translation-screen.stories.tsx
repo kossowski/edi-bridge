@@ -12,6 +12,7 @@ import {
 } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
+  aiBudgetExhaustedStatus,
   createLookupTableEndpoint,
   lookupTableKinds,
   lookupTableSuggestionsEndpoint,
@@ -241,6 +242,91 @@ export const SuggestionsError = meta.story({
   },
 })
 
+export const SuggestionsBudgetExhausted = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...lookupTableHandlers(apiUrl, { suggestions: 'aiBudgetExhausted' }))
+  },
+  async play({ canvas, canvasElement }) {
+    await chooseKindAndEveryPartner(canvasElement)
+
+    await expect(
+      await canvas.findByText(
+        "Today's AI budget is used up, so no values are suggested. Add your own values below; suggestions are back tomorrow.",
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByText('Suggestions unavailable')).toBeNull()
+    await expect(canvas.queryByRole('button', { name: 'Try again' })).toBeNull()
+    await expect(canvas.queryByRole('list', { name: /^Suggested values/ })).toBeNull()
+    await expect(canvas.getByRole('form', { name: 'Add a value' })).toBeVisible()
+    await expect(canvas.getByRole('button', { name: 'Create list' })).toBeEnabled()
+  },
+})
+
+function aiTurnedOff() {
+  return suggestionsResponding(() =>
+    HttpResponse.json(
+      {
+        code: 'aiBudgetExhausted',
+        message: 'The daily AI budget of the Workspace is used up.',
+        budget: { dailyLimit: 0, usedToday: 0, resetsAt: '2026-10-21T00:00:00.000Z' },
+      },
+      { status: aiBudgetExhaustedStatus },
+    ),
+  )
+}
+
+export const SuggestionsAiTurnedOff = meta.story({
+  beforeEach({ msw }) {
+    msw.use(aiTurnedOff())
+  },
+  async play({ canvas, canvasElement }) {
+    await chooseKindAndEveryPartner(canvasElement)
+
+    await expect(
+      await canvas.findByText(
+        'AI is turned off, so no values are suggested. Add your own values below.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.getByRole('form', { name: 'Add a value' })).toBeVisible()
+  },
+})
+
+export const GermanSuggestionsBudgetExhausted = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...lookupTableHandlers(apiUrl, { suggestions: 'aiBudgetExhausted' }))
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('radio', { name: startsWith('Mengeneinheiten') }))
+    await userEvent.click(canvas.getByRole('radio', { name: startsWith('Jeder Partner') }))
+
+    await expect(
+      await canvas.findByText(
+        'Das KI-Budget für heute ist aufgebraucht, daher werden keine Werte vorgeschlagen. Fügen Sie unten eigene Werte hinzu; morgen gibt es wieder Vorschläge.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.getByRole('form', { name: 'Wert hinzufügen' })).toBeVisible()
+  },
+})
+
+export const GermanSuggestionsAiTurnedOff = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(aiTurnedOff())
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('radio', { name: startsWith('Mengeneinheiten') }))
+    await userEvent.click(canvas.getByRole('radio', { name: startsWith('Jeder Partner') }))
+
+    await expect(
+      await canvas.findByText(
+        'Die KI ist ausgeschaltet, daher werden keine Werte vorgeschlagen. Fügen Sie unten eigene Werte hinzu.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.getByRole('form', { name: 'Wert hinzufügen' })).toBeVisible()
+  },
+})
+
 export const SuggestionsEmpty = meta.story({
   beforeEach({ msw }) {
     msw.use(suggestionsResponding(() => HttpResponse.json({ entries: [] })))
@@ -353,6 +439,7 @@ export const German = meta.story({
     const suggestions = within(await canvas.findByRole('list', { name: /^Vorgeschlagene Werte/ }))
 
     await expect(await suggestions.findByRole('button', { name: 'Übernehmen: ST' })).toBeVisible()
+    await expect(suggestions.getByText('PCE bedeutet Stück.')).toBeVisible()
     await expect(canvas.getByText(/^Legt/)).toHaveTextContent('Legt Mengeneinheiten ohne Werte an.')
     await expect(canvas.getByText('Von der KI vorgeschlagen')).toBeVisible()
     await expect(canvas.getByRole('heading', { level: 1 })).toHaveTextContent(

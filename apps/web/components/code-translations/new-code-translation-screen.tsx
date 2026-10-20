@@ -29,7 +29,8 @@ import { LoadError } from '@/components/load-error'
 import { scopeInputOf, scopeKey } from '@/components/lookup-tables/lookup-table-scope'
 import { TradingPartnerChoice } from '@/components/lookup-tables/trading-partner-choice'
 import { ChoiceCards } from '@/components/trading-partners/choice-cards'
-import { createLookupTable } from '@/lib/api/client'
+import { useLanguage } from '@/hooks/use-language'
+import { aiBudgetExhaustedProblemOf, createLookupTable } from '@/lib/api/client'
 import {
   lookupTableSuggestionsQuery,
   lookupTablesQuery,
@@ -38,7 +39,9 @@ import {
 } from '@/lib/api/queries'
 import { lookupTableHref } from '@/lib/navigation'
 import {
+  type AiBudget,
   type Direction,
+  type Language,
   type LookupTableEntry,
   type LookupTableKind,
   lookupTableKinds,
@@ -62,10 +65,11 @@ type AddRow =
 function suggestionsQueryOf(
   kind: LookupTableKind,
   scope: LookupTableScopeInput,
+  language: Language,
 ): LookupTableSuggestionsQuery {
   return scope.kind === 'tradingPartner'
-    ? { kind, tradingPartnerId: scope.tradingPartnerId }
-    : { kind }
+    ? { kind, tradingPartnerId: scope.tradingPartnerId, language }
+    : { kind, language }
 }
 
 function useKindSides(kind: LookupTableKind, direction: Direction): Sides {
@@ -181,7 +185,7 @@ function Suggestions({
   onSkip,
   onShowSkipped,
 }: {
-  query: { isPending: boolean; isError: boolean; onRetry: () => void }
+  query: { isPending: boolean; isError: boolean; budget: AiBudget | null; onRetry: () => void }
   direction: Direction
   suggestedCount: number
   pending: ReadonlyArray<SuggestedEntry>
@@ -245,6 +249,14 @@ function Suggestions({
     )
   }
 
+  if (query.budget) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        {t(query.budget.dailyLimit === 0 ? 'budget.turnedOff' : 'budget.exhausted')}
+      </p>
+    )
+  }
+
   if (!query.isPending && !query.isError && suggestedCount === 0) {
     return <p className="text-muted-foreground text-sm">{t('none')}</p>
   }
@@ -300,7 +312,13 @@ function FirstValues({
   const router = useRouter()
   const direction = kindDirections[kind]
   const sides = useKindSides(kind, direction)
-  const suggestions = useQuery(lookupTableSuggestionsQuery(suggestionsQueryOf(kind, scope)))
+  const language = useLanguage()
+
+  const suggestions = useQuery(
+    lookupTableSuggestionsQuery(suggestionsQueryOf(kind, scope, language)),
+  )
+
+  const budgetProblem = aiBudgetExhaustedProblemOf(suggestions.error)
   const valuesId = useId()
   const valuesHeading = useRef<HTMLHeadingElement>(null)
   const valuesList = useRef<HTMLUListElement>(null)
@@ -311,7 +329,7 @@ function FirstValues({
   const [adding, setAdding] = useState<AddRow>({ status: 'initial' })
   const [announcement, setAnnouncement] = useState('')
   const suggested = suggestions.data?.entries ?? []
-  const noSuggestions = suggestions.isSuccess && suggested.length === 0
+  const noSuggestions = (suggestions.isSuccess && suggested.length === 0) || budgetProblem !== null
 
   const pending = suggested.filter(
     ({ sourceCode }) => !hasValue(entries, sourceCode) && !skipped.includes(sourceCode),
@@ -419,6 +437,7 @@ function FirstValues({
         query={{
           isPending: suggestions.isPending,
           isError: suggestions.isError,
+          budget: budgetProblem?.budget ?? null,
           onRetry: () => void suggestions.refetch(),
         }}
         restoredCode={restoredCode}

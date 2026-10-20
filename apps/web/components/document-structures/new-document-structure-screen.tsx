@@ -23,6 +23,7 @@ import {
   isBlank,
   keptChoices,
   type LabelChoices,
+  labelsToSave,
   readProgress,
 } from '@/components/document-structures/new-document-structure'
 import {
@@ -40,6 +41,7 @@ import {
   type CreateDocumentStructureBody,
   type CsvSettings,
   defaultCsvSettings,
+  type DocumentStructureInference,
   type DocumentStructureOriginKind,
   type InferredDocumentStructure,
 } from '@edi-bridge/contracts'
@@ -54,7 +56,7 @@ type Stage =
       originKind: DocumentStructureOriginKind | null
       chosen: ChosenFile | null
       facts: FileFacts | null
-      inferred: InferredDocumentStructure | null
+      inferred: DocumentStructureInference | null
       previous: InferredDocumentStructure | null
     }
   | {
@@ -65,7 +67,7 @@ type Stage =
       error: Error | null
       previous: InferredDocumentStructure | null
     }
-  | { kind: 'review'; chosen: ChosenFile; inferred: InferredDocumentStructure }
+  | { kind: 'review'; chosen: ChosenFile; inferred: DocumentStructureInference }
 
 function chosenOf(stage: Stage) {
   return stage.kind === 'drop' ? null : stage.chosen
@@ -292,7 +294,7 @@ export function NewDocumentStructureScreen() {
             create.mutate({
               name: name.trim(),
               origin: toOrigin(stage.chosen.kind, stage.chosen.file, csv),
-              labels: [...choices].map(([path, label]) => ({ path, label })),
+              labels: labelsToSave(stage.inferred, choices),
             })
           }
           onUndo={(path) =>

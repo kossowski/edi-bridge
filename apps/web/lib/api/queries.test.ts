@@ -1,8 +1,15 @@
-import { MutationObserver, QueryClient } from '@tanstack/react-query'
+import {
+  focusManager,
+  MutationObserver,
+  onlineManager,
+  QueryClient,
+  QueryObserver,
+} from '@tanstack/react-query'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { type Task } from '@edi-bridge/contracts'
+import { lookupTableSuggestionsEndpoint, type Task } from '@edi-bridge/contracts'
 import {
   aiDraftHandlers,
   aiProposalFor,
@@ -19,6 +26,7 @@ import {
   withAiProposal,
 } from '@edi-bridge/mocks'
 
+import { retriesQuery } from './client'
 import { apiUrl } from './config'
 import {
   acceptAiProposedPartsMutation,
@@ -124,22 +132,51 @@ describe('storeSavedDocumentStructure', () => {
   })
 })
 
+describe('lookupTableQuery', () => {
+  it('keys a Lookup Table by the language of its code meanings', () => {
+    const id = seedLookupTables[0]!.id
+
+    expect(lookupTableQuery(id, 'de').queryKey).not.toEqual(lookupTableQuery(id, 'en').queryKey)
+    expect(lookupTableMissingCodesQuery(id, 'de').queryKey).not.toEqual(
+      lookupTableMissingCodesQuery(id, 'en').queryKey,
+    )
+  })
+})
+
 describe('storeSavedLookupTable', () => {
+  const saved = toLookupTable(seedLookupTables[0]!, {
+    get: (id) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
+  })
+
   it('caches the saved Lookup Table and marks its missing codes as stale', () => {
     const queryClient = new QueryClient()
 
-    const saved = toLookupTable(seedLookupTables[0]!, {
-      get: (id) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
-    })
-
-    queryClient.setQueryData(lookupTableMissingCodesQuery(saved.id).queryKey, [])
+    queryClient.setQueryData(lookupTableMissingCodesQuery(saved.id, 'en').queryKey, [])
+    queryClient.setQueryData(lookupTableMissingCodesQuery(saved.id, 'de').queryKey, [])
 
     storeSavedLookupTable(queryClient, saved)
 
-    expect(queryClient.getQueryData(lookupTableQuery(saved.id).queryKey)).toEqual(saved)
-    expect(
-      queryClient.getQueryState(lookupTableMissingCodesQuery(saved.id).queryKey)?.isInvalidated,
-    ).toBe(true)
+    expect(queryClient.getQueryData(lookupTableQuery(saved.id, 'en').queryKey)).toEqual(saved)
+
+    for (const language of ['en', 'de'] as const) {
+      expect(
+        queryClient.getQueryState(lookupTableMissingCodesQuery(saved.id, language).queryKey)
+          ?.isInvalidated,
+      ).toBe(true)
+    }
+  })
+
+  it('keeps the German code meanings until the German Lookup Table is read again', () => {
+    const queryClient = new QueryClient()
+    const germanMeanings = [{ code: 'PCE', meaning: 'Stück' }]
+    const german = lookupTableQuery(saved.id, 'de').queryKey
+
+    queryClient.setQueryData(german, { ...saved, entries: [], codeMeanings: germanMeanings })
+
+    storeSavedLookupTable(queryClient, saved)
+
+    expect(queryClient.getQueryData(german)).toEqual({ ...saved, codeMeanings: germanMeanings })
+    expect(queryClient.getQueryState(german)?.isInvalidated).toBe(true)
   })
 })
 
@@ -154,29 +191,85 @@ describe('forgetDeletedLookupTable', () => {
     const [deleted, kept] = seedLookupTables.map((table) => toLookupTable(table, tradingPartners))
 
     queryClient.setQueryData(lookupTablesQuery.queryKey, [deleted!, kept!])
-    queryClient.setQueryData(lookupTableQuery(deleted!.id).queryKey, deleted)
+    queryClient.setQueryData(lookupTableQuery(deleted!.id, 'de').queryKey, deleted)
 
     forgetDeletedLookupTable(queryClient, deleted!.id)
 
-    expect(queryClient.getQueryState(lookupTableQuery(deleted!.id).queryKey)).toBeUndefined()
+    expect(queryClient.getQueryState(lookupTableQuery(deleted!.id, 'de').queryKey)).toBeUndefined()
     expect(queryClient.getQueryData(lookupTablesQuery.queryKey)).toEqual([kept])
     expect(queryClient.getQueryState(lookupTablesQuery.queryKey)?.isInvalidated).toBe(true)
   })
 })
 
 describe('lookupTableSuggestionsQuery', () => {
-  it('keys the suggestions by kind and Trading Partner and keeps them fresh', () => {
-    const units = lookupTableSuggestionsQuery({ kind: 'units' })
+  it('keys the suggestions by kind, Trading Partner and language', () => {
+    const units = lookupTableSuggestionsQuery({ kind: 'units', language: 'en' })
 
     const hansemarktUnits = lookupTableSuggestionsQuery({
       kind: 'units',
       tradingPartnerId: seedTradingPartners[0]!.id,
+      language: 'en',
     })
 
-    expect(lookupTableSuggestionsQuery({ kind: 'units' }).queryKey).toEqual(units.queryKey)
+    expect(lookupTableSuggestionsQuery({ kind: 'units', language: 'en' }).queryKey).toEqual(
+      units.queryKey,
+    )
     expect(hansemarktUnits.queryKey).not.toEqual(units.queryKey)
-    expect(lookupTableSuggestionsQuery({ kind: 'countries' }).queryKey).not.toEqual(units.queryKey)
-    expect(units.staleTime).toBe(Infinity)
+    expect(lookupTableSuggestionsQuery({ kind: 'countries', language: 'en' }).queryKey).not.toEqual(
+      units.queryKey,
+    )
+    expect(lookupTableSuggestionsQuery({ kind: 'units', language: 'de' }).queryKey).not.toEqual(
+      units.queryKey,
+    )
+  })
+
+  it('never fetches the suggestions again on its own, since each fetch spends AI budget', () => {
+    const units = lookupTableSuggestionsQuery({ kind: 'units', language: 'en' })
+
+    expect(units).toMatchObject({ staleTime: Infinity, gcTime: Infinity, retry: false })
+  })
+
+  describe('when the AI budget is used up', () => {
+    const server = setupServer()
+
+    beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+
+    afterEach(() => {
+      server.resetHandlers()
+      server.events.removeAllListeners()
+      focusManager.setFocused(undefined)
+      onlineManager.setOnline(true)
+    })
+
+    afterAll(() => server.close())
+
+    it('fetches the suggestions once, also after a remount, a focus or a reconnect', async () => {
+      let requests = 0
+      server.use(
+        http.get(`${apiUrl}${lookupTableSuggestionsEndpoint.path}`, () =>
+          HttpResponse.json({ message: 'AI budget used up for today' }, { status: 429 }),
+        ),
+      )
+      server.events.on('request:start', () => requests++)
+
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retriesQuery } } })
+      const units = lookupTableSuggestionsQuery({ kind: 'units', language: 'en' })
+      const mounted = new QueryObserver(queryClient, units)
+      const unmount = mounted.subscribe(() => {})
+      await expect.poll(() => mounted.getCurrentResult().status).toBe('error')
+      unmount()
+
+      const remounted = new QueryObserver(queryClient, units)
+      remounted.subscribe(() => {})
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+      onlineManager.setOnline(false)
+      onlineManager.setOnline(true)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(requests).toBe(1)
+      expect(remounted.getCurrentResult().status).toBe('error')
+    })
   })
 })
 
