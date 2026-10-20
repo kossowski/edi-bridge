@@ -161,11 +161,15 @@ describe('POST /manual-submissions', () => {
   it('answers 422 with a problem that suggests no encoding when an Interchange is not valid in its character set', async () => {
     const response = await submit(Buffer.from(ordersInterchange.replace('UNOC', 'UNOA'), 'latin1'))
 
+    const notValidInUnoa: unknown = expect.stringMatching(
+      /^Byte \d+ \(0xFC\) is not valid in UNOA \(ASCII\), at .+\.$/,
+    )
+
     expect(response.statusCode).toBe(422)
     expect(documentUndecodableProblemSchema.parse(response.json())).toMatchObject({
       code: 'documentUndecodable',
       encoding: null,
-      message: expect.stringMatching(/^Byte \d+ \(0xFC\) is not valid in UNOA \(ASCII\), at .+\.$/),
+      message: notValidInUnoa,
     })
   })
 
