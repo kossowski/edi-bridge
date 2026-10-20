@@ -40,6 +40,7 @@ import {
   type CreateDocumentStructureBody,
   type CsvSettings,
   defaultCsvSettings,
+  type DocumentStructureInference,
   type DocumentStructureOriginKind,
   type InferredDocumentStructure,
 } from '@edi-bridge/contracts'
@@ -54,7 +55,7 @@ type Stage =
       originKind: DocumentStructureOriginKind | null
       chosen: ChosenFile | null
       facts: FileFacts | null
-      inferred: InferredDocumentStructure | null
+      inferred: DocumentStructureInference | null
       previous: InferredDocumentStructure | null
     }
   | {
@@ -65,7 +66,7 @@ type Stage =
       error: Error | null
       previous: InferredDocumentStructure | null
     }
-  | { kind: 'review'; chosen: ChosenFile; inferred: InferredDocumentStructure }
+  | { kind: 'review'; chosen: ChosenFile; inferred: DocumentStructureInference }
 
 function chosenOf(stage: Stage) {
   return stage.kind === 'drop' ? null : stage.chosen
