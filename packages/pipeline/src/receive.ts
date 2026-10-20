@@ -135,7 +135,7 @@ function interchangeKeyOf(content: string): InterchangeKey | undefined {
   }
 }
 
-const reprocessed = aliasedTable(runs, 'reprocessed')
+const replaced = aliasedTable(runs, 'replaced')
 
 // The lock holds a concurrent copy back until this one's Runs are stored, so only one is the original.
 async function originalRunsOf(
@@ -163,12 +163,9 @@ async function originalRunsOf(
         notExists(
           tx
             .select()
-            .from(reprocessed)
+            .from(replaced)
             .where(
-              and(
-                eq(reprocessed.id, runs.replacesRunId),
-                eq(reprocessed.documentId, runs.documentId),
-              ),
+              and(eq(replaced.id, runs.replacesRunId), eq(replaced.documentId, runs.documentId)),
             ),
         ),
       ),
