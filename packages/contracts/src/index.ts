@@ -328,6 +328,7 @@ export {
   mappingSummarySchema,
   type MessageTypeSide,
   messageTypeSideSchema,
+  type NewMappingMessageType,
   newMappingMessageTypes,
   type SaveMappingDraftBody,
   saveMappingDraftBodySchema,

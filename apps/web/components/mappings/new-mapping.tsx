@@ -14,11 +14,12 @@ import {
 import { DirectionHint } from '@/components/mappings/direction-path'
 import { usePlainNames } from '@/components/plain-names'
 import { documentStructuresQuery } from '@/lib/api/queries'
+import { onlyDocumentStructureId } from '@/lib/document-structures'
 import {
-  type CreateMappingBody,
   type Direction,
   directionOf,
   type DocumentStructureSummary,
+  type NewMappingMessageType,
   newMappingMessageTypes,
 } from '@edi-bridge/contracts'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
@@ -37,15 +38,13 @@ import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { Spinner } from '@edi-bridge/ui/components/spinner'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
-type NewMessageType = CreateMappingBody['messageType']
-
 function Choice({
   messageType,
   locked,
   chosen,
   onChoose,
 }: {
-  messageType: NewMessageType
+  messageType: NewMappingMessageType
   locked: boolean
   chosen: boolean
   onChoose: () => void
@@ -149,9 +148,11 @@ function DocumentStructuresUnavailable({ onRetry }: { onRetry: () => void }) {
 
 export function NewMappingChoices({
   direction,
+  messageType = null,
   className,
 }: {
   direction: Direction | null
+  messageType?: NewMappingMessageType | null
   className?: string
 }) {
   const t = useTranslations('Mappings.new.documentStructure')
@@ -163,7 +164,7 @@ export function NewMappingChoices({
 
   const available = documentStructures.data ?? []
   const chosen = available.some(({ id }) => id === chosenId) ? chosenId : ''
-  const documentStructureId = available.length === 1 ? (available[0]?.id ?? '') : chosen
+  const documentStructureId = onlyDocumentStructureId(available) ?? chosen
 
   if (documentStructures.isError) {
     return <DocumentStructuresUnavailable onRetry={() => void documentStructures.refetch()} />
@@ -173,11 +174,13 @@ export function NewMappingChoices({
     return <NoDocumentStructure />
   }
 
-  const shown = newMappingMessageTypes.filter(
-    (messageType) => !direction || directionOf({ messageType }) === direction,
+  const shown = newMappingMessageTypes.filter((candidate) =>
+    messageType
+      ? candidate === messageType
+      : !direction || directionOf({ messageType: candidate }) === direction,
   )
 
-  function choose(messageType: NewMessageType) {
+  function choose(messageType: NewMappingMessageType) {
     if (documentStructures.isPending) {
       return
     }
@@ -215,13 +218,13 @@ export function NewMappingChoices({
         />
       )}
       <ul className={cn('grid gap-2', className)}>
-        {shown.map((messageType) => (
+        {shown.map((candidate) => (
           <Choice
-            key={messageType}
-            chosen={create.locked && create.messageType === messageType}
+            key={candidate}
+            chosen={create.locked && create.messageType === candidate}
             locked={create.locked || documentStructures.isPending}
-            messageType={messageType}
-            onChoose={() => choose(messageType)}
+            messageType={candidate}
+            onChoose={() => choose(candidate)}
           />
         ))}
       </ul>
@@ -236,10 +239,12 @@ export function NewMappingChoices({
 export function NewMappingSheet({
   open,
   direction,
+  messageType,
   onOpenChange,
 }: {
   open: boolean
   direction: Direction | null
+  messageType: NewMappingMessageType | null
   onOpenChange: (open: boolean) => void
 }) {
   const t = useTranslations('Mappings.new')
@@ -252,7 +257,7 @@ export function NewMappingSheet({
           <SheetDescription>{t('description')}</SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          <NewMappingChoices direction={direction} />
+          <NewMappingChoices direction={direction} messageType={messageType} />
         </div>
       </SheetContent>
     </Sheet>

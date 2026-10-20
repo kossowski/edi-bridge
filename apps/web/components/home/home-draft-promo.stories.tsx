@@ -3,28 +3,48 @@ import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor } from 'storybook/test'
 
 import type { MswApi } from 'msw-storybook-addon'
+import type { screen } from 'storybook/test'
 
 import { HomeDraftPromo } from '@/components/home/home-draft-promo'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { createMappingEndpoint, mappingDraftEndpoint } from '@edi-bridge/contracts'
-import { mappingHandlers } from '@edi-bridge/mocks'
+import {
+  documentStructureHandlers,
+  mappingHandlers,
+  seedDocumentStructures,
+} from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
+
+// SAFETY: the seed holds a Document Structure for every Message Type.
+const documentStructure = seedDocumentStructures[0]!
 
 const meta = preview.meta({
   title: 'Home/HomeDraftPromo',
   component: HomeDraftPromo,
   parameters: { nextjs: { navigation: { pathname: '/' } } },
   beforeEach({ msw }) {
-    msw.use(...mappingHandlers(apiUrl))
+    msw.use(
+      ...mappingHandlers(apiUrl),
+      ...documentStructureHandlers(apiUrl, { documentStructures: [documentStructure] }),
+    )
   },
 })
 
 const createUrl = `${apiUrl}${createMappingEndpoint.path}`
 
 const button = 'Draft a mapping with AI'
+
+async function findDraftButton(canvas: { findByRole: typeof screen.findByRole }) {
+  const draft = await canvas.findByRole('button', { name: button })
+
+  await waitFor(() => expect(draft).not.toHaveAttribute('aria-busy'))
+  await expect(draft).not.toHaveAttribute('aria-disabled')
+
+  return draft
+}
 
 function recordCreates(msw: MswApi) {
   const bodies: unknown[] = []
@@ -44,7 +64,9 @@ async function expectOneDraftStart(bodies: unknown[]) {
       expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
     ),
   )
-  await expect(bodies).toEqual([{ messageType: 'ORDERS' }])
+  await expect(bodies).toEqual([
+    { messageType: 'ORDERS', documentStructureId: documentStructure.id },
+  ])
   await expect(getRouter().push).toHaveBeenCalledOnce()
 }
 
@@ -56,7 +78,7 @@ export const Default = meta.story({
       await canvas.findByRole('heading', { name: 'Let the AI draft your next mapping' }),
     ).toBeVisible()
 
-    await userEvent.click(canvas.getByRole('button', { name: button }))
+    await userEvent.click(await findDraftButton(canvas))
 
     await expectOneDraftStart(createBodies)
 
@@ -73,7 +95,7 @@ export const Pending = meta.story({
     msw.use(http.post(createUrl, () => delay('infinite')))
   },
   async play({ canvas }) {
-    await userEvent.click(await canvas.findByRole('button', { name: button }))
+    await userEvent.click(await findDraftButton(canvas))
 
     const creating = canvas.getByRole('button', { name: 'Creating the Mapping…' })
 
@@ -88,7 +110,7 @@ export const Failed = meta.story({
     msw.use(http.post(createUrl, () => HttpResponse.json({ message: 'Down' }, { status: 500 })))
   },
   async play({ canvas }) {
-    await userEvent.click(await canvas.findByRole('button', { name: button }))
+    await userEvent.click(await findDraftButton(canvas))
 
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
       'The Mapping could not be created. Try again.',
@@ -98,28 +120,86 @@ export const Failed = meta.story({
   },
 })
 
-export const NoDataFormat = meta.story({
+export const DocumentStructureGone = meta.story({
   beforeEach({ msw }) {
     msw.use(
       http.post(createUrl, () =>
-        HttpResponse.json(
-          { message: 'The Workspace has no Document Structure to map yet.' },
-          { status: 422 },
-        ),
+        HttpResponse.json({ message: 'The Document Structure does not exist.' }, { status: 422 }),
       ),
     )
   },
   async play({ canvas }) {
-    await userEvent.click(await canvas.findByRole('button', { name: button }))
+    await userEvent.click(await findDraftButton(canvas))
 
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'Add your data format first, so the AI knows the shape of your files.',
+      'This data format no longer exists. Choose another one.',
     )
-    await expect(canvas.getByRole('link', { name: 'Add a data format' })).toHaveAttribute(
-      'href',
-      '/data-formats/new',
-    )
-    await expect(canvas.getByRole('button', { name: button })).not.toHaveAttribute('aria-disabled')
+  },
+})
+
+async function expectCreateStepLink(
+  canvas: { findByRole: typeof screen.findByRole },
+  name = button,
+) {
+  await expect(await canvas.findByRole('link', { name })).toHaveAttribute(
+    'href',
+    '/mappings?new=ORDERS',
+  )
+}
+
+export const SeveralDocumentStructures = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: seedDocumentStructures }))
+  },
+  async play({ canvas, msw }) {
+    const createBodies = recordCreates(msw)
+
+    await expectCreateStepLink(canvas)
+    await expect(canvas.queryByRole('button', { name: button })).toBeNull()
+    await expect(createBodies).toEqual([])
+  },
+})
+
+export const SeveralDocumentStructuresGerman = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: seedDocumentStructures }))
+  },
+  async play({ canvas }) {
+    await expectCreateStepLink(canvas, 'Mapping mit KI entwerfen')
+  },
+})
+
+export const NoDocumentStructure = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [] }))
+  },
+  async play({ canvas }) {
+    await expectCreateStepLink(canvas)
+  },
+})
+
+export const DocumentStructuresLoading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { state: 'loading' }))
+  },
+  async play({ canvas, msw }) {
+    const createBodies = recordCreates(msw)
+    const draft = await canvas.findByRole('button', { name: button })
+
+    await expect(draft).toHaveAttribute('aria-busy', 'true')
+    await expect(draft).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(draft)
+    await expect(createBodies).toEqual([])
+  },
+})
+
+export const DocumentStructuresUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { state: 'error' }))
+  },
+  async play({ canvas }) {
+    await expectCreateStepLink(canvas)
   },
 })
 
@@ -127,7 +207,7 @@ export const DoubleClick = meta.story({
   async play({ canvas, msw }) {
     const createBodies = recordCreates(msw)
 
-    await userEvent.dblClick(await canvas.findByRole('button', { name: button }))
+    await userEvent.dblClick(await findDraftButton(canvas))
 
     await expectOneDraftStart(createBodies)
   },
@@ -137,7 +217,7 @@ export const RepeatedKeyPresses = meta.story({
   async play({ canvas, msw }) {
     const createBodies = recordCreates(msw)
 
-    const draft = await canvas.findByRole('button', { name: button })
+    const draft = await findDraftButton(canvas)
 
     draft.focus()
     await userEvent.keyboard('{Enter}{Enter}[Space]')

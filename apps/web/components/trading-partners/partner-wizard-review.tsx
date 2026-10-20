@@ -18,7 +18,11 @@ import {
 } from '@/components/trading-partners/partner-wizard-load-state'
 import { type WizardResult } from '@/components/trading-partners/partner-wizard-state'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
-import { channelsQuery, publishedMappingVersionsQuery } from '@/lib/api/queries'
+import {
+  channelsQuery,
+  documentStructuresQuery,
+  publishedMappingVersionsQuery,
+} from '@/lib/api/queries'
 import { directionOf } from '@edi-bridge/contracts'
 
 function PlanSection({ title, children }: { title: string; children: ReactNode }) {
@@ -62,6 +66,12 @@ export function useSetupPlan(result: WizardResult, active: boolean): SetupPlanSt
   const plainNames = usePlainNames()
   const name = result.partner.name
   const channels = useQuery({ ...channelsQuery, enabled: active })
+  const hasAiDrafts = result.documents.some((document) => result.mappings[document]?.way === 'ai')
+
+  const documentStructures = useQuery({
+    ...documentStructuresQuery,
+    enabled: active && hasAiDrafts,
+  })
 
   const versions = useQueries({
     queries: result.documents.flatMap((document) =>
@@ -71,7 +81,7 @@ export function useSetupPlan(result: WizardResult, active: boolean): SetupPlanSt
     ),
   })
 
-  const queries = [channels, ...versions]
+  const queries = [channels, ...(hasAiDrafts ? [documentStructures] : []), ...versions]
 
   if (queries.some((query) => query.isError)) {
     return {
@@ -86,15 +96,16 @@ export function useSetupPlan(result: WizardResult, active: boolean): SetupPlanSt
     }
   }
 
-  if (channels.data === undefined || versions.some((query) => query.data === undefined)) {
+  if (queries.some((query) => query.data === undefined)) {
     return { status: 'loading' }
   }
 
   return {
     status: 'ready',
     plan: setupPlan(result, {
-      channels: channels.data,
+      channels: channels.data ?? [],
       mappingVersions: versions.flatMap((query) => query.data ?? []),
+      documentStructures: documentStructures.data ?? [],
       names: {
         connection: (kind) => tSuggested(kind, { name }),
         route: (messageType) =>
@@ -122,6 +133,17 @@ export function ReviewStep({ state }: { state: SetupPlanState }) {
 
   const { plan } = state
   const { name } = plan.partner
+  const skipped = plan.skippedMappingDrafts
+
+  const mappings = [
+    ...plan.mappingDrafts.map(({ messageType }) => ({ messageType, detail: t('mappings.detail') })),
+    ...(skipped === null
+      ? []
+      : skipped.messageTypes.map((messageType) => ({
+          messageType,
+          detail: t(`mappings.skipped.${skipped.reason}`),
+        }))),
+  ]
 
   return (
     <div className="flex flex-col gap-6">
@@ -155,13 +177,13 @@ export function ReviewStep({ state }: { state: SetupPlanState }) {
         )}
       </PlanSection>
 
-      {plan.mappingDrafts.length > 0 && (
+      {mappings.length > 0 && (
         <PlanSection title={t('mappings.title')}>
           <ul className="flex flex-col gap-2">
-            {plan.mappingDrafts.map((messageType) => (
+            {mappings.map(({ messageType, detail }) => (
               <PlanItem
                 key={messageType}
-                detail={t('mappings.detail')}
+                detail={detail}
                 title={t('mappings.draft', {
                   documents: tWizard(`documentNames.${messageType}`),
                 })}

@@ -2,7 +2,9 @@
 
 import { AiMagicIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
+import Link from 'next/link'
 import { useId } from 'react'
 
 import {
@@ -10,8 +12,12 @@ import {
   useCreateMappingWithDraft,
 } from '@/components/mappings/create-mapping-with-draft'
 import { useCanChange } from '@/hooks/use-session'
-import { Button } from '@edi-bridge/ui/components/button'
+import { documentStructuresQuery } from '@/lib/api/queries'
+import { onlyDocumentStructureId } from '@/lib/document-structures'
+import { newMappingHref } from '@/lib/navigation'
+import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import { Spinner } from '@edi-bridge/ui/components/spinner'
+import { cn } from '@edi-bridge/ui/lib/utils'
 
 type SketchField = {
   key: 'orderNumber' | 'customer' | 'deliveryDate' | 'itemCode'
@@ -197,12 +203,58 @@ function MiniMapping({ sketch, className }: { sketch: Sketch; className: string 
   )
 }
 
-export function HomeDraftPromo() {
+function DraftAction() {
   const t = useTranslations('Home.promo')
   const tCreate = useTranslations('Mappings.create')
+  const create = useCreateMappingWithDraft()
+  const documentStructures = useQuery(documentStructuresQuery)
+  const documentStructureId = onlyDocumentStructureId(documentStructures.data)
+  const loading = documentStructures.isPending
+  const locked = create.locked || loading
+
+  if (!loading && documentStructureId === null) {
+    return (
+      <Link href={newMappingHref('ORDERS')} className={cn(buttonVariants({ size: 'lg' }), 'mt-1')}>
+        <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />
+        {t('button')}
+      </Link>
+    )
+  }
+
+  return (
+    <>
+      <Button
+        size="lg"
+        aria-busy={loading || undefined}
+        aria-disabled={locked || undefined}
+        className="mt-1 aria-disabled:cursor-progress aria-disabled:opacity-50"
+        onClick={() => {
+          if (documentStructureId !== null) {
+            create.start({ messageType: 'ORDERS', documentStructureId })
+          }
+        }}>
+        {locked ? (
+          <Spinner role="presentation" aria-hidden data-icon="inline-start" />
+        ) : (
+          <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />
+        )}
+        {create.locked ? tCreate('creating') : t('button')}
+      </Button>
+      <p role="status" className="sr-only">
+        {create.locked ? tCreate('creating') : ''}
+      </p>
+      <CreateMappingError
+        error={create.error}
+        withDocumentStructure={create.withDocumentStructure}
+      />
+    </>
+  )
+}
+
+export function HomeDraftPromo() {
+  const t = useTranslations('Home.promo')
   const headingId = useId()
   const canChange = useCanChange()
-  const create = useCreateMappingWithDraft()
 
   if (!canChange) {
     return null
@@ -230,22 +282,7 @@ export function HomeDraftPromo() {
           {t('title')}
         </h2>
         <p className="text-muted-foreground text-sm text-pretty">{t('description')}</p>
-        <Button
-          size="lg"
-          aria-disabled={create.locked || undefined}
-          className="mt-1 aria-disabled:cursor-progress aria-disabled:opacity-50"
-          onClick={() => create.start({ messageType: 'ORDERS' })}>
-          {create.locked ? (
-            <Spinner role="presentation" aria-hidden data-icon="inline-start" />
-          ) : (
-            <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />
-          )}
-          {create.locked ? tCreate('creating') : t('button')}
-        </Button>
-        <p role="status" className="sr-only">
-          {create.locked ? tCreate('creating') : ''}
-        </p>
-        <CreateMappingError error={create.error} />
+        <DraftAction />
       </div>
     </section>
   )

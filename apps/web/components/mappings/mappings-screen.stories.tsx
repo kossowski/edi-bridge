@@ -1,12 +1,13 @@
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
+import { useState } from 'react'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { MappingsScreen } from '@/components/mappings/mappings-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import { createMappingEndpoint } from '@edi-bridge/contracts'
+import { createMappingEndpoint, type NewMappingMessageType } from '@edi-bridge/contracts'
 import {
   createDocumentStructures,
   createHandlers,
@@ -252,6 +253,84 @@ export const NewMappingFromLane = meta.story({
     )
     await expect(sheet.getByRole('button', { name: 'Invoices you send' })).toBeVisible()
     await expect(sheet.queryByRole('button', { name: 'Purchase orders you receive' })).toBeNull()
+  },
+})
+
+export const NewMappingWithMessageType = meta.story({
+  args: { newMessageType: 'DESADV' },
+  async play({ msw }) {
+    const bodies: unknown[] = []
+
+    msw.use(
+      http.post(createUrl, async ({ request }) => {
+        bodies.push(await request.clone().json())
+      }),
+    )
+
+    const sheet = within(await screen.findByRole('dialog', { name: 'New Mapping' }))
+
+    await waitFor(() =>
+      expect(sheet.getByRole('button', { name: 'Dispatch advices you send' })).toBeVisible(),
+    )
+    await expect(sheet.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(1)
+    await expect(getRouter().replace).toHaveBeenCalledWith('/mappings', { scroll: false })
+
+    await chooseDocumentStructure(sheet)
+    await userEvent.click(sheet.getByRole('button', { name: 'Dispatch advices you send' }))
+
+    await waitFor(() =>
+      expect(getRouter().push).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
+      ),
+    )
+    await expect(bodies).toEqual([
+      { messageType: 'DESADV', documentStructureId: documentStructure.id },
+    ])
+  },
+})
+
+export const NewMappingWithMessageTypeClosed = meta.story({
+  args: { newMessageType: 'DESADV' },
+  async play({ canvasElement }) {
+    await screen.findByRole('dialog', { name: 'New Mapping' })
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await waitFor(() =>
+      expect(sheet.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(3),
+    )
+  },
+})
+
+function FollowsCreateLink() {
+  const [newMessageType, setNewMessageType] = useState<NewMappingMessageType | null>(null)
+
+  return (
+    <>
+      <button type="button" onClick={() => setNewMessageType('INVOIC')}>
+        Follow the create link
+      </button>
+      <MappingsScreen newMessageType={newMessageType} />
+    </>
+  )
+}
+
+export const NewMappingWithMessageTypeAfterNavigation = meta.story({
+  render: () => <FollowsCreateLink />,
+  async play({ canvas, canvasElement }) {
+    await lane(canvasElement, 'Going out')
+    await expect(screen.queryByRole('dialog')).toBeNull()
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Follow the create link' }))
+
+    const sheet = within(await screen.findByRole('dialog', { name: 'New Mapping' }))
+
+    await waitFor(() =>
+      expect(sheet.getByRole('button', { name: 'Invoices you send' })).toBeVisible(),
+    )
+    await expect(sheet.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(1)
   },
 })
 
@@ -584,6 +663,18 @@ export const EmptyWorkspaceGerman = meta.story({
   },
 })
 
+export const EmptyWorkspaceWithMessageType = meta.story({
+  args: { newMessageType: 'INVOIC' },
+  beforeEach({ msw }) {
+    msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByRole('button', { name: 'Invoices you send' })).toBeVisible()
+    await expect(canvas.getAllByRole('button', { name: /you (receive|send)$/ })).toHaveLength(1)
+    await expect(getRouter().replace).toHaveBeenCalledWith('/mappings', { scroll: false })
+  },
+})
+
 export const EmptyWorkspaceDark = meta.story({
   beforeEach({ msw }) {
     msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
@@ -605,6 +696,18 @@ export const Viewer = meta.story({
 
       await expect(canvas.queryByRole('button', { name: 'New Mapping' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Another document/ })).toBeNull()
+    },
+  }),
+})
+
+export const ViewerWithMessageType = meta.story({
+  args: { newMessageType: 'DESADV' },
+  ...viewerStory({
+    async play({ canvas, canvasElement }) {
+      await lane(canvasElement, 'Going out')
+      await canvas.findByRole('link', { name: 'Dispatch advices to 2 partners' })
+
+      await expect(screen.queryByRole('dialog', { name: 'New Mapping' })).toBeNull()
     },
   }),
 })

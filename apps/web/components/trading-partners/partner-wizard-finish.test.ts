@@ -56,9 +56,12 @@ const invoicVersion = {
   mappingName: 'ERP JSON to INVOIC',
 }
 
+const erpJson = { id: '40000000-0000-4000-8000-000000000002' }
+
 const context: SetupContext<PlanChannel> = {
   channels: [erpDelivery, erpWebhook],
   mappingVersions: [ordersVersion, invoicVersion],
+  documentStructures: [erpJson],
   names: {
     connection: (kind) => `Kieler Kontor ${kind}`,
     route: (messageType) => `${messageType} route`,
@@ -99,13 +102,13 @@ function createdChannel(input: ChannelInput) {
   }
 }
 
-function createdMapping({ messageType }: CreateMappingBody): MappingSummary {
+function createdMapping({ messageType, documentStructureId }: CreateMappingBody): MappingSummary {
   return {
     id: '40000000-0000-4000-8000-000000000001',
     name: `New ${messageType} mapping`,
     direction: 'outbound',
     messageType,
-    documentStructureId: '40000000-0000-4000-8000-000000000002',
+    documentStructureId: documentStructureId ?? erpJson.id,
     documentStructureName: 'ERP JSON',
     latestVersion: null,
     latestVersionPublishedAt: null,
@@ -173,7 +176,10 @@ describe('finishSetup', () => {
         url: 'https://edi.kieler-kontor.de/inbox',
       }),
     ])
-    expect(api.createMapping).toHaveBeenCalledExactlyOnceWith({ messageType: 'DESADV' })
+    expect(api.createMapping).toHaveBeenCalledExactlyOnceWith({
+      messageType: 'DESADV',
+      documentStructureId: erpJson.id,
+    })
     expect(api.createFlow.mock.calls.map(([input]) => input)).toEqual([
       {
         name: 'ORDERS route',
@@ -195,6 +201,25 @@ describe('finishSetup', () => {
     expect(finished.channels.inbound?.webhookToken).toBe('whk_token')
     expect(finished.mappings.DESADV?.messageType).toBe('DESADV')
     expect(nothingLeft(leftOver(plan, finished))).toBe(true)
+  })
+
+  it('skips the AI drafts when the workspace has several document structures', async () => {
+    const api = fakeApi()
+
+    const several = setupPlan(result, {
+      ...context,
+      documentStructures: [erpJson, { id: '40000000-0000-4000-8000-000000000003' }],
+    })
+
+    const finished = await finishSetup(several, api)
+
+    expect(api.createMapping).not.toHaveBeenCalled()
+    expect(api.createFlow).toHaveBeenCalledTimes(2)
+    expect(leftOver(several, finished).mappingDrafts).toEqual([])
+    expect(setupSummary(several, finished).skippedMappingDrafts).toEqual({
+      reason: 'severalDocumentStructures',
+      messageTypes: ['DESADV'],
+    })
   })
 
   it('creates nothing else when the partner cannot be created', async () => {
@@ -360,6 +385,7 @@ describe('setupSummary', () => {
     expect(summary.mappingDrafts).toEqual([
       { messageType: 'DESADV', mapping: finished.mappings.DESADV },
     ])
+    expect(summary.skippedMappingDrafts).toBeNull()
     expect(summary.left.routes.map(({ messageType }) => messageType)).toEqual(['ORDERS', 'INVOIC'])
     expect(summary.later).toEqual({
       connections: [],

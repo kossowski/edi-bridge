@@ -10,7 +10,8 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useId, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useId, useState } from 'react'
 
 import { AppPage } from '@/components/app-page'
 import { LoadError } from '@/components/load-error'
@@ -26,10 +27,11 @@ import {
 import { NewMappingChoices, NewMappingSheet } from '@/components/mappings/new-mapping'
 import { useCanChange } from '@/hooks/use-session'
 import { mappingsQuery } from '@/lib/api/queries'
+import { navigationItems } from '@/lib/navigation'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
-import type { Direction, MappingSummary } from '@edi-bridge/contracts'
+import type { Direction, MappingSummary, NewMappingMessageType } from '@edi-bridge/contracts'
 
 const directions = ['inbound', 'outbound'] as const satisfies ReadonlyArray<Direction>
 
@@ -101,7 +103,13 @@ function Lane({
   )
 }
 
-function FirstMapping({ canChange }: { canChange: boolean }) {
+function FirstMapping({
+  canChange,
+  messageType,
+}: {
+  canChange: boolean
+  messageType: NewMappingMessageType | null
+}) {
   const t = useTranslations('Mappings')
   const titleId = useId()
 
@@ -128,6 +136,7 @@ function FirstMapping({ canChange }: { canChange: boolean }) {
       {canChange && (
         <NewMappingChoices
           direction={null}
+          messageType={messageType}
           className="w-full text-left @xl:grid-cols-2 @4xl:grid-cols-3"
         />
       )}
@@ -135,19 +144,42 @@ function FirstMapping({ canChange }: { canChange: boolean }) {
   )
 }
 
-export function MappingsScreen() {
+export function MappingsScreen({
+  newMessageType = null,
+}: {
+  newMessageType?: NewMappingMessageType | null
+}) {
   const t = useTranslations()
   const tMappings = useTranslations('Mappings')
   const mappings = useQuery(mappingsQuery)
   const canChange = useCanChange()
+  const router = useRouter()
   const [filter, setFilter] = useState<MappingFilter>('all')
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(newMessageType !== null)
   const [sheetDirection, setSheetDirection] = useState<Direction | null>(null)
+  const [sheetMessageType, setSheetMessageType] = useState(newMessageType)
+  const [shownMessageType, setShownMessageType] = useState(newMessageType)
 
-  function openSheet(direction: Direction | null) {
+  function openSheet(direction: Direction | null, messageType: NewMappingMessageType | null) {
     setSheetDirection(direction)
+    setSheetMessageType(messageType)
     setSheetOpen(true)
   }
+
+  if (newMessageType !== shownMessageType) {
+    setShownMessageType(newMessageType)
+
+    if (newMessageType !== null) {
+      openSheet(null, newMessageType)
+    }
+  }
+
+  // The create link leaves the address once used, so a reload or going back does not reopen it.
+  useEffect(() => {
+    if (newMessageType !== null) {
+      router.replace(navigationItems.mappings.href, { scroll: false })
+    }
+  }, [newMessageType, router])
 
   if (mappings.isError) {
     return (
@@ -169,7 +201,7 @@ export function MappingsScreen() {
   if (mappings.isSuccess && all.length === 0) {
     return (
       <AppPage title={t('Sidebar.items.mappings.label')}>
-        <FirstMapping canChange={canChange} />
+        <FirstMapping canChange={canChange} messageType={sheetMessageType} />
       </AppPage>
     )
   }
@@ -178,7 +210,7 @@ export function MappingsScreen() {
     <AppPage
       busy={mappings.isPending}
       changeActions={
-        <Button onClick={() => openSheet(null)}>
+        <Button onClick={() => openSheet(null, null)}>
           <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} data-icon="inline-start" />
           {tMappings('new.button')}
         </Button>
@@ -216,11 +248,16 @@ export function MappingsScreen() {
             direction={direction}
             loading={mappings.isPending}
             mappings={sorted.filter((mapping) => mapping.direction === direction)}
-            onAddAnother={canChange ? () => openSheet(direction) : null}
+            onAddAnother={canChange ? () => openSheet(direction, null) : null}
           />
         ))}
       </div>
-      <NewMappingSheet direction={sheetDirection} open={sheetOpen} onOpenChange={setSheetOpen} />
+      <NewMappingSheet
+        direction={sheetDirection}
+        messageType={sheetMessageType}
+        open={sheetOpen && canChange}
+        onOpenChange={setSheetOpen}
+      />
     </AppPage>
   )
 }

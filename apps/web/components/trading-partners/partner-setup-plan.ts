@@ -1,8 +1,10 @@
+import { onlyDocumentStructureId } from '@/lib/document-structures'
 import {
   type ChannelSummary,
   type Direction,
   directionOf,
   directions,
+  type DocumentStructureSummary,
   type MappingVersionSummary,
 } from '@edi-bridge/contracts'
 
@@ -24,6 +26,7 @@ export type LeftReason =
   | 'noOwnConnection'
   | 'severalOwnConnections'
   | 'mappingDraft'
+  | 'mappingToCreate'
   | 'mappingLater'
 
 export type PlannedRoute<Channel extends PlanChannel> = {
@@ -39,16 +42,25 @@ export type PlannedDocument<Channel extends PlanChannel> = { messageType: Wizard
   | { reasons: LeftReason[] }
 )
 
+export type PlannedMappingDraft = { messageType: WizardDocument; documentStructureId: string }
+
+export type SkippedMappingDrafts = {
+  reason: 'noDocumentStructure' | 'severalDocumentStructures'
+  messageTypes: WizardDocument[]
+}
+
 export type SetupPlan<Channel extends PlanChannel> = {
   partner: WizardResult['partner']
   connections: PlannedConnection[]
-  mappingDrafts: WizardDocument[]
+  mappingDrafts: PlannedMappingDraft[]
+  skippedMappingDrafts: SkippedMappingDrafts | null
   documents: PlannedDocument<Channel>[]
 }
 
 export type SetupContext<Channel extends PlanChannel> = {
   channels: ReadonlyArray<Channel>
   mappingVersions: ReadonlyArray<MappingVersionSummary>
+  documentStructures: ReadonlyArray<Pick<DocumentStructureSummary, 'id'>>
   names: {
     connection: (kind: ChannelKindKey) => string
     route: (messageType: WizardDocument) => string
@@ -82,7 +94,7 @@ function plannedDocument<Channel extends PlanChannel>(
   messageType: WizardDocument,
   result: WizardResult,
   connections: ReadonlyArray<PlannedConnection>,
-  { channels, mappingVersions, names }: SetupContext<Channel>,
+  { channels, mappingVersions, documentStructures, names }: SetupContext<Channel>,
 ): PlannedDocument<Channel> {
   const direction = directionOf({ messageType })
   const own = ownConnections(channels, messageType)
@@ -108,7 +120,9 @@ function plannedDocument<Channel extends PlanChannel>(
   }
 
   if (mapping?.way === 'ai') {
-    reasons.push('mappingDraft')
+    reasons.push(
+      onlyDocumentStructureId(documentStructures) === null ? 'mappingToCreate' : 'mappingDraft',
+    )
   } else if (mappingVersion === undefined) {
     reasons.push('mappingLater')
   }
@@ -136,6 +150,36 @@ function plannedDocument<Channel extends PlanChannel>(
   }
 }
 
+function plannedMappingDrafts(
+  result: WizardResult,
+  documentStructures: SetupContext<PlanChannel>['documentStructures'],
+): Pick<SetupPlan<PlanChannel>, 'mappingDrafts' | 'skippedMappingDrafts'> {
+  const drafts = result.documents.filter(
+    (messageType) => result.mappings[messageType]?.way === 'ai',
+  )
+
+  const documentStructureId = onlyDocumentStructureId(documentStructures)
+
+  if (drafts.length === 0) {
+    return { mappingDrafts: [], skippedMappingDrafts: null }
+  }
+
+  if (documentStructureId !== null) {
+    return {
+      mappingDrafts: drafts.map((messageType) => ({ messageType, documentStructureId })),
+      skippedMappingDrafts: null,
+    }
+  }
+
+  return {
+    mappingDrafts: [],
+    skippedMappingDrafts: {
+      reason: documentStructures.length === 0 ? 'noDocumentStructure' : 'severalDocumentStructures',
+      messageTypes: drafts,
+    },
+  }
+}
+
 export function setupPlan<Channel extends PlanChannel>(
   result: WizardResult,
   context: SetupContext<Channel>,
@@ -145,9 +189,7 @@ export function setupPlan<Channel extends PlanChannel>(
   return {
     partner: result.partner,
     connections,
-    mappingDrafts: result.documents.filter(
-      (messageType) => result.mappings[messageType]?.way === 'ai',
-    ),
+    ...plannedMappingDrafts(result, context.documentStructures),
     documents: result.documents.map((messageType) =>
       plannedDocument(messageType, result, connections, context),
     ),

@@ -46,8 +46,8 @@ export const Seeded = meta.story({
 
     await expect(documents).toBeVisible()
     await expect(
-      within(promo).getByRole('button', { name: 'Draft a mapping with AI' }),
-    ).toBeEnabled()
+      await within(promo).findByRole('link', { name: 'Draft a mapping with AI' }),
+    ).toHaveAttribute('href', '/mappings?new=ORDERS')
     await expect(
       canvas.getByRole('region', { name: 'Key numbers' }).compareDocumentPosition(promo) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -84,7 +84,7 @@ export const ContinueSetup = meta.story({
     await expect(setup).toHaveAttribute('href', '/first-steps')
 
     const promo = await canvas.findByRole('region', { name: 'Let the AI draft your next mapping' })
-    const draft = within(promo).getByRole('button', { name: 'Draft a mapping with AI' })
+    const draft = await within(promo).findByRole('link', { name: 'Draft a mapping with AI' })
 
     await expect(draft).toBeVisible()
     await expect(draft.getBoundingClientRect().bottom).toBeLessThanOrEqual(
@@ -258,7 +258,7 @@ export const German = meta.story({
     await expect(await canvas.findByRole('heading', { name: 'Belege' })).toBeVisible()
     await expect(canvas.getByRole('heading', { name: 'Ihre Handelspartner' })).toBeVisible()
     await expect(
-      await canvas.findByRole('button', { name: 'Mapping mit KI entwerfen' }),
+      await canvas.findByRole('link', { name: 'Mapping mit KI entwerfen' }),
     ).toBeVisible()
     await expect(
       canvas.getByRole('link', { name: /^Handlungsbedarf\s*Braucht Sie\s*3/ }),
@@ -307,9 +307,7 @@ export const Mobile = meta.story({
   async play({ canvas, canvasElement }) {
     await canvas.findByRole('heading', { name: 'Documents' })
     await expect(canvas.getByRole('link', { name: /^Continue setup/ })).toBeVisible()
-    await expect(
-      await canvas.findByRole('button', { name: 'Draft a mapping with AI' }),
-    ).toBeVisible()
+    await expect(await canvas.findByRole('link', { name: 'Draft a mapping with AI' })).toBeVisible()
     await expectNoPageScroll(canvasElement)
   },
 })

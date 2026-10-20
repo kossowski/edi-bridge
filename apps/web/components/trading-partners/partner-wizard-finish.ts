@@ -21,6 +21,7 @@ import {
   type PlannedConnection,
   type PlannedRoute,
   type SetupPlan,
+  type SkippedMappingDrafts,
 } from './partner-setup-plan'
 import { type WizardDocument } from './partner-wizard-state'
 import { defaultCharacterSet } from './trading-partner-form-values'
@@ -114,8 +115,8 @@ export async function finishSetup(
     }
   }
 
-  for (const messageType of plan.mappingDrafts) {
-    const created = await tryCreate(() => api.createMapping({ messageType }))
+  for (const { messageType, documentStructureId } of plan.mappingDrafts) {
+    const created = await tryCreate(() => api.createMapping({ messageType, documentStructureId }))
 
     if (created) {
       finished.mappings[messageType] = created
@@ -164,7 +165,9 @@ export function leftOver(plan: SetupPlan<PlanChannel>, finished: FinishedSetup):
 
       return [{ direction, kind, name: values.name, reason: valid ? 'failed' : 'invalid' }]
     }),
-    mappingDrafts: plan.mappingDrafts.filter((messageType) => !finished.mappings[messageType]),
+    mappingDrafts: plan.mappingDrafts.flatMap(({ messageType }) =>
+      finished.mappings[messageType] ? [] : [messageType],
+    ),
     routes: plan.documents.flatMap((document) =>
       'route' in document && !finished.flows[document.messageType]
         ? [{ messageType: document.messageType, name: document.route.name }]
@@ -209,6 +212,7 @@ export type SetupSummary = {
   name: string
   webhook: CreatedWebhook | null
   mappingDrafts: Array<{ messageType: WizardDocument; mapping: MappingSummary }>
+  skippedMappingDrafts: SkippedMappingDrafts | null
   left: LeftOver
   later: ForLater
 }
@@ -227,11 +231,12 @@ export function setupSummary(plan: SetupPlan<PlanChannel>, finished: FinishedSet
   return {
     name: finished.tradingPartner.name,
     webhook: createdWebhook(finished),
-    mappingDrafts: plan.mappingDrafts.flatMap((messageType) => {
+    mappingDrafts: plan.mappingDrafts.flatMap(({ messageType }) => {
       const mapping = finished.mappings[messageType]
 
       return mapping ? [{ messageType, mapping }] : []
     }),
+    skippedMappingDrafts: plan.skippedMappingDrafts,
     left: leftOver(plan, finished),
     later: forLater(plan),
   }

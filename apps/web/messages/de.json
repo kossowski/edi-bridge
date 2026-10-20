@@ -1270,6 +1270,12 @@
         "mappingDraft": "Neues Mapping für {documents}",
         "route": "Belegweg {name}"
       },
+      "skipped": {
+        "title": "Anzulegende Mappings",
+        "noDocumentStructure": "Diese Mappings wurden nicht angelegt, weil Sie noch kein Datenformat haben. Fügen Sie eines hinzu und legen Sie dann jedes Mapping an.",
+        "severalDocumentStructures": "Diese Mappings wurden nicht angelegt, weil Sie mehrere Datenformate haben. Legen Sie jedes Mapping an und wählen Sie sein Datenformat.",
+        "create": "Mapping für {documents} anlegen"
+      },
       "later": {
         "title": "Später einrichten",
         "description": "Diese Punkte haben Sie für später gelassen. Fügen Sie sie über die Einrichtungsschritte unten hinzu, sobald Sie so weit sind.",
@@ -1284,6 +1290,7 @@
           "noOwnConnection": "Noch keine Ihrer eigenen Verbindungen passt zu {documents}. Fügen Sie zuerst eine hinzu.",
           "severalOwnConnections": "Mehrere Ihrer eigenen Verbindungen passen zu {documents}. Wählen Sie eine in den Einrichtungsschritten aus.",
           "mappingDraft": "Er braucht den veröffentlichten KI-Entwurf.",
+          "mappingToCreate": "Das Mapping muss zuerst angelegt und veröffentlicht sein.",
           "mappingLater": "Wählen Sie das Mapping in den Einrichtungsschritten."
         }
       },
@@ -1822,7 +1829,11 @@
       "mappings": {
         "title": "Mappings",
         "draft": "Neues Mapping für {documents}",
-        "detail": "Die KI entwirft es aus einem Beispielbeleg. Sie prüfen und veröffentlichen es im Mapping-Editor."
+        "detail": "Die KI entwirft es aus einem Beispielbeleg. Sie prüfen und veröffentlichen es im Mapping-Editor.",
+        "skipped": {
+          "noDocumentStructure": "Wird hier nicht angelegt: Fügen Sie zuerst Ihr Datenformat hinzu und legen Sie das Mapping dann unter Mappings an.",
+          "severalDocumentStructures": "Wird hier nicht angelegt: Sie haben mehrere Datenformate und wählen eines, wenn Sie das Mapping unter Mappings anlegen."
+        }
       },
       "routes": {
         "title": "Belegwege",
@@ -1833,6 +1844,7 @@
           "noOwnConnection": "Noch keine Ihrer eigenen Verbindungen passt zu {documents}.",
           "severalOwnConnections": "Mehrere Ihrer eigenen Verbindungen passen zu {documents}. Sie wählen dort eine aus.",
           "mappingDraft": "Der Belegweg folgt, sobald der KI-Entwurf veröffentlicht ist.",
+          "mappingToCreate": "Der Belegweg folgt, sobald das Mapping angelegt und veröffentlicht ist.",
           "mappingLater": "Sie wählen das Mapping dort."
         }
       },
