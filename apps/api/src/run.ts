@@ -283,7 +283,6 @@ export const loadRun = (id: string) =>
       ]),
     )
 
-    // The pipeline stored the delivery input itself, so one that breaks its schema is a defect.
     const deliveryInput = deliveryInputSchema.nullable().parse(row.deliveryInput)
 
     return toDetail(
@@ -336,7 +335,7 @@ const toParsedMessage = (
   })),
 })
 
-const parsedMessageOf = (
+const interchangeMessageOf = (
   raw: string,
   messageType: MessageType,
   messageIndex: number | null,
@@ -348,16 +347,20 @@ const parsedMessageOf = (
     : toParsedMessage(found.message, found.reference, messageType)
 }
 
-// An outbound Run that failed before its Interchange was built keeps only the Message it built.
-const builtMessageOf = (built: Message, messageType: MessageType): ParsedMessage | null => {
+const builtMessageOf = (built: Message, messageType: MessageType): ParsedMessage => {
   const reference = built.header.elements[0]?.[0]
 
-  return reference ? toParsedMessage(built, reference, messageType) : null
+  if (!reference) {
+    throw new Error('The built Message has no reference in its UNH')
+  }
+
+  return toParsedMessage(built, reference, messageType)
 }
 
-const messageOfDetail = (row: DetailRow, raw: string | null, messageType: MessageType) => {
+// An outbound Run that failed before its Interchange was built keeps only the Message it built.
+const messageOf = (row: DetailRow, raw: string | null, messageType: MessageType) => {
   if (raw) {
-    return parsedMessageOf(raw, messageType, row.messageIndex)
+    return interchangeMessageOf(raw, messageType, row.messageIndex)
   }
 
   return directionOf(row) === 'outbound' && row.deliveryInput !== null
@@ -382,7 +385,7 @@ const toDetail = (
     ...summary,
     ...loaded,
     interchange: summary.interchange && raw ? { ...summary.interchange, raw } : null,
-    message: parsed ? messageOfDetail(row, raw, summary.messageType) : null,
+    message: parsed ? messageOf(row, raw, summary.messageType) : null,
     documentDeletedAt: row.documentDeletedAt?.toISOString() ?? null,
     testIndicator: row.documentDeletedAt === null ? row.testIndicator : null,
   }
