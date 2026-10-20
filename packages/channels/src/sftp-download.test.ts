@@ -36,6 +36,7 @@ const inboundChannel = (remotePath: string): SftpChannel => ({
   remotePath,
   authentication: 'password',
   encryptedCredential: secrets.seal(sftp.password, `channels/${channelId}/encryptedCredential`),
+  hostKeyFingerprint: null,
 })
 
 const inbox = async (name: string, files: Record<string, string | Buffer>) => {

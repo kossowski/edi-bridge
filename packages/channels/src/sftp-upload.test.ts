@@ -39,6 +39,7 @@ const outbox = (): SftpLogin => ({
   username: sftp.username,
   credential: { password: sftp.password },
   remotePath: '/upload',
+  hostKeyFingerprint: null,
 })
 
 const interchange = (name: string): OutboundDocument => ({
@@ -198,6 +199,7 @@ const outboundChannel = (): SftpChannel => ({
   remotePath: '/upload',
   authentication: 'password',
   encryptedCredential: secrets.seal(sftp.password, `channels/${channelId}/encryptedCredential`),
+  hostKeyFingerprint: null,
 })
 
 describe('sftpChannelDelivery', () => {

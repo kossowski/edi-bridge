@@ -85,6 +85,7 @@ const sftpOutbox = (): SftpLogin => ({
   username: sftp.username,
   credential: { password: sftp.password },
   remotePath: '/upload',
+  hostKeyFingerprint: null,
 })
 
 const httpDelivery = (url = erp.url): HttpDestination => ({
