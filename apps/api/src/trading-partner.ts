@@ -1,9 +1,10 @@
-import { and, count, eq, exists, isNotNull, isNull, type SQL } from 'drizzle-orm'
+import { and, count, eq, exists, isNotNull, isNull } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import {
   activityDays,
-  directions,
+  channelDirectionsOf,
+  neededDirectionsOf,
   type TradingPartner,
   type TradingPartnerActivity,
   type TradingPartnerActivityDetail,
@@ -37,6 +38,7 @@ const toTradingPartner = (row: Row): TradingPartner => ({
   gln: row.gln,
   characterSet: row.characterSet,
   acknowledgementTimeLimitHours: row.acknowledgementTimeLimitHours,
+  ...(row.messageTypes !== null && { messageTypes: row.messageTypes }),
   testMode: row.testMode,
   onboarding: {
     testInterchangeSentAt: row.testInterchangeSentAt?.toISOString() ?? null,
@@ -65,22 +67,6 @@ export const listTradingPartners = Effect.gen(function* () {
   return rows.map(toTradingPartner).toSorted(byName)
 })
 
-const countsByTradingPartner = async (
-  db: Database,
-  table: typeof channels | typeof flows,
-  where: SQL | undefined,
-) => {
-  const rows = await db
-    .select({ tradingPartnerId: table.tradingPartnerId, count: count() })
-    .from(table)
-    .where(where)
-    .groupBy(table.tradingPartnerId)
-
-  const byTradingPartner = new Map(rows.map((row) => [row.tradingPartnerId, row.count]))
-
-  return (tradingPartnerId: string) => byTradingPartner.get(tradingPartnerId) ?? 0
-}
-
 const ofTradingPartner = (
   table: typeof channels | typeof flows,
   workspaceId: string,
@@ -92,17 +78,48 @@ const ofTradingPartner = (
     tradingPartnerId === undefined ? undefined : eq(table.tradingPartnerId, tradingPartnerId),
   )
 
-const selectChannelAndFlowCounts = async (
-  db: Database,
-  workspaceId: string,
-  tradingPartnerId?: string,
+const groupedByTradingPartner = <Grouped extends { tradingPartnerId: string | null }>(
+  rows: Grouped[],
 ) => {
-  const [channelCountOf, flowCountOf] = await Promise.all([
-    countsByTradingPartner(db, channels, ofTradingPartner(channels, workspaceId, tradingPartnerId)),
-    countsByTradingPartner(db, flows, ofTradingPartner(flows, workspaceId, tradingPartnerId)),
+  const byTradingPartner = Map.groupBy(rows, (row) => row.tradingPartnerId)
+
+  return (tradingPartnerId: string) => byTradingPartner.get(tradingPartnerId) ?? []
+}
+
+const sumOf = (rows: ReadonlyArray<{ count: number }>) =>
+  rows.reduce((sum, row) => sum + row.count, 0)
+
+const selectConnections = async (db: Database, workspaceId: string, tradingPartnerId?: string) => {
+  const [channelRows, flowRows] = await Promise.all([
+    db
+      .select({
+        tradingPartnerId: channels.tradingPartnerId,
+        direction: channels.direction,
+        count: count(),
+      })
+      .from(channels)
+      .where(ofTradingPartner(channels, workspaceId, tradingPartnerId))
+      .groupBy(channels.tradingPartnerId, channels.direction),
+    db
+      .select({
+        tradingPartnerId: flows.tradingPartnerId,
+        messageType: flows.messageType,
+        count: count(),
+      })
+      .from(flows)
+      .where(ofTradingPartner(flows, workspaceId, tradingPartnerId))
+      .groupBy(flows.tradingPartnerId, flows.messageType),
   ])
 
-  return (id: string) => ({ channelCount: channelCountOf(id), flowCount: flowCountOf(id) })
+  const channelsOf = groupedByTradingPartner(channelRows)
+  const flowsOf = groupedByTradingPartner(flowRows)
+
+  return ({ id, messageTypes }: Pick<Row, 'id' | 'messageTypes'>) => ({
+    channelCount: sumOf(channelsOf(id)),
+    flowCount: sumOf(flowsOf(id)),
+    channelDirections: channelDirectionsOf(channelsOf(id)),
+    neededDirections: neededDirectionsOf({ messageTypes, flows: flowsOf(id) }),
+  })
 }
 
 // Until Runs exist (#187).
@@ -113,26 +130,27 @@ const noRuns = (tradingPartnerId: string) => ({
   lastActivityAt: null,
 })
 
-// Until the api reports the Channel directions (#235).
-const noDirections = { channelDirections: [], neededDirections: [...directions] }
-
 export const listTradingPartnerActivities = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
 
-  const [rows, countsOf] = yield* Effect.promise(() =>
+  const [rows, connectionsOf] = yield* Effect.promise(() =>
     Promise.all([
       db
-        .select({ id: tradingPartners.id, name: tradingPartners.name })
+        .select({
+          id: tradingPartners.id,
+          name: tradingPartners.name,
+          messageTypes: tradingPartners.messageTypes,
+        })
         .from(tradingPartners)
         .where(inWorkspace(tradingPartners, workspace.id)),
-      selectChannelAndFlowCounts(db, workspace.id),
+      selectConnections(db, workspace.id),
     ]),
   )
 
   return rows
     .toSorted(byName)
-    .map(({ id }): TradingPartnerActivity => ({ ...noRuns(id), ...countsOf(id), ...noDirections }))
+    .map((row): TradingPartnerActivity => ({ ...noRuns(row.id), ...connectionsOf(row) }))
 })
 
 const rejectingDuplicateGln = <A>(query: () => Promise<A>) =>
@@ -227,15 +245,15 @@ const lastUtcDays = (now: number) =>
 
 export const loadTradingPartnerActivity = (id: string) =>
   Effect.gen(function* () {
-    const { id: tradingPartnerId } = yield* loadTradingPartner(id)
+    const { id: tradingPartnerId, messageTypes = null } = yield* loadTradingPartner(id)
     const now = yield* Effect.sync(() => Date.now())
 
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const [countsOf, flowsOfPartner] = yield* Effect.promise(() =>
+    const [connectionsOf, flowsOfPartner] = yield* Effect.promise(() =>
       Promise.all([
-        selectChannelAndFlowCounts(db, workspace.id, tradingPartnerId),
+        selectConnections(db, workspace.id, tradingPartnerId),
         db
           .select({ id: flows.id, name: flows.name })
           .from(flows)
@@ -245,8 +263,7 @@ export const loadTradingPartnerActivity = (id: string) =>
 
     return {
       ...noRuns(tradingPartnerId),
-      ...countsOf(tradingPartnerId),
-      ...noDirections,
+      ...connectionsOf({ id: tradingPartnerId, messageTypes }),
       days: lastUtcDays(now),
       flows: flowsOfPartner.toSorted(byName).map((flow) => ({ flow, runs: 0 })),
       problems: [],
