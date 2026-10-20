@@ -355,11 +355,14 @@ describe('the receipt of a Document', () => {
       .split('\n')
       .filter((line) => line !== '')
 
+    // A control reference of its own, so the Interchange is no Duplicate of an earlier test's.
     const twoInvoices = [
-      ...invoice.filter((line) => line.startsWith('UNB')),
+      ...invoice
+        .filter((line) => line.startsWith('UNB'))
+        .map((line) => line.replace("+00000001'", "+00000002'")),
       ...invoice.filter((line) => !/^UN[BZ]/.test(line)),
       ...invoice.filter((line) => !/^UN[BZ]/.test(line)),
-      "UNZ+2+00000001'",
+      "UNZ+2+00000002'",
     ].join('\n')
 
     const queue = inMemoryRunQueue({ failures: 1 })
@@ -2179,12 +2182,126 @@ describe('the processing of an inbound Run', () => {
     expect(erp.received).toHaveLength(0)
   })
 
+  describe('a re-sent Interchange', () => {
+    const fromSender = (sender: string, messages: string[][]) =>
+      interchangeOf(messages).replace('4071615111110', sender)
+
+    const receiveAgain = async (into: InvoiceWorkspace, content: string) => {
+      const queue = inMemoryRunQueue()
+
+      const receipt = await Effect.runPromise(
+        receive({
+          workspaceId: into.id,
+          channelId: into.inboundChannelId,
+          fileName: 'orders.edi',
+          content,
+          manualSubmission: false,
+        }).pipe(pipelineServices(connection.db, queue)),
+      )
+
+      await processQueued(queue, deliveryByChannelType)
+
+      return {
+        queued: queue.queued,
+        document: receipt.document,
+        runs: await Promise.all(receipt.runs.map(({ id }) => readRun(connection.db, id))),
+      }
+    }
+
+    it('is recorded as a Duplicate linked to the original Run of each Message and never delivered', async () => {
+      const into = await ordersWorkspace('Duplicate Foods')
+      const content = interchangeOf([ordersMessage, ordersMessage])
+      const originals = await receiveInterchange(into, content)
+      const delivered = erp.received.length
+
+      const again = await receiveAgain(into, content)
+
+      expect(originals).toMatchObject([{ status: 'delivered' }, { status: 'delivered' }])
+      expect(again.queued).toEqual([])
+      expect(erp.received).toHaveLength(delivered)
+      expect(again.document).toMatchObject({
+        interchangeSender: '4071615111110',
+        interchangeControlReference: '00000001',
+      })
+      expect(again.runs).toMatchObject(
+        originals.map((original) => ({
+          status: 'duplicate',
+          messageIndex: original?.messageIndex,
+          duplicateOfRunId: original?.id,
+          failureStage: null,
+          steps: [
+            { stage: 'receipt', status: 'succeeded' },
+            ...['parse', 'validation', 'mapping', 'delivery'].map((stage) => ({
+              stage,
+              status: 'skipped',
+              startedAt: null,
+              finishedAt: null,
+            })),
+          ],
+        })),
+      )
+    })
+
+    it('links a third copy to the original Run, not to the Duplicate', async () => {
+      const into = await ordersWorkspace('Thrice Sent Foods')
+      const content = interchangeOf([ordersMessage])
+      const [original] = await receiveInterchange(into, content)
+
+      await receiveAgain(into, content)
+      const third = await receiveAgain(into, content)
+
+      expect(third.runs).toMatchObject([{ status: 'duplicate', duplicateOfRunId: original?.id }])
+    })
+
+    it('is no Duplicate when another sender used the same control reference', async () => {
+      const into = await ordersWorkspace('Two Sender Foods')
+
+      await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+      const other = await receiveAgain(
+        into,
+        fromSender(withCheckDigit('430000000011'), [ordersMessage]),
+      )
+
+      expect(other.runs).toMatchObject([{ status: 'delivered', duplicateOfRunId: null }])
+    })
+
+    it('is no Duplicate of an Interchange another Workspace received', async () => {
+      const content = interchangeOf([ordersMessage])
+
+      await receiveInterchange(await ordersWorkspace('First Workspace Foods'), content)
+      const elsewhere = await receiveAgain(await ordersWorkspace('Second Workspace Foods'), content)
+
+      expect(elsewhere.runs).toMatchObject([{ status: 'delivered', duplicateOfRunId: null }])
+    })
+
+    it('yields one original when copies arrive at once', async () => {
+      const into = await ordersWorkspace('Concurrent Foods')
+      const content = interchangeOf([ordersMessage])
+
+      const copies = await Promise.all(Array.from({ length: 4 }, () => receiveAgain(into, content)))
+
+      const statuses = copies.flatMap(({ runs: copyRuns }) => copyRuns.map((run) => run?.status))
+
+      expect(statuses.toSorted()).toEqual(['delivered', 'duplicate', 'duplicate', 'duplicate'])
+    })
+  })
+
   describe('a delivered resend', () => {
+    let sent = 0
+
+    // A resend is a new Interchange, so each copy gets a control reference of its own.
+    const sentAnew = (content: string) => {
+      sent += 1
+
+      return content.replaceAll("+00000001'", `+${String(100 + sent).padStart(8, '0')}'`)
+    }
+
     const invalidOrders = (order: string) =>
-      interchangeOf([replaced("BGM+220:::+128576+9'", `BGM+220:::+${order}+99'`)])
+      sentAnew(interchangeOf([replaced("BGM+220:::+128576+9'", `BGM+220:::+${order}+99'`)]))
 
     const validOrders = (order: string) =>
-      interchangeOf([replaced("BGM+220:::+128576+9'", `BGM+220:::+${order}+9'`)])
+      sentAnew(interchangeOf([replaced("BGM+220:::+128576+9'", `BGM+220:::+${order}+9'`)]))
 
     const idOf = (run: { id: string } | undefined) => {
       if (run === undefined) {
