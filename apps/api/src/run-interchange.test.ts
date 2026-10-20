@@ -241,11 +241,12 @@ describe('an outbound Run', () => {
     const runId = await submitted(unreachable)
 
     const run = await detail(runId)
+    const unbSegment: unknown = expect.stringMatching(/^UNB\+/u)
 
     expect(run).toMatchObject({
       status: 'failed',
       failureStage: 'delivery',
-      interchange: { id: runId, raw: expect.stringMatching(/^UNB\+/u) },
+      interchange: { id: runId, raw: unbSegment },
     })
     expect(run.message).toMatchObject({ messageType: 'INVOIC' })
   })

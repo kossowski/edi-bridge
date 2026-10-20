@@ -223,6 +223,10 @@ describe('GET /runs/:id', () => {
   it('shows a processed Run with its steps and Mapping Version', async () => {
     const run = await detail(processed)
 
+    const wholeInterchange: unknown = expect.stringMatching(
+      /^UNB\+UNOC:3\+4389876511114:14\+4071615111111:14\+.*'UNZ\+1\+1'$/u,
+    )
+
     expect(run).toMatchObject({
       id: processed,
       status: 'delivered',
@@ -238,9 +242,7 @@ describe('GET /runs/:id', () => {
       interchange: {
         id: processed,
         controlReference: '1',
-        raw: expect.stringMatching(
-          /^UNB\+UNOC:3\+4389876511114:14\+4071615111111:14\+.*'UNZ\+1\+1'$/u,
-        ),
+        raw: wholeInterchange,
       },
       message: { reference: '1', messageType: 'INVOIC' },
       replaces: null,
