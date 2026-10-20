@@ -59,7 +59,10 @@ function useFieldErrorMessage() {
       case 'format':
         return isFieldOfKind(field, 'format') ? t(`format.${field}`) : t('invalid')
       case 'required':
-        return isFieldOfKind(field, 'choice') ? t('invalid') : t(`required.${field}`)
+        // A blank fingerprint is never required: it leaves the Channel unchecked.
+        return isFieldOfKind(field, 'choice') || field === 'hostKeyFingerprint'
+          ? t('invalid')
+          : t(`required.${field}`)
     }
   }
 }
@@ -224,6 +227,18 @@ export function ChannelKindFields({
               type="number"
             />
           </div>
+          <TextField
+            {...field('hostKeyFingerprint')}
+            autoComplete="off"
+            description={
+              channel
+                ? t('fields.hostKeyFingerprint.keep')
+                : t('fields.hostKeyFingerprint.description')
+            }
+            label={t('fields.hostKeyFingerprint.label')}
+            spellCheck={false}
+            className="font-mono"
+          />
           <TextField
             {...field('username')}
             autoComplete="off"

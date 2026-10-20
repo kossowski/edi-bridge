@@ -16,6 +16,8 @@ function seeded(name: string) {
 
 const sftpInbox = seeded('Hansemarkt SFTP inbox')
 
+const uncheckedInbox = seeded('Alpenfrisch SFTP inbox')
+
 const webhook = seeded('ERP webhook')
 
 const httpDelivery = seeded('ERP HTTP delivery')
@@ -94,6 +96,36 @@ export const EditInboundSftp = meta.story({
     await expect(canvas.getByText('Inbound SFTP')).toBeVisible()
     await expect(canvas.queryByRole('radio')).toBeNull()
     await expect(canvas.getByText(/Leave blank to keep the current one/)).toBeVisible()
+  },
+})
+
+export const PasteHostKey = meta.story({
+  async play({ canvas }) {
+    const field = canvas.getByLabelText('Host key fingerprint (optional)')
+    await expect(field).toHaveValue('')
+    await expect(canvas.getByText(/Ed25519 host key, as ssh-keygen -lf prints it/)).toBeVisible()
+    await userEvent.type(field, '16:27:ac:a5')
+    await userEvent.click(canvas.getByRole('button', { name: 'Create Channel' }))
+    await expect(
+      canvas.getByText('Enter the fingerprint as SHA256: followed by 43 characters.'),
+    ).toBeVisible()
+  },
+})
+
+export const EditConfirmedHostKey = meta.story({
+  render: () => <EditChannelScreen id={sftpInbox.id} />,
+  async play({ canvas }) {
+    await expect(await canvas.findByLabelText('Host key fingerprint (optional)')).toHaveValue(
+      sftpInbox.type === 'sftp' ? sftpInbox.hostKeyFingerprint : '',
+    )
+    await expect(canvas.getByText(/Clear it to stop checking the key/)).toBeVisible()
+  },
+})
+
+export const EditUncheckedHostKey = meta.story({
+  render: () => <EditChannelScreen id={uncheckedInbox.id} />,
+  async play({ canvas }) {
+    await expect(await canvas.findByLabelText('Host key fingerprint (optional)')).toHaveValue('')
   },
 })
 
@@ -183,6 +215,9 @@ export const German = meta.story({
   ],
   async play({ canvas }) {
     await expect(canvas.getByRole('button', { name: 'Channel anlegen' })).toBeVisible()
+    await expect(
+      canvas.getByLabelText('Fingerabdruck des Serverschlüssels (optional)'),
+    ).toBeVisible()
   },
 })
 

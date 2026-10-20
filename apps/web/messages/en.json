@@ -2023,6 +2023,11 @@
         "label": "Port",
         "description": "Usually 22."
       },
+      "hostKeyFingerprint": {
+        "label": "Host key fingerprint (optional)",
+        "description": "The SHA256 fingerprint of the server's Ed25519 host key, as ssh-keygen -lf prints it. Or leave it blank and accept the key a connection test shows.",
+        "keep": "The SHA256 fingerprint of the server's Ed25519 host key, as ssh-keygen -lf prints it, or the key a connection test showed. Clear it to stop checking the key."
+      },
       "username": {
         "label": "Username",
         "description": "The user EDI Bridge logs in as."
@@ -2079,6 +2084,7 @@
       "format": {
         "host": "Enter a host name without protocol, path or port.",
         "remotePath": "Enter an absolute path that starts with /.",
+        "hostKeyFingerprint": "Enter the fingerprint as SHA256: followed by 43 characters.",
         "url": "Enter a full URL that starts with https:// or http://."
       },
       "invalid": "Check this value.",

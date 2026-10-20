@@ -2023,6 +2023,11 @@
         "label": "Port",
         "description": "Meist 22."
       },
+      "hostKeyFingerprint": {
+        "label": "Fingerabdruck des Serverschlüssels (optional)",
+        "description": "Der SHA256-Fingerabdruck des Ed25519-Hostschlüssels des Servers, wie ihn ssh-keygen -lf ausgibt. Oder lassen Sie das Feld leer und übernehmen Sie den Schlüssel, den ein Verbindungstest zeigt.",
+        "keep": "Der SHA256-Fingerabdruck des Ed25519-Hostschlüssels des Servers, wie ihn ssh-keygen -lf ausgibt, oder der Schlüssel, den ein Verbindungstest gezeigt hat. Leeren Sie das Feld, um den Schlüssel nicht mehr zu prüfen."
+      },
       "username": {
         "label": "Benutzername",
         "description": "Der Benutzer, mit dem sich EDI Bridge anmeldet."
@@ -2079,6 +2084,7 @@
       "format": {
         "host": "Geben Sie einen Hostnamen ohne Protokoll, Pfad und Port ein.",
         "remotePath": "Geben Sie einen absoluten Pfad ein, der mit / beginnt.",
+        "hostKeyFingerprint": "Geben Sie den Fingerabdruck als SHA256: gefolgt von 43 Zeichen ein.",
         "url": "Geben Sie eine vollständige URL ein, die mit https:// oder http:// beginnt."
       },
       "invalid": "Prüfen Sie diesen Wert.",
