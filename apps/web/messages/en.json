@@ -1180,6 +1180,11 @@
       "copyLabel": "message",
       "text": "Hello {tradingPartner} team,\n\nWe sent you the {document} for order {businessReference} on {sentAt} (transmission {controlReference}), but we have not received a receipt confirmation yet. Could you check whether it arrived in your system?\n\nThank you and kind regards"
     },
+    "notSent": {
+      "state": "Not sent",
+      "reason": "{tradingPartner} got no receipt confirmation for this {document}, because {reason, select, noOutboundChannel {no document route sends documents to {tradingPartner}.} ambiguousChannel {the document routes to {tradingPartner} use different connections, so EDI Bridge cannot tell which one to use.} workspaceGlnMissing {your company's GLN is missing.} other {the header of the transmission from {tradingPartner} cannot be repeated in a valid receipt confirmation.}}",
+      "fix": "{reason, select, noOutboundChannel {<link>Add a document route to {tradingPartner}</link> so that later documents get a receipt confirmation.} ambiguousChannel {Check the <link>document routes of {tradingPartner}</link> and let them all use the same connection.} workspaceGlnMissing {<link>Record your company's GLN</link> so that later documents get a receipt confirmation.} other {Ask {tradingPartner} to check the header of its transmissions.}}"
+    },
     "acknowledgement": {
       "state": {
         "pending": "Pending",
