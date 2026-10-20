@@ -40,12 +40,12 @@ describe('orderVerdictOf', () => {
     })
   })
 
-  it('waits for the receipt confirmation within the time limit', () => {
+  it('needs attention for a not-sent receipt confirmation while another one is pending', () => {
     expect(verdictOf(orderLifecycleReferences.partial)).toMatchObject({
-      status: 'waiting-for-trading-partner',
+      status: 'needs-attention',
       reason: 'confirmationPending',
       messageType: 'DESADV',
-      done: 1,
+      done: 0,
     })
   })
 
