@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { Redis } from 'ioredis'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:net'
-import { setTimeout } from 'node:timers/promises'
+import { setImmediate } from 'node:timers/promises'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
@@ -38,6 +38,9 @@ const runOf = (status: 'received' | 'delivered'): RunSummary => ({
 
 const changed = (run: RunSummary) => ({ type: 'run.changed' as const, run })
 
+// Under parallel test load delivery can exceed vitest's 1 s default; 2 s stays well under the 5 s test timeout.
+const delivery = { timeout: 2_000 }
+
 describe('live events over Redis', () => {
   it('hands a subscriber the live events of its Workspace only', async () => {
     const publisher = redisLiveEvents(redis.url)
@@ -46,7 +49,7 @@ describe('live events over Redis', () => {
     const received: unknown[] = []
 
     try {
-      await subscriber.ready
+      await Promise.all([publisher.ready, subscriber.ready])
       subscriber.subscribe(workspaceId, (event) => received.push(event))
 
       const other = changed(runOf('received'))
@@ -59,7 +62,7 @@ describe('live events over Redis', () => {
 
       await vi.waitFor(() => {
         expect(received).toEqual([own])
-      })
+      }, delivery)
     } finally {
       publisher.close()
       subscriber.close()
@@ -74,7 +77,7 @@ describe('live events over Redis', () => {
     const staying: unknown[] = []
 
     try {
-      await subscriber.ready
+      await Promise.all([publisher.ready, subscriber.ready])
       const unsubscribe = subscriber.subscribe(workspaceId, (event) => left.push(event))
       subscriber.subscribe(workspaceId, (event) => staying.push(event))
 
@@ -86,7 +89,7 @@ describe('live events over Redis', () => {
 
       await vi.waitFor(() => {
         expect(staying).toEqual([event])
-      })
+      }, delivery)
       expect(left).toEqual([])
     } finally {
       publisher.close()
@@ -102,7 +105,7 @@ describe('live events over Redis', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     try {
-      await subscriber.ready
+      await Promise.all([publisher.ready, subscriber.ready])
       subscriber.subscribe(workspaceId, () => {
         throw new Error('The stream is closed')
       })
@@ -114,7 +117,7 @@ describe('live events over Redis', () => {
 
       await vi.waitFor(() => {
         expect(received).toEqual([event])
-      })
+      }, delivery)
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('The stream is closed'))
     } finally {
       warn.mockRestore()
@@ -132,7 +135,7 @@ describe('live events over Redis', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     try {
-      await subscriber.ready
+      await Promise.all([publisher.ready, subscriber.ready])
       subscriber.subscribe(workspaceId, (event) => received.push(event))
 
       await other.publish(liveEventsChannel, 'not json')
@@ -147,7 +150,7 @@ describe('live events over Redis', () => {
 
       await vi.waitFor(() => {
         expect(received).toEqual([event])
-      })
+      }, delivery)
       expect(warn).toHaveBeenCalledTimes(2)
     } finally {
       warn.mockRestore()
@@ -167,10 +170,10 @@ describe('live events over Redis', () => {
     process.on('unhandledRejection', record)
 
     try {
-      liveEventSubscriber(redis.url).close()
+      await liveEventSubscriber(redis.url).close()
 
-      // Nothing marks the absence of a rejection, so the test gives one the time to surface.
-      await setTimeout(100)
+      // Node reports an unhandled rejection only after the turn in which it happened.
+      await setImmediate()
 
       expect(unhandled).toBe(0)
     } finally {

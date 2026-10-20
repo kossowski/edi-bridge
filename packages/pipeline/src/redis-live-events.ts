@@ -33,6 +33,10 @@ export function redisLiveEvents(
   // A failed publish reports the outage itself, so ioredis need not log it too.
   redis.on('error', () => {})
 
+  const ready = new Promise<void>((resolve) => {
+    redis.once('ready', () => resolve())
+  })
+
   const service: LiveEventsService = {
     publish: (published) =>
       Effect.tryPromise(() => redis.publish(liveEventsChannel, JSON.stringify(published))).pipe(
@@ -48,6 +52,7 @@ export function redisLiveEvents(
   }
 
   return {
+    ready,
     service,
     close: () => {
       redis.disconnect()
@@ -108,8 +113,14 @@ export function liveEventSubscriber(redisUrl: string) {
       }
     },
     close: () => {
+      const ended = new Promise<void>((resolve) => {
+        redis.once('end', () => resolve())
+      })
+
       listeners.clear()
       redis.disconnect()
+
+      return ended
     },
   }
 }
