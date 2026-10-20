@@ -3410,6 +3410,35 @@ describe('the Acknowledgement of a sent Interchange', () => {
       })
     })
 
+    it('keeps the rejection of the latest test Interchange when an earlier one is rejected late', async () => {
+      const into = await testingWorkspace('Late Refused Test Foods')
+      const first = await sendInvoice(into)
+      const second = await sendInvoice(into)
+
+      const contrl = await receiveContrl(into, contrlOf(String(second?.controlReference), '4'))
+
+      await receiveContrl(into, contrlOf(String(first?.controlReference), '4'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        testRejectedAt: contrl?.receivedAt,
+        testRejectedRunId: second?.id,
+      })
+    })
+
+    it('records no rejection of a test Interchange sent before the awaited one', async () => {
+      const into = await testingWorkspace('Earlier Refused Test Foods')
+      const first = await sendInvoice(into)
+
+      await sendInvoice(into)
+      await receiveContrl(into, contrlOf(String(first?.controlReference), '4'))
+
+      await expect(onboardingOf(into)).resolves.toMatchObject({
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      })
+    })
+
     it('clears the rejection once a CONTRL accepts another test Interchange', async () => {
       const into = await testingWorkspace('Finally Confirmed Test Foods')
       const rejected = await sendInvoice(into)
