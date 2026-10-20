@@ -52,7 +52,7 @@ async function shutdown(): Promise<void> {
   await app.close()
   await runQueue.close()
   livePublisher.close()
-  liveSubscriber.close()
+  await liveSubscriber.close()
   await connection.close()
   await sql.end({ timeout: 5 })
   redis.disconnect()
