@@ -1002,18 +1002,18 @@ export const TestConnectionRequestFails = meta.story({
   },
 })
 
+const seededChannelTest = http.post(`${apiUrl}${testChannelEndpoint.path}`, () =>
+  HttpResponse.json({
+    outcome: 'failed',
+    reason: 'seededChannel',
+    testedAt: new Date().toISOString(),
+  }),
+)
+
 export const TestConnectionSeededChannel = meta.story({
   ...at(live, 'connections'),
   beforeEach({ msw }) {
-    msw.use(
-      http.post(`${apiUrl}${testChannelEndpoint.path}`, () =>
-        HttpResponse.json({
-          outcome: 'failed',
-          reason: 'seededChannel',
-          testedAt: new Date().toISOString(),
-        }),
-      ),
-    )
+    msw.use(seededChannelTest)
   },
   async play({ canvasElement }) {
     const item = await connectionItem(
@@ -1026,6 +1026,27 @@ export const TestConnectionSeededChannel = meta.story({
     await expect(await item.findByText('This is a demo connection.')).toBeVisible()
     await expect(
       item.getByText('A demo connection never sends, so there is nothing to test.'),
+    ).toBeVisible()
+  },
+})
+
+export const TestConnectionSeededChannelGerman = meta.story({
+  ...at(live, 'connections'),
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(seededChannelTest)
+  },
+  async play({ canvasElement }) {
+    const item = await connectionItem(
+      canvasElement,
+      'Verbindungen mit Hansemarkt GmbH',
+      'Empfangen von Hansemarkt GmbH',
+    )
+
+    await userEvent.click(item.getByRole('button', { name: /^Verbindung testen/ }))
+    await expect(await item.findByText('Das ist eine Demo-Verbindung.')).toBeVisible()
+    await expect(
+      item.getByText('Eine Demo-Verbindung sendet nie, darum gibt es nichts zu testen.'),
     ).toBeVisible()
   },
 })
