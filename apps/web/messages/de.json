@@ -3812,18 +3812,28 @@
     },
     "file": {
       "label": "Datei",
-      "description": "Eine EDI-Datei von einem Partner oder eine JSON- oder CSV-Datei aus Ihren eigenen Systemen. Höchstens 5 Millionen Zeichen.",
+      "description": "Eine EDI-Datei von einem Partner oder eine JSON- oder CSV-Datei aus Ihren eigenen Systemen. Höchstens 5 MB.",
       "drop": "Datei hier ablegen oder auswählen.",
       "chosen": "Gewählt: {fileName}"
+    },
+    "encoding": {
+      "label": "Zeichenkodierung",
+      "description": "Wie die Datei Umlaute speichert. Ältere ERP-Exporte verwenden oft Windows-1252."
     },
     "errors": {
       "channelRequired": "Wählen Sie, woher der Beleg kommt.",
       "file": {
         "required": "Wählen Sie eine Datei.",
         "empty": "Die Datei ist leer.",
-        "tooLarge": "Die Datei ist zu groß. Eine Datei darf höchstens 5 Millionen Zeichen haben."
+        "tooLarge": "Die Datei ist zu groß. Eine Datei darf höchstens 5 MB groß sein.",
+        "unreadable": "Die Datei konnte nicht gelesen werden. Wählen Sie sie erneut oder wählen Sie eine andere Datei."
       },
       "unroutable": "Kein Belegweg auf dieser Verbindung verarbeitet die Belege in dieser Datei. Richten Sie zuerst einen Belegweg für sie ein.",
+      "undecodable": {
+        "encoding": "Die Datei ist kein gültiges {encoding}. Wählen Sie eine andere Kodierung, etwa Windows-1252 für eine typische deutsche CSV-Datei, und laden Sie sie erneut hoch.",
+        "interchange": "Die Übertragung ist in dem Zeichensatz, den ihr Kopf nennt, nicht gültig. Bitten Sie den Partner, sie erneut zu senden.",
+        "details": "Details: {reason}"
+      },
       "failed": "Die Datei konnte nicht hochgeladen werden. Versuchen Sie es erneut."
     },
     "result": {

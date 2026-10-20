@@ -11,6 +11,7 @@ import { useChannelKindLabel, useChannelTradingPartners } from '@/components/cha
 import {
   documentProblem,
   type DocumentProblem,
+  namesItsCharacterSet,
   parseMessageType,
 } from '@/components/documents/manual-submission'
 import { RunStatusBadge } from '@/components/documents/run-status'
@@ -18,7 +19,7 @@ import { useRunTitle } from '@/components/documents/run-title'
 import { describedBy, FormField, SelectField } from '@/components/form-field'
 import { MessageTypeName, usePlainNames } from '@/components/plain-names'
 import { useLookup } from '@/hooks/use-lookup'
-import { ApiError, submitDocument } from '@/lib/api/client'
+import { ApiError, documentUndecodableOf, submitDocument } from '@/lib/api/client'
 import {
   channelsQuery,
   interchangeKeys,
@@ -26,8 +27,9 @@ import {
   homeKeys,
   runKeys,
 } from '@/lib/api/queries'
+import { encodingLabels } from '@/lib/encoding-labels'
 import { documentHref } from '@/lib/navigation'
-import { encodeBase64 } from '@edi-bridge/contracts'
+import { type CharacterEncoding, characterEncodings, encodeBase64 } from '@edi-bridge/contracts'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -121,7 +123,34 @@ function ChannelChoice({
   )
 }
 
-function FailureAlert({ message, children }: { message: string; children: ReactNode }) {
+function EncodingChoice({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: CharacterEncoding
+  onChange: (encoding: CharacterEncoding) => void
+}) {
+  const t = useTranslations('ManualSubmission.encoding')
+
+  return (
+    <SelectField
+      id={id}
+      description={t('description')}
+      items={characterEncodings.map((encoding) => ({
+        value: encoding,
+        label: encodingLabels[encoding],
+      }))}
+      label={t('label')}
+      value={value}
+      className="w-full"
+      onChange={onChange}
+    />
+  )
+}
+
+function FailureAlert({ message, children }: { message: string; children?: ReactNode }) {
   return (
     <Alert variant="destructive">
       <AlertDescription className="flex flex-col items-start gap-2">
@@ -190,6 +219,13 @@ function FileField({
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
+  // A file that could not be read is dropped, so choosing the same file again fires a change.
+  useEffect(() => {
+    if (file === null && input.current) {
+      input.current.value = ''
+    }
+  }, [file])
+
   function drop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
     setDragging(false)
@@ -252,6 +288,21 @@ function FileField({
 
 function ManualSubmissionFailure({ error, onRetry }: { error: Error; onRetry: () => void }) {
   const t = useTranslations('ManualSubmission.errors')
+  const undecodable = documentUndecodableOf(error)
+
+  if (undecodable !== null) {
+    return (
+      <FailureAlert
+        message={
+          undecodable.encoding === null
+            ? t('undecodable.interchange')
+            : t('undecodable.encoding', { encoding: encodingLabels[undecodable.encoding] })
+        }>
+        <p className="break-words">{t('undecodable.details', { reason: undecodable.reason })}</p>
+      </FailureAlert>
+    )
+  }
+
   const unroutable = error instanceof ApiError && error.status === 422
 
   return (
@@ -272,13 +323,12 @@ function FormFooter({ children }: { children?: ReactNode }) {
   )
 }
 
-async function readFile(file: File | null) {
-  const bytes = file === null ? null : new Uint8Array(await file.arrayBuffer())
+type ChosenFile = { file: File; bytes: Uint8Array; namesItsCharacterSet: boolean }
 
-  return {
-    content: bytes === null ? null : encodeBase64(bytes),
-    problem: documentProblem(bytes === null ? null : new TextDecoder().decode(bytes)),
-  }
+async function readFile(file: File): Promise<ChosenFile> {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+
+  return { file, bytes, namesItsCharacterSet: namesItsCharacterSet(bytes) }
 }
 
 function ManualSubmissionForm({
@@ -297,8 +347,11 @@ function ManualSubmissionForm({
   const queryClient = useQueryClient()
   const channels = useInboundChannels()
   const [file, setFile] = useState<File | null>(null)
+  const [chosen, setChosen] = useState<ChosenFile | null>(null)
+  const [encoding, setEncoding] = useState<CharacterEncoding>('utf-8')
+  const latestFile = useRef<File | null>(null)
   const [channelError, setChannelError] = useState(false)
-  const [fileProblem, setFileProblem] = useState<DocumentProblem | null>(null)
+  const [fileProblem, setFileProblem] = useState<DocumentProblem | 'unreadable' | null>(null)
 
   const submission = useMutation({
     mutationFn: (input: { channel: Channel; document: SubmittedDocument }) =>
@@ -317,19 +370,47 @@ function ManualSubmissionForm({
     },
   })
 
-  async function submit() {
-    const { content, problem } = await readFile(file)
+  const read = chosen !== null && chosen.file === file ? chosen : null
+
+  function choose(next: File | null) {
+    latestFile.current = next
+    setFile(next)
+    setEncoding('utf-8')
+    setFileProblem(null)
+    submission.reset()
+
+    if (next !== null) {
+      void readFile(next).then(
+        (result) => {
+          if (latestFile.current === next) {
+            setChosen(result)
+          }
+        },
+        () => {
+          if (latestFile.current === next) {
+            latestFile.current = null
+            setFile(null)
+            setFileProblem('unreadable')
+          }
+        },
+      )
+    }
+  }
+
+  function submit() {
+    const problem = documentProblem(read?.bytes ?? null)
     const channel = channels.find(channelId)
 
     setChannelError(channel === undefined)
     setFileProblem(problem)
 
-    if (channel !== undefined && file !== null && content !== null && problem === null) {
+    if (channel !== undefined && read !== null && problem === null) {
       submission.mutate({
         channel,
         document: {
-          fileName: file.name,
-          content,
+          fileName: read.file.name,
+          content: encodeBase64(read.bytes),
+          encoding: read.namesItsCharacterSet ? undefined : encoding,
         },
       })
     } else {
@@ -361,7 +442,7 @@ function ManualSubmissionForm({
       className="flex min-h-0 flex-1 flex-col"
       onSubmit={(event) => {
         event.preventDefault()
-        void submit()
+        submit()
       }}>
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
         {channels.isError ? (
@@ -386,18 +467,32 @@ function ManualSubmissionForm({
           id={`${id}-file`}
           error={fileProblem ? t(`errors.file.${fileProblem}`) : null}
           file={file}
-          onChange={(next) => {
-            setFile(next)
-            setFileProblem(null)
-            submission.reset()
-          }}
+          onChange={choose}
         />
+        {read !== null && !read.namesItsCharacterSet && (
+          <EncodingChoice
+            id={`${id}-encoding`}
+            value={encoding}
+            onChange={(next) => {
+              setEncoding(next)
+              submission.reset()
+            }}
+          />
+        )}
         {submission.isError && (
-          <ManualSubmissionFailure error={submission.error} onRetry={() => void submit()} />
+          <ManualSubmissionFailure error={submission.error} onRetry={submit} />
         )}
       </div>
       <FormFooter>
-        <Button disabled={submission.isPending || channels.isError} type="submit">
+        <Button
+          // Until the chosen file is read, Upload would send no bytes or the previous file's.
+          disabled={
+            submission.isPending ||
+            channels.isPending ||
+            channels.isError ||
+            (file !== null && read === null)
+          }
+          type="submit">
           {submission.isPending && <Spinner aria-hidden data-icon="inline-start" />}
           {submission.isPending ? t('submitting') : t('submit')}
         </Button>

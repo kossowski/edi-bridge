@@ -5,7 +5,6 @@ import {
   type AcceptAiProposedPartsBody,
   acceptAiProposedPartsEndpoint,
   aiBudgetEndpoint,
-  type AiBudgetExhaustedProblem,
   aiBudgetExhaustedProblemSchema,
   aiBudgetExhaustedStatus,
   type AiDraftEvent,
@@ -29,8 +28,9 @@ import {
   deleteLookupTableEndpoint,
   documentStructureEndpoint,
   type DocumentStructureOrigin,
-  type DocumentStructureProblem,
   documentStructureProblemSchema,
+  documentUndecodableProblemSchema,
+  documentUndecodableStatus,
   documentStructuresEndpoint,
   firstStepsEndpoint,
   type Endpoint,
@@ -109,7 +109,6 @@ import {
   sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
   tasksEndpoint,
-  type TestInterchangeRefusal,
   testInterchangeRefusalSchema,
   testInterchangeRefusedStatus,
   toPath,
@@ -148,6 +147,22 @@ export class ApiError extends Error {
   ) {
     super(`API request to ${path} failed with status ${status}`)
     this.name = 'ApiError'
+  }
+}
+
+function problemOf<Problem>(schema: Endpoint<Problem>['response'], status: number) {
+  return (error: Error | null): Problem | null => {
+    if (!(error instanceof ApiError) || error.status !== status) {
+      return null
+    }
+
+    try {
+      const parsed = schema.safeParse(JSON.parse(error.body))
+
+      return parsed.success ? parsed.data : null
+    } catch {
+      return null
+    }
   }
 }
 
@@ -302,6 +317,8 @@ export function acceptInvite(body: AcceptInviteInput) {
   return request(acceptInviteEndpoint, { body })
 }
 
+const inviteUnusableProblemOf = problemOf(inviteUnusableProblemSchema, inviteUnusableStatus)
+
 export type AcceptInviteRefusal = InviteUnusableReason | 'unknown' | 'existingUser'
 
 export function acceptInviteRefusalOf(error: Error | null): AcceptInviteRefusal | null {
@@ -317,17 +334,7 @@ export function acceptInviteRefusalOf(error: Error | null): AcceptInviteRefusal 
     return 'existingUser'
   }
 
-  if (error.status !== inviteUnusableStatus) {
-    return null
-  }
-
-  try {
-    const parsed = inviteUnusableProblemSchema.safeParse(JSON.parse(error.body))
-
-    return parsed.success ? parsed.data.reason : null
-  } catch {
-    return null
-  }
+  return inviteUnusableProblemOf(error)?.reason ?? null
 }
 
 export function listOperatorWorkspaceMembers(workspaceId: string) {
@@ -489,19 +496,10 @@ export function isAiReviewOpen(error: Error | null) {
   return error instanceof ApiError && error.status === aiReviewOpenStatus
 }
 
-export function aiBudgetExhaustedProblemOf(error: Error | null): AiBudgetExhaustedProblem | null {
-  if (!(error instanceof ApiError) || error.status !== aiBudgetExhaustedStatus) {
-    return null
-  }
-
-  try {
-    const parsed = aiBudgetExhaustedProblemSchema.safeParse(JSON.parse(error.body))
-
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
-}
+export const aiBudgetExhaustedProblemOf = problemOf(
+  aiBudgetExhaustedProblemSchema,
+  aiBudgetExhaustedStatus,
+)
 
 export function listMappings() {
   return request(mappingsEndpoint)
@@ -558,19 +556,7 @@ export function updateDocumentStructure(id: string, body: UpdateDocumentStructur
   })
 }
 
-export function documentStructureProblemOf(error: Error | null): DocumentStructureProblem | null {
-  if (!(error instanceof ApiError) || error.status !== 422) {
-    return null
-  }
-
-  try {
-    const parsed = documentStructureProblemSchema.safeParse(JSON.parse(error.body))
-
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
-}
+export const documentStructureProblemOf = problemOf(documentStructureProblemSchema, 422)
 
 export function getMessageTypeStructure(messageType: MessageType) {
   return request(messageTypeStructureEndpoint, {
@@ -672,19 +658,10 @@ export function sendTestInterchange(id: string) {
   })
 }
 
-export function testInterchangeRefusalOf(error: Error | null): TestInterchangeRefusal | null {
-  if (!(error instanceof ApiError) || error.status !== testInterchangeRefusedStatus) {
-    return null
-  }
-
-  try {
-    const parsed = testInterchangeRefusalSchema.safeParse(JSON.parse(error.body))
-
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
-}
+export const testInterchangeRefusalOf = problemOf(
+  testInterchangeRefusalSchema,
+  testInterchangeRefusedStatus,
+)
 
 export function listChannels() {
   return request(channelsEndpoint)
@@ -738,3 +715,8 @@ export function moveFlowMappingVersion(id: string, body: MoveFlowMappingVersionB
 export function submitDocument(body: ManualSubmissionInput) {
   return request(submitDocumentEndpoint, { body })
 }
+
+export const documentUndecodableOf = problemOf(
+  documentUndecodableProblemSchema,
+  documentUndecodableStatus,
+)

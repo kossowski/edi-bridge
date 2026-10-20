@@ -2,7 +2,13 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { documentStructureOrigins, mappingVersionSummarySchema } from '@edi-bridge/contracts'
+import {
+  type CharacterEncoding,
+  documentStructureOrigins,
+  encodeBase64,
+  mappingVersionSummarySchema,
+  submitDocumentEndpoint,
+} from '@edi-bridge/contracts'
 import {
   aiDraftHandlers,
   aiProposalFor,
@@ -13,6 +19,7 @@ import {
   documentStructureHandlers,
   lookupTableHandlers,
   lookupTableListHandler,
+  manualSubmissionHandler,
   mappingHandlers,
   mappingVersionHandlers,
   seedDocumentStructures,
@@ -21,6 +28,7 @@ import {
   seedUnusedDocumentStructures,
   runDetailHandlers,
   runsHandler,
+  seedChannels,
   seedLookupTableNamed,
   seedLookupTables,
   seedTradingPartners,
@@ -38,6 +46,7 @@ import {
   createTradingPartner,
   deleteLookupTable,
   documentStructureProblemOf,
+  documentUndecodableOf,
   getChannel,
   getLookupTable,
   getLookupTableSuggestions,
@@ -56,6 +65,7 @@ import {
   retryRun,
   saveMappingDraft,
   sendTestInterchange,
+  submitDocument,
   switchToProduction,
   testInterchangeRefusalOf,
   updateCompanyIdentity,
@@ -597,5 +607,46 @@ describe('retriesQuery', () => {
 
   it('tries again when the request did not reach the api', () => {
     expect(retriesQuery(0, new TypeError('Failed to fetch'))).toBe(true)
+  })
+})
+
+describe('Manual Submission refusals', () => {
+  const erpWebhook = seedChannels.find(({ name }) => name === 'ERP webhook')!
+
+  // "Käufer" in Windows-1252: the ä is the byte E4, which UTF-8 never holds alone.
+  const windows1252 = new Uint8Array([0x4b, 0xe4, 0x75, 0x66, 0x65, 0x72, 0x0a])
+
+  const submitted = (encoding?: CharacterEncoding) =>
+    submitDocument({
+      channelId: erpWebhook.id,
+      document: { fileName: 'dispatch.csv', content: encodeBase64(windows1252), encoding },
+    }).then(
+      () => null,
+      (failure: Error) => failure,
+    )
+
+  it('reads the refusal of a Document not valid in its encoding', async () => {
+    server.use(manualSubmissionHandler(apiUrl))
+
+    const problem = documentUndecodableOf(await submitted('utf-8'))
+
+    expect(problem).toMatchObject({ code: 'documentUndecodable', encoding: 'utf-8' })
+    expect(problem?.message).toContain('Windows-1252')
+  })
+
+  it('has no refusal for another unprocessable submission', async () => {
+    server.use(
+      http.post(`${apiUrl}${submitDocumentEndpoint.path}`, () =>
+        HttpResponse.json(
+          { message: 'No Flow routes Documents from this Channel' },
+          { status: 422 },
+        ),
+      ),
+    )
+
+    const error = await submitted('windows-1252')
+
+    expect(error).toMatchObject({ status: 422 })
+    expect(documentUndecodableOf(error)).toBeNull()
   })
 })
