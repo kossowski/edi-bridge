@@ -577,16 +577,16 @@ export function lookupTableHandlers(
         }
 
         const { language } = query.data
+        const { missingCodes } = usageOf(table, language)
 
-        const { hintOf, notice } = missingCodeHintsNotice
-          ? { hintOf: knownMeaningOf, notice: missingCodeHintsNotices[missingCodeHintsNotice] }
-          : { hintOf: aiHintOf, notice: null }
+        // Like the api, a table without missing codes asks no model, so it has no notice.
+        const { hintOf, notice } =
+          missingCodeHintsNotice && missingCodes.length > 0
+            ? { hintOf: knownMeaningOf, notice: missingCodeHintsNotices[missingCodeHintsNotice] }
+            : { hintOf: aiHintOf, notice: null }
 
         return HttpResponse.json({
-          hints: usageOf(table, language).missingCodes.map(({ code }) => ({
-            code,
-            ...hintOf(table.kind, code, language),
-          })),
+          hints: missingCodes.map(({ code }) => ({ code, ...hintOf(table.kind, code, language) })),
           notice,
         })
       }),

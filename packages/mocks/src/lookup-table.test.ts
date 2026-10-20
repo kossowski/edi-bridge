@@ -730,14 +730,17 @@ describe('POST /lookup-tables/:id/missing-codes/hints', () => {
     expect(hints.map(({ meaning }) => meaning)).toEqual([null, null, 'Set'])
   })
 
-  it('answers with no hints for a table without missing codes', async () => {
-    server.use(...lookupTableHandlers(apiUrl, { runs: [] }))
+  it.each([undefined, 'aiBudgetExhausted', 'aiUnavailable'] as const)(
+    'answers no hints and no notice for a table without missing codes (notice %s)',
+    async (missingCodeHintsNotice) => {
+      server.use(...lookupTableHandlers(apiUrl, { runs: [], missingCodeHintsNotice }))
 
-    expect(await getHints(seedLookupTableNamed('VAT categories').id)).toEqual({
-      hints: [],
-      notice: null,
-    })
-  })
+      expect(await getHints(seedLookupTableNamed('VAT categories').id)).toEqual({
+        hints: [],
+        notice: null,
+      })
+    },
+  )
 
   it('explains a large volume of missing codes', async () => {
     const [large] = createLookupTables({ count: 1, blockingCodeCount: 200, upcomingCodeCount: 500 })
