@@ -204,6 +204,7 @@ export {
   findNode,
   inferDocumentStructure,
   parseCsv,
+  renamedNodes,
   rootListPath,
   sameCsvSettings,
   visitedNode,

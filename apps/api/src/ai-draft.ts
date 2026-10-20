@@ -34,6 +34,7 @@ import {
 
 import type { MappingError, MappingErrorCode } from '@edi-bridge/mapping'
 
+import { tokensOf } from './ai-budget.js'
 import { AiDraftFailed } from './errors.js'
 import { type Engine, type Loaded, loadSamples, startEngine } from './mapping-preview.js'
 
@@ -220,8 +221,6 @@ const errorMessage = (errors: ReadonlyArray<string>): ModelMessage => ({
     .map((error) => `- ${error}`)
     .join('\n')}`,
 })
-
-const tokensOf = ({ totalTokens }: { totalTokens: number | undefined }) => totalTokens ?? 0
 
 export const draftMapping = ({ mappingId, sampleId, model, onStep, onTokens }: AiDraftRequest) =>
   Effect.gen(function* () {
