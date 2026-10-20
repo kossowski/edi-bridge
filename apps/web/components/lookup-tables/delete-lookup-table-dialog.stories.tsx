@@ -89,7 +89,7 @@ export const GermanInUse = meta.story({
     await userEvent.click(screen.getByRole('button', { name: 'Code-Übersetzung löschen' }))
 
     await expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Liste, deshalb kann sie nicht gelöscht werden.',
+      'Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Code-Übersetzung, deshalb kann sie nicht gelöscht werden.',
     )
   },
 })

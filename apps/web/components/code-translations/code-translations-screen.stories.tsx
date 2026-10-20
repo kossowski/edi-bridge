@@ -251,9 +251,9 @@ export const LargeVolume = meta.story({
       ),
     )
 
-    await expect(canvas.getByText('400 lists')).toBeVisible()
+    await expect(canvas.getByText('400 code translations')).toBeVisible()
     await expect(everyPartner.getAllByRole('listitem')).toHaveLength(12)
-    const showAll = everyPartner.getByRole('button', { name: /^Show all \d+ lists$/ })
+    const showAll = everyPartner.getByRole('button', { name: /^Show all \d+ code translations$/ })
 
     await expect(showAll).toBeVisible()
     await expect(showAll).not.toHaveAttribute('aria-expanded')
