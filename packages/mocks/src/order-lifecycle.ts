@@ -222,7 +222,7 @@ function interchangeOf(
   acknowledgement: AcknowledgementOutcome | undefined,
   tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
   now: Date,
-  notSentReason?: AcknowledgementNotSentReason | undefined,
+  notSentReason?: AcknowledgementNotSentReason,
 ): OrderLifecycleInterchange | null {
   if (run.interchange === null) {
     return null
