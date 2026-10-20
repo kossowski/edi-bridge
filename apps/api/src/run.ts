@@ -144,15 +144,15 @@ export const listRunSummaries = async (db: Database, ids: readonly string[]) => 
 // A Run not yet processed will be mapped with the Mapping Version its Flow pins.
 const mappingVersionOfRun = sql`coalesce(${runs.mappingVersionId}, ${flows.mappingVersionId})`
 
-// A search term matches the Business Reference or the Trading Partner of a Run.
-export const matchingSearchTerm = (q: string | undefined) => {
+export const matchingSearchTerm = (q: string | undefined, ...alsoSearched: SQL[]) => {
   const searchTerm = q?.toLowerCase() ?? ''
 
   return searchTerm === ''
     ? undefined
     : or(
-        sql`strpos(lower(${businessReferenceOfRun}), ${searchTerm}) > 0`,
-        sql`strpos(lower(${tradingPartners.name}), ${searchTerm}) > 0`,
+        ...[businessReferenceOfRun, tradingPartners.name, ...alsoSearched].map(
+          (searched) => sql`strpos(lower(${searched}), ${searchTerm}) > 0`,
+        ),
       )
 }
 
