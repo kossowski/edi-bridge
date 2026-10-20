@@ -270,6 +270,7 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
     tradingPartnerId: tradingPartner.id,
     inboundChannelId: inboundChannel.id,
     outboundChannelId: outboundChannel.id,
+    documentStructureId: documentStructure.id,
     mappingId: mapping.id,
     mappingVersionId: mappingVersion.id,
     flowId: flow.id,

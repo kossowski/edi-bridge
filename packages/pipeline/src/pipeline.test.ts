@@ -24,6 +24,7 @@ import {
   connect,
   type Connection,
   documents,
+  documentStructures,
   flows,
   postgresDocumentStorage,
   lookupTableEntries,
@@ -49,6 +50,7 @@ import {
   retryRun,
   RunNotRetryable,
   sendAcknowledgements,
+  sendTestDocument,
   sweepRunsEvery,
   sweepStuckRuns,
 } from './index'
@@ -3479,6 +3481,87 @@ describe('the Acknowledgement of a sent Interchange', () => {
       await expect(onboardingOf(into)).resolves.toMatchObject({
         testRejectedAt: null,
         testRejectedRunId: null,
+      })
+    })
+
+    describe('the test send', () => {
+      const withSample = async (into: InvoiceWorkspace) => {
+        await connection.db
+          .update(documentStructures)
+          .set({
+            sampleFileName: 'invoice-sample.json',
+            sampleText: goldenInvoice,
+            sampleTakenAt: new Date(),
+          })
+          .where(eq(documentStructures.id, into.documentStructureId))
+
+        return into
+      }
+
+      const sendTest = async (into: InvoiceWorkspace) => {
+        const queue = inMemoryRunQueue()
+
+        const run = await Effect.runPromise(
+          sendTestDocument({ workspaceId: into.id, tradingPartnerId: into.tradingPartnerId }).pipe(
+            pipelineServices(connection.db, queue),
+          ),
+        )
+
+        expect(queue.queued).toEqual([{ workspaceId: into.id, runId: run.id }])
+        await processQueued(queue, deliveryByChannelType)
+
+        return readRun(connection.db, run.id)
+      }
+
+      it('sends the sample of the Flow as a test Interchange and records its handover', async () => {
+        const into = await withSample(await testingWorkspace('Sample Test Foods'))
+
+        const sent = await sendTest(into)
+
+        expect(sent).toMatchObject({
+          status: 'delivered',
+          manualSubmission: true,
+          flowId: into.flowId,
+          mappingVersionId: into.mappingVersionId,
+          document: {
+            channelId: into.inboundChannelId,
+            fileName: 'invoice-sample.json',
+            content: goldenInvoice,
+          },
+        })
+        expect(sent?.output).toContain(`+${String(sent?.controlReference)}++++++1'UNH+`)
+        expect(erp.received).toMatchObject([
+          { body: Buffer.from(sent?.output ?? '', 'latin1').toString() },
+        ])
+        await expect(onboardingOf(into)).resolves.toEqual({
+          testInterchangeSentAt: sent?.handedOverAt,
+          contrlReceivedAt: null,
+          testRejectedAt: null,
+          testRejectedRunId: null,
+        })
+      })
+
+      it('clears the rejection of the earlier test Interchange', async () => {
+        const into = await withSample(await testingWorkspace('Resent Test Foods'))
+        const rejected = await sendTest(into)
+
+        await receiveContrl(into, contrlOf(String(rejected?.controlReference), '4'))
+        await expect(onboardingOf(into)).resolves.toMatchObject({
+          testRejectedRunId: rejected?.id,
+        })
+
+        const queue = inMemoryRunQueue()
+
+        await Effect.runPromise(
+          sendTestDocument({ workspaceId: into.id, tradingPartnerId: into.tradingPartnerId }).pipe(
+            pipelineServices(connection.db, queue),
+          ),
+        )
+
+        await expect(onboardingOf(into)).resolves.toMatchObject({
+          testRejectedAt: null,
+          testRejectedRunId: null,
+        })
       })
     })
   })

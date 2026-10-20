@@ -1,5 +1,7 @@
 import { Data } from 'effect'
 
+import type { TestInterchangeRefusal } from '@edi-bridge/contracts'
+
 export const receiptRejections = {
   unknownChannel: 'The Channel does not exist',
   outboundChannel: 'A Document can only arrive on an inbound Channel',
@@ -61,3 +63,7 @@ export class MappingVersionNotOfRun extends Data.TaggedError('MappingVersionNotO
     return 'The Mapping Version does not belong to the Mapping of the Run'
   }
 }
+
+export class TestInterchangeRefused extends Data.TaggedError('TestInterchangeRefused')<{
+  readonly refusal: TestInterchangeRefusal
+}> {}

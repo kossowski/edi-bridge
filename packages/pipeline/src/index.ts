@@ -15,6 +15,7 @@ export {
   RunNotQueued,
   RunNotReprocessable,
   RunNotRetryable,
+  TestInterchangeRefused,
 } from './errors'
 
 export { markOverdueInterchanges } from './mark-overdue-interchanges'
@@ -28,6 +29,8 @@ export { type ArrivingDocument, type Receipt, type ReceivedRun, receive } from '
 export { isFixedByReprocess, isReprocessable, type Reprocess, reprocessRun } from './reprocess'
 
 export { retryRun } from './retry'
+
+export { sendTestDocument, type TestSend } from './send-test-document'
 
 export { sweepRunsEvery } from './sweep-runs'
 
