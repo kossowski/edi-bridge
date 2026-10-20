@@ -421,7 +421,7 @@ const deliveryFailure = (
           details: details ?? null,
         },
         problem: {
-          reason: 'unreachable',
+          reason: reason === 'hostKeyMismatch' ? 'hostKeyMismatch' : 'unreachable',
           fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
         },
       }),
