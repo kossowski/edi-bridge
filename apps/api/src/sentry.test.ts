@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/node'
 import { Effect } from 'effect'
 import { randomUUID } from 'node:crypto'
+import { constants } from 'node:os'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
@@ -44,6 +45,8 @@ const recordingTransport = (options: Parameters<typeof Sentry.createTransport>[0
 const itemHeaderSchema = z.object({ type: z.string() })
 
 const eventSchema = z.looseObject({
+  transaction: z.string().optional(),
+  breadcrumbs: z.array(z.unknown()).optional(),
   exception: z.object({
     values: z.array(z.looseObject({ type: z.string(), value: z.string().optional() })),
   }),
@@ -81,6 +84,9 @@ const queue = testRunQueue()
 
 let defect: Error | undefined
 
+// Holds a failing receipt back until the test lets it fail.
+let defectReleased: Promise<void> = Promise.resolve()
+
 let api: TestApi
 
 let workspace: InvoiceWorkspace
@@ -106,7 +112,13 @@ beforeAll(async () => {
     runQueue: {
       ...queue,
       service: {
-        enqueue: (run) => (defect === undefined ? queue.service.enqueue(run) : Effect.die(defect)),
+        enqueue: (run) => {
+          const failure = defect
+
+          return failure === undefined
+            ? queue.service.enqueue(run)
+            : Effect.promise(() => defectReleased).pipe(Effect.andThen(Effect.die(failure)))
+        },
       },
     },
   })
@@ -147,13 +159,16 @@ beforeEach(async () => {
   sent.length = 0
   queue.queued.length = 0
   defect = undefined
+  defectReleased = Promise.resolve()
 })
 
 const request = (path: string, init: RequestInit) =>
   fetch(new URL(path, address), init).then(({ status }) => status)
 
-const postWebhook = (content: string, presented = token) =>
-  request(toPath(receiveWebhookEndpoint.path, { id: workspace.inboundChannelId }), {
+const webhookPath = () => toPath(receiveWebhookEndpoint.path, { id: workspace.inboundChannelId })
+
+const postWebhook = (content: string, presented = token, query = '') =>
+  request(`${webhookPath()}${query}`, {
     method: receiveWebhookEndpoint.method,
     headers: {
       [webhookTokenHeader]: webhookAuthorization(presented),
@@ -226,10 +241,74 @@ describe('the error report of the api', () => {
     const envelopes = await flushed()
 
     expect(
-      events().flatMap(({ exception }) =>
-        exception.values.map(({ type, value }) => ({ type, value })),
-      ),
-    ).toEqual([{ type: 'Error', value: 'Error' }])
+      events().map(({ exception, breadcrumbs }) => ({
+        exceptions: exception.values.map(({ type, value }) => ({ type, value })),
+        breadcrumbs: breadcrumbs ?? [],
+      })),
+    ).toEqual([{ exceptions: [{ type: 'Error', value: 'Error' }], breadcrumbs: [] }])
+    expect(spans()).not.toEqual([])
+    expect(envelopes).not.toContain('sentry.status.message')
+    expectAbsent(envelopes, secret)
+  })
+
+  it('reports a defect with the transaction of its own request among concurrent requests', async () => {
+    defect = new Error('The queue broke among others')
+
+    let release = () => {}
+
+    defectReleased = new Promise((resolve) => {
+      release = resolve
+    })
+
+    const failing = postWebhook(goldenInvoice)
+
+    expect(await asAdmin('/runs/not-a-run')).toBe(404)
+
+    release()
+
+    expect(await failing).toBe(500)
+
+    await flushed()
+
+    expect(events().map(({ transaction }) => transaction)).toEqual([
+      `${receiveWebhookEndpoint.method} ${receiveWebhookEndpoint.path}`,
+    ])
+  })
+
+  it('reports a system error without its path, which can name the file of a Trading Partner', async () => {
+    const path = `/sftp/inbox/partner-${randomUUID()}.edi`
+
+    defect = Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+      errno: -constants.errno.ENOENT,
+      code: 'ENOENT',
+      syscall: 'open',
+      path,
+    })
+
+    expect(await postWebhook(goldenInvoice)).toBe(500)
+
+    const envelopes = await flushed()
+
+    expect(events()).toHaveLength(1)
+    expect(envelopes).not.toContain('node_system_error')
+    expectAbsent(envelopes, path)
+  })
+
+  it('reports no query string of a request URL, which can carry a token', async () => {
+    const secret = `token-${randomUUID()}`
+
+    defect = new Error('The queue broke with a query')
+
+    expect(await postWebhook(goldenInvoice, token, `?token=${secret}`)).toBe(500)
+
+    defect = undefined
+
+    expect(await asAdmin(`/auth/get-session?token=${secret}`)).toBe(200)
+
+    const envelopes = await flushed()
+
+    expect(events()).toHaveLength(1)
+    expect(spans()).not.toEqual([])
     expectAbsent(envelopes, secret)
   })
 
