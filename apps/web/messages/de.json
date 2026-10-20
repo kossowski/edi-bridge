@@ -2286,16 +2286,26 @@
     "new": {
       "button": "Neues Mapping",
       "title": "Neues Mapping",
-      "description": "Wählen Sie den Beleg. Die KI entwirft das Mapping aus einem Beispielbeleg, und Sie prüfen jede Verknüpfung.",
+      "description": "Wählen Sie Ihr Datenformat und den Beleg. Die KI entwirft das Mapping aus einem Beispielbeleg, und Sie prüfen jede Verknüpfung.",
       "choice": "{documents}, die Sie {direction, select, inbound {empfangen} other {senden}}",
       "aiHint": "Mit KI entwerfen",
-      "close": "Schließen"
+      "close": "Schließen",
+      "documentStructure": {
+        "label": "Ihr Datenformat",
+        "description": "Das Mapping übersetzt zwischen diesem Format und dem EDI-Beleg.",
+        "placeholder": "Datenformat wählen",
+        "missing": "Wählen Sie zuerst Ihr Datenformat.",
+        "loading": "Ihre Datenformate werden geladen…",
+        "failed": "Ihre Datenformate konnten nicht geladen werden.",
+        "retry": "Erneut versuchen"
+      }
     },
     "create": {
       "creating": "Mapping wird angelegt…",
       "failed": "Das Mapping konnte nicht angelegt werden. Versuchen Sie es erneut.",
       "noDocumentStructure": "Legen Sie zuerst Ihr Datenformat an, damit die KI die Form Ihrer Dateien kennt.",
-      "addDataFormat": "Datenformat anlegen"
+      "addDataFormat": "Datenformat anlegen",
+      "documentStructureGone": "Dieses Datenformat gibt es nicht mehr. Wählen Sie ein anderes."
     },
     "first": {
       "title": "Übersetzen Sie Ihren ersten Beleg",
