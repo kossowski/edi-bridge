@@ -5,6 +5,8 @@ import {
   canSwitchToProduction,
   glnRequired,
   onboardingChecklist,
+  testInterchangeRefusedProblem,
+  testInterchangeRefusedProblemSchema,
   type TradingPartner,
   tradingPartnerInputSchema,
 } from './trading-partner'
@@ -194,6 +196,40 @@ describe('canSendTestInterchange', () => {
     ],
   ])('refuses %s', (_, tradingPartner, gln) => {
     expect(canSendTestInterchange(tradingPartner, gln)).toBe(false)
+  })
+})
+
+describe('testInterchangeRefusedProblem', () => {
+  const flow = { id: '00000000-0000-4000-8000-0000000000f1', name: 'Invoices to Hansemarkt' }
+
+  it('says why a Trading Partner that does not await a test is refused', () => {
+    expect(testInterchangeRefusedProblem({ reason: 'notAwaited' })).toEqual({
+      reason: 'notAwaited',
+      message: 'The Trading Partner does not await a test Interchange.',
+    })
+  })
+
+  it('says that no outbound Flow leads to the Trading Partner', () => {
+    expect(testInterchangeRefusedProblem({ reason: 'noOutboundFlow' })).toEqual({
+      reason: 'noOutboundFlow',
+      message: 'No outbound Flow leads to the Trading Partner.',
+    })
+  })
+
+  it('names the Flow whose Document Structure has no sample Document', () => {
+    expect(testInterchangeRefusedProblem({ reason: 'sampleMissing', flow })).toEqual({
+      reason: 'sampleMissing',
+      flow,
+      message:
+        'The Document Structure of the Flow "Invoices to Hansemarkt" has no sample Document.',
+    })
+  })
+
+  it('needs the Flow for a missing sample Document', () => {
+    expect(
+      testInterchangeRefusedProblemSchema.safeParse({ reason: 'sampleMissing', message: 'x' })
+        .success,
+    ).toBe(false)
   })
 })
 

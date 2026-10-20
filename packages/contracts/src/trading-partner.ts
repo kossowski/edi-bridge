@@ -111,6 +111,41 @@ export function canSendTestInterchange(
   )
 }
 
+export const testInterchangeRefusedStatus = 409
+
+const flowReferenceSchema = z.object({ id: z.uuid(), name: z.string().min(1) })
+
+export const testInterchangeRefusalSchema = z.discriminatedUnion('reason', [
+  z.object({ reason: z.literal('notAwaited') }),
+  z.object({ reason: z.literal('noOutboundFlow') }),
+  z.object({ reason: z.literal('sampleMissing'), flow: flowReferenceSchema }),
+])
+
+export type TestInterchangeRefusal = z.infer<typeof testInterchangeRefusalSchema>
+
+export const testInterchangeRefusedProblemSchema = testInterchangeRefusalSchema.and(
+  z.object({ message: z.string().min(1) }),
+)
+
+export type TestInterchangeRefusedProblem = z.infer<typeof testInterchangeRefusedProblemSchema>
+
+function testInterchangeRefusalMessage(refusal: TestInterchangeRefusal) {
+  switch (refusal.reason) {
+    case 'notAwaited':
+      return 'The Trading Partner does not await a test Interchange.'
+    case 'noOutboundFlow':
+      return 'No outbound Flow leads to the Trading Partner.'
+    case 'sampleMissing':
+      return `The Document Structure of the Flow "${refusal.flow.name}" has no sample Document.`
+  }
+}
+
+export function testInterchangeRefusedProblem(
+  refusal: TestInterchangeRefusal,
+): TestInterchangeRefusedProblem {
+  return { ...refusal, message: testInterchangeRefusalMessage(refusal) }
+}
+
 export const tradingPartnersEndpoint: Endpoint<TradingPartner[]> = {
   method: 'GET',
   path: '/trading-partners',
