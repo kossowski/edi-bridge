@@ -160,6 +160,7 @@ describe('finishSetup', () => {
       gln: null,
       characterSet: 'UNOC',
       acknowledgementTimeLimitHours: acknowledgementTimeLimitHours.default,
+      messageTypes: ['ORDERS', 'DESADV', 'INVOIC'],
     })
     expect(api.createChannel.mock.calls.map(([input]) => input)).toEqual([
       expect.objectContaining({

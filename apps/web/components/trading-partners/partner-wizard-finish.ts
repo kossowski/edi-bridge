@@ -53,11 +53,14 @@ export type LeftOver = {
   routes: LeftRoute[]
 }
 
-export function partnerInput(plan: Pick<SetupPlan<PlanChannel>, 'partner'>): TradingPartnerInput {
+export function partnerInput(
+  plan: Pick<SetupPlan<PlanChannel>, 'partner' | 'documents'>,
+): TradingPartnerInput {
   return {
     ...plan.partner,
     characterSet: defaultCharacterSet,
     acknowledgementTimeLimitHours: acknowledgementTimeLimitHours.default,
+    messageTypes: plan.documents.map(({ messageType }) => messageType),
   }
 }
 
