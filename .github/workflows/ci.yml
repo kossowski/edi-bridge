@@ -137,21 +137,39 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+  agent-hooks:
+    name: Agent hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+
+      - name: Test the Claude Code hooks
+        run: node --test '.claude/hooks/*.test.mjs'
+
   checks:
     name: CI passed
     if: always()
-    needs: [plan, tasks, full-stack-e2e, format]
+    needs: [plan, tasks, full-stack-e2e, format, agent-hooks]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - name: Require the plan, task, full-stack E2E and format jobs to pass
+      - name: Require the plan, task, full-stack E2E, format and agent hooks jobs to pass
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
           TASKS_RESULT: ${{ needs.tasks.result }}
           FULL_STACK_E2E_RESULT: ${{ needs.full-stack-e2e.result }}
           FORMAT_RESULT: ${{ needs.format.result }}
+          AGENT_HOOKS_RESULT: ${{ needs.agent-hooks.result }}
         run: |
           test "$PLAN_RESULT" = success
           test "$FORMAT_RESULT" = success
+          test "$AGENT_HOOKS_RESULT" = success
           test "$TASKS_RESULT" = success || test "$TASKS_RESULT" = skipped
           test "$FULL_STACK_E2E_RESULT" = success || test "$FULL_STACK_E2E_RESULT" = skipped

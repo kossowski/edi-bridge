@@ -23,6 +23,7 @@ You are the **developer** for one brief. It names a GOAL, a WORKTREE with its br
 - **Stop what you started**: every dev server, Storybook and background shell is gone before you report. Start and stop a dev server inside one slot command, so the slot frees itself when the check ends. `bash .agents/skills/developer/scripts/stop-leftovers.sh <worktree>` stops what still runs from your worktree and prints it.
 - **Park work by committing it**: commit work in progress, or copy a file aside into your scratchpad. `git stash` is off limits: every worktree shares one stash list, so a pop can take another ticket's stash.
 - **Commit** per `AGENTS.md`: one commit per concern, footer `refs: #<NN>`. Fix the message when the hook rejects it.
+- **Never bypass the git hooks**: no `--no-verify`, `git commit -n`, `HUSKY=0` or `core.hooksPath` override, not even for a temporary fixup commit that a rebase squashes later. That rebase runs no hooks, so the fixup's content reaches the final commit unchecked. Fix what the hook reports instead. A PreToolUse hook in `.claude/settings.json` refuses these commands.
 - **Questions**: answer technical ones from the code and the docs, and record the answer in NOTES. A product decision, or anything that blocks you, goes into QUESTIONS, and you stop with STATUS blocked.
 
 ## Report
