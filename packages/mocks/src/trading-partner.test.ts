@@ -144,7 +144,7 @@ describe('seedTradingPartners', () => {
     const interchange = interchangeEndpoint.response.parse(await response.json())
     const tradingPartner = seedTradingPartners.find(({ id }) => id === run.tradingPartner.id)!
 
-    expect(interchange.sender.gln).toBe(tradingPartner.gln)
+    expect(interchange.sender.identification).toBe(tradingPartner.gln)
   })
 })
 

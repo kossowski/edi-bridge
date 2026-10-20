@@ -491,6 +491,8 @@ export {
   releases,
 } from './message-type'
 
+export { segmentDefinition } from './eancom/directory'
+
 export { messageTypeStructures } from './eancom/structures'
 
 export {

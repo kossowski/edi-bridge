@@ -108,25 +108,29 @@ async function addTradingPartner(target: InvoiceWorkspace, name: string, gln: st
         .returning(),
     )
 
+  // Without handedOverAt, delivery built the Interchange but the Channel has not taken it yet.
   const sendInvoice = async ({
     controlReference,
     handedOverAt,
+    receivedAt = handedOverAt,
     businessReference = null,
   }: {
     controlReference: number
-    handedOverAt: Date
     businessReference?: string | null
-  }) => {
+  } & (
+    | { handedOverAt: Date; receivedAt?: Date }
+    | { handedOverAt?: undefined; receivedAt: Date }
+  )) => {
     return addRun({
       flowId: invoic.id,
-      status: 'delivered',
+      status: handedOverAt === undefined ? 'processing' : 'delivered',
       businessReference,
       output: interchangeOf(workspaceGln, gln, String(controlReference), [
         { reference: '1', messageType: 'INVOIC' },
       ]),
       handedOverAt,
       controlReference,
-      receivedAt: handedOverAt,
+      receivedAt,
     })
   }
 
@@ -248,6 +252,29 @@ describe('GET /interchanges', () => {
           }),
         ],
       },
+    ])
+  })
+
+  it('lists an outbound Interchange delivery built before the Channel took it, prepared when received', async () => {
+    const partner = await addTradingPartner(workspace, 'Moselgut eG', '4012345000122')
+
+    const invoice = await partner.sendInvoice({ controlReference: 4712, receivedAt: hoursAgo(2) })
+
+    const { interchanges } = await listed({ tradingPartnerId: [partner.tradingPartner.id] })
+
+    expect(interchanges).toEqual([
+      expect.objectContaining({
+        id: invoice.id,
+        controlReference: '4712',
+        direction: 'outbound',
+        preparedAt: hoursAgo(2).toISOString(),
+        runs: [
+          expect.objectContaining({
+            id: invoice.id,
+            interchange: { id: invoice.id, controlReference: '4712' },
+          }),
+        ],
+      }),
     ])
   })
 
@@ -395,8 +422,8 @@ describe('GET /interchanges/:id', () => {
       id: invoice.id,
       controlReference: '515',
       direction: 'outbound',
-      sender: { gln: workspaceGln, name: 'Nordwind Foods' },
-      receiver: { gln: '4012345000054', name: 'Weserfrisch eG' },
+      sender: { identification: workspaceGln, name: 'Nordwind Foods' },
+      receiver: { identification: '4012345000054', name: 'Weserfrisch eG' },
       raw: invoice.output,
       runs: [
         expect.objectContaining({
@@ -406,6 +433,29 @@ describe('GET /interchanges/:id', () => {
         }),
       ],
     })
+  })
+
+  it('shows the outbound Interchange a Run names before the Channel took it', async () => {
+    const partner = await addTradingPartner(workspace, 'Saalegrund KG', '4012345000139')
+    const invoice = await partner.sendInvoice({ controlReference: 516, receivedAt: hoursAgo(1) })
+
+    const response = await loaded(invoice.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(interchangeSchema.parse(response.json())).toEqual(
+      expect.objectContaining({
+        id: invoice.id,
+        controlReference: '516',
+        direction: 'outbound',
+        raw: invoice.output,
+        runs: [
+          expect.objectContaining({
+            id: invoice.id,
+            interchange: { id: invoice.id, controlReference: '516' },
+          }),
+        ],
+      }),
+    )
   })
 
   it('shows a received Interchange with the Message reference of each Run', async () => {
@@ -424,8 +474,8 @@ describe('GET /interchanges/:id', () => {
       id: received.document.id,
       controlReference: 'OSK77',
       direction: 'inbound',
-      sender: { gln: '4012345000061', name: 'Ostseekauf GmbH' },
-      receiver: { gln: workspaceGln, name: 'Nordwind Foods' },
+      sender: { identification: '4012345000061', name: 'Ostseekauf GmbH' },
+      receiver: { identification: workspaceGln, name: 'Nordwind Foods' },
       raw: received.document.content,
     })
     expect(
@@ -435,6 +485,123 @@ describe('GET /interchanges/:id', () => {
     ).toEqual(
       received.runs.map(({ id }, index) => ({ id, messageReference: `PO-7${String(index + 1)}` })),
     )
+  })
+
+  it('shows a received Interchange whose envelope breaks after its Messages', async () => {
+    const partner = await addTradingPartner(workspace, 'Lahnhof eG', '4012345000092')
+
+    const content = `${interchangeOf('4012345000092', workspaceGln, 'LAH1', [
+      { reference: 'PO-91', messageType: 'ORDERS' },
+    ])
+      .split('\n')
+      .slice(0, -1)
+      .join('\n')}\nUNH+PO-92+ORDERS:D:96A:UN:EAN008'`
+
+    const document = await partner.storeDocument({
+      content,
+      interchangeSender: '4012345000092',
+      interchangeControlReference: 'LAH1',
+    })
+
+    const runIds = []
+
+    for (const messageIndex of [1, 2, 3]) {
+      runIds.push(
+        (
+          await partner.addRun({
+            documentId: document.id,
+            flowId: partner.orders.id,
+            status: 'failed',
+            failureStage: 'parse',
+            problem: { reason: 'unreadable', fixTarget: null },
+            error: {
+              code: 'missing-interchange-trailer',
+              message: 'No UNZ',
+              position: null,
+              details: null,
+            },
+            messageIndex,
+          })
+        ).id,
+      )
+    }
+
+    const response = await loaded(document.id)
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect(
+      interchangeSchema
+        .parse(response.json())
+        .runs.map(({ id, messageReference }) => ({ id, messageReference })),
+    ).toEqual([
+      { id: runIds[0], messageReference: 'PO-91' },
+      { id: runIds[1], messageReference: 'PO-92' },
+      { id: runIds[2], messageReference: null },
+    ])
+  })
+
+  it('names the parties by the identifications in the UNB, though they are no GLNs', async () => {
+    const partner = await addTradingPartner(workspace, 'Rhönmarkt KG', '4012345000108')
+
+    const document = await partner.storeDocument({
+      content: interchangeOf('RHOENMARKT', 'NORDWIND-FOODS', 'RHM1', [
+        { reference: 'PO-1', messageType: 'ORDERS' },
+      ]),
+      interchangeSender: 'RHOENMARKT',
+      interchangeControlReference: 'RHM1',
+    })
+
+    await partner.addRun({
+      documentId: document.id,
+      flowId: partner.orders.id,
+      status: 'delivered',
+      messageIndex: 1,
+    })
+
+    const response = await loaded(document.id)
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect(interchangeSchema.parse(response.json())).toMatchObject({
+      sender: { identification: 'RHOENMARKT', name: 'Rhönmarkt KG' },
+      receiver: { identification: 'NORDWIND-FOODS', name: 'Nordwind Foods' },
+    })
+  })
+
+  it('shows a received Interchange whose UNB no longer reads, without its parties', async () => {
+    const partner = await addTradingPartner(workspace, 'Moselgut AG', '4012345000115')
+
+    const document = await partner.storeDocument({
+      // As read from bytes whose first character is not valid in the named character set.
+      content: `\uFFFD${interchangeOf('4012345000115', workspaceGln, 'MOS1', [
+        { reference: 'PO-1', messageType: 'ORDERS' },
+      ]).slice(1)}`,
+      interchangeSender: '4012345000115',
+      interchangeControlReference: 'MOS1',
+    })
+
+    const run = await partner.addRun({
+      documentId: document.id,
+      flowId: partner.orders.id,
+      status: 'failed',
+      failureStage: 'parse',
+      problem: { reason: 'unreadable', fixTarget: null },
+      error: {
+        code: 'missing-interchange-trailer',
+        message: 'No UNZ',
+        position: null,
+        details: null,
+      },
+      messageIndex: 1,
+    })
+
+    const response = await loaded(document.id)
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect(interchangeSchema.parse(response.json())).toMatchObject({
+      sender: { identification: null, name: 'Moselgut AG' },
+      receiver: { identification: null, name: 'Nordwind Foods' },
+      runs: [{ id: run.id, messageReference: null }],
+    })
   })
 
   it('answers 404 for a Run without an Interchange, an unknown id and another Workspace', async () => {

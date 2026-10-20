@@ -11,18 +11,20 @@ import {
   type RunSummary,
 } from '@edi-bridge/contracts'
 import { documents, flows, runs, tradingPartners } from '@edi-bridge/db'
-import { parseMessages } from '@edi-bridge/edifact'
+import { readInterchange } from '@edi-bridge/edifact'
 
 import { Db, type Database } from './db.js'
+import { messageAt } from './message-at.js'
 import { foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
 import { fromRuns, listRunSummaries, matchingSearchTerm } from './run.js'
+import { readableTextOf } from './stored-document.js'
 import { CurrentWorkspace, loadCurrentWorkspace } from './workspace.js'
 
 const interchangeFieldsOf = (
   id: AnyPgColumn,
   direction: Direction,
   controlReference: SQL<string>,
-  preparedAt: AnyPgColumn,
+  preparedAt: SQL<Date>,
 ) => ({
   id: sql<string>`${id}`.as('id'),
   direction: sql<Direction>`${direction}`.as('direction'),
@@ -41,7 +43,8 @@ const outboundBranch = {
   controlReference: sql<string>`${runs.controlReference}::text`,
 }
 
-// An outbound Run the Channel took is its own Interchange, so the Run id names it.
+// An outbound Run is its own Interchange once delivery built it, so the Run id names it. One the
+// Channel has not taken yet counts as prepared when the Run was received.
 const outboundInterchangeRuns = (db: Database, workspaceId: string, condition: BranchCondition) =>
   fromRuns(
     db,
@@ -49,13 +52,12 @@ const outboundInterchangeRuns = (db: Database, workspaceId: string, condition: B
       outboundBranch.id,
       'outbound',
       outboundBranch.controlReference,
-      runs.handedOverAt,
+      sql<Date>`coalesce(${runs.handedOverAt}, ${runs.receivedAt})`,
     ),
   ).where(
     inWorkspace(
       runs,
       workspaceId,
-      isNotNull(runs.handedOverAt),
       isNotNull(runs.controlReference),
       isNotNull(runs.output),
       condition(outboundBranch),
@@ -75,7 +77,7 @@ const inboundInterchangeRuns = (db: Database, workspaceId: string, condition: Br
       inboundBranch.id,
       'inbound',
       inboundBranch.controlReference,
-      documents.receivedAt,
+      sql<Date>`${documents.receivedAt}`,
     ),
   )
     .innerJoin(documents, eq(documents.id, runs.documentId))
@@ -150,14 +152,7 @@ const listRunsOf = async (db: Database, interchanges: readonly InterchangeRow[])
   ])
 
   return (interchange: InterchangeRow): RunSummary[] =>
-    runIdsOf(interchange).flatMap((runId) =>
-      summaries
-        .filter(({ id }) => id === runId)
-        .map((summary) => ({
-          ...summary,
-          interchange: { id: interchange.id, controlReference: interchange.controlReference },
-        })),
-    )
+    runIdsOf(interchange).flatMap((runId) => summaries.filter(({ id }) => id === runId))
 }
 
 const toSummary =
@@ -206,26 +201,23 @@ export const listInterchanges = (query: InterchangeListQuery) =>
     } satisfies InterchangeList
   })
 
-const rawOf = async (db: Database, { id, direction }: InterchangeRow) => {
-  const [row] =
-    direction === 'outbound'
-      ? await db.select({ raw: runs.output }).from(runs).where(eq(runs.id, id))
-      : await db.select({ raw: documents.content }).from(documents).where(eq(documents.id, id))
+const loadRaw = async (db: Database, { id, direction }: InterchangeRow) => {
+  if (direction === 'inbound') {
+    const [document] = await db
+      .select({ id: documents.id, content: documents.content, bytes: documents.bytes })
+      .from(documents)
+      .where(eq(documents.id, id))
 
-  if (row?.raw === null || row?.raw === undefined) {
-    throw new Error(`Interchange ${id} has no raw text`)
+    return document && readableTextOf(document)
   }
 
-  return row.raw
+  const [run] = await db.select({ output: runs.output }).from(runs).where(eq(runs.id, id))
+
+  return run?.output ?? undefined
 }
 
-const presentOrThrow = (value: string | undefined, missing: string) => {
-  if (value === undefined || value === '') {
-    throw new Error(missing)
-  }
-
-  return value
-}
+const presentOrNull = (value: string | undefined) =>
+  value === undefined || value === '' ? null : value
 
 export const loadInterchange = (id: string) =>
   Effect.gen(function* () {
@@ -243,7 +235,7 @@ export const loadInterchange = (id: string) =>
 
     const [raw, runsOf, messageIndexes] = yield* Effect.promise(() =>
       Promise.all([
-        rawOf(db, row),
+        loadRaw(db, row),
         listRunsOf(db, [row]),
         db
           .select({ id: runs.id, messageIndex: runs.messageIndex })
@@ -252,29 +244,21 @@ export const loadInterchange = (id: string) =>
       ]),
     )
 
-    const { header, messages } = parseMessages(raw)
+    if (raw === undefined) {
+      throw new Error(`Interchange ${id} has no raw text`)
+    }
+
+    // Receipt accepted this header, so a later broken segment must not fail the read.
+    const { header, messages } = readInterchange(raw)
     const tradingPartner = { name: row.tradingPartnerName }
     const ownCompany = { name: own.name }
-
-    const sender = {
-      gln: presentOrThrow(header.elements[1]?.[0], `Interchange ${id} has no sender`),
-    }
-
-    const receiver = {
-      gln: presentOrThrow(header.elements[2]?.[0], `Interchange ${id} has no receiver`),
-    }
-
-    // An outbound Run, a test send too, has no Message Index: its Interchange holds one Message.
-    const onlyMessage = 1
+    const sender = { identification: presentOrNull(header?.elements[1]?.[0]) }
+    const receiver = { identification: presentOrNull(header?.elements[2]?.[0]) }
 
     const messageReferenceOf = (runId: string) => {
-      const messageIndex =
-        messageIndexes.find((run) => run.id === runId)?.messageIndex ?? onlyMessage
+      const messageIndex = messageIndexes.find((run) => run.id === runId)?.messageIndex ?? null
 
-      return presentOrThrow(
-        messages[messageIndex - 1]?.header.elements[0]?.[0],
-        `Interchange ${id} has no Message ${String(messageIndex)}`,
-      )
+      return messageAt(messages, messageIndex)?.reference ?? null
     }
 
     return {

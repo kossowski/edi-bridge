@@ -266,16 +266,17 @@ const messageVersions: Readonly<Record<MessageType, string>> = {
   CONTRL: '',
 }
 
-export const ownCompany: InterchangeParty = {
-  gln: seedWorkspace.gln!,
+// Every seeded UNB is readable, so each party has its identification.
+type SeedParty = InterchangeParty & { identification: string }
+
+export const ownCompany: SeedParty = {
+  identification: seedWorkspace.gln!,
   name: seedWorkspace.name,
 }
 
-export function tradingPartnerParty(
-  tradingPartner: RunSummary['tradingPartner'],
-): InterchangeParty {
+export function tradingPartnerParty(tradingPartner: RunSummary['tradingPartner']): SeedParty {
   return {
-    gln: seedGln(tradingPartner.id),
+    identification: seedGln(tradingPartner.id),
     name: tradingPartner.name,
   }
 }
@@ -313,8 +314,8 @@ function businessSegments(faker: Faker, run: RunSummary, parties: Parties): Segm
       return [
         seg('BGM', '220', orderNumber, '9'),
         seg('DTM', ['137', date, '102']),
-        seg('NAD', 'BY', [buyer.gln, '', '9']),
-        seg('NAD', 'SU', [supplier.gln, '', '9']),
+        seg('NAD', 'BY', [buyer.identification, '', '9']),
+        seg('NAD', 'SU', [supplier.identification, '', '9']),
         ...lines.flatMap((line, index) => [
           seg('LIN', String(index + 1), '', [line.gtin, 'EN']),
           seg('QTY', ['21', line.quantity, 'PCE']),
@@ -329,8 +330,8 @@ function businessSegments(faker: Faker, run: RunSummary, parties: Parties): Segm
         seg('BGM', '351', `DN${faker.string.numeric(6)}`, '9'),
         seg('DTM', ['137', date, '102']),
         seg('RFF', ['ON', orderNumber]),
-        seg('NAD', 'BY', [buyer.gln, '', '9']),
-        seg('NAD', 'SU', [supplier.gln, '', '9']),
+        seg('NAD', 'BY', [buyer.identification, '', '9']),
+        seg('NAD', 'SU', [supplier.identification, '', '9']),
         seg('CPS', '1'),
         ...lines.flatMap((line, index) => [
           seg('LIN', String(index + 1), '', [line.gtin, 'EN']),
@@ -347,8 +348,8 @@ function businessSegments(faker: Faker, run: RunSummary, parties: Parties): Segm
         seg('BGM', '380', `IN${faker.string.numeric(6)}`, '9'),
         seg('DTM', ['137', date, '102']),
         seg('RFF', ['ON', orderNumber]),
-        seg('NAD', 'BY', [buyer.gln, '', '9']),
-        seg('NAD', 'SU', [supplier.gln, '', '9']),
+        seg('NAD', 'BY', [buyer.identification, '', '9']),
+        seg('NAD', 'SU', [supplier.identification, '', '9']),
         ...lines.flatMap((line, index) => [
           seg('LIN', String(index + 1), '', [line.gtin, 'EN']),
           seg('QTY', ['47', line.quantity, 'PCE']),
@@ -364,8 +365,8 @@ function businessSegments(faker: Faker, run: RunSummary, parties: Parties): Segm
         seg(
           'UCI',
           faker.string.numeric(8),
-          [parties.receiver.gln, '14'],
-          [parties.sender.gln, '14'],
+          [parties.receiver.identification, '14'],
+          [parties.sender.identification, '14'],
           '7',
         ),
       ]
@@ -596,7 +597,7 @@ function failureOf(run: RunSummary, faker: Faker, { fault, broken }: FaultyMessa
   }
 }
 
-type Parties = { sender: InterchangeParty; receiver: InterchangeParty }
+type Parties = { sender: SeedParty; receiver: SeedParty }
 
 export function partiesOf(run: RunSummary): Parties {
   const tradingPartner = tradingPartnerParty(run.tradingPartner)
@@ -683,11 +684,13 @@ export function serializeInterchange({
   parties,
   preparedAt,
   messages,
+  testIndicator = false,
 }: {
   controlReference: string
   parties: Parties
   preparedAt: string
   messages: ReadonlyArray<{ runId: string; message: GeneratedMessage }>
+  testIndicator?: boolean
 }): GeneratedInterchange {
   const positions = new Map<string, ErrorPosition | null>()
 
@@ -697,10 +700,12 @@ export function serializeInterchange({
       seg(
         'UNB',
         ['UNOC', '3'],
-        [parties.sender.gln, '14'],
-        [parties.receiver.gln, '14'],
+        [parties.sender.identification, '14'],
+        [parties.receiver.identification, '14'],
         interchangeDate(preparedAt).split(':'),
         controlReference,
+        // UNB 0035 follows five optional elements.
+        ...(testIndicator ? ['', '', '', '', '', '1'] : []),
       ),
     ),
   ]

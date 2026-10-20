@@ -24,6 +24,7 @@ import { seedLookupTableNamed } from './lookup-table'
 import { createRun, createRuns } from './run'
 import { runDetailHandlers, seedExpiredDocuments, seedReprocessed } from './run-detail'
 import { createRunStore, interchangeIdOf } from './run-store'
+import { seedTradingPartners } from './trading-partner'
 import { seedWorkspace } from './workspace'
 
 const apiUrl = 'http://api.test'
@@ -110,6 +111,39 @@ describe('GET /runs/:id', () => {
     expect(body?.message?.segments[0]?.tag).toBe('UNH')
     expect(body?.interchange?.raw).toMatch(/^UNA:\+\.\? 'UNB\+/)
     expect(body?.mappingVersion).not.toBeNull()
+  })
+
+  it('flags an inbound Run from a Trading Partner in Test Mode with the test indicator of its UNB', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001')
+
+    const outbound = createRun({
+      id: '00000000-0000-4000-8000-000000000002',
+      tradingPartner: hansemarkt,
+      messageType: 'INVOIC',
+      flow: invoicFlow,
+      receivedAt: '2026-10-01T09:00:00.000Z',
+      status: 'delivered',
+      failureStage: null,
+    })
+
+    const testing = { ...seedTradingPartners[0]!, ...hansemarkt, testMode: true }
+    server.use(...runDetailHandlers(apiUrl, { runs: [run, outbound], tradingPartners: [testing] }))
+
+    const inbound = (await getRun(run.id)).body
+
+    expect(inbound?.testIndicator).toBe(true)
+    expect(inbound?.interchange?.raw).toMatch(/UNB(\+[^+']*){5}\+{6}1'/)
+    await expect(getRun(outbound.id)).resolves.toMatchObject({ body: { testIndicator: false } })
+  })
+
+  it('leaves the test indicator off an inbound Run from a Trading Partner in production', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001')
+    server.use(...runDetailHandlers(apiUrl, { runs: [run] }))
+
+    const { body } = await getRun(run.id)
+
+    expect(body?.testIndicator).toBe(false)
+    expect(body?.interchange?.raw).toMatch(/UNB(\+[^+']*){5}'/)
   })
 
   it('answers 404 for an unknown Run', async () => {
@@ -270,6 +304,9 @@ describe('GET /runs/:id', () => {
         'destinationUnreachable:true',
       ]),
     )
+    expect(
+      details.filter(({ interchange }) => interchange !== null).every(({ message }) => message),
+    ).toBe(true)
   })
 
   it('fails an outbound Run at validation with the codes of the edifact package', async () => {
@@ -1080,6 +1117,7 @@ describe('a Run whose Document expired', () => {
     const { body } = await getRun(run.id)
 
     expect(body?.documentDeletedAt).toBe(deletedAt)
+    expect(body?.testIndicator).toBeNull()
   })
 
   it('refuses a Reprocess with a Conflict that names the expired Document', async () => {

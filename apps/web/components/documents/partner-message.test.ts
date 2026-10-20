@@ -45,6 +45,7 @@ const parsed = runDetailSchema.parse({
   waitingForTradingPartnerSince: null,
   duplicateOf: null,
   documentDeletedAt: null,
+  testIndicator: false,
 })
 
 if (parsed.status !== 'failed') {

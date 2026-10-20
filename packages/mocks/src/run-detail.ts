@@ -50,8 +50,7 @@ import {
   toRunStore,
 } from './run-store'
 import { seededFaker } from './seeded-faker'
-
-import type { TradingPartnerStore } from './trading-partner'
+import { type TradingPartnerStore, toTradingPartnerStore } from './trading-partner'
 
 const stepDurations: Readonly<Record<RunStepStage, readonly [number, number]>> = {
   receipt: [20, 200],
@@ -212,6 +211,13 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
     return store
   }
 
+  const tradingPartnerStore = toTradingPartnerStore(options.tradingPartners)
+
+  // Interchanges to and from a Trading Partner in Test Mode carry the test indicator.
+  function inTestMode(run: RunSummary) {
+    return tradingPartnerStore.get(run.tradingPartner.id)?.testMode === true
+  }
+
   function generate(group: RunGroup): GeneratedGroup {
     const cached = generated.get(group)
 
@@ -237,6 +243,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
               controlReference: group.controlReference,
               parties: partiesOf(first),
               preparedAt: first.receivedAt,
+              testIndicator: inTestMode(first),
               messages: group.messageOwners.map(({ runId }) => ({
                 runId,
                 message: messages.get(runId)!,
@@ -317,6 +324,8 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       replaces: replaced ? { id: replaced } : null,
       replacedBy: replacing ? { id: replacing } : null,
       documentDeletedAt: documentDeletedAt.get(id) ?? null,
+      // An outbound Run's Document is the in-house file, which has no UNB.
+      testIndicator: documentDeletedAt.has(id) ? null : direction === 'inbound' && inTestMode(run),
     })
   }
 
