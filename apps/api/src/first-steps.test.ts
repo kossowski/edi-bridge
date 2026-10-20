@@ -80,6 +80,19 @@ describe('GET /workspaces/current/first-steps', () => {
     })
   })
 
+  it("leaves out another Workspace's Channels, Trading Partners and Mapping Versions", async () => {
+    await seedWorkspaceWithAdmin(api, 'Isar Einkauf AG')
+
+    expect((await firstSteps()).steps.map(({ id, done }) => ({ id, done }))).toEqual([
+      { id: 'gln', done: false },
+      { id: 'erpConnection', done: false },
+      { id: 'tradingPartner', done: false },
+      { id: 'mapping', done: false },
+      { id: 'testInterchange', done: false },
+      { id: 'production', done: false },
+    ])
+  })
+
   it('answers 401 without a session', async () => {
     const response = await api.app.inject({
       method: firstStepsEndpoint.method,

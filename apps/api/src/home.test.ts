@@ -146,6 +146,34 @@ describe('GET /home', () => {
     ])
   })
 
+  it("leaves out another Workspace's Runs", async () => {
+    const { workspace, admin } = await seedWorkspaceWithAdmin(api, 'Weser Vertrieb GmbH')
+    const other = await seedWorkspaceWithAdmin(api, 'Isar Einkauf AG')
+    const partner = await addTradingPartnerWithFlows(api.connection.db, other.workspace, 'Donau')
+
+    await partner.orders({ receivedAt: hoursAgo(1) })
+    await partner.orders({ status: 'processing', receivedAt: hoursAgo(1) })
+    await partner.orders({ ...failedRun('mapping'), receivedAt: hoursAgo(2) })
+
+    const result = await home(admin)
+
+    expect(result.keyNumbers).toEqual({
+      needsAttention: 0,
+      inProgress: 0,
+      waitingForTradingPartner: 0,
+      delivered: 0,
+    })
+    expect(result.throughput.every(({ delivered, failed }) => delivered + failed === 0)).toBe(true)
+    expect(result.tradingPartners).toEqual([
+      {
+        tradingPartner: { id: workspace.tradingPartnerId, name: 'Hanse Retail' },
+        testMode: false,
+        documentsToday: 0,
+        openProblems: 0,
+      },
+    ])
+  })
+
   it('answers 400 for an unknown window', async () => {
     const response = await api.admin.inject({
       method: homeEndpoint.method,
