@@ -44,6 +44,7 @@ import {
 } from './index'
 import { Documents } from './services'
 import {
+  addContrlFlow,
   addOrdersFlow,
   deliverOverSftp,
   golden,
@@ -2629,5 +2630,190 @@ describe('the Retry of a Run', () => {
     expect(erp.received).toMatchObject([
       { headers: { 'content-type': 'application/json' }, body: document },
     ])
+  })
+})
+
+describe('the Acknowledgement of a sent Interchange', () => {
+  const partnerGln = '4071615111110'
+
+  const workspaceGln = '4389876511113'
+
+  // Each CONTRL gets its own Interchange control reference, so none is a Duplicate.
+  const contrlOf = (
+    controlReference: string,
+    action: string,
+    { sender = partnerGln, messages = '' }: { sender?: string; messages?: string } = {},
+  ) => {
+    const own = randomUUID().slice(0, 8)
+    const segments = `UCI+${controlReference}+${workspaceGln}:14+${partnerGln}:14+${action}'${messages}`
+    const segmentCount = segments.split("'").length + 1
+
+    return (
+      `UNB+UNOC:3+${sender}:14+${workspaceGln}:14+261020:0800+${own}'` +
+      `UNH+1+CONTRL:D:3:UN:EAN002'${segments}UNT+${String(segmentCount)}+1'UNZ+1+${own}'`
+    )
+  }
+
+  const acknowledgingWorkspace = async (name: string) => {
+    const into = await seedInvoiceWorkspace(connection.db, name)
+
+    await connection.db
+      .update(channels)
+      .set({ url: erp.url })
+      .where(eq(channels.id, into.outboundChannelId))
+    await addContrlFlow(connection.db, into, { url: erp.url })
+
+    return into
+  }
+
+  const sendInvoice = async (into: InvoiceWorkspace) => {
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), into)
+
+    await processQueued(queue, deliveryByChannelType)
+
+    return readRun(connection.db, runId)
+  }
+
+  const receiveContrl = async (into: InvoiceWorkspace, content: string) => {
+    const queue = inMemoryRunQueue()
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: into.id,
+        channelId: into.inboundChannelId,
+        fileName: 'contrl.edi',
+        content,
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, queue)),
+    )
+
+    await processQueued(queue, deliveryByChannelType)
+
+    return readRun(connection.db, receipt.runs[0]?.id ?? '')
+  }
+
+  it('awaits the Acknowledgement of an Interchange once the Channel took it', async () => {
+    const into = await acknowledgingWorkspace('Pending Foods')
+
+    await expect(sendInvoice(into)).resolves.toMatchObject({
+      status: 'delivered',
+      acknowledgementState: 'pending',
+    })
+  })
+
+  it('awaits no Acknowledgement of an Interchange the Channel did not take', async () => {
+    const into = await acknowledgingWorkspace('Unreachable Foods')
+
+    await connection.db
+      .update(channels)
+      .set({ url: `${erp.url}?status=503` })
+      .where(eq(channels.id, into.outboundChannelId))
+
+    await expect(sendInvoice(into)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      acknowledgementState: null,
+    })
+  })
+
+  it.each([
+    ['accepted', 'the action 7', '7', ''],
+    ['accepted', 'the action 8', '8', ''],
+    ['rejected', 'the action 4', '4', ''],
+    ['rejected', 'the action 6', '6', ''],
+    ['rejected', 'the action 7 with a rejected Message', '7', "UCM+1+INVOIC:D:96A:UN:EAN008+4'"],
+  ])(
+    'marks the sent Interchange %s by a CONTRL with %s and delivers the CONTRL',
+    async (status, _case, action, messages) => {
+      const into = await acknowledgingWorkspace(`Acknowledged Foods ${action} ${messages}`)
+      const sent = await sendInvoice(into)
+
+      const contrl = await receiveContrl(
+        into,
+        contrlOf(String(sent?.controlReference), action, { messages }),
+      )
+
+      expect(contrl).toMatchObject({ status: 'delivered', acknowledgementState: null })
+      await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+        status: 'delivered',
+        acknowledgementState: status,
+      })
+    },
+  )
+
+  it('accepts an overdue Interchange by a late CONTRL', async () => {
+    const into = await acknowledgingWorkspace('Late Foods')
+    const sent = await sendInvoice(into)
+
+    await connection.db
+      .update(runs)
+      .set({ acknowledgementState: 'overdue' })
+      .where(eq(runs.id, sent?.id ?? ''))
+
+    await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
+
+    await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+      acknowledgementState: 'accepted',
+    })
+  })
+
+  it('accepts an Interchange by a CONTRL with a zero-padded control reference', async () => {
+    const into = await acknowledgingWorkspace('Padded Foods')
+    const sent = await sendInvoice(into)
+
+    await receiveContrl(into, contrlOf(String(sent?.controlReference).padStart(5, '0'), '7'))
+
+    await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+      acknowledgementState: 'accepted',
+    })
+  })
+
+  it('keeps the first Acknowledgement of an Interchange', async () => {
+    const into = await acknowledgingWorkspace('Settled Foods')
+    const sent = await sendInvoice(into)
+
+    await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
+    await receiveContrl(into, contrlOf(String(sent?.controlReference), '4'))
+
+    await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+      acknowledgementState: 'accepted',
+    })
+  })
+
+  it.each([
+    ['another control reference', (reference: number) => contrlOf(String(reference + 1), '7')],
+    ['a control reference that is no number', () => contrlOf('CTL1', '7')],
+    [
+      'another sender',
+      (reference: number) => contrlOf(String(reference), '7', { sender: '4012345000016' }),
+    ],
+  ])('changes nothing for a CONTRL of %s and delivers it', async (_case, contrlFor) => {
+    const into = await acknowledgingWorkspace(`Unmatched Foods ${_case}`)
+    const sent = await sendInvoice(into)
+
+    const contrl = await receiveContrl(into, contrlFor(sent?.controlReference ?? 0))
+
+    expect(contrl).toMatchObject({ status: 'delivered' })
+    await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+      acknowledgementState: 'pending',
+    })
+  })
+
+  it('matches only an Interchange of its own Workspace', async () => {
+    const into = await acknowledgingWorkspace('Own Foods')
+    const other = await acknowledgingWorkspace('Other Foods')
+    const sent = await sendInvoice(into)
+    const elsewhere = await sendInvoice(other)
+
+    expect(elsewhere?.controlReference).toBe(sent?.controlReference)
+
+    await receiveContrl(other, contrlOf(String(elsewhere?.controlReference), '4'))
+
+    await expect(readRun(connection.db, sent?.id ?? '')).resolves.toMatchObject({
+      acknowledgementState: 'pending',
+    })
+    await expect(readRun(connection.db, elsewhere?.id ?? '')).resolves.toMatchObject({
+      acknowledgementState: 'rejected',
+    })
   })
 })

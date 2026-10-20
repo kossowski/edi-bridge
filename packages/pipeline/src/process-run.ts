@@ -4,6 +4,7 @@ import { Data, DateTime, Effect, Match, Predicate, Ref, Result } from 'effect'
 import { z } from 'zod'
 
 import {
+  type AcknowledgementState,
   type ChannelTestFailureReason,
   type CharacterSet,
   type Direction,
@@ -40,11 +41,14 @@ import {
 } from '@edi-bridge/db'
 import {
   type Interchange,
+  type InterchangeAction,
   isBrokenMessage,
   type Message,
   type ParsedInterchange,
   parseMessages,
   type Position,
+  readAcknowledgedInterchange,
+  ReadAcknowledgementError,
   type Segment,
   serialize,
   validate,
@@ -549,6 +553,7 @@ const handOver = (
   lease: StepLease,
   channel: Destination['channel'],
   document: OutboundDocument,
+  acknowledgementState?: 'pending',
 ) =>
   Effect.gen(function* () {
     if (run.handedOverAt !== null) {
@@ -567,7 +572,9 @@ const handOver = (
     const handedOverAt = yield* DateTime.nowAsDate
 
     // Recorded even when the sweep failed the Run meanwhile, so its Retry does not hand it over again.
-    yield* Effect.promise(() => db.update(runs).set({ handedOverAt }).where(eq(runs.id, run.id)))
+    yield* Effect.promise(() =>
+      db.update(runs).set({ acknowledgementState, handedOverAt }).where(eq(runs.id, run.id)),
+    )
   })
 
 const segmentSchema = z.object({ tag: z.string(), elements: z.array(z.array(z.string())) })
@@ -648,12 +655,18 @@ const deliverInterchange =
           : yield* buildInterchange(queued, run, lease, destination)
 
       // The name carries the control reference, so a Retry uploads under the name of its first attempt.
-      yield* handOver(run, lease, destination.channel, {
-        name: `${messageType}-${String(reference)}.edi`,
-        content,
-        mediaType: 'application/edifact',
-        isRetry,
-      })
+      yield* handOver(
+        run,
+        lease,
+        destination.channel,
+        {
+          name: `${messageType}-${String(reference)}.edi`,
+          content,
+          mediaType: 'application/edifact',
+          isRetry,
+        },
+        'pending',
+      )
     })
 
 const documentFormats = {
@@ -1308,6 +1321,70 @@ const validatedInbound = ({ interchange, message }: ReadMessage) =>
     },
   })
 
+const acknowledgementStatesByAction = {
+  accepted: 'accepted',
+  received: 'accepted',
+  rejected: 'rejected',
+} as const satisfies Record<InterchangeAction, AcknowledgementState>
+
+const acknowledgementIn = ({ interchange, message }: ReadMessage) => {
+  const sender = interchange.header.elements[1]?.[0]
+
+  if (sender === undefined || message.header.elements[1]?.[0] !== 'CONTRL') {
+    return undefined
+  }
+
+  try {
+    const { controlReference, action } = readAcknowledgedInterchange(message)
+
+    if (!/^0*[1-9]\d{0,8}$/.test(controlReference)) {
+      // This Workspace sends positive integers only, so the CONTRL acknowledges nothing and its Run goes on.
+      return undefined
+    }
+
+    return {
+      sender,
+      controlReference: Number(controlReference),
+      state: acknowledgementStatesByAction[action],
+    }
+  } catch (error) {
+    if (error instanceof ReadAcknowledgementError) {
+      return undefined
+    }
+
+    throw error
+  }
+}
+
+type Acknowledgement = NonNullable<ReturnType<typeof acknowledgementIn>>
+
+const acknowledge = async (
+  tx: Transaction,
+  workspaceId: string,
+  { sender, controlReference, state }: Acknowledgement,
+) => {
+  await tx
+    .update(runs)
+    .set({ acknowledgementState: state })
+    .where(
+      and(
+        eq(runs.workspaceId, workspaceId),
+        eq(runs.controlReference, controlReference),
+        // A late CONTRL still resolves an overdue Interchange, but the first Acknowledgement stays.
+        inArray(runs.acknowledgementState, ['pending', 'overdue']),
+        inArray(
+          runs.tradingPartnerId,
+          tx
+            .select({ id: tradingPartners.id })
+            .from(tradingPartners)
+            .where(
+              and(eq(tradingPartners.workspaceId, workspaceId), eq(tradingPartners.gln, sender)),
+            ),
+        ),
+      ),
+    )
+}
+
 const documentNumberOf = ({ segments }: Message) =>
   segments.find(({ tag }) => tag === 'BGM')?.elements[1]?.[0] ?? null
 
@@ -1339,7 +1416,19 @@ const processInbound = ({
     }
 
     const { message } = read.success
-    const checked = yield* step(holding, 'validation', () => validatedInbound(read.success))
+    const acknowledgement = acknowledgementIn(read.success)
+
+    const checked = yield* step(
+      holding,
+      'validation',
+      () => validatedInbound(read.success),
+      async (tx) => {
+        // An invalid CONTRL acknowledges nothing.
+        if (acknowledgement !== undefined) {
+          await acknowledge(tx, queued.workspaceId, acknowledgement)
+        }
+      },
+    )
 
     if (Result.isFailure(checked)) {
       return yield* fail(

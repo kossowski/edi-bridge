@@ -416,6 +416,92 @@ export async function addOrdersFlow(
   }
 }
 
+const acknowledgementDocument = JSON.stringify({ interchangeReference: 'CTL1', action: '7' })
+
+export async function addContrlFlow(db: Db, workspace: InvoiceWorkspace, { url }: { url: string }) {
+  const structure = inferDocumentStructure({
+    kind: 'jsonDocument',
+    document: toEncodedFile('acknowledgement.json', acknowledgementDocument),
+  })
+
+  if (structure.format !== 'json') {
+    throw new Error('The acknowledgement Document is not JSON')
+  }
+
+  const documentStructure = one(
+    await db
+      .insert(documentStructures)
+      .values({
+        workspaceId: workspace.id,
+        name: 'ERP acknowledgement',
+        format: 'json',
+        jsonRoot: structure.root,
+        children: structure.children,
+      })
+      .returning(),
+  )
+
+  const graph = {
+    links: [
+      { sourcePath: 'UCI/0020', targetPath: 'interchangeReference' },
+      { sourcePath: 'UCI/0083', targetPath: 'action' },
+    ],
+    transforms: [],
+    transformLinks: [],
+  }
+
+  const mapping = one(
+    await db
+      .insert(mappings)
+      .values({
+        workspaceId: workspace.id,
+        documentStructureId: documentStructure.id,
+        messageType: 'CONTRL',
+        name: 'CONTRL to ERP acknowledgement',
+        draft: graph,
+        unpublishedChanges: false,
+      })
+      .returning(),
+  )
+
+  const pinned = one(
+    await db
+      .insert(mappingVersions)
+      .values({ mappingId: mapping.id, version: 1, graph, publishedBy: workspace.userId })
+      .returning(),
+  )
+
+  const erp = one(
+    await db
+      .insert(channels)
+      .values({
+        workspaceId: workspace.id,
+        type: 'http',
+        direction: 'outbound',
+        name: 'ERP acknowledgement import',
+        url,
+      })
+      .returning(),
+  )
+
+  const flow = one(
+    await db
+      .insert(flows)
+      .values({
+        workspaceId: workspace.id,
+        tradingPartnerId: workspace.tradingPartnerId,
+        messageType: 'CONTRL',
+        name: 'Acknowledgements from Hanse Retail',
+        inboundChannelId: workspace.inboundChannelId,
+        destinationChannelId: erp.id,
+        mappingVersionId: pinned.id,
+      })
+      .returning(),
+  )
+
+  return { flowId: flow.id, erpChannelId: erp.id }
+}
+
 export async function deliverOverSftp(
   db: Db,
   workspace: InvoiceWorkspace,
