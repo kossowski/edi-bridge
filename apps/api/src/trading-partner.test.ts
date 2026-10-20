@@ -9,12 +9,13 @@ import {
   tradingPartnerEndpoint,
   tradingPartnerSchema,
   tradingPartnersEndpoint,
+  switchToProductionEndpoint,
   updateTradingPartnerEndpoint,
   withCheckDigit,
 } from '@edi-bridge/contracts'
-import { type Connection, tradingPartners } from '@edi-bridge/db'
+import { type Connection, tradingPartners, workspaces } from '@edi-bridge/db'
 
-import { type Client, startTestApi, type TestApi } from './testing.js'
+import { type Client, ownWorkspace, startTestApi, type TestApi } from './testing.js'
 
 type TradingPartnerBody = Omit<
   TradingPartnerInput,
@@ -390,5 +391,126 @@ describe('GET /trading-partners/:id/activity', () => {
     const response = await getActivity(created.id, otherAdmin)
 
     expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('POST /trading-partners/:id/production', () => {
+  const switchToProduction = (id: string, target = admin) =>
+    target.inject({ method: 'POST', url: switchToProductionEndpoint.path.replace(':id', id) })
+
+  type Onboarding = Pick<
+    typeof tradingPartners.$inferInsert,
+    'testInterchangeSentAt' | 'contrlReceivedAt'
+  >
+
+  const onboarded: Onboarding = {
+    testInterchangeSentAt: new Date('2026-10-06T14:03:00.000Z'),
+    contrlReceivedAt: new Date('2026-10-06T14:05:00.000Z'),
+  }
+
+  const setOnboarding = (id: string, onboarding: Onboarding) =>
+    connection.db.update(tradingPartners).set(onboarding).where(eq(tradingPartners.id, id))
+
+  const setWorkspaceGln = (gln: string | null) =>
+    connection.db.update(workspaces).set({ gln }).where(eq(workspaces.id, ownWorkspace.id))
+
+  beforeEach(async () => {
+    await setWorkspaceGln(withCheckDigit('400000000099'))
+  })
+
+  afterEach(async () => {
+    await setWorkspaceGln(null)
+  })
+
+  it('takes a Trading Partner out of Test Mode once its onboarding is complete', async () => {
+    const created = await postedTradingPartner(hansemarkt)
+    await setOnboarding(created.id, onboarded)
+
+    const response = await switchToProduction(created.id)
+
+    const expected = {
+      ...created,
+      testMode: false,
+      onboarding: {
+        testInterchangeSentAt: '2026-10-06T14:03:00.000Z',
+        contrlReceivedAt: '2026-10-06T14:05:00.000Z',
+      },
+    }
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual(expected)
+
+    const read = await get(created.id)
+
+    expect(read.json()).toEqual(expected)
+  })
+
+  it.each([
+    ['no test Interchange was sent', { testInterchangeSentAt: null, contrlReceivedAt: null }],
+    ['no CONTRL was received', { contrlReceivedAt: null }],
+  ])('answers 409 while %s', async (_case, missing) => {
+    const created = await postedTradingPartner(hansemarkt)
+    await setOnboarding(created.id, { ...onboarded, ...missing })
+    const before = (await get(created.id)).json()
+
+    const response = await switchToProduction(created.id)
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ message: 'Onboarding is not complete' })
+
+    const read = await get(created.id)
+
+    expect(read.json()).toEqual(before)
+  })
+
+  it('answers 409 while the Trading Partner has no GLN', async () => {
+    const created = await postedTradingPartner({ ...hansemarkt, gln: null })
+    await setOnboarding(created.id, onboarded)
+
+    const response = await switchToProduction(created.id)
+
+    expect(response.statusCode).toBe(409)
+    expect((await get(created.id)).json()).toMatchObject({ testMode: true })
+  })
+
+  it('answers 409 while the Workspace has no GLN', async () => {
+    await setWorkspaceGln(null)
+    const created = await postedTradingPartner(hansemarkt)
+    await setOnboarding(created.id, onboarded)
+
+    const response = await switchToProduction(created.id)
+
+    expect(response.statusCode).toBe(409)
+    expect((await get(created.id)).json()).toMatchObject({ testMode: true })
+  })
+
+  it('answers 409 for a Trading Partner already in production', async () => {
+    const created = await postedTradingPartner(hansemarkt)
+    await setOnboarding(created.id, onboarded)
+    await switchToProduction(created.id)
+
+    const response = await switchToProduction(created.id)
+
+    expect(response.statusCode).toBe(409)
+  })
+
+  it.each([
+    ['an unknown id', unknownId],
+    ['an id that is no uuid', 'hansemarkt'],
+  ])('answers 404 for %s', async (_case, id) => {
+    const response = await switchToProduction(id)
+
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ message: 'Not found' })
+  })
+
+  it('answers 404 for a Trading Partner of another Workspace', async () => {
+    const created = await postedTradingPartner(hansemarkt, otherAdmin)
+    await setOnboarding(created.id, onboarded)
+
+    const response = await switchToProduction(created.id)
+
+    expect(response.statusCode).toBe(404)
+    expect((await get(created.id, otherAdmin)).json()).toMatchObject({ testMode: true })
   })
 })

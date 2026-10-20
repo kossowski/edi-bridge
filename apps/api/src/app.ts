@@ -76,6 +76,7 @@ import {
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
   tradingPartnersEndpoint,
+  switchToProductionEndpoint,
   updateLookupTableEndpoint,
   updateCompanyIdentityEndpoint,
   updateOperatorWorkspaceSettingsEndpoint,
@@ -170,6 +171,7 @@ import {
   listTradingPartners,
   loadTradingPartner,
   loadTradingPartnerActivity,
+  switchToProduction,
   updateTradingPartner,
 } from './trading-partner.js'
 import { WebhookRateLimit, type WebhookRateLimiter } from './webhook-rate-limit.js'
@@ -514,6 +516,10 @@ function registerRoutes(
         parse(updateTradingPartnerEndpoint.body, request.body),
       ),
     ),
+  )
+
+  app.post<{ Params: { id: string } }>(switchToProductionEndpoint.path, (request, reply) =>
+    respond(request, reply, switchToProduction(request.params.id)),
   )
 
   app.get(channelsEndpoint.path, (request, reply) => respond(request, reply, listChannels))
