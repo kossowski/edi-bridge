@@ -24,6 +24,7 @@ type Reprocessable = {
   direction: Direction
   problem: { reason: ProblemReason } | null
   mappingVersionId: string | null
+  documentDeletedAt?: Date | string | null
 }
 
 // The Trading Partner fixes its Document by a resend, and a delivery failure by a Retry.
@@ -35,6 +36,7 @@ export const isReprocessable = <R extends Reprocessable>(
   run.failureStage !== 'delivery' &&
   run.problem !== null &&
   run.mappingVersionId !== null &&
+  (run.documentDeletedAt ?? null) === null &&
   whoFixes({
     failureStage: run.failureStage,
     direction: run.direction,
@@ -73,7 +75,9 @@ export const reprocessRun = ({ workspaceId, runId, mappingVersionId }: Reprocess
             .where(eq(runs.replacesRunId, run.id))
 
           if (replacing !== undefined || !isReprocessable(run)) {
-            return Effect.fail(new RunNotReprocessable({ runId }))
+            return Effect.fail(
+              new RunNotReprocessable({ runId, documentExpired: run.documentDeletedAt !== null }),
+            )
           }
 
           const [chosen] = await tx

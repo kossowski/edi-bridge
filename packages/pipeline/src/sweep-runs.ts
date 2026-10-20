@@ -1,6 +1,7 @@
 import { type Duration, Effect, Schedule } from 'effect'
 
 import { sendAcknowledgements } from './acknowledgement'
+import { deleteExpiredDocuments } from './delete-expired-documents'
 import { markOverdueInterchanges } from './mark-overdue-interchanges'
 import { queueReceivedRuns } from './queue-received-runs'
 import { sweepStuckRuns } from './sweep-stuck-runs'
@@ -27,6 +28,9 @@ export const sweepRunsEvery = ({
       // A CONTRL attempt older than the bound of a stuck Run was cut off or failed.
       sendAcknowledgements(stuckAfter).pipe(
         Effect.catchCause((cause) => Effect.logError('CONTRLs not sent', cause)),
+      ),
+      deleteExpiredDocuments.pipe(
+        Effect.catchCause((cause) => Effect.logError('Expired Documents not deleted', cause)),
       ),
     ],
     { discard: true },

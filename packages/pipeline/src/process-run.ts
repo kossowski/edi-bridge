@@ -1474,11 +1474,22 @@ const processClaimed = (
       return
     }
 
+    const { documentId } = run
+
+    // Unreachable but by a race: the deletion of expired Documents keeps the Document of a Run in flight.
+    if (documentId === null) {
+      if (!(yield* failHeldOnDefect(holding))) {
+        return yield* new RunNotOwned({ runId: run.id })
+      }
+
+      return yield* Effect.logError(`The Document of Run ${run.id} expired before it was processed`)
+    }
+
     const documents = yield* Documents
-    const document = yield* Effect.promise(() => documents.read(queued.workspaceId, run.documentId))
+    const document = yield* Effect.promise(() => documents.read(queued.workspaceId, documentId))
 
     if (document === undefined) {
-      return yield* Effect.die(new Error(`Document ${run.documentId} of Run ${run.id} is missing`))
+      return yield* Effect.die(new Error(`Document ${documentId} of Run ${run.id} is missing`))
     }
 
     const lookupTables = yield* loadLookupTables(queued.workspaceId, pinned.graph)

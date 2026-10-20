@@ -68,6 +68,11 @@ _Avoid_: Mock, faker, generator
 A single business payload received or sent on a Channel, in any format (JSON, CSV, EDIFACT).
 _Avoid_: File, payload, record
 
+**Retention period**:
+How long a Workspace keeps a raw Document, set per Workspace by the Operator between 7 and 730 days, 90 by default. Once it ends, the Document expires and is deleted while its Runs stay; a Run whose Document expired cannot be Reprocessed, and Duplicates are only recognised within the retention period.
+_Avoid_: Retention time, storage period, TTL
+_On screen_: Keep documents for (DE: Belege aufbewahren)
+
 **Interchange**:
 One EDIFACT transmission from a sender to a receiver, enclosed in a UNB…UNZ envelope and containing one or more Messages.
 _Avoid_: EDI file, batch
@@ -176,7 +181,7 @@ _Avoid_: Job, transmission, execution
 _On screen_: Document (DE: Beleg)
 
 **Duplicate**:
-A Document received again: an Interchange with the same sender and Interchange control reference as an earlier one in the Workspace, or a file polled from an SFTP Channel with the same Channel, file name and content hash as an earlier one.
+A Document received again: an Interchange with the same sender and Interchange control reference as an earlier one in the Workspace, or a file polled from an SFTP Channel with the same Channel, file name and content hash as an earlier one. Only an earlier Document within the Workspace's retention period counts, since an expired Document takes its keys with it.
 _Avoid_: Resend, double, repeat
 _On screen_: Duplicate (DE: Duplikat)
 

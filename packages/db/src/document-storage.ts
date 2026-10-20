@@ -7,7 +7,12 @@ import type { Connection } from './client.js'
 export type RawDocument = typeof documents.$inferSelect
 
 export type NewDocument = Pick<RawDocument, 'workspaceId' | 'channelId' | 'fileName' | 'content'> &
-  Partial<Pick<RawDocument, 'interchangeSender' | 'interchangeControlReference' | 'contentHash'>>
+  Partial<
+    Pick<
+      RawDocument,
+      'interchangeSender' | 'interchangeControlReference' | 'contentHash' | 'receivedAt'
+    >
+  >
 
 export interface DocumentStorage {
   store(document: NewDocument): Promise<RawDocument>
