@@ -1341,6 +1341,9 @@ type Processing = {
   tradingPartner: TradingPartner
 }
 
+// What a Run stores of its built Message: its references and the Message as the delivery input.
+const builtOf = (message: Message) => ({ ...referencesOf(message), deliveryInput: message })
+
 const processOutbound = ({ holding, queued, run, document, pinned, lookupTables }: Processing) =>
   Effect.gen(function* () {
     const mapped = yield* step(
@@ -1357,12 +1360,10 @@ const processOutbound = ({ holding, queued, run, document, pinned, lookupTables 
             ),
           ),
         ),
-      // The built Message is kept even when validation fails, so Run detail can point into it.
+      // The built Message is kept even when validation fails,
+      // so the failing segment position can point into it.
       async (tx, { message }) => {
-        await tx
-          .update(runs)
-          .set({ ...referencesOf(message), deliveryInput: message })
-          .where(eq(runs.id, run.id))
+        await tx.update(runs).set(builtOf(message)).where(eq(runs.id, run.id))
       },
     )
 
@@ -1373,11 +1374,7 @@ const processOutbound = ({ holding, queued, run, document, pinned, lookupTables 
     const { message } = mapped.success
     const destination = yield* loadDestination(queued)
 
-    const delivering = {
-      ...run,
-      ...referencesOf(message),
-      deliveryInput: message,
-    }
+    const delivering = { ...run, ...builtOf(message) }
 
     const checked = yield* step(holding, 'validation', () =>
       validated(message, destination.tradingPartner.characterSet),

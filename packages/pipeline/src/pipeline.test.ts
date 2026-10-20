@@ -645,6 +645,20 @@ const parsedInvoice: unknown = JSON.parse(goldenInvoice)
 
 const invoiceDocument = z.looseObject({ lines: z.array(z.looseObject({})) }).parse(parsedInvoice)
 
+// An INVOIC whose BGM document number is longer than the element allows, so validation fails.
+const tooLongInvoiceNumber = JSON.stringify({
+  ...invoiceDocument,
+  invoiceNumber: 'INV-'.repeat(10),
+})
+
+// The stored Message with its UNH, so a segment position counted from UNH as 1 indexes it.
+const storedSegments = z
+  .object({
+    header: z.looseObject({ tag: z.string() }),
+    segments: z.array(z.looseObject({ tag: z.string() })),
+  })
+  .transform(({ header, segments }) => [header, ...segments])
+
 describe('the sweep of received Runs', () => {
   const sweep = async (
     queue: ReturnType<typeof inMemoryRunQueue>,
@@ -1734,11 +1748,6 @@ describe('the processing of a Run', () => {
   })
 
   it('stops a Run with an invalid INVOIC at validation and keeps its built Message', async () => {
-    const tooLongInvoiceNumber = JSON.stringify({
-      ...invoiceDocument,
-      invoiceNumber: 'INV-'.repeat(10),
-    })
-
     const { queue, runId } = await receiveInvoice(tooLongInvoiceNumber)
 
     await processQueued(queue)
@@ -1752,9 +1761,6 @@ describe('the processing of a Run', () => {
       output: null,
       businessReference: '4711',
       documentNumber: 'INV-'.repeat(10),
-      deliveryInput: {
-        segments: expect.arrayContaining([expect.objectContaining({ tag: 'BGM' })]),
-      },
       error: {
         code: 'too-long-element',
         position: { segment: 2, tag: 'BGM', element: 2, component: null },
@@ -1776,6 +1782,12 @@ describe('the processing of a Run', () => {
       ],
     })
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation'])
+
+    const position = run?.error?.position
+    assert(position)
+    expect(storedSegments.parse(run?.deliveryInput)[position.segment - 1]).toMatchObject({
+      tag: 'BGM',
+    })
   })
 
   it('stops a Run whose code is missing from a Lookup Table at mapping and names the code to add', async () => {
@@ -3138,11 +3150,6 @@ describe('the Retry of a Run', () => {
   })
 
   it('refuses a Run that failed at validation although it kept its built Message', async () => {
-    const tooLongInvoiceNumber = JSON.stringify({
-      ...invoiceDocument,
-      invoiceNumber: 'INV-'.repeat(10),
-    })
-
     const { queue, runId } = await receiveInvoice(tooLongInvoiceNumber)
 
     await processQueued(queue)
