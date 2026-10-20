@@ -1,3 +1,4 @@
+import { onlyDocumentStructureId } from '@/lib/document-structures'
 import {
   type ChannelSummary,
   type Direction,
@@ -25,6 +26,7 @@ export type LeftReason =
   | 'noOwnConnection'
   | 'severalOwnConnections'
   | 'mappingDraft'
+  | 'mappingToCreate'
   | 'mappingLater'
 
 export type PlannedRoute<Channel extends PlanChannel> = {
@@ -42,16 +44,16 @@ export type PlannedDocument<Channel extends PlanChannel> = { messageType: Wizard
 
 export type PlannedMappingDraft = { messageType: WizardDocument; documentStructureId: string }
 
-export type SkippedMappingDraft = {
-  messageType: WizardDocument
+export type SkippedMappingDrafts = {
   reason: 'noDocumentStructure' | 'severalDocumentStructures'
+  messageTypes: WizardDocument[]
 }
 
 export type SetupPlan<Channel extends PlanChannel> = {
   partner: WizardResult['partner']
   connections: PlannedConnection[]
   mappingDrafts: PlannedMappingDraft[]
-  skippedMappingDrafts: SkippedMappingDraft[]
+  skippedMappingDrafts: SkippedMappingDrafts | null
   documents: PlannedDocument<Channel>[]
 }
 
@@ -92,7 +94,7 @@ function plannedDocument<Channel extends PlanChannel>(
   messageType: WizardDocument,
   result: WizardResult,
   connections: ReadonlyArray<PlannedConnection>,
-  { channels, mappingVersions, names }: SetupContext<Channel>,
+  { channels, mappingVersions, documentStructures, names }: SetupContext<Channel>,
 ): PlannedDocument<Channel> {
   const direction = directionOf({ messageType })
   const own = ownConnections(channels, messageType)
@@ -118,7 +120,9 @@ function plannedDocument<Channel extends PlanChannel>(
   }
 
   if (mapping?.way === 'ai') {
-    reasons.push('mappingDraft')
+    reasons.push(
+      onlyDocumentStructureId(documentStructures) === null ? 'mappingToCreate' : 'mappingDraft',
+    )
   } else if (mappingVersion === undefined) {
     reasons.push('mappingLater')
   }
@@ -146,8 +150,6 @@ function plannedDocument<Channel extends PlanChannel>(
   }
 }
 
-// A Mapping Draft names its Document Structure; the wizard picks one only when the Workspace has
-// exactly one, and leaves the choice to the create step otherwise.
 function plannedMappingDrafts(
   result: WizardResult,
   documentStructures: SetupContext<PlanChannel>['documentStructures'],
@@ -156,20 +158,25 @@ function plannedMappingDrafts(
     (messageType) => result.mappings[messageType]?.way === 'ai',
   )
 
-  const [only, ...others] = documentStructures
+  const documentStructureId = onlyDocumentStructureId(documentStructures)
 
-  if (only !== undefined && others.length === 0) {
+  if (drafts.length === 0) {
+    return { mappingDrafts: [], skippedMappingDrafts: null }
+  }
+
+  if (documentStructureId !== null) {
     return {
-      mappingDrafts: drafts.map((messageType) => ({ messageType, documentStructureId: only.id })),
-      skippedMappingDrafts: [],
+      mappingDrafts: drafts.map((messageType) => ({ messageType, documentStructureId })),
+      skippedMappingDrafts: null,
     }
   }
 
-  const reason = only === undefined ? 'noDocumentStructure' : 'severalDocumentStructures'
-
   return {
     mappingDrafts: [],
-    skippedMappingDrafts: drafts.map((messageType) => ({ messageType, reason })),
+    skippedMappingDrafts: {
+      reason: documentStructures.length === 0 ? 'noDocumentStructure' : 'severalDocumentStructures',
+      messageTypes: drafts,
+    },
   }
 }
 

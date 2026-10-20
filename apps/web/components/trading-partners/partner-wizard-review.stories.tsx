@@ -169,6 +169,12 @@ export const AiDraftsWithSeveralDocumentStructures = meta.story({
       ),
     ).toHaveLength(2)
     await expect(mappings.queryByText(aiDraftDetail)).toBeNull()
+
+    const routes = section(canvas, 'Document routes')
+    await expect(
+      routes.getAllByText('The route follows once the mapping is created and published.'),
+    ).toHaveLength(2)
+    await expect(routes.queryByText(/AI draft is published/)).toBeNull()
   },
 })
 
@@ -333,6 +339,37 @@ export const German = meta.story({
     await expect(canvas.getByText('Im Testbetrieb angelegt')).toBeVisible()
     await expect(
       canvas.getByRole('button', { name: 'Partner im Testbetrieb anlegen' }),
+    ).toBeVisible()
+  },
+})
+
+export const GermanAiDraftsWithoutDocumentStructure = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [] }))
+  },
+  async play({ canvas }) {
+    await userEvent.type(canvas.getByLabelText('Firmenname'), wizardPartner)
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'Ich trage sie später ein' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await canvas.findByRole('checkbox', { name: /Rechnungen senden/ }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await canvas.findByRole('radio', { name: /Wir fragen den Partner/ }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await canvas.findByRole('radio', { name: /Von der KI entwerfen lassen/ }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Weiter' }))
+
+    const mappings = await findSection(canvas, 'Mappings')
+    await expect(mappings.getByText('Neues Mapping für Rechnungen')).toBeVisible()
+    await expect(
+      mappings.getByText(
+        'Wird hier nicht angelegt: Fügen Sie zuerst Ihr Datenformat hinzu und legen Sie das Mapping dann unter Mappings an.',
+      ),
+    ).toBeVisible()
+    await expect(
+      section(canvas, 'Belegwege').getByText(
+        /Der Belegweg folgt, sobald das Mapping angelegt und veröffentlicht ist\.$/,
+      ),
     ).toBeVisible()
   },
 })

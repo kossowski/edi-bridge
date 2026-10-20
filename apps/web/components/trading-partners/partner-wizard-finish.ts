@@ -21,7 +21,7 @@ import {
   type PlannedConnection,
   type PlannedRoute,
   type SetupPlan,
-  type SkippedMappingDraft,
+  type SkippedMappingDrafts,
 } from './partner-setup-plan'
 import { type WizardDocument } from './partner-wizard-state'
 import { defaultCharacterSet } from './trading-partner-form-values'
@@ -212,7 +212,7 @@ export type SetupSummary = {
   name: string
   webhook: CreatedWebhook | null
   mappingDrafts: Array<{ messageType: WizardDocument; mapping: MappingSummary }>
-  skippedMappingDrafts: SkippedMappingDraft[]
+  skippedMappingDrafts: SkippedMappingDrafts | null
   left: LeftOver
   later: ForLater
 }

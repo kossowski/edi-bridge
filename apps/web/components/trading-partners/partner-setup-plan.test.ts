@@ -150,7 +150,7 @@ describe('setupPlan', () => {
     )
 
     expect(plan.mappingDrafts).toEqual([{ messageType: 'INVOIC', documentStructureId: 'erp-json' }])
-    expect(plan.skippedMappingDrafts).toEqual([])
+    expect(plan.skippedMappingDrafts).toBeNull()
     expect(plan.documents[1]).toEqual({ messageType: 'INVOIC', reasons: ['mappingDraft'] })
   })
 
@@ -163,10 +163,10 @@ describe('setupPlan', () => {
     const none = setupPlan(drafts, { ...context, documentStructures: [] })
 
     expect(none.mappingDrafts).toEqual([])
-    expect(none.skippedMappingDrafts).toEqual([
-      { messageType: 'ORDERS', reason: 'noDocumentStructure' },
-      { messageType: 'INVOIC', reason: 'noDocumentStructure' },
-    ])
+    expect(none.skippedMappingDrafts).toEqual({
+      reason: 'noDocumentStructure',
+      messageTypes: ['ORDERS', 'INVOIC'],
+    })
 
     const several = setupPlan(drafts, {
       ...context,
@@ -174,13 +174,13 @@ describe('setupPlan', () => {
     })
 
     expect(several.mappingDrafts).toEqual([])
-    expect(several.skippedMappingDrafts).toEqual([
-      { messageType: 'ORDERS', reason: 'severalDocumentStructures' },
-      { messageType: 'INVOIC', reason: 'severalDocumentStructures' },
-    ])
+    expect(several.skippedMappingDrafts).toEqual({
+      reason: 'severalDocumentStructures',
+      messageTypes: ['ORDERS', 'INVOIC'],
+    })
     expect(several.documents.map((document) => 'reasons' in document && document.reasons)).toEqual([
-      ['mappingDraft'],
-      ['mappingDraft'],
+      ['mappingToCreate'],
+      ['mappingToCreate'],
     ])
   })
 

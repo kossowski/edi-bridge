@@ -9,7 +9,7 @@ import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { WebhookTokenReveal } from '@/components/channels/webhook-token'
 import { CopyableValue } from '@/components/copy-button'
 import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
-import { type SkippedMappingDraft } from '@/components/trading-partners/partner-setup-plan'
+import { type SkippedMappingDrafts } from '@/components/trading-partners/partner-setup-plan'
 import {
   nothingForLater,
   nothingLeft,
@@ -32,20 +32,19 @@ function NoticeSection({ title, children }: { title: string; children: ReactNode
   )
 }
 
-function SkippedMappingDrafts({ skipped }: { skipped: ReadonlyArray<SkippedMappingDraft> }) {
+function MappingsToCreate({ skipped }: { skipped: SkippedMappingDrafts | null }) {
   const t = useTranslations('TradingPartner.created.skipped')
   const tWizard = useTranslations('PartnerWizard')
-  const [first] = skipped
 
-  if (first === undefined) {
+  if (skipped === null) {
     return null
   }
 
   return (
     <NoticeSection title={t('title')}>
-      <p className="text-sm">{t(first.reason)}</p>
+      <p className="text-sm">{t(skipped.reason)}</p>
       <ul className="flex flex-wrap gap-2">
-        {skipped.map(({ messageType }) => (
+        {skipped.messageTypes.map((messageType) => (
           <li key={messageType} className="max-w-full min-w-0">
             <Link
               href={newMappingHref(messageType)}
@@ -122,7 +121,7 @@ export function SetupNotice({
         </NoticeSection>
       )}
 
-      <SkippedMappingDrafts skipped={skippedMappingDrafts} />
+      <MappingsToCreate skipped={skippedMappingDrafts} />
 
       {!nothingForLater(later) && (
         <NoticeSection title={t('later.title')}>

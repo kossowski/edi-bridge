@@ -216,9 +216,10 @@ describe('finishSetup', () => {
     expect(api.createMapping).not.toHaveBeenCalled()
     expect(api.createFlow).toHaveBeenCalledTimes(2)
     expect(leftOver(several, finished).mappingDrafts).toEqual([])
-    expect(setupSummary(several, finished).skippedMappingDrafts).toEqual([
-      { messageType: 'DESADV', reason: 'severalDocumentStructures' },
-    ])
+    expect(setupSummary(several, finished).skippedMappingDrafts).toEqual({
+      reason: 'severalDocumentStructures',
+      messageTypes: ['DESADV'],
+    })
   })
 
   it('creates nothing else when the partner cannot be created', async () => {
@@ -384,7 +385,7 @@ describe('setupSummary', () => {
     expect(summary.mappingDrafts).toEqual([
       { messageType: 'DESADV', mapping: finished.mappings.DESADV },
     ])
-    expect(summary.skippedMappingDrafts).toEqual([])
+    expect(summary.skippedMappingDrafts).toBeNull()
     expect(summary.left.routes.map(({ messageType }) => messageType)).toEqual(['ORDERS', 'INVOIC'])
     expect(summary.later).toEqual({
       connections: [],

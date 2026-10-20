@@ -451,6 +451,12 @@ export const GermanWithSeveralDocumentStructures = meta.story({
     await expect(
       skipped.getByRole('link', { name: 'Mapping für Rechnungen anlegen' }),
     ).toHaveAttribute('href', '/mappings?new=INVOIC')
+
+    const later = within(canvas.getByRole('region', { name: 'Später einrichten' }))
+    await expect(
+      later.getByText(/Das Mapping muss zuerst angelegt und veröffentlicht sein\.$/),
+    ).toBeVisible()
+    await expect(later.queryByText(/KI-Entwurf/)).toBeNull()
   },
 })
 

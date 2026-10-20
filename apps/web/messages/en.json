@@ -1290,6 +1290,7 @@
           "noOwnConnection": "None of your own connections fits {documents} yet. Add one first.",
           "severalOwnConnections": "Several of your own connections fit {documents}. Choose one in the setup steps.",
           "mappingDraft": "It needs the published AI draft.",
+          "mappingToCreate": "The mapping must be created and published first.",
           "mappingLater": "Choose the mapping in the setup steps."
         }
       },
@@ -1843,6 +1844,7 @@
           "noOwnConnection": "None of your own connections fits {documents} yet.",
           "severalOwnConnections": "Several of your own connections fit {documents}. You choose one there.",
           "mappingDraft": "The route follows once the AI draft is published.",
+          "mappingToCreate": "The route follows once the mapping is created and published.",
           "mappingLater": "You choose the mapping there."
         }
       },
