@@ -1,10 +1,11 @@
 import { and, eq } from 'drizzle-orm'
-import { DateTime, Effect } from 'effect'
+import { DateTime, Effect, Result } from 'effect'
 
 import { directionOf } from '@edi-bridge/contracts'
 import { channels, flows, type RawDocument, runs, runSteps, tradingPartners } from '@edi-bridge/db'
 import { ParseError, parseMessages } from '@edi-bridge/edifact'
 
+import { answerDocument } from './acknowledgement'
 import { ReceiptRejected } from './errors'
 import { Database, Documents, RunQueue } from './services'
 import { stagesOf } from './stages'
@@ -172,13 +173,21 @@ export const receive = (arriving: ArrivingDocument) =>
       }),
     )
 
-    // A Document rejected after storing stays findable by its id.
-    const { routed, notRouted } = yield* routeOnChannel(arriving).pipe(
-      Effect.mapError(({ reason }) => new ReceiptRejected({ reason, documentId: document.id })),
+    const routing = yield* Effect.result(routeOnChannel(arriving))
+    const receiptFinishedAt = yield* DateTime.now
+
+    yield* answerDocument(
+      { workspaceId: arriving.workspaceId, documentId: document.id, content: arriving.content },
+      receiptFinishedAt,
     )
 
+    if (Result.isFailure(routing)) {
+      // A Document rejected after storing stays findable by its id.
+      return yield* new ReceiptRejected({ reason: routing.failure.reason, documentId: document.id })
+    }
+
+    const { routed, notRouted } = routing.success
     const db = yield* Database
-    const receiptFinishedAt = yield* DateTime.nowAsDate
 
     const created = yield* Effect.promise(() =>
       db.transaction((tx) =>
@@ -210,7 +219,7 @@ export const receive = (arriving: ArrivingDocument) =>
                       stage,
                       status: 'succeeded' as const,
                       startedAt: receiptStartedAt,
-                      finishedAt: receiptFinishedAt,
+                      finishedAt: DateTime.toDateUtc(receiptFinishedAt),
                     }
                   : { runId: run.id, position, stage },
               ),

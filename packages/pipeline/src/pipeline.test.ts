@@ -5,7 +5,12 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, assert, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { secretBox, secretKeyBytes, sftpChannelDelivery } from '@edi-bridge/channels'
+import {
+  DeliveryFailed,
+  secretBox,
+  secretKeyBytes,
+  sftpChannelDelivery,
+} from '@edi-bridge/channels'
 import {
   startTestErp,
   startTestSftpServer,
@@ -14,6 +19,7 @@ import {
 } from '@edi-bridge/channels/testing'
 import { type CharacterSet, withCheckDigit } from '@edi-bridge/contracts'
 import {
+  acknowledgements,
   channels,
   connect,
   type Connection,
@@ -41,10 +47,11 @@ import {
   receive,
   retryRun,
   RunNotRetryable,
+  sendAcknowledgements,
   sweepRunsEvery,
   sweepStuckRuns,
 } from './index'
-import { type Database, Documents, type RunQueue } from './services'
+import { type Database, type Delivery, Documents, type RunQueue } from './services'
 import {
   addContrlFlow,
   addOrdersFlow,
@@ -1786,10 +1793,10 @@ describe('the processing of an inbound Run', () => {
     .split('\n')
     .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
 
-  const interchangeOf = (messages: string[][]) =>
-    [ordersInterchange.split('\n')[0], ...messages.flat(), `UNZ+${messages.length}+00000001'`].join(
-      '\n',
-    )
+  const fromHanseRetail = "UNB+UNOC:3+4071615111110:14+4389876511113:14+000324:1200+00000001'"
+
+  const interchangeOf = (messages: string[][], count = messages.length) =>
+    [fromHanseRetail, ...messages.flat(), `UNZ+${count}+00000001'`].join('\n')
 
   const ordersWorkspace = async (name: string, options: { format?: 'json' | 'csv' } = {}) => {
     const created = await seedInvoiceWorkspace(connection.db, name)
@@ -2825,7 +2832,7 @@ describe('the Acknowledgement of a sent Interchange', () => {
     const atTimeAfter = (
       sent: { handedOverAt: Date | null } | undefined,
       after: Duration.Duration,
-      check: Effect.Effect<unknown, never, Database | RunQueue>,
+      check: Effect.Effect<unknown, never, Database | RunQueue | Delivery>,
     ) =>
       Effect.gen(function* () {
         const handedOverAt = sent?.handedOverAt
@@ -2918,6 +2925,469 @@ describe('the Acknowledgement of a sent Interchange', () => {
       } finally {
         await Effect.runPromise(Fiber.interrupt(sweeping))
       }
+    })
+  })
+})
+
+describe('the CONTRL answering a received Interchange', () => {
+  const ordersInterchange = golden('orders-reference.edi', 'latin1')
+
+  const ordersMessage = ordersInterchange
+    .split('\n')
+    .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
+
+  const fromHanseRetail = "UNB+UNOC:3+4071615111110:14+4389876511113:14+000324:1200+00000001'"
+
+  const interchangeOf = (messages: string[][], count = messages.length) =>
+    [fromHanseRetail, ...messages.flat(), `UNZ+${count}+00000001'`].join('\n')
+
+  const answeringWorkspace = async (name: string) => {
+    const into = await seedInvoiceWorkspace(connection.db, name)
+    const orders = await addOrdersFlow(connection.db, into, { url: erp.url })
+
+    return { ...into, orders }
+  }
+
+  const receiving = async (into: InvoiceWorkspace, content: string) => {
+    const { messages, logger } = collectLogs()
+
+    const exit = await Effect.runPromiseExit(
+      receive({
+        workspaceId: into.id,
+        channelId: into.inboundChannelId,
+        fileName: 'orders.edi',
+        content,
+        manualSubmission: false,
+      }).pipe(pipelineServices(connection.db, inMemoryRunQueue()), Effect.provide(logger)),
+    )
+
+    return { exit, logs: messages }
+  }
+
+  const receiveInterchange = async (into: InvoiceWorkspace, content: string) => {
+    const { exit, logs } = await receiving(into, content)
+
+    assert(Exit.isSuccess(exit), 'The Interchange was not received')
+
+    return { receipt: exit.value, logs }
+  }
+
+  // Without a readable envelope, routing may still find an outbound Flow for the Document.
+  const documentIdOf = (exit: Exit.Exit<{ document: { id: string } }, ReceiptRejected>) => {
+    if (Exit.isSuccess(exit)) {
+      return exit.value.document.id
+    }
+
+    const rejected = Cause.squash(exit.cause)
+
+    assert(rejected instanceof ReceiptRejected, 'The receipt failed without a rejection')
+
+    return rejected.documentId ?? ''
+  }
+
+  const sendWith = (delivery: DeliveryService, retryAfter: Duration.Input = '10 minutes') =>
+    Effect.runPromise(
+      sendAcknowledgements(retryAfter).pipe(
+        pipelineServices(connection.db, inMemoryRunQueue(), delivery),
+      ),
+    )
+
+  const recordingDelivery = ({ failing = false }: { failing?: boolean } = {}) => {
+    const delivered: Array<{
+      channelId: string
+      name: string
+      mediaType: string
+      content: string
+      isRetry: boolean
+    }> = []
+
+    const service: DeliveryService = (channel, { name, mediaType, content, isRetry = false }) =>
+      Effect.suspend(() => {
+        delivered.push({
+          channelId: channel.id,
+          name,
+          mediaType: mediaType ?? '',
+          content: content.toString('latin1').replace(/\+\d{6}:\d{4}\+/, '+YYMMDD:HHMM+'),
+          isRetry,
+        })
+
+        return failing
+          ? Effect.fail(new DeliveryFailed({ reason: 'hostUnreachable' }))
+          : Effect.void
+      })
+
+    return {
+      service,
+      to: (channelId: string) =>
+        delivered.flatMap(({ channelId: to, ...document }) => (to === channelId ? [document] : [])),
+    }
+  }
+
+  const acknowledgementOf = async (documentId: string) => {
+    const [row] = await connection.db
+      .select()
+      .from(acknowledgements)
+      .where(eq(acknowledgements.documentId, documentId))
+
+    return row
+  }
+
+  it('sends a CONTRL accepting a valid Interchange to the Channel of the outbound Flows of its Trading Partner', async () => {
+    const into = await answeringWorkspace('Answered Orders')
+    const delivery = recordingDelivery()
+
+    await receiveInterchange(into, interchangeOf([ordersMessage]))
+    await sendWith(delivery.service)
+
+    expect(delivery.to(into.outboundChannelId)).toEqual([
+      {
+        name: 'CONTRL-1.edi',
+        mediaType: 'application/edifact',
+        content:
+          "UNB+UNOC:3+4389876511113:14+4071615111110:14+YYMMDD:HHMM+1'" +
+          "UNH+1+CONTRL:D:3:UN:EAN002'" +
+          "UCI+00000001+4071615111110:14+4389876511113:14+7'" +
+          "UCM+ME0001+ORDERS:D:96A:UN:EAN008+7'" +
+          "UNT+4+1'" +
+          "UNZ+1+1'",
+        isRetry: false,
+      },
+    ])
+  })
+
+  it('rejects a broken Message in the CONTRL and leaves the Runs of the Interchange to their processing', async () => {
+    const into = await answeringWorkspace('Broken Orders')
+    const delivery = recordingDelivery()
+    const withoutBgm = ordersMessage.filter((line) => !line.startsWith('BGM'))
+
+    const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage, withoutBgm]))
+    await sendWith(delivery.service)
+
+    const [sent, ...more] = delivery.to(into.outboundChannelId)
+
+    expect(more).toEqual([])
+    expect(sent?.content).toContain(
+      "UCM+ME0001+ORDERS:D:96A:UN:EAN008+7'UCM+ME0001+ORDERS:D:96A:UN:EAN008+4+29+UNT+1'",
+    )
+    await expect(
+      Promise.all(receipt.runs.map(({ id }) => readRun(connection.db, id))),
+    ).resolves.toMatchObject([{ status: 'received' }, { status: 'received' }])
+  })
+
+  it('answers a Duplicate with a CONTRL of its own', async () => {
+    const into = await answeringWorkspace('Duplicate Orders')
+    const delivery = recordingDelivery()
+
+    await receiveInterchange(into, interchangeOf([ordersMessage]))
+    await receiveInterchange(into, interchangeOf([ordersMessage]))
+    await sendWith(delivery.service)
+
+    expect(
+      delivery
+        .to(into.outboundChannelId)
+        .map(({ name }) => name)
+        .toSorted(),
+    ).toEqual(['CONTRL-1.edi', 'CONTRL-2.edi'])
+  })
+
+  it('never answers a received CONTRL', async () => {
+    const into = await answeringWorkspace('Acknowledging Orders')
+    const delivery = recordingDelivery()
+
+    await addContrlFlow(connection.db, into, { url: erp.url })
+
+    const { receipt } = await receiveInterchange(
+      into,
+      "UNB+UNOC:3+4071615111110:14+4389876511113:14+261020:0800+77'" +
+        "UNH+1+CONTRL:D:3:UN:EAN002'UCI+1+4389876511113:14+4071615111110:14+7'UNT+3+1'UNZ+1+77'",
+    )
+
+    await sendWith(delivery.service)
+
+    expect(receipt.runs).toHaveLength(1)
+    expect(delivery.to(into.outboundChannelId)).toEqual([])
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toBeUndefined()
+  })
+
+  it('answers no Document of an ERP', async () => {
+    const into = await answeringWorkspace('Invoicing Foods')
+
+    const { receipt } = await receiveInterchange(into, goldenInvoice)
+
+    expect(receipt.runs).toHaveLength(1)
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toBeUndefined()
+  })
+
+  it('sends a CONTRL once', async () => {
+    const into = await answeringWorkspace('Once Orders')
+    const delivery = recordingDelivery()
+
+    await receiveInterchange(into, interchangeOf([ordersMessage]))
+    await sendWith(delivery.service)
+    await sendWith(delivery.service, '0 millis')
+
+    expect(delivery.to(into.outboundChannelId)).toHaveLength(1)
+  })
+
+  it('tries a CONTRL again after a failed delivery once the bound passed and fails no Run', async () => {
+    const into = await answeringWorkspace('Unreachable Orders')
+    const failing = recordingDelivery({ failing: true })
+    const delivery = recordingDelivery()
+
+    const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+    await sendWith(failing.service)
+    await sendWith(delivery.service)
+
+    expect(failing.to(into.outboundChannelId)).toHaveLength(1)
+    expect(delivery.to(into.outboundChannelId)).toEqual([])
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toMatchObject({
+      handedOverAt: null,
+      deliveryError: 'hostUnreachable',
+    })
+    await expect(readRun(connection.db, receipt.runs[0]?.id ?? '')).resolves.toMatchObject({
+      status: 'received',
+    })
+
+    await sendWith(delivery.service, '0 millis')
+
+    expect(delivery.to(into.outboundChannelId)).toMatchObject([
+      { name: 'CONTRL-1.edi', isRetry: true },
+    ])
+    const sent = await acknowledgementOf(receipt.document.id)
+
+    expect(sent?.handedOverAt).toBeInstanceOf(Date)
+    expect(sent?.deliveryError).toBeNull()
+  })
+
+  it('sends a CONTRL whose attempt a worker restart cut off once the bound passed', async () => {
+    const into = await answeringWorkspace('Restarted Orders')
+    const delivery = recordingDelivery()
+
+    const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+    await connection.db
+      .update(acknowledgements)
+      .set({ deliveryAttemptedAt: new Date(Date.now() - 5 * 60_000) })
+      .where(eq(acknowledgements.documentId, receipt.document.id))
+    await sendWith(delivery.service)
+
+    expect(delivery.to(into.outboundChannelId)).toEqual([])
+
+    await sendWith(delivery.service, '1 minute')
+
+    expect(delivery.to(into.outboundChannelId)).toMatchObject([{ isRetry: true }])
+  })
+
+  it('sends the CONTRLs with the sweep of Runs', async () => {
+    const into = await answeringWorkspace('Swept Orders')
+    const delivery = recordingDelivery()
+
+    await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+    const sweeping = Effect.runFork(
+      sweepRunsEvery({ interval: '1 hour', stuckAfter: '10 minutes' }).pipe(
+        pipelineServices(connection.db, inMemoryRunQueue(), delivery.service),
+      ),
+    )
+
+    try {
+      await vi.waitFor(
+        () => {
+          expect(delivery.to(into.outboundChannelId)).toHaveLength(1)
+        },
+        { timeout: 2000, interval: 20 },
+      )
+    } finally {
+      await Effect.runPromise(Fiber.interrupt(sweeping))
+    }
+  })
+
+  describe('a CONTRL recorded but not sent', () => {
+    const recordedFor = async (
+      into: InvoiceWorkspace,
+      content = interchangeOf([ordersMessage]),
+    ) => {
+      const delivery = recordingDelivery()
+      const { receipt, logs } = await receiveInterchange(into, content)
+
+      await sendWith(delivery.service, '0 millis')
+
+      expect(delivery.to(into.outboundChannelId)).toEqual([])
+
+      return { acknowledgement: await acknowledgementOf(receipt.document.id), logs }
+    }
+
+    it('names a Trading Partner without an outbound EDIFACT Flow', async () => {
+      const into = await answeringWorkspace('Inbound-only Orders')
+
+      await connection.db.delete(flows).where(eq(flows.id, into.flowId))
+
+      const { acknowledgement, logs } = await recordedFor(into)
+
+      expect(acknowledgement).toMatchObject({
+        notSentReason: 'noOutboundChannel',
+        channelId: null,
+        controlReference: 1,
+      })
+      expect(acknowledgement?.content).toContain(
+        "UCI+00000001+4071615111110:14+4389876511113:14+7'",
+      )
+      expect(logs).toContainEqual([
+        `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: no outbound EDIFACT Flow of its Trading Partner names a Channel`,
+      ])
+    })
+
+    it('names outbound EDIFACT Flows of different Channels', async () => {
+      const into = await answeringWorkspace('Two-channel Orders')
+
+      const [other] = await connection.db
+        .insert(channels)
+        .values({
+          workspaceId: into.id,
+          tradingPartnerId: into.tradingPartnerId,
+          type: 'http',
+          direction: 'outbound',
+          name: 'Hanse Retail dispatch inbox',
+          url: erp.url,
+        })
+        .returning()
+
+      await connection.db.insert(flows).values({
+        workspaceId: into.id,
+        tradingPartnerId: into.tradingPartnerId,
+        messageType: 'DESADV',
+        name: 'Dispatch advices to Hanse Retail',
+        inboundChannelId: into.inboundChannelId,
+        destinationChannelId: other?.id ?? '',
+        mappingVersionId: into.mappingVersionId,
+      })
+
+      const { acknowledgement, logs } = await recordedFor(into)
+
+      expect(acknowledgement).toMatchObject({ notSentReason: 'ambiguousChannel', channelId: null })
+      expect(logs).toContainEqual([
+        `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: the outbound EDIFACT Flows of its Trading Partner name different Channels`,
+      ])
+    })
+
+    it('names a Workspace without a GLN', async () => {
+      const into = await answeringWorkspace('GLN-less Orders')
+
+      await connection.db.update(workspaces).set({ gln: null }).where(eq(workspaces.id, into.id))
+
+      await expect(recordedFor(into)).resolves.toMatchObject({
+        acknowledgement: {
+          notSentReason: 'workspaceGlnMissing',
+          channelId: into.outboundChannelId,
+          controlReference: null,
+          content: null,
+        },
+      })
+    })
+  })
+
+  it('rejects an Interchange whose envelope is broken in a CONTRL sent', async () => {
+    const into = await answeringWorkspace('Miscounted Orders')
+    const delivery = recordingDelivery()
+
+    const { exit } = await receiving(into, interchangeOf([ordersMessage], 2))
+    await sendWith(delivery.service)
+
+    const sent = delivery.to(into.outboundChannelId)
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]?.content).toContain('UCI+00000001+4071615111110:14+4389876511113:14+4+29+UNZ')
+
+    const acknowledgement = await acknowledgementOf(documentIdOf(exit))
+
+    expect(acknowledgement?.notSentReason).toBeNull()
+    expect(acknowledgement?.handedOverAt).toBeInstanceOf(Date)
+  })
+
+  it('answers an Interchange whose Message Type no Flow takes', async () => {
+    const into = await answeringWorkspace('Price Catalogue')
+    const delivery = recordingDelivery()
+
+    const pricat = ordersMessage.map((line) => line.replace('ORDERS:D:96A', 'PRICAT:D:96A'))
+
+    const { exit } = await receiving(into, interchangeOf([pricat]))
+    await sendWith(delivery.service)
+
+    expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toMatchObject({
+      reason: 'noRoutedMessage',
+    })
+    const sent = delivery.to(into.outboundChannelId)
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]?.content).toContain(
+      "UCI+00000001+4071615111110:14+4389876511113:14+7'UCM+ME0001+PRICAT",
+    )
+  })
+
+  it('answers no Interchange from a sender without a Trading Partner', async () => {
+    const into = await answeringWorkspace('Stranger Orders')
+
+    const { receipt, logs } = await receiveInterchange(
+      into,
+      interchangeOf([ordersMessage]).replace('4071615111110:14', '4012345000009:14'),
+    )
+
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toBeUndefined()
+    expect(logs).toContainEqual([
+      `The Interchange of Document ${receipt.document.id} gets no CONTRL: no Trading Partner has the GLN 4012345000009 of its sender`,
+    ])
+  })
+
+  it('answers no Interchange whose UNB cannot be read', async () => {
+    const into = await answeringWorkspace('Headless Orders')
+
+    const { exit } = await receiving(
+      into,
+      interchangeOf([ordersMessage])
+        .replace("+00000001'", "'")
+        .replace("UNZ+1+00000001'", "UNZ+1'"),
+    )
+
+    await expect(acknowledgementOf(documentIdOf(exit))).resolves.toBeUndefined()
+  })
+
+  it('keeps the Runs of an Interchange whose CONTRL cannot be recorded', async () => {
+    const into = await answeringWorkspace('Exhausted Orders')
+
+    await connection.db
+      .update(tradingPartners)
+      .set({ nextControlReference: 2_147_483_647 })
+      .where(eq(tradingPartners.id, into.tradingPartnerId))
+
+    const { receipt, logs } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+    expect(receipt.runs).toHaveLength(1)
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toBeUndefined()
+    expect(logs).toContainEqual([`The CONTRL for Document ${receipt.document.id} was not recorded`])
+  })
+
+  it('records no attempt over a later one', async () => {
+    const into = await answeringWorkspace('Slow Orders')
+    const laterAttempt = new Date(Date.now() + 60_000)
+
+    const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+    const overtaken: DeliveryService = () =>
+      Effect.andThen(
+        Effect.promise(() =>
+          connection.db
+            .update(acknowledgements)
+            .set({ deliveryAttemptedAt: laterAttempt })
+            .where(eq(acknowledgements.documentId, receipt.document.id)),
+        ),
+        Effect.fail(new DeliveryFailed({ reason: 'hostUnreachable' })),
+      )
+
+    await sendWith(overtaken)
+
+    await expect(acknowledgementOf(receipt.document.id)).resolves.toMatchObject({
+      deliveryAttemptedAt: laterAttempt,
+      deliveryError: null,
     })
   })
 })

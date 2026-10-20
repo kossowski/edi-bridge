@@ -4,7 +4,7 @@ export { readAcknowledgedInterchange, ReadAcknowledgementError } from './acknowl
 
 export { isBrokenMessage } from './model'
 
-export { parse, ParseError, parseMessages } from './parse'
+export { parse, ParseError, parseMessages, readInterchange } from './parse'
 
 export { serialize, SerializeError, serializeMessage } from './serialize'
 

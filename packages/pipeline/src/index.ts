@@ -51,3 +51,5 @@ export {
   MessageUnreadable,
   processRun,
 } from './process-run'
+
+export { sendAcknowledgements } from './acknowledgement'
