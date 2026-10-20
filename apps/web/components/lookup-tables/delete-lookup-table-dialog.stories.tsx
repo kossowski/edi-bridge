@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw'
 import { expect, fn, screen, userEvent, waitFor } from 'storybook/test'
 
 import { DeleteLookupTableDialog } from '@/components/lookup-tables/delete-lookup-table-dialog'
-import { german } from '@/components/story-helpers'
+import { german, waitForFocusInside } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
   deleteLookupTableEndpoint,
@@ -18,10 +18,11 @@ const units = toLookupTableSummary(seedLookupTableNamed('Units of measure'), {
   get: (id) => seedTradingPartners.find((tradingPartner) => tradingPartner.id === id),
 })
 
-// Waits out the opening fade, so visibility checks see the settled dialog.
+// Waits out the opening fade and the initial focus, so checks and clicks see the settled dialog.
 async function dialog() {
   const element = await screen.findByRole('dialog')
   await waitFor(() => expect(element).toBeVisible())
+  await waitForFocusInside(element)
 
   return element
 }
