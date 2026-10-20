@@ -589,7 +589,7 @@
       },
       "lookupTable": {
         "label": "Code translation",
-        "explanation": "A list that translates codes, for example your unit ST becomes your partner’s PCE."
+        "explanation": "Translates codes, for example your unit ST becomes your partner’s PCE."
       },
       "mappingVersion": {
         "label": "Version",
@@ -2926,7 +2926,7 @@
           "decimalSeparator": "The character between the whole number and its decimals."
         },
         "lookupTable": {
-          "lookupTableId": "The code translation that translates the value. A workspace list serves every trading partner, a trading partner's list only that partner.",
+          "lookupTableId": "The code translation that translates the value. A workspace's code translation serves every trading partner, a trading partner's only that partner.",
           "fallback": "What happens when the code translation has no entry for the value."
         },
         "conditional": {
@@ -3526,14 +3526,14 @@
   },
   "CodeTranslation": {
     "title": "Code translation",
-    "loading": "Loading the list",
+    "loading": "Loading the code translation",
     "notFound": {
-      "title": "List not found",
-      "description": "This workspace has no code translation list with this ID."
+      "title": "Code translation not found",
+      "description": "This workspace has no code translation with this ID."
     },
     "error": {
-      "title": "List unavailable",
-      "description": "The list could not be loaded. Try again.",
+      "title": "Code translation unavailable",
+      "description": "The code translation could not be loaded. Try again.",
       "retry": "Try again"
     },
     "values": {
@@ -3610,9 +3610,9 @@
     }
   },
   "CodeTranslationNew": {
-    "title": "New list",
+    "title": "New code translation",
     "titleNamed": "New: {name}",
-    "intro": "Choose what your partners write differently and which partners the list applies to. The list starts with suggested values that you accept or change.",
+    "intro": "Choose what your partners write differently and which partners the code translation applies to. It starts with suggested values that you accept or change.",
     "kind": {
       "question": "What is written differently?",
       "examples": {
@@ -3663,7 +3663,7 @@
       }
     },
     "values": {
-      "title": "Values in the new list",
+      "title": "Values in the new code translation",
       "empty": "No values yet. Accept a suggestion or add your own.",
       "added": "{code} added.",
       "removed": "{code} removed."
@@ -3671,9 +3671,9 @@
     "create": {
       "summary": "Creates <strong>{name}</strong> with {count, plural, =0 {no values} one {# value} other {# values}}.",
       "pendingLeftOut": "{count, plural, one {# suggestion you have not accepted is left out.} other {# suggestions you have not accepted are left out.}}",
-      "submit": "Create list",
+      "submit": "Create code translation",
       "creating": "Creating…",
-      "failed": "The list could not be created. Try again."
+      "failed": "The code translation could not be created. Try again."
     },
     "sides": {
       "units": {
@@ -3696,9 +3696,9 @@
   },
   "CodeTranslations": {
     "intro": "Values your partners write differently than your ERP, grouped by who receives them.",
-    "summary": "{count, plural, one {# list} other {# lists}}",
-    "blockingSummary": "{count, plural, one {# list blocks documents} other {# lists block documents}}",
-    "new": "New list",
+    "summary": "{count, plural, one {# code translation} other {# code translations}}",
+    "blockingSummary": "{count, plural, one {# code translation blocks documents} other {# code translations block documents}}",
+    "new": "New code translation",
     "loading": "Loading code translations",
     "groups": {
       "workspace": "Sent to every partner",
@@ -3721,7 +3721,7 @@
     "moreCodes": "{count} more",
     "open": "Open",
     "add": "Add {code}",
-    "showAll": "Show all {count} lists",
+    "showAll": "Show all {count} code translations",
     "actions": {
       "label": "Actions for {name}",
       "edit": "Edit name and receiver",
@@ -3747,7 +3747,7 @@
   "LookupTables": {
     "form": {
       "editTitle": "Edit {name}",
-      "editDescription": "Rename the list or change who receives it. The values stay as they are.",
+      "editDescription": "Rename the code translation or change who receives it. The values stay as they are.",
       "close": "Close",
       "cancel": "Cancel",
       "save": "Save",
@@ -3768,10 +3768,10 @@
         },
         "tradingPartner": {
           "label": "Trading partner",
-          "description": "The trading partner who receives this list.",
+          "description": "The trading partner who receives this code translation.",
           "placeholder": "Choose a trading partner",
           "loading": "Loading trading partners…",
-          "empty": "There are no trading partners yet. Create one first, or send the list to every partner.",
+          "empty": "There are no trading partners yet. Create one first, or send the code translation to every partner.",
           "error": "The trading partners could not be loaded.",
           "retry": "Try again"
         }
@@ -3782,19 +3782,19 @@
           "tradingPartnerId": "Choose a trading partner."
         },
         "tooLong": "Use at most {max} characters.",
-        "taken": "Another list for the same receiver already uses this name.",
-        "saveFailed": "The list could not be saved. Try again."
+        "taken": "Another code translation for the same receiver already uses this name.",
+        "saveFailed": "The code translation could not be saved. Try again."
       }
     },
     "delete": {
       "title": "Delete {name}?",
-      "description": "{count, plural, =0 {The list is deleted.} one {The list and its # value are deleted.} other {The list and its # values are deleted.}} This cannot be undone.",
+      "description": "{count, plural, =0 {The code translation is deleted.} one {The code translation and its # value are deleted.} other {The code translation and its # values are deleted.}} This cannot be undone.",
       "close": "Close",
       "cancel": "Cancel",
-      "confirm": "Delete list",
+      "confirm": "Delete code translation",
       "pending": "Deleting…",
-      "failed": "The list could not be deleted. Try again.",
-      "inUse": "A draft or a published version of a mapping uses this list, so it cannot be deleted."
+      "failed": "The code translation could not be deleted. Try again.",
+      "inUse": "A draft or a published version of a mapping uses this code translation, so it cannot be deleted."
     }
   },
   "LookupTable": {

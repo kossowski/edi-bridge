@@ -589,7 +589,7 @@
       },
       "lookupTable": {
         "label": "Code-Übersetzung",
-        "explanation": "Eine Liste, die Codes übersetzt, zum Beispiel wird Ihre Einheit ST zur Einheit PCE Ihres Partners."
+        "explanation": "Übersetzt Codes, zum Beispiel wird Ihre Einheit ST zur Einheit PCE Ihres Partners."
       },
       "mappingVersion": {
         "label": "Version",
@@ -2926,7 +2926,7 @@
           "decimalSeparator": "Das Zeichen zwischen der ganzen Zahl und ihren Nachkommastellen."
         },
         "lookupTable": {
-          "lookupTableId": "Die Code-Übersetzung, die den Wert übersetzt. Eine Liste des Arbeitsbereichs gilt für alle Handelspartner, die eines Handelspartners nur für diesen.",
+          "lookupTableId": "Die Code-Übersetzung, die den Wert übersetzt. Eine Code-Übersetzung des Arbeitsbereichs gilt für alle Handelspartner, die eines Handelspartners nur für diesen.",
           "fallback": "Was geschieht, wenn die Code-Übersetzung keinen Eintrag für den Wert hat."
         },
         "conditional": {
@@ -3526,14 +3526,14 @@
   },
   "CodeTranslation": {
     "title": "Code-Übersetzung",
-    "loading": "Liste wird geladen",
+    "loading": "Code-Übersetzung wird geladen",
     "notFound": {
-      "title": "Liste nicht gefunden",
-      "description": "In diesem Arbeitsbereich gibt es keine Code-Übersetzungsliste mit dieser ID."
+      "title": "Code-Übersetzung nicht gefunden",
+      "description": "In diesem Arbeitsbereich gibt es keine Code-Übersetzung mit dieser ID."
     },
     "error": {
-      "title": "Liste nicht verfügbar",
-      "description": "Die Liste konnte nicht geladen werden. Versuchen Sie es erneut.",
+      "title": "Code-Übersetzung nicht verfügbar",
+      "description": "Die Code-Übersetzung konnte nicht geladen werden. Versuchen Sie es erneut.",
       "retry": "Erneut versuchen"
     },
     "values": {
@@ -3610,9 +3610,9 @@
     }
   },
   "CodeTranslationNew": {
-    "title": "Neue Liste",
+    "title": "Neue Code-Übersetzung",
     "titleNamed": "Neu: {name}",
-    "intro": "Wählen Sie, was Ihre Partner anders schreiben und für welche Partner die Liste gilt. Die Liste beginnt mit vorgeschlagenen Werten, die Sie übernehmen oder ändern.",
+    "intro": "Wählen Sie, was Ihre Partner anders schreiben und für welche Partner die Code-Übersetzung gilt. Sie beginnt mit vorgeschlagenen Werten, die Sie übernehmen oder ändern.",
     "kind": {
       "question": "Was wird anders geschrieben?",
       "examples": {
@@ -3663,7 +3663,7 @@
       }
     },
     "values": {
-      "title": "Werte in der neuen Liste",
+      "title": "Werte in der neuen Code-Übersetzung",
       "empty": "Noch keine Werte. Übernehmen Sie einen Vorschlag oder fügen Sie eigene hinzu.",
       "added": "{code} hinzugefügt.",
       "removed": "{code} entfernt."
@@ -3671,9 +3671,9 @@
     "create": {
       "summary": "Legt <strong>{name}</strong> {count, plural, =0 {ohne Werte} one {mit # Wert} other {mit # Werten}} an.",
       "pendingLeftOut": "{count, plural, one {# Vorschlag, den Sie nicht übernommen haben, bleibt außen vor.} other {# Vorschläge, die Sie nicht übernommen haben, bleiben außen vor.}}",
-      "submit": "Liste anlegen",
+      "submit": "Code-Übersetzung anlegen",
       "creating": "Wird angelegt…",
-      "failed": "Die Liste konnte nicht angelegt werden. Versuchen Sie es erneut."
+      "failed": "Die Code-Übersetzung konnte nicht angelegt werden. Versuchen Sie es erneut."
     },
     "sides": {
       "units": {
@@ -3696,9 +3696,9 @@
   },
   "CodeTranslations": {
     "intro": "Werte, die Ihre Partner anders schreiben als Ihr ERP, gruppiert danach, wer sie erhält.",
-    "summary": "{count, plural, one {# Liste} other {# Listen}}",
-    "blockingSummary": "{count, plural, one {# Liste blockiert Belege} other {# Listen blockieren Belege}}",
-    "new": "Neue Liste",
+    "summary": "{count, plural, one {# Code-Übersetzung} other {# Code-Übersetzungen}}",
+    "blockingSummary": "{count, plural, one {# Code-Übersetzung blockiert Belege} other {# Code-Übersetzungen blockieren Belege}}",
+    "new": "Neue Code-Übersetzung",
     "loading": "Code-Übersetzungen werden geladen",
     "groups": {
       "workspace": "An jeden Partner gesendet",
@@ -3721,7 +3721,7 @@
     "moreCodes": "{count} weitere",
     "open": "Öffnen",
     "add": "{code} hinzufügen",
-    "showAll": "Alle {count} Listen anzeigen",
+    "showAll": "Alle {count} Code-Übersetzungen anzeigen",
     "actions": {
       "label": "Aktionen für {name}",
       "edit": "Name und Empfänger bearbeiten",
@@ -3747,7 +3747,7 @@
   "LookupTables": {
     "form": {
       "editTitle": "{name} bearbeiten",
-      "editDescription": "Benennen Sie die Liste um oder ändern Sie, wer sie erhält. Die Werte bleiben unverändert.",
+      "editDescription": "Benennen Sie die Code-Übersetzung um oder ändern Sie, wer sie erhält. Die Werte bleiben unverändert.",
       "close": "Schließen",
       "cancel": "Abbrechen",
       "save": "Speichern",
@@ -3768,10 +3768,10 @@
         },
         "tradingPartner": {
           "label": "Handelspartner",
-          "description": "Der Handelspartner, der diese Liste erhält.",
+          "description": "Der Handelspartner, der diese Code-Übersetzung erhält.",
           "placeholder": "Handelspartner wählen",
           "loading": "Handelspartner werden geladen…",
-          "empty": "Es gibt noch keine Handelspartner. Legen Sie zuerst einen an oder senden Sie die Liste an jeden Partner.",
+          "empty": "Es gibt noch keine Handelspartner. Legen Sie zuerst einen an oder senden Sie die Code-Übersetzung an jeden Partner.",
           "error": "Die Handelspartner konnten nicht geladen werden.",
           "retry": "Erneut versuchen"
         }
@@ -3782,19 +3782,19 @@
           "tradingPartnerId": "Wählen Sie einen Handelspartner."
         },
         "tooLong": "Verwenden Sie höchstens {max} Zeichen.",
-        "taken": "Eine andere Liste für denselben Empfänger verwendet diesen Namen bereits.",
-        "saveFailed": "Die Liste konnte nicht gespeichert werden. Versuchen Sie es erneut."
+        "taken": "Eine andere Code-Übersetzung für denselben Empfänger verwendet diesen Namen bereits.",
+        "saveFailed": "Die Code-Übersetzung konnte nicht gespeichert werden. Versuchen Sie es erneut."
       }
     },
     "delete": {
       "title": "{name} löschen?",
-      "description": "{count, plural, =0 {Die Liste wird gelöscht.} one {Die Liste und ihr # Wert werden gelöscht.} other {Die Liste und ihre # Werte werden gelöscht.}} Das lässt sich nicht rückgängig machen.",
+      "description": "{count, plural, =0 {Die Code-Übersetzung wird gelöscht.} one {Die Code-Übersetzung und ihr # Wert werden gelöscht.} other {Die Code-Übersetzung und ihre # Werte werden gelöscht.}} Das lässt sich nicht rückgängig machen.",
       "close": "Schließen",
       "cancel": "Abbrechen",
-      "confirm": "Liste löschen",
+      "confirm": "Code-Übersetzung löschen",
       "pending": "Wird gelöscht…",
-      "failed": "Die Liste konnte nicht gelöscht werden. Versuchen Sie es erneut.",
-      "inUse": "Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Liste, deshalb kann sie nicht gelöscht werden."
+      "failed": "Die Code-Übersetzung konnte nicht gelöscht werden. Versuchen Sie es erneut.",
+      "inUse": "Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Code-Übersetzung, deshalb kann sie nicht gelöscht werden."
     }
   },
   "LookupTable": {

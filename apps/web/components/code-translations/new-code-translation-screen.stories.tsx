@@ -69,7 +69,9 @@ async function chooseKindAndEveryPartner(root: HTMLElement, kind: LookupTableKin
 }
 
 async function valueList(root: HTMLElement) {
-  return within(await within(root).findByRole('list', { name: /^Values in the new list/ }))
+  return within(
+    await within(root).findByRole('list', { name: /^Values in the new code translation/ }),
+  )
 }
 
 async function suggestionList(root: HTMLElement) {
@@ -99,8 +101,10 @@ export const Default = meta.story({
       kinds.getByRole('radio', { name: startsWith('Units of measure') }),
     ).toHaveAccessibleDescription('Your ST is sent as PCE')
     await expect(canvas.queryByRole('radiogroup', { name: 'Who receives it?' })).toBeNull()
-    await expect(canvas.queryByRole('button', { name: 'Create list' })).toBeNull()
-    await expect(canvas.getByRole('heading', { level: 1 })).toHaveTextContent('New list')
+    await expect(canvas.queryByRole('button', { name: 'Create code translation' })).toBeNull()
+    await expect(canvas.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'New code translation',
+    )
   },
 })
 
@@ -177,7 +181,7 @@ export const Other = meta.story({
     await userEvent.type(add.getByRole('textbox', { name: 'Their value' }), 'STANDARD')
     await userEvent.click(add.getByRole('button', { name: 'Save' }))
 
-    const values = within(canvas.getByRole('list', { name: /^Values in the new list/ }))
+    const values = within(canvas.getByRole('list', { name: /^Values in the new code translation/ }))
 
     await expect(values.getByText('STANDARD')).toBeVisible()
     await expect(
@@ -238,7 +242,7 @@ export const SuggestionsError = meta.story({
     await expect(await canvas.findByText('Suggestions unavailable')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Try again' })).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Add a value' })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Create list' })).toBeEnabled()
+    await expect(canvas.getByRole('button', { name: 'Create code translation' })).toBeEnabled()
   },
 })
 
@@ -258,7 +262,7 @@ export const SuggestionsBudgetExhausted = meta.story({
     await expect(canvas.queryByRole('button', { name: 'Try again' })).toBeNull()
     await expect(canvas.queryByRole('list', { name: /^Suggested values/ })).toBeNull()
     await expect(canvas.getByRole('form', { name: 'Add a value' })).toBeVisible()
-    await expect(canvas.getByRole('button', { name: 'Create list' })).toBeEnabled()
+    await expect(canvas.getByRole('button', { name: 'Create code translation' })).toBeEnabled()
   },
 })
 
@@ -357,7 +361,7 @@ export const AcceptAndEditSuggestions = meta.story({
     await userEvent.click(suggestions.getByRole('button', { name: 'Skip KG' }))
 
     await expect(canvas.getByText('1 suggestion skipped')).toBeVisible()
-    const values = within(canvas.getByRole('list', { name: /^Values in the new list/ }))
+    const values = within(canvas.getByRole('list', { name: /^Values in the new code translation/ }))
 
     await expect(values.getAllByRole('listitem').map(({ textContent }) => textContent)).toEqual([
       expect.stringMatching(/^ST.*PCE.*Piece/),
@@ -368,7 +372,7 @@ export const AcceptAndEditSuggestions = meta.story({
     )
     await expect(canvas.getByText('1 suggestion you have not accepted is left out.')).toBeVisible()
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Create list' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Create code translation' }))
     await waitFor(() =>
       expect(getRouter().push).toHaveBeenCalledWith(
         expect.stringMatching(/^\/code-translations\/[\w-]+$/),
@@ -403,10 +407,10 @@ export const CreateError = meta.story({
   },
   async play({ canvas, canvasElement }) {
     await chooseKindAndEveryPartner(canvasElement, 'countries')
-    await userEvent.click(await canvas.findByRole('button', { name: 'Create list' }))
+    await userEvent.click(await canvas.findByRole('button', { name: 'Create code translation' }))
 
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'The list could not be created. Try again.',
+      'The code translation could not be created. Try again.',
     )
     await expect(getRouter().push).not.toHaveBeenCalled()
   },
@@ -458,7 +462,9 @@ export const Dark = meta.story({
 
     await userEvent.click(await suggestions.findByRole('button', { name: 'Accept ST' }))
     await expect(
-      within(canvas.getByRole('list', { name: /^Values in the new list/ })).getByText('PCE'),
+      within(canvas.getByRole('list', { name: /^Values in the new code translation/ })).getByText(
+        'PCE',
+      ),
     ).toBeVisible()
   },
 })
