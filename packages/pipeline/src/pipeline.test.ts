@@ -1870,6 +1870,23 @@ describe('the processing of an inbound Run', () => {
   const replaced = (segment: string, by: string) =>
     ordersMessage.map((line) => (line === segment ? by : line))
 
+  it('gives a Run the order number of its Message as the Business Reference', async () => {
+    const into = await ordersWorkspace('Order Number Foods')
+    const buyer = "NAD+BY+4398765000004::9'"
+
+    const withOrderNumber = ordersMessage.flatMap((line) =>
+      line === buyer
+        ? ["RFF+ON:4500017'", buyer]
+        : line.startsWith('UNT')
+          ? ["UNT+23+ME0001'"]
+          : [line],
+    )
+
+    const [run] = await receiveInterchange(into, interchangeOf([withOrderNumber]))
+
+    expect(run).toMatchObject({ businessReference: '4500017' })
+  })
+
   it('fails only the Run of a Message that fails mapping and delivers the others', async () => {
     const into = await ordersWorkspace('Kilogram Foods')
     const inKilograms = replaced("QTY+21:20:PCE'", "QTY+21:20:KGM'")

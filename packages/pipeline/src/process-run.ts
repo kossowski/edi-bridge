@@ -67,6 +67,7 @@ import {
 import type { DeliveryFailed, OutboundDocument } from '@edi-bridge/channels'
 import type { ParseError } from '@edi-bridge/edifact'
 
+import { businessReferenceOf } from './business-reference'
 import { enveloped, framed } from './envelope'
 import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
@@ -638,10 +639,6 @@ const deliverDocument =
       })
     })
 
-const orderNumberOf = ({ segments }: Message) =>
-  segments.find(({ tag, elements }) => tag === 'RFF' && elements[0]?.[0] === 'ON')
-    ?.elements[0]?.[1] ?? null
-
 const loadPinned = (workspaceId: string, mappingVersionId: string, direction: Direction) =>
   Effect.gen(function* () {
     const db = yield* Database
@@ -1204,7 +1201,12 @@ const processOutbound = ({ holding, queued, run, content, pinned, lookupTables }
 
     const { message } = mapped.success
     const destination = yield* loadDestination(queued)
-    const delivering = { ...run, businessReference: orderNumberOf(message), deliveryInput: message }
+
+    const delivering = {
+      ...run,
+      businessReference: businessReferenceOf(message),
+      deliveryInput: message,
+    }
 
     const checked = yield* step(
       holding,
@@ -1326,9 +1328,6 @@ const acknowledge = async (
     )
 }
 
-const documentNumberOf = ({ segments }: Message) =>
-  segments.find(({ tag }) => tag === 'BGM')?.elements[1]?.[0] ?? null
-
 const processInbound = ({
   holding,
   queued,
@@ -1347,7 +1346,7 @@ const processInbound = ({
       async (tx, { message }) => {
         await tx
           .update(runs)
-          .set({ businessReference: documentNumberOf(message) })
+          .set({ businessReference: businessReferenceOf(message) })
           .where(eq(runs.id, run.id))
       },
     )
@@ -1404,7 +1403,7 @@ const processInbound = ({
 
     const delivering = {
       ...run,
-      businessReference: documentNumberOf(message),
+      businessReference: businessReferenceOf(message),
       output: mapped.success,
     }
 
