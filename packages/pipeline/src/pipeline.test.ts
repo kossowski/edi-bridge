@@ -1485,6 +1485,55 @@ describe('the processing of a Run', () => {
     expect(ranStages(run)).toEqual(['receipt', 'mapping', 'validation', 'delivery'])
   })
 
+  it('fails a Run at delivery over a seeded Channel without opening a connection', async () => {
+    const demo = await seedInvoiceWorkspace(connection.db, 'Demo Foods')
+    const channelId = await deliverOverSftp(connection.db, demo, sftpLogin())
+
+    await connection.db.update(channels).set({ seeded: true }).where(eq(channels.id, channelId))
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), demo)
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+
+    await processQueued(queue, handOvers)
+
+    expect(handOvers).not.toHaveBeenCalled()
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      handedOverAt: null,
+      error: {
+        code: 'demoChannel',
+        message: 'A demo connection never sends, so the Document never left EDI Bridge',
+        position: null,
+        details: null,
+      },
+      problem: {
+        reason: 'unreachable',
+        fixTarget: { kind: 'channel', channelId, name: 'Hanse Retail SFTP inbox' },
+      },
+    })
+  })
+
+  it('never opens a connection over a seeded Channel in the Channel adapter', async () => {
+    const demo = await seedInvoiceWorkspace(connection.db, 'Adapter Demo Foods')
+    const channelId = await deliverOverSftp(connection.db, demo, sftpLogin())
+
+    const [channel] = await connection.db
+      .update(channels)
+      .set({ seeded: true })
+      .where(eq(channels.id, channelId))
+      .returning()
+
+    assert(channel !== undefined, 'The Channel was not seeded')
+
+    const exit = await Effect.runPromiseExit(
+      deliveryByChannelType(channel, { name: 'demo.edi', content: Buffer.from('UNA') }),
+    )
+
+    assert(Exit.isFailure(exit), 'The seeded Channel delivered')
+    expect(Cause.squash(exit.cause)).toEqual(new Error(`Seeded Channel ${channelId} never sends`))
+  })
+
   it('fails a Run at delivery on a defect when the database fails in the delivery step', async () => {
     const exhausted = await seedInvoiceWorkspace(connection.db, 'Exhausted Foods')
 

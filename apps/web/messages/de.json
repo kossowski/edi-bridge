@@ -808,6 +808,10 @@
           "title": "{direction, select, inbound {Ihr ERP hat nicht geantwortet} other {Der Server von {tradingPartner} hat nicht geantwortet}}",
           "description": "{direction, select, inbound {Der Beleg wurde übersetzt, aber Ihr ERP hat ihn bei der Zustellung nicht angenommen.} other {Der Beleg ist fertig, aber die Übertragung an {tradingPartner} ist fehlgeschlagen.}} Das ist meist nur vorübergehend."
         },
+        "demoChannel": {
+          "title": "Demo-Verbindungen senden nie",
+          "description": "Dies ist eine Demo-Verbindung, über die EDI Bridge nie Belege sendet. Der Beleg ist fertig, bleibt aber in EDI Bridge, und ein neuer Versuch endet genauso."
+        },
         "incompleteSetup": {
           "title": "Die Einrichtung für {tradingPartner} ist nicht vollständig",
           "description": "{piece, select, workspaceGln {Der Beleg ist fertig, aber die GLN Ihres Unternehmens fehlt, daher kann EDI Bridge den Beleg nicht adressieren. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} tradingPartnerGln {Der Beleg ist fertig, aber die GLN von {tradingPartner} fehlt, daher kann EDI Bridge den Beleg nicht adressieren. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} channelCredential {Der Beleg ist fertig, aber EDI Bridge kann die Zugangsdaten der Verbindung zu {tradingPartner} nicht verwenden. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.} tradingPartner {Der Beleg ist fertig, aber EDI Bridge kann ihn nicht im Zeichensatz schreiben, der für {tradingPartner} gewählt ist. Wählen Sie für {tradingPartner} einen unterstützten Zeichensatz (UNOA, UNOB oder UNOC) und versuchen Sie es dann erneut.} other {Der Beleg ist fertig, aber ein Teil der Einrichtung für {tradingPartner} fehlt. Vervollständigen Sie die Einrichtung und versuchen Sie es dann erneut.}}"

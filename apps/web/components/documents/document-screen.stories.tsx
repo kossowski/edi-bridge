@@ -205,6 +205,29 @@ function servingIncompleteSetup(setup: IncompleteSetup) {
   )
 }
 
+const demoChannelTarget = { kind: 'channel', channelId: channel.id, name: channel.name } as const
+
+function servingDemoChannel() {
+  const detail = incompleteSetupDetail({
+    error: {
+      code: 'demoChannel',
+      message: 'A demo connection never sends, so the Document never left EDI Bridge',
+      position: null,
+      details: null,
+    },
+    fixTarget: demoChannelTarget,
+  })
+
+  return http.get(`${apiUrl}${toPath(runEndpoint.path, { id: incompleteSetup.id })}`, () =>
+    HttpResponse.json(
+      runDetailSchema.parse({
+        ...detail,
+        problem: { reason: 'unreachable', whoFixes: 'retry', fixTarget: demoChannelTarget },
+      }),
+    ),
+  )
+}
+
 const meta = preview.meta({
   title: 'Documents/DocumentScreen',
   component: DocumentScreen,
@@ -457,6 +480,41 @@ export const DeliveryFailureToErp = meta.story({
   async play({ canvas }) {
     await expect(
       await canvas.findByRole('heading', { name: 'Your ERP did not answer' }),
+    ).toBeVisible()
+  },
+})
+
+export const DemoChannelDelivery = meta.story({
+  args: { id: incompleteSetup.id },
+  beforeEach({ msw }) {
+    msw.use(servingDemoChannel())
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'Demo connections never send' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'This is a demo connection, so EDI Bridge never sends documents over it. The document is ready, but it stays in EDI Bridge, and trying again ends the same way.',
+      ),
+    ).toBeVisible()
+  },
+})
+
+export const GermanDemoChannelDelivery = meta.story({
+  args: { id: incompleteSetup.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(servingDemoChannel())
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('heading', { name: 'Demo-Verbindungen senden nie' }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        'Dies ist eine Demo-Verbindung, über die EDI Bridge nie Belege sendet. Der Beleg ist fertig, bleibt aber in EDI Bridge, und ein neuer Versuch endet genauso.',
+      ),
     ).toBeVisible()
   },
 })

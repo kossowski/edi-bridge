@@ -113,6 +113,11 @@ export class ChannelDefect extends Data.TaggedError('ChannelDefect')<{
   readonly defect: unknown
 }> {}
 
+// A seeded Channel names a reserved .invalid host and serves the demo only.
+export class SeededChannel extends Data.TaggedError('SeededChannel')<{
+  readonly channelId: string
+}> {}
+
 // Any other defect in the delivery step, such as a database error.
 export class DeliveryDefect extends Data.TaggedError('DeliveryDefect')<{
   readonly defect: unknown
@@ -366,6 +371,7 @@ type DeliveryError =
   | CharacterSetUnsupported
   | ChannelDefect
   | DeliveryDefect
+  | SeededChannel
 
 const deliveryFailure = (
   failure: DeliveryError,
@@ -434,6 +440,19 @@ const deliveryFailure = (
         problem: {
           reason: 'incompleteSetup',
           fixTarget: { kind: 'channelCredential', channelId: channel.id, name: channel.name },
+        },
+      }),
+      SeededChannel: (): Failure => ({
+        stage: 'delivery',
+        error: {
+          code: 'demoChannel',
+          message: 'A demo connection never sends, so the Document never left EDI Bridge',
+          position: null,
+          details: null,
+        },
+        problem: {
+          reason: 'unreachable',
+          fixTarget: { kind: 'channel', channelId: channel.id, name: channel.name },
         },
       }),
       DeliveryDefect: (): Failure => ({
@@ -581,6 +600,10 @@ const handOver = (
     }
 
     yield* ensureOwned(lease)
+
+    if (channel.seeded) {
+      return yield* new SeededChannel({ channelId: channel.id })
+    }
 
     const delivery = yield* Delivery
 
