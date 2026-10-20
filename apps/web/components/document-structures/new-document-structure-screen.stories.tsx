@@ -259,9 +259,60 @@ export const AllConfirmed = meta.story({
         expect.stringMatching(/^\/data-formats\/[\da-f-]{36}$/),
       ),
     )
+    await expect(labels?.map(({ path }) => path)).toEqual([
+      'rows[]',
+      'rows[].RechNr',
+      'rows[].RechDatum',
+      'rows[].AuftrNr',
+      'rows[].KdNr',
+      'rows[].ArtNr',
+      'rows[].Bezeichnung',
+      'rows[].Menge',
+      'rows[].ME',
+      'rows[].EPreis',
+      'rows[].Netto',
+      'rows[].MwSt',
+      'rows[].Whg',
+    ])
+    await expect(labels).toContainEqual({
+      path: 'rows[].RechNr',
+      label: 'Invoice number',
+      labelReason: '"RechNr" stands for "Rechnungsnummer", the number of the invoice.',
+    })
+    await expect(labels).toContainEqual({
+      path: 'rows[].ME',
+      label: 'Unit',
+      labelReason:
+        '"ME" stands for "Mengeneinheit", the unit the quantity is counted in, if the values are units. Values KRT and ST look like units.',
+    })
+    await expect(labels).toContainEqual({
+      path: 'rows[].EPreis',
+      label: 'Price per unit',
+      labelReason: null,
+    })
+  },
+})
+
+export const AllConfirmedWithoutAi = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { documentStructureFieldNamesNotice: 'aiBudgetExhausted' }))
+  },
+  async play({ canvas, canvasElement, msw }) {
+    let labels: FieldLabelChoice[] | undefined
+
+    msw.use(
+      http.post(createPath, async ({ request }) => {
+        labels = createDocumentStructureEndpoint.body.parse(await request.clone().json()).labels
+      }),
+    )
+    await drop(canvasElement, invoiceExport)
+    await review(canvasElement)
+    await confirmEveryName(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: 'Save data format' }))
+    await waitFor(() => expect(getRouter().push).toHaveBeenCalled())
     await expect(labels).toEqual([
       { path: 'rows[].ME', label: 'Unit' },
-      { path: 'rows[].EPreis', label: 'Price per unit' },
+      { path: 'rows[].EPreis', label: 'Unit price' },
     ])
   },
 })

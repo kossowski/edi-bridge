@@ -23,6 +23,7 @@ import {
   isBlank,
   keptChoices,
   type LabelChoices,
+  labelsToSave,
   readProgress,
 } from '@/components/document-structures/new-document-structure'
 import {
@@ -293,7 +294,7 @@ export function NewDocumentStructureScreen() {
             create.mutate({
               name: name.trim(),
               origin: toOrigin(stage.chosen.kind, stage.chosen.file, csv),
-              labels: [...choices].map(([path, label]) => ({ path, label })),
+              labels: labelsToSave(stage.inferred, choices),
             })
           }
           onUndo={(path) =>

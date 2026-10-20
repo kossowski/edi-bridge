@@ -4,6 +4,8 @@ import {
   documentStructureNodes,
   type DocumentStructureOriginKind,
   type EncodedFile,
+  type FieldLabelChoice,
+  type FieldNamesNotice,
   type InferredDocumentStructure,
   type JsonContent,
   jsonContentSchema,
@@ -56,6 +58,26 @@ export function keptChoices(
       return before.get(path) !== label || nextLabel === label
     }),
   )
+}
+
+type NamedTree = {
+  children: ReadonlyArray<DocumentStructureNode>
+  fieldNamesNotice: FieldNamesNotice | null
+}
+
+export function labelsToSave(
+  { children, fieldNamesNotice }: NamedTree,
+  choices: LabelChoices,
+): FieldLabelChoice[] {
+  if (fieldNamesNotice !== null) {
+    return [...choices].map(([path, label]) => ({ path, label }))
+  }
+
+  return [...documentStructureNodes(children)].map(({ node }) => {
+    const label = choices.get(node.path) ?? node.label
+
+    return { path: node.path, label, labelReason: label === node.label ? node.labelReason : null }
+  })
 }
 
 export type FileFacts =
