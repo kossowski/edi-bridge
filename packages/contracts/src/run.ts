@@ -269,6 +269,8 @@ const runDetailFields = {
   replaces: runReferenceSchema.nullable(),
   replacedBy: runReferenceSchema.nullable(),
   documentDeletedAt: z.iso.datetime().nullable(),
+  // The Document's UNB test indicator, unknown once the Document expired.
+  testIndicator: z.boolean().nullable(),
 }
 
 const unfailedFields = {

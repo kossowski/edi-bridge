@@ -262,6 +262,7 @@ export const loadRun = (id: string) =>
         output: runs.output,
         content: documents.content,
         bytes: documents.bytes,
+        testIndicator: documents.testIndicator,
       }).where(inWorkspace(runs, workspace.id, eq(runs.id, id))),
     )
 
@@ -301,6 +302,7 @@ type DetailRow = SummaryRow & {
   output: string | null
   content: string | null
   bytes: Buffer | null
+  testIndicator: boolean | null
 }
 
 const rawOf = (row: DetailRow) =>
@@ -358,6 +360,7 @@ const toDetail = (
         ? parsedMessageOf(raw, summary.messageType, row.messageIndex ?? onlyMessage)
         : null,
     documentDeletedAt: row.documentDeletedAt?.toISOString() ?? null,
+    testIndicator: row.testIndicator,
   }
 
   const unfailed = {

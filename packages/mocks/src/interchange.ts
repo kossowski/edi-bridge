@@ -683,11 +683,13 @@ export function serializeInterchange({
   parties,
   preparedAt,
   messages,
+  testIndicator = false,
 }: {
   controlReference: string
   parties: Parties
   preparedAt: string
   messages: ReadonlyArray<{ runId: string; message: GeneratedMessage }>
+  testIndicator?: boolean
 }): GeneratedInterchange {
   const positions = new Map<string, ErrorPosition | null>()
 
@@ -701,6 +703,8 @@ export function serializeInterchange({
         [parties.receiver.gln, '14'],
         interchangeDate(preparedAt).split(':'),
         controlReference,
+        // UNB 0035 follows five optional elements.
+        ...(testIndicator ? ['', '', '', '', '', '1'] : []),
       ),
     ),
   ]

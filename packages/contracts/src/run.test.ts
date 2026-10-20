@@ -30,6 +30,7 @@ const base = {
   replaces: null,
   replacedBy: null,
   documentDeletedAt: null,
+  testIndicator: false,
 } as const
 
 const error = {
@@ -246,6 +247,18 @@ describe('runDetailSchema', () => {
     expect(runDetailSchema.parse(expired).documentDeletedAt).toBe(expired.documentDeletedAt)
     expect(runDetailSchema.parse(unreadable).documentDeletedAt).toBeNull()
     expect(runDetailSchema.safeParse({ ...unreadable, documentDeletedAt: undefined }).success).toBe(
+      false,
+    )
+  })
+})
+
+describe('the test indicator of a Run', () => {
+  it('is unknown once retention deleted the Document', () => {
+    const expired = { ...unreadable, documentDeletedAt: '2026-10-08T08:00:00.000Z' }
+
+    expect(runDetailSchema.parse({ ...unreadable, testIndicator: true }).testIndicator).toBe(true)
+    expect(runDetailSchema.parse({ ...expired, testIndicator: null }).testIndicator).toBeNull()
+    expect(runDetailSchema.safeParse({ ...unreadable, testIndicator: undefined }).success).toBe(
       false,
     )
   })

@@ -112,6 +112,7 @@ function largeDetail() {
     waitingForTradingPartnerSince: null,
     duplicateOf: null,
     documentDeletedAt: null,
+    testIndicator: false,
   })
 }
 

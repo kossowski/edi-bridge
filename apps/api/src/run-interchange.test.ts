@@ -127,6 +127,7 @@ describe('an inbound Run', () => {
     expect(run).toMatchObject({
       status: 'delivered',
       interchange: { id: documentId, controlReference: 'DETAIL1', raw: orders },
+      testIndicator: false,
     })
     expect(run.message).toMatchObject({ reference: 'ME0001', messageType: 'ORDERS' })
     expect(run.message?.segments).toHaveLength(22)
@@ -140,6 +141,17 @@ describe('an inbound Run', () => {
       name: 'Contact information',
       elements: [['OC'], ['Claus Früh']],
     })
+  })
+
+  it('carries the test indicator of its Interchange', async () => {
+    const { runId } = await received(
+      Buffer.from(
+        ordersWith('TEST1', (header) => `${header}++++++1`),
+        'latin1',
+      ),
+    )
+
+    await expect(detail(runId)).resolves.toMatchObject({ testIndicator: true })
   })
 
   it('shows the readable text of an Interchange kept as bytes, without a Message', async () => {

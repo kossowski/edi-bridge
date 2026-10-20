@@ -247,6 +247,7 @@ describe('GET /runs/:id', () => {
       replacedBy: null,
       duplicateOf: null,
       documentDeletedAt: null,
+      testIndicator: false,
     })
     expect(run.message?.segments[1]).toEqual({
       tag: 'BGM',
