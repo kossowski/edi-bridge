@@ -232,6 +232,15 @@ export function isUnauthorized(error: Error | null) {
   return error instanceof ApiError && error.status === 401
 }
 
+const queryRetries = 3
+
+// A 4xx answer stays the same on a second try, so a not-found state shows at once.
+export function retriesQuery(failureCount: number, error: Error) {
+  const refused = error instanceof ApiError && error.status >= 400 && error.status < 500
+
+  return !refused && failureCount < queryRetries
+}
+
 export function isConflict(error: Error | null) {
   return error instanceof ApiError && error.status === 409
 }
