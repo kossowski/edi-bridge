@@ -185,9 +185,9 @@ export const SendTestDocument = meta.story({
       'true',
     )
     // The api answers before the hand-over, so the page checks again until it is recorded.
-    await waitFor(() => {
+    await waitFor(async () => {
       checkNow()
-      expect(
+      await expect(
         canvas.getByText(/Waiting for the receipt confirmation from Spreewald Frische GmbH/),
       ).toBeVisible()
     })
@@ -295,13 +295,13 @@ export const ConfirmationArrives = meta.story({
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
     )
-    await waitFor(() => {
+    await waitFor(async () => {
       checkNow()
-      expect(canvas.getByText(/Waiting for the receipt confirmation/)).toBeVisible()
+      await expect(canvas.getByText(/Waiting for the receipt confirmation/)).toBeVisible()
     })
-    await waitFor(() => {
+    await waitFor(async () => {
       checkNow()
-      expect(
+      await expect(
         canvas.getByText(
           'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
           { selector: ':not([role="status"])' },
@@ -344,13 +344,13 @@ export const TestRejected = meta.story({
     await userEvent.click(
       await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
     )
-    await waitFor(() => {
+    await waitFor(async () => {
       checkNow()
-      expect(canvas.getByText(/Waiting for the receipt confirmation/)).toBeVisible()
+      await expect(canvas.getByText(/Waiting for the receipt confirmation/)).toBeVisible()
     })
-    await waitFor(() => {
+    await waitFor(async () => {
       checkNow()
-      expect(
+      await expect(
         canvas.getByText('Spreewald Frische GmbH rejected the test document.', {
           selector: ':not([role="status"])',
         }),
