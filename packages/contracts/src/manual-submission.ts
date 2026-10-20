@@ -42,6 +42,8 @@ export const documentUndecodableProblemSchema = z.object({
   // null when the Interchange names its character set, so another encoding would not help.
   encoding: characterEncodingSchema.nullable(),
   message: z.string().min(1),
+  // The decoder's reason without the advice of message, for a screen that gives its own advice.
+  reason: z.string().min(1),
 })
 
 export type DocumentUndecodableProblem = z.infer<typeof documentUndecodableProblemSchema>
@@ -56,6 +58,7 @@ export const documentUndecodableProblem = (
     encoding === null
       ? `${reason}.`
       : `${reason}. Choose another encoding, such as Windows-1252 for a typical German CSV.`,
+  reason,
 })
 
 // One Run per Message: an Interchange with several Messages produces several Runs. A Message

@@ -142,6 +142,7 @@ describe('documentUndecodableProblem', () => {
       encoding: 'utf-8',
       message:
         'Byte 12 (0xFC) is not valid utf-8. Choose another encoding, such as Windows-1252 for a typical German CSV.',
+      reason: 'Byte 12 (0xFC) is not valid utf-8',
     })
   })
 
@@ -155,6 +156,7 @@ describe('documentUndecodableProblem', () => {
       code: 'documentUndecodable',
       encoding: null,
       message: 'Byte 40 (0xFC) is not valid in UNOA (ASCII), at segment 2 (UNH).',
+      reason: 'Byte 40 (0xFC) is not valid in UNOA (ASCII), at segment 2 (UNH)',
     })
   })
 })
