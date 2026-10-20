@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { Clock, Duration, Effect, Exit, Fiber, Logger, Scope } from 'effect'
+import { Cause, Clock, Duration, Effect, Exit, Fiber, Logger, Option, Scope } from 'effect'
 import { TestClock } from 'effect/testing'
 import { createHash, randomBytes } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -162,7 +162,9 @@ afterEach(async () => {
   await connection.db.delete(workspaces).where(eq(workspaces.id, workspace.id))
 })
 
-const startPolling = async (service: DownloadService = download, logs: unknown[] = []) => {
+type PollLog = { message: unknown; cause: Cause.Cause<unknown> }
+
+const startPolling = async (service: DownloadService = download, logs: PollLog[] = []) => {
   const recording = recorded(service)
   const scope = await Effect.runPromise(Scope.make())
   const clock = await Effect.runPromise(TestClock.make().pipe(Scope.provide(scope)))
@@ -174,7 +176,9 @@ const startPolling = async (service: DownloadService = download, logs: unknown[]
       pipelineServices(connection.db, inMemoryRunQueue()),
       Effect.provideService(Download, recording.service),
       Effect.provideService(Clock.Clock, clock),
-      Effect.provide(Logger.layer([Logger.make(({ message }) => logs.push(message))])),
+      Effect.provide(
+        Logger.layer([Logger.make(({ message, cause }) => logs.push({ message, cause }))]),
+      ),
     ),
   )
 
@@ -525,7 +529,7 @@ describe('the polling of inbound SFTP Channels', () => {
 
   it('refuses a server whose host key does not match and logs the mismatch with the Channel', async () => {
     const { host, port, username, password } = sftp
-    const logs: unknown[] = []
+    const logs: PollLog[] = []
 
     await sftp.exec(
       `install -d -m 777 ${sftp.home}/impostor && echo '{}' > ${sftp.home}/impostor/invoice.json`,
@@ -544,7 +548,15 @@ describe('the polling of inbound SFTP Channels', () => {
 
     await vi.waitFor(
       () => {
-        expect(logs).toContainEqual([`Inbound Channel ${impostorId} not polled: hostKeyMismatch`])
+        const log = logs.find(
+          ({ message }) =>
+            Array.isArray(message) &&
+            message.includes(`Inbound Channel ${impostorId} not polled: hostKeyMismatch`),
+        )
+
+        expect(log && Cause.findErrorOption(log.cause)).toEqual(
+          Option.some(new DownloadFailed({ reason: 'hostKeyMismatch' })),
+        )
       },
       { timeout: 2000, interval: 10 },
     )
