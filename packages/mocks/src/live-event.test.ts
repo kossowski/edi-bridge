@@ -239,7 +239,7 @@ describe('createHandlers live events', () => {
 
     const stream = await openStream()
     const { frames } = await readFrames(stream, 1, 100)
-    void stream.reader.cancel()
+    await stream.reader.cancel()
 
     expect(stream.response.status).toBe(200)
     expect(frames).toEqual([])
@@ -288,10 +288,20 @@ describe('createHandlers live events', () => {
     )
 
     const stream = await openStream()
-    await fetch(`${apiUrl}${toPath(sendTestInterchangeEndpoint.path, readyForTest)}`, {
+
+    expect(stream.response.status).toBe(200)
+
+    const sent = await fetch(`${apiUrl}${toPath(sendTestInterchangeEndpoint.path, readyForTest)}`, {
       method: 'POST',
     })
-    const events = eventsOf((await readFrames(stream, 2)).frames)
+
+    expect(sent.status).toBe(200)
+
+    const { frames, ended } = await readFrames(stream, 2)
+
+    expect(ended, 'the stream ended before the hand-over and its CONTRL were announced').toBe(false)
+
+    const events = eventsOf(frames)
 
     expect(events.map(({ run }) => run.tradingPartner.id)).toEqual([
       readyForTest.id,
