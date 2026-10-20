@@ -13,6 +13,7 @@ import {
   flows,
   mappings,
   mappingVersions,
+  runs,
   tradingPartners,
   type Transaction,
   workspaces,
@@ -110,6 +111,37 @@ async function candidatesOf(
     )
 }
 
+// A test send is a manual submission on an outbound Flow; until it is handed over or fails, it is the awaited test.
+async function testInFlight(
+  tx: Transaction,
+  { workspaceId, tradingPartnerId }: TestInterchangeToSend,
+  candidates: readonly Candidate[],
+) {
+  if (candidates.length === 0) {
+    return false
+  }
+
+  const [inFlight] = await tx
+    .select({ id: runs.id })
+    .from(runs)
+    .where(
+      and(
+        eq(runs.workspaceId, workspaceId),
+        eq(runs.tradingPartnerId, tradingPartnerId),
+        eq(runs.manualSubmission, true),
+        inArray(
+          runs.flowId,
+          candidates.map(({ flow }) => flow.id),
+        ),
+        inArray(runs.status, ['received', 'processing']),
+        isNull(runs.handedOverAt),
+      ),
+    )
+    .limit(1)
+
+  return inFlight !== undefined
+}
+
 // The first Flow by name with a sample sends it, so the same Flow sends each test.
 function choose(
   candidates: readonly Candidate[],
@@ -140,7 +172,13 @@ export const sendTestInterchange = (send: TestInterchangeToSend) =>
           return refused({ reason: 'notAwaited' })
         }
 
-        const chosen = choose(await candidatesOf(tx, send))
+        const candidates = await candidatesOf(tx, send)
+
+        if (await testInFlight(tx, send, candidates)) {
+          return refused({ reason: 'notAwaited' })
+        }
+
+        const chosen = choose(candidates)
 
         if (chosen.kind === 'refused') {
           return chosen

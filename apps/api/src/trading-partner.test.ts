@@ -784,6 +784,10 @@ describe('POST /trading-partners/:id/test-interchange', () => {
 
     const [rejected] = await runsOf(into)
 
+    await connection.db
+      .update(runs)
+      .set({ status: 'delivered', handedOverAt: new Date('2026-10-06T14:03:00.000Z') })
+      .where(eq(runs.id, rejected?.id ?? ''))
     await setPartner({
       testInterchangeSentAt: new Date('2026-10-06T14:03:00.000Z'),
       testRejectedAt: new Date('2026-10-06T14:05:00.000Z'),
@@ -802,6 +806,84 @@ describe('POST /trading-partners/:id/test-interchange', () => {
       },
     })
     await expect(runsOf(into)).resolves.toHaveLength(2)
+  })
+
+  it.each<{
+    state: string
+    sendable: boolean
+    earlier: Partial<typeof runs.$inferInsert>
+  }>([
+    { state: 'waits for processing', sendable: false, earlier: { status: 'received' } },
+    { state: 'is in processing', sendable: false, earlier: { status: 'processing' } },
+    {
+      state: 'was handed over',
+      sendable: true,
+      earlier: { status: 'delivered', handedOverAt: new Date('2026-10-06T14:03:00.000Z') },
+    },
+    {
+      state: 'failed',
+      sendable: true,
+      earlier: {
+        status: 'failed',
+        failureStage: 'delivery',
+        error: { code: 'unreachable', message: 'Unreachable', position: null, details: null },
+        problem: { reason: 'defect', fixTarget: null },
+      },
+    },
+  ])(
+    'answers a second test while the earlier test Run $state',
+    async ({ state, sendable, earlier }) => {
+      const into = await seedTestingWorkspace(`Second Test Foods ${state}`)
+
+      await postTest(into.tradingPartnerId, seededAdmin)
+
+      const [first] = await runsOf(into)
+
+      await connection.db
+        .update(runs)
+        .set(earlier)
+        .where(eq(runs.id, first?.id ?? ''))
+
+      const queuedBefore = api.runQueue.queued.length
+
+      const response = await postTest(into.tradingPartnerId, seededAdmin)
+
+      expect(response.statusCode).toBe(sendable ? 200 : testInterchangeRefusedStatus)
+
+      if (!sendable) {
+        expect(response.json()).toEqual(testInterchangeRefusedProblem({ reason: 'notAwaited' }))
+      }
+
+      await expect(runsOf(into)).resolves.toHaveLength(sendable ? 2 : 1)
+      expect(api.runQueue.queued.slice(queuedBefore)).toHaveLength(sendable ? 1 : 0)
+    },
+  )
+
+  it('refuses the second of two tests sent right after another', async () => {
+    const into = await seedTestingWorkspace('Twice Test Foods')
+
+    const first = await postTest(into.tradingPartnerId, seededAdmin)
+    const second = await postTest(into.tradingPartnerId, seededAdmin)
+
+    expect(first.statusCode).toBe(200)
+    expect(second.statusCode).toBe(testInterchangeRefusedStatus)
+    expect(second.json()).toEqual(testInterchangeRefusedProblem({ reason: 'notAwaited' }))
+    await expect(runsOf(into)).resolves.toHaveLength(1)
+  })
+
+  it('refuses one of two tests sent at once', async () => {
+    const into = await seedTestingWorkspace('At Once Test Foods')
+
+    const responses = await Promise.all([
+      postTest(into.tradingPartnerId, seededAdmin),
+      postTest(into.tradingPartnerId, seededAdmin),
+    ])
+
+    expect(responses.map(({ statusCode }) => statusCode).toSorted()).toEqual([
+      200,
+      testInterchangeRefusedStatus,
+    ])
+    await expect(runsOf(into)).resolves.toHaveLength(1)
   })
 
   it('sends the sample of the first outbound Flow by name that has one', async () => {
