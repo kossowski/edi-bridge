@@ -426,10 +426,9 @@ describe('POST /trading-partners/:id/test-interchange', () => {
 
     await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
 
-    expect((await getTradingPartner(notStarted.id)).onboarding).toMatchObject({
-      testInterchangeSentAt: expect.any(String),
-      contrlReceivedAt: null,
-    })
+    const handedOver = (await getTradingPartner(notStarted.id)).onboarding
+    expect(handedOver.testInterchangeSentAt).toEqual(expect.any(String))
+    expect(handedOver.contrlReceivedAt).toBeNull()
     expect((await getTradingPartner(notStarted.id)).onboarding.contrlReceivedAt).toEqual(
       expect.any(String),
     )
