@@ -249,11 +249,16 @@ const erpSeeds: ReadonlyArray<ChannelRecord> = [
   },
 ]
 
+// Each seed Trading Partner runs one SFTP server, named after the first word of its name.
+function seedSftpServer(tradingPartner: { name: string }) {
+  const shortName = tradingPartner.name.split(' ')[0] ?? tradingPartner.name
+
+  return { shortName, host: `sftp.${shortName.toLowerCase()}.example` }
+}
+
 const tradingPartnerSeeds = seedTrafficPartners.flatMap(
   (tradingPartner, index): ChannelRecord[] => {
-    const shortName = tradingPartner.name.split(' ')[0] ?? tradingPartner.name
-
-    const host = `sftp.${shortName.toLowerCase()}.example`
+    const { shortName, host } = seedSftpServer(tradingPartner)
 
     const connection = sftpConnection(
       seededFaker(`sftp:${tradingPartner.id}`),
@@ -277,12 +282,11 @@ const tradingPartnerSeeds = seedTrafficPartners.flatMap(
   },
 )
 
-// Chose Message Types in both directions, but postponed the outbound Connection.
+// Chose Message Types in both directions, but postponed the outbound Channel.
 const postponedOutboundSeeds = seedTradingPartners
   .filter((tradingPartner) => !hasTraffic(tradingPartner) && tradingPartner.messageTypes)
   .map((tradingPartner, index): ChannelRecord => {
-    const shortName = tradingPartner.name.split(' ')[0] ?? tradingPartner.name
-    const host = `sftp.${shortName.toLowerCase()}.example`
+    const { shortName, host } = seedSftpServer(tradingPartner)
 
     return sftpChannel(
       seedId(3, erpSeeds.length + tradingPartnerSeeds.length + index + 1),

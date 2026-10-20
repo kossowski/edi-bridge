@@ -163,7 +163,7 @@ describe('GET /trading-partners/activity', () => {
     ])
   })
 
-  it('needs the directions of the Message Types chosen for a partner without Flows', async () => {
+  it('needs the directions of the Message Types chosen for a Trading Partner without Flows', async () => {
     server.use(
       ...tradingPartnerActivityHandlers(apiUrl, {
         tradingPartners: [{ ...rheinkauf, messageTypes: ['DESADV', 'INVOIC'] }],
@@ -346,7 +346,7 @@ describe('createHandlers', () => {
     expect(activities.some(({ flowCount }) => flowCount > 0)).toBe(true)
   })
 
-  it('gives a seed Trading Partner a Connection in one needed direction only', async () => {
+  it('gives a seed Trading Partner a Channel in one needed direction only', async () => {
     server.use(...createHandlers(apiUrl))
 
     const activities = await listActivities()
