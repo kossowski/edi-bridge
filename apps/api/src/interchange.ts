@@ -14,6 +14,7 @@ import { documents, flows, runs, tradingPartners } from '@edi-bridge/db'
 import { readInterchange } from '@edi-bridge/edifact'
 
 import { Db, type Database } from './db.js'
+import { messageAt } from './message-at.js'
 import { foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
 import { fromRuns, listRunSummaries, matchingSearchTerm } from './run.js'
 import { readableTextOf } from './stored-document.js'
@@ -200,7 +201,7 @@ export const listInterchanges = (query: InterchangeListQuery) =>
     } satisfies InterchangeList
   })
 
-const rawOf = async (db: Database, { id, direction }: InterchangeRow) => {
+const loadRaw = async (db: Database, { id, direction }: InterchangeRow) => {
   if (direction === 'inbound') {
     const [document] = await db
       .select({ id: documents.id, content: documents.content, bytes: documents.bytes })
@@ -234,7 +235,7 @@ export const loadInterchange = (id: string) =>
 
     const [raw, runsOf, messageIndexes] = yield* Effect.promise(() =>
       Promise.all([
-        rawOf(db, row),
+        loadRaw(db, row),
         listRunsOf(db, [row]),
         db
           .select({ id: runs.id, messageIndex: runs.messageIndex })
@@ -254,16 +255,10 @@ export const loadInterchange = (id: string) =>
     const sender = { identification: presentOrNull(header?.elements[1]?.[0]) }
     const receiver = { identification: presentOrNull(header?.elements[2]?.[0]) }
 
-    // An outbound Run, a test send too, has no Message Index: its Interchange holds one Message.
-    const onlyMessage = 1
-
     const messageReferenceOf = (runId: string) => {
-      const messageIndex =
-        messageIndexes.find((run) => run.id === runId)?.messageIndex ?? onlyMessage
+      const messageIndex = messageIndexes.find((run) => run.id === runId)?.messageIndex ?? null
 
-      const reference = messages[messageIndex - 1]?.message.header.elements[0]?.[0]
-
-      return reference === undefined || reference === '' ? null : reference
+      return messageAt(messages, messageIndex)?.reference ?? null
     }
 
     return {

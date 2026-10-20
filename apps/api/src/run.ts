@@ -48,6 +48,7 @@ import {
 import { Db, type Database } from './db.js'
 import { Conflict, NotFound, Unprocessable } from './errors.js'
 import { selectVersions, toHeader } from './mapping-version.js'
+import { messageAt } from './message-at.js'
 import { inWorkspace, rejectingInvalidId } from './rows.js'
 import { readableTextOf } from './stored-document.js'
 import { CurrentWorkspace } from './workspace.js'
@@ -305,7 +306,7 @@ type DetailRow = SummaryRow & {
   testIndicator: boolean | null
 }
 
-const rawOf = (row: DetailRow) =>
+const rawOfDetail = (row: DetailRow) =>
   directionOf(row) === 'outbound'
     ? row.output
     : row.documentId === null
@@ -315,14 +316,15 @@ const rawOf = (row: DetailRow) =>
 const parsedMessageOf = (
   raw: string,
   messageType: MessageType,
-  messageIndex: number,
+  messageIndex: number | null,
 ): ParsedMessage | null => {
-  const read = readInterchange(raw).messages[messageIndex - 1]?.message
-  const reference = read?.header.elements[0]?.[0]
+  const found = messageAt(readInterchange(raw).messages, messageIndex)
 
-  if (read === undefined || isBrokenMessage(read) || reference === undefined || reference === '') {
+  if (found === null || isBrokenMessage(found.message)) {
     return null
   }
+
+  const { message: read, reference } = found
 
   return {
     reference,
@@ -335,9 +337,6 @@ const parsedMessageOf = (
   }
 }
 
-// An outbound Run's Interchange holds its one Message, which mapping wrote.
-const onlyMessage = 1
-
 const parsedStageOf = { inbound: 'parse', outbound: 'mapping' } as const
 
 const toDetail = (
@@ -345,7 +344,7 @@ const toDetail = (
   loaded: Pick<RunDetail, 'steps' | 'mappingVersion' | 'replaces' | 'replacedBy'>,
 ): RunDetail => {
   const summary = toSummary(row)
-  const raw = rawOf(row)
+  const raw = rawOfDetail(row)
 
   const parsed = loaded.steps.some(
     ({ stage, status }) => stage === parsedStageOf[summary.direction] && status === 'succeeded',
@@ -355,10 +354,7 @@ const toDetail = (
     ...summary,
     ...loaded,
     interchange: summary.interchange && raw ? { ...summary.interchange, raw } : null,
-    message:
-      raw && parsed
-        ? parsedMessageOf(raw, summary.messageType, row.messageIndex ?? onlyMessage)
-        : null,
+    message: raw && parsed ? parsedMessageOf(raw, summary.messageType, row.messageIndex) : null,
     documentDeletedAt: row.documentDeletedAt?.toISOString() ?? null,
     testIndicator: row.testIndicator,
   }
