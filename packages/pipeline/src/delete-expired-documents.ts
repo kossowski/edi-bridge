@@ -1,7 +1,14 @@
 import { and, asc, eq, inArray, lte, notExists, sql } from 'drizzle-orm'
 import { DateTime, Effect } from 'effect'
 
-import { type Connection, documents, runs, type Transaction, workspaces } from '@edi-bridge/db'
+import {
+  channels,
+  type Connection,
+  documents,
+  runs,
+  type Transaction,
+  workspaces,
+} from '@edi-bridge/db'
 
 import { Database } from './services'
 
@@ -25,8 +32,11 @@ const deleteBatch = (db: Connection['db'], now: Date, size: number) =>
       .select({ id: documents.id })
       .from(documents)
       .innerJoin(workspaces, eq(workspaces.id, documents.workspaceId))
+      .innerJoin(channels, eq(channels.id, documents.channelId))
       .where(
         and(
+          // The seeded-traffic guard on a Run reads the source Channel of its Document.
+          eq(channels.seeded, false),
           lte(
             sql`${documents.receivedAt} + make_interval(days => ${workspaces.documentRetentionDays})`,
             sql`${now.toISOString()}::timestamptz`,

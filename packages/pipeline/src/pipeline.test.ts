@@ -2880,6 +2880,47 @@ describe('the Retry of a Run', () => {
     expect(handOvers).not.toHaveBeenCalled()
   })
 
+  it('fails the Retry of a seeded Run at delivery after its retention period and a Flow repointed to a Channel that is not seeded', async () => {
+    const seeded = await seedInvoiceWorkspace(connection.db, 'Seeded Expired Retry Foods')
+
+    await markSeeded(connection.db, seeded.inboundChannelId)
+    await markSeeded(connection.db, await deliverOverSftp(connection.db, seeded, sftpLogin()))
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), seeded)
+
+    await processQueued(queue)
+
+    const receivedAt = (await readRun(connection.db, runId))?.document?.receivedAt
+
+    assert.instanceOf(receivedAt, Date)
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(receivedAt.getTime() + Duration.toMillis(Duration.days(90)))
+        yield* deleteExpiredDocuments
+      }).pipe(
+        pipelineServices(connection.db, inMemoryRunQueue()),
+        Effect.provide(TestClock.layer()),
+      ),
+    )
+
+    const channelId = await deliverOverSftp(
+      connection.db,
+      seeded,
+      await outboxOf('seeded-expired-retry'),
+    )
+
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+
+    await expect(retried(seeded, runId, handOvers)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      handedOverAt: null,
+      error: { code: 'seededChannel' },
+      problem: { reason: 'unreachable', fixTarget: { kind: 'channel', channelId } },
+    })
+    expect(handOvers).not.toHaveBeenCalled()
+  })
+
   it('delivers the stored Interchange again under its control reference once the SFTP Channel is reachable', async () => {
     const into = await seedInvoiceWorkspace(connection.db, 'Flaky Foods')
     const login = await outboxOf('flaky')
