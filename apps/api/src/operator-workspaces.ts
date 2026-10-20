@@ -3,11 +3,14 @@ import { Effect } from 'effect'
 
 import { invites, members, runs, workspaces } from '@edi-bridge/db'
 
-import type { WorkspaceSummary } from '@edi-bridge/contracts'
+import type { WorkspaceInput, WorkspaceSummary } from '@edi-bridge/contracts'
 
 import { Db } from './db.js'
 import { startOfUtcDay } from './duration.js'
-import { byName } from './rows.js'
+import { Conflict } from './errors.js'
+import { byName, exactlyOne } from './rows.js'
+
+import type { ValidationError } from './parse.js'
 
 const latest = (...dates: (Date | null | undefined)[]) =>
   dates.reduce<Date | null>(
@@ -92,3 +95,40 @@ const loadSummaries = (workspaceId?: string) =>
 export const listWorkspaceSummaries = Effect.map(loadSummaries(), (summaries) =>
   summaries.sort(byName),
 )
+
+const duplicateName = new Conflict({ message: 'Another Workspace already uses this name' })
+
+export const createWorkspace = (input: Effect.Effect<WorkspaceInput, ValidationError>) =>
+  Effect.gen(function* () {
+    const { name } = yield* input
+    const db = yield* Db
+
+    // The lock keeps two Operators from creating the same name at once.
+    const created = yield* Effect.promise(() =>
+      db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext('workspaces.name'))`)
+
+        const [taken] = await tx
+          .select({ id: workspaces.id })
+          .from(workspaces)
+          .where(eq(sql`lower(${workspaces.name})`, name.toLowerCase()))
+
+        if (taken !== undefined) {
+          return undefined
+        }
+
+        const [workspace] = await tx
+          .insert(workspaces)
+          .values({ name })
+          .returning({ id: workspaces.id })
+
+        return workspace
+      }),
+    )
+
+    if (created === undefined) {
+      return yield* duplicateName
+    }
+
+    return yield* Effect.flatMap(loadSummaries(created.id), exactlyOne)
+  })

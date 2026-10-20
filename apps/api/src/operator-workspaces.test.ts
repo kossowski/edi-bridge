@@ -3,6 +3,9 @@ import { z } from 'zod'
 
 import {
   createInviteEndpoint,
+  createWorkspaceEndpoint,
+  tradingPartnersEndpoint,
+  type WorkspaceInput,
   operatorWorkspacesEndpoint,
   toPath,
   workspaceSummarySchema,
@@ -49,6 +52,44 @@ const listWorkspaces = async (client: Client) => {
   return summariesSchema.parse(response.json())
 }
 
+const createWorkspace = (client: Client, body: WorkspaceInput) =>
+  client.inject({
+    method: createWorkspaceEndpoint.method,
+    url: createWorkspaceEndpoint.path,
+    body,
+  })
+
+const createdWorkspace = async (body: WorkspaceInput) => {
+  const response = await createWorkspace(operator, body)
+
+  expect(response.statusCode, response.body).toBe(201)
+
+  return workspaceSummarySchema.parse(response.json())
+}
+
+// A Member of the new Workspace, to read its data through the API.
+const memberOf = async (workspaceId: string, slug: string) => {
+  const member = {
+    name: `${slug} admin`,
+    email: `admin@${slug}.example`,
+    password: `${slug}-admin-password`,
+    workspaceId,
+    role: 'admin' as const,
+  }
+
+  await addMember(api.connection.db, member)
+
+  return signIn(api.app, member)
+}
+
+const read = async <A>(client: Client, url: string, schema: z.ZodType<A>) => {
+  const response = await client.inject({ method: 'GET', url })
+
+  expect(response.statusCode, response.body).toBe(200)
+
+  return schema.parse(response.json())
+}
+
 describe('GET /operator/workspaces', () => {
   it('lists every Workspace by name with its Members, open invites and traffic', async () => {
     const { workspace } = await seedWorkspaceWithAdmin(api, 'Alpenland Getränke GmbH')
@@ -92,6 +133,51 @@ describe('GET /operator/workspaces', () => {
       method: operatorWorkspacesEndpoint.method,
       url: operatorWorkspacesEndpoint.path,
     })
+
+    expect(response.statusCode).toBe(403)
+  })
+})
+
+describe('POST /operator/workspaces', () => {
+  it('creates an empty Workspace without seed', async () => {
+    const created = await createdWorkspace({ name: '  Weserland Mühle KG ', seed: false })
+
+    expect(created).toMatchObject({
+      name: 'Weserland Mühle KG',
+      gln: null,
+      kind: 'standard',
+      seeded: false,
+      memberCount: 0,
+      pendingInviteCount: 0,
+      documentsToday: 0,
+      lastActivityAt: null,
+      lastResetAt: null,
+    })
+    expect((await listWorkspaces(operator)).map(({ id }) => id)).toContain(created.id)
+
+    const admin = await memberOf(created.id, 'weserland')
+
+    expect(await read(admin, tradingPartnersEndpoint.path, z.array(z.unknown()))).toEqual([])
+  })
+
+  it('refuses a name another Workspace uses, ignoring case', async () => {
+    const response = await createWorkspace(operator, {
+      name: ownWorkspace.name.toUpperCase(),
+      seed: false,
+    })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ message: 'Another Workspace already uses this name' })
+  })
+
+  it('refuses a blank name', async () => {
+    const response = await createWorkspace(operator, { name: '   ', seed: false })
+
+    expect(response.statusCode).toBe(400)
+  })
+
+  it('refuses everyone but the Operator', async () => {
+    const response = await createWorkspace(api.admin, { name: 'Admin Workspace', seed: false })
 
     expect(response.statusCode).toBe(403)
   })

@@ -64,6 +64,7 @@ import {
   moveFlowMappingVersionEndpoint,
   operatorWorkspaceMembersEndpoint,
   operatorWorkspacesEndpoint,
+  createWorkspaceEndpoint,
   operatorWorkspaceSettingsEndpoint,
   orderLifecycleEndpoint,
   orderLifecyclesEndpoint,
@@ -165,7 +166,7 @@ import {
 } from './mapping-version.js'
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
-import { listWorkspaceSummaries } from './operator-workspaces.js'
+import { createWorkspace, listWorkspaceSummaries } from './operator-workspaces.js'
 import { listOrderLifecycles, loadOrderLifecycles } from './order-lifecycle.js'
 import { parse, type ValidationError } from './parse.js'
 import {
@@ -999,6 +1000,15 @@ function registerRoutes(
 
   app.get(operatorWorkspacesEndpoint.path, (request, reply) =>
     respondToOperator(request, reply, listWorkspaceSummaries),
+  )
+
+  app.post(createWorkspaceEndpoint.path, (request, reply) =>
+    respondToOperator(
+      request,
+      reply,
+      createWorkspace(parse(createWorkspaceEndpoint.body, request.body)),
+      201,
+    ),
   )
 
   app.get<{ Params: { workspaceId: string } }>(
