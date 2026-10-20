@@ -9,7 +9,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
@@ -53,6 +53,16 @@ export function reprocessMapping(run: FailedRun): ReprocessMapping | null {
 
   return (
     run.mappingVersion && { id: run.mappingVersion.mappingId, name: run.mappingVersion.mappingName }
+  )
+}
+
+// Mirrors isFixedByReprocess in the api: trying a Defect again outside delivery reprocesses it.
+export function retryReprocesses(run: FailedRun): boolean {
+  return (
+    run.problem.reason === 'defect' &&
+    run.failureStage !== 'delivery' &&
+    run.problem.whoFixes !== 'tradingPartner' &&
+    run.mappingVersion !== null
   )
 }
 
@@ -156,6 +166,31 @@ export function ProcessAgainStep({ run, mapping }: { run: FailedRun; mapping: Re
   )
 }
 
+export function DocumentExpiredStep({
+  run,
+  deletedAt,
+  afterFix,
+}: {
+  run: FailedRun
+  deletedAt: string
+  afterFix: boolean
+}) {
+  const t = useTranslations('Document.problem.steps')
+  const format = useFormatter()
+
+  return (
+    <p>
+      {t.rich('documentExpired', {
+        direction: run.direction,
+        tradingPartner: run.tradingPartner.name,
+        afterFix: afterFix ? 'yes' : 'no',
+        deletedAt: format.dateTime(new Date(deletedAt), { dateStyle: 'medium' }),
+        time: (chunks) => <time dateTime={deletedAt}>{chunks}</time>,
+      })}
+    </p>
+  )
+}
+
 export function TryAgainStep({ run, secondary }: { run: FailedRun; secondary: boolean }) {
   const t = useTranslations('Document')
   const canChange = useCanChange()
@@ -163,7 +198,9 @@ export function TryAgainStep({ run, secondary }: { run: FailedRun; secondary: bo
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-2">
-      <p>{t('problem.steps.tryAgain', { stage: run.failureStage })}</p>
+      <p>
+        {t('problem.steps.tryAgain', { action: retryReprocesses(run) ? 'reprocess' : 'retry' })}
+      </p>
       {canChange ? (
         <Button
           disabled={retry.isPending}

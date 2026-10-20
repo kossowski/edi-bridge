@@ -11,10 +11,12 @@ import { FixerBadge, fixerIcons, shownFixer } from '@/components/documents/fixer
 import { invalidContentCode } from '@/components/documents/invalid-content'
 import {
   CopyPartnerMessage,
+  DocumentExpiredStep,
   MarkWaitingStep,
   ProcessAgainStep,
   ProcessedAgain,
   reprocessMapping,
+  retryReprocesses,
   TryAgainStep,
   useFreshlyReprocessed,
 } from '@/components/documents/problem-actions'
@@ -28,8 +30,14 @@ import type { FixTarget } from '@edi-bridge/contracts'
 
 export type WhatToDoStep = { key: string; content: ReactNode }
 
-function useProblemText({ problem, error, direction, failureStage, tradingPartner }: FailedRun) {
+// Trying again reprocesses the Run, which needs the Document that retention may have deleted.
+function retryDocumentDeletedAt(run: FailedRun): string | null {
+  return retryReprocesses(run) ? run.documentDeletedAt : null
+}
+
+function useProblemText(run: FailedRun) {
   const t = useTranslations('Document.problem.reason')
+  const { problem, error, direction, failureStage, tradingPartner } = run
   const { fixTarget } = problem
   const field = fixTarget?.kind === 'mapping' ? fixTarget.fieldPath : null
   const lookupTable = fixTarget?.kind === 'lookupTable' ? fixTarget : null
@@ -102,7 +110,10 @@ function useProblemText({ problem, error, direction, failureStage, tradingPartne
     case 'defect': {
       return {
         title: t('defect.title'),
-        description: t('defect.description', { stage: failureStage }),
+        description: t('defect.description', {
+          stage: failureStage,
+          retry: retryDocumentDeletedAt(run) === null ? 'available' : 'documentExpired',
+        }),
       }
     }
   }
@@ -157,6 +168,13 @@ function fixStep(text: string, run: FailedRun, target: FixTarget, primary: boole
   }
 }
 
+function documentExpiredStep(run: FailedRun, deletedAt: string, afterFix: boolean): WhatToDoStep {
+  return {
+    key: 'documentExpired',
+    content: <DocumentExpiredStep afterFix={afterFix} deletedAt={deletedAt} run={run} />,
+  }
+}
+
 export function useFixSteps(run: FailedRun): WhatToDoStep[] {
   const t = useTranslations('Document.problem.steps')
   const { problem, tradingPartner } = run
@@ -185,12 +203,25 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
       return [
         ...(target ? [fixStep(t('fixCause'), run, target, true)] : []),
         ...(mapping
-          ? [{ key: 'processAgain', content: <ProcessAgainStep mapping={mapping} run={run} /> }]
+          ? [
+              run.documentDeletedAt === null
+                ? {
+                    key: 'processAgain',
+                    content: <ProcessAgainStep mapping={mapping} run={run} />,
+                  }
+                : documentExpiredStep(run, run.documentDeletedAt, target !== null),
+            ]
           : []),
       ]
     }
 
     case 'retry': {
+      const deletedAt = retryDocumentDeletedAt(run)
+
+      if (deletedAt !== null) {
+        return [documentExpiredStep(run, deletedAt, false)]
+      }
+
       // The setup has to be complete before trying again can work.
       if (problem.reason === 'incompleteSetup' && target) {
         return [
