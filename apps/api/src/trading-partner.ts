@@ -36,9 +36,8 @@ const toTradingPartner = (row: Row): TradingPartner => ({
   onboarding: {
     testInterchangeSentAt: row.testInterchangeSentAt?.toISOString() ?? null,
     contrlReceivedAt: row.contrlReceivedAt?.toISOString() ?? null,
-    // The rejected test is stored once the pipeline records rejecting CONTRLs.
-    testRejectedAt: null,
-    testRejectedRunId: null,
+    testRejectedAt: row.testRejectedAt?.toISOString() ?? null,
+    testRejectedRunId: row.testRejectedRunId,
   },
 })
 

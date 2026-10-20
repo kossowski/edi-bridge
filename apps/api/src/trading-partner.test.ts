@@ -14,9 +14,17 @@ import {
   updateTradingPartnerEndpoint,
   withCheckDigit,
 } from '@edi-bridge/contracts'
-import { type Connection, tradingPartners, workspaces } from '@edi-bridge/db'
+import { type Connection, documents, runs, tradingPartners, workspaces } from '@edi-bridge/db'
+import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
-import { type Client, ownWorkspace, startTestApi, type TestApi } from './testing.js'
+import {
+  addMember,
+  type Client,
+  ownWorkspace,
+  signIn,
+  startTestApi,
+  type TestApi,
+} from './testing.js'
 
 type TradingPartnerBody = Omit<
   TradingPartnerInput,
@@ -149,6 +157,64 @@ describe('GET /trading-partners/:id', () => {
 
     expect(response.statusCode).toBe(404)
     expect(response.json()).toEqual({ message: 'Not found' })
+  })
+
+  describe('a rejected test Interchange', () => {
+    let seeded: InvoiceWorkspace | undefined
+
+    afterEach(async () => {
+      if (seeded !== undefined) {
+        await connection.db.delete(workspaces).where(eq(workspaces.id, seeded.id))
+      }
+    })
+
+    it('shows when the test was rejected and the Run that sent it', async () => {
+      seeded = await seedInvoiceWorkspace(connection.db, 'Refused Test Foods')
+
+      const member = {
+        name: 'Refused Test Foods admin',
+        email: 'admin@refused-test-foods.example',
+        password: 'refused-test-foods-admin-password',
+        workspaceId: seeded.id,
+        role: 'admin' as const,
+      }
+
+      await addMember(connection.db, member)
+
+      const [document] = await connection.db
+        .insert(documents)
+        .values({
+          workspaceId: seeded.id,
+          channelId: seeded.inboundChannelId,
+          fileName: 'invoice.json',
+          content: '{}',
+        })
+        .returning()
+
+      const [run] = await connection.db
+        .insert(runs)
+        .values({
+          workspaceId: seeded.id,
+          documentId: document?.id,
+          flowId: seeded.flowId,
+          tradingPartnerId: seeded.tradingPartnerId,
+          manualSubmission: false,
+          status: 'delivered',
+        })
+        .returning()
+
+      await connection.db
+        .update(tradingPartners)
+        .set({ testRejectedAt: new Date('2026-10-06T14:05:00.000Z'), testRejectedRunId: run?.id })
+        .where(eq(tradingPartners.id, seeded.tradingPartnerId))
+
+      const response = await get(seeded.tradingPartnerId, await signIn(api.app, member))
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toMatchObject({
+        onboarding: { testRejectedAt: '2026-10-06T14:05:00.000Z', testRejectedRunId: run?.id },
+      })
+    })
   })
 })
 
