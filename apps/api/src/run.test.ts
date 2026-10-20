@@ -173,7 +173,7 @@ describe('GET /runs', () => {
     ['channel traffic', () => 'manualSubmission=false', () => []],
     ['manual Submissions', () => 'manualSubmission=true', () => [received, failed, processed]],
     ['a time range', () => `receivedTo=${sevenDaysAgo}`, () => [processed]],
-    ['a Business Reference', () => 'q=471', () => [processed]],
+    ['a Business Reference', () => 'q=471', () => [failed, processed]],
     ['a Trading Partner name in any case', () => 'q=hanse', () => [received, failed, processed]],
     ['a text no Run contains', () => 'q=nordwind', () => []],
   ])('filters by %s', async (_, query, expected) => {

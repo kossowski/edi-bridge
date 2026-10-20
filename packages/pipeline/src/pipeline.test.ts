@@ -1733,7 +1733,7 @@ describe('the processing of a Run', () => {
     })
   })
 
-  it('stops a Run with an invalid INVOIC at validation and keeps no output', async () => {
+  it('stops a Run with an invalid INVOIC at validation and keeps its built Message', async () => {
     const tooLongInvoiceNumber = JSON.stringify({
       ...invoiceDocument,
       invoiceNumber: 'INV-'.repeat(10),
@@ -1750,6 +1750,11 @@ describe('the processing of a Run', () => {
       failureStage: 'validation',
       mappingVersionId: workspace.mappingVersionId,
       output: null,
+      businessReference: '4711',
+      documentNumber: 'INV-'.repeat(10),
+      deliveryInput: {
+        segments: expect.arrayContaining([expect.objectContaining({ tag: 'BGM' })]),
+      },
       error: {
         code: 'too-long-element',
         position: { segment: 2, tag: 'BGM', element: 2, component: null },
@@ -3127,6 +3132,33 @@ describe('the Retry of a Run', () => {
       ),
     )
 
+    expect(error).toEqual(new RunNotRetryable({ runId }))
+    expect(retrying.queued).toEqual([])
+    await expect(readRun(connection.db, runId)).resolves.toEqual(failed)
+  })
+
+  it('refuses a Run that failed at validation although it kept its built Message', async () => {
+    const tooLongInvoiceNumber = JSON.stringify({
+      ...invoiceDocument,
+      invoiceNumber: 'INV-'.repeat(10),
+    })
+
+    const { queue, runId } = await receiveInvoice(tooLongInvoiceNumber)
+
+    await processQueued(queue)
+
+    const failed = await readRun(connection.db, runId)
+    const retrying = inMemoryRunQueue()
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        retryRun({ workspaceId: workspace.id, runId }).pipe(
+          pipelineServices(connection.db, retrying),
+        ),
+      ),
+    )
+
+    expect(failed).toMatchObject({ failureStage: 'validation', deliveryInput: expect.anything() })
     expect(error).toEqual(new RunNotRetryable({ runId }))
     expect(retrying.queued).toEqual([])
     await expect(readRun(connection.db, runId)).resolves.toEqual(failed)
