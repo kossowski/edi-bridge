@@ -4,7 +4,15 @@ import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 import { ManualSubmissionSheet } from '@/components/documents/manual-submission-sheet'
 import { darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import { channelsEndpoint, submitDocumentEndpoint } from '@edi-bridge/contracts'
+import {
+  channelsEndpoint,
+  decodeBase64,
+  type SubmittedDocument,
+  submitDocumentEndpoint,
+} from '@edi-bridge/contracts'
+import { decodeBytes, decodeInterchange } from '@edi-bridge/edifact'
+import dispatchUrl from '@edi-bridge/fixtures/documents/valid/dispatch-nordlicht-markt.csv?url'
+import ordersUrl from '@edi-bridge/fixtures/documents/valid/orders-nordlicht-markt.edi?url'
 import { createHandlers, seedChannels } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -38,7 +46,48 @@ const orders = new File([twoOrders], 'orders.edi', { type: 'text/plain' })
 
 const mixed = new File([mixedInterchange], 'mixed.edi', { type: 'text/plain' })
 
+// UNOA allows only ASCII, so the ä (E4) makes the Interchange invalid in its character set.
+const unoaInterchange = new File(
+  [
+    "UNB+UNOA:3+4012345000016:14+4098765000013:14+261009:1015+4713'UNH+1+ORDERS:D:96A:UN:EAN008'BGM+220+PO-4+9'NAD+BY+++K",
+    new Uint8Array([0xe4]),
+    "ufer'UNT+4+1'UNZ+1+4713'",
+  ],
+  'unoa.edi',
+)
+
+async function fixtureFile(url: string, fileName: string) {
+  const response = await fetch(url)
+
+  return new File([await response.arrayBuffer()], fileName)
+}
+
+// Falls through to the handlers of the mock api, which decode and route what it records.
+function recordSubmissions() {
+  const received: SubmittedDocument[] = []
+
+  return {
+    received,
+    handler: http.post(`${apiUrl}${submitDocumentEndpoint.path}`, async ({ request }) => {
+      const body = submitDocumentEndpoint.body.safeParse(await request.clone().json())
+
+      if (body.success) {
+        received.push(body.data.document)
+      }
+    }),
+  }
+}
+
+function receivedText({ content, encoding = 'utf-8' }: SubmittedDocument) {
+  const bytes = decodeBase64(content)
+  const decoded = decodeInterchange(bytes) ?? decodeBytes(bytes, encoding)
+
+  return 'text' in decoded ? decoded.text : null
+}
+
 const channelLabel = 'Where does the document come from?'
+
+const encodingLabel = 'Character encoding'
 
 async function sheet(name = 'Upload a document') {
   const element = await screen.findByRole('dialog', { name })
@@ -47,8 +96,8 @@ async function sheet(name = 'Upload a document') {
   return within(element)
 }
 
-async function loaded(content: Awaited<ReturnType<typeof sheet>>) {
-  const trigger = content.getByRole('combobox', { name: channelLabel })
+async function loaded(content: Awaited<ReturnType<typeof sheet>>, label = channelLabel) {
+  const trigger = content.getByRole('combobox', { name: label })
   await waitFor(() => expect(trigger).not.toHaveAttribute('aria-disabled'))
 
   return trigger
@@ -60,7 +109,13 @@ async function chooseChannel(content: Awaited<ReturnType<typeof sheet>>, channel
   await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 }
 
-async function submitFile(file: File, channel?: string) {
+async function chooseEncoding(content: Awaited<ReturnType<typeof sheet>>, encoding: string) {
+  await userEvent.click(await content.findByRole('combobox', { name: encodingLabel }))
+  await userEvent.click(await screen.findByRole('option', { name: encoding }))
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+}
+
+async function submitFile(file: File, channel?: string, encoding?: string) {
   const content = await sheet()
 
   if (channel) {
@@ -71,6 +126,11 @@ async function submitFile(file: File, channel?: string) {
   }
 
   await userEvent.upload(content.getByLabelText('File'), file)
+
+  if (encoding) {
+    await chooseEncoding(content, encoding)
+  }
+
   await userEvent.click(content.getByRole('button', { name: 'Upload' }))
 
   return content
@@ -280,6 +340,103 @@ export const NothingRoutable = meta.story({
       'No document route on this connection handles the documents in this file.',
     )
     await expect(content.getByRole('link', { name: 'Set up a document route' })).toBeVisible()
+  },
+})
+
+const latinOrders = recordSubmissions()
+
+export const LatinOrders = meta.story({
+  beforeEach({ msw }) {
+    latinOrders.received.length = 0
+    msw.use(latinOrders.handler)
+  },
+  async play() {
+    const file = await fixtureFile(ordersUrl, 'orders-nordlicht-markt.edi')
+    const content = await submitFile(file, 'Hansemarkt SFTP inbox')
+
+    await expect(await content.findByRole('heading', { name: '1 document created' })).toBeVisible()
+    await expect(content.queryByRole('combobox', { name: encodingLabel })).toBeNull()
+
+    const [received] = latinOrders.received
+
+    await expect(received?.encoding).toBeUndefined()
+    await expect(receivedText(received!)).toContain("CTA+OC+:Jana Weiß'")
+    await expect(receivedText(received!)).not.toContain('\uFFFD')
+  },
+})
+
+const windows1252Csv = recordSubmissions()
+
+export const Windows1252Csv = meta.story({
+  beforeEach({ msw }) {
+    windows1252Csv.received.length = 0
+    msw.use(windows1252Csv.handler)
+  },
+  async play() {
+    const file = await fixtureFile(dispatchUrl, 'dispatch-nordlicht-markt.csv')
+    const content = await submitFile(file, 'ERP webhook', 'Windows-1252')
+
+    await expect(await content.findByRole('heading', { name: '1 document created' })).toBeVisible()
+
+    const [received] = windows1252Csv.received
+
+    await expect(received?.encoding).toBe('windows-1252')
+    await expect(receivedText(received!)).toContain('Grünkohl im Glas 720 ml')
+    await expect(receivedText(received!)).not.toContain('\uFFFD')
+  },
+})
+
+export const WrongEncoding = meta.story({
+  async play() {
+    const file = await fixtureFile(dispatchUrl, 'dispatch-nordlicht-markt.csv')
+    const content = await submitFile(file, 'ERP webhook')
+    const alert = await content.findByRole('alert')
+
+    await expect(content.getByRole('combobox', { name: encodingLabel })).toHaveTextContent('UTF-8')
+    await expect(alert).toHaveTextContent(
+      'The file is not valid UTF-8. Choose another encoding, such as Windows-1252 for a typical German CSV file, and upload it again.',
+    )
+    await expect(alert).toHaveTextContent(/Details: Byte \d+ \(0xE4\) is not valid utf-8/)
+    await expect(content.queryByRole('link', { name: 'Set up a document route' })).toBeNull()
+
+    await chooseEncoding(content, 'Windows-1252')
+    await expect(content.queryByRole('alert')).toBeNull()
+    await userEvent.click(content.getByRole('button', { name: 'Upload' }))
+    await expect(await content.findByRole('heading', { name: '1 document created' })).toBeVisible()
+  },
+})
+
+export const UndecodableInterchange = meta.story({
+  args: { defaultChannelId: inbox.id },
+  async play() {
+    const content = await submitFile(unoaInterchange)
+    const alert = await content.findByRole('alert')
+
+    await expect(alert).toHaveTextContent(
+      'The transmission is not valid in the character set its header names. Ask the partner to send it again.',
+    )
+    await expect(alert).toHaveTextContent(/Details: .+/)
+    await expect(content.queryByRole('combobox', { name: encodingLabel })).toBeNull()
+  },
+})
+
+export const GermanWrongEncoding = meta.story({
+  decorators: [german],
+  async play() {
+    const file = await fixtureFile(dispatchUrl, 'dispatch-nordlicht-markt.csv')
+    const content = await sheet('Beleg hochladen')
+
+    await userEvent.click(await loaded(content, 'Woher kommt der Beleg?'))
+    await userEvent.click(await screen.findByRole('option', { name: /^ERP webhook/ }))
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+    await userEvent.upload(content.getByLabelText('Datei'), file)
+    await expect(
+      await content.findByRole('combobox', { name: 'Zeichenkodierung' }),
+    ).toHaveTextContent('UTF-8')
+    await userEvent.click(content.getByRole('button', { name: 'Hochladen' }))
+    await expect(await content.findByRole('alert')).toHaveTextContent(
+      'Die Datei ist kein gültiges UTF-8. Wählen Sie eine andere Kodierung, etwa Windows-1252 für eine typische deutsche CSV-Datei, und laden Sie sie erneut hoch.',
+    )
   },
 })
 

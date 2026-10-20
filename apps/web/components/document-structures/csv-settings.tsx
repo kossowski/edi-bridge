@@ -34,7 +34,7 @@ export const delimiterKeys = {
   '|': 'pipe',
 } as const satisfies Record<CsvDelimiter, string>
 
-const encodingLabels = { 'utf-8': 'UTF-8', 'windows-1252': 'Windows-1252' } as const
+export const encodingLabels = { 'utf-8': 'UTF-8', 'windows-1252': 'Windows-1252' } as const
 
 function SettingSelect<Value extends string>({
   id,

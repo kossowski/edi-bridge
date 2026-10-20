@@ -31,6 +31,9 @@ import {
   type DocumentStructureOrigin,
   type DocumentStructureProblem,
   documentStructureProblemSchema,
+  type DocumentUndecodableProblem,
+  documentUndecodableProblemSchema,
+  documentUndecodableStatus,
   documentStructuresEndpoint,
   firstStepsEndpoint,
   type Endpoint,
@@ -737,4 +740,18 @@ export function moveFlowMappingVersion(id: string, body: MoveFlowMappingVersionB
 
 export function submitDocument(body: ManualSubmissionInput) {
   return request(submitDocumentEndpoint, { body })
+}
+
+export function documentUndecodableOf(error: Error | null): DocumentUndecodableProblem | null {
+  if (!(error instanceof ApiError) || error.status !== documentUndecodableStatus) {
+    return null
+  }
+
+  try {
+    const parsed = documentUndecodableProblemSchema.safeParse(JSON.parse(error.body))
+
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
 }

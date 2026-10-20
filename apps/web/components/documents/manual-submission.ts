@@ -1,17 +1,23 @@
 import { maxDocumentBytes, type MessageType, messageTypeSchema } from '@edi-bridge/contracts'
+import { decodeInterchange } from '@edi-bridge/edifact'
 
 export type DocumentProblem = 'required' | 'empty' | 'tooLarge'
 
-export function documentProblem(content: string | null): DocumentProblem | null {
-  if (content === null) {
+export function documentProblem(bytes: Uint8Array | null): DocumentProblem | null {
+  if (bytes === null) {
     return 'required'
   }
 
-  if (content.length === 0) {
+  if (bytes.byteLength === 0) {
     return 'empty'
   }
 
-  return content.length > maxDocumentBytes ? 'tooLarge' : null
+  return bytes.byteLength > maxDocumentBytes ? 'tooLarge' : null
+}
+
+// The api decodes such an Interchange by its UNB and ignores a chosen encoding.
+export function namesItsCharacterSet(bytes: Uint8Array): boolean {
+  return decodeInterchange(bytes) !== undefined
 }
 
 export function parseMessageType(messageType: string): MessageType | null {

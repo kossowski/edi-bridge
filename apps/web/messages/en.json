@@ -3812,18 +3812,27 @@
     },
     "file": {
       "label": "File",
-      "description": "An EDI file from a partner, or a JSON or CSV file from your own systems. At most 5 million characters.",
+      "description": "An EDI file from a partner, or a JSON or CSV file from your own systems. At most 5 MB.",
       "drop": "Drop the file here or choose it.",
       "chosen": "Chosen: {fileName}"
+    },
+    "encoding": {
+      "label": "Character encoding",
+      "description": "How the file stores umlauts. Older ERP exports often use Windows-1252."
     },
     "errors": {
       "channelRequired": "Choose where the document comes from.",
       "file": {
         "required": "Choose a file.",
         "empty": "The file is empty.",
-        "tooLarge": "The file is too large. A file can have at most 5 million characters."
+        "tooLarge": "The file is too large. A file can have at most 5 MB."
       },
       "unroutable": "No document route on this connection handles the documents in this file. Set up a document route for them first.",
+      "undecodable": {
+        "encoding": "The file is not valid {encoding}. Choose another encoding, such as Windows-1252 for a typical German CSV file, and upload it again.",
+        "interchange": "The transmission is not valid in the character set its header names. Ask the partner to send it again.",
+        "details": "Details: {message}"
+      },
       "failed": "The file could not be uploaded. Try again."
     },
     "result": {

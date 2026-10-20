@@ -8,9 +8,11 @@ import Link from 'next/link'
 import { type DragEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 
 import { useChannelKindLabel, useChannelTradingPartners } from '@/components/channels/channel-parts'
+import { encodingLabels } from '@/components/document-structures/csv-settings'
 import {
   documentProblem,
   type DocumentProblem,
+  namesItsCharacterSet,
   parseMessageType,
 } from '@/components/documents/manual-submission'
 import { RunStatusBadge } from '@/components/documents/run-status'
@@ -18,7 +20,7 @@ import { useRunTitle } from '@/components/documents/run-title'
 import { describedBy, FormField, SelectField } from '@/components/form-field'
 import { MessageTypeName, usePlainNames } from '@/components/plain-names'
 import { useLookup } from '@/hooks/use-lookup'
-import { ApiError, submitDocument } from '@/lib/api/client'
+import { ApiError, documentUndecodableOf, submitDocument } from '@/lib/api/client'
 import {
   channelsQuery,
   interchangeKeys,
@@ -27,7 +29,7 @@ import {
   runKeys,
 } from '@/lib/api/queries'
 import { documentHref } from '@/lib/navigation'
-import { encodeBase64 } from '@edi-bridge/contracts'
+import { type CharacterEncoding, characterEncodings, encodeBase64 } from '@edi-bridge/contracts'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Button, buttonVariants } from '@edi-bridge/ui/components/button'
 import {
@@ -121,7 +123,34 @@ function ChannelChoice({
   )
 }
 
-function FailureAlert({ message, children }: { message: string; children: ReactNode }) {
+function EncodingChoice({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: CharacterEncoding
+  onChange: (encoding: CharacterEncoding) => void
+}) {
+  const t = useTranslations('ManualSubmission.encoding')
+
+  return (
+    <SelectField
+      id={id}
+      description={t('description')}
+      items={characterEncodings.map((encoding) => ({
+        value: encoding,
+        label: encodingLabels[encoding],
+      }))}
+      label={t('label')}
+      value={value}
+      className="w-full"
+      onChange={onChange}
+    />
+  )
+}
+
+function FailureAlert({ message, children }: { message: string; children?: ReactNode }) {
   return (
     <Alert variant="destructive">
       <AlertDescription className="flex flex-col items-start gap-2">
@@ -252,6 +281,21 @@ function FileField({
 
 function ManualSubmissionFailure({ error, onRetry }: { error: Error; onRetry: () => void }) {
   const t = useTranslations('ManualSubmission.errors')
+  const undecodable = documentUndecodableOf(error)
+
+  if (undecodable !== null) {
+    return (
+      <FailureAlert
+        message={
+          undecodable.encoding === null
+            ? t('undecodable.interchange')
+            : t('undecodable.encoding', { encoding: encodingLabels[undecodable.encoding] })
+        }>
+        <p className="break-words">{t('undecodable.details', { message: undecodable.message })}</p>
+      </FailureAlert>
+    )
+  }
+
   const unroutable = error instanceof ApiError && error.status === 422
 
   return (
@@ -272,13 +316,12 @@ function FormFooter({ children }: { children?: ReactNode }) {
   )
 }
 
-async function readFile(file: File | null) {
-  const bytes = file === null ? null : new Uint8Array(await file.arrayBuffer())
+type ChosenFile = { file: File; bytes: Uint8Array; namesItsCharacterSet: boolean }
 
-  return {
-    content: bytes === null ? null : encodeBase64(bytes),
-    problem: documentProblem(bytes === null ? null : new TextDecoder().decode(bytes)),
-  }
+async function readFile(file: File): Promise<ChosenFile> {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+
+  return { file, bytes, namesItsCharacterSet: namesItsCharacterSet(bytes) }
 }
 
 function ManualSubmissionForm({
@@ -297,6 +340,9 @@ function ManualSubmissionForm({
   const queryClient = useQueryClient()
   const channels = useInboundChannels()
   const [file, setFile] = useState<File | null>(null)
+  const [chosen, setChosen] = useState<ChosenFile | null>(null)
+  const [encoding, setEncoding] = useState<CharacterEncoding>('utf-8')
+  const latestFile = useRef<File | null>(null)
   const [channelError, setChannelError] = useState(false)
   const [fileProblem, setFileProblem] = useState<DocumentProblem | null>(null)
 
@@ -317,19 +363,38 @@ function ManualSubmissionForm({
     },
   })
 
+  const read = chosen !== null && chosen.file === file ? chosen : null
+
+  function choose(next: File | null) {
+    latestFile.current = next
+    setFile(next)
+    setFileProblem(null)
+    submission.reset()
+
+    if (next !== null) {
+      void readFile(next).then((result) => {
+        if (latestFile.current === next) {
+          setChosen(result)
+        }
+      })
+    }
+  }
+
   async function submit() {
-    const { content, problem } = await readFile(file)
+    const submitted = read ?? (file === null ? null : await readFile(file))
+    const problem = documentProblem(submitted?.bytes ?? null)
     const channel = channels.find(channelId)
 
     setChannelError(channel === undefined)
     setFileProblem(problem)
 
-    if (channel !== undefined && file !== null && content !== null && problem === null) {
+    if (channel !== undefined && submitted !== null && problem === null) {
       submission.mutate({
         channel,
         document: {
-          fileName: file.name,
-          content,
+          fileName: submitted.file.name,
+          content: encodeBase64(submitted.bytes),
+          encoding: submitted.namesItsCharacterSet ? undefined : encoding,
         },
       })
     } else {
@@ -386,12 +451,18 @@ function ManualSubmissionForm({
           id={`${id}-file`}
           error={fileProblem ? t(`errors.file.${fileProblem}`) : null}
           file={file}
-          onChange={(next) => {
-            setFile(next)
-            setFileProblem(null)
-            submission.reset()
-          }}
+          onChange={choose}
         />
+        {read !== null && !read.namesItsCharacterSet && (
+          <EncodingChoice
+            id={`${id}-encoding`}
+            value={encoding}
+            onChange={(next) => {
+              setEncoding(next)
+              submission.reset()
+            }}
+          />
+        )}
         {submission.isError && (
           <ManualSubmissionFailure error={submission.error} onRetry={() => void submit()} />
         )}
