@@ -325,9 +325,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       replacedBy: replacing ? { id: replacing } : null,
       documentDeletedAt: documentDeletedAt.get(id) ?? null,
       // An outbound Run's Document is the in-house file, which has no UNB.
-      testIndicator: documentDeletedAt.has(id)
-        ? null
-        : direction === 'inbound' && interchange !== null && inTestMode(run),
+      testIndicator: documentDeletedAt.has(id) ? null : direction === 'inbound' && inTestMode(run),
     })
   }
 

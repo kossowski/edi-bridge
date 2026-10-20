@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -16,6 +17,7 @@ import {
   webhookAuthorization,
   webhookTokenHeader,
 } from '@edi-bridge/contracts'
+import { runs } from '@edi-bridge/db'
 import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
 import {
   addOrdersFlow,
@@ -168,6 +170,22 @@ describe('an inbound Run', () => {
     )
 
     await expect(detail(runId)).resolves.toMatchObject({ testIndicator: true })
+  })
+
+  it('has no test indicator once its Document expired', async () => {
+    const { runId } = await received(
+      Buffer.from(
+        ordersWith('EXPIRED1', (header) => `${header}++++++1`),
+        'latin1',
+      ),
+    )
+
+    await api.connection.db
+      .update(runs)
+      .set({ documentId: null, documentDeletedAt: new Date() })
+      .where(eq(runs.id, runId))
+
+    await expect(detail(runId)).resolves.toMatchObject({ testIndicator: null })
   })
 
   it('shows the readable text of an Interchange kept as bytes, without a Message', async () => {

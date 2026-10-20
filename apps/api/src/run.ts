@@ -356,7 +356,7 @@ const toDetail = (
     interchange: summary.interchange && raw ? { ...summary.interchange, raw } : null,
     message: raw && parsed ? parsedMessageOf(raw, summary.messageType, row.messageIndex) : null,
     documentDeletedAt: row.documentDeletedAt?.toISOString() ?? null,
-    testIndicator: row.testIndicator,
+    testIndicator: row.documentDeletedAt === null ? row.testIndicator : null,
   }
 
   const unfailed = {
