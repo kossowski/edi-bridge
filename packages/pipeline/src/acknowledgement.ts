@@ -27,7 +27,7 @@ export type Answer = {
   tradingPartnerId: string
   channelId: string | null
   notSentReason: NotSentReason | null
-  contrl: { message: Message; sender: string; receiver: string } | null
+  contrl: { message: Message; sender: string; receiver: string; testMode: boolean } | null
 }
 
 class ContrlNotBuilt extends Data.TaggedError('ContrlNotBuilt')<{
@@ -107,7 +107,11 @@ const answerOf = (workspaceId: string, documentId: string, content: string) =>
 
     const [found] = yield* Effect.promise(() =>
       db
-        .select({ tradingPartnerId: tradingPartners.id, workspaceGln: workspaces.gln })
+        .select({
+          tradingPartnerId: tradingPartners.id,
+          testMode: tradingPartners.testMode,
+          workspaceGln: workspaces.gln,
+        })
         .from(tradingPartners)
         .innerJoin(workspaces, eq(workspaces.id, tradingPartners.workspaceId))
         .where(and(eq(tradingPartners.workspaceId, workspaceId), eq(tradingPartners.gln, sender))),
@@ -121,7 +125,7 @@ const answerOf = (workspaceId: string, documentId: string, content: string) =>
       return undefined
     }
 
-    const { tradingPartnerId, workspaceGln } = found
+    const { tradingPartnerId, testMode, workspaceGln } = found
     const { channelId, notSentReason } = yield* channelOf(workspaceId, tradingPartnerId)
     const message = Result.isSuccess(built) ? built.success : null
 
@@ -137,7 +141,7 @@ const answerOf = (workspaceId: string, documentId: string, content: string) =>
       contrl:
         message === null || workspaceGln === null
           ? null
-          : { message, sender: workspaceGln, receiver: sender },
+          : { message, sender: workspaceGln, receiver: sender, testMode },
     } satisfies Answer
   })
 
@@ -175,6 +179,7 @@ const recordAnswer = (
                   receiver: sent.receiver,
                   sentAt,
                   reference: sent.reference,
+                  testMode: sent.testMode,
                 }),
         })
       }),

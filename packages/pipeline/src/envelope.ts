@@ -33,11 +33,15 @@ type Envelope = {
   receiver: string
   sentAt: DateTime.Utc
   reference: number
+  testMode: boolean
 }
+
+// 0035 is element 11 of the UNB, so the optional elements 6 to 10 before it stay empty.
+const testIndicator = [[''], [''], [''], [''], [''], ['1']]
 
 export const enveloped = (
   message: Message,
-  { characterSet, sender, receiver, sentAt, reference }: Envelope,
+  { characterSet, sender, receiver, sentAt, reference, testMode }: Envelope,
 ) => {
   const { year, month, day, hour, minute } = DateTime.toPartsUtc(sentAt)
 
@@ -55,6 +59,7 @@ export const enveloped = (
             twoDigits(hour) + twoDigits(minute),
           ],
           [String(reference)],
+          ...(testMode ? testIndicator : []),
         ],
       },
       { tag: 'UNZ', elements: [['1'], [String(reference)]] },
