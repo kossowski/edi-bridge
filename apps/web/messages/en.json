@@ -809,6 +809,10 @@
           "title": "{direction, select, inbound {Your ERP did not answer} other {The server of {tradingPartner} did not answer}}",
           "description": "{direction, select, inbound {The document was translated, but your ERP did not accept it when EDI Bridge delivered it.} other {The document is ready, but the upload to {tradingPartner} failed.}} This is usually temporary."
         },
+        "hostKeyMismatch": {
+          "title": "The server of {tradingPartner} showed a different key",
+          "description": "The document is ready, but the server's key is not the one confirmed for this connection, so EDI Bridge did not send the document. Ask {tradingPartner} whether they replaced their server or its key, confirm the new key on the connection, then try again."
+        },
         "seededChannel": {
           "title": "Demo connections never send",
           "description": "This is a demo connection, so EDI Bridge never sends documents over it. The document is ready, but it stays in EDI Bridge, and trying again ends the same way."
@@ -1517,6 +1521,10 @@
         "testedAt": "Tested <when>{time}</when>.",
         "requestFailed": "The test could not run. Try again.",
         "failed": {
+          "hostKeyMismatch": {
+            "title": "The server showed a different key.",
+            "hint": "The server's key is not the one you confirmed, so EDI Bridge did not log in. Ask the other side's IT team whether they replaced their server or its key before you accept the new one."
+          },
           "loginRejected": {
             "title": "Login was rejected.",
             "hint": "Check the username and the password or key. The other side's IT team can confirm them."

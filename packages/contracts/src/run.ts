@@ -27,6 +27,7 @@ export const problemReasons = [
   'missingCode',
   'missingField',
   'unreachable',
+  'hostKeyMismatch',
   'incompleteSetup',
   'defect',
 ] as const

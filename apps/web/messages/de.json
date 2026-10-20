@@ -809,6 +809,10 @@
           "title": "{direction, select, inbound {Ihr ERP hat nicht geantwortet} other {Der Server von {tradingPartner} hat nicht geantwortet}}",
           "description": "{direction, select, inbound {Der Beleg wurde übersetzt, aber Ihr ERP hat ihn bei der Zustellung nicht angenommen.} other {Der Beleg ist fertig, aber die Übertragung an {tradingPartner} ist fehlgeschlagen.}} Das ist meist nur vorübergehend."
         },
+        "hostKeyMismatch": {
+          "title": "Der Server von {tradingPartner} hat einen anderen Schlüssel gezeigt",
+          "description": "Der Beleg ist fertig, aber der Schlüssel des Servers ist nicht der für diese Verbindung bestätigte, deshalb hat EDI Bridge den Beleg nicht gesendet. Fragen Sie {tradingPartner}, ob der Server oder dessen Schlüssel ersetzt wurde, bestätigen Sie den neuen Schlüssel an der Verbindung und versuchen Sie es dann erneut."
+        },
         "seededChannel": {
           "title": "Demo-Verbindungen senden nie",
           "description": "Dies ist eine Demo-Verbindung, über die EDI Bridge nie Belege sendet. Der Beleg ist fertig, bleibt aber in EDI Bridge, und ein neuer Versuch endet genauso."
@@ -1517,6 +1521,10 @@
         "testedAt": "Getestet <when>{time}</when>.",
         "requestFailed": "Der Test konnte nicht laufen. Versuchen Sie es erneut.",
         "failed": {
+          "hostKeyMismatch": {
+            "title": "Der Server hat einen anderen Schlüssel gezeigt.",
+            "hint": "Der Schlüssel des Servers ist nicht der bestätigte, deshalb hat sich EDI Bridge nicht angemeldet. Fragen Sie die IT der Gegenseite, ob sie ihren Server oder dessen Schlüssel ersetzt hat, bevor Sie den neuen Schlüssel übernehmen."
+          },
           "loginRejected": {
             "title": "Die Anmeldung wurde abgelehnt.",
             "hint": "Prüfen Sie den Benutzernamen und das Passwort oder den Schlüssel. Die IT der Gegenseite kann sie bestätigen."

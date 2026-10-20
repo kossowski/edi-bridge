@@ -101,6 +101,13 @@ function useProblemText(run: FailedRun) {
       }
     }
 
+    case 'hostKeyMismatch': {
+      return {
+        title: t('hostKeyMismatch.title', values),
+        description: t('hostKeyMismatch.description', values),
+      }
+    }
+
     case 'incompleteSetup': {
       return {
         title: t('incompleteSetup.title', values),

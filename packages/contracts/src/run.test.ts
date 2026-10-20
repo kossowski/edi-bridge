@@ -168,6 +168,31 @@ describe('runDetailSchema', () => {
     expect(runDetailSchema.parse(incompleteSetup)).toEqual(incompleteSetup)
   })
 
+  it('names the Channel to confirm when its server shows another host key', () => {
+    const hostKeyMismatch = {
+      ...unreadable,
+      direction: 'outbound',
+      failureStage: 'delivery',
+      error: {
+        code: 'hostKeyMismatch',
+        message: 'The SFTP server showed another host key than the one confirmed',
+        position: null,
+        details: null,
+      },
+      problem: {
+        reason: 'hostKeyMismatch',
+        whoFixes: 'retry',
+        fixTarget: {
+          kind: 'channel',
+          channelId: '00000003-0000-4000-8000-000000000003',
+          name: 'Hansemarkt SFTP outbox',
+        },
+      },
+    }
+
+    expect(runDetailSchema.parse(hostKeyMismatch)).toEqual(hostKeyMismatch)
+  })
+
   it('records the HTTP status the receiving system answered on a delivery failure', () => {
     const rejected = {
       ...unreadable,
