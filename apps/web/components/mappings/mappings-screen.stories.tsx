@@ -8,6 +8,7 @@ import { darkMode, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { createMappingEndpoint } from '@edi-bridge/contracts'
 import {
+  createDocumentStructures,
   createHandlers,
   createMappingsWithTraffic,
   documentStructureHandlers,
@@ -417,6 +418,93 @@ export const DocumentStructuresUnavailable = meta.story({
     )
     await waitFor(() => expect(sheet.getByRole('button', { name: 'Try again' })).toBeVisible())
     await expect(sheet.queryByRole('button', { name: 'Invoices you send' })).toBeNull()
+  },
+})
+
+const manyDocumentStructures = [
+  ...seedDocumentStructures,
+  ...createDocumentStructures({ count: 40 }),
+]
+
+export const ManyDocumentStructures = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { documentStructures: manyDocumentStructures }))
+  },
+  async play({ canvasElement, msw }) {
+    const bodies: unknown[] = []
+    // SAFETY: the story adds 40 Document Structures to the seed.
+    const last = manyDocumentStructures.at(-1)!
+
+    msw.use(
+      http.post(createUrl, async ({ request }) => {
+        bodies.push(await request.clone().json())
+      }),
+    )
+
+    const sheet = await openNewMappingSheet(canvasElement)
+    const picker = await sheet.findByRole('combobox', { name: 'Your data format' })
+
+    await waitFor(() =>
+      expect(within(picker).getAllByRole('option')).toHaveLength(manyDocumentStructures.length + 1),
+    )
+    await expect(picker).toHaveValue('')
+
+    await chooseDocumentStructure(sheet, last.name)
+    await userEvent.click(sheet.getByRole('button', { name: 'Invoices you send' }))
+
+    await waitFor(() => expect(getRouter().push).toHaveBeenCalledOnce())
+    await expect(bodies).toEqual([{ messageType: 'INVOIC', documentStructureId: last.id }])
+  },
+})
+
+export const NoDocumentStructureGerman = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [] }))
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement, 'Neues Mapping')
+
+    await expect(
+      await sheet.findByText(
+        'Legen Sie zuerst Ihr Datenformat an, damit die KI die Form Ihrer Dateien kennt.',
+      ),
+    ).toBeVisible()
+    await expect(sheet.getByRole('link', { name: 'Datenformat anlegen' })).toHaveAttribute(
+      'href',
+      '/data-formats/new',
+    )
+  },
+})
+
+export const DocumentStructuresLoadingGerman = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { state: 'loading' }))
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement, 'Neues Mapping')
+
+    await expect(await sheet.findByRole('status')).toHaveTextContent(
+      'Ihre Datenformate werden geladen',
+    )
+  },
+})
+
+export const DocumentStructuresUnavailableGerman = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { state: 'error' }))
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement, 'Neues Mapping')
+
+    await expect(await sheet.findByRole('alert')).toHaveTextContent(
+      'Ihre Datenformate konnten nicht geladen werden.',
+    )
+    await waitFor(() =>
+      expect(sheet.getByRole('button', { name: 'Erneut versuchen' })).toBeVisible(),
+    )
   },
 })
 
