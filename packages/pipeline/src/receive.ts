@@ -1,5 +1,6 @@
-import { aliasedTable, and, asc, eq, isNull, ne, notExists, sql } from 'drizzle-orm'
+import { aliasedTable, and, asc, eq, isNull, ne, notExists, or, sql } from 'drizzle-orm'
 import { DateTime, Effect, Result } from 'effect'
+import { createHash } from 'node:crypto'
 
 import { directionOf } from '@edi-bridge/contracts'
 import {
@@ -47,6 +48,10 @@ type ChannelFlow = { flow: Flow; tradingPartnerGln: string | null }
 type RoutedMessage = { flow: Flow; messageIndex: number | null }
 
 type InterchangeKey = { sender: string; controlReference: string }
+
+type FileKey = { channelId: string; fileName: string; contentHash: string }
+
+type DuplicateKeys = { interchange: InterchangeKey | undefined; file: FileKey | undefined }
 
 // A Document without an Interchange envelope declares no Message Types.
 function declaredMessagesOf(content: string): Declared {
@@ -137,16 +142,45 @@ function interchangeKeyOf(content: string): InterchangeKey | undefined {
 
 const replaced = aliasedTable(runs, 'replaced')
 
-// The lock holds a concurrent copy back until this one's Runs are stored, so only one is the original.
+const advisoryLock = (tx: Transaction, key: readonly string[]) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(key)}, 0))`)
+
+// The locks hold a concurrent copy back until this one's Runs are stored, so only one is the original.
 async function originalRunsOf(
   tx: Transaction,
   workspaceId: string,
   documentId: string,
-  { sender, controlReference }: InterchangeKey,
+  { interchange, file }: DuplicateKeys,
 ) {
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify([workspaceId, sender, controlReference])}, 0))`,
-  )
+  const matches = []
+
+  // Every receipt takes its locks in the same order, so two receipts never deadlock.
+  if (file !== undefined) {
+    await advisoryLock(tx, ['file', file.channelId, file.fileName, file.contentHash])
+    matches.push(
+      and(
+        eq(storedDocuments.channelId, file.channelId),
+        eq(storedDocuments.fileName, file.fileName),
+        eq(storedDocuments.contentHash, file.contentHash),
+      ),
+    )
+  }
+
+  if (interchange !== undefined) {
+    await advisoryLock(tx, [workspaceId, interchange.sender, interchange.controlReference])
+    matches.push(
+      and(
+        eq(storedDocuments.interchangeSender, interchange.sender),
+        eq(storedDocuments.interchangeControlReference, interchange.controlReference),
+      ),
+    )
+  }
+
+  const originals = new Map<number | null, string>()
+
+  if (matches.length === 0) {
+    return originals
+  }
 
   const found = await tx
     .select({ id: runs.id, messageIndex: runs.messageIndex })
@@ -155,8 +189,7 @@ async function originalRunsOf(
     .where(
       and(
         eq(storedDocuments.workspaceId, workspaceId),
-        eq(storedDocuments.interchangeSender, sender),
-        eq(storedDocuments.interchangeControlReference, controlReference),
+        or(...matches),
         ne(storedDocuments.id, documentId),
         isNull(runs.duplicateOfRunId),
         // A Reprocess Run replaces a Run of its own Document, which stays the original.
@@ -172,10 +205,8 @@ async function originalRunsOf(
     )
     .orderBy(asc(storedDocuments.receivedAt), asc(storedDocuments.id))
 
-  const originals = new Map<number, string>()
-
   for (const { id, messageIndex } of found) {
-    if (messageIndex !== null && !originals.has(messageIndex)) {
+    if (!originals.has(messageIndex)) {
       originals.set(messageIndex, id)
     }
   }
@@ -191,7 +222,7 @@ const checkInboundChannel = (workspaceId: string, channelId: string) =>
 
     const [channel] = yield* Effect.promise(() =>
       db
-        .select({ direction: channels.direction })
+        .select({ type: channels.type, direction: channels.direction })
         .from(channels)
         .where(and(eq(channels.workspaceId, workspaceId), eq(channels.id, channelId))),
     )
@@ -203,6 +234,8 @@ const checkInboundChannel = (workspaceId: string, channelId: string) =>
     if (channel.direction !== 'inbound') {
       return yield* new ReceiptRejected({ reason: 'outboundChannel' })
     }
+
+    return channel
   })
 
 const routeOnChannel = ({ workspaceId, channelId, content }: ArrivingDocument) =>
@@ -235,10 +268,20 @@ export const receive = (arriving: ArrivingDocument) =>
   Effect.gen(function* () {
     const receiptStartedAt = yield* DateTime.nowAsDate
 
-    yield* checkInboundChannel(arriving.workspaceId, arriving.channelId)
+    const channel = yield* checkInboundChannel(arriving.workspaceId, arriving.channelId)
 
     const documents = yield* Documents
     const key = interchangeKeyOf(arriving.content)
+
+    // Only a file polled from an SFTP server comes again unchanged after a failed removal.
+    const fileKey =
+      channel.type === 'sftp' && !arriving.manualSubmission
+        ? {
+            channelId: arriving.channelId,
+            fileName: arriving.fileName,
+            contentHash: createHash('sha256').update(arriving.content).digest('hex'),
+          }
+        : undefined
 
     const document = yield* Effect.promise(() =>
       documents.store({
@@ -248,6 +291,7 @@ export const receive = (arriving: ArrivingDocument) =>
         content: arriving.content,
         interchangeSender: key?.sender ?? null,
         interchangeControlReference: key?.controlReference ?? null,
+        contentHash: fileKey?.contentHash ?? null,
       }),
     )
 
@@ -269,14 +313,14 @@ export const receive = (arriving: ArrivingDocument) =>
 
     const created = yield* Effect.promise(() =>
       db.transaction(async (tx) => {
-        const originals =
-          key === undefined
-            ? new Map<number, string>()
-            : await originalRunsOf(tx, arriving.workspaceId, document.id, key)
+        const originals = await originalRunsOf(tx, arriving.workspaceId, document.id, {
+          interchange: key,
+          file: fileKey,
+        })
 
         return Promise.all(
           routed.map(async ({ flow, messageIndex }) => {
-            const duplicateOfRunId = messageIndex === null ? undefined : originals.get(messageIndex)
+            const duplicateOfRunId = originals.get(messageIndex)
 
             const [run] = await tx
               .insert(runs)

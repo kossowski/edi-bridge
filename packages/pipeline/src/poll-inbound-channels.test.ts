@@ -17,6 +17,7 @@ import { Download, type DownloadService, pollInboundChannels } from './index'
 import {
   addOrdersFlow,
   golden,
+  goldenInvoice,
   inMemoryRunQueue,
   type InvoiceWorkspace,
   pipelineServices,
@@ -511,5 +512,35 @@ describe('the polling of inbound SFTP Channels', () => {
 
     expect(reads).toBe(1)
     expect(await storedOn(box.channelId)).toHaveLength(1)
+  })
+
+  it('records a stored file without an Interchange received again after a restart as a Duplicate', async () => {
+    const box = await outbox({ 'invoice.json': goldenInvoice }, { flowId: workspace.flowId })
+
+    const beforeRestart = await startPolling({
+      ...download,
+      remove: () => Effect.fail(new DownloadFailed({ reason: 'timedOut' })),
+    })
+
+    await beforeRestart.pollAgain(box.channelId)
+    await received(box.channelId, 1)
+    await stopPolling?.()
+
+    const afterRestart = await startPolling()
+
+    await afterRestart.pollAgain(box.channelId)
+    await removed(box)
+
+    const stored = await connection.db
+      .select({ status: runs.status, duplicateOfRunId: runs.duplicateOfRunId, id: runs.id })
+      .from(runs)
+      .innerJoin(documents, eq(documents.id, runs.documentId))
+      .where(eq(documents.channelId, box.channelId))
+      .orderBy(documents.receivedAt)
+
+    expect(stored).toEqual([
+      { status: 'received', duplicateOfRunId: null, id: expect.any(String) },
+      { status: 'duplicate', duplicateOfRunId: stored[0]?.id, id: expect.any(String) },
+    ])
   })
 })

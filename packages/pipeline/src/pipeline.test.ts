@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { Cause, Duration, Effect, Exit, Fiber, Logger } from 'effect'
 import { TestClock } from 'effect/testing'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, assert, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
@@ -63,6 +63,7 @@ import {
   type InvoiceWorkspace,
   pipelineServices,
   readRun,
+  receiveOverSftp,
   seedInvoiceWorkspace,
   testSecrets,
 } from './testing'
@@ -2284,6 +2285,173 @@ describe('the processing of an inbound Run', () => {
       const statuses = copies.flatMap(({ runs: copyRuns }) => copyRuns.map((run) => run?.status))
 
       expect(statuses.toSorted()).toEqual(['delivered', 'duplicate', 'duplicate', 'duplicate'])
+    })
+  })
+
+  describe('a re-sent SFTP file', () => {
+    const onSftp = async (into: InvoiceWorkspace, flowId: string) =>
+      receiveOverSftp(connection.db, into, sftpLogin(), { flowId })
+
+    const receiveFile = async (
+      into: InvoiceWorkspace,
+      onChannel: string,
+      { fileName = 'invoice.json', content = goldenInvoice, manualSubmission = false } = {},
+    ) => {
+      const queue = inMemoryRunQueue()
+
+      const receipt = await Effect.runPromise(
+        receive({
+          workspaceId: into.id,
+          channelId: onChannel,
+          fileName,
+          content,
+          manualSubmission,
+        }).pipe(pipelineServices(connection.db, queue)),
+      )
+
+      return {
+        queued: queue.queued,
+        document: receipt.document,
+        runs: await Promise.all(receipt.runs.map(({ id }) => readRun(connection.db, id))),
+      }
+    }
+
+    it('is recorded as a Duplicate of the original Run and never queued', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'File Resend Foods')
+      const sftpChannelId = await onSftp(into, into.flowId)
+
+      const original = await receiveFile(into, sftpChannelId)
+      const again = await receiveFile(into, sftpChannelId)
+
+      expect(original.runs).toMatchObject([{ status: 'received', duplicateOfRunId: null }])
+      expect(again.queued).toEqual([])
+      expect(again.document).toMatchObject({
+        channelId: sftpChannelId,
+        fileName: 'invoice.json',
+        contentHash: createHash('sha256').update(goldenInvoice).digest('hex'),
+      })
+      expect(again.runs).toMatchObject([
+        {
+          status: 'duplicate',
+          messageIndex: null,
+          duplicateOfRunId: original.runs[0]?.id,
+          steps: [
+            { stage: 'receipt', status: 'succeeded' },
+            ...['mapping', 'validation', 'delivery'].map((stage) => ({ stage, status: 'skipped' })),
+          ],
+        },
+      ])
+    })
+
+    it('links a third copy to the original Run, not to the Duplicate', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'File Thrice Foods')
+      const sftpChannelId = await onSftp(into, into.flowId)
+
+      const original = await receiveFile(into, sftpChannelId)
+
+      await receiveFile(into, sftpChannelId)
+      const third = await receiveFile(into, sftpChannelId)
+
+      expect(third.runs).toMatchObject([
+        { status: 'duplicate', duplicateOfRunId: original.runs[0]?.id },
+      ])
+    })
+
+    it('is no Duplicate under another file name', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'Renamed File Foods')
+      const sftpChannelId = await onSftp(into, into.flowId)
+
+      await receiveFile(into, sftpChannelId)
+      const renamed = await receiveFile(into, sftpChannelId, { fileName: 'invoice-2.json' })
+
+      expect(renamed.runs).toMatchObject([{ status: 'received', duplicateOfRunId: null }])
+    })
+
+    it('is no Duplicate with other content under the same file name', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'Changed File Foods')
+      const sftpChannelId = await onSftp(into, into.flowId)
+
+      await receiveFile(into, sftpChannelId)
+      const changed = await receiveFile(into, sftpChannelId, { content: `${goldenInvoice}\n` })
+
+      expect(changed.runs).toMatchObject([{ status: 'received', duplicateOfRunId: null }])
+    })
+
+    it('is no Duplicate of a file another SFTP Channel received', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'Two Outbox Foods')
+      const firstChannelId = await onSftp(into, into.flowId)
+
+      await receiveFile(into, firstChannelId)
+      const secondChannelId = await onSftp(into, into.flowId)
+      const elsewhere = await receiveFile(into, secondChannelId)
+
+      expect(elsewhere.runs).toMatchObject([{ status: 'received', duplicateOfRunId: null }])
+    })
+
+    it('keeps processing a Manual Submission of the same file', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'Submitted File Foods')
+      const sftpChannelId = await onSftp(into, into.flowId)
+
+      await receiveFile(into, sftpChannelId)
+      const submitted = await receiveFile(into, sftpChannelId, { manualSubmission: true })
+      const resubmitted = await receiveFile(into, sftpChannelId, { manualSubmission: true })
+
+      expect(submitted.document.contentHash).toBeNull()
+      expect([...submitted.runs, ...resubmitted.runs]).toMatchObject([
+        { status: 'received', duplicateOfRunId: null },
+        { status: 'received', duplicateOfRunId: null },
+      ])
+    })
+
+    it('keeps processing the same request on a webhook Channel', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'Webhook Foods')
+
+      const first = await receiveFile(into, into.inboundChannelId)
+      const second = await receiveFile(into, into.inboundChannelId)
+
+      expect(second.document.contentHash).toBeNull()
+      expect([...first.runs, ...second.runs]).toMatchObject([
+        { status: 'received', duplicateOfRunId: null },
+        { status: 'received', duplicateOfRunId: null },
+      ])
+    })
+
+    it('yields one original when copies arrive at once', async () => {
+      const into = await seedInvoiceWorkspace(connection.db, 'Concurrent File Foods')
+      const sftpChannelId = await onSftp(into, into.flowId)
+
+      const copies = await Promise.all(
+        Array.from({ length: 4 }, () => receiveFile(into, sftpChannelId)),
+      )
+
+      const statuses = copies.flatMap(({ runs: copyRuns }) => copyRuns.map((run) => run?.status))
+
+      expect(statuses.toSorted()).toEqual(['duplicate', 'duplicate', 'duplicate', 'received'])
+    })
+
+    it('is a Duplicate of the original Interchange when either key matches', async () => {
+      const into = await ordersWorkspace('Either Key Foods')
+      const sftpChannelId = await onSftp(into, into.orders.flowId)
+      const content = interchangeOf([ordersMessage, ordersMessage])
+      const asOrders = { fileName: 'orders.edi', content }
+
+      const original = await receiveFile(into, sftpChannelId, asOrders)
+      // The Interchange key alone: another file name.
+      const renamed = await receiveFile(into, sftpChannelId, { ...asOrders, fileName: 'copy.edi' })
+
+      // The file key matches only the Duplicate above, so the Interchange key finds the original.
+      const renamedAgain = await receiveFile(into, sftpChannelId, {
+        ...asOrders,
+        fileName: 'copy.edi',
+      })
+
+      const originalIds = original.runs.map((run) => run?.id)
+
+      expect(original.runs).toMatchObject([{ status: 'received' }, { status: 'received' }])
+
+      for (const copy of [renamed, renamedAgain]) {
+        expect(copy.runs.map((run) => run?.duplicateOfRunId)).toEqual(originalIds)
+      }
     })
   })
 
