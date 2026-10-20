@@ -238,6 +238,7 @@ import type {
 export type Probe = () => Promise<void>
 
 export interface AppDependencies {
+  aiFieldNamesTimeoutMs?: number | undefined
   aiModel?: LanguageModel | null
   auth: AuthSettings
   channels: ChannelSettings
@@ -379,6 +380,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
 function registerRoutes(
   app: FastifyInstance,
   {
+    aiFieldNamesTimeoutMs = 20_000,
     aiModel = null,
     auth: authSettings,
     channels: channelSettings,
@@ -839,9 +841,12 @@ function registerRoutes(
       respond(
         request,
         reply,
-        Effect.flatMap(
-          parse(inferDocumentStructureEndpoint.body, request.body),
-          inferDocumentStructureOrReject,
+        Effect.flatMap(parse(inferDocumentStructureEndpoint.body, request.body), (origin) =>
+          inferDocumentStructureOrReject(origin, {
+            model: aiModel,
+            timeoutMs: aiFieldNamesTimeoutMs,
+            log: request.log,
+          }),
         ),
       ),
   )

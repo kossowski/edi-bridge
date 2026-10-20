@@ -386,10 +386,12 @@ export const ownOperator: NewMember = {
 }
 
 export async function startTestApi({
+  aiFieldNamesTimeoutMs,
   aiModel = null,
   liveEventHeartbeatMs,
   logger = false,
 }: {
+  aiFieldNamesTimeoutMs?: number
   aiModel?: LanguageModel | null
   liveEventHeartbeatMs?: number
   logger?: FastifyServerOptions['logger']
@@ -406,6 +408,7 @@ export async function startTestApi({
   const liveEvents = memoryLiveEvents()
 
   const app = buildApp({
+    aiFieldNamesTimeoutMs,
     aiModel,
     auth: testAuth,
     channels: testChannels,

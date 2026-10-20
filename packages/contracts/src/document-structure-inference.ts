@@ -816,7 +816,7 @@ function chosenName(current: PlainName, label: string): PlainName {
     : { label, labelReason: null, labelUnsure: false }
 }
 
-function renamedNodes(
+export function renamedNodes(
   nodes: ReadonlyArray<DocumentStructureNode>,
   nameAt: (node: DocumentStructureNode) => PlainName | undefined,
 ): DocumentStructureNode[] {

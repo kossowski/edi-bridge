@@ -7,14 +7,12 @@ import {
   type CreateDocumentStructureBody,
   csvSettingsChangeProblem,
   type DocumentStructure,
-  type DocumentStructureInference,
   type DocumentStructureOrigin,
   type DocumentStructureProblem,
   DocumentStructureProblemError,
   documentStructureLeaves,
   documentStructureSchema,
   type DocumentStructureSummary,
-  fieldNamesNotices,
   inferDocumentStructure,
   type InferredDocumentStructure,
   linkChangeProblem,
@@ -24,6 +22,7 @@ import {
 } from '@edi-bridge/contracts'
 import { documentStructures } from '@edi-bridge/db'
 
+import { type FieldNaming, withFieldNames } from './ai-field-names.js'
 import { Db } from './db.js'
 import { DocumentStructureRejected } from './errors.js'
 import { selectDocumentStructureUses, selectMappingsByDocumentStructure } from './mapping-use.js'
@@ -46,11 +45,14 @@ const rejectingDocumentStructureProblem = <A>(infer: () => A) =>
 const rejectingProblem = (problem: DocumentStructureProblem | null) =>
   problem === null ? Effect.void : Effect.fail(new DocumentStructureRejected({ problem }))
 
-export const inferDocumentStructureOrReject = (origin: DocumentStructureOrigin) =>
-  rejectingDocumentStructureProblem((): DocumentStructureInference => ({
-    ...inferDocumentStructure(origin),
-    fieldNamesNotice: fieldNamesNotices.aiUnavailable,
-  }))
+export const inferDocumentStructureOrReject = (
+  origin: DocumentStructureOrigin,
+  naming: FieldNaming,
+) =>
+  Effect.flatMap(
+    rejectingDocumentStructureProblem(() => inferDocumentStructure(origin)),
+    (structure) => withFieldNames(structure, naming),
+  )
 
 const toRowValues = (structure: DocumentStructure | InferredDocumentStructure) => ({
   format: structure.format,

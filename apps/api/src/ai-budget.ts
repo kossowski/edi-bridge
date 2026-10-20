@@ -70,3 +70,5 @@ export const recordAiTokenUsage = (tokens: number) =>
         }),
     )
   })
+
+export const tokensOf = ({ totalTokens }: { totalTokens: number | undefined }) => totalTokens ?? 0
