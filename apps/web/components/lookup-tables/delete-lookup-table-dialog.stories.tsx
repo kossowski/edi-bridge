@@ -44,7 +44,7 @@ export const Default = meta.story({
   async play() {
     await dialog()
     await expect(
-      screen.getByText('The list and its 4 values are deleted. This cannot be undone.'),
+      screen.getByText('The code translation and its 4 values are deleted. This cannot be undone.'),
     ).toBeVisible()
     await expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
   },
@@ -65,13 +65,13 @@ export const InUse = meta.story({
   },
   async play({ args }) {
     await dialog()
-    await userEvent.click(screen.getByRole('button', { name: 'Delete list' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete code translation' }))
 
     await expect(await screen.findByRole('alert')).toHaveTextContent(
-      'A draft or a published version of a mapping uses this list, so it cannot be deleted.',
+      'A draft or a published version of a mapping uses this code translation, so it cannot be deleted.',
     )
     await expect(screen.queryByText(/Try again/)).toBeNull()
-    const confirm = screen.getByRole('button', { name: 'Delete list' })
+    const confirm = screen.getByRole('button', { name: 'Delete code translation' })
 
     await expect(confirm).toHaveAttribute('aria-disabled', 'true')
     await expect(confirm).toHaveFocus()
@@ -86,10 +86,10 @@ export const GermanInUse = meta.story({
   },
   async play() {
     await dialog()
-    await userEvent.click(screen.getByRole('button', { name: 'Liste löschen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Code-Übersetzung löschen' }))
 
     await expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Liste, deshalb kann sie nicht gelöscht werden.',
+      'Ein Entwurf oder eine veröffentlichte Version eines Mappings verwendet diese Code-Übersetzung, deshalb kann sie nicht gelöscht werden.',
     )
   },
 })
@@ -98,7 +98,7 @@ export const German = meta.story({
   decorators: [german],
   async play() {
     await dialog()
-    await expect(screen.getByRole('button', { name: 'Liste löschen' })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Code-Übersetzung löschen' })).toBeVisible()
   },
 })
 
@@ -110,6 +110,6 @@ export const Dark = meta.story({
   },
   async play() {
     await dialog()
-    await expect(screen.getByRole('button', { name: 'Delete list' })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Delete code translation' })).toBeVisible()
   },
 })

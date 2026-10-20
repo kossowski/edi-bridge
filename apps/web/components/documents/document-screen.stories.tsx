@@ -152,9 +152,9 @@ const expiredDocuments: ReadonlyMap<string, string> = new Map(
 )
 
 const expiredFromErp =
-  'EDI Bridge deleted the original file on Oct 8, 2026, when the retention period ended, so this document cannot be processed again. Fixing the cause helps only the documents that arrive from now on. Send it again from your ERP.'
+  'EDI Bridge deleted the original file on Oct 8, 2026, when the time to keep documents ran out, so this document cannot be processed again. Fixing the cause helps only the documents that arrive from now on. Send it again from your ERP.'
 
-const expiredFromPartner = `EDI Bridge deleted the original file on Oct 8, 2026, when the retention period ended, so this document cannot be processed again. Ask ${partner.name} to send it again.`
+const expiredFromPartner = `EDI Bridge deleted the original file on Oct 8, 2026, when the time to keep documents ran out, so this document cannot be processed again. Ask ${partner.name} to send it again.`
 
 const runs = [
   missingField,
@@ -811,7 +811,7 @@ export const GermanDocumentExpired = meta.story({
     await expect(
       await canvas.findByText(
         paragraph(
-          'EDI Bridge hat die Originaldatei am 08.10.2026 gelöscht, als die Aufbewahrungsdauer abgelaufen war. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. Das Beheben der Ursache hilft nur den Belegen, die ab jetzt eingehen. Senden Sie ihn erneut aus Ihrem ERP.',
+          'EDI Bridge hat die Originaldatei am 08.10.2026 gelöscht, als die Zeit abgelaufen war, für die Belege aufbewahrt werden. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. Das Beheben der Ursache hilft nur den Belegen, die ab jetzt eingehen. Senden Sie ihn erneut aus Ihrem ERP.',
         ),
       ),
     ).toBeVisible()
@@ -850,7 +850,7 @@ export const GermanDefectDocumentExpired = meta.story({
     await expect(
       await canvas.findByText(
         paragraph(
-          `EDI Bridge hat die Originaldatei am 08.10.2026 gelöscht, als die Aufbewahrungsdauer abgelaufen war. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. Bitten Sie ${partner.name}, ihn erneut zu senden.`,
+          `EDI Bridge hat die Originaldatei am 08.10.2026 gelöscht, als die Zeit abgelaufen war, für die Belege aufbewahrt werden. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. Bitten Sie ${partner.name}, ihn erneut zu senden.`,
         ),
       ),
     ).toBeVisible()

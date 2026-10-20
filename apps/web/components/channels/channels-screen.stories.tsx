@@ -33,7 +33,7 @@ export const Empty = meta.story({
     msw.use(...channelHandlers(apiUrl, { channels: [] }))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('No Channels yet')).toBeVisible()
+    await expect(await canvas.findByText('No connections yet')).toBeVisible()
   },
 })
 
@@ -46,7 +46,7 @@ export const Loading = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Channels')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading connections')).toBeInTheDocument()
   },
 })
 
@@ -59,7 +59,7 @@ export const Unavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Channels unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Connections unavailable')).toBeVisible()
   },
 })
 
@@ -71,7 +71,7 @@ export const LargeVolume = meta.story({
   // outrun the test timeout on CI, so only the structural rules run here.
   parameters: { a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } } },
   async play({ canvas }) {
-    await expect(await canvas.findByText('400 Channels')).toBeVisible()
+    await expect(await canvas.findByText('400 connections')).toBeVisible()
   },
 })
 
@@ -104,7 +104,7 @@ export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas }) {
       await expect(await canvas.findByRole('link', { name: 'ERP webhook' })).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'New Channel' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'New connection' })).toBeNull()
     },
   }),
 })
@@ -114,9 +114,9 @@ export const ViewerEmpty = meta.story({
     handlers: [...channelHandlers(apiUrl, { channels: [] })],
     async play({ canvas }) {
       await expect(
-        await canvas.findByText('Channels appear here once an Admin creates one.'),
+        await canvas.findByText('Connections appear here once an Admin creates one.'),
       ).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'New Channel' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'New connection' })).toBeNull()
     },
   }),
 })

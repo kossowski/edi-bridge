@@ -299,7 +299,7 @@ export const Loading = meta.story({
     msw.use(...lookupTableHandlers(apiUrl, { lookupTables: 'loading' }))
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading the list')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading the code translation')).toBeInTheDocument()
   },
 })
 
@@ -308,14 +308,14 @@ export const Unavailable = meta.story({
     msw.use(...lookupTableHandlers(apiUrl, { lookupTables: 'error' }))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('List unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Code translation unavailable')).toBeVisible()
   },
 })
 
 export const NotFound = meta.story({
   args: { id: '00000000-0000-4000-8000-0000000000ff' },
   async play({ canvas }) {
-    await expect(await canvas.findByText('List not found')).toBeVisible()
+    await expect(await canvas.findByText('Code translation not found')).toBeVisible()
   },
 })
 

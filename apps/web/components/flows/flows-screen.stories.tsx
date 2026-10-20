@@ -37,7 +37,7 @@ export const Empty = meta.story({
     msw.use(...flowHandlers(apiUrl, { flows: [] }))
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('No Flows yet')).toBeVisible()
+    await expect(await canvas.findByText('No document routes yet')).toBeVisible()
   },
 })
 
@@ -50,7 +50,7 @@ export const Loading = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Flows')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading document routes')).toBeInTheDocument()
   },
 })
 
@@ -63,7 +63,7 @@ export const Unavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Flows unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Document routes unavailable')).toBeVisible()
   },
 })
 
@@ -75,7 +75,7 @@ export const LargeVolume = meta.story({
   // outrun the test timeout on CI, so only the structural rules run here.
   parameters: { a11y: { config: { rules: [{ id: 'color-contrast', enabled: false }] } } },
   async play({ canvas }) {
-    await expect(await canvas.findByText('400 Flows')).toBeVisible()
+    await expect(await canvas.findByText('400 document routes')).toBeVisible()
   },
 })
 
@@ -114,7 +114,7 @@ export const Viewer = meta.story({
       await expect(
         await canvas.findByRole('link', { name: 'Hansemarkt DESADV outbound' }),
       ).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'New Flow' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'New document route' })).toBeNull()
     },
   }),
 })
@@ -124,9 +124,9 @@ export const ViewerEmpty = meta.story({
     handlers: [...flowHandlers(apiUrl, { flows: [] })],
     async play({ canvas }) {
       await expect(
-        await canvas.findByText('Flows appear here once an Admin creates one.'),
+        await canvas.findByText('Document routes appear here once an Admin creates one.'),
       ).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'New Flow' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'New document route' })).toBeNull()
     },
   }),
 })

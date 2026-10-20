@@ -61,7 +61,7 @@ export const ChooseAiDraft = meta.story({
 
     const dialog = await findSheet(canvasElement, 'Draft with AI')
 
-    await expect(await dialog.findByRole('combobox', { name: 'Sample Document' })).toBeVisible()
+    await expect(await dialog.findByRole('combobox', { name: 'Example document' })).toBeVisible()
     await userEvent.click(dialog.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(page(canvasElement).queryByRole('dialog')).toBeNull())
     await expect(canvas.getByRole('heading', { name: 'Start here' })).toBeVisible()

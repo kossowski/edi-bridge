@@ -105,7 +105,7 @@ export const DetailsFromToolbar = meta.story({
     const trigger = canvas.getByRole('button', { name: 'Details' })
 
     await expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    await expect(details.getByText('Outbound: data format to Message Type')).toBeVisible()
+    await expect(details.getByText('Outbound: data format to document type')).toBeVisible()
     await waitFor(() => expect(details.getByRole('group', { name: 'Details' })).toHaveFocus())
 
     // The details open inside the canvas's frame, below the toolbar, whose buttons stay in reach.
@@ -332,7 +332,7 @@ export const SmallScreenDetails = meta.story({
 
     const details = await findSheet(canvasElement, 'Details')
 
-    await expect(details.getByText('Outbound: data format to Message Type')).toBeVisible()
+    await expect(details.getByText('Outbound: data format to document type')).toBeVisible()
   },
 })
 

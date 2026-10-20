@@ -107,14 +107,16 @@ export const PlaceLookupTableAndConditional = meta.story({
 
     await expect(palette.getAllByRole('button', { name: /^Add / })).toHaveLength(10)
 
-    await place(canvasElement, 'Lookup Table', 'Lookup Table 1')
+    await place(canvasElement, 'Code translation', 'Code translation 1')
 
     const panel = await detailsPanel(canvasElement)
 
-    await expect(await panel.findByRole('combobox', { name: 'Lookup Table' })).toBeVisible()
+    await expect(await panel.findByRole('combobox', { name: 'Code translation' })).toBeVisible()
     await expect(panel.getByRole('radio', { name: 'Keep the incoming value' })).toBeChecked()
     await expect(
-      (await findNode(canvasElement, 'Lookup Table 1')).getByText('Lookup Table is required.'),
+      (await findNode(canvasElement, 'Code translation 1')).getByText(
+        'Code translation is required.',
+      ),
     ).toBeVisible()
 
     await place(canvasElement, 'Conditional', 'Conditional 1')
@@ -149,21 +151,21 @@ export const PlaceLoopAndJsonata = meta.story({
 export const ConfigureLookupTable = meta.story({
   args: { id: invoic.id },
   async play({ canvasElement }) {
-    const node = await findNode(canvasElement, 'Lookup Table 1')
+    const node = await findNode(canvasElement, 'Code translation 1')
 
     await expect(await node.findByText('VAT categories')).toBeVisible()
 
-    const panel = await select(canvasElement, 'Lookup Table 1')
-    const table = await panel.findByRole('combobox', { name: 'Lookup Table' })
+    const panel = await select(canvasElement, 'Code translation 1')
+    const table = await panel.findByRole('combobox', { name: 'Code translation' })
 
     await waitFor(() => expect(table).toHaveTextContent('VAT categories'))
     await expect(panel.getByText('Belongs to: Workspace')).toBeVisible()
 
     await chooseOption(canvasElement, table, /^Hansemarkt units/)
     await waitFor(() =>
-      expect(liveStatus(canvasElement)).toHaveTextContent('Settings of Lookup Table 1 saved.'),
+      expect(liveStatus(canvasElement)).toHaveTextContent('Settings of Code translation 1 saved.'),
     )
-    await expect(panel.getByText(/^Belongs to: Trading Partner Hansemarkt/)).toBeVisible()
+    await expect(panel.getByText(/^Belongs to: Trading partner Hansemarkt/)).toBeVisible()
     await expect(node.getByText('Hansemarkt units')).toBeVisible()
 
     await userEvent.click(panel.getByRole('radio', { name: 'Leave the target empty' }))
@@ -175,16 +177,16 @@ export const ConfigureLookupTable = meta.story({
 export const LookupTableNotChosen = meta.story({
   args: { id: desadv.id },
   async play({ canvasElement }) {
-    const node = await findNode(canvasElement, 'Lookup Table 1')
+    const node = await findNode(canvasElement, 'Code translation 1')
 
-    await expect(node.getByText('Lookup Table is required.')).toBeVisible()
-    await expect(node.getByText('No Lookup Table chosen')).toBeVisible()
+    await expect(node.getByText('Code translation is required.')).toBeVisible()
+    await expect(node.getByText('No code translation chosen')).toBeVisible()
 
-    const panel = await select(canvasElement, 'Lookup Table 1')
-    const table = await panel.findByRole('combobox', { name: 'Lookup Table' })
+    const panel = await select(canvasElement, 'Code translation 1')
+    const table = await panel.findByRole('combobox', { name: 'Code translation' })
 
     await expect(table).toHaveAttribute('aria-invalid', 'true')
-    await expect(table).toHaveAccessibleDescription(/Lookup Table is required\./)
+    await expect(table).toHaveAccessibleDescription(/Code translation is required\./)
   },
 })
 
@@ -200,21 +202,21 @@ export const LookupTableDeleted = meta.story({
     )
   },
   async play({ canvasElement }) {
-    const node = await findNode(canvasElement, 'Lookup Table 1')
+    const node = await findNode(canvasElement, 'Code translation 1')
 
     await expect(
-      await node.findByText('The chosen Lookup Table no longer exists. Choose another one.'),
+      await node.findByText('The chosen code translation no longer exists. Choose another one.'),
     ).toBeVisible()
-    await expect(node.getByText('Lookup Table not found')).toBeVisible()
+    await expect(node.getByText('Code translation not found')).toBeVisible()
 
-    const panel = await select(canvasElement, 'Lookup Table 1')
-    const table = await panel.findByRole('combobox', { name: 'Lookup Table' })
+    const panel = await select(canvasElement, 'Code translation 1')
+    const table = await panel.findByRole('combobox', { name: 'Code translation' })
 
     await expect(table).toHaveAttribute('aria-invalid', 'true')
     await chooseOption(canvasElement, table, /^Country codes/)
     await waitFor(() =>
       expect(
-        node.queryByText('The chosen Lookup Table no longer exists. Choose another one.'),
+        node.queryByText('The chosen code translation no longer exists. Choose another one.'),
       ).toBeNull(),
     )
     await expect(table).toHaveAttribute('aria-invalid', 'false')
@@ -233,13 +235,15 @@ export const LookupTablesLoading = meta.story({
     )
   },
   async play({ canvasElement }) {
-    const panel = await select(canvasElement, 'Lookup Table 1')
-    const table = await panel.findByRole('combobox', { name: 'Lookup Table' })
+    const panel = await select(canvasElement, 'Code translation 1')
+    const table = await panel.findByRole('combobox', { name: 'Code translation' })
 
     await expect(table).toHaveAttribute('aria-busy', 'true')
-    await expect(panel.getAllByText('Loading the Lookup Tables…')[0]).toBeVisible()
+    await expect(panel.getAllByText('Loading the code translations…')[0]).toBeVisible()
     await expect(
-      within(transformNodeOf(canvasElement, 'Lookup Table 1')).getByText('Lookup Table chosen'),
+      within(transformNodeOf(canvasElement, 'Code translation 1')).getByText(
+        'Code translation chosen',
+      ),
     ).toBeVisible()
   },
 })
@@ -250,12 +254,12 @@ export const LookupTablesEmpty = meta.story({
     msw.use(lookupTableListHandler(apiUrl, []))
   },
   async play({ canvasElement }) {
-    const panel = await select(canvasElement, 'Lookup Table 1')
+    const panel = await select(canvasElement, 'Code translation 1')
 
     await expect(
-      await panel.findByText('There are no Lookup Tables in this Workspace yet.'),
+      await panel.findByText('There are no code translations in this workspace yet.'),
     ).toBeVisible()
-    await expect(panel.getByRole('combobox', { name: 'Lookup Table' })).toHaveAttribute(
+    await expect(panel.getByRole('combobox', { name: 'Code translation' })).toHaveAttribute(
       'data-disabled',
     )
   },
@@ -276,12 +280,12 @@ export const LookupTablesError = meta.story({
     )
   },
   async play({ canvasElement }) {
-    const panel = await select(canvasElement, 'Lookup Table 1')
+    const panel = await select(canvasElement, 'Code translation 1')
 
     await expect(
-      await panel.findByText('The Lookup Tables could not be loaded.', {}, { timeout: 5000 }),
+      await panel.findByText('The code translations could not be loaded.', {}, { timeout: 5000 }),
     ).toBeVisible()
-    await expect(panel.getByRole('combobox', { name: 'Lookup Table' })).toHaveAttribute(
+    await expect(panel.getByRole('combobox', { name: 'Code translation' })).toHaveAttribute(
       'data-disabled',
     )
 
@@ -290,7 +294,7 @@ export const LookupTablesError = meta.story({
     await expect(
       await panel.findByText('Belongs to: Workspace', {}, { timeout: 5000 }),
     ).toBeVisible()
-    await expect(panel.queryByText('The Lookup Tables could not be loaded.')).toBeNull()
+    await expect(panel.queryByText('The code translations could not be loaded.')).toBeNull()
   },
 })
 
@@ -552,7 +556,7 @@ export const German = meta.story({
   ],
   async play({ canvas, canvasElement }) {
     await expect(
-      await canvas.findByRole('button', { name: 'Lookup Table hinzufügen' }),
+      await canvas.findByRole('button', { name: 'Code-Übersetzung hinzufügen' }),
     ).toBeVisible()
 
     const name = 'JSONata-Ausdruck 1'
@@ -577,8 +581,8 @@ export const German = meta.story({
       header.lastElementChild!.clientWidth,
     )
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Lookup Table 1' }))
-    await expect(await panel.findByText('Gehört zu: Workspace')).toBeVisible()
+    await userEvent.click(canvas.getByRole('button', { name: 'Code-Übersetzung 1' }))
+    await expect(await panel.findByText('Gehört zu: Arbeitsbereich')).toBeVisible()
     await expect(panel.getByRole('radio', { name: 'Eingehenden Wert behalten' })).toBeChecked()
   },
 })

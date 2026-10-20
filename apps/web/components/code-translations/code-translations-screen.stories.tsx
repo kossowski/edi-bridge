@@ -98,13 +98,15 @@ export const Default = meta.story({
     const orderUnits = card(elbtal.getByRole('link', { name: 'Elbtal order units' }))
 
     await expect(orderUnits.getByText('KGM missing')).toBeVisible()
-    await expect(canvas.getByText('2 lists block documents', { exact: false })).toBeVisible()
+    await expect(
+      canvas.getByText('2 code translations block documents', { exact: false }),
+    ).toBeVisible()
   },
 })
 
 export const NewList = meta.story({
   async play({ canvas }) {
-    await expect(await canvas.findByRole('link', { name: 'New list' })).toHaveAttribute(
+    await expect(await canvas.findByRole('link', { name: 'New code translation' })).toHaveAttribute(
       'href',
       '/code-translations/new',
     )
@@ -166,7 +168,7 @@ export const DeleteUnused = meta.story({
     await expect(remove).not.toHaveAttribute('aria-disabled')
     await expect(remove).not.toHaveAccessibleDescription()
     await userEvent.click(remove)
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete list' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete code translation' }))
     await expect(await canvas.findByText('Hansemarkt store numbers deleted.')).toBeInTheDocument()
     await expect(canvas.queryByRole('link', { name: 'Hansemarkt store numbers' })).toBeNull()
   },
@@ -208,7 +210,7 @@ export const Empty = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'No code translations yet' }),
     ).toBeVisible()
-    const newLinks = canvas.getAllByRole('link', { name: 'New list' })
+    const newLinks = canvas.getAllByRole('link', { name: 'New code translation' })
 
     await expect(newLinks).toHaveLength(2)
 
@@ -249,9 +251,9 @@ export const LargeVolume = meta.story({
       ),
     )
 
-    await expect(canvas.getByText('400 lists')).toBeVisible()
+    await expect(canvas.getByText('400 code translations')).toBeVisible()
     await expect(everyPartner.getAllByRole('listitem')).toHaveLength(12)
-    const showAll = everyPartner.getByRole('button', { name: /^Show all \d+ lists$/ })
+    const showAll = everyPartner.getByRole('button', { name: /^Show all \d+ code translations$/ })
 
     await expect(showAll).toBeVisible()
     await expect(showAll).not.toHaveAttribute('aria-expanded')
@@ -330,7 +332,7 @@ export const Viewer = meta.story({
   ...viewerStory({
     async play({ canvas }) {
       await expect(await canvas.findByRole('link', { name: 'Units of measure' })).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'New list' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'New code translation' })).toBeNull()
       await expect(canvas.queryByRole('button', { name: /^Actions for / })).toBeNull()
     },
   }),
@@ -343,7 +345,7 @@ export const ViewerEmpty = meta.story({
       await expect(
         await canvas.findByText(/They appear here once an Admin creates one\./),
       ).toBeVisible()
-      await expect(canvas.queryByRole('link', { name: 'New list' })).toBeNull()
+      await expect(canvas.queryByRole('link', { name: 'New code translation' })).toBeNull()
     },
   }),
 })

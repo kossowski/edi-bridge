@@ -62,11 +62,13 @@ export const MoveToNewerVersion = meta.story({
       await canvas.findByText('2 newer versions are available, up to version 4.'),
     ).toBeVisible()
     await userEvent.click(await canvas.findByRole('button', { name: 'Move to a newer version' }))
-    await expect(canvas.getByText(/Runs already processed keep the version/)).toHaveFocus()
+    await expect(canvas.getByText(/Documents already processed keep the version/)).toHaveFocus()
     await expect(canvas.getByRole('radio', { name: /^Version 4/ })).toBeChecked()
     await userEvent.click(canvas.getByRole('radio', { name: /^Version 3/ }))
     await userEvent.click(canvas.getByRole('button', { name: 'Move to version 3' }))
-    await waitFor(() => expect(canvas.getByText('The Flow now uses version 3.')).toHaveFocus())
+    await waitFor(() =>
+      expect(canvas.getByText('The document route now uses version 3.')).toHaveFocus(),
+    )
     await expect(canvas.getByText('Hansemarkt: CONTRL to ERP JSON, version 3')).toBeVisible()
     await expect(canvas.getByText('A newer version is available: version 4.')).toBeVisible()
   },
@@ -94,14 +96,16 @@ export const MoveFails = meta.story({
   async play({ canvas }) {
     await userEvent.click(await canvas.findByRole('button', { name: 'Move to a newer version' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Move to version 4' }))
-    await expect(await canvas.findByRole('alert')).toHaveTextContent('The Flow could not be moved.')
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'The document route could not be moved.',
+    )
   },
 })
 
 export const NotFound = meta.story({
   args: { id: '20000000-0000-4000-8000-0000000000ff' },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Flow not found')).toBeVisible()
+    await expect(await canvas.findByText('Document route not found')).toBeVisible()
   },
 })
 
@@ -115,7 +119,7 @@ export const Loading = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Flow')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading document route')).toBeInTheDocument()
   },
 })
 
@@ -129,7 +133,7 @@ export const Unavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Flow unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Document route unavailable')).toBeVisible()
   },
 })
 

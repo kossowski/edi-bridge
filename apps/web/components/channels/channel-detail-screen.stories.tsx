@@ -259,7 +259,7 @@ export const OutboundHttp = meta.story({
 export const NotFound = meta.story({
   args: { id: '10000000-0000-4000-8000-0000000000ff' },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Channel not found')).toBeVisible()
+    await expect(await canvas.findByText('Connection not found')).toBeVisible()
   },
 })
 
@@ -273,7 +273,7 @@ export const Loading = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(canvas.getByText('Loading Channel')).toBeInTheDocument()
+    await expect(canvas.getByText('Loading connection')).toBeInTheDocument()
   },
 })
 
@@ -287,7 +287,7 @@ export const Unavailable = meta.story({
     )
   },
   async play({ canvas }) {
-    await expect(await canvas.findByText('Channel unavailable')).toBeVisible()
+    await expect(await canvas.findByText('Connection unavailable')).toBeVisible()
   },
 })
 

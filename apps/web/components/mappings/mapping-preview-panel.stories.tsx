@@ -101,7 +101,7 @@ export const SampleChosen = meta.story({
       canvas.getByRole('region', { name: `Example document ${firstSample!.name}` }),
     ).toHaveTextContent('"despatchNumber"')
     await expect(canvas.getByText('2 targets left empty')).toBeVisible()
-    await expect(canvas.getByText('Lookup Table 1 has an invalid configuration.')).toBeVisible()
+    await expect(canvas.getByText('Code translation 1 has an invalid configuration.')).toBeVisible()
 
     await userEvent.click(canvas.getByRole('combobox', { name: 'Example document' }))
     await userEvent.click(await screen.findByRole('option', { name: secondSample!.name }))
@@ -258,7 +258,7 @@ export const EngineStoppedGerman = meta.story({
 
     await expect(
       await canvas.findByRole('heading', {
-        name: 'Die Vorschau hat angehalten und kein Ziel-Document erstellt',
+        name: 'Die Vorschau hat angehalten und keinen Zielbeleg erstellt',
       }),
     ).toBeVisible()
     await expect(canvas.getByText('Dieser Pflichtwert ist nicht gefüllt.')).toBeVisible()
@@ -289,10 +289,10 @@ export const German = meta.story({
 
     await expect(canvas.getByRole('heading', { name: 'Vorschau' })).toBeVisible()
     await expect(
-      await canvas.findByRole('region', { name: `Ziel-Document für ${firstSample!.name}` }),
+      await canvas.findByRole('region', { name: `Zielbeleg für ${firstSample!.name}` }),
     ).toBeVisible()
     await expect(await canvas.findByText('2 Ziele bleiben leer')).toBeVisible()
-    await expect(canvas.getByText('Lookup Table 1 ist ungültig konfiguriert.')).toBeVisible()
+    await expect(canvas.getByText('Code-Übersetzung 1 ist ungültig konfiguriert.')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Vorschau schließen' })).toBeVisible()
   },
 })

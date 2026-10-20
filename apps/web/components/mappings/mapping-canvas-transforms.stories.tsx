@@ -742,9 +742,9 @@ export const Viewer = meta.story({
       await expectNoSettingsInputs(canvasElement)
       await expect(panel.queryByRole('button', { name: /^(Remove|Move) / })).toBeNull()
 
-      const lookup = await findNode(canvasElement, 'Lookup Table 1')
+      const lookup = await findNode(canvasElement, 'Code translation 1')
 
-      await userEvent.click(lookup.getByRole('button', { name: 'Lookup Table 1' }))
+      await userEvent.click(lookup.getByRole('button', { name: 'Code translation 1' }))
       await expect(await panel.findByText('VAT categories')).toBeVisible()
       await expect(panel.getByText('Belongs to: Workspace')).toBeVisible()
 

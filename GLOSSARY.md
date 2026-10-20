@@ -31,6 +31,7 @@ _Avoid_: Playground, test workspace
 **Operator**:
 The person running the platform, above all Workspaces, who creates Workspaces and their users.
 _Avoid_: Superadmin, root, owner
+_On screen_: Operator (DE: Operator)
 
 **Member**:
 A user with a role, Admin or Viewer, in one Workspace. A user can be a Member of several Workspaces.
@@ -85,7 +86,7 @@ _Avoid_: Transaction, EDI document
 **Message Type**:
 The kind of business document per the EDIFACT standard: ORDERS (purchase order), DESADV (dispatch advice), INVOIC (invoice), CONTRL and APERAK (Acknowledgements).
 _Avoid_: Document type, format
-_On screen_: ORDERS → Purchase order (DE: Bestellung), DESADV → Dispatch advice (DE: Lieferavis), INVOIC → Invoice (DE: Rechnung), CONTRL → Receipt confirmation (DE: Empfangsbestätigung)
+_On screen_: Document type (DE: Belegart), ORDERS → Purchase order (DE: Bestellung), DESADV → Dispatch advice (DE: Lieferavis), INVOIC → Invoice (DE: Rechnung), CONTRL → Receipt confirmation (DE: Empfangsbestätigung)
 
 **Code List**:
 The set of codes the EDIFACT directory allows for one coded data element, e.g. `220` (order) for the document name code. Validation rejects any other code. Unlike a Lookup Table, it is part of the standard and translates nothing.
