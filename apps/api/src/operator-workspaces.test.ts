@@ -82,7 +82,6 @@ const createdWorkspace = async (body: WorkspaceInput) => {
   return workspaceSummarySchema.parse(response.json())
 }
 
-// A Member of the new Workspace, to read its data through the API.
 const memberOf = async (workspaceId: string, slug: string) => {
   const member = {
     name: `${slug} admin`,

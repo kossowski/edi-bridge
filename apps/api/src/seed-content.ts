@@ -119,7 +119,6 @@ export interface SeedOrder {
 const interchangeHeader = (sender: string, receiver: string, at: Date, reference: string) =>
   `UNB+UNOC:3+${sender}:14+${receiver}:14+${yyyymmdd(at).slice(2)}:${at.toISOString().slice(11, 16).replace(':', '')}+${reference}'`
 
-// The ORDERS a Trading Partner sends, in the shape of the reference ORDERS of packages/mapping.
 export function ordersInterchange(
   { number, orderedAt, deliveryDate, tradingPartner, store, lines }: SeedOrder,
   reference: string,
@@ -127,6 +126,7 @@ export function ordersInterchange(
 ) {
   const [first, second] = lines
 
+  // The reference ORDERS Mapping of packages/mapping reads these segments.
   const message = [
     "UNH+1+ORDERS:D:96A:UN:EAN008'",
     `BGM+220+${number}+9'`,
@@ -160,7 +160,6 @@ export function ordersInterchange(
   ].join('\n')
 }
 
-// The sample the ERP order structure is read from, in the shape the reference ORDERS maps to.
 export const erpOrderSample = {
   orderNumber: 'B-100000',
   orderDate: '2026-01-05',
@@ -206,7 +205,6 @@ const vatRate = 7
 
 const amount = (value: number) => Math.round(value * 100) / 100
 
-// The invoice the ERP sends for an order, in the shape of the reference invoice of packages/mapping.
 export function erpInvoice(order: SeedOrder, invoiceNumber: string, invoicedAt: Date) {
   const lines = order.lines.map(({ article, quantity }) => ({
     gtin: article.gtin,
@@ -220,6 +218,7 @@ export function erpInvoice(order: SeedOrder, invoiceNumber: string, invoicedAt: 
   const lineAmount = amount(lines.reduce((total, { netAmount }) => total + netAmount, 0))
   const vatAmount = amount((lineAmount * vatRate) / 100)
 
+  // The reference INVOIC Mapping of packages/mapping reads these fields.
   return {
     invoiceNumber,
     invoiceDate: ddmmyyyy(invoicedAt),

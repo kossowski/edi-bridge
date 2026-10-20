@@ -106,8 +106,8 @@ const graphOf = (
 
 const seedPublisher = { name: 'EDI Bridge seed', email: 'seed@edi-bridge.invalid' }
 
-// Mapping Versions name who published them; seeded ones name the seed, a user who never signs in.
 async function seedPublisherId(tx: Transaction) {
+  // Mapping Versions name who published them; seeded ones name the seed, a user who never signs in.
   await tx.insert(users).values(seedPublisher).onConflictDoNothing({ target: users.email })
 
   const { id } = await one(
