@@ -1,4 +1,4 @@
-import { asc, eq, inArray, isNotNull, or, type SQL, sql } from 'drizzle-orm'
+import { asc, eq, inArray, isNotNull, type SQL, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { Effect } from 'effect'
 
@@ -21,36 +21,30 @@ import { acknowledgements, documents, flows, runs, tradingPartners } from '@edi-
 import { Db, type Database } from './db.js'
 import { parse } from './parse.js'
 import { byName, inWorkspace } from './rows.js'
-import { businessReferenceOfRun, originalRuns } from './run.js'
+import { businessReferenceOfRun, failureOf, fromRuns, matchingSearchTerm } from './run.js'
 import { CurrentWorkspace } from './workspace.js'
 
 const replacingRuns = alias(runs, 'replacing_runs')
 
 const selectLifecycleRuns = (db: Database, where: SQL | undefined) =>
-  db
-    .select({
-      id: runs.id,
-      receivedAt: runs.receivedAt,
-      status: runs.status,
-      failureStage: runs.failureStage,
-      waitingForTradingPartnerSince: runs.waitingForTradingPartnerSince,
-      businessReference: businessReferenceOfRun,
-      messageType: flows.messageType,
-      tradingPartnerId: tradingPartners.id,
-      tradingPartnerName: tradingPartners.name,
-      acknowledgementTimeLimitHours: tradingPartners.acknowledgementTimeLimitHours,
-      controlReference: runs.controlReference,
-      acknowledgementState: runs.acknowledgementState,
-      documentId: runs.documentId,
-      receivedControlReference: documents.interchangeControlReference,
-      notSentReason: acknowledgements.notSentReason,
-      replacedById: replacingRuns.id,
-    })
-    .from(runs)
-    .innerJoin(flows, eq(flows.id, runs.flowId))
-    .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
+  fromRuns(db, {
+    id: runs.id,
+    receivedAt: runs.receivedAt,
+    failureStage: runs.failureStage,
+    waitingForTradingPartnerSince: runs.waitingForTradingPartnerSince,
+    businessReference: businessReferenceOfRun,
+    messageType: flows.messageType,
+    tradingPartnerId: tradingPartners.id,
+    tradingPartnerName: tradingPartners.name,
+    acknowledgementTimeLimitHours: tradingPartners.acknowledgementTimeLimitHours,
+    controlReference: runs.controlReference,
+    acknowledgementState: runs.acknowledgementState,
+    documentId: runs.documentId,
+    receivedControlReference: documents.interchangeControlReference,
+    notSentReason: acknowledgements.notSentReason,
+    replacedById: replacingRuns.id,
+  })
     .innerJoin(documents, eq(documents.id, runs.documentId))
-    .leftJoin(originalRuns, eq(originalRuns.id, runs.duplicateOfRunId))
     .leftJoin(acknowledgements, eq(acknowledgements.documentId, runs.documentId))
     .leftJoin(replacingRuns, eq(replacingRuns.replacesRunId, runs.id))
     .where(where)
@@ -69,31 +63,19 @@ const lifecycleRunsInWorkspace = (workspaceId: string, condition: SQL | undefine
 
 const runOf = (row: LifecycleRow): OrderLifecycleRun => {
   const replacedBy = row.replacedById === null ? null : { id: row.replacedById }
+  const failure = failureOf(row)
 
-  if (row.status === 'failed' && row.failureStage !== null) {
-    return {
-      id: row.id,
-      replacedBy,
-      status: row.status,
-      failureStage: row.failureStage,
-      waitingForTradingPartnerSince: row.waitingForTradingPartnerSince?.toISOString() ?? null,
-    }
-  }
-
-  if (row.status !== 'failed') {
-    return {
-      id: row.id,
-      replacedBy,
-      status: row.status,
-      failureStage: null,
-      waitingForTradingPartnerSince: null,
-    }
-  }
-
-  throw new Error(`Failed Run ${row.id} has no Failure Stage`)
+  return failure.status === 'failed'
+    ? {
+        id: row.id,
+        replacedBy,
+        ...failure,
+        waitingForTradingPartnerSince: row.waitingForTradingPartnerSince?.toISOString() ?? null,
+      }
+    : { id: row.id, replacedBy, ...failure, waitingForTradingPartnerSince: null }
 }
 
-// The Run names its sent Interchange; a received one is the Document the Trading Partner sent.
+// A received Interchange is identified by its Document, so a reprocessed Run shares it.
 const interchangeOf = (
   row: LifecycleRow,
   direction: OrderLifecycleMessage['direction'],
@@ -151,7 +133,7 @@ const lifecyclesOf = (rows: readonly LifecycleRow[]): OrderLifecycle[] =>
     }
   })
 
-const noStatuses = (): Record<OrderLifecycleStatus, number> =>
+const zeroStatusCounts = (): Record<OrderLifecycleStatus, number> =>
   // SAFETY: the entries cover every status of orderLifecycleStatuses.
   Object.fromEntries(orderLifecycleStatuses.map((status) => [status, 0])) as Record<
     OrderLifecycleStatus,
@@ -163,27 +145,14 @@ export const listOrderLifecycles = (query: OrderLifecycleListQuery) =>
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
-    const text = query.q?.toLowerCase() ?? ''
-
     // A search term matches the Business Reference or Trading Partner every Run of a lifecycle shares.
     const rows = yield* Effect.promise(() =>
-      selectLifecycleRuns(
-        db,
-        lifecycleRunsInWorkspace(
-          workspace.id,
-          text === ''
-            ? undefined
-            : or(
-                sql`strpos(lower(${businessReferenceOfRun}), ${text}) > 0`,
-                sql`strpos(lower(${tradingPartners.name}), ${text}) > 0`,
-              ),
-        ),
-      ),
+      selectLifecycleRuns(db, lifecycleRunsInWorkspace(workspace.id, matchingSearchTerm(query.q))),
     )
 
     const searched = lifecyclesOf(rows).map(toOrderLifecycleSummary)
 
-    const statusCounts = noStatuses()
+    const statusCounts = zeroStatusCounts()
 
     for (const { status } of searched) {
       statusCounts[status] += 1
