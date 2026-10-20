@@ -361,7 +361,6 @@ export const fieldNamesNotices = {
   aiUnavailable: { reason: 'aiUnavailable', message: 'AI unavailable; fields named without AI' },
 } as const satisfies Record<FieldNamesNoticeReason, FieldNamesNotice>
 
-// A null notice means the AI named the fields; otherwise they carry the dictionary names.
 export const documentStructureInferenceSchema = z.intersection(
   inferredDocumentStructureSchema,
   z.object({ fieldNamesNotice: fieldNamesNoticeSchema.nullable() }),
