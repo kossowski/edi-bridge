@@ -16,6 +16,7 @@ It type-checks and unit-tests the packages changed since `<parent>` and every pa
 
 - CI runs every task on each PR: `lint`, `check-types`, `test`, `test:stories`, `test:canvas`, `test:e2e`, `build`, `build-storybook`, and `test:e2e:full-stack` against the `full-stack` Compose profile in a job of its own (`.github/workflows/ci.yml`). Run one of these locally only to reproduce a failed CI task.
 - The pre-commit hook runs lint-staged: `oxlint --fix` and `oxfmt` on the staged files.
+- The `agent-hooks` CI job tests the Claude Code hooks in `.claude/hooks/`. After a change there, run `pnpm test:agent-hooks` locally: the verify command leaves these hooks out.
 
 ## UI parts
 
