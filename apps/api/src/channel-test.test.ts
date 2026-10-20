@@ -4,12 +4,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   listening,
+  mismatchingHostKeyFingerprint,
   startTestErp,
   startTestSftpServer,
   type TestErp,
   type TestSftpServer,
 } from '@edi-bridge/channels/testing'
 import {
+  acceptHostKeyEndpoint,
   type ChannelInput,
   createChannelEndpoint,
   createdChannelSchema,
@@ -141,9 +143,67 @@ describe('POST /channels/:id/test for an SFTP Channel', () => {
   })
 })
 
+describe('POST /channels/:id/test for the host key of an SFTP Channel', () => {
+  it('shows the fingerprint of the server as unchecked while none is confirmed', async () => {
+    expect(await outcomeOf(sftpOutbox())).toMatchObject({
+      outcome: 'succeeded',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'unchecked' },
+    })
+  })
+
+  it('shows that the server matches the confirmed fingerprint', async () => {
+    expect(
+      await outcomeOf({ ...sftpOutbox(), hostKeyFingerprint: sftp.hostKeyFingerprint }),
+    ).toMatchObject({
+      outcome: 'succeeded',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'matches' },
+    })
+  })
+
+  it('refuses a server whose host key does not match and shows its fingerprint', async () => {
+    expect(
+      await outcomeOf({ ...sftpOutbox(), hostKeyFingerprint: mismatchingHostKeyFingerprint }),
+    ).toEqual({
+      outcome: 'failed',
+      reason: 'hostKeyMismatch',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'mismatch' },
+      testedAt: expect.any(String),
+    })
+  })
+
+  it('shows the fingerprint when the login fails after the host key check', async () => {
+    expect(await outcomeOf({ ...sftpOutbox(), credential: 'wrong-password' })).toMatchObject({
+      outcome: 'failed',
+      reason: 'loginRejected',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'unchecked' },
+    })
+  })
+
+  it('matches once the Admin accepts the fingerprint the test showed', async () => {
+    const channel = await created(sftpOutbox())
+    const first = testChannelEndpoint.response.parse((await tested(channel.id)).body)
+
+    const accepted = await admin.inject({
+      method: 'PUT',
+      url: toPath(acceptHostKeyEndpoint.path, { id: channel.id }),
+      body: { hostKeyFingerprint: first.hostKey?.fingerprint },
+    })
+
+    expect(accepted.statusCode).toBe(200)
+    expect(testChannelEndpoint.response.parse((await tested(channel.id)).body)).toMatchObject({
+      outcome: 'succeeded',
+      hostKey: { fingerprint: sftp.hostKeyFingerprint, state: 'matches' },
+    })
+  })
+})
+
 describe('POST /channels/:id/test for an HTTP Channel', () => {
   it('reaches the destination with the stored authorization and sends no Document', async () => {
-    expect(await outcomeOf(httpDelivery())).toMatchObject({ outcome: 'succeeded' })
+    expect(await outcomeOf(httpDelivery())).toEqual({
+      outcome: 'succeeded',
+      hostKey: null,
+      testedAt: expect.any(String),
+    })
 
     expect(erp.received).toHaveLength(1)
     expect(erp.received[0]).toMatchObject({

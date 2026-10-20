@@ -10,6 +10,7 @@ import {
   secretContext,
 } from '@edi-bridge/channels'
 import {
+  type AcceptHostKeyBody,
   type Channel,
   type ChannelInput,
   channelSchema,
@@ -18,6 +19,7 @@ import {
   type CreatedChannel,
   type MaskedSecret,
   type RegeneratedWebhookToken,
+  type TestedHostKey,
   toPath,
   webhookPath,
   webhookTokenSchema,
@@ -89,7 +91,7 @@ interface KindHandling<K extends Kind> {
   reach: (
     channel: OfKind<Channel, K>,
     secret: (column: SecretColumn) => string | null,
-  ) => Effect.Effect<void, ChannelUnreachable, ChannelReach>
+  ) => Effect.Effect<TestedHostKey | null, ChannelUnreachable, ChannelReach>
 }
 
 type KindHandlings = { [K in Kind]: KindHandling<K> }
@@ -103,6 +105,7 @@ const kinds: KindHandlings = {
       remotePath: row.remotePath,
       authentication: row.authentication,
       credential: hidden,
+      hostKeyFingerprint: row.hostKeyFingerprint,
       ...(row.direction === 'inbound' && { pollingIntervalMinutes: row.pollingIntervalMinutes }),
     }),
     columns: (input) => ({
@@ -112,6 +115,9 @@ const kinds: KindHandlings = {
       remotePath: input.remotePath,
       authentication: input.authentication,
       pollingIntervalMinutes: input.direction === 'inbound' ? input.pollingIntervalMinutes : null,
+      ...(input.hostKeyFingerprint !== undefined && {
+        hostKeyFingerprint: input.hostKeyFingerprint,
+      }),
     }),
     createdSecrets: (secrets, id, input) => ({
       columns: sealed(secrets, id, 'encryptedCredential', input.credential),
@@ -121,7 +127,10 @@ const kinds: KindHandlings = {
       input.credential === undefined
         ? {}
         : sealed(secrets, id, 'encryptedCredential', input.credential),
-    reach: ({ host, port, username, remotePath, authentication }, secret) => {
+    reach: (
+      { host, port, username, remotePath, authentication, hostKeyFingerprint = null },
+      secret,
+    ) => {
       const credential = secret('encryptedCredential') ?? ''
 
       return Effect.flatMap(ChannelReach, (reach) =>
@@ -130,6 +139,7 @@ const kinds: KindHandlings = {
           port,
           username,
           remotePath,
+          hostKeyFingerprint,
           credential:
             authentication === 'password' ? { password: credential } : { privateKey: credential },
         }),
@@ -149,7 +159,7 @@ const kinds: KindHandlings = {
       return { columns: sealedToken(secrets, id, webhookToken), webhookToken }
     },
     changedSecrets: () => ({}),
-    reach: () => Effect.void,
+    reach: () => Effect.succeed(null),
   },
   http: {
     responseFields: (row) => ({
@@ -175,7 +185,10 @@ const kinds: KindHandlings = {
     },
     reach: (channel, secret) =>
       Effect.flatMap(ChannelReach, (reach) =>
-        reach.http({ url: channel.url, authorization: secret('encryptedAuthorization') }),
+        Effect.as(
+          reach.http({ url: channel.url, authorization: secret('encryptedAuthorization') }),
+          null,
+        ),
       ),
   },
 }
@@ -378,6 +391,21 @@ export const regenerateWebhookToken = (id: string) =>
     return { channel, webhookToken } satisfies RegeneratedWebhookToken
   })
 
+export const acceptHostKey = (
+  id: string,
+  input: Effect.Effect<AcceptHostKeyBody, ValidationError>,
+) =>
+  Effect.gen(function* () {
+    const existing = yield* loadRow(id)
+    const { hostKeyFingerprint } = yield* input
+
+    if (existing.type !== 'sftp') {
+      return yield* new Conflict({ message: 'Only SFTP Channels have a host key' })
+    }
+
+    return yield* updatingRow(id, { hostKeyFingerprint }, existing.tradingPartnerId)
+  })
+
 const secretOf =
   (secrets: SecretBox, row: Row) =>
   (column: SecretColumn): string | null => {
@@ -393,18 +421,23 @@ export const testChannel = (id: string) =>
     const channel = toChannel(row, apiPublicUrl)
 
     // A seeded Channel points at a reserved host and never connects, not even for a test.
-    const reason = row.seeded
-      ? ('seededChannel' as const)
+    const outcome = row.seeded
+      ? { reason: 'seededChannel' as const, hostKey: null }
       : yield* handlingOf(channel.type)
           .reach(channel, secretOf(secrets, row))
           .pipe(
-            Effect.as(null),
-            Effect.catchTag('ChannelUnreachable', (error) => Effect.succeed(error.reason)),
+            Effect.map((hostKey) => ({ reason: null, hostKey })),
+            Effect.catchTag('ChannelUnreachable', ({ reason, hostKey = null }) =>
+              Effect.succeed({ reason, hostKey }),
+            ),
           )
 
+    const { reason, hostKey } = outcome
     const testedAt = new Date().toISOString()
 
     return (
-      reason === null ? { outcome: 'succeeded', testedAt } : { outcome: 'failed', reason, testedAt }
+      reason === null
+        ? { outcome: 'succeeded', hostKey, testedAt }
+        : { outcome: 'failed', reason, hostKey, testedAt }
     ) satisfies ChannelTestResult
   })
