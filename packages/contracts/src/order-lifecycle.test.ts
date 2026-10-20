@@ -34,6 +34,7 @@ function message(
   const id = `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`
   const direction = messageType === 'ORDERS' ? 'inbound' : 'outbound'
   const replacedBy = options.replacedBy ? { id: options.replacedBy.run.id } : null
+
   const acknowledgement =
     options.acknowledgement === undefined ? 'accepted' : options.acknowledgement
 
@@ -164,6 +165,16 @@ describe('orderLifecycleStatusOf', () => {
         message('INVOIC'),
       ]),
     ).toBe('done')
+  })
+
+  it('is on track while a delivered outbound Message has no Interchange', () => {
+    expect(
+      orderLifecycleStatusOf([
+        message('ORDERS'),
+        { ...message('DESADV'), interchange: null },
+        message('INVOIC'),
+      ]),
+    ).toBe('on-track')
   })
 
   it('needs attention while the CONTRL to a received Interchange was not sent', () => {
