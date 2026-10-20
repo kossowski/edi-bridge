@@ -4,6 +4,7 @@ import { type Task, tasksEndpoint, tasksSchema } from '@edi-bridge/contracts'
 import { documents, flows, runs, tradingPartners } from '@edi-bridge/db'
 import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
+import { hourMs } from './duration.js'
 import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
 
 let api: TestApi
@@ -12,11 +13,11 @@ let workspace: InvoiceWorkspace
 
 let admin: Client
 
-const hour = 60 * 60 * 1000
+type RunValues = Partial<typeof runs.$inferInsert> & { receivedAt: Date }
 
 const now = Date.now()
 
-const hoursAgo = (hours: number) => new Date(now - hours * hour)
+const hoursAgo = (hours: number) => new Date(now - hours * hourMs)
 
 const failure = (failureStage: 'parse' | 'validation' | 'mapping' | 'delivery') => ({
   status: 'failed' as const,
@@ -74,10 +75,7 @@ async function addTradingPartner(target: InvoiceWorkspace, name: string) {
   const orders = await flowOf('ORDERS')
   const invoic = await flowOf('INVOIC')
 
-  const run = async (
-    flow: typeof orders,
-    values: Partial<typeof runs.$inferInsert> & { receivedAt: Date },
-  ) => {
+  const run = async (flow: typeof orders, values: RunValues) => {
     const document = await one(
       db
         .insert(documents)
@@ -108,10 +106,8 @@ async function addTradingPartner(target: InvoiceWorkspace, name: string) {
 
   return {
     tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
-    orders: (values: Partial<typeof runs.$inferInsert> & { receivedAt: Date }) =>
-      run(orders, values),
-    invoic: (values: Partial<typeof runs.$inferInsert> & { receivedAt: Date }) =>
-      run(invoic, values),
+    orders: (values: RunValues) => run(orders, values),
+    invoic: (values: RunValues) => run(invoic, values),
   }
 }
 

@@ -17,13 +17,10 @@ import {
 import { flows, runs, tradingPartners } from '@edi-bridge/db'
 
 import { Db, type Database } from './db.js'
+import { dayMs, hourMs } from './duration.js'
 import { inWorkspace } from './rows.js'
 import { failureOf, fromRuns } from './run.js'
 import { CurrentWorkspace } from './workspace.js'
-
-const hour = 60 * 60 * 1000
-
-const lookback = 24 * hour
 
 const replacingRuns = alias(runs, 'replacing_runs')
 
@@ -59,6 +56,7 @@ const whoActsOn = (row: FailedRunRow, failureStage: FailureStage): TaskActor =>
     ? whoActsOnFailedRun({ failureStage, messageType: row.messageType })
     : 'tradingPartner'
 
+// The query selects failed Runs only; the status check narrows the failure to read its stage.
 const toFailedRunTask = (row: FailedRunRow): Task[] => {
   const failure = failureOf(row)
 
@@ -124,7 +122,10 @@ const toOverdueAcknowledgementTask = (row: OverdueInterchangeRow): Task[] => {
       kind: 'overdueAcknowledgement',
       whoActs: 'tradingPartner',
       tradingPartner: { id: row.tradingPartnerId, name: row.tradingPartnerName },
-      at: new Date(handedOverAt.getTime() + row.acknowledgementTimeLimitHours * hour).toISOString(),
+      // No overdue-since time is stored, so the deadline marks when the Interchange became overdue.
+      at: new Date(
+        handedOverAt.getTime() + row.acknowledgementTimeLimitHours * hourMs,
+      ).toISOString(),
       interchange,
       messageType,
       sentAt: handedOverAt.toISOString(),
@@ -139,7 +140,7 @@ const finishedSince = (status: 'delivered' | 'failed', from: Date) =>
     Number,
   )
 
-const listTradingPartnerActivity = (db: Database, workspaceId: string, from: Date) =>
+const countRecentRunsByTradingPartner = (db: Database, workspaceId: string, from: Date) =>
   db
     .select({
       tradingPartnerId: tradingPartners.id,
@@ -153,9 +154,9 @@ const listTradingPartnerActivity = (db: Database, workspaceId: string, from: Dat
     .where(inWorkspace(runs, workspaceId))
     .groupBy(tradingPartners.id)
 
-type TradingPartnerActivityRow = Awaited<ReturnType<typeof listTradingPartnerActivity>>[number]
+type RecentRunCountsRow = Awaited<ReturnType<typeof countRecentRunsByTradingPartner>>[number]
 
-// A tie between actors leaves the Trading Partner to you.
+// Without one clear actor, you own the Trading Partner's follow-up.
 const dominantWhoActs = (failedRunTasks: readonly Task[]): TaskActor => {
   const counts = taskCountsOf(failedRunTasks)
   const [first, second] = taskActors.toSorted((a, b) => counts[b] - counts[a])
@@ -167,7 +168,7 @@ const dominantWhoActs = (failedRunTasks: readonly Task[]): TaskActor => {
 
 const toFailingTradingPartnerTask =
   (failedRunTasks: readonly Task[], overdueTasks: readonly Task[], now: Date) =>
-  (row: TradingPartnerActivityRow): Task[] => {
+  (row: RecentRunCountsRow): Task[] => {
     const ofTradingPartner = (task: Task) => task.tradingPartner.id === row.tradingPartnerId
     const overdue = overdueTasks.filter(ofTradingPartner).length
 
@@ -196,13 +197,13 @@ export const listTasks = Effect.gen(function* () {
   const db = yield* Db
   const workspace = yield* CurrentWorkspace
   const now = new Date(yield* Clock.currentTimeMillis)
-  const from = new Date(now.getTime() - lookback)
+  const from = new Date(now.getTime() - dayMs)
 
   const [failedRuns, overdueInterchanges, activity] = yield* Effect.promise(() =>
     Promise.all([
       listFailedRuns(db, workspace.id, from),
       listOverdueInterchanges(db, workspace.id),
-      listTradingPartnerActivity(db, workspace.id, from),
+      countRecentRunsByTradingPartner(db, workspace.id, from),
     ]),
   )
 
