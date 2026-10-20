@@ -175,7 +175,7 @@ describe('runDetailSchema', () => {
       failureStage: 'delivery',
       error: {
         code: 'hostKeyMismatch',
-        message: 'The SFTP server showed another host key than the one confirmed',
+        message: 'The SFTP server showed a different host key from the one confirmed',
         position: null,
         details: null,
       },

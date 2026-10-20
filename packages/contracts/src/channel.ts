@@ -63,8 +63,7 @@ export type MaskedSecret = z.infer<typeof maskedSecretSchema>
 
 export const maxChannelNameLength = 70
 
-// OpenSSH's `SHA256:<base64>` form: 32 bytes are 43 characters without padding, the last one
-// carrying only four bits.
+// The last of the 43 base64 characters carries only 4 bits of the 32-byte hash.
 export const hostKeyFingerprintSchema = z
   .string()
   .trim()
@@ -143,7 +142,6 @@ function channelUnion<
   PollingInterval extends z.ZodType,
   Webhook extends Record<string, z.ZodType>,
   Authorization extends z.ZodType,
-  HostKeyFingerprint extends z.ZodType,
 >(
   object: <Fields extends Record<string, z.ZodType>>(
     fields: Fields,
@@ -154,10 +152,9 @@ function channelUnion<
     pollingInterval: PollingInterval
     webhook: Webhook
     authorization: Authorization
-    hostKeyFingerprint: HostKeyFingerprint
   },
 ) {
-  const { common, credential, pollingInterval, webhook, authorization, hostKeyFingerprint } = parts
+  const { common, credential, pollingInterval, webhook, authorization } = parts
 
   return z.discriminatedUnion('type', [
     z.discriminatedUnion('direction', [
@@ -168,7 +165,7 @@ function channelUnion<
         ...sftpConnection,
         pollingIntervalMinutes: pollingInterval,
         credential,
-        hostKeyFingerprint,
+        hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
       }),
       object({
         ...common,
@@ -176,7 +173,7 @@ function channelUnion<
         ...channelIdentity,
         ...sftpConnection,
         credential,
-        hostKeyFingerprint,
+        hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
       }),
     ]),
     object({
@@ -202,20 +199,17 @@ export const channelInputSchema = channelUnion(z.object, {
   pollingInterval: pollingIntervalSchema.default(pollingIntervalMinutes.default),
   webhook: {},
   authorization: secretInputSchema.nullable(),
-  hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
 })
 
 export type ChannelInput = z.infer<typeof channelInputSchema>
 
-// Omitting a secret or the host key fingerprint keeps the stored one; null removes the HTTP
-// Authorization header or the fingerprint.
+// Omitting a secret or fingerprint keeps the stored one; null removes it.
 export const channelUpdateSchema = channelUnion(z.object, {
   common: {},
   credential: secretInputSchema.optional(),
   pollingInterval: pollingIntervalSchema,
   webhook: {},
   authorization: secretInputSchema.nullable().optional(),
-  hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
 })
 
 export type ChannelUpdate = z.infer<typeof channelUpdateSchema>
@@ -227,7 +221,6 @@ export const channelSchema = channelUnion(z.strictObject, {
   pollingInterval: pollingIntervalSchema,
   webhook: { url: z.url(), token: maskedSecretSchema },
   authorization: maskedSecretSchema.nullable(),
-  hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
 })
 
 export type Channel = z.infer<typeof channelSchema>
@@ -321,7 +314,6 @@ export const hostKeyStateSchema = z.enum(hostKeyStates)
 
 export type HostKeyState = z.infer<typeof hostKeyStateSchema>
 
-// The fingerprint the server presented, and how it compares to the one the Admin confirmed.
 export const testedHostKeySchema = z.object({
   fingerprint: hostKeyFingerprintSchema,
   state: hostKeyStateSchema,
@@ -329,19 +321,18 @@ export const testedHostKeySchema = z.object({
 
 export type TestedHostKey = z.infer<typeof testedHostKeySchema>
 
-// Null for a Channel without a host key, or when the test failed before the server showed one.
+const channelTestFields = {
+  testedAt: z.iso.datetime(),
+  hostKey: testedHostKeySchema.nullable().optional(),
+}
+
 export const channelTestResultSchema = z
   .discriminatedUnion('outcome', [
-    z.object({
-      outcome: z.literal('succeeded'),
-      testedAt: z.iso.datetime(),
-      hostKey: testedHostKeySchema.nullable().optional(),
-    }),
+    z.object({ outcome: z.literal('succeeded'), ...channelTestFields }),
     z.object({
       outcome: z.literal('failed'),
       reason: channelTestResultReasonSchema,
-      testedAt: z.iso.datetime(),
-      hostKey: testedHostKeySchema.nullable().optional(),
+      ...channelTestFields,
     }),
   ])
   .superRefine((result, context) => {
@@ -376,8 +367,7 @@ export const acceptHostKeyBodySchema = z.strictObject({
 
 export type AcceptHostKeyBody = z.infer<typeof acceptHostKeyBodySchema>
 
-// The Admin accepts the fingerprint a Channel test showed; the body carries it, so only the key
-// the Admin saw is stored, even if the server presents another one in the meantime.
+// The body pins the key the Admin saw, in case the server presents another one meanwhile.
 export const acceptHostKeyEndpoint: Endpoint<
   Channel,
   undefined,
