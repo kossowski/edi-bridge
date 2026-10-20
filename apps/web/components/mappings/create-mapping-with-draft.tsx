@@ -20,6 +20,10 @@ function isMissingDocumentStructure(error: Error) {
   return error instanceof ApiError && error.status === 422
 }
 
+function namesDocumentStructure(body: CreateMappingBody | undefined) {
+  return body?.documentStructureId !== undefined
+}
+
 export function useCreateMappingWithDraft() {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -34,7 +38,7 @@ export function useCreateMappingWithDraft() {
     onError: (error, body) => {
       started.current = false
 
-      if (body.documentStructureId !== undefined && isMissingDocumentStructure(error)) {
+      if (namesDocumentStructure(body) && isMissingDocumentStructure(error)) {
         void queryClient.invalidateQueries({ queryKey: documentStructureKeys.all() })
       }
     },
@@ -54,7 +58,7 @@ export function useCreateMappingWithDraft() {
     locked: create.isPending || create.isSuccess,
     messageType: create.variables?.messageType,
     error: create.error,
-    documentStructureNamed: create.variables?.documentStructureId !== undefined,
+    withDocumentStructure: namesDocumentStructure(create.variables),
   }
 }
 
@@ -86,11 +90,11 @@ export function NoDocumentStructure({
 
 export function CreateMappingError({
   error,
-  documentStructureNamed = false,
+  withDocumentStructure = false,
   className,
 }: {
   error: Error | null
-  documentStructureNamed?: boolean
+  withDocumentStructure?: boolean
   className?: string
 }) {
   const t = useTranslations('Mappings.create')
@@ -99,14 +103,16 @@ export function CreateMappingError({
     return null
   }
 
-  if (isMissingDocumentStructure(error) && !documentStructureNamed) {
+  const missingDocumentStructure = isMissingDocumentStructure(error)
+
+  if (missingDocumentStructure && !withDocumentStructure) {
     return <NoDocumentStructure variant="destructive" className={className} />
   }
 
   return (
     <Alert variant="destructive" className={cn('text-left', className)}>
       <AlertDescription>
-        {isMissingDocumentStructure(error) ? t('documentStructureGone') : t('failed')}
+        {missingDocumentStructure ? t('documentStructureGone') : t('failed')}
       </AlertDescription>
     </Alert>
   )
