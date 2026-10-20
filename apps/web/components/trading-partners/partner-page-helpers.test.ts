@@ -4,7 +4,33 @@ import {
   awaitsReceiptConfirmation,
   dayTotals,
   receiptConfirmationPollInterval,
+  testRejected,
 } from './partner-page-helpers'
+
+describe('testRejected', () => {
+  const sent = {
+    testInterchangeSentAt: '2026-10-10T08:00:00.000Z',
+    contrlReceivedAt: null,
+    testRejectedAt: null,
+    testRejectedRunId: null,
+  }
+
+  it('is false while the Trading Partner has not rejected the test', () => {
+    expect(testRejected({ onboarding: sent })).toBe(false)
+  })
+
+  it('is true once the Trading Partner rejected the test', () => {
+    expect(
+      testRejected({
+        onboarding: {
+          ...sent,
+          testRejectedAt: '2026-10-10T08:05:00.000Z',
+          testRejectedRunId: '00000000-0000-4000-8000-0000000000e1',
+        },
+      }),
+    ).toBe(true)
+  })
+})
 
 describe('awaitsReceiptConfirmation', () => {
   const sent = {

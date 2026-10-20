@@ -204,7 +204,7 @@ export const SendRefusedForMissingSample = meta.story({
     )
     const alert = await canvas.findByRole('alert')
     await expect(alert).toHaveTextContent(
-      `The document route ${flowWithoutSample!.name} has no example document to send as a test.`,
+      `The document route ${flowWithoutSample!.name} has no example document to send as a test. Add an example document to the data format of this document route.`,
     )
     await expect(
       within(alert).getByRole('link', { name: flowWithoutSample!.name }),
@@ -220,7 +220,7 @@ export const SendRefusedForMissingSampleGerman = meta.story({
       await canvas.findByRole('button', { name: 'Testbeleg senden' }, activityLoaded),
     )
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      `Der Belegweg ${flowWithoutSample!.name} hat keinen Beispielbeleg, der als Test gesendet werden kann.`,
+      `Der Belegweg ${flowWithoutSample!.name} hat keinen Beispielbeleg, der als Test gesendet werden kann. Fügen Sie dem Datenformat dieses Belegwegs einen Beispielbeleg hinzu.`,
     )
   },
 })
@@ -319,7 +319,7 @@ export const TestRejected = meta.story({
     msw.use(
       ...createHandlers(apiUrl, {
         tradingPartners: withReadyForTest,
-        testInterchange: { contrlDelayMs: 0, rejectedRunId: rejectedRun!.id },
+        testInterchange: { contrlDelayMs: 0, rejectingRunId: rejectedRun!.id },
       }),
     )
   },

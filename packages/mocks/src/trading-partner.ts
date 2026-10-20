@@ -236,8 +236,7 @@ export function toTradingPartnerStore(
 
 export type TestInterchangeOptions = {
   contrlDelayMs?: number | null
-  // The CONTRL after the delay rejects the test and points at this Run.
-  rejectedRunId?: string
+  rejectingRunId?: string
   refusal?: Exclude<TestInterchangeRefusal, { reason: 'notAwaited' }>
 }
 
@@ -263,7 +262,7 @@ export function tradingPartnerHandlers(
   {
     tradingPartners = seedTradingPartners,
     workspace = seedWorkspace,
-    testInterchange: { contrlDelayMs = 5000, rejectedRunId, refusal } = {},
+    testInterchange: { contrlDelayMs = 5000, rejectingRunId, refusal } = {},
     session = seedSession,
   }: {
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
@@ -293,9 +292,9 @@ export function tradingPartnerHandlers(
         ...tradingPartner,
         onboarding: {
           ...tradingPartner.onboarding,
-          ...(rejectedRunId === undefined
+          ...(rejectingRunId === undefined
             ? { contrlReceivedAt: at }
-            : { testRejectedAt: at, testRejectedRunId: rejectedRunId }),
+            : { testRejectedAt: at, testRejectedRunId: rejectingRunId }),
         },
       })
     }

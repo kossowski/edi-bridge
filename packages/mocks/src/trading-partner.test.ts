@@ -385,12 +385,12 @@ describe('POST /trading-partners/:id/test-interchange', () => {
   it('records a rejecting CONTRL after the delay, with the Run of the rejected test', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(sentAt)
-    const rejectedRunId = '10000000-0000-4000-8000-0000000000e1'
+    const rejectingRunId = '10000000-0000-4000-8000-0000000000e1'
 
     server.use(
       ...tradingPartnerHandlers(apiUrl, {
         tradingPartners: [notStarted],
-        testInterchange: { contrlDelayMs: 60_000, rejectedRunId },
+        testInterchange: { contrlDelayMs: 60_000, rejectingRunId },
       }),
     )
 
@@ -401,7 +401,7 @@ describe('POST /trading-partners/:id/test-interchange', () => {
       testInterchangeSentAt: '2026-10-10T12:00:00.000Z',
       contrlReceivedAt: null,
       testRejectedAt: '2026-10-10T12:01:00.000Z',
-      testRejectedRunId: rejectedRunId,
+      testRejectedRunId: rejectingRunId,
     })
   })
 

@@ -1361,7 +1361,7 @@
       "sendRefused": {
         "notAwaited": "{name} erwartet gerade keinen Testbeleg.",
         "noOutboundFlow": "Noch kein Belegweg sendet Belege an {name}, daher gibt es nichts als Test zu senden.",
-        "sampleMissing": "Der Belegweg <link>{flow}</link> hat keinen Beispielbeleg, der als Test gesendet werden kann."
+        "sampleMissing": "Der Belegweg <link>{flow}</link> hat keinen Beispielbeleg, der als Test gesendet werden kann. Fügen Sie dem Datenformat dieses Belegwegs einen Beispielbeleg hinzu."
       },
       "waiting": "Warten auf die Empfangsbestätigung von {name}. Diese Seite aktualisiert sich von selbst.",
       "sentAt": "Testbeleg gesendet <when>{time}</when>.",

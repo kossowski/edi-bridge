@@ -14,15 +14,18 @@ export type PartnerActivityProps = {
   activity: TradingPartnerActivityDetail
 }
 
-export function awaitsReceiptConfirmation({
-  testMode,
-  onboarding,
-}: Pick<TradingPartner, 'testMode' | 'onboarding'>) {
+export function testRejected({ onboarding }: Pick<TradingPartner, 'onboarding'>) {
+  return onboarding.testRejectedAt !== null
+}
+
+export function awaitsReceiptConfirmation(
+  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'>,
+) {
   return (
-    testMode &&
-    onboarding.testInterchangeSentAt !== null &&
-    onboarding.contrlReceivedAt === null &&
-    onboarding.testRejectedAt === null
+    tradingPartner.testMode &&
+    tradingPartner.onboarding.testInterchangeSentAt !== null &&
+    tradingPartner.onboarding.contrlReceivedAt === null &&
+    !testRejected(tradingPartner)
   )
 }
 

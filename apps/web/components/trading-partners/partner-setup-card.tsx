@@ -16,6 +16,7 @@ import { linkClass } from '@/components/detail-parts'
 import {
   awaitsReceiptConfirmation,
   type PartnerActivityProps,
+  testRejected,
 } from '@/components/trading-partners/partner-page-helpers'
 import {
   type PartnerSetup,
@@ -236,13 +237,7 @@ function Waiting({ tradingPartner }: { tradingPartner: TradingPartner }) {
   )
 }
 
-function Rejected({
-  tradingPartner,
-  runId,
-}: {
-  tradingPartner: TradingPartner
-  runId: string | null
-}) {
+function Rejected({ name, runId }: { name: string; runId: string | null }) {
   const t = useTranslations('TradingPartner.setup')
 
   return (
@@ -253,7 +248,7 @@ function Rejected({
         aria-hidden
         className="text-destructive-text mt-0.5 size-4 shrink-0"
       />
-      <span>{t('rejected', { name: tradingPartner.name })}</span>
+      <span>{t('rejected', { name })}</span>
       {runId && (
         <Link href={documentHref(runId)} className={linkClass}>
           {t('rejectedReason')}
@@ -330,13 +325,13 @@ function StepAction({ item, context }: { item: PartnerSetupItem; context: SetupC
     case 'awaitConfirmation':
       return (
         <>
-          {tradingPartner.onboarding.testRejectedAt === null ? (
-            <Waiting tradingPartner={tradingPartner} />
-          ) : (
+          {testRejected(tradingPartner) ? (
             <Rejected
+              name={tradingPartner.name}
               runId={tradingPartner.onboarding.testRejectedRunId}
-              tradingPartner={tradingPartner}
             />
+          ) : (
+            <Waiting tradingPartner={tradingPartner} />
           )}
           {canChange && canSendTestInterchange(tradingPartner, workspaceGln) && (
             <SendTestDocument again tradingPartner={tradingPartner} />
@@ -464,9 +459,7 @@ export function PartnerSetupCard({
     ? wentLive && t('goLive.done', { name })
     : sawWaiting &&
       !awaiting &&
-      (tradingPartner.onboarding.testRejectedAt === null
-        ? t('arrived', { name })
-        : t('rejected', { name }))
+      (testRejected(tradingPartner) ? t('rejected', { name }) : t('arrived', { name }))
 
   return (
     <Card role="region" aria-labelledby={titleId}>
