@@ -6,7 +6,7 @@ import { channels } from '@edi-bridge/db'
 
 import type { SftpFile } from '@edi-bridge/channels'
 
-import { decodeDocument } from './decode-document'
+import { type DecodedDocument, decodeDocument } from './decode-document'
 import { receive } from './receive'
 import { Database, Download } from './services'
 
@@ -38,7 +38,7 @@ const removeStored = (channel: InboundChannel, file: SftpFile, state: ChannelPol
 const storeAndRemove = (
   channel: InboundChannel,
   file: SftpFile,
-  content: string,
+  content: DecodedDocument,
   state: ChannelPolling,
 ) =>
   Effect.gen(function* () {

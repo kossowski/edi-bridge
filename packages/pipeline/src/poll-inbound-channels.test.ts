@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { Clock, Duration, Effect, Exit, Fiber, Scope } from 'effect'
 import { TestClock } from 'effect/testing'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -13,7 +13,7 @@ import {
 import { channels, connect, type Connection, documents, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
-import { Download, type DownloadService, pollInboundChannels } from './index'
+import { Download, type DownloadService, pollInboundChannels, processRun } from './index'
 import {
   addOrdersFlow,
   golden,
@@ -22,6 +22,7 @@ import {
   type InvoiceWorkspace,
   markSeeded,
   pipelineServices,
+  readRun,
   receiveOverSftp,
   seedInvoiceWorkspace,
   testSecrets,
@@ -288,6 +289,103 @@ describe('the polling of inbound SFTP Channels', () => {
     await received(box.channelId, 1)
 
     expect(await storedOn(box.channelId)).toMatchObject([{ fileName: 'utf8.edi', content: utf8 }])
+  })
+
+  it('reads an Interchange in UNOW as UTF-8, whatever the bytes of another encoding would be', async () => {
+    const box = await outbox()
+    const utf8Orders = ordersInterchange.replace('UNOC', 'UNOW')
+
+    box.place('orders.edi', utf8Orders, { encoding: 'utf8' })
+
+    const polling = await startPolling()
+
+    await polling.pollAgain(box.channelId)
+    await received(box.channelId, 1)
+
+    expect(await storedOn(box.channelId)).toMatchObject([{ content: utf8Orders, bytes: null }])
+  })
+
+  const processedRunsOn = async (channelId: string) => {
+    const found = await connection.db
+      .select({ id: runs.id })
+      .from(runs)
+      .innerJoin(documents, eq(documents.id, runs.documentId))
+      .where(eq(documents.channelId, channelId))
+
+    for (const { id } of found) {
+      await Effect.runPromise(
+        processRun({ workspaceId: workspace.id, runId: id }).pipe(
+          pipelineServices(connection.db, inMemoryRunQueue()),
+        ),
+      )
+    }
+
+    return Promise.all(found.map(({ id }) => readRun(connection.db, id)))
+  }
+
+  it('keeps the bytes of an Interchange not valid in the character set its UNB names, and fails its Run at parse at the first invalid byte', async () => {
+    const orders = await addOrdersFlow(connection.db, workspace, { url: 'http://erp.invalid/' })
+    const box = await outbox({}, { flowId: orders.flowId })
+    const latin1Bytes = ordersInterchange.replace('UNOC', 'UNOW')
+
+    box.place('orders.edi', latin1Bytes)
+
+    const polling = await startPolling()
+
+    await polling.pollAgain(box.channelId)
+    await removed(box)
+
+    const [run] = await processedRunsOn(box.channelId)
+
+    expect(run?.document).toMatchObject({
+      content: null,
+      bytes: Buffer.from(latin1Bytes, 'latin1'),
+    })
+    // UNB to NAD take 205 bytes, CTA+OC+Claus Fr the rest before the ü.
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'parse',
+      error: {
+        code: 'invalid-byte-sequence',
+        message:
+          'Byte 206 (0xFC) is not valid in UNOW (UTF-8), at segment 7, element 2, component 1',
+        position: { segment: 7, tag: 'CTA', element: 2, component: 1 },
+      },
+    })
+  })
+
+  it('keeps the bytes of a Document not valid UTF-8, and fails its Run where its Document Structure reads it', async () => {
+    const box = await outbox({ 'invoice.json': goldenInvoice }, { flowId: workspace.flowId })
+    const polling = await startPolling()
+
+    await polling.pollAgain(box.channelId)
+    await removed(box)
+
+    const [run] = await processedRunsOn(box.channelId)
+
+    expect(run?.document).toMatchObject({
+      content: null,
+      bytes: Buffer.from(goldenInvoice, 'latin1'),
+    })
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      error: { code: 'invalid-byte-sequence', message: 'Byte 574 (0xFC) is not valid utf-8' },
+    })
+  })
+
+  it('takes the content hash of a file over its bytes', async () => {
+    const box = await outbox({ 'orders.edi': threeOrders })
+    const polling = await startPolling()
+
+    await polling.pollAgain(box.channelId)
+    await removed(box)
+
+    expect(await storedOn(box.channelId)).toMatchObject([
+      {
+        contentHash: createHash('sha256').update(Buffer.from(threeOrders, 'latin1')).digest('hex'),
+      },
+    ])
   })
 
   it('removes a file whose Document is stored but rejected at receipt', async () => {

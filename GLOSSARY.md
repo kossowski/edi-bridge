@@ -181,7 +181,7 @@ _Avoid_: Job, transmission, execution
 _On screen_: Document (DE: Beleg)
 
 **Duplicate**:
-A Document received again: an Interchange with the same sender and Interchange control reference as an earlier one in the Workspace, or a file polled from an SFTP Channel with the same Channel, file name and content hash as an earlier one. Only an earlier Document within the Workspace's retention period counts, since an expired Document takes its keys with it.
+A Document received again: an Interchange with the same sender and Interchange control reference as an earlier one in the Workspace, or a file polled from an SFTP Channel with the same Channel, file name and hash of its bytes as an earlier one. Only an earlier Document within the Workspace's retention period counts, since an expired Document takes its keys with it.
 _Avoid_: Resend, double, repeat
 _On screen_: Duplicate (DE: Duplikat)
 

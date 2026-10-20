@@ -53,7 +53,7 @@ const receiveInvoice = async (into: InvoiceWorkspace) => {
       workspaceId: into.id,
       channelId: into.inboundChannelId,
       fileName: 'invoice.json',
-      content: goldenInvoice,
+      content: { text: goldenInvoice },
       manualSubmission: true,
     }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
   )

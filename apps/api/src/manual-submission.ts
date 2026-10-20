@@ -18,7 +18,7 @@ export const submitDocument = (input: ManualSubmissionInput) =>
       workspaceId: workspace.id,
       channelId: input.channelId,
       fileName: input.document.fileName,
-      content: input.document.content,
+      content: { text: input.document.content },
       manualSubmission: true,
     }).pipe(
       Effect.provideService(Database, db),

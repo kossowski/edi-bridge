@@ -201,7 +201,7 @@ describe('the missing codes of a Lookup Table', () => {
         workspaceId: other.id,
         channelId: other.inboundChannelId,
         fileName: 'invoice.json',
-        content: inUnit('PAL'),
+        content: { text: inUnit('PAL') },
         manualSubmission: false,
       }).pipe(pipelineServices(api.connection.db, api.runQueue)),
     )

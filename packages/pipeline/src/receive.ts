@@ -16,6 +16,7 @@ import {
 import { ParseError, parseMessages, readInterchange } from '@edi-bridge/edifact'
 
 import { answerDocument } from './acknowledgement'
+import { type DocumentUndecodable } from './decode-document'
 import { carriesTestIndicator } from './envelope'
 import { ReceiptRejected } from './errors'
 import { publishRunChanges } from './live-events'
@@ -26,9 +27,14 @@ export type ArrivingDocument = {
   workspaceId: string
   channelId: string
   fileName: string
-  content: string
+  content: ArrivingContent
   manualSubmission: boolean
 }
+
+// The bytes as received, with the text they decode to or how they fail to.
+export type ArrivingContent =
+  | { text: string; bytes?: Buffer }
+  | { readable: string; bytes: Buffer; undecodable: DocumentUndecodable }
 
 type Flow = typeof flows.$inferSelect
 
@@ -128,6 +134,10 @@ function route(content: string, channelFlows: readonly ChannelFlow[]) {
 
 type ReceivedEnvelope = { key: InterchangeKey | undefined; testIndicator: boolean }
 
+// A key read from bytes not valid in their character set holds U+FFFD in place of the bytes.
+const isKey = (value: string | undefined): value is string =>
+  value !== undefined && value !== '' && !value.includes('\ufffd')
+
 function envelopeOf(content: string): ReceivedEnvelope {
   try {
     const { header } = readInterchange(content)
@@ -135,7 +145,7 @@ function envelopeOf(content: string): ReceivedEnvelope {
     const controlReference = header?.elements[4]?.[0]
 
     return {
-      key: sender && controlReference ? { sender, controlReference } : undefined,
+      key: isKey(sender) && isKey(controlReference) ? { sender, controlReference } : undefined,
       testIndicator: carriesTestIndicator(header),
     }
   } catch (error) {
@@ -147,7 +157,8 @@ function envelopeOf(content: string): ReceivedEnvelope {
   }
 }
 
-export const contentHashOf = (content: string) => createHash('sha256').update(content).digest('hex')
+export const contentHashOf = (content: string | Buffer) =>
+  createHash('sha256').update(content).digest('hex')
 
 const replaced = aliasedTable(runs, 'replaced')
 
@@ -252,7 +263,12 @@ const inboundChannelOf = (workspaceId: string, channelId: string) =>
     return channel
   })
 
-const routeOnChannel = ({ workspaceId, channelId, content }: ArrivingDocument) =>
+const textOf = (content: ArrivingContent) => ('text' in content ? content.text : content.readable)
+
+const storedContentOf = (content: ArrivingContent) =>
+  'text' in content ? { content: content.text } : { bytes: content.bytes }
+
+const routeOnChannel = (workspaceId: string, channelId: string, content: string) =>
   Effect.gen(function* () {
     const db = yield* Database
 
@@ -349,7 +365,8 @@ export const receive = (arriving: ArrivingDocument) =>
     const channel = yield* inboundChannelOf(arriving.workspaceId, arriving.channelId)
 
     const documents = yield* Documents
-    const { key: interchangeKey, testIndicator } = envelopeOf(arriving.content)
+    const text = textOf(arriving.content)
+    const { key: interchangeKey, testIndicator } = envelopeOf(text)
 
     // Only a file polled from an SFTP server comes again unchanged after a failed removal.
     const fileKey =
@@ -357,7 +374,7 @@ export const receive = (arriving: ArrivingDocument) =>
         ? {
             channelId: arriving.channelId,
             fileName: arriving.fileName,
-            contentHash: contentHashOf(arriving.content),
+            contentHash: contentHashOf(arriving.content.bytes ?? text),
           }
         : undefined
 
@@ -366,7 +383,7 @@ export const receive = (arriving: ArrivingDocument) =>
         workspaceId: arriving.workspaceId,
         channelId: arriving.channelId,
         fileName: arriving.fileName,
-        content: arriving.content,
+        ...storedContentOf(arriving.content),
         interchangeSender: interchangeKey?.sender ?? null,
         interchangeControlReference: interchangeKey?.controlReference ?? null,
         testIndicator,
@@ -375,13 +392,21 @@ export const receive = (arriving: ArrivingDocument) =>
       }),
     )
 
-    const routing = yield* Effect.result(routeOnChannel(arriving))
+    const routing = yield* Effect.result(
+      routeOnChannel(arriving.workspaceId, arriving.channelId, text),
+    )
+
     const receiptFinishedAt = yield* DateTime.now
 
-    yield* answerDocument(
-      { workspaceId: arriving.workspaceId, documentId: document.id, content: arriving.content },
-      receiptFinishedAt,
-    )
+    // A CONTRL read from U+FFFD in place of the invalid bytes could accept what the sender broke.
+    yield* 'undecodable' in arriving.content
+      ? Effect.logWarning(
+          `Document ${document.id} gets no CONTRL: ${arriving.content.undecodable.message}`,
+        )
+      : answerDocument(
+          { workspaceId: arriving.workspaceId, documentId: document.id, content: text },
+          receiptFinishedAt,
+        )
 
     if (Result.isFailure(routing)) {
       // A Document rejected after storing stays findable by its id.

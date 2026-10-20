@@ -124,7 +124,7 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId: workspace.inboundChannelId,
         fileName: 'invoice.json',
-        content: goldenInvoice,
+        content: { text: goldenInvoice },
         manualSubmission: true,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -160,7 +160,7 @@ describe('the receipt of a Document', () => {
           workspaceId: workspace.id,
           channelId: workspace.inboundChannelId,
           fileName: 'unqueued.json',
-          content: goldenInvoice,
+          content: { text: goldenInvoice },
           manualSubmission: true,
         }).pipe(pipelineServices(connection.db, unreachable)),
       )
@@ -188,7 +188,7 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId: workspace.inboundChannelId,
         fileName: 'invoice.json',
-        content: goldenInvoice,
+        content: { text: goldenInvoice },
         manualSubmission: true,
         ...arriving,
       }).pipe(pipelineServices(connection.db, queue)),
@@ -297,7 +297,7 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId,
         fileName: 'interchange.edi',
-        content: interchange,
+        content: { text: interchange },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -314,7 +314,7 @@ describe('the receipt of a Document', () => {
       "UNZ+1+00000001'",
     ].join('\n')
 
-    const exit = await rejection({ channelId, content: ordersOnly })
+    const exit = await rejection({ channelId, content: { text: ordersOnly } })
 
     expect(exit).toStrictEqual(
       Exit.fail(
@@ -384,7 +384,7 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId,
         fileName: 'two-invoices.edi',
-        content: twoInvoices,
+        content: { text: twoInvoices },
         manualSubmission: true,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -404,7 +404,7 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId,
         fileName: 'invoice.json',
-        content: goldenInvoice,
+        content: { text: goldenInvoice },
         manualSubmission: true,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -448,7 +448,7 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId,
         fileName: 'orders.edi',
-        content: ordersInterchange([ordersMessage, ordersMessage, ordersMessage]),
+        content: { text: ordersInterchange([ordersMessage, ordersMessage, ordersMessage]) },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -492,7 +492,7 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId,
         fileName: 'orders.edi',
-        content: ordersInterchange([ordersMessage, withoutSegment, ordersMessage]),
+        content: { text: ordersInterchange([ordersMessage, withoutSegment, ordersMessage]) },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
     )
@@ -552,7 +552,7 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId,
         fileName: 'orders.edi',
-        content: interchangeFrom(withCheckDigit('430000000002'), [ordersMessage]),
+        content: { text: interchangeFrom(withCheckDigit('430000000002'), [ordersMessage]) },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
     )
@@ -578,7 +578,9 @@ describe('the receipt of a Document', () => {
         workspaceId: workspace.id,
         channelId,
         fileName: 'interchange.edi',
-        content: interchangeFrom(withCheckDigit('430000000005'), [invoicMessage, ordersMessage]),
+        content: {
+          text: interchangeFrom(withCheckDigit('430000000005'), [invoicMessage, ordersMessage]),
+        },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
     )
@@ -600,7 +602,7 @@ const receiveInvoice = async (
       workspaceId: into.id,
       channelId: into.inboundChannelId,
       fileName: 'invoice.json',
-      content,
+      content: { text: content },
       manualSubmission: true,
     }).pipe(pipelineServices(connection.db, queue)),
   )
@@ -1943,7 +1945,7 @@ describe('the processing of an inbound Run', () => {
         workspaceId: into.id,
         channelId: into.inboundChannelId,
         fileName: 'orders.edi',
-        content,
+        content: { text: content },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -2263,7 +2265,7 @@ describe('the processing of an inbound Run', () => {
         workspaceId: into.id,
         channelId: into.inboundChannelId,
         fileName: 'orders.edi',
-        content: ordersInterchange,
+        content: { text: ordersInterchange },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -2290,7 +2292,7 @@ describe('the processing of an inbound Run', () => {
         workspaceId: into.id,
         channelId: into.inboundChannelId,
         fileName: 'orders.edi',
-        content: ordersInterchange,
+        content: { text: ordersInterchange },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -2340,7 +2342,7 @@ describe('the processing of an inbound Run', () => {
           workspaceId: into.id,
           channelId: into.inboundChannelId,
           fileName: 'orders.edi',
-          content,
+          content: { text: content },
           manualSubmission: false,
         }).pipe(pipelineServices(connection.db, queue)),
       )
@@ -2484,7 +2486,7 @@ describe('the processing of an inbound Run', () => {
           workspaceId: into.id,
           channelId: onChannel,
           fileName,
-          content,
+          content: { text: content },
           manualSubmission,
         }).pipe(pipelineServices(connection.db, queue)),
       )
@@ -3189,7 +3191,7 @@ describe('the Retry of a Run', () => {
         workspaceId: into.id,
         channelId: into.inboundChannelId,
         fileName: 'orders.edi',
-        content: golden('orders-reference.edi', 'latin1'),
+        content: { text: golden('orders-reference.edi', 'latin1') },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -3274,7 +3276,7 @@ describe('the Acknowledgement of a sent Interchange', () => {
         workspaceId: into.id,
         channelId: into.inboundChannelId,
         fileName: 'contrl.edi',
-        content,
+        content: { text: content },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, queue)),
     )
@@ -3899,7 +3901,7 @@ describe('the CONTRL answering a received Interchange', () => {
         workspaceId: into.id,
         channelId: into.inboundChannelId,
         fileName: 'orders.edi',
-        content,
+        content: { text: content },
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, inMemoryRunQueue()), Effect.provide(logger)),
     )
@@ -4605,7 +4607,7 @@ describe('the live events of Runs', () => {
         workspaceId: workspace.id,
         channelId: workspace.inboundChannelId,
         fileName: 'invoice.json',
-        content: goldenInvoice,
+        content: { text: goldenInvoice },
         manualSubmission: true,
       }).pipe(
         Effect.provideService(LiveEvents, unpublished),

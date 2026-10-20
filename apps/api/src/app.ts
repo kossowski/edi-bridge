@@ -683,6 +683,7 @@ function registerRoutes(
             request.params.id,
             bearerTokenSchema.safeParse(request.headers[webhookTokenHeader.toLowerCase()]).data,
             request.body,
+            request.headers['content-type'],
           ).pipe(Effect.provideService(WebhookRateLimit, webhookRateLimiter)),
           201,
         ),
