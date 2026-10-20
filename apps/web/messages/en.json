@@ -2286,16 +2286,26 @@
     "new": {
       "button": "New Mapping",
       "title": "New Mapping",
-      "description": "Pick the document. The AI drafts the Mapping from an example document, and you check every link.",
+      "description": "Pick your data format and the document. The AI drafts the Mapping from an example document, and you check every link.",
       "choice": "{documents} {direction, select, inbound {you receive} other {you send}}",
       "aiHint": "Draft with AI",
-      "close": "Close"
+      "close": "Close",
+      "dataFormat": {
+        "label": "Your data format",
+        "description": "The Mapping translates between this format and the EDI document.",
+        "placeholder": "Choose a data format",
+        "missing": "Choose your data format first.",
+        "loading": "Loading your data formats…",
+        "failed": "Your data formats could not be loaded.",
+        "retry": "Try again"
+      }
     },
     "create": {
       "creating": "Creating the Mapping…",
       "failed": "The Mapping could not be created. Try again.",
       "noDocumentStructure": "Add your data format first, so the AI knows the shape of your files.",
-      "addDataFormat": "Add a data format"
+      "addDataFormat": "Add a data format",
+      "documentStructureGone": "This data format no longer exists. Choose another one."
     },
     "first": {
       "title": "Translate your first document",

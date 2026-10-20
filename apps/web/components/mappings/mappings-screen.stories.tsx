@@ -10,7 +10,9 @@ import { createMappingEndpoint } from '@edi-bridge/contracts'
 import {
   createHandlers,
   createMappingsWithTraffic,
+  documentStructureHandlers,
   mappingHandlers,
+  seedDocumentStructures,
   seedMappings,
 } from '@edi-bridge/mocks'
 
@@ -47,6 +49,16 @@ async function openNewMappingSheet(canvasElement: HTMLElement, name = 'New Mappi
   await userEvent.click(await within(canvasElement).findByRole('button', { name }))
 
   return within(await screen.findByRole('dialog', { name }))
+}
+
+// SAFETY: the seed holds a Document Structure for every Message Type.
+const dataFormat = seedDocumentStructures[0]!
+
+async function chooseDataFormat(sheet: ReturnType<typeof within>, name = dataFormat.name) {
+  await userEvent.selectOptions(
+    await sheet.findByRole('combobox', { name: 'Your data format' }),
+    name,
+  )
 }
 
 const choices = ['Purchase orders you receive', 'Dispatch advices you send', 'Invoices you send']
@@ -200,6 +212,17 @@ export const NewMappingSheet = meta.story({
       sheet.getByRole('button', { name: 'Purchase orders you receive' }),
     ).toHaveAccessibleDescription('Trading partner goes into Your ERP')
 
+    const picker = await sheet.findByRole('combobox', { name: 'Your data format' })
+
+    await expect(picker).toHaveValue('')
+
+    await userEvent.click(sheet.getByRole('button', { name: 'Invoices you send' }))
+
+    await expect(picker).toHaveFocus()
+    await expect(picker).toHaveAccessibleDescription(/^Choose your data format first\./)
+    await expect(getRouter().push).not.toHaveBeenCalled()
+
+    await chooseDataFormat(sheet)
     await userEvent.click(sheet.getByRole('button', { name: 'Invoices you send' }))
 
     await waitFor(() =>
@@ -235,6 +258,7 @@ export const CreatingMapping = meta.story({
   async play({ canvasElement }) {
     const sheet = await openNewMappingSheet(canvasElement)
 
+    await chooseDataFormat(sheet)
     await userEvent.click(sheet.getByRole('button', { name: 'Dispatch advices you send' }))
 
     await expect(await sheet.findByRole('status')).toHaveTextContent('Creating the Mapping…')
@@ -259,6 +283,7 @@ export const CreateMappingOnce = meta.story({
 
     const sheet = await openNewMappingSheet(canvasElement)
 
+    await chooseDataFormat(sheet)
     await userEvent.dblClick(sheet.getByRole('button', { name: 'Invoices you send' }))
     await userEvent.click(sheet.getByRole('button', { name: 'Dispatch advices you send' }))
 
@@ -267,7 +292,7 @@ export const CreateMappingOnce = meta.story({
         expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
       ),
     )
-    await expect(bodies).toEqual([{ messageType: 'INVOIC' }])
+    await expect(bodies).toEqual([{ messageType: 'INVOIC', documentStructureId: dataFormat.id }])
     await expect(getRouter().push).toHaveBeenCalledOnce()
   },
 })
@@ -276,24 +301,18 @@ export const CreateMappingFailed = meta.story({
   beforeEach({ msw }) {
     msw.use(
       http.post(createUrl, () =>
-        HttpResponse.json(
-          { message: 'The Workspace has no Document Structure to map yet.' },
-          { status: 422 },
-        ),
+        HttpResponse.json({ message: 'The Document Structure does not exist.' }, { status: 422 }),
       ),
     )
   },
   async play({ canvasElement }) {
     const sheet = await openNewMappingSheet(canvasElement)
 
+    await chooseDataFormat(sheet)
     await userEvent.click(sheet.getByRole('button', { name: 'Purchase orders you receive' }))
 
     await expect(await sheet.findByRole('alert')).toHaveTextContent(
-      'Add your data format first, so the AI knows the shape of your files.',
-    )
-    await expect(sheet.getByRole('link', { name: 'Add a data format' })).toHaveAttribute(
-      'href',
-      '/data-formats/new',
+      'This data format no longer exists. Choose another one.',
     )
     await expect(sheet.getByRole('button', { name: 'Purchase orders you receive' })).toBeEnabled()
   },
@@ -306,11 +325,91 @@ export const CreateMappingUnavailable = meta.story({
   async play({ canvasElement }) {
     const sheet = await openNewMappingSheet(canvasElement)
 
+    await chooseDataFormat(sheet)
     await userEvent.click(sheet.getByRole('button', { name: 'Invoices you send' }))
 
     await expect(await sheet.findByRole('alert')).toHaveTextContent(
       'The Mapping could not be created. Try again.',
     )
+  },
+})
+
+export const OneDataFormat = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [dataFormat] }))
+  },
+  async play({ canvasElement, msw }) {
+    const bodies: unknown[] = []
+
+    msw.use(
+      http.post(createUrl, async ({ request }) => {
+        bodies.push(await request.clone().json())
+      }),
+    )
+
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await waitFor(() =>
+      expect(sheet.getByRole('combobox', { name: 'Your data format' })).toHaveDisplayValue(
+        dataFormat.name,
+      ),
+    )
+
+    await userEvent.click(sheet.getByRole('button', { name: 'Purchase orders you receive' }))
+
+    await waitFor(() => expect(getRouter().push).toHaveBeenCalledOnce())
+    await expect(bodies).toEqual([{ messageType: 'ORDERS', documentStructureId: dataFormat.id }])
+  },
+})
+
+export const NoDataFormat = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [] }))
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await expect(
+      await sheet.findByText(
+        'Add your data format first, so the AI knows the shape of your files.',
+      ),
+    ).toBeVisible()
+    await expect(sheet.getByRole('link', { name: 'Add a data format' })).toHaveAttribute(
+      'href',
+      '/data-formats/new',
+    )
+    await expect(sheet.queryByRole('combobox')).toBeNull()
+    await expect(sheet.queryByRole('button', { name: 'Invoices you send' })).toBeNull()
+  },
+})
+
+export const DataFormatsLoading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { state: 'loading' }))
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await expect(await sheet.findByRole('status')).toHaveTextContent('Loading your data formats')
+
+    for (const name of choices) {
+      await expect(sheet.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true')
+    }
+  },
+})
+
+export const DataFormatsUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...documentStructureHandlers(apiUrl, { state: 'error' }))
+  },
+  async play({ canvasElement }) {
+    const sheet = await openNewMappingSheet(canvasElement)
+
+    await expect(await sheet.findByRole('alert')).toHaveTextContent(
+      'Your data formats could not be loaded.',
+    )
+    await waitFor(() => expect(sheet.getByRole('button', { name: 'Try again' })).toBeVisible())
+    await expect(sheet.queryByRole('button', { name: 'Invoices you send' })).toBeNull()
   },
 })
 
@@ -339,16 +438,18 @@ export const EmptyWorkspace = meta.story({
 
 export const EmptyWorkspaceWithoutDataFormat = meta.story({
   beforeEach({ msw }) {
-    msw.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }))
+    msw.use(
+      ...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }),
+      ...documentStructureHandlers(apiUrl, { documentStructures: [] }),
+    )
   },
   async play({ canvas }) {
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Purchase orders you receive' }),
-    )
-
-    await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'Add your data format first, so the AI knows the shape of your files.',
-    )
+    await expect(
+      await canvas.findByText(
+        'Add your data format first, so the AI knows the shape of your files.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.getByRole('link', { name: 'Add a data format' })).toBeVisible()
   },
 })
 
@@ -431,6 +532,7 @@ export const German = meta.story({
     await waitFor(() =>
       expect(sheet.getByRole('button', { name: 'Rechnungen, die Sie senden' })).toBeVisible(),
     )
+    await expect(await sheet.findByRole('combobox', { name: 'Ihr Datenformat' })).toBeVisible()
   },
 })
 

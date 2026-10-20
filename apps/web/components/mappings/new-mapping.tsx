@@ -2,22 +2,30 @@
 
 import { AiMagicIcon, ArrowRight02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useId } from 'react'
+import { type Ref, useId, useRef, useState } from 'react'
 
 import {
   CreateMappingError,
+  NoDocumentStructure,
   useCreateMappingWithDraft,
 } from '@/components/mappings/create-mapping-with-draft'
 import { DirectionHint } from '@/components/mappings/direction-path'
 import { usePlainNames } from '@/components/plain-names'
+import { documentStructuresQuery } from '@/lib/api/queries'
 import {
   type CreateMappingBody,
   type Direction,
   directionOf,
+  type DocumentStructureSummary,
   newMappingMessageTypes,
 } from '@edi-bridge/contracts'
+import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { Badge } from '@edi-bridge/ui/components/badge'
+import { Button } from '@edi-bridge/ui/components/button'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@edi-bridge/ui/components/field'
+import { NativeSelect, NativeSelectOption } from '@edi-bridge/ui/components/native-select'
 import {
   Sheet,
   SheetContent,
@@ -25,6 +33,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@edi-bridge/ui/components/sheet'
+import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 import { Spinner } from '@edi-bridge/ui/components/spinner'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
@@ -79,6 +88,65 @@ function Choice({
   )
 }
 
+function DocumentStructurePicker({
+  documentStructures,
+  value,
+  missing,
+  selectRef,
+  onChange,
+}: {
+  documentStructures: ReadonlyArray<DocumentStructureSummary>
+  value: string
+  missing: boolean
+  selectRef: Ref<HTMLSelectElement>
+  onChange: (id: string) => void
+}) {
+  const t = useTranslations('Mappings.new.dataFormat')
+  const id = useId()
+
+  return (
+    <Field data-invalid={missing || undefined}>
+      <FieldLabel htmlFor={id}>{t('label')}</FieldLabel>
+      <NativeSelect
+        id={id}
+        ref={selectRef}
+        value={value}
+        aria-describedby={missing ? `${id}-error ${id}-description` : `${id}-description`}
+        aria-invalid={missing || undefined}
+        className="w-full"
+        onChange={(event) => onChange(event.target.value)}>
+        {documentStructures.length > 1 && (
+          <NativeSelectOption disabled value="">
+            {t('placeholder')}
+          </NativeSelectOption>
+        )}
+        {documentStructures.map((documentStructure) => (
+          <NativeSelectOption key={documentStructure.id} value={documentStructure.id}>
+            {documentStructure.name}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      {missing && <FieldError id={`${id}-error`}>{t('missing')}</FieldError>}
+      <FieldDescription id={`${id}-description`}>{t('description')}</FieldDescription>
+    </Field>
+  )
+}
+
+function DocumentStructuresUnavailable({ onRetry }: { onRetry: () => void }) {
+  const t = useTranslations('Mappings.new.dataFormat')
+
+  return (
+    <Alert variant="destructive">
+      <AlertDescription className="flex flex-col items-start gap-2">
+        {t('failed')}
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          {t('retry')}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
 export function NewMappingChoices({
   direction,
   className,
@@ -86,26 +154,81 @@ export function NewMappingChoices({
   direction: Direction | null
   className?: string
 }) {
+  const t = useTranslations('Mappings.new.dataFormat')
   const create = useCreateMappingWithDraft()
+  const documentStructures = useQuery(documentStructuresQuery)
+  const selectRef = useRef<HTMLSelectElement>(null)
+  const [chosenId, setChosenId] = useState('')
+  const [missing, setMissing] = useState(false)
+
+  const available = documentStructures.data ?? []
+  const chosen = available.some(({ id }) => id === chosenId) ? chosenId : ''
+  const documentStructureId = available.length === 1 ? (available[0]?.id ?? '') : chosen
+
+  if (documentStructures.isError) {
+    return <DocumentStructuresUnavailable onRetry={() => void documentStructures.refetch()} />
+  }
+
+  if (documentStructures.isSuccess && available.length === 0) {
+    return <NoDocumentStructure />
+  }
 
   const shown = newMappingMessageTypes.filter(
     (messageType) => !direction || directionOf({ messageType }) === direction,
   )
 
+  function choose(messageType: NewMessageType) {
+    if (documentStructures.isPending) {
+      return
+    }
+
+    if (!documentStructureId) {
+      setMissing(true)
+      selectRef.current?.focus()
+
+      return
+    }
+
+    create.start({ messageType, documentStructureId })
+  }
+
   return (
     <div className="flex flex-col gap-3">
+      {documentStructures.isPending ? (
+        <div className="flex flex-col gap-2">
+          <p role="status" className="sr-only">
+            {t('loading')}
+          </p>
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ) : (
+        <DocumentStructurePicker
+          documentStructures={available}
+          missing={missing && !documentStructureId}
+          selectRef={selectRef}
+          value={documentStructureId}
+          onChange={(id) => {
+            setChosenId(id)
+            setMissing(false)
+          }}
+        />
+      )}
       <ul className={cn('grid gap-2', className)}>
         {shown.map((messageType) => (
           <Choice
             key={messageType}
             chosen={create.locked && create.messageType === messageType}
-            locked={create.locked}
+            locked={create.locked || documentStructures.isPending}
             messageType={messageType}
-            onChoose={() => create.start({ messageType })}
+            onChoose={() => choose(messageType)}
           />
         ))}
       </ul>
-      <CreateMappingError error={create.error} />
+      <CreateMappingError
+        documentStructureNamed={create.documentStructureNamed}
+        error={create.error}
+      />
     </div>
   )
 }

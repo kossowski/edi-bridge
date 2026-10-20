@@ -8,7 +8,7 @@ import { useRef } from 'react'
 
 import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
 import { ApiError, createMapping } from '@/lib/api/client'
-import { storeCreatedMapping } from '@/lib/api/queries'
+import { documentStructureKeys, storeCreatedMapping } from '@/lib/api/queries'
 import { newDocumentStructureHref } from '@/lib/navigation'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
@@ -31,8 +31,12 @@ export function useCreateMappingWithDraft() {
       storeCreatedMapping(queryClient, created)
       router.push(aiDraftStartHref(created.id))
     },
-    onError: () => {
+    onError: (error, body) => {
       started.current = false
+
+      if (body.documentStructureId !== undefined && isMissingDocumentStructure(error)) {
+        void queryClient.invalidateQueries({ queryKey: documentStructureKeys.all() })
+      }
     },
   })
 
@@ -50,14 +54,43 @@ export function useCreateMappingWithDraft() {
     locked: create.isPending || create.isSuccess,
     messageType: create.variables?.messageType,
     error: create.error,
+    documentStructureNamed: create.variables?.documentStructureId !== undefined,
   }
+}
+
+export function NoDocumentStructure({
+  variant = 'default',
+  className,
+}: {
+  variant?: 'default' | 'destructive'
+  className?: string | undefined
+}) {
+  const t = useTranslations('Mappings.create')
+
+  return (
+    <Alert
+      role={variant === 'destructive' ? 'alert' : 'note'}
+      variant={variant}
+      className={cn('text-left', className)}>
+      <AlertDescription className="flex flex-col items-start gap-2">
+        {t('noDocumentStructure')}
+        <Link
+          href={newDocumentStructureHref}
+          className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          {t('addDataFormat')}
+        </Link>
+      </AlertDescription>
+    </Alert>
+  )
 }
 
 export function CreateMappingError({
   error,
+  documentStructureNamed = false,
   className,
 }: {
   error: Error | null
+  documentStructureNamed?: boolean
   className?: string
 }) {
   const t = useTranslations('Mappings.create')
@@ -66,19 +99,14 @@ export function CreateMappingError({
     return null
   }
 
-  const missingDocumentStructure = isMissingDocumentStructure(error)
+  if (isMissingDocumentStructure(error) && !documentStructureNamed) {
+    return <NoDocumentStructure variant="destructive" className={className} />
+  }
 
   return (
     <Alert variant="destructive" className={cn('text-left', className)}>
-      <AlertDescription className="flex flex-col items-start gap-2">
-        {missingDocumentStructure ? t('noDocumentStructure') : t('failed')}
-        {missingDocumentStructure && (
-          <Link
-            href={newDocumentStructureHref}
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            {t('addDataFormat')}
-          </Link>
-        )}
+      <AlertDescription>
+        {isMissingDocumentStructure(error) ? t('documentStructureGone') : t('failed')}
       </AlertDescription>
     </Alert>
   )
