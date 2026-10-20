@@ -395,10 +395,8 @@ export function createHandlers(
 ) {
   const orderLifecycles = seedOrderLifecycles()
 
-  const runs = createRunStore(
-    [...seedRuns(), ...orderLifecycles.runs],
-    [...seedReprocessed(), ...orderLifecycles.reprocessed],
-  )
+  const reprocessed = [...seedReprocessed(), ...orderLifecycles.reprocessed]
+  const runs = createRunStore([...seedRuns(), ...orderLifecycles.runs], reprocessed)
 
   const ownWorkspace = workspace ?? seedWorkspace
   const operatorStore = createOperatorStore({ workspaces: operatorWorkspaces, invites })
@@ -508,7 +506,7 @@ export function createHandlers(
     ...runDetailHandlers(apiUrl, {
       runs,
       waitingForTradingPartnerSince: orderLifecycles.waitingForTradingPartnerSince,
-      documentDeletedAt: seedExpiredDocuments(),
+      documentDeletedAt: seedExpiredDocuments(seedRuns(), reprocessed),
       mappingVersions: mappingVersionStore,
       flows,
       channels: channelStore,

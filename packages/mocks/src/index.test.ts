@@ -622,6 +622,7 @@ describe('createHandlers', () => {
       expect(await getRun(id)).toMatchObject({
         status: 'failed',
         failureStage: 'mapping',
+        replacedBy: null,
         documentDeletedAt: deletedAt,
       })
     }
