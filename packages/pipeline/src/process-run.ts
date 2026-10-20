@@ -67,6 +67,7 @@ import {
 import type { DeliveryFailed, OutboundDocument } from '@edi-bridge/channels'
 import type { ParseError } from '@edi-bridge/edifact'
 
+import { referencesOf } from './business-reference'
 import { enveloped, framed } from './envelope'
 import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
@@ -638,10 +639,6 @@ const deliverDocument =
       })
     })
 
-const orderNumberOf = ({ segments }: Message) =>
-  segments.find(({ tag, elements }) => tag === 'RFF' && elements[0]?.[0] === 'ON')
-    ?.elements[0]?.[1] ?? null
-
 const loadPinned = (workspaceId: string, mappingVersionId: string, direction: Direction) =>
   Effect.gen(function* () {
     const db = yield* Database
@@ -1066,9 +1063,9 @@ const claim = ({ workspaceId, runId }: QueuedRun) =>
 
 const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
   Effect.gen(function* () {
-    const { businessReference } = run
+    const { documentNumber } = run
 
-    if (businessReference === null || run.replacesRunId !== null) {
+    if (documentNumber === null || run.replacesRunId !== null) {
       return
     }
 
@@ -1084,7 +1081,7 @@ const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
             and(
               eq(runs.workspaceId, run.workspaceId),
               eq(runs.flowId, run.flowId),
-              eq(runs.businessReference, businessReference),
+              eq(runs.documentNumber, documentNumber),
               eq(runs.status, 'failed'),
               lt(runs.receivedAt, run.receivedAt),
               notExists(tx.select().from(replacing).where(eq(replacing.replacesRunId, runs.id))),
@@ -1204,7 +1201,12 @@ const processOutbound = ({ holding, queued, run, content, pinned, lookupTables }
 
     const { message } = mapped.success
     const destination = yield* loadDestination(queued)
-    const delivering = { ...run, businessReference: orderNumberOf(message), deliveryInput: message }
+
+    const delivering = {
+      ...run,
+      ...referencesOf(message),
+      deliveryInput: message,
+    }
 
     const checked = yield* step(
       holding,
@@ -1215,6 +1217,7 @@ const processOutbound = ({ holding, queued, run, content, pinned, lookupTables }
           .update(runs)
           .set({
             businessReference: delivering.businessReference,
+            documentNumber: delivering.documentNumber,
             deliveryInput: delivering.deliveryInput,
           })
           .where(eq(runs.id, run.id))
@@ -1326,9 +1329,6 @@ const acknowledge = async (
     )
 }
 
-const documentNumberOf = ({ segments }: Message) =>
-  segments.find(({ tag }) => tag === 'BGM')?.elements[1]?.[0] ?? null
-
 const processInbound = ({
   holding,
   queued,
@@ -1339,16 +1339,13 @@ const processInbound = ({
   tradingPartner,
 }: Processing) =>
   Effect.gen(function* () {
-    // A waiting Run needs its Business Reference, so a resend can replace it.
+    // A waiting Run needs its document number, so a resend can replace it.
     const read = yield* step(
       holding,
       'parse',
       () => readMessage(content, run.messageIndex),
       async (tx, { message }) => {
-        await tx
-          .update(runs)
-          .set({ businessReference: documentNumberOf(message) })
-          .where(eq(runs.id, run.id))
+        await tx.update(runs).set(referencesOf(message)).where(eq(runs.id, run.id))
       },
     )
 
@@ -1404,7 +1401,7 @@ const processInbound = ({
 
     const delivering = {
       ...run,
-      businessReference: documentNumberOf(message),
+      ...referencesOf(message),
       output: mapped.success,
     }
 
