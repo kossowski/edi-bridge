@@ -20,6 +20,7 @@ import {
   goldenInvoice,
   inMemoryRunQueue,
   type InvoiceWorkspace,
+  markSeeded,
   pipelineServices,
   receiveOverSftp,
   seedInvoiceWorkspace,
@@ -381,10 +382,7 @@ describe('the polling of inbound SFTP Channels', () => {
     const seeded = await outbox({ 'orders.edi': threeOrders })
     const other = await outbox()
 
-    await connection.db
-      .update(channels)
-      .set({ seeded: true })
-      .where(eq(channels.id, seeded.channelId))
+    await markSeeded(connection.db, seeded.channelId)
 
     const polling = await startPolling()
 

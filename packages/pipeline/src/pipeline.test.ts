@@ -64,6 +64,7 @@ import {
   addContrlFlow,
   addOrdersFlow,
   deliverOverSftp,
+  markSeeded,
   golden,
   goldenInvoice,
   goldenInvoicMessage,
@@ -1489,7 +1490,7 @@ describe('the processing of a Run', () => {
     const demo = await seedInvoiceWorkspace(connection.db, 'Demo Foods')
     const channelId = await deliverOverSftp(connection.db, demo, sftpLogin())
 
-    await connection.db.update(channels).set({ seeded: true }).where(eq(channels.id, channelId))
+    await markSeeded(connection.db, channelId)
 
     const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), demo)
     const handOvers = vi.fn<DeliveryService>(() => Effect.void)
@@ -1518,13 +1519,7 @@ describe('the processing of a Run', () => {
     const demo = await seedInvoiceWorkspace(connection.db, 'Adapter Demo Foods')
     const channelId = await deliverOverSftp(connection.db, demo, sftpLogin())
 
-    const [channel] = await connection.db
-      .update(channels)
-      .set({ seeded: true })
-      .where(eq(channels.id, channelId))
-      .returning()
-
-    assert(channel !== undefined, 'The Channel was not seeded')
+    const channel = await markSeeded(connection.db, channelId)
 
     const exit = await Effect.runPromiseExit(
       deliveryByChannelType(channel, { name: 'demo.edi', content: Buffer.from('UNA') }),
@@ -1532,6 +1527,52 @@ describe('the processing of a Run', () => {
 
     assert(Exit.isFailure(exit), 'The seeded Channel delivered')
     expect(Cause.squash(exit.cause)).toEqual(new Error(`Seeded Channel ${channelId} never sends`))
+  })
+
+  it('fails the new Run of a Reprocess at delivery when its Document came over a seeded Channel', async () => {
+    const seeded = await seedInvoiceWorkspace(connection.db, 'Seeded Reprocess Foods')
+    const channelId = await deliverOverSftp(connection.db, seeded, sftpLogin())
+
+    await markSeeded(connection.db, seeded.inboundChannelId)
+
+    const unknownUnit = JSON.stringify({
+      ...invoiceDocument,
+      lines: invoiceDocument.lines.map((line) => ({ ...line, unit: 'KG' })),
+    })
+
+    const { queue, runId } = await receiveInvoice(unknownUnit, inMemoryRunQueue(), seeded)
+
+    await processQueued(queue)
+    await connection.db
+      .update(lookupTableEntries)
+      .set({ sourceCode: 'KG' })
+      .where(eq(lookupTableEntries.lookupTableId, seeded.lookupTableId))
+
+    const reprocessing = inMemoryRunQueue()
+
+    const reprocessed = await Effect.runPromise(
+      reprocessRun({
+        workspaceId: seeded.id,
+        runId,
+        mappingVersionId: seeded.mappingVersionId,
+      }).pipe(pipelineServices(connection.db, reprocessing)),
+    )
+
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+
+    await processQueued(reprocessing, handOvers)
+
+    expect(handOvers).not.toHaveBeenCalled()
+    await expect(readRun(connection.db, reprocessed.runId)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      handedOverAt: null,
+      error: {
+        code: 'seededChannel',
+        message: 'A seeded Channel never sends, so the Document never left EDI Bridge',
+      },
+      problem: { reason: 'unreachable', fixTarget: { kind: 'channel', channelId } },
+    })
   })
 
   it('fails a Run at delivery on a defect when the database fails in the delivery step', async () => {
@@ -2812,6 +2853,32 @@ describe('the Retry of a Run', () => {
 
     return { ...sftpLogin(), remotePath }
   }
+
+  it('fails the Retry of a seeded Run at delivery again after its Flow names a Channel that is not seeded', async () => {
+    const seeded = await seedInvoiceWorkspace(connection.db, 'Seeded Retry Foods')
+
+    await markSeeded(connection.db, seeded.inboundChannelId)
+    await markSeeded(connection.db, await deliverOverSftp(connection.db, seeded, sftpLogin()))
+
+    const { queue, runId } = await receiveInvoice(goldenInvoice, inMemoryRunQueue(), seeded)
+
+    await processQueued(queue)
+
+    const channelId = await deliverOverSftp(connection.db, seeded, await outboxOf('seeded-retry'))
+    const handOvers = vi.fn<DeliveryService>(() => Effect.void)
+
+    await expect(retried(seeded, runId, handOvers)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      handedOverAt: null,
+      error: {
+        code: 'seededChannel',
+        message: 'A seeded Channel never sends, so the Document never left EDI Bridge',
+      },
+      problem: { reason: 'unreachable', fixTarget: { kind: 'channel', channelId } },
+    })
+    expect(handOvers).not.toHaveBeenCalled()
+  })
 
   it('delivers the stored Interchange again under its control reference once the SFTP Channel is reachable', async () => {
     const into = await seedInvoiceWorkspace(connection.db, 'Flaky Foods')
@@ -4182,10 +4249,7 @@ describe('the CONTRL answering a received Interchange', () => {
     it('names a seeded Channel', async () => {
       const into = await answeringWorkspace('Demo Orders')
 
-      await connection.db
-        .update(channels)
-        .set({ seeded: true })
-        .where(eq(channels.id, into.outboundChannelId))
+      await markSeeded(connection.db, into.outboundChannelId)
 
       const { acknowledgement, logs } = await recordedFor(into)
 
@@ -4200,10 +4264,36 @@ describe('the CONTRL answering a received Interchange', () => {
       const delivery = recordingDelivery()
       const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
 
-      await connection.db
-        .update(channels)
-        .set({ seeded: true })
-        .where(eq(channels.id, into.outboundChannelId))
+      await markSeeded(connection.db, into.outboundChannelId)
+      await sendWith(delivery.service, '0 millis')
+
+      expect(delivery.to(into.outboundChannelId)).toEqual([])
+      await expect(acknowledgementOf(receipt.document.id)).resolves.toMatchObject({
+        channelId: into.outboundChannelId,
+        deliveryAttemptedAt: null,
+        handedOverAt: null,
+      })
+    })
+
+    it('names a Document received over a seeded Channel', async () => {
+      const into = await answeringWorkspace('Seeded Source Orders')
+
+      await markSeeded(connection.db, into.inboundChannelId)
+
+      const { acknowledgement, logs } = await recordedFor(into)
+
+      expect(acknowledgement).toMatchObject({ notSentReason: 'seededChannel', channelId: null })
+      expect(logs).toContainEqual([
+        `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: a seeded Channel never sends`,
+      ])
+    })
+
+    it('stays unsent when the Channel of its Document is seeded after the CONTRL was recorded', async () => {
+      const into = await answeringWorkspace('Source Seeded Later Orders')
+      const delivery = recordingDelivery()
+      const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+      await markSeeded(connection.db, into.inboundChannelId)
       await sendWith(delivery.service, '0 millis')
 
       expect(delivery.to(into.outboundChannelId)).toEqual([])
