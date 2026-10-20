@@ -7,18 +7,15 @@ import { useRouter } from 'next/navigation'
 import { useRef } from 'react'
 
 import { aiDraftStartHref } from '@/components/mappings/ai-draft-run'
-import { ApiError, createMapping } from '@/lib/api/client'
+import { createMapping } from '@/lib/api/client'
 import { documentStructureKeys, storeCreatedMapping } from '@/lib/api/queries'
+import { isMissingDocumentStructure } from '@/lib/document-structures'
 import { newDocumentStructureHref } from '@/lib/navigation'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'
 import { buttonVariants } from '@edi-bridge/ui/components/button'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
 import type { CreateMappingBody } from '@edi-bridge/contracts'
-
-function isMissingDocumentStructure(error: Error) {
-  return error instanceof ApiError && error.status === 422
-}
 
 export function useCreateMappingWithDraft() {
   const router = useRouter()

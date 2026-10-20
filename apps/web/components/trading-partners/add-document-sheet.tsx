@@ -20,7 +20,7 @@ import {
   latestMappingVersions,
   newDocumentFlow,
 } from '@/components/trading-partners/partner-documents'
-import { ApiError, createFlow, createMapping } from '@/lib/api/client'
+import { createFlow, createMapping } from '@/lib/api/client'
 import {
   documentStructureKeys,
   documentStructuresQuery,
@@ -30,7 +30,7 @@ import {
   storeSavedFlow,
   tradingPartnerKeys,
 } from '@/lib/api/queries'
-import { onlyDocumentStructureId } from '@/lib/document-structures'
+import { isMissingDocumentStructure, onlyDocumentStructureId } from '@/lib/document-structures'
 import { newMappingHref } from '@/lib/navigation'
 import {
   type Channel,
@@ -166,7 +166,7 @@ function DocumentRouteForm({
       onDrafting({ mapping, document })
     },
     onError: (error) => {
-      if (error instanceof ApiError && error.status === 422) {
+      if (isMissingDocumentStructure(error)) {
         void queryClient.invalidateQueries({ queryKey: documentStructureKeys.all() })
       }
     },
@@ -188,8 +188,6 @@ function DocumentRouteForm({
     ownChannelId !== null &&
     !versions.isPending &&
     !documentStructures.isPending
-
-  const dataFormatGone = draft.error instanceof ApiError && draft.error.status === 422
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -316,7 +314,9 @@ function DocumentRouteForm({
       )}
       {draft.isError && (
         <p role="alert" className="text-destructive-text text-sm">
-          {dataFormatGone ? t('dataFormatGone') : t('mappingFailed')}
+          {isMissingDocumentStructure(draft.error)
+            ? t('documentStructureGone')
+            : t('mappingFailed')}
         </p>
       )}
       <div className="flex flex-wrap gap-2">
