@@ -44,9 +44,9 @@ import { inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
 // A Duplicate is never mapped, so it shows the Business Reference of its original Run.
-const originalRuns = alias(runs, 'original_runs')
+export const originalRuns = alias(runs, 'original_runs')
 
-const businessReferenceOfRun = sql<
+export const businessReferenceOfRun = sql<
   string | null
 >`coalesce(${runs.businessReference}, ${originalRuns.businessReference})`
 
