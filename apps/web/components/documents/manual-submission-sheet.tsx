@@ -8,7 +8,6 @@ import Link from 'next/link'
 import { type DragEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 
 import { useChannelKindLabel, useChannelTradingPartners } from '@/components/channels/channel-parts'
-import { encodingLabels } from '@/components/document-structures/csv-settings'
 import {
   documentProblem,
   type DocumentProblem,
@@ -28,6 +27,7 @@ import {
   homeKeys,
   runKeys,
 } from '@/lib/api/queries'
+import { encodingLabels } from '@/lib/encoding-labels'
 import { documentHref } from '@/lib/navigation'
 import { type CharacterEncoding, characterEncodings, encodeBase64 } from '@edi-bridge/contracts'
 import { Alert, AlertDescription } from '@edi-bridge/ui/components/alert'

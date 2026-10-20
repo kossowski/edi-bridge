@@ -10,6 +10,7 @@ import {
   firstRows,
 } from '@/components/document-structures/csv-text'
 import { type StructureTree } from '@/components/document-structures/structure-tree'
+import { encodingLabels } from '@/lib/encoding-labels'
 import {
   characterEncodings,
   type CsvDelimiter,
@@ -33,8 +34,6 @@ export const delimiterKeys = {
   '\t': 'tab',
   '|': 'pipe',
 } as const satisfies Record<CsvDelimiter, string>
-
-export const encodingLabels = { 'utf-8': 'UTF-8', 'windows-1252': 'Windows-1252' } as const
 
 function SettingSelect<Value extends string>({
   id,
