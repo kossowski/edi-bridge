@@ -639,6 +639,7 @@ describe('POST /lookup-tables/:id/missing-codes/hints', () => {
   it('explains the own codes of the missing codes and suggests partner codes', async () => {
     server.use(...lookupTableHandlers(apiUrl, { runs: [newerFailure] }))
     const units = seedLookupTableNamed('Units of measure')
+    const anySuggestions: unknown = expect.any(Array)
 
     expect(await getHints(units.id)).toEqual({
       hints: [
@@ -651,8 +652,8 @@ describe('POST /lookup-tables/:id/missing-codes/hints', () => {
             { code: 'BX', meaning: 'Box' },
           ],
         },
-        { code: 'BTL', meaning: 'Bottle', suggestions: expect.any(Array) },
-        { code: 'SET', meaning: 'Set', suggestions: expect.any(Array) },
+        { code: 'BTL', meaning: 'Bottle', suggestions: anySuggestions },
+        { code: 'SET', meaning: 'Set', suggestions: anySuggestions },
       ],
       notice: null,
     })
