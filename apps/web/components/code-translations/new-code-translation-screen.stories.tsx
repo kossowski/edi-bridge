@@ -262,20 +262,22 @@ export const SuggestionsBudgetExhausted = meta.story({
   },
 })
 
+function aiTurnedOff() {
+  return suggestionsResponding(() =>
+    HttpResponse.json(
+      {
+        code: 'aiBudgetExhausted',
+        message: 'The daily AI budget of the Workspace is used up.',
+        budget: { dailyLimit: 0, usedToday: 0, resetsAt: '2026-10-21T00:00:00.000Z' },
+      },
+      { status: aiBudgetExhaustedStatus },
+    ),
+  )
+}
+
 export const SuggestionsAiTurnedOff = meta.story({
   beforeEach({ msw }) {
-    msw.use(
-      suggestionsResponding(() =>
-        HttpResponse.json(
-          {
-            code: 'aiBudgetExhausted',
-            message: 'The daily AI budget of the Workspace is used up.',
-            budget: { dailyLimit: 0, usedToday: 0, resetsAt: '2026-10-21T00:00:00.000Z' },
-          },
-          { status: aiBudgetExhaustedStatus },
-        ),
-      ),
-    )
+    msw.use(aiTurnedOff())
   },
   async play({ canvas, canvasElement }) {
     await chooseKindAndEveryPartner(canvasElement)
@@ -301,6 +303,24 @@ export const GermanSuggestionsBudgetExhausted = meta.story({
     await expect(
       await canvas.findByText(
         'Das KI-Budget für heute ist aufgebraucht, daher werden keine Werte vorgeschlagen. Fügen Sie unten eigene Werte hinzu; morgen gibt es wieder Vorschläge.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.getByRole('form', { name: 'Wert hinzufügen' })).toBeVisible()
+  },
+})
+
+export const GermanSuggestionsAiTurnedOff = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(aiTurnedOff())
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('radio', { name: startsWith('Mengeneinheiten') }))
+    await userEvent.click(canvas.getByRole('radio', { name: startsWith('Jeder Partner') }))
+
+    await expect(
+      await canvas.findByText(
+        'Die KI ist ausgeschaltet, daher werden keine Werte vorgeschlagen. Fügen Sie unten eigene Werte hinzu.',
       ),
     ).toBeVisible()
     await expect(canvas.getByRole('form', { name: 'Wert hinzufügen' })).toBeVisible()
