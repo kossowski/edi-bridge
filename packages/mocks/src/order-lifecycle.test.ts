@@ -99,6 +99,34 @@ describe('GET /order-lifecycles/:businessReference', () => {
     expect(openMessageTypes(lifecycle!.messages)).toEqual(['INVOIC'])
   })
 
+  it('says why the CONTRL to the ORDERS of a partial lifecycle was not sent', async () => {
+    server.use(orderLifecycleHandler(apiUrl))
+
+    const [lifecycle] = await lifecyclesOf(orderLifecycleReferences.partial)
+
+    expect(
+      lifecycle!.messages.map(({ messageType, interchange }) => [
+        messageType,
+        interchange?.notSentReason,
+      ]),
+    ).toEqual([
+      ['ORDERS', 'noOutboundChannel'],
+      ['DESADV', null],
+    ])
+  })
+
+  it('has no not-sent reason where the CONTRL was sent', async () => {
+    server.use(orderLifecycleHandler(apiUrl))
+
+    const [lifecycle] = await lifecyclesOf(orderLifecycleReferences.full)
+
+    expect(lifecycle!.messages.map(({ interchange }) => interchange?.notSentReason)).toEqual([
+      null,
+      null,
+      null,
+    ])
+  })
+
   it('shows one Order Lifecycle per Trading Partner that uses the same order number', async () => {
     server.use(orderLifecycleHandler(apiUrl))
 

@@ -20,6 +20,17 @@ export const acknowledgementStateSchema = z.enum(acknowledgementStates)
 
 export type AcknowledgementState = z.infer<typeof acknowledgementStateSchema>
 
+export const acknowledgementNotSentReasons = [
+  'noOutboundChannel',
+  'ambiguousChannel',
+  'workspaceGlnMissing',
+  'unechoableInterchangeHeader',
+] as const
+
+export const acknowledgementNotSentReasonSchema = z.enum(acknowledgementNotSentReasons)
+
+export type AcknowledgementNotSentReason = z.infer<typeof acknowledgementNotSentReasonSchema>
+
 export const businessReferenceSchema = z.string().trim().min(1).max(35)
 
 const lifecycleRunBaseSchema = z.object({
@@ -46,17 +57,23 @@ export const orderLifecycleInterchangeSchema = z.object({
   id: z.uuid(),
   controlReference: controlReferenceSchema,
   acknowledgement: acknowledgementStateSchema.nullable(),
+  notSentReason: acknowledgementNotSentReasonSchema.nullable(),
 })
 
 export type OrderLifecycleInterchange = z.infer<typeof orderLifecycleInterchangeSchema>
 
-export const orderLifecycleMessageSchema = z.object({
-  messageType: orderLifecycleMessageTypeSchema,
-  direction: directionSchema,
-  receivedAt: z.iso.datetime(),
-  run: orderLifecycleRunSchema,
-  interchange: orderLifecycleInterchangeSchema.nullable(),
-})
+export const orderLifecycleMessageSchema = z
+  .object({
+    messageType: orderLifecycleMessageTypeSchema,
+    direction: directionSchema,
+    receivedAt: z.iso.datetime(),
+    run: orderLifecycleRunSchema,
+    interchange: orderLifecycleInterchangeSchema.nullable(),
+  })
+  .refine(
+    ({ direction, interchange }) => direction === 'inbound' || interchange?.notSentReason == null,
+    { message: 'Only a received Interchange has a not-sent reason', path: ['interchange'] },
+  )
 
 export type OrderLifecycleMessage = z.infer<typeof orderLifecycleMessageSchema>
 

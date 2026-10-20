@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from 'msw'
 
 import {
+  type AcknowledgementNotSentReason,
   type AcknowledgementState,
   businessReferenceSchema,
   directionOf,
@@ -52,6 +53,7 @@ type MessageSeed = {
   hoursAgo: number
   outcome: 'delivered' | FailureStage
   acknowledgement?: AcknowledgementOutcome | undefined
+  notSentReason?: AcknowledgementNotSentReason
   waitingHoursAgo?: number
   reprocessed?: { hoursAgo: number; acknowledgement: AcknowledgementOutcome }
 }
@@ -119,7 +121,12 @@ const lifecycleSeeds: LifecycleSeed[] = [
     businessReference: orderLifecycleReferences.partial,
     tradingPartner: 'Rheinkauf eG',
     messages: [
-      { messageType: 'ORDERS', hoursAgo: 30, outcome: 'delivered' },
+      {
+        messageType: 'ORDERS',
+        hoursAgo: 30,
+        outcome: 'delivered',
+        notSentReason: 'noOutboundChannel',
+      },
       { messageType: 'DESADV', hoursAgo: 3, outcome: 'delivered' },
     ],
   },
@@ -215,6 +222,7 @@ function interchangeOf(
   acknowledgement: AcknowledgementOutcome | undefined,
   tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
   now: Date,
+  notSentReason: AcknowledgementNotSentReason | null = null,
 ): OrderLifecycleInterchange | null {
   if (run.interchange === null) {
     return null
@@ -227,12 +235,14 @@ function interchangeOf(
     acknowledgement: sent
       ? acknowledgementOf(run.receivedAt, acknowledgement, tradingPartner, now)
       : null,
+    notSentReason,
   }
 }
 
 type MessageEntry = {
   runId: string
   acknowledgement: AcknowledgementOutcome | undefined
+  notSentReason?: AcknowledgementNotSentReason | undefined
   replacedBy: RunSummary | null
 }
 
@@ -286,7 +296,14 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
       }
 
       if (!message.reprocessed) {
-        return [{ runId: run.id, acknowledgement: message.acknowledgement, replacedBy: null }]
+        return [
+          {
+            runId: run.id,
+            acknowledgement: message.acknowledgement,
+            notSentReason: message.notSentReason,
+            replacedBy: null,
+          },
+        ]
       }
 
       const replacing = toRun(`${index}:reprocessed`, {
@@ -313,7 +330,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
   const store = createRunStore(runs, reprocessed)
 
   const orderLifecycles = seeded.map(({ businessReference, tradingPartner, entries }) => {
-    const toMessage = ({ runId, acknowledgement, replacedBy }: MessageEntry) => {
+    const toMessage = ({ runId, acknowledgement, notSentReason, replacedBy }: MessageEntry) => {
       const run = store.get(runId)!
 
       return orderLifecycleMessageSchema.parse({
@@ -327,7 +344,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
           replacedBy: replacedBy && { id: replacedBy.id },
           waitingForTradingPartnerSince: waitingForTradingPartnerSince.get(run.id) ?? null,
         },
-        interchange: interchangeOf(run, acknowledgement, tradingPartner, now),
+        interchange: interchangeOf(run, acknowledgement, tradingPartner, now, notSentReason),
       })
     }
 
@@ -438,6 +455,7 @@ export function createLargeVolumeOrderLifecycles({
                     direction === 'outbound'
                       ? acknowledgementOf(receivedAt, step.acknowledgement, tradingPartner, now)
                       : null,
+                  notSentReason: null,
                 }
               : null,
         }

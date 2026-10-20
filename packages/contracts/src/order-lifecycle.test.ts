@@ -6,6 +6,7 @@ import {
   type OrderLifecycleMessage,
   type OrderLifecycleMessageType,
   orderLifecycleListQuerySchema,
+  orderLifecycleMessageSchema,
   orderLifecycleStatusOf,
   toOrderLifecycleSummary,
 } from './order-lifecycle'
@@ -58,6 +59,7 @@ function message(
           controlReference: String(sequence),
           acknowledgement:
             direction === 'outbound' ? (options.acknowledgement ?? 'accepted') : null,
+          notSentReason: null,
         },
   }
 }
@@ -238,5 +240,40 @@ describe('openMessageTypes', () => {
         { messageType: 'INVOIC' },
       ]),
     ).toEqual([])
+  })
+})
+
+describe('orderLifecycleMessageSchema', () => {
+  it('keeps why the CONTRL to a received Interchange was not sent', () => {
+    const orders = message('ORDERS')
+
+    expect(
+      orderLifecycleMessageSchema.parse({
+        ...orders,
+        interchange: { ...orders.interchange, notSentReason: 'ambiguousChannel' },
+      }).interchange?.notSentReason,
+    ).toBe('ambiguousChannel')
+  })
+
+  it('rejects an unknown not-sent reason', () => {
+    const orders = message('ORDERS')
+
+    expect(
+      orderLifecycleMessageSchema.safeParse({
+        ...orders,
+        interchange: { ...orders.interchange, notSentReason: 'partnerAsleep' },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects a not-sent reason on a sent Interchange', () => {
+    const desadv = message('DESADV')
+
+    expect(
+      orderLifecycleMessageSchema.safeParse({
+        ...desadv,
+        interchange: { ...desadv.interchange, notSentReason: 'noOutboundChannel' },
+      }).success,
+    ).toBe(false)
   })
 })
