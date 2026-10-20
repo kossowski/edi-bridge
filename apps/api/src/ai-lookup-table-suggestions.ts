@@ -1,6 +1,6 @@
-import { generateText, type LanguageModel, Output } from 'ai'
+import { type LanguageModel } from 'ai'
 import { asc, eq } from 'drizzle-orm'
-import { Cause, Duration, Effect } from 'effect'
+import { Effect } from 'effect'
 
 import type { FastifyBaseLogger } from 'fastify'
 
@@ -13,7 +13,8 @@ import {
 } from '@edi-bridge/contracts'
 import { tradingPartners } from '@edi-bridge/db'
 
-import { recordAiTokenUsage, requireAiBudget, tokensOf } from './ai-budget.js'
+import { requireAiBudget } from './ai-budget.js'
+import { callAi, dataLine } from './ai-call.js'
 import { Db } from './db.js'
 import { inWorkspace } from './rows.js'
 import { rejectingUnknownTradingPartner } from './trading-partner.js'
@@ -49,8 +50,7 @@ const targetCodesOf: Readonly<Record<LookupTableKind, string>> = {
 
 const languageNames: Readonly<Record<Language, string>> = { en: 'English', de: 'German' }
 
-// A closing tag inside a name would end its data block early.
-const nameLine = (name: string) => JSON.stringify({ name }).replaceAll('<', String.raw`\u003c`)
+const nameLine = (name: string) => dataLine({ name })
 
 function suggestionsPrompt({ kind, language }: SuggestionsRequest, names: ReadonlyArray<string>) {
   return [
@@ -116,36 +116,18 @@ const suggestWithAi = (
   names: ReadonlyArray<string>,
   model: LanguageModel,
   { timeoutMs, log }: LookupTableSuggesting,
-): Effect.Effect<LookupTableSuggestions, never, CurrentWorkspace | Db> => {
-  let tokens = 0
-
-  return Effect.tryPromise((abortSignal) =>
-    generateText({
-      model,
-      instructions,
-      prompt: suggestionsPrompt(request, names),
-      output: Output.object({ schema: lookupTableSuggestionsSchema }),
-      abortSignal,
-      // An answer that fails validation still used its tokens.
-      onStepEnd: ({ usage }) => {
-        tokens += tokensOf(usage)
-      },
-    }),
-  ).pipe(
-    Effect.timeout(Duration.millis(timeoutMs)),
-    Effect.map(({ output }) => withKnownMeanings(request, output)),
-    Effect.catchCause((cause) =>
-      Effect.as(
-        Effect.sync(() =>
-          log.warn({ err: Cause.squash(cause) }, 'Suggesting Lookup Table entries with AI failed'),
-        ),
-        noSuggestions,
-      ),
-    ),
-    // Outside the catch, so a failed recording fails the request instead of passing as a model failure.
-    Effect.ensuring(Effect.suspend(() => recordAiTokenUsage(tokens))),
-  )
-}
+): Effect.Effect<LookupTableSuggestions, never, CurrentWorkspace | Db> =>
+  callAi({
+    model,
+    instructions,
+    prompt: suggestionsPrompt(request, names),
+    schema: lookupTableSuggestionsSchema,
+    timeoutMs,
+    log,
+    failureMessage: 'Suggesting Lookup Table entries with AI failed',
+    onAnswer: (answer) => withKnownMeanings(request, answer),
+    onFailure: noSuggestions,
+  })
 
 export const suggestLookupTableEntries = (
   request: SuggestionsRequest,
