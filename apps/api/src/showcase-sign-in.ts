@@ -72,9 +72,11 @@ export const showcaseSignIn = (database: Database) =>
             throw new APIError('NOT_FOUND', { message: 'No Showcase Workspace exists' })
           }
 
-          const session = await ctx.context.internalAdapter.createSession(user.id)
+          // Not remembered: better-auth then keeps the session to a day and never extends it.
+          const dontRememberMe = true
+          const session = await ctx.context.internalAdapter.createSession(user.id, dontRememberMe)
 
-          await setSessionCookie(ctx, { session, user })
+          await setSessionCookie(ctx, { session, user }, dontRememberMe)
 
           return ctx.json({
             user: { id: user.id, name: user.name, email: user.email },

@@ -1,5 +1,5 @@
 import { hashPassword } from 'better-auth/crypto'
-import { and, count, eq, inArray } from 'drizzle-orm'
+import { and, count, desc, eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { secretBox } from '@edi-bridge/channels'
@@ -11,7 +11,7 @@ import {
   showcaseSignInEndpoint,
   signedInSchema,
 } from '@edi-bridge/contracts'
-import { members, runs, users, workspaces } from '@edi-bridge/db'
+import { members, runs, sessions, users, workspaces } from '@edi-bridge/db'
 
 import { ensureShowcaseAndSandbox, showcaseAdmin, showcaseViewer } from './showcase-and-sandbox.js'
 import {
@@ -321,6 +321,35 @@ describe('a Showcase Viewer session issued earlier', () => {
     } finally {
       await api.connection.db.update(users).set({ operator: false }).where(eq(users.id, userId))
     }
+  })
+
+  it('expires within a day, shorter than a session of an email sign-in', async () => {
+    const day = 24 * 60 * 60 * 1000
+    const viewer = signedInClient(api.app, await showcaseSignIn())
+
+    // A request may refresh the session; it must keep the short lifetime.
+    expect(await sessionStatus(viewer)).toBe(200)
+
+    const latestExpiry = async (email: string) => {
+      const [session] = await api.connection.db
+        .select({ expiresAt: sessions.expiresAt })
+        .from(sessions)
+        .where(eq(sessions.userId, await userIdOf(email)))
+        .orderBy(desc(sessions.createdAt))
+        .limit(1)
+
+      if (session === undefined) {
+        throw new Error(`${email} has no session`)
+      }
+
+      return session.expiresAt.getTime()
+    }
+
+    expect(await latestExpiry(showcaseViewer.email)).toBeLessThanOrEqual(Date.now() + day)
+
+    await adminSignIn()
+
+    expect(await latestExpiry(showcaseAdmin.email)).toBeGreaterThan(Date.now() + day)
   })
 })
 
