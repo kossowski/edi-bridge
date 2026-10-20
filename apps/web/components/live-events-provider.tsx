@@ -4,7 +4,7 @@ import { createContext, type ReactNode, use } from 'react'
 
 import { type LiveStatus, useLiveEvents } from '@/hooks/use-live-events'
 
-const LiveStatusContext = createContext<LiveStatus>('connecting')
+const LiveStatusContext = createContext<LiveStatus | null>(null)
 
 export function LiveEventsProvider({ children }: { children: ReactNode }) {
   const status = useLiveEvents()
@@ -12,6 +12,12 @@ export function LiveEventsProvider({ children }: { children: ReactNode }) {
   return <LiveStatusContext value={status}>{children}</LiveStatusContext>
 }
 
-export function useLiveStatus() {
-  return use(LiveStatusContext)
+export function useLiveStatus(): LiveStatus {
+  const status = use(LiveStatusContext)
+
+  if (status === null) {
+    throw new Error('useLiveStatus needs a LiveEventsProvider')
+  }
+
+  return status
 }
