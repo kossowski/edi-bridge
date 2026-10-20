@@ -138,9 +138,13 @@ export const listRunSummaries = async (db: Database, ids: readonly string[]) => 
     return []
   }
 
-  const summaries = await runSummariesOf(db, ids)
+  const byId = new Map((await runSummariesOf(db, ids)).map(({ run }) => [run.id, run]))
 
-  return ids.flatMap((id) => summaries.flatMap(({ run }) => (run.id === id ? [run] : [])))
+  return ids.flatMap((id) => {
+    const run = byId.get(id)
+
+    return run === undefined ? [] : [run]
+  })
 }
 
 // A Run not yet processed will be mapped with the Mapping Version its Flow pins.
