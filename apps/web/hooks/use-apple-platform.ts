@@ -1,15 +1,7 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
-
-function subscribeToNothing() {
-  return () => {}
-}
+import { useClientValue } from '@/hooks/use-client-value'
 
 export function useApplePlatform() {
-  return useSyncExternalStore(
-    subscribeToNothing,
-    () => /Mac|iPhone|iPad/.test(navigator.userAgent),
-    () => false,
-  )
+  return useClientValue(() => /Mac|iPhone|iPad/.test(navigator.userAgent), false)
 }

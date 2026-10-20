@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { apiUrl } from '@/lib/api/config'
+
 test('the shell shows the name of the current Workspace', async ({ page }) => {
   await page.goto('/')
 
@@ -37,4 +39,25 @@ test('client-side navigation to glossary entries highlights them without errors'
   }
 
   expect(errors).toEqual([])
+})
+
+test('a workspace page requests its data only once the session is known', async ({ page }) => {
+  const apiOrigin = new URL(apiUrl).origin
+  let sessionKnown = false
+  const early: string[] = []
+  page.on('response', (response) => {
+    if (response.url() === `${apiOrigin}/session`) sessionKnown = true
+  })
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+
+    if (url.origin === apiOrigin && url.pathname !== '/session' && !sessionKnown) {
+      early.push(url.pathname)
+    }
+  })
+
+  await page.goto('/documents')
+  await expect(page.getByText('Nordwind Handel GmbH')).toBeVisible()
+
+  expect(early).toEqual([])
 })
