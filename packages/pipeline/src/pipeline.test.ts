@@ -3165,7 +3165,9 @@ describe('the Retry of a Run', () => {
       ),
     )
 
-    expect(failed).toMatchObject({ failureStage: 'validation', deliveryInput: expect.anything() })
+    const storedDeliveryInput: unknown = expect.anything()
+
+    expect(failed).toMatchObject({ failureStage: 'validation', deliveryInput: storedDeliveryInput })
     expect(error).toEqual(new RunNotRetryable({ runId }))
     expect(retrying.queued).toEqual([])
     await expect(readRun(connection.db, runId)).resolves.toEqual(failed)
