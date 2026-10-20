@@ -39,6 +39,7 @@ const notSentMessages: Record<NotSentReason, string> = {
   ambiguousChannel: 'the outbound EDIFACT Flows of its Trading Partner name different Channels',
   workspaceGlnMissing: 'the Workspace has no GLN',
   unechoableInterchangeHeader: 'its UNB cannot be echoed in a valid CONTRL',
+  demoChannel: 'a demo connection never sends',
 }
 
 const builtContrl = (content: string) =>
@@ -60,20 +61,20 @@ const channelOf = (workspaceId: string, tradingPartnerId: string) =>
 
     const found = yield* Effect.promise(() =>
       db
-        .selectDistinct({ messageType: flows.messageType, channelId: flows.destinationChannelId })
+        .selectDistinct({
+          messageType: flows.messageType,
+          channelId: flows.destinationChannelId,
+          seeded: channels.seeded,
+        })
         .from(flows)
+        .innerJoin(channels, eq(channels.id, flows.destinationChannelId))
         .where(
           and(eq(flows.workspaceId, workspaceId), eq(flows.tradingPartnerId, tradingPartnerId)),
         ),
     )
 
-    const channelIds = [
-      ...new Set(
-        found.flatMap(({ messageType, channelId }) =>
-          directionOf({ messageType }) === 'outbound' ? [channelId] : [],
-        ),
-      ),
-    ]
+    const outbound = found.filter(({ messageType }) => directionOf({ messageType }) === 'outbound')
+    const channelIds = [...new Set(outbound.map(({ channelId }) => channelId))]
 
     const [channelId] = channelIds
 
@@ -81,8 +82,12 @@ const channelOf = (workspaceId: string, tradingPartnerId: string) =>
       return { channelId: null, notSentReason: 'noOutboundChannel' as const }
     }
 
-    return channelIds.length > 1
-      ? { channelId: null, notSentReason: 'ambiguousChannel' as const }
+    if (channelIds.length > 1) {
+      return { channelId: null, notSentReason: 'ambiguousChannel' as const }
+    }
+
+    return outbound.some(({ seeded }) => seeded)
+      ? { channelId: null, notSentReason: 'demoChannel' as const }
       : { channelId, notSentReason: null }
   })
 
@@ -219,8 +224,10 @@ export const answerDocument = (
     ),
   )
 
+// Each query of due CONTRLs joins their Channel, and a seeded one never sends.
 const isDue = (cutoff: Date) =>
   and(
+    eq(channels.seeded, false),
     isNull(acknowledgements.handedOverAt),
     isNull(acknowledgements.notSentReason),
     or(
@@ -315,7 +322,11 @@ export const sendAcknowledgements = (retryAfter: Duration.Input) =>
     const cutoff = DateTime.toDateUtc(DateTime.subtractDuration(yield* DateTime.now, retryAfter))
 
     const due = yield* Effect.promise(() =>
-      db.select({ id: acknowledgements.id }).from(acknowledgements).where(isDue(cutoff)),
+      db
+        .select({ id: acknowledgements.id })
+        .from(acknowledgements)
+        .innerJoin(channels, eq(channels.id, acknowledgements.channelId))
+        .where(isDue(cutoff)),
     )
 
     yield* Effect.forEach(

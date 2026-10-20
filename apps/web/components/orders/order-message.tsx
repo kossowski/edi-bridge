@@ -133,6 +133,7 @@ const notSentFixHref: Record<
   ambiguousChannel: ({ id }) => tradingPartnerHref(id, 'documents'),
   workspaceGlnMissing: () => navigationItems.settings.href,
   unechoableInterchangeHeader: () => null,
+  demoChannel: () => null,
 }
 
 function NotSentHelp({

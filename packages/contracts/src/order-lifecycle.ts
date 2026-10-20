@@ -25,6 +25,7 @@ export const acknowledgementNotSentReasons = [
   'ambiguousChannel',
   'workspaceGlnMissing',
   'unechoableInterchangeHeader',
+  'demoChannel',
 ] as const
 
 export const acknowledgementNotSentReasonSchema = z.enum(acknowledgementNotSentReasons)

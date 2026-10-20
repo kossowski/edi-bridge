@@ -4179,6 +4179,41 @@ describe('the CONTRL answering a received Interchange', () => {
       ])
     })
 
+    it('names a seeded Channel', async () => {
+      const into = await answeringWorkspace('Demo Orders')
+
+      await connection.db
+        .update(channels)
+        .set({ seeded: true })
+        .where(eq(channels.id, into.outboundChannelId))
+
+      const { acknowledgement, logs } = await recordedFor(into)
+
+      expect(acknowledgement).toMatchObject({ notSentReason: 'demoChannel', channelId: null })
+      expect(logs).toContainEqual([
+        `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: a demo connection never sends`,
+      ])
+    })
+
+    it('stays unsent when its Channel is seeded after the CONTRL was recorded', async () => {
+      const into = await answeringWorkspace('Seeded Later Orders')
+      const delivery = recordingDelivery()
+      const { receipt } = await receiveInterchange(into, interchangeOf([ordersMessage]))
+
+      await connection.db
+        .update(channels)
+        .set({ seeded: true })
+        .where(eq(channels.id, into.outboundChannelId))
+      await sendWith(delivery.service, '0 millis')
+
+      expect(delivery.to(into.outboundChannelId)).toEqual([])
+      await expect(acknowledgementOf(receipt.document.id)).resolves.toMatchObject({
+        channelId: into.outboundChannelId,
+        deliveryAttemptedAt: null,
+        handedOverAt: null,
+      })
+    })
+
     it('names a Workspace without a GLN', async () => {
       const into = await answeringWorkspace('GLN-less Orders')
 

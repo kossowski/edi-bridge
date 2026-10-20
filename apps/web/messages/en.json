@@ -1189,8 +1189,8 @@
     },
     "notSent": {
       "state": "Not sent",
-      "reason": "{tradingPartner} got no receipt confirmation for this {document}, because {reason, select, noOutboundChannel {no document route sends documents to {tradingPartner}.} ambiguousChannel {the document routes to {tradingPartner} use different connections, so EDI Bridge cannot tell which one to use.} workspaceGlnMissing {your company's GLN is missing.} other {the header of the transmission from {tradingPartner} cannot be repeated in a valid receipt confirmation.}}",
-      "fix": "{reason, select, noOutboundChannel {<link>Add a document route to {tradingPartner}</link> so that later documents get a receipt confirmation.} ambiguousChannel {Check the <link>document routes of {tradingPartner}</link> and let them all use the same connection.} workspaceGlnMissing {<link>Record your company's GLN</link> so that later documents get a receipt confirmation.} other {Ask {tradingPartner} to check the header of its transmissions.}}"
+      "reason": "{tradingPartner} got no receipt confirmation for this {document}, because {reason, select, noOutboundChannel {no document route sends documents to {tradingPartner}.} ambiguousChannel {the document routes to {tradingPartner} use different connections, so EDI Bridge cannot tell which one to use.} workspaceGlnMissing {your company's GLN is missing.} demoChannel {its connection is a demo connection, and a demo connection never sends.} other {the header of the transmission from {tradingPartner} cannot be repeated in a valid receipt confirmation.}}",
+      "fix": "{reason, select, noOutboundChannel {<link>Add a document route to {tradingPartner}</link> so that later documents get a receipt confirmation.} ambiguousChannel {Check the <link>document routes of {tradingPartner}</link> and let them all use the same connection.} workspaceGlnMissing {<link>Record your company's GLN</link> so that later documents get a receipt confirmation.} demoChannel {Nothing needs fixing: in the demo, receipt confirmations stay in EDI Bridge.} other {Ask {tradingPartner} to check the header of its transmissions.}}"
     },
     "acknowledgement": {
       "state": {
