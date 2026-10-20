@@ -21,6 +21,8 @@ import {
   sweepRunsEvery,
 } from '@edi-bridge/pipeline'
 
+import { type Monitoring, withMonitoring } from './sentry.js'
+
 const channelTimeoutMs = 10_000
 
 export function startRunWorker({
@@ -30,6 +32,7 @@ export function startRunWorker({
   requeueInterval,
   stuckAfter,
   pollingMinute,
+  monitoring,
 }: {
   redisUrl: string
   db: Connection['db']
@@ -37,6 +40,7 @@ export function startRunWorker({
   requeueInterval: Duration.Input
   stuckAfter: Duration.Input
   pollingMinute?: Duration.Input
+  monitoring?: Monitoring | undefined
 }) {
   // BullMQ blocks on its worker connection, so commands must wait for a reconnect, not fail.
   const redis = new Redis(redisUrl, { maxRetriesPerRequest: null })
@@ -55,6 +59,7 @@ export function startRunWorker({
           Effect.provideService(Documents, documents),
           Effect.provideService(Delivery, delivery),
           Effect.provideService(LiveEvents, liveEvents.service),
+          withMonitoring(monitoring, data),
         ),
       ),
     { connection: redis },
@@ -66,6 +71,7 @@ export function startRunWorker({
       Effect.provideService(RunQueue, queue.service),
       Effect.provideService(Delivery, delivery),
       Effect.provideService(LiveEvents, liveEvents.service),
+      withMonitoring(monitoring),
     ),
   )
 
@@ -76,6 +82,7 @@ export function startRunWorker({
       Effect.provideService(RunQueue, queue.service),
       Effect.provideService(Download, download),
       Effect.provideService(LiveEvents, liveEvents.service),
+      withMonitoring(monitoring),
     ),
   )
 

@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
-import { Effect } from 'effect'
+import { Effect, Tracer } from 'effect'
 import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -31,6 +31,7 @@ import {
   pipelineServices,
   readRun,
   receiveOverSftp,
+  recordingDefectReporter,
   seedInvoiceWorkspace,
   startTestRedis,
   type TestRedis,
@@ -57,6 +58,20 @@ let queue: ReturnType<typeof bullmqRunQueue>
 
 let worker: ReturnType<typeof startRunWorker>
 
+const defects = recordingDefectReporter()
+
+const nativeTracer = Effect.runSync(Effect.tracer)
+
+const spanNames: string[] = []
+
+const recordingTracer = Tracer.make({
+  span: (options) => {
+    spanNames.push(options.name)
+
+    return nativeTracer.span(options)
+  },
+})
+
 beforeAll(async () => {
   ;[testDatabase, testRedis, sftp, erp] = await Promise.all([
     startTestDatabase(),
@@ -82,6 +97,7 @@ beforeAll(async () => {
     requeueInterval: '100 millis',
     stuckAfter: '1 hour',
     pollingMinute: '100 millis',
+    monitoring: { defectReporter: defects.service, tracer: recordingTracer },
   })
   // Each SFTP operation takes an SSH session, so the receipt of the ORDERS file outlasts a test.
   await vi.waitFor(
@@ -224,7 +240,7 @@ describe('the worker', () => {
 
   it('fails a Run that stops on a defect and reports the defect', async () => {
     const defective = await seedInvoiceWorkspace(connection.db, 'Defective Foods')
-    const reported: string[] = []
+    const failed: string[] = []
 
     // An outbound Flow pinned to an inbound Mapping is a defect of the stored setup.
     await connection.db
@@ -239,7 +255,7 @@ describe('the worker', () => {
       remotePath: '/upload',
     })
     worker.worker.on('failed', (job) => {
-      reported.push(job?.data.runId ?? '')
+      failed.push(job?.data.runId ?? '')
     })
 
     const runId = await arrive(goldenInvoice, queue, defective)
@@ -250,8 +266,15 @@ describe('the worker', () => {
       error: { code: 'processingDefect' },
     })
     await vi.waitFor(() => {
-      expect(reported).toContain(runId)
+      expect(failed).toContain(runId)
     })
+    expect(defects.reported.filter((report) => report.runId === runId)).toEqual([
+      expect.objectContaining({
+        workspaceId: defective.id,
+        tradingPartnerId: defective.tradingPartnerId,
+        code: 'processingDefect',
+      }),
+    ])
   })
 
   it('delivers a Run retried after its delivery stopped on a defect', async () => {
@@ -354,6 +377,45 @@ describe('the worker', () => {
     expect(erp.received).toMatchObject([
       { method: 'POST', headers: { 'content-type': 'application/json' } },
     ])
+  })
+
+  it('traces the receipt of the polled file but no poll that received nothing', () => {
+    // The worker polled the emptied directory of the ORDERS Channel every 100 ms since.
+    expect(spanNames.filter((name) => !name.startsWith('run.'))).toEqual([])
+    expect(spanNames.filter((name) => name === 'run.receipt')).toEqual(['run.receipt'])
+  })
+
+  describe('without monitoring', () => {
+    let unmonitoredRedis: TestRedis
+
+    let unmonitoredQueue: ReturnType<typeof bullmqRunQueue>
+
+    let unmonitored: ReturnType<typeof startRunWorker>
+
+    beforeAll(async () => {
+      unmonitoredRedis = await startTestRedis()
+      unmonitoredQueue = bullmqRunQueue(unmonitoredRedis.url)
+      unmonitored = startRunWorker({
+        redisUrl: unmonitoredRedis.url,
+        db: connection.db,
+        secrets: testSecrets,
+        requeueInterval: '1 hour',
+        stuckAfter: '1 hour',
+        pollingMinute: '1 hour',
+      })
+    }, 60_000)
+
+    afterAll(async () => {
+      await unmonitored.close()
+      await unmonitoredQueue.close()
+      await unmonitoredRedis.stop()
+    })
+
+    it('delivers a queued Run', async () => {
+      const runId = await arrive(goldenInvoice, unmonitoredQueue)
+
+      await expect(processed(runId)).resolves.toMatchObject({ status: 'delivered' })
+    })
   })
 
   describe('its live events', () => {
