@@ -29,6 +29,7 @@ const base = {
   mappingVersion: null,
   replaces: null,
   replacedBy: null,
+  documentDeletedAt: null,
 } as const
 
 const error = {
@@ -237,6 +238,16 @@ describe('runDetailSchema', () => {
 
     expect(runDetailSchema.parse(duplicate).duplicateOf).toEqual(original)
     expect(runDetailSchema.safeParse({ ...duplicate, status: 'delivered' }).success).toBe(false)
+  })
+
+  it('marks when retention deleted the Document of a Run', () => {
+    const expired = { ...unreadable, documentDeletedAt: '2026-10-08T08:00:00.000Z' }
+
+    expect(runDetailSchema.parse(expired).documentDeletedAt).toBe(expired.documentDeletedAt)
+    expect(runDetailSchema.parse(unreadable).documentDeletedAt).toBeNull()
+    expect(runDetailSchema.safeParse({ ...unreadable, documentDeletedAt: undefined }).success).toBe(
+      false,
+    )
   })
 })
 

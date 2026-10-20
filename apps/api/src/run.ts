@@ -266,6 +266,7 @@ const toDetail = (
     // Interchanges and parsed Messages come with inbound processing.
     interchange: null,
     message: null,
+    documentDeletedAt: null,
   }
 
   const unfailed = {

@@ -80,6 +80,7 @@ const missingFieldDetail = runDetailSchema.parse({
   },
   waitingForTradingPartnerSince: null,
   duplicateOf: null,
+  documentDeletedAt: null,
 })
 
 const unreadable = storyRun(2, 'ORDERS', 'parse')
@@ -173,6 +174,7 @@ function incompleteSetupDetail({ error, fixTarget }: IncompleteSetup) {
     problem: { reason: 'incompleteSetup', whoFixes: 'retry', fixTarget },
     waitingForTradingPartnerSince: null,
     duplicateOf: null,
+    documentDeletedAt: null,
   })
 }
 
@@ -570,6 +572,7 @@ export const UnreadableFromErp = meta.story({
             problem: { reason: 'unreadable', whoFixes: 'you', fixTarget: null },
             waitingForTradingPartnerSince: null,
             duplicateOf: null,
+            documentDeletedAt: null,
           }),
         ),
       ),

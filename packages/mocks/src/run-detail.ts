@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw'
 
 import {
   directionOf,
+  documentRetentionDays,
   type Interchange,
   interchangeEndpoint,
   interchangeSchema,
@@ -102,6 +103,7 @@ export type RunDetailOptions = (
   channels?: ChannelStore
   lookupTables?: LookupTableStore
   waitingForTradingPartnerSince?: Map<string, string>
+  documentDeletedAt?: ReadonlyMap<string, string>
   tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
 }
 
@@ -130,6 +132,38 @@ export function seedReprocessed(runs: ReadonlyArray<RunSummary> = seedRuns()): R
     return replacing ? [{ replaced: replaced.id, replacing: replacing.id }] : []
   })
 }
+
+// Retention deletes a Document no sooner than its shortest period after it was received.
+const shortestRetention = documentRetentionDays.min * 24 * 60 * 60 * 1000
+
+export function seedExpiredDocuments(
+  runs: ReadonlyArray<RunSummary> = seedRuns(),
+  reprocessed: ReadonlyArray<Reprocessed> = seedReprocessed(runs),
+): Map<string, string> {
+  const replaced = new Set(reprocessed.map(({ replaced }) => replaced))
+
+  const oldest = runs
+    .filter(
+      (run) =>
+        run.status === 'failed' &&
+        run.failureStage === 'mapping' &&
+        run.problem.reason !== 'defect' &&
+        !replaced.has(run.id) &&
+        Date.parse(run.receivedAt) + shortestRetention <= Date.now(),
+    )
+    .reduce<RunSummary | undefined>(
+      (found, run) => (found && found.receivedAt <= run.receivedAt ? found : run),
+      undefined,
+    )
+
+  return new Map(
+    oldest
+      ? [[oldest.id, new Date(Date.parse(oldest.receivedAt) + shortestRetention).toISOString()]]
+      : [],
+  )
+}
+
+const documentExpired = 'The Document of the Run expired, so the Run cannot be reprocessed'
 
 // Mirrors the API: the Trading Partner fixes its Document by a resend, a delivery failure by a Retry.
 function isReprocessable(
@@ -164,6 +198,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
   const retried = new Map<string, RunDetail>()
   const deliveringAgain = new Set<string>()
   const waitingSince = options.waitingForTradingPartnerSince ?? new Map<string, string>()
+  const documentDeletedAt = options.documentDeletedAt ?? new Map<string, string>()
 
   const problemSources = {
     flows: toFlowStore(options.flows),
@@ -281,6 +316,7 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       mappingVersion,
       replaces: replaced ? { id: replaced } : null,
       replacedBy: replacing ? { id: replacing } : null,
+      documentDeletedAt: documentDeletedAt.get(id) ?? null,
     })
   }
 
@@ -458,7 +494,12 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
       }
 
       // Before delivery there is no finished Document to send again, so the Defect is reprocessed.
+      // A Retry at delivery keeps what it delivers and does not read the Document.
       if (run.problem?.reason === 'defect' && isReprocessable(run)) {
+        if (run.documentDeletedAt !== null) {
+          return problem(409, documentExpired)
+        }
+
         reprocess(run, run.mappingVersion)
 
         return HttpResponse.json(detail(run.id))
@@ -516,6 +557,10 @@ export function runDetailHandlers(apiUrl: string, options: RunDetailOptions = {}
 
         if (run === undefined) {
           return problem(404, 'Not Found')
+        }
+
+        if (run.documentDeletedAt !== null) {
+          return problem(409, documentExpired)
         }
 
         if (!isReprocessable(run)) {

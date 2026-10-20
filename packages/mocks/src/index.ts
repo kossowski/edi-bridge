@@ -71,7 +71,7 @@ import {
 } from './order-lifecycle'
 import { seedOverdueAcknowledgements } from './overdue-acknowledgement'
 import { runsHandler, seedRuns } from './run'
-import { runDetailHandlers, seedReprocessed } from './run-detail'
+import { runDetailHandlers, seedExpiredDocuments, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
 import { createCredentialStore, createSessionStore, seedSession, sessionHandlers } from './session'
 import { tasksHandler } from './task'
@@ -261,7 +261,12 @@ export { serializeSegment } from './interchange'
 
 export { interchangesHandler } from './interchange-list'
 
-export { runDetailHandlers, type RunDetailOptions, seedReprocessed } from './run-detail'
+export {
+  runDetailHandlers,
+  type RunDetailOptions,
+  seedExpiredDocuments,
+  seedReprocessed,
+} from './run-detail'
 
 export {
   createTradingPartner,
@@ -390,10 +395,8 @@ export function createHandlers(
 ) {
   const orderLifecycles = seedOrderLifecycles()
 
-  const runs = createRunStore(
-    [...seedRuns(), ...orderLifecycles.runs],
-    [...seedReprocessed(), ...orderLifecycles.reprocessed],
-  )
+  const reprocessed = [...seedReprocessed(), ...orderLifecycles.reprocessed]
+  const runs = createRunStore([...seedRuns(), ...orderLifecycles.runs], reprocessed)
 
   const ownWorkspace = workspace ?? seedWorkspace
   const operatorStore = createOperatorStore({ workspaces: operatorWorkspaces, invites })
@@ -503,6 +506,7 @@ export function createHandlers(
     ...runDetailHandlers(apiUrl, {
       runs,
       waitingForTradingPartnerSince: orderLifecycles.waitingForTradingPartnerSince,
+      documentDeletedAt: seedExpiredDocuments(seedRuns(), reprocessed),
       mappingVersions: mappingVersionStore,
       flows,
       channels: channelStore,
