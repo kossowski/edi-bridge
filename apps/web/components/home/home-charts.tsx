@@ -193,7 +193,8 @@ export function ThroughputChart({ rows, totals, timeWindow }: HomeSeries) {
       <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
         <BarChart
           data={toBarRows(rows)}
-          margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+          // Room for half the latest bucket's label, which centres on the chart's last bar.
+          margin={{ top: 4, right: 24, bottom: 0, left: 0 }}
           aria-label={title}>
           <defs>
             <pattern
