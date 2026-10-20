@@ -9,14 +9,16 @@ import { tradingPartnerSummarySchema } from './trading-partner'
 import type { Endpoint } from './endpoint'
 
 export const interchangePartySchema = z.object({
-  gln: z.string().regex(/^\d{13}$/),
+  // UNB 0004 and 0010 name a party by any identification, a GLN for EANCOM.
+  gln: z.string().min(1).max(35),
   name: z.string().min(1),
 })
 
 export type InterchangeParty = z.infer<typeof interchangePartySchema>
 
 export const interchangeRunSchema = runSummarySchema.and(
-  z.object({ messageReference: z.string().min(1).max(14) }),
+  // Null when the Interchange breaks before the Run's Message.
+  z.object({ messageReference: z.string().min(1).max(14).nullable() }),
 )
 
 export type InterchangeRun = z.infer<typeof interchangeRunSchema>

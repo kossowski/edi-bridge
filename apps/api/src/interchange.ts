@@ -11,11 +11,12 @@ import {
   type RunSummary,
 } from '@edi-bridge/contracts'
 import { documents, flows, runs, tradingPartners } from '@edi-bridge/db'
-import { parseMessages } from '@edi-bridge/edifact'
+import { readInterchange } from '@edi-bridge/edifact'
 
 import { Db, type Database } from './db.js'
 import { foundOrNotFound, inWorkspace, rejectingInvalidId } from './rows.js'
 import { fromRuns, listRunSummaries, matchingSearchTerm } from './run.js'
+import { readableTextOf } from './stored-document.js'
 import { CurrentWorkspace, loadCurrentWorkspace } from './workspace.js'
 
 const interchangeFieldsOf = (
@@ -150,14 +151,7 @@ const listRunsOf = async (db: Database, interchanges: readonly InterchangeRow[])
   ])
 
   return (interchange: InterchangeRow): RunSummary[] =>
-    runIdsOf(interchange).flatMap((runId) =>
-      summaries
-        .filter(({ id }) => id === runId)
-        .map((summary) => ({
-          ...summary,
-          interchange: { id: interchange.id, controlReference: interchange.controlReference },
-        })),
-    )
+    runIdsOf(interchange).flatMap((runId) => summaries.filter(({ id }) => id === runId))
 }
 
 const toSummary =
@@ -207,16 +201,18 @@ export const listInterchanges = (query: InterchangeListQuery) =>
   })
 
 const rawOf = async (db: Database, { id, direction }: InterchangeRow) => {
-  const [row] =
-    direction === 'outbound'
-      ? await db.select({ raw: runs.output }).from(runs).where(eq(runs.id, id))
-      : await db.select({ raw: documents.content }).from(documents).where(eq(documents.id, id))
+  if (direction === 'inbound') {
+    const [document] = await db
+      .select({ id: documents.id, content: documents.content, bytes: documents.bytes })
+      .from(documents)
+      .where(eq(documents.id, id))
 
-  if (row?.raw === null || row?.raw === undefined) {
-    throw new Error(`Interchange ${id} has no raw text`)
+    return document && readableTextOf(document)
   }
 
-  return row.raw
+  const [run] = await db.select({ output: runs.output }).from(runs).where(eq(runs.id, id))
+
+  return run?.output ?? undefined
 }
 
 const presentOrThrow = (value: string | undefined, missing: string) => {
@@ -252,16 +248,21 @@ export const loadInterchange = (id: string) =>
       ]),
     )
 
-    const { header, messages } = parseMessages(raw)
+    if (raw === undefined) {
+      throw new Error(`Interchange ${id} has no raw text`)
+    }
+
+    // Receipt read the keys from this header, so it reads again though a later segment breaks.
+    const { header, messages } = readInterchange(raw)
     const tradingPartner = { name: row.tradingPartnerName }
     const ownCompany = { name: own.name }
 
     const sender = {
-      gln: presentOrThrow(header.elements[1]?.[0], `Interchange ${id} has no sender`),
+      gln: presentOrThrow(header?.elements[1]?.[0], `Interchange ${id} has no sender`),
     }
 
     const receiver = {
-      gln: presentOrThrow(header.elements[2]?.[0], `Interchange ${id} has no receiver`),
+      gln: presentOrThrow(header?.elements[2]?.[0], `Interchange ${id} has no receiver`),
     }
 
     // An outbound Run, a test send too, has no Message Index: its Interchange holds one Message.
@@ -271,10 +272,9 @@ export const loadInterchange = (id: string) =>
       const messageIndex =
         messageIndexes.find((run) => run.id === runId)?.messageIndex ?? onlyMessage
 
-      return presentOrThrow(
-        messages[messageIndex - 1]?.header.elements[0]?.[0],
-        `Interchange ${id} has no Message ${String(messageIndex)}`,
-      )
+      const reference = messages[messageIndex - 1]?.message.header.elements[0]?.[0]
+
+      return reference === undefined || reference === '' ? null : reference
     }
 
     return {

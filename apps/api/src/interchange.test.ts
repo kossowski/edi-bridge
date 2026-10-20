@@ -437,6 +437,86 @@ describe('GET /interchanges/:id', () => {
     )
   })
 
+  it('shows a received Interchange whose envelope breaks after its Messages', async () => {
+    const partner = await addTradingPartner(workspace, 'Lahnhof eG', '4012345000092')
+
+    const content = `${interchangeOf('4012345000092', workspaceGln, 'LAH1', [
+      { reference: 'PO-91', messageType: 'ORDERS' },
+    ])
+      .split('\n')
+      .slice(0, -1)
+      .join('\n')}\nUNH+PO-92+ORDERS:D:96A:UN:EAN008'`
+
+    const document = await partner.storeDocument({
+      content,
+      interchangeSender: '4012345000092',
+      interchangeControlReference: 'LAH1',
+    })
+
+    const runIds = []
+
+    for (const messageIndex of [1, 2, 3]) {
+      runIds.push(
+        (
+          await partner.addRun({
+            documentId: document.id,
+            flowId: partner.orders.id,
+            status: 'failed',
+            failureStage: 'parse',
+            problem: { reason: 'unreadable', fixTarget: null },
+            error: {
+              code: 'missing-interchange-trailer',
+              message: 'No UNZ',
+              position: null,
+              details: null,
+            },
+            messageIndex,
+          })
+        ).id,
+      )
+    }
+
+    const response = await loaded(document.id)
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect(
+      interchangeSchema
+        .parse(response.json())
+        .runs.map(({ id, messageReference }) => ({ id, messageReference })),
+    ).toEqual([
+      { id: runIds[0], messageReference: 'PO-91' },
+      { id: runIds[1], messageReference: 'PO-92' },
+      { id: runIds[2], messageReference: null },
+    ])
+  })
+
+  it('names the parties by the identifications in the UNB, though they are no GLNs', async () => {
+    const partner = await addTradingPartner(workspace, 'Rhönmarkt KG', '4012345000108')
+
+    const document = await partner.storeDocument({
+      content: interchangeOf('RHOENMARKT', 'NORDWIND-FOODS', 'RHM1', [
+        { reference: 'PO-1', messageType: 'ORDERS' },
+      ]),
+      interchangeSender: 'RHOENMARKT',
+      interchangeControlReference: 'RHM1',
+    })
+
+    await partner.addRun({
+      documentId: document.id,
+      flowId: partner.orders.id,
+      status: 'delivered',
+      messageIndex: 1,
+    })
+
+    const response = await loaded(document.id)
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect(interchangeSchema.parse(response.json())).toMatchObject({
+      sender: { gln: 'RHOENMARKT', name: 'Rhönmarkt KG' },
+      receiver: { gln: 'NORDWIND-FOODS', name: 'Nordwind Foods' },
+    })
+  })
+
   it('answers 404 for a Run without an Interchange, an unknown id and another Workspace', async () => {
     const partner = await addTradingPartner(workspace, 'Harzgold KG', '4012345000078')
 

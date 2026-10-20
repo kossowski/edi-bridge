@@ -2,6 +2,7 @@ import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  interchangeEndpoint,
   receiveWebhookEndpoint,
   regeneratedWebhookTokenSchema,
   regenerateWebhookTokenEndpoint,
@@ -166,6 +167,16 @@ describe('an inbound Run', () => {
       failureStage: 'parse',
       interchange: { id: documentId, controlReference: 'BYTES1', raw: readable },
       message: null,
+    })
+
+    const interchange = await admin.inject({
+      method: interchangeEndpoint.method,
+      url: toPath(interchangeEndpoint.path, { id: documentId }),
+    })
+
+    expect(interchange.statusCode, interchange.body).toBe(200)
+    expect(interchangeEndpoint.response.parse(interchange.json())).toMatchObject({
+      raw: readable,
     })
   })
 })
