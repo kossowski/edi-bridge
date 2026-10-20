@@ -25,6 +25,13 @@ export {
   publishRunChanges,
 } from './live-events'
 
+export {
+  type LiveEventListener,
+  liveEventsChannel,
+  liveEventSubscriber,
+  redisLiveEvents,
+} from './redis-live-events'
+
 export { markOverdueInterchanges } from './mark-overdue-interchanges'
 
 export { pollInboundChannels } from './poll-inbound-channels'
