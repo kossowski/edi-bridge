@@ -1,28 +1,39 @@
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { DeliveryFailed } from '@edi-bridge/channels'
 import {
   interchangeEndpoint,
+  manualSubmissionSchema,
   receiveWebhookEndpoint,
   regeneratedWebhookTokenSchema,
   regenerateWebhookTokenEndpoint,
   runEndpoint,
   runListSchema,
   runsEndpoint,
+  submitDocumentEndpoint,
   toPath,
   webhookAuthorization,
   webhookTokenHeader,
 } from '@edi-bridge/contracts'
-import { processRun } from '@edi-bridge/pipeline'
+import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
 import {
   addOrdersFlow,
   golden,
+  goldenInvoice,
   type InvoiceWorkspace,
   pipelineServices,
   seedInvoiceWorkspace,
 } from '@edi-bridge/pipeline/testing'
 
-import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+import {
+  addMember,
+  type Client,
+  signIn,
+  startTestApi,
+  submittedDocument,
+  type TestApi,
+} from './testing.js'
 
 let api: TestApi
 
@@ -69,6 +80,14 @@ afterAll(async () => {
   await api.stop()
 })
 
+const processQueued = async (delivery?: DeliveryService) => {
+  for (const queued of api.runQueue.queued.splice(0)) {
+    await Effect.runPromise(
+      processRun(queued).pipe(pipelineServices(api.connection.db, api.runQueue, delivery)),
+    )
+  }
+}
+
 const received = async (bytes: Buffer) => {
   const response = await api.app.inject({
     method: receiveWebhookEndpoint.method,
@@ -89,11 +108,7 @@ const received = async (bytes: Buffer) => {
     throw new Error('The webhook created no Run')
   }
 
-  for (const queued of api.runQueue.queued.splice(0)) {
-    await Effect.runPromise(
-      processRun(queued).pipe(pipelineServices(api.connection.db, api.runQueue, () => Effect.void)),
-    )
-  }
+  await processQueued(() => Effect.void)
 
   return { documentId, runId: run.id }
 }
@@ -178,5 +193,42 @@ describe('an inbound Run', () => {
     expect(interchangeEndpoint.response.parse(interchange.json())).toMatchObject({
       raw: readable,
     })
+  })
+})
+
+describe('an outbound Run', () => {
+  const unreachable: DeliveryService = () =>
+    Effect.fail(new DeliveryFailed({ reason: 'hostUnreachable' }))
+
+  const submitted = async (delivery: DeliveryService) => {
+    const response = await admin.inject({
+      method: submitDocumentEndpoint.method,
+      url: submitDocumentEndpoint.path,
+      body: {
+        channelId: workspace.inboundChannelId,
+        document: submittedDocument('invoice.json', goldenInvoice),
+      },
+    })
+
+    expect(response.statusCode, response.body).toBe(201)
+
+    const runId = manualSubmissionSchema.parse(response.json()).runs[0]?.id ?? ''
+
+    await processQueued(delivery)
+
+    return runId
+  }
+
+  it('shows the Interchange and Message it built, though the Channel never took them', async () => {
+    const runId = await submitted(unreachable)
+
+    const run = await detail(runId)
+
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      interchange: { id: runId, raw: expect.stringMatching(/^UNB\+/u) },
+    })
+    expect(run.message).toMatchObject({ messageType: 'INVOIC' })
   })
 })

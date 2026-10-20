@@ -304,6 +304,9 @@ describe('GET /runs/:id', () => {
         'destinationUnreachable:true',
       ]),
     )
+    expect(
+      details.filter(({ interchange }) => interchange !== null).every(({ message }) => message),
+    ).toBe(true)
   })
 
   it('fails an outbound Run at validation with the codes of the edifact package', async () => {

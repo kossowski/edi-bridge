@@ -12,12 +12,11 @@ import { type Connection, documents, flows, runs, tradingPartners } from '@edi-b
 // A Duplicate is never mapped, so it shows the Business Reference of its original Run.
 const originalRuns = alias(runs, 'original_runs')
 
-// Selected with the Run's Document joined.
 export const interchangeFields = {
   documentId: runs.documentId,
   interchangeControlReference: documents.interchangeControlReference,
   controlReference: runs.controlReference,
-  handedOver: sql<boolean>`${runs.handedOverAt} is not null and ${runs.output} is not null`,
+  built: sql<boolean>`${runs.output} is not null`,
 }
 
 type InterchangeRow = {
@@ -25,10 +24,10 @@ type InterchangeRow = {
   documentId: string | null
   interchangeControlReference: string | null
   controlReference: number | null
-  handedOver: boolean
+  built: boolean
 }
 
-// A received Interchange is its Document; an outbound Run the Channel took is its own Interchange.
+// A received Interchange is its Document; an outbound Run is its own once delivery built it.
 export const interchangeOf = (id: string, row: InterchangeRow): InterchangeReference | null => {
   if (directionOf(row) === 'inbound') {
     return row.documentId === null || row.interchangeControlReference === null
@@ -36,7 +35,7 @@ export const interchangeOf = (id: string, row: InterchangeRow): InterchangeRefer
       : { id: row.documentId, controlReference: row.interchangeControlReference }
   }
 
-  return row.handedOver && row.controlReference !== null
+  return row.built && row.controlReference !== null
     ? { id, controlReference: String(row.controlReference) }
     : null
 }
