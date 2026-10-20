@@ -46,7 +46,6 @@ export type GeneratedErrorCode =
 export type GeneratedError = RunError & { code: GeneratedErrorCode }
 
 // `defect` pins whether the Run stops on a Defect, for a story or test that needs one either way.
-// `refusedHostKey` marks the delivery the SFTP server refused for another host key.
 type ProblemFields = Pick<RunSummary, 'id' | 'messageType' | 'flow' | 'failureStage'> & {
   defect?: boolean | undefined
   refusedHostKey?: boolean | undefined
