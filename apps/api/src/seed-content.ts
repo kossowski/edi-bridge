@@ -1,6 +1,7 @@
 import { withCheckDigit } from '@edi-bridge/contracts'
 
 // GS1 keeps the prefixes 020 to 029 for restricted circulation, so no seeded number is a real one.
+// Each seeded VAT ID fails the ISO 7064 MOD 11,10 check digit, so no company can hold it.
 export const seedCompany = { gln: withCheckDigit('020400100000'), vatId: 'DE900000001' }
 
 export const seedChannelDomain = 'invalid'

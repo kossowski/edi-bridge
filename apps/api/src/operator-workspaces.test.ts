@@ -42,6 +42,16 @@ import {
 
 const summariesSchema = z.array(workspaceSummarySchema)
 
+const iso7064CheckDigit = (digits: string) => {
+  const product = [...digits].reduce((carry, digit) => {
+    const sum = (Number(digit) + carry) % 10
+
+    return (2 * (sum === 0 ? 10 : sum)) % 11
+  }, 10)
+
+  return (11 - product) % 10
+}
+
 let api: TestApi
 
 let operator: Client
@@ -271,6 +281,21 @@ describe('POST /operator/workspaces with seed', () => {
     for (const number of numbers) {
       expect(number).toMatch(restricted)
       expect(glnIssue(number)).toBeNull()
+    }
+  })
+
+  it('uses VAT IDs whose check digit fails, so no company holds them', async () => {
+    const contents = await api.connection.db
+      .select({ text: documents.content })
+      .from(documents)
+      .where(eq(documents.workspaceId, created.id))
+
+    const vatIds = contents.flatMap(({ text }) => text.match(/DE\d{9}/g) ?? [])
+
+    expect(vatIds.length).toBeGreaterThan(0)
+
+    for (const vatId of vatIds) {
+      expect(vatId.at(-1)).not.toBe(String(iso7064CheckDigit(vatId.slice(2, 10))))
     }
   })
 
