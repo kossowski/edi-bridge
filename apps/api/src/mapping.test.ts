@@ -57,8 +57,12 @@ const postDocumentStructure = async (name: string, target = admin) => {
   return documentStructureSchema.parse(response.json())
 }
 
-const create = (messageType: string, target = admin) =>
-  target.inject({ method: 'POST', url: createMappingEndpoint.path, body: { messageType } })
+const create = (messageType: string, target = admin, documentStructureId?: string) =>
+  target.inject({
+    method: 'POST',
+    url: createMappingEndpoint.path,
+    body: { messageType, documentStructureId },
+  })
 
 const created = async (messageType: string, target = admin) => {
   const response = await create(messageType, target)
@@ -142,6 +146,47 @@ describe('POST /mappings', () => {
     const dispatch = await postDocumentStructure('ERP dispatch')
 
     expect((await created('DESADV')).documentStructureId).toBe(dispatch.id)
+  })
+
+  it('takes the named Document Structure', async () => {
+    await postDocumentStructure('A orders')
+    await created('ORDERS')
+    const named = await postDocumentStructure('B orders')
+
+    const response = await create('ORDERS', admin, named.id)
+
+    expect(response.statusCode).toBe(201)
+    expect(mappingSummarySchema.parse(response.json())).toMatchObject({
+      name: 'ORDERS to B orders',
+      documentStructureId: named.id,
+      documentStructureName: 'B orders',
+    })
+  })
+
+  it('answers 422 for a Document Structure that does not exist', async () => {
+    await postDocumentStructure('ERP orders')
+
+    const response = await create('ORDERS', admin, crypto.randomUUID())
+
+    expect(response.statusCode).toBe(422)
+    expect(response.json()).toEqual({ message: 'The Document Structure does not exist.' })
+  })
+
+  it('answers 422 for a Document Structure of another Workspace', async () => {
+    await postDocumentStructure('ERP orders')
+    const foreign = await postDocumentStructure('Sudhafen orders', otherAdmin)
+
+    const response = await create('ORDERS', admin, foreign.id)
+
+    expect(response.statusCode).toBe(422)
+    expect(response.json()).toEqual({ message: 'The Document Structure does not exist.' })
+    expect(await list()).toEqual([])
+  })
+
+  it('answers 400 for a Document Structure id that is no UUID', async () => {
+    await postDocumentStructure('ERP orders')
+
+    expect((await create('ORDERS', admin, 'erp-orders')).statusCode).toBe(400)
   })
 
   it('answers 422 while the Workspace has no Document Structure', async () => {

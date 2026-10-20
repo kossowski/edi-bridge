@@ -289,7 +289,7 @@ describe('GET /mappings', () => {
   })
 })
 
-async function createMapping(body: { messageType?: string }) {
+async function createMapping(body: { messageType?: string; documentStructureId?: string }) {
   return fetch(`${apiUrl}${createMappingEndpoint.path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -364,6 +364,38 @@ describe('POST /mappings', () => {
     expect(created.documentStructureId).toBe(first!.id)
   })
 
+  it('takes the named Document Structure', async () => {
+    const [first, second] = createDocumentStructures({ count: 2 }).toSorted((a, b) =>
+      a.name.localeCompare(b.name, 'de'),
+    )
+
+    server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [first!, second!] }))
+
+    const created = createMappingEndpoint.response.parse(
+      await (
+        await createMapping({ messageType: 'ORDERS', documentStructureId: second!.id })
+      ).json(),
+    )
+
+    expect(created).toMatchObject({
+      documentStructureId: second!.id,
+      documentStructureName: second!.name,
+    })
+  })
+
+  it('refuses a Document Structure the Workspace does not have', async () => {
+    server.use(...mappingHandlers(apiUrl, { mappings: [] }))
+
+    const response = await createMapping({
+      messageType: 'ORDERS',
+      documentStructureId: crypto.randomUUID(),
+    })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({ message: 'The Document Structure does not exist.' })
+    expect(await listMappings()).toEqual([])
+  })
+
   it('opens the created Mapping with an empty Draft and lists it', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
 
@@ -427,14 +459,16 @@ describe('POST /mappings', () => {
     expect((await createMapping({ messageType: 'INVOIC' })).status).toBe(500)
   })
 
-  it.each([{ messageType: 'CONTRL' }, { messageType: 'APERAK' }, {}])(
-    'rejects the body %j',
-    async (body) => {
-      server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
+  it.each([
+    { messageType: 'CONTRL' },
+    { messageType: 'APERAK' },
+    {},
+    { messageType: 'ORDERS', documentStructureId: 'erp-orders' },
+  ])('rejects the body %j', async (body) => {
+    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
 
-      expect((await createMapping(body)).status).toBe(400)
-    },
-  )
+    expect((await createMapping(body)).status).toBe(400)
+  })
 })
 
 describe('GET /mappings/:id/draft', () => {

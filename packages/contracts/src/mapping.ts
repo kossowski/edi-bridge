@@ -237,6 +237,7 @@ export const newMappingMessageTypes = ['ORDERS', 'DESADV', 'INVOIC'] as const
 
 export const createMappingBodySchema = z.strictObject({
   messageType: messageTypeSchema.extract(newMappingMessageTypes),
+  documentStructureId: z.uuid().optional(),
 })
 
 export type CreateMappingBody = z.infer<typeof createMappingBodySchema>
