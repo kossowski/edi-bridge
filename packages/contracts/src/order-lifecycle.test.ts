@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  type AcknowledgementNotSentReason,
   type AcknowledgementState,
   openMessageTypes,
   type OrderLifecycleMessage,
@@ -19,6 +20,7 @@ type MessageOptions = {
   failed?: FailureStage
   status?: 'received' | 'processing' | 'duplicate'
   acknowledgement?: AcknowledgementState
+  notSentReason?: AcknowledgementNotSentReason
   replacedBy?: OrderLifecycleMessage
   waitingSince?: string
 }
@@ -59,7 +61,7 @@ function message(
           controlReference: String(sequence),
           acknowledgement:
             direction === 'outbound' ? (options.acknowledgement ?? 'accepted') : null,
-          notSentReason: null,
+          notSentReason: options.notSentReason ?? null,
         },
   }
 }
@@ -245,14 +247,11 @@ describe('openMessageTypes', () => {
 
 describe('orderLifecycleMessageSchema', () => {
   it('keeps why the CONTRL to a received Interchange was not sent', () => {
-    const orders = message('ORDERS')
+    const orders = message('ORDERS', { notSentReason: 'ambiguousChannel' })
 
-    expect(
-      orderLifecycleMessageSchema.parse({
-        ...orders,
-        interchange: { ...orders.interchange, notSentReason: 'ambiguousChannel' },
-      }).interchange?.notSentReason,
-    ).toBe('ambiguousChannel')
+    expect(orderLifecycleMessageSchema.parse(orders).interchange?.notSentReason).toBe(
+      'ambiguousChannel',
+    )
   })
 
   it('rejects an unknown not-sent reason', () => {
@@ -267,13 +266,8 @@ describe('orderLifecycleMessageSchema', () => {
   })
 
   it('rejects a not-sent reason on a sent Interchange', () => {
-    const desadv = message('DESADV')
+    const desadv = message('DESADV', { notSentReason: 'noOutboundChannel' })
 
-    expect(
-      orderLifecycleMessageSchema.safeParse({
-        ...desadv,
-        interchange: { ...desadv.interchange, notSentReason: 'noOutboundChannel' },
-      }).success,
-    ).toBe(false)
+    expect(orderLifecycleMessageSchema.safeParse(desadv).success).toBe(false)
   })
 })
