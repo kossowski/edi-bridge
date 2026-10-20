@@ -832,7 +832,8 @@
         "processAgain": "Verarbeiten Sie den Beleg erneut. EDI Bridge nutzt die Originaldatei, {direction, select, inbound {{tradingPartner} muss} other {Ihr ERP muss}} also nichts erneut senden.",
         "tryAgain": "{stage, select, delivery {Versuchen Sie es erneut. Der fertige Beleg wird noch einmal gesendet, nichts wird neu übersetzt.} other {Versuchen Sie es erneut. EDI Bridge verarbeitet die Originaldatei noch einmal mit derselben Mapping-Version.}}",
         "tellTradingPartner": "Informieren Sie {tradingPartner} und bitten Sie um eine korrigierte Datei. Die Nachricht enthält die technischen Details für das IT-Team. Die Kontaktdaten stehen auf der Partnerseite.",
-        "markWaiting": "Markieren Sie den Beleg, damit Ihr Team weiß, dass Sie auf {tradingPartner} warten."
+        "markWaiting": "Markieren Sie den Beleg, damit Ihr Team weiß, dass Sie auf {tradingPartner} warten.",
+        "documentExpired": "EDI Bridge hat die Originaldatei am <time>{deletedAt}</time> gelöscht, als die Aufbewahrungsdauer abgelaufen war. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. {direction, select, inbound {Bitten Sie {tradingPartner}, ihn erneut zu senden.} other {Senden Sie ihn erneut aus Ihrem ERP.}}"
       },
       "fixLink": {
         "mapping": "„{name}“ an diesem Feld öffnen",

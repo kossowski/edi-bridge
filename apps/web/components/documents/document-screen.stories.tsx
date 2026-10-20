@@ -129,6 +129,19 @@ const unreadableFromErp = storyRun(18, 'INVOIC', 'parse')
 
 const defect = storyRun(47, 'ORDERS', 'mapping', { defect: true })
 
+const expired = storyRun(48, 'INVOIC', 'mapping', { defect: false })
+
+const expiredDefect = storyRun(49, 'ORDERS', 'mapping', { defect: true })
+
+const expiredDefectAtDelivery = storyRun(50, 'ORDERS', 'delivery', { defect: true })
+
+const documentDeletedAt = '2026-10-08T08:00:00.000Z'
+
+const expiredFromErp =
+  'EDI Bridge deleted the original file on Oct 8, 2026, when the retention period ended, so this document cannot be processed again. Send it again from your ERP.'
+
+const expiredFromPartner = `EDI Bridge deleted the original file on Oct 8, 2026, when the retention period ended, so this document cannot be processed again. Ask ${partner.name} to send it again.`
+
 const runs = [
   missingField,
   unreadable,
@@ -150,6 +163,9 @@ const runs = [
   incompleteSetup,
   unreadableFromErp,
   defect,
+  expired,
+  expiredDefect,
+  expiredDefectAtDelivery,
 ]
 
 const channel = seedChannels.find(({ id }) => id === flowFor('INVOIC').destinationChannelId)!
@@ -196,6 +212,12 @@ const meta = preview.meta({
       ...runDetailHandlers(apiUrl, {
         runs,
         reprocessed: [{ replaced: replaced.id, replacing: replacing.id }],
+        documentDeletedAt: new Map(
+          [expired, expiredDefect, expiredDefectAtDelivery].map(({ id }) => [
+            id,
+            documentDeletedAt,
+          ]),
+        ),
       }),
     )
   },
@@ -235,6 +257,12 @@ function stubClipboard() {
       Reflect.deleteProperty(navigator, 'clipboard')
     }
   }
+}
+
+// The date sits in its own <time> element, so the step is matched by its whole paragraph.
+function paragraph(text: string) {
+  return (_: string, element: Element | null) =>
+    element?.tagName === 'P' && element.textContent === text
 }
 
 async function expectFixLink(link: HTMLElement, href: string) {
@@ -625,6 +653,63 @@ export const GermanDefect = meta.story({
         { exact: false },
       ),
     ).toBeVisible()
+  },
+})
+
+export const DocumentExpired = meta.story({
+  args: { id: expired.id },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(paragraph(expiredFromErp))).toBeVisible()
+    await expect(canvas.getByText('Oct 8, 2026').getAttribute('datetime')).toBe(documentDeletedAt)
+    await expect(canvas.queryByRole('button', { name: 'Process again' })).toBeNull()
+    await expect(canvas.queryByRole('combobox', { name: 'Version' })).toBeNull()
+  },
+})
+
+export const GermanDocumentExpired = meta.story({
+  args: { id: expired.id },
+  decorators: [german],
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(
+        paragraph(
+          'EDI Bridge hat die Originaldatei am 08.10.2026 gelöscht, als die Aufbewahrungsdauer abgelaufen war. Dieser Beleg lässt sich deshalb nicht erneut verarbeiten. Senden Sie ihn erneut aus Ihrem ERP.',
+        ),
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Erneut verarbeiten' })).toBeNull()
+  },
+})
+
+export const ViewerDocumentExpired = meta.story({
+  args: { id: expired.id },
+  ...viewerStory({
+    async play({ canvas }) {
+      await expect(await canvas.findByText(paragraph(expiredFromErp))).toBeVisible()
+      await expect(canvas.queryByText('An Admin can process it again.')).toBeNull()
+    },
+  }),
+})
+
+export const DefectDocumentExpired = meta.story({
+  args: { id: expiredDefect.id },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(paragraph(expiredFromPartner))).toBeVisible()
+    await expect(canvas.queryByRole('button', { name: 'Try again' })).toBeNull()
+  },
+})
+
+export const DefectAtDeliveryDocumentExpired = meta.story({
+  args: { id: expiredDefectAtDelivery.id },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByText(
+        'Try again. The finished document is sent once more, nothing is translated again.',
+      ),
+    ).toBeVisible()
+    await expect(canvas.queryByText(paragraph(expiredFromPartner))).toBeNull()
+    await userEvent.click(canvas.getByRole('button', { name: 'Try again' }))
+    await expect(await canvas.findByText('Delivering again')).toBeVisible()
   },
 })
 

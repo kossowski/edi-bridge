@@ -832,7 +832,8 @@
         "processAgain": "Process it again. EDI Bridge uses the original file, so {direction, select, inbound {{tradingPartner} does} other {your ERP does}} not have to send anything again.",
         "tryAgain": "{stage, select, delivery {Try again. The finished document is sent once more, nothing is translated again.} other {Try again. EDI Bridge processes the original file once more with the same mapping version.}}",
         "tellTradingPartner": "Tell {tradingPartner} and ask for a corrected file. The message includes the technical detail their IT team needs. Their contact details are on the partner page.",
-        "markWaiting": "Mark it so your team knows you are waiting for {tradingPartner}."
+        "markWaiting": "Mark it so your team knows you are waiting for {tradingPartner}.",
+        "documentExpired": "EDI Bridge deleted the original file on <time>{deletedAt}</time>, when the retention period ended, so this document cannot be processed again. {direction, select, inbound {Ask {tradingPartner} to send it again.} other {Send it again from your ERP.}}"
       },
       "fixLink": {
         "mapping": "Open “{name}” at this field",

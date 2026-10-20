@@ -11,6 +11,7 @@ import { FixerBadge, fixerIcons, shownFixer } from '@/components/documents/fixer
 import { invalidContentCode } from '@/components/documents/invalid-content'
 import {
   CopyPartnerMessage,
+  DocumentExpiredStep,
   MarkWaitingStep,
   ProcessAgainStep,
   ProcessedAgain,
@@ -157,6 +158,13 @@ function fixStep(text: string, run: FailedRun, target: FixTarget, primary: boole
   }
 }
 
+function documentExpiredStep(run: FailedRun, deletedAt: string): WhatToDoStep {
+  return {
+    key: 'documentExpired',
+    content: <DocumentExpiredStep deletedAt={deletedAt} run={run} />,
+  }
+}
+
 export function useFixSteps(run: FailedRun): WhatToDoStep[] {
   const t = useTranslations('Document.problem.steps')
   const { problem, tradingPartner } = run
@@ -185,12 +193,28 @@ export function useFixSteps(run: FailedRun): WhatToDoStep[] {
       return [
         ...(target ? [fixStep(t('fixCause'), run, target, true)] : []),
         ...(mapping
-          ? [{ key: 'processAgain', content: <ProcessAgainStep mapping={mapping} run={run} /> }]
+          ? [
+              run.documentDeletedAt === null
+                ? {
+                    key: 'processAgain',
+                    content: <ProcessAgainStep mapping={mapping} run={run} />,
+                  }
+                : documentExpiredStep(run, run.documentDeletedAt),
+            ]
           : []),
       ]
     }
 
     case 'retry': {
+      // Before delivery, trying a Defect again reprocesses the Run, which needs its Document.
+      if (
+        problem.reason === 'defect' &&
+        run.failureStage !== 'delivery' &&
+        run.documentDeletedAt !== null
+      ) {
+        return [documentExpiredStep(run, run.documentDeletedAt)]
+      }
+
       // The setup has to be complete before trying again can work.
       if (problem.reason === 'incompleteSetup' && target) {
         return [

@@ -9,7 +9,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
@@ -153,6 +153,22 @@ export function ProcessAgainStep({ run, mapping }: { run: FailedRun; mapping: Re
         <ViewOnly text={t('actions.processAgain.viewOnly')} />
       )}
     </div>
+  )
+}
+
+export function DocumentExpiredStep({ run, deletedAt }: { run: FailedRun; deletedAt: string }) {
+  const t = useTranslations('Document.problem.steps')
+  const format = useFormatter()
+
+  return (
+    <p>
+      {t.rich('documentExpired', {
+        direction: run.direction,
+        tradingPartner: run.tradingPartner.name,
+        deletedAt: format.dateTime(new Date(deletedAt), { dateStyle: 'medium' }),
+        time: (chunks) => <time dateTime={deletedAt}>{chunks}</time>,
+      })}
+    </p>
   )
 }
 
