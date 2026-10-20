@@ -233,6 +233,7 @@ describe('GET /runs/:id', () => {
       replaces: null,
       replacedBy: null,
       duplicateOf: null,
+      documentDeletedAt: null,
     })
     expect(run.steps.map(({ stage, status }) => [stage, status])).toEqual([
       ['receipt', 'succeeded'],

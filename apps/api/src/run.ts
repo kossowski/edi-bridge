@@ -218,6 +218,7 @@ export const loadRun = (id: string) =>
         waitingForTradingPartnerSince: runs.waitingForTradingPartnerSince,
         replacesRunId: runs.replacesRunId,
         duplicateOfRunId: runs.duplicateOfRunId,
+        documentDeletedAt: runs.documentDeletedAt,
       }).where(inWorkspace(runs, workspace.id, eq(runs.id, id))),
     )
 
@@ -252,6 +253,7 @@ type DetailRow = SummaryRow & {
   error: (typeof runs.$inferSelect)['error']
   waitingForTradingPartnerSince: Date | null
   duplicateOfRunId: string | null
+  documentDeletedAt: Date | null
 }
 
 const toDetail = (
@@ -266,7 +268,7 @@ const toDetail = (
     // Interchanges and parsed Messages come with inbound processing.
     interchange: null,
     message: null,
-    documentDeletedAt: null,
+    documentDeletedAt: row.documentDeletedAt?.toISOString() ?? null,
   }
 
   const unfailed = {
