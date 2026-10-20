@@ -30,6 +30,7 @@ import {
   createMappingEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
+  firstStepsEndpoint,
   deleteLookupTableEndpoint,
   endWaitingForTradingPartnerRunEndpoint,
   documentStructureEndpoint,
@@ -126,6 +127,7 @@ import {
   loadDocumentStructure,
   updateDocumentStructure,
 } from './document-structure.js'
+import { loadFirstSteps } from './first-steps.js'
 import { createFlow, listFlows, loadFlow, moveFlowMappingVersion, updateFlow } from './flow.js'
 import { listInterchanges, loadInterchange } from './interchange.js'
 import { acceptInvite, createInvite, listInvites, revokeInvite } from './invite.js'
@@ -462,6 +464,8 @@ function registerRoutes(
   app.get(currentWorkspaceEndpoint.path, (request, reply) =>
     respond(request, reply, loadCurrentWorkspace),
   )
+
+  app.get(firstStepsEndpoint.path, (request, reply) => respond(request, reply, loadFirstSteps))
 
   app.put(updateCompanyIdentityEndpoint.path, (request, reply) =>
     respond(
