@@ -24,11 +24,11 @@ type Reprocessable = {
   direction: Direction
   problem: { reason: ProblemReason } | null
   mappingVersionId: string | null
-  documentDeletedAt?: Date | string | null
+  documentDeletedAt: Date | string | null
 }
 
 // The Trading Partner fixes its Document by a resend, and a delivery failure by a Retry.
-export const isReprocessable = <R extends Reprocessable>(
+export const isFixedByReprocess = <R extends Omit<Reprocessable, 'documentDeletedAt'>>(
   run: R,
 ): run is R & { mappingVersionId: string } =>
   run.status === 'failed' &&
@@ -36,12 +36,17 @@ export const isReprocessable = <R extends Reprocessable>(
   run.failureStage !== 'delivery' &&
   run.problem !== null &&
   run.mappingVersionId !== null &&
-  (run.documentDeletedAt ?? null) === null &&
   whoFixes({
     failureStage: run.failureStage,
     direction: run.direction,
     problem: run.problem,
   }) !== 'tradingPartner'
+
+// A Reprocess takes the Document again, so it needs the Document kept.
+export const isReprocessable = <R extends Reprocessable>(
+  run: R,
+): run is R & { mappingVersionId: string } =>
+  isFixedByReprocess(run) && run.documentDeletedAt === null
 
 // The new Run takes the same, unmodified Document; the replaced Run stays failed.
 export const reprocessRun = ({ workspaceId, runId, mappingVersionId }: Reprocess) =>

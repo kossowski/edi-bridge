@@ -1,4 +1,5 @@
 import { hashPassword } from 'better-auth/crypto'
+import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 
 import type { LanguageModel } from 'ai'
@@ -6,7 +7,7 @@ import type { FastifyServerOptions, InjectOptions, LightMyRequestResponse } from
 
 import { secretKeyBytes } from '@edi-bridge/channels'
 import { signInEndpoint, type WorkspaceRole } from '@edi-bridge/contracts'
-import { connect, members, workspaces } from '@edi-bridge/db'
+import { connect, documents, members, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase } from '@edi-bridge/db/testing'
 import { type QueuedRun, RunNotQueued, type RunQueueService } from '@edi-bridge/pipeline'
 
@@ -89,6 +90,27 @@ export async function addMember(database: Database, member: NewMember) {
     .values({ userId, workspaceId: member.workspaceId, role: member.role })
 
   return userId
+}
+
+// The nightly deletion of a Document, for a Run whose Document expired.
+export const documentDeletedAt = new Date('2026-09-01T02:00:00.000Z')
+
+// Leaves the Run as the retention sweep leaves it once its Document expired.
+export async function expireDocumentOf(database: Database, runId: string) {
+  const [run] = await database
+    .select({ documentId: runs.documentId })
+    .from(runs)
+    .where(eq(runs.id, runId))
+
+  if (run === undefined || run.documentId === null) {
+    throw new Error(`Run ${runId} has no Document to expire`)
+  }
+
+  await database
+    .update(runs)
+    .set({ documentId: null, documentDeletedAt })
+    .where(eq(runs.documentId, run.documentId))
+  await database.delete(documents).where(eq(documents.id, run.documentId))
 }
 
 export const signInRequest = ({ email, password }: Credentials): InjectOptions => ({

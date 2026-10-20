@@ -37,13 +37,16 @@ export class RunNotRetryable extends Data.TaggedError('RunNotRetryable')<{
   }
 }
 
+export const documentExpiredMessage =
+  'The Document of the Run expired, so the Run cannot be reprocessed'
+
 export class RunNotReprocessable extends Data.TaggedError('RunNotReprocessable')<{
   readonly runId: string
   readonly documentExpired?: boolean
 }> {
   override get message() {
     if (this.documentExpired === true) {
-      return 'The Document of the Run expired, so the Run cannot be reprocessed'
+      return documentExpiredMessage
     }
 
     return 'Only a failed Run that is not replaced yet and that neither the Trading Partner nor a Retry fixes can be reprocessed'

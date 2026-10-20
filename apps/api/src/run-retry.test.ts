@@ -12,7 +12,13 @@ import {
   toPath,
 } from '@edi-bridge/contracts'
 import { runs } from '@edi-bridge/db'
-import { type DeliveryService, Documents, processRun, RunNotRetryable } from '@edi-bridge/pipeline'
+import {
+  type DeliveryService,
+  documentExpiredMessage,
+  Documents,
+  processRun,
+  RunNotRetryable,
+} from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
   type InvoiceWorkspace,
@@ -20,7 +26,15 @@ import {
   seedInvoiceWorkspace,
 } from '@edi-bridge/pipeline/testing'
 
-import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+import {
+  addMember,
+  type Client,
+  documentDeletedAt,
+  expireDocumentOf,
+  signIn,
+  startTestApi,
+  type TestApi,
+} from './testing.js'
 
 let api: TestApi
 
@@ -80,6 +94,34 @@ const processed = async (content: string, delivery: DeliveryService) => {
   return manualSubmissionSchema.parse(response.json()).runs[0]?.id ?? ''
 }
 
+// The Document storage breaks while the worker reads it.
+const failedOnDefect = async () => {
+  const response = await admin.inject({
+    method: submitDocumentEndpoint.method,
+    url: submitDocumentEndpoint.path,
+    body: {
+      channelId: workspace.inboundChannelId,
+      document: { fileName: 'invoice.json', content: goldenInvoice },
+    },
+  })
+
+  expect(response.statusCode, response.body).toBe(201)
+
+  for (const queued of api.runQueue.queued.splice(0)) {
+    await Effect.runPromiseExit(
+      processRun(queued).pipe(
+        Effect.provideService(Documents, {
+          store: () => Promise.reject(new Error('unused')),
+          read: () => Promise.reject(new Error('The Document storage is down')),
+        }),
+        pipelineServices(api.connection.db, api.runQueue, unreachable),
+      ),
+    )
+  }
+
+  return manualSubmissionSchema.parse(response.json()).runs[0]?.id ?? ''
+}
+
 const retry = (id: string, as = admin) =>
   as.inject({ method: retryRunEndpoint.method, url: toPath(retryRunEndpoint.path, { id }) })
 
@@ -122,29 +164,7 @@ describe('POST /runs/:id/retry', () => {
   })
 
   it('reprocesses a Run that failed on a Defect before delivery with its own Mapping Version', async () => {
-    const response = await admin.inject({
-      method: submitDocumentEndpoint.method,
-      url: submitDocumentEndpoint.path,
-      body: {
-        channelId: workspace.inboundChannelId,
-        document: { fileName: 'invoice.json', content: goldenInvoice },
-      },
-    })
-
-    const id = manualSubmissionSchema.parse(response.json()).runs[0]?.id ?? ''
-
-    // The Document storage breaks while the worker reads it.
-    for (const queued of api.runQueue.queued.splice(0)) {
-      await Effect.runPromiseExit(
-        processRun(queued).pipe(
-          Effect.provideService(Documents, {
-            store: () => Promise.reject(new Error('unused')),
-            read: () => Promise.reject(new Error('The Document storage is down')),
-          }),
-          pipelineServices(api.connection.db, api.runQueue, unreachable),
-        ),
-      )
-    }
+    const id = await failedOnDefect()
 
     await expect(detail(id)).resolves.toMatchObject({
       status: 'failed',
@@ -239,5 +259,43 @@ describe('POST /runs/:id/retry', () => {
     const response = await retry(crypto.randomUUID())
 
     expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('POST /runs/:id/retry for a Run whose Document expired', () => {
+  it('answers 409 with the expiry as the reason for a Defect before delivery', async () => {
+    const id = await failedOnDefect()
+
+    await expireDocumentOf(api.connection.db, id)
+
+    const retried = await retry(id)
+
+    expect(retried.statusCode, retried.body).toBe(409)
+    expect(retried.json()).toEqual({ message: documentExpiredMessage })
+    expect(api.runQueue.queued).toEqual([])
+    await expect(detail(id)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      replacedBy: null,
+      documentDeletedAt: documentDeletedAt.toISOString(),
+    })
+  })
+
+  it('still repeats the delivery of a Run that failed at delivery', async () => {
+    const id = await processed(goldenInvoice, unreachable)
+
+    await expireDocumentOf(api.connection.db, id)
+
+    const response = await retry(id)
+
+    expect(response.statusCode, response.body).toBe(200)
+    expect(api.runQueue.queued).toEqual([{ workspaceId: workspace.id, runId: id }])
+
+    await processQueued(() => Effect.void)
+
+    await expect(detail(id)).resolves.toMatchObject({
+      status: 'delivered',
+      documentDeletedAt: documentDeletedAt.toISOString(),
+    })
   })
 })

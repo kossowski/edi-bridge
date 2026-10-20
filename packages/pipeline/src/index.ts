@@ -7,6 +7,7 @@ export { decodeDocument } from './decode-document'
 export { deleteExpiredDocuments } from './delete-expired-documents'
 
 export {
+  documentExpiredMessage,
   MappingVersionNotOfRun,
   ReceiptRejected,
   type ReceiptRejection,
@@ -24,7 +25,7 @@ export { queueReceivedRuns } from './queue-received-runs'
 
 export { type ArrivingDocument, type Receipt, type ReceivedRun, receive } from './receive'
 
-export { isReprocessable, type Reprocess, reprocessRun } from './reprocess'
+export { isFixedByReprocess, isReprocessable, type Reprocess, reprocessRun } from './reprocess'
 
 export { retryRun } from './retry'
 

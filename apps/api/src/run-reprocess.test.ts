@@ -13,7 +13,7 @@ import {
   toPath,
 } from '@edi-bridge/contracts'
 import { lookupTableEntries, lookupTables, mappingVersions } from '@edi-bridge/db'
-import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
+import { type DeliveryService, documentExpiredMessage, processRun } from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
   type InvoiceWorkspace,
@@ -22,7 +22,15 @@ import {
   seedInvoiceWorkspace,
 } from '@edi-bridge/pipeline/testing'
 
-import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+import {
+  addMember,
+  type Client,
+  documentDeletedAt,
+  expireDocumentOf,
+  signIn,
+  startTestApi,
+  type TestApi,
+} from './testing.js'
 
 let api: TestApi
 
@@ -324,5 +332,32 @@ describe('POST /runs/:id/reprocess', () => {
     const response = await reprocess(crypto.randomUUID())
 
     expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('a Run whose Document expired', () => {
+  it('serves the time its Document was deleted', async () => {
+    const id = await processed(inKilograms)
+
+    await expireDocumentOf(api.connection.db, id)
+
+    await expect(detail(id)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'mapping',
+      documentDeletedAt: documentDeletedAt.toISOString(),
+    })
+  })
+
+  it('answers 409 with the expiry as the reason and starts no Run', async () => {
+    const id = await processed(inKilograms)
+
+    await expireDocumentOf(api.connection.db, id)
+
+    const response = await reprocess(id)
+
+    expect(response.statusCode, response.body).toBe(409)
+    expect(response.json()).toEqual({ message: documentExpiredMessage })
+    expect(api.runQueue.queued).toEqual([])
+    await expect(detail(id)).resolves.toMatchObject({ status: 'failed', replacedBy: null })
   })
 })
