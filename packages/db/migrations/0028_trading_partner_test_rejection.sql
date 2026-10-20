@@ -1,0 +1,3 @@
+ALTER TABLE "trading_partners" ADD COLUMN "test_rejected_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "trading_partners" ADD COLUMN "test_rejected_run_id" uuid;--> statement-breakpoint
+ALTER TABLE "trading_partners" ADD CONSTRAINT "trading_partners_test_rejected_run_id_runs_id_fk" FOREIGN KEY ("test_rejected_run_id") REFERENCES "public"."runs"("id") ON DELETE set null ON UPDATE no action;
