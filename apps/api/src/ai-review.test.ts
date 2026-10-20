@@ -115,8 +115,8 @@ const mappingWith = async (graph: MappingGraph) => {
 }
 
 // Stores the outcome of an AI draft directly, so these tests need no model.
-const openReview = async (id: string) => {
-  await connection.db.update(mappings).set({ aiReview: review }).where(eq(mappings.id, id))
+const openReview = async (id: string, aiReview = review) => {
+  await connection.db.update(mappings).set({ aiReview }).where(eq(mappings.id, id))
 }
 
 const draftedByAi = async () => {
@@ -144,6 +144,34 @@ const versionsOf = async (mappingId: string) => {
 
   return mappingVersionEntrySchema.array().parse(response.json())
 }
+
+const noGraph: MappingGraph = { links: [], transforms: [], transformLinks: [] }
+
+const lastLinkMarks: AiReview = {
+  sampleId,
+  proposedLinks: ['buyer.gln'],
+  proposedTransforms: [],
+  proposedTransformLinks: [],
+}
+
+const editedLastLink: MappingGraph = {
+  ...proposed,
+  links: [proposed.links[0]!, { sourcePath: 'BGM/1004', targetPath: 'buyer.gln' }],
+}
+
+// Each save leaves no AI review mark, so it closes the review.
+const closingSaves = [
+  { closedBy: 'rejected every proposed part', marks: review, draft: noGraph },
+  { closedBy: 'edited the last proposed part', marks: lastLinkMarks, draft: editedLastLink },
+]
+
+const unknownVersionId = '9c8b7a6d-5e4f-4d3c-8b2a-1f0e9d8c7b6a'
+
+const restore = (mappingId: string, versionId: string) =>
+  admin.inject({
+    method: 'POST',
+    url: toPath(restoreMappingVersionEndpoint.path, { mappingId, versionId }),
+  })
 
 const aiReviewOpenProblem = { message: 'The AI review of the Draft is still open.' }
 
@@ -181,6 +209,20 @@ describe('PUT /mappings/:id/draft', () => {
     expect((await draftOf(id)).aiReview).toEqual(expected)
   })
 
+  it.each(closingSaves)(
+    'closes the AI review once the Admin $closedBy',
+    async ({ marks, draft }) => {
+      const id = await mappingWith(proposed)
+      await openReview(id, marks)
+
+      const response = await save(id, draft)
+
+      expect(response.statusCode).toBe(200)
+      expect(mappingDraftSchema.parse(response.json()).aiReview).toBeNull()
+      expect((await draftOf(id)).aiReview).toBeNull()
+    },
+  )
+
   it('keeps the marks of a transform the Admin only moved', async () => {
     const id = await draftedByAi()
 
@@ -207,6 +249,14 @@ describe('POST /mappings/:mappingId/versions', () => {
     expect(response.json()).toEqual(aiReviewOpenProblem)
     expect(await versionsOf(id)).toEqual([])
   })
+
+  it.each(closingSaves)('publishes once the Admin $closedBy', async ({ marks, draft }) => {
+    const id = await mappingWith(proposed)
+    await openReview(id, marks)
+    expect((await save(id, draft)).statusCode).toBe(200)
+
+    expect((await publish(id)).statusCode).toBe(201)
+  })
 })
 
 describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
@@ -217,13 +267,38 @@ describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
     expect((await save(id, proposed)).statusCode).toBe(200)
     await openReview(id)
 
-    const response = await admin.inject({
-      method: 'POST',
-      url: toPath(restoreMappingVersionEndpoint.path, { mappingId: id, versionId: version!.id }),
-    })
+    const response = await restore(id, version!.id)
 
     expect(response.statusCode).toBe(aiReviewOpenStatus)
     expect(response.json()).toEqual(aiReviewOpenProblem)
+    expect(await draftOf(id)).toMatchObject({ ...proposed, aiReview: review })
+  })
+
+  it.each(closingSaves)(
+    'restores the version once the Admin $closedBy',
+    async ({ marks, draft }) => {
+      const id = await mappingWith(proposed)
+      expect((await publish(id)).statusCode).toBe(201)
+      const [version] = await versionsOf(id)
+      await openReview(id, marks)
+      expect((await save(id, draft)).statusCode).toBe(200)
+
+      const response = await restore(id, version!.id)
+
+      expect(response.statusCode).toBe(200)
+      expect(mappingDraftSchema.parse(response.json())).toMatchObject({
+        ...proposed,
+        aiReview: null,
+      })
+    },
+  )
+
+  it('answers 404 for an unknown version while the AI review is open', async () => {
+    const id = await draftedByAi()
+
+    const response = await restore(id, unknownVersionId)
+
+    expect(response.statusCode).toBe(404)
     expect(await draftOf(id)).toMatchObject({ ...proposed, aiReview: review })
   })
 })
