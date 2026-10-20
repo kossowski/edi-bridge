@@ -30,9 +30,25 @@ const livePartner = {
   },
 }
 
-const nothingSetUp = { channelCount: 0, flowCount: 0 }
+const bothDirections = ['inbound', 'outbound'] as const
 
-const setUp = { channelCount: 2, flowCount: 3 }
+const nothingSetUp = {
+  flowCount: 0,
+  channelDirections: [],
+  neededDirections: [...bothDirections],
+}
+
+const setUp = {
+  flowCount: 3,
+  channelDirections: [...bothDirections],
+  neededDirections: [...bothDirections],
+}
+
+const oneConnection = { ...nothingSetUp, channelDirections: ['inbound' as const] }
+
+function connectionsOf(setup: ReturnType<typeof partnerSetup>) {
+  return setup.steps.find(({ step }) => step === 'connections')
+}
 
 describe('partnerSetup', () => {
   it('starts with your company identity when nothing is set up', () => {
@@ -70,7 +86,9 @@ describe('partnerSetup', () => {
   })
 
   it('asks for the document types once a connection exists', () => {
-    expect(partnerSetup(newPartner, { channelCount: 1, flowCount: 0 }, gln)).toMatchObject({
+    expect(
+      partnerSetup(newPartner, { ...oneConnection, neededDirections: ['inbound'] }, gln),
+    ).toMatchObject({
       done: 3,
       next: 'documents',
     })
@@ -107,7 +125,7 @@ describe('partnerSetup', () => {
   })
 
   it('names the first missing step even when later ones are done', () => {
-    expect(partnerSetup(livePartner, { channelCount: 0, flowCount: 1 }, gln)).toMatchObject({
+    expect(partnerSetup(livePartner, { ...nothingSetUp, flowCount: 1 }, gln)).toMatchObject({
       done: 6,
       next: 'connections',
     })
@@ -115,7 +133,7 @@ describe('partnerSetup', () => {
 
   it('marks each step as done, next or open', () => {
     expect(
-      partnerSetup(newPartner, { channelCount: 1, flowCount: 0 }, gln).steps.map(
+      partnerSetup(newPartner, { ...oneConnection, neededDirections: ['inbound'] }, gln).steps.map(
         ({ state }) => state,
       ),
     ).toEqual(['done', 'done', 'done', 'next', 'open', 'open', 'open'])
@@ -143,5 +161,59 @@ describe('partnerSetup', () => {
       { kind: 'awaitConfirmation' },
       { kind: 'goLive' },
     ])
+  })
+
+  describe('connections', () => {
+    it('is done once the one needed direction has a connection', () => {
+      const setup = partnerSetup(
+        newPartner,
+        { ...oneConnection, neededDirections: ['inbound'] },
+        gln,
+      )
+
+      expect(connectionsOf(setup)).toMatchObject({ state: 'done', missingDirections: [] })
+    })
+
+    it('stays open while the one needed direction has no connection', () => {
+      const setup = partnerSetup(
+        newPartner,
+        { ...oneConnection, neededDirections: ['outbound'] },
+        gln,
+      )
+
+      expect(connectionsOf(setup)).toMatchObject({
+        state: 'next',
+        missingDirections: ['outbound'],
+      })
+    })
+
+    it('stays open while one of both needed directions has no connection', () => {
+      const setup = partnerSetup(newPartner, oneConnection, gln)
+
+      expect(setup).toMatchObject({ done: 2, next: 'connections' })
+      expect(connectionsOf(setup)?.missingDirections).toEqual(['outbound'])
+    })
+
+    it('is done once both needed directions have a connection', () => {
+      expect(connectionsOf(partnerSetup(newPartner, setUp, gln))).toMatchObject({
+        state: 'done',
+        missingDirections: [],
+      })
+    })
+
+    it('names both directions as missing without any connection', () => {
+      expect(connectionsOf(partnerSetup(newPartner, nothingSetUp, gln))).toMatchObject({
+        state: 'next',
+        missingDirections: ['inbound', 'outbound'],
+      })
+    })
+
+    it('names no missing direction for the other steps', () => {
+      const others = partnerSetup(newPartner, nothingSetUp, gln).steps.filter(
+        ({ step }) => step !== 'connections',
+      )
+
+      expect(others.every(({ missingDirections }) => missingDirections.length === 0)).toBe(true)
+    })
   })
 })

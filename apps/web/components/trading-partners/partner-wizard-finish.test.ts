@@ -160,6 +160,7 @@ describe('finishSetup', () => {
       gln: null,
       characterSet: 'UNOC',
       acknowledgementTimeLimitHours: acknowledgementTimeLimitHours.default,
+      messageTypes: ['ORDERS', 'DESADV', 'INVOIC'],
     })
     expect(api.createChannel.mock.calls.map(([input]) => input)).toEqual([
       expect.objectContaining({
@@ -220,6 +221,26 @@ describe('finishSetup', () => {
       reason: 'severalDocumentStructures',
       messageTypes: ['DESADV'],
     })
+  })
+
+  it('sends the message type of a document whose connection is postponed on create', async () => {
+    const api = fakeApi()
+
+    const postponed = setupPlan(
+      { ...result, connections: { outbound: { way: 'web', values: httpValues } } },
+      context,
+    )
+
+    const orders = postponed.documents.find(({ messageType }) => messageType === 'ORDERS')
+
+    expect(orders).toEqual(expect.objectContaining({ reasons: ['connectionPostponed'] }))
+    expect(orders).not.toHaveProperty('route')
+
+    await finishSetup(postponed, api)
+
+    expect(api.createTradingPartner).toHaveBeenCalledWith(
+      expect.objectContaining({ messageTypes: ['ORDERS', 'DESADV', 'INVOIC'] }),
+    )
   })
 
   it('creates nothing else when the partner cannot be created', async () => {

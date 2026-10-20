@@ -1,6 +1,11 @@
 import { onboardingChecklist } from '@edi-bridge/contracts'
 
-import type { OnboardingStep, TradingPartner, TradingPartnerActivity } from '@edi-bridge/contracts'
+import type {
+  Direction,
+  OnboardingStep,
+  TradingPartner,
+  TradingPartnerActivity,
+} from '@edi-bridge/contracts'
 
 export type PartnerSetupStep = OnboardingStep | 'connections' | 'documents'
 
@@ -35,6 +40,7 @@ export type PartnerSetupItem = {
   state: PartnerSetupStepState
   doneAt: string | null
   action: PartnerSetupAction
+  missingDirections: ReadonlyArray<Direction>
 }
 
 export type PartnerSetup = {
@@ -46,19 +52,33 @@ export type PartnerSetup = {
 
 export function partnerSetup(
   tradingPartner: Pick<TradingPartner, 'id' | 'gln' | 'testMode' | 'onboarding'>,
-  activity: Pick<TradingPartnerActivity, 'channelCount' | 'flowCount'>,
+  activity: Pick<TradingPartnerActivity, 'flowCount' | 'channelDirections' | 'neededDirections'>,
   workspaceGln: string | null,
 ): PartnerSetup {
+  const missingDirections = activity.neededDirections.filter(
+    (direction) => !activity.channelDirections.includes(direction),
+  )
+
   const checks = onboardingChecklist(tradingPartner, workspaceGln).flatMap(
     ({
       step,
       state,
       at,
-    }): ReadonlyArray<{ step: PartnerSetupStep; done: boolean; at: string | null }> =>
+    }): ReadonlyArray<{
+      step: PartnerSetupStep
+      done: boolean
+      at: string | null
+      missingDirections?: ReadonlyArray<Direction>
+    }> =>
       step === 'partnerGln'
         ? [
             { step, done: state === 'done', at },
-            { step: 'connections', done: activity.channelCount > 0, at: null },
+            {
+              step: 'connections',
+              done: missingDirections.length === 0,
+              at: null,
+              missingDirections,
+            },
             { step: 'documents', done: activity.flowCount > 0, at: null },
           ]
         : [{ step, done: state === 'done', at }],
@@ -67,14 +87,20 @@ export function partnerSetup(
   const actions = stepActions(tradingPartner.id)
   const next = checks.find(({ done }) => !done)?.step ?? null
 
-  const steps = checks.map(({ step, done, at }): PartnerSetupItem => {
+  const steps = checks.map(({ step, done, at, missingDirections = [] }): PartnerSetupItem => {
     const action = actions[step]
 
     if (done) {
-      return { step, state: 'done', doneAt: at, action }
+      return { step, state: 'done', doneAt: at, action, missingDirections }
     }
 
-    return { step, state: step === next ? 'next' : 'open', doneAt: null, action }
+    return {
+      step,
+      state: step === next ? 'next' : 'open',
+      doneAt: null,
+      action,
+      missingDirections,
+    }
   })
 
   return {

@@ -1362,6 +1362,10 @@
         }
       },
       "doneAt": "Erledigt am <when>{at}</when>",
+      "missingConnection": {
+        "inbound": "Verbindung für Belege von {name} fehlt",
+        "outbound": "Verbindung für Belege an {name} fehlt"
+      },
       "actions": {
         "identity": "GLN Ihres Unternehmens erfassen",
         "partnerGln": "GLN des Partners erfassen",

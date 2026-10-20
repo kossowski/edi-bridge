@@ -389,7 +389,7 @@ function SetupSteps({
       </Progress>
       <ol className="flex flex-col gap-3">
         {setup.steps.map((item, index) => {
-          const { step, state, doneAt } = item
+          const { step, state, doneAt, missingDirections } = item
 
           return (
             <li
@@ -421,6 +421,21 @@ function SetupSteps({
                 <p className={cn('text-sm', state !== 'next' && 'text-muted-foreground')}>
                   {t(`steps.${step}.description`)}
                 </p>
+                {state !== 'done' && missingDirections.length > 0 && (
+                  <ul className="flex flex-col gap-1 text-sm">
+                    {missingDirections.map((direction) => (
+                      <li key={direction} className="flex items-start gap-2">
+                        <HugeiconsIcon
+                          icon={AlertCircleIcon}
+                          strokeWidth={2}
+                          aria-hidden
+                          className="mt-0.5 size-4 shrink-0"
+                        />
+                        {t(`missingConnection.${direction}`, { name: context.tradingPartner.name })}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {doneAt && (
                   <p className="text-sm">
                     {t.rich('doneAt', {
