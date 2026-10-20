@@ -218,9 +218,17 @@ const trailerError = ({
   return undefined
 }
 
+interface ReadMessage {
+  headerIndex: number
+  message: ParsedMessage
+}
+
 interface Reading {
+  hasServiceStringAdvice: boolean
+  segments: Segment[]
+  header: Segment | undefined
   tokenErrors: ParseError[]
-  messages: ParsedMessage[]
+  messages: ReadMessage[]
   envelope: Envelope | ParseError
 }
 
@@ -231,7 +239,7 @@ interface OpenMessage {
   error: ParseError | undefined
 }
 
-const readInterchange = (text: string): Reading => {
+export const readInterchange = (text: string): Reading => {
   const hasServiceStringAdvice = text.startsWith(serviceStringAdviceTag)
 
   const delimiters = hasServiceStringAdvice
@@ -247,16 +255,25 @@ const readInterchange = (text: string): Reading => {
   )
 
   const tokenErrors = [...segmentErrors, endError].filter((error) => error !== undefined)
-  const messages: ParsedMessage[] = []
-  const failed = (error: ParseError): Reading => ({ tokenErrors, messages, envelope: error })
+  const messages: ReadMessage[] = []
+  const [firstSegment] = segments
+  const header = !segmentErrors[0] && firstSegment?.tag === 'UNB' ? firstSegment : undefined
 
-  const [header] = segments
+  const reading = {
+    hasServiceStringAdvice,
+    segments,
+    header,
+    tokenErrors,
+    messages,
+  }
+
+  const failed = (error: ParseError): Reading => ({ ...reading, envelope: error })
 
   if (segmentErrors[0]) {
     return failed(segmentErrors[0])
   }
 
-  if (header?.tag !== 'UNB') {
+  if (header === undefined) {
     return failed(new ParseError('missing-interchange-header', position(0)))
   }
 
@@ -264,8 +281,11 @@ const readInterchange = (text: string): Reading => {
 
   const closeWithoutTrailer = (message: OpenMessage) => {
     messages.push({
-      header: message.header,
-      error: message.error ?? new ParseError('missing-message-trailer', position(message.index)),
+      headerIndex: message.index,
+      message: {
+        header: message.header,
+        error: message.error ?? new ParseError('missing-message-trailer', position(message.index)),
+      },
     })
     openMessage = undefined
   }
@@ -289,11 +309,12 @@ const readInterchange = (text: string): Reading => {
           controlReference: controlValue(openMessage.header, messageReferenceElement),
         })
 
-      messages.push(
-        error
+      messages.push({
+        headerIndex: openMessage.index,
+        message: error
           ? { header: openMessage.header, error }
           : { header: openMessage.header, segments: openMessage.segments, trailer: segment },
-      )
+      })
       openMessage = undefined
     } else if (openMessage && segment.tag !== 'UNH' && segment.tag !== 'UNZ') {
       openMessage.segments.push(segment)
@@ -325,8 +346,7 @@ const readInterchange = (text: string): Reading => {
         return error
           ? failed(error)
           : {
-              tokenErrors,
-              messages,
+              ...reading,
               envelope: {
                 hasServiceStringAdvice,
                 delimiters,
@@ -353,7 +373,7 @@ export const parseMessages = (text: string): ParsedInterchange => {
     throw envelope
   }
 
-  return { ...envelope, messages }
+  return { ...envelope, messages: messages.map(({ message }) => message) }
 }
 
 export const parse = (text: string): Interchange => {
@@ -363,7 +383,7 @@ export const parse = (text: string): Interchange => {
     throw tokenErrors[0]
   }
 
-  const validMessages = messages.map((message) => {
+  const validMessages = messages.map(({ message }) => {
     if (isBrokenMessage(message)) {
       throw message.error
     }
