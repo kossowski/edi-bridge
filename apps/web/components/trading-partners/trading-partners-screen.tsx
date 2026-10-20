@@ -42,6 +42,8 @@ const noActivity: PartnerActivity = {
   lastActivityAt: null,
   channelCount: 0,
   flowCount: 0,
+  channelDirections: [],
+  neededDirections: ['inbound', 'outbound'],
 }
 
 function SetupProgress({

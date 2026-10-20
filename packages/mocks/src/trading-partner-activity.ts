@@ -3,9 +3,12 @@ import { delay, http, HttpResponse } from 'msw'
 import {
   type ActivityDay,
   activityDays,
+  channelDirectionsOf,
   type ChannelSummary,
+  directionOf,
   type FlowActivity,
   type FlowSummary,
+  neededDirectionsOf,
   type OpenProblem,
   openProblemListLimit,
   type OverdueAcknowledgement,
@@ -29,9 +32,9 @@ import {
   type WorkspaceActivityState,
 } from './workspace-activity'
 
-type PartnerFlow = Pick<FlowSummary, 'id' | 'name' | 'tradingPartnerId'>
+type PartnerFlow = Pick<FlowSummary, 'id' | 'name' | 'tradingPartnerId' | 'messageType'>
 
-type PartnerChannel = Pick<ChannelSummary, 'tradingPartnerId'>
+type PartnerChannel = Pick<ChannelSummary, 'tradingPartnerId' | 'direction'>
 
 export type TradingPartnerActivityData = {
   tradingPartners: ReadonlyArray<TradingPartner> | TradingPartnerStore
@@ -51,11 +54,11 @@ type PartnerTraffic = {
   runs: RunSummary[]
   overdueAcknowledgements: OverdueAcknowledgement[]
   flows: PartnerFlow[]
-  channelCount: number
+  channels: PartnerChannel[]
 }
 
 function noTraffic(): PartnerTraffic {
-  return { runs: [], overdueAcknowledgements: [], flows: [], channelCount: 0 }
+  return { runs: [], overdueAcknowledgements: [], flows: [], channels: [] }
 }
 
 function trafficOf(data: TradingPartnerActivityData) {
@@ -82,9 +85,9 @@ function trafficOf(data: TradingPartnerActivityData) {
     of(flow.tradingPartnerId).flows.push(flow)
   }
 
-  for (const { tradingPartnerId } of allOf(data.channels)) {
-    if (tradingPartnerId !== null) {
-      of(tradingPartnerId).channelCount += 1
+  for (const channel of allOf(data.channels)) {
+    if (channel.tradingPartnerId !== null) {
+      of(channel.tradingPartnerId).channels.push(channel)
     }
   }
 
@@ -121,7 +124,10 @@ function receivedSince(runs: readonly RunSummary[], since: number) {
   return runs.filter(({ receivedAt }) => Date.parse(receivedAt) >= since)
 }
 
-function activityOf(tradingPartnerId: string, traffic: PartnerTraffic) {
+function activityOf(
+  { id: tradingPartnerId, messageTypes }: Pick<TradingPartner, 'id' | 'messageTypes'>,
+  traffic: PartnerTraffic,
+) {
   const problems = openProblemsOf(traffic)
 
   const activity: TradingPartnerActivity = {
@@ -129,8 +135,10 @@ function activityOf(tradingPartnerId: string, traffic: PartnerTraffic) {
     runsToday: receivedSince(traffic.runs, windowOf().today).length,
     openProblems: problems.length,
     lastActivityAt: traffic.runs[0]?.receivedAt ?? null,
-    channelCount: traffic.channelCount,
+    channelCount: traffic.channels.length,
     flowCount: traffic.flows.length,
+    channelDirections: channelDirectionsOf(traffic.channels),
+    neededDirections: neededDirectionsOf({ messageTypes, flows: traffic.flows }),
   }
 
   return { activity, problems }
@@ -143,16 +151,20 @@ export function toTradingPartnerActivities(
 
   return toTradingPartnerStore(data.tradingPartners)
     .all()
-    .map(({ id }) => tradingPartnerActivitySchema.parse(activityOf(id, traffic(id)).activity))
+    .map((tradingPartner) =>
+      tradingPartnerActivitySchema.parse(
+        activityOf(tradingPartner, traffic(tradingPartner.id)).activity,
+      ),
+    )
 }
 
 export function toTradingPartnerActivityDetail(
   data: TradingPartnerActivityData,
-  tradingPartnerId: string,
+  tradingPartner: TradingPartner,
 ): TradingPartnerActivityDetail {
   const { from } = windowOf()
-  const traffic = trafficOf(data)(tradingPartnerId)
-  const { activity, problems } = activityOf(tradingPartnerId, traffic)
+  const traffic = trafficOf(data)(tradingPartner.id)
+  const { activity, problems } = activityOf(tradingPartner, traffic)
 
   const days: ActivityDay[] = Array.from({ length: activityDays }, (_, index) => ({
     date: new Date(from + index * day).toISOString().slice(0, 10),
@@ -190,25 +202,27 @@ export function toTradingPartnerActivityDetail(
 }
 
 // Generated workspace activity has no Flow or Channel records, so each partner with Runs gets the
-// Flows its Runs name and one Channel.
+// Flows its Runs name and a Channel in each direction of those Flows.
 function withSetupFromRuns(activity: WorkspaceActivity): TradingPartnerActivityData {
   const runs = toRunStore(activity.runs)
   const flows = new Map<string, PartnerFlow>()
 
-  for (const { flow, tradingPartner } of runs.all()) {
-    flows.set(flow.id, { ...flow, tradingPartnerId: tradingPartner.id })
+  for (const { flow, tradingPartner, messageType } of runs.all()) {
+    flows.set(flow.id, { ...flow, tradingPartnerId: tradingPartner.id, messageType })
   }
 
-  const partnersWithRuns = new Set(
-    [...flows.values()].map(({ tradingPartnerId }) => tradingPartnerId),
-  )
+  const channels = new Map<string, PartnerChannel>()
 
-  return {
-    ...activity,
-    runs,
-    flows: [...flows.values()],
-    channels: [...partnersWithRuns].map((tradingPartnerId) => ({ tradingPartnerId })),
+  for (const flow of flows.values()) {
+    const direction = directionOf(flow)
+
+    channels.set(`${flow.tradingPartnerId}:${direction}`, {
+      tradingPartnerId: flow.tradingPartnerId,
+      direction,
+    })
   }
+
+  return { ...activity, runs, flows: [...flows.values()], channels: [...channels.values()] }
 }
 
 let largeActivityData: TradingPartnerActivityData | undefined
@@ -256,11 +270,13 @@ export function tradingPartnerActivityHandlers(
     http.get<{ id: string }>(detailPath, ({ params }) => {
       data ??= activityDataOf(source)
 
-      if (!toTradingPartnerStore(data.tradingPartners).get(params.id)) {
+      const tradingPartner = toTradingPartnerStore(data.tradingPartners).get(params.id)
+
+      if (!tradingPartner) {
         return notFound()
       }
 
-      return HttpResponse.json(toTradingPartnerActivityDetail(data, params.id))
+      return HttpResponse.json(toTradingPartnerActivityDetail(data, tradingPartner))
     }),
   ]
 }

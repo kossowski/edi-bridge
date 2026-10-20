@@ -72,9 +72,9 @@ const largeRuns: readonly RunSummary[] = 'all' in large.runs ? large.runs.all() 
 
 const largeFlows = [
   ...new Map(
-    largeRuns.map(({ flow, tradingPartner }) => [
+    largeRuns.map(({ flow, tradingPartner, messageType }) => [
       flow.id,
-      { ...flow, tradingPartnerId: tradingPartner.id },
+      { ...flow, tradingPartnerId: tradingPartner.id, messageType },
     ]),
   ).values(),
 ]
@@ -713,7 +713,10 @@ export const LargeVolume = meta.story({
         runs: large.runs,
         overdueAcknowledgements: large.overdueAcknowledgements,
         flows: largeFlows,
-        channels: [{ tradingPartnerId: largePartner.id }],
+        channels: [
+          { tradingPartnerId: largePartner.id, direction: 'inbound' },
+          { tradingPartnerId: largePartner.id, direction: 'outbound' },
+        ],
       }),
     )
   },

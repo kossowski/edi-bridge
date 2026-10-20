@@ -48,6 +48,25 @@ describe('tradingPartnerInputSchema', () => {
     expect(tradingPartnerInputSchema.parse({ ...input, gln: null })).toMatchObject({ gln: null })
   })
 
+  it('keeps the Message Types chosen for a new Trading Partner', () => {
+    expect(
+      tradingPartnerInputSchema.parse({ ...input, gln: null, messageTypes: ['ORDERS', 'INVOIC'] }),
+    ).toMatchObject({ messageTypes: ['ORDERS', 'INVOIC'] })
+  })
+
+  it('leaves the Message Types out when none were chosen', () => {
+    expect(tradingPartnerInputSchema.parse({ ...input, gln: null })).not.toHaveProperty(
+      'messageTypes',
+    )
+  })
+
+  it('rejects an unknown Message Type', () => {
+    expect(
+      tradingPartnerInputSchema.safeParse({ ...input, gln: null, messageTypes: ['PRICAT'] })
+        .success,
+    ).toBe(false)
+  })
+
   it('still checks a given GLN', () => {
     expect(tradingPartnerInputSchema.safeParse({ ...input, gln: '4006381333932' }).success).toBe(
       false,

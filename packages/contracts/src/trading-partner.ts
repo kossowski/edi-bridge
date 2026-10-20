@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { glnSchema } from './gln'
+import { messageTypeSchema } from './message-type'
 
 import type { Endpoint } from './endpoint'
 
@@ -37,6 +38,7 @@ export const tradingPartnerInputSchema = z.object({
     .int()
     .min(acknowledgementTimeLimitHours.min)
     .max(acknowledgementTimeLimitHours.max),
+  messageTypes: z.array(messageTypeSchema).optional(),
 })
 
 export type TradingPartnerInput = z.infer<typeof tradingPartnerInputSchema>
