@@ -145,6 +145,20 @@ const versionsOf = async (mappingId: string) => {
   return mappingVersionEntrySchema.array().parse(response.json())
 }
 
+const noGraph: MappingGraph = { links: [], transforms: [], transformLinks: [] }
+
+const lastLink = {
+  proposedLinks: ['buyer.gln'],
+  proposedTransforms: [],
+  proposedTransformLinks: [],
+}
+
+const restore = (mappingId: string, versionId: string) =>
+  admin.inject({
+    method: 'POST',
+    url: toPath(restoreMappingVersionEndpoint.path, { mappingId, versionId }),
+  })
+
 const aiReviewOpenProblem = { message: 'The AI review of the Draft is still open.' }
 
 describe('GET /mappings/:id/draft', () => {
@@ -181,6 +195,32 @@ describe('PUT /mappings/:id/draft', () => {
     expect((await draftOf(id)).aiReview).toEqual(expected)
   })
 
+  it('closes the AI review once the Admin rejected every proposed part', async () => {
+    const id = await draftedByAi()
+
+    const response = await save(id, noGraph)
+
+    expect(response.statusCode).toBe(200)
+    expect(mappingDraftSchema.parse(response.json()).aiReview).toBeNull()
+    expect((await draftOf(id)).aiReview).toBeNull()
+  })
+
+  it('closes the AI review once the Admin edited the last proposed part', async () => {
+    const id = await mappingWith(proposed)
+    await connection.db
+      .update(mappings)
+      .set({ aiReview: { ...lastLink, sampleId } })
+      .where(eq(mappings.id, id))
+
+    const response = await save(id, {
+      ...proposed,
+      links: [proposed.links[0]!, { sourcePath: 'BGM/1004', targetPath: 'buyer.gln' }],
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(mappingDraftSchema.parse(response.json()).aiReview).toBeNull()
+  })
+
   it('keeps the marks of a transform the Admin only moved', async () => {
     const id = await draftedByAi()
 
@@ -207,6 +247,13 @@ describe('POST /mappings/:mappingId/versions', () => {
     expect(response.json()).toEqual(aiReviewOpenProblem)
     expect(await versionsOf(id)).toEqual([])
   })
+
+  it('publishes once the Admin rejected every proposed part', async () => {
+    const id = await draftedByAi()
+    expect((await save(id, noGraph)).statusCode).toBe(200)
+
+    expect((await publish(id)).statusCode).toBe(201)
+  })
 })
 
 describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
@@ -217,14 +264,24 @@ describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
     expect((await save(id, proposed)).statusCode).toBe(200)
     await openReview(id)
 
-    const response = await admin.inject({
-      method: 'POST',
-      url: toPath(restoreMappingVersionEndpoint.path, { mappingId: id, versionId: version!.id }),
-    })
+    const response = await restore(id, version!.id)
 
     expect(response.statusCode).toBe(aiReviewOpenStatus)
     expect(response.json()).toEqual(aiReviewOpenProblem)
     expect(await draftOf(id)).toMatchObject({ ...proposed, aiReview: review })
+  })
+
+  it('restores the version once the Admin rejected every proposed part', async () => {
+    const id = await mappingWith(proposed)
+    expect((await publish(id)).statusCode).toBe(201)
+    const [version] = await versionsOf(id)
+    await openReview(id)
+    expect((await save(id, noGraph)).statusCode).toBe(200)
+
+    const response = await restore(id, version!.id)
+
+    expect(response.statusCode).toBe(200)
+    expect(mappingDraftSchema.parse(response.json())).toMatchObject({ ...proposed, aiReview: null })
   })
 })
 
