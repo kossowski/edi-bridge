@@ -290,40 +290,43 @@ describe('an outbound Run', () => {
 
     await api.connection.db.update(tradingPartners).set({ gln: null }).where(withTradingPartner)
 
-    const runId = await submitted(unreachable).finally(() =>
-      api.connection.db
+    try {
+      const runId = await submitted(unreachable)
+
+      const message = await deliveryInputOf(api.connection.db, runId)
+
+      const run = await detail(runId)
+
+      expect(run).toMatchObject({
+        status: 'failed',
+        failureStage: 'delivery',
+        error: { code: 'glnMissing' },
+        interchange: null,
+      })
+      expect(run.message).toMatchObject({ messageType: 'INVOIC' })
+      expect(run.message?.segments.map(({ tag }) => tag)).toEqual([
+        message.header.tag,
+        ...message.segments.map(({ tag }) => tag),
+        message.trailer.tag,
+      ])
+    } finally {
+      await api.connection.db
         .update(tradingPartners)
         .set({ gln: tradingPartner?.gln })
-        .where(withTradingPartner),
-    )
-
-    const message = await deliveryInputOf(api.connection.db, runId)
-
-    const run = await detail(runId)
-
-    expect(run).toMatchObject({
-      status: 'failed',
-      failureStage: 'delivery',
-      error: { code: 'glnMissing' },
-      interchange: null,
-    })
-    expect(run.message).toMatchObject({ messageType: 'INVOIC' })
-    expect(run.message?.segments.map(({ tag }) => tag)).toEqual([
-      message.header.tag,
-      ...message.segments.map(({ tag }) => tag),
-      message.trailer.tag,
-    ])
+        .where(withTradingPartner)
+    }
   })
 
   it('has no Message when mapping failed, and its error says why', async () => {
     const runId = await submitted(unreachable, 'not json')
+    const anyText: unknown = expect.any(String)
 
     await expect(detail(runId)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'mapping',
       interchange: null,
       message: null,
-      error: { message: expect.any(String) },
+      error: { message: anyText },
     })
   })
 })
