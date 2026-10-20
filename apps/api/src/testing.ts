@@ -1,6 +1,7 @@
 import { hashPassword } from 'better-auth/crypto'
 import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
+import { z } from 'zod'
 
 import type { LanguageModel } from 'ai'
 import type { FastifyServerOptions, InjectOptions, LightMyRequestResponse } from 'fastify'
@@ -10,6 +11,7 @@ import {
   type CharacterEncoding,
   encodeBase64,
   encodeText,
+  type RunDetail,
   signInEndpoint,
   type SubmittedDocument,
   type WorkspaceRole,
@@ -26,12 +28,17 @@ import {
 import { startTestDatabase } from '@edi-bridge/db/testing'
 import {
   type LiveEventListener,
+  deliveryInputSchema,
   type PublishedLiveEvent,
   type QueuedRun,
   RunNotQueued,
   type RunQueueService,
 } from '@edi-bridge/pipeline'
-import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
+import {
+  goldenInvoice,
+  type InvoiceWorkspace,
+  seedInvoiceWorkspace,
+} from '@edi-bridge/pipeline/testing'
 
 import { utcDay } from './ai-budget.js'
 import { buildApp } from './app.js'
@@ -63,6 +70,33 @@ export const submittedDocument = (
   content: encodeBase64(encodeText(text, encoding ?? 'utf-8')),
   encoding,
 })
+
+// An invoice number too long for BGM, so the Run fails at validation after mapping.
+export const invalidInvoiceNumber = 'INV-'.repeat(10)
+
+export const invalidInvoice = JSON.stringify({
+  ...z.looseObject({}).parse(JSON.parse(goldenInvoice)),
+  invoiceNumber: invalidInvoiceNumber,
+})
+
+export async function deliveryInputOf(database: Database, runId: string) {
+  const [run] = await database
+    .select({ deliveryInput: runs.deliveryInput })
+    .from(runs)
+    .where(eq(runs.id, runId))
+
+  return deliveryInputSchema.parse(run?.deliveryInput)
+}
+
+export const failingSegmentOf = ({ error, message }: RunDetail) => {
+  const position = error?.position
+
+  if (!position || !message) {
+    throw new Error('The Run has no failing position in a Message')
+  }
+
+  return message.segments[position.segment - 1]
+}
 
 export const webOrigin = 'http://localhost:3000'
 

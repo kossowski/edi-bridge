@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 
 import { DeliveryFailed } from '@edi-bridge/channels'
 import {
@@ -18,8 +17,8 @@ import {
   webhookAuthorization,
   webhookTokenHeader,
 } from '@edi-bridge/contracts'
-import { runs } from '@edi-bridge/db'
-import { type DeliveryService, deliveryInputSchema, processRun } from '@edi-bridge/pipeline'
+import { runs, tradingPartners } from '@edi-bridge/db'
+import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
 import {
   addOrdersFlow,
   golden,
@@ -32,6 +31,10 @@ import {
 import {
   addMember,
   type Client,
+  deliveryInputOf,
+  failingSegmentOf,
+  invalidInvoice,
+  invalidInvoiceNumber,
   signIn,
   startTestApi,
   submittedDocument,
@@ -251,44 +254,12 @@ describe('an outbound Run', () => {
     })
     expect(run.message).toMatchObject({ messageType: 'INVOIC' })
   })
-  const invoiceNumber = 'INV-'.repeat(10)
-
-  const invalidInvoice = JSON.stringify({
-    ...z.looseObject({}).parse(JSON.parse(goldenInvoice)),
-    invoiceNumber,
-  })
-
-  const deliveryInputOf = async (runId: string) => {
-    const [run] = await api.connection.db
-      .select({ deliveryInput: runs.deliveryInput })
-      .from(runs)
-      .where(eq(runs.id, runId))
-
-    return deliveryInputSchema.parse(run?.deliveryInput)
-  }
-
-  // The Message the pipeline builds for the invalid invoice: the golden one with its long BGM number.
-  const builtInvalidMessage = async () => {
-    const message = await deliveryInputOf(await submitted(unreachable))
-
-    return {
-      ...message,
-      segments: message.segments.map((segment) =>
-        segment.tag === 'BGM'
-          ? { ...segment, elements: segment.elements.with(1, [invoiceNumber]) }
-          : segment,
-      ),
-    }
-  }
 
   it('shows the Message it built at the failing position when validation failed', async () => {
-    const message = await builtInvalidMessage()
     const runId = await submitted(unreachable, invalidInvoice)
-
-    await api.connection.db.update(runs).set({ deliveryInput: message }).where(eq(runs.id, runId))
+    const message = await deliveryInputOf(api.connection.db, runId)
 
     const run = await detail(runId)
-    const position = run.error?.position
 
     expect(run).toMatchObject({
       status: 'failed',
@@ -296,26 +267,46 @@ describe('an outbound Run', () => {
       interchange: null,
       error: { code: 'too-long-element', position: { segment: 2, tag: 'BGM', element: 2 } },
     })
-    expect(run.message).toMatchObject({ reference: message.header.elements[0]?.[0] })
+    expect(run.message).toMatchObject({
+      reference: message.header.elements[0]?.[0],
+      messageType: 'INVOIC',
+    })
     expect(run.message?.segments[0]).toMatchObject({ tag: 'UNH', name: 'Message header' })
-    expect(run.message?.segments[(position?.segment ?? 0) - 1]).toEqual({
+    expect(failingSegmentOf(run)).toEqual({
       tag: 'BGM',
       name: 'Beginning of message',
-      elements: [['380'], [invoiceNumber], ['9']],
+      elements: [['380'], [invalidInvoiceNumber], ['9']],
     })
     expect(run.message?.segments).toHaveLength(message.segments.length + 2)
   })
 
   it('shows the Message it built when delivery failed before the Interchange was built', async () => {
-    const runId = await submitted(unreachable)
-    const message = await deliveryInputOf(runId)
+    const withTradingPartner = eq(tradingPartners.id, workspace.tradingPartnerId)
 
-    // A delivery that fails before the envelope, for a missing GLN, stores no Interchange.
-    await api.connection.db.update(runs).set({ output: null }).where(eq(runs.id, runId))
+    const [tradingPartner] = await api.connection.db
+      .select({ gln: tradingPartners.gln })
+      .from(tradingPartners)
+      .where(withTradingPartner)
+
+    await api.connection.db.update(tradingPartners).set({ gln: null }).where(withTradingPartner)
+
+    const runId = await submitted(unreachable).finally(() =>
+      api.connection.db
+        .update(tradingPartners)
+        .set({ gln: tradingPartner?.gln })
+        .where(withTradingPartner),
+    )
+
+    const message = await deliveryInputOf(api.connection.db, runId)
 
     const run = await detail(runId)
 
-    expect(run).toMatchObject({ status: 'failed', failureStage: 'delivery', interchange: null })
+    expect(run).toMatchObject({
+      status: 'failed',
+      failureStage: 'delivery',
+      error: { code: 'glnMissing' },
+      interchange: null,
+    })
     expect(run.message).toMatchObject({ messageType: 'INVOIC' })
     expect(run.message?.segments.map(({ tag }) => tag)).toEqual([
       message.header.tag,

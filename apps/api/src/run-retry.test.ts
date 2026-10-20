@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { Effect } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
 
 import { DeliveryFailed } from '@edi-bridge/channels'
 import {
@@ -30,8 +29,10 @@ import {
 import {
   addMember,
   type Client,
+  deliveryInputOf,
   documentDeletedAt,
   expireDocumentOf,
+  invalidInvoice,
   signIn,
   startTestApi,
   submittedDocument,
@@ -66,11 +67,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await api.stop()
-})
-
-const invalidInvoice = JSON.stringify({
-  ...z.looseObject({}).parse(JSON.parse(goldenInvoice)),
-  invoiceNumber: 'INV-'.repeat(10),
 })
 
 const unreachable: DeliveryService = () =>
@@ -228,19 +224,12 @@ describe('POST /runs/:id/retry', () => {
   })
 
   it('answers 409 for a Run that failed at validation with its built Message, and offers Reprocess', async () => {
-    const delivered = await processed(goldenInvoice, () => Effect.void)
     const id = await processed(invalidInvoice, unreachable)
 
-    const [built] = await api.connection.db
-      .select({ deliveryInput: runs.deliveryInput })
-      .from(runs)
-      .where(eq(runs.id, delivered))
-
     // The pipeline keeps the Message it built when validation fails.
-    await api.connection.db
-      .update(runs)
-      .set({ deliveryInput: built?.deliveryInput })
-      .where(eq(runs.id, id))
+    await expect(deliveryInputOf(api.connection.db, id)).resolves.toMatchObject({
+      header: { tag: 'UNH' },
+    })
 
     const response = await retry(id)
 
