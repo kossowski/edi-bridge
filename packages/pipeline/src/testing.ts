@@ -139,7 +139,7 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
   )
 
   const workspace = one(
-    await db.insert(workspaces).values({ name, gln: '4389876511113' }).returning(),
+    await db.insert(workspaces).values({ name, gln: '4389876511114' }).returning(),
   )
 
   const workspaceId = workspace.id
@@ -150,7 +150,7 @@ export async function seedInvoiceWorkspace(db: Db, name: string) {
       .values({
         workspaceId,
         name: 'Hanse Retail',
-        gln: '4071615111110',
+        gln: '4071615111111',
         characterSet: 'UNOC',
         acknowledgementTimeLimitHours: 24,
       })

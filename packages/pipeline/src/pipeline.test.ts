@@ -1253,7 +1253,7 @@ describe('the processing of a Run', () => {
 
     expect([interchangeTime(before), interchangeTime(after)]).toContain(time)
     expect(run?.output).toBe(
-      `UNB+UNOC:3+4389876511113:14+4071615111110:14+${time}+${reference}'` +
+      `UNB+UNOC:3+4389876511114:14+4071615111111:14+${time}+${reference}'` +
         invoicSegments +
         `UNZ+1+${reference}'`,
     )
@@ -1309,7 +1309,7 @@ describe('the processing of a Run', () => {
     const reference = String(run?.controlReference)
 
     expect(run).toMatchObject({ status: 'delivered' })
-    expect(run?.output).toMatch(/^UNA:\+\.\? 'UNB\+UNOB:3\+4389876511113:14\+.*:::Rudi Ruessel'/)
+    expect(run?.output).toMatch(/^UNA:\+\.\? 'UNB\+UNOB:3\+4389876511114:14\+.*:::Rudi Ruessel'/)
     await expect(remoteFile(`/upload/unob/INVOIC-${reference}.edi`)).resolves.toBe(run?.output)
   })
 
@@ -1799,7 +1799,7 @@ describe('the processing of an inbound Run', () => {
     .split('\n')
     .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
 
-  const fromHanseRetail = "UNB+UNOC:3+4071615111110:14+4389876511113:14+000324:1200+00000001'"
+  const fromHanseRetail = "UNB+UNOC:3+4071615111111:14+4389876511114:14+000324:1200+00000001'"
 
   const interchangeOf = (messages: string[][], count = messages.length) =>
     [fromHanseRetail, ...messages.flat(), `UNZ+${count}+00000001'`].join('\n')
@@ -2187,7 +2187,7 @@ describe('the processing of an inbound Run', () => {
 
   describe('an Interchange received again', () => {
     const fromSender = (sender: string, messages: string[][]) =>
-      interchangeOf(messages).replace('4071615111110', sender)
+      interchangeOf(messages).replace('4071615111111', sender)
 
     const receiveAgain = async (into: InvoiceWorkspace, content: string) => {
       const queue = inMemoryRunQueue()
@@ -2223,7 +2223,7 @@ describe('the processing of an inbound Run', () => {
       expect(again.queued).toEqual([])
       expect(erp.received).toHaveLength(delivered)
       expect(again.document).toMatchObject({
-        interchangeSender: '4071615111110',
+        interchangeSender: '4071615111111',
         interchangeControlReference: '00000001',
       })
       expect(again.runs).toMatchObject(
@@ -2964,9 +2964,9 @@ describe('the Retry of a Run', () => {
 })
 
 describe('the Acknowledgement of a sent Interchange', () => {
-  const partnerGln = '4071615111110'
+  const partnerGln = '4071615111111'
 
-  const workspaceGln = '4389876511113'
+  const workspaceGln = '4389876511114'
 
   // Each CONTRL gets its own Interchange control reference, so none is a Duplicate.
   const contrlOf = (
@@ -3257,7 +3257,7 @@ describe('the CONTRL answering a received Interchange', () => {
     .split('\n')
     .filter((line) => line !== '' && !/^UN[BZ]/.test(line))
 
-  const fromHanseRetail = "UNB+UNOC:3+4071615111110:14+4389876511113:14+000324:1200+00000001'"
+  const fromHanseRetail = "UNB+UNOC:3+4071615111111:14+4389876511114:14+000324:1200+00000001'"
 
   const interchangeOf = (messages: string[][], count = messages.length) =>
     [fromHanseRetail, ...messages.flat(), `UNZ+${count}+00000001'`].join('\n')
@@ -3365,9 +3365,9 @@ describe('the CONTRL answering a received Interchange', () => {
         name: 'CONTRL-1.edi',
         mediaType: 'application/edifact',
         content:
-          "UNB+UNOC:3+4389876511113:14+4071615111110:14+YYMMDD:HHMM+1'" +
+          "UNB+UNOC:3+4389876511114:14+4071615111111:14+YYMMDD:HHMM+1'" +
           "UNH+1+CONTRL:D:3:UN:EAN002'" +
-          "UCI+00000001+4071615111110:14+4389876511113:14+7'" +
+          "UCI+00000001+4071615111111:14+4389876511114:14+7'" +
           "UCM+ME0001+ORDERS:D:96A:UN:EAN008+7'" +
           "UNT+4+1'" +
           "UNZ+1+1'",
@@ -3419,8 +3419,8 @@ describe('the CONTRL answering a received Interchange', () => {
 
     const { receipt } = await receiveInterchange(
       into,
-      "UNB+UNOC:3+4071615111110:14+4389876511113:14+261020:0800+77'" +
-        "UNH+1+CONTRL:D:3:UN:EAN002'UCI+1+4389876511113:14+4071615111110:14+7'UNT+3+1'UNZ+1+77'",
+      "UNB+UNOC:3+4071615111111:14+4389876511114:14+261020:0800+77'" +
+        "UNH+1+CONTRL:D:3:UN:EAN002'UCI+1+4389876511114:14+4071615111111:14+7'UNT+3+1'UNZ+1+77'",
     )
 
     await sendWith(delivery.service)
@@ -3551,7 +3551,7 @@ describe('the CONTRL answering a received Interchange', () => {
         controlReference: 1,
       })
       expect(acknowledgement?.content).toContain(
-        "UCI+00000001+4071615111110:14+4389876511113:14+7'",
+        "UCI+00000001+4071615111111:14+4389876511114:14+7'",
       )
       expect(logs).toContainEqual([
         `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: no outbound EDIFACT Flow of its Trading Partner names a Channel`,
@@ -3617,7 +3617,7 @@ describe('the CONTRL answering a received Interchange', () => {
     const sent = delivery.to(into.outboundChannelId)
 
     expect(sent).toHaveLength(1)
-    expect(sent[0]?.content).toContain('UCI+00000001+4071615111110:14+4389876511113:14+4+29+UNZ')
+    expect(sent[0]?.content).toContain('UCI+00000001+4071615111111:14+4389876511114:14+4+29+UNZ')
 
     const acknowledgement = await acknowledgementOf(documentIdOf(exit))
 
@@ -3641,7 +3641,7 @@ describe('the CONTRL answering a received Interchange', () => {
 
     expect(sent).toHaveLength(1)
     expect(sent[0]?.content).toContain(
-      "UCI+00000001+4071615111110:14+4389876511113:14+7'UCM+ME0001+PRICAT",
+      "UCI+00000001+4071615111111:14+4389876511114:14+7'UCM+ME0001+PRICAT",
     )
   })
 
@@ -3650,7 +3650,7 @@ describe('the CONTRL answering a received Interchange', () => {
 
     const { receipt, logs } = await receiveInterchange(
       into,
-      interchangeOf([ordersMessage]).replace('4071615111110:14', '4012345000009:14'),
+      interchangeOf([ordersMessage]).replace('4071615111111:14', '4012345000009:14'),
     )
 
     await expect(acknowledgementOf(receipt.document.id)).resolves.toBeUndefined()
