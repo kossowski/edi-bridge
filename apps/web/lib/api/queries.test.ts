@@ -345,10 +345,12 @@ describe('lookupTableMissingCodeHintsQuery', () => {
 
       const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retriesQuery } } })
       const id = seedLookupTables[0]!.id
+
       const observer = new QueryObserver(
         queryClient,
         lookupTableMissingCodeHintsQuery(id, 'en', true),
       )
+
       observer.subscribe(() => {})
       await expect.poll(() => observer.getCurrentResult().status).toBe('error')
 
