@@ -134,6 +134,30 @@ The browser calls the API through the same-origin `/api` prefix. Next.js inlines
 
 The Dokploy web application requires no build argument. Override `NEXT_PUBLIC_API_URL` only if the API is served from a different path or origin. Outside Docker, the variable defaults to `http://localhost:3001`.
 
+## Error monitoring of the web application
+
+The web application reports unexpected errors to Sentry: errors in the browser, and errors of the server when it renders a page. It sends a sample of the page loads and navigations as traces. Sentry is optional: without a DSN, the web application sends nothing. This also applies to local development, mock mode, Storybook and Playwright.
+
+The browser and the server read separate variables. Next.js inlines the `NEXT_PUBLIC_` variables into the client bundle at build time, so set them as build arguments of the Dokploy web application. Set the server variables in its **Environment** settings.
+
+| Kind           | Variable                                | Value template                   |
+| -------------- | --------------------------------------- | -------------------------------- |
+| Runtime        | `SENTRY_DSN`                            | `<web-sentry-dsn>`               |
+| Runtime        | `SENTRY_ENVIRONMENT`                    | `production`                     |
+| Runtime        | `SENTRY_TRACES_SAMPLE_RATE`             | Not set; see below               |
+| Build argument | `NEXT_PUBLIC_SENTRY_DSN`                | `<web-sentry-dsn>`               |
+| Build argument | `NEXT_PUBLIC_SENTRY_ENVIRONMENT`        | `production`                     |
+| Build argument | `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | Not set; see below               |
+| Build argument | `SENTRY_ORG`                            | `<sentry-org>`                   |
+| Build argument | `SENTRY_PROJECT`                        | `<web-sentry-project>`           |
+| Build secret   | `SENTRY_AUTH_TOKEN`                     | `<sentry-auth-token>`; see below |
+
+`<web-sentry-dsn>` is the DSN of the Sentry project of the web application. The browser receives the DSN, so it is not a secret. `SENTRY_ENVIRONMENT` and `NEXT_PUBLIC_SENTRY_ENVIRONMENT` set the environment that Sentry files the events under. `SENTRY_TRACES_SAMPLE_RATE` and `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` set the share of requests and page loads whose traces the web application sends, from `0` to `1`. Their default is `0.1`. A build with an invalid browser value fails. With an invalid server value, the server starts but logs the invalid variable and answers every request with an error, so the health check fails.
+
+The events carry no error message, request body, query, cookies, headers or user data, no file paths or addresses of system errors, and no breadcrumbs, because these can show a Document, a file name of a Trading Partner, a token or a session. The traces carry no URL query.
+
+`<sentry-auth-token>` is a Sentry auth token that may upload source maps. When `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are all set, the build creates a release and uploads the source maps of the web application to that org and project, so Sentry shows the original code in stack traces. The build deletes the source maps after the upload, so the browser cannot load them. Without any of the three, the build uploads nothing and creates no release. The Dockerfile reads the token as the build secret `SENTRY_AUTH_TOKEN`, not as a build argument, so it stays out of the image and its build history. With Docker, pass it with `--secret id=SENTRY_AUTH_TOKEN,env=SENTRY_AUTH_TOKEN`. Store the token in Dokploy and do not commit it.
+
 ## Health checks
 
 Each application Dockerfile defines a health check. The web check requests `/`. The API and worker checks request `/health`.
