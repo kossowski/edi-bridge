@@ -163,6 +163,43 @@ export const NewPartnerWithoutActivity = meta.story({
   },
 })
 
+async function connectionsStep(canvasElement: HTMLElement) {
+  const step = await within(canvasElement).findByRole(
+    'listitem',
+    { current: 'step' },
+    activityLoaded,
+  )
+
+  return within(step)
+}
+
+export const ConnectionDirectionMissing = meta.story({
+  ...at(untouched),
+  async play({ canvasElement }) {
+    const step = await connectionsStep(canvasElement)
+
+    await expect(step.getByRole('heading', { name: 'Connections' })).toBeVisible()
+    await expect(
+      step.getByText('Connection for documents to Mainfranken Getränke GmbH is missing'),
+    ).toBeVisible()
+    await expect(step.queryByText(/documents from Mainfranken/)).toBeNull()
+    await expect(step.getByRole('button', { name: 'Add a connection' })).toBeVisible()
+  },
+})
+
+export const ConnectionDirectionMissingGerman = meta.story({
+  ...at(untouched),
+  decorators: [german],
+  async play({ canvasElement }) {
+    const step = await connectionsStep(canvasElement)
+
+    await expect(step.getByRole('heading', { name: 'Verbindungen' })).toBeVisible()
+    await expect(
+      step.getByText('Verbindung für Belege an Mainfranken Getränke GmbH fehlt'),
+    ).toBeVisible()
+  },
+})
+
 function withoutUntouchedConnections({ msw }: StoryContext) {
   msw.use(
     ...createHandlers(apiUrl, {
@@ -170,6 +207,21 @@ function withoutUntouchedConnections({ msw }: StoryContext) {
     }),
   )
 }
+
+export const ConnectionDirectionsMissing = meta.story({
+  ...at(untouched),
+  beforeEach: withoutUntouchedConnections,
+  async play({ canvasElement }) {
+    const step = await connectionsStep(canvasElement)
+
+    await expect(
+      step.getByText('Connection for documents from Mainfranken Getränke GmbH is missing'),
+    ).toBeVisible()
+    await expect(
+      step.getByText('Connection for documents to Mainfranken Getränke GmbH is missing'),
+    ).toBeVisible()
+  },
+})
 
 export const SendTestDocument = meta.story({
   ...at(readyForTest),

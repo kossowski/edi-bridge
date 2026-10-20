@@ -1362,6 +1362,10 @@
         }
       },
       "doneAt": "Done on <when>{at}</when>",
+      "missingConnection": {
+        "inbound": "Connection for documents from {name} is missing",
+        "outbound": "Connection for documents to {name} is missing"
+      },
       "actions": {
         "identity": "Record your company's GLN",
         "partnerGln": "Add the partner's GLN",
