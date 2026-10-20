@@ -125,9 +125,9 @@ describe('POST /document-structures/inference with AI', () => {
       labelUnsure: true,
       items: { label: 'Order lines', labelUnsure: true },
     })
-    expect(prompts).toEqual([
-      { system: expect.any(String), user: expect.stringContaining('lines[].gtin') },
-    ])
+    const anySystem: unknown = expect.any(String)
+    const userWithLines: unknown = expect.stringContaining('lines[].gtin')
+    expect(prompts).toEqual([{ system: anySystem, user: userWithLines }])
   })
 
   it('keeps the plain names of the paths the AI leaves out or does not know', async () => {
@@ -191,7 +191,9 @@ describe('POST /document-structures/inference with AI', () => {
   it('names the fields without AI when the model does not answer in time', async () => {
     generate = ({ abortSignal }) =>
       new Promise((_resolve, reject) => {
-        abortSignal?.addEventListener('abort', () => reject(abortSignal.reason))
+        abortSignal?.addEventListener('abort', () =>
+          reject(new Error('The model call was aborted', { cause: abortSignal.reason })),
+        )
       })
 
     const structure = await inferred(documentStructureOrigins.csvDocument)
