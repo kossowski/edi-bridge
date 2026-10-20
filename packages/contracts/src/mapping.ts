@@ -239,7 +239,7 @@ export type NewMappingMessageType = (typeof newMappingMessageTypes)[number]
 
 export const createMappingBodySchema = z.strictObject({
   messageType: messageTypeSchema.extract(newMappingMessageTypes),
-  documentStructureId: z.uuid().optional(),
+  documentStructureId: z.uuid(),
 })
 
 export type CreateMappingBody = z.infer<typeof createMappingBodySchema>

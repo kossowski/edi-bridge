@@ -208,7 +208,11 @@ beforeAll(async () => {
     documentStructure,
   )
 
-  const mapping = await createdId(createMappingEndpoint.path, { messageType: 'ORDERS' })
+  const mapping = await createdId(createMappingEndpoint.path, {
+    messageType: 'ORDERS',
+    documentStructureId,
+  })
+
   const versionsPath = toPath(publishMappingDraftEndpoint.path, { mappingId: mapping })
   const mappingVersion = await createdId(versionsPath, { changeNote: '' })
 
@@ -416,7 +420,11 @@ const changes: Change[] = [
   ],
   [
     'create a Mapping',
-    () => ({ method: 'POST', url: createMappingEndpoint.path, body: { messageType: 'DESADV' } }),
+    () => ({
+      method: 'POST',
+      url: createMappingEndpoint.path,
+      body: { messageType: 'DESADV', documentStructureId: ids.documentStructure },
+    }),
   ],
   [
     'save the Draft of a Mapping',

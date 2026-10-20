@@ -11,6 +11,7 @@ import {
   createDocumentStructureEndpoint,
   createMappingEndpoint,
   documentStructureOrigins,
+  documentStructureSchema,
   mappingDraftEndpoint,
   mappingDraftSchema,
   type MappingGraph,
@@ -102,7 +103,10 @@ const mappingWith = async (graph: MappingGraph) => {
   const response = await admin.inject({
     method: 'POST',
     url: createMappingEndpoint.path,
-    body: { messageType: 'ORDERS' },
+    body: {
+      messageType: 'ORDERS',
+      documentStructureId: documentStructureSchema.parse(structure.json()).id,
+    },
   })
 
   expect(response.statusCode).toBe(201)

@@ -5,6 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { type FormEvent, type RefObject, useLayoutEffect, useRef, useState } from 'react'
 
 import { channelAddress } from '@/components/channels/channel-parts'
@@ -19,14 +20,18 @@ import {
   latestMappingVersions,
   newDocumentFlow,
 } from '@/components/trading-partners/partner-documents'
-import { ApiError, createFlow, createMapping } from '@/lib/api/client'
+import { createFlow, createMapping } from '@/lib/api/client'
 import {
+  documentStructureKeys,
+  documentStructuresQuery,
   flowsQuery,
   mappingKeys,
   publishedMappingVersionsQuery,
   storeSavedFlow,
   tradingPartnerKeys,
 } from '@/lib/api/queries'
+import { isMissingDocumentStructure, onlyDocumentStructureId } from '@/lib/document-structures'
+import { newMappingHref } from '@/lib/navigation'
 import {
   type Channel,
   directionOf,
@@ -130,6 +135,7 @@ function DocumentRouteForm({
   const format = useFormatter()
   const plainNames = usePlainNames()
   const queryClient = useQueryClient()
+  const router = useRouter()
   const name = tradingPartner.name
   const direction = directionOf({ messageType })
   const document = plainNames.messageTypeName(messageType, true)
@@ -137,6 +143,8 @@ function DocumentRouteForm({
   const [ownChoice, setOwnChoice] = useState<string | null>(null)
   const [chosenMappingVersion, setChosenMappingVersion] = useState<string | null>(null)
   const versions = useQuery(publishedMappingVersionsQuery(messageType))
+  const documentStructures = useQuery(documentStructuresQuery)
+  const documentStructureId = onlyDocumentStructureId(documentStructures.data)
 
   const add = useMutation({
     mutationFn: createFlow,
@@ -157,6 +165,11 @@ function DocumentRouteForm({
       void queryClient.invalidateQueries({ queryKey: mappingKeys.list() })
       onDrafting({ mapping, document })
     },
+    onError: (error) => {
+      if (isMissingDocumentStructure(error)) {
+        void queryClient.invalidateQueries({ queryKey: documentStructureKeys.all() })
+      }
+    },
   })
 
   const pending = add.isPending || draft.isPending
@@ -169,8 +182,12 @@ function DocumentRouteForm({
   const mappings = latestMappingVersions(versions.data ?? [])
   const mappingVersionChoice = chosenMappingVersion ?? mappings[0]?.id ?? aiMappingChoice
   const withAi = mappingVersionChoice === aiMappingChoice
-  const ready = partnerChannelId !== null && ownChannelId !== null && !versions.isPending
-  const noDataFormat = draft.error instanceof ApiError && draft.error.status === 422
+
+  const ready =
+    partnerChannelId !== null &&
+    ownChannelId !== null &&
+    !versions.isPending &&
+    !documentStructures.isPending
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -180,7 +197,11 @@ function DocumentRouteForm({
     }
 
     if (withAi) {
-      draft.mutate({ messageType })
+      if (documentStructureId === null) {
+        router.push(newMappingHref(messageType))
+      } else {
+        draft.mutate({ messageType, documentStructureId })
+      }
 
       return
     }
@@ -250,11 +271,13 @@ function DocumentRouteForm({
           onChange={setOwnChoice}
         />
       )}
-      {partnerChannelId !== null && ownChannelId !== null && versions.isPending && (
-        <p role="status" className="text-muted-foreground text-sm">
-          {t('mapping.loading')}
-        </p>
-      )}
+      {partnerChannelId !== null &&
+        ownChannelId !== null &&
+        (versions.isPending || documentStructures.isPending) && (
+          <p role="status" className="text-muted-foreground text-sm">
+            {t('mapping.loading')}
+          </p>
+        )}
       {ready && (
         <div className="flex flex-col gap-2">
           {versions.isError && (
@@ -291,7 +314,9 @@ function DocumentRouteForm({
       )}
       {draft.isError && (
         <p role="alert" className="text-destructive-text text-sm">
-          {noDataFormat ? t('noDataFormat') : t('mappingFailed')}
+          {isMissingDocumentStructure(draft.error)
+            ? t('documentStructureGone')
+            : t('mappingFailed')}
         </p>
       )}
       <div className="flex flex-wrap gap-2">

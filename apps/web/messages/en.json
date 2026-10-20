@@ -1604,7 +1604,7 @@
       "added": "{document} are now set up with {name}.",
       "failed": "The document type could not be added. Try again.",
       "mappingFailed": "The mapping could not be created. Try again.",
-      "noDataFormat": "Your Workspace has no data format to translate to yet. Add one first, then create the mapping.",
+      "documentStructureGone": "Your data format no longer exists. Try again to choose another one.",
       "drafting": {
         "created": "The mapping {mapping} is created.",
         "next": "The AI drafts it in the mapping editor from an example document. Once you have reviewed and published it, add “{document}” here again and choose the mapping.",

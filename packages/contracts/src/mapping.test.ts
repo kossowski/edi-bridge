@@ -129,17 +129,32 @@ describe('mappingSummarySchema', () => {
 })
 
 describe('createMappingEndpoint', () => {
+  const documentStructureId = '6b0f6c3e-2b1d-4f5a-9c8e-7d6a5b4c3d2e'
+
   it.each(['ORDERS', 'DESADV', 'INVOIC'] as const)('creates a Mapping for %s', (messageType) => {
-    expect(createMappingEndpoint.body.parse({ messageType })).toEqual({ messageType })
+    expect(createMappingEndpoint.body.parse({ messageType, documentStructureId })).toEqual({
+      messageType,
+      documentStructureId,
+    })
   })
 
   it('creates no Mapping for CONTRL, which is linked to its Interchange, not mapped', () => {
-    expect(createMappingEndpoint.body.safeParse({ messageType: 'CONTRL' }).success).toBe(false)
+    expect(
+      createMappingEndpoint.body.safeParse({ messageType: 'CONTRL', documentStructureId }).success,
+    ).toBe(false)
   })
 
-  it('takes only the Message Type', () => {
+  it('creates no Mapping without its Document Structure', () => {
+    expect(createMappingEndpoint.body.safeParse({ messageType: 'ORDERS' }).success).toBe(false)
+  })
+
+  it('takes only the Message Type and the Document Structure', () => {
     expect(
-      createMappingEndpoint.body.safeParse({ messageType: 'INVOIC', name: 'Invoices' }).success,
+      createMappingEndpoint.body.safeParse({
+        messageType: 'INVOIC',
+        documentStructureId,
+        name: 'Invoices',
+      }).success,
     ).toBe(false)
   })
 })

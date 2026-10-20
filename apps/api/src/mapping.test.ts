@@ -57,15 +57,15 @@ const postDocumentStructure = async (name: string, target = admin) => {
   return documentStructureSchema.parse(response.json())
 }
 
-const create = (messageType: string, target = admin, documentStructureId?: string) =>
+const create = (messageType: string, documentStructureId?: string, target = admin) =>
   target.inject({
     method: 'POST',
     url: createMappingEndpoint.path,
     body: { messageType, documentStructureId },
   })
 
-const created = async (messageType: string, target = admin) => {
-  const response = await create(messageType, target)
+const created = async (messageType: string, documentStructureId: string, target = admin) => {
+  const response = await create(messageType, documentStructureId, target)
 
   expect(response.statusCode).toBe(201)
 
@@ -84,7 +84,7 @@ describe('POST /mappings', () => {
   it('creates a never published Mapping between a Message Type and a Document Structure', async () => {
     const structure = await postDocumentStructure('ERP orders')
 
-    const response = await create('ORDERS')
+    const response = await create('ORDERS', structure.id)
 
     expect(response.statusCode).toBe(201)
 
@@ -109,22 +109,26 @@ describe('POST /mappings', () => {
   })
 
   it('names an outbound Mapping from the Document Structure to the Message Type', async () => {
-    await postDocumentStructure('ERP dispatch')
+    const structure = await postDocumentStructure('ERP dispatch')
 
-    expect((await created('DESADV')).name).toBe('ERP dispatch to DESADV')
+    expect((await created('DESADV', structure.id)).name).toBe('ERP dispatch to DESADV')
   })
 
   it('numbers the name of a second Mapping between the same sides', async () => {
-    await postDocumentStructure('ERP orders')
-    await created('ORDERS')
+    const structure = await postDocumentStructure('ERP orders')
+    await created('ORDERS', structure.id)
 
-    expect((await created('ORDERS')).name).toBe('ORDERS to ERP orders 2')
+    expect((await created('ORDERS', structure.id)).name).toBe('ORDERS to ERP orders 2')
   })
 
   it('numbers the names of Mappings created at the same time', async () => {
-    await postDocumentStructure('ERP orders')
+    const { id } = await postDocumentStructure('ERP orders')
 
-    const names = await Promise.all([created('ORDERS'), created('ORDERS'), created('ORDERS')])
+    const names = await Promise.all([
+      created('ORDERS', id),
+      created('ORDERS', id),
+      created('ORDERS', id),
+    ])
 
     expect(names.map(({ name }) => name).toSorted()).toEqual([
       'ORDERS to ERP orders',
@@ -133,27 +137,12 @@ describe('POST /mappings', () => {
     ])
   })
 
-  it('takes the Document Structure another Mapping of the Message Type already uses', async () => {
-    await postDocumentStructure('A orders')
-    const first = await created('ORDERS')
-    await postDocumentStructure('0 orders')
-
-    expect((await created('ORDERS')).documentStructureId).toBe(first.documentStructureId)
-  })
-
-  it('takes the first Document Structure by name for a new Message Type', async () => {
-    await postDocumentStructure('ERP orders')
-    const dispatch = await postDocumentStructure('ERP dispatch')
-
-    expect((await created('DESADV')).documentStructureId).toBe(dispatch.id)
-  })
-
   it('takes the named Document Structure', async () => {
-    await postDocumentStructure('A orders')
-    await created('ORDERS')
+    const first = await postDocumentStructure('A orders')
+    await created('ORDERS', first.id)
     const named = await postDocumentStructure('B orders')
 
-    const response = await create('ORDERS', admin, named.id)
+    const response = await create('ORDERS', named.id)
 
     expect(response.statusCode).toBe(201)
     expect(mappingSummarySchema.parse(response.json())).toMatchObject({
@@ -163,10 +152,17 @@ describe('POST /mappings', () => {
     })
   })
 
+  it('answers 400 without a Document Structure', async () => {
+    await postDocumentStructure('ERP orders')
+
+    expect((await create('ORDERS')).statusCode).toBe(400)
+    expect(await list()).toEqual([])
+  })
+
   it('answers 422 for a Document Structure that does not exist', async () => {
     await postDocumentStructure('ERP orders')
 
-    const response = await create('ORDERS', admin, crypto.randomUUID())
+    const response = await create('ORDERS', crypto.randomUUID())
 
     expect(response.statusCode).toBe(422)
     expect(response.json()).toEqual({ message: 'The Document Structure does not exist.' })
@@ -176,7 +172,7 @@ describe('POST /mappings', () => {
     await postDocumentStructure('ERP orders')
     const foreign = await postDocumentStructure('Sudhafen orders', otherAdmin)
 
-    const response = await create('ORDERS', admin, foreign.id)
+    const response = await create('ORDERS', foreign.id)
 
     expect(response.statusCode).toBe(422)
     expect(response.json()).toEqual({ message: 'The Document Structure does not exist.' })
@@ -186,34 +182,23 @@ describe('POST /mappings', () => {
   it('answers 400 for a Document Structure id that is no UUID', async () => {
     await postDocumentStructure('ERP orders')
 
-    expect((await create('ORDERS', admin, 'erp-orders')).statusCode).toBe(400)
-  })
-
-  it('answers 422 while the Workspace has no Document Structure', async () => {
-    await postDocumentStructure('Sudhafen orders', otherAdmin)
-
-    const response = await create('ORDERS')
-
-    expect(response.statusCode).toBe(422)
-    expect(response.json()).toEqual({
-      message: 'The Workspace has no Document Structure to map yet.',
-    })
+    expect((await create('ORDERS', 'erp-orders')).statusCode).toBe(400)
   })
 
   it('answers 400 for a Message Type no Mapping is created for', async () => {
-    await postDocumentStructure('ERP orders')
+    const structure = await postDocumentStructure('ERP orders')
 
-    expect((await create('CONTRL')).statusCode).toBe(400)
+    expect((await create('CONTRL', structure.id)).statusCode).toBe(400)
   })
 })
 
 describe('GET /mappings', () => {
   it('lists only the Mappings of the Workspace, by name', async () => {
-    await postDocumentStructure('ERP orders')
-    await postDocumentStructure('Sudhafen orders', otherAdmin)
-    const second = await created('ORDERS')
-    const first = await created('DESADV')
-    await created('ORDERS', otherAdmin)
+    const ours = await postDocumentStructure('ERP orders')
+    const theirs = await postDocumentStructure('Sudhafen orders', otherAdmin)
+    const second = await created('ORDERS', ours.id)
+    const first = await created('DESADV', ours.id)
+    await created('ORDERS', theirs.id, otherAdmin)
 
     expect((await list()).map(({ id }) => id)).toEqual([first.id, second.id])
   })
@@ -286,7 +271,7 @@ const unknownId = '0b6f1a7e-2c4d-4e8f-9a1b-3c5d7e9f1a2b'
 describe('GET /mappings/:id/draft', () => {
   it('serves the empty Draft of a new Mapping with its sides', async () => {
     const structure = await postDocumentStructure('ERP orders')
-    const mapping = await created('ORDERS')
+    const mapping = await created('ORDERS', structure.id)
 
     expect(await draftOf(mapping.id)).toEqual({
       mappingId: mapping.id,
@@ -316,8 +301,8 @@ describe('GET /mappings/:id/draft', () => {
   })
 
   it('answers 404 for a Mapping of another Workspace', async () => {
-    await postDocumentStructure('Sudhafen orders', otherAdmin)
-    const theirs = await created('ORDERS', otherAdmin)
+    const structure = await postDocumentStructure('Sudhafen orders', otherAdmin)
+    const theirs = await created('ORDERS', structure.id, otherAdmin)
 
     expect((await getDraft(theirs.id)).statusCode).toBe(404)
   })
@@ -325,8 +310,8 @@ describe('GET /mappings/:id/draft', () => {
 
 describe('PUT /mappings/:id/draft', () => {
   it('saves the links, transforms and transform links of the Draft', async () => {
-    await postDocumentStructure('ERP orders')
-    const mapping = await created('ORDERS')
+    const structure = await postDocumentStructure('ERP orders')
+    const mapping = await created('ORDERS', structure.id)
     const lookupTableId = await postLookupTable()
 
     const response = await save(mapping.id, graphWithLookup(lookupTableId))
@@ -345,8 +330,8 @@ describe('PUT /mappings/:id/draft', () => {
   })
 
   it('saves a Lookup Table Transform that has no Lookup Table chosen yet', async () => {
-    await postDocumentStructure('ERP orders')
-    const mapping = await created('ORDERS')
+    const structure = await postDocumentStructure('ERP orders')
+    const mapping = await created('ORDERS', structure.id)
 
     const response = await save(mapping.id, graphWithLookup(null))
 
@@ -355,8 +340,8 @@ describe('PUT /mappings/:id/draft', () => {
   })
 
   it('answers 400 and keeps the Draft for a graph that links a target twice', async () => {
-    await postDocumentStructure('ERP orders')
-    const mapping = await created('ORDERS')
+    const structure = await postDocumentStructure('ERP orders')
+    const mapping = await created('ORDERS', structure.id)
 
     const response = await save(mapping.id, {
       links: [
@@ -387,8 +372,8 @@ describe('PUT /mappings/:id/draft', () => {
       'The target has no field or element at buyer.fax',
     ],
   ])('answers 422 for a link from an unknown %s path', async (_, link, message) => {
-    await postDocumentStructure('ERP orders')
-    const mapping = await created('ORDERS')
+    const structure = await postDocumentStructure('ERP orders')
+    const mapping = await created('ORDERS', structure.id)
 
     const response = await save(mapping.id, { links: [link], transforms: [], transformLinks: [] })
 
@@ -397,8 +382,8 @@ describe('PUT /mappings/:id/draft', () => {
   })
 
   it('answers 422 for a Lookup Table Transform with a Lookup Table outside the Workspace', async () => {
-    await postDocumentStructure('ERP orders')
-    const mapping = await created('ORDERS')
+    const structure = await postDocumentStructure('ERP orders')
+    const mapping = await created('ORDERS', structure.id)
     const theirs = await postLookupTable(otherAdmin)
 
     const response = await save(mapping.id, graphWithLookup(theirs))
@@ -409,8 +394,8 @@ describe('PUT /mappings/:id/draft', () => {
   })
 
   it('answers 404 for a Mapping of another Workspace', async () => {
-    await postDocumentStructure('Sudhafen orders', otherAdmin)
-    const theirs = await created('ORDERS', otherAdmin)
+    const structure = await postDocumentStructure('Sudhafen orders', otherAdmin)
+    const theirs = await created('ORDERS', structure.id, otherAdmin)
 
     const response = await save(theirs.id, graphWithLookup(null))
 

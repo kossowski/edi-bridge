@@ -13,6 +13,7 @@ import {
   createMappingEndpoint,
   createTradingPartnerEndpoint,
   documentStructureOrigins,
+  documentStructureSchema,
   flowSchema,
   lookupTableSchema,
   lookupTablesEndpoint,
@@ -132,17 +133,19 @@ const translating = (lookupTableId: string): MappingGraph => ({
 })
 
 const createdMapping = async () => {
-  await sent({
-    method: 'POST',
-    url: createDocumentStructureEndpoint.path,
-    body: { name: 'ERP ORDERS', origin: documentStructureOrigins.jsonDocument },
-  })
+  const structure = documentStructureSchema.parse(
+    await sent({
+      method: 'POST',
+      url: createDocumentStructureEndpoint.path,
+      body: { name: 'ERP ORDERS', origin: documentStructureOrigins.jsonDocument },
+    }),
+  )
 
   return mappingSummarySchema.parse(
     await sent({
       method: 'POST',
       url: createMappingEndpoint.path,
-      body: { messageType: 'ORDERS' },
+      body: { messageType: 'ORDERS', documentStructureId: structure.id },
     }),
   )
 }

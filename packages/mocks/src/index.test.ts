@@ -338,7 +338,10 @@ describe('createHandlers', () => {
         await fetch(`${apiUrl}${createMappingEndpoint.path}`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ messageType: 'INVOIC' }),
+          body: JSON.stringify({
+            messageType: 'INVOIC',
+            documentStructureId: seedDocumentStructureOf.INVOIC.id,
+          }),
         })
       ).json(),
     )

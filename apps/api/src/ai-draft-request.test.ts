@@ -122,7 +122,10 @@ const createdInvoiceMapping = async () => {
   const mapping = await api.admin.inject({
     method: 'POST',
     url: createMappingEndpoint.path,
-    body: { messageType: 'INVOIC' },
+    body: {
+      messageType: 'INVOIC',
+      documentStructureId: documentStructureSchema.parse(structure.json()).id,
+    },
   })
 
   return {

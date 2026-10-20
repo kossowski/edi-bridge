@@ -1604,7 +1604,7 @@
       "added": "{document} sind jetzt mit {name} eingerichtet.",
       "failed": "Die Belegart konnte nicht hinzugefügt werden. Versuchen Sie es erneut.",
       "mappingFailed": "Das Mapping konnte nicht erstellt werden. Versuchen Sie es erneut.",
-      "noDataFormat": "Ihr Workspace hat noch kein Datenformat, in das übersetzt werden kann. Fügen Sie zuerst eines hinzu und erstellen Sie dann das Mapping.",
+      "documentStructureGone": "Ihr Datenformat gibt es nicht mehr. Versuchen Sie es erneut, um ein anderes zu wählen.",
       "drafting": {
         "created": "Das Mapping {mapping} ist erstellt.",
         "next": "Die KI entwirft es im Mapping-Editor aus einem Beispielbeleg. Sobald Sie es geprüft und veröffentlicht haben, fügen Sie „{document}“ hier erneut hinzu und wählen das Mapping.",

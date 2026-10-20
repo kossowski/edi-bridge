@@ -12,6 +12,7 @@ import {
   createMappingEndpoint,
   createTradingPartnerEndpoint,
   documentStructureOrigins,
+  documentStructureSchema,
   flowEndpoint,
   type FlowInput,
   type MappingGraph,
@@ -113,14 +114,20 @@ const httpDelivery = (tradingPartnerId: string | null): ChannelInput => ({
 })
 
 const createdMapping = async (messageType: MessageType = 'ORDERS') => {
-  await sent({
-    method: 'POST',
-    url: createDocumentStructureEndpoint.path,
-    body: { name: `ERP ${messageType}`, origin: documentStructureOrigins.jsonDocument },
-  })
+  const structure = documentStructureSchema.parse(
+    await sent({
+      method: 'POST',
+      url: createDocumentStructureEndpoint.path,
+      body: { name: `ERP ${messageType}`, origin: documentStructureOrigins.jsonDocument },
+    }),
+  )
 
   return mappingSummarySchema.parse(
-    await sent({ method: 'POST', url: createMappingEndpoint.path, body: { messageType } }),
+    await sent({
+      method: 'POST',
+      url: createMappingEndpoint.path,
+      body: { messageType, documentStructureId: structure.id },
+    }),
   )
 }
 

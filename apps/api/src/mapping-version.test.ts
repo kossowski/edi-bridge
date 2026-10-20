@@ -7,6 +7,7 @@ import {
   createDocumentStructureEndpoint,
   createMappingEndpoint,
   documentStructureOrigins,
+  documentStructureSchema,
   mappingComparisonEndpoint,
   mappingComparisonSchema,
   type MappingGraph,
@@ -66,7 +67,10 @@ const createdMapping = async (target = admin) => {
   const response = await target.inject({
     method: 'POST',
     url: createMappingEndpoint.path,
-    body: { messageType: 'ORDERS' },
+    body: {
+      messageType: 'ORDERS',
+      documentStructureId: documentStructureSchema.parse(structure.json()).id,
+    },
   })
 
   expect(response.statusCode).toBe(201)
@@ -219,11 +223,11 @@ const restore = (mappingId: string, versionId: string, target = admin) =>
     url: toPath(restoreMappingVersionEndpoint.path, { mappingId, versionId }),
   })
 
-const created = async (messageType: string) => {
+const created = async (messageType: string, documentStructureId: string) => {
   const response = await admin.inject({
     method: 'POST',
     url: createMappingEndpoint.path,
-    body: { messageType },
+    body: { messageType, documentStructureId },
   })
 
   expect(response.statusCode).toBe(201)
@@ -446,7 +450,7 @@ describe('GET /mappings/:mappingId/versions/:versionId', () => {
   it('answers 404 for a version of another Mapping', async () => {
     const mapping = await createdMapping()
     const version = await published(mapping.id)
-    const other = await created('DESADV')
+    const other = await created('DESADV', mapping.documentStructureId)
 
     const response = await admin.inject({ method: 'GET', url: versionUrl(other.id, version.id) })
 
@@ -520,7 +524,7 @@ describe('POST /mappings/:mappingId/versions/:versionId/restore', () => {
   it('answers 404 and keeps the Draft for a version of another Mapping', async () => {
     const mapping = await createdMapping()
     const version = await published(mapping.id)
-    const other = await created('DESADV')
+    const other = await created('DESADV', mapping.documentStructureId)
     const before = await draftOf(other.id)
 
     expect((await restore(other.id, version.id)).statusCode).toBe(404)
@@ -604,8 +608,8 @@ describe('GET /mappings/:mappingId/comparison', () => {
   })
 
   it('answers 404 for a version of another Mapping', async () => {
-    const { from } = await twoVersions()
-    const other = await created('DESADV')
+    const { mapping, from } = await twoVersions()
+    const other = await created('DESADV', mapping.documentStructureId)
     const otherVersion = await published(other.id)
 
     const response = await compare(other.id, { from: from.id, to: otherVersion.id })
@@ -650,7 +654,7 @@ describe('GET /mapping-versions', () => {
     const first = await published(orders.id)
     await save(orders.id, buyerGln)
     const second = await published(orders.id)
-    const despatch = await created('DESADV')
+    const despatch = await created('DESADV', orders.documentStructureId)
     const despatchVersion = await published(despatch.id)
     await published((await createdMapping(otherAdmin)).id, '', otherAdmin)
 

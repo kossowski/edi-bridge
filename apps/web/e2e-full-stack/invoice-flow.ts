@@ -114,7 +114,7 @@ export async function setUpInvoiceFlow(api: Api) {
     },
   })
 
-  await call(api, createDocumentStructureEndpoint, {
+  const documentStructure = await call(api, createDocumentStructureEndpoint, {
     body: {
       name: `ERP invoice ${suffix}`,
       origin: {
@@ -138,7 +138,9 @@ export async function setUpInvoiceFlow(api: Api) {
 
   const reference = mappingVersionSchema.parse(JSON.parse(golden('invoic-reference.mapping.json')))
 
-  const mapping = await call(api, createMappingEndpoint, { body: { messageType: 'INVOIC' } })
+  const mapping = await call(api, createMappingEndpoint, {
+    body: { messageType: 'INVOIC', documentStructureId: documentStructure.id },
+  })
 
   await call(api, saveMappingDraftEndpoint, {
     path: toPath(saveMappingDraftEndpoint.path, { id: mapping.id }),
