@@ -48,7 +48,10 @@ async function badges(canvasElement: HTMLElement, name: string) {
 }
 
 async function openNewMappingSheet(canvasElement: HTMLElement, name = 'New Mapping') {
-  await userEvent.click(await within(canvasElement).findByRole('button', { name }))
+  // The button shows once the Mappings load, which can pass the default second under load.
+  await userEvent.click(
+    await within(canvasElement).findByRole('button', { name }, { timeout: 5000 }),
+  )
 
   return within(await findOpenDialog(canvasElement, name))
 }

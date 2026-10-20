@@ -51,7 +51,10 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   async play({ canvas }) {
-    await expect(await canvas.findByRole('heading', { name: 'Mapping differences' })).toBeVisible()
+    // The heading waits for the versions list and both versions to load.
+    await expect(
+      await canvas.findByRole('heading', { name: 'Mapping differences' }, { timeout: 5000 }),
+    ).toBeVisible()
     await expect(
       await canvas.findByText(/differences: \d+ added/, {}, { timeout: 5000 }),
     ).toBeVisible()

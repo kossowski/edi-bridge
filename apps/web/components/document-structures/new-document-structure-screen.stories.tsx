@@ -139,6 +139,8 @@ export const Reading = meta.story({
   async play({ canvas, canvasElement }) {
     await drop(canvasElement, invoiceExport)
     await expect(await canvas.findByRole('heading', { name: readingTitle })).toBeVisible()
+    // The heading shows while the file opens; the columns follow once it is read.
+    await canvas.findByText('Found 12 columns, separated by semicolons')
     const steps = [...canvas.getAllByRole('list')[0]!.children]
 
     await expect(steps[0]).toHaveTextContent('Opening the file: done')
@@ -481,7 +483,10 @@ export const GermanReading = meta.story({
     await expect(
       await canvas.findByRole('heading', { name: 'Rechnungsexport_2026-10-08.csv wird gelesen' }),
     ).toBeVisible()
-    await expect(canvas.getByText('12 Spalten gefunden, getrennt durch Semikolons')).toBeVisible()
+    // The heading shows while the file opens; the columns follow once it is read.
+    await expect(
+      await canvas.findByText('12 Spalten gefunden, getrennt durch Semikolons'),
+    ).toBeVisible()
     await expect(canvas.getByText(/^Felder in einfachen Worten benennen/)).toBeVisible()
   },
 })
