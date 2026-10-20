@@ -3896,6 +3896,7 @@ describe('the CONTRL answering a received Interchange', () => {
 
   const receivingContent = async (into: InvoiceWorkspace, content: ArrivingDocument['content']) => {
     const { messages, logger } = collectLogs()
+    const queue = inMemoryRunQueue()
 
     const exit = await Effect.runPromiseExit(
       receive({
@@ -3904,10 +3905,10 @@ describe('the CONTRL answering a received Interchange', () => {
         fileName: 'orders.edi',
         content,
         manualSubmission: false,
-      }).pipe(pipelineServices(connection.db, inMemoryRunQueue()), Effect.provide(logger)),
+      }).pipe(pipelineServices(connection.db, queue), Effect.provide(logger)),
     )
 
-    return { exit, logs: messages }
+    return { exit, logs: messages, queue }
   }
 
   const receiving = (into: InvoiceWorkspace, content: string) =>
@@ -4399,15 +4400,17 @@ describe('the CONTRL answering a received Interchange', () => {
     })
   })
 
+  const misEncodedOrders = ordersMessage.map((line) => line.replace('+128576+', '+1285\u00e476+'))
+
   it('rejects an Interchange not valid in its character set in a CONTRL sent', async () => {
     const into = await answeringWorkspace('Mis-encoded Order Lines')
     const delivery = recordingDelivery()
-    const misEncoded = ordersMessage.map((line) => line.replace('+128576+', '+1285\u00e476+'))
 
     const { exit } = await receivingContent(
       into,
-      undecodableInterchange(interchangeOf([misEncoded])),
+      undecodableInterchange(interchangeOf([misEncodedOrders])),
     )
+
     await sendWith(delivery.service)
 
     expect(delivery.to(into.outboundChannelId).map(({ content }) => content)).toEqual([
@@ -4424,16 +4427,32 @@ describe('the CONTRL answering a received Interchange', () => {
 
   it('answers no Interchange not valid in its character set whose UNB cannot be read', async () => {
     const into = await answeringWorkspace('Mis-encoded Headless Orders')
-    const misEncoded = ordersMessage.map((line) => line.replace('+128576+', '+1285\u00e476+'))
+    const delivery = recordingDelivery()
 
-    const { exit } = await receivingContent(
+    const { exit, queue } = await receivingContent(
       into,
       undecodableInterchange(
-        interchangeOf([misEncoded]).replace("+00000001'", "'").replace("UNZ+1+00000001'", "UNZ+1'"),
+        interchangeOf([misEncodedOrders])
+          .replace("+00000001'", "'")
+          .replace("UNZ+1+00000001'", "UNZ+1'"),
       ),
     )
 
+    await processQueued(queue, delivery.service)
+    await sendWith(delivery.service)
+
+    const [run] = await connection.db
+      .select({ id: runs.id })
+      .from(runs)
+      .where(eq(runs.documentId, documentIdOf(exit)))
+
+    await expect(readRun(connection.db, run?.id ?? '')).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'parse',
+    })
     await expect(acknowledgementOf(documentIdOf(exit))).resolves.toBeUndefined()
+    expect(delivery.to(into.outboundChannelId)).toEqual([])
+    expect(erp.received).toHaveLength(0)
   })
 
   it('rejects an Interchange whose envelope is broken in a CONTRL sent', async () => {
