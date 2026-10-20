@@ -83,6 +83,12 @@ function MemoryHistory({ start, children }: { start: StoryNavigation; children: 
     router.back.mockImplementation(() =>
       setHistory(({ entries, index }) => ({ entries, index: Math.max(0, index - 1) })),
     )
+    router.forward.mockImplementation(() =>
+      setHistory(({ entries, index }) => ({
+        entries,
+        index: Math.min(entries.length - 1, index + 1),
+      })),
+    )
   }, [])
 
   const href = history.entries[history.index] ?? ''
@@ -106,6 +112,8 @@ export const withMemoryHistory = (
 )
 
 export const goBack = () => getRouter().back()
+
+export const goForward = () => getRouter().forward()
 
 export const withSidebarProvider = (
   Story: () => ReactNode,

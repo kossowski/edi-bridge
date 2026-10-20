@@ -5,6 +5,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { SearchParamsReader } from '@/lib/search-params'
 
+type SearchBurst = { before: string; searches: Set<string> }
+
+function isSearchOnly<Filters>(change: Partial<Filters>) {
+  const keys = Object.keys(change)
+
+  return keys.length === 1 && keys[0] === 'q'
+}
+
 export function useUrlFilters<Filters extends { page: number }>(
   parse: (params: SearchParamsReader) => Filters,
   toSearch: (filters: Filters) => string,
@@ -24,18 +32,25 @@ export function useUrlFilters<Filters extends { page: number }>(
   }
 
   const latest = useRef(filters)
-  // The search the last search-only change navigated to; a typing burst replaces that entry.
-  const searchEntry = useRef<string>(undefined)
+  const burst = useRef<SearchBurst>(undefined)
 
   useEffect(() => {
     latest.current = filters
   })
+
+  useEffect(() => {
+    // Back, Forward or a link moved the URL, so the next search starts an entry of its own.
+    if (!burst.current?.searches.has(search)) {
+      burst.current = undefined
+    }
+  }, [search])
 
   const updateFilters = useCallback(
     (change: Partial<Filters>) => {
       const current = toSearch(latest.current)
       const next = { ...latest.current, page: 1, ...change }
       const nextSearch = toSearch(next)
+      const href = `${pathname}?${nextSearch}`
 
       latest.current = next
       setState((previous) => ({ ...previous, filters: next }))
@@ -44,11 +59,22 @@ export function useUrlFilters<Filters extends { page: number }>(
         return
       }
 
-      const searchOnly = Object.keys(change).join() === 'q'
-      const method = searchOnly && searchEntry.current === current ? 'replace' : 'push'
+      const scroll = { scroll: false }
 
-      searchEntry.current = searchOnly ? nextSearch : undefined
-      router[method](`${pathname}?${nextSearch}`, { scroll: false })
+      if (!isSearchOnly(change)) {
+        burst.current = undefined
+        router.push(href, scroll)
+      } else if (!burst.current) {
+        burst.current = { before: current, searches: new Set([nextSearch]) }
+        router.push(href, scroll)
+      } else if (nextSearch === burst.current.before) {
+        // Replacing would copy the entry before the burst, and Back would seem to do nothing.
+        burst.current = undefined
+        router.back()
+      } else {
+        burst.current.searches.add(nextSearch)
+        router.replace(href, scroll)
+      }
     },
     [pathname, router, toSearch],
   )
