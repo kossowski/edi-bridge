@@ -32,6 +32,7 @@ import {
   workspaces,
 } from '@edi-bridge/db'
 
+import { DefectReporter, type DefectReport, type DefectReporterService } from './defect-report'
 import { RunNotQueued } from './errors'
 import { LiveEvents, type LiveEventsService, type PublishedLiveEvent } from './live-events'
 import {
@@ -128,6 +129,29 @@ export const testLiveEvents = recordingLiveEvents()
 export const liveStatusesOf = (runId: string) =>
   testLiveEvents.published.flatMap(({ event: { run } }) => (run.id === runId ? [run.status] : []))
 
+export function recordingDefectReporter() {
+  const reported: DefectReport[] = []
+
+  return {
+    reported,
+    service: {
+      report: (report) =>
+        Effect.sync(() => {
+          reported.push(report)
+        }),
+    } satisfies DefectReporterService,
+  }
+}
+
+// Every test reports to one recorder, and tells its own Runs apart by their ids.
+export const testDefectReporter = recordingDefectReporter()
+
+export const defectReportsOf = (runId: string) =>
+  testDefectReporter.reported.filter((report) => report.runId === runId)
+
+export const defectReportsIn = (workspaceId: string) =>
+  testDefectReporter.reported.filter((report) => report.workspaceId === workspaceId)
+
 const noDelivery: DeliveryService = () => Effect.die(new Error('This test delivers nothing'))
 
 export const pipelineServices =
@@ -139,6 +163,7 @@ export const pipelineServices =
       Effect.provideService(RunQueue, queue.service),
       Effect.provideService(Delivery, delivery),
       Effect.provideService(LiveEvents, testLiveEvents.service),
+      Effect.provideService(DefectReporter, testDefectReporter.service),
     )
 
 export const testSecrets = secretBox(randomBytes(secretKeyBytes))

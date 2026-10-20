@@ -21,6 +21,7 @@ import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 import { Download, type DownloadService, pollInboundChannels, processRun } from './index'
 import {
   addOrdersFlow,
+  defectReportsIn,
   golden,
   goldenInvoice,
   inMemoryRunQueue,
@@ -564,6 +565,7 @@ describe('the polling of inbound SFTP Channels', () => {
     expect(
       await connection.db.select().from(documents).where(eq(documents.channelId, impostorId)),
     ).toEqual([])
+    expect(defectReportsIn(workspace.id)).toEqual([])
   })
 
   it('polls a Channel again at its next interval after its poll failed', async () => {

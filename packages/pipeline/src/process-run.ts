@@ -12,7 +12,7 @@ import {
   notExists,
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import { Data, DateTime, Effect, Match, Predicate, Ref, Result } from 'effect'
+import { Data, DateTime, Effect, Match, Predicate, Ref, Result, Tracer } from 'effect'
 
 import {
   type AcknowledgementState,
@@ -81,6 +81,7 @@ import type { ParseError } from '@edi-bridge/edifact'
 
 import { referencesOf } from './business-reference'
 import { decodeDocument, type DocumentUndecodable } from './decode-document'
+import { type DefectReport, reportDefect, reportFoundDefect } from './defect-report'
 import { deliveryInputSchema } from './delivery-input'
 import { enveloped, framed } from './envelope'
 import { publishRunChanges } from './live-events'
@@ -113,6 +114,7 @@ export class CharacterSetUnsupported extends Data.TaggedError('CharacterSetUnsup
 
 // The Delivery adapter died: a broken Channel row or a credential that does not open.
 export class ChannelDefect extends Data.TaggedError('ChannelDefect')<{
+  readonly channelId: string
   readonly defect: unknown
 }> {}
 
@@ -121,6 +123,7 @@ export class SeededChannel extends Data.TaggedError('SeededChannel') {}
 
 // Any other defect in the delivery step, such as a database error.
 export class DeliveryDefect extends Data.TaggedError('DeliveryDefect')<{
+  readonly channelId: string
   readonly defect: unknown
 }> {}
 
@@ -648,7 +651,9 @@ const handOver = (
     const delivery = yield* Delivery
 
     yield* delivery(channel, document).pipe(
-      Effect.catchDefect((defect) => Effect.fail(new ChannelDefect({ defect }))),
+      Effect.catchDefect((defect) =>
+        Effect.fail(new ChannelDefect({ channelId: channel.id, defect })),
+      ),
     )
 
     const db = yield* Database
@@ -1033,7 +1038,7 @@ const step = <A, E, R>(
     yield* Ref.set(hold, finished)
 
     return result
-  })
+  }).pipe(Effect.withSpan(`run.${stage}`, { attributes: { runId } }))
 
 // Only a processing Run fails, so a defect never overwrites a Run that already failed.
 const failRun = async (tx: Transaction, runId: string, failure: Failure, position: number) => {
@@ -1292,7 +1297,9 @@ const deliveryStep = (
       'delivery',
       (lease) =>
         delivering(lease).pipe(
-          Effect.catchDefect((defect) => Effect.fail(new DeliveryDefect({ defect }))),
+          Effect.catchDefect((defect) =>
+            Effect.fail(new DeliveryDefect({ channelId: destination.channel.id, defect })),
+          ),
         ),
       async (tx) => {
         await tx
@@ -1318,7 +1325,8 @@ const deliveryStep = (
       Predicate.isTagged(failure, 'ChannelDefect') ||
       Predicate.isTagged(failure, 'DeliveryDefect')
     ) {
-      return yield* Effect.die(failure.defect)
+      // The processing reports the defect with the code and Channel it failed the Run with.
+      return yield* Effect.die(failure)
     }
 
     return false
@@ -1685,7 +1693,10 @@ const processClaimed = (
         return yield* new RunNotOwned({ runId: run.id })
       }
 
-      return yield* Effect.logError(`The Document of Run ${run.id} expired before it was processed`)
+      return yield* reportFoundDefect(
+        `The Document of Run ${run.id} expired before it was processed`,
+        { workspaceId: queued.workspaceId, runId: run.id, tradingPartnerId: tradingPartner.id },
+      )
     }
 
     const documents = yield* Documents
@@ -1710,6 +1721,20 @@ const processClaimed = (
     yield* direction === 'outbound' ? processOutbound(processing) : processInbound(processing)
   })
 
+type DiedDefect = Pick<DefectReport, 'code' | 'channelId'> & { defect: unknown }
+
+const defectFailedWith = (cause: unknown): DiedDefect => {
+  if (cause instanceof ChannelDefect) {
+    return { code: 'channelDefect', channelId: cause.channelId, defect: cause.defect }
+  }
+
+  if (cause instanceof DeliveryDefect) {
+    return { code: 'deliveryDefect', channelId: cause.channelId, defect: cause.defect }
+  }
+
+  return { code: 'processingDefect', channelId: null, defect: cause }
+}
+
 export const processRun = (queued: QueuedRun) =>
   Effect.gen(function* () {
     const claimed = yield* claim(queued)
@@ -1727,7 +1752,7 @@ export const processRun = (queued: QueuedRun) =>
 
     // The defect still dies, so the worker reports it, unless the worker lost the Run before it.
     yield* processClaimed(holding, queued, claimed).pipe(
-      Effect.catchDefect((defect) =>
+      Effect.catchDefect((died) =>
         Effect.gen(function* () {
           // A failure to fail the Run must not hide the defect that stopped it.
           const held = yield* failHeldOnDefect(holding).pipe(
@@ -1739,9 +1764,22 @@ export const processRun = (queued: QueuedRun) =>
             ),
           )
 
+          const { code, channelId, defect } = defectFailedWith(died)
+
           if (!held) {
             return yield* new RunNotOwned({ runId: holding.runId, cause: defect })
           }
+
+          yield* reportDefect(
+            {
+              workspaceId: queued.workspaceId,
+              runId: holding.runId,
+              tradingPartnerId: claimed.tradingPartner.id,
+              channelId,
+              code,
+            },
+            defect,
+          )
 
           return yield* Effect.die(defect)
         }),
@@ -1754,4 +1792,9 @@ export const processRun = (queued: QueuedRun) =>
       ),
       Effect.ensuring(publishRunChanges([claimed.run.id])),
     )
-  })
+  }).pipe(
+    Effect.withSpan('run.processing', {
+      attributes: { workspaceId: queued.workspaceId, runId: queued.runId },
+      parent: queued.trace && Tracer.externalSpan(queued.trace),
+    }),
+  )

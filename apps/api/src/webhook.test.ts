@@ -137,7 +137,9 @@ describe('POST /webhooks/:id', () => {
 
     expect(receipt.runs).toHaveLength(1)
     expect(receipt.notRouted).toEqual([])
-    expect(api.runQueue.queued).toEqual([{ workspaceId: workspace.id, runId: receipt.runs[0]?.id }])
+    expect(api.runQueue.queued).toMatchObject([
+      { workspaceId: workspace.id, runId: receipt.runs[0]?.id },
+    ])
 
     const run = await admin.inject({
       method: 'GET',
