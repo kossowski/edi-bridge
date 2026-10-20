@@ -43,6 +43,13 @@ import { selectVersions, toHeader } from './mapping-version.js'
 import { inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
+// A Duplicate is never mapped, so it shows the Business Reference of its original Run.
+const originalRuns = alias(runs, 'original_runs')
+
+const businessReferenceOfRun = sql<
+  string | null
+>`coalesce(${runs.businessReference}, ${originalRuns.businessReference})`
+
 const summaryFields = {
   id: runs.id,
   receivedAt: runs.receivedAt,
@@ -50,7 +57,7 @@ const summaryFields = {
   failureStage: runs.failureStage,
   problem: runs.problem,
   manualSubmission: runs.manualSubmission,
-  businessReference: runs.businessReference,
+  businessReference: businessReferenceOfRun,
   tradingPartnerId: tradingPartners.id,
   tradingPartnerName: tradingPartners.name,
   flowId: flows.id,
@@ -65,6 +72,7 @@ const fromRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =
     .from(runs)
     .innerJoin(flows, eq(flows.id, runs.flowId))
     .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
+    .leftJoin(originalRuns, eq(originalRuns.id, runs.duplicateOfRunId))
 
 const selectRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
   fromRuns(db, { ...summaryFields, ...fields })
@@ -148,7 +156,7 @@ const filtersExceptStatus = (db: Database, workspaceId: string, query: RunListQu
     text === ''
       ? undefined
       : or(
-          sql`strpos(lower(${runs.businessReference}), ${text}) > 0`,
+          sql`strpos(lower(${businessReferenceOfRun}), ${text}) > 0`,
           sql`strpos(lower(${tradingPartners.name}), ${text}) > 0`,
         ),
   )
