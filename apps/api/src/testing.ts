@@ -7,9 +7,18 @@ import type { FastifyServerOptions, InjectOptions, LightMyRequestResponse } from
 
 import { secretKeyBytes } from '@edi-bridge/channels'
 import { signInEndpoint, type WorkspaceRole } from '@edi-bridge/contracts'
-import { connect, documents, members, runs, workspaces } from '@edi-bridge/db'
+import {
+  connect,
+  documents,
+  flows,
+  members,
+  runs,
+  tradingPartners,
+  workspaces,
+} from '@edi-bridge/db'
 import { startTestDatabase } from '@edi-bridge/db/testing'
 import { type QueuedRun, RunNotQueued, type RunQueueService } from '@edi-bridge/pipeline'
+import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
 import { utcDay } from './ai-budget.js'
 import { buildApp } from './app.js'
@@ -111,6 +120,123 @@ export async function expireDocumentOf(database: Database, runId: string) {
     .set({ documentId: null, documentDeletedAt })
     .where(eq(runs.documentId, run.documentId))
   await database.delete(documents).where(eq(documents.id, run.documentId))
+}
+
+export const failedRun = (failureStage: 'parse' | 'validation' | 'mapping' | 'delivery') => ({
+  status: 'failed' as const,
+  failureStage,
+  error: {
+    code: 'processingDefect',
+    message: 'The processing failed',
+    position: null,
+    details: null,
+  },
+  problem: { reason: 'defect' as const, fixTarget: null },
+})
+
+type RunValues = Partial<typeof runs.$inferInsert> & { receivedAt: Date }
+
+export const one = async <Row>(rows: Promise<Row[]>) => {
+  const [row] = await rows
+
+  if (row === undefined) {
+    throw new Error('Insert returned no row')
+  }
+
+  return row
+}
+
+export async function addTradingPartnerWithFlows(
+  database: Database,
+  workspace: InvoiceWorkspace,
+  name: string,
+) {
+  const tradingPartner = await one(
+    database
+      .insert(tradingPartners)
+      .values({
+        workspaceId: workspace.id,
+        name,
+        characterSet: 'UNOC',
+        acknowledgementTimeLimitHours: 24,
+      })
+      .returning(),
+  )
+
+  const flowOf = (messageType: 'ORDERS' | 'INVOIC') =>
+    one(
+      database
+        .insert(flows)
+        .values({
+          workspaceId: workspace.id,
+          tradingPartnerId: tradingPartner.id,
+          messageType,
+          name: `${name} ${messageType}`,
+          inboundChannelId: workspace.inboundChannelId,
+          destinationChannelId: workspace.outboundChannelId,
+          mappingVersionId: workspace.mappingVersionId,
+        })
+        .returning(),
+    )
+
+  const orders = await flowOf('ORDERS')
+  const invoic = await flowOf('INVOIC')
+
+  const run = async (flow: typeof orders, values: RunValues) => {
+    const document = await one(
+      database
+        .insert(documents)
+        .values({
+          workspaceId: workspace.id,
+          channelId: workspace.inboundChannelId,
+          fileName: 'message.edi',
+          content: 'UNA',
+        })
+        .returning(),
+    )
+
+    return one(
+      database
+        .insert(runs)
+        .values({
+          workspaceId: workspace.id,
+          documentId: document.id,
+          flowId: flow.id,
+          tradingPartnerId: tradingPartner.id,
+          manualSubmission: false,
+          status: 'delivered',
+          ...values,
+        })
+        .returning(),
+    )
+  }
+
+  return {
+    tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
+    orders: (values: RunValues) => run(orders, values),
+    invoic: (values: RunValues) => run(invoic, values),
+  }
+}
+
+export async function seedWorkspaceWithAdmin(
+  api: { app: Client; connection: { db: Database } },
+  name: string,
+) {
+  // A Workspace of its own, so its numbers stay apart from other tests.
+  const workspace = await seedInvoiceWorkspace(api.connection.db, name)
+  const slug = name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')
+
+  const member = {
+    name: `${name} admin`,
+    email: `admin@${slug}.example`,
+    password: `${slug}-admin-password`,
+    workspaceId: workspace.id,
+    role: 'admin' as const,
+  }
+
+  await addMember(api.connection.db, member)
+
+  return { workspace, admin: await signIn(api.app, member) }
 }
 
 export const signInRequest = ({ email, password }: Credentials): InjectOptions => ({

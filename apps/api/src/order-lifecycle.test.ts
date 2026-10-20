@@ -10,7 +10,7 @@ import {
 import { acknowledgements, documents, flows, runs, tradingPartners } from '@edi-bridge/db'
 import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
-import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+import { addMember, type Client, one, signIn, startTestApi, type TestApi } from './testing.js'
 
 let api: TestApi
 
@@ -36,16 +36,6 @@ const failure = {
 }
 
 type MessageType = 'ORDERS' | 'DESADV' | 'INVOIC' | 'CONTRL'
-
-const one = async <Row>(rows: Promise<Row[]>) => {
-  const [row] = await rows
-
-  if (row === undefined) {
-    throw new Error('Insert returned no row')
-  }
-
-  return row
-}
 
 // The ids the assertions name, set while seeding.
 const seeded = {

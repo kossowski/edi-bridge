@@ -25,7 +25,7 @@ A change to the shell (`apps/web/app/layout.tsx`, `apps/web/components/app-*`) o
 
 ## Browser check server
 
-The browser-check scripts read `.agents/project.env`: they start `next dev` of `WEB_PACKAGE` with `WEB_DEV_ENV`. Here that is `@edi-bridge/web` with `NEXT_PUBLIC_API_MOCKING=enabled`, so the pages get their data from the MSW handlers in `packages/mocks`; `apps/api` doesn't serve the screens' endpoints yet. The same server by hand: `pnpm --filter @edi-bridge/web dev:mock`. `DEV_PORTS` lists the ports `stop-leftovers.sh` checks: Next on 3000, Storybook on 6006.
+The browser-check scripts read `.agents/project.env`: they start `next dev` of `WEB_PACKAGE` with `WEB_DEV_ENV`. Here that is `@edi-bridge/web` with `NEXT_PUBLIC_API_MOCKING=enabled`, so the pages get their data from the MSW handlers in `packages/mocks`, not from `apps/api`. The mocks cover screens whose endpoints `apps/api` doesn't serve yet. The same server by hand: `pnpm --filter @edi-bridge/web dev:mock`. `DEV_PORTS` lists the ports `stop-leftovers.sh` checks: Next on 3000, Storybook on 6006.
 
 ## Skipping review
 

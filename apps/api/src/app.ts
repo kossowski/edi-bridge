@@ -30,6 +30,8 @@ import {
   createMappingEndpoint,
   createTradingPartnerEndpoint,
   currentWorkspaceEndpoint,
+  firstStepsEndpoint,
+  homeEndpoint,
   deleteLookupTableEndpoint,
   endWaitingForTradingPartnerRunEndpoint,
   documentStructureEndpoint,
@@ -126,7 +128,9 @@ import {
   loadDocumentStructure,
   updateDocumentStructure,
 } from './document-structure.js'
+import { loadFirstSteps } from './first-steps.js'
 import { createFlow, listFlows, loadFlow, moveFlowMappingVersion, updateFlow } from './flow.js'
+import { loadHome } from './home.js'
 import { listInterchanges, loadInterchange } from './interchange.js'
 import { acceptInvite, createInvite, listInvites, revokeInvite } from './invite.js'
 import {
@@ -463,6 +467,8 @@ function registerRoutes(
     respond(request, reply, loadCurrentWorkspace),
   )
 
+  app.get(firstStepsEndpoint.path, (request, reply) => respond(request, reply, loadFirstSteps))
+
   app.put(updateCompanyIdentityEndpoint.path, (request, reply) =>
     respond(
       request,
@@ -659,6 +665,10 @@ function registerRoutes(
   )
 
   app.get(tasksEndpoint.path, (request, reply) => respond(request, reply, listTasks))
+
+  app.get(homeEndpoint.path, (request, reply) =>
+    respond(request, reply, Effect.flatMap(parse(homeEndpoint.query, request.query), loadHome)),
+  )
 
   app.get(interchangesEndpoint.path, (request, reply) =>
     respond(

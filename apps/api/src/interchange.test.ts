@@ -13,7 +13,7 @@ import { documents, flows, runs, tradingPartners } from '@edi-bridge/db'
 import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
 import { hourMs } from './duration.js'
-import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+import { addMember, type Client, one, signIn, startTestApi, type TestApi } from './testing.js'
 
 let api: TestApi
 
@@ -26,16 +26,6 @@ const workspaceGln = '4389876511114'
 const now = Date.now()
 
 const hoursAgo = (hours: number) => new Date(now - hours * hourMs)
-
-const one = async <Row>(rows: Promise<Row[]>) => {
-  const [row] = await rows
-
-  if (row === undefined) {
-    throw new Error('Insert returned no row')
-  }
-
-  return row
-}
 
 const interchangeOf = (
   sender: string,
