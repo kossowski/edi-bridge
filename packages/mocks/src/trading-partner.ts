@@ -15,6 +15,9 @@ import {
   type TradingPartnerOnboarding,
   tradingPartnerSchema,
   sendTestInterchangeEndpoint,
+  type TestInterchangeRefusal,
+  testInterchangeRefusedProblem,
+  testInterchangeRefusedStatus,
   tradingPartnersEndpoint,
   updateTradingPartnerEndpoint,
   type Workspace,
@@ -22,7 +25,7 @@ import {
 } from '@edi-bridge/contracts'
 
 import { randomGln } from './gln'
-import { conflict, unprocessable } from './responses'
+import { notFound, unprocessable } from './responses'
 import { seedId } from './seed-id'
 import { seededFaker } from './seeded-faker'
 import { seedSession, toSessionStore } from './session'
@@ -216,6 +219,7 @@ export function toTradingPartnerStore(
 
 export type TestInterchangeOptions = {
   contrlDelayMs?: number | null
+  refusal?: Exclude<TestInterchangeRefusal, { reason: 'notAwaited' }>
 }
 
 const uuid = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
@@ -225,12 +229,22 @@ function isTradingPartnerId(id: string) {
   return uuid.test(id)
 }
 
+const refuseTestInterchange = (refusal: TestInterchangeRefusal) =>
+  HttpResponse.json(testInterchangeRefusedProblem(refusal), {
+    status: testInterchangeRefusedStatus,
+  })
+
+// Registered after the handlers of /trading-partners/<word>, so only an unknown id reaches it.
+export function tradingPartnerNotFoundHandler(apiUrl: string) {
+  return http.get(`${apiUrl}${tradingPartnerEndpoint.path}`, () => notFound())
+}
+
 export function tradingPartnerHandlers(
   apiUrl: string,
   {
     tradingPartners = seedTradingPartners,
     workspace = seedWorkspace,
-    testInterchange: { contrlDelayMs = 5000 } = {},
+    testInterchange: { contrlDelayMs = 5000, refusal } = {},
     session = seedSession,
   }: {
     tradingPartners?: ReadonlyArray<TradingPartner> | TradingPartnerStore
@@ -285,8 +299,6 @@ export function tradingPartnerHandlers(
 
   const glnConflict = () =>
     HttpResponse.json({ message: 'Another Trading Partner already uses this GLN' }, { status: 409 })
-
-  const notFound = () => HttpResponse.json({ message: 'Not found' }, { status: 404 })
 
   return [
     http.get(`${apiUrl}${tradingPartnersEndpoint.path}`, () => {
@@ -389,7 +401,11 @@ export function tradingPartnerHandlers(
         }
 
         if (!canSendTestInterchange(existing, workspaceStore.get().gln)) {
-          return conflict('The Trading Partner does not await a test Interchange')
+          return refuseTestInterchange({ reason: 'notAwaited' })
+        }
+
+        if (refusal) {
+          return refuseTestInterchange(refusal)
         }
 
         const sentAt = Date.now()

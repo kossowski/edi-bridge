@@ -13,6 +13,8 @@ import {
   toPath,
   sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
+  testInterchangeRefusedProblemSchema,
+  tradingPartnerActivitiesEndpoint,
   tradingPartnerEndpoint,
   tradingPartnerSchema,
   tradingPartnersEndpoint,
@@ -397,7 +399,31 @@ describe('POST /trading-partners/:id/test-interchange', () => {
     const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, tradingPartner))
 
     expect(response.status).toBe(409)
+    expect(testInterchangeRefusedProblemSchema.parse(await response.json())).toMatchObject({
+      reason: 'notAwaited',
+    })
     expect(await getTradingPartner(tradingPartner.id)).toEqual(tradingPartner)
+  })
+
+  it.each([
+    { reason: 'noOutboundFlow' as const },
+    {
+      reason: 'sampleMissing' as const,
+      flow: { id: '10000000-0000-4000-8000-0000000000f1', name: 'Invoices to Kieler Kontor' },
+    },
+  ])('refuses the test send for the simulated reason $reason', async (refusal) => {
+    server.use(
+      ...tradingPartnerHandlers(apiUrl, {
+        tradingPartners: [notStarted],
+        testInterchange: { refusal },
+      }),
+    )
+
+    const response = await send('POST', toPath(sendTestInterchangeEndpoint.path, notStarted))
+
+    expect(response.status).toBe(409)
+    expect(testInterchangeRefusedProblemSchema.parse(await response.json())).toMatchObject(refusal)
+    expect(await getTradingPartner(notStarted.id)).toEqual(notStarted)
   })
 
   it('answers 404 for an unknown Trading Partner', async () => {
@@ -426,6 +452,16 @@ describe('createHandlers', () => {
 
     expect(workspaceSchema.parse(await workspace.json()).gln).toBe('0212345000007')
     expect((await send('POST', path)).status).toBe(200)
+  })
+
+  it('answers 404 for a Trading Partner id that is not a UUID, like the api', async () => {
+    server.use(...createHandlers(apiUrl))
+
+    const missing = await send('GET', toPath(tradingPartnerEndpoint.path, { id: 'no-such-id' }))
+    const activities = await send('GET', tradingPartnerActivitiesEndpoint.path)
+
+    expect(missing.status).toBe(404)
+    expect(activities.status).toBe(200)
   })
 
   it('rejects a company GLN with a wrong check digit', async () => {

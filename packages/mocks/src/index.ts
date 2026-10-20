@@ -80,6 +80,7 @@ import {
   seedTradingPartners,
   type TestInterchangeOptions,
   tradingPartnerHandlers,
+  tradingPartnerNotFoundHandler,
 } from './trading-partner'
 import { tradingPartnerActivityHandlers } from './trading-partner-activity'
 import { seedWorkspace, workspaceHandlers } from './workspace'
@@ -275,6 +276,7 @@ export {
   seedTradingPartners,
   type TestInterchangeOptions,
   tradingPartnerHandlers,
+  tradingPartnerNotFoundHandler,
   type TradingPartnerStore,
 } from './trading-partner'
 
@@ -475,6 +477,7 @@ export function createHandlers(
       flows,
       channels: channelStore,
     }),
+    tradingPartnerNotFoundHandler(apiUrl),
     ...channelHandlers(apiUrl, { channels: channelStore, flows, connectionFailures }),
     ...flowHandlers(apiUrl, { flows, channels: channelStore, mappings: mappingVersionStore }),
     publishedMappingVersionsHandler(apiUrl, mappingVersionStore),
