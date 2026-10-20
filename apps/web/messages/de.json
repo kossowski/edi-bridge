@@ -753,7 +753,8 @@
     "header": {
       "receivedAt": "{direction, select, inbound {Empfangen} other {Erstellt}}",
       "uploaded": "Von Hand hochgeladen",
-      "order": "Ganzen Auftrag {reference} ansehen"
+      "order": "Ganzen Auftrag {reference} ansehen",
+      "testTransmission": "Testübertragung"
     },
     "problem": {
       "whatHappened": "Was passiert ist",

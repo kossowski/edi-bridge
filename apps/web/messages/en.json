@@ -753,7 +753,8 @@
     "header": {
       "receivedAt": "{direction, select, inbound {Received} other {Created}}",
       "uploaded": "uploaded by hand",
-      "order": "View the whole order {reference}"
+      "order": "View the whole order {reference}",
+      "testTransmission": "Test transmission"
     },
     "problem": {
       "whatHappened": "What happened",
