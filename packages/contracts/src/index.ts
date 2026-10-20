@@ -156,11 +156,18 @@ export {
   type DocumentStructureOriginKind,
   documentStructureOriginKinds,
   documentStructureOriginSchema,
+  type DocumentStructureInference,
+  documentStructureInferenceSchema,
   type DocumentStructureSummary,
   documentStructureSummarySchema,
   documentStructuresEndpoint,
   type EncodedFile,
   encodedFileSchema,
+  type FieldNamesNotice,
+  type FieldNamesNoticeReason,
+  fieldNamesNoticeReasons,
+  fieldNamesNotices,
+  fieldNamesNoticeSchema,
   samplePreview,
   samplePreviewLineCount,
   type FieldLabelChoice,
@@ -430,6 +437,17 @@ export {
 } from './lookup-table'
 
 export { applyLookupTableImport, classifyLookupTableImport } from './lookup-table-import'
+
+export {
+  codeMeaningOf,
+  codeMeaningsOf,
+  defaultLanguage,
+  type Language,
+  type LanguageQuery,
+  languageQuerySchema,
+  languages,
+  languageSchema,
+} from './code-meaning'
 
 export {
   byNameAndNewest,

@@ -7,12 +7,14 @@ import {
   type CreateDocumentStructureBody,
   csvSettingsChangeProblem,
   type DocumentStructure,
+  type DocumentStructureInference,
   type DocumentStructureOrigin,
   type DocumentStructureProblem,
   DocumentStructureProblemError,
   documentStructureLeaves,
   documentStructureSchema,
   type DocumentStructureSummary,
+  fieldNamesNotices,
   inferDocumentStructure,
   type InferredDocumentStructure,
   linkChangeProblem,
@@ -45,7 +47,10 @@ const rejectingProblem = (problem: DocumentStructureProblem | null) =>
   problem === null ? Effect.void : Effect.fail(new DocumentStructureRejected({ problem }))
 
 export const inferDocumentStructureOrReject = (origin: DocumentStructureOrigin) =>
-  rejectingDocumentStructureProblem(() => inferDocumentStructure(origin))
+  rejectingDocumentStructureProblem((): DocumentStructureInference => ({
+    ...inferDocumentStructure(origin),
+    fieldNamesNotice: fieldNamesNotices.aiUnavailable,
+  }))
 
 const toRowValues = (structure: DocumentStructure | InferredDocumentStructure) => ({
   format: structure.format,

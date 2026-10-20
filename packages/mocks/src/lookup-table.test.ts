@@ -2,6 +2,8 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  aiBudgetExhaustedProblemSchema,
+  aiBudgetExhaustedStatus,
   createLookupTableEndpoint,
   deleteLookupTableEndpoint,
   importLookupTableEndpoint,
@@ -97,8 +99,12 @@ function usedOnlyByVersion(lookupTableId: string) {
   }
 }
 
-async function getLookupTable(id: string) {
-  const response = await send('GET', toPath(lookupTableEndpoint.path, { id }))
+function inLanguage(path: string, language?: string) {
+  return language === undefined ? path : `${path}?${toSearchParams({ language })}`
+}
+
+async function getLookupTable(id: string, language?: string) {
+  const response = await send('GET', inLanguage(toPath(lookupTableEndpoint.path, { id }), language))
 
   return lookupTableEndpoint.response.parse(await response.json())
 }
@@ -421,8 +427,11 @@ function failedRunAt(receivedAt: string) {
   }
 }
 
-async function getMissingCodes(id: string) {
-  const response = await send('GET', toPath(lookupTableMissingCodesEndpoint.path, { id }))
+async function getMissingCodes(id: string, language?: string) {
+  const response = await send(
+    'GET',
+    inLanguage(toPath(lookupTableMissingCodesEndpoint.path, { id }), language),
+  )
 
   return lookupTableMissingCodesEndpoint.response.parse(await response.json())
 }
@@ -452,6 +461,23 @@ describe('GET /lookup-tables/:id/missing-codes', () => {
           businessReference: newerFailure.businessReference,
         },
         expect.objectContaining({ id: olderFailure.id }),
+      ],
+    })
+  })
+
+  it('explains the code and its suggestions in German', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [newerFailure] }))
+    const units = seedLookupTableNamed('Units of measure')
+
+    const [krt] = await getMissingCodes(units.id, 'de')
+
+    expect(krt).toMatchObject({
+      code: 'KRT',
+      meaning: 'Karton',
+      suggestions: [
+        { code: 'CT', meaning: 'Karton' },
+        { code: 'PK', meaning: 'Packung' },
+        { code: 'BX', meaning: 'Kiste' },
       ],
     })
   })
@@ -700,6 +726,28 @@ describe('code meanings', () => {
       { code: 'LTR', meaning: 'Litre' },
     ])
   })
+
+  it('explains them in German for a German page', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const { codeMeanings } = await getLookupTable(seedLookupTableNamed('Units of measure').id, 'de')
+
+    expect(codeMeanings).toEqual([
+      { code: 'PCE', meaning: 'Stück' },
+      { code: 'KGM', meaning: 'Kilogramm' },
+      { code: 'LTR', meaning: 'Liter' },
+    ])
+  })
+
+  it.each([
+    ['GET', lookupTableEndpoint.path],
+    ['GET', lookupTableMissingCodesEndpoint.path],
+  ])('answers 400 to %s %s in a language the pages do not speak', async (method, path) => {
+    server.use(...lookupTableHandlers(apiUrl))
+    const id = seedLookupTableNamed('Units of measure').id
+
+    expect((await send(method, inLanguage(toPath(path, { id }), 'fr'))).status).toBe(400)
+  })
 })
 
 describe('GET /lookup-table-suggestions', () => {
@@ -715,6 +763,29 @@ describe('GET /lookup-table-suggestions', () => {
 
     expect(entries[0]).toEqual({ sourceCode: 'ST', targetCode: 'PCE', targetMeaning: 'Piece' })
     expect(entries.map(({ sourceCode }) => sourceCode)).toEqual(['ST', 'KRT', 'KG', 'PAL'])
+  })
+
+  it('explains the suggested codes in German', async () => {
+    server.use(...lookupTableHandlers(apiUrl))
+
+    const response = await suggest({ kind: 'countries', language: 'de' })
+    const { entries } = lookupTableSuggestionsEndpoint.response.parse(await response.json())
+
+    expect(entries[2]).toEqual({
+      sourceCode: 'Niederlande',
+      targetCode: 'NL',
+      targetMeaning: 'Niederlande',
+    })
+  })
+
+  it('answers that the AI budget of the Workspace is used up', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { suggestions: 'aiBudgetExhausted' }))
+
+    const response = await suggest({ kind: 'units' })
+    const problem = aiBudgetExhaustedProblemSchema.parse(await response.json())
+
+    expect(response.status).toBe(aiBudgetExhaustedStatus)
+    expect(problem.budget.usedToday).toBeGreaterThanOrEqual(problem.budget.dailyLimit)
   })
 
   it('suggests nothing for a kind without a known code list', async () => {
@@ -761,6 +832,10 @@ describe('lookupTableHandlers for a Viewer', () => {
     ['delete a Lookup Table', () => send('DELETE', path(deleteLookupTableEndpoint))],
     ['preview an import', () => send('POST', path(lookupTableImportPreviewEndpoint), csv)],
     ['import a CSV', () => send('POST', path(importLookupTableEndpoint), csv)],
+    [
+      'ask for suggested values',
+      () => send('GET', `${lookupTableSuggestionsEndpoint.path}?kind=units`),
+    ],
   ])('answers 403 to %s and changes nothing', async (_, request) => {
     server.use(...lookupTableHandlers(apiUrl, { session: showcaseViewerSession }))
     const before = await listLookupTables()

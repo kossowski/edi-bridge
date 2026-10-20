@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { type LanguageQuery, languageQuerySchema } from './code-meaning'
 import { directionOf, directionSchema, messageTypeSchema } from './message-type'
 import { tradingPartnerSummarySchema } from './trading-partner'
 
@@ -139,12 +140,13 @@ export const lookupTablesEndpoint: Endpoint<LookupTableSummary[]> = {
 
 export const lookupTableEndpoint: Endpoint<
   LookupTable,
-  undefined,
+  LanguageQuery,
   undefined,
   '/lookup-tables/:id'
 > = {
   method: 'GET',
   path: '/lookup-tables/:id',
+  query: languageQuerySchema,
   response: lookupTableSchema,
 }
 
@@ -235,21 +237,21 @@ export const missingCodesSchema = z
 
 export const lookupTableMissingCodesEndpoint: Endpoint<
   MissingCode[],
-  undefined,
+  LanguageQuery,
   undefined,
   '/lookup-tables/:id/missing-codes'
 > = {
   method: 'GET',
   path: '/lookup-tables/:id/missing-codes',
+  query: languageQuerySchema,
   response: missingCodesSchema,
 }
 
-export const lookupTableSuggestionsQuerySchema = z.object({
-  kind: lookupTableKindSchema,
-  tradingPartnerId: z.uuid().optional(),
-})
+export const lookupTableSuggestionsQuerySchema = z
+  .object({ kind: lookupTableKindSchema, tradingPartnerId: z.uuid().optional() })
+  .extend(languageQuerySchema.shape)
 
-export type LookupTableSuggestionsQuery = z.infer<typeof lookupTableSuggestionsQuerySchema>
+export type LookupTableSuggestionsQuery = z.input<typeof lookupTableSuggestionsQuerySchema>
 
 export const suggestedEntrySchema = lookupTableEntrySchema.extend({
   targetMeaning: z.string().min(1).nullable(),

@@ -844,7 +844,7 @@ export function applyLabels<Tree extends { children: DocumentStructureNode[] }>(
   tree: Tree,
   labels: ReadonlyArray<FieldLabelChoice>,
 ): Tree {
-  const byPath = new Map(labels.map(({ path, label }) => [path, label]))
+  const byPath = new Map(labels.map((choice) => [choice.path, choice]))
 
   for (const { path } of labels) {
     if (!findNode(tree.children, path)) {
@@ -855,9 +855,15 @@ export function applyLabels<Tree extends { children: DocumentStructureNode[] }>(
   return {
     ...tree,
     children: renamedNodes(tree.children, (node) => {
-      const label = byPath.get(node.path)
+      const choice = byPath.get(node.path)
 
-      return label === undefined ? undefined : chosenName(node, label)
+      if (choice === undefined) {
+        return undefined
+      }
+
+      return choice.labelReason === undefined
+        ? chosenName(node, choice.label)
+        : { label: choice.label, labelReason: choice.labelReason, labelUnsure: false }
     }),
   }
 }

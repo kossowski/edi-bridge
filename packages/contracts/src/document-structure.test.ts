@@ -6,6 +6,8 @@ import {
   documentStructureProblemSchema,
   documentStructureSchema,
   documentStructureSummarySchema,
+  fieldNamesNotices,
+  inferDocumentStructureEndpoint,
   samplePreview,
   inferredDocumentStructureSchema,
   updateDocumentStructureBodySchema,
@@ -349,6 +351,43 @@ describe('inferredDocumentStructureSchema', () => {
   })
 })
 
+describe('inferDocumentStructureEndpoint', () => {
+  const inferred = {
+    ...purchaseOrder,
+    id: undefined,
+    name: undefined,
+    facts: { fieldCount: 2 },
+  }
+
+  it('says whether the AI named the fields', () => {
+    const named = { ...inferred, fieldNamesNotice: null }
+    const unnamed = { ...inferred, fieldNamesNotice: fieldNamesNotices.aiBudgetExhausted }
+
+    expect(inferDocumentStructureEndpoint.response.parse(named).fieldNamesNotice).toBeNull()
+    expect(inferDocumentStructureEndpoint.response.parse(unnamed).fieldNamesNotice).toEqual({
+      reason: 'aiBudgetExhausted',
+      message: 'AI budget used up for today; fields named without AI',
+    })
+  })
+
+  it('rejects an answer without the notice or with an unknown reason', () => {
+    const unknown = { ...inferred, fieldNamesNotice: { reason: 'tired', message: 'Later' } }
+
+    expect(inferDocumentStructureEndpoint.response.safeParse(inferred).success).toBe(false)
+    expect(inferDocumentStructureEndpoint.response.safeParse(unknown).success).toBe(false)
+  })
+
+  it('still checks the inferred structure', () => {
+    const wrongFacts = {
+      ...inferred,
+      facts: { columnCount: 2, rowCount: 3 },
+      fieldNamesNotice: null,
+    }
+
+    expect(inferDocumentStructureEndpoint.response.safeParse(wrongFacts).success).toBe(false)
+  })
+})
+
 describe('documentStructureSummarySchema', () => {
   const summary = {
     id: '00000006-0000-4000-8000-000000000001',
@@ -420,6 +459,34 @@ describe('createDocumentStructureBodySchema', () => {
     }
 
     expect(createDocumentStructureBodySchema.safeParse(body).success).toBe(true)
+  })
+
+  it('takes a chosen name with the reason it was given', () => {
+    const body = createDocumentStructureBodySchema.parse({
+      name: 'ERP dispatch export',
+      origin: { kind: 'jsonDocument', document },
+      labels: [
+        { path: 'rows[].Menge', label: 'Quantity', labelReason: 'Menge is German for quantity.' },
+        { path: 'rows[].ME', label: 'Unit of measure', labelReason: null },
+        { path: 'rows[].EPreis', label: 'Unit price' },
+      ],
+    })
+
+    expect(body.labels?.map(({ labelReason }) => labelReason)).toEqual([
+      'Menge is German for quantity.',
+      null,
+      undefined,
+    ])
+  })
+
+  it('rejects an empty reason for a chosen name', () => {
+    const body = {
+      name: 'ERP dispatch export',
+      origin: { kind: 'jsonDocument', document },
+      labels: [{ path: 'rows[].ME', label: 'Unit of measure', labelReason: '' }],
+    }
+
+    expect(createDocumentStructureBodySchema.safeParse(body).success).toBe(false)
   })
 
   it('rejects two plain names for the same path', () => {

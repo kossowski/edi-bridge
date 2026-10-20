@@ -114,6 +114,16 @@ describe('lookupTableEndpoint', () => {
   })
 })
 
+describe.each([
+  ['lookupTableEndpoint', lookupTableEndpoint],
+  ['lookupTableMissingCodesEndpoint', lookupTableMissingCodesEndpoint],
+])('%s query', (_, endpoint) => {
+  it('asks for the code meanings in English unless a language is given', () => {
+    expect(endpoint.query.parse({})).toEqual({ language: 'en' })
+    expect(endpoint.query.parse({ language: 'de' })).toEqual({ language: 'de' })
+  })
+})
+
 describe('lookupTableEntriesSchema', () => {
   it('trims the codes of an entry', () => {
     expect(lookupTableEntriesSchema.parse([{ sourceCode: ' ST ', targetCode: 'PCE ' }])).toEqual([
@@ -233,10 +243,20 @@ describe('lookupTableSuggestionsEndpoint', () => {
         kind: 'units',
         tradingPartnerId: hansemarkt.id,
       }),
-    ).toEqual({ kind: 'units', tradingPartnerId: hansemarkt.id })
+    ).toEqual({ kind: 'units', tradingPartnerId: hansemarkt.id, language: 'en' })
     expect(lookupTableSuggestionsEndpoint.query.parse({ kind: 'countries' })).toEqual({
       kind: 'countries',
+      language: 'en',
     })
+  })
+
+  it('asks for the meanings in a language of the pages', () => {
+    expect(
+      lookupTableSuggestionsEndpoint.query.parse({ kind: 'units', language: 'de' }).language,
+    ).toBe('de')
+    expect(
+      lookupTableSuggestionsEndpoint.query.safeParse({ kind: 'units', language: 'fr' }).success,
+    ).toBe(false)
   })
 
   it('rejects a request without a kind', () => {

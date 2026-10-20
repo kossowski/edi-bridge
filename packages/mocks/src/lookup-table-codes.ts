@@ -1,43 +1,21 @@
-import type { CodeMeaning, LookupTableKind, SuggestedEntry } from '@edi-bridge/contracts'
+import {
+  codeMeaningOf,
+  codeMeaningsOf,
+  type Language,
+  type LookupTableKind,
+  type SuggestedEntry,
+} from '@edi-bridge/contracts'
 
-const partnerCodeMeanings: Readonly<Record<LookupTableKind, ReadonlyMap<string, string>>> = {
-  units: new Map([
-    ['PCE', 'Piece'],
-    ['KGM', 'Kilogram'],
-    ['LTR', 'Litre'],
-    ['PF', 'Pallet'],
-    ['MTR', 'Metre'],
-    ['CT', 'Carton'],
-    ['PK', 'Package'],
-    ['BX', 'Box'],
-    ['BO', 'Bottle'],
-    ['SET', 'Set'],
-  ]),
-  countries: new Map([
-    ['DE', 'Germany'],
-    ['AT', 'Austria'],
-    ['CH', 'Switzerland'],
-    ['PL', 'Poland'],
-    ['NL', 'Netherlands'],
-    ['FR', 'France'],
-  ]),
-  addresses: new Map(),
-  other: new Map([
-    ['S', 'Standard rate'],
-    ['AA', 'Lower rate'],
-    ['Z', 'Zero rated goods'],
-  ]),
-}
-
-type OwnCodeHint = { meaning: string | null; suggestions: ReadonlyArray<string> }
+// An own code means what its partner code means, so its meaning follows the language.
+type OwnCodeHint = { meansCode: string | null; suggestions: ReadonlyArray<string> }
 
 const ownCodeHints: Readonly<Record<LookupTableKind, ReadonlyMap<string, OwnCodeHint>>> = {
   units: new Map([
-    ['KRT', { meaning: 'Carton', suggestions: ['CT', 'PK', 'BX'] }],
-    ['BTL', { meaning: 'Bottle', suggestions: ['BO', 'PCE'] }],
-    ['SET', { meaning: 'Set', suggestions: ['SET', 'PCE'] }],
+    ['KRT', { meansCode: 'CT', suggestions: ['CT', 'PK', 'BX'] }],
+    ['BTL', { meansCode: 'BO', suggestions: ['BO', 'PCE'] }],
+    ['SET', { meansCode: 'SET', suggestions: ['SET', 'PCE'] }],
   ]),
-  countries: new Map([['Polen', { meaning: null, suggestions: ['PL'] }]]),
+  countries: new Map([['Polen', { meansCode: null, suggestions: ['PL'] }]]),
   addresses: new Map(),
   other: new Map(),
 }
@@ -59,31 +37,20 @@ const firstValues: Readonly<Record<LookupTableKind, ReadonlyArray<readonly [stri
   other: [],
 }
 
-export function meaningOf(kind: LookupTableKind, code: string) {
-  return partnerCodeMeanings[kind].get(code) ?? null
-}
-
-export function codeMeaningsOf(kind: LookupTableKind, codes: Iterable<string>): CodeMeaning[] {
-  return [...new Set(codes)].flatMap((code) => {
-    const meaning = meaningOf(kind, code)
-
-    return meaning === null ? [] : [{ code, meaning }]
-  })
-}
-
-export function hintFor(kind: LookupTableKind, code: string) {
+export function hintFor(kind: LookupTableKind, code: string, language: Language) {
   const hint = ownCodeHints[kind].get(code)
+  const meansCode = hint?.meansCode ?? null
 
   return {
-    meaning: hint?.meaning ?? null,
-    suggestions: codeMeaningsOf(kind, hint?.suggestions ?? []),
+    meaning: meansCode === null ? null : codeMeaningOf(kind, meansCode, language),
+    suggestions: codeMeaningsOf(kind, hint?.suggestions ?? [], language),
   }
 }
 
-export function firstValuesOf(kind: LookupTableKind): SuggestedEntry[] {
+export function firstValuesOf(kind: LookupTableKind, language: Language): SuggestedEntry[] {
   return firstValues[kind].map(([sourceCode, targetCode]) => ({
     sourceCode,
     targetCode,
-    targetMeaning: meaningOf(kind, targetCode),
+    targetMeaning: codeMeaningOf(kind, targetCode, language),
   }))
 }

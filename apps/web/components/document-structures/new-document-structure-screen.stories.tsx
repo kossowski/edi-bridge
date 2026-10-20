@@ -14,10 +14,10 @@ import {
   csvRowsPath,
   defaultCsvSettings,
   type DocumentField,
+  type DocumentStructureInference,
   documentStructureOrigins,
   type FieldLabelChoice,
   inferDocumentStructureEndpoint,
-  type InferredDocumentStructure,
 } from '@edi-bridge/contracts'
 import { createHandlers } from '@edi-bridge/mocks'
 
@@ -75,7 +75,7 @@ const wideRows = {
   required: true,
 } as const
 
-const wideInferred: InferredDocumentStructure = {
+const wideInferred: DocumentStructureInference = {
   format: 'csv',
   csv: defaultCsvSettings,
   facts: { columnCount: wideColumns.length, rowCount: 3 },
@@ -87,6 +87,7 @@ const wideInferred: InferredDocumentStructure = {
       items: { ...wideRows, kind: 'object', children: wideColumns.map(wideField) },
     },
   ],
+  fieldNamesNotice: null,
 }
 
 async function drop(canvasElement: HTMLElement, file: File, label = dropLabel) {

@@ -13,6 +13,7 @@ import {
   documentFieldTypes,
   type DocumentStructure,
   documentStructureEndpoint,
+  type DocumentStructureInference,
   documentStructureLeaves,
   type DocumentStructureNode,
   documentStructureOrigins,
@@ -22,6 +23,8 @@ import {
   documentStructuresEndpoint,
   type DocumentStructureSummary,
   documentStructureSummarySchema,
+  type FieldNamesNoticeReason,
+  fieldNamesNotices,
   samplePreview,
   inferDocumentStructure,
   inferDocumentStructureEndpoint,
@@ -609,11 +612,13 @@ export function documentStructureHandlers(
     versions,
     state,
     inferenceState,
+    fieldNamesNotice,
     session = seedSession,
   }: {
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     state?: DocumentStructuresState | undefined
     inferenceState?: DocumentStructuresState | undefined
+    fieldNamesNotice?: FieldNamesNoticeReason | undefined
     session?: Session | null | SessionStore
   } & MappingUse = {},
 ) {
@@ -661,7 +666,12 @@ export function documentStructureHandlers(
 
         const inferred = attempt(() => inferDocumentStructure(body.data))
 
-        return 'response' in inferred ? inferred.response : HttpResponse.json(inferred.result)
+        return 'response' in inferred
+          ? inferred.response
+          : HttpResponse.json({
+              ...inferred.result,
+              fieldNamesNotice: fieldNamesNotice ? fieldNamesNotices[fieldNamesNotice] : null,
+            } satisfies DocumentStructureInference)
       }),
     ),
     http.post(

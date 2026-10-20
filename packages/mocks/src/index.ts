@@ -1,6 +1,7 @@
 import type {
   ChannelTestResultReason,
   DocumentStructure,
+  FieldNamesNoticeReason,
   Invite,
   Session,
   TradingPartner,
@@ -34,6 +35,7 @@ import {
   createLookupTableStore,
   lookupTableHandlers,
   type LookupTableRecord,
+  type LookupTableSuggestionsState,
   seedLookupTables,
 } from './lookup-table'
 import { manualSubmissionHandler } from './manual-submission'
@@ -172,6 +174,7 @@ export {
   lookupTableListHandler,
   type LookupTablesState,
   type LookupTableStore,
+  type LookupTableSuggestionsState,
   type LookupTableUsage,
   type LookupTableWorld,
   partnerScope,
@@ -369,7 +372,9 @@ export function createHandlers(
     documentStructures = [...seedDocumentStructures, ...seedUnusedDocumentStructures],
     documentStructuresState,
     documentStructureInferenceState,
+    documentStructureFieldNamesNotice,
     lookupTables = seedLookupTables,
+    lookupTableSuggestions,
     mappingSamples = seedMappingSamples,
     mappingVersions,
     liveEvents = { mode: 'quiet' },
@@ -389,7 +394,9 @@ export function createHandlers(
     documentStructures?: ReadonlyArray<DocumentStructure> | DocumentStructureStore
     documentStructuresState?: DocumentStructuresState
     documentStructureInferenceState?: DocumentStructuresState
+    documentStructureFieldNamesNotice?: FieldNamesNoticeReason
     lookupTables?: ReadonlyArray<LookupTableRecord>
+    lookupTableSuggestions?: LookupTableSuggestionsState
     mappingSamples?: ReadonlyArray<MappingSampleRecord>
     mappingVersions?: ReadonlyArray<MappingVersionRecord> | MappingVersionStore
     liveEvents?: Omit<LiveEventsOptions, 'runs' | 'bus'>
@@ -557,6 +564,7 @@ export function createHandlers(
       versions: mappingVersionStore,
       state: documentStructuresState,
       inferenceState: documentStructureInferenceState,
+      fieldNamesNotice: documentStructureFieldNamesNotice,
       session: sessionStore,
     }),
     messageTypeStructureHandler(apiUrl),
@@ -569,6 +577,8 @@ export function createHandlers(
       channels: channelStore,
       runs,
       session: sessionStore,
+      settings: workspaceSettingsStore,
+      suggestions: lookupTableSuggestions,
     }),
   ]
 }

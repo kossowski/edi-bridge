@@ -3,6 +3,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   acceptInviteEndpoint,
+  aiBudgetExhaustedProblemSchema,
+  aiBudgetExhaustedStatus,
   type ChannelInput,
   createInviteEndpoint,
   inviteSchema,
@@ -24,6 +26,7 @@ import {
   lookupTableEndpoint,
   showcaseSignInEndpoint,
   lookupTablesEndpoint,
+  lookupTableSuggestionsEndpoint,
   type MappingGraph,
   mappingDraftEndpoint,
   mappingPreviewEndpoint,
@@ -89,6 +92,7 @@ import {
   seedShowcaseWorkspace,
   seedTradingPartners,
   seedWorkspace,
+  seedWorkspaceSettings,
 } from './index'
 import { day } from './overdue'
 import { publishDraft } from './publish-request'
@@ -771,6 +775,43 @@ describe('createHandlers', () => {
 
     expect(inference.status).toBe(500)
     expect((await fetch(`${apiUrl}${documentStructuresEndpoint.path}`)).status).toBe(200)
+  })
+
+  it('names the inferred fields without AI when the AI budget is used up', async () => {
+    server.use(
+      ...createHandlers(apiUrl, { documentStructureFieldNamesNotice: 'aiBudgetExhausted' }),
+    )
+
+    const inference = await fetch(`${apiUrl}${inferDocumentStructureEndpoint.path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(documentStructureOrigins.invoiceCsvDocument),
+    })
+
+    expect(
+      inferDocumentStructureEndpoint.response.parse(await inference.json()).fieldNamesNotice
+        ?.reason,
+    ).toBe('aiBudgetExhausted')
+  })
+
+  it('refuses suggested values with the budget of the Workspace when it is used up', async () => {
+    server.use(
+      ...createHandlers(apiUrl, {
+        workspaceSettings: {
+          ...seedWorkspaceSettings,
+          aiTokenBudget: { dailyLimit: 1_000, usedToday: 1_200 },
+        },
+        lookupTableSuggestions: 'aiBudgetExhausted',
+      }),
+    )
+
+    const response = await fetch(`${apiUrl}${lookupTableSuggestionsEndpoint.path}?kind=units`)
+
+    expect(response.status).toBe(aiBudgetExhaustedStatus)
+    expect(aiBudgetExhaustedProblemSchema.parse(await response.json()).budget).toMatchObject({
+      dailyLimit: 1_000,
+      usedToday: 1_200,
+    })
   })
 
   it('lists Lookup Tables for the Lookup Table node, and none when asked', async () => {

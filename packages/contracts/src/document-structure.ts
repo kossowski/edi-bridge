@@ -342,24 +342,55 @@ export const documentStructureOriginSchema = z.discriminatedUnion('kind', [
 
 export type DocumentStructureOrigin = z.infer<typeof documentStructureOriginSchema>
 
+export const fieldNamesNoticeReasons = ['aiBudgetExhausted', 'aiUnavailable'] as const
+
+export const fieldNamesNoticeSchema = z.object({
+  reason: z.enum(fieldNamesNoticeReasons),
+  message: z.string().min(1),
+})
+
+export type FieldNamesNotice = z.infer<typeof fieldNamesNoticeSchema>
+
+export type FieldNamesNoticeReason = FieldNamesNotice['reason']
+
+export const fieldNamesNotices = {
+  aiBudgetExhausted: {
+    reason: 'aiBudgetExhausted',
+    message: 'AI budget used up for today; fields named without AI',
+  },
+  aiUnavailable: { reason: 'aiUnavailable', message: 'AI unavailable; fields named without AI' },
+} as const satisfies Record<FieldNamesNoticeReason, FieldNamesNotice>
+
+export const documentStructureInferenceSchema = z.intersection(
+  inferredDocumentStructureSchema,
+  z.object({ fieldNamesNotice: fieldNamesNoticeSchema.nullable() }),
+)
+
+export type DocumentStructureInference = z.infer<typeof documentStructureInferenceSchema>
+
 export const inferDocumentStructureEndpoint: Endpoint<
-  InferredDocumentStructure,
+  DocumentStructureInference,
   undefined,
   DocumentStructureOrigin
 > = {
   method: 'POST',
   path: '/document-structures/inference',
   body: documentStructureOriginSchema,
-  response: inferredDocumentStructureSchema,
+  response: documentStructureInferenceSchema,
 }
 
 function onePerPath(entries: ReadonlyArray<{ path: string }>) {
   return new Set(entries.map(({ path }) => path)).size === entries.length
 }
 
-// A plain name the same as the inferred one confirms it and keeps its reason; another one renames
-// the field by hand and has no reason. Either way the name is no longer unsure.
-export const fieldLabelChoiceSchema = z.object({ path: z.string().min(1), label: fieldLabelSchema })
+// A chosen name is never unsure. A given reason is stored as given, and null marks a name chosen by
+// hand. Without a reason, a name the same as the inferred one keeps its reason, and another one
+// renames the field by hand.
+export const fieldLabelChoiceSchema = z.object({
+  path: z.string().min(1),
+  label: fieldLabelSchema,
+  labelReason: z.string().trim().min(1).nullable().optional(),
+})
 
 export type FieldLabelChoice = z.infer<typeof fieldLabelChoiceSchema>
 
