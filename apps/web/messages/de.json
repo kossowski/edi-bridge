@@ -994,7 +994,9 @@
       "receivedAt": "{direction, select, inbound {Empfangen} other {Erstellt}}",
       "source": "Herkunft",
       "uploaded": "Von Hand hochgeladen",
-      "connection": "Über eine Verbindung"
+      "connection": "Über eine Verbindung",
+      "interchange": "Übertragung",
+      "testInterchange": "Von {tradingPartner} als Test markiert"
     },
     "content": {
       "description": "Eine lesbare Ansicht der Positionen in diesem Beleg.",

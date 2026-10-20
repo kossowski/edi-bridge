@@ -994,7 +994,9 @@
       "receivedAt": "{direction, select, inbound {Received} other {Created}}",
       "source": "How it arrived",
       "uploaded": "Uploaded by hand",
-      "connection": "Through a connection"
+      "connection": "Through a connection",
+      "interchange": "Transmission",
+      "testInterchange": "Marked as a test by {tradingPartner}"
     },
     "content": {
       "description": "A readable view of the lines in this document.",

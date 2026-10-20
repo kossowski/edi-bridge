@@ -60,6 +60,9 @@ export function DocumentSummary({ run }: { run: RunDetail }) {
         </time>
       </Fact>
       <Fact label={t('source')}>{run.manualSubmission ? t('uploaded') : t('connection')}</Fact>
+      {run.testIndicator === true && (
+        <Fact label={t('interchange')}>{t('testInterchange', values)}</Fact>
+      )}
     </FactGrid>
   )
 }

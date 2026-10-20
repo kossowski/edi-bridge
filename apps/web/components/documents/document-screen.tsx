@@ -15,6 +15,7 @@ import { ProblemCard } from '@/components/documents/problem-card'
 import { RelativeTime } from '@/components/documents/relative-time'
 import { RunStatusBadge } from '@/components/documents/run-status'
 import { useRunTitle } from '@/components/documents/run-title'
+import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
 import { useLocationHash } from '@/hooks/use-location-hash'
 import { ApiError } from '@/lib/api/client'
 import { runQuery } from '@/lib/api/queries'
@@ -30,6 +31,7 @@ function DocumentHeader({ run }: { run: RunDetail }) {
   return (
     <>
       <RunStatusBadge status={run.status} />
+      {run.testIndicator === true && <TestModeBadge testMode />}
       <span>
         {t('receivedAt', { direction: run.direction })} <RelativeTime dateTime={run.receivedAt} />
         {run.manualSubmission && ` · ${t('uploaded')}`}

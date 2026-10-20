@@ -36,6 +36,7 @@ import {
   seedChannels,
   seedMappingDrafts,
   seedMappingVersions,
+  seedTradingPartners,
   seedWorkspace,
   toMappingVersionSummary,
 } from '@edi-bridge/mocks'
@@ -103,6 +104,8 @@ const delivered = storyRun(8, 'ORDERS', 'delivered')
 
 const uploaded = storyRun(9, 'ORDERS', 'delivered', { manualSubmission: true })
 
+const testInterchange = storyRun(21, 'ORDERS', 'delivered')
+
 const processing = storyRun(10, 'ORDERS', 'processing')
 
 const received = storyRun(11, 'ORDERS', 'received')
@@ -159,6 +162,7 @@ const runs = [
   unreachableInbound,
   delivered,
   uploaded,
+  testInterchange,
   processing,
   received,
   original,
@@ -827,6 +831,7 @@ export const Delivered = meta.story({
       `/orders/${delivered.businessReference}`,
     )
     await expect(canvas.queryByText('uploaded by hand', { exact: false })).toBeNull()
+    await expect(canvas.queryByText('Testing')).toBeNull()
   },
 })
 
@@ -834,6 +839,51 @@ export const UploadedByHand = meta.story({
   args: { id: uploaded.id },
   async play({ canvas }) {
     await expect(await canvas.findByText('· uploaded by hand', { exact: false })).toBeVisible()
+  },
+})
+
+// The seeded Trading Partner is live, so these stories put it in Test Mode.
+function servingTestMode() {
+  return runDetailHandlers(apiUrl, {
+    runs,
+    tradingPartners: seedTradingPartners.map((candidate) =>
+      candidate.id === partner.id ? { ...candidate, testMode: true } : candidate,
+    ),
+    documentDeletedAt: new Map([[expiredDefect.id, documentDeletedAt]]),
+  })
+}
+
+export const TestInterchange = meta.story({
+  args: { id: testInterchange.id },
+  beforeEach({ msw }) {
+    msw.use(...servingTestMode())
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Testing')).toBeVisible()
+    await expect(canvas.getByText(`Marked as a test by ${partner.name}`)).toBeVisible()
+  },
+})
+
+export const GermanTestInterchange = meta.story({
+  args: { id: testInterchange.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...servingTestMode())
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Testbetrieb')).toBeVisible()
+    await expect(canvas.getByText(`Von ${partner.name} als Test markiert`)).toBeVisible()
+  },
+})
+
+export const TestInterchangeDocumentExpired = meta.story({
+  args: { id: expiredDefect.id },
+  beforeEach({ msw }) {
+    msw.use(...servingTestMode())
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(paragraph(expiredFromPartner))).toBeVisible()
+    await expect(canvas.queryByText('Testing')).toBeNull()
   },
 })
 
