@@ -7,6 +7,8 @@ export {
   syntaxCharacterSets,
 } from './character-set'
 
+export { decodeDocument, namesOtherEncoding } from './decode-document'
+
 export { buildContrl, BuildContrlError } from './contrl'
 
 export { readAcknowledgedInterchange, ReadAcknowledgementError } from './acknowledgement'
@@ -20,6 +22,8 @@ export { serialize, SerializeError, serializeMessage } from './serialize'
 export { validate, ValidationError, validationErrorCodes } from './validate'
 
 export type { DecodedBytes, DecodedInterchange, SyntaxCharacterSet } from './character-set'
+
+export type { DecodedDocument } from './decode-document'
 
 export type { BuildContrlErrorCode, InvalidCharacter } from './contrl'
 

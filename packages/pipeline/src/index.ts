@@ -2,12 +2,9 @@ export { bullmqRunQueue, runQueueName } from './bullmq-run-queue'
 
 export { channelDelivery } from './channel-delivery'
 
-export {
-  type DecodedDocument,
-  decodeDocument,
-  DocumentUndecodable,
-  namesOtherEncoding,
-} from './decode-document'
+export { namesOtherEncoding } from '@edi-bridge/edifact'
+
+export { type DecodedDocument, decodeDocument, DocumentUndecodable } from './decode-document'
 
 export { deleteExpiredDocuments } from './delete-expired-documents'
 

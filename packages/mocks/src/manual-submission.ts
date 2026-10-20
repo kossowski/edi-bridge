@@ -9,7 +9,7 @@ import {
   submitDocumentEndpoint,
   type TradingPartner,
 } from '@edi-bridge/contracts'
-import { decodeBytes, decodeInterchange, hexOf } from '@edi-bridge/edifact'
+import { decodeDocument } from '@edi-bridge/edifact'
 
 import { type ChannelRecord, type ChannelStore, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, toFlowStore } from './flow'
@@ -31,25 +31,15 @@ export function messageTypesOf(content: string): string[] | null {
   return [...content.matchAll(messageHeader)].flatMap(([, type]) => (type ? [type] : []))
 }
 
-// Mirrors decodeDocument of the pipeline, which the mocks cannot import.
 function decodedContent(content: string, encoding: CharacterEncoding = 'utf-8') {
-  const bytes = decodeBase64(content)
-  const interchange = decodeInterchange(bytes)
-
-  if (interchange !== undefined) {
-    return 'text' in interchange
-      ? { text: interchange.text }
-      : { problem: documentUndecodableProblem(interchange.error.message, null) }
-  }
-
-  const decoded = decodeBytes(bytes, encoding)
+  const decoded = decodeDocument(decodeBase64(content), encoding)
 
   return 'text' in decoded
     ? { text: decoded.text }
     : {
         problem: documentUndecodableProblem(
-          `Byte ${String(decoded.invalidAt + 1)} (${hexOf(bytes[decoded.invalidAt] ?? 0)}) is not valid ${encoding}`,
-          encoding,
+          decoded.reason,
+          decoded.characterSet === undefined ? encoding : null,
         ),
       }
 }
