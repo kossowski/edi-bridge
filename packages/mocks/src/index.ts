@@ -71,7 +71,7 @@ import {
 } from './order-lifecycle'
 import { seedOverdueAcknowledgements } from './overdue-acknowledgement'
 import { runsHandler, seedRuns } from './run'
-import { runDetailHandlers, seedReprocessed } from './run-detail'
+import { runDetailHandlers, seedExpiredDocuments, seedReprocessed } from './run-detail'
 import { createRunStore } from './run-store'
 import { createCredentialStore, createSessionStore, seedSession, sessionHandlers } from './session'
 import { tasksHandler } from './task'
@@ -261,7 +261,12 @@ export { serializeSegment } from './interchange'
 
 export { interchangesHandler } from './interchange-list'
 
-export { runDetailHandlers, type RunDetailOptions, seedReprocessed } from './run-detail'
+export {
+  runDetailHandlers,
+  type RunDetailOptions,
+  seedExpiredDocuments,
+  seedReprocessed,
+} from './run-detail'
 
 export {
   createTradingPartner,
@@ -503,6 +508,7 @@ export function createHandlers(
     ...runDetailHandlers(apiUrl, {
       runs,
       waitingForTradingPartnerSince: orderLifecycles.waitingForTradingPartnerSince,
+      documentDeletedAt: seedExpiredDocuments(),
       mappingVersions: mappingVersionStore,
       flows,
       channels: channelStore,

@@ -22,7 +22,7 @@ import { seedChannels } from './channel'
 import { seedFlows } from './flow'
 import { seedLookupTableNamed } from './lookup-table'
 import { createRun, createRuns } from './run'
-import { runDetailHandlers, seedReprocessed } from './run-detail'
+import { runDetailHandlers, seedExpiredDocuments, seedReprocessed } from './run-detail'
 import { createRunStore, interchangeIdOf } from './run-store'
 import { seedWorkspace } from './workspace'
 
@@ -98,6 +98,7 @@ describe('GET /runs/:id', () => {
       error: null,
       replaces: null,
       replacedBy: null,
+      documentDeletedAt: null,
     })
     expect(body?.steps.map(({ stage, status }) => [stage, status])).toEqual([
       ['receipt', 'succeeded'],
@@ -1045,6 +1046,92 @@ describe('POST /runs/:id/reprocess', () => {
       expect(status).toBe(409)
     },
   )
+})
+
+describe('a Run whose Document expired', () => {
+  const deletedAt = '2026-10-08T08:00:00.000Z'
+  const documentExpired = 'The Document of the Run expired, so the Run cannot be reprocessed'
+
+  async function refusal(path: string, body?: ReprocessRunBody) {
+    const response = await fetch(`${apiUrl}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: body === undefined ? null : JSON.stringify(body),
+    })
+
+    return { status: response.status, body: await response.json() }
+  }
+
+  it('serves when retention deleted its Document', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
+    server.use(
+      ...runDetailHandlers(apiUrl, {
+        runs: [run],
+        documentDeletedAt: new Map([[run.id, deletedAt]]),
+      }),
+    )
+
+    const { body } = await getRun(run.id)
+
+    expect(body?.documentDeletedAt).toBe(deletedAt)
+  })
+
+  it('refuses a Reprocess with a Conflict that names the expired Document', async () => {
+    const run = inboundOrders('00000000-0000-4000-8000-000000000001', { failureStage: 'mapping' })
+    server.use(
+      ...runDetailHandlers(apiUrl, {
+        runs: [run],
+        documentDeletedAt: new Map([[run.id, deletedAt]]),
+      }),
+    )
+    const { body: before } = await getRun(run.id)
+    const [latest] = await versionsOf(before!.mappingVersion!.mappingId)
+
+    const answer = await refusal(toPath(reprocessRunEndpoint.path, { id: run.id }), {
+      // SAFETY: the seeded Mapping of the ORDERS Flow has at least one Mapping Version.
+      mappingVersionId: latest!.id,
+    })
+
+    expect(answer).toEqual({ status: 409, body: { message: documentExpired } })
+    expect((await getRun(run.id)).body?.replacedBy).toBeNull()
+  })
+
+  it('refuses to try a Defect again with a Conflict that names the expired Document', async () => {
+    const run = defectRun()
+    server.use(
+      ...runDetailHandlers(apiUrl, {
+        runs: [run],
+        documentDeletedAt: new Map([[run.id, deletedAt]]),
+      }),
+    )
+
+    const answer = await refusal(toPath(retryRunEndpoint.path, { id: run.id }))
+
+    expect(answer).toEqual({ status: 409, body: { message: documentExpired } })
+  })
+
+  it('seeds a failed mapping Run that the Workspace would reprocess, deleted after its receipt', async () => {
+    const runs = createRuns({ count: 2000 })
+    const reprocessed = seedReprocessed(runs)
+    const documentDeletedAt = seedExpiredDocuments(runs, reprocessed)
+    server.use(...runDetailHandlers(apiUrl, { runs, reprocessed, documentDeletedAt }))
+
+    expect(documentDeletedAt.size).toBeGreaterThan(0)
+
+    for (const [id, at] of documentDeletedAt) {
+      const { body } = await getRun(id)
+
+      expect(body).toMatchObject({
+        status: 'failed',
+        failureStage: 'mapping',
+        problem: { whoFixes: 'you' },
+        replacedBy: null,
+        documentDeletedAt: at,
+      })
+      expect(Date.parse(at)).toBeGreaterThan(Date.parse(body!.receivedAt))
+      expect(Date.parse(at)).toBeLessThanOrEqual(Date.now())
+    }
+  })
 })
 
 describe('seedReprocessed', () => {

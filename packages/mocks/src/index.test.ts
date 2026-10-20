@@ -80,6 +80,7 @@ import {
   orderLifecycleReferences,
   seedChannels,
   seedDocumentStructureOf,
+  seedExpiredDocuments,
   seedFlows,
   seedLookupTableNamed,
   seedMappingDrafts,
@@ -609,6 +610,21 @@ describe('createHandlers', () => {
     expect((await getRun(run.id)).waitingForTradingPartnerSince).toBe(
       run.waitingForTradingPartnerSince,
     )
+  })
+
+  it('shows a seeded Run whose Document expired', async () => {
+    server.use(...createHandlers(apiUrl))
+    const expired = seedExpiredDocuments()
+
+    expect(expired.size).toBeGreaterThan(0)
+
+    for (const [id, deletedAt] of expired) {
+      expect(await getRun(id)).toMatchObject({
+        status: 'failed',
+        failureStage: 'mapping',
+        documentDeletedAt: deletedAt,
+      })
+    }
   })
 
   it('lists and shows the Runs of a Manual Submission', async () => {
