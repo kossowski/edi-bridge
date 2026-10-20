@@ -43,6 +43,13 @@ import { selectVersions, toHeader } from './mapping-version.js'
 import { inWorkspace, rejectingInvalidId } from './rows.js'
 import { CurrentWorkspace } from './workspace.js'
 
+// A Duplicate is never mapped, so it shows the Business Reference of its original Run.
+const originalRuns = alias(runs, 'original_runs')
+
+const businessReferenceOfRun = sql<
+  string | null
+>`coalesce(${runs.businessReference}, ${originalRuns.businessReference})`
+
 const summaryFields = {
   id: runs.id,
   receivedAt: runs.receivedAt,
@@ -50,7 +57,7 @@ const summaryFields = {
   failureStage: runs.failureStage,
   problem: runs.problem,
   manualSubmission: runs.manualSubmission,
-  businessReference: runs.businessReference,
+  businessReference: businessReferenceOfRun,
   tradingPartnerId: tradingPartners.id,
   tradingPartnerName: tradingPartners.name,
   flowId: flows.id,
@@ -65,6 +72,7 @@ const fromRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =
     .from(runs)
     .innerJoin(flows, eq(flows.id, runs.flowId))
     .innerJoin(tradingPartners, eq(tradingPartners.id, runs.tradingPartnerId))
+    .leftJoin(originalRuns, eq(originalRuns.id, runs.duplicateOfRunId))
 
 const selectRuns = <Fields extends SelectedFields>(db: Database, fields: Fields) =>
   fromRuns(db, { ...summaryFields, ...fields })
@@ -148,7 +156,7 @@ const filtersExceptStatus = (db: Database, workspaceId: string, query: RunListQu
     text === ''
       ? undefined
       : or(
-          sql`strpos(lower(${runs.businessReference}), ${text}) > 0`,
+          sql`strpos(lower(${businessReferenceOfRun}), ${text}) > 0`,
           sql`strpos(lower(${tradingPartners.name}), ${text}) > 0`,
         ),
   )
@@ -209,6 +217,7 @@ export const loadRun = (id: string) =>
         error: runs.error,
         waitingForTradingPartnerSince: runs.waitingForTradingPartnerSince,
         replacesRunId: runs.replacesRunId,
+        duplicateOfRunId: runs.duplicateOfRunId,
       }).where(inWorkspace(runs, workspace.id, eq(runs.id, id))),
     )
 
@@ -242,6 +251,7 @@ export const loadRun = (id: string) =>
 type DetailRow = SummaryRow & {
   error: (typeof runs.$inferSelect)['error']
   waitingForTradingPartnerSince: Date | null
+  duplicateOfRunId: string | null
 }
 
 const toDetail = (
@@ -253,21 +263,29 @@ const toDetail = (
   const shared = {
     ...summary,
     ...loaded,
-    // Interchanges, parsed Messages and Duplicates come with inbound processing.
+    // Interchanges and parsed Messages come with inbound processing.
     interchange: null,
     message: null,
-    duplicateOf: null,
+  }
+
+  const unfailed = {
+    failureStage: null,
+    error: null,
+    problem: null,
+    waitingForTradingPartnerSince: null,
+  }
+
+  if (summary.status === 'duplicate') {
+    return {
+      ...shared,
+      ...unfailed,
+      status: summary.status,
+      duplicateOf: row.duplicateOfRunId === null ? null : { id: row.duplicateOfRunId },
+    }
   }
 
   if (summary.status !== 'failed') {
-    return {
-      ...shared,
-      status: summary.status,
-      failureStage: null,
-      error: null,
-      problem: null,
-      waitingForTradingPartnerSince: null,
-    }
+    return { ...shared, ...unfailed, status: summary.status, duplicateOf: null }
   }
 
   const fixer = whoFixes(summary)
@@ -283,6 +301,7 @@ const toDetail = (
     error: row.error,
     problem: { ...row.problem, whoFixes: fixer },
     waitingForTradingPartnerSince: row.waitingForTradingPartnerSince?.toISOString() ?? null,
+    duplicateOf: null,
   }
 }
 
