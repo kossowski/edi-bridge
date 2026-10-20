@@ -34,6 +34,7 @@ import {
   documentStructuresQuery,
   forgetDeletedLookupTable,
   graphChangeScope,
+  lookupTableMissingCodeHintsQuery,
   lookupTableMissingCodesQuery,
   lookupTableQuery,
   lookupTablesQuery,
@@ -166,6 +167,17 @@ describe('storeSavedLookupTable', () => {
     }
   })
 
+  it('keeps the AI hints of its missing codes, since each fetch spends AI budget', () => {
+    const queryClient = new QueryClient()
+    const hints = lookupTableMissingCodeHintsQuery(saved.id, 'en').queryKey
+
+    queryClient.setQueryData(hints, { hints: [], notice: null })
+
+    storeSavedLookupTable(queryClient, saved)
+
+    expect(queryClient.getQueryState(hints)?.isInvalidated).toBe(false)
+  })
+
   it('keeps the German code meanings until the German Lookup Table is read again', () => {
     const queryClient = new QueryClient()
     const germanMeanings = [{ code: 'PCE', meaning: 'Stück' }]
@@ -192,8 +204,16 @@ describe('forgetDeletedLookupTable', () => {
 
     queryClient.setQueryData(lookupTablesQuery.queryKey, [deleted!, kept!])
     queryClient.setQueryData(lookupTableQuery(deleted!.id, 'de').queryKey, deleted)
+    queryClient.setQueryData(lookupTableMissingCodeHintsQuery(deleted!.id, 'de').queryKey, {
+      hints: [],
+      notice: null,
+    })
 
     forgetDeletedLookupTable(queryClient, deleted!.id)
+
+    expect(
+      queryClient.getQueryState(lookupTableMissingCodeHintsQuery(deleted!.id, 'de').queryKey),
+    ).toBeUndefined()
 
     expect(queryClient.getQueryState(lookupTableQuery(deleted!.id, 'de').queryKey)).toBeUndefined()
     expect(queryClient.getQueryData(lookupTablesQuery.queryKey)).toEqual([kept])
@@ -269,6 +289,32 @@ describe('lookupTableSuggestionsQuery', () => {
 
       expect(requests).toBe(1)
       expect(remounted.getCurrentResult().status).toBe('error')
+    })
+  })
+})
+
+describe('lookupTableMissingCodeHintsQuery', () => {
+  it('keys the hints by Lookup Table and language', () => {
+    const id = seedLookupTables[0]!.id
+
+    expect(lookupTableMissingCodeHintsQuery(id, 'de').queryKey).not.toEqual(
+      lookupTableMissingCodeHintsQuery(id, 'en').queryKey,
+    )
+    expect(lookupTableMissingCodeHintsQuery(id, 'en').queryKey).not.toEqual(
+      lookupTableMissingCodesQuery(id, 'en').queryKey,
+    )
+  })
+
+  it('never asks for the hints again on its own, since each fetch spends AI budget', () => {
+    const hints = lookupTableMissingCodeHintsQuery(seedLookupTables[0]!.id, 'en')
+
+    expect(hints).toMatchObject({
+      staleTime: Infinity,
+      gcTime: Infinity,
+      retry: false,
+      retryOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     })
   })
 })

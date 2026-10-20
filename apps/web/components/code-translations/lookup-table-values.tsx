@@ -23,6 +23,7 @@ import {
   tableDirection,
   withEntry,
   withFixes,
+  withHints,
   withoutEntry,
 } from '@/components/code-translations/lookup-table-entries'
 import { MissingCodes, RunLinks } from '@/components/code-translations/missing-codes'
@@ -59,6 +60,7 @@ import type {
   LookupTableEntry,
   LookupTableKind,
   MissingCode,
+  MissingCodeHints,
 } from '@edi-bridge/contracts'
 
 type Removed = { entry: LookupTableEntry; index: number }
@@ -279,6 +281,7 @@ function Uses({ table }: { table: LookupTable }) {
 export function LookupTableValues({
   table,
   missing,
+  hints,
   canChange,
   requestedCode,
   originRunId,
@@ -287,6 +290,7 @@ export function LookupTableValues({
 }: {
   table: LookupTable
   missing: UseQueryResult<MissingCode[]>
+  hints: MissingCodeHints | undefined
   canChange: boolean
   requestedCode: string | undefined
   originRunId: string | undefined
@@ -308,7 +312,7 @@ export function LookupTableValues({
   const [filter, setFilter] = useState('')
   const [announcement, setAnnouncement] = useState('')
   const save = useSaveEntries(table)
-  const missingCodes = openMissingCodes(missing.data, table.entries) ?? []
+  const missingCodes = withHints(openMissingCodes(missing.data, table.entries) ?? [], hints?.hints)
   const meanings = meaningsOf(table, missingCodes)
   const meaningOf = (code: string) => meanings.get(code) ?? null
   const term = filter.trim().toLocaleLowerCase()
@@ -429,6 +433,7 @@ export function LookupTableValues({
             isError={missing.isError}
             isPending={missing.isPending}
             meaningOf={meaningOf}
+            notice={hints?.notice ?? null}
             saving={save.isPending}
             onAccept={canChange ? add : null}
           />

@@ -3537,6 +3537,11 @@
       "title": "Noch nicht übersetzt",
       "loading": "Noch nicht übersetzte Werte werden geladen",
       "unavailable": "Die noch nicht übersetzten Werte konnten nicht geladen werden.",
+      "hintsNotice": {
+        "title": "Werte ohne KI erklärt",
+        "aiBudgetExhausted": "Das KI-Budget für heute ist aufgebraucht, daher werden nur bekannte Codes erklärt und vorgeschlagen. Geben Sie unten die Übersetzung für jeden Wert ein.",
+        "aiUnavailable": "Die KI konnte die Werte nicht erklären, daher werden nur bekannte Codes erklärt und vorgeschlagen. Geben Sie unten die Übersetzung für jeden Wert ein."
+      },
       "accept": "Übernehmen",
       "acceptCode": "Übernehmen: {code}",
       "sendAs": "{direction, select, inbound {Was aus {code} wird} other {{code} senden als}}",

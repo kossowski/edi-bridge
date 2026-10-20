@@ -56,6 +56,7 @@ import {
   type LookupTableImportBody,
   lookupTableImportPreviewEndpoint,
   type LookupTableInput,
+  lookupTableMissingCodeHintsEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTablesEndpoint,
   lookupTableSuggestionsEndpoint,
@@ -583,6 +584,13 @@ export function getLookupTable(id: string, language: Language) {
 export function listLookupTableMissingCodes(id: string, language: Language) {
   return request(lookupTableMissingCodesEndpoint, {
     path: toPath(lookupTableMissingCodesEndpoint.path, { id }),
+    query: { language },
+  })
+}
+
+export function hintLookupTableMissingCodes(id: string, language: Language) {
+  return request(lookupTableMissingCodeHintsEndpoint, {
+    path: toPath(lookupTableMissingCodeHintsEndpoint.path, { id }),
     query: { language },
   })
 }

@@ -7,6 +7,7 @@ import {
   type LookupTableKind,
   type LookupTableSummary,
   type MissingCode,
+  type MissingCodeHint,
 } from '@edi-bridge/contracts'
 
 export type EntryProblem = 'required' | 'tooLong' | 'duplicate'
@@ -137,4 +138,17 @@ export function runsToReprocess(fixes: ReadonlyArray<Fix>, originRunId: string |
   return newestFirst([...runs.values()]).toSorted(
     (left, right) => Number(right.id === originRunId) - Number(left.id === originRunId),
   )
+}
+
+export function withHints(
+  codes: ReadonlyArray<MissingCode>,
+  hints: ReadonlyArray<MissingCodeHint> | undefined,
+): MissingCode[] {
+  const hintOf = new Map(hints?.map((hint) => [hint.code, hint]))
+
+  return codes.map((code) => {
+    const hint = hintOf.get(code.code)
+
+    return hint ? { ...code, meaning: hint.meaning, suggestions: hint.suggestions } : code
+  })
 }
