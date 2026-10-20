@@ -88,6 +88,9 @@ export function liveEventSubscriber(redisUrl: string) {
 
   const ready = redis.subscribe(liveEventsChannel).then(() => undefined)
 
+  // Callers need not await the subscription, and a close before it is ready rejects it.
+  ready.catch(() => {})
+
   return {
     ready,
     subscribe: (workspaceId: string, listener: LiveEventListener) => {

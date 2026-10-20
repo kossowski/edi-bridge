@@ -2,6 +2,7 @@ import { Effect } from 'effect'
 import { Redis } from 'ioredis'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:net'
+import { setTimeout } from 'node:timers/promises'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
@@ -153,6 +154,27 @@ describe('live events over Redis', () => {
       other.disconnect()
       publisher.close()
       subscriber.close()
+    }
+  })
+
+  it('closes a subscriber before its subscription is ready without an unhandled rejection', async () => {
+    let unhandled = 0
+
+    const record = () => {
+      unhandled += 1
+    }
+
+    process.on('unhandledRejection', record)
+
+    try {
+      liveEventSubscriber(redis.url).close()
+
+      // Nothing marks the absence of a rejection, so the test gives one the time to surface.
+      await setTimeout(100)
+
+      expect(unhandled).toBe(0)
+    } finally {
+      process.off('unhandledRejection', record)
     }
   })
 
