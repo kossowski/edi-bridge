@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   failureStages,
   runDetailSchema,
+  runListQuerySchema,
   runSummarySchema,
   waitForTradingPartnerRunEndpoint,
   endWaitingForTradingPartnerRunEndpoint,
@@ -254,5 +255,11 @@ describe('endWaitingForTradingPartnerRunEndpoint', () => {
       method: 'DELETE',
       path: '/runs/:id/wait-for-trading-partner',
     })
+  })
+})
+
+describe('runListQuerySchema mappingId', () => {
+  it('states that a Run matches by the Mapping Version it recorded', () => {
+    expect(runListQuerySchema.shape.mappingId.description).toMatch(/recorded/)
   })
 })

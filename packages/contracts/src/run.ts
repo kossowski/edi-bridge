@@ -112,7 +112,9 @@ export const runListQuerySchema = z.object({
   tradingPartnerId: many(z.uuid()),
   messageType: many(messageTypeSchema),
   flowId: many(z.uuid()),
-  mappingId: many(z.uuid()),
+  mappingId: many(z.uuid()).describe(
+    'Runs whose recorded Mapping Version belongs to one of these Mappings; a Run not yet processed uses the Mapping Version its Flow is pinned to',
+  ),
   receivedFrom: z.iso.datetime().optional(),
   receivedTo: z.iso.datetime().optional(),
   manualSubmission: z.stringbool().optional(),

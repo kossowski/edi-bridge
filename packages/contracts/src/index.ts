@@ -630,6 +630,8 @@ export {
   whoFixes,
 } from './run'
 
+export { type RunMappingFilterCase, runMappingFilterCase } from './run-mapping-filter-case'
+
 export {
   type Task,
   type TaskActor,
