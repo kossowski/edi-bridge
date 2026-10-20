@@ -59,14 +59,16 @@ function KnownMappingFilter({
 }
 
 function MappingFilter({ mappingId, onRemove }: { mappingId: string; onRemove: () => void }) {
-  const { data: mappings } = useQuery(mappingsQuery)
+  const t = useTranslations('Documents.filters')
+  const { data: mappings, isPending } = useQuery(mappingsQuery)
   const mapping = mappings?.find(({ id }) => id === mappingId)
 
   if (mapping) {
     return <KnownMappingFilter mapping={mapping} onRemove={onRemove} />
   }
 
-  return <MappingFilterButton name="…" onRemove={onRemove} />
+  // A deleted Mapping, a stale link or a failed request leaves nothing to name.
+  return <MappingFilterButton name={isPending ? '…' : t('unknownMapping')} onRemove={onRemove} />
 }
 
 function Filters({

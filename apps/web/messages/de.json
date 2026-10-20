@@ -650,6 +650,7 @@
       "allMessageTypes": "Alle Belegarten",
       "mapping": "Mapping: {name}",
       "removeMapping": "Mapping: {name}, Filter entfernen",
+      "unknownMapping": "unbekannt",
       "clear": "Filter zurücksetzen",
       "searchInterchanges": "Datei-, Bestellnummer oder Partner suchen"
     },

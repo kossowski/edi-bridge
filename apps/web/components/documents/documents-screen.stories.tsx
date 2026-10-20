@@ -13,7 +13,7 @@ import {
   withMemoryHistory,
 } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
-import { runsEndpoint } from '@edi-bridge/contracts'
+import { mappingsEndpoint, runsEndpoint } from '@edi-bridge/contracts'
 import { createHandlers, createRuns, runsHandler, seedMappings, seedRuns } from '@edi-bridge/mocks'
 
 import preview from '../../.storybook/preview'
@@ -143,6 +143,81 @@ export const NarrowedToMappingMobile = meta.story({
     await expect(outsideOf(mapping)).toEqual([])
     await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth)
     await expect(overflowingWrappers(canvasElement)).toEqual([])
+  },
+})
+
+const mappingsUrl = `${apiUrl}${mappingsEndpoint.path}`
+
+export const NarrowedToMappingLoading = meta.story({
+  parameters: narrowedToMapping,
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(mappingsUrl, async () => {
+        await delay('infinite')
+      }),
+      ...createHandlers(apiUrl),
+    )
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('button', { name: 'Mapping: …, remove filter' }),
+    ).toBeVisible()
+  },
+})
+
+const unknownMapping = {
+  nextjs: {
+    navigation: {
+      pathname: '/documents',
+      query: { status: 'attention', mapping: '00000000-0000-4000-8000-000000000000' },
+    },
+  },
+}
+
+export const NarrowedToUnknownMapping = meta.story({
+  parameters: unknownMapping,
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl))
+  },
+  async play({ canvas }) {
+    const mapping = await canvas.findByRole('button', {
+      name: 'Mapping: unknown, remove filter',
+    })
+
+    await expect(mapping).toBeVisible()
+
+    await userEvent.click(mapping)
+    await waitFor(() => expect(canvas.queryByRole('button', { name: /^Mapping:/ })).toBeNull())
+  },
+})
+
+export const NarrowedToUnknownMappingGerman = meta.story({
+  parameters: unknownMapping,
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl))
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('button', { name: 'Mapping: unbekannt, Filter entfernen' }),
+    ).toBeVisible()
+  },
+})
+
+export const NarrowedToMappingUnavailable = meta.story({
+  parameters: narrowedToMapping,
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(mappingsUrl, () =>
+        HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 }),
+      ),
+      ...createHandlers(apiUrl),
+    )
+  },
+  async play({ canvas }) {
+    await expect(
+      await canvas.findByRole('button', { name: 'Mapping: unknown, remove filter' }),
+    ).toBeVisible()
   },
 })
 
