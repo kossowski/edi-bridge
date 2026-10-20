@@ -154,7 +154,7 @@ const answerOf = (
 
     const { tradingPartnerId, testMode, workspaceGln } = found
     const { channelId, notSentReason } = yield* channelOf(workspaceId, tradingPartnerId, documentId)
-    // A CONTRL echoing U+FFFD in place of the invalid bytes could accept what the sender broke.
+    // An Acknowledgement echoing U+FFFD in place of the invalid bytes could accept what the sender broke.
     const message = Result.isSuccess(built) && undecodable === undefined ? built.success : null
 
     return {

@@ -500,7 +500,7 @@ export const documents = pgTable(
       .references(() => channels.id),
     fileName: text().notNull(),
     content: text(),
-    // The bytes as received when they are not valid in the encoding they name; content is null then.
+    // Text would hold U+FFFD for bytes not valid in their encoding, so those are kept as bytes.
     bytes: bytea(),
     // The UNB keys that make a later copy of the Interchange a Duplicate; null for no Interchange.
     interchangeSender: text(),

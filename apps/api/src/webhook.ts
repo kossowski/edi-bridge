@@ -74,7 +74,7 @@ const authenticate = (channelId: string, presented: string | undefined) =>
 const charsetOf = (contentType: string | undefined) =>
   contentType?.match(/;\s*charset\s*=\s*"?([^";\s]+)"?/i)?.[1]
 
-// A sender at the other end of the request can name the encoding, so a Document not valid in it is refused.
+// The sender gets the refusal in its response and can send again, so nothing undecodable is stored.
 const decodedBody = (channelId: string, body: Buffer, contentType: string | undefined) =>
   Effect.gen(function* () {
     const charset = charsetOf(contentType)

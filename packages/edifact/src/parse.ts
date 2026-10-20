@@ -380,7 +380,6 @@ const readDelimitersOrUndefined = (advice: string) => {
   }
 }
 
-// Where the character after a text cut short within an Interchange stands, and in which segment.
 export const positionAfter = (text: string) => {
   const hasServiceStringAdvice = text.startsWith(serviceStringAdviceTag)
 

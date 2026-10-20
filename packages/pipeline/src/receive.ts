@@ -31,7 +31,6 @@ export type ArrivingDocument = {
   manualSubmission: boolean
 }
 
-// The bytes as received, with the text they decode to or how they fail to.
 export type ArrivingContent =
   | { text: string; bytes?: Buffer }
   | { readable: string; bytes: Buffer; undecodable: DocumentUndecodable }

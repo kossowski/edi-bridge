@@ -27,7 +27,6 @@ const encodingNamed = (label: string) => {
   }
 }
 
-// An Interchange is decoded with the character set its UNB names, any other Document with the encoding named for it.
 export const decodeDocument = (bytes: Buffer, label = 'utf-8'): DecodedDocument => {
   const interchange = decodeInterchange(bytes)
 
