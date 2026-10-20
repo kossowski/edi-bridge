@@ -111,6 +111,7 @@ function largeDetail() {
     problem: null,
     waitingForTradingPartnerSince: null,
     duplicateOf: null,
+    documentDeletedAt: null,
   })
 }
 
