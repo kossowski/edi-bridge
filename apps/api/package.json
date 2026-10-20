@@ -9,6 +9,7 @@
     "start": "node --env-file-if-exists=../../.env dist/main.js",
     "create-operator": "tsx --env-file-if-exists=../../.env src/create-operator.ts",
     "create-demo-workspaces": "tsx --env-file-if-exists=../../.env src/create-demo-workspaces.ts",
+    "reset-sandbox": "tsx --env-file-if-exists=../../.env src/reset-sandbox.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "check-types": "tsc --noEmit",

@@ -71,6 +71,7 @@ import {
   publishedMappingVersionsEndpoint,
   publishMappingDraftEndpoint,
   removeWorkspaceMemberEndpoint,
+  resetSandboxWorkspaceEndpoint,
   requestAiDraftEndpoint,
   restoreMappingVersionEndpoint,
   reprocessRunEndpoint,
@@ -166,7 +167,11 @@ import {
 } from './mapping-version.js'
 import { createMapping, listMappings, loadMappingDraft, saveMappingDraft } from './mapping.js'
 import { loadMessageTypeStructure } from './message-type.js'
-import { createWorkspace, listWorkspaceSummaries } from './operator-workspaces.js'
+import {
+  createWorkspace,
+  listWorkspaceSummaries,
+  resetSandboxWorkspace,
+} from './operator-workspaces.js'
 import { listOrderLifecycles, loadOrderLifecycles } from './order-lifecycle.js'
 import { parse, type ValidationError } from './parse.js'
 import {
@@ -1009,6 +1014,12 @@ function registerRoutes(
       createWorkspace(parse(createWorkspaceEndpoint.body, request.body)),
       201,
     ),
+  )
+
+  app.post<{ Params: { workspaceId: string } }>(
+    resetSandboxWorkspaceEndpoint.path,
+    (request, reply) =>
+      respondToOperator(request, reply, resetSandboxWorkspace(request.params.workspaceId)),
   )
 
   app.get<{ Params: { workspaceId: string } }>(
