@@ -33,6 +33,7 @@ import { flows, mappingVersions, runs, runSteps, tradingPartners } from '@edi-br
 import {
   isFixedByReprocess,
   Database as PipelineDatabase,
+  publishRunChanges,
   reprocessRun as reprocessInPipeline,
   retryRun as retryDelivery,
 } from '@edi-bridge/pipeline'
@@ -377,6 +378,11 @@ export const retryRun = (id: string) =>
     return yield* loadRun(id)
   })
 
+const announceChangeOf = (id: string) =>
+  Effect.flatMap(Db, (db) =>
+    publishRunChanges([id]).pipe(Effect.provideService(PipelineDatabase, db)),
+  )
+
 export const waitForTradingPartnerRun = (id: string) =>
   Effect.gen(function* () {
     const db = yield* Db
@@ -402,6 +408,8 @@ export const waitForTradingPartnerRun = (id: string) =>
     if (!marked) {
       return yield* new Conflict({ message: 'The Run can no longer wait for the Trading Partner' })
     }
+
+    yield* announceChangeOf(id)
 
     return yield* loadRun(id)
   })
@@ -460,6 +468,8 @@ export const endWaitingForTradingPartnerRun = (id: string) =>
         message: 'Only a Run that waits for the Trading Partner can end its wait',
       })
     }
+
+    yield* announceChangeOf(id)
 
     return yield* loadRun(id)
   })

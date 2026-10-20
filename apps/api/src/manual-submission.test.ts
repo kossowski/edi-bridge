@@ -68,6 +68,16 @@ const receivedRuns = async () => {
 const ordersInterchange = golden('orders-reference.edi', 'latin1')
 
 describe('POST /manual-submissions', () => {
+  it('announces the new Run to its Workspace', async () => {
+    const response = await submit(goldenInvoice)
+
+    const [run] = manualSubmissionSchema.parse(response.json()).runs
+
+    expect(api.liveEvents.published.filter(({ event }) => event.run.id === run?.id)).toEqual([
+      { workspaceId: workspace.id, event: { type: 'run.changed', run } },
+    ])
+  })
+
   it('receives the Document as a manual Run on the Flow of the Channel and queues it', async () => {
     const response = await submit(goldenInvoice)
 

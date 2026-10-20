@@ -2,7 +2,7 @@ import { Redis } from 'ioredis'
 import postgres from 'postgres'
 
 import { connect, migrate } from '@edi-bridge/db'
-import { bullmqRunQueue } from '@edi-bridge/pipeline'
+import { bullmqRunQueue, liveEventSubscriber, redisLiveEvents } from '@edi-bridge/pipeline'
 
 import { buildApp } from './app.js'
 import { config } from './config.js'
@@ -20,11 +20,16 @@ const redis = new Redis(config.redisUrl, { enableOfflineQueue: false, maxRetries
 
 const runQueue = bullmqRunQueue(config.redisUrl)
 
+const livePublisher = redisLiveEvents(config.redisUrl)
+
+const liveSubscriber = liveEventSubscriber(config.redisUrl)
+
 const app = buildApp({
   aiModel: config.aiModel,
   auth: config.auth,
   channels: config.channels,
   database: connection.db,
+  liveEvents: { service: livePublisher.service, subscribe: liveSubscriber.subscribe },
   logger: true,
   probes: {
     postgres: async () => {
@@ -46,6 +51,8 @@ redis.on('error', (error: Error) => {
 async function shutdown(): Promise<void> {
   await app.close()
   await runQueue.close()
+  livePublisher.close()
+  liveSubscriber.close()
   await connection.close()
   await sql.end({ timeout: 5 })
   redis.disconnect()

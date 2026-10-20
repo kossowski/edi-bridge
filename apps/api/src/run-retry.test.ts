@@ -163,6 +163,20 @@ describe('POST /runs/:id/retry', () => {
     ])
   })
 
+  it('announces the retried Run to its Workspace', async () => {
+    const id = await processed(goldenInvoice, unreachable)
+    const count = api.liveEvents.published.length
+
+    await retry(id)
+
+    expect(api.liveEvents.published.slice(count)).toEqual([
+      {
+        workspaceId: workspace.id,
+        event: { type: 'run.changed', run: expect.objectContaining({ id, status: 'received' }) },
+      },
+    ])
+  })
+
   it('reprocesses a Run that failed on a Defect before delivery with its own Mapping Version', async () => {
     const id = await failedOnDefect()
 
