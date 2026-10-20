@@ -130,6 +130,31 @@ describe('GET /tasks', () => {
     expect(counts).toEqual({ you: 0, retry: 1, tradingPartner: 1 })
   })
 
+  it('gives a failed Run that waits for a resend to the Trading Partner', async () => {
+    const waiting = createRun({
+      tradingPartner: summaryOf(rheinkauf),
+      messageType: 'ORDERS',
+      status: 'failed',
+      failureStage: 'mapping',
+      receivedAt: '2026-10-10T11:00:00.000Z',
+    })
+
+    server.use(
+      tasksHandler(
+        apiUrl,
+        data({
+          runs: [waiting],
+          waitingForTradingPartnerSince: new Map([[waiting.id, '2026-10-10T11:30:00.000Z']]),
+        }),
+      ),
+    )
+
+    const { tasks, counts } = await getTasks()
+
+    expect(tasks).toEqual([expect.objectContaining({ whoActs: 'tradingPartner' })])
+    expect(counts).toEqual({ you: 0, retry: 0, tradingPartner: 1 })
+  })
+
   it('drops a failed Run once a Reprocess replaces it', async () => {
     const failed = createRun({
       tradingPartner: summaryOf(rheinkauf),
@@ -249,6 +274,40 @@ describe('GET /tasks', () => {
       )
     },
   )
+
+  it('picks who acts on a failing Trading Partner from its open failed Runs only', async () => {
+    const failedRun = (failureStage: 'parse' | 'delivery', hour: number) =>
+      createRun({
+        tradingPartner: summaryOf(hansemarkt),
+        messageType: 'ORDERS',
+        status: 'failed',
+        failureStage,
+        receivedAt: `2026-10-10T0${hour}:00:00.000Z`,
+      })
+
+    const replaced = [1, 2, 3].map((hour) => failedRun('parse', hour))
+    const open = [4, 5].map((hour) => failedRun('delivery', hour))
+    const replacing = replaced.map(() => delivered('2026-10-10T08:00:00.000Z', hansemarkt))
+
+    server.use(
+      tasksHandler(
+        apiUrl,
+        data({
+          runs: createRunStore(
+            [...replaced, ...open, ...replacing],
+            replaced.map((run, index) => ({ replaced: run.id, replacing: replacing[index]!.id })),
+          ),
+          tradingPartners: [hansemarkt],
+        }),
+      ),
+    )
+
+    const { tasks } = await getTasks()
+
+    expect(tasks.find(({ kind }) => kind === 'failingTradingPartner')).toEqual(
+      expect.objectContaining({ whoActs: 'retry' }),
+    )
+  })
 
   it('has nothing to do when all is good', async () => {
     server.use(tasksHandler(apiUrl, 'empty'))

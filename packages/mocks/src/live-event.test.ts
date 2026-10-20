@@ -10,7 +10,10 @@ import {
   runEndpoint,
   runListSchema,
   runsEndpoint,
+  sendTestInterchangeEndpoint,
   toPath,
+  tradingPartnerEndpoint,
+  tradingPartnerSchema,
   toSearchParams,
 } from '@edi-bridge/contracts'
 
@@ -20,7 +23,7 @@ import { liveEventsHandler, type LiveEventsOptions } from './live-event'
 import { createRuns, runsHandler } from './run'
 import { createRunStore } from './run-store'
 import { seedRunsBeforeAll } from './test-helpers'
-import { seedTradingPartners } from './trading-partner'
+import { createTradingPartner, seedTradingPartners } from './trading-partner'
 
 const apiUrl = 'http://api.test'
 
@@ -236,7 +239,7 @@ describe('createHandlers live events', () => {
 
     const stream = await openStream()
     const { frames } = await readFrames(stream, 1, 100)
-    void stream.reader.cancel()
+    await stream.reader.cancel()
 
     expect(stream.response.status).toBe(200)
     expect(frames).toEqual([])
@@ -261,5 +264,59 @@ describe('createHandlers live events', () => {
         status: run.status,
       })
     }
+  })
+
+  it('announces the hand-over of a test send and its CONTRL as changes of the Trading Partner', async () => {
+    const readyForTest = createTradingPartner({
+      id: '10000000-0000-4000-8000-0000000000f1',
+      gln: '0200000000042',
+      testMode: true,
+      onboarding: {
+        testInterchangeSentAt: null,
+        contrlReceivedAt: null,
+        testRejectedAt: null,
+        testRejectedRunId: null,
+      },
+    })
+
+    server.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: [readyForTest],
+        testInterchange: { handoverDelayMs: 0, contrlDelayMs: 0 },
+        liveEvents: { signal: streams.signal },
+      }),
+    )
+
+    const stream = await openStream()
+
+    expect(stream.response.status).toBe(200)
+
+    const sent = await fetch(`${apiUrl}${toPath(sendTestInterchangeEndpoint.path, readyForTest)}`, {
+      method: 'POST',
+    })
+
+    expect(sent.status).toBe(200)
+
+    const { frames, ended } = await readFrames(stream, 2)
+
+    expect(ended, 'the stream ended before the hand-over and its CONTRL were announced').toBe(false)
+
+    const events = eventsOf(frames)
+
+    expect(events.map(({ run }) => run.tradingPartner.id)).toEqual([
+      readyForTest.id,
+      readyForTest.id,
+    ])
+
+    const response = await fetch(`${apiUrl}${toPath(tradingPartnerEndpoint.path, readyForTest)}`)
+
+    const { onboarding } = tradingPartnerSchema.parse(await response.json())
+
+    expect(onboarding.testInterchangeSentAt).toEqual(expect.any(String))
+    expect(onboarding.contrlReceivedAt).toEqual(expect.any(String))
+
+    const { runs } = await listRuns()
+
+    expect(runs.map(({ id }) => id)).toContain(events[0]?.run.id)
   })
 })

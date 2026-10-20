@@ -5,6 +5,9 @@ import { failsBeforeInterchange } from './interchange'
 import { statusOf } from './run-steps'
 import { stableUuid } from './seed-id'
 
+// Each failed Run that waits for its Trading Partner to resend, by Run id, with the time it began.
+export type WaitingForTradingPartnerSince = ReadonlyMap<string, string>
+
 export type Reprocessed = { replaced: string; replacing: string }
 
 export type MessageOwner = { runId: string; run: RunSummary }

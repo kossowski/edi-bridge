@@ -1,11 +1,15 @@
 'use client'
 
-import { type QueryClient, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { openLiveEvents } from '@/lib/api/client'
-import { homeKeys, runKeys, taskKeys } from '@/lib/api/queries'
-import { type LiveEvent, parseLiveEvent } from '@edi-bridge/contracts'
+import {
+  applyLiveEvent,
+  invalidateLiveQueries,
+  invalidateMissedLiveQueries,
+} from '@/lib/api/live-queries'
+import { parseLiveEvent } from '@edi-bridge/contracts'
 
 export type LiveStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline'
 
@@ -21,19 +25,6 @@ function backoffMs(failures: number) {
   return base / 2 + Math.random() * (base / 2)
 }
 
-function invalidateLiveQueries(queryClient: QueryClient) {
-  void queryClient.invalidateQueries({ queryKey: homeKeys.all() })
-  void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
-  void queryClient.invalidateQueries({ queryKey: taskKeys.all() })
-}
-
-function applyEvent(queryClient: QueryClient, event: LiveEvent) {
-  switch (event.type) {
-    case 'run.changed':
-      void queryClient.invalidateQueries({ queryKey: runKeys.detail(event.run.id) })
-  }
-}
-
 export function useLiveEvents(): LiveStatus {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<LiveStatus>('connecting')
@@ -43,6 +34,7 @@ export function useLiveEvents(): LiveStatus {
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     let throttleTimer: ReturnType<typeof setTimeout> | undefined
     let lastFlush = 0
+    let missedEvents = false
     let failures = 0
     let connectedBefore = false
     let disposed = false
@@ -50,7 +42,13 @@ export function useLiveEvents(): LiveStatus {
     function flush() {
       throttleTimer = undefined
       lastFlush = Date.now()
-      invalidateLiveQueries(queryClient)
+
+      if (missedEvents) {
+        missedEvents = false
+        invalidateMissedLiveQueries(queryClient)
+      } else {
+        invalidateLiveQueries(queryClient)
+      }
     }
 
     function scheduleFlush() {
@@ -81,6 +79,7 @@ export function useLiveEvents(): LiveStatus {
 
         opened.addEventListener('open', () => {
           if (connectedBefore) {
+            missedEvents = true
             scheduleFlush()
           }
 
@@ -93,7 +92,7 @@ export function useLiveEvents(): LiveStatus {
           const event = parseLiveEvent(data)
 
           if (event) {
-            applyEvent(queryClient, event)
+            applyLiveEvent(queryClient, event)
             scheduleFlush()
           }
         })

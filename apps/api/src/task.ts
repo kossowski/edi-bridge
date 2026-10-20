@@ -3,16 +3,14 @@ import { alias } from 'drizzle-orm/pg-core'
 import { Clock, Effect } from 'effect'
 
 import {
-  type FailureStage,
   healthStatusOf,
-  taskActors,
   type MessageType,
   overdueAcknowledgementMessageTypes,
   type Task,
-  type TaskActor,
   taskCountsOf,
   type Tasks,
   whoActsOnFailedRun,
+  whoActsOnFailingTradingPartner,
 } from '@edi-bridge/contracts'
 import { flows, runs, tradingPartners } from '@edi-bridge/db'
 
@@ -50,12 +48,6 @@ const listFailedRuns = (db: Database, workspaceId: string, from: Date) =>
 
 type FailedRunRow = Awaited<ReturnType<typeof listFailedRuns>>[number]
 
-// A failed Run that waits for a resend is the Trading Partner's to act on, whatever its stage.
-const whoActsOn = (row: FailedRunRow, failureStage: FailureStage): TaskActor =>
-  row.waitingForTradingPartnerSince === null
-    ? whoActsOnFailedRun({ failureStage, messageType: row.messageType })
-    : 'tradingPartner'
-
 // The query selects failed Runs only; the status check narrows the failure to read its stage.
 const toFailedRunTask = (row: FailedRunRow): Task[] => {
   const failure = failureOf(row)
@@ -68,7 +60,11 @@ const toFailedRunTask = (row: FailedRunRow): Task[] => {
     {
       id: `run:${row.id}`,
       kind: 'failedRun',
-      whoActs: whoActsOn(row, failure.failureStage),
+      whoActs: whoActsOnFailedRun({
+        failureStage: failure.failureStage,
+        messageType: row.messageType,
+        waitingForTradingPartner: row.waitingForTradingPartnerSince !== null,
+      }),
       tradingPartner: { id: row.tradingPartnerId, name: row.tradingPartnerName },
       at: row.receivedAt.toISOString(),
       run: { id: row.id, messageType: row.messageType, failureStage: failure.failureStage },
@@ -156,16 +152,6 @@ const countRecentRunsByTradingPartner = (db: Database, workspaceId: string, from
 
 type RecentRunCountsRow = Awaited<ReturnType<typeof countRecentRunsByTradingPartner>>[number]
 
-// Without one clear actor, you own the Trading Partner's follow-up.
-const dominantWhoActs = (failedRunTasks: readonly Task[]): TaskActor => {
-  const counts = taskCountsOf(failedRunTasks)
-  const [first, second] = taskActors.toSorted((a, b) => counts[b] - counts[a])
-
-  return first !== undefined && second !== undefined && counts[first] > counts[second]
-    ? first
-    : 'you'
-}
-
 const toFailingTradingPartnerTask =
   (failedRunTasks: readonly Task[], overdueTasks: readonly Task[], now: Date) =>
   (row: RecentRunCountsRow): Task[] => {
@@ -180,7 +166,7 @@ const toFailingTradingPartnerTask =
       {
         id: `tradingPartner:${row.tradingPartnerId}`,
         kind: 'failingTradingPartner',
-        whoActs: dominantWhoActs(failedRunTasks.filter(ofTradingPartner)),
+        whoActs: whoActsOnFailingTradingPartner(failedRunTasks.filter(ofTradingPartner)),
         tradingPartner: { id: row.tradingPartnerId, name: row.tradingPartnerName },
         at: (row.lastRunAt ?? now).toISOString(),
         delivered: row.delivered,

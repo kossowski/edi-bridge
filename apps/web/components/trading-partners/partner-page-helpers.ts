@@ -39,19 +39,6 @@ export function awaitsTestHandover(
   )
 }
 
-// One indexed row per check, so an open page polling every 10 s is cheap for the api.
-const onboardingPollMs = 10_000
-
-export function onboardingPollInterval(
-  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'> | undefined,
-  testSent: boolean,
-) {
-  return tradingPartner &&
-    (awaitsTestHandover(tradingPartner, testSent) || awaitsReceiptConfirmation(tradingPartner))
-    ? onboardingPollMs
-    : false
-}
-
 export function dayTotals(days: ReadonlyArray<ActivityDay>) {
   return days.reduce(
     (totals, day) => ({

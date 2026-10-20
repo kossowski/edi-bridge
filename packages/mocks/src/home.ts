@@ -90,9 +90,9 @@ function tradingPartnerCardsOf(
 }
 
 export function toHome(data: WorkspaceActivity, query: HomeQuery, now = new Date()): Home {
-  const { tradingPartners, overdueAcknowledgements } = data
+  const { tradingPartners } = data
   const runs = toRunStore(data.runs)
-  const { tasks, counts } = toTasks({ runs, tradingPartners, overdueAcknowledgements }, now)
+  const { tasks, counts } = toTasks({ ...data, runs }, now)
   const { from, to, throughput } = throughputOf(runs, query, now)
 
   const inProgress = runs

@@ -30,7 +30,13 @@ import { includesText, pageOf } from './list'
 import { hour, isUnacknowledged, overdueSinceOf } from './overdue'
 import { badRequest, serverError } from './responses'
 import { toRunSummary } from './run'
-import { controlReferenceOf, createRunStore, type Reprocessed, type RunStore } from './run-store'
+import {
+  controlReferenceOf,
+  createRunStore,
+  type Reprocessed,
+  type RunStore,
+  type WaitingForTradingPartnerSince,
+} from './run-store'
 import { stableUuid } from './seed-id'
 import { seedTradingPartners, type TradingPartnerStore } from './trading-partner'
 
@@ -481,7 +487,7 @@ const defaultTimeLimit = { acknowledgementTimeLimitHours: 24 }
 type OrderLifecycleSourceOptions = {
   runs?: RunStore | undefined
   tradingPartners?: Pick<TradingPartnerStore, 'get'>
-  waitingForTradingPartnerSince?: ReadonlyMap<string, string>
+  waitingForTradingPartnerSince?: WaitingForTradingPartnerSince
 }
 
 const seedTradingPartnerLookup: Pick<TradingPartnerStore, 'get'> = {

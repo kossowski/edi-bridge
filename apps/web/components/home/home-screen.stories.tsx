@@ -4,7 +4,13 @@ import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { HomeScreen } from '@/components/home/home-screen'
 import { viewerStory } from '@/components/session/session-story-helpers'
-import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
+import {
+  darkMode,
+  expectNoPageScroll,
+  german,
+  mobile,
+  withLiveEvents,
+} from '@/components/story-helpers'
 import { everyKind, hansemarkt } from '@/components/tasks/task-story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
@@ -23,6 +29,7 @@ const meta = preview.meta({
   title: 'Home/HomeScreen',
   component: HomeScreen,
   parameters: { layout: 'fullscreen' },
+  decorators: [withLiveEvents],
 })
 
 function keyNumbers(canvasElement: HTMLElement) {
@@ -274,6 +281,24 @@ export const Dark = meta.story({
   },
 })
 
+async function expectTimeAxisLabelsInside(canvasElement: HTMLElement) {
+  const charts = [...canvasElement.querySelectorAll('svg.recharts-surface')]
+
+  const labels = charts.flatMap((chart) => [
+    ...chart.querySelectorAll('.recharts-xAxis-tick-labels text'),
+  ])
+
+  await expect(labels.length).toBeGreaterThan(0)
+
+  for (const label of labels) {
+    const chart = label.closest('svg')!.getBoundingClientRect()
+    const { left, right } = label.getBoundingClientRect()
+
+    await expect(left).toBeGreaterThanOrEqual(chart.left)
+    await expect(right).toBeLessThanOrEqual(chart.right)
+  }
+}
+
 export const Mobile = meta.story({
   ...mobile,
   beforeEach({ msw }) {
@@ -286,6 +311,17 @@ export const Mobile = meta.story({
       await canvas.findByRole('button', { name: 'Draft a mapping with AI' }),
     ).toBeVisible()
     await expectNoPageScroll(canvasElement)
+  },
+})
+
+export const MobileCharts = meta.story({
+  ...mobile,
+  beforeEach({ msw }) {
+    msw.use(homeHandler(apiUrl), firstStepsHandler(apiUrl))
+  },
+  async play({ canvas, canvasElement }) {
+    await canvas.findByRole('heading', { name: 'Documents' })
+    await waitFor(() => expectTimeAxisLabelsInside(canvasElement), { timeout: 5000 })
   },
 })
 

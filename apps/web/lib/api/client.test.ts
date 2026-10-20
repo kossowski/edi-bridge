@@ -52,6 +52,7 @@ import {
   publishMappingDraft,
   regenerateWebhookToken,
   reprocessRun,
+  retriesQuery,
   retryRun,
   saveMappingDraft,
   sendTestInterchange,
@@ -575,5 +576,26 @@ describe('Lookup Table CSV import', () => {
     await expect(
       previewLookupTableImport('00000000-0000-4000-8000-0000000000ff', { csv }),
     ).rejects.toMatchObject({ status: 404 })
+  })
+})
+
+describe('retriesQuery', () => {
+  it.each([400, 401, 403, 404, 409, 422])('gives up at once on a %i answer', (status) => {
+    expect(retriesQuery(0, new ApiError(status, '/trading-partners/1'))).toBe(false)
+  })
+
+  it.each([408, 429, 500, 502, 503])('tries a %i answer three times more', (status) => {
+    const error = new ApiError(status, '/trading-partners/1')
+
+    expect([0, 1, 2, 3].map((failureCount) => retriesQuery(failureCount, error))).toEqual([
+      true,
+      true,
+      true,
+      false,
+    ])
+  })
+
+  it('tries again when the request did not reach the api', () => {
+    expect(retriesQuery(0, new TypeError('Failed to fetch'))).toBe(true)
   })
 })

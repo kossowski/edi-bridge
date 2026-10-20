@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { taskCountsOf, taskSchema, whoActsOnFailedRun } from './task'
+import {
+  taskCountsOf,
+  taskSchema,
+  whoActsOnFailedRun,
+  whoActsOnFailingTradingPartner,
+} from './task'
 
 const runId = '20000000-0000-4000-8000-000000000001'
 
@@ -24,8 +29,19 @@ describe('whoActsOnFailedRun', () => {
     ['validation', 'CONTRL', 'tradingPartner'],
     ['validation', 'INVOIC', 'you'],
   ] as const)('gives a Run that failed at %s with a %s to %s', (failureStage, messageType, who) => {
-    expect(whoActsOnFailedRun({ failureStage, messageType })).toBe(who)
+    expect(whoActsOnFailedRun({ failureStage, messageType, waitingForTradingPartner: false })).toBe(
+      who,
+    )
   })
+
+  it.each(['delivery', 'mapping', 'validation'] as const)(
+    'gives a Run that failed at %s and waits for a resend to the Trading Partner',
+    (failureStage) => {
+      expect(
+        whoActsOnFailedRun({ failureStage, messageType: 'INVOIC', waitingForTradingPartner: true }),
+      ).toBe('tradingPartner')
+    },
+  )
 })
 
 describe('taskSchema', () => {
@@ -75,5 +91,16 @@ describe('taskCountsOf', () => {
       retry: 0,
       tradingPartner: 1,
     })
+  })
+})
+
+describe('whoActsOnFailingTradingPartner', () => {
+  it.each([
+    [['tradingPartner', 'tradingPartner', 'retry'], 'tradingPartner'],
+    [['retry', 'retry', 'you'], 'retry'],
+    [['retry', 'tradingPartner'], 'you'],
+    [[], 'you'],
+  ] as const)('gives open failed Runs acted on by %j to %s', (actors, expected) => {
+    expect(whoActsOnFailingTradingPartner(actors.map((whoActs) => ({ whoActs })))).toBe(expected)
   })
 })

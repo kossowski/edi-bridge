@@ -4,6 +4,7 @@ import { expect, waitFor, within } from 'storybook/test'
 import type { StoryContext } from '@storybook/nextjs-vite'
 
 import { AppHeader } from '@/components/app-header'
+import { LiveEventsProvider } from '@/components/live-events-provider'
 import { sessionHandlers } from '@/components/session/session-story-helpers'
 import { type TradingPartner } from '@edi-bridge/contracts'
 import { seedTradingPartners, showcaseViewerSession } from '@edi-bridge/mocks'
@@ -62,10 +63,12 @@ export async function sheetOf(
 }
 
 export const withPartnerFrame = (Story: () => ReactNode) => (
-  <SidebarProvider>
-    <div className="w-full">
-      <AppHeader />
-      <Story />
-    </div>
-  </SidebarProvider>
+  <LiveEventsProvider>
+    <SidebarProvider>
+      <div className="w-full">
+        <AppHeader />
+        <Story />
+      </div>
+    </SidebarProvider>
+  </LiveEventsProvider>
 )
