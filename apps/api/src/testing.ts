@@ -225,7 +225,7 @@ export async function seedWorkspaceWithAdmin(
   name: string,
 ) {
   const workspace = await seedInvoiceWorkspace(api.connection.db, name)
-  const slug = name.toLowerCase().replaceAll(' ', '-')
+  const slug = name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')
 
   const member = {
     name: `${name} admin`,
