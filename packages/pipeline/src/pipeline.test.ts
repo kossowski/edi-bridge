@@ -47,6 +47,7 @@ import {
   type LiveEventsService,
   markOverdueInterchanges,
   processRun,
+  publishRunChanges,
   ReceiptRejected,
   receive,
   reprocessRun,
@@ -4345,6 +4346,36 @@ describe('the live events of Runs', () => {
 
     expect(liveStatusesOf(runId)).toEqual(['received', 'processing', 'failed', 'failed'])
     expect(liveStatusesOf(reprocessed.runId)).toEqual(['received'])
+  })
+
+  it('publishes the changes of several Runs at the same time', async () => {
+    const runIds = [(await receiveInvoice()).runId, (await receiveInvoice()).runId]
+    let inFlight = 0
+    let mostInFlight = 0
+
+    const slow = {
+      publish: () =>
+        Effect.acquireUseRelease(
+          Effect.sync(() => {
+            inFlight += 1
+            mostInFlight = Math.max(mostInFlight, inFlight)
+          }),
+          () => Effect.sleep('20 millis'),
+          () =>
+            Effect.sync(() => {
+              inFlight -= 1
+            }),
+        ),
+    } satisfies LiveEventsService
+
+    await Effect.runPromise(
+      publishRunChanges(runIds).pipe(
+        Effect.provideService(LiveEvents, slow),
+        pipelineServices(connection.db, inMemoryRunQueue()),
+      ),
+    )
+
+    expect(mostInFlight).toBe(2)
   })
 
   it('keeps a Run that its live event fails to announce', async () => {

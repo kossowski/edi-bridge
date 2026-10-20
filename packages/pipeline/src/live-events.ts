@@ -30,7 +30,8 @@ export const publishRunChanges = (runIds: readonly string[]) =>
     yield* Effect.forEach(
       summaries,
       ({ workspaceId, run }) => live.publish({ workspaceId, event: { type: 'run.changed', run } }),
-      { discard: true },
+      // Concurrently, so an outage delays the caller by one publish timeout, not one per Run.
+      { concurrency: 'unbounded', discard: true },
     )
   }).pipe(
     Effect.catchCause((cause) =>
