@@ -14,6 +14,8 @@ export {
   RunNotRetryable,
 } from './errors'
 
+export { markOverdueInterchanges } from './mark-overdue-interchanges'
+
 export { pollInboundChannels } from './poll-inbound-channels'
 
 export { queueReceivedRuns } from './queue-received-runs'
