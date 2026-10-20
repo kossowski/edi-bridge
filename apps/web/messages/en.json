@@ -1930,7 +1930,9 @@
       "confirmed": "EDI Bridge connects only to a server that shows this key.",
       "unchecked": {
         "title": "The server's key is not checked yet.",
-        "description": "Until a key is confirmed, EDI Bridge connects to whichever server answers at this address. Test the connection to see the server's key and accept it, or paste the key when you edit the Channel."
+        "description": "Until a key is confirmed, EDI Bridge connects to whichever server answers at this address.",
+        "action": "Test the connection to see the server's key and accept it, or paste the key when you edit the connection.",
+        "viewOnly": "An Admin can confirm the key."
       }
     },
     "test": {
@@ -2044,8 +2046,8 @@
       },
       "hostKeyFingerprint": {
         "label": "Host key fingerprint (optional)",
-        "description": "The SHA256 fingerprint of the server's Ed25519 host key, as ssh-keygen -lf prints it. Or leave it blank and accept the key a connection test shows.",
-        "keep": "The SHA256 fingerprint of the server's Ed25519 host key, as ssh-keygen -lf prints it, or the key a connection test showed. Clear it to stop checking the key."
+        "description": "The SHA256 fingerprint of the server's host key (usually Ed25519), as ssh-keygen -lf prints it. Or leave it blank and accept the key a connection test shows.",
+        "keep": "The SHA256 fingerprint of the server's host key (usually Ed25519), as ssh-keygen -lf prints it, or the key a connection test showed. Clear it to stop checking the key."
       },
       "username": {
         "label": "Username",
