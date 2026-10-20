@@ -89,6 +89,9 @@ Each application's Dokploy **Environment** settings contain values with the form
 | worker      | `WORKER_HEALTH_PORT`           | `3002`                                                                         |
 | worker      | `RUN_REQUEUE_INTERVAL_SECONDS` | Not set; see below                                                             |
 | worker      | `RUN_STUCK_AFTER_MINUTES`      | Not set; see below                                                             |
+| worker      | `SENTRY_DSN`                   | `<sentry-dsn>`; see [Error monitoring](#error-monitoring)                      |
+| worker      | `SENTRY_ENVIRONMENT`           | `production`                                                                   |
+| worker      | `SENTRY_TRACES_SAMPLE_RATE`    | Not set; see [Error monitoring](#error-monitoring)                             |
 
 These runtime variables require neither Docker build arguments nor a repository `.env` file.
 
@@ -107,6 +110,14 @@ These runtime variables require neither Docker build arguments nor a repository 
 `<anthropic-api-key>` is the Anthropic API key with which the API requests AI drafts of Mappings. It is stored in Dokploy. Without it, the API starts, but every AI draft fails as unavailable. The API does not start with a key that contains whitespace.
 
 `AI_MODEL` is the Anthropic model that drafts the Mappings. Its default is `claude-sonnet-5-5`. Set it only to draft with another model.
+
+## Error monitoring
+
+The worker reports Defects and uncaught errors to Sentry, and sends a sample of its traces. Sentry is optional: without `SENTRY_DSN`, the worker starts and sends nothing.
+
+`<sentry-dsn>` is the DSN of the Sentry project, stored in Dokploy. `SENTRY_ENVIRONMENT` is the environment that Sentry files the events under. `SENTRY_TRACES_SAMPLE_RATE` is the share of Runs whose traces the worker sends, from `0` to `1`. Its default is `0.1`. A Run whose receipt was traced continues the trace of its receipt, and a Run whose receipt was not traced sends no trace. A Run queued without the trace of a receipt, for example by the sweep, a Retry or a Reprocess, is sampled anew at this rate.
+
+A Defect event carries the failure code, the Workspace, Run, Trading Partner and Channel ids as tags, and the stack frames of the Defect. It carries no Document contents, Channel secrets or error messages. An uncaught error arrives with the stack frames and the type of the error and its causes, without their error messages. A Run that fails at parse, validation or setup, or an inbound Channel that fails to poll, sends no event. A failed Run job is not reported a second time: the processing of the Run reports its Defect.
 
 ## API URL of the web application
 

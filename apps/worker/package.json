@@ -17,6 +17,8 @@
     "@edi-bridge/channels": "workspace:*",
     "@edi-bridge/db": "workspace:*",
     "@edi-bridge/pipeline": "workspace:*",
+    "@effect/opentelemetry": "4.0.4",
+    "@sentry/node": "^11.8.0",
     "bullmq": "^6.3.16",
     "drizzle-orm": "^0.45.4",
     "effect": "^4.0.4",

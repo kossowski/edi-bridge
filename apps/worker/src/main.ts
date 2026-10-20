@@ -7,6 +7,9 @@ import { connect } from '@edi-bridge/db'
 import { config } from './config.js'
 import { createHealthServer } from './health.js'
 import { startRunWorker } from './run-worker.js'
+import { startSentry, stopSentry } from './sentry.js'
+
+const monitoring = config.sentry && startSentry(config.sentry)
 
 // Without the offline queue, commands fail fast while Redis is unreachable instead of waiting
 // for a reconnect, so the health check reports the outage right away.
@@ -29,12 +32,14 @@ const runWorker = startRunWorker({
   secrets: secretBox(config.channelSecretKey),
   requeueInterval: config.requeueInterval,
   stuckAfter: config.stuckAfter,
+  monitoring,
 })
 
 runWorker.worker.on('error', (error) => {
   console.warn(`run worker error: ${error.message}`)
 })
 
+// The processing of a Run reports its defect itself, so a failed job is not reported again.
 runWorker.worker.on('failed', (queued, error) => {
   console.error(`run ${queued?.data.runId ?? 'unknown'} failed: ${error.message}`)
 })
@@ -60,6 +65,10 @@ async function shutdown(): Promise<void> {
   }
 
   redis.disconnect()
+
+  if (monitoring) {
+    await stopSentry()
+  }
 }
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

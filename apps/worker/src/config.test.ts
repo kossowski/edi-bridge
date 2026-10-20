@@ -35,3 +35,48 @@ describe('the bound after which a processing Run is stuck', () => {
     expect(() => loadConfig({ RUN_STUCK_AFTER_MINUTES: '0' })).toThrow(/RUN_STUCK_AFTER_MINUTES/)
   })
 })
+
+describe('the Sentry configuration', () => {
+  it('is off without a DSN', () => {
+    expect(loadConfig({ SENTRY_ENVIRONMENT: 'production' }).sentry).toBeUndefined()
+  })
+
+  it('is off with an empty DSN', () => {
+    expect(loadConfig({ SENTRY_DSN: '' }).sentry).toBeUndefined()
+  })
+
+  it('samples a tenth of the traces by default', () => {
+    expect(loadConfig({ SENTRY_DSN: 'https://key@sentry.example/1' }).sentry).toEqual({
+      dsn: 'https://key@sentry.example/1',
+      environment: undefined,
+      tracesSampleRate: 0.1,
+    })
+  })
+
+  it('reads the environment and the trace sample rate', () => {
+    expect(
+      loadConfig({
+        SENTRY_DSN: 'https://key@sentry.example/1',
+        SENTRY_ENVIRONMENT: 'staging',
+        SENTRY_TRACES_SAMPLE_RATE: '0.2',
+      }).sentry,
+    ).toMatchObject({ environment: 'staging', tracesSampleRate: 0.2 })
+  })
+
+  it('samples a tenth of the traces with an empty trace sample rate', () => {
+    expect(
+      loadConfig({ SENTRY_DSN: 'https://key@sentry.example/1', SENTRY_TRACES_SAMPLE_RATE: '' })
+        .sentry,
+    ).toMatchObject({ tracesSampleRate: 0.1 })
+  })
+
+  it('rejects a trace sample rate above 1', () => {
+    expect(() =>
+      loadConfig({ SENTRY_DSN: 'https://key@sentry.example/1', SENTRY_TRACES_SAMPLE_RATE: '2' }),
+    ).toThrow(/SENTRY_TRACES_SAMPLE_RATE/)
+  })
+
+  it('rejects a DSN that is not a URL', () => {
+    expect(() => loadConfig({ SENTRY_DSN: 'not a dsn' })).toThrow(/SENTRY_DSN/)
+  })
+})
