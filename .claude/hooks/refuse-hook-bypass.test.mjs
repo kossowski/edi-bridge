@@ -6,7 +6,11 @@ import { describe, it } from 'node:test'
 const script = fileURLToPath(new URL('./refuse-hook-bypass.mjs', import.meta.url))
 
 function runHook(input) {
-  return spawnSync(process.execPath, [script], { input: JSON.stringify(input), encoding: 'utf8' })
+  return runHookRaw(JSON.stringify(input))
+}
+
+function runHookRaw(stdin) {
+  return spawnSync(process.execPath, [script], { input: stdin, encoding: 'utf8' })
 }
 
 function bash(command) {
@@ -48,6 +52,11 @@ const refused = [
   'echo start\ngit commit --no-verify -m x',
   '(cd /tmp/repo && git commit -n -m x)',
   'git commit -m "$(cat <<\'EOF\'\nfix: x\nEOF\n)" --no-verify',
+  'echo "$(git commit -n -m x)"',
+  'echo "result: $(cd /tmp/repo && git push --no-verify)"',
+  'echo `git commit -n -m x`',
+  'echo "`git commit --no-verify -m x`"',
+  'echo "$(echo "$(git commit -nm x)")"',
 ]
 
 const allowed = [
@@ -60,6 +69,11 @@ const allowed = [
   'git commit -m --no-verify',
   'git commit -F - <<\'EOF\'\nfix: x\n\ngit commit --no-verify is refused\nHUSKY=0 git push\nEOF',
   'git commit -m "$(cat <<\'EOF\'\nfix: x\n\nnever run git commit -n\nEOF\n)"',
+  'echo "$(git log --oneline -n 5)"',
+  'echo `git rev-parse HEAD`',
+  'git commit -m "fix: x" -m "$(echo never run git commit -n)"',
+  'git commit -m "docs: never use \\`git commit --no-verify\\`"',
+  'echo "\\$(git commit -n -m x)"',
   'git push',
   'git push -u origin feat/470-2-refuse-hook-bypass',
   'git push -n',
@@ -94,6 +108,14 @@ describe('refuse-hook-bypass', () => {
     it(`allows ${JSON.stringify(command)}`, () => {
       const result = runHook(bash(command))
       assert.equal(result.status, 0, result.stderr)
+    })
+  }
+
+  for (const stdin of ['not json', '', 'null', '[]', '"text"']) {
+    it(`exits quietly on malformed input ${JSON.stringify(stdin)}`, () => {
+      const result = runHookRaw(stdin)
+      assert.equal(result.status, 0)
+      assert.equal(result.stderr, '')
     })
   }
 
