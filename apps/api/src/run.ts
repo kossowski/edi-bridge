@@ -36,6 +36,7 @@ import {
   publishRunChanges,
   reprocessRun as reprocessInPipeline,
   retryRun as retryDelivery,
+  runSummariesOf,
 } from '@edi-bridge/pipeline'
 
 import { Db, type Database } from './db.js'
@@ -137,9 +138,9 @@ export const listRunSummaries = async (db: Database, ids: readonly string[]) => 
     return []
   }
 
-  const rows = await selectRuns(db, {}).where(inArray(runs.id, [...ids]))
+  const summaries = await runSummariesOf(db, ids)
 
-  return ids.flatMap((id) => rows.filter((row) => row.id === id).map(toSummary))
+  return ids.flatMap((id) => summaries.flatMap(({ run }) => (run.id === id ? [run] : [])))
 }
 
 // A Run not yet processed will be mapped with the Mapping Version its Flow pins.
