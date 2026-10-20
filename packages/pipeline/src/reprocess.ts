@@ -24,7 +24,7 @@ type Reprocessable = {
   direction: Direction
   problem: { reason: ProblemReason } | null
   mappingVersionId: string | null
-  documentDeletedAt?: Date | string | null
+  documentDeletedAt: Date | string | null
 }
 
 // The Trading Partner fixes its Document by a resend, and a delivery failure by a Retry.
@@ -36,7 +36,7 @@ export const isReprocessable = <R extends Reprocessable>(
   run.failureStage !== 'delivery' &&
   run.problem !== null &&
   run.mappingVersionId !== null &&
-  (run.documentDeletedAt ?? null) === null &&
+  run.documentDeletedAt === null &&
   whoFixes({
     failureStage: run.failureStage,
     direction: run.direction,

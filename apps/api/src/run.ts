@@ -334,7 +334,12 @@ export const retryRun = (id: string) =>
 
     const run = yield* loadRun(id)
 
-    const candidate = { ...run, mappingVersionId: run.mappingVersion?.id ?? null }
+    // The Reprocess refuses an expired Document with its reason; a Retry at delivery does not read it.
+    const candidate = {
+      ...run,
+      mappingVersionId: run.mappingVersion?.id ?? null,
+      documentDeletedAt: null,
+    }
 
     // Trying a Defect again outside delivery reprocesses the Run with its own Mapping Version.
     if (candidate.problem?.reason === 'defect' && isReprocessable(candidate)) {
