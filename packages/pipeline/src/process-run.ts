@@ -67,7 +67,7 @@ import {
 import type { DeliveryFailed, OutboundDocument } from '@edi-bridge/channels'
 import type { ParseError } from '@edi-bridge/edifact'
 
-import { businessReferenceOf, documentNumberOf } from './business-reference'
+import { referencesOf } from './business-reference'
 import { enveloped, framed } from './envelope'
 import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
@@ -1204,8 +1204,7 @@ const processOutbound = ({ holding, queued, run, content, pinned, lookupTables }
 
     const delivering = {
       ...run,
-      businessReference: businessReferenceOf(message),
-      documentNumber: documentNumberOf(message),
+      ...referencesOf(message),
       deliveryInput: message,
     }
 
@@ -1346,13 +1345,7 @@ const processInbound = ({
       'parse',
       () => readMessage(content, run.messageIndex),
       async (tx, { message }) => {
-        await tx
-          .update(runs)
-          .set({
-            businessReference: businessReferenceOf(message),
-            documentNumber: documentNumberOf(message),
-          })
-          .where(eq(runs.id, run.id))
+        await tx.update(runs).set(referencesOf(message)).where(eq(runs.id, run.id))
       },
     )
 
@@ -1408,8 +1401,7 @@ const processInbound = ({
 
     const delivering = {
       ...run,
-      businessReference: businessReferenceOf(message),
-      documentNumber: documentNumberOf(message),
+      ...referencesOf(message),
       output: mapped.success,
     }
 

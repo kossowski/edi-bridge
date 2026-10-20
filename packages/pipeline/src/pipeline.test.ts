@@ -1229,6 +1229,7 @@ describe('the processing of a Run', () => {
       problem: null,
       mappingVersionId: workspace.mappingVersionId,
       businessReference: '4711',
+      documentNumber: '87441',
       steps: [
         { stage: 'receipt', status: 'succeeded' },
         { stage: 'mapping', status: 'succeeded' },
@@ -1870,16 +1871,18 @@ describe('the processing of an inbound Run', () => {
   const replaced = (segment: string, by: string) =>
     ordersMessage.map((line) => (line === segment ? by : line))
 
+  // The UNT segment count of a Message whose test added a segment.
+  const counted = (message: string[]) =>
+    message.map((line) =>
+      line.startsWith('UNT+') ? line.replace(/^UNT\+\d+/, `UNT+${String(message.length)}`) : line,
+    )
+
   it('gives a Run the order number of its Message as the Business Reference', async () => {
     const into = await ordersWorkspace('Order Number Foods')
     const buyer = "NAD+BY+4398765000004::9'"
 
-    const withOrderNumber = ordersMessage.flatMap((line) =>
-      line === buyer
-        ? ["RFF+ON:4500017'", buyer]
-        : line.startsWith('UNT')
-          ? ["UNT+23+ME0001'"]
-          : [line],
+    const withOrderNumber = counted(
+      ordersMessage.flatMap((line) => (line === buyer ? ["RFF+ON:4500017'", buyer] : [line])),
     )
 
     const [run] = await receiveInterchange(into, interchangeOf([withOrderNumber]))
@@ -2573,20 +2576,18 @@ describe('the processing of an inbound Run', () => {
     })
 
     // An order number in RFF+ON makes it the Business Reference, so each Message of the order shares it.
-    const ofOrder = (order: string, documentNumber: string, messageFunction: string) =>
-      sentAnew(
-        interchangeOf([
-          ordersMessage.flatMap((line) =>
-            line === "BGM+220:::+128576+9'"
-              ? [`BGM+220:::+${documentNumber}+${messageFunction}'`]
-              : line === "NAD+BY+4398765000004::9'"
-                ? [`RFF+ON:${order}'`, line]
-                : line.startsWith('UNT')
-                  ? ["UNT+23+ME0001'"]
-                  : [line],
-          ),
-        ]),
+    const ofOrder = (order: string, documentNumber: string, messageFunction: string) => {
+      const buyer = "NAD+BY+4398765000004::9'"
+
+      const changed = new Map([
+        ["BGM+220:::+128576+9'", [`BGM+220:::+${documentNumber}+${messageFunction}'`]],
+        [buyer, [`RFF+ON:${order}'`, buyer]],
+      ])
+
+      return sentAnew(
+        interchangeOf([counted(ordersMessage.flatMap((line) => changed.get(line) ?? [line]))]),
       )
+    }
 
     it('replaces the waiting Run of its document number, not another Message of its order', async () => {
       const into = await ordersWorkspace('Document Number Foods')
