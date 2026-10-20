@@ -176,7 +176,7 @@ _Avoid_: Job, transmission, execution
 _On screen_: Document (DE: Beleg)
 
 **Duplicate**:
-A Document received again: an Interchange with the same sender and Interchange control reference as an earlier one in the Workspace, or a file received on an SFTP Channel with the same file name and content as an earlier file from that Channel; matching either key is enough. It is recorded and linked to the original Run, but not processed. A Manual Submission or a webhook request is a Duplicate only by its Interchange key.
+A Document received again: an Interchange with the same sender and Interchange control reference as an earlier one in the Workspace, or a file polled from an SFTP Channel with the same Channel, file name and content hash as an earlier one.
 _Avoid_: Resend, double, repeat
 _On screen_: Duplicate (DE: Duplikat)
 
