@@ -304,6 +304,7 @@ export const buildContrl = (
   } = readableInterchange(text)
 
   const firstSegment = interchangeSegmentPosition(hasServiceStringAdvice)(0).segment
+  const receivedAt = (segment: number) => received[segment - firstSegment]
 
   const interchangeResponse = (...response: Element[]) =>
     withoutTrailingEmptyElements({
@@ -325,20 +326,11 @@ export const buildContrl = (
   const responses = () => {
     // The text holds U+FFFD in place of the invalid bytes, so nothing read from it is accepted.
     if (invalidCharacter) {
-      return [
-        interchangeResponse(
-          ...invalidCharacterRejection(
-            invalidCharacter,
-            (segment) => received[segment - firstSegment],
-          ),
-        ),
-      ]
+      return [interchangeResponse(...invalidCharacterRejection(invalidCharacter, receivedAt))]
     }
 
     if (envelope instanceof ParseError) {
-      return [
-        interchangeResponse(...rejection(envelope, (segment) => received[segment - firstSegment])),
-      ]
+      return [interchangeResponse(...rejection(envelope, receivedAt))]
     }
 
     const envelopeError = validationErrorOf({ ...envelope, messages: [] })
