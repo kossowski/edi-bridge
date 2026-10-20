@@ -7,6 +7,7 @@ export { decodeDocument } from './decode-document'
 export { deleteExpiredDocuments } from './delete-expired-documents'
 
 export {
+  documentExpiredMessage,
   MappingVersionNotOfRun,
   ReceiptRejected,
   type ReceiptRejection,

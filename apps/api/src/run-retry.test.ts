@@ -12,7 +12,13 @@ import {
   toPath,
 } from '@edi-bridge/contracts'
 import { runs } from '@edi-bridge/db'
-import { type DeliveryService, Documents, processRun, RunNotRetryable } from '@edi-bridge/pipeline'
+import {
+  type DeliveryService,
+  documentExpiredMessage,
+  Documents,
+  processRun,
+  RunNotRetryable,
+} from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
   type InvoiceWorkspace,
@@ -23,6 +29,7 @@ import {
 import {
   addMember,
   type Client,
+  documentDeletedAt,
   expireDocumentOf,
   signIn,
   startTestApi,
@@ -256,32 +263,28 @@ describe('POST /runs/:id/retry', () => {
 })
 
 describe('POST /runs/:id/retry for a Run whose Document expired', () => {
-  const deletedAt = new Date('2026-09-01T02:00:00.000Z')
-
   it('answers 409 with the expiry as the reason for a Defect before delivery', async () => {
     const id = await failedOnDefect()
 
-    await expireDocumentOf(api.connection.db, id, deletedAt)
+    await expireDocumentOf(api.connection.db, id)
 
     const retried = await retry(id)
 
     expect(retried.statusCode, retried.body).toBe(409)
-    expect(retried.json()).toEqual({
-      message: 'The Document of the Run expired, so the Run cannot be reprocessed',
-    })
+    expect(retried.json()).toEqual({ message: documentExpiredMessage })
     expect(api.runQueue.queued).toEqual([])
     await expect(detail(id)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'mapping',
       replacedBy: null,
-      documentDeletedAt: deletedAt.toISOString(),
+      documentDeletedAt: documentDeletedAt.toISOString(),
     })
   })
 
   it('still repeats the delivery of a Run that failed at delivery', async () => {
     const id = await processed(goldenInvoice, unreachable)
 
-    await expireDocumentOf(api.connection.db, id, deletedAt)
+    await expireDocumentOf(api.connection.db, id)
 
     const response = await retry(id)
 
@@ -292,7 +295,7 @@ describe('POST /runs/:id/retry for a Run whose Document expired', () => {
 
     await expect(detail(id)).resolves.toMatchObject({
       status: 'delivered',
-      documentDeletedAt: deletedAt.toISOString(),
+      documentDeletedAt: documentDeletedAt.toISOString(),
     })
   })
 })

@@ -13,7 +13,7 @@ import {
   toPath,
 } from '@edi-bridge/contracts'
 import { lookupTableEntries, lookupTables, mappingVersions } from '@edi-bridge/db'
-import { type DeliveryService, processRun } from '@edi-bridge/pipeline'
+import { type DeliveryService, documentExpiredMessage, processRun } from '@edi-bridge/pipeline'
 import {
   goldenInvoice,
   type InvoiceWorkspace,
@@ -25,6 +25,7 @@ import {
 import {
   addMember,
   type Client,
+  documentDeletedAt,
   expireDocumentOf,
   signIn,
   startTestApi,
@@ -335,32 +336,27 @@ describe('POST /runs/:id/reprocess', () => {
 })
 
 describe('a Run whose Document expired', () => {
-  // The Run detail screen shows the same reason against the mocks.
-  const documentExpired = 'The Document of the Run expired, so the Run cannot be reprocessed'
-
-  const deletedAt = new Date('2026-09-01T02:00:00.000Z')
-
   it('serves the time its Document was deleted', async () => {
     const id = await processed(inKilograms)
 
-    await expireDocumentOf(api.connection.db, id, deletedAt)
+    await expireDocumentOf(api.connection.db, id)
 
     await expect(detail(id)).resolves.toMatchObject({
       status: 'failed',
       failureStage: 'mapping',
-      documentDeletedAt: deletedAt.toISOString(),
+      documentDeletedAt: documentDeletedAt.toISOString(),
     })
   })
 
   it('answers 409 with the expiry as the reason and starts no Run', async () => {
     const id = await processed(inKilograms)
 
-    await expireDocumentOf(api.connection.db, id, deletedAt)
+    await expireDocumentOf(api.connection.db, id)
 
     const response = await reprocess(id)
 
     expect(response.statusCode, response.body).toBe(409)
-    expect(response.json()).toEqual({ message: documentExpired })
+    expect(response.json()).toEqual({ message: documentExpiredMessage })
     expect(api.runQueue.queued).toEqual([])
     await expect(detail(id)).resolves.toMatchObject({ status: 'failed', replacedBy: null })
   })

@@ -92,8 +92,11 @@ export async function addMember(database: Database, member: NewMember) {
   return userId
 }
 
+// The nightly deletion of a Document, for a Run whose Document expired.
+export const documentDeletedAt = new Date('2026-09-01T02:00:00.000Z')
+
 // Leaves the Run as the retention sweep leaves it once its Document expired.
-export async function expireDocumentOf(database: Database, runId: string, deletedAt: Date) {
+export async function expireDocumentOf(database: Database, runId: string) {
   const [run] = await database
     .select({ documentId: runs.documentId })
     .from(runs)
@@ -105,7 +108,7 @@ export async function expireDocumentOf(database: Database, runId: string, delete
 
   await database
     .update(runs)
-    .set({ documentId: null, documentDeletedAt: deletedAt })
+    .set({ documentId: null, documentDeletedAt })
     .where(eq(runs.documentId, run.documentId))
   await database.delete(documents).where(eq(documents.id, run.documentId))
 }
