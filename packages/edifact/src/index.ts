@@ -21,7 +21,7 @@ export { validate, ValidationError, validationErrorCodes } from './validate'
 
 export type { DecodedBytes, DecodedInterchange, SyntaxCharacterSet } from './character-set'
 
-export type { BuildContrlErrorCode } from './contrl'
+export type { BuildContrlErrorCode, InvalidCharacter } from './contrl'
 
 export type {
   AcknowledgedInterchange,

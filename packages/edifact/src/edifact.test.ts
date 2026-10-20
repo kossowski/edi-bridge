@@ -730,6 +730,17 @@ describe('buildContrl', () => {
     },
   )
 
+  it('rejects an Interchange with a byte not valid in an encoding its UNB does not name', () => {
+    const text = `UNB+UNOX:3+7300015200048:14+7350000001266:14+221125:1605+88776655'${orders('M1', "BGM+220+P\ufffdO1+9'", ...validOrder.slice(1))}UNZ+1+88776655'`
+    const contrl = buildContrl(text, 'C1', { invalidCharacter: 'unlocated' })
+
+    expect(serializeMessage(contrl).split('\n')).toEqual([
+      "UNH+C1+CONTRL:D:3:UN:EAN002'",
+      "UCI+88776655+7300015200048:14+7350000001266:14+4+21'",
+      "UNT+3+C1'",
+    ])
+  })
+
   it('builds no CONTRL when the header it echoes holds a byte not valid in its character set', () => {
     const { readable, invalidCharacter } = undecodable(
       `UNB+UNOW:3+73000152000ä:14+7350000001266:14+221125:1605+88776655'UNZ+0+88776655'`,

@@ -3976,9 +3976,11 @@ describe('the CONTRL answering a received Interchange', () => {
     }
   }
 
-  // The bytes of the text read as ISO 8859-1 are not valid in the UTF-8 the UNB names.
-  const undecodableInterchange = (text: string) => {
-    const decoded = decodeDocument(Buffer.from(text.replace('UNOC:3', 'UNOW:3'), 'latin1'))
+  // The bytes of the text read as ISO 8859-1 are not valid in UTF-8.
+  const undecodableInterchange = (text: string, characterSet = 'UNOW') => {
+    const decoded = decodeDocument(
+      Buffer.from(text.replace('UNOC:3', `${characterSet}:3`), 'latin1'),
+    )
 
     assert('undecodable' in decoded, 'The Interchange decoded in UTF-8')
 
@@ -4402,13 +4404,16 @@ describe('the CONTRL answering a received Interchange', () => {
 
   const misEncodedOrders = ordersMessage.map((line) => line.replace('+128576+', '+1285\u00e476+'))
 
-  it('rejects an Interchange not valid in its character set in a CONTRL sent', async () => {
-    const into = await answeringWorkspace('Mis-encoded Order Lines')
+  it.each([
+    ['its character set', 'UNOW'],
+    ['UTF-8 under a syntax identifier not listed', 'UNOX'],
+  ])('rejects an Interchange not valid in %s in a CONTRL sent', async (_case, characterSet) => {
+    const into = await answeringWorkspace(`Mis-encoded ${characterSet} Order Lines`)
     const delivery = recordingDelivery()
 
     const { exit } = await receivingContent(
       into,
-      undecodableInterchange(interchangeOf([misEncodedOrders])),
+      undecodableInterchange(interchangeOf([misEncodedOrders]), characterSet),
     )
 
     await sendWith(delivery.service)

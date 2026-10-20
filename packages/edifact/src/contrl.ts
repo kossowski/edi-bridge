@@ -278,11 +278,19 @@ const rejection = (
   ...(serviceSegmentError(error, segmentAt) ?? [[syntaxErrorCode(error)]]),
 ]
 
+// Bytes that fail an encoding the UNB does not name have no position in its character set.
+export type InvalidCharacter = CharacterSetError | 'unlocated'
+
 // A UCI names only a service segment, so a byte in another segment rejects without a position.
 const invalidCharacterRejection = (
-  { position, tag }: CharacterSetError,
+  invalidCharacter: InvalidCharacter,
   segmentAt: (segment: number) => Segment | undefined,
 ): Element[] => {
+  if (invalidCharacter === 'unlocated') {
+    return [[rejected], [invalidCharacterCode]]
+  }
+
+  const { position, tag } = invalidCharacter
   const segment = segmentAt(position.segment)
 
   return serviceSegmentTags.has(tag)
@@ -293,7 +301,7 @@ const invalidCharacterRejection = (
 export const buildContrl = (
   text: string,
   messageReference: string,
-  { invalidCharacter }: { invalidCharacter?: CharacterSetError | undefined } = {},
+  { invalidCharacter }: { invalidCharacter?: InvalidCharacter | undefined } = {},
 ): Message => {
   const {
     hasServiceStringAdvice,

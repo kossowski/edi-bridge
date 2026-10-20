@@ -17,7 +17,7 @@ import {
   buildContrl,
   BuildContrlError,
   type BuildContrlErrorCode,
-  type CharacterSetError,
+  type InvalidCharacter,
   type Message,
   readInterchange,
 } from '@edi-bridge/edifact'
@@ -47,7 +47,7 @@ const notSentMessages: Record<NotSentReason, string> = {
   seededChannel: 'a seeded Channel never sends',
 }
 
-const builtContrl = (content: string, invalidCharacter: CharacterSetError | undefined) =>
+const builtContrl = (content: string, invalidCharacter: InvalidCharacter | undefined) =>
   Effect.try({
     try: () => buildContrl(content, '1', { invalidCharacter }),
     catch: (cause) => {
@@ -117,7 +117,12 @@ const answerOf = (
   undecodable: DocumentUndecodable | undefined,
 ) =>
   Effect.gen(function* () {
-    const built = yield* Effect.result(builtContrl(content, undecodable?.characterSetError))
+    const built = yield* Effect.result(
+      builtContrl(
+        content,
+        undecodable === undefined ? undefined : (undecodable.characterSetError ?? 'unlocated'),
+      ),
+    )
 
     if (Result.isFailure(built) && built.failure.code === 'unreadable-interchange-header') {
       return undefined
