@@ -2,9 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { firstStepsEndpoint, firstStepsSchema } from '@edi-bridge/contracts'
 import { tradingPartners } from '@edi-bridge/db'
-import { seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
-import { addMember, signIn, startTestApi, type TestApi } from './testing.js'
+import { seedWorkspaceWithAdmin, startTestApi, type TestApi } from './testing.js'
 
 let api: TestApi
 
@@ -43,17 +42,7 @@ describe('GET /workspaces/current/first-steps', () => {
 
   it('marks the steps done from the Workspace data and targets the partner to onboard next', async () => {
     const db = api.connection.db
-    const workspace = await seedInvoiceWorkspace(db, 'Nordwind Foods')
-
-    const member = {
-      name: 'Nordwind Foods admin',
-      email: 'admin@nordwind-foods.example',
-      password: 'nordwind-foods-admin-password',
-      workspaceId: workspace.id,
-      role: 'admin' as const,
-    }
-
-    await addMember(db, member)
+    const { workspace, admin } = await seedWorkspaceWithAdmin(api, 'Nordwind Foods')
 
     const inTestMode = (name: string, testInterchangeSentAt: Date | null) => ({
       workspaceId: workspace.id,
@@ -71,7 +60,7 @@ describe('GET /workspaces/current/first-steps', () => {
       ])
       .returning({ id: tradingPartners.id })
 
-    expect(await firstSteps(await signIn(api.app, member))).toEqual({
+    expect(await firstSteps(admin)).toEqual({
       steps: [
         { id: 'gln', done: true, target: { kind: 'companySettings' } },
         { id: 'erpConnection', done: true, target: { kind: 'newChannel' } },

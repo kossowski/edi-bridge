@@ -1,11 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { type Task, tasksEndpoint, tasksSchema } from '@edi-bridge/contracts'
-import { documents, flows, runs, tradingPartners } from '@edi-bridge/db'
-import { type InvoiceWorkspace, seedInvoiceWorkspace } from '@edi-bridge/pipeline/testing'
+import { type InvoiceWorkspace } from '@edi-bridge/pipeline/testing'
 
 import { hourMs } from './duration.js'
-import { addMember, type Client, signIn, startTestApi, type TestApi } from './testing.js'
+import {
+  addTradingPartnerWithFlows,
+  type Client,
+  failedRun,
+  seedWorkspaceWithAdmin,
+  startTestApi,
+  type TestApi,
+} from './testing.js'
 
 let api: TestApi
 
@@ -13,118 +19,16 @@ let workspace: InvoiceWorkspace
 
 let admin: Client
 
-type RunValues = Partial<typeof runs.$inferInsert> & { receivedAt: Date }
-
 const now = Date.now()
 
 const hoursAgo = (hours: number) => new Date(now - hours * hourMs)
 
-const failure = (failureStage: 'parse' | 'validation' | 'mapping' | 'delivery') => ({
-  status: 'failed' as const,
-  failureStage,
-  error: {
-    code: 'processingDefect',
-    message: 'The processing failed',
-    position: null,
-    details: null,
-  },
-  problem: { reason: 'defect' as const, fixTarget: null },
-})
-
-const one = async <Row>(rows: Promise<Row[]>) => {
-  const [row] = await rows
-
-  if (row === undefined) {
-    throw new Error('Insert returned no row')
-  }
-
-  return row
-}
-
-async function addTradingPartner(target: InvoiceWorkspace, name: string) {
-  const db = api.connection.db
-
-  const tradingPartner = await one(
-    db
-      .insert(tradingPartners)
-      .values({
-        workspaceId: target.id,
-        name,
-        characterSet: 'UNOC',
-        acknowledgementTimeLimitHours: 24,
-      })
-      .returning(),
-  )
-
-  const flowOf = (messageType: 'ORDERS' | 'INVOIC') =>
-    one(
-      db
-        .insert(flows)
-        .values({
-          workspaceId: target.id,
-          tradingPartnerId: tradingPartner.id,
-          messageType,
-          name: `${name} ${messageType}`,
-          inboundChannelId: target.inboundChannelId,
-          destinationChannelId: target.outboundChannelId,
-          mappingVersionId: target.mappingVersionId,
-        })
-        .returning(),
-    )
-
-  const orders = await flowOf('ORDERS')
-  const invoic = await flowOf('INVOIC')
-
-  const run = async (flow: typeof orders, values: RunValues) => {
-    const document = await one(
-      db
-        .insert(documents)
-        .values({
-          workspaceId: target.id,
-          channelId: target.inboundChannelId,
-          fileName: 'message.edi',
-          content: 'UNA',
-        })
-        .returning(),
-    )
-
-    return one(
-      db
-        .insert(runs)
-        .values({
-          workspaceId: target.id,
-          documentId: document.id,
-          flowId: flow.id,
-          tradingPartnerId: tradingPartner.id,
-          manualSubmission: false,
-          status: 'delivered',
-          ...values,
-        })
-        .returning(),
-    )
-  }
-
-  return {
-    tradingPartner: { id: tradingPartner.id, name: tradingPartner.name },
-    orders: (values: RunValues) => run(orders, values),
-    invoic: (values: RunValues) => run(invoic, values),
-  }
-}
+const addTradingPartner = (target: InvoiceWorkspace, name: string) =>
+  addTradingPartnerWithFlows(api.connection.db, target, name)
 
 beforeAll(async () => {
   api = await startTestApi()
-  workspace = await seedInvoiceWorkspace(api.connection.db, 'Nordwind Foods')
-
-  const member = {
-    name: 'Nordwind Foods admin',
-    email: 'admin@nordwind-foods.example',
-    password: 'nordwind-foods-admin-password',
-    workspaceId: workspace.id,
-    role: 'admin' as const,
-  }
-
-  await addMember(api.connection.db, member)
-  admin = await signIn(api.app, member)
+  ;({ workspace, admin } = await seedWorkspaceWithAdmin(api, 'Nordwind Foods'))
 }, 60_000)
 
 afterAll(async () => {
@@ -146,23 +50,23 @@ describe('GET /tasks', () => {
   it('lists the failed Runs of the last 24 hours by who acts, linked to the Run', async () => {
     const partner = await addTradingPartner(workspace, 'Rheinkauf eG')
 
-    const delivery = await partner.invoic({ ...failure('delivery'), receivedAt: hoursAgo(1) })
-    const mapping = await partner.orders({ ...failure('mapping'), receivedAt: hoursAgo(2) })
-    const inboundParse = await partner.orders({ ...failure('parse'), receivedAt: hoursAgo(3) })
+    const delivery = await partner.invoic({ ...failedRun('delivery'), receivedAt: hoursAgo(1) })
+    const mapping = await partner.orders({ ...failedRun('mapping'), receivedAt: hoursAgo(2) })
+    const inboundParse = await partner.orders({ ...failedRun('parse'), receivedAt: hoursAgo(3) })
 
     const outboundValidation = await partner.invoic({
-      ...failure('validation'),
+      ...failedRun('validation'),
       receivedAt: hoursAgo(4),
     })
 
     const waiting = await partner.orders({
-      ...failure('mapping'),
+      ...failedRun('mapping'),
       waitingForTradingPartnerSince: hoursAgo(4),
       receivedAt: hoursAgo(5),
     })
 
-    await partner.orders({ ...failure('mapping'), receivedAt: hoursAgo(25) })
-    const reprocessed = await partner.orders({ ...failure('mapping'), receivedAt: hoursAgo(6) })
+    await partner.orders({ ...failedRun('mapping'), receivedAt: hoursAgo(25) })
+    const reprocessed = await partner.orders({ ...failedRun('mapping'), receivedAt: hoursAgo(6) })
     await partner.orders({ replacesRunId: reprocessed.id, receivedAt: hoursAgo(5.5) })
 
     const { tasks } = await listed()
@@ -263,15 +167,15 @@ describe('GET /tasks', () => {
     const failing = await addTradingPartner(workspace, 'Alpenfrisch Märkte AG')
 
     await failing.invoic({ receivedAt: hoursAgo(10) })
-    await failing.invoic({ ...failure('delivery'), receivedAt: hoursAgo(9) })
-    await failing.invoic({ ...failure('delivery'), receivedAt: hoursAgo(8) })
-    await failing.orders({ ...failure('mapping'), receivedAt: hoursAgo(7) })
-    await failing.orders({ ...failure('mapping'), receivedAt: hoursAgo(30) })
+    await failing.invoic({ ...failedRun('delivery'), receivedAt: hoursAgo(9) })
+    await failing.invoic({ ...failedRun('delivery'), receivedAt: hoursAgo(8) })
+    await failing.orders({ ...failedRun('mapping'), receivedAt: hoursAgo(7) })
+    await failing.orders({ ...failedRun('mapping'), receivedAt: hoursAgo(30) })
     await failing.orders({ receivedAt: hoursAgo(3) })
 
     const degraded = await addTradingPartner(workspace, 'Baltic Frische GmbH')
 
-    await degraded.orders({ ...failure('mapping'), receivedAt: hoursAgo(5) })
+    await degraded.orders({ ...failedRun('mapping'), receivedAt: hoursAgo(5) })
 
     for (const hours of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
       await degraded.orders({ receivedAt: hoursAgo(hours) })
@@ -295,22 +199,15 @@ describe('GET /tasks', () => {
   })
 
   it('lists only the tasks of the own Workspace and counts them by who acts', async () => {
-    const other = await seedInvoiceWorkspace(api.connection.db, 'Sudhafen Logistik')
-
-    const member = {
-      name: 'Sudhafen Logistik admin',
-      email: 'admin@sudhafen-logistik.example',
-      password: 'sudhafen-logistik-admin-password',
-      workspaceId: other.id,
-      role: 'admin' as const,
-    }
-
-    await addMember(api.connection.db, member)
+    const { workspace: other, admin: otherAdmin } = await seedWorkspaceWithAdmin(
+      api,
+      'Sudhafen Logistik',
+    )
 
     const partner = await addTradingPartner(other, 'Elbe Großhandel GmbH')
-    const failed = await partner.invoic({ ...failure('delivery'), receivedAt: hoursAgo(1) })
+    const failed = await partner.invoic({ ...failedRun('delivery'), receivedAt: hoursAgo(1) })
 
-    const { tasks, counts } = await listed(await signIn(api.app, member))
+    const { tasks, counts } = await listed(otherAdmin)
 
     expect(tasks.map(({ id }) => id)).toEqual([
       `run:${failed.id}`,
