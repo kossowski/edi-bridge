@@ -111,9 +111,13 @@ export const withMemoryHistory = (
   </MemoryHistory>
 )
 
-export const goBack = () => getRouter().back()
+export function goBack(): void {
+  getRouter().back()
+}
 
-export const goForward = () => getRouter().forward()
+export function goForward(): void {
+  getRouter().forward()
+}
 
 export const withSidebarProvider = (
   Story: () => ReactNode,
