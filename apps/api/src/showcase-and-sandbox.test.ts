@@ -269,6 +269,61 @@ describe('POST /auth/sign-in/showcase', () => {
   })
 })
 
+describe('a Showcase Viewer session issued earlier', () => {
+  const sessionStatus = async (viewer: Client) =>
+    (await viewer.inject({ method: 'GET', url: sessionEndpoint.path })).statusCode
+
+  it('is refused once the Viewer is also Member of another Workspace', async () => {
+    const viewer = signedInClient(api.app, await showcaseSignIn())
+    const userId = await userIdOf(showcaseViewer.email)
+
+    // Joined before the Showcase, so the first membership would no longer be the Showcase's.
+    await api.connection.db
+      .insert(members)
+      .values({ userId, workspaceId: ownWorkspace.id, role: 'admin', createdAt: new Date(0) })
+
+    try {
+      expect(await sessionStatus(viewer)).toBe(401)
+    } finally {
+      await api.connection.db
+        .delete(members)
+        .where(and(eq(members.userId, userId), eq(members.workspaceId, ownWorkspace.id)))
+    }
+  })
+
+  it('is refused once the Viewer holds a role above Viewer', async () => {
+    const viewer = signedInClient(api.app, await showcaseSignIn())
+    const userId = await userIdOf(showcaseViewer.email)
+
+    await api.connection.db.update(members).set({ role: 'admin' }).where(eq(members.userId, userId))
+
+    try {
+      expect(await sessionStatus(viewer)).toBe(401)
+    } finally {
+      await api.connection.db
+        .update(members)
+        .set({ role: 'viewer' })
+        .where(eq(members.userId, userId))
+    }
+  })
+
+  it('is refused once the Viewer is an Operator', async () => {
+    const viewer = signedInClient(api.app, await showcaseSignIn())
+    const userId = await userIdOf(showcaseViewer.email)
+
+    await api.connection.db.update(users).set({ operator: true }).where(eq(users.id, userId))
+
+    try {
+      expect(await sessionStatus(viewer)).toBe(401)
+      expect(
+        (await viewer.inject({ method: 'GET', url: operatorWorkspacesEndpoint.path })).statusCode,
+      ).toBe(401)
+    } finally {
+      await api.connection.db.update(users).set({ operator: false }).where(eq(users.id, userId))
+    }
+  })
+})
+
 describe('ensureShowcaseAndSandbox run again after a change', () => {
   it('adds the missing memberships of the Viewer and the Admin', async () => {
     const userIds = [await userIdOf(showcaseViewer.email), await userIdOf(showcaseAdmin.email)]

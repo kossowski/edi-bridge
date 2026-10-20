@@ -11,7 +11,12 @@ import { showcaseViewer } from './showcase-and-sandbox.js'
 
 import type { Database } from './db.js'
 
-async function findShowcaseViewer(database: Database) {
+type ShowcaseViewerRule =
+  | { readonly holds: true; readonly userId: string }
+  | { readonly holds: false; readonly showcase: boolean }
+
+// Only a read-only Viewer of the Showcase may use the form-free login; any more rights and it stays shut.
+export async function showcaseViewerRule(database: Database): Promise<ShowcaseViewerRule> {
   const rows = await database
     .select({
       id: users.id,
@@ -27,22 +32,19 @@ async function findShowcaseViewer(database: Database) {
   const [viewer] = rows
 
   if (viewer === undefined || !rows.some(({ kind }) => kind === 'showcase')) {
-    return null
+    return { holds: false, showcase: false }
   }
 
-  // Only a read-only Viewer of the Showcase may sign in here; any more rights and it stays shut.
   if (
     rows.length !== 1 ||
     viewer.operator ||
     viewer.role !== 'viewer' ||
     viewer.kind !== 'showcase'
   ) {
-    throw new APIError('FORBIDDEN', {
-      message: 'The showcase Viewer has rights beyond a Viewer of the Showcase',
-    })
+    return { holds: false, showcase: true }
   }
 
-  return viewer.id
+  return { holds: true, userId: viewer.id }
 }
 
 export const showcaseSignIn = (database: Database) =>
@@ -54,10 +56,17 @@ export const showcaseSignIn = (database: Database) =>
         // The same origin check as the email sign-in, so no foreign page signs a visitor in.
         { method: 'POST', use: [formCsrfMiddleware] },
         async (ctx) => {
-          const viewerId = await findShowcaseViewer(database)
+          const rule = await showcaseViewerRule(database)
 
-          const user =
-            viewerId === null ? null : await ctx.context.internalAdapter.findUserById(viewerId)
+          if (!rule.holds && rule.showcase) {
+            throw new APIError('FORBIDDEN', {
+              message: 'The showcase Viewer has rights beyond a Viewer of the Showcase',
+            })
+          }
+
+          const user = rule.holds
+            ? await ctx.context.internalAdapter.findUserById(rule.userId)
+            : null
 
           if (user === null) {
             throw new APIError('NOT_FOUND', { message: 'No Showcase Workspace exists' })
