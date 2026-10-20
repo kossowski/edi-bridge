@@ -88,7 +88,7 @@ const createdMapping = async (
   const response = await target.inject({
     method: 'POST',
     url: createMappingEndpoint.path,
-    body: { messageType },
+    body: { messageType, documentStructureId: documentStructureSchema.parse(structure.json()).id },
   })
 
   expect(response.statusCode).toBe(201)

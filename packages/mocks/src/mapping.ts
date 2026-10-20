@@ -927,22 +927,6 @@ export function linkProblem(graph: MappingGraph, leaves: SideLeaves) {
   return message === null ? null : unprocessable(message)
 }
 
-function documentStructureForNew(
-  messageType: MessageType,
-  mappings: ReadonlyArray<MappingDraftRecord>,
-  documentStructures: DocumentStructures,
-) {
-  const structureIdsOfMessageType = new Set(
-    mappings.flatMap((mapping) =>
-      mapping.messageType === messageType ? [mapping.documentStructureId] : [],
-    ),
-  )
-
-  const structuresByName = documentStructures.toSorted((a, b) => a.name.localeCompare(b.name, 'de'))
-
-  return structuresByName.find(({ id }) => structureIdsOfMessageType.has(id)) ?? structuresByName[0]
-}
-
 function unknownLookupTable({ transforms }: MappingGraph, lookupTables: LookupTableStore) {
   const unknown = transforms.find(
     (transform) =>
@@ -1068,20 +1052,11 @@ export function mappingHandlers(
 
       const { messageType, documentStructureId } = body.data
 
-      // Until Document Structures carry a Message Type, every one of the Workspace fits.
-      const fitting = structures.all()
-
-      const documentStructure =
-        documentStructureId === undefined
-          ? documentStructureForNew(messageType, store.all(), fitting)
-          : fitting.find(({ id }) => id === documentStructureId)
+      // Until Document Structures carry a Message Type, any one of the Workspace fits.
+      const documentStructure = structures.get(documentStructureId)
 
       if (!documentStructure) {
-        return unprocessable(
-          documentStructureId === undefined
-            ? 'The Workspace has no Document Structure to map yet.'
-            : 'The Document Structure does not exist.',
-        )
+        return unprocessable('The Document Structure does not exist.')
       }
 
       const record = newMappingDraft(messageType, documentStructure, store.all())

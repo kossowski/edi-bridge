@@ -8,6 +8,7 @@ import {
   createMappingEndpoint,
   deleteLookupTableEndpoint,
   type DocumentStructureOrigin,
+  type DocumentStructure,
   documentStructureOrigins,
   documentStructureProblemSchema,
   documentStructureSchema,
@@ -66,11 +67,14 @@ const createdStructure = async (name: string, origin: DocumentStructureOrigin) =
   return documentStructureSchema.parse(response.json())
 }
 
-const createdMapping = async (messageType: MessageType = 'ORDERS') => {
+const createdMapping = async (
+  { id: documentStructureId }: DocumentStructure,
+  messageType: MessageType = 'ORDERS',
+) => {
   const response = await admin.inject({
     method: 'POST',
     url: createMappingEndpoint.path,
-    body: { messageType },
+    body: { messageType, documentStructureId },
   })
 
   expect(response.statusCode).toBe(201)
@@ -160,8 +164,8 @@ const problemOf = (response: LightMyRequestResponse) => {
 describe('GET /document-structures', () => {
   it('names the Mappings that use each Document Structure by name', async () => {
     const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
-    const first = await createdMapping('ORDERS')
-    const second = await createdMapping('DESADV')
+    const first = await createdMapping(orders, 'ORDERS')
+    const second = await createdMapping(orders, 'DESADV')
     await createdStructure('Lieferscheine', documentStructureOrigins.csvDocument)
 
     const response = await admin.inject({ method: 'GET', url: documentStructuresEndpoint.path })
@@ -186,7 +190,7 @@ describe('GET /document-structures', () => {
 describe('PUT /document-structures/:id used by Mappings', () => {
   it('refuses a change that removes a node a Draft links', async () => {
     const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(orders)
     await save(mapping.id, linking('SG2+BY/NAD+BY/C082/3039', 'buyer.gln'))
 
     const problem = problemOf(
@@ -201,7 +205,7 @@ describe('PUT /document-structures/:id used by Mappings', () => {
 
   it('lets a structure only Drafts use change the type of a linked field', async () => {
     const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(orders)
     await save(mapping.id, linking('BGM/1004', 'orderNumber'))
 
     const response = await update(orders.id, {
@@ -214,7 +218,7 @@ describe('PUT /document-structures/:id used by Mappings', () => {
 
   it('refuses a change of a field a published Mapping Version links', async () => {
     const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(orders)
     await save(mapping.id, linking('BGM/1004', 'orderNumber'))
     const version = await published(mapping.id)
     await save(mapping.id, empty)
@@ -243,7 +247,7 @@ describe('PUT /document-structures/:id used by Mappings', () => {
 
   it('lets a used structure change a field no published Mapping Version links', async () => {
     const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(orders)
     await save(mapping.id, linking('BGM/1004', 'orderNumber'))
     await published(mapping.id)
 
@@ -257,7 +261,7 @@ describe('PUT /document-structures/:id used by Mappings', () => {
 
   it('refuses new CSV settings for a structure a published Mapping Version reads', async () => {
     const dispatch = await createdStructure('Lieferscheine', documentStructureOrigins.csvDocument)
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(dispatch)
     await save(mapping.id, linking('BGM/1004', 'rows[].Lieferscheinnummer'))
     const version = await published(mapping.id)
 
@@ -290,10 +294,10 @@ const removeLookupTable = (id: string) =>
 
 describe('Lookup Tables used by Mappings', () => {
   it('names the Mappings whose Draft uses a Lookup Table', async () => {
-    await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
+    const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
     const units = await createdLookupTable()
     await createdLookupTable('Länder')
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(orders)
     await save(mapping.id, translating(units.id))
 
     const summaries = await lookupTableSummaries()
@@ -323,9 +327,9 @@ describe('Lookup Tables used by Mappings', () => {
   })
 
   it('names a Mapping whose published Mapping Version alone still uses a Lookup Table', async () => {
-    await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
+    const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
     const units = await createdLookupTable()
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(orders)
     await save(mapping.id, translating(units.id))
     await published(mapping.id)
     await save(mapping.id, empty)
@@ -336,9 +340,9 @@ describe('Lookup Tables used by Mappings', () => {
   })
 
   it('refuses to delete a Lookup Table a Draft uses', async () => {
-    await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
+    const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
     const units = await createdLookupTable()
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(orders)
     await save(mapping.id, translating(units.id))
 
     const response = await removeLookupTable(units.id)
@@ -349,9 +353,9 @@ describe('Lookup Tables used by Mappings', () => {
   })
 
   it('refuses to delete a Lookup Table a published Mapping Version uses', async () => {
-    await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
+    const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
     const units = await createdLookupTable()
-    const mapping = await createdMapping()
+    const mapping = await createdMapping(orders)
     await save(mapping.id, translating(units.id))
     await published(mapping.id)
     await save(mapping.id, empty)
@@ -360,9 +364,9 @@ describe('Lookup Tables used by Mappings', () => {
   })
 
   it('deletes a Lookup Table once no Mapping uses it', async () => {
-    await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
+    const orders = await createdStructure('ERP orders', documentStructureOrigins.jsonDocument)
     const units = await createdLookupTable()
-    await createdMapping()
+    await createdMapping(orders)
 
     expect((await removeLookupTable(units.id)).statusCode).toBe(204)
   })

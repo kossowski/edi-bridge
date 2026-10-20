@@ -116,9 +116,6 @@ const uniqueName = (name: string, taken: ReadonlySet<string>) => {
   return count === 1 ? name : `${name} ${count}`
 }
 
-const noDocumentStructure = () =>
-  new Unprocessable({ message: 'The Workspace has no Document Structure to map yet.' })
-
 const unknownDocumentStructure = () =>
   new Unprocessable({ message: 'The Document Structure does not exist.' })
 
@@ -127,41 +124,30 @@ const insertNumbered = ({ messageType, documentStructureId }: CreateMappingBody)
     const db = yield* Db
     const workspace = yield* CurrentWorkspace
 
+    // Until Document Structures carry a Message Type, any one of the Workspace fits.
     const [structures, existing] = yield* Effect.promise(() =>
       Promise.all([
         db
           .select({ id: documentStructures.id, name: documentStructures.name })
           .from(documentStructures)
-          .where(inWorkspace(documentStructures, workspace.id)),
+          .where(
+            inWorkspace(
+              documentStructures,
+              workspace.id,
+              eq(documentStructures.id, documentStructureId),
+            ),
+          ),
         db
-          .select({
-            name: mappings.name,
-            messageType: mappings.messageType,
-            documentStructureId: mappings.documentStructureId,
-          })
+          .select({ name: mappings.name })
           .from(mappings)
           .where(inWorkspace(mappings, workspace.id)),
       ]),
     )
 
-    const structureIdsOfMessageType = new Set(
-      existing.flatMap((mapping) =>
-        mapping.messageType === messageType ? [mapping.documentStructureId] : [],
-      ),
-    )
-
-    // Until Document Structures carry a Message Type, every one of the Workspace fits.
-    const fitting = structures.toSorted(byName)
-
-    const structure =
-      documentStructureId === undefined
-        ? (fitting.find(({ id }) => structureIdsOfMessageType.has(id)) ?? fitting[0])
-        : fitting.find(({ id }) => id === documentStructureId)
+    const [structure] = structures
 
     if (!structure) {
-      return yield* documentStructureId === undefined
-        ? noDocumentStructure()
-        : unknownDocumentStructure()
+      return yield* unknownDocumentStructure()
     }
 
     const name = uniqueName(

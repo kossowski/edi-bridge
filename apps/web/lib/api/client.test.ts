@@ -22,6 +22,7 @@ import {
   manualSubmissionHandler,
   mappingHandlers,
   mappingVersionHandlers,
+  seedDocumentStructureOf,
   seedDocumentStructures,
   seedMappingDrafts,
   seedMappingSamples,
@@ -300,18 +301,29 @@ describe('createMapping', () => {
   it('creates a never-published Mapping for the Message Type', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: [...seedMappingDrafts] }))
 
-    await expect(createMapping({ messageType: 'ORDERS' })).resolves.toMatchObject({
+    await expect(
+      createMapping({
+        messageType: 'ORDERS',
+        documentStructureId: seedDocumentStructureOf.ORDERS.id,
+      }),
+    ).resolves.toMatchObject({
       direction: 'inbound',
       messageType: 'ORDERS',
+      documentStructureId: seedDocumentStructureOf.ORDERS.id,
       latestVersion: null,
       unpublishedChanges: true,
     })
   })
 
-  it('rejects with 422 when the Workspace has no Document Structure', async () => {
+  it('rejects with 422 for a Document Structure the Workspace does not have', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }))
 
-    await expect(createMapping({ messageType: 'INVOIC' })).rejects.toMatchObject({ status: 422 })
+    await expect(
+      createMapping({
+        messageType: 'INVOIC',
+        documentStructureId: seedDocumentStructureOf.INVOIC.id,
+      }),
+    ).rejects.toMatchObject({ status: 422 })
   })
 })
 

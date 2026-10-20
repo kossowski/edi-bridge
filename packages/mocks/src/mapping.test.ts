@@ -300,7 +300,11 @@ async function createMapping(body: { messageType?: string; documentStructureId?:
 describe('POST /mappings', () => {
   it('creates a never-published Mapping for the Message Type, without traffic', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
-    const response = await createMapping({ messageType: 'INVOIC' })
+
+    const response = await createMapping({
+      messageType: 'INVOIC',
+      documentStructureId: seedDocumentStructureOf.INVOIC.id,
+    })
 
     expect(response.status).toBe(201)
     expect(createMappingEndpoint.response.parse(await response.json())).toMatchObject({
@@ -313,55 +317,6 @@ describe('POST /mappings', () => {
       documentsLast7Days: 0,
       failedRunsLast7Days: 0,
     })
-  })
-
-  it('uses the Document Structure the other Mappings of the Message Type use', async () => {
-    server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
-
-    const created = createMappingEndpoint.response.parse(
-      await (await createMapping({ messageType: 'ORDERS' })).json(),
-    )
-
-    expect(created).toMatchObject({
-      direction: 'inbound',
-      documentStructureId: seedDocumentStructureOf.ORDERS.id,
-      documentStructureName: seedDocumentStructureOf.ORDERS.name,
-    })
-  })
-
-  it('falls back to the first Document Structure of the Workspace by name', async () => {
-    const [first, second] = createDocumentStructures({ count: 2 }).toSorted((a, b) =>
-      a.name.localeCompare(b.name, 'de'),
-    )
-
-    server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [second!, first!] }))
-
-    const created = createMappingEndpoint.response.parse(
-      await (await createMapping({ messageType: 'DESADV' })).json(),
-    )
-
-    expect(created.documentStructureId).toBe(first!.id)
-  })
-
-  it('takes the first by name of the Document Structures the Message Type uses', async () => {
-    const [first, second] = createDocumentStructures({ count: 2 }).toSorted((a, b) =>
-      a.name.localeCompare(b.name, 'de'),
-    )
-
-    const mappings = createMappingDrafts({ count: 1, documentStructures: [first!] }).flatMap(
-      (mapping) => [
-        { ...mapping, id: crypto.randomUUID(), documentStructureId: second!.id },
-        mapping,
-      ],
-    )
-
-    server.use(...mappingHandlers(apiUrl, { mappings, documentStructures: [second!, first!] }))
-
-    const created = createMappingEndpoint.response.parse(
-      await (await createMapping({ messageType: mappings[0]!.messageType })).json(),
-    )
-
-    expect(created.documentStructureId).toBe(first!.id)
   })
 
   it('takes the named Document Structure', async () => {
@@ -400,7 +355,12 @@ describe('POST /mappings', () => {
     server.use(...mappingHandlers(apiUrl, { mappings: createMappingDraftStore() }))
 
     const created = createMappingEndpoint.response.parse(
-      await (await createMapping({ messageType: 'DESADV' })).json(),
+      await (
+        await createMapping({
+          messageType: 'DESADV',
+          documentStructureId: seedDocumentStructureOf.DESADV.id,
+        })
+      ).json(),
     )
 
     expect(await getDraft(created.id)).toMatchObject({
@@ -421,35 +381,12 @@ describe('POST /mappings', () => {
   it('gives a second Mapping of the same Message Type its own name', async () => {
     server.use(...mappingHandlers(apiUrl, { mappings: [] }))
 
-    const first = createMappingEndpoint.response.parse(
-      await (await createMapping({ messageType: 'INVOIC' })).json(),
-    )
+    const body = { messageType: 'INVOIC', documentStructureId: seedDocumentStructureOf.INVOIC.id }
 
-    const second = createMappingEndpoint.response.parse(
-      await (await createMapping({ messageType: 'INVOIC' })).json(),
-    )
+    const first = createMappingEndpoint.response.parse(await (await createMapping(body)).json())
+    const second = createMappingEndpoint.response.parse(await (await createMapping(body)).json())
 
     expect(second.name).toBe(`${first.name} 2`)
-  })
-
-  it('creates the first Mapping of an empty Workspace from its Document Structures', async () => {
-    server.use(...mappingHandlers(apiUrl, { mappings: [] }))
-    const response = await createMapping({ messageType: 'ORDERS' })
-
-    expect(response.status).toBe(201)
-    expect(await listMappings()).toEqual([
-      createMappingEndpoint.response.parse(await response.json()),
-    ])
-  })
-
-  it('refuses a Workspace without a Document Structure with a plain reason', async () => {
-    server.use(...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }))
-    const response = await createMapping({ messageType: 'INVOIC' })
-
-    expect(response.status).toBe(422)
-    expect(await response.json()).toEqual({
-      message: 'The Workspace has no Document Structure to map yet.',
-    })
   })
 
   it('fails listing and creating Mappings in the error state', async () => {
@@ -462,6 +399,7 @@ describe('POST /mappings', () => {
   it.each([
     { messageType: 'CONTRL' },
     { messageType: 'APERAK' },
+    { messageType: 'ORDERS' },
     {},
     { messageType: 'ORDERS', documentStructureId: 'erp-orders' },
   ])('rejects the body %j', async (body) => {
