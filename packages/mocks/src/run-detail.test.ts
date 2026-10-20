@@ -1059,7 +1059,9 @@ describe('a Run whose Document expired', () => {
       body: body === undefined ? null : JSON.stringify(body),
     })
 
-    return { status: response.status, body: await response.json() }
+    const answer: unknown = await response.json()
+
+    return { status: response.status, body: answer }
   }
 
   function serveExpired(run: RunSummary) {
