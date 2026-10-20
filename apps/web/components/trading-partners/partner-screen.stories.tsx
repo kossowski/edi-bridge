@@ -36,6 +36,7 @@ import {
   createHandlers,
   createWorkspaceActivity,
   createWorkspace,
+  seedChannels,
   seedFlows,
   seedRuns,
   seedTradingPartners,
@@ -161,6 +162,14 @@ export const NewPartnerWithoutActivity = meta.story({
     await expect(canvas.getByText('Nothing needs attention.')).toBeVisible()
   },
 })
+
+function withoutUntouchedConnections({ msw }: StoryContext) {
+  msw.use(
+    ...createHandlers(apiUrl, {
+      channels: seedChannels.filter(({ tradingPartnerId }) => tradingPartnerId !== untouched.id),
+    }),
+  )
+}
 
 export const SendTestDocument = meta.story({
   ...at(readyForTest),
@@ -837,6 +846,7 @@ export const Connections = meta.story({
 
 export const ConnectionsEmpty = meta.story({
   ...at(untouched, 'connections'),
+  beforeEach: withoutUntouchedConnections,
   async play({ canvas }) {
     await expect(await canvas.findByText('No connections yet')).toBeVisible()
     await expect(
@@ -1075,6 +1085,7 @@ export const AddConnectionSheet = meta.story({
 
 export const AddSftpConnection = meta.story({
   ...at(untouched, 'connections'),
+  beforeEach: withoutUntouchedConnections,
   async play({ canvas, canvasElement }) {
     const add = await canvas.findByRole('button', { name: 'Add a connection' })
     await userEvent.click(add)
@@ -1149,6 +1160,7 @@ export const AddConnectionFails = meta.story({
 
 export const AddConnectionFromSetup = meta.story({
   ...at(untouched),
+  beforeEach: withoutUntouchedConnections,
   async play({ canvas, canvasElement }) {
     const current = await canvas.findByRole('listitem', { current: 'step' })
     await expect(current).toHaveTextContent('Connections')
