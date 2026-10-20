@@ -58,7 +58,7 @@ function Choice({
 
   return (
     <li
-      className="bg-card not-data-locked:has-[button:hover]:border-primary not-data-locked:has-[button:hover]:bg-primary/5 has-[button:focus-visible]:ring-ring/50 has-[button:focus-visible]:border-ring data-chosen:border-primary relative flex h-full flex-col gap-2 rounded-lg border p-4 transition-colors has-[button:focus-visible]:ring-3"
+      className="bg-card not-data-locked:has-[button:hover]:border-primary has-[button:focus-visible]:ring-ring/50 has-[button:focus-visible]:border-ring data-chosen:border-primary relative flex h-full flex-col gap-2 rounded-lg border p-4 transition-colors has-[button:focus-visible]:ring-3"
       data-chosen={chosen || undefined}
       data-locked={locked || undefined}>
       <span id={pathId}>
@@ -193,7 +193,7 @@ export function NewMappingChoices({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 text-left">
       {documentStructures.isPending ? (
         <div className="flex flex-col gap-2">
           <p role="status" className="sr-only">

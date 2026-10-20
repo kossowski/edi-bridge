@@ -55,7 +55,7 @@ async function openNewMappingSheet(canvasElement: HTMLElement, name = 'New Mappi
 const documentStructure = seedDocumentStructures[0]!
 
 async function chooseDocumentStructure(
-  sheet: ReturnType<typeof within>,
+  sheet: Awaited<ReturnType<typeof openNewMappingSheet>>,
   name = documentStructure.name,
 ) {
   await userEvent.selectOptions(
@@ -440,6 +440,22 @@ export const EmptyWorkspace = meta.story({
 
     await expect(canvas.queryByRole('group', { name: 'Show' })).toBeNull()
     await expect(canvas.queryByRole('region', { name: 'Coming in' })).toBeNull()
+  },
+})
+
+export const EmptyWorkspaceDocumentStructureMissing = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...mappingHandlers(apiUrl, { mappings: [] }))
+  },
+  async play({ canvas }) {
+    await canvas.findByRole('combobox', { name: 'Your data format' })
+    await userEvent.click(canvas.getByRole('button', { name: 'Invoices you send' }))
+
+    const error = await canvas.findByText('Choose your data format first.')
+
+    await expect(canvas.getByRole('combobox', { name: 'Your data format' })).toHaveFocus()
+    await expect(getComputedStyle(error).textAlign).toBe('left')
+    await expect(getRouter().push).not.toHaveBeenCalled()
   },
 })
 
