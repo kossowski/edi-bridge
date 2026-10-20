@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { secretContext } from '@edi-bridge/channels'
 import { documentSchema, type WebhookSubmission } from '@edi-bridge/contracts'
 import { channels, postgresDocumentStorage } from '@edi-bridge/db'
+import { readableOf } from '@edi-bridge/edifact'
 import {
   Database,
   decodeDocument,
@@ -113,7 +114,7 @@ export const receiveOnWebhook = (
 
     const decoded = yield* decodedBody(channelId, body, contentType)
 
-    yield* parse(documentSchema.shape.content, 'text' in decoded ? decoded.text : decoded.readable)
+    yield* parse(documentSchema.shape.content, readableOf(decoded))
 
     const db = yield* Db
 

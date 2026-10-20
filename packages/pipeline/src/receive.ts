@@ -13,7 +13,7 @@ import {
   tradingPartners,
   type Transaction,
 } from '@edi-bridge/db'
-import { ParseError, parseMessages, readInterchange } from '@edi-bridge/edifact'
+import { ParseError, parseMessages, readableOf, readInterchange } from '@edi-bridge/edifact'
 
 import { answerDocument } from './acknowledgement'
 import { type DocumentUndecodable } from './decode-document'
@@ -262,8 +262,6 @@ const inboundChannelOf = (workspaceId: string, channelId: string) =>
     return channel
   })
 
-const textOf = (content: ArrivingContent) => ('text' in content ? content.text : content.readable)
-
 const storedContentOf = (content: ArrivingContent) =>
   'text' in content ? { content: content.text } : { bytes: content.bytes }
 
@@ -364,7 +362,7 @@ export const receive = (arriving: ArrivingDocument) =>
     const channel = yield* inboundChannelOf(arriving.workspaceId, arriving.channelId)
 
     const documents = yield* Documents
-    const text = textOf(arriving.content)
+    const text = readableOf(arriving.content)
     const { key: interchangeKey, testIndicator } = envelopeOf(text)
 
     // Only a file polled from an SFTP server comes again unchanged after a failed removal.

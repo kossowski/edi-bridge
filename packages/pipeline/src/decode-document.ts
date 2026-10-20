@@ -4,20 +4,19 @@ import {
   type CharacterSetError,
   decodeBytes,
   decodeInterchange,
+  hexOf,
   type SyntaxCharacterSet,
 } from '@edi-bridge/edifact'
 
 export class DocumentUndecodable extends Data.TaggedError('DocumentUndecodable')<{
   readonly message: string
-  readonly interchange: CharacterSetError | undefined
+  readonly characterSetError: CharacterSetError | undefined
 }> {}
 
 export type DecodedDocument = {
   bytes: Buffer
   characterSet: SyntaxCharacterSet | undefined
 } & ({ text: string } | { readable: string; undecodable: DocumentUndecodable })
-
-const hex = (value: number) => `0x${value.toString(16).toUpperCase().padStart(2, '0')}`
 
 const encodingNamed = (label: string) => {
   try {
@@ -41,7 +40,7 @@ export const decodeDocument = (bytes: Buffer, label = 'utf-8'): DecodedDocument 
           readable: interchange.readable,
           undecodable: new DocumentUndecodable({
             message: interchange.error.message,
-            interchange: interchange.error,
+            characterSetError: interchange.error,
           }),
         }
   }
@@ -55,7 +54,7 @@ export const decodeDocument = (bytes: Buffer, label = 'utf-8'): DecodedDocument 
       readable: '',
       undecodable: new DocumentUndecodable({
         message: `The encoding ${label} is unknown`,
-        interchange: undefined,
+        characterSetError: undefined,
       }),
     }
   }
@@ -69,8 +68,8 @@ export const decodeDocument = (bytes: Buffer, label = 'utf-8'): DecodedDocument 
         characterSet: undefined,
         readable: decoded.readable,
         undecodable: new DocumentUndecodable({
-          message: `Byte ${String(decoded.invalidAt + 1)} (${hex(bytes[decoded.invalidAt] ?? 0)}) is not valid ${encoding}`,
-          interchange: undefined,
+          message: `Byte ${String(decoded.invalidAt + 1)} (${hexOf(bytes[decoded.invalidAt] ?? 0)}) is not valid ${encoding}`,
+          characterSetError: undefined,
         }),
       }
 }

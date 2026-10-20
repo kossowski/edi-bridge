@@ -2,6 +2,8 @@ export {
   CharacterSetError,
   decodeBytes,
   decodeInterchange,
+  hexOf,
+  readableOf,
   syntaxCharacterSets,
 } from './character-set'
 

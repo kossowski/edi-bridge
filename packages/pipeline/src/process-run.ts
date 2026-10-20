@@ -298,10 +298,10 @@ type TradingPartner = { id: string; name: string }
 
 const undecodableFailure = (
   stage: 'parse' | 'mapping',
-  { message, interchange }: DocumentUndecodable,
+  { message, characterSetError }: DocumentUndecodable,
   fixTarget: FixTarget | null,
 ): Failure => {
-  const tag = segmentTagSchema.safeParse(interchange?.tag)
+  const tag = segmentTagSchema.safeParse(characterSetError?.tag)
 
   return {
     stage,
@@ -309,12 +309,12 @@ const undecodableFailure = (
       code: 'invalid-byte-sequence',
       message,
       position:
-        interchange !== undefined && tag.success
+        characterSetError !== undefined && tag.success
           ? {
-              segment: interchange.position.segment,
+              segment: characterSetError.position.segment,
               tag: tag.data,
-              element: interchange.position.element ?? null,
-              component: interchange.position.component ?? null,
+              element: characterSetError.position.element ?? null,
+              component: characterSetError.position.component ?? null,
             }
           : null,
       details: null,
@@ -1344,7 +1344,7 @@ type Processing = {
 const processOutbound = ({ holding, queued, run, document, pinned, lookupTables }: Processing) =>
   Effect.gen(function* () {
     const mapped = yield* step(holding, 'mapping', () =>
-      textOf(document, encodingOf(pinned.structure)).pipe(
+      storedTextOf(document, encodingOf(pinned.structure)).pipe(
         Effect.flatMap((content) => readDocument(pinned.structure, content)),
         Effect.flatMap((document) =>
           mapMessage(
@@ -1400,7 +1400,7 @@ const processOutbound = ({ holding, queued, run, document, pinned, lookupTables 
 type StoredDocument = { content: string | null; bytes: Buffer | null }
 
 // Receipt kept the bytes only when they are not valid in the encoding they name.
-const textOf = (
+const storedTextOf = (
   { content, bytes }: StoredDocument,
   encoding?: string,
 ): Effect.Effect<string, DocumentUndecodable> => {
@@ -1420,7 +1420,7 @@ const textOf = (
 // Receipt routed the Message by this envelope, so the Interchange reads again here.
 const readMessage = (document: StoredDocument, messageIndex: number | null) =>
   Effect.gen(function* () {
-    const content = yield* textOf(document)
+    const content = yield* storedTextOf(document)
     const interchange = parseMessages(content)
     const message = messageIndex === null ? undefined : interchange.messages[messageIndex - 1]
 

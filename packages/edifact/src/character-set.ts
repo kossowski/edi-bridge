@@ -16,6 +16,11 @@ export type SyntaxCharacterSet = (typeof syntaxCharacterSets)[number]
 
 export type DecodedBytes = { text: string } | { readable: string; invalidAt: number }
 
+export const hexOf = (value: number) => `0x${value.toString(16).toUpperCase().padStart(2, '0')}`
+
+export const readableOf = (decoded: { text: string } | { readable: string }) =>
+  'text' in decoded ? decoded.text : decoded.readable
+
 export class CharacterSetError extends Error {
   override readonly name = 'CharacterSetError'
 
@@ -28,7 +33,7 @@ export class CharacterSetError extends Error {
     readonly tag: string,
   ) {
     super(
-      `Byte ${String(byte)} (0x${value.toString(16).toUpperCase().padStart(2, '0')}) is not valid in ${characterSet} (${characterSetNames[characterSet]}), at ${describePosition(position)}`,
+      `Byte ${String(byte)} (${hexOf(value)}) is not valid in ${characterSet} (${characterSetNames[characterSet]}), at ${describePosition(position)}`,
     )
   }
 }
@@ -170,7 +175,7 @@ export const decodeInterchange = (received: Uint8Array): DecodedInterchange | un
   }
 
   const before = decode(bytes.subarray(0, decoded.invalidAt))
-  const { position, tag } = positionAfter('text' in before ? before.text : before.readable)
+  const { position, tag } = positionAfter(readableOf(before))
   const byte = decoded.invalidAt + 1 + received.length - bytes.length
 
   return {
