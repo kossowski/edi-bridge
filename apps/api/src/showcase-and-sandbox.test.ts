@@ -8,6 +8,7 @@ import {
   operatorWorkspacesEndpoint,
   sessionEndpoint,
   sessionSchema,
+  runsEndpoint,
   showcaseSignInEndpoint,
   signedInSchema,
   tradingPartnerActivitiesEndpoint,
@@ -205,6 +206,36 @@ describe('POST /auth/sign-in/showcase', () => {
         neededDirections: ['inbound', 'outbound'],
       }),
     ])
+  })
+
+  it('shows outbound INVOIC traffic to a Trading Partner with an outbound Channel', async () => {
+    const viewer = signedInClient(api.app, await showcaseSignIn())
+
+    const activities = tradingPartnerActivitiesEndpoint.response.parse(
+      (await viewer.inject({ method: 'GET', url: tradingPartnerActivitiesEndpoint.path })).json(),
+    )
+
+    const withOutboundChannel = new Set(
+      activities
+        .filter(({ channelDirections }) => channelDirections.includes('outbound'))
+        .map(({ tradingPartnerId }) => tradingPartnerId),
+    )
+
+    const invoices = runsEndpoint.response.parse(
+      (
+        await viewer.inject({
+          method: 'GET',
+          url: `${runsEndpoint.path}?messageType=INVOIC&pageSize=100`,
+        })
+      ).json(),
+    )
+
+    expect(
+      invoices.runs.filter(
+        ({ direction, tradingPartner }) =>
+          direction === 'outbound' && withOutboundChannel.has(tradingPartner.id),
+      ),
+    ).not.toEqual([])
   })
 
   it('lets the Viewer change nothing', async () => {
