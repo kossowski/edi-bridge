@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  acceptHostKeyEndpoint,
   type Channel,
   type ChannelInput,
   channelInputSchema,
   channelKinds,
   channelSchema,
   channelSummarySchema,
+  channelTestResultSchema,
   channelUpdateSchema,
   createdChannelSchema,
+  hostKeyFingerprintSchema,
   webhookAuthorization,
   webhookTokenHeader,
   webhookTokenSchema,
@@ -219,5 +222,134 @@ describe('createdChannelSchema', () => {
       channel: webhookChannel,
       webhookToken,
     })
+  })
+})
+
+const fingerprint = 'SHA256:nThbg6kXUpJWGl7E1IGOCspRomTxdCARLviKw6E5SY8'
+
+const otherFingerprint = 'SHA256:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU'
+
+describe('hostKeyFingerprintSchema', () => {
+  it('accepts an OpenSSH SHA256 fingerprint and trims the pasted text', () => {
+    expect(hostKeyFingerprintSchema.parse(` ${fingerprint}\n`)).toBe(fingerprint)
+  })
+
+  it.each([
+    'nThbg6kXUpJWGl7E1IGOCspRomTxdCARLviKw6E5SY8',
+    `${fingerprint}=`,
+    'SHA256:short',
+    'MD5:16:27:ac:a5:76:28:2d:36:63:1b:56:4d:eb:df:a6:48',
+    `sha256:${fingerprint.slice(7)}`,
+  ])('rejects %s', (text) => {
+    expect(hostKeyFingerprintSchema.safeParse(text).success).toBe(false)
+  })
+})
+
+describe('the host key fingerprint of an SFTP Channel', () => {
+  it('is stored when the Admin pastes it while creating or updating the Channel', () => {
+    const input = { ...inboundSftp, hostKeyFingerprint: fingerprint }
+
+    expect(channelInputSchema.parse(input)).toMatchObject({ hostKeyFingerprint: fingerprint })
+    expect(channelUpdateSchema.parse(input)).toMatchObject({ hostKeyFingerprint: fingerprint })
+  })
+
+  it('may be missing, so a Channel without one connects unchecked', () => {
+    expect(channelInputSchema.safeParse(inboundSftp).success).toBe(true)
+    expect(
+      channelInputSchema.safeParse({ ...outboundSftp, hostKeyFingerprint: null }).success,
+    ).toBe(true)
+    expect(channelSchema.parse({ ...sftpChannel, hostKeyFingerprint: null })).toMatchObject({
+      hostKeyFingerprint: null,
+    })
+  })
+
+  it('is read back with the Channel, since it is not a secret', () => {
+    const channel = { ...sftpChannel, hostKeyFingerprint: fingerprint }
+
+    expect(channelSchema.parse(channel)).toEqual(channel)
+  })
+
+  it('rejects a malformed fingerprint', () => {
+    expect(
+      channelInputSchema.safeParse({ ...inboundSftp, hostKeyFingerprint: 'SHA256:short' }).success,
+    ).toBe(false)
+  })
+
+  it('belongs only to SFTP Channels', () => {
+    expect(
+      channelSchema.safeParse({ ...webhookChannel, hostKeyFingerprint: fingerprint }).success,
+    ).toBe(false)
+  })
+})
+
+describe('acceptHostKeyEndpoint', () => {
+  it('confirms the fingerprint a Channel test showed and returns the Channel', () => {
+    expect(acceptHostKeyEndpoint.body.parse({ hostKeyFingerprint: fingerprint })).toEqual({
+      hostKeyFingerprint: fingerprint,
+    })
+    expect(acceptHostKeyEndpoint.body.safeParse({ hostKeyFingerprint: null }).success).toBe(false)
+    expect(acceptHostKeyEndpoint.response).toBe(channelSchema)
+  })
+})
+
+describe('channelTestResultSchema', () => {
+  const testedAt = '2026-10-20T09:00:00.000Z'
+
+  it('shows the server fingerprint and whether it matches the confirmed one', () => {
+    for (const state of ['matches', 'unchecked'] as const) {
+      const result = { outcome: 'succeeded', testedAt, hostKey: { fingerprint, state } }
+
+      expect(channelTestResultSchema.parse(result)).toEqual(result)
+    }
+  })
+
+  it('fails with hostKeyMismatch and shows the fingerprint the server presented', () => {
+    const result = {
+      outcome: 'failed',
+      reason: 'hostKeyMismatch',
+      testedAt,
+      hostKey: { fingerprint: otherFingerprint, state: 'mismatch' },
+    }
+
+    expect(channelTestResultSchema.parse(result)).toEqual(result)
+  })
+
+  it('has no host key for a Channel without one or a server not reached', () => {
+    expect(
+      channelTestResultSchema.safeParse({ outcome: 'succeeded', testedAt, hostKey: null }).success,
+    ).toBe(true)
+    expect(
+      channelTestResultSchema.safeParse({
+        outcome: 'failed',
+        reason: 'hostUnreachable',
+        testedAt,
+        hostKey: null,
+      }).success,
+    ).toBe(true)
+  })
+
+  it('ties a mismatching host key to the hostKeyMismatch failure', () => {
+    const mismatch = { fingerprint: otherFingerprint, state: 'mismatch' }
+
+    expect(
+      channelTestResultSchema.safeParse({ outcome: 'succeeded', testedAt, hostKey: mismatch })
+        .success,
+    ).toBe(false)
+    expect(
+      channelTestResultSchema.safeParse({
+        outcome: 'failed',
+        reason: 'loginRejected',
+        testedAt,
+        hostKey: mismatch,
+      }).success,
+    ).toBe(false)
+    expect(
+      channelTestResultSchema.safeParse({
+        outcome: 'failed',
+        reason: 'hostKeyMismatch',
+        testedAt,
+        hostKey: { fingerprint, state: 'matches' },
+      }).success,
+    ).toBe(false)
   })
 })

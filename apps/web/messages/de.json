@@ -809,6 +809,10 @@
           "title": "{direction, select, inbound {Ihr ERP hat nicht geantwortet} other {Der Server von {tradingPartner} hat nicht geantwortet}}",
           "description": "{direction, select, inbound {Der Beleg wurde übersetzt, aber Ihr ERP hat ihn bei der Zustellung nicht angenommen.} other {Der Beleg ist fertig, aber die Übertragung an {tradingPartner} ist fehlgeschlagen.}} Das ist meist nur vorübergehend."
         },
+        "hostKeyMismatch": {
+          "title": "{direction, select, inbound {Der Server Ihres ERP hat einen anderen Serverschlüssel gezeigt} other {Der Server von {tradingPartner} hat einen anderen Serverschlüssel gezeigt}}",
+          "description": "{direction, select, inbound {Der Beleg wurde übersetzt} other {Der Beleg ist fertig}}, aber der Serverschlüssel ist nicht der für diese Verbindung bestätigte, deshalb hat EDI Bridge den Beleg nicht gesendet. Ein neuer Versuch schlägt fehl, bis der neue Serverschlüssel an der Verbindung übernommen ist."
+        },
         "seededChannel": {
           "title": "Demo-Verbindungen senden nie",
           "description": "Dies ist eine Demo-Verbindung, über die EDI Bridge nie Belege sendet. Der Beleg ist fertig, bleibt aber in EDI Bridge, und ein neuer Versuch endet genauso."
@@ -834,6 +838,7 @@
         "completeSetup": "Vervollständigen Sie die Einrichtung.",
         "fixCauseWithoutTarget": "Beheben Sie die hier beschriebene Ursache. EDI Bridge kann diesen Beleg nicht erneut verarbeiten, {direction, select, inbound {bitten Sie also {tradingPartner}, ihn erneut zu senden} other {senden Sie ihn also erneut aus Ihrem ERP}}.",
         "checkConnection": "Wenn es weiter fehlschlägt, prüfen Sie die Verbindungsdaten.",
+        "acceptHostKey": "Fragen Sie {direction, select, inbound {Ihre IT} other {{tradingPartner}}}, ob der Server oder der Serverschlüssel ersetzt wurde. Wenn ja, übernehmen Sie den neuen Serverschlüssel an der Verbindung.",
         "processAgain": "Verarbeiten Sie den Beleg erneut. EDI Bridge nutzt die Originaldatei, {direction, select, inbound {{tradingPartner} muss} other {Ihr ERP muss}} also nichts erneut senden.",
         "tryAgain": "{action, select, reprocess {Versuchen Sie es erneut. EDI Bridge verarbeitet die Originaldatei noch einmal mit derselben Mapping-Version.} other {Versuchen Sie es erneut. Der fertige Beleg wird noch einmal gesendet, nichts wird neu übersetzt.}}",
         "tellTradingPartner": "Informieren Sie {tradingPartner} und bitten Sie um eine korrigierte Datei. Die Nachricht enthält die technischen Details für das IT-Team. Die Kontaktdaten stehen auf der Partnerseite.",
@@ -1517,6 +1522,10 @@
         "testedAt": "Getestet <when>{time}</when>.",
         "requestFailed": "Der Test konnte nicht laufen. Versuchen Sie es erneut.",
         "failed": {
+          "hostKeyMismatch": {
+            "title": "Der Server hat einen anderen Serverschlüssel gezeigt.",
+            "hint": "Der Serverschlüssel ist nicht der bestätigte, deshalb hat sich EDI Bridge nicht angemeldet. Fragen Sie die IT der Gegenseite, ob sie ihren Server oder den Serverschlüssel ersetzt hat, bevor Sie den neuen Serverschlüssel übernehmen."
+          },
           "loginRejected": {
             "title": "Die Anmeldung wurde abgelehnt.",
             "hint": "Prüfen Sie den Benutzernamen und das Passwort oder den Schlüssel. Die IT der Gegenseite kann sie bestätigen."

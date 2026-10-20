@@ -62,6 +62,9 @@ export {
 } from './ai-review'
 
 export {
+  type AcceptHostKeyBody,
+  acceptHostKeyBodySchema,
+  acceptHostKeyEndpoint,
   type Channel,
   channelEndpoint,
   type ChannelInput,
@@ -87,6 +90,11 @@ export {
   type CreatedChannel,
   createChannelEndpoint,
   createdChannelSchema,
+  type HostKeyFingerprint,
+  hostKeyFingerprintSchema,
+  type HostKeyState,
+  hostKeyStates,
+  hostKeyStateSchema,
   type MaskedSecret,
   maskedSecretSchema,
   maxChannelNameLength,
@@ -101,6 +109,8 @@ export {
   sftpAuthentications,
   sftpPort,
   testChannelEndpoint,
+  testedHostKeySchema,
+  type TestedHostKey,
   updateChannelEndpoint,
   webhookAuthorization,
   webhookPath,

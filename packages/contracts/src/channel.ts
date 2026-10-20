@@ -63,6 +63,14 @@ export type MaskedSecret = z.infer<typeof maskedSecretSchema>
 
 export const maxChannelNameLength = 70
 
+// The last of the 43 base64 characters carries only 4 bits of the 32-byte hash.
+export const hostKeyFingerprintSchema = z
+  .string()
+  .trim()
+  .regex(/^SHA256:[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]$/)
+
+export type HostKeyFingerprint = z.infer<typeof hostKeyFingerprintSchema>
+
 const channelIdentity = {
   name: z.string().trim().min(1).max(maxChannelNameLength),
   tradingPartnerId: z.uuid().nullable(),
@@ -157,6 +165,7 @@ function channelUnion<
         ...sftpConnection,
         pollingIntervalMinutes: pollingInterval,
         credential,
+        hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
       }),
       object({
         ...common,
@@ -164,6 +173,7 @@ function channelUnion<
         ...channelIdentity,
         ...sftpConnection,
         credential,
+        hostKeyFingerprint: hostKeyFingerprintSchema.nullable().optional(),
       }),
     ]),
     object({
@@ -193,7 +203,7 @@ export const channelInputSchema = channelUnion(z.object, {
 
 export type ChannelInput = z.infer<typeof channelInputSchema>
 
-// Omitting a secret keeps the stored one; for HTTP, null removes the Authorization header.
+// Omitting a secret or fingerprint keeps the stored one; null removes it.
 export const channelUpdateSchema = channelUnion(z.object, {
   common: {},
   credential: secretInputSchema.optional(),
@@ -280,6 +290,7 @@ export const regenerateWebhookTokenEndpoint: Endpoint<
 }
 
 export const channelTestFailureReasons = [
+  'hostKeyMismatch',
   'loginRejected',
   'hostUnreachable',
   'timedOut',
@@ -297,14 +308,45 @@ export const channelTestResultReasonSchema = z.enum([...channelTestFailureReason
 
 export type ChannelTestResultReason = z.infer<typeof channelTestResultReasonSchema>
 
-export const channelTestResultSchema = z.discriminatedUnion('outcome', [
-  z.object({ outcome: z.literal('succeeded'), testedAt: z.iso.datetime() }),
-  z.object({
-    outcome: z.literal('failed'),
-    reason: channelTestResultReasonSchema,
-    testedAt: z.iso.datetime(),
-  }),
-])
+export const hostKeyStates = ['matches', 'mismatch', 'unchecked'] as const
+
+export const hostKeyStateSchema = z.enum(hostKeyStates)
+
+export type HostKeyState = z.infer<typeof hostKeyStateSchema>
+
+export const testedHostKeySchema = z.object({
+  fingerprint: hostKeyFingerprintSchema,
+  state: hostKeyStateSchema,
+})
+
+export type TestedHostKey = z.infer<typeof testedHostKeySchema>
+
+const channelTestFields = {
+  testedAt: z.iso.datetime(),
+  hostKey: testedHostKeySchema.nullable().optional(),
+}
+
+export const channelTestResultSchema = z
+  .discriminatedUnion('outcome', [
+    z.object({ outcome: z.literal('succeeded'), ...channelTestFields }),
+    z.object({
+      outcome: z.literal('failed'),
+      reason: channelTestResultReasonSchema,
+      ...channelTestFields,
+    }),
+  ])
+  .superRefine((result, context) => {
+    const mismatch = result.hostKey?.state === 'mismatch'
+    const failedOnMismatch = result.outcome === 'failed' && result.reason === 'hostKeyMismatch'
+
+    if (mismatch !== failedOnMismatch) {
+      context.addIssue({
+        code: 'custom',
+        path: ['hostKey', 'state'],
+        message: 'A Channel test fails with hostKeyMismatch exactly when the host key mismatches',
+      })
+    }
+  })
 
 export type ChannelTestResult = z.infer<typeof channelTestResultSchema>
 
@@ -317,4 +359,23 @@ export const testChannelEndpoint: Endpoint<
   method: 'POST',
   path: '/channels/:id/test',
   response: channelTestResultSchema,
+}
+
+export const acceptHostKeyBodySchema = z.strictObject({
+  hostKeyFingerprint: hostKeyFingerprintSchema,
+})
+
+export type AcceptHostKeyBody = z.infer<typeof acceptHostKeyBodySchema>
+
+// The body pins the key the Admin saw, in case the server presents another one meanwhile.
+export const acceptHostKeyEndpoint: Endpoint<
+  Channel,
+  undefined,
+  AcceptHostKeyBody,
+  '/channels/:id/host-key'
+> = {
+  method: 'PUT',
+  path: '/channels/:id/host-key',
+  body: acceptHostKeyBodySchema,
+  response: channelSchema,
 }

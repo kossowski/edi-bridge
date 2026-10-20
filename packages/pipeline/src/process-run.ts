@@ -387,6 +387,7 @@ const inboundValidationFailure = (
 }
 
 const deliveryReasons: Record<ChannelTestFailureReason, string> = {
+  hostKeyMismatch: 'The SFTP server showed a different host key from the one confirmed',
   loginRejected: 'The SFTP server rejected the login',
   hostUnreachable: 'The host of the Channel is unreachable',
   timedOut: 'The Channel did not answer in time',
