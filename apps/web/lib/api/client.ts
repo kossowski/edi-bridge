@@ -234,9 +234,15 @@ export function isUnauthorized(error: Error | null) {
 
 const queryRetries = 3
 
-// A 4xx answer stays the same on a second try, so a not-found state shows at once.
+// A timeout or a rate limit passes; other 4xx answers stay the same, so a not-found state shows at once.
+const passingStatuses: ReadonlySet<number> = new Set([408, 429])
+
 export function retriesQuery(failureCount: number, error: Error) {
-  const refused = error instanceof ApiError && error.status >= 400 && error.status < 500
+  const refused =
+    error instanceof ApiError &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    !passingStatuses.has(error.status)
 
   return !refused && failureCount < queryRetries
 }

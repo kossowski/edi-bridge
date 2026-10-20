@@ -584,7 +584,7 @@ describe('retriesQuery', () => {
     expect(retriesQuery(0, new ApiError(status, '/trading-partners/1'))).toBe(false)
   })
 
-  it.each([500, 502, 503])('tries a %i answer three times more', (status) => {
+  it.each([408, 429, 500, 502, 503])('tries a %i answer three times more', (status) => {
     const error = new ApiError(status, '/trading-partners/1')
 
     expect([0, 1, 2, 3].map((failureCount) => retriesQuery(failureCount, error))).toEqual([
