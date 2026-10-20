@@ -139,6 +139,20 @@ export const BackAfterSearchUndone = meta.story({
   },
 })
 
+export const FirstPageReplacesEntry = meta.story({
+  parameters: ordersAt({ page: '99' }),
+  decorators: [withMemoryHistory],
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Go to the first page' }))
+
+    await expect(
+      await canvas.findByRole('list', { name: 'Orders, latest activity first' }),
+    ).toBeVisible()
+    await expect(getRouter().replace).toHaveBeenCalledOnce()
+    await expect(getRouter().push).not.toHaveBeenCalled()
+  },
+})
+
 export const NoResult = meta.story({
   parameters: ordersAt({ q: 'PO-none' }),
   async play({ canvas }) {

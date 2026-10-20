@@ -5,6 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { SearchParamsReader } from '@/lib/search-params'
 
+export type UpdateFilters<Filters> = (
+  change: Partial<Filters>,
+  options?: { replace?: boolean },
+) => void
+
 type SearchBurst = { before: string; searches: Set<string> }
 
 function isSearchOnly<Filters>(change: Partial<Filters>) {
@@ -45,8 +50,8 @@ export function useUrlFilters<Filters extends { page: number }>(
     }
   }, [search])
 
-  const updateFilters = useCallback(
-    (change: Partial<Filters>) => {
+  const updateFilters = useCallback<UpdateFilters<Filters>>(
+    (change, options) => {
       const current = toSearch(latest.current)
       const next = { ...latest.current, page: 1, ...change }
       const nextSearch = toSearch(next)
@@ -61,9 +66,9 @@ export function useUrlFilters<Filters extends { page: number }>(
 
       const scroll = { scroll: false }
 
-      if (!isSearchOnly(change)) {
+      if (options?.replace || !isSearchOnly(change)) {
         burst.current = undefined
-        router.push(href, scroll)
+        router[options?.replace ? 'replace' : 'push'](href, scroll)
       } else if (!burst.current) {
         burst.current = { before: current, searches: new Set([nextSearch]) }
         router.push(href, scroll)

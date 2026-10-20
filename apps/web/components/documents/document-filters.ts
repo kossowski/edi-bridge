@@ -10,6 +10,8 @@ import { type DocumentView, documentViews } from '../../lib/navigation'
 import { listPageSize, parsePage, type SearchParamsReader, setPage } from '../../lib/search-params'
 import { groupStatuses, type StatusGroup, statusGroups } from '../../lib/status-groups'
 
+import type { UpdateFilters } from '../../hooks/use-url-filters'
+
 export const defaultStatusGroup: StatusGroup = 'attention'
 
 export type DocumentFilters = {
@@ -23,7 +25,7 @@ export type DocumentFilters = {
 
 export type ResultsProps = {
   filters: DocumentFilters
-  onChange: (change: Partial<DocumentFilters>) => void
+  onChange: UpdateFilters<DocumentFilters>
   onClear: () => void
 }
 
