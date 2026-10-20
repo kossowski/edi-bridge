@@ -496,6 +496,7 @@ describe('GET /runs with Run detail', () => {
     // SAFETY: the seed has a Flow for every Message Type, ORDERS among them.
     const ordersFlow = seedFlows.find(({ messageType }) => messageType === 'ORDERS')!
     const [recordedMapping] = mappingVersionsForFlow({ flow: ordersFlow, messageType: 'ORDERS' })
+
     const otherMapping = seedMappings.find(
       ({ mappingId }) => mappingId !== recordedMapping?.mappingId,
     )
