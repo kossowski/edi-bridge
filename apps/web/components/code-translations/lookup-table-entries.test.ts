@@ -15,6 +15,7 @@ import {
   trimmedEntry,
   withEntry,
   withFixes,
+  withHints,
   withoutEntry,
 } from './lookup-table-entries'
 
@@ -173,5 +174,46 @@ describe('tableDirection', () => {
     expect(tableDirection({ kind: 'units', uses: [] })).toBe('outbound')
     expect(tableDirection({ kind: 'countries', uses: [] })).toBe('outbound')
     expect(tableDirection({ kind: 'other', uses: [] })).toBe('outbound')
+  })
+})
+
+describe('withHints', () => {
+  const krt: MissingCode = {
+    urgency: 'upcoming',
+    code: 'KRT',
+    meaning: null,
+    suggestions: [],
+    itemCount: 3,
+  }
+
+  const set: MissingCode = {
+    urgency: 'upcoming',
+    code: 'SET',
+    meaning: 'Set',
+    suggestions: [{ code: 'SET', meaning: 'Set' }],
+    itemCount: 1,
+  }
+
+  it('shows the meaning and suggestions of a hint over the static ones', () => {
+    const hint = {
+      code: 'KRT',
+      meaning: 'Carton',
+      suggestions: [{ code: 'CT', meaning: 'Carton' }],
+    }
+
+    expect(withHints([krt, set], [hint])).toEqual([
+      { ...krt, meaning: 'Carton', suggestions: [{ code: 'CT', meaning: 'Carton' }] },
+      set,
+    ])
+  })
+
+  it('keeps the static meaning when the hint has none', () => {
+    const hint = { code: 'SET', meaning: null, suggestions: [] }
+
+    expect(withHints([set], [hint])).toEqual([{ ...set, suggestions: [] }])
+  })
+
+  it('keeps the static codes without hints', () => {
+    expect(withHints([krt, set], undefined)).toEqual([krt, set])
   })
 })

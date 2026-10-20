@@ -1,11 +1,10 @@
 'use client'
 
-import { InformationCircleIcon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslations } from 'next-intl'
 import { useId, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
+import { AiNoticeAlert } from '@/components/ai-notice-alert'
 import { RefusalAlert } from '@/components/document-structures/document-structure-problem'
 import {
   CheckedIcon,
@@ -27,10 +26,8 @@ import { leafCount } from '@/components/document-structures/structure-tree'
 import { TextField } from '@/components/form-field'
 import {
   type DocumentStructureInference,
-  type AiNotice,
   maxDocumentStructureNameLength,
 } from '@edi-bridge/contracts'
-import { Alert, AlertDescription, AlertTitle } from '@edi-bridge/ui/components/alert'
 import { Button } from '@edi-bridge/ui/components/button'
 
 function SaveLabel({ block, saving }: { block: SaveBlock | null; saving: boolean }) {
@@ -45,19 +42,6 @@ function SaveLabel({ block, saving }: { block: SaveBlock | null; saving: boolean
   }
 
   return saving ? t('saving') : t('submit')
-}
-
-function FieldNamesNoticeAlert({ notice }: { notice: AiNotice }) {
-  const t = useTranslations('DocumentStructureForm.review.fieldNamesNotice')
-  const titleId = useId()
-
-  return (
-    <Alert role="status" aria-labelledby={titleId}>
-      <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} aria-hidden />
-      <AlertTitle id={titleId}>{t('title')}</AlertTitle>
-      <AlertDescription>{t(notice.reason)}</AlertDescription>
-    </Alert>
-  )
 }
 
 export function Review({
@@ -189,7 +173,12 @@ export function Review({
           {t('anotherFile')}
         </Button>
       </section>
-      {inferred.fieldNamesNotice && <FieldNamesNoticeAlert notice={inferred.fieldNamesNotice} />}
+      {inferred.fieldNamesNotice && (
+        <AiNoticeAlert
+          message={t(`review.fieldNamesNotice.${inferred.fieldNamesNotice.reason}`)}
+          title={t('review.fieldNamesNotice.title')}
+        />
+      )}
       {sample && content ? (
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <div className="min-w-0 lg:sticky lg:top-4">

@@ -55,6 +55,7 @@ import {
   inferDocumentStructure,
   getRun,
   importLookupTable,
+  getLookupTableMissingCodeHints,
   listLookupTableMissingCodes,
   listLookupTables,
   listMappingVersions,
@@ -544,7 +545,26 @@ describe('Lookup Table actions', () => {
 
     const codes = await listLookupTableMissingCodes(units.id, 'de')
 
-    expect(codes.find(({ code }) => code === 'BTL')?.meaning).toBe('Flasche')
+    expect(codes.find(({ code }) => code === 'SET')?.meaning).toBe('Satz')
+  })
+
+  it('asks the AI to explain the missing codes in the page language', async () => {
+    server.use(...lookupTableHandlers(apiUrl, { runs: [] }))
+
+    const { hints, notice } = await getLookupTableMissingCodeHints(units.id, 'de')
+
+    expect(hints.find(({ code }) => code === 'BTL')?.meaning).toBe('Flasche')
+    expect(notice).toBeNull()
+  })
+
+  it('explains the missing codes without AI when the AI budget is used up', async () => {
+    server.use(
+      ...lookupTableHandlers(apiUrl, { runs: [], missingCodeHintsNotice: 'aiBudgetExhausted' }),
+    )
+
+    const { notice } = await getLookupTableMissingCodeHints(units.id, 'en')
+
+    expect(notice?.reason).toBe('aiBudgetExhausted')
   })
 
   it('reads the meanings of suggested values in the page language', async () => {

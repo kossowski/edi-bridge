@@ -1,3 +1,4 @@
+import { delay, http, HttpResponse } from 'msw'
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test'
 
 import { LookupTableScreen } from '@/components/code-translations/lookup-table-screen'
@@ -5,14 +6,18 @@ import { viewerStory } from '@/components/session/session-story-helpers'
 import { darkMode, expectNoPageScroll, german, mobile } from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import {
+  type AiNoticeReason,
+  type FailedRunReference,
+  lookupTableMissingCodeHintsEndpoint,
+  type LookupTableKind,
+} from '@edi-bridge/contracts'
+import {
   createLookupTables,
   lookupTableHandlers,
   seedLookupTableNamed,
   seedLookupTables,
   seedTradingPartners,
 } from '@edi-bridge/mocks'
-
-import type { FailedRunReference, LookupTableKind } from '@edi-bridge/contracts'
 
 import preview from '../../.storybook/preview'
 
@@ -120,6 +125,33 @@ function stoppedCountriesHandlers() {
   })
 }
 
+function hintsNoticeHandlers(missingCodeHintsNotice: AiNoticeReason) {
+  return lookupTableHandlers(apiUrl, { lookupTables, missingCodeHintsNotice })
+}
+
+const hintsPath = `${apiUrl}${lookupTableMissingCodeHintsEndpoint.path}`
+
+// Each story that counts the hint requests takes its own counter.
+function failingHints() {
+  const requests = { count: 0 }
+
+  const handler = http.post(hintsPath, () => {
+    requests.count += 1
+
+    return HttpResponse.json({ message: 'The AI hints failed' }, { status: 500 })
+  })
+
+  return { requests, handler }
+}
+
+const viewerHints = failingHints()
+
+const failedHints = failingHints()
+
+const germanFailedHints = failingHints()
+
+const failedHintsAfterUndo = failingHints()
+
 function valueRow(code: string) {
   const values = screen.getByRole('list', { name: /^Values/ })
 
@@ -128,10 +160,21 @@ function valueRow(code: string) {
 }
 
 async function missingRow(code: string) {
-  const missing = await screen.findByRole('region', { name: 'Not translated yet' })
+  const missing = await screen.findByRole('region', {
+    name: /^(Not translated yet|Noch nicht übersetzt)$/,
+  })
 
   // SAFETY: every missing code row names its code and sits in a list item.
   return within(within(missing).getByText(code, { selector: 'span' }).closest('li') as HTMLElement)
+}
+
+// The AI hints of the missing codes arrive after the missing codes, so wait for their first suggestion.
+async function hintedRow(code: string, target: string, label = `Send ${code} as`) {
+  const row = await missingRow(code)
+
+  await waitFor(() => expect(row.getByRole('textbox', { name: label })).toHaveValue(target))
+
+  return row
 }
 
 async function addForm() {
@@ -162,10 +205,9 @@ export const Default = meta.story({
     await expect(valueRow('KG').getByText('is sent as')).toBeInTheDocument()
     await expect(valueRow('KG').getByRole('button', { name: 'Edit KG' })).toBeVisible()
 
-    const krt = await missingRow('KRT')
+    const krt = await hintedRow('KRT', 'CT')
 
     await expect(krt.getByText('Carton')).toBeVisible()
-    await expect(krt.getByRole('textbox', { name: 'Send KRT as' })).toHaveValue('CT')
     await expect(krt.getByRole('button', { name: 'Use PK (Package)' })).toBeVisible()
     await expect(krt.getByText(/^Stops (Invoice|Dispatch advice) .+ to /)).toBeVisible()
     await expect(krt.getAllByRole('link')[0]).toHaveAttribute(
@@ -174,10 +216,9 @@ export const Default = meta.story({
     )
     await expect(krt.getByRole('button', { name: 'Accept KRT' })).toBeVisible()
 
-    const btl = await missingRow('BTL')
+    const btl = await hintedRow('BTL', 'BO')
 
     await expect(btl.getByText('14 items in your ERP data use it')).toBeVisible()
-    await expect(btl.getByRole('textbox', { name: 'Send BTL as' })).toHaveValue('BO')
 
     const usedFor = within(canvas.getByRole('list', { name: 'Used for' }))
 
@@ -210,9 +251,8 @@ export const Incoming = meta.story({
     await expect(valueRow('Deutschland').getByText('DE')).toBeVisible()
     await expect(valueRow('Deutschland').getByText('Germany')).toBeVisible()
 
-    const polen = await missingRow('Polen')
+    const polen = await hintedRow('Polen', 'PL', 'What Polen becomes')
 
-    await expect(polen.getByRole('textbox', { name: 'What Polen becomes' })).toHaveValue('PL')
     await expect(polen.getByText('2 items in your ERP data use it')).toBeVisible()
   },
 })
@@ -223,7 +263,7 @@ export const AcceptIncoming = meta.story({
     msw.use(...stoppedCountriesHandlers())
   },
   async play() {
-    const polen = await missingRow('Polen')
+    const polen = await hintedRow('Polen', 'PL', 'What Polen becomes')
 
     await expect(
       polen.getByText('Stops Purchase order PO-900005 from Hansemarkt GmbH'),
@@ -340,7 +380,7 @@ export const LargeVolume = meta.story({
 
 export const AcceptInPlace = meta.story({
   async play({ canvas }) {
-    const krt = await missingRow('KRT')
+    const krt = await hintedRow('KRT', 'CT')
     const input = krt.getByRole('textbox', { name: 'Send KRT as' })
 
     await userEvent.click(krt.getByRole('button', { name: 'Use PK (Package)' }))
@@ -359,7 +399,7 @@ export const AcceptInPlace = meta.story({
 
 export const AcceptUpcoming = meta.story({
   async play({ canvas }) {
-    const btl = await missingRow('BTL')
+    const btl = await hintedRow('BTL', 'BO')
 
     await userEvent.click(btl.getByRole('button', { name: 'Accept BTL' }))
 
@@ -370,7 +410,7 @@ export const AcceptUpcoming = meta.story({
 
 export const RejectsEmptyAccept = meta.story({
   async play() {
-    const krt = await missingRow('KRT')
+    const krt = await hintedRow('KRT', 'CT')
     const input = krt.getByRole('textbox', { name: 'Send KRT as' })
 
     await userEvent.clear(input)
@@ -420,7 +460,7 @@ export const ReprocessOriginRun = meta.story({
   },
   args: { code: 'KRT', run: originRun.id },
   async play({ canvas }) {
-    const krt = await missingRow('KRT')
+    const krt = await hintedRow('KRT', 'CT')
 
     await waitFor(() => expect(krt.getByRole('textbox', { name: 'Send KRT as' })).toHaveFocus())
     await userEvent.click(krt.getByRole('button', { name: 'Accept KRT' }))
@@ -451,7 +491,7 @@ export const ReprocessNewestFirst = meta.story({
     msw.use(...manyRunsHandlers())
   },
   async play() {
-    const krt = await missingRow('KRT')
+    const krt = await hintedRow('KRT', 'CT')
 
     await userEvent.click(krt.getByRole('button', { name: 'Accept KRT' }))
 
@@ -595,6 +635,22 @@ export const Viewer = meta.story({
   }),
 })
 
+export const ViewerWithoutHints = meta.story({
+  ...viewerStory({
+    beforeEach({ msw }) {
+      viewerHints.requests.count = 0
+      msw.use(viewerHints.handler)
+    },
+    async play() {
+      const set = await missingRow('SET')
+
+      await expect(set.getByText('Set')).toBeVisible()
+      await expect((await missingRow('KRT')).queryByText('Carton')).toBeNull()
+      await expect(viewerHints.requests.count).toBe(0)
+    },
+  }),
+})
+
 export const ViewerFromDocument = meta.story({
   args: { code: 'KRT' },
   ...viewerStory({
@@ -626,7 +682,7 @@ export const German = meta.story({
 
     const missing = within(await canvas.findByRole('region', { name: 'Noch nicht übersetzt' }))
 
-    await expect(missing.getByRole('textbox', { name: 'KRT senden als' })).toHaveValue('CT')
+    await hintedRow('KRT', 'CT', 'KRT senden als')
     await expect(missing.getByText('CT bedeutet Karton.')).toBeVisible()
     await userEvent.click(missing.getByRole('button', { name: 'Übernehmen: KRT' }))
     await expect(await canvas.findByText('KRT wird jetzt als CT gesendet')).toBeVisible()
@@ -634,6 +690,154 @@ export const German = meta.story({
     await expect(
       await within(canvas.getByRole('list', { name: 'Werte (5)' })).findByText('Karton'),
     ).toBeVisible()
+  },
+})
+
+export const HintsBudgetUsedUp = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...hintsNoticeHandlers('aiBudgetExhausted'))
+  },
+  async play({ canvas }) {
+    const notice = await canvas.findByRole('status', { name: 'Values explained without AI' })
+
+    await expect(notice).toHaveTextContent(
+      "Today's AI budget is used up, so only known codes are explained and suggested.",
+    )
+    await expect((await hintedRow('SET', 'SET')).getByText('Set')).toBeVisible()
+
+    const krt = await missingRow('KRT')
+
+    await expect(krt.getByRole('textbox', { name: 'Send KRT as' })).toHaveValue('')
+    await expect(krt.queryByText('Carton')).toBeNull()
+  },
+})
+
+export const HintsUnavailable = meta.story({
+  beforeEach({ msw }) {
+    msw.use(...hintsNoticeHandlers('aiUnavailable'))
+  },
+  async play({ canvas }) {
+    const notice = await canvas.findByRole('status', { name: 'Values explained without AI' })
+
+    await expect(notice).toHaveTextContent('The AI could not explain the values')
+    await expect((await missingRow('KRT')).queryByRole('button', { name: /^Use / })).toBeNull()
+  },
+})
+
+export const HintsFailed = meta.story({
+  beforeEach({ msw }) {
+    failedHints.requests.count = 0
+    msw.use(failedHints.handler)
+  },
+  async play({ canvas }) {
+    await waitFor(() => expect(failedHints.requests.count).toBe(1))
+
+    const set = await hintedRow('SET', 'SET')
+
+    await expect(set.getByText('Set')).toBeVisible()
+    await expect(canvas.queryByRole('status', { name: 'Values explained without AI' })).toBeNull()
+    await expect(
+      canvas.queryByText('The values that are not translated yet could not be loaded.'),
+    ).toBeNull()
+  },
+})
+
+export const HintsAskedOnceAfterUndo = meta.story({
+  args: { id: countryCodes.id },
+  beforeEach({ msw }) {
+    failedHintsAfterUndo.requests.count = 0
+    msw.use(failedHintsAfterUndo.handler)
+  },
+  async play({ canvas }) {
+    await waitFor(() => expect(failedHintsAfterUndo.requests.count).toBe(1))
+
+    const polen = await missingRow('Polen')
+
+    await userEvent.type(polen.getByRole('textbox', { name: 'What Polen becomes' }), 'PL')
+    await userEvent.click(polen.getByRole('button', { name: 'Accept Polen' }))
+    await waitFor(() =>
+      expect(canvas.queryByRole('region', { name: 'Not translated yet' })).toBeNull(),
+    )
+
+    await userEvent.click(valueRow('Polen').getByRole('button', { name: 'Remove Polen' }))
+    await missingRow('Polen')
+    await userEvent.click(canvas.getByRole('button', { name: 'Undo' }))
+    await expect(await canvas.findByRole('button', { name: 'Edit Polen' })).toBeVisible()
+
+    await expect(failedHintsAfterUndo.requests.count).toBe(1)
+  },
+})
+
+export const HintsLoading = meta.story({
+  beforeEach({ msw }) {
+    msw.use(http.post(hintsPath, () => delay('infinite')))
+  },
+  async play() {
+    await expect((await missingRow('SET')).getByText('Set')).toBeVisible()
+
+    const krt = await missingRow('KRT')
+
+    await expect(krt.getByRole('textbox', { name: 'Send KRT as' })).toHaveValue('')
+    await expect(krt.queryByText('Carton')).toBeNull()
+  },
+})
+
+export const GermanHintsLoading = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(http.post(hintsPath, () => delay('infinite')))
+  },
+  async play() {
+    await expect((await missingRow('SET')).getByText('Satz')).toBeVisible()
+
+    const krt = await missingRow('KRT')
+
+    await expect(krt.getByRole('textbox', { name: 'KRT senden als' })).toHaveValue('')
+    await expect(krt.queryByText('Karton')).toBeNull()
+  },
+})
+
+export const GermanHintsUnavailable = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...hintsNoticeHandlers('aiUnavailable'))
+  },
+  async play({ canvas }) {
+    const notice = await canvas.findByRole('status', { name: 'Werte ohne KI erklärt' })
+
+    await expect(notice).toHaveTextContent('Die KI konnte die Werte nicht erklären')
+    await expect(
+      (await missingRow('KRT')).queryByRole('button', { name: / verwenden / }),
+    ).toBeNull()
+  },
+})
+
+export const GermanHintsFailed = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    germanFailedHints.requests.count = 0
+    msw.use(germanFailedHints.handler)
+  },
+  async play({ canvas }) {
+    await waitFor(() => expect(germanFailedHints.requests.count).toBe(1))
+
+    const set = await hintedRow('SET', 'SET', 'SET senden als')
+
+    await expect(set.getByText('Satz')).toBeVisible()
+    await expect(canvas.queryByRole('status', { name: 'Werte ohne KI erklärt' })).toBeNull()
+  },
+})
+
+export const GermanHintsBudgetUsedUp = meta.story({
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...hintsNoticeHandlers('aiBudgetExhausted'))
+  },
+  async play({ canvas }) {
+    const notice = await canvas.findByRole('status', { name: 'Werte ohne KI erklärt' })
+
+    await expect(notice).toHaveTextContent('Das KI-Budget für heute ist aufgebraucht')
+    await expect((await hintedRow('SET', 'SET', 'SET senden als')).getByText('Satz')).toBeVisible()
   },
 })
 
@@ -646,9 +850,7 @@ export const GermanIncoming = meta.story({
     await expect(canvas.getByText('Was der Partner sendet')).toBeVisible()
     await expect(values.getAllByText('wird zu')).toHaveLength(3)
 
-    const missing = within(await canvas.findByRole('region', { name: 'Noch nicht übersetzt' }))
-
-    await expect(missing.getByRole('textbox', { name: 'Was aus Polen wird' })).toHaveValue('PL')
+    await hintedRow('Polen', 'PL', 'Was aus Polen wird')
   },
 })
 
@@ -681,7 +883,7 @@ export const DarkAfterSaving = meta.story({
     return darkMode()
   },
   async play() {
-    const krt = await missingRow('KRT')
+    const krt = await hintedRow('KRT', 'CT')
 
     await userEvent.click(krt.getByRole('button', { name: 'Accept KRT' }))
     const fixed = await fixedAlert('KRT is now sent as CT')

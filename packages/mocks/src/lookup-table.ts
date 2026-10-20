@@ -46,7 +46,7 @@ import { aiBudgetOf } from './ai-budget'
 import { type ChannelRecord, type ChannelStore, seedChannels, toChannelStore } from './channel'
 import { type FlowRecord, type FlowStore, seedFlows, toFlowStore } from './flow'
 import { lookupTableFailureOf } from './interchange'
-import { aiHintOf, firstValuesOf, knownMeaningOf, ownCodeHintOf } from './lookup-table-codes'
+import { aiHintOf, firstValuesOf, knownMeaningOf } from './lookup-table-codes'
 import {
   type LookupTableRecord,
   type LookupTableStore,
@@ -329,7 +329,7 @@ export function createLookupTableUsage(
       .map(([code, references]) => ({
         urgency: 'blocking' as const,
         code,
-        ...ownCodeHintOf(table.kind, code, language),
+        ...knownMeaningOf(table.kind, code, language),
         failedRuns: references.toSorted(newestFirst),
       }))
       .toSorted((a, b) => newestFirst(a.failedRuns[0]!, b.failedRuns[0]!))
@@ -343,7 +343,7 @@ export function createLookupTableUsage(
               {
                 urgency: 'upcoming',
                 code,
-                ...ownCodeHintOf(table.kind, code, language),
+                ...knownMeaningOf(table.kind, code, language),
                 itemCount,
               },
             ],

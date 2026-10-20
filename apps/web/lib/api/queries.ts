@@ -52,6 +52,7 @@ import {
   getHome,
   getLookupTable,
   getLookupTableSuggestions,
+  getLookupTableMissingCodeHints,
   getMappingDraft,
   getMappingVersion,
   getOperatorWorkspaceSettings,
@@ -526,6 +527,10 @@ export const lookupTableKeys = {
   allMissingCodes: (id: string) => [...lookupTableKeys.all(), 'missing-codes', id] as const,
   missingCodes: (id: string, language: Language) =>
     [...lookupTableKeys.allMissingCodes(id), language] as const,
+  allMissingCodeHints: (id: string) =>
+    [...lookupTableKeys.all(), 'missing-code-hints', id] as const,
+  missingCodeHints: (id: string, language: Language) =>
+    [...lookupTableKeys.allMissingCodeHints(id), language] as const,
   suggestions: (query: LookupTableSuggestionsQuery) =>
     [...lookupTableKeys.all(), 'suggestions', query] as const,
 }
@@ -549,19 +554,32 @@ export function lookupTableMissingCodesQuery(id: string, language: Language) {
   })
 }
 
-// Each fetch spends AI budget, so the suggestions are fetched once and never again on their own.
-// An error leaves the query without data, so it is stale: no retry, mount, focus or reconnect
-// fetches it again.
+// Each fetch spends AI budget, so an AI read is fetched once and never again on its own.
+const fetchedOnce = {
+  staleTime: Infinity,
+  gcTime: Infinity,
+  retry: false,
+  retryOnMount: false,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+} as const
+
 export function lookupTableSuggestionsQuery(query: LookupTableSuggestionsQuery) {
   return queryOptions({
     queryKey: lookupTableKeys.suggestions(query),
     queryFn: () => getLookupTableSuggestions(query),
-    staleTime: Infinity,
-    gcTime: Infinity,
-    retry: false,
-    retryOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    ...fetchedOnce,
+  })
+}
+
+// Kept apart from the missing codes, so a save that marks them stale does not ask the AI again.
+export function lookupTableMissingCodeHintsQuery(id: string, language: Language, wanted: boolean) {
+  return queryOptions({
+    queryKey: lookupTableKeys.missingCodeHints(id, language),
+    queryFn: () => getLookupTableMissingCodeHints(id, language),
+    ...fetchedOnce,
+    // Once answered or failed, a screen that wants the hints anew keeps the first result.
+    enabled: ({ state }) => wanted && state.dataUpdateCount + state.errorUpdateCount === 0,
   })
 }
 
@@ -586,6 +604,7 @@ export function storeSavedLookupTable(queryClient: QueryClient, saved: LookupTab
 export function forgetDeletedLookupTable(queryClient: QueryClient, id: string) {
   queryClient.removeQueries({ queryKey: lookupTableKeys.details(id) })
   queryClient.removeQueries({ queryKey: lookupTableKeys.allMissingCodes(id) })
+  queryClient.removeQueries({ queryKey: lookupTableKeys.allMissingCodeHints(id) })
   queryClient.setQueryData<LookupTableSummary[]>(lookupTablesQuery.queryKey, (tables) =>
     tables?.filter((table) => table.id !== id),
   )

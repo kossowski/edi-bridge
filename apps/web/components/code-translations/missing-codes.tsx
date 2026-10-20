@@ -6,6 +6,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { type ReactNode, useId, useRef, useState } from 'react'
 
+import { AiNoticeAlert } from '@/components/ai-notice-alert'
 import { newestFirst } from '@/components/code-translations/lookup-table-entries'
 import {
   focusOnMount,
@@ -19,6 +20,7 @@ import { ActionError } from '@/components/documents/action-error'
 import { useRunTitle } from '@/components/documents/run-title'
 import { documentHref } from '@/lib/navigation'
 import {
+  type AiNotice,
   type BlockingMissingCode,
   type Direction,
   type FailedRunReference,
@@ -137,7 +139,9 @@ function AcceptForm({
   const problemId = `${inputId}-problem`
   const orId = useId()
   const input = useRef<HTMLInputElement>(null)
-  const [targetCode, setTargetCode] = useState(code.suggestions[0]?.code ?? '')
+  const [typed, setTyped] = useState<string | null>(null)
+  // Until the user types, the field follows the first suggestion, which the AI hints may replace.
+  const targetCode = typed ?? code.suggestions[0]?.code ?? ''
   const validation = useValidation(context.entries, null)
   const draft = { sourceCode: code.code, targetCode }
   const problem = validation.messagesFor(draft).targetCode
@@ -178,7 +182,7 @@ function AcceptForm({
               aria-describedby={problem ? problemId : undefined}
               aria-invalid={problem ? true : undefined}
               className="font-mono"
-              onChange={(event) => setTargetCode(event.target.value)}
+              onChange={(event) => setTyped(event.target.value)}
             />
           </span>
           <Button
@@ -213,7 +217,7 @@ function AcceptForm({
                 })}
                 className="font-mono"
                 onClick={() => {
-                  setTargetCode(suggestion.code)
+                  setTyped(suggestion.code)
                   input.current?.focus()
                 }}>
                 {suggestion.code}
@@ -335,11 +339,13 @@ export function MissingCodes({
   codes,
   isPending,
   isError,
+  notice,
   ...context
 }: RowContext & {
   codes: ReadonlyArray<MissingCode> | undefined
   isPending: boolean
   isError: boolean
+  notice: AiNotice | null
 }) {
   const t = useTranslations('CodeTranslation.missing')
   const headingId = useId()
@@ -379,6 +385,9 @@ export function MissingCodes({
       <h2 id={headingId} className="text-base font-semibold">
         {t('title')}
       </h2>
+      {notice && (
+        <AiNoticeAlert message={t(`hintsNotice.${notice.reason}`)} title={t('hintsNotice.title')} />
+      )}
       <Group
         codes={blocking}
         description={t('blocking.description')}

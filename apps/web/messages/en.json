@@ -3537,6 +3537,11 @@
       "title": "Not translated yet",
       "loading": "Loading the values that are not translated yet",
       "unavailable": "The values that are not translated yet could not be loaded.",
+      "hintsNotice": {
+        "title": "Values explained without AI",
+        "aiBudgetExhausted": "Today's AI budget is used up, so only known codes are explained and suggested. Enter the translation for each value below.",
+        "aiUnavailable": "The AI could not explain the values, so only known codes are explained and suggested. Enter the translation for each value below."
+      },
       "accept": "Accept",
       "acceptCode": "Accept {code}",
       "sendAs": "{direction, select, inbound {What {code} becomes} other {Send {code} as}}",

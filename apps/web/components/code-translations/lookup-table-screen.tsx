@@ -18,7 +18,11 @@ import { ImportCsvDialog } from '@/components/lookup-tables/import-csv-dialog'
 import { useLanguage } from '@/hooks/use-language'
 import { useSession } from '@/hooks/use-session'
 import { ApiError } from '@/lib/api/client'
-import { lookupTableMissingCodesQuery, lookupTableQuery } from '@/lib/api/queries'
+import {
+  lookupTableMissingCodeHintsQuery,
+  lookupTableMissingCodesQuery,
+  lookupTableQuery,
+} from '@/lib/api/queries'
 import { Button } from '@edi-bridge/ui/components/button'
 import { Skeleton } from '@edi-bridge/ui/components/skeleton'
 
@@ -60,6 +64,15 @@ export function LookupTableScreen({
   const { data, error, isPending, refetch } = useQuery(lookupTableQuery(id, language))
   const missing = useQuery(lookupTableMissingCodesQuery(id, language))
   const session = useSession()
+
+  const hints = useQuery(
+    lookupTableMissingCodeHintsQuery(
+      id,
+      language,
+      session.canChange && (missing.data?.length ?? 0) > 0,
+    ),
+  )
+
   const [importOpen, setImportOpen] = useState(false)
   const [imported, setImported] = useState('')
   const fixedCodes = useFixedCodes()
@@ -96,6 +109,7 @@ export function LookupTableScreen({
             key={`${data.id}:${requestedCode ?? ''}`}
             canChange={session.canChange}
             fixed={fixedCodes.fixed}
+            hints={hints.data}
             missing={missing}
             originRunId={run}
             requestedCode={requestedCode}
