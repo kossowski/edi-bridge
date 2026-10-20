@@ -69,11 +69,23 @@ const delivered: DeliveryService = () => Effect.void
 const unreachable: DeliveryService = () =>
   Effect.fail(new DeliveryFailed({ reason: 'hostUnreachable' }))
 
+let submitted = 0
+
+// Each submission is a new Interchange, so a copy of an earlier one is no Duplicate.
+const sentAnew = (content: string) => {
+  submitted += 1
+
+  return content.replaceAll("+00000001'", `+${String(submitted).padStart(8, '0')}'`)
+}
+
 const processed = async (fileName: string, content: string, delivery = delivered) => {
   const response = await admin.inject({
     method: submitDocumentEndpoint.method,
     url: submitDocumentEndpoint.path,
-    body: { channelId: workspace.inboundChannelId, document: { fileName, content } },
+    body: {
+      channelId: workspace.inboundChannelId,
+      document: { fileName, content: sentAnew(content) },
+    },
   })
 
   expect(response.statusCode, response.body).toBe(201)
