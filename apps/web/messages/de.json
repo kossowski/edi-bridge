@@ -2231,7 +2231,7 @@
       },
       "messageType": {
         "label": "Belegart",
-        "description": "Die Art von Beleg, die dieser Belegweg verarbeitet.",
+        "description": "Die Belegart, die dieser Belegweg verarbeitet.",
         "fixed": "Die Belegart lässt sich nicht ändern. Legen Sie für eine andere einen neuen Belegweg an."
       },
       "inboundChannel": {
@@ -2947,7 +2947,7 @@
       "fallbacks": {
         "keepValue": "Eingehenden Wert behalten",
         "empty": "Ziel leer lassen",
-        "fail": "Beleg scheitern lassen"
+        "fail": "Beleg als fehlgeschlagen markieren"
       },
       "lookupTables": {
         "placeholder": "Code-Übersetzung wählen",
