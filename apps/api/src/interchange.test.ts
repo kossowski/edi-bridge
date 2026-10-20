@@ -395,8 +395,8 @@ describe('GET /interchanges/:id', () => {
       id: invoice.id,
       controlReference: '515',
       direction: 'outbound',
-      sender: { gln: workspaceGln, name: 'Nordwind Foods' },
-      receiver: { gln: '4012345000054', name: 'Weserfrisch eG' },
+      sender: { identification: workspaceGln, name: 'Nordwind Foods' },
+      receiver: { identification: '4012345000054', name: 'Weserfrisch eG' },
       raw: invoice.output,
       runs: [
         expect.objectContaining({
@@ -424,8 +424,8 @@ describe('GET /interchanges/:id', () => {
       id: received.document.id,
       controlReference: 'OSK77',
       direction: 'inbound',
-      sender: { gln: '4012345000061', name: 'Ostseekauf GmbH' },
-      receiver: { gln: workspaceGln, name: 'Nordwind Foods' },
+      sender: { identification: '4012345000061', name: 'Ostseekauf GmbH' },
+      receiver: { identification: workspaceGln, name: 'Nordwind Foods' },
       raw: received.document.content,
     })
     expect(
@@ -512,8 +512,8 @@ describe('GET /interchanges/:id', () => {
 
     expect(response.statusCode, response.body).toBe(200)
     expect(interchangeSchema.parse(response.json())).toMatchObject({
-      sender: { gln: 'RHOENMARKT', name: 'Rhönmarkt KG' },
-      receiver: { gln: 'NORDWIND-FOODS', name: 'Nordwind Foods' },
+      sender: { identification: 'RHOENMARKT', name: 'Rhönmarkt KG' },
+      receiver: { identification: 'NORDWIND-FOODS', name: 'Nordwind Foods' },
     })
   })
 

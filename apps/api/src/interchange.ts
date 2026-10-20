@@ -258,11 +258,11 @@ export const loadInterchange = (id: string) =>
     const ownCompany = { name: own.name }
 
     const sender = {
-      gln: presentOrThrow(header?.elements[1]?.[0], `Interchange ${id} has no sender`),
+      identification: presentOrThrow(header?.elements[1]?.[0], `Interchange ${id} has no sender`),
     }
 
     const receiver = {
-      gln: presentOrThrow(header?.elements[2]?.[0], `Interchange ${id} has no receiver`),
+      identification: presentOrThrow(header?.elements[2]?.[0], `Interchange ${id} has no receiver`),
     }
 
     // An outbound Run, a test send too, has no Message Index: its Interchange holds one Message.

@@ -10,7 +10,7 @@ import type { Endpoint } from './endpoint'
 
 export const interchangePartySchema = z.object({
   // UNB 0004 and 0010 name a party by any identification, a GLN for EANCOM.
-  gln: z.string().min(1).max(35),
+  identification: z.string().min(1).max(35),
   name: z.string().min(1),
 })
 
