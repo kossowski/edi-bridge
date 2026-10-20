@@ -68,6 +68,8 @@ describe('the Document storage', () => {
       channelId,
       fileName: 'invoice.edi',
       content: invoice,
+      interchangeSender: '4012345000009',
+      interchangeControlReference: '1',
     })
 
     await expect(storage.read(workspaceId, stored.id)).resolves.toEqual({
@@ -76,6 +78,8 @@ describe('the Document storage', () => {
       channelId,
       fileName: 'invoice.edi',
       content: invoice,
+      interchangeSender: '4012345000009',
+      interchangeControlReference: '1',
       receivedAt: stored.receivedAt,
     })
   })
