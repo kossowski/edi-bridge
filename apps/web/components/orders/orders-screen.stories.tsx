@@ -1,7 +1,15 @@
-import { expect, within } from 'storybook/test'
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { OrdersScreen } from '@/components/orders/orders-screen'
-import { darkMode, german, mobile } from '@/components/story-helpers'
+import {
+  darkMode,
+  german,
+  goBack,
+  goForward,
+  mobile,
+  withMemoryHistory,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { orderLifecycleListHandler, orderLifecycleReferences } from '@edi-bridge/mocks'
 
@@ -48,6 +56,100 @@ export const FilteredByStatus = meta.story({
     ).toBeVisible()
     await expect(within(list).getAllByText('Needs attention').length).toBeGreaterThan(0)
     await expect(within(list).queryByText('Done')).toBeNull()
+  },
+})
+
+export const BackUndoesStatusFilter = meta.story({
+  decorators: [withMemoryHistory],
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: /^Needs attention \d+$/ }))
+    await expect(
+      await canvas.findByRole('button', { name: /^Needs attention \d+$/, pressed: true }),
+    ).toBeVisible()
+
+    goBack()
+
+    await expect(
+      await canvas.findByRole('button', { name: /^All \d+$/, pressed: true }),
+    ).toBeVisible()
+  },
+})
+
+export const BackUndoesWholeSearch = meta.story({
+  parameters: ordersAt({ status: 'needs-attention' }),
+  decorators: [withMemoryHistory],
+  async play({ canvas }) {
+    await canvas.findByRole('button', { name: /^Needs attention \d+$/, pressed: true })
+    // Each keystroke waits out the search delay, so every one reaches the URL.
+    await userEvent.type(canvas.getByRole('searchbox'), 'zz', { delay: 400 })
+    await expect(await canvas.findByText('No orders match')).toBeVisible()
+
+    goBack()
+
+    await waitFor(() => expect(canvas.getByRole('searchbox')).toHaveValue(''))
+    await expect(
+      canvas.getByRole('button', { name: /^Needs attention \d+$/, pressed: true }),
+    ).toBeVisible()
+  },
+})
+
+export const SearchAfterForwardKeepsEntry = meta.story({
+  parameters: ordersAt({ status: 'needs-attention' }),
+  decorators: [withMemoryHistory],
+  async play({ canvas }) {
+    const searchbox = await canvas.findByRole('searchbox')
+
+    await userEvent.type(searchbox, 'P')
+    await waitFor(() => expect(getRouter().push).toHaveBeenCalledOnce())
+
+    goBack()
+    await waitFor(() => expect(searchbox).toHaveValue(''))
+    goForward()
+    await waitFor(() => expect(searchbox).toHaveValue('P'))
+
+    await userEvent.type(searchbox, 'z')
+    await waitFor(() => expect(getRouter().push).toHaveBeenCalledTimes(2))
+
+    goBack()
+
+    await waitFor(() => expect(searchbox).toHaveValue('P'))
+  },
+})
+
+export const BackAfterSearchUndone = meta.story({
+  decorators: [withMemoryHistory],
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: /^Needs attention \d+$/ }))
+    await canvas.findByRole('button', { name: /^Needs attention \d+$/, pressed: true })
+
+    const searchbox = canvas.getByRole('searchbox')
+
+    await userEvent.type(searchbox, 'zz')
+    await expect(await canvas.findByText('No orders match')).toBeVisible()
+    await userEvent.type(searchbox, 'z')
+    await waitFor(() => expect(getRouter().replace).toHaveBeenCalledOnce())
+    await userEvent.clear(searchbox)
+    await waitFor(() => expect(getRouter().back).toHaveBeenCalledOnce())
+
+    goBack()
+
+    await expect(
+      await canvas.findByRole('button', { name: /^All \d+$/, pressed: true }),
+    ).toBeVisible()
+  },
+})
+
+export const FirstPageReplacesEntry = meta.story({
+  parameters: ordersAt({ page: '99' }),
+  decorators: [withMemoryHistory],
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Go to the first page' }))
+
+    await expect(
+      await canvas.findByRole('list', { name: 'Orders, latest activity first' }),
+    ).toBeVisible()
+    await expect(getRouter().replace).toHaveBeenCalledOnce()
+    await expect(getRouter().push).not.toHaveBeenCalled()
   },
 })
 

@@ -19,7 +19,7 @@ import {
 } from '@/components/orders/order-filters'
 import { OrderRow, OrderRowSkeleton } from '@/components/orders/order-row'
 import { OrderStatusIcon } from '@/components/orders/order-status'
-import { useUrlFilters } from '@/hooks/use-url-filters'
+import { type UpdateFilters, useUrlFilters } from '@/hooks/use-url-filters'
 import { orderLifecycleListQuery } from '@/lib/api/queries'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { ToggleGroup, ToggleGroupItem } from '@edi-bridge/ui/components/toggle-group'
@@ -104,7 +104,7 @@ function Results({
 }: {
   query: UseQueryResult<OrderLifecycleList>
   filters: OrderFilters
-  onChange: (change: Partial<OrderFilters>) => void
+  onChange: UpdateFilters<OrderFilters>
   onShowAll: () => void
 }) {
   const t = useTranslations('Orders.list')
@@ -112,7 +112,10 @@ function Results({
   const emptyActions: Record<EmptyKind, EmptyAction | undefined> = {
     noOrders: undefined,
     nothingMatches: { label: t('showAll'), onClick: onShowAll },
-    pageOutOfRange: { label: t('firstPage'), onClick: () => onChange({ page: 1 }) },
+    pageOutOfRange: {
+      label: t('firstPage'),
+      onClick: () => onChange({ page: 1 }, { replace: true }),
+    },
   }
 
   const { data, isPending } = query

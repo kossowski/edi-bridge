@@ -10,6 +10,9 @@ export function useEmptyActions({ onChange, onClear }: Pick<ResultsProps, 'onCha
 
   return {
     nothingMatches: { label: t('filters.clear'), onClick: onClear },
-    pageOutOfRange: { label: tPagination('first'), onClick: () => onChange({ page: 1 }) },
+    pageOutOfRange: {
+      label: tPagination('first'),
+      onClick: () => onChange({ page: 1 }, { replace: true }),
+    },
   }
 }

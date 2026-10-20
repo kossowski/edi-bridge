@@ -1,8 +1,17 @@
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
 import { delay, http, HttpResponse } from 'msw'
-import { expect, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 
 import { DocumentsScreen } from '@/components/documents/documents-screen'
-import { besideSidebar, darkMode, german, mobile, tablet } from '@/components/story-helpers'
+import {
+  besideSidebar,
+  darkMode,
+  german,
+  goBack,
+  mobile,
+  tablet,
+  withMemoryHistory,
+} from '@/components/story-helpers'
 import { apiUrl } from '@/lib/api/config'
 import { runsEndpoint } from '@edi-bridge/contracts'
 import { createRuns, runsHandler, seedRuns } from '@edi-bridge/mocks'
@@ -43,6 +52,23 @@ export const AllStatuses = meta.story({
   },
   async play({ canvas }) {
     await expect(await canvas.findByText('40 documents')).toBeVisible()
+  },
+})
+
+export const BackUndoesStatusFilter = meta.story({
+  decorators: [withMemoryHistory],
+  beforeEach({ msw }) {
+    msw.use(runsHandler(apiUrl, runs))
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: /^All\b/ }))
+    await expect(await canvas.findByText('40 documents')).toBeVisible()
+
+    goBack()
+
+    await expect(
+      await canvas.findByRole('button', { name: /^Needs attention\b/, pressed: true }),
+    ).toBeVisible()
   },
 })
 
@@ -130,6 +156,23 @@ export const PageOutOfRange = meta.story({
   async play({ canvas }) {
     await expect(await canvas.findByText('This page is empty')).toBeVisible()
     await expect(canvas.getByRole('button', { name: 'Go to the first page' })).toBeVisible()
+  },
+})
+
+export const FirstPageReplacesEntry = meta.story({
+  parameters: {
+    nextjs: { navigation: { pathname: '/documents', query: { status: 'all', page: '99999' } } },
+  },
+  decorators: [withMemoryHistory],
+  beforeEach({ msw }) {
+    msw.use(runsHandler(apiUrl, runs))
+  },
+  async play({ canvas }) {
+    await userEvent.click(await canvas.findByRole('button', { name: 'Go to the first page' }))
+
+    await waitFor(() => expect(canvas.queryByText('This page is empty')).toBeNull())
+    await expect(getRouter().replace).toHaveBeenCalledOnce()
+    await expect(getRouter().push).not.toHaveBeenCalled()
   },
 })
 
