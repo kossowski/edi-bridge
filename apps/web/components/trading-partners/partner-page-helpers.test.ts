@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { awaitsReceiptConfirmation, dayTotals } from './partner-page-helpers'
+import {
+  awaitsReceiptConfirmation,
+  dayTotals,
+  receiptConfirmationPollInterval,
+} from './partner-page-helpers'
 
 describe('awaitsReceiptConfirmation', () => {
   const sent = { testInterchangeSentAt: '2026-10-10T08:00:00.000Z', contrlReceivedAt: null }
@@ -29,6 +33,27 @@ describe('awaitsReceiptConfirmation', () => {
 
   it('does not wait for a live partner', () => {
     expect(awaitsReceiptConfirmation({ testMode: false, onboarding: sent })).toBe(false)
+  })
+})
+
+describe('receiptConfirmationPollInterval', () => {
+  const sent = { testInterchangeSentAt: '2026-10-10T08:00:00.000Z', contrlReceivedAt: null }
+
+  it('checks every 10 seconds while the receipt confirmation is awaited', () => {
+    expect(receiptConfirmationPollInterval({ testMode: true, onboarding: sent })).toBe(10_000)
+  })
+
+  it('stops checking once the receipt confirmation arrived', () => {
+    expect(
+      receiptConfirmationPollInterval({
+        testMode: true,
+        onboarding: { ...sent, contrlReceivedAt: '2026-10-10T08:05:00.000Z' },
+      }),
+    ).toBe(false)
+  })
+
+  it('does not check before the Trading Partner is loaded', () => {
+    expect(receiptConfirmationPollInterval(undefined)).toBe(false)
   })
 })
 

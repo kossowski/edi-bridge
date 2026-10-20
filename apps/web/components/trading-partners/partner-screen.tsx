@@ -12,7 +12,7 @@ import { PartnerConnections } from '@/components/trading-partners/partner-connec
 import { PartnerDocuments } from '@/components/trading-partners/partner-documents-panel'
 import { PartnerGln } from '@/components/trading-partners/partner-gln'
 import { PartnerLoading, PartnerOverview } from '@/components/trading-partners/partner-overview'
-import { awaitsReceiptConfirmation } from '@/components/trading-partners/partner-page-helpers'
+import { receiptConfirmationPollInterval } from '@/components/trading-partners/partner-page-helpers'
 import { PartnerSettings } from '@/components/trading-partners/partner-settings'
 import { SetupNotice } from '@/components/trading-partners/partner-setup-notice'
 import { TestModeBadge } from '@/components/trading-partners/test-mode-badge'
@@ -22,8 +22,6 @@ import { tradingPartnerQuery, useTakenSetupSummary } from '@/lib/api/queries'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@edi-bridge/ui/components/tabs'
 
 import type { TradingPartner } from '@edi-bridge/contracts'
-
-export const receiptConfirmationPollMs = 3000
 
 const partnerTabs = [
   { value: 'overview' },
@@ -115,8 +113,7 @@ export function PartnerScreen({ id }: { id: string }) {
 
   const { data, error, isPending, refetch } = useQuery({
     ...tradingPartnerQuery(id),
-    refetchInterval: ({ state }) =>
-      state.data && awaitsReceiptConfirmation(state.data) ? receiptConfirmationPollMs : false,
+    refetchInterval: ({ state }) => receiptConfirmationPollInterval(state.data),
   })
 
   return (

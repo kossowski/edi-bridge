@@ -23,6 +23,17 @@ export function awaitsReceiptConfirmation({
   )
 }
 
+// One indexed row per check, so an open page polling every 10 s is cheap for the api.
+const receiptConfirmationPollMs = 10_000
+
+export function receiptConfirmationPollInterval(
+  tradingPartner: Pick<TradingPartner, 'testMode' | 'onboarding'> | undefined,
+) {
+  return tradingPartner && awaitsReceiptConfirmation(tradingPartner)
+    ? receiptConfirmationPollMs
+    : false
+}
+
 export function dayTotals(days: ReadonlyArray<ActivityDay>) {
   return days.reduce(
     (totals, day) => ({
