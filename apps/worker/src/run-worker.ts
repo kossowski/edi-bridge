@@ -11,9 +11,11 @@ import {
   Delivery,
   Documents,
   Download,
+  LiveEvents,
   pollInboundChannels,
   processRun,
   type QueuedRun,
+  redisLiveEvents,
   RunQueue,
   runQueueName,
   sweepRunsEvery,
@@ -40,6 +42,7 @@ export function startRunWorker({
   const redis = new Redis(redisUrl, { maxRetriesPerRequest: null })
   const documents = postgresDocumentStorage(db)
   const queue = bullmqRunQueue(redisUrl)
+  const liveEvents = redisLiveEvents(redisUrl)
   const delivery = channelDelivery({ secrets, timeoutMs: channelTimeoutMs })
   const download = sftpChannelDownload({ secrets, timeoutMs: channelTimeoutMs })
 
@@ -51,6 +54,7 @@ export function startRunWorker({
           Effect.provideService(Database, db),
           Effect.provideService(Documents, documents),
           Effect.provideService(Delivery, delivery),
+          Effect.provideService(LiveEvents, liveEvents.service),
         ),
       ),
     { connection: redis },
@@ -61,6 +65,7 @@ export function startRunWorker({
       Effect.provideService(Database, db),
       Effect.provideService(RunQueue, queue.service),
       Effect.provideService(Delivery, delivery),
+      Effect.provideService(LiveEvents, liveEvents.service),
     ),
   )
 
@@ -70,6 +75,7 @@ export function startRunWorker({
       Effect.provideService(Documents, documents),
       Effect.provideService(RunQueue, queue.service),
       Effect.provideService(Download, download),
+      Effect.provideService(LiveEvents, liveEvents.service),
     ),
   )
 
@@ -79,6 +85,7 @@ export function startRunWorker({
       // A poll in flight stores and removes its current file before it stops.
       await Effect.runPromise(Fiber.interruptAll([polling, sweeping]))
       await Promise.all([worker.close(), queue.close()])
+      liveEvents.close()
       redis.disconnect()
     },
   }
