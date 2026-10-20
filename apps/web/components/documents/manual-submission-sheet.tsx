@@ -273,9 +273,12 @@ function FormFooter({ children }: { children?: ReactNode }) {
 }
 
 async function readFile(file: File | null) {
-  const content = file === null ? null : await file.text()
+  const bytes = file === null ? null : new Uint8Array(await file.arrayBuffer())
 
-  return { content, problem: documentProblem(content) }
+  return {
+    content: bytes === null ? null : encodeBase64(bytes),
+    problem: documentProblem(bytes === null ? null : new TextDecoder().decode(bytes)),
+  }
 }
 
 function ManualSubmissionForm({
@@ -326,8 +329,7 @@ function ManualSubmissionForm({
         channel,
         document: {
           fileName: file.name,
-          content: encodeBase64(new TextEncoder().encode(content)),
-          encoding: 'utf-8',
+          content,
         },
       })
     } else {
