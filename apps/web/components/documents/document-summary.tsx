@@ -4,6 +4,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 
 import { Fact, FactGrid, linkClass } from '@/components/detail-parts'
+import { isTestTransmission } from '@/components/documents/test-transmission-badge'
 import { MessageTypeName } from '@/components/plain-names'
 import { flowHref, mappingHref, orderHref, tradingPartnerHref } from '@/lib/navigation'
 
@@ -60,6 +61,9 @@ export function DocumentSummary({ run }: { run: RunDetail }) {
         </time>
       </Fact>
       <Fact label={t('source')}>{run.manualSubmission ? t('uploaded') : t('connection')}</Fact>
+      {isTestTransmission(run) && (
+        <Fact label={t('interchange')}>{t('testInterchange', values)}</Fact>
+      )}
     </FactGrid>
   )
 }

@@ -7,6 +7,8 @@ import { useTranslations } from 'next-intl'
 import { Badge } from '@edi-bridge/ui/components/badge'
 import { cn } from '@edi-bridge/ui/lib/utils'
 
+export const testModeClassName = 'bg-amber-500/10 text-amber-800 dark:text-amber-300'
+
 export function TestModeBadge({ testMode }: { testMode: boolean }) {
   const t = useTranslations('TradingPartners.mode')
 
@@ -15,9 +17,7 @@ export function TestModeBadge({ testMode }: { testMode: boolean }) {
       variant="outline"
       className={cn(
         'gap-1',
-        testMode
-          ? 'bg-amber-500/10 text-amber-800 dark:text-amber-300'
-          : 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+        testMode ? testModeClassName : 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
       )}>
       <HugeiconsIcon
         icon={testMode ? TestTube01Icon : CheckmarkCircle02Icon}

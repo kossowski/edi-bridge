@@ -753,7 +753,8 @@
     "header": {
       "receivedAt": "{direction, select, inbound {Received} other {Created}}",
       "uploaded": "uploaded by hand",
-      "order": "View the whole order {reference}"
+      "order": "View the whole order {reference}",
+      "testTransmission": "Test transmission"
     },
     "problem": {
       "whatHappened": "What happened",
@@ -994,7 +995,9 @@
       "receivedAt": "{direction, select, inbound {Received} other {Created}}",
       "source": "How it arrived",
       "uploaded": "Uploaded by hand",
-      "connection": "Through a connection"
+      "connection": "Through a connection",
+      "interchange": "Transmission",
+      "testInterchange": "Marked as a test by {tradingPartner}"
     },
     "content": {
       "description": "A readable view of the lines in this document.",

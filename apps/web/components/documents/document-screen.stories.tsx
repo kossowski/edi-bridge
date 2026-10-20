@@ -23,6 +23,7 @@ import {
   type RunDetail,
   type RunError,
   type RunProblem,
+  type TradingPartner,
   toPath,
   waitForTradingPartnerRunEndpoint,
   endWaitingForTradingPartnerRunEndpoint,
@@ -36,6 +37,7 @@ import {
   seedChannels,
   seedMappingDrafts,
   seedMappingVersions,
+  seedTradingPartners,
   seedWorkspace,
   toMappingVersionSummary,
 } from '@edi-bridge/mocks'
@@ -103,6 +105,8 @@ const delivered = storyRun(8, 'ORDERS', 'delivered')
 
 const uploaded = storyRun(9, 'ORDERS', 'delivered', { manualSubmission: true })
 
+const testInterchange = storyRun(21, 'ORDERS', 'delivered')
+
 const processing = storyRun(10, 'ORDERS', 'processing')
 
 const received = storyRun(11, 'ORDERS', 'received')
@@ -143,6 +147,10 @@ const expiredDefectAtDelivery = runSummarySchema.parse({
 
 const documentDeletedAt = '2026-10-08T08:00:00.000Z'
 
+const expiredDocuments: ReadonlyMap<string, string> = new Map(
+  [expired, expiredDefect, expiredDefectAtDelivery].map(({ id }) => [id, documentDeletedAt]),
+)
+
 const expiredFromErp =
   'EDI Bridge deleted the original file on Oct 8, 2026, when the retention period ended, so this document cannot be processed again. Fixing the cause helps only the documents that arrive from now on. Send it again from your ERP.'
 
@@ -159,6 +167,7 @@ const runs = [
   unreachableInbound,
   delivered,
   uploaded,
+  testInterchange,
   processing,
   received,
   original,
@@ -230,6 +239,15 @@ function servingSeededChannel() {
   )
 }
 
+function servingRuns(tradingPartners: ReadonlyArray<TradingPartner> = seedTradingPartners) {
+  return runDetailHandlers(apiUrl, {
+    runs,
+    reprocessed: [{ replaced: replaced.id, replacing: replacing.id }],
+    documentDeletedAt: expiredDocuments,
+    tradingPartners,
+  })
+}
+
 const meta = preview.meta({
   title: 'Documents/DocumentScreen',
   component: DocumentScreen,
@@ -239,16 +257,7 @@ const meta = preview.meta({
       http.get(`${apiUrl}${toPath(runEndpoint.path, { id: missingField.id })}`, () =>
         HttpResponse.json(missingFieldDetail),
       ),
-      ...runDetailHandlers(apiUrl, {
-        runs,
-        reprocessed: [{ replaced: replaced.id, replacing: replacing.id }],
-        documentDeletedAt: new Map(
-          [expired, expiredDefect, expiredDefectAtDelivery].map(({ id }) => [
-            id,
-            documentDeletedAt,
-          ]),
-        ),
-      }),
+      ...servingRuns(),
     )
   },
 })
@@ -827,6 +836,8 @@ export const Delivered = meta.story({
       `/orders/${delivered.businessReference}`,
     )
     await expect(canvas.queryByText('uploaded by hand', { exact: false })).toBeNull()
+    await expect(canvas.queryByText('Test transmission')).toBeNull()
+    await expect(canvas.queryByText('Transmission', { selector: 'dt' })).toBeNull()
   },
 })
 
@@ -834,6 +845,95 @@ export const UploadedByHand = meta.story({
   args: { id: uploaded.id },
   async play({ canvas }) {
     await expect(await canvas.findByText('· uploaded by hand', { exact: false })).toBeVisible()
+  },
+})
+
+// The seeded Trading Partner is live, so these stories put it in Test Mode.
+function servingTestMode() {
+  return servingRuns(
+    seedTradingPartners.map((candidate) =>
+      candidate.id === partner.id ? { ...candidate, testMode: true } : candidate,
+    ),
+  )
+}
+
+export const TestInterchange = meta.story({
+  args: { id: testInterchange.id },
+  beforeEach({ msw }) {
+    msw.use(...servingTestMode())
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Test transmission')).toBeVisible()
+    await expect(canvas.getByText(`Marked as a test by ${partner.name}`)).toBeVisible()
+  },
+})
+
+const ordersMapping = toMappingVersionSummary(
+  seedMappingVersions.find(({ id }) => id === flowFor('ORDERS').mappingVersionId)!,
+)
+
+// A live Trading Partner can still set the UNB test indicator, which the Test Mode mock never does.
+export const TestInterchangeFromLivePartner = meta.story({
+  args: { id: testInterchange.id },
+  beforeEach({ msw }) {
+    msw.use(
+      http.get(`${apiUrl}${toPath(runEndpoint.path, { id: testInterchange.id })}`, () =>
+        HttpResponse.json(
+          runDetailSchema.parse({
+            ...testInterchange,
+            steps: [
+              { stage: 'receipt', status: 'succeeded' },
+              { stage: 'parse', status: 'succeeded' },
+              { stage: 'mapping', status: 'succeeded' },
+              { stage: 'validation', status: 'succeeded' },
+              { stage: 'delivery', status: 'succeeded' },
+            ].map((step) => ({ ...step, startedAt: null, finishedAt: null })),
+            interchange: null,
+            message: null,
+            mappingVersion: ordersMapping,
+            replaces: null,
+            replacedBy: null,
+            error: null,
+            problem: null,
+            waitingForTradingPartnerSince: null,
+            duplicateOf: null,
+            documentDeletedAt: null,
+            testIndicator: true,
+          }),
+        ),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Test transmission')).toBeVisible()
+    await expect(canvas.queryByText('Testing')).toBeNull()
+    await expect(canvas.getByText('Transmission', { selector: 'dt' })).toBeVisible()
+    await expect(canvas.getByText(`Marked as a test by ${partner.name}`)).toBeVisible()
+  },
+})
+
+export const GermanTestInterchange = meta.story({
+  args: { id: testInterchange.id },
+  decorators: [german],
+  beforeEach({ msw }) {
+    msw.use(...servingTestMode())
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Testübertragung')).toBeVisible()
+    await expect(canvas.getByText(`Von ${partner.name} als Test markiert`)).toBeVisible()
+  },
+})
+
+export const TestInterchangeDocumentExpired = meta.story({
+  args: { id: expiredDefect.id },
+  beforeEach({ msw }) {
+    msw.use(...servingTestMode())
+  },
+  async play({ canvas }) {
+    await expect(await canvas.findByText(paragraph(expiredFromPartner))).toBeVisible()
+    await expect(canvas.getByText('How it arrived', { selector: 'dt' })).toBeVisible()
+    await expect(canvas.queryByText('Test transmission')).toBeNull()
+    await expect(canvas.queryByText('Transmission', { selector: 'dt' })).toBeNull()
   },
 })
 
