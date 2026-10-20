@@ -12,6 +12,7 @@ import {
 } from './index'
 import {
   listening,
+  mismatchingHostKeyFingerprint,
   startTestErp,
   startTestSftpServer,
   type TestErp,
@@ -77,8 +78,6 @@ const hostKeyOutcome = (effect: Effect.Effect<TestedHostKey, ChannelUnreachable>
       Effect.catch(({ reason, hostKey }) => Effect.succeed({ outcome: 'failed', reason, hostKey })),
     ),
   )
-
-const otherFingerprint = `SHA256:${'A'.repeat(43)}`
 
 const sftpOutbox = (): SftpLogin => ({
   host: sftp.host,
@@ -169,7 +168,9 @@ describe('channelReach for the host key of an SFTP Channel', () => {
 
   it('refuses a server whose fingerprint does not match the stored one', async () => {
     expect(
-      await hostKeyOutcome(reach.sftp({ ...sftpOutbox(), hostKeyFingerprint: otherFingerprint })),
+      await hostKeyOutcome(
+        reach.sftp({ ...sftpOutbox(), hostKeyFingerprint: mismatchingHostKeyFingerprint }),
+      ),
     ).toEqual({
       outcome: 'failed',
       reason: 'hostKeyMismatch',
@@ -183,7 +184,7 @@ describe('channelReach for the host key of an SFTP Channel', () => {
         reach.sftp({
           ...sftpOutbox(),
           credential: { password: 'wrong-password' },
-          hostKeyFingerprint: otherFingerprint,
+          hostKeyFingerprint: mismatchingHostKeyFingerprint,
         }),
       ),
     ).toMatchObject({ outcome: 'failed', reason: 'hostKeyMismatch' })

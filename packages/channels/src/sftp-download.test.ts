@@ -8,7 +8,7 @@ import {
   type SftpChannel,
   sftpChannelDownload,
 } from './index'
-import { startTestSftpServer, type TestSftpServer } from './testing'
+import { mismatchingHostKeyFingerprint, startTestSftpServer, type TestSftpServer } from './testing'
 
 const timeoutMs = 1500
 
@@ -147,7 +147,7 @@ describe('sftpChannelDownload', () => {
 
   it('refuses a server whose host key does not match the stored fingerprint', async () => {
     const channel = await inbox('impostor', { 'orders-1.edi': 'UNB' })
-    const impostor = { ...channel, hostKeyFingerprint: `SHA256:${'A'.repeat(43)}` }
+    const impostor = { ...channel, hostKeyFingerprint: mismatchingHostKeyFingerprint }
 
     for (const attempt of [
       download.list(impostor),

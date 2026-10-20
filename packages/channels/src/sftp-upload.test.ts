@@ -12,7 +12,12 @@ import {
   type SftpLogin,
   uploadSftp,
 } from './index'
-import { listening, startTestSftpServer, type TestSftpServer } from './testing'
+import {
+  listening,
+  mismatchingHostKeyFingerprint,
+  startTestSftpServer,
+  type TestSftpServer,
+} from './testing'
 
 const timeoutMs = 1500
 
@@ -156,7 +161,7 @@ describe('uploadSftp', () => {
     expect(
       await failure(
         uploadSftp(
-          { ...outbox(), hostKeyFingerprint: `SHA256:${'A'.repeat(43)}` },
+          { ...outbox(), hostKeyFingerprint: mismatchingHostKeyFingerprint },
           interchange('orders-50.edi'),
           { timeoutMs },
         ),
@@ -226,7 +231,7 @@ describe('sftpChannelDelivery', () => {
     expect(
       await failure(
         deliver(
-          { ...outboundChannel(), hostKeyFingerprint: `SHA256:${'A'.repeat(43)}` },
+          { ...outboundChannel(), hostKeyFingerprint: mismatchingHostKeyFingerprint },
           interchange('desadv-10.edi'),
         ),
       ),

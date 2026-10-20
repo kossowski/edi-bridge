@@ -57,6 +57,11 @@ export async function startTestSftpServer() {
 
 export type TestSftpServer = Awaited<ReturnType<typeof startTestSftpServer>>
 
+// A well-formed fingerprint that matches no host key of the test SFTP server.
+export const mismatchingHostKeyFingerprint = hostKeyFingerprintSchema.parse(
+  `SHA256:${'A'.repeat(43)}`,
+)
+
 export interface ReceivedRequest {
   method: string | undefined
   url: string | undefined
