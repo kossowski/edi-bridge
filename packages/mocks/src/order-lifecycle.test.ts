@@ -127,6 +127,36 @@ describe('GET /order-lifecycles/:businessReference', () => {
     ])
   })
 
+  it('says why the CONTRL was not sent on the Run that reprocessed the ORDERS', () => {
+    const {
+      orderLifecycles: [lifecycle],
+    } = seedOrderLifecycles(now, [
+      {
+        businessReference: '4799',
+        tradingPartner: 'Rheinkauf eG',
+        messages: [
+          {
+            messageType: 'ORDERS',
+            hoursAgo: 30,
+            outcome: 'mapping',
+            notSentReason: 'noOutboundChannel',
+            reprocessed: { hoursAgo: 28 },
+          },
+        ],
+      },
+    ])
+
+    expect(
+      lifecycle!.messages.map(({ run, interchange }) => [
+        run.replacedBy === null,
+        interchange?.notSentReason ?? null,
+      ]),
+    ).toEqual([
+      [false, null],
+      [true, 'noOutboundChannel'],
+    ])
+  })
+
   it('shows one Order Lifecycle per Trading Partner that uses the same order number', async () => {
     server.use(orderLifecycleHandler(apiUrl))
 

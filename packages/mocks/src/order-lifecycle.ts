@@ -53,9 +53,9 @@ type MessageSeed = {
   hoursAgo: number
   outcome: 'delivered' | FailureStage
   acknowledgement?: AcknowledgementOutcome | undefined
-  notSentReason?: AcknowledgementNotSentReason
+  notSentReason?: AcknowledgementNotSentReason | undefined
   waitingHoursAgo?: number
-  reprocessed?: { hoursAgo: number; acknowledgement: AcknowledgementOutcome }
+  reprocessed?: { hoursAgo: number; acknowledgement?: AcknowledgementOutcome | undefined }
 }
 
 type LifecycleSeed = {
@@ -222,7 +222,7 @@ function interchangeOf(
   acknowledgement: AcknowledgementOutcome | undefined,
   tradingPartner: Pick<TradingPartner, 'acknowledgementTimeLimitHours'>,
   now: Date,
-  notSentReason: AcknowledgementNotSentReason | null = null,
+  notSentReason?: AcknowledgementNotSentReason | undefined,
 ): OrderLifecycleInterchange | null {
   if (run.interchange === null) {
     return null
@@ -235,7 +235,7 @@ function interchangeOf(
     acknowledgement: sent
       ? acknowledgementOf(run.receivedAt, acknowledgement, tradingPartner, now)
       : null,
-    notSentReason,
+    notSentReason: notSentReason ?? null,
   }
 }
 
@@ -246,12 +246,12 @@ type MessageEntry = {
   replacedBy: RunSummary | null
 }
 
-export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
+export function seedOrderLifecycles(now = new Date(), seeds = lifecycleSeeds): OrderLifecycleSeed {
   const runs: RunSummary[] = []
   const reprocessed: Reprocessed[] = []
   const waitingForTradingPartnerSince = new Map<string, string>()
 
-  const seeded = lifecycleSeeds.map(({ businessReference, messages, ...seed }) => {
+  const seeded = seeds.map(({ businessReference, messages, ...seed }) => {
     const tradingPartner = seedTradingPartners.find(({ name }) => name === seed.tradingPartner)!
     const tradingPartnerSummary = { id: tradingPartner.id, name: tradingPartner.name }
 
@@ -319,6 +319,7 @@ export function seedOrderLifecycles(now = new Date()): OrderLifecycleSeed {
         {
           runId: replacing.id,
           acknowledgement: message.reprocessed.acknowledgement,
+          notSentReason: message.notSentReason,
           replacedBy: null,
         },
       ]
