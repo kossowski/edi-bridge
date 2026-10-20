@@ -2,7 +2,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { fromNodeHeaders } from 'better-auth/node'
 
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { accounts, sessions, users, verifications } from '@edi-bridge/db'
 
@@ -18,6 +18,9 @@ export interface AuthSettings {
 
 const basePath = '/auth'
 
+// Every visitor shares the Showcase users, so none may change an account or anyone's sessions.
+const servedPaths = ['/sign-in/email', '/sign-in/showcase', '/sign-out', '/get-session']
+
 function createAuth(database: Database, { secret, baseUrl, trustedOrigins }: AuthSettings) {
   return betterAuth({
     secret,
@@ -30,7 +33,6 @@ function createAuth(database: Database, { secret, baseUrl, trustedOrigins }: Aut
       schema: { users, sessions, accounts, verifications },
     }),
     emailAndPassword: { enabled: true, disableSignUp: true },
-    disabledPaths: ['/sign-up/email'],
     plugins: [showcaseSignIn(database)],
     // better-auth skips the origin check under NODE_ENV=test; tests must meet the real check.
     advanced: { database: { generateId: 'uuid' }, disableOriginCheck: false },
@@ -45,38 +47,38 @@ export const headersOf = (request: FastifyRequest) => fromNodeHeaders(request.he
 export function mountAuth(app: FastifyInstance, database: Database, settings: AuthSettings) {
   const auth = createAuth(database, settings)
 
-  app.route({
-    method: ['GET', 'POST'],
-    url: `${basePath}/*`,
-    handler: async (request, reply) => {
-      const headers = headersOf(request)
+  const forward = async (request: FastifyRequest, reply: FastifyReply) => {
+    const headers = headersOf(request)
 
-      // The body is serialised again below, so the original length no longer applies.
-      headers.delete('content-length')
+    // The body is serialised again below, so the original length no longer applies.
+    headers.delete('content-length')
 
-      const response = await auth.handler(
-        new Request(new URL(request.url, settings.baseUrl), {
-          method: request.method,
-          headers,
-          ...(request.body !== undefined && { body: JSON.stringify(request.body) }),
-        }),
-      )
+    const response = await auth.handler(
+      new Request(new URL(request.url, settings.baseUrl), {
+        method: request.method,
+        headers,
+        ...(request.body !== undefined && { body: JSON.stringify(request.body) }),
+      }),
+    )
 
-      response.headers.forEach((value, key) => {
-        if (key !== 'set-cookie') {
-          void reply.header(key, value)
-        }
-      })
-
-      const cookies = response.headers.getSetCookie()
-
-      if (cookies.length > 0) {
-        void reply.header('set-cookie', cookies)
+    response.headers.forEach((value, key) => {
+      if (key !== 'set-cookie') {
+        void reply.header(key, value)
       }
+    })
 
-      return reply.code(response.status).send(response.body ? await response.text() : null)
-    },
-  })
+    const cookies = response.headers.getSetCookie()
+
+    if (cookies.length > 0) {
+      void reply.header('set-cookie', cookies)
+    }
+
+    return reply.code(response.status).send(response.body ? await response.text() : null)
+  }
+
+  for (const path of servedPaths) {
+    app.route({ method: ['GET', 'POST'], url: `${basePath}${path}`, handler: forward })
+  }
 
   return auth
 }
