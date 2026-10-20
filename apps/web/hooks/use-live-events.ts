@@ -1,11 +1,15 @@
 'use client'
 
-import { type QueryClient, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { openLiveEvents } from '@/lib/api/client'
-import { homeKeys, interchangeKeys, runKeys, taskKeys, tradingPartnerKeys } from '@/lib/api/queries'
-import { type LiveEvent, parseLiveEvent } from '@edi-bridge/contracts'
+import {
+  applyLiveEvent,
+  invalidateLiveQueries,
+  invalidateMissedLiveQueries,
+} from '@/lib/api/live-queries'
+import { parseLiveEvent } from '@edi-bridge/contracts'
 
 export type LiveStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline'
 
@@ -21,26 +25,6 @@ function backoffMs(failures: number) {
   return base / 2 + Math.random() * (base / 2)
 }
 
-// A run.changed carries no Acknowledgement state, so tasks and Interchanges refresh on every one.
-function invalidateLiveQueries(queryClient: QueryClient) {
-  void queryClient.invalidateQueries({ queryKey: homeKeys.all() })
-  void queryClient.invalidateQueries({ queryKey: runKeys.lists() })
-  void queryClient.invalidateQueries({ queryKey: taskKeys.all() })
-  void queryClient.invalidateQueries({ queryKey: interchangeKeys.all() })
-  void queryClient.invalidateQueries({ queryKey: tradingPartnerKeys.all() })
-}
-
-function applyEvent(queryClient: QueryClient, event: LiveEvent) {
-  switch (event.type) {
-    case 'run.changed':
-      void queryClient.invalidateQueries({ queryKey: runKeys.detail(event.run.id) })
-      // A test Interchange's hand-over and its CONTRL move the Trading Partner's onboarding.
-      void queryClient.invalidateQueries({
-        queryKey: tradingPartnerKeys.detail(event.run.tradingPartner.id),
-      })
-  }
-}
-
 export function useLiveEvents(): LiveStatus {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<LiveStatus>('connecting')
@@ -50,6 +34,7 @@ export function useLiveEvents(): LiveStatus {
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     let throttleTimer: ReturnType<typeof setTimeout> | undefined
     let lastFlush = 0
+    let missedEvents = false
     let failures = 0
     let connectedBefore = false
     let disposed = false
@@ -57,7 +42,13 @@ export function useLiveEvents(): LiveStatus {
     function flush() {
       throttleTimer = undefined
       lastFlush = Date.now()
-      invalidateLiveQueries(queryClient)
+
+      if (missedEvents) {
+        missedEvents = false
+        invalidateMissedLiveQueries(queryClient)
+      } else {
+        invalidateLiveQueries(queryClient)
+      }
     }
 
     function scheduleFlush() {
@@ -88,6 +79,7 @@ export function useLiveEvents(): LiveStatus {
 
         opened.addEventListener('open', () => {
           if (connectedBefore) {
+            missedEvents = true
             scheduleFlush()
           }
 
@@ -100,7 +92,7 @@ export function useLiveEvents(): LiveStatus {
           const event = parseLiveEvent(data)
 
           if (event) {
-            applyEvent(queryClient, event)
+            applyLiveEvent(queryClient, event)
             scheduleFlush()
           }
         })
