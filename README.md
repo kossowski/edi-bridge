@@ -150,6 +150,15 @@ Then sign in at `http://localhost:3000` (or your `WEB_PORT`) with the email and 
 
 See [Create the Operator](docs/deployment/deployment-operations.md#create-the-operator) for the options.
 
+To create the Showcase and Sandbox Workspaces, and later to reset the Sandbox to its seed:
+
+```sh
+docker compose exec api node dist/create-demo-workspaces.js
+docker compose exec api node dist/reset-sandbox.js
+```
+
+See [Create the Showcase and Sandbox](docs/deployment/deployment-operations.md#create-the-showcase-and-sandbox) and [Reset the Sandbox](docs/deployment/deployment-operations.md#reset-the-sandbox).
+
 A Playwright test runs against the started stack. It signs in as the Operator, sets up an invoice Flow to the profile's SFTP service through the API, submits an invoice manually in the UI and waits until the Run is delivered. Pass the Operator's credentials, and `WEB_PORT` and `API_PORT` if you changed them:
 
 ```sh

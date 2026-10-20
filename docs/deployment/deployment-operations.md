@@ -79,7 +79,7 @@ The Showcase sign-in refuses to sign anyone in once the Viewer gains any right b
 
 ## Reset the Sandbox
 
-A reset replaces all data of the Sandbox Workspace with its seed: Trading Partners, Lookup Tables, Document Structures, Mappings, Channels, Flows, Documents, Runs and the AI usage of the day. It keeps the Workspace, its name, its Operator settings, its Members, open invites and sessions. It never changes another Workspace. A reset cannot be undone.
+A reset replaces all data of the Sandbox Workspace with its seed: Trading Partners, Lookup Tables, Document Structures, Mappings, Channels, Flows, Documents, Runs, Acknowledgements and all AI token usage of the Sandbox. It keeps the Workspace, its name, its Operator settings, its Members, open invites and sessions. It never changes another Workspace. A reset cannot be undone.
 
 To reset the Sandbox in the Operator area:
 
@@ -101,7 +101,7 @@ To reset the Sandbox from a terminal:
 
 The command uses `DATABASE_URL` and `CHANNEL_SECRET_KEY` from the application's **Environment** settings. If no Sandbox exists, it fails with a message. Run [Create the Showcase and Sandbox](#create-the-showcase-and-sandbox) first.
 
-A Run that the worker still has queued for the Sandbox at the time of the reset is dropped without an error. Screens of the Sandbox that are open in another browser show the new data after a reload.
+A Run that is still queued for the Sandbox at the time of the reset is dropped. A Run that the worker is processing at that time can end with a warning or an error in the worker log, and no data of it comes back. In rare cases the reset conflicts with such a Run and fails with an error. Then reset the Sandbox again. Screens of the Sandbox that are open in another browser show the new data after a reload.
 
 ## Deploy a change
 
