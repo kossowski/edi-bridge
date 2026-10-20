@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { Clock, Duration, Effect, Exit, Fiber, Scope } from 'effect'
+import { Clock, Duration, Effect, Exit, Fiber, Logger, Scope } from 'effect'
 import { TestClock } from 'effect/testing'
 import { createHash, randomBytes } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,11 @@ import {
   secretKeyBytes,
   sftpChannelDownload,
 } from '@edi-bridge/channels'
+import {
+  mismatchingHostKeyFingerprint,
+  startTestSftpServer,
+  type TestSftpServer,
+} from '@edi-bridge/channels/testing'
 import { channels, connect, type Connection, documents, runs, workspaces } from '@edi-bridge/db'
 import { startTestDatabase, type TestDatabase } from '@edi-bridge/db/testing'
 
@@ -34,14 +39,16 @@ let connection: Connection
 
 let workspace: InvoiceWorkspace
 
+let sftp: TestSftpServer
+
 beforeAll(async () => {
-  testDatabase = await startTestDatabase()
+  ;[testDatabase, sftp] = await Promise.all([startTestDatabase(), startTestSftpServer()])
   connection = connect(testDatabase.url)
 }, 180_000)
 
 afterAll(async () => {
   await connection.close()
-  await testDatabase.stop()
+  await Promise.all([testDatabase.stop(), sftp.stop()])
 })
 
 const ordersInterchange = golden('orders-reference.edi', 'latin1')
@@ -155,7 +162,7 @@ afterEach(async () => {
   await connection.db.delete(workspaces).where(eq(workspaces.id, workspace.id))
 })
 
-const startPolling = async (service: DownloadService = download) => {
+const startPolling = async (service: DownloadService = download, logs: unknown[] = []) => {
   const recording = recorded(service)
   const scope = await Effect.runPromise(Scope.make())
   const clock = await Effect.runPromise(TestClock.make().pipe(Scope.provide(scope)))
@@ -167,6 +174,7 @@ const startPolling = async (service: DownloadService = download) => {
       pipelineServices(connection.db, inMemoryRunQueue()),
       Effect.provideService(Download, recording.service),
       Effect.provideService(Clock.Clock, clock),
+      Effect.provide(Logger.layer([Logger.make(({ message }) => logs.push(message))])),
     ),
   )
 
@@ -513,6 +521,37 @@ describe('the polling of inbound SFTP Channels', () => {
     await removed(healthy)
     await polling.polled(badCredentialId, 2)
     await polling.polled(unreachableId, 2)
+  })
+
+  it('refuses a server whose host key does not match and logs the mismatch with the Channel', async () => {
+    const { host, port, username, password } = sftp
+    const logs: unknown[] = []
+
+    await sftp.exec(
+      `install -d -m 777 ${sftp.home}/impostor && echo '{}' > ${sftp.home}/impostor/invoice.json`,
+    )
+
+    const impostorId = await receiveOverSftp(connection.db, workspace, {
+      host,
+      port,
+      username,
+      password,
+      remotePath: '/impostor',
+      hostKeyFingerprint: mismatchingHostKeyFingerprint,
+    })
+
+    const polling = await startPolling(download, logs)
+
+    await vi.waitFor(
+      () => {
+        expect(logs).toContainEqual([`Inbound Channel ${impostorId} not polled: hostKeyMismatch`])
+      },
+      { timeout: 2000, interval: 10 },
+    )
+    expect(polling.operations(impostorId).filter((operation) => operation !== 'list')).toEqual([])
+    expect(
+      await connection.db.select().from(documents).where(eq(documents.channelId, impostorId)),
+    ).toEqual([])
   })
 
   it('polls a Channel again at its next interval after its poll failed', async () => {

@@ -173,6 +173,9 @@ export const pollInboundChannels = (minute: Duration.Input = Duration.minutes(1)
 
         // Each Channel polls in its own fiber, so a failure or defect stops only that Channel.
         yield* pollChannel(channel, state).pipe(
+          Effect.catchTag('DownloadFailed', ({ reason }) =>
+            Effect.logError(`Inbound Channel ${channel.id} not polled: ${reason}`),
+          ),
           Effect.catchCause((cause) =>
             Effect.logError(`Inbound Channel ${channel.id} not polled`, cause),
           ),
