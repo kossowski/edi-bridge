@@ -101,7 +101,7 @@ function DocumentStructurePicker({
   selectRef: Ref<HTMLSelectElement>
   onChange: (id: string) => void
 }) {
-  const t = useTranslations('Mappings.new.dataFormat')
+  const t = useTranslations('Mappings.new.documentStructure')
   const id = useId()
 
   return (
@@ -133,7 +133,7 @@ function DocumentStructurePicker({
 }
 
 function DocumentStructuresUnavailable({ onRetry }: { onRetry: () => void }) {
-  const t = useTranslations('Mappings.new.dataFormat')
+  const t = useTranslations('Mappings.new.documentStructure')
 
   return (
     <Alert variant="destructive">
@@ -154,7 +154,7 @@ export function NewMappingChoices({
   direction: Direction | null
   className?: string
 }) {
-  const t = useTranslations('Mappings.new.dataFormat')
+  const t = useTranslations('Mappings.new.documentStructure')
   const create = useCreateMappingWithDraft()
   const documentStructures = useQuery(documentStructuresQuery)
   const selectRef = useRef<HTMLSelectElement>(null)

@@ -52,9 +52,12 @@ async function openNewMappingSheet(canvasElement: HTMLElement, name = 'New Mappi
 }
 
 // SAFETY: the seed holds a Document Structure for every Message Type.
-const dataFormat = seedDocumentStructures[0]!
+const documentStructure = seedDocumentStructures[0]!
 
-async function chooseDataFormat(sheet: ReturnType<typeof within>, name = dataFormat.name) {
+async function chooseDocumentStructure(
+  sheet: ReturnType<typeof within>,
+  name = documentStructure.name,
+) {
   await userEvent.selectOptions(
     await sheet.findByRole('combobox', { name: 'Your data format' }),
     name,
@@ -88,10 +91,10 @@ export const Default = meta.story({
     await expect(
       shared.getByText('Bodensee Handelshaus AG and Spreewald Frische GmbH'),
     ).toBeVisible()
-    const dataFormat = shared.getByText('ERP dispatch advice')
+    const documentStructure = shared.getByText('ERP dispatch advice')
 
-    await expect(dataFormat).toBeVisible()
-    await expect(dataFormat).toHaveTextContent('Your data format: ERP dispatch advice')
+    await expect(documentStructure).toBeVisible()
+    await expect(documentStructure).toHaveTextContent('Your data format: ERP dispatch advice')
     const seeWhatFailed = shared.getByRole('link', { name: 'See what failed' })
 
     await expect(seeWhatFailed).toBeVisible()
@@ -222,7 +225,7 @@ export const NewMappingSheet = meta.story({
     await expect(picker).toHaveAccessibleDescription(/^Choose your data format first\./)
     await expect(getRouter().push).not.toHaveBeenCalled()
 
-    await chooseDataFormat(sheet)
+    await chooseDocumentStructure(sheet)
     await userEvent.click(sheet.getByRole('button', { name: 'Invoices you send' }))
 
     await waitFor(() =>
@@ -258,7 +261,7 @@ export const CreatingMapping = meta.story({
   async play({ canvasElement }) {
     const sheet = await openNewMappingSheet(canvasElement)
 
-    await chooseDataFormat(sheet)
+    await chooseDocumentStructure(sheet)
     await userEvent.click(sheet.getByRole('button', { name: 'Dispatch advices you send' }))
 
     await expect(await sheet.findByRole('status')).toHaveTextContent('Creating the Mapping…')
@@ -283,7 +286,7 @@ export const CreateMappingOnce = meta.story({
 
     const sheet = await openNewMappingSheet(canvasElement)
 
-    await chooseDataFormat(sheet)
+    await chooseDocumentStructure(sheet)
     await userEvent.dblClick(sheet.getByRole('button', { name: 'Invoices you send' }))
     await userEvent.click(sheet.getByRole('button', { name: 'Dispatch advices you send' }))
 
@@ -292,7 +295,9 @@ export const CreateMappingOnce = meta.story({
         expect.stringMatching(/^\/mappings\/[\w-]+\?ai-draft=start$/),
       ),
     )
-    await expect(bodies).toEqual([{ messageType: 'INVOIC', documentStructureId: dataFormat.id }])
+    await expect(bodies).toEqual([
+      { messageType: 'INVOIC', documentStructureId: documentStructure.id },
+    ])
     await expect(getRouter().push).toHaveBeenCalledOnce()
   },
 })
@@ -308,7 +313,7 @@ export const CreateMappingFailed = meta.story({
   async play({ canvasElement }) {
     const sheet = await openNewMappingSheet(canvasElement)
 
-    await chooseDataFormat(sheet)
+    await chooseDocumentStructure(sheet)
     await userEvent.click(sheet.getByRole('button', { name: 'Purchase orders you receive' }))
 
     await expect(await sheet.findByRole('alert')).toHaveTextContent(
@@ -325,7 +330,7 @@ export const CreateMappingUnavailable = meta.story({
   async play({ canvasElement }) {
     const sheet = await openNewMappingSheet(canvasElement)
 
-    await chooseDataFormat(sheet)
+    await chooseDocumentStructure(sheet)
     await userEvent.click(sheet.getByRole('button', { name: 'Invoices you send' }))
 
     await expect(await sheet.findByRole('alert')).toHaveTextContent(
@@ -334,9 +339,9 @@ export const CreateMappingUnavailable = meta.story({
   },
 })
 
-export const OneDataFormat = meta.story({
+export const OneDocumentStructure = meta.story({
   beforeEach({ msw }) {
-    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [dataFormat] }))
+    msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [documentStructure] }))
   },
   async play({ canvasElement, msw }) {
     const bodies: unknown[] = []
@@ -351,18 +356,20 @@ export const OneDataFormat = meta.story({
 
     await waitFor(() =>
       expect(sheet.getByRole('combobox', { name: 'Your data format' })).toHaveDisplayValue(
-        dataFormat.name,
+        documentStructure.name,
       ),
     )
 
     await userEvent.click(sheet.getByRole('button', { name: 'Purchase orders you receive' }))
 
     await waitFor(() => expect(getRouter().push).toHaveBeenCalledOnce())
-    await expect(bodies).toEqual([{ messageType: 'ORDERS', documentStructureId: dataFormat.id }])
+    await expect(bodies).toEqual([
+      { messageType: 'ORDERS', documentStructureId: documentStructure.id },
+    ])
   },
 })
 
-export const NoDataFormat = meta.story({
+export const NoDocumentStructure = meta.story({
   beforeEach({ msw }) {
     msw.use(...documentStructureHandlers(apiUrl, { documentStructures: [] }))
   },
@@ -383,7 +390,7 @@ export const NoDataFormat = meta.story({
   },
 })
 
-export const DataFormatsLoading = meta.story({
+export const DocumentStructuresLoading = meta.story({
   beforeEach({ msw }) {
     msw.use(...documentStructureHandlers(apiUrl, { state: 'loading' }))
   },
@@ -398,7 +405,7 @@ export const DataFormatsLoading = meta.story({
   },
 })
 
-export const DataFormatsUnavailable = meta.story({
+export const DocumentStructuresUnavailable = meta.story({
   beforeEach({ msw }) {
     msw.use(...documentStructureHandlers(apiUrl, { state: 'error' }))
   },
@@ -436,7 +443,7 @@ export const EmptyWorkspace = meta.story({
   },
 })
 
-export const EmptyWorkspaceWithoutDataFormat = meta.story({
+export const EmptyWorkspaceWithoutDocumentStructure = meta.story({
   beforeEach({ msw }) {
     msw.use(
       ...mappingHandlers(apiUrl, { mappings: [], documentStructures: [] }),

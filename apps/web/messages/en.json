@@ -2290,7 +2290,7 @@
       "choice": "{documents} {direction, select, inbound {you receive} other {you send}}",
       "aiHint": "Draft with AI",
       "close": "Close",
-      "dataFormat": {
+      "documentStructure": {
         "label": "Your data format",
         "description": "The Mapping translates between this format and the EDI document.",
         "placeholder": "Choose a data format",

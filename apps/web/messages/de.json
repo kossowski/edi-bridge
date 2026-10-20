@@ -2290,7 +2290,7 @@
       "choice": "{documents}, die Sie {direction, select, inbound {empfangen} other {senden}}",
       "aiHint": "Mit KI entwerfen",
       "close": "Schließen",
-      "dataFormat": {
+      "documentStructure": {
         "label": "Ihr Datenformat",
         "description": "Das Mapping übersetzt zwischen diesem Format und dem EDI-Beleg.",
         "placeholder": "Datenformat wählen",
