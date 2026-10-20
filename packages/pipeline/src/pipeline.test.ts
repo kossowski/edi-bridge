@@ -42,6 +42,7 @@ import {
   bullmqRunQueue,
   channelDelivery,
   type DeliveryService,
+  decodeDocument,
   deleteExpiredDocuments,
   LiveEvents,
   type LiveEventsService,
@@ -3893,7 +3894,7 @@ describe('the CONTRL answering a received Interchange', () => {
     return { ...into, orders }
   }
 
-  const receiving = async (into: InvoiceWorkspace, content: string) => {
+  const receivingContent = async (into: InvoiceWorkspace, content: ArrivingDocument['content']) => {
     const { messages, logger } = collectLogs()
 
     const exit = await Effect.runPromiseExit(
@@ -3901,7 +3902,7 @@ describe('the CONTRL answering a received Interchange', () => {
         workspaceId: into.id,
         channelId: into.inboundChannelId,
         fileName: 'orders.edi',
-        content: { text: content },
+        content,
         manualSubmission: false,
       }).pipe(pipelineServices(connection.db, inMemoryRunQueue()), Effect.provide(logger)),
     )
@@ -3909,13 +3910,19 @@ describe('the CONTRL answering a received Interchange', () => {
     return { exit, logs: messages }
   }
 
-  const receiveInterchange = async (into: InvoiceWorkspace, content: string) => {
-    const { exit, logs } = await receiving(into, content)
+  const receiving = (into: InvoiceWorkspace, content: string) =>
+    receivingContent(into, { text: content })
+
+  const receiveContent = async (into: InvoiceWorkspace, content: ArrivingDocument['content']) => {
+    const { exit, logs } = await receivingContent(into, content)
 
     assert(Exit.isSuccess(exit), 'The Interchange was not received')
 
     return { receipt: exit.value, logs }
   }
+
+  const receiveInterchange = (into: InvoiceWorkspace, content: string) =>
+    receiveContent(into, { text: content })
 
   // Without a readable envelope, routing may still find an outbound Flow for the Document.
   const documentIdOf = (exit: Exit.Exit<{ document: { id: string } }, ReceiptRejected>) => {
@@ -4224,10 +4231,10 @@ describe('the CONTRL answering a received Interchange', () => {
   describe('a CONTRL recorded but not sent', () => {
     const recordedFor = async (
       into: InvoiceWorkspace,
-      content = interchangeOf([ordersMessage]),
+      content: ArrivingDocument['content'] = { text: interchangeOf([ordersMessage]) },
     ) => {
       const delivery = recordingDelivery()
-      const { receipt, logs } = await receiveInterchange(into, content)
+      const { receipt, logs } = await receiveContent(into, content)
 
       await sendWith(delivery.service, '0 millis')
 
@@ -4345,6 +4352,28 @@ describe('the CONTRL answering a received Interchange', () => {
         deliveryAttemptedAt: null,
         handedOverAt: null,
       })
+    })
+
+    it('names the header of an Interchange not valid in its character set', async () => {
+      const into = await answeringWorkspace('Mis-encoded Orders')
+
+      const decoded = decodeDocument(
+        Buffer.from(interchangeOf([ordersMessage]).replace('UNOC:3', 'UNOW:3'), 'latin1'),
+      )
+
+      assert('undecodable' in decoded, 'The Interchange decoded in UTF-8')
+
+      const { acknowledgement, logs } = await recordedFor(into, decoded)
+
+      expect(acknowledgement).toMatchObject({
+        notSentReason: 'unechoableInterchangeHeader',
+        channelId: into.outboundChannelId,
+        controlReference: null,
+        content: null,
+      })
+      expect(logs).toContainEqual([
+        `The CONTRL for Document ${acknowledgement?.documentId ?? ''} is not sent: ${decoded.undecodable.message}`,
+      ])
     })
 
     it('names a Workspace without a GLN', async () => {

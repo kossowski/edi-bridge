@@ -21,6 +21,7 @@ import {
   readInterchange,
 } from '@edi-bridge/edifact'
 
+import { type DocumentUndecodable } from './decode-document'
 import { carriesTestIndicator, enveloped } from './envelope'
 import { Database, Delivery } from './services'
 
@@ -108,7 +109,12 @@ const channelOf = (workspaceId: string, tradingPartnerId: string, documentId: st
   })
 
 // A Document without a readable UNB is no Interchange, and a CONTRL is never answered.
-const answerOf = (workspaceId: string, documentId: string, content: string) =>
+const answerOf = (
+  workspaceId: string,
+  documentId: string,
+  content: string,
+  undecodable: DocumentUndecodable | undefined,
+) =>
   Effect.gen(function* () {
     const built = yield* Effect.result(builtContrl(content))
 
@@ -148,7 +154,8 @@ const answerOf = (workspaceId: string, documentId: string, content: string) =>
 
     const { tradingPartnerId, testMode, workspaceGln } = found
     const { channelId, notSentReason } = yield* channelOf(workspaceId, tradingPartnerId, documentId)
-    const message = Result.isSuccess(built) ? built.success : null
+    // A CONTRL echoing U+FFFD in place of the invalid bytes could accept what the sender broke.
+    const message = Result.isSuccess(built) && undecodable === undefined ? built.success : null
 
     return {
       tradingPartnerId,
@@ -213,27 +220,37 @@ const recordAnswer = (
     )
   })
 
-const warnNotSent = (documentId: string, { notSentReason }: Answer) =>
+const warnNotSent = (
+  documentId: string,
+  { notSentReason }: Answer,
+  undecodable: DocumentUndecodable | undefined,
+) =>
   notSentReason === null
     ? Effect.void
     : Effect.logWarning(
-        `The CONTRL for Document ${documentId} is not sent: ${notSentMessages[notSentReason]}`,
+        `The CONTRL for Document ${documentId} is not sent: ${undecodable?.message ?? notSentMessages[notSentReason]}`,
       )
 
 // The receipt does not depend on the CONTRL, so a defect in it leaves the Document unanswered.
 export const answerDocument = (
-  stored: { workspaceId: string; documentId: string; content: string },
+  stored: {
+    workspaceId: string
+    documentId: string
+    content: string
+    undecodable: DocumentUndecodable | undefined
+  },
   answeredAt: DateTime.Utc,
 ) =>
   Effect.gen(function* () {
-    const answer = yield* answerOf(stored.workspaceId, stored.documentId, stored.content)
+    const { workspaceId, documentId, content, undecodable } = stored
+    const answer = yield* answerOf(workspaceId, documentId, content, undecodable)
 
     if (answer === undefined) {
       return
     }
 
     yield* recordAnswer(stored, answer, answeredAt)
-    yield* warnNotSent(stored.documentId, answer)
+    yield* warnNotSent(documentId, answer, undecodable)
   }).pipe(
     Effect.catchCause((cause) =>
       Effect.logError(`The CONTRL for Document ${stored.documentId} was not recorded`, cause),

@@ -398,15 +398,15 @@ export const receive = (arriving: ArrivingDocument) =>
 
     const receiptFinishedAt = yield* DateTime.now
 
-    // A CONTRL read from U+FFFD in place of the invalid bytes could accept what the sender broke.
-    yield* 'undecodable' in arriving.content
-      ? Effect.logWarning(
-          `Document ${document.id} gets no CONTRL: ${arriving.content.undecodable.message}`,
-        )
-      : answerDocument(
-          { workspaceId: arriving.workspaceId, documentId: document.id, content: text },
-          receiptFinishedAt,
-        )
+    yield* answerDocument(
+      {
+        workspaceId: arriving.workspaceId,
+        documentId: document.id,
+        content: text,
+        undecodable: 'undecodable' in arriving.content ? arriving.content.undecodable : undefined,
+      },
+      receiptFinishedAt,
+    )
 
     if (Result.isFailure(routing)) {
       // A Document rejected after storing stays findable by its id.
