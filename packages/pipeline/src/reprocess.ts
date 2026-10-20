@@ -12,6 +12,7 @@ import {
 import { flows, mappingVersions, runs, runSteps } from '@edi-bridge/db'
 
 import { MappingVersionNotOfRun, RunNotReprocessable } from './errors'
+import { publishRunChanges } from './live-events'
 import { queueOrLeaveToSweep } from './queue-received-runs'
 import { Database, type QueuedRun } from './services'
 import { stagesOf } from './stages'
@@ -157,6 +158,8 @@ export const reprocessRun = ({ workspaceId, runId, mappingVersionId }: Reprocess
     )
 
     const queued = { workspaceId, runId: started.id }
+
+    yield* publishRunChanges([started.id, runId])
 
     yield* queueOrLeaveToSweep(queued, 'Reprocessed')
 

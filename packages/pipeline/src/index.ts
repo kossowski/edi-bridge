@@ -18,6 +18,13 @@ export {
   TestInterchangeRefused,
 } from './errors'
 
+export {
+  LiveEvents,
+  type LiveEventsService,
+  type PublishedLiveEvent,
+  publishRunChanges,
+} from './live-events'
+
 export { markOverdueInterchanges } from './mark-overdue-interchanges'
 
 export { pollInboundChannels } from './poll-inbound-channels'

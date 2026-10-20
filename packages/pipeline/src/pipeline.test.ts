@@ -43,10 +43,13 @@ import {
   channelDelivery,
   type DeliveryService,
   deleteExpiredDocuments,
+  LiveEvents,
+  type LiveEventsService,
   markOverdueInterchanges,
   processRun,
   ReceiptRejected,
   receive,
+  reprocessRun,
   retryRun,
   RunNotRetryable,
   sendAcknowledgements,
@@ -68,6 +71,8 @@ import {
   pipelineServices,
   readRun,
   receiveOverSftp,
+  liveStatusesOf,
+  testLiveEvents,
   seedInvoiceWorkspace,
   testSecrets,
 } from './testing'
@@ -2590,6 +2595,16 @@ describe('the processing of an inbound Run', () => {
       })
     })
 
+    it('publishes the waiting Run it replaces', async () => {
+      const into = await ordersWorkspace('Announced Resend Foods')
+      const waitingId = idOf((await receiveInterchange(into, invalidOrders('128577')))[0])
+
+      await markWaiting(waitingId)
+      await receiveInterchange(into, validOrders('128577'))
+
+      expect(liveStatusesOf(waitingId)).toEqual(['received', 'processing', 'failed', 'failed'])
+    })
+
     it('replaces a waiting Run once, so the next resend replaces the Run before it', async () => {
       const into = await ordersWorkspace('Twice Sent Foods')
       const older = idOf((await receiveInterchange(into, invalidOrders('128576')))[0])
@@ -3176,6 +3191,16 @@ describe('the Acknowledgement of a sent Interchange', () => {
     })
   })
 
+  it('publishes an Interchange its CONTRL acknowledged', async () => {
+    const into = await acknowledgingWorkspace('Announced Foods')
+    const sent = await sendInvoice(into)
+    const before = liveStatusesOf(sent?.id ?? '').length
+
+    await receiveContrl(into, contrlOf(String(sent?.controlReference), '7'))
+
+    expect(liveStatusesOf(sent?.id ?? '').slice(before)).toEqual(['delivered'])
+  })
+
   it('accepts an Interchange by a CONTRL with a zero-padded control reference', async () => {
     const into = await acknowledgingWorkspace('Padded Foods')
     const sent = await sendInvoice(into)
@@ -3542,6 +3567,14 @@ describe('the Acknowledgement of a sent Interchange', () => {
         })
       })
 
+      it('publishes the Run of the test Interchange', async () => {
+        const into = await withSample(await testingWorkspace('Announced Test Foods'))
+
+        const sent = await sendTest(into)
+
+        expect(liveStatusesOf(sent?.id ?? '')).toEqual(['received', 'processing', 'delivered'])
+      })
+
       it('clears the rejection of the earlier test Interchange', async () => {
         const into = await withSample(await testingWorkspace('Resent Test Foods'))
         const rejected = await sendTest(into)
@@ -3613,6 +3646,16 @@ describe('the Acknowledgement of a sent Interchange', () => {
         status: 'delivered',
         acknowledgementState: 'overdue',
       })
+    })
+
+    it('publishes an Interchange marked overdue', async () => {
+      const into = await acknowledgingWorkspace('Announced Overdue Foods')
+      const sent = await sendInvoice(into)
+      const before = liveStatusesOf(sent?.id ?? '').length
+
+      await checkAfter(sent, Duration.hours(limitHours))
+
+      expect(liveStatusesOf(sent?.id ?? '').slice(before)).toEqual(['delivered'])
     })
 
     it('reads the time limit of the Trading Partner of the Interchange', async () => {
@@ -4205,5 +4248,129 @@ describe('the CONTRL answering a received Interchange', () => {
       deliveryAttemptedAt: laterAttempt,
       deliveryError: null,
     })
+  })
+})
+
+describe('the live events of Runs', () => {
+  it('publishes a received Run with its summary', async () => {
+    const { runId } = await receiveInvoice()
+    const received = await readRun(connection.db, runId)
+
+    expect(testLiveEvents.published.filter(({ event }) => event.run.id === runId)).toEqual([
+      {
+        workspaceId: workspace.id,
+        event: {
+          type: 'run.changed',
+          run: {
+            id: runId,
+            receivedAt: received?.receivedAt.toISOString(),
+            tradingPartner: { id: workspace.tradingPartnerId, name: 'Hanse Retail' },
+            messageType: 'INVOIC',
+            direction: 'outbound',
+            flow: { id: workspace.flowId, name: 'Invoices to Hanse Retail' },
+            manualSubmission: true,
+            businessReference: null,
+            interchange: null,
+            status: 'received',
+            failureStage: null,
+            problem: null,
+          },
+        },
+      },
+    ])
+  })
+
+  it('publishes a Run as it is processed and once it is delivered', async () => {
+    const { queue, runId } = await receiveInvoice()
+
+    await processQueued(queue)
+
+    expect(liveStatusesOf(runId)).toEqual(['received', 'processing', 'delivered'])
+  })
+
+  it('publishes a stuck Run released to be processed again', async () => {
+    const { runId } = await receiveInvoice()
+
+    await leaveStuck(runId)
+    await sweepStuck()
+
+    expect(liveStatusesOf(runId)).toEqual(['received', 'received'])
+  })
+
+  it('publishes a stuck Run failed as a defect', async () => {
+    const { runId } = await receiveInvoice()
+
+    await connection.db.execute(
+      sql`update run_steps set status = 'running', started_at = now() where run_id = ${runId} and stage = 'mapping'`,
+    )
+    await leaveStuck(runId)
+    await sweepStuck()
+
+    expect(liveStatusesOf(runId)).toEqual(['received', 'failed'])
+  })
+
+  it('publishes a Run reopened by its Retry', async () => {
+    const unreachable: DeliveryService = () =>
+      Effect.fail(new DeliveryFailed({ reason: 'hostUnreachable' }))
+
+    const { queue, runId } = await receiveInvoice()
+
+    await processQueued(queue, unreachable)
+    await Effect.runPromise(
+      retryRun({ workspaceId: workspace.id, runId }).pipe(
+        pipelineServices(connection.db, inMemoryRunQueue()),
+      ),
+    )
+
+    expect(liveStatusesOf(runId)).toEqual(['received', 'processing', 'failed', 'received'])
+  })
+
+  it('publishes the new Run of a Reprocess and the Run it replaces', async () => {
+    const unknownUnit = JSON.stringify({
+      ...invoiceDocument,
+      lines: invoiceDocument.lines.map((line) => ({ ...line, unit: 'KG' })),
+    })
+
+    const { queue, runId } = await receiveInvoice(unknownUnit)
+
+    await processQueued(queue)
+
+    const reprocessed = await Effect.runPromise(
+      reprocessRun({
+        workspaceId: workspace.id,
+        runId,
+        mappingVersionId: workspace.mappingVersionId,
+      }).pipe(pipelineServices(connection.db, inMemoryRunQueue())),
+    )
+
+    expect(liveStatusesOf(runId)).toEqual(['received', 'processing', 'failed', 'failed'])
+    expect(liveStatusesOf(reprocessed.runId)).toEqual(['received'])
+  })
+
+  it('keeps a Run that its live event fails to announce', async () => {
+    const { logger, messages } = collectLogs()
+
+    const unpublished = {
+      publish: () => Effect.die(new Error('Redis is unreachable')),
+    } satisfies LiveEventsService
+
+    const receipt = await Effect.runPromise(
+      receive({
+        workspaceId: workspace.id,
+        channelId: workspace.inboundChannelId,
+        fileName: 'invoice.json',
+        content: goldenInvoice,
+        manualSubmission: true,
+      }).pipe(
+        Effect.provideService(LiveEvents, unpublished),
+        pipelineServices(connection.db, inMemoryRunQueue()),
+        Effect.provide(logger),
+      ),
+    )
+
+    const runId = receipt.runs[0]?.id ?? ''
+
+    await expect(readRun(connection.db, runId)).resolves.toMatchObject({ status: 'received' })
+    expect(messages).toContainEqual([`Changes of Runs ${runId} not published`])
   })
 })

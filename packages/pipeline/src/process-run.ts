@@ -81,6 +81,7 @@ import type { ParseError } from '@edi-bridge/edifact'
 
 import { referencesOf } from './business-reference'
 import { enveloped, framed } from './envelope'
+import { publishRunChanges } from './live-events'
 import { parse } from './parse'
 import { Database, Delivery, Documents, type QueuedRun } from './services'
 
@@ -1165,7 +1166,7 @@ const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
     const db = yield* Database
     const replacing = alias(runs, 'replacing')
 
-    yield* Effect.promise(() =>
+    const replacedWaiting = yield* Effect.promise(() =>
       db.transaction(async (tx) => {
         const candidates = await tx
           .select({ id: runs.id, failureStage: runs.failureStage, problem: runs.problem })
@@ -1188,7 +1189,7 @@ const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
         )
 
         if (waiting === undefined) {
-          return
+          return []
         }
 
         // Locks the waiting Run, so two resends delivered at once replace it once.
@@ -1201,7 +1202,7 @@ const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
           .where(eq(runs.replacesRunId, waiting.id))
 
         if (replaced !== undefined) {
-          return
+          return []
         }
 
         await tx.update(runs).set({ replacesRunId: waiting.id }).where(eq(runs.id, run.id))
@@ -1209,13 +1210,17 @@ const replaceWaitingRun = (run: ClaimedRun, direction: Direction) =>
           .update(runs)
           .set({ waitingForTradingPartnerSince: null })
           .where(eq(runs.id, waiting.id))
+
+        return [waiting.id]
       }),
     ).pipe(
       // The Document is already handed over, so the Run stays delivered without the link.
       Effect.catchCause((cause) =>
-        Effect.logError(`Delivered Run ${run.id} replaced no waiting Run`, cause),
+        Effect.as(Effect.logError(`Delivered Run ${run.id} replaced no waiting Run`, cause), []),
       ),
     )
+
+    yield* publishRunChanges(replacedWaiting)
   })
 
 const deliveryStep = (
@@ -1423,8 +1428,10 @@ const acknowledge = async (
     )
     .returning({ id: runs.id, tradingPartnerId: runs.tradingPartnerId })
 
+  const ids = acknowledged.map(({ id }) => id)
+
   if (acknowledged.length === 0) {
-    return
+    return ids
   }
 
   // The Trading Partner's system could read the test only when its CONTRL accepts the Interchange.
@@ -1437,13 +1444,15 @@ const acknowledge = async (
       receivedAt,
     )
 
-    return
+    return ids
   }
 
   // Each rejected Run is checked against the Interchanges handed over after it.
   for (const { id, tradingPartnerId } of acknowledged) {
     await recordTestRejection(tx, workspaceId, { runId: id, tradingPartnerId }, receivedAt)
   }
+
+  return ids
 }
 
 const processInbound = ({
@@ -1472,6 +1481,7 @@ const processInbound = ({
 
     const { message } = read.success
     const acknowledgement = acknowledgementIn(read.success)
+    let acknowledged: readonly string[] = []
 
     const checked = yield* step(
       holding,
@@ -1480,10 +1490,12 @@ const processInbound = ({
       async (tx) => {
         // An invalid CONTRL acknowledges nothing.
         if (acknowledgement !== undefined) {
-          await acknowledge(tx, queued.workspaceId, acknowledgement, run.receivedAt)
+          acknowledged = await acknowledge(tx, queued.workspaceId, acknowledgement, run.receivedAt)
         }
       },
     )
+
+    yield* publishRunChanges(acknowledged)
 
     if (Result.isFailure(checked)) {
       return yield* fail(
@@ -1634,6 +1646,8 @@ export const processRun = (queued: QueuedRun) =>
       hold: yield* Ref.make<Hold>({ updatedAt: claimed.run.updatedAt }),
     }
 
+    yield* publishRunChanges([claimed.run.id])
+
     // The defect still dies, so the worker reports it, unless the worker lost the Run before it.
     yield* processClaimed(holding, queued, claimed).pipe(
       Effect.catchDefect((defect) =>
@@ -1661,5 +1675,6 @@ export const processRun = (queued: QueuedRun) =>
           ...(cause === undefined ? [] : [cause]),
         ),
       ),
+      Effect.ensuring(publishRunChanges([claimed.run.id])),
     )
   })
