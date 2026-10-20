@@ -266,7 +266,6 @@ const workspaceReads = (): string[] => [
   flowsEndpoint.path,
   withId(flowEndpoint.path, ids.flow),
   lookupTablesEndpoint.path,
-  `${lookupTableSuggestionsEndpoint.path}?kind=units`,
   withId(lookupTableEndpoint.path, ids.lookupTable),
   withId(lookupTableMissingCodesEndpoint.path, ids.lookupTable),
   documentStructuresEndpoint.path,
@@ -365,6 +364,10 @@ const changes: Change[] = [
       url: withId(moveFlowMappingVersionEndpoint.path, ids.flow),
       body: { mappingVersionId: ids.laterMappingVersion },
     }),
+  ],
+  [
+    'suggest the first values of a Lookup Table',
+    () => ({ method: 'GET', url: `${lookupTableSuggestionsEndpoint.path}?kind=units` }),
   ],
   [
     'create a Lookup Table',

@@ -17,8 +17,6 @@ import {
   type LookupTableScope,
   type LookupTableKind,
   type LookupTableScopeInput,
-  type LookupTableSuggestions,
-  type LookupTableSuggestionsQuery,
   lookupTableInUseMessage,
   type LookupTableSummary,
   type LookupTableUse,
@@ -43,7 +41,7 @@ import {
   rejectingInvalidId,
   writingInWorkspace,
 } from './rows.js'
-import { assertTradingPartnerIn, rejectingUnknownTradingPartner } from './trading-partner.js'
+import { assertTradingPartnerIn } from './trading-partner.js'
 import { CurrentWorkspace } from './workspace.js'
 
 import type { ValidationError } from './parse.js'
@@ -226,16 +224,6 @@ export const listLookupTableMissingCodes = (id: string, language: Language) =>
     const blockingOf = yield* Effect.promise(() => selectBlockingCodes(db, workspace.id, id))
 
     return blockingOf(id).map(withMeaning(kind, language))
-  })
-
-export const suggestLookupTableEntries = ({ tradingPartnerId }: LookupTableSuggestionsQuery) =>
-  Effect.gen(function* () {
-    if (tradingPartnerId !== undefined) {
-      yield* rejectingUnknownTradingPartner(tradingPartnerId)
-    }
-
-    // Until suggested code values exist (#228).
-    return { entries: [] } satisfies LookupTableSuggestions
   })
 
 const tradingPartnerIdOf = (scope: LookupTableScopeInput) =>

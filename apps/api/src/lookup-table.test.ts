@@ -337,7 +337,7 @@ describe('GET /lookup-table-suggestions', () => {
   const suggestions = (query: Record<string, string>, target = admin) =>
     target.inject({ method: 'GET', url: lookupTableSuggestionsEndpoint.path, query })
 
-  it('suggests no entries for the Workspace until suggested code values exist', async () => {
+  it('suggests no entries for the Workspace without a model', async () => {
     const response = await suggestions({ kind: 'units' })
 
     expect(response.statusCode).toBe(200)
@@ -346,7 +346,7 @@ describe('GET /lookup-table-suggestions', () => {
     })
   })
 
-  it('suggests no entries for a Trading Partner until suggested code values exist', async () => {
+  it('suggests no entries for a Trading Partner without a model', async () => {
     const { id } = await postTradingPartner('Nordkontor GmbH')
 
     const response = await suggestions({ kind: 'countries', tradingPartnerId: id })

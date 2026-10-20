@@ -25,7 +25,7 @@ let api: TestApi
 const model = new MockLanguageModelV4({ doGenerate: (options) => generate(options) })
 
 beforeAll(async () => {
-  api = await startTestApi({ aiModel: model, aiFieldNamesTimeoutMs: 1000 })
+  api = await startTestApi({ aiModel: model, aiTimeoutMs: 1000 })
 }, 60_000)
 
 afterAll(async () => {

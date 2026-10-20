@@ -49,6 +49,7 @@ import {
   lookupTableImportPreviewEndpoint,
   lookupTableMissingCodesEndpoint,
   lookupTableSuggestionsEndpoint,
+  lookupTableSuggestionsQuerySchema,
   languageQuerySchema,
   liveEventsEndpoint,
   lookupTablesEndpoint,
@@ -116,6 +117,7 @@ import {
 
 import { loadAiBudget } from './ai-budget.js'
 import { requestAiDraft } from './ai-draft-request.js'
+import { suggestLookupTableEntries } from './ai-lookup-table-suggestions.js'
 import { acceptAiDraft, acceptAiProposedParts } from './ai-review.js'
 import { type AuthSettings, mountAuth } from './auth.js'
 import {
@@ -155,7 +157,6 @@ import {
   listLookupTables,
   loadLookupTable,
   previewLookupTableImport,
-  suggestLookupTableEntries,
   updateLookupTable,
 } from './lookup-table.js'
 import { submitDocument } from './manual-submission.js'
@@ -239,7 +240,7 @@ import type {
 export type Probe = () => Promise<void>
 
 export interface AppDependencies {
-  aiFieldNamesTimeoutMs?: number | undefined
+  aiTimeoutMs?: number | undefined
   aiModel?: LanguageModel | null
   auth: AuthSettings
   channels: ChannelSettings
@@ -381,7 +382,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
 function registerRoutes(
   app: FastifyInstance,
   {
-    aiFieldNamesTimeoutMs = 20_000,
+    aiTimeoutMs = 20_000,
     aiModel = null,
     auth: authSettings,
     channels: channelSettings,
@@ -774,9 +775,15 @@ function registerRoutes(
     respond(
       request,
       reply,
-      Effect.flatMap(
-        parse(lookupTableSuggestionsEndpoint.query, request.query),
-        suggestLookupTableEntries,
+      requireChangeRight.pipe(
+        Effect.andThen(parse(lookupTableSuggestionsQuerySchema, request.query)),
+        Effect.flatMap((query) =>
+          suggestLookupTableEntries(query, {
+            model: aiModel,
+            timeoutMs: aiTimeoutMs,
+            log: request.log,
+          }),
+        ),
       ),
     ),
   )
@@ -857,7 +864,7 @@ function registerRoutes(
         Effect.flatMap(parse(inferDocumentStructureEndpoint.body, request.body), (origin) =>
           inferDocumentStructureOrReject(origin, {
             model: aiModel,
-            timeoutMs: aiFieldNamesTimeoutMs,
+            timeoutMs: aiTimeoutMs,
             log: request.log,
           }),
         ),
