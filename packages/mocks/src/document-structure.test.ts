@@ -431,6 +431,38 @@ describe('POST /document-structures', () => {
     expect(created.sample).toMatchObject({ fileName: 'Rechnungsexport_2026-10-08.csv' })
   })
 
+  it('keeps the inferred reason of a name confirmed without a reason', async () => {
+    useHandlers()
+
+    const response = await create(documentStructureOrigins.invoiceCsvDocument, 'Invoices', [
+      { path: 'rows[].EPreis', label: 'Unit price' },
+    ])
+
+    const created = createDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(nodeAt(created.children, 'rows[].EPreis')).toMatchObject({
+      label: 'Unit price',
+      labelUnsure: false,
+    })
+    expect(nodeAt(created.children, 'rows[].EPreis')?.labelReason).toContain('Einzelpreis')
+  })
+
+  it('stores a null reason as given, even for the inferred name', async () => {
+    useHandlers()
+
+    const response = await create(documentStructureOrigins.invoiceCsvDocument, 'Invoices', [
+      { path: 'rows[].EPreis', label: 'Unit price', labelReason: null },
+    ])
+
+    const created = createDocumentStructureEndpoint.response.parse(await response.json())
+
+    expect(nodeAt(created.children, 'rows[].EPreis')).toMatchObject({
+      label: 'Unit price',
+      labelReason: null,
+      labelUnsure: false,
+    })
+  })
+
   it('keeps the plain name and reason of a node it was given no name for', async () => {
     useHandlers()
 

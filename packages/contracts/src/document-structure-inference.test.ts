@@ -235,10 +235,9 @@ describe('applyLabels', () => {
     })
   })
 
-  it('stores a name chosen without a reason as named by hand', () => {
+  it('stores a name chosen with a null reason as named by hand', () => {
     const named = applyLabels(invoices, [
-      { path: 'rows[].EPreis', label: 'Unit price' },
-      { path: 'rows[].ME', label: 'Unit', labelReason: null },
+      { path: 'rows[].EPreis', label: 'Unit price', labelReason: null },
     ])
 
     expect(at(named, 'rows[].EPreis')).toMatchObject({
@@ -246,8 +245,20 @@ describe('applyLabels', () => {
       labelReason: null,
       labelUnsure: false,
     })
+  })
+
+  it('keeps the inferred reason of a name confirmed without a reason', () => {
+    const named = applyLabels(invoices, [{ path: 'rows[].EPreis', label: 'Unit price' }])
+
+    expect(at(named, 'rows[].EPreis')).toMatchObject({ label: 'Unit price', labelUnsure: false })
+    expect(at(named, 'rows[].EPreis')?.labelReason).toContain('Einzelpreis')
+  })
+
+  it('stores a name renamed without a reason as named by hand', () => {
+    const named = applyLabels(invoices, [{ path: 'rows[].ME', label: 'Unit of measure' }])
+
     expect(at(named, 'rows[].ME')).toMatchObject({
-      label: 'Unit',
+      label: 'Unit of measure',
       labelReason: null,
       labelUnsure: false,
     })

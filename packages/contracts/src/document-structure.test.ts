@@ -475,7 +475,7 @@ describe('createDocumentStructureBodySchema', () => {
     expect(body.labels?.map(({ labelReason }) => labelReason)).toEqual([
       'Menge is German for quantity.',
       null,
-      null,
+      undefined,
     ])
   })
 
