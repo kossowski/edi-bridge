@@ -7,6 +7,7 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 
+import { linkClass } from '@/components/detail-parts'
 import {
   awaitsReceiptConfirmation,
   type PartnerActivityProps,
@@ -18,11 +19,12 @@ import {
   type PartnerSetupStepState,
 } from '@/components/trading-partners/partner-setup'
 import { useSession } from '@/hooks/use-session'
-import { sendTestInterchange, switchToProduction } from '@/lib/api/client'
+import { sendTestInterchange, switchToProduction, testInterchangeRefusalOf } from '@/lib/api/client'
 import { currentWorkspaceQuery, storeSavedTradingPartner } from '@/lib/api/queries'
 import {
   canSendTestInterchange,
   canSwitchToProduction,
+  type TestInterchangeRefusal,
   type TradingPartner,
 } from '@edi-bridge/contracts'
 import {
@@ -64,6 +66,25 @@ const stepBadges = {
   open: 'outline',
 } as const satisfies Record<PartnerSetupStepState, 'secondary' | 'default' | 'outline'>
 
+function SendRefused({ refusal, name }: { refusal: TestInterchangeRefusal; name: string }) {
+  const t = useTranslations('TradingPartner.setup.sendRefused')
+
+  switch (refusal.reason) {
+    case 'notAwaited':
+    case 'noOutboundFlow':
+      return t(refusal.reason, { name })
+    case 'sampleMissing':
+      return t.rich('sampleMissing', {
+        flow: refusal.flow.name,
+        link: (chunks) => (
+          <Link href={`/flows/${refusal.flow.id}`} className={linkClass}>
+            {chunks}
+          </Link>
+        ),
+      })
+  }
+}
+
 function SendTestDocument({
   tradingPartner,
   again,
@@ -78,6 +99,8 @@ function SendTestDocument({
     mutationFn: () => sendTestInterchange(tradingPartner.id),
     onSuccess: (updated) => storeSavedTradingPartner(queryClient, updated),
   })
+
+  const refusal = testInterchangeRefusalOf(send.error)
 
   return (
     <div className="flex flex-col gap-2">
@@ -99,7 +122,7 @@ function SendTestDocument({
       </Button>
       {send.isError && (
         <p role="alert" className="text-destructive-text text-sm">
-          {t('sendFailed')}
+          {refusal ? <SendRefused name={tradingPartner.name} refusal={refusal} /> : t('sendFailed')}
         </p>
       )}
     </div>

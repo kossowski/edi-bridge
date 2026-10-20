@@ -1,6 +1,9 @@
 import { getRouter } from '@storybook/nextjs-vite/navigation.mock'
+import { focusManager } from '@tanstack/react-query'
 import { delay, http, HttpResponse } from 'msw'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
+
+import type { StoryContext } from '@storybook/nextjs-vite'
 
 import { darkMode, german } from '@/components/story-helpers'
 import { PartnerScreen } from '@/components/trading-partners/partner-screen'
@@ -20,7 +23,10 @@ import {
   activityDays,
   channelsEndpoint,
   type RunSummary,
+  sendTestInterchangeEndpoint,
   testChannelEndpoint,
+  testInterchangeRefusedProblem,
+  testInterchangeRefusedStatus,
   type TradingPartner,
   tradingPartnerActivityEndpoint,
   tradingPartnerEndpoint,
@@ -31,6 +37,7 @@ import {
   createHandlers,
   createWorkspaceActivity,
   createWorkspace,
+  seedFlows,
   seedTradingPartners,
   tradingPartnerActivityHandlers,
   tradingPartnerHandlers,
@@ -169,13 +176,98 @@ export const SendTestDocument = meta.story({
   },
 })
 
+const [flowWithoutSample] = seedFlows
+
+const refusedForMissingSample = {
+  ...at(readyForTest),
+  beforeEach({ msw }: StoryContext) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: withReadyForTest,
+        testInterchange: { refusal: { reason: 'sampleMissing', flow: flowWithoutSample! } },
+      }),
+    )
+  },
+}
+
+export const SendRefusedForMissingSample = meta.story({
+  ...refusedForMissingSample,
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
+    const alert = await canvas.findByRole('alert')
+    await expect(alert).toHaveTextContent(
+      `The document route ${flowWithoutSample!.name} has no example document to send as a test.`,
+    )
+    await expect(
+      within(alert).getByRole('link', { name: flowWithoutSample!.name }),
+    ).toHaveAttribute('href', `/flows/${flowWithoutSample!.id}`)
+  },
+})
+
+export const SendRefusedForMissingSampleGerman = meta.story({
+  ...refusedForMissingSample,
+  decorators: [german],
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Testbeleg senden' }, activityLoaded),
+    )
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      `Der Belegweg ${flowWithoutSample!.name} hat keinen Beispielbeleg, der als Test gesendet werden kann.`,
+    )
+  },
+})
+
+export const SendRefusedWithoutOutboundFlow = meta.story({
+  ...at(readyForTest),
+  beforeEach({ msw }) {
+    msw.use(
+      ...createHandlers(apiUrl, {
+        tradingPartners: withReadyForTest,
+        testInterchange: { refusal: { reason: 'noOutboundFlow' } },
+      }),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'No document route sends documents to Spreewald Frische GmbH yet, so there is nothing to send as a test.',
+    )
+  },
+})
+
+export const SendRefusedWhenNotAwaited = meta.story({
+  ...at(readyForTest),
+  beforeEach({ msw }) {
+    msw.use(...createHandlers(apiUrl, { tradingPartners: withReadyForTest }))
+    msw.use(
+      http.post(`${apiUrl}${sendTestInterchangeEndpoint.path}`, () =>
+        HttpResponse.json(testInterchangeRefusedProblem({ reason: 'notAwaited' }), {
+          status: testInterchangeRefusedStatus,
+        }),
+      ),
+    )
+  },
+  async play({ canvas }) {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
+    )
+    await expect(await canvas.findByRole('alert')).toHaveTextContent(
+      'Spreewald Frische GmbH does not await a test document right now.',
+    )
+  },
+})
+
 export const ConfirmationArrives = meta.story({
   ...at(readyForTest),
   beforeEach({ msw }) {
     msw.use(
       ...createHandlers(apiUrl, {
         tradingPartners: withReadyForTest,
-        testInterchange: { contrlDelayMs: 1000 },
+        testInterchange: { contrlDelayMs: 0 },
       }),
     )
   },
@@ -184,11 +276,13 @@ export const ConfirmationArrives = meta.story({
       await canvas.findByRole('button', { name: 'Send a test document' }, activityLoaded),
     )
     await expect(await canvas.findByText(/Waiting for the receipt confirmation/)).toBeVisible()
+    // Returning to the tab checks at once, so the story need not wait for the 10 s poll.
+    focusManager.setFocused(false)
+    focusManager.setFocused(undefined)
     await expect(
       await canvas.findByText(
         'The receipt confirmation from Spreewald Frische GmbH arrived. You can go live now.',
         { selector: ':not([role="status"])' },
-        { timeout: 10_000 },
       ),
     ).toBeVisible()
     const goLive = canvas.getByRole('button', { name: 'Go live' })
@@ -451,6 +545,13 @@ export const SettingsWithoutGlnAsViewer = meta.story({
 
 export const NotFound = meta.story({
   ...at({ ...live, id: '10000000-0000-4000-8000-0000000000ff' }),
+  async play({ canvas }) {
+    await expect(await canvas.findByText('Trading partner not found')).toBeVisible()
+  },
+})
+
+export const NotFoundForAnIdThatIsNoUuid = meta.story({
+  ...at({ ...live, id: 'no-such-id' }),
   async play({ canvas }) {
     await expect(await canvas.findByText('Trading partner not found')).toBeVisible()
   },

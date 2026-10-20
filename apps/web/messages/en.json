@@ -1358,6 +1358,11 @@
         "other": "An Admin continues the setup."
       },
       "sendFailed": "The test document could not be sent. Try again.",
+      "sendRefused": {
+        "notAwaited": "{name} does not await a test document right now.",
+        "noOutboundFlow": "No document route sends documents to {name} yet, so there is nothing to send as a test.",
+        "sampleMissing": "The document route <link>{flow}</link> has no example document to send as a test."
+      },
       "waiting": "Waiting for the receipt confirmation from {name}. This page updates by itself.",
       "sentAt": "Test document sent <when>{time}</when>.",
       "arrived": "The receipt confirmation from {name} arrived. You can go live now.",

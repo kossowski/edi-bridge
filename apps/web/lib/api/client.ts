@@ -109,6 +109,9 @@ import {
   sendTestInterchangeEndpoint,
   switchToProductionEndpoint,
   tasksEndpoint,
+  type TestInterchangeRefusal,
+  testInterchangeRefusalSchema,
+  testInterchangeRefusedStatus,
   toPath,
   toSearchParams,
   tradingPartnerActivitiesEndpoint,
@@ -652,6 +655,20 @@ export function sendTestInterchange(id: string) {
   return request(sendTestInterchangeEndpoint, {
     path: toPath(sendTestInterchangeEndpoint.path, { id }),
   })
+}
+
+export function testInterchangeRefusalOf(error: Error | null): TestInterchangeRefusal | null {
+  if (!(error instanceof ApiError) || error.status !== testInterchangeRefusedStatus) {
+    return null
+  }
+
+  try {
+    const parsed = testInterchangeRefusalSchema.safeParse(JSON.parse(error.body))
+
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
 }
 
 export function listChannels() {
